@@ -35,7 +35,7 @@ export default function HomePage() {
         ))}
       </div>
 
-      <div className="flex-1">
+      <div className="flex-1 min-h-0">
         <MapWrapper />
       </div>
     </main>

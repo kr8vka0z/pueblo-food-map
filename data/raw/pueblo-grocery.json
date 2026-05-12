@@ -1,0 +1,1328 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-05-12T18:07:45Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 3520944581,
+  "lat": 38.1661645,
+  "lon": -103.9430132,
+  "tags": {
+    "addr:city": "Olney Springs",
+    "addr:postcode": "81062",
+    "addr:state": "CO",
+    "addr:street": "Warner Avenue",
+    "name": "KiKi's Place",
+    "phone": "+1-719-269-3177",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 4041145701,
+  "lat": 38.2871686,
+  "lon": -104.5848540,
+  "tags": {
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4041145706,
+  "lat": 38.2707675,
+  "lon": -104.5868588,
+  "tags": {
+    "brand": "Alta Convenience",
+    "brand:wikidata": "Q110311797",
+    "name": "Alta Convenience",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4041145715,
+  "lat": 38.2702179,
+  "lon": -104.6157354,
+  "tags": {
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4041297300,
+  "lat": 38.3091376,
+  "lon": -104.6312840,
+  "tags": {
+    "brand": "Shell",
+    "brand:wikidata": "Q110716465",
+    "name": "Shell",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4041363143,
+  "lat": 38.2247918,
+  "lon": -104.6256269,
+  "tags": {
+    "name": "Mindful Food",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4041363156,
+  "lat": 38.2183032,
+  "lon": -104.6256080,
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "3201",
+    "addr:postcode": "81004",
+    "addr:state": "CO",
+    "addr:street": "Lake Avenue",
+    "name": "Western Convenience Store",
+    "opening_hours": "24/7",
+    "operator": "Western Convenience Store",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4041363163,
+  "lat": 38.2662401,
+  "lon": -104.6285260,
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4041374999,
+  "lat": 38.2193558,
+  "lon": -104.6257130,
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "1201",
+    "addr:postcode": "81004",
+    "addr:state": "CO",
+    "addr:street": "West Pueblo Boulevard",
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "name": "Loaf 'N Jug",
+    "opening_hours": "24/7",
+    "operator": "Loaf 'N Jug",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4041375005,
+  "lat": 38.2445523,
+  "lon": -104.6388854,
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4041375014,
+  "lat": 38.2371285,
+  "lon": -104.6433271,
+  "tags": {
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4041375052,
+  "lat": 38.2205791,
+  "lon": -104.6442032,
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "2727",
+    "addr:postcode": "81005",
+    "addr:state": "CO",
+    "addr:street": "South Prairie Avenue",
+    "atm": "yes",
+    "brand": "7-Eleven",
+    "brand:wikidata": "Q259340",
+    "fast_food": "yes",
+    "fuel:propane": "yes",
+    "name": "7-Eleven",
+    "phone": "+1 719-564-0447",
+    "ref": "13111",
+    "shop": "convenience",
+    "source": "Mapbox",
+    "website": "https://www.7-eleven.com/locations/co/pueblo/2727-south-prairie-13111"
+  }
+},
+{
+  "type": "node",
+  "id": 4041375053,
+  "lat": 38.2272763,
+  "lon": -104.6433255,
+  "tags": {
+    "brand": "Conoco",
+    "brand:wikidata": "Q109341187",
+    "name": "Conoco",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4043068526,
+  "lat": 38.3317934,
+  "lon": -104.7452384,
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 4043068646,
+  "lat": 38.3325902,
+  "lon": -104.7450535,
+  "tags": {
+    "name": "KwikStop",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "node",
+  "id": 5409829684,
+  "lat": 38.2481485,
+  "lon": -104.2588332,
+  "tags": {
+    "addr:city": "Boone",
+    "addr:housenumber": "410",
+    "addr:street": "Main Street",
+    "name": "Boone Grocery & Hardware",
+    "opening_hours": "Mo-Su 08:00-17:00",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 9330967204,
+  "lat": 38.2731250,
+  "lon": -104.6120080,
+  "tags": {
+    "brand": "Alta Convenience",
+    "brand:wikidata": "Q110311797",
+    "name": "Alta Convenience",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 10239124452,
+  "lat": 38.2746719,
+  "lon": -104.4964451,
+  "tags": {
+    "amenity": "fuel;fast_food",
+    "name": "Sinclair",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 10239175368,
+  "lat": 38.1312360,
+  "lon": -104.0247000,
+  "tags": {
+    "amenity": "fuel;fast_food",
+    "name": "Alta Convenience",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 10239175372,
+  "lat": 38.1304160,
+  "lon": -104.0241157,
+  "tags": {
+    "name": "Thaxton market",
+    "shop": "supermarket"
+  }
+},
+{
+  "type": "node",
+  "id": 11550915644,
+  "lat": 38.3092014,
+  "lon": -104.6213435,
+  "tags": {
+    "contact:instagram": "https://www.instagram.com/baguni_pueblo/",
+    "name": "Baguni Mart",
+    "shop": "supermarket"
+  }
+},
+{
+  "type": "node",
+  "id": 11776365906,
+  "lat": 38.2975161,
+  "lon": -104.5725442,
+  "tags": {
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 12079476149,
+  "lat": 38.2451510,
+  "lon": -104.5794295,
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 12184485110,
+  "lat": 38.2368524,
+  "lon": -104.3495236,
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 12199987090,
+  "lat": 38.2445269,
+  "lon": -104.6211951,
+  "tags": {
+    "brand": "7-Eleven",
+    "brand:wikidata": "Q259340",
+    "name": "7-Eleven",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 12259768973,
+  "lat": 38.2435801,
+  "lon": -104.6140266,
+  "tags": {
+    "brand": "Alta Convenience",
+    "brand:wikidata": "Q110311797",
+    "name": "Alta Convenience",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 12478967185,
+  "lat": 38.2746911,
+  "lon": -104.6112145,
+  "tags": {
+    "brand": "7-Eleven",
+    "brand:wikidata": "Q259340",
+    "name": "7-Eleven",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 12496998446,
+  "lat": 38.2829735,
+  "lon": -104.6240737,
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 12528946501,
+  "lat": 38.2451120,
+  "lon": -104.5654592,
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 12599529644,
+  "lat": 38.2498152,
+  "lon": -104.4582423,
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "936",
+    "addr:postcode": "81006",
+    "addr:state": "CO",
+    "addr:street": "36th Lane",
+    "name": "Mauro Farms Market & Bakery",
+    "note": "Identifies as Women owned",
+    "opening_hours": "Mo-Su 09:00-16:00",
+    "payment:cheque": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "payment:snap_ebt": "yes",
+    "phone": "+1 719-948-3381",
+    "shop": "farm",
+    "website": "https://maurofarms.com/"
+  }
+},
+{
+  "type": "node",
+  "id": 12599529663,
+  "lat": 38.2453565,
+  "lon": -104.4480731,
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "37137",
+    "addr:postcode": "81006",
+    "addr:state": "CO",
+    "addr:street": "US 50 Bus",
+    "name": "DiTomaso Farms",
+    "opening_hours": "Mo-Su 08:00-17:00",
+    "phone": "+1 719-948-3200",
+    "shop": "farm",
+    "website": "https://www.facebook.com/ditomasofarms1/"
+  }
+},
+{
+  "type": "node",
+  "id": 12706112997,
+  "lat": 38.2536953,
+  "lon": -104.6622935,
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 12839229515,
+  "lat": 38.2457276,
+  "lon": -104.4589326,
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 12849787149,
+  "lat": 38.3061053,
+  "lon": -104.5993314,
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 13398740836,
+  "lat": 38.2384093,
+  "lon": -104.6630680,
+  "tags": {
+    "brand": "Murphy USA",
+    "brand:wikidata": "Q19604459",
+    "name": "Murphy USA",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 224603771,
+  "center": {
+    "lat": 38.3422346,
+    "lon": -104.6229579
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "6470",
+    "addr:postcode": "81008",
+    "addr:state": "CO",
+    "addr:street": "North Elizabeth Street",
+    "brand": "Love's",
+    "brand:wikidata": "Q1872496",
+    "building": "yes",
+    "name": "Love's",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 264728293,
+  "center": {
+    "lat": 38.3258018,
+    "lon": -104.6973452
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "1017",
+    "addr:postcode": "81007",
+    "addr:state": "CO",
+    "addr:street": "North Market Plaza",
+    "brand": "Safeway",
+    "brand:wikidata": "Q1508234",
+    "building": "retail",
+    "name": "Safeway",
+    "phone": "+1 719-547-2108",
+    "shop": "supermarket",
+    "website": "https://local.safeway.com/safeway/co/pueblo/1017-n-market-plaza.html"
+  }
+},
+{
+  "type": "way",
+  "id": 439892311,
+  "center": {
+    "lat": 38.2989353,
+    "lon": -104.6068224
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:country": "US",
+    "addr:housenumber": "101",
+    "addr:postcode": "81008",
+    "addr:state": "CO",
+    "addr:street": "West 29th Street",
+    "branch": "Pueblo",
+    "brand": "Natural Grocers",
+    "brand:wikidata": "Q17146520",
+    "building": "yes",
+    "name": "Natural Grocers",
+    "opening_hours": "Mo,Tu,Th-Sa 08:30-21:06; We 08:00-21:06; Su 09:00-19:35",
+    "phone": "+1-719-542-2411",
+    "ref": "8768",
+    "shop": "supermarket",
+    "website": "https://www.naturalgrocers.com/store/pueblo"
+  }
+},
+{
+  "type": "way",
+  "id": 439892313,
+  "center": {
+    "lat": 38.2974917,
+    "lon": -104.6065373
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:country": "US",
+    "addr:housenumber": "102",
+    "addr:postcode": "81008",
+    "addr:state": "CO",
+    "addr:street": "West 29th Street",
+    "branch": "Pueblo North",
+    "brand": "King Soopers",
+    "brand:wikidata": "Q6412065",
+    "building": "retail",
+    "name": "King Soopers",
+    "opening_hours": "05:00-24:00",
+    "phone": "+1-719-544-0390",
+    "shop": "supermarket",
+    "website": "https://www.kingsoopers.com/stores/details/620/00043"
+  }
+},
+{
+  "type": "way",
+  "id": 466464064,
+  "center": {
+    "lat": 38.3363949,
+    "lon": -104.7400681
+  },
+  "tags": {
+    "addr:city": "Pueblo West",
+    "addr:country": "US",
+    "addr:housenumber": "78",
+    "addr:postcode": "81007",
+    "addr:state": "CO",
+    "addr:street": "North McCulloch Boulevard",
+    "brand": "Walmart",
+    "brand:wikidata": "Q483551",
+    "building": "retail",
+    "name": "Walmart Supercenter",
+    "opening_hours": "24/7",
+    "operator": "Walmart",
+    "payment:app:walmart": "yes",
+    "payment:apple_pay": "no",
+    "payment:google_pay": "no",
+    "payment:samsung_pay": "no",
+    "phone": "+1 719-647-9861",
+    "ref": "3382",
+    "ref:walmart": "3382",
+    "sensory_friendly:accommodation": "dimmed_light;static_screens;no_pa",
+    "sensory_friendly:conditional": "yes @ 08:00-10:00",
+    "shop": "supermarket",
+    "website": "https://www.walmart.com/store/3382-pueblo-west-co"
+  }
+},
+{
+  "type": "way",
+  "id": 480235190,
+  "center": {
+    "lat": 38.1299809,
+    "lon": -104.0178505
+  },
+  "tags": {
+    "amenity": "fuel;fast_food",
+    "building": "yes",
+    "name": "Loaf and Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 499816944,
+  "center": {
+    "lat": 37.9622808,
+    "lon": -104.7970297
+  },
+  "tags": {
+    "addr:city": "Colorado City",
+    "addr:housenumber": "6654",
+    "addr:postcode": "81004",
+    "addr:state": "CO",
+    "addr:street": "State Highway 165",
+    "building": "yes",
+    "name": "Fast Break",
+    "shop": "convenience",
+    "source": "bing"
+  }
+},
+{
+  "type": "way",
+  "id": 499816958,
+  "center": {
+    "lat": 37.9613696,
+    "lon": -104.7941694
+  },
+  "tags": {
+    "addr:city": "Colorado City",
+    "addr:country": "US",
+    "addr:housenumber": "8950",
+    "addr:postcode": "81004",
+    "addr:state": "CO",
+    "addr:street": "Abbey Road",
+    "building": "yes",
+    "contact:phone": "+17196763367",
+    "contact:website": "http://cornerstore.com/StoreHome/4062",
+    "loc_name": "Corner Store",
+    "name": "Corner Store",
+    "note": "Convenience Store;Gas Station",
+    "opening_hours": "24/7",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 505568940,
+  "center": {
+    "lat": 38.2705506,
+    "lon": -104.5964044
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "804",
+    "addr:postcode": "81001",
+    "addr:state": "CO",
+    "addr:street": "East 4th Street",
+    "atm": "yes",
+    "brand": "7-Eleven",
+    "brand:wikidata": "Q259340",
+    "building": "commercial",
+    "fast_food": "yes",
+    "fuel:propane": "yes",
+    "name": "7-Eleven",
+    "opening_hours": "24/7",
+    "phone": "+1 719-543-7265",
+    "ref": "20638",
+    "shop": "convenience",
+    "source": "Mapbox",
+    "website": "https://www.7-eleven.com/locations/co/pueblo/804-e-4th-st-20638"
+  }
+},
+{
+  "type": "way",
+  "id": 535378000,
+  "center": {
+    "lat": 38.3198545,
+    "lon": -104.6128446
+  },
+  "tags": {
+    "addr:state": "CO",
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "building": "yes",
+    "name": "Loaf 'N Jug",
+    "operator": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 535378006,
+  "center": {
+    "lat": 38.3210718,
+    "lon": -104.6177588
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "615",
+    "addr:postcode": "81008",
+    "addr:state": "CO",
+    "addr:street": "Eagleridge Boulevard",
+    "building": "yes",
+    "name": "J R's Country Store",
+    "opening_hours": "24/7",
+    "operator": "J R's Country Store",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 535379543,
+  "center": {
+    "lat": 38.3088898,
+    "lon": -104.6200240
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "905",
+    "addr:postcode": "81008",
+    "addr:state": "CO",
+    "addr:street": "West US Highway 50",
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "building": "yes",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 535379550,
+  "center": {
+    "lat": 38.3083240,
+    "lon": -104.6168095
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "601",
+    "addr:postcode": "81008",
+    "addr:state": "CO",
+    "addr:street": "West US Highway 50",
+    "brand": "Circle K",
+    "brand:wikidata": "Q3268010",
+    "building": "yes",
+    "name": "Circle K",
+    "opening_hours": "24/7",
+    "operator": "Corner Store",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 535650928,
+  "center": {
+    "lat": 38.3067378,
+    "lon": -104.6146365
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "3522",
+    "addr:postcode": "81008",
+    "addr:state": "CO",
+    "addr:street": "North Elizabeth Street",
+    "brand": "7-Eleven",
+    "brand:wikidata": "Q259340",
+    "building": "yes",
+    "contact:website": "https://www.7-eleven.com/locations/co/pueblo/3522-n-elizabeth-32990",
+    "name": "7-Eleven",
+    "operator": "7-Eleven",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 535656814,
+  "center": {
+    "lat": 38.2971074,
+    "lon": -104.6159966
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "2801",
+    "addr:postcode": "81008",
+    "addr:state": "CO",
+    "addr:street": "North Elizabeth Street",
+    "brand": "Alta Convenience",
+    "brand:wikidata": "Q110311797",
+    "building": "yes",
+    "name": "Alta Convenience",
+    "operator": "Alta",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 535686236,
+  "center": {
+    "lat": 38.2746100,
+    "lon": -104.4924802
+  },
+  "tags": {
+    "amenity": "fuel;fast_food",
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "building": "retail",
+    "name": "Loaf and Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 536454112,
+  "center": {
+    "lat": 38.3139678,
+    "lon": -104.6096164
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:country": "US",
+    "addr:housenumber": "4200",
+    "addr:postcode": "81008",
+    "addr:state": "CO",
+    "addr:street": "Dillon Drive",
+    "brand": "Walmart",
+    "brand:wikidata": "Q483551",
+    "building": "retail",
+    "name": "Walmart Supercenter",
+    "opening_hours": "Mo-Su 06:00-24:00",
+    "operator": "Walmart",
+    "operator:wikidata": "Q483551",
+    "payment:app:walmart": "yes",
+    "payment:apple_pay": "no",
+    "payment:google_pay": "no",
+    "payment:samsung_pay": "no",
+    "phone": "+1 719-545-6404",
+    "ref": "842",
+    "ref:walmart": "842",
+    "sensory_friendly:accommodation": "dimmed_light;static_screens;no_pa",
+    "sensory_friendly:conditional": "yes @ 08:00-10:00",
+    "shop": "supermarket",
+    "website": "https://www.walmart.com/store/842-pueblo-co"
+  }
+},
+{
+  "type": "way",
+  "id": 544400971,
+  "center": {
+    "lat": 38.3109269,
+    "lon": -104.6278964
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "1601",
+    "addr:postcode": "81008",
+    "addr:state": "CO",
+    "addr:street": "US 50",
+    "brand": "Albertsons",
+    "brand:wikidata": "Q2831861",
+    "building": "yes",
+    "name": "Albertsons",
+    "phone": "+1 719-543-5671",
+    "shop": "supermarket",
+    "website": "https://local.albertsons.com/co/pueblo/1601-hwy-50-w.html"
+  }
+},
+{
+  "type": "way",
+  "id": 547529779,
+  "center": {
+    "lat": 38.2831929,
+    "lon": -104.6447711
+  },
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "building": "yes",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 552953163,
+  "center": {
+    "lat": 38.3060974,
+    "lon": -104.5993218
+  },
+  "tags": {
+    "building": "yes",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 591851971,
+  "center": {
+    "lat": 38.2719445,
+    "lon": -104.5724074
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "2119",
+    "addr:postcode": "81001",
+    "addr:state": "CO",
+    "addr:street": "East 4th Street",
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "building": "yes",
+    "name": "Loaf 'N Jug",
+    "opening_hours": "24/7",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 659620782,
+  "center": {
+    "lat": 38.2673537,
+    "lon": -104.6064807
+  },
+  "tags": {
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "building": "yes",
+    "building:levels": "1",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 682492454,
+  "center": {
+    "lat": 38.2322489,
+    "lon": -104.6650134
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:country": "US",
+    "addr:housenumber": "4080",
+    "addr:postcode": "81005",
+    "addr:state": "CO",
+    "addr:street": "West Northern Avenue",
+    "brand": "Walmart",
+    "brand:wikidata": "Q483551",
+    "building": "retail",
+    "name": "Walmart Supercenter",
+    "opening_hours": "Mo-Su 06:00-24:00",
+    "operator": "Walmart",
+    "operator:wikidata": "Q483551",
+    "payment:app:walmart": "yes",
+    "payment:apple_pay": "no",
+    "payment:google_pay": "no",
+    "payment:samsung_pay": "no",
+    "phone": "+1 719-561-8495",
+    "ref": "1001",
+    "ref:walmart": "1001",
+    "sensory_friendly:accommodation": "dimmed_light;static_screens;no_pa",
+    "sensory_friendly:conditional": "yes @ 08:00-10:00",
+    "shop": "supermarket",
+    "website": "https://www.walmart.com/store/1001-pueblo-co"
+  }
+},
+{
+  "type": "way",
+  "id": 682492473,
+  "center": {
+    "lat": 38.2198954,
+    "lon": -104.6415791
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:country": "US",
+    "addr:housenumber": "2730",
+    "addr:postcode": "81005",
+    "addr:state": "CO",
+    "addr:street": "South Prairie Avenue",
+    "brand": "Walmart",
+    "brand:wikidata": "Q483551",
+    "building": "retail",
+    "name": "Walmart Neighborhood Market",
+    "opening_hours": "Mo-Su 06:00-23:00",
+    "operator": "Walmart",
+    "operator:wikidata": "Q483551",
+    "payment:app:walmart": "yes",
+    "payment:apple_pay": "no",
+    "payment:google_pay": "no",
+    "payment:samsung_pay": "no",
+    "phone": "+1 719-696-6149",
+    "ref": "5828",
+    "ref:walmart": "5828",
+    "sensory_friendly:accommodation": "dimmed_light;static_screens;no_pa",
+    "sensory_friendly:conditional": "yes @ 08:00-10:00",
+    "shop": "supermarket",
+    "website": "https://www.walmart.com/store/5828/pueblo-co"
+  }
+},
+{
+  "type": "way",
+  "id": 946612229,
+  "center": {
+    "lat": 38.2448502,
+    "lon": -104.6443088
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:country": "US",
+    "addr:housenumber": "1231",
+    "addr:postcode": "81005",
+    "addr:state": "CO",
+    "addr:street": "South Prairie Avenue",
+    "branch": "South Prarie Avenue",
+    "brand": "Safeway",
+    "brand:wikidata": "Q1508234",
+    "building": "retail",
+    "name": "Safeway",
+    "opening_hours": "06:00-23:00",
+    "phone": "+1-719-561-1234",
+    "shop": "supermarket",
+    "website": "https://local.safeway.com/safeway/co/pueblo/1231-s-prairie-ave.html"
+  }
+},
+{
+  "type": "way",
+  "id": 946612238,
+  "center": {
+    "lat": 38.2427811,
+    "lon": -104.6458653
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:country": "US",
+    "addr:housenumber": "3050",
+    "addr:postcode": "81005",
+    "addr:state": "CO",
+    "addr:street": "West Northern Avenue",
+    "branch": "Pueblo South",
+    "brand": "King Soopers",
+    "brand:wikidata": "Q6412065",
+    "building": "retail",
+    "name": "King Soopers",
+    "opening_hours": "05:00-24:00",
+    "phone": "+1-719-564-0590",
+    "shop": "supermarket",
+    "website": "https://www.kingsoopers.com/stores/details/620/00012"
+  }
+},
+{
+  "type": "way",
+  "id": 946614791,
+  "center": {
+    "lat": 38.2871913,
+    "lon": -104.5964102
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "1002",
+    "addr:postcode": "81001",
+    "addr:state": "CO",
+    "addr:street": "Bonforte Boulevard",
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "building": "yes",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "way",
+  "id": 946614803,
+  "center": {
+    "lat": 38.2883870,
+    "lon": -104.5946680
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:country": "US",
+    "addr:housenumber": "1110",
+    "addr:postcode": "81001",
+    "addr:state": "CO",
+    "addr:street": "Bonforte Boulevard",
+    "branch": "Pueblo",
+    "brand": "Save-A-Lot",
+    "brand:wikidata": "Q7427972",
+    "building": "retail",
+    "name": "Save-A-Lot",
+    "opening_hours": "08:00-21:00",
+    "phone": "+1-719-544-6057",
+    "shop": "supermarket",
+    "website": "https://savealot.com/grocery-stores/pueblo-81001-23844/"
+  }
+},
+{
+  "type": "way",
+  "id": 946620900,
+  "center": {
+    "lat": 38.3253710,
+    "lon": -104.6997733
+  },
+  "tags": {
+    "building": "yes",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "way",
+  "id": 947245246,
+  "center": {
+    "lat": 38.2324327,
+    "lon": -104.6618437
+  },
+  "tags": {
+    "building": "yes",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "way",
+  "id": 947245256,
+  "center": {
+    "lat": 38.2338041,
+    "lon": -104.6663755
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "4125",
+    "addr:postcode": "81005",
+    "addr:state": "CO",
+    "addr:street": "Thames Drive",
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "building": "yes",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 947249120,
+  "center": {
+    "lat": 38.2438347,
+    "lon": -104.6632699
+  },
+  "tags": {
+    "building": "yes",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "way",
+  "id": 971896407,
+  "center": {
+    "lat": 38.2439261,
+    "lon": -104.4612430
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "35779",
+    "addr:postcode": "81006",
+    "addr:state": "CO",
+    "addr:street": "Hillside Road",
+    "building": "yes",
+    "name": "Musso Farms",
+    "note": "surcharge for using cards",
+    "opening_hours": "Mo-Sa 08:00-18:00",
+    "payment:debit_cards": "yes",
+    "payment:nfc_mobile_payments": "yes",
+    "payment:snap_ebt": "yes",
+    "phone": "+1 719-948-3581",
+    "shop": "farm",
+    "website": "https://www.mussofarmschileroom.com/"
+  }
+},
+{
+  "type": "way",
+  "id": 974172860,
+  "center": {
+    "lat": 38.2849647,
+    "lon": -104.5725774
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "2120",
+    "addr:postcode": "81001",
+    "addr:state": "CO",
+    "addr:street": "Oakshire Lane",
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "building": "yes",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 1079237907,
+  "center": {
+    "lat": 38.3215496,
+    "lon": -104.7020671
+  },
+  "tags": {
+    "addr:city": "Pueblo West",
+    "addr:housenumber": "136",
+    "addr:state": "CO",
+    "addr:street": "South Purcell Boulevard",
+    "brand": "Loaf 'N Jug",
+    "brand:wikidata": "Q6663398",
+    "building": "yes",
+    "name": "Loaf 'N Jug",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 1135823373,
+  "center": {
+    "lat": 38.2443400,
+    "lon": -104.6433867
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "1242",
+    "addr:postcode": "81004",
+    "addr:street": "South Prairie Avenue",
+    "brand": "Conoco",
+    "brand:wikidata": "Q109341187",
+    "building": "retail",
+    "name": "Conoco",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 1136336572,
+  "center": {
+    "lat": 38.2464892,
+    "lon": -104.6626361
+  },
+  "tags": {
+    "building": "yes",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "way",
+  "id": 1145626534,
+  "center": {
+    "lat": 38.2876959,
+    "lon": -104.5744998
+  },
+  "tags": {
+    "building": "yes",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "way",
+  "id": 1147450216,
+  "center": {
+    "lat": 38.2898981,
+    "lon": -104.5957932
+  },
+  "tags": {
+    "building": "yes",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "way",
+  "id": 1266766543,
+  "center": {
+    "lat": 38.3220427,
+    "lon": -104.8175323
+  },
+  "tags": {
+    "building": "yes",
+    "name": "Katmando's",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "way",
+  "id": 1269116057,
+  "center": {
+    "lat": 38.2582742,
+    "lon": -104.6435525
+  },
+  "tags": {
+    "addr:city": "Pueblo",
+    "addr:housenumber": "2714",
+    "addr:postcode": "81004",
+    "addr:street": "Thatcher Avenue",
+    "building": "retail",
+    "roof:shape": "flat",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+},
+{
+  "type": "way",
+  "id": 1298616281,
+  "center": {
+    "lat": 38.2977031,
+    "lon": -104.6212332
+  },
+  "tags": {
+    "building": "supermarket",
+    "shop": "convenience",
+    "source": "Mapbox"
+  }
+}
+
+  ]
+}

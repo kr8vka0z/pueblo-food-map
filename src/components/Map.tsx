@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -21,27 +21,35 @@ interface MapProps {
 }
 
 function MapController({
-  selectedVenue,
-  userLocation,
+  selectedLat,
+  selectedLng,
+  userLat,
+  userLng,
 }: {
-  selectedVenue: Venue | null;
-  userLocation: { lat: number; lng: number } | null;
+  selectedLat: number | null;
+  selectedLng: number | null;
+  userLat: number | null;
+  userLng: number | null;
 }) {
   const map = useMap();
+  const flownToUserRef = useRef(false);
 
-  // Fly to the user's location the first time we get it.
+  // Fly to the user's location only the first time it arrives, so subsequent
+  // clicks on sidebar venues are not yanked back to the user's spot when this
+  // effect re-runs.
   useEffect(() => {
-    if (userLocation) {
-      map.flyTo([userLocation.lat, userLocation.lng], 14, { duration: 0.6 });
+    if (userLat != null && userLng != null && !flownToUserRef.current) {
+      flownToUserRef.current = true;
+      map.flyTo([userLat, userLng], 14, { duration: 0.6 });
     }
-  }, [userLocation, map]);
+  }, [userLat, userLng, map]);
 
-  // Fly to the selected venue whenever it changes.
+  // Fly to the selected venue whenever its coordinates change.
   useEffect(() => {
-    if (selectedVenue) {
-      map.flyTo([selectedVenue.lat, selectedVenue.lng], 16, { duration: 0.8 });
+    if (selectedLat != null && selectedLng != null) {
+      map.flyTo([selectedLat, selectedLng], 16, { duration: 0.8 });
     }
-  }, [selectedVenue, map]);
+  }, [selectedLat, selectedLng, map]);
 
   return null;
 }
@@ -92,8 +100,10 @@ export default function Map({
       />
 
       <MapController
-        selectedVenue={selectedVenue}
-        userLocation={userLocation}
+        selectedLat={selectedVenue?.lat ?? null}
+        selectedLng={selectedVenue?.lng ?? null}
+        userLat={userLocation?.lat ?? null}
+        userLng={userLocation?.lng ?? null}
       />
 
       {userLocation && (

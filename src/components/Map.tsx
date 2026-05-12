@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -21,27 +21,73 @@ interface MapProps {
 }
 
 function MapController({
-  selectedVenue,
-  userLocation,
+  venues,
+  selectedLat,
+  selectedLng,
+  userLat,
+  userLng,
 }: {
-  selectedVenue: Venue | null;
-  userLocation: { lat: number; lng: number } | null;
+  venues: Venue[];
+  selectedLat: number | null;
+  selectedLng: number | null;
+  userLat: number | null;
+  userLng: number | null;
 }) {
   const map = useMap();
+  const flownToUserRef = useRef(false);
+  const fittedBoundsRef = useRef(false);
 
-  // Fly to the user's location the first time we get it.
+  // Recompute map size whenever the leaflet container resizes, AND on a
+  // short delay after mount so the initial size measurement is right.
+  // Leaflet caches the container size internally; without these calls the
+  // map's logical center is correct but the tiles render as if the container
+  // were a different size — visually misaligned by hundreds of meters.
   useEffect(() => {
-    if (userLocation) {
-      map.flyTo([userLocation.lat, userLocation.lng], 14, { duration: 0.6 });
-    }
-  }, [userLocation, map]);
+    const container = map.getContainer();
+    const t = setTimeout(() => map.invalidateSize({ pan: false }), 100);
+    const ro = new ResizeObserver(() => map.invalidateSize({ pan: false }));
+    ro.observe(container);
+    return () => {
+      clearTimeout(t);
+      ro.disconnect();
+    };
+  }, [map]);
 
-  // Fly to the selected venue whenever it changes.
+  // Fit the map to venues within ~15 miles of downtown Pueblo on mount so
+  // the user sees the bulk of food access points without the eastern
+  // outliers (Olney Springs, Boone) dragging the bounds so wide that
+  // Pueblo proper becomes a postage stamp. Outliers still render as
+  // markers; they're just not used to compute the initial framing.
   useEffect(() => {
-    if (selectedVenue) {
-      map.flyTo([selectedVenue.lat, selectedVenue.lng], 16, { duration: 0.8 });
+    if (fittedBoundsRef.current) return;
+    if (venues.length === 0) return;
+    fittedBoundsRef.current = true;
+    const PUEBLO = { lat: 38.2544, lng: -104.6091 };
+    const inCity = venues.filter((v) => {
+      const dLat = v.lat - PUEBLO.lat;
+      const dLng = v.lng - PUEBLO.lng;
+      // Rough miles: 1 deg lat ≈ 69 mi, 1 deg lng at 38°N ≈ 54 mi.
+      const miles = Math.sqrt((dLat * 69) ** 2 + (dLng * 54) ** 2);
+      return miles <= 15;
+    });
+    const source = inCity.length > 0 ? inCity : venues;
+    const bounds = source.map((v) => [v.lat, v.lng] as [number, number]);
+    map.fitBounds(bounds, { padding: [30, 30] });
+  }, [venues, map]);
+
+  // Single effect: venue takes priority over user-location. If a venue is
+  // selected, fly there. Otherwise, fly to the user's location only the
+  // first time it arrives. This avoids competing flyTo calls.
+  useEffect(() => {
+    if (selectedLat != null && selectedLng != null) {
+      map.flyTo([selectedLat, selectedLng], 16, { duration: 0.8 });
+      return;
     }
-  }, [selectedVenue, map]);
+    if (userLat != null && userLng != null && !flownToUserRef.current) {
+      flownToUserRef.current = true;
+      map.flyTo([userLat, userLng], 14, { duration: 0.6 });
+    }
+  }, [selectedLat, selectedLng, userLat, userLng, map]);
 
   return null;
 }
@@ -92,8 +138,11 @@ export default function Map({
       />
 
       <MapController
-        selectedVenue={selectedVenue}
-        userLocation={userLocation}
+        venues={venues}
+        selectedLat={selectedVenue?.lat ?? null}
+        selectedLng={selectedVenue?.lng ?? null}
+        userLat={userLocation?.lat ?? null}
+        userLng={userLocation?.lng ?? null}
       />
 
       {userLocation && (

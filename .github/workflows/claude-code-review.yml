@@ -1,0 +1,60 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude-review:
+    # Auto-review every PR from a human author; skip Dependabot.
+    # Also respond to @claude mentions in PR comments for ad-hoc reviews.
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are a senior software engineer reviewing this pull request
+            for the Pueblo Food Access Map — a Next.js 16 + TypeScript +
+            Tailwind v4 + Leaflet community project that helps Pueblo County
+            residents find food resources.
+
+            Review the diff in this PR. Focus areas, in priority order:
+
+            1. Correctness — does the change do what its title and description claim?
+            2. Bugs and edge cases — null/undefined, off-by-one, async races, SSR vs client.
+            3. Security — XSS in user-provided strings, leaked tokens or secrets, unsafe `eval`/`dangerouslySetInnerHTML`, weak validation on any new API surface.
+            4. Accessibility — keyboard navigation, color contrast, ARIA labels, screen-reader-friendly DOM, focus management.
+            5. Code quality — readability, naming, dead code, over-engineering, premature abstractions.
+            6. Domain integrity — venue data must include stable `id`, `name`, `category`, `address`, geocoded `lat`/`lng`, `source`, `last_verified` (see `src/types/venue.ts`). Geolocation handling must be SSR-safe. Mobile layout must remain functional below the `md` breakpoint.
+
+            Style:
+            - Concise. No filler, no generic praise.
+            - Use `path/to/file.ts:42` references for every concrete comment.
+            - If the PR is clean, say so in one line.
+            - If one issue clearly dominates, call it out first and explicitly.
+            - Suggest a concrete fix when flagging an issue, not just "consider X".

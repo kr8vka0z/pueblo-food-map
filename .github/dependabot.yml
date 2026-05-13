@@ -27,6 +27,16 @@ updates:
           - minor
           - patch
     # Major updates remain individual PRs so each can be reviewed for breaking changes.
+    ignore:
+      # ESLint majors are gated on the rest of the lint plugin ecosystem (especially
+      # eslint-plugin-react, pulled in transitively via eslint-config-next) shipping
+      # compatible releases. The 9 → 10 bump (PR #10) failed because
+      # eslint-plugin-react still caps its peer at eslint ^9.7 and its rule context
+      # API is incompatible with v10. Revisit once eslint-plugin-react ships
+      # ESLint 10 support.
+      - dependency-name: eslint
+        update-types:
+          - version-update:semver-major
     labels:
       - dependencies
       - npm

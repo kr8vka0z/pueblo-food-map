@@ -1,0 +1,56 @@
+# Dependabot config — opens PRs to update dependencies on a weekly cadence.
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+
+updates:
+  # npm packages (Next.js, React, Leaflet, ESLint, TypeScript, etc.)
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Denver
+    open-pull-requests-limit: 5
+    groups:
+      # Bundle non-breaking production updates into one PR.
+      production-minor-patch:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      # Bundle non-breaking dev-tool updates into one PR.
+      development-minor-patch:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    # Major updates remain individual PRs so each can be reviewed for breaking changes.
+    labels:
+      - dependencies
+      - npm
+    commit-message:
+      prefix: chore
+      include: scope
+
+  # GitHub Actions used in .github/workflows/*.yml (actions/checkout, actions/setup-node, etc.)
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Denver
+    open-pull-requests-limit: 3
+    groups:
+      actions-minor-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: ci
+      include: scope

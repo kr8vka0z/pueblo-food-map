@@ -31,7 +31,7 @@ See the project PRD in the Pueblo Food Project research vault for the full plan.
 3. Re-geocode the PFP venues against a real address service so pins land at the right buildings.
 4. Add 40+ Pueblo pantries from Plentiful directory (`directory.plentiful.org/colorado/pueblo`).
 5. Category filters and venue detail panels.
-6. Address input → walking + bus route via OpenTripPlanner + Pueblo Transit GTFS (`data.trilliumtransit.com/gtfs/pueblo-co-us/pueblo-co-us.zip`).
+6. Google Maps directions deep link on every venue card (`https://www.google.com/maps/dir/?api=1&destination=…&travelmode=transit`). Pueblo Transit's GTFS already feeds Google's transit routing, so one `<a href>` per venue covers walking, transit, and driving without standing up any routing infrastructure. Revisit self-hosted OpenTripPlanner + Pueblo Transit GTFS (`data.trilliumtransit.com/gtfs/pueblo-co-us/pueblo-co-us.zip`) later if PFP needs in-app routing, offline support, or custom paratransit.
 7. Live demo + implementation plan at the 2026-06-09 PFP meeting.
 
 ## Local development

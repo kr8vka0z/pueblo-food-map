@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import Sidebar from "./Sidebar";
 import { venues as allVenues } from "@/data/venues";
@@ -24,34 +24,59 @@ type LocationStatus =
   | "unavailable"
   | "fallback";
 
+type GeolocationAvailability = "available" | "unavailable" | "unknown";
+
+// SSR-safe browser feature detection. Returns "unknown" on the server, the real
+// value on the client. Lets us derive `locationStatus` instead of writing it
+// from inside an effect (which triggers react-hooks/set-state-in-effect).
+const noopSubscribe = () => () => {};
+
+function readGeolocationAvailability(): GeolocationAvailability {
+  return typeof navigator !== "undefined" && !!navigator.geolocation
+    ? "available"
+    : "unavailable";
+}
+
+function serverGeolocationAvailability(): GeolocationAvailability {
+  return "unknown";
+}
+
 export default function MapWrapper() {
+  const availability = useSyncExternalStore(
+    noopSubscribe,
+    readGeolocationAvailability,
+    serverGeolocationAvailability,
+  );
   const [userLocation, setUserLocation] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
-  const [locationStatus, setLocationStatus] =
-    useState<LocationStatus>("loading");
+  const [geolocationResult, setGeolocationResult] = useState<
+    "granted" | "denied" | null
+  >(null);
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
 
+  const locationStatus: LocationStatus =
+    availability === "unknown"
+      ? "loading"
+      : availability === "unavailable"
+        ? "unavailable"
+        : (geolocationResult ?? "loading");
+
   useEffect(() => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLocationStatus("unavailable");
-      return;
-    }
+    if (availability !== "available") return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setUserLocation({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         });
-        setLocationStatus("granted");
+        setGeolocationResult("granted");
       },
-      () => {
-        setLocationStatus("denied");
-      },
+      () => setGeolocationResult("denied"),
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 },
     );
-  }, []);
+  }, [availability]);
 
   const venuesWithDistance = useMemo(() => {
     const origin = userLocation ?? PUEBLO_CENTER;

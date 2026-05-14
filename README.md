@@ -8,7 +8,7 @@ Built for [Pueblo Food Project](https://pueblofoodproject.org). Proof of concept
 
 Phase 1, in progress. The map renders 74 markers — 10 PFP community gardens and edible landscapes from [pueblofoodproject.org/cgsp](https://pueblofoodproject.org/cgsp/) plus 64 grocery, convenience, and farm venues ingested from OpenStreetMap — on a Leaflet + OpenStreetMap base, with a distance-sorted sidebar, hover tooltips, and a "fly to nearest" geolocation flow.
 
-> ⚠️ **PFP garden coordinates are placeholders.** The 10 PFP venues currently use rough latitude/longitude values guessed from each street address, and most of them do not match the listed addresses on the map. They need to be re-geocoded against a real address service (e.g. Nominatim) before the live demo on 2026-06-09. The OpenStreetMap venues are correct.
+PFP garden coordinates were re-geocoded against Nominatim on 2026-05-14 (see [`scripts/geocode-pfp.py`](scripts/geocode-pfp.py) and [`data/raw/pfp-geocodes.json`](data/raw/pfp-geocodes.json)). One venue — Ray Aguilera Community Garden — uses a manual coordinate supplied by PFP because the garden plot sits south of the OSM Ray Aguilera Park centroid.
 
 ## Live preview
 
@@ -26,9 +26,9 @@ Phase 1, in progress. The map renders 74 markers — 10 PFP community gardens an
 
 See the project PRD in the Pueblo Food Project research vault for the full plan. Short version:
 
-1. Base map with 10 PFP gardens + edible landscapes — scaffold **done**; coordinates need real geocoding.
+1. Base map with 10 PFP gardens + edible landscapes — **done**.
 2. Ingest grocery / convenience / farm venues from OpenStreetMap Overpass API — **done** (64 venues).
-3. Re-geocode the PFP venues against a real address service so pins land at the right buildings.
+3. Re-geocode the PFP venues against a real address service so pins land at the right buildings — **done** (Nominatim, 2026-05-14).
 4. Add 40+ Pueblo pantries from Plentiful directory (`directory.plentiful.org/colorado/pueblo`).
 5. Category filters and venue detail panels.
 6. Google Maps directions deep link on every venue card (`https://www.google.com/maps/dir/?api=1&destination=…&travelmode=transit`). Pueblo Transit's GTFS already feeds Google's transit routing, so one `<a href>` per venue covers walking, transit, and driving without standing up any routing infrastructure. Revisit self-hosted OpenTripPlanner + Pueblo Transit GTFS (`data.trilliumtransit.com/gtfs/pueblo-co-us/pueblo-co-us.zip`) later if PFP needs in-app routing, offline support, or custom paratransit.

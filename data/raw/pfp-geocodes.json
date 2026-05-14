@@ -1,0 +1,195 @@
+{
+  "generated_at": "2026-05-14",
+  "source": "Nominatim (https://nominatim.openstreetmap.org)",
+  "viewbox": [
+    -104.75,
+    38.35,
+    -104.48,
+    38.18
+  ],
+  "results": [
+    {
+      "id": "garden-rmser",
+      "display_address": "330 Lake Ave, Pueblo, CO 81004",
+      "queries_tried": [
+        "330 Lake Avenue, Pueblo, CO 81004",
+        "330 Lake Ave, Pueblo, CO"
+      ],
+      "matched_query": "330 Lake Avenue, Pueblo, CO 81004",
+      "new_lat": 38.254427,
+      "new_lng": -104.620381,
+      "nominatim_display_name": "330, Lake Avenue, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "nominatim_type": "house",
+      "nominatim_importance": 9.99999999995449e-06,
+      "nominatim_osm_id": "way/17129946",
+      "current_lat": 38.279,
+      "current_lng": -104.6068,
+      "shift_miles": 1.851
+    },
+    {
+      "id": "garden-la-familia",
+      "display_address": "814 E 5th St, Pueblo, CO 81001",
+      "queries_tried": [
+        "814 East 5th Street, Pueblo, CO 81001",
+        "814 E 5th St, Pueblo, CO 81001"
+      ],
+      "matched_query": "814 East 5th Street, Pueblo, CO 81001",
+      "new_lat": 38.271769,
+      "new_lng": -104.596439,
+      "nominatim_display_name": "814, East 5th Street, East Side, Fearnowville, Pueblo, Pueblo County, Colorado, 81001, United States",
+      "nominatim_type": "house",
+      "nominatim_importance": 9.99999999995449e-06,
+      "nominatim_osm_id": "way/17134094",
+      "current_lat": 38.2742,
+      "current_lng": -104.616,
+      "shift_miles": 1.074
+    },
+    {
+      "id": "garden-ray-aguilera",
+      "display_address": "Lake Ave near the Fire Station, Pueblo, CO",
+      "queries_tried": [],
+      "matched_query": null,
+      "new_lat": 38.23117,
+      "new_lng": -104.625036,
+      "nominatim_display_name": null,
+      "nominatim_type": "manual_override",
+      "nominatim_importance": null,
+      "nominatim_osm_id": null,
+      "current_lat": 38.2779,
+      "current_lng": -104.608,
+      "shift_miles": 3.358,
+      "override_note": "Supplied by PFP \u2014 specific garden plot location, south of Ray Aguilera Park centroid"
+    },
+    {
+      "id": "garden-midway",
+      "display_address": "110 Midway Dr, Pueblo, CO",
+      "queries_tried": [
+        "110 Midway Avenue, Pueblo, CO",
+        "Midway Avenue, Mesa Junction, Pueblo, CO"
+      ],
+      "matched_query": "110 Midway Avenue, Pueblo, CO",
+      "new_lat": 38.260521,
+      "new_lng": -104.621467,
+      "nominatim_display_name": "110, Midway Avenue, Mesa Junction, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "nominatim_type": "house",
+      "nominatim_importance": 9.99999999995449e-06,
+      "nominatim_osm_id": "way/17131354",
+      "current_lat": 38.2563,
+      "current_lng": -104.6398,
+      "shift_miles": 1.037
+    },
+    {
+      "id": "garden-steelworks",
+      "display_address": "215 Canal St, Pueblo, CO 81004",
+      "queries_tried": [
+        "215 Canal Street, Pueblo, CO 81004",
+        "Steelworks Center of the West, Pueblo, CO",
+        "215 Canal St, Pueblo, CO"
+      ],
+      "matched_query": "215 Canal Street, Pueblo, CO 81004",
+      "new_lat": 38.237869,
+      "new_lng": -104.612428,
+      "nominatim_display_name": "Steelworks Center of the West, 215, Canal Street, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "nominatim_type": "museum",
+      "nominatim_importance": 6.185931181806695e-05,
+      "nominatim_osm_id": "way/971913064",
+      "current_lat": 38.2614,
+      "current_lng": -104.6125,
+      "shift_miles": 1.626
+    },
+    {
+      "id": "garden-bethany-lutheran",
+      "display_address": "1802 Sheridan Rd, Pueblo, CO 81001",
+      "queries_tried": [
+        "1802 Sheridan Road, Pueblo, CO 81001",
+        "Bethany Lutheran Church, Pueblo, CO",
+        "1802 Sheridan Rd, Pueblo, CO"
+      ],
+      "matched_query": "1802 Sheridan Road, Pueblo, CO 81001",
+      "new_lat": 38.297496,
+      "new_lng": -104.591039,
+      "nominatim_display_name": "1802, Sheridan Road, Belmont, Pueblo, Pueblo County, Colorado, 81001, United States",
+      "nominatim_type": "house",
+      "nominatim_importance": 9.99999999995449e-06,
+      "nominatim_osm_id": "way/17132885",
+      "current_lat": 38.2459,
+      "current_lng": -104.6354,
+      "shift_miles": 4.301
+    },
+    {
+      "id": "landscape-mineral-palace",
+      "display_address": "Mineral Palace Park, Pueblo, CO",
+      "queries_tried": [
+        "Mineral Palace Park, Pueblo, CO",
+        "Mineral Palace Park, Pueblo County, CO"
+      ],
+      "matched_query": "Mineral Palace Park, Pueblo, CO",
+      "new_lat": 38.283229,
+      "new_lng": -104.607842,
+      "nominatim_display_name": "Mineral Palace Park, Pueblo, Pueblo County, Colorado, United States",
+      "nominatim_type": "park",
+      "nominatim_importance": 0.08006185931181808,
+      "nominatim_osm_id": "way/71376259",
+      "current_lat": 38.2885,
+      "current_lng": -104.6094,
+      "shift_miles": 0.374
+    },
+    {
+      "id": "landscape-central-plaza",
+      "display_address": "1st & Main, Pueblo, CO",
+      "queries_tried": [
+        "East 1st Street and North Main Street, Pueblo, CO",
+        "1st Street and Main Street, Pueblo, CO",
+        "Central Plaza, Pueblo, CO"
+      ],
+      "matched_query": "Central Plaza, Pueblo, CO",
+      "new_lat": 38.268172,
+      "new_lng": -104.608897,
+      "nominatim_display_name": "Central Plaza, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "nominatim_type": "service",
+      "nominatim_importance": 0.040061859311818104,
+      "nominatim_osm_id": "way/17132379",
+      "current_lat": 38.2722,
+      "current_lng": -104.6105,
+      "shift_miles": 0.292
+    },
+    {
+      "id": "landscape-jj-raigoza",
+      "display_address": "600 Maryland Ave, Pueblo, CO",
+      "queries_tried": [
+        "600 Maryland Avenue, Pueblo, CO",
+        "JJ Raigoza Park, Pueblo, CO",
+        "Maryland Avenue, Pueblo, CO"
+      ],
+      "matched_query": "600 Maryland Avenue, Pueblo, CO",
+      "new_lat": 38.222062,
+      "new_lng": -104.617207,
+      "nominatim_display_name": "600, Maryland Avenue, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "nominatim_type": "house",
+      "nominatim_importance": 9.99999999995449e-06,
+      "nominatim_osm_id": "way/17134743",
+      "current_lat": 38.2697,
+      "current_lng": -104.6309,
+      "shift_miles": 3.374
+    },
+    {
+      "id": "landscape-fuel-iron",
+      "display_address": "400 S Union Ave, Pueblo, CO 81003",
+      "queries_tried": [
+        "400 South Union Avenue, Pueblo, CO 81003",
+        "Fuel and Iron Food Hall, Pueblo, CO",
+        "400 S Union Ave, Pueblo, CO"
+      ],
+      "matched_query": "400 South Union Avenue, Pueblo, CO 81003",
+      "new_lat": 38.262121,
+      "new_lng": -104.615912,
+      "nominatim_display_name": "Fuel & Iron Food Hall, 400, South Union Avenue, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "nominatim_type": "marketplace",
+      "nominatim_importance": 6.185931181806695e-05,
+      "nominatim_osm_id": "node/12143399901",
+      "current_lat": 38.2702,
+      "current_lng": -104.6093,
+      "shift_miles": 0.664
+    }
+  ]
+}

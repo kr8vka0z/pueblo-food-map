@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- `scripts/geocode-pfp.py` — reproducible Nominatim geocoder for the ten PFP
+  venues. Honors Nominatim's usage policy (custom User-Agent with contact
+  email, 1.1s rate limit, Pueblo-county `viewbox` bias) and supports per-id
+  manual overrides for addresses Nominatim cannot resolve to a single node.
+  Writes a full audit trail to `data/raw/pfp-geocodes.json`.
+
+### Changed
+
+- Replaced the placeholder latitude/longitude on every PFP community garden and
+  edible-landscape venue with precise geocodes from Nominatim. Some pins
+  shifted by more than four miles, including Bethany Lutheran (4.30 mi),
+  JJ Raigoza Park (3.37 mi), and Ray Aguilera Garden (3.27 mi). See
+  `data/raw/pfp-geocodes.json` for the matched OSM ids and display names.
+- Updated the listed address for La Familia Community Garden from the
+  "5th & Hudson" intersection to "814 E 5th St, Pueblo, CO 81001" (the
+  actual lot the garden sits on, per PFP).
+- Ray Aguilera Community Garden uses a manual coordinate supplied by PFP
+  because the garden plot sits south of the OSM Ray Aguilera Park centroid.
+
 ## [0.1.0] - 2026-05-12
 
 ### Added

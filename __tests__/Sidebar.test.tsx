@@ -2,9 +2,9 @@ import { describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Sidebar from "@/components/Sidebar";
-import type { Venue } from "@/types/venue";
+import type { Venue, VenueCategory } from "@/types/venue";
 
-const sampleVenues: Array<Venue & { distanceMiles: number | null }> = [
+const sampleVenues: Array<Venue & { distanceMiles?: number }> = [
   {
     id: "v1",
     name: "Riverwalk Pantry",
@@ -29,13 +29,22 @@ const sampleVenues: Array<Venue & { distanceMiles: number | null }> = [
   },
 ];
 
+const baseProps = {
+  selectedCategories: null as Set<VenueCategory> | null,
+  categoryCounts: { pantry: 1, grocery: 1 } as Partial<Record<VenueCategory, number>>,
+  totalCount: sampleVenues.length,
+  onToggleCategory: () => {},
+  showCategoryChips: false,
+};
+
 describe("Sidebar", () => {
   test("renders every venue with its formatted distance", () => {
     render(
       <Sidebar
+        {...baseProps}
         venues={sampleVenues}
         selectedVenueId={null}
-        onSelect={() => {}}
+        onSelectVenue={() => {}}
         locationStatus="granted"
       />,
     );
@@ -47,34 +56,50 @@ describe("Sidebar", () => {
   });
 
   test("shows the location-status banner appropriate to the current state", () => {
-    render(
+    const { rerender } = render(
       <Sidebar
+        {...baseProps}
         venues={sampleVenues}
         selectedVenueId={null}
-        onSelect={() => {}}
+        onSelectVenue={() => {}}
+        locationStatus="granted"
+      />,
+    );
+
+    expect(
+      screen.getByText(/Sorted by distance from your location/i),
+    ).toBeInTheDocument();
+
+    rerender(
+      <Sidebar
+        {...baseProps}
+        venues={sampleVenues}
+        selectedVenueId={null}
+        onSelectVenue={() => {}}
         locationStatus="denied"
       />,
     );
 
     expect(
-      screen.getByText(/Location permission denied/i),
+      screen.getByText(/Showing distance from downtown Pueblo/i),
     ).toBeInTheDocument();
   });
 
-  test("fires onSelect with the clicked venue id", async () => {
+  test("fires onSelectVenue with the clicked venue id", async () => {
     const user = userEvent.setup();
-    const onSelect = vi.fn();
+    const onSelectVenue = vi.fn();
 
     render(
       <Sidebar
+        {...baseProps}
         venues={sampleVenues}
         selectedVenueId={null}
-        onSelect={onSelect}
+        onSelectVenue={onSelectVenue}
         locationStatus="granted"
       />,
     );
 
     await user.click(screen.getByRole("button", { name: /East Side Grocery/i }));
-    expect(onSelect).toHaveBeenCalledWith("v2");
+    expect(onSelectVenue).toHaveBeenCalledWith("v2");
   });
 });

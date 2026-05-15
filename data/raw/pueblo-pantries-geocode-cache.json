@@ -1,0 +1,298 @@
+{
+  "pueblo community college": {
+    "address": "Pueblo Community College",
+    "lat": 38.263186,
+    "lng": -104.637172,
+    "matched_query": "Pueblo Community College",
+    "nominatim_display_name": "Pueblo Community College, 900, West Orman Avenue, Aberdeen, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "way/463826988"
+  },
+  "165 central main st., pueblo, co 81003": {
+    "address": "165 Central Main St., Pueblo, CO 81003",
+    "lat": 38.265162,
+    "lng": -104.610623,
+    "matched_query": "165 Central Main St., Pueblo, CO 81003",
+    "nominatim_display_name": "165, Central Main Street, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+    "nominatim_osm_id": "way/17134746"
+  },
+  "1902 st. clair ave., pueblo, co 81004": {
+    "address": "1902 St. Clair Ave., Pueblo, CO 81004",
+    "lat": 38.254816,
+    "lng": -104.633727,
+    "matched_query": "1902 St. Clair Ave., Pueblo, CO 81004",
+    "nominatim_display_name": "1902, Saint Clair Avenue, Heritage, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "way/17133791"
+  },
+  "1102 e. abriendo ave., pueblo, co 81004": {
+    "address": "1102 E. Abriendo Ave., Pueblo, CO 81004",
+    "lat": 38.247716,
+    "lng": -104.613751,
+    "matched_query": "1102 E. Abriendo Ave., Pueblo, CO 81004",
+    "nominatim_display_name": "1102, East Abriendo Avenue, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "way/177258308"
+  },
+  "2631 east 4th street, pueblo, co 81001": {
+    "address": "2631 East 4th Street, Pueblo, CO 81001",
+    "lat": 38.272001,
+    "lng": -104.563807,
+    "matched_query": "2631 East 4th Street, Pueblo, CO 81001",
+    "nominatim_display_name": "2631, East 4th Street, Fearnowville, Pueblo, Pueblo County, Colorado, 81001, United States",
+    "nominatim_osm_id": "way/173573916"
+  },
+  "724 e. 4th st., pueblo, co 81001": {
+    "address": "724 E. 4th St., Pueblo, CO 81001",
+    "lat": 38.270809,
+    "lng": -104.597789,
+    "matched_query": "724 E. 4th St., Pueblo, CO 81001",
+    "nominatim_display_name": "724, East 4th Street, Lower East Side, Pueblo, Pueblo County, Colorado, 81001, United States",
+    "nominatim_osm_id": "way/38563542"
+  },
+  "1112 pueblo blvd, pueblo, co 81005": {
+    "address": "1112 Pueblo Blvd, Pueblo, CO 81005",
+    "lat": 38.246826,
+    "lng": -104.662071,
+    "matched_query": "1112 Pueblo Blvd, Pueblo, CO 81005",
+    "nominatim_display_name": "1112, South Pueblo Boulevard, Pueblo, Pueblo County, Colorado, 81005, United States",
+    "nominatim_osm_id": "way/900394232"
+  },
+  "1925 e. orman ave., pueblo, co 81004": {
+    "address": "1925 E. Orman Ave., Pueblo, CO 81004",
+    "lat": 38.234119,
+    "lng": -104.62075,
+    "matched_query": "1925 E. Orman Ave., Pueblo, CO 81004",
+    "nominatim_display_name": "1925, East Orman Avenue, Bessemer, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "way/170688472"
+  },
+  "615 e. 5th st., pueblo, co 81001": {
+    "address": "615 E. 5th St., Pueblo, CO 81001",
+    "lat": 38.271856,
+    "lng": -104.599463,
+    "matched_query": "615 E. 5th St., Pueblo, CO 81001",
+    "nominatim_display_name": "615, East 5th Street, East Side, Fearnowville, Pueblo, Pueblo County, Colorado, 81001, United States",
+    "nominatim_osm_id": "way/17134094"
+  },
+  "1401 jerry murphy rd., pueblo, co 81001": {
+    "address": "1401 Jerry Murphy Rd., Pueblo, CO 81001",
+    "lat": 38.290574,
+    "lng": -104.596121,
+    "matched_query": "1401 Jerry Murphy Rd., Pueblo, CO 81001",
+    "nominatim_display_name": "1401, Jerry Murphy Road, Pueblo, Pueblo County, Colorado, 81001, United States",
+    "nominatim_osm_id": "way/17132491"
+  },
+  "901 w. 8th st., pueblo, co 81003": {
+    "address": "901 W. 8th St., Pueblo, CO 81003",
+    "lat": 38.274091,
+    "lng": -104.6197,
+    "matched_query": "901 W. 8th St., Pueblo, CO 81003",
+    "nominatim_display_name": "901, West 8th Street, Pueblo, Pueblo County, Colorado, 81003, United States",
+    "nominatim_osm_id": "way/17130148"
+  },
+  "422 w. 7th st., pueblo, co 81003": {
+    "address": "422 W. 7th St., Pueblo, CO 81003",
+    "lat": 38.273296,
+    "lng": -104.612059,
+    "matched_query": "422 W. 7th St., Pueblo, CO 81003",
+    "nominatim_display_name": "422, West 7th Street, Pueblo, Pueblo County, Colorado, 81003, United States",
+    "nominatim_osm_id": "way/659617184"
+  },
+  "224 e 4th st, pueblo, co 81003": {
+    "address": "224 E 4th St, Pueblo, CO 81003",
+    "lat": 38.270611,
+    "lng": -104.606116,
+    "matched_query": "224 E 4th St, Pueblo, CO 81003",
+    "nominatim_display_name": "224, East 4th Street, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+    "nominatim_osm_id": "way/38563544"
+  },
+  "3804 w. pueblo blvd., pueblo, co 81005": {
+    "address": "3804 W. Pueblo Blvd., Pueblo, CO 81005",
+    "lat": 38.223992,
+    "lng": -104.656767,
+    "matched_query": "3804 W. Pueblo Blvd., Pueblo, CO 81005",
+    "nominatim_display_name": "3804, West Pueblo Boulevard, Highland Park, Pueblo, Pueblo County, Colorado, 81005, United States",
+    "nominatim_osm_id": "way/900398495"
+  },
+  "1101 cedar st., pueblo, co 81004": {
+    "address": "1101 Cedar St., Pueblo, CO 81004",
+    "lat": 38.247706,
+    "lng": -104.619755,
+    "matched_query": "1101 Cedar St., Pueblo, CO 81004",
+    "nominatim_display_name": "1101, Cedar Street, Bessemer, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "way/17133005"
+  },
+  "2315 sprague ave, pueblo, co 81004": {
+    "address": "2315 Sprague Ave, Pueblo, CO 81004",
+    "lat": 38.240536,
+    "lng": -104.638127,
+    "matched_query": "2315 Sprague Ave, Pueblo, CO 81004",
+    "nominatim_display_name": "2315, Sprague Avenue, Lakeview, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "way/899897192"
+  },
+  "414 booth ave, pueblo, co 81001": {
+    "address": "414 Booth Ave, Pueblo, CO 81001",
+    "lat": 38.264913,
+    "lng": -104.565793,
+    "matched_query": "414 Booth Ave, Pueblo, CO 81001",
+    "nominatim_display_name": "414, Booth Avenue, Blende, Pueblo County, Colorado, 81001, United States",
+    "nominatim_osm_id": "way/17134217"
+  },
+  "215 canal st, pueblo, co 81004": {
+    "address": "215 Canal St, Pueblo, CO 81004",
+    "lat": 38.237869,
+    "lng": -104.612428,
+    "matched_query": "215 Canal St, Pueblo, CO 81004",
+    "nominatim_display_name": "Steelworks Center of the West, 215, Canal Street, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "way/971913064"
+  },
+  "132 w b st, pueblo, co 81003": {
+    "address": "132 W B St, Pueblo, CO 81003",
+    "lat": 38.262858,
+    "lng": -104.617193,
+    "matched_query": "132 W B St, Pueblo, CO 81003",
+    "nominatim_display_name": "Union Depot, 132, West B Street, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+    "nominatim_osm_id": "way/319910835"
+  },
+  "2800 east 17th st, pueblo, co 81001": {
+    "address": "2800 East 17th St, Pueblo, CO 81001",
+    "lat": 38.283411,
+    "lng": -104.579346,
+    "matched_query": "2800 East 17th St, Pueblo, CO 81001",
+    "nominatim_display_name": "East 17th Street, Pueblo, Pueblo County, Colorado, 81001, United States",
+    "nominatim_osm_id": "way/17131325"
+  },
+  "2701 e. 12th st., pueblo, co 81001": {
+    "address": "2701 E. 12th St., Pueblo, CO 81001",
+    "lat": 38.279561,
+    "lng": -104.562587,
+    "matched_query": "2701 E. 12th St., Pueblo, CO 81001",
+    "nominatim_display_name": "Saint Anne Catholic Church, 2701, East 12th Street, Fearnowville, Pueblo, Pueblo County, Colorado, 81001, United States",
+    "nominatim_osm_id": "way/683268918"
+  },
+  "3304 baltimore ave., pueblo, co 81008": {
+    "address": "3304 Baltimore Ave., Pueblo, CO 81008",
+    "lat": 38.304889,
+    "lng": -104.63527,
+    "matched_query": "3304 Baltimore Ave., Pueblo, CO 81008",
+    "nominatim_display_name": "3304, Baltimore Avenue, Skyview, Pueblo, Pueblo County, Colorado, 81008, United States",
+    "nominatim_osm_id": "way/17133325"
+  },
+  "2000 troy avenue, pueblo, co 81001": {
+    "address": "2000 Troy Avenue, Pueblo, CO 81001",
+    "lat": 38.285559,
+    "lng": -104.573368,
+    "matched_query": "2000 Troy Avenue, Pueblo, CO 81001",
+    "nominatim_display_name": "2000, Troy Avenue, Pueblo, Pueblo County, Colorado, 81001, United States",
+    "nominatim_osm_id": "way/900385172"
+  },
+  "326 west 8th street, pueblo, co 81003": {
+    "address": "326 West 8th Street, Pueblo, CO 81003",
+    "lat": 38.274237,
+    "lng": -104.610622,
+    "matched_query": "326 West 8th Street, Pueblo, CO 81003",
+    "nominatim_display_name": "326, West 8th Street, Pueblo, Pueblo County, Colorado, 81003, United States",
+    "nominatim_osm_id": "way/659617188"
+  },
+  "611 broadway ave., pueblo, co 81004": {
+    "address": "611 Broadway Ave., Pueblo, CO 81004",
+    "lat": 38.25376,
+    "lng": -104.626774,
+    "matched_query": "611 Broadway Ave., Pueblo, CO 81004",
+    "nominatim_display_name": "Agape Fellowship, 611, Broadway Avenue, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "node/12843448581"
+  },
+  "216 w routt ave, pueblo, co 81004": {
+    "address": "216 W Routt Ave, Pueblo, CO 81004",
+    "lat": 38.25902,
+    "lng": -104.625612,
+    "matched_query": "216 W Routt Ave, Pueblo, CO 81004",
+    "nominatim_display_name": "216, West Routt Avenue, Mesa Junction, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "way/17132065"
+  },
+  "330 lake ave, pueblo, co 81004": {
+    "address": "330 Lake Ave, Pueblo, CO 81004",
+    "lat": 38.254427,
+    "lng": -104.620381,
+    "matched_query": "330 Lake Ave, Pueblo, CO 81004",
+    "nominatim_display_name": "330, Lake Avenue, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "way/17129946"
+  },
+  "326 w 8th st, pueblo, co 81003": {
+    "address": "326 W 8th St, Pueblo, CO 81003",
+    "lat": 38.274237,
+    "lng": -104.610622,
+    "matched_query": "326 W 8th St, Pueblo, CO 81003",
+    "nominatim_display_name": "326, West 8th Street, Pueblo, Pueblo County, Colorado, 81003, United States",
+    "nominatim_osm_id": "way/659617188"
+  },
+  "2631 e 4th st, pueblo, co 81001": {
+    "address": "2631 E 4th St, Pueblo, CO 81001",
+    "lat": 38.272001,
+    "lng": -104.563807,
+    "matched_query": "2631 E 4th St, Pueblo, CO 81001",
+    "nominatim_display_name": "2631, East 4th Street, Fearnowville, Pueblo, Pueblo County, Colorado, 81001, United States",
+    "nominatim_osm_id": "way/173573916"
+  },
+  "401 s prairie ave, pueblo, co 81005": {
+    "address": "401 S Prairie Ave, Pueblo, CO 81005",
+    "lat": 38.260216,
+    "lng": -104.644065,
+    "matched_query": "401 S Prairie Ave, Pueblo, CO 81005",
+    "nominatim_display_name": "401, South Prairie Avenue, Aberdeen, Pueblo, Pueblo County, Colorado, 81005, United States",
+    "nominatim_osm_id": "way/17131300"
+  },
+  "422 w. 7th street, pueblo, co 81003": {
+    "address": "422 W. 7th Street, Pueblo, CO 81003",
+    "lat": 38.273296,
+    "lng": -104.612059,
+    "matched_query": "422 W. 7th Street, Pueblo, CO 81003",
+    "nominatim_display_name": "422, West 7th Street, Pueblo, Pueblo County, Colorado, 81003, United States",
+    "nominatim_osm_id": "way/659617184"
+  },
+  "230 n union ave, pueblo, co 81003": {
+    "address": "230 N Union Ave, Pueblo, CO 81003",
+    "lat": 38.266428,
+    "lng": -104.610567,
+    "matched_query": "230 N Union Ave, Pueblo, CO 81003",
+    "nominatim_display_name": "Senior Resource Development Agency Pueblo Inc, 230, North Union Avenue, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+    "nominatim_osm_id": "way/439874632"
+  },
+  "3030 thatcher ave, pueblo, co 81005": {
+    "address": "3030 Thatcher Ave, Pueblo, CO 81005",
+    "lat": 38.258422,
+    "lng": -104.647055,
+    "matched_query": "3030 Thatcher Ave, Pueblo, CO 81005",
+    "nominatim_display_name": "3030, Thatcher Avenue, Aberdeen, Pueblo, Pueblo County, Colorado, 81005, United States",
+    "nominatim_osm_id": "way/38341728"
+  },
+  "1230 e 8th st, pueblo, co 81001": {
+    "address": "1230 E 8th St, Pueblo, CO 81001",
+    "lat": 38.274686,
+    "lng": -104.590266,
+    "matched_query": "1230 E 8th St, Pueblo, CO 81001",
+    "nominatim_display_name": "1230, East 8th Street, East Side, Pueblo, Pueblo County, Colorado, 81001, United States",
+    "nominatim_osm_id": "way/401701993"
+  },
+  "228 w evans ave, pueblo, co 81004": {
+    "address": "228 W Evans Ave, Pueblo, CO 81004",
+    "lat": 38.260184,
+    "lng": -104.624609,
+    "matched_query": "228 W Evans Ave, Pueblo, CO 81004",
+    "nominatim_display_name": "228, West Evans Avenue, Mesa Junction, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "way/17133713"
+  },
+  "728 w 4th st, pueblo, co 81003": {
+    "address": "728 W 4th St, Pueblo, CO 81003",
+    "lat": 38.270682,
+    "lng": -104.616821,
+    "matched_query": "728 W 4th St, Pueblo, CO 81003",
+    "nominatim_display_name": "728, West 4th Street, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+    "nominatim_osm_id": "way/954148789"
+  },
+  "100 greenhorn dr #100, pueblo, co 81004": {
+    "address": "100 Greenhorn Dr #100, Pueblo, CO 81004",
+    "lat": 38.209461,
+    "lng": -104.627381,
+    "matched_query": "100 Greenhorn Dr, Pueblo, CO 81004",
+    "nominatim_display_name": "100, Greenhorn Drive, Southgate, Pueblo, Pueblo County, Colorado, 81004, United States",
+    "nominatim_osm_id": "way/17130383"
+  }
+}

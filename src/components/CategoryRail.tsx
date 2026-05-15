@@ -128,7 +128,7 @@ export default function CategoryRail({
     <aside className="flex flex-col overflow-y-auto py-3">
       {/* Category section */}
       <p className="px-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
-        {t("category.all", locale)} CATEGORIES
+        {t("rail.categories", locale)}
       </p>
 
       <RailRow
@@ -162,7 +162,7 @@ export default function CategoryRail({
 
       {/* Advanced filters */}
       <p className="px-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
-        FILTERS
+        {t("rail.filters", locale)}
       </p>
       <ToggleRow
         label={t("filter.openNow", locale)}

@@ -14,6 +14,8 @@ import "leaflet/dist/leaflet.css";
 import type { Venue } from "@/types/venue";
 import { categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
+import { t } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 import { createVenueIcon } from "./VenueMarker";
 
 const PUEBLO_CENTER: [number, number] = [38.2544, -104.6091];
@@ -32,6 +34,7 @@ interface MapProps {
   userLocation: { lat: number; lng: number } | null;
   userDistances: Map<string, number>;
   onSelectVenue: (id: string) => void;
+  locale?: Locale;
 }
 
 // ─── MapController (logic preserved verbatim from original) ──────────────────
@@ -83,14 +86,28 @@ function MapController({
   }, [venues, map]);
 
   // Venue flyTo takes priority over user location flyTo.
+  // Reduced-motion: if the user prefers reduced motion, use setView
+  // (instant pan) instead of flyTo (animated pan).
   useEffect(() => {
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     if (selectedLat != null && selectedLng != null) {
-      map.flyTo([selectedLat, selectedLng], 16, { duration: 0.8 });
+      if (prefersReducedMotion) {
+        map.setView([selectedLat, selectedLng], 16, { animate: false });
+      } else {
+        map.flyTo([selectedLat, selectedLng], 16, { duration: 0.8 });
+      }
       return;
     }
     if (userLat != null && userLng != null && !flownToUserRef.current) {
       flownToUserRef.current = true;
-      map.flyTo([userLat, userLng], 14, { duration: 0.6 });
+      if (prefersReducedMotion) {
+        map.setView([userLat, userLng], 14, { animate: false });
+      } else {
+        map.flyTo([userLat, userLng], 14, { duration: 0.6 });
+      }
     }
   }, [selectedLat, selectedLng, userLat, userLng, map]);
 
@@ -132,6 +149,7 @@ export default function Map({
   userLocation,
   userDistances,
   onSelectVenue,
+  locale = "en",
 }: MapProps) {
   const selectedVenue = venues.find((v) => v.id === selectedVenueId) ?? null;
 
@@ -172,7 +190,7 @@ export default function Map({
           }}
         >
           <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
-            <span className="text-xs font-medium">You are here</span>
+            <span className="text-xs font-medium">{t("distance.youAreHere", locale)}</span>
           </Tooltip>
         </CircleMarker>
       )}

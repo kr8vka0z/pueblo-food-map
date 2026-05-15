@@ -1,5 +1,6 @@
 import type { Venue } from "@/types/venue";
 import { groceryOsmVenues } from "@/data/grocery-osm";
+import { plentifulPantries } from "@/data/pantries-plentiful";
 
 // v1 seed data — Pueblo Food Project Community Garden Sustainability Project (CGSP)
 // and edible landscapes. Source: https://pueblofoodproject.org/cgsp/ (verified 2026-05-12).
@@ -148,7 +149,7 @@ export const pfpVenues: Venue[] = [
 
 // Combined venue list rendered on the map. PFP first so its richer metadata
 // (notes, partnerships) wins any future de-dup pass.
-export const venues: Venue[] = [...pfpVenues, ...groceryOsmVenues];
+export const venues: Venue[] = [...pfpVenues, ...groceryOsmVenues, ...plentifulPantries];
 
 export const categoryLabels: Record<Venue["category"], string> = {
   pantry: "Food Pantry",

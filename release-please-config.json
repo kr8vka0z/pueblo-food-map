@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "f4cfd0be39763f03e7ce930b1d0b5678dc804230",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "pueblo-food-map",
+      "changelog-path": "CHANGELOG.md",
+      "include-component-in-tag": false,
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "draft": false,
+      "prerelease": false,
+      "changelog-sections": [
+        { "type": "feat", "section": "Added" },
+        { "type": "fix", "section": "Fixed" },
+        { "type": "perf", "section": "Changed" },
+        { "type": "refactor", "section": "Changed" },
+        { "type": "docs", "section": "Changed", "hidden": false },
+        { "type": "chore", "hidden": true },
+        { "type": "ci", "hidden": true },
+        { "type": "test", "hidden": true },
+        { "type": "build", "hidden": true },
+        { "type": "style", "hidden": true }
+      ]
+    }
+  }
+}

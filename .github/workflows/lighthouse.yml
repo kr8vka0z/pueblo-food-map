@@ -1,0 +1,27 @@
+name: Lighthouse CI
+
+# Fires when Vercel reports a successful deployment via the GitHub
+# deployment_status event. Runs Lighthouse against the freshly deployed
+# preview URL (or production URL on main pushes) and uploads a public
+# report whose link is logged in the workflow output.
+on:
+  deployment_status:
+
+jobs:
+  lighthouse:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment_status.environment_url != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run Lighthouse against the deployed URL
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: ${{ github.event.deployment_status.environment_url }}
+          configPath: ./.lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true

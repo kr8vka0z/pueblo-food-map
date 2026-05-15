@@ -1,26 +1,104 @@
 @import "tailwindcss";
 
+@theme {
+  /* Bone — warm background neutrals */
+  --color-bone-50:  #FBFAF6;
+  --color-bone-100: #F4F1EA;
+  --color-bone-200: #E8E3D6;
+  --color-bone-300: #D4CDB8;
+
+  /* Ink — warm foreground neutrals */
+  --color-ink-400:  #8A847A;
+  --color-ink-500:  #5F5A52;
+  --color-ink-700:  #2D2A26;
+  --color-ink-900:  #1A1817;
+
+  /* Sage — primary brand + interactive */
+  --color-sage-50:  #EAF0EC;
+  --color-sage-100: #D1DDD3;
+  --color-sage-500: #4A8466;
+  --color-sage-600: #2C5F4F;
+  --color-sage-700: #1F4639;
+
+  /* Clay — secondary accent */
+  --color-clay-100: #F8E2D4;
+  --color-clay-500: #C2410C;
+  --color-clay-700: #7C2D12;
+
+  /* Semantic */
+  --color-success: #15803D;
+  --color-warning: #B45309;
+  --color-danger:  #B91C1C;
+
+  /* Category accents */
+  --color-cat-pantry:      #BE2D45;
+  --color-cat-grocery:     #1F4E8C;
+  --color-cat-convenience: #0F6573;
+  --color-cat-farm:        #92591D;
+  --color-cat-garden:      #2C5F4F;
+  --color-cat-landscape:   #58772B;
+  --color-cat-meal:        #6B3FA0;
+
+  /* Type families */
+  --font-sans:    var(--font-inter);
+  --font-display: var(--font-fraunces);
+  --font-mono:    var(--font-mono);
+
+  /* Spacing (extending Tailwind defaults — these are tokens for spec compliance) */
+  --spacing-1:  4px;
+  --spacing-2:  8px;
+  --spacing-3:  12px;
+  --spacing-4:  16px;
+  --spacing-5:  24px;
+  --spacing-6:  32px;
+  --spacing-8:  48px;
+  --spacing-10: 64px;
+
+  /* Radius */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-xl:   20px;
+  --radius-full: 9999px;
+
+  /* Easing + duration */
+  --ease-out-circ: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-fast: 150ms;
+  --duration-default: 250ms;
+  --duration-slow: 400ms;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bone-50);
+  color: var(--color-ink-700);
+  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Elevation utilities — spec §3.5 */
+@utility elevation-1 {
+  box-shadow:
+    0 1px 2px rgba(26, 24, 23, 0.04),
+    0 0 0 1px rgba(26, 24, 23, 0.05);
+}
+
+@utility elevation-2 {
+  box-shadow:
+    0 4px 12px rgba(26, 24, 23, 0.06),
+    0 0 0 1px rgba(26, 24, 23, 0.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

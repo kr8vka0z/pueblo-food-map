@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.0...v0.1.1) (2026-05-15)
+
+
+### Added
+
+* **data:** ingest Plentiful pantry directory for Pueblo ([#21](https://github.com/kr8vka0z/pueblo-food-map/issues/21)) ([94b731d](https://github.com/kr8vka0z/pueblo-food-map/commit/94b731d7d49073f5a0b50e22562583370fbd6f20))
+* **design:** land PR 2 — new layout, custom markers, search, basemap, detail panel ([#22](https://github.com/kr8vka0z/pueblo-food-map/issues/22)) ([d21caca](https://github.com/kr8vka0z/pueblo-food-map/commit/d21cacaa33911f5e37feec598dc24ad32d76271c))
+* **design:** PR 3 — Spanish translations, empty states, reduced motion ([#23](https://github.com/kr8vka0z/pueblo-food-map/issues/23)) ([a433e91](https://github.com/kr8vka0z/pueblo-food-map/commit/a433e91244a74ac7fc13b9c63f1cd099a2bfd78d))
+* **design:** swap to Inter + Fraunces and add full design-system token set ([#20](https://github.com/kr8vka0z/pueblo-food-map/issues/20)) ([380f7b6](https://github.com/kr8vka0z/pueblo-food-map/commit/380f7b60ebd43714e7b1c4f1f8aaa05c01331761))
+
 ## [Unreleased]
 
 ### Added

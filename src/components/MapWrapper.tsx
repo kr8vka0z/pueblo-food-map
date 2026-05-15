@@ -14,6 +14,7 @@ import CategoryRail from "./CategoryRail";
 import BottomSheet from "./BottomSheet";
 import VenueDetail from "./VenueDetail";
 import SearchInput from "./SearchInput";
+import EmptyState from "./EmptyState";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
@@ -26,7 +27,7 @@ import type { VenueCategory } from "@/types/venue";
 const LeafletMap = dynamic(() => import("./Map"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full w-full items-center justify-center bg-[var(--color-bone-100)] text-[var(--color-ink-400)] text-sm animate-pulse">
+    <div className="flex h-full w-full items-center justify-center bg-[var(--color-bone-100)] text-[var(--color-ink-400)] text-sm motion-safe:animate-pulse">
       Loading map…
     </div>
   ),
@@ -85,6 +86,13 @@ export default function MapWrapper() {
   const locale = useSyncExternalStore(noopSubscribe, readLocale, serverLocale);
   const [localeOverride, setLocaleOverride] = useState<Locale | null>(null);
   const activeLocale: Locale = localeOverride ?? locale;
+
+  // Sync <html lang> on mount and on every locale change (accessibility).
+  // layout.tsx renders lang="en" server-side; this effect updates it after
+  // hydration and whenever the user toggles.
+  useEffect(() => {
+    document.documentElement.lang = activeLocale;
+  }, [activeLocale]);
 
   function handleLocaleChange(l: Locale) {
     setLocaleOverride(l);
@@ -215,6 +223,22 @@ export default function MapWrapper() {
     filterWalking,
   ]);
 
+  // Whether any filter is active (used to gate empty-state display)
+  const anyFilterActive =
+    searchQuery.trim() !== "" ||
+    (selectedCategories !== null && selectedCategories.size > 0) ||
+    filterOpenNow ||
+    filterSnap ||
+    filterWalking;
+
+  function handleClearFilters() {
+    setSearchQuery("");
+    setSelectedCategories(null);
+    setFilterOpenNow(false);
+    setFilterSnap(false);
+    setFilterWalking(false);
+  }
+
   // Pre-compute distance map for Map.tsx (aria-labels on markers)
   const userDistances = useMemo(() => {
     const m = new Map<string, number>();
@@ -293,34 +317,46 @@ export default function MapWrapper() {
 
         {/* Desktop: venue list column (380px) */}
         <div className="hidden lg:flex lg:w-[380px] shrink-0">
-          <Sidebar
-            venues={filteredVenues}
-            selectedVenueId={selectedVenueId}
-            selectedCategories={selectedCategories}
-            categoryCounts={categoryCounts}
-            totalCount={filteredVenues.length}
-            onSelectVenue={(id) => setSelectedVenueId(id)}
-            onToggleCategory={handleToggleCategory}
-            locationStatus={locationStatus}
-            locale={activeLocale}
-            showCategoryChips={false}
-          />
+          {filteredVenues.length === 0 && anyFilterActive ? (
+            <div className="flex flex-1 items-center justify-center p-6">
+              <EmptyState locale={activeLocale} onClearFilters={handleClearFilters} />
+            </div>
+          ) : (
+            <Sidebar
+              venues={filteredVenues}
+              selectedVenueId={selectedVenueId}
+              selectedCategories={selectedCategories}
+              categoryCounts={categoryCounts}
+              totalCount={filteredVenues.length}
+              onSelectVenue={(id) => setSelectedVenueId(id)}
+              onToggleCategory={handleToggleCategory}
+              locationStatus={locationStatus}
+              locale={activeLocale}
+              showCategoryChips={false}
+            />
+          )}
         </div>
 
         {/* Tablet: sidebar (360px) with chips */}
         <div className="hidden md:flex lg:hidden w-[360px] shrink-0">
-          <Sidebar
-            venues={filteredVenues}
-            selectedVenueId={selectedVenueId}
-            selectedCategories={selectedCategories}
-            categoryCounts={categoryCounts}
-            totalCount={filteredVenues.length}
-            onSelectVenue={(id) => setSelectedVenueId(id)}
-            onToggleCategory={handleToggleCategory}
-            locationStatus={locationStatus}
-            locale={activeLocale}
-            showCategoryChips
-          />
+          {filteredVenues.length === 0 && anyFilterActive ? (
+            <div className="flex flex-1 items-center justify-center p-6">
+              <EmptyState locale={activeLocale} onClearFilters={handleClearFilters} />
+            </div>
+          ) : (
+            <Sidebar
+              venues={filteredVenues}
+              selectedVenueId={selectedVenueId}
+              selectedCategories={selectedCategories}
+              categoryCounts={categoryCounts}
+              totalCount={filteredVenues.length}
+              onSelectVenue={(id) => setSelectedVenueId(id)}
+              onToggleCategory={handleToggleCategory}
+              locationStatus={locationStatus}
+              locale={activeLocale}
+              showCategoryChips
+            />
+          )}
         </div>
 
         {/* Map — fills remaining space on all breakpoints */}
@@ -334,6 +370,7 @@ export default function MapWrapper() {
               setSelectedVenueId(id);
               setSheetSnap(SNAP_FULL);
             }}
+            locale={activeLocale}
           />
 
           {/* Tablet/Desktop: detail slide-over panel */}
@@ -381,6 +418,8 @@ export default function MapWrapper() {
             locale={activeLocale}
             snap={sheetSnap}
             onSnapChange={setSheetSnap}
+            anyFilterActive={anyFilterActive}
+            onClearFilters={handleClearFilters}
           />
         </div>
       </div>

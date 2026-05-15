@@ -13,6 +13,7 @@ import type { Venue } from "@/types/venue";
 import VenueCard from "./VenueCard";
 import VenueDetail from "./VenueDetail";
 import CategoryChips from "./CategoryChips";
+import EmptyState from "./EmptyState";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 import type { VenueCategory } from "@/types/venue";
@@ -34,6 +35,8 @@ interface BottomSheetProps {
   locale?: Locale;
   snap: (typeof SNAP_POINTS)[number];
   onSnapChange: (snap: (typeof SNAP_POINTS)[number]) => void;
+  anyFilterActive?: boolean;
+  onClearFilters?: () => void;
 }
 
 export default function BottomSheet({
@@ -47,6 +50,8 @@ export default function BottomSheet({
   locale = "en",
   snap,
   onSnapChange,
+  anyFilterActive = false,
+  onClearFilters,
 }: BottomSheetProps) {
   const selectedVenue = selectedVenueId
     ? venues.find((v) => v.id === selectedVenueId) ?? null
@@ -65,7 +70,9 @@ export default function BottomSheet({
       setActiveSnapPoint={handleSnapChange}
       open
       modal={false}
-      // Vaul handles prefers-reduced-motion internally
+      // Vaul's snap-point CSS transition is suppressed by the global
+      // @media (prefers-reduced-motion: reduce) block in globals.css,
+      // which sets transition-duration: 0.01ms on all elements.
     >
       <Drawer.Portal>
         <Drawer.Content
@@ -138,23 +145,29 @@ export default function BottomSheet({
 
               {/* Venue list — only visible when expanded */}
               {snap !== SNAP_POINTS[0] && (
-                <ul
-                  className="flex-1 overflow-y-auto divide-y divide-[var(--color-bone-200)]"
-                  aria-label="Filtered venues"
-                >
-                  {venues.map((v) => (
-                    <VenueCard
-                      key={v.id}
-                      venue={v}
-                      isSelected={v.id === selectedVenueId}
-                      onClick={() => {
-                        onSelectVenue(v.id);
-                        onSnapChange(SNAP_POINTS[2]);
-                      }}
-                      locale={locale}
-                    />
-                  ))}
-                </ul>
+                venues.length === 0 && anyFilterActive ? (
+                  <div className="flex flex-1 items-center justify-center p-6">
+                    <EmptyState locale={locale} onClearFilters={onClearFilters} />
+                  </div>
+                ) : (
+                  <ul
+                    className="flex-1 overflow-y-auto divide-y divide-[var(--color-bone-200)]"
+                    aria-label="Filtered venues"
+                  >
+                    {venues.map((v) => (
+                      <VenueCard
+                        key={v.id}
+                        venue={v}
+                        isSelected={v.id === selectedVenueId}
+                        onClick={() => {
+                          onSelectVenue(v.id);
+                          onSnapChange(SNAP_POINTS[2]);
+                        }}
+                        locale={locale}
+                      />
+                    ))}
+                  </ul>
+                )
               )}
             </div>
           )}

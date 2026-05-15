@@ -1,73 +1,90 @@
 "use client";
 
+/**
+ * Sidebar — used on tablet (360px) and within the desktop list column (380px).
+ * Shows category chips, then a scrollable venue list.
+ * On tablet it's the left panel; on desktop it's the middle column, with
+ * the filter rail in a separate leftmost column.
+ */
+
 import type { Venue } from "@/types/venue";
-import { categoryLabels, categoryColors } from "@/data/venues";
-import { formatMiles } from "@/lib/distance";
+import type { VenueCategory } from "@/types/venue";
+import VenueCard from "./VenueCard";
+import CategoryChips from "./CategoryChips";
+import { t } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 
 interface SidebarProps {
-  venues: Array<Venue & { distanceMiles: number | null }>;
+  venues: Array<Venue & { distanceMiles?: number }>;
   selectedVenueId: string | null;
-  onSelect: (id: string) => void;
+  selectedCategories: Set<VenueCategory> | null;
+  categoryCounts: Partial<Record<VenueCategory, number>>;
+  totalCount: number;
+  onSelectVenue: (id: string) => void;
+  onToggleCategory: (cat: VenueCategory | null) => void;
   locationStatus: "loading" | "granted" | "denied" | "unavailable" | "fallback";
+  locale?: Locale;
+  /** On tablet, also shows filter chips (no dedicated rail). On desktop, chips
+   *  are not shown here because the CategoryRail handles it. */
+  showCategoryChips?: boolean;
 }
-
-const locationStatusMessage: Record<SidebarProps["locationStatus"], string> = {
-  loading: "Detecting your location…",
-  granted: "Sorted by distance from your current location.",
-  denied:
-    "Location permission denied. Showing distance from downtown Pueblo.",
-  unavailable:
-    "Location not available on this device. Showing distance from downtown Pueblo.",
-  fallback: "Showing distance from downtown Pueblo.",
-};
 
 export default function Sidebar({
   venues,
   selectedVenueId,
-  onSelect,
+  selectedCategories,
+  categoryCounts,
+  totalCount,
+  onSelectVenue,
+  onToggleCategory,
   locationStatus,
+  locale = "en",
+  showCategoryChips = true,
 }: SidebarProps) {
+  const sortedByLabel = locationStatus === "granted"
+    ? t("location.granted", locale)
+    : t("location.fallback", locale);
+
   return (
-    <aside className="flex w-full flex-col border-b border-gray-200 bg-white md:h-full md:w-80 md:border-b-0 md:border-r">
-      <div className="border-b border-gray-200 px-4 py-2 text-xs text-gray-500">
-        {locationStatusMessage[locationStatus]}
+    <aside
+      className="flex flex-col h-full border-r border-[var(--color-bone-200)] bg-[var(--color-bone-50)]"
+      aria-label="Venue list"
+    >
+      {/* Header row */}
+      <div className="px-4 py-2.5 border-b border-[var(--color-bone-200)]">
+        <h2 className="text-sm font-semibold text-[var(--color-ink-700)]">
+          {t("sheet.places", locale, { count: String(venues.length) })}
+        </h2>
+        <p className="text-xs text-[var(--color-ink-400)] mt-0.5">{sortedByLabel}</p>
       </div>
-      <ul className="flex-1 divide-y divide-gray-100 overflow-y-auto">
-        {venues.map((v) => {
-          const isSelected = selectedVenueId === v.id;
-          return (
-            <li key={v.id}>
-              <button
-                type="button"
-                onClick={() => onSelect(v.id)}
-                className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
-                  isSelected
-                    ? "bg-blue-50"
-                    : "hover:bg-gray-50 focus:bg-gray-50"
-                }`}
-              >
-                <span
-                  className="mt-1 inline-block h-3 w-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: categoryColors[v.category] }}
-                  aria-hidden
-                />
-                <span className="flex-1 min-w-0">
-                  <span className="block truncate text-sm font-medium text-gray-900">
-                    {v.name}
-                  </span>
-                  <span className="block truncate text-xs text-gray-500">
-                    {categoryLabels[v.category]} · {v.address}
-                  </span>
-                </span>
-                {v.distanceMiles !== null && (
-                  <span className="shrink-0 text-xs font-medium text-gray-600">
-                    {formatMiles(v.distanceMiles)}
-                  </span>
-                )}
-              </button>
-            </li>
-          );
-        })}
+
+      {/* Category chips — optional (tablet shows them, desktop relies on rail) */}
+      {showCategoryChips && (
+        <div className="py-2 border-b border-[var(--color-bone-200)]">
+          <CategoryChips
+            selected={selectedCategories}
+            counts={categoryCounts}
+            totalCount={totalCount}
+            onToggle={onToggleCategory}
+            locale={locale}
+          />
+        </div>
+      )}
+
+      {/* Venue list */}
+      <ul
+        className="flex-1 overflow-y-auto divide-y divide-[var(--color-bone-200)]"
+        aria-label="Filtered venues"
+      >
+        {venues.map((v) => (
+          <VenueCard
+            key={v.id}
+            venue={v}
+            isSelected={v.id === selectedVenueId}
+            onClick={() => onSelectVenue(v.id)}
+            locale={locale}
+          />
+        ))}
       </ul>
     </aside>
   );

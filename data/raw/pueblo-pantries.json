@@ -1,0 +1,821 @@
+{
+  "generated_at": "2026-05-15T04:55:32Z",
+  "source": "https://directory.plentiful.org/colorado/pueblo",
+  "total_raw": 41,
+  "total_unique": 38,
+  "dropped_dedupe": 3,
+  "geocode_ok": 38,
+  "geocode_null": 0,
+  "entries": [
+    {
+      "id": "plentiful-pueblo-community-college-mobile-pantry-stop-e0de86e7",
+      "name": "Pueblo Community College - Mobile Pantry Stop",
+      "address": "Pueblo Community College",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-college-mobile-pantry-stop-e0de86e7",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Pueblo Community College - Mobile Pantry Stop. in Pueblo, CO. Hours and directions available.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.263186,
+      "lng": -104.637172,
+      "geocode_matched_query": "Pueblo Community College",
+      "geocode_display_name": "Pueblo Community College, 900, West Orman Avenue, Aberdeen, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/463826988"
+    },
+    {
+      "id": "plentiful-senior-towers-mobile-market-19a75a56",
+      "name": "Senior Towers - Mobile Market",
+      "address": "165 Central Main St., Pueblo, CO 81003",
+      "phone": "(719) 296-6995",
+      "url": "https://directory.plentiful.org/colorado/pueblo/senior-towers-mobile-market-19a75a56",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Senior Towers - Mobile Market. in Pueblo, CO. Phone: (719) 296-6995.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.265162,
+      "lng": -104.610623,
+      "geocode_matched_query": "165 Central Main St., Pueblo, CO 81003",
+      "geocode_display_name": "165, Central Main Street, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "geocode_osm_id": "way/17134746"
+    },
+    {
+      "id": "plentiful-cornerstone-assembly-of-god-pueblo-e68b65ea",
+      "name": "Cornerstone Assembly of God Pueblo",
+      "address": "1902 St. Clair Ave., Pueblo, CO 81004",
+      "phone": "(719) 542-4133",
+      "url": "https://directory.plentiful.org/colorado/pueblo/cornerstone-assembly-of-god-pueblo-e68b65ea",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Cornerstone Assembly of God Pueblo. in Pueblo, CO. Phone: (719) 542-4133.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.254816,
+      "lng": -104.633727,
+      "geocode_matched_query": "1902 St. Clair Ave., Pueblo, CO 81004",
+      "geocode_display_name": "1902, Saint Clair Avenue, Heritage, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/17133791"
+    },
+    {
+      "id": "plentiful-pueblo-community-college-school-pantry-cdc32119",
+      "name": "Pueblo Community College - School Pantry",
+      "address": "Pueblo Community College",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-college-school-pantry-cdc32119",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Pueblo Community College - School Pantry. in Pueblo, CO. Hours and directions available.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.263186,
+      "lng": -104.637172,
+      "geocode_matched_query": "Pueblo Community College",
+      "geocode_display_name": "Pueblo Community College, 900, West Orman Avenue, Aberdeen, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/463826988"
+    },
+    {
+      "id": "plentiful-compassion-care-pueblo-caba5d25",
+      "name": "Compassion Care- Pueblo",
+      "address": "1102 E. Abriendo Ave., Pueblo, CO 81004",
+      "phone": "(719) 423-9138",
+      "url": "https://directory.plentiful.org/colorado/pueblo/compassion-care-pueblo-caba5d25",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Compassion Care- Pueblo. in Pueblo, CO. Phone: (719) 423-9138.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.247716,
+      "lng": -104.613751,
+      "geocode_matched_query": "1102 E. Abriendo Ave., Pueblo, CO 81004",
+      "geocode_display_name": "1102, East Abriendo Avenue, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/177258308"
+    },
+    {
+      "id": "plentiful-pueblo-county-hhs-c01bc9c1",
+      "name": "Pueblo County HHS",
+      "address": "2631 East 4th Street, Pueblo, CO 81001",
+      "phone": "(719) 583-6199",
+      "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-county-hhs-c01bc9c1",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Pueblo County HHS. in Pueblo, CO. Phone: (719) 583-6199.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.272001,
+      "lng": -104.563807,
+      "geocode_matched_query": "2631 East 4th Street, Pueblo, CO 81001",
+      "geocode_display_name": "2631, East 4th Street, Fearnowville, Pueblo, Pueblo County, Colorado, 81001, United States",
+      "geocode_osm_id": "way/173573916"
+    },
+    {
+      "id": "plentiful-minnequa-vfw-post-3641-9faa99be",
+      "name": "Minnequa VFW Post 3641",
+      "address": "724 E. 4th St., Pueblo, CO 81001",
+      "phone": "(719) 406-5247",
+      "url": "https://directory.plentiful.org/colorado/pueblo/minnequa-vfw-post-3641-9faa99be",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": null,
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.270809,
+      "lng": -104.597789,
+      "geocode_matched_query": "724 E. 4th St., Pueblo, CO 81001",
+      "geocode_display_name": "724, East 4th Street, Lower East Side, Pueblo, Pueblo County, Colorado, 81001, United States",
+      "geocode_osm_id": "way/38563542"
+    },
+    {
+      "id": "plentiful-assistance-league-pueblo-services-7754e3e3",
+      "name": "Assistance League-Pueblo Services",
+      "address": "1112 Pueblo Blvd, Pueblo, CO 81005",
+      "phone": "(719) 544-1528",
+      "url": "https://directory.plentiful.org/colorado/pueblo/assistance-league-pueblo-services-7754e3e3",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Assistance League-Pueblo Services. in Pueblo, CO. Phone: (719) 544-1528.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.246826,
+      "lng": -104.662071,
+      "geocode_matched_query": "1112 Pueblo Blvd, Pueblo, CO 81005",
+      "geocode_display_name": "1112, South Pueblo Boulevard, Pueblo, Pueblo County, Colorado, 81005, United States",
+      "geocode_osm_id": "way/900394232"
+    },
+    {
+      "id": "plentiful-mt-carmel-veteran-center-of-pueblo-76b970d4",
+      "name": "Mt Carmel Veteran Center of Pueblo",
+      "address": "1925 E. Orman Ave., Pueblo, CO 81004",
+      "phone": "(719) 309-4719",
+      "url": "https://directory.plentiful.org/colorado/pueblo/mt-carmel-veteran-center-of-pueblo-76b970d4",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Mt Carmel Veteran Center of Pueblo. in Pueblo, CO. Phone: (719) 309-4719.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.234119,
+      "lng": -104.62075,
+      "geocode_matched_query": "1925 E. Orman Ave., Pueblo, CO 81004",
+      "geocode_display_name": "1925, East Orman Avenue, Bessemer, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/170688472"
+    },
+    {
+      "id": "plentiful-pueblo-united-3d8ce244",
+      "name": "Pueblo United",
+      "address": "615 E. 5th St., Pueblo, CO 81001",
+      "phone": "(719) 696-8586",
+      "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-united-3d8ce244",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Pueblo United. in Pueblo, CO. Phone: (719) 696-8586.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.271856,
+      "lng": -104.599463,
+      "geocode_matched_query": "615 E. 5th St., Pueblo, CO 81001",
+      "geocode_display_name": "615, East 5th Street, East Side, Fearnowville, Pueblo, Pueblo County, Colorado, 81001, United States",
+      "geocode_osm_id": "way/17134094"
+    },
+    {
+      "id": "plentiful-steel-city-fellowship-2d4c6ff3",
+      "name": "Steel City Fellowship",
+      "address": "1401 Jerry Murphy Rd., Pueblo, CO 81001",
+      "phone": "(719) 350-5001",
+      "url": "https://directory.plentiful.org/colorado/pueblo/steel-city-fellowship-2d4c6ff3",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Steel City Fellowship. in Pueblo, CO. Phone: (719) 350-5001.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.290574,
+      "lng": -104.596121,
+      "geocode_matched_query": "1401 Jerry Murphy Rd., Pueblo, CO 81001",
+      "geocode_display_name": "1401, Jerry Murphy Road, Pueblo, Pueblo County, Colorado, 81001, United States",
+      "geocode_osm_id": "way/17132491"
+    },
+    {
+      "id": "plentiful-center-toward-self-reliance-1c29edf8",
+      "name": "Center Toward Self-Reliance",
+      "address": "901 W. 8th St., Pueblo, CO 81003",
+      "phone": "(719) 546-1271",
+      "url": "https://directory.plentiful.org/colorado/pueblo/center-toward-self-reliance-1c29edf8",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Center Toward Self-Reliance. in Pueblo, CO. Phone: (719) 546-1271.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.274091,
+      "lng": -104.6197,
+      "geocode_matched_query": "901 W. 8th St., Pueblo, CO 81003",
+      "geocode_display_name": "901, West 8th Street, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "geocode_osm_id": "way/17130148"
+    },
+    {
+      "id": "plentiful-pueblo-community-soup-kitchen-1bc98af5",
+      "name": "Pueblo Community Soup Kitchen",
+      "address": "422 W. 7th St., Pueblo, CO 81003",
+      "phone": "(719) 545-6540",
+      "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-soup-kitchen-1bc98af5",
+      "category": "meal_site",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": null,
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.273296,
+      "lng": -104.612059,
+      "geocode_matched_query": "422 W. 7th St., Pueblo, CO 81003",
+      "geocode_display_name": "422, West 7th Street, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "geocode_osm_id": "way/659617184"
+    },
+    {
+      "id": "plentiful-foodbank-of-eastside-neighbor-s-council-fde35382",
+      "name": "Foodbank of Eastside Neighbor's Council",
+      "address": "224 E 4th St, Pueblo, CO 81003",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/foodbank-of-eastside-neighbor-s-council-fde35382",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Foodbank of Eastside Neighbor's Council. in Pueblo, CO.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.270611,
+      "lng": -104.606116,
+      "geocode_matched_query": "224 E 4th St, Pueblo, CO 81003",
+      "geocode_display_name": "224, East 4th Street, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "geocode_osm_id": "way/38563544"
+    },
+    {
+      "id": "plentiful-lynn-gardens-baptist-church-d9ee705e",
+      "name": "Lynn Gardens Baptist Church",
+      "address": "3804 W. Pueblo Blvd., Pueblo, CO 81005",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/lynn-gardens-baptist-church-d9ee705e",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": null,
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.223992,
+      "lng": -104.656767,
+      "geocode_matched_query": "3804 W. Pueblo Blvd., Pueblo, CO 81005",
+      "geocode_display_name": "3804, West Pueblo Boulevard, Highland Park, Pueblo, Pueblo County, Colorado, 81005, United States",
+      "geocode_osm_id": "way/900398495"
+    },
+    {
+      "id": "plentiful-full-force-ministries-food-pantry-cf58c38d",
+      "name": "Full Force Ministries Food Pantry",
+      "address": "1101 Cedar St., Pueblo, CO 81004",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/full-force-ministries-food-pantry-cf58c38d",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Full Force Ministries Food Pantry. in Pueblo, CO.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.247706,
+      "lng": -104.619755,
+      "geocode_matched_query": "1101 Cedar St., Pueblo, CO 81004",
+      "geocode_display_name": "1101, Cedar Street, Bessemer, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/17133005"
+    },
+    {
+      "id": "plentiful-victory-life-ministries-a24917c0",
+      "name": "Victory Life Ministries",
+      "address": "2315 Sprague Ave, Pueblo, CO 81004",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/victory-life-ministries-a24917c0",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Victory Life Ministries. in Pueblo, CO.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.240536,
+      "lng": -104.638127,
+      "geocode_matched_query": "2315 Sprague Ave, Pueblo, CO 81004",
+      "geocode_display_name": "2315, Sprague Avenue, Lakeview, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/899897192"
+    },
+    {
+      "id": "plentiful-edible-planet-food-distribution-center-71b7a0fe",
+      "name": "Edible Planet - Food Distribution Center",
+      "address": "414 Booth Ave, Pueblo, CO 81001",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/edible-planet-food-distribution-center-71b7a0fe",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Edible Planet - Food Distribution Center. in Pueblo, CO.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.264913,
+      "lng": -104.565793,
+      "geocode_matched_query": "414 Booth Ave, Pueblo, CO 81001",
+      "geocode_display_name": "414, Booth Avenue, Blende, Pueblo County, Colorado, 81001, United States",
+      "geocode_osm_id": "way/17134217"
+    },
+    {
+      "id": "plentiful-bessemer-mobile-food-pantry-58874d63",
+      "name": "Bessemer Mobile Food Pantry",
+      "address": "215 Canal St, Pueblo, CO 81004",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/bessemer-mobile-food-pantry-58874d63",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Bessemer Mobile Food Pantry. in Pueblo, CO.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.237869,
+      "lng": -104.612428,
+      "geocode_matched_query": "215 Canal St, Pueblo, CO 81004",
+      "geocode_display_name": "Steelworks Center of the West, 215, Canal Street, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/971913064"
+    },
+    {
+      "id": "plentiful-colorado-division-of-housing-food-distribution-center-5448eb74",
+      "name": "Colorado Division Of Housing - Food Distribution Center",
+      "address": "132 W B St, Pueblo, CO 81003",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/colorado-division-of-housing-food-distribution-center-5448eb74",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Colorado Division Of Housing - Food Distribution Center. in Pueblo, CO.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.262858,
+      "lng": -104.617193,
+      "geocode_matched_query": "132 W B St, Pueblo, CO 81003",
+      "geocode_display_name": "Union Depot, 132, West B Street, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "geocode_osm_id": "way/319910835"
+    },
+    {
+      "id": "plentiful-eva-r-baca-elementary-school-52dc3901",
+      "name": "Eva R Baca Elementary School",
+      "address": "2800 East 17th St, Pueblo, CO 81001",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/eva-r-baca-elementary-school-52dc3901",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Eva R Baca Elementary School. in Pueblo, CO.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.283411,
+      "lng": -104.579346,
+      "geocode_matched_query": "2800 East 17th St, Pueblo, CO 81001",
+      "geocode_display_name": "East 17th Street, Pueblo, Pueblo County, Colorado, 81001, United States",
+      "geocode_osm_id": "way/17131325"
+    },
+    {
+      "id": "plentiful-care-and-share-food-bank-for-southern-colorado-main-location-4a362e63",
+      "name": "Care and Share Food Bank for Southern Colorado - Main Location",
+      "address": "100 Greenhorn Dr #100, Pueblo, CO 81004",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/care-and-share-food-bank-for-southern-colorado-main-location-4a362e63",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Care and Share Food Bank for Southern Colorado - Main Location. in Pueblo, CO. Hours and directions available.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.209461,
+      "lng": -104.627381,
+      "geocode_matched_query": "100 Greenhorn Dr, Pueblo, CO 81004",
+      "geocode_display_name": "100, Greenhorn Drive, Southgate, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/17130383"
+    },
+    {
+      "id": "plentiful-st-anne-s-catholic-church-37512aae",
+      "name": "St. Anne's Catholic Church",
+      "address": "2701 E. 12th St., Pueblo, CO 81001",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/st-anne-s-catholic-church-37512aae",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "St. Anne's Catholic Church. in Pueblo, CO.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.279561,
+      "lng": -104.562587,
+      "geocode_matched_query": "2701 E. 12th St., Pueblo, CO 81001",
+      "geocode_display_name": "Saint Anne Catholic Church, 2701, East 12th Street, Fearnowville, Pueblo, Pueblo County, Colorado, 81001, United States",
+      "geocode_osm_id": "way/683268918"
+    },
+    {
+      "id": "plentiful-new-heights-baptist-church-35755919",
+      "name": "New Heights Baptist Church",
+      "address": "3304 Baltimore Ave., Pueblo, CO 81008",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/new-heights-baptist-church-35755919",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "New Heights Baptist Church. in Pueblo, CO. Hours and directions available.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.304889,
+      "lng": -104.63527,
+      "geocode_matched_query": "3304 Baltimore Ave., Pueblo, CO 81008",
+      "geocode_display_name": "3304, Baltimore Avenue, Skyview, Pueblo, Pueblo County, Colorado, 81008, United States",
+      "geocode_osm_id": "way/17133325"
+    },
+    {
+      "id": "plentiful-praise-assembly-of-god-food-pantry-2118f856",
+      "name": "Praise Assembly of God - Food Pantry",
+      "address": "2000 Troy Avenue, Pueblo, CO 81001",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/praise-assembly-of-god-food-pantry-2118f856",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Praise Assembly of God - Food Pantry. in Pueblo, CO.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.285559,
+      "lng": -104.573368,
+      "geocode_matched_query": "2000 Troy Avenue, Pueblo, CO 81001",
+      "geocode_display_name": "2000, Troy Avenue, Pueblo, Pueblo County, Colorado, 81001, United States",
+      "geocode_osm_id": "way/900385172"
+    },
+    {
+      "id": "plentiful-pueblo-cooperative-care-center-97ec4eda",
+      "name": "Pueblo Cooperative Care Center",
+      "address": "326 West 8th Street, Pueblo, CO 81003",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-cooperative-care-center-97ec4eda",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Pueblo Cooperative Care Center. in Pueblo, CO. Hours and directions available.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.274237,
+      "lng": -104.610622,
+      "geocode_matched_query": "326 West 8th Street, Pueblo, CO 81003",
+      "geocode_display_name": "326, West 8th Street, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "geocode_osm_id": "way/659617188"
+    },
+    {
+      "id": "plentiful-agape-fellowship-church-925bb133",
+      "name": "Agape Fellowship Church",
+      "address": "611 Broadway Ave., Pueblo, CO 81004",
+      "phone": "",
+      "url": "https://directory.plentiful.org/colorado/pueblo/agape-fellowship-church-925bb133",
+      "category": "pantry",
+      "hours_weekly": null,
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Agape Fellowship Church. in Pueblo, CO. Hours and directions available.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.25376,
+      "lng": -104.626774,
+      "geocode_matched_query": "611 Broadway Ave., Pueblo, CO 81004",
+      "geocode_display_name": "Agape Fellowship, 611, Broadway Avenue, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "node/12843448581"
+    },
+    {
+      "id": "plentiful-blessing-box-216-w-routt-plentiful-1454",
+      "name": "Blessing Box - 216 W Routt",
+      "address": "216 W Routt Ave, Pueblo, CO 81004",
+      "phone": "(800) 748-2074",
+      "url": "https://directory.plentiful.org/colorado/pueblo/blessing-box-216-w-routt-plentiful-1454",
+      "category": "pantry",
+      "hours_weekly": {
+        "tue": [
+          "8:00 AM - 2:00 PM"
+        ]
+      },
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Blessing Box - 216 W Routt. in Pueblo, CO. Phone: (800) 748-2074.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.25902,
+      "lng": -104.625612,
+      "geocode_matched_query": "216 W Routt Ave, Pueblo, CO 81004",
+      "geocode_display_name": "216, West Routt Avenue, Mesa Junction, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/17132065"
+    },
+    {
+      "id": "plentiful-rmser-empowerment-center-plentiful-3072",
+      "name": "RMSER Empowerment Center",
+      "address": "330 Lake Ave, Pueblo, CO 81004",
+      "phone": "(800) 748-2074",
+      "url": "https://directory.plentiful.org/colorado/pueblo/rmser-empowerment-center-plentiful-3072",
+      "category": "pantry",
+      "hours_weekly": {
+        "wed": [
+          "4:00 PM - 6:00 PM"
+        ],
+        "fri": [
+          "4:00 PM - 6:00 PM"
+        ]
+      },
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "RMSER Empowerment Center. in Pueblo, CO. Phone: (800) 748-2074.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.254427,
+      "lng": -104.620381,
+      "geocode_matched_query": "330 Lake Ave, Pueblo, CO 81004",
+      "geocode_display_name": "330, Lake Avenue, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/17129946"
+    },
+    {
+      "id": "plentiful-pueblo-cooperative-care-center-plentiful-3140",
+      "name": "Pueblo Cooperative Care Center",
+      "address": "326 W 8th St, Pueblo, CO 81003",
+      "phone": "(719) 543-7484",
+      "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-cooperative-care-center-plentiful-3140",
+      "category": "pantry",
+      "hours_weekly": {
+        "mon": [
+          "9:00 AM - 1:00 PM"
+        ],
+        "tue": [
+          "9:00 AM - 1:00 PM"
+        ],
+        "wed": [
+          "9:00 AM - 1:00 PM"
+        ],
+        "thu": [
+          "9:00 AM - 1:00 PM"
+        ]
+      },
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Pueblo Cooperative Care Center. in Pueblo, CO. Phone: (719) 543-7484.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.274237,
+      "lng": -104.610622,
+      "geocode_matched_query": "326 W 8th St, Pueblo, CO 81003",
+      "geocode_display_name": "326, West 8th Street, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "geocode_osm_id": "way/659617188"
+    },
+    {
+      "id": "plentiful-pueblo-county-usda-food-distribution-plentiful-3149",
+      "name": "Pueblo County USDA Food Distribution",
+      "address": "2631 E 4th St, Pueblo, CO 81001",
+      "phone": "(719) 583-6199",
+      "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-county-usda-food-distribution-plentiful-3149",
+      "category": "pantry",
+      "hours_weekly": {
+        "mon": [
+          "7:30 AM - 3:15 PM"
+        ],
+        "tue": [
+          "7:30 AM - 3:15 PM"
+        ],
+        "wed": [
+          "7:30 AM - 3:15 PM"
+        ],
+        "thu": [
+          "7:30 AM - 3:15 PM"
+        ],
+        "fri": [
+          "7:30 AM - 3:15 PM"
+        ]
+      },
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Pueblo County USDA Food Distribution. in Pueblo, CO. Phone: (719) 583-6199.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.272001,
+      "lng": -104.563807,
+      "geocode_matched_query": "2631 E 4th St, Pueblo, CO 81001",
+      "geocode_display_name": "2631, East 4th Street, Fearnowville, Pueblo, Pueblo County, Colorado, 81001, United States",
+      "geocode_osm_id": "way/173573916"
+    },
+    {
+      "id": "plentiful-salvation-army-pueblo-plentiful-3190",
+      "name": "Salvation Army- Pueblo",
+      "address": "401 S Prairie Ave, Pueblo, CO 81005",
+      "phone": "(719) 543-3656",
+      "url": "https://directory.plentiful.org/colorado/pueblo/salvation-army-pueblo-plentiful-3190",
+      "category": "pantry",
+      "hours_weekly": {
+        "tue": [
+          "10:00 AM - 12:00 PM"
+        ],
+        "wed": [
+          "10:00 AM - 12:00 PM"
+        ],
+        "thu": [
+          "10:00 AM - 12:00 PM"
+        ]
+      },
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Salvation Army- Pueblo. in Pueblo, CO. Phone: (719) 543-3656.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.260216,
+      "lng": -104.644065,
+      "geocode_matched_query": "401 S Prairie Ave, Pueblo, CO 81005",
+      "geocode_display_name": "401, South Prairie Avenue, Aberdeen, Pueblo, Pueblo County, Colorado, 81005, United States",
+      "geocode_osm_id": "way/17131300"
+    },
+    {
+      "id": "plentiful-pueblo-community-soup-kitchen-plentiful-3195",
+      "name": "Pueblo Community Soup Kitchen",
+      "address": "422 W. 7th Street, Pueblo, CO 81003",
+      "phone": "(719) 545-6540",
+      "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-soup-kitchen-plentiful-3195",
+      "category": "meal_site",
+      "hours_weekly": {
+        "mon": [
+          "10:30 AM - 12:00 PM",
+          "8:30 AM - 9:30 AM"
+        ],
+        "tue": [
+          "10:30 AM - 12:00 PM",
+          "8:30 AM - 9:30 AM"
+        ],
+        "wed": [
+          "10:30 AM - 12:00 PM",
+          "8:30 AM - 9:30 AM"
+        ],
+        "thu": [
+          "10:30 AM - 12:00 PM",
+          "8:30 AM - 9:30 AM"
+        ],
+        "fri": [
+          "10:30 AM - 12:00 PM",
+          "8:30 AM - 9:30 AM"
+        ],
+        "sat": [
+          "10:30 AM - 12:00 PM",
+          "8:30 AM - 9:30 AM"
+        ]
+      },
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Pueblo Community Soup Kitchen. in Pueblo, CO. Phone: (719) 545-6540.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.273296,
+      "lng": -104.612059,
+      "geocode_matched_query": "422 W. 7th Street, Pueblo, CO 81003",
+      "geocode_display_name": "422, West 7th Street, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "geocode_osm_id": "way/659617184"
+    },
+    {
+      "id": "plentiful-senior-resource-development-agency-pueblo-inc-plentiful-3197",
+      "name": "Senior Resource Development Agency, Pueblo Inc.",
+      "address": "230 N Union Ave, Pueblo, CO 81003",
+      "phone": "(719) 543-0100",
+      "url": "https://directory.plentiful.org/colorado/pueblo/senior-resource-development-agency-pueblo-inc-plentiful-3197",
+      "category": "pantry",
+      "hours_weekly": {
+        "mon": [
+          "11:00 AM - 12:30 PM"
+        ],
+        "tue": [
+          "11:00 AM - 12:30 PM"
+        ],
+        "wed": [
+          "11:00 AM - 12:30 PM"
+        ],
+        "thu": [
+          "11:00 AM - 12:30 PM"
+        ],
+        "fri": [
+          "11:00 AM - 12:30 PM"
+        ]
+      },
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "Senior Resource Development Agency, Pueblo Inc.. in Pueblo, CO. Phone: (719) 543-0100.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.266428,
+      "lng": -104.610567,
+      "geocode_matched_query": "230 N Union Ave, Pueblo, CO 81003",
+      "geocode_display_name": "Senior Resource Development Agency Pueblo Inc, 230, North Union Avenue, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "geocode_osm_id": "way/439874632"
+    },
+    {
+      "id": "plentiful-the-avenue-church-plentiful-3200",
+      "name": "The Avenue Church",
+      "address": "3030 Thatcher Ave, Pueblo, CO 81005",
+      "phone": "(719) 561-1512",
+      "url": "https://directory.plentiful.org/colorado/pueblo/the-avenue-church-plentiful-3200",
+      "category": "pantry",
+      "hours_weekly": {
+        "sat": [
+          "9:00 AM - 11:30 AM"
+        ]
+      },
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "The Avenue Church. in Pueblo, CO. Phone: (719) 561-1512.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.258422,
+      "lng": -104.647055,
+      "geocode_matched_query": "3030 Thatcher Ave, Pueblo, CO 81005",
+      "geocode_display_name": "3030, Thatcher Avenue, Aberdeen, Pueblo, Pueblo County, Colorado, 81005, United States",
+      "geocode_osm_id": "way/38341728"
+    },
+    {
+      "id": "plentiful-bgcc-pueblo-pantry-plentiful-4069",
+      "name": "BGCC Pueblo Pantry",
+      "address": "1230 E 8th St, Pueblo, CO 81001",
+      "phone": "(719) 470-1004",
+      "url": "https://directory.plentiful.org/colorado/pueblo/bgcc-pueblo-pantry-plentiful-4069",
+      "category": "pantry",
+      "hours_weekly": {
+        "thu": [
+          "11:00 AM - 2:00 PM"
+        ]
+      },
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "BGCC Pueblo Pantry. in Pueblo, CO. Phone: (719) 470-1004.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.274686,
+      "lng": -104.590266,
+      "geocode_matched_query": "1230 E 8th St, Pueblo, CO 81001",
+      "geocode_display_name": "1230, East 8th Street, East Side, Pueblo, Pueblo County, Colorado, 81001, United States",
+      "geocode_osm_id": "way/401701993"
+    },
+    {
+      "id": "plentiful-first-congregational-united-church-of-christ-pueblo-plentiful-4247",
+      "name": "First Congregational United Church of Christ- Pueblo",
+      "address": "228 W Evans Ave, Pueblo, CO 81004",
+      "phone": "(719) 544-1892",
+      "url": "https://directory.plentiful.org/colorado/pueblo/first-congregational-united-church-of-christ-pueblo-plentiful-4247",
+      "category": "pantry",
+      "hours_weekly": {
+        "sun": [
+          "9:00 AM - 12:00 PM"
+        ]
+      },
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "First Congregational United Church of Christ- Pueblo. in Pueblo, CO. Phone: (719) 544-1892.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.260184,
+      "lng": -104.624609,
+      "geocode_matched_query": "228 W Evans Ave, Pueblo, CO 81004",
+      "geocode_display_name": "228, West Evans Avenue, Mesa Junction, Pueblo, Pueblo County, Colorado, 81004, United States",
+      "geocode_osm_id": "way/17133713"
+    },
+    {
+      "id": "plentiful-the-pueblo-shelter-safeside-recovery-plentiful-4265",
+      "name": "The Pueblo Shelter/SafeSide Recovery",
+      "address": "728 W 4th St, Pueblo, CO 81003",
+      "phone": "(719) 924-8413",
+      "url": "https://directory.plentiful.org/colorado/pueblo/the-pueblo-shelter-safeside-recovery-plentiful-4265",
+      "category": "pantry",
+      "hours_weekly": {
+        "mon": [
+          "4:30 PM - 5:00 PM"
+        ],
+        "tue": [
+          "4:30 PM - 5:00 PM"
+        ],
+        "wed": [
+          "4:30 PM - 5:00 PM"
+        ],
+        "thu": [
+          "4:30 PM - 5:00 PM"
+        ],
+        "fri": [
+          "2:00 PM - 4:00 PM",
+          "4:30 PM - 5:00 PM"
+        ],
+        "sat": [
+          "4:30 PM - 5:00 PM"
+        ],
+        "sun": [
+          "4:30 PM - 5:00 PM"
+        ]
+      },
+      "accepts_snap": null,
+      "accepts_wic": null,
+      "notes": "The Pueblo Shelter/SafeSide Recovery. in Pueblo, CO. Phone: (719) 924-8413.",
+      "scrape_timestamp": "2026-05-15T04:55:32Z",
+      "lat": 38.270682,
+      "lng": -104.616821,
+      "geocode_matched_query": "728 W 4th St, Pueblo, CO 81003",
+      "geocode_display_name": "728, West 4th Street, Downtown, Pueblo, Pueblo County, Colorado, 81003, United States",
+      "geocode_osm_id": "way/954148789"
+    }
+  ]
+}

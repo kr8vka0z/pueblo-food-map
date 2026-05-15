@@ -1,5 +1,6 @@
 import type { Venue } from "@/types/venue";
 import { groceryOsmVenues } from "@/data/grocery-osm";
+import { plentifulPantries } from "@/data/pantries-plentiful";
 
 // v1 seed data — Pueblo Food Project Community Garden Sustainability Project (CGSP)
 // and edible landscapes. Source: https://pueblofoodproject.org/cgsp/ (verified 2026-05-12).
@@ -148,7 +149,7 @@ export const pfpVenues: Venue[] = [
 
 // Combined venue list rendered on the map. PFP first so its richer metadata
 // (notes, partnerships) wins any future de-dup pass.
-export const venues: Venue[] = [...pfpVenues, ...groceryOsmVenues];
+export const venues: Venue[] = [...pfpVenues, ...groceryOsmVenues, ...plentifulPantries];
 
 export const categoryLabels: Record<Venue["category"], string> = {
   pantry: "Food Pantry",
@@ -161,11 +162,21 @@ export const categoryLabels: Record<Venue["category"], string> = {
 };
 
 export const categoryColors: Record<Venue["category"], string> = {
-  pantry: "#e11d48", // rose-600
-  grocery: "#2563eb", // blue-600
-  convenience: "#0891b2", // cyan-600
-  farm: "#ca8a04", // yellow-600
-  garden: "#16a34a", // green-600
-  edible_landscape: "#65a30d", // lime-600
-  meal_site: "#9333ea", // purple-600
+  pantry: "#BE2D45",       // cranberry — spec §3.1
+  grocery: "#1F4E8C",      // deep blue
+  convenience: "#0F6573",  // teal
+  farm: "#92591D",         // burnt amber
+  garden: "#2C5F4F",       // sage (matches brand)
+  edible_landscape: "#58772B", // olive
+  meal_site: "#6B3FA0",    // plum
+};
+
+export const categoryIcon: Record<Venue["category"], string> = {
+  pantry: "ShoppingBasket",
+  grocery: "ShoppingCart",
+  convenience: "Store",
+  farm: "Tractor",
+  garden: "Sprout",
+  edible_landscape: "Leaf",
+  meal_site: "Utensils",
 };

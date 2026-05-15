@@ -162,11 +162,21 @@ export const categoryLabels: Record<Venue["category"], string> = {
 };
 
 export const categoryColors: Record<Venue["category"], string> = {
-  pantry: "#e11d48", // rose-600
-  grocery: "#2563eb", // blue-600
-  convenience: "#0891b2", // cyan-600
-  farm: "#ca8a04", // yellow-600
-  garden: "#16a34a", // green-600
-  edible_landscape: "#65a30d", // lime-600
-  meal_site: "#9333ea", // purple-600
+  pantry: "#BE2D45",       // cranberry — spec §3.1
+  grocery: "#1F4E8C",      // deep blue
+  convenience: "#0F6573",  // teal
+  farm: "#92591D",         // burnt amber
+  garden: "#2C5F4F",       // sage (matches brand)
+  edible_landscape: "#58772B", // olive
+  meal_site: "#6B3FA0",    // plum
+};
+
+export const categoryIcon: Record<Venue["category"], string> = {
+  pantry: "ShoppingBasket",
+  grocery: "ShoppingCart",
+  convenience: "Store",
+  farm: "Tractor",
+  garden: "Sprout",
+  edible_landscape: "Leaf",
+  meal_site: "Utensils",
 };

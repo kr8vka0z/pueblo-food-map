@@ -92,6 +92,15 @@ body {
     0 0 0 1px rgba(26, 24, 23, 0.06);
 }
 
+/* Hide scrollbars in chip rows while keeping scroll functional */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

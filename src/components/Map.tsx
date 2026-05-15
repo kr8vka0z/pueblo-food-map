@@ -1,24 +1,40 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import L from "leaflet";
 import {
   MapContainer,
   TileLayer,
+  Marker,
   CircleMarker,
   Tooltip,
   useMap,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Venue } from "@/types/venue";
-import { categoryLabels, categoryColors } from "@/data/venues";
+import { categoryLabels } from "@/data/venues";
+import { formatMiles } from "@/lib/distance";
+import { createVenueIcon } from "./VenueMarker";
 
 const PUEBLO_CENTER: [number, number] = [38.2544, -104.6091];
+
+// CARTO Voyager basemap — warmer / calmer than raw OSM, better marker
+// hierarchy, free for OSS, same OSM data underneath (spec §10.1).
+const CARTO_VOYAGER =
+  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+
+const CARTO_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 interface MapProps {
   venues: Venue[];
   selectedVenueId: string | null;
   userLocation: { lat: number; lng: number } | null;
+  userDistances: Map<string, number>;
+  onSelectVenue: (id: string) => void;
 }
+
+// ─── MapController (logic preserved verbatim from original) ──────────────────
 
 function MapController({
   venues,
@@ -37,11 +53,7 @@ function MapController({
   const flownToUserRef = useRef(false);
   const fittedBoundsRef = useRef(false);
 
-  // Recompute map size whenever the leaflet container resizes, AND on a
-  // short delay after mount so the initial size measurement is right.
-  // Leaflet caches the container size internally; without these calls the
-  // map's logical center is correct but the tiles render as if the container
-  // were a different size — visually misaligned by hundreds of meters.
+  // Recompute map size on container resize to prevent tile misalignment.
   useEffect(() => {
     const container = map.getContainer();
     const t = setTimeout(() => map.invalidateSize({ pan: false }), 100);
@@ -53,11 +65,7 @@ function MapController({
     };
   }, [map]);
 
-  // Fit the map to venues within ~15 miles of downtown Pueblo on mount so
-  // the user sees the bulk of food access points without the eastern
-  // outliers (Olney Springs, Boone) dragging the bounds so wide that
-  // Pueblo proper becomes a postage stamp. Outliers still render as
-  // markers; they're just not used to compute the initial framing.
+  // Fit to venues within ~15 miles of downtown Pueblo on mount.
   useEffect(() => {
     if (fittedBoundsRef.current) return;
     if (venues.length === 0) return;
@@ -66,7 +74,6 @@ function MapController({
     const inCity = venues.filter((v) => {
       const dLat = v.lat - PUEBLO.lat;
       const dLng = v.lng - PUEBLO.lng;
-      // Rough miles: 1 deg lat ≈ 69 mi, 1 deg lng at 38°N ≈ 54 mi.
       const miles = Math.sqrt((dLat * 69) ** 2 + (dLng * 54) ** 2);
       return miles <= 15;
     });
@@ -75,9 +82,7 @@ function MapController({
     map.fitBounds(bounds, { padding: [30, 30] });
   }, [venues, map]);
 
-  // Single effect: venue takes priority over user-location. If a venue is
-  // selected, fly there. Otherwise, fly to the user's location only the
-  // first time it arrives. This avoids competing flyTo calls.
+  // Venue flyTo takes priority over user location flyTo.
   useEffect(() => {
     if (selectedLat != null && selectedLng != null) {
       map.flyTo([selectedLat, selectedLng], 16, { duration: 0.8 });
@@ -92,38 +97,43 @@ function MapController({
   return null;
 }
 
-function VenueTooltipBody({ venue }: { venue: Venue }) {
-  return (
-    <div className="space-y-1 text-sm max-w-xs">
-      <h3 className="font-semibold text-base leading-tight">{venue.name}</h3>
-      <p className="text-xs uppercase tracking-wide text-gray-500">
-        {categoryLabels[venue.category]}
-      </p>
-      <p className="text-xs text-gray-700">{venue.address}</p>
-      {venue.hours_weekly && (
-        <p className="text-xs">
-          <span className="font-medium">Hours: </span>
-          {Object.entries(venue.hours_weekly)
-            .map(([day, slots]) => `${day} ${slots.join(", ")}`)
-            .join(" · ")}
-        </p>
-      )}
-      {venue.phone && <p className="text-xs">{venue.phone}</p>}
-      {venue.email && <p className="text-xs">{venue.email}</p>}
-      {venue.notes && (
-        <p className="text-xs text-gray-700 leading-snug">{venue.notes}</p>
-      )}
-    </div>
-  );
+// ─── Attribution helper (bottom-left) ────────────────────────────────────────
+
+function AttributionBottomLeft() {
+  const map = useMap();
+
+  useEffect(() => {
+    const ctrl = L.control.attribution({
+      position: "bottomleft",
+      prefix: false,
+    });
+    ctrl.addTo(map);
+    // Style the attribution element
+    const el = ctrl.getContainer();
+    if (el) {
+      el.style.fontSize = "11px";
+      el.style.opacity = "0.8";
+      el.style.background = "transparent";
+      el.style.boxShadow = "none";
+    }
+    return () => {
+      ctrl.remove();
+    };
+  }, [map]);
+
+  return null;
 }
+
+// ─── Map component ────────────────────────────────────────────────────────────
 
 export default function Map({
   venues,
   selectedVenueId,
   userLocation,
+  userDistances,
+  onSelectVenue,
 }: MapProps) {
-  const selectedVenue =
-    venues.find((v) => v.id === selectedVenueId) ?? null;
+  const selectedVenue = venues.find((v) => v.id === selectedVenueId) ?? null;
 
   return (
     <MapContainer
@@ -131,11 +141,15 @@ export default function Map({
       zoom={13}
       scrollWheelZoom
       style={{ height: "100%", width: "100%" }}
+      attributionControl={false}
     >
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution={CARTO_ATTRIBUTION}
+        url={CARTO_VOYAGER}
       />
+
+      {/* Attribution at bottom-left per spec §10.3 */}
+      <AttributionBottomLeft />
 
       <MapController
         venues={venues}
@@ -145,6 +159,7 @@ export default function Map({
         userLng={userLocation?.lng ?? null}
       />
 
+      {/* User location dot — blue circle (v1; no custom marker needed) */}
       {userLocation && (
         <CircleMarker
           center={[userLocation.lat, userLocation.lng]}
@@ -162,29 +177,33 @@ export default function Map({
         </CircleMarker>
       )}
 
+      {/* Venue markers — custom SVG pin via L.divIcon */}
       {venues.map((v) => {
         const isSelected = v.id === selectedVenueId;
+        const icon = createVenueIcon({ category: v.category, selected: isSelected });
+        const distMiles = userDistances.get(v.id);
+        const distLabel = distMiles !== undefined ? formatMiles(distMiles) : "";
+        const ariaLabel = `${v.name}, ${categoryLabels[v.category]}${distLabel ? `, ${distLabel} from you` : ""}`;
+
         return (
-          <CircleMarker
+          <Marker
             key={v.id}
-            center={[v.lat, v.lng]}
-            radius={isSelected ? 12 : 9}
-            pathOptions={{
-              color: categoryColors[v.category],
-              fillColor: categoryColors[v.category],
-              fillOpacity: isSelected ? 1 : 0.85,
-              weight: isSelected ? 4 : 2,
+            position={[v.lat, v.lng]}
+            icon={icon}
+            title={ariaLabel}
+            eventHandlers={{
+              click: () => onSelectVenue(v.id),
             }}
           >
-            <Tooltip
-              direction="top"
-              offset={[0, -10]}
-              opacity={1}
-              permanent={isSelected}
-            >
-              <VenueTooltipBody venue={v} />
+            <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+              <div className="text-sm font-medium leading-tight max-w-[200px]">
+                {v.name}
+                <span className="block text-xs text-gray-500 font-normal">
+                  {categoryLabels[v.category]}
+                </span>
+              </div>
             </Tooltip>
-          </CircleMarker>
+          </Marker>
         );
       })}
     </MapContainer>

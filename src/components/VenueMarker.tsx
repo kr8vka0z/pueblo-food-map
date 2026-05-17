@@ -69,6 +69,10 @@ interface VenueMarkerProps {
   /** Distance from user in miles, appended to aria-label when available. */
   distanceMiles?: number;
   onClick: () => void;
+  /** Called with venue.id on mouseenter/focusin — hover tooltip is managed in Map.tsx. */
+  onHover?: (id: string) => void;
+  /** Called on mouseleave/focusout — dismisses hover tooltip in Map.tsx. */
+  onLeave?: () => void;
   /** Locale for future i18n of aria strings (currently unused but wired). */
   locale?: Locale;
 }
@@ -80,6 +84,8 @@ export default function VenueMarker({
   selected,
   distanceMiles,
   onClick,
+  onHover,
+  onLeave,
   locale: _locale = "en",
 }: VenueMarkerProps) {
   const color = CATEGORY_COLORS[venue.category];
@@ -173,10 +179,14 @@ export default function VenueMarker({
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.15)";
+          onHover?.(venue.id);
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+          onLeave?.();
         }}
+        onFocus={() => onHover?.(venue.id)}
+        onBlur={() => onLeave?.()}
       >
         {pinElement}
       </button>

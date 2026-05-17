@@ -139,3 +139,65 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ─── Mapbox attribution — spec §10.3: bottom-left, 11px, transparent ────────── */
+.mapboxgl-ctrl-attrib {
+  font-size: 11px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  opacity: 0.8;
+  color: var(--color-ink-400);
+}
+
+.mapboxgl-ctrl-attrib a {
+  color: var(--color-ink-400);
+}
+
+/* ─── Hover tooltip popups (venue name + category, "You are here") ─────────── */
+/* Strip default Mapbox popup chrome; render a minimal sage-bordered chip. */
+.pfm-tooltip .mapboxgl-popup-content {
+  background: var(--color-bone-50);
+  border: 1px solid var(--color-sage-500);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  box-shadow: 0 2px 8px rgba(26, 24, 23, 0.12);
+  pointer-events: none;
+}
+
+.pfm-tooltip .mapboxgl-popup-tip {
+  display: none;
+}
+
+.pfm-tooltip__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pfm-tooltip__name {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-700);
+  white-space: nowrap;
+}
+
+.pfm-tooltip__category {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--color-ink-500);
+  white-space: nowrap;
+}
+
+/* ─── User-location dot pulse animation ─────────────────────────────────────
+   The global prefers-reduced-motion block above sets animation-duration to
+   0.01ms !important, which effectively disables the pulse. No extra guard
+   needed here — the cascade handles it. */
+@keyframes pfm-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.7; transform: scale(1.2); }
+}
+
+.pfm-user-dot {
+  animation: pfm-pulse 2s ease-in-out infinite;
+}

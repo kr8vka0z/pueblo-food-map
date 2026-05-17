@@ -90,6 +90,36 @@ describe("createVenueIcon", () => {
       });
     });
 
+    test("aria-label includes formatted distance when distanceMiles provided", () => {
+      const icon = createVenueIcon({ category: "pantry", name: "Test Pantry", distanceMiles: 1.3 });
+      const html = getHtml(icon);
+      // formatMiles(1.3) → "1.3 mi"
+      expect(html).toContain("Test Pantry");
+      expect(html).toContain("1.3 mi");
+    });
+
+    test("aria-label does NOT include distance when distanceMiles is omitted", () => {
+      const icon = createVenueIcon({ category: "pantry", name: "Test Pantry" });
+      const html = getHtml(icon);
+      expect(html).toContain("Test Pantry");
+      // No distance fragment should appear
+      expect(html).not.toMatch(/\d+\.?\d* mi/);
+    });
+
+    test("aria-label formats sub-tenth distance as '< 0.1 mi'", () => {
+      const icon = createVenueIcon({ category: "grocery", name: "Near Store", distanceMiles: 0.05 });
+      const html = getHtml(icon);
+      expect(html).toContain("Near Store");
+      // buildPinHtml embeds the string directly in an attribute; formatMiles returns "< 0.1 mi"
+      expect(html).toContain("< 0.1 mi");
+    });
+
+    test("aria-label formats ≥10 mile distance as integer", () => {
+      const icon = createVenueIcon({ category: "farm", name: "Far Farm", distanceMiles: 12.7 });
+      const html = getHtml(icon);
+      expect(html).toContain("13 mi");
+    });
+
     test("container has tabindex='0' for keyboard focus", () => {
       const icon = createVenueIcon({ category: "pantry" });
       const html = getHtml(icon);

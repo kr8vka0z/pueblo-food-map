@@ -21,6 +21,7 @@ import L from "leaflet";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MapPin } from "lucide-react";
 import type { VenueCategory } from "@/types/venue";
+import { formatMiles } from "@/lib/distance";
 
 // ─── Category color map (mirrors --color-cat-* tokens in globals.css) ─────────
 // Hardcoded hex values so the icon is renderable during SSR (no DOM/CSSOM).
@@ -66,6 +67,12 @@ interface MarkerOptions {
    * Pass venue.name from Map.tsx for full accessibility.
    */
   name?: string;
+  /**
+   * Distance from user in miles, appended to aria-label when present.
+   * Format: "0.3 miles" (< 10 mi, 1 decimal) or "12 miles" (≥ 10 mi, integer).
+   * Omit when user position is unknown — aria-label falls back to name + category only.
+   */
+  distanceMiles?: number;
 }
 
 /**
@@ -88,14 +95,21 @@ function buildPinHtml({
   category,
   selected,
   name,
+  distanceMiles,
 }: Required<Pick<MarkerOptions, "category" | "selected">> &
-  Pick<MarkerOptions, "name">): string {
+  Pick<MarkerOptions, "name" | "distanceMiles">): string {
   const color = CATEGORY_COLORS[category];
   const pinSize = selected ? SIZE_SELECTED : SIZE_DEFAULT;
   // When selected, the container must be larger to accommodate the ring.
   const totalSize = selected ? pinSize + RING_PAD * 2 : pinSize;
   const readableName = CATEGORY_READABLE[category];
-  const ariaLabel = name ? `${name}, ${readableName}` : readableName;
+  // Build aria-label: "<name>, <category>[, <distance>]"
+  const distLabel = distanceMiles !== undefined ? formatMiles(distanceMiles) : "";
+  const ariaLabel = name
+    ? distLabel
+      ? `${name}, ${readableName}, ${distLabel}`
+      : `${name}, ${readableName}`
+    : readableName;
 
   // Render Lucide MapPin to an SVG string.
   // MapPin renders a filled teardrop/drop-pin shape. We pass:
@@ -169,13 +183,14 @@ export function createVenueIcon({
   category,
   selected = false,
   name,
+  distanceMiles,
 }: MarkerOptions): L.DivIcon {
   const pinSize = selected ? SIZE_SELECTED : SIZE_DEFAULT;
   const totalSize = selected ? pinSize + RING_PAD * 2 : pinSize;
   const halfTotal = totalSize / 2;
 
   return L.divIcon({
-    html: buildPinHtml({ category, selected, name }),
+    html: buildPinHtml({ category, selected, name, distanceMiles }),
     className: "", // clear Leaflet's default white-box style
     iconSize: [totalSize, totalSize],
     // Anchor at the bottom-center of the pin tip.

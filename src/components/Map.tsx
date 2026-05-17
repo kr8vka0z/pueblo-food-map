@@ -214,9 +214,14 @@ export default function Map({
       {/* Venue markers — custom SVG pin via L.divIcon */}
       {venues.map((v) => {
         const isSelected = v.id === selectedVenueId;
-        // Fix A: pass name so aria-label reads "<venue name>, <category>"
-        const icon = createVenueIcon({ category: v.category, selected: isSelected, name: v.name });
         const distMiles = userDistances.get(v.id);
+        // Pass distanceMiles so the divIcon aria-label includes distance when user position is known.
+        const icon = createVenueIcon({
+          category: v.category,
+          selected: isSelected,
+          name: v.name,
+          distanceMiles: distMiles,
+        });
         const distLabel = distMiles !== undefined ? formatMiles(distMiles) : "";
         const ariaLabel = `${v.name}, ${categoryLabels[v.category]}${distLabel ? `, ${distLabel} from you` : ""}`;
 

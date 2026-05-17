@@ -29,16 +29,19 @@ import { useEffect, useRef, useState } from "react";
 import { X, MapPin, Phone, Clock, ChevronDown } from "lucide-react";
 
 /**
- * Minimal interface covering the Leaflet Map methods DesktopVenueWindow uses.
- * Leaflet has been removed in #44; this stub keeps the component compilable.
- * The full Mapbox equivalent will be wired in #46.
- * TODO(#46): replace with the Mapbox MapRef equivalent.
+ * Minimal interface covering the mapboxgl.Map methods DesktopVenueWindow uses.
+ * Wired in #47: onMapReady now delivers a mapboxgl.Map instance.
+ *
+ * Key difference from Leaflet:
+ *   Leaflet:  latLngToContainerPoint([lat, lng]) → Point
+ *   Mapbox:   project([lng, lat]) → Point  (lng/lat order reversed)
  */
-interface LeafletMap {
-  latLngToContainerPoint: (latlng: [number, number]) => { x: number; y: number };
+interface MapboxMap {
+  /** Convert [lng, lat] to container pixel coordinates. */
+  project: (lnglat: [number, number]) => { x: number; y: number };
   getContainer: () => HTMLElement;
-  on: (event: string, fn: () => void) => void;
-  off: (event: string, fn: () => void) => void;
+  on: (event: string, fn: () => void) => MapboxMap;
+  off: (event: string, fn: () => void) => MapboxMap;
 }
 import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
@@ -137,7 +140,8 @@ function computeWindowPosition(
 interface DesktopVenueWindowProps {
   venue: Venue & { distanceMiles?: number };
   expanded: boolean;
-  leafletMap: LeafletMap | null;
+  /** mapboxgl.Map instance delivered by Map.tsx onLoad → onMapReady. */
+  mapboxMap: MapboxMap | null;
   onExpand: () => void;
   onCollapse: () => void;
   onClose: () => void;
@@ -148,7 +152,7 @@ interface DesktopVenueWindowProps {
 export default function DesktopVenueWindow({
   venue,
   expanded,
-  leafletMap,
+  mapboxMap,
   onExpand,
   onCollapse,
   onClose,
@@ -171,13 +175,13 @@ export default function DesktopVenueWindow({
   // synchronously at the top level of an effect body).
 
   useEffect(() => {
-    if (!leafletMap) return;
+    if (!mapboxMap) return;
 
     function computeAndSet() {
-      if (!leafletMap) return;
-      const latlng: [number, number] = [venue.lat, venue.lng];
-      const pt = leafletMap.latLngToContainerPoint(latlng);
-      const container = leafletMap.getContainer();
+      if (!mapboxMap) return;
+      // Mapbox project takes [lng, lat] (opposite of Leaflet's [lat, lng])
+      const pt = mapboxMap.project([venue.lng, venue.lat]);
+      const container = mapboxMap.getContainer();
       const pos = computeWindowPosition(
         pt.x,
         pt.y,
@@ -193,13 +197,13 @@ export default function DesktopVenueWindow({
     // setState-in-effect lint violation.
     queueMicrotask(computeAndSet);
 
-    leafletMap.on("move", computeAndSet);
-    leafletMap.on("zoom", computeAndSet);
+    mapboxMap.on("move", computeAndSet);
+    mapboxMap.on("zoom", computeAndSet);
     return () => {
-      leafletMap.off("move", computeAndSet);
-      leafletMap.off("zoom", computeAndSet);
+      mapboxMap.off("move", computeAndSet);
+      mapboxMap.off("zoom", computeAndSet);
     };
-  }, [leafletMap, venue.lat, venue.lng, windowW, windowH]);
+  }, [mapboxMap, venue.lat, venue.lng, windowW, windowH]);
 
   // ── Keyboard handling ────────────────────────────────────────────────────
 

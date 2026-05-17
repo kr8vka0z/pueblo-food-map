@@ -177,14 +177,14 @@ export default function Map({
         userLng={userLocation?.lng ?? null}
       />
 
-      {/* User location dot — blue circle (v1; no custom marker needed) */}
+      {/* User location dot — brand navy ring, sage fill */}
       {userLocation && (
         <CircleMarker
           center={[userLocation.lat, userLocation.lng]}
           radius={8}
           pathOptions={{
-            color: "#1d4ed8",
-            fillColor: "#3b82f6",
+            color: "#190F3F",
+            fillColor: "#4A8466",
             fillOpacity: 1,
             weight: 3,
           }}

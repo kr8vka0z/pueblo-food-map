@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.1...v0.1.2) (2026-05-17)
+
+
+### Added
+
+* **v2:** LocationDeniedBanner component ([#33](https://github.com/kr8vka0z/pueblo-food-map/issues/33)) ([b0a75c8](https://github.com/kr8vka0z/pueblo-food-map/commit/b0a75c804d6421a62a8c21d0bd5d80030b73bc90))
+* **v2:** Lucide MapPin pin markers with category color + sage selected ring ([#27](https://github.com/kr8vka0z/pueblo-food-map/issues/27)) ([076097a](https://github.com/kr8vka0z/pueblo-food-map/commit/076097a3f2aa0fcab77cada10aaa1cf6c4b103ed))
+* **v2:** searchVenues filter (name + readable category) ([#31](https://github.com/kr8vka0z/pueblo-food-map/issues/31)) ([5ef9059](https://github.com/kr8vka0z/pueblo-food-map/commit/5ef9059e0b431859881f56446035fa3121fcad3f))
+* **v2:** vaul-based BottomSheet v2 with peek/quick/full snap points + Dialog.Title fix ([#32](https://github.com/kr8vka0z/pueblo-food-map/issues/32)) ([ef3bfb6](https://github.com/kr8vka0z/pueblo-food-map/commit/ef3bfb6d19b948b612e6a3482c013f3ab2406f7e))
+
+
+### Fixed
+
+* restore body height so map container can resolve h-full ([#36](https://github.com/kr8vka0z/pueblo-food-map/issues/36)) ([46ceccb](https://github.com/kr8vka0z/pueblo-food-map/commit/46ceccb0251e4f8193b4d737062901d5faa25e3e))
+
+
+### Changed
+
+* **v2:** demo-readiness checklist ([#35](https://github.com/kr8vka0z/pueblo-food-map/issues/35)) ([4798c51](https://github.com/kr8vka0z/pueblo-food-map/commit/4798c51b236ec4967c7c092c3f8bcb5b0fa1c726))
+
 ## [0.1.1](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.0...v0.1.1) (2026-05-15)
 
 

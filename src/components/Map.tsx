@@ -1,32 +1,35 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import L from "leaflet";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  CircleMarker,
-  Tooltip,
-  useMap,
-} from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+/**
+ * Map — Mapbox GL JS basemap via react-map-gl v8.
+ *
+ * #44: Bare basemap only. Accepts the same Props interface as the previous
+ * Leaflet implementation so callers (MapWrapper.tsx) don't need changes.
+ * All venue/interaction props are accepted but intentionally unused here;
+ * they will be wired in subsequent tickets:
+ *
+ *   - #45: venue markers (VenueMarker SVG pins)
+ *   - #46: popups, tooltips, user-location dot, attribution
+ *   - #47: flyTo / fitBounds / locate flow
+ *   - #48: full test update
+ */
+
+import MapGL from "react-map-gl/mapbox";
+import "mapbox-gl/dist/mapbox-gl.css";
 import type { Venue } from "@/types/venue";
-import { categoryLabels } from "@/data/venues";
-import { formatMiles } from "@/lib/distance";
-import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
-import { createVenueIcon } from "./VenueMarker";
 
-const PUEBLO_CENTER: [number, number] = [38.2544, -104.6091];
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-// CARTO Voyager basemap — warmer / calmer than raw OSM, better marker
-// hierarchy, free for OSS, same OSM data underneath (spec §10.1).
-const CARTO_VOYAGER =
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+// Pueblo, CO city center
+const PUEBLO_CENTER = {
+  longitude: -104.6091,
+  latitude: 38.2544,
+  zoom: 13,
+};
 
-const CARTO_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+// ─── Props — kept identical to the Leaflet version for caller compatibility ────
+// Unused props are prefixed with _ (TypeScript convention for intentional no-ops).
 
 interface MapProps {
   venues: Venue[];
@@ -34,229 +37,25 @@ interface MapProps {
   userLocation: { lat: number; lng: number } | null;
   userDistances: Map<string, number>;
   onSelectVenue: (id: string) => void;
-  onMapReady?: (map: L.Map) => void;
+  onMapReady?: (map: unknown) => void; // TODO(#46): wire with MapRef once controls are ported
   locale?: Locale;
 }
 
-// ─── MapController (logic preserved verbatim from original) ──────────────────
-
-function MapController({
-  venues,
-  selectedLat,
-  selectedLng,
-  userLat,
-  userLng,
-}: {
-  venues: Venue[];
-  selectedLat: number | null;
-  selectedLng: number | null;
-  userLat: number | null;
-  userLng: number | null;
-}) {
-  const map = useMap();
-  const flownToUserRef = useRef(false);
-  const fittedBoundsRef = useRef(false);
-
-  // Recompute map size on container resize to prevent tile misalignment.
-  useEffect(() => {
-    const container = map.getContainer();
-    const t = setTimeout(() => map.invalidateSize({ pan: false }), 100);
-    const ro = new ResizeObserver(() => map.invalidateSize({ pan: false }));
-    ro.observe(container);
-    return () => {
-      clearTimeout(t);
-      ro.disconnect();
-    };
-  }, [map]);
-
-  // Fit to venues within ~15 miles of downtown Pueblo on mount.
-  useEffect(() => {
-    if (fittedBoundsRef.current) return;
-    if (venues.length === 0) return;
-    fittedBoundsRef.current = true;
-    const PUEBLO = { lat: 38.2544, lng: -104.6091 };
-    const inCity = venues.filter((v) => {
-      const dLat = v.lat - PUEBLO.lat;
-      const dLng = v.lng - PUEBLO.lng;
-      const miles = Math.sqrt((dLat * 69) ** 2 + (dLng * 54) ** 2);
-      return miles <= 15;
-    });
-    const source = inCity.length > 0 ? inCity : venues;
-    const bounds = source.map((v) => [v.lat, v.lng] as [number, number]);
-    map.fitBounds(bounds, { padding: [30, 30] });
-  }, [venues, map]);
-
-  // Venue flyTo takes priority over user location flyTo.
-  // Reduced-motion: if the user prefers reduced motion, use setView
-  // (instant pan) instead of flyTo (animated pan).
-  useEffect(() => {
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (selectedLat != null && selectedLng != null) {
-      if (prefersReducedMotion) {
-        map.setView([selectedLat, selectedLng], 16, { animate: false });
-      } else {
-        map.flyTo([selectedLat, selectedLng], 16, { duration: 0.8 });
-      }
-      return;
-    }
-    if (userLat != null && userLng != null && !flownToUserRef.current) {
-      flownToUserRef.current = true;
-      if (prefersReducedMotion) {
-        map.setView([userLat, userLng], 14, { animate: false });
-      } else {
-        map.flyTo([userLat, userLng], 14, { duration: 0.6 });
-      }
-    }
-  }, [selectedLat, selectedLng, userLat, userLng, map]);
-
-  return null;
-}
-
-// ─── MapReadyReporter — fires onMapReady once with the Leaflet map instance ───
-
-function MapReadyReporter({ onMapReady }: { onMapReady?: (map: L.Map) => void }) {
-  const map = useMap();
-  useEffect(() => {
-    if (onMapReady) onMapReady(map);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally run once only
-  return null;
-}
-
-// ─── Attribution helper (bottom-left) ────────────────────────────────────────
-
-function AttributionBottomLeft() {
-  const map = useMap();
-
-  useEffect(() => {
-    const ctrl = L.control.attribution({
-      position: "bottomleft",
-      prefix: false,
-    });
-    ctrl.addTo(map);
-    // Style the attribution element
-    const el = ctrl.getContainer();
-    if (el) {
-      el.style.fontSize = "11px";
-      el.style.opacity = "0.8";
-      el.style.background = "transparent";
-      el.style.boxShadow = "none";
-    }
-    return () => {
-      ctrl.remove();
-    };
-  }, [map]);
-
-  return null;
-}
-
-// ─── Map component ────────────────────────────────────────────────────────────
-
 export default function Map({
-  venues,
-  selectedVenueId,
-  userLocation,
-  userDistances,
-  onSelectVenue,
-  onMapReady,
-  locale = "en",
+  venues: _venues,
+  selectedVenueId: _selectedVenueId,
+  userLocation: _userLocation,
+  userDistances: _userDistances,
+  onSelectVenue: _onSelectVenue,
+  onMapReady: _onMapReady,
+  locale: _locale = "en",
 }: MapProps) {
-  const selectedVenue = venues.find((v) => v.id === selectedVenueId) ?? null;
-
   return (
-    <MapContainer
-      center={PUEBLO_CENTER}
-      zoom={13}
-      scrollWheelZoom
-      style={{ height: "100%", width: "100%" }}
-      attributionControl={false}
-    >
-      <TileLayer
-        attribution={CARTO_ATTRIBUTION}
-        url={CARTO_VOYAGER}
-      />
-
-      {/* Attribution at bottom-left per spec §10.3 */}
-      <AttributionBottomLeft />
-
-      {/* Fire onMapReady with the Leaflet map instance (used by DesktopVenueWindow) */}
-      {onMapReady && <MapReadyReporter onMapReady={onMapReady} />}
-
-      <MapController
-        venues={venues}
-        selectedLat={selectedVenue?.lat ?? null}
-        selectedLng={selectedVenue?.lng ?? null}
-        userLat={userLocation?.lat ?? null}
-        userLng={userLocation?.lng ?? null}
-      />
-
-      {/* User location dot — brand navy ring, sage fill */}
-      {userLocation && (
-        <CircleMarker
-          center={[userLocation.lat, userLocation.lng]}
-          radius={8}
-          pathOptions={{
-            color: "#190F3F",
-            fillColor: "#4A8466",
-            fillOpacity: 1,
-            weight: 3,
-          }}
-        >
-          <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
-            <span className="text-xs font-medium">{t("distance.youAreHere", locale)}</span>
-          </Tooltip>
-        </CircleMarker>
-      )}
-
-      {/* Venue markers — custom SVG pin via L.divIcon */}
-      {venues.map((v) => {
-        const isSelected = v.id === selectedVenueId;
-        const distMiles = userDistances.get(v.id);
-        // Pass distanceMiles so the divIcon aria-label includes distance when user position is known.
-        const icon = createVenueIcon({
-          category: v.category,
-          selected: isSelected,
-          name: v.name,
-          distanceMiles: distMiles,
-        });
-        const distLabel = distMiles !== undefined ? formatMiles(distMiles) : "";
-        const ariaLabel = `${v.name}, ${categoryLabels[v.category]}${distLabel ? `, ${distLabel} from you` : ""}`;
-
-        function handleClick() {
-          onSelectVenue(v.id);
-        }
-
-        return (
-          <Marker
-            key={v.id}
-            position={[v.lat, v.lng]}
-            icon={icon}
-            title={ariaLabel}
-            eventHandlers={{
-              click: handleClick,
-              // Fix B: Enter or Space on a focused marker triggers the click handler
-              keydown: (e) => {
-                if (e.originalEvent.key === "Enter" || e.originalEvent.key === " ") {
-                  e.originalEvent.preventDefault();
-                  handleClick();
-                }
-              },
-            }}
-          >
-            <Tooltip direction="top" offset={[0, -8]} opacity={1}>
-              <div className="text-sm font-medium leading-tight max-w-[200px]">
-                {v.name}
-                <span className="block text-xs text-[var(--color-ink-400)] font-normal">
-                  {categoryLabels[v.category]}
-                </span>
-              </div>
-            </Tooltip>
-          </Marker>
-        );
-      })}
-    </MapContainer>
+    <MapGL
+      mapboxAccessToken={MAPBOX_TOKEN}
+      initialViewState={PUEBLO_CENTER}
+      mapStyle="mapbox://styles/mapbox/streets-v12"
+      style={{ width: "100%", height: "100%" }}
+    />
   );
 }

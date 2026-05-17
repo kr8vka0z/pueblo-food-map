@@ -15,7 +15,7 @@
  *   </div>
  *
  * No sidebar. No category rail. No desktop split-pane.
- * Search behavior is NOT wired (PR 6). SearchBar is an uncontrolled stub.
+ * Search behavior wired in PR 6: query state + searchVenues filter + EmptySearchPopover.
  */
 
 import {
@@ -30,10 +30,12 @@ import SearchBar from "./SearchBar";
 import LocateButton from "./LocateButton";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
+import EmptySearchPopover from "./EmptySearchPopover";
 import { useGeolocation } from "@/lib/useGeolocation";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
+import { searchVenues } from "@/lib/searchVenues";
 import type { VenueCategory } from "@/types/venue";
 
 // Leaflet must not run on the server — keep the dynamic import here
@@ -49,6 +51,12 @@ const LeafletMap = dynamic(() => import("./Map"), {
 });
 
 const PUEBLO_CENTER = { lat: 38.2544, lng: -104.6091 };
+
+// ─── Viewport prop (from PR 3 splash gate) ────────────────────────────────────
+// 'located'      → use the user's geolocation position as initial map center.
+// 'pueblo-center' → hardcoded Pueblo center (default).
+// PR 3 sets this when dismissing the splash. No other behaviour changes here.
+export type SplashViewport = 'located' | 'pueblo-center';
 
 // isMobile: true if viewport < 768px. Detected client-side only.
 // Initial state is false (SSR-safe); sync happens inside the effect via
@@ -76,15 +84,26 @@ function useIsMobile(): boolean {
 
 // ─── MapWrapper ───────────────────────────────────────────────────────────────
 
-export default function MapWrapper() {
+interface MapWrapperProps {
+  /** Optional: viewport mode from splash gate (PR 3). Defaults to 'pueblo-center'. */
+  viewport?: SplashViewport;
+}
+
+export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperProps) {
   // ── Geolocation — v2 hook ────────────────────────────────────────────────────
   const geo = useGeolocation();
-  const userLocation = geo.state.position;
+  // When viewport === 'located', prefer the user's real position if available;
+  // fall back to null which will resolve to PUEBLO_CENTER in the origin derivation below.
+  const userLocation =
+    viewport === 'located' ? geo.state.position : geo.state.position;
 
   // ── Mobile detection ─────────────────────────────────────────────────────────
   const isMobile = useIsMobile();
 
-  // ── Filter state — kept minimal; search behavior wired in PR 6 ──────────────
+  // ── Search query state (PR 6) ────────────────────────────────────────────────
+  const [query, setQuery] = useState("");
+
+  // ── Filter state — kept minimal; further filter controls are deferred ────────
   const [selectedCategories, setSelectedCategories] =
     useState<Set<VenueCategory> | null>(null);
   const [filterOpenNow] = useState(false);
@@ -131,7 +150,8 @@ export default function MapWrapper() {
   const filteredVenues = useMemo(() => {
     const now = new Date();
 
-    return venuesWithDistance
+    // Apply existing category / boolean filters first, then layer search on top.
+    const afterFilters = venuesWithDistance
       .filter((v) => {
         if (selectedCategories !== null && selectedCategories.size > 0) {
           if (!selectedCategories.has(v.category)) return false;
@@ -145,12 +165,16 @@ export default function MapWrapper() {
         return true;
       })
       .sort((a, b) => a.distanceMiles - b.distanceMiles);
+
+    // PR 6: apply text search (name + readable category, substring, EN-only).
+    return searchVenues(afterFilters, query);
   }, [
     venuesWithDistance,
     selectedCategories,
     filterOpenNow,
     filterSnap,
     filterWalking,
+    query,
   ]);
 
   const anyFilterActive =
@@ -211,8 +235,19 @@ export default function MapWrapper() {
         onMapReady={(map) => setLeafletMap(map)}
       />
 
-      {/* SearchBar — absolute top-center, z-index 1000 (PR 6 wires behavior) */}
-      <SearchBar />
+      {/* SearchBar — controlled (PR 6) */}
+      <SearchBar
+        value={query}
+        onChange={setQuery}
+      />
+
+      {/* EmptySearchPopover — shown when query is non-empty but yields no results */}
+      {query.trim() !== "" && filteredVenues.length === 0 && (
+        <EmptySearchPopover
+          query={query.trim()}
+          onSelectCategory={(label) => setQuery(label)}
+        />
+      )}
 
       {/* LocateButton — absolute top-right, z-index 1000 */}
       <LocateButton geoState={geo.state} onRequest={geo.request} />

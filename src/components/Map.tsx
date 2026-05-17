@@ -216,7 +216,7 @@ export default function Map({
             <Tooltip direction="top" offset={[0, -8]} opacity={1}>
               <div className="text-sm font-medium leading-tight max-w-[200px]">
                 {v.name}
-                <span className="block text-xs text-gray-500 font-normal">
+                <span className="block text-xs text-[var(--color-ink-400)] font-normal">
                   {categoryLabels[v.category]}
                 </span>
               </div>

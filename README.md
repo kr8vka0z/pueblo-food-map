@@ -12,8 +12,8 @@ PFP garden coordinates were re-geocoded against Nominatim on 2026-05-14 (see [`s
 
 ## Live preview
 
-- Production: <https://pueblo-food-map.vercel.app> — auto-deploys on every merge to `main`.
-- Every pull request gets its own preview URL via the Vercel ↔ GitHub integration; the link is posted as a status check on the PR.
+- Production: <https://pueblofoodmap.com> — auto-deploys on every merge to `main` via Cloudflare Workers Builds.
+- Every pull request gets its own preview URL via the Cloudflare Workers ↔ GitHub integration; the link is posted as a status check on the PR.
 
 ## Stack
 
@@ -46,7 +46,7 @@ Open <http://localhost:3000>. The dev server uses Turbopack and hot-reloads on s
 ## Project infrastructure
 
 - **CI:** `lint → typecheck → build` runs on every PR and on every push to `main` via [`.github/workflows/ci.yml`](.github/workflows/ci.yml). The job name "Lint, typecheck, build" is the required status check on `main`.
-- **Preview deploys:** Vercel builds a preview environment for every pull request and rebuilds production on every merge to `main`.
+- **Preview deploys:** Cloudflare Workers Builds creates a preview environment for every pull request and rebuilds production on every merge to `main`.
 - **Dependency updates:** [Dependabot](.github/dependabot.yml) opens weekly PRs for npm packages and GitHub Actions, with non-breaking updates grouped into single PRs. ESLint major-version bumps are currently gated until `eslint-plugin-react` ships ESLint 10 support.
 - **Code review:** every human-authored pull request is reviewed by the [Claude Code GitHub Action](.github/workflows/claude-code-review.yml); mention `@claude` in a comment to ask follow-up questions.
 - **Branch protection:** `main` requires a passing CI status check, a linear history, an up-to-date branch, and resolved conversations on every PR.

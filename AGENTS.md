@@ -1,6 +1,8 @@
 # Hosting — Cloudflare Workers via OpenNext
 
-- **Live worker URL:** https://pueblo-food-map.kyle-boyd.workers.dev/ (until custom domain `pueblofoodmap.com` lands in #40)
+- **Live production URL:** https://pueblofoodmap.com/ (primary)
+- **Direct Worker URL:** https://pueblo-food-map.kyle-boyd.workers.dev/ (fallback / bypass CDN)
+- **HTTP/www redirect:** HTTP requests and `www.pueblofoodmap.com` both 301-redirect to `https://pueblofoodmap.com` via Cloudflare zone redirect rule + Always-Use-HTTPS.
 - **Hosting:** Cloudflare Workers, project name `pueblo-food-map` (configured in `wrangler.jsonc`)
 - **Adapter:** `@opennextjs/cloudflare` — translates Next.js App Router output into Worker format
 - **CI/CD:** Cloudflare Workers Builds, connected to this GitHub repo via the CF dashboard. There is NO GitHub Actions YAML for deploys — wiring is entirely in the CF dashboard.

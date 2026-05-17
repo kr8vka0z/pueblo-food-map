@@ -22,6 +22,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { Map as LMap } from "leaflet";
@@ -31,6 +32,7 @@ import LocateButton from "./LocateButton";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
 import EmptySearchPopover from "./EmptySearchPopover";
+import LocationDeniedBanner from "./LocationDeniedBanner";
 import { useGeolocation } from "@/lib/useGeolocation";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
@@ -96,6 +98,40 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
   // fall back to null which will resolve to PUEBLO_CENTER in the origin derivation below.
   const userLocation =
     viewport === 'located' ? geo.state.position : geo.state.position;
+
+  // ── Location-denied banner (PR 7) ────────────────────────────────────────────
+  // Shows only when the user ACTIVELY re-taps locate (not on initial mount when
+  // permission is already denied — that path uses silent Pueblo-center fallback).
+  //
+  // Strategy: track "user requested at" as a timestamp ref.
+  //   - handleLocateRequest sets the ref and calls geo.request()
+  //   - A useEffect watches geo.state.permission; if it transitions to "denied"
+  //     AND a request was made after the last time the banner was shown, the
+  //     banner appears.
+  //   - bannerShownAt tracks when we last surfaced the banner so subsequent
+  //     automatic Permissions API changes don't re-trigger it.
+  const [bannerVisible, setBannerVisible] = useState(false);
+  const userRequestedAtRef = useRef<number>(0);   // epoch ms of last user-initiated request
+  const bannerShownAtRef   = useRef<number>(0);   // epoch ms of last time banner was shown
+
+  useEffect(() => {
+    if (
+      geo.state.permission === "denied" &&
+      userRequestedAtRef.current > bannerShownAtRef.current
+    ) {
+      setBannerVisible(true);
+      bannerShownAtRef.current = Date.now();
+    }
+    // Depend on geo.state (object reference) rather than just permission:
+    // useGeolocation always creates a new state object on each setState call,
+    // so this effect fires even when permission stays "denied" across retries.
+  }, [geo.state]);
+
+  // Wraps geo.request() to stamp the request timestamp.
+  const handleLocateRequest = useCallback(() => {
+    userRequestedAtRef.current = Date.now();
+    geo.request();
+  }, [geo]);
 
   // ── Mobile detection ─────────────────────────────────────────────────────────
   const isMobile = useIsMobile();
@@ -250,7 +286,18 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
       )}
 
       {/* LocateButton — absolute top-right, z-index 1000 */}
-      <LocateButton geoState={geo.state} onRequest={geo.request} />
+      <LocateButton geoState={geo.state} onRequest={handleLocateRequest} />
+
+      {/* LocationDeniedBanner — appears only after active re-tap → denial */}
+      {bannerVisible && (
+        <LocationDeniedBanner
+          onRetry={() => {
+            // Re-request; if still denied, the useEffect above re-shows the banner.
+            handleLocateRequest();
+          }}
+          onDismiss={() => setBannerVisible(false)}
+        />
+      )}
 
       {/* BottomSheet — mobile only (vaul v2, venue-centric API) */}
       {isMobile && (

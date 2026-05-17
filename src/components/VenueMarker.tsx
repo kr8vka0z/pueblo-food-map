@@ -1,201 +1,185 @@
 "use client";
 
 /**
- * VenueMarker — produces an L.divIcon from a Venue for use with
- * react-leaflet's <Marker>. Returns a Lucide MapPin SVG pin colored by
- * category, with a 4px sage outer ring on the selected state.
+ * VenueMarker — Mapbox GL JS marker component for a single venue.
  *
- * This module must only be imported inside "use client" context because
- * it references `L` (Leaflet). Map.tsx lives behind next/dynamic ssr:false
- * so the import chain is safe.
+ * Wraps react-map-gl/mapbox's `Marker` with a <button> child so the marker
+ * is natively keyboard-focusable (Tab) and activatable (Enter / Space).
  *
- * Keyboard accessibility:
- *   The divIcon container div carries tabindex="0" so it participates in
- *   keyboard tab order. Enter→click binding is NOT wired here because the
- *   HTML string has no access to Leaflet's event system. Map.tsx should
- *   add `keydown` to its eventHandlers to call onSelectVenue on Enter/Space.
- *   See PR 4 notes — flagged for PR 2 / post-merge wiring in Map.tsx.
+ * Visual design:
+ *   - Default: Lucide MapPin filled with category color, white stroke, drop shadow.
+ *   - Selected: same pin + 4px sage ring rendered as an outer SVG circle.
+ *   - Hover: slight scale-up (CSS transform) for interactive affordance.
+ *
+ * Accessibility:
+ *   - aria-label: "<name>, <readable-category>[, <distance>]"
+ *   - Keyboard: Enter/Space fires onClick via onKeyDown handler.
+ *   - The <button> element provides native role="button" — no ARIA role needed.
+ *
+ * #44 stub files removed in this PR:
+ *   - src/types/leaflet.d.ts
+ *   - src/__mocks__/leaflet.ts
+ *   - vitest.config.mts leaflet alias
  */
 
-import L from "leaflet";
-import { renderToStaticMarkup } from "react-dom/server";
+import { Marker } from "react-map-gl/mapbox";
 import { MapPin } from "lucide-react";
-import type { VenueCategory } from "@/types/venue";
+import type { KeyboardEvent } from "react";
+import type { Venue, VenueCategory } from "@/types/venue";
 import { formatMiles } from "@/lib/distance";
+import type { Locale } from "@/lib/i18n";
 
 // ─── Category color map (mirrors --color-cat-* tokens in globals.css) ─────────
-// Hardcoded hex values so the icon is renderable during SSR (no DOM/CSSOM).
+// Hardcoded hex values so the icon is renderable without DOM/CSSOM.
 const CATEGORY_COLORS: Record<VenueCategory, string> = {
-  pantry:           "#BE2D45",
-  grocery:          "#1F4E8C",
-  convenience:      "#0F6573",
-  farm:             "#92591D",
-  garden:           "#2C5F4F",
+  pantry: "#BE2D45",
+  grocery: "#1F4E8C",
+  convenience: "#0F6573",
+  farm: "#92591D",
+  garden: "#2C5F4F",
   edible_landscape: "#58772B",
-  meal_site:        "#6B3FA0",
+  meal_site: "#6B3FA0",
 };
 
 // ─── Accessible readable-name labels ──────────────────────────────────────────
 const CATEGORY_READABLE: Record<VenueCategory, string> = {
-  pantry:           "Food pantry",
-  grocery:          "Grocery store",
-  convenience:      "Convenience store",
-  farm:             "Farm",
-  garden:           "Community garden",
+  pantry: "Food pantry",
+  grocery: "Grocery store",
+  convenience: "Convenience store",
+  farm: "Farm",
+  garden: "Community garden",
   edible_landscape: "Edible landscape",
-  meal_site:        "Meal site",
+  meal_site: "Meal site",
 };
 
 // ─── Sage selected ring color (--color-sage-500) ──────────────────────────────
 const SAGE_500 = "#4A8466";
 
 // ─── Marker size constants ─────────────────────────────────────────────────────
-// Default: 28×28. Selected: 36×36 (spec §PR4).
 const SIZE_DEFAULT = 28;
 const SIZE_SELECTED = 36;
-// Ring padding on the outer ring (px on each side)
+// Extra padding around the pin to accommodate the outer ring.
 const RING_PAD = 5;
 
-interface MarkerOptions {
-  /** Venue category — drives fill color. */
-  category: VenueCategory;
-  /** Whether this marker is the currently selected venue. */
-  selected?: boolean;
-  /**
-   * Venue name, used in aria-label: "<name>, <readable-category>".
-   * If omitted the aria-label falls back to the readable category name alone.
-   * Pass venue.name from Map.tsx for full accessibility.
-   */
-  name?: string;
-  /**
-   * Distance from user in miles, appended to aria-label when present.
-   * Format: "0.3 miles" (< 10 mi, 1 decimal) or "12 miles" (≥ 10 mi, integer).
-   * Omit when user position is unknown — aria-label falls back to name + category only.
-   */
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+interface VenueMarkerProps {
+  venue: Venue;
+  selected: boolean;
+  /** Distance from user in miles, appended to aria-label when available. */
   distanceMiles?: number;
+  onClick: () => void;
+  /** Locale for future i18n of aria strings (currently unused but wired). */
+  locale?: Locale;
 }
 
-/**
- * Build the divIcon HTML for a venue pin.
- *
- * Structure (outermost → innermost):
- *   <div role="img" aria-label="…" tabindex="0">
- *     <svg>                          ← ring SVG (selected only, else transparent)
- *       <circle …/>                  ← sage 4px ring
- *       <g transform="translate(…)"> ← offset MapPin inside ring area
- *         <!-- Lucide MapPin SVG contents -->
- *       </g>
- *     </svg>
- *   </div>
- *
- * The outer <div> carries tabindex="0" so that keyboard users can Tab to the
- * marker. Enter→click must be wired by Map.tsx via marker.getElement().
- */
-function buildPinHtml({
-  category,
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function VenueMarker({
+  venue,
   selected,
-  name,
   distanceMiles,
-}: Required<Pick<MarkerOptions, "category" | "selected">> &
-  Pick<MarkerOptions, "name" | "distanceMiles">): string {
-  const color = CATEGORY_COLORS[category];
+  onClick,
+  locale: _locale = "en",
+}: VenueMarkerProps) {
+  const color = CATEGORY_COLORS[venue.category];
+  const readableName = CATEGORY_READABLE[venue.category];
   const pinSize = selected ? SIZE_SELECTED : SIZE_DEFAULT;
-  // When selected, the container must be larger to accommodate the ring.
   const totalSize = selected ? pinSize + RING_PAD * 2 : pinSize;
-  const readableName = CATEGORY_READABLE[category];
+
   // Build aria-label: "<name>, <category>[, <distance>]"
   const distLabel = distanceMiles !== undefined ? formatMiles(distanceMiles) : "";
-  const ariaLabel = name
-    ? distLabel
-      ? `${name}, ${readableName}, ${distLabel}`
-      : `${name}, ${readableName}`
-    : readableName;
+  const ariaLabel = distLabel
+    ? `${venue.name}, ${readableName}, ${distLabel}`
+    : `${venue.name}, ${readableName}`;
 
-  // Render Lucide MapPin to an SVG string.
-  // MapPin renders a filled teardrop/drop-pin shape. We pass:
-  //   fill = category color (opaque fill)
-  //   color = white (stroke color for the inner circle cutout)
-  //   strokeWidth = 1.5 (white border for legibility on varied tile backgrounds)
-  const mapPinSvg = renderToStaticMarkup(
+  // Keyboard handler: fire click on Enter or Space (native <button> behaviour
+  // covers this already in most browsers, but we add it explicitly for clarity
+  // and to satisfy the acceptance criteria note in the issue).
+  function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick();
+    }
+  }
+
+  // ─── Pin SVG ──────────────────────────────────────────────────────────────
+  // When selected, wrap the MapPin in a larger SVG that adds the sage ring.
+  // When not selected, render the MapPin directly.
+
+  const pinElement = selected ? (
+    <svg
+      width={totalSize}
+      height={totalSize}
+      viewBox={`0 0 ${totalSize} ${totalSize}`}
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      style={{ display: "block" }}
+    >
+      {/* Sage ring sits behind the pin */}
+      <circle
+        cx={totalSize / 2}
+        cy={totalSize / 2}
+        r={totalSize / 2 - 2}
+        fill="none"
+        stroke={SAGE_500}
+        strokeWidth={4}
+      />
+      {/* Offset the MapPin to sit centred within the ring padding */}
+      <foreignObject x={RING_PAD} y={RING_PAD} width={pinSize} height={pinSize}>
+        <MapPin
+          size={pinSize}
+          fill={color}
+          color="#FFFFFF"
+          strokeWidth={1.5}
+          aria-hidden="true"
+        />
+      </foreignObject>
+    </svg>
+  ) : (
     <MapPin
       size={pinSize}
       fill={color}
       color="#FFFFFF"
       strokeWidth={1.5}
       aria-hidden="true"
-    />,
+      style={{ display: "block" }}
+    />
   );
-
-  // Drop shadow via CSS filter on the container div.
-  const shadowStyle = "filter:drop-shadow(0 2px 4px rgba(0,0,0,0.25))";
-
-  if (!selected) {
-    // Default state: plain MapPin, no ring.
-    return (
-      `<div role="img" aria-label="${ariaLabel}" tabindex="0" ` +
-      `style="width:${pinSize}px;height:${pinSize}px;${shadowStyle};line-height:0">` +
-      mapPinSvg +
-      `</div>`
-    );
-  }
-
-  // Selected state: MapPin offset inside ring area, plus sage circle ring.
-  // Ring drawn as SVG circle on a larger canvas so it sits behind the pin.
-  const cx = totalSize / 2;
-  const cy = totalSize / 2;
-  const ringR = cx - 2; // 2px inset so ring doesn't clip
-
-  // Translate the MapPin SVG so it's centered within the larger container.
-  const pinOffset = RING_PAD;
-
-  // Rewrite the MapPin SVG's root <svg> element to add a translate so it
-  // sits centered in the totalSize canvas.
-  const shiftedPin = mapPinSvg.replace(
-    /^<svg([^>]*)>/,
-    `<svg$1 x="${pinOffset}" y="${pinOffset}">`,
-  );
-
-  const ringSvg =
-    `<svg width="${totalSize}" height="${totalSize}" ` +
-    `viewBox="0 0 ${totalSize} ${totalSize}" xmlns="http://www.w3.org/2000/svg">` +
-    `<circle cx="${cx}" cy="${cy}" r="${ringR}" fill="none" ` +
-    `stroke="${SAGE_500}" stroke-width="4"/>` +
-    shiftedPin +
-    `</svg>`;
 
   return (
-    `<div role="img" aria-label="${ariaLabel}" tabindex="0" ` +
-    `style="width:${totalSize}px;height:${totalSize}px;${shadowStyle};line-height:0">` +
-    ringSvg +
-    `</div>`
+    <Marker
+      longitude={venue.lng}
+      latitude={venue.lat}
+      anchor="bottom"
+    >
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        onClick={onClick}
+        onKeyDown={handleKeyDown}
+        style={{
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          display: "block",
+          filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))",
+          transform: "scale(1)",
+          transition: "transform 0.1s ease",
+          width: `${totalSize}px`,
+          height: `${totalSize}px`,
+          lineHeight: 0,
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.15)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+        }}
+      >
+        {pinElement}
+      </button>
+    </Marker>
   );
-}
-
-/**
- * Build a Leaflet divIcon for a venue.
- *
- * @example
- * ```tsx
- * const icon = createVenueIcon({ category: venue.category, selected: isSelected, name: venue.name });
- * ```
- */
-export function createVenueIcon({
-  category,
-  selected = false,
-  name,
-  distanceMiles,
-}: MarkerOptions): L.DivIcon {
-  const pinSize = selected ? SIZE_SELECTED : SIZE_DEFAULT;
-  const totalSize = selected ? pinSize + RING_PAD * 2 : pinSize;
-  const halfTotal = totalSize / 2;
-
-  return L.divIcon({
-    html: buildPinHtml({ category, selected, name, distanceMiles }),
-    className: "", // clear Leaflet's default white-box style
-    iconSize: [totalSize, totalSize],
-    // Anchor at the bottom-center of the pin tip.
-    // MapPin's tip falls at the bottom of the SVG bounding box.
-    iconAnchor: [halfTotal, totalSize],
-    popupAnchor: [0, -(totalSize + 4)],
-  });
 }

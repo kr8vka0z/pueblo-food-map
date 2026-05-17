@@ -1,15 +1,15 @@
 name: Lighthouse CI
 
-# Fires when Vercel reports a successful deployment via the GitHub
-# deployment_status event. Runs Lighthouse against the freshly deployed
-# preview URL (or production URL on main pushes) and uploads a public
-# report whose link is logged in the workflow output.
+# Runs on every PR and on pushes to main against the live production URL.
+# (Previously triggered on Vercel deployment_status events; Vercel is decommissioned
+# as of issue #42. CI is now hosted on Cloudflare Workers.)
 on:
-  deployment_status:
+  pull_request:
+  push:
+    branches: [main]
 
 jobs:
   lighthouse:
-    if: github.event.deployment_status.state == 'success' && github.event.deployment_status.environment_url != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -18,10 +18,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Run Lighthouse against the deployed URL
+      - name: Run Lighthouse against production
         uses: treosh/lighthouse-ci-action@v12
         with:
-          urls: ${{ github.event.deployment_status.environment_url }}
+          urls: https://pueblofoodmap.com/
           configPath: ./.lighthouserc.json
           uploadArtifacts: true
           temporaryPublicStorage: true

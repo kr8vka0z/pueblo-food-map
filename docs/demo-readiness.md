@@ -1,7 +1,7 @@
 # Pueblo Food Map v2 — Demo Readiness Checklist
 
 **Demo:** 2026-06-09 with Pueblo Food Project team
-**Prod URL:** https://pueblo-food-map.vercel.app
+**Prod URL:** https://pueblofoodmap.com
 **v2 shipped:** PRs #26, #27, #28, #30, #31, #32, #33, #34 (all merged to main)
 
 ---
@@ -90,9 +90,9 @@ Fonts are self-hosted at `/fonts/PublicSans-Variable.woff2` and `/fonts/Fraunces
 
 ## Rollback (if demo morning shows a regression)
 
-The v1 site lived on `main` before this rebuild. To restore: pin Vercel to the commit SHA just before `dc3de96` (PR #26, the first v2 commit), or `git revert` the v2 range. **Don't do this yourself — text Kyle to coordinate.**
+The site deploys via Cloudflare Workers. To roll back: open the Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab → find a recent green deployment → "Rollback to this deployment". Traffic switches in ~30 seconds. **Don't do this yourself — text Kyle to coordinate.**
 
-The Vercel dashboard at https://vercel.com/dashboard lets you roll back to a specific deployment without touching git.
+Alternatively, `git revert` the offending commit and push to `main` to trigger a fresh build.
 
 ---
 

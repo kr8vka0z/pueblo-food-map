@@ -25,12 +25,6 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 - **Rollback:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab → find a previous successful deployment → "Rollback to this deployment". Production traffic switches in ~30 seconds.
 - **Environment variables:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Settings → Variables and Secrets. `NEXT_PUBLIC_*` vars are baked into the client bundle at build time (same model as Vercel). Set them in both the "Production" and "Preview" environments.
 
-## Transitional state (remove after #42)
-
-Vercel auto-deploys are still firing in parallel from the old Vercel integration. They are ignored — Cloudflare Workers is the canonical production host. Vercel decommission is tracked in issue #42.
-
----
-
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

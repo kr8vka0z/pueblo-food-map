@@ -24,10 +24,12 @@ import {
   useMemo,
   useState,
 } from "react";
+import type { Map as LMap } from "leaflet";
 import dynamic from "next/dynamic";
 import SearchBar from "./SearchBar";
 import LocateButton from "./LocateButton";
 import BottomSheet from "./BottomSheet";
+import DesktopVenueWindow from "./DesktopVenueWindow";
 import { useGeolocation } from "@/lib/useGeolocation";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
@@ -47,11 +49,6 @@ const LeafletMap = dynamic(() => import("./Map"), {
 });
 
 const PUEBLO_CENTER = { lat: 38.2544, lng: -104.6091 };
-
-// Bottom sheet snap points (fractions matching BottomSheet.tsx SNAP_POINTS)
-const SNAP_PEEK = 0.18 as const;
-const SNAP_FULL = 0.87 as const;
-type SnapPoint = 0.18 | 0.5 | 0.87;
 
 // isMobile: true if viewport < 768px. Detected client-side only.
 // Initial state is false (SSR-safe); sync happens inside the effect via
@@ -97,8 +94,12 @@ export default function MapWrapper() {
   // ── Selected venue ───────────────────────────────────────────────────────────
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
 
-  // ── Bottom sheet snap ────────────────────────────────────────────────────────
-  const [sheetSnap, setSheetSnap] = useState<SnapPoint>(SNAP_PEEK);
+  // ── Desktop window expanded state (PR 5) ─────────────────────────────────────
+  const [windowExpanded, setWindowExpanded] = useState(false);
+
+  // ── Leaflet map instance — passed up from Map via onMapReady (PR 5) ──────────
+  // Stored in state (not ref) so changes trigger re-render in DesktopVenueWindow.
+  const [leafletMap, setLeafletMap] = useState<LMap | null>(null);
 
   // ── Category toggle ──────────────────────────────────────────────────────────
   const handleToggleCategory = useCallback((cat: VenueCategory | null) => {
@@ -182,16 +183,14 @@ export default function MapWrapper() {
     );
   }, [filteredVenues]);
 
-  // NOTE: selectedVenue derivation lives here for PR 5 (FloatingWindow) to consume.
-  // Uncomment when PR 5 lands:
-  //
-  // const selectedVenue = useMemo(
-  //   () =>
-  //     filteredVenues.find((v) => v.id === selectedVenueId) ??
-  //     venuesWithDistance.find((v) => v.id === selectedVenueId) ??
-  //     null,
-  //   [filteredVenues, venuesWithDistance, selectedVenueId],
-  // );
+  // Selected venue object — used by BottomSheet (mobile) and DesktopVenueWindow (desktop)
+  const selectedVenue = useMemo(
+    () =>
+      filteredVenues.find((v) => v.id === selectedVenueId) ??
+      venuesWithDistance.find((v) => v.id === selectedVenueId) ??
+      null,
+    [filteredVenues, venuesWithDistance, selectedVenueId],
+  );
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -205,8 +204,11 @@ export default function MapWrapper() {
         userDistances={userDistances}
         onSelectVenue={(id) => {
           setSelectedVenueId(id);
-          setSheetSnap(SNAP_FULL);
+          if (!isMobile) {
+            setWindowExpanded(false);
+          }
         }}
+        onMapReady={(map) => setLeafletMap(map)}
       />
 
       {/* SearchBar — absolute top-center, z-index 1000 (PR 6 wires behavior) */}
@@ -215,24 +217,30 @@ export default function MapWrapper() {
       {/* LocateButton — absolute top-right, z-index 1000 */}
       <LocateButton geoState={geo.state} onRequest={geo.request} />
 
-      {/* BottomSheet — mobile only (PR 5 will replace with vaul v2 variant) */}
+      {/* BottomSheet — mobile only (vaul v2, venue-centric API) */}
       {isMobile && (
         <BottomSheet
-          venues={filteredVenues}
-          selectedVenueId={selectedVenueId}
-          selectedCategories={selectedCategories}
-          categoryCounts={categoryCounts}
-          totalCount={allVenues.length}
-          onSelectVenue={(id) => setSelectedVenueId(id)}
-          onToggleCategory={handleToggleCategory}
-          snap={sheetSnap}
-          onSnapChange={setSheetSnap}
-          anyFilterActive={anyFilterActive}
-          onClearFilters={handleClearFilters}
+          key={selectedVenueId ?? "empty"}
+          venue={selectedVenue}
+          onClose={() => setSelectedVenueId(null)}
         />
       )}
 
-      {/* Desktop: FloatingWindow goes here in PR 5. selectedVenue is derived above. */}
+      {/* DesktopVenueWindow — marker-anchored, desktop only */}
+      {!isMobile && selectedVenue && (
+        <DesktopVenueWindow
+          key={selectedVenueId}
+          venue={selectedVenue}
+          expanded={windowExpanded}
+          leafletMap={leafletMap}
+          onExpand={() => setWindowExpanded(true)}
+          onCollapse={() => setWindowExpanded(false)}
+          onClose={() => {
+            setSelectedVenueId(null);
+            setWindowExpanded(false);
+          }}
+        />
+      )}
     </div>
   );
 }

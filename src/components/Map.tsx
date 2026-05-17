@@ -34,6 +34,7 @@ interface MapProps {
   userLocation: { lat: number; lng: number } | null;
   userDistances: Map<string, number>;
   onSelectVenue: (id: string) => void;
+  onMapReady?: (map: L.Map) => void;
   locale?: Locale;
 }
 
@@ -114,6 +115,17 @@ function MapController({
   return null;
 }
 
+// ─── MapReadyReporter — fires onMapReady once with the Leaflet map instance ───
+
+function MapReadyReporter({ onMapReady }: { onMapReady?: (map: L.Map) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    if (onMapReady) onMapReady(map);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run once only
+  return null;
+}
+
 // ─── Attribution helper (bottom-left) ────────────────────────────────────────
 
 function AttributionBottomLeft() {
@@ -149,6 +161,7 @@ export default function Map({
   userLocation,
   userDistances,
   onSelectVenue,
+  onMapReady,
   locale = "en",
 }: MapProps) {
   const selectedVenue = venues.find((v) => v.id === selectedVenueId) ?? null;
@@ -168,6 +181,9 @@ export default function Map({
 
       {/* Attribution at bottom-left per spec §10.3 */}
       <AttributionBottomLeft />
+
+      {/* Fire onMapReady with the Leaflet map instance (used by DesktopVenueWindow) */}
+      {onMapReady && <MapReadyReporter onMapReady={onMapReady} />}
 
       <MapController
         venues={venues}
@@ -198,10 +214,15 @@ export default function Map({
       {/* Venue markers — custom SVG pin via L.divIcon */}
       {venues.map((v) => {
         const isSelected = v.id === selectedVenueId;
-        const icon = createVenueIcon({ category: v.category, selected: isSelected });
+        // Fix A: pass name so aria-label reads "<venue name>, <category>"
+        const icon = createVenueIcon({ category: v.category, selected: isSelected, name: v.name });
         const distMiles = userDistances.get(v.id);
         const distLabel = distMiles !== undefined ? formatMiles(distMiles) : "";
         const ariaLabel = `${v.name}, ${categoryLabels[v.category]}${distLabel ? `, ${distLabel} from you` : ""}`;
+
+        function handleClick() {
+          onSelectVenue(v.id);
+        }
 
         return (
           <Marker
@@ -210,7 +231,14 @@ export default function Map({
             icon={icon}
             title={ariaLabel}
             eventHandlers={{
-              click: () => onSelectVenue(v.id),
+              click: handleClick,
+              // Fix B: Enter or Space on a focused marker triggers the click handler
+              keydown: (e) => {
+                if (e.originalEvent.key === "Enter" || e.originalEvent.key === " ") {
+                  e.originalEvent.preventDefault();
+                  handleClick();
+                }
+              },
             }}
           >
             <Tooltip direction="top" offset={[0, -8]} opacity={1}>

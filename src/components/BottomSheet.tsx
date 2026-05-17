@@ -1,81 +1,385 @@
 "use client";
 
 /**
- * BottomSheet — mobile-only draggable sheet with 3 snap points:
- *   peek (~140px) → half (~50vh) → full (~100vh − 100px)
+ * BottomSheet v2 — vaul-based mobile-only sheet with three snap points:
+ *   peek (88px): visible bar at bottom — venue name + chevron, clickable to expand
+ *   quick (~320px): venue summary — name, category badge, distance, hours-today,
+ *                   SNAP/WIC pills, two-line description, "See full details →" link
+ *   full (90vh): complete venue detail — hours table, address, phone, badges
  *
- * Uses vaul (Drawer.Root) which ships built-in snap-point support,
- * spring physics, and reduced-motion awareness.
+ * Fixes v1 a11y violation: Drawer.Title is now required (Radix Dialog.Title).
+ *
+ * Three dismissal paths:
+ *   1. Escape key (vaul handles natively when modal=false via onOpenChange)
+ *   2. Tap on scrim (vaul handles by default)
+ *   3. Explicit close X button on quick/full states
  */
 
+import { useState } from "react";
 import { Drawer } from "vaul";
+import { X, ChevronUp, MapPin, Phone, Clock } from "lucide-react";
 import type { Venue } from "@/types/venue";
-import VenueCard from "./VenueCard";
-import VenueDetail from "./VenueDetail";
-import CategoryChips from "./CategoryChips";
-import EmptyState from "./EmptyState";
-import { t } from "@/lib/i18n";
-import type { Locale } from "@/lib/i18n";
-import type { VenueCategory } from "@/types/venue";
+import { categoryColors, categoryLabels } from "@/data/venues";
+import { formatMiles } from "@/lib/distance";
+import { computeOpenStatus, formatSlot } from "@/lib/hours";
 
-// Snap points expressed as fractions of total viewport or as pixel values.
-// vaul accepts numbers between 0 and 1 (fraction of viewport height)
-// and also plain pixel strings via CSS custom properties.
-// We use fractions here; "full" leaves ~100px of map showing (top bar).
-const SNAP_POINTS = [0.18, 0.5, 0.87] as const;
+// ─── Snap points ─────────────────────────────────────────────────────────────
+// vaul accepts pixel strings and fractions (0-1 = % of viewport height).
+// "88px" = peek bar. 0.4 ≈ 320px on 800px screen. 0.9 = 90% of viewport.
+const SNAP_PEEK = "88px" as const;
+const SNAP_QUICK = 0.4 as const;
+const SNAP_FULL = 0.9 as const;
+type SnapPoint = typeof SNAP_PEEK | typeof SNAP_QUICK | typeof SNAP_FULL;
+const SNAP_POINTS: SnapPoint[] = [SNAP_PEEK, SNAP_QUICK, SNAP_FULL];
 
-interface BottomSheetProps {
-  venues: Array<Venue & { distanceMiles?: number }>;
-  selectedVenueId: string | null;
-  selectedCategories: Set<VenueCategory> | null;
-  categoryCounts: Partial<Record<VenueCategory, number>>;
-  totalCount: number;
-  onSelectVenue: (id: string | null) => void;
-  onToggleCategory: (cat: VenueCategory | null) => void;
-  locale?: Locale;
-  snap: (typeof SNAP_POINTS)[number];
-  onSnapChange: (snap: (typeof SNAP_POINTS)[number]) => void;
-  anyFilterActive?: boolean;
-  onClearFilters?: () => void;
+const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+type DayKey = (typeof DAY_KEYS)[number];
+
+function todayKey(): DayKey {
+  const idx = new Date().getDay(); // 0=Sun
+  const map: DayKey[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+  return map[idx] ?? "mon";
 }
 
-export default function BottomSheet({
-  venues,
-  selectedVenueId,
-  selectedCategories,
-  categoryCounts,
-  totalCount,
-  onSelectVenue,
-  onToggleCategory,
-  locale = "en",
-  snap,
-  onSnapChange,
-  anyFilterActive = false,
-  onClearFilters,
-}: BottomSheetProps) {
-  const selectedVenue = selectedVenueId
-    ? venues.find((v) => v.id === selectedVenueId) ?? null
-    : null;
+const DAY_LABELS: Record<DayKey, string> = {
+  mon: "Mon",
+  tue: "Tue",
+  wed: "Wed",
+  thu: "Thu",
+  fri: "Fri",
+  sat: "Sat",
+  sun: "Sun",
+};
+
+// ─── Props ───────────────────────────────────────────────────────────────────
+
+interface BottomSheetProps {
+  venue: (Venue & { distanceMiles?: number }) | null;
+  onClose: () => void;
+}
+
+// ─── BottomSheet ─────────────────────────────────────────────────────────────
+
+export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
+  const [snap, setSnap] = useState<SnapPoint>(SNAP_PEEK);
+
+  // When a new venue is selected, reset to quick snap
+  // (handled by key prop in MapWrapper)
+
+  const open = venue !== null;
+  const status = venue ? computeOpenStatus(venue.hours_weekly) : null;
+  const today = todayKey();
 
   function handleSnapChange(s: string | number | null) {
-    if (typeof s === "number" && SNAP_POINTS.includes(s as (typeof SNAP_POINTS)[number])) {
-      onSnapChange(s as (typeof SNAP_POINTS)[number]);
+    if (s === null) return;
+    if (SNAP_POINTS.includes(s as SnapPoint)) {
+      setSnap(s as SnapPoint);
     }
   }
 
+  function handleOpenChange(isOpen: boolean) {
+    if (!isOpen) onClose();
+  }
+
+  const directionsUrl = venue
+    ? `https://maps.google.com/?q=${venue.lat},${venue.lng}`
+    : "#";
+
+  // ── Peek content ─────────────────────────────────────────────────────────
+
+  const peekContent = venue ? (
+    <button
+      type="button"
+      onClick={() => setSnap(SNAP_QUICK)}
+      className={
+        "flex w-full items-center gap-3 px-4 py-3 text-left " +
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset " +
+        "focus-visible:ring-[var(--color-sage-500)]"
+      }
+      aria-label={`Expand details for ${venue.name}`}
+    >
+      <span className="flex-1 text-base font-semibold text-[var(--color-ink-900)] truncate">
+        {venue.name}
+      </span>
+      <ChevronUp size={18} className="text-[var(--color-ink-400)] shrink-0" aria-hidden />
+    </button>
+  ) : null;
+
+  // ── Quick summary content ─────────────────────────────────────────────────
+
+  const quickContent = venue ? (
+    <div className="flex flex-col px-5 py-4 gap-3">
+      {/* Header row: title + close */}
+      <div className="flex items-start gap-2">
+        <h2
+          className="flex-1 text-xl font-normal text-[var(--color-ink-900)] leading-tight"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          {venue.name}
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close venue details"
+          className={
+            "flex items-center justify-center w-8 h-8 -mr-1 rounded-md " +
+            "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          }
+        >
+          <X size={18} aria-hidden />
+        </button>
+      </div>
+
+      {/* Category badge + SNAP/WIC pills */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium text-[var(--color-bone-50)]"
+          style={{ backgroundColor: categoryColors[venue.category] }}
+        >
+          <span className="w-2 h-2 rounded-full bg-white/40 shrink-0" aria-hidden />
+          {categoryLabels[venue.category]}
+        </span>
+        {venue.accepts_snap && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
+            SNAP
+          </span>
+        )}
+        {venue.accepts_wic && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
+            WIC
+          </span>
+        )}
+      </div>
+
+      {/* Distance + hours today */}
+      <div className="flex items-center gap-4 text-sm text-[var(--color-ink-500)]">
+        {venue.distanceMiles !== undefined && (
+          <span className="flex items-center gap-1.5">
+            <MapPin size={14} aria-hidden className="text-[var(--color-ink-400)]" />
+            {formatMiles(venue.distanceMiles)} from you
+          </span>
+        )}
+        {status && status.state !== "no_hours" && (
+          <span className="flex items-center gap-1.5">
+            <Clock size={14} aria-hidden className="text-[var(--color-ink-400)]" />
+            {status.state === "open"
+              ? `Open · closes ${status.time}`
+              : status.state === "opens_at"
+              ? `Opens at ${status.time}`
+              : "Closed today"}
+          </span>
+        )}
+      </div>
+
+      {/* Description (notes), max two lines */}
+      {venue.notes && (
+        <p className="text-sm text-[var(--color-ink-700)] leading-relaxed line-clamp-2">
+          {venue.notes}
+        </p>
+      )}
+
+      {/* "See full details" link */}
+      <button
+        type="button"
+        onClick={() => setSnap(SNAP_FULL)}
+        className={
+          "mt-1 text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] " +
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+          "rounded text-left"
+        }
+      >
+        See full details →
+      </button>
+    </div>
+  ) : null;
+
+  // ── Full detail content ───────────────────────────────────────────────────
+
+  const fullContent = venue ? (
+    <div className="flex flex-col h-full">
+      {/* Sticky header */}
+      <div className="flex items-center gap-2 px-4 h-12 border-b border-[var(--color-bone-200)] shrink-0 sticky top-0 bg-[var(--color-bone-50)] z-10">
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={() => setSnap(SNAP_QUICK)}
+          aria-label="Collapse to quick summary"
+          className={
+            "flex items-center justify-center w-9 h-9 -mr-2 rounded-md " +
+            "text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] transition-colors " +
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          }
+        >
+          <X size={20} aria-hidden />
+        </button>
+      </div>
+
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+        {/* Venue name */}
+        <div>
+          <h2
+            className="text-2xl font-normal text-[var(--color-ink-900)] leading-tight mb-2"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {venue.name}
+          </h2>
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium text-[var(--color-bone-50)]"
+            style={{ backgroundColor: categoryColors[venue.category] }}
+          >
+            <span className="w-2 h-2 rounded-full bg-white/40 shrink-0" aria-hidden />
+            {categoryLabels[venue.category]}
+          </span>
+        </div>
+
+        {/* Address */}
+        <div className="flex gap-2.5">
+          <MapPin size={16} className="text-[var(--color-ink-400)] shrink-0 mt-0.5" aria-hidden />
+          <div>
+            <p className="text-sm text-[var(--color-ink-700)]">{venue.address}</p>
+            {venue.distanceMiles !== undefined && (
+              <p className="text-sm text-[var(--color-ink-400)] font-mono mt-0.5">
+                {formatMiles(venue.distanceMiles)} from you
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Get directions — first focusable action after header per spec */}
+        <a
+          href={directionsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={
+            "flex items-center justify-center gap-2 w-full h-12 rounded-[var(--radius-md)] " +
+            "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
+            "text-base font-semibold transition-colors duration-150 " +
+            "hover:bg-[var(--color-sage-600)] focus-visible:outline-none " +
+            "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
+          }
+        >
+          Get directions →
+        </a>
+
+        {/* SNAP/WIC badges */}
+        {(venue.accepts_snap || venue.accepts_wic) && (
+          <div className="flex flex-wrap gap-2">
+            {venue.accepts_snap && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
+                Accepts SNAP
+              </span>
+            )}
+            {venue.accepts_wic && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
+                Accepts WIC
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Hours table (Mon-Sun, today highlighted with aria-current) */}
+        {venue.hours_weekly && (
+          <section aria-label="Hours">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
+              Hours
+            </h3>
+            <dl className="space-y-1">
+              {DAY_KEYS.map((day) => {
+                const slots = venue.hours_weekly![day];
+                const isToday = day === today;
+                return (
+                  <div
+                    key={day}
+                    className={
+                      "flex items-baseline gap-3 py-0.5 " +
+                      (isToday
+                        ? "border-l-[3px] pl-2 border-[var(--color-sage-500)]"
+                        : "pl-3")
+                    }
+                    aria-current={isToday ? "true" : undefined}
+                  >
+                    <dt
+                      className={
+                        "w-8 text-sm shrink-0 " +
+                        (isToday
+                          ? "font-semibold text-[var(--color-sage-700)]"
+                          : "text-[var(--color-ink-500)]")
+                      }
+                    >
+                      {DAY_LABELS[day]}
+                    </dt>
+                    <dd
+                      className={
+                        "text-sm font-mono " +
+                        (isToday
+                          ? "text-[var(--color-sage-700)]"
+                          : "text-[var(--color-ink-700)]")
+                      }
+                    >
+                      {slots && slots.length > 0
+                        ? slots.map(formatSlot).join(", ")
+                        : "Closed"}
+                    </dd>
+                    {isToday && (
+                      <span className="text-xs text-[var(--color-sage-600)] font-medium ml-auto">
+                        Today
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </dl>
+          </section>
+        )}
+
+        {/* Phone */}
+        {venue.phone && (
+          <section aria-label="Contact">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
+              Contact
+            </h3>
+            <a
+              href={`tel:${venue.phone}`}
+              className="flex items-center gap-2.5 text-sm text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+            >
+              <Phone size={15} className="text-[var(--color-ink-400)]" aria-hidden />
+              {venue.phone}
+            </a>
+          </section>
+        )}
+
+        {/* Notes / Description */}
+        {venue.notes && (
+          <section aria-label="About">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
+              About
+            </h3>
+            <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+              {venue.notes}
+            </p>
+          </section>
+        )}
+      </div>
+    </div>
+  ) : null;
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
   return (
     <Drawer.Root
-      snapPoints={SNAP_POINTS as unknown as number[]}
+      snapPoints={SNAP_POINTS as (string | number)[]}
       activeSnapPoint={snap}
       setActiveSnapPoint={handleSnapChange}
-      open
+      open={open}
+      onOpenChange={handleOpenChange}
       modal={false}
-      // Vaul's snap-point CSS transition is suppressed by the global
-      // @media (prefers-reduced-motion: reduce) block in globals.css,
-      // which sets transition-duration: 0.01ms on all elements.
+      dismissible
     >
       <Drawer.Portal>
         <Drawer.Content
+          key={venue?.id ?? "empty"}
           className={
             "fixed bottom-0 left-0 right-0 z-[800] flex flex-col " +
             "bg-[var(--color-bone-50)] " +
@@ -83,21 +387,26 @@ export default function BottomSheet({
             "elevation-2 " +
             "focus:outline-none"
           }
-          // vaul manages the height via data attributes; we add a max-height
           style={{ maxHeight: "calc(100dvh - 100px)" }}
-          aria-label="Venue list panel"
+          aria-label="Venue details panel"
         >
-          {/* Drag handle */}
+          {/* Drawer.Title — required by Radix to fix a11y missing-title violation */}
+          <Drawer.Title className="sr-only">
+            {venue ? `${venue.name} venue details` : "Venue details"}
+          </Drawer.Title>
+
+          {/* Drag handle — keyboard focusable, toggles peek ↔ quick */}
           <div
-            className="flex-shrink-0 flex justify-center pt-3 pb-2"
+            className="flex-shrink-0 flex justify-center pt-3 pb-1"
             role="button"
             tabIndex={0}
-            aria-label="Drag to expand or collapse panel"
+            aria-label="Drag to expand or close venue details"
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
-                // Toggle between peek and half
-                onSnapChange(snap === SNAP_POINTS[0] ? SNAP_POINTS[1] : SNAP_POINTS[0]);
+                e.preventDefault();
+                setSnap(snap === SNAP_PEEK ? SNAP_QUICK : SNAP_PEEK);
               }
+              if (e.key === "Escape") onClose();
             }}
           >
             <div
@@ -106,71 +415,10 @@ export default function BottomSheet({
             />
           </div>
 
-          {/* Content: either venue detail or list */}
-          {selectedVenue ? (
-            <VenueDetail
-              venue={selectedVenue}
-              onClose={() => onSelectVenue(null)}
-              onBack={() => onSelectVenue(null)}
-              locale={locale}
-            />
-          ) : (
-            <div className="flex flex-col flex-1 overflow-hidden">
-              {/* Count line */}
-              <div className="flex items-center justify-between px-4 py-1.5">
-                <h2 className="text-sm font-semibold text-[var(--color-ink-700)]">
-                  {t("sheet.places", locale, { count: String(venues.length) })}
-                </h2>
-                {snap === SNAP_POINTS[0] && (
-                  <button
-                    type="button"
-                    onClick={() => onSnapChange(SNAP_POINTS[1])}
-                    className="text-sm font-medium text-[var(--color-sage-500)] hover:text-[var(--color-sage-600)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
-                  >
-                    {t("sheet.viewList", locale)} →
-                  </button>
-                )}
-              </div>
-
-              {/* Category chips */}
-              <div className="pb-2">
-                <CategoryChips
-                  selected={selectedCategories}
-                  counts={categoryCounts}
-                  totalCount={totalCount}
-                  onToggle={onToggleCategory}
-                  locale={locale}
-                />
-              </div>
-
-              {/* Venue list — only visible when expanded */}
-              {snap !== SNAP_POINTS[0] && (
-                venues.length === 0 && anyFilterActive ? (
-                  <div className="flex flex-1 items-center justify-center p-6">
-                    <EmptyState locale={locale} onClearFilters={onClearFilters} />
-                  </div>
-                ) : (
-                  <ul
-                    className="flex-1 overflow-y-auto divide-y divide-[var(--color-bone-200)]"
-                    aria-label="Filtered venues"
-                  >
-                    {venues.map((v) => (
-                      <VenueCard
-                        key={v.id}
-                        venue={v}
-                        isSelected={v.id === selectedVenueId}
-                        onClick={() => {
-                          onSelectVenue(v.id);
-                          onSnapChange(SNAP_POINTS[2]);
-                        }}
-                        locale={locale}
-                      />
-                    ))}
-                  </ul>
-                )
-              )}
-            </div>
-          )}
+          {/* Content: changes by snap point */}
+          {snap === SNAP_PEEK && peekContent}
+          {snap === SNAP_QUICK && quickContent}
+          {snap === SNAP_FULL && fullContent}
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

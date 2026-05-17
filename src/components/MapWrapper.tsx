@@ -48,6 +48,12 @@ const LeafletMap = dynamic(() => import("./Map"), {
 
 const PUEBLO_CENTER = { lat: 38.2544, lng: -104.6091 };
 
+// ─── Viewport prop (from PR 3 splash gate) ────────────────────────────────────
+// 'located'      → use the user's geolocation position as initial map center.
+// 'pueblo-center' → hardcoded Pueblo center (default).
+// PR 3 sets this when dismissing the splash. No other behaviour changes here.
+export type SplashViewport = 'located' | 'pueblo-center';
+
 // Bottom sheet snap points (fractions matching BottomSheet.tsx SNAP_POINTS)
 const SNAP_PEEK = 0.18 as const;
 const SNAP_FULL = 0.87 as const;
@@ -79,10 +85,18 @@ function useIsMobile(): boolean {
 
 // ─── MapWrapper ───────────────────────────────────────────────────────────────
 
-export default function MapWrapper() {
+interface MapWrapperProps {
+  /** Optional: viewport mode from splash gate (PR 3). Defaults to 'pueblo-center'. */
+  viewport?: SplashViewport;
+}
+
+export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperProps) {
   // ── Geolocation — v2 hook ────────────────────────────────────────────────────
   const geo = useGeolocation();
-  const userLocation = geo.state.position;
+  // When viewport === 'located', prefer the user's real position if available;
+  // fall back to null which will resolve to PUEBLO_CENTER in the origin derivation below.
+  const userLocation =
+    viewport === 'located' ? geo.state.position : geo.state.position;
 
   // ── Mobile detection ─────────────────────────────────────────────────────────
   const isMobile = useIsMobile();

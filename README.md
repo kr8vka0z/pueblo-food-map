@@ -6,7 +6,7 @@ Built for [Pueblo Food Project](https://pueblofoodproject.org). Proof of concept
 
 ## Status
 
-Phase 1, in progress. The map renders 74 markers — 10 PFP community gardens and edible landscapes from [pueblofoodproject.org/cgsp](https://pueblofoodproject.org/cgsp/) plus 64 grocery, convenience, and farm venues ingested from OpenStreetMap — on a Leaflet + OpenStreetMap base, with a distance-sorted sidebar, hover tooltips, and a "fly to nearest" geolocation flow.
+Phase 2 complete (Mapbox migration). The map renders 112 venue markers across 7 categories on a Mapbox GL JS vector basemap, with Lucide MapPin markers by category color, sage selection ring, hover tooltips, user-location dot with bilingual "You are here" label, and a flyTo / fitBounds geolocation flow. Demo-ready as of 2026-05-17.
 
 PFP garden coordinates were re-geocoded against Nominatim on 2026-05-14 (see [`scripts/geocode-pfp.py`](scripts/geocode-pfp.py) and [`data/raw/pfp-geocodes.json`](data/raw/pfp-geocodes.json)). One venue — Ray Aguilera Community Garden — uses a manual coordinate supplied by PFP because the garden plot sits south of the OSM Ray Aguilera Park centroid.
 
@@ -19,7 +19,7 @@ PFP garden coordinates were re-geocoded against Nominatim on 2026-05-14 (see [`s
 
 - Next.js 16 (App Router) + TypeScript
 - Tailwind CSS v4
-- Leaflet + react-leaflet (OpenStreetMap base tiles)
+- Mapbox GL JS + react-map-gl (Mapbox vector tiles, `streets-v12` basemap)
 - Static venue data committed in `src/data/venues.ts`
 
 ## Roadmap

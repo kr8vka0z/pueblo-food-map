@@ -1,15 +1,18 @@
 /**
  * Accessibility smoke tests — axe-core via vitest-axe.
  *
- * Covers the two primary entry surfaces:
+ * Covers the primary entry surfaces:
  *   1. SplashScreen — first-visit gate (PR 3)
  *   2. SearchBar — floating search bar above map (PR 6)
  *   3. LocateButton — geolocation trigger (idle / granted / denied states)
  *   4. LocationDeniedBanner — permission-denied overlay (PR 7)
+ *   5. VenueMarker — Mapbox marker button (PR 45, Mapbox migration)
  *
- * Map.tsx is excluded: it requires Leaflet (canvas + DOM APIs not in jsdom) and
- * lives behind next/dynamic ssr:false. Its accessibility is verified manually
- * via Chrome Lighthouse during the PR 9 demo dry-run.
+ * Map.tsx is excluded from direct axe tests: it requires a real Mapbox GL
+ * canvas/WebGL context unavailable in jsdom. Map-level a11y is verified via
+ * Lighthouse on the live Cloudflare production deploy (see PR #48 baseline).
+ * VenueMarker (the interactive button inside each map pin) is testable because
+ * we mock react-map-gl/mapbox's Marker to render children directly.
  *
  * Notes on test environment:
  *   - navigator.permissions is mocked to avoid unhandled promise rejections.
@@ -154,6 +157,85 @@ describe("LocationDeniedBanner a11y", () => {
   test("has no axe violations", async () => {
     const { container } = render(
       <LocationDeniedBanner onRetry={vi.fn()} onDismiss={vi.fn()} />,
+    );
+    const results = await runAxe(container);
+    expect(
+      results.violations.length,
+      `Violations found:\n${describeViolations(results)}`,
+    ).toBe(0);
+  });
+});
+
+// ─── VenueMarker ─────────────────────────────────────────────────────────────
+// Mock react-map-gl/mapbox Marker so the button child is testable in jsdom.
+// Map.tsx itself is excluded (needs WebGL canvas — verified via Lighthouse).
+
+vi.mock("react-map-gl/mapbox", () => ({
+  default: vi.fn(({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  )),
+  Marker: vi.fn(({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  )),
+  Popup: vi.fn(() => null),
+  AttributionControl: vi.fn(() => null),
+}));
+
+import VenueMarker from "@/components/VenueMarker";
+import type { Venue } from "@/types/venue";
+
+function makeAxeVenue(category: Venue["category"] = "pantry"): Venue {
+  return {
+    id: "axe-test-venue",
+    name: "Axe Test Venue",
+    category,
+    lat: 38.2544,
+    lng: -104.6091,
+    address: "123 Test St",
+    source: "test",
+    last_verified: "2026-01-01",
+  };
+}
+
+describe("VenueMarker a11y", () => {
+  test("unselected pantry marker has no axe violations", async () => {
+    const { container } = render(
+      <VenueMarker
+        venue={makeAxeVenue("pantry")}
+        selected={false}
+        onClick={vi.fn()}
+      />,
+    );
+    const results = await runAxe(container);
+    expect(
+      results.violations.length,
+      `Violations found:\n${describeViolations(results)}`,
+    ).toBe(0);
+  });
+
+  test("selected marker (with sage ring) has no axe violations", async () => {
+    const { container } = render(
+      <VenueMarker
+        venue={makeAxeVenue("grocery")}
+        selected={true}
+        onClick={vi.fn()}
+      />,
+    );
+    const results = await runAxe(container);
+    expect(
+      results.violations.length,
+      `Violations found:\n${describeViolations(results)}`,
+    ).toBe(0);
+  });
+
+  test("marker with distance label has no axe violations", async () => {
+    const { container } = render(
+      <VenueMarker
+        venue={makeAxeVenue("garden")}
+        selected={false}
+        distanceMiles={1.4}
+        onClick={vi.fn()}
+      />,
     );
     const results = await runAxe(container);
     expect(

@@ -151,12 +151,11 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
   // ── Desktop window expanded state (PR 5) ─────────────────────────────────────
   const [windowExpanded, setWindowExpanded] = useState(false);
 
-  // ── Map instance — passed up from Map via onMapReady (PR 5 / TODO #46) ───────
+  // ── Map instance — passed up from Map via onMapReady (wired in #47) ────────
   // Stored in state so changes trigger re-render in DesktopVenueWindow.
-  // Typed as unknown for now; DesktopVenueWindow narrows it to LeafletMap but has
-  // a null-guard — window will be hidden until #46 wires the Mapbox equivalent.
+  // Typed as unknown; DesktopVenueWindow narrows it via its MapboxMap interface.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [leafletMap, setLeafletMap] = useState<any>(null);
+  const [mapboxMap, setMapboxMap] = useState<any>(null);
 
   // ── Category toggle ──────────────────────────────────────────────────────────
   const handleToggleCategory = useCallback((cat: VenueCategory | null) => {
@@ -270,7 +269,7 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
             setWindowExpanded(false);
           }
         }}
-        onMapReady={(map) => setLeafletMap(map)}
+        onMapReady={(map) => setMapboxMap(map)}
       />
 
       {/* SearchBar — controlled (PR 6) */}
@@ -316,7 +315,7 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
           key={selectedVenueId}
           venue={selectedVenue}
           expanded={windowExpanded}
-          leafletMap={leafletMap}
+          mapboxMap={mapboxMap}
           onExpand={() => setWindowExpanded(true)}
           onCollapse={() => setWindowExpanded(false)}
           onClose={() => {

@@ -5,21 +5,24 @@
  *
  * #44: Bare basemap.
  * #45: Venue markers wired (VenueMarker SVG pins, selection ring, click handler).
- * #46: Hover tooltips, user-location dot, attribution control (this PR).
- *
- * Remaining TODOs for subsequent tickets:
- *   - #47: flyTo / fitBounds / locate flow
- *   - #48: full test update
+ * #46: Hover tooltips, user-location dot, attribution control.
+ * #47: flyTo / fitBounds / locate flow + reduced-motion guards (this PR).
  */
 
-import { useState, useCallback } from "react";
-import MapGL, { Popup, Marker, AttributionControl } from "react-map-gl/mapbox";
+import { useState, useCallback, useRef, useEffect } from "react";
+import MapGL, {
+  Popup,
+  Marker,
+  AttributionControl,
+} from "react-map-gl/mapbox";
+import type { MapRef } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Venue } from "@/types/venue";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { categoryLabels } from "@/data/venues";
 import VenueMarker from "@/components/VenueMarker";
+import type mapboxgl from "mapbox-gl";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -29,6 +32,10 @@ const PUEBLO_CENTER = {
   latitude: 38.2544,
   zoom: 13,
 };
+
+// Downtown Pueblo for 15-mile filter
+const PUEBLO_LAT = 38.2544;
+const PUEBLO_LNG = -104.6091;
 
 // Design tokens (mirrors globals.css @theme)
 const BRAND_NAVY = "#190F3F";
@@ -42,7 +49,8 @@ interface MapProps {
   userLocation: { lat: number; lng: number } | null;
   userDistances: Map<string, number>;
   onSelectVenue: (id: string) => void;
-  onMapReady?: (map: unknown) => void; // TODO(#47): wire with MapRef for flyTo / fitBounds
+  /** Called once after the map loads. Receives the underlying mapboxgl.Map instance. */
+  onMapReady?: (map: mapboxgl.Map) => void;
   locale?: Locale;
 }
 
@@ -52,11 +60,100 @@ export default function Map({
   userLocation,
   userDistances,
   onSelectVenue,
-  onMapReady: _onMapReady,
+  onMapReady,
   locale = "en",
 }: MapProps) {
   // Centralized hover state — one Popup for the whole map avoids per-marker mount churn.
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
+
+  const mapRef = useRef<MapRef>(null);
+
+  // Guards — each fires at most once per mount
+  const fittedBoundsRef = useRef(false);
+  const flownToUserRef = useRef(false);
+
+  // ── Reduced-motion helper ─────────────────────────────────────────────────
+  // Evaluated lazily (not at module scope) so SSR never touches window.
+  const prefersReducedMotion = useCallback((): boolean => {
+    return (
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
+  }, []);
+
+  // ── fitBounds-on-mount: fit to venues within 15mi of downtown Pueblo ──────
+  useEffect(() => {
+    if (fittedBoundsRef.current) return;
+    if (venues.length === 0) return;
+
+    fittedBoundsRef.current = true;
+
+    const inCity = venues.filter((v) => {
+      const dLat = v.lat - PUEBLO_LAT;
+      const dLng = v.lng - PUEBLO_LNG;
+      // Approximate miles: 1 deg lat ≈ 69mi, 1 deg lng ≈ 54mi at this latitude
+      const miles = Math.sqrt((dLat * 69) ** 2 + (dLng * 54) ** 2);
+      return miles <= 15;
+    });
+
+    const source = inCity.length > 0 ? inCity : venues;
+
+    // Mapbox fitBounds: [[lngWest, latSouth], [lngEast, latNorth]]
+    const lngs = source.map((v) => v.lng);
+    const lats = source.map((v) => v.lat);
+    const bounds: [[number, number], [number, number]] = [
+      [Math.min(...lngs), Math.min(...lats)],
+      [Math.max(...lngs), Math.max(...lats)],
+    ];
+
+    // Schedule after first render so mapRef is populated
+    const id = setTimeout(() => {
+      mapRef.current?.fitBounds(bounds, { padding: 30, duration: 0 });
+    }, 0);
+    return () => clearTimeout(id);
+  }, [venues]);
+
+  // ── Selected-venue flyTo — 800ms, zoom 16, reduced-motion guard ───────────
+  useEffect(() => {
+    if (selectedVenueId === null) return;
+
+    const venue = venues.find((v) => v.id === selectedVenueId);
+    if (!venue) return;
+
+    if (prefersReducedMotion()) {
+      mapRef.current?.jumpTo({ center: [venue.lng, venue.lat], zoom: 16 });
+    } else {
+      mapRef.current?.flyTo({
+        center: [venue.lng, venue.lat],
+        zoom: 16,
+        duration: 800,
+      });
+    }
+  }, [selectedVenueId, venues, prefersReducedMotion]);
+
+  // ── User-location flyTo — 600ms, zoom 14, fires once, venue has priority ──
+  useEffect(() => {
+    if (!userLocation) return;
+    if (flownToUserRef.current) return;
+    if (selectedVenueId !== null) return; // venue flyTo takes priority
+
+    flownToUserRef.current = true;
+
+    if (prefersReducedMotion()) {
+      mapRef.current?.jumpTo({
+        center: [userLocation.lng, userLocation.lat],
+        zoom: 14,
+      });
+    } else {
+      mapRef.current?.flyTo({
+        center: [userLocation.lng, userLocation.lat],
+        zoom: 14,
+        duration: 600,
+      });
+    }
+  }, [userLocation, selectedVenueId, prefersReducedMotion]);
+
+  // ── Marker interaction handlers ───────────────────────────────────────────
 
   const handleMarkerHover = useCallback((id: string) => {
     setHoveredVenueId(id);
@@ -72,13 +169,23 @@ export default function Map({
 
   const youAreHere = t("distance.youAreHere", locale);
 
+  // ── onLoad: fire onMapReady with the underlying mapboxgl.Map instance ─────
+  const handleLoad = useCallback(
+    (e: { target: mapboxgl.Map }) => {
+      onMapReady?.(e.target);
+    },
+    [onMapReady],
+  );
+
   return (
     <MapGL
+      ref={mapRef}
       mapboxAccessToken={MAPBOX_TOKEN}
       initialViewState={PUEBLO_CENTER}
       mapStyle="mapbox://styles/mapbox/streets-v12"
       style={{ width: "100%", height: "100%" }}
       attributionControl={false}
+      onLoad={handleLoad}
     >
       {/* Attribution — bottom-left per spec §10.3; styled in globals.css */}
       <AttributionControl position="bottom-left" compact={true} />

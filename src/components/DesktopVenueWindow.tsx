@@ -26,8 +26,20 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import type { Map as LeafletMap } from "leaflet";
 import { X, MapPin, Phone, Clock, ChevronDown } from "lucide-react";
+
+/**
+ * Minimal interface covering the Leaflet Map methods DesktopVenueWindow uses.
+ * Leaflet has been removed in #44; this stub keeps the component compilable.
+ * The full Mapbox equivalent will be wired in #46.
+ * TODO(#46): replace with the Mapbox MapRef equivalent.
+ */
+interface LeafletMap {
+  latLngToContainerPoint: (latlng: [number, number]) => { x: number; y: number };
+  getContainer: () => HTMLElement;
+  on: (event: string, fn: () => void) => void;
+  off: (event: string, fn: () => void) => void;
+}
 import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";

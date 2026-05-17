@@ -25,7 +25,6 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Map as LMap } from "leaflet";
 import dynamic from "next/dynamic";
 import SearchBar from "./SearchBar";
 import LocateButton from "./LocateButton";
@@ -40,9 +39,9 @@ import { computeOpenStatus } from "@/lib/hours";
 import { searchVenues } from "@/lib/searchVenues";
 import type { VenueCategory } from "@/types/venue";
 
-// Leaflet must not run on the server — keep the dynamic import here
-// in a Client Component as required by Next.js 16 (ssr:false only works
-// in Client Components per the lazy-loading doc).
+// mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
+// dynamic import here in a Client Component as required by Next.js 16
+// (ssr:false only works in Client Components per the lazy-loading doc).
 const LeafletMap = dynamic(() => import("./Map"), {
   ssr: false,
   loading: () => (
@@ -152,9 +151,12 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
   // ── Desktop window expanded state (PR 5) ─────────────────────────────────────
   const [windowExpanded, setWindowExpanded] = useState(false);
 
-  // ── Leaflet map instance — passed up from Map via onMapReady (PR 5) ──────────
-  // Stored in state (not ref) so changes trigger re-render in DesktopVenueWindow.
-  const [leafletMap, setLeafletMap] = useState<LMap | null>(null);
+  // ── Map instance — passed up from Map via onMapReady (PR 5 / TODO #46) ───────
+  // Stored in state so changes trigger re-render in DesktopVenueWindow.
+  // Typed as unknown for now; DesktopVenueWindow narrows it to LeafletMap but has
+  // a null-guard — window will be hidden until #46 wires the Mapbox equivalent.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [leafletMap, setLeafletMap] = useState<any>(null);
 
   // ── Category toggle ──────────────────────────────────────────────────────────
   const handleToggleCategory = useCallback((cat: VenueCategory | null) => {

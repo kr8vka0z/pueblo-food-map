@@ -15,7 +15,7 @@
  *   </div>
  *
  * No sidebar. No category rail. No desktop split-pane.
- * Search behavior is NOT wired (PR 6). SearchBar is an uncontrolled stub.
+ * Search behavior wired in PR 6: query state + searchVenues filter + EmptySearchPopover.
  */
 
 import {
@@ -28,10 +28,12 @@ import dynamic from "next/dynamic";
 import SearchBar from "./SearchBar";
 import LocateButton from "./LocateButton";
 import BottomSheet from "./BottomSheet";
+import EmptySearchPopover from "./EmptySearchPopover";
 import { useGeolocation } from "@/lib/useGeolocation";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
+import { searchVenues } from "@/lib/searchVenues";
 import type { VenueCategory } from "@/types/venue";
 
 // Leaflet must not run on the server — keep the dynamic import here
@@ -87,7 +89,10 @@ export default function MapWrapper() {
   // ── Mobile detection ─────────────────────────────────────────────────────────
   const isMobile = useIsMobile();
 
-  // ── Filter state — kept minimal; search behavior wired in PR 6 ──────────────
+  // ── Search query state (PR 6) ────────────────────────────────────────────────
+  const [query, setQuery] = useState("");
+
+  // ── Filter state — kept minimal; further filter controls are deferred ────────
   const [selectedCategories, setSelectedCategories] =
     useState<Set<VenueCategory> | null>(null);
   const [filterOpenNow] = useState(false);
@@ -130,7 +135,8 @@ export default function MapWrapper() {
   const filteredVenues = useMemo(() => {
     const now = new Date();
 
-    return venuesWithDistance
+    // Apply existing category / boolean filters first, then layer search on top.
+    const afterFilters = venuesWithDistance
       .filter((v) => {
         if (selectedCategories !== null && selectedCategories.size > 0) {
           if (!selectedCategories.has(v.category)) return false;
@@ -144,12 +150,16 @@ export default function MapWrapper() {
         return true;
       })
       .sort((a, b) => a.distanceMiles - b.distanceMiles);
+
+    // PR 6: apply text search (name + readable category, substring, EN-only).
+    return searchVenues(afterFilters, query);
   }, [
     venuesWithDistance,
     selectedCategories,
     filterOpenNow,
     filterSnap,
     filterWalking,
+    query,
   ]);
 
   const anyFilterActive =
@@ -209,8 +219,19 @@ export default function MapWrapper() {
         }}
       />
 
-      {/* SearchBar — absolute top-center, z-index 1000 (PR 6 wires behavior) */}
-      <SearchBar />
+      {/* SearchBar — controlled (PR 6) */}
+      <SearchBar
+        value={query}
+        onChange={setQuery}
+      />
+
+      {/* EmptySearchPopover — shown when query is non-empty but yields no results */}
+      {query.trim() !== "" && filteredVenues.length === 0 && (
+        <EmptySearchPopover
+          query={query.trim()}
+          onSelectCategory={(label) => setQuery(label)}
+        />
+      )}
 
       {/* LocateButton — absolute top-right, z-index 1000 */}
       <LocateButton geoState={geo.state} onRequest={geo.request} />

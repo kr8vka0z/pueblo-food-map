@@ -9,18 +9,37 @@
  * - Floats above Leaflet tiles (z-index 1000 — Leaflet uses 200–800).
  * - Near-full-width on mobile (16px margins each side).
  * - ~520px centered on desktop (≥768px).
- * - Search behavior is NOT wired here — that is PR 6.
- *   Input holds local string state only.
+ * - Controlled: value/onChange/onSubmit wired by PR 6 (MapWrapper).
  */
 
+import { useCallback } from "react";
 import { Search } from "lucide-react";
 
 interface SearchBarProps {
-  /** Uncontrolled initial value. State is local until PR 6 wires behavior. */
-  defaultValue?: string;
+  /** Controlled value — owned by MapWrapper. */
+  value: string;
+  onChange: (next: string) => void;
+  /** Called when the user presses Enter to commit the current query. */
+  onSubmit?: () => void;
+  placeholder?: string;
 }
 
-export default function SearchBar({ defaultValue = "" }: SearchBarProps) {
+export default function SearchBar({
+  value,
+  onChange,
+  onSubmit,
+  placeholder = "Search venues or categories",
+}: SearchBarProps) {
+  const handleKey = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        e.currentTarget.blur();
+        onSubmit?.();
+      }
+    },
+    [onSubmit],
+  );
+
   return (
     <div
       className="absolute top-4 left-0 right-0 flex justify-center"
@@ -53,8 +72,10 @@ export default function SearchBar({ defaultValue = "" }: SearchBarProps) {
 
         <input
           type="search"
-          defaultValue={defaultValue}
-          placeholder="Search venues or categories"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder={placeholder}
           aria-label="Search venues or categories"
           className={
             "w-full h-11 md:h-[52px] " +

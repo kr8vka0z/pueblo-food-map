@@ -101,6 +101,9 @@ const en: Record<string, string> = {
   // Empty state (PR 3)
   "empty.title": "No places match your filters.",
   "empty.clear": "Clear filters",
+
+  // Sponsor credit (#69)
+  "sponsor.text": "Sponsored by Pueblo Food Project",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -204,6 +207,9 @@ const es: Record<string, string> = {
   // Empty state (PR 3)
   "empty.title": "Ningún lugar coincide con tus filtros.",
   "empty.clear": "Borrar filtros",
+
+  // Sponsor credit (#69)
+  "sponsor.text": "Patrocinado por Pueblo Food Project",
 };
 
 /** Substitute simple {key} placeholders. */

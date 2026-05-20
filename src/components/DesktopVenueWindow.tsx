@@ -440,6 +440,7 @@ export default function DesktopVenueWindow({
                       }
                     >
                       {DAY_LABELS[day]}
+                      {isToday && <span className="sr-only">, today</span>}
                     </dt>
                     <dd
                       className={
@@ -453,11 +454,6 @@ export default function DesktopVenueWindow({
                         ? slots.map(formatSlot).join(", ")
                         : "Closed"}
                     </dd>
-                    {isToday && (
-                      <span className="text-xs text-[var(--color-sage-600)] font-medium ml-auto">
-                        Today
-                      </span>
-                    )}
                   </div>
                 );
               })}

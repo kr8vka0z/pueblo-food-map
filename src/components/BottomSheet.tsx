@@ -22,6 +22,7 @@ import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus, formatSlot } from "@/lib/hours";
+import { t } from "@/lib/i18n";
 
 // ─── Snap points ─────────────────────────────────────────────────────────────
 // vaul accepts pixel strings and fractions (0-1 = % of viewport height).
@@ -258,12 +259,12 @@ export default function BottomSheet({ venue, onClose, onSnapChange }: BottomShee
           className={
             "flex items-center justify-center gap-2 w-full h-12 rounded-[var(--radius-md)] " +
             "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-            "text-base font-semibold transition-colors duration-150 " +
+            "text-xl font-semibold transition-colors duration-150 " +
             "hover:bg-[var(--color-sage-600)] focus-visible:outline-none " +
             "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
           }
         >
-          Get directions →
+          {t("detail.getDirections", "en")}
         </a>
 
         {/* SNAP/WIC badges */}

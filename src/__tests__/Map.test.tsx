@@ -3,7 +3,8 @@
  *
  * react-map-gl/mapbox requires a live WebGL context. We mock the entire module
  * so vitest/jsdom can render the Map component tree without a real canvas:
- *   - MapGL (default export) → renders children inside a <div>
+ *   - MapGL (default export) → forwardRef wrapper that exposes flyTo/jumpTo spies
+ *     via the ref, so useEffect flyTo calls are observable in tests
  *   - Marker                → renders children inside a <div>
  *   - Popup                 → renders null (tooltips are visual-only)
  *   - AttributionControl    → renders null
@@ -16,30 +17,44 @@
  *   - User-location dot is absent when userLocation is null
  *   - User-location dot is present when userLocation is set
  *   - onSelectVenue is called when a VenueMarker button is clicked
+ *   - locate button recenters on every tap, not just the first (#60)
  */
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import MapComponent from "@/components/Map";
 import type { Venue } from "@/types/venue";
 
 // ─── Stub mapbox-gl CSS (no-op in jsdom) ─────────────────────────────────────
 vi.mock("mapbox-gl/dist/mapbox-gl.css", () => ({}));
 
+// Shared spy instances — reset in beforeEach
+export const mockFlyTo = vi.fn();
+export const mockJumpTo = vi.fn();
+
 // ─── Mock react-map-gl/mapbox ─────────────────────────────────────────────────
-// Use factory function returning plain objects — avoids React copy issues caused
-// by importing React inside vi.mock factory scope.
+// MapGL forwards the ref so Map.tsx's mapRef.current is populated with a mock
+// object exposing flyTo / jumpTo spies. Without ref-forwarding those calls are
+// silent no-ops (optional chaining on null) and we can't assert on them.
 vi.mock("react-map-gl/mapbox", async () => {
   const React = await import("react");
+  const MapGLMock = React.forwardRef(function MapGLMock(
+    {
+      children,
+    }: {
+      children: React.ReactNode;
+      onLoad?: (e: { target: object }) => void;
+    },
+    ref: React.Ref<{ flyTo: typeof mockFlyTo; jumpTo: typeof mockJumpTo }>,
+  ) {
+    React.useImperativeHandle(ref, () => ({
+      flyTo: mockFlyTo,
+      jumpTo: mockJumpTo,
+    }));
+    return React.createElement("div", { "data-testid": "mapgl-root" }, children);
+  });
   return {
-    default: vi.fn(
-      ({
-        children,
-      }: {
-        children: React.ReactNode;
-        onLoad?: (e: { target: object }) => void;
-      }) => React.createElement("div", { "data-testid": "mapgl-root" }, children),
-    ),
+    default: MapGLMock,
     Marker: vi.fn(({ children }: { children: React.ReactNode }) =>
       React.createElement("div", { "data-testid": "mapbox-marker" }, children),
     ),
@@ -203,5 +218,93 @@ describe("Map — distance in marker aria-label", () => {
       name: /La Familia Pantry.*0\.8 mi/,
     });
     expect(btn).toBeDefined();
+  });
+});
+
+// ─── Locate button recenter — issue #60 ──────────────────────────────────────
+//
+// Reproduces: second locate tap after panning does nothing.
+// The fix: Map accepts a `recenterRequestId` prop (number); the flyTo effect
+// depends on it in addition to userLocation, so every increment triggers a
+// recenter regardless of whether userLocation changed.
+
+describe("Map — locate button recenter (#60)", () => {
+  const USER_LOC = { lat: 38.26, lng: -104.62 };
+
+  test("flyTo fires on first recenterRequestId (initial locate)", () => {
+    render(
+      <MapComponent
+        {...makeProps({
+          userLocation: USER_LOC,
+          recenterRequestId: 1,
+        })}
+      />,
+    );
+    expect(mockFlyTo).toHaveBeenCalledTimes(1);
+    expect(mockFlyTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        center: [USER_LOC.lng, USER_LOC.lat],
+        zoom: 14,
+      }),
+    );
+  });
+
+  test("flyTo fires again when recenterRequestId increments (second tap after pan)", () => {
+    const { rerender } = render(
+      <MapComponent
+        {...makeProps({
+          userLocation: USER_LOC,
+          recenterRequestId: 1,
+        })}
+      />,
+    );
+    expect(mockFlyTo).toHaveBeenCalledTimes(1);
+
+    // Simulate user panning away, then tapping locate again — same userLocation,
+    // incremented recenterRequestId.
+    act(() => {
+      rerender(
+        <MapComponent
+          {...makeProps({
+            userLocation: USER_LOC,
+            recenterRequestId: 2,
+          })}
+        />,
+      );
+    });
+
+    // Bug: with the old flownToUserRef guard, flyTo is NOT called a second time.
+    // Fix: flyTo must fire again → total call count = 2.
+    expect(mockFlyTo).toHaveBeenCalledTimes(2);
+  });
+
+  test("passive userLocation update without recenterRequestId change does NOT re-center", () => {
+    // Guards against watchPosition jitter causing unwanted re-centers.
+    // recenterRequestId stays at 1 across both renders.
+    const { rerender } = render(
+      <MapComponent
+        {...makeProps({
+          userLocation: USER_LOC,
+          recenterRequestId: 1,
+        })}
+      />,
+    );
+    expect(mockFlyTo).toHaveBeenCalledTimes(1);
+
+    // Simulate geolocation watchPosition firing a slightly different position
+    // (jitter) without a user tap.
+    act(() => {
+      rerender(
+        <MapComponent
+          {...makeProps({
+            userLocation: { lat: 38.2601, lng: -104.6201 },
+            recenterRequestId: 1, // unchanged — no user tap
+          })}
+        />,
+      );
+    });
+
+    // Should still be 1 — passive jitter must not re-center.
+    expect(mockFlyTo).toHaveBeenCalledTimes(1);
   });
 });

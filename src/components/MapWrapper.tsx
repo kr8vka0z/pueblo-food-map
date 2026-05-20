@@ -126,6 +126,11 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
     // so this effect fires even when permission stays "denied" across retries.
   }, [geo.state]);
 
+  // ── Explicit recenter counter — incremented on each user-initiated locate tap ──
+  // Map.tsx's flyTo effect depends on this value so the map re-centers every
+  // time the user taps LocateButton, not just on the first geolocation event. (#60)
+  const [recenterRequestId, setRecenterRequestId] = useState(0);
+
   // Wraps geo.request() to stamp the request timestamp and increment the
   // recenter counter so Map.tsx re-centers even if userLocation hasn't changed.
   const handleLocateRequest = useCallback(() => {
@@ -158,11 +163,6 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
   // Typed as unknown; DesktopVenueWindow narrows it via its MapboxMap interface.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [mapboxMap, setMapboxMap] = useState<any>(null);
-
-  // ── Explicit recenter counter — incremented on each user-initiated locate tap ──
-  // Map.tsx's flyTo effect depends on this value so the map re-centers every
-  // time the user taps LocateButton, not just on the first geolocation event. (#60)
-  const [recenterRequestId, setRecenterRequestId] = useState(0);
 
   // ── Category toggle ──────────────────────────────────────────────────────────
   const handleToggleCategory = useCallback((cat: VenueCategory | null) => {

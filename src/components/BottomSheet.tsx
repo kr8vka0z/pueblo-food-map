@@ -59,11 +59,13 @@ interface BottomSheetProps {
   onClose: () => void;
   /** Called when the snap point changes — e.g. to hide overlapping UI when fully expanded. */
   onSnapChange?: (snap: SnapPoint) => void;
+  /** BCP 47 locale tag forwarded from MapWrapper. Defaults to "en". */
+  locale?: string;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
 
-export default function BottomSheet({ venue, onClose, onSnapChange }: BottomSheetProps) {
+export default function BottomSheet({ venue, onClose, onSnapChange, locale = "en" }: BottomSheetProps) {
   const [snap, setSnap] = useState<SnapPoint>(SNAP_PEEK);
 
   // When a new venue is selected, reset to quick snap
@@ -264,7 +266,7 @@ export default function BottomSheet({ venue, onClose, onSnapChange }: BottomShee
             "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
           }
         >
-          {t("detail.getDirections", "en")}
+          {t("detail.getDirections", locale)}
         </a>
 
         {/* SNAP/WIC badges */}

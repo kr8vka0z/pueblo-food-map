@@ -146,6 +146,8 @@ interface DesktopVenueWindowProps {
   onExpand: () => void;
   onCollapse: () => void;
   onClose: () => void;
+  /** BCP 47 locale tag forwarded from MapWrapper. Defaults to "en". */
+  locale?: string;
 }
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
@@ -157,6 +159,7 @@ export default function DesktopVenueWindow({
   onExpand,
   onCollapse,
   onClose,
+  locale = "en",
 }: DesktopVenueWindowProps) {
   const windowRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<WindowPosition>({ left: 0, top: 0 });
@@ -387,12 +390,12 @@ export default function DesktopVenueWindow({
           className={
             "flex items-center justify-center gap-2 w-full h-10 rounded-[var(--radius-md)] " +
             "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-            "text-xl font-semibold transition-colors duration-150 " +
+            "text-lg font-semibold transition-colors duration-150 " +
             "hover:bg-[var(--color-sage-600)] focus-visible:outline-none " +
             "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
           }
         >
-          {t("detail.getDirections", "en")}
+          {t("detail.getDirections", locale)}
         </a>
 
         {/* SNAP/WIC */}

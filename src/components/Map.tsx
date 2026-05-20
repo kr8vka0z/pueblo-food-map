@@ -52,6 +52,13 @@ interface MapProps {
   /** Called once after the map loads. Receives the underlying mapboxgl.Map instance. */
   onMapReady?: (map: mapboxgl.Map) => void;
   locale?: Locale;
+  /**
+   * Incremented by MapWrapper each time the user explicitly taps the locate
+   * button. The flyTo effect depends on this counter so it fires on every tap,
+   * not just the first (#60). Passive watchPosition jitter (same counter value)
+   * does NOT re-center. Defaults to 0 (no explicit recenter requested yet).
+   */
+  recenterRequestId?: number;
 }
 
 export default function Map({
@@ -62,6 +69,7 @@ export default function Map({
   onSelectVenue,
   onMapReady,
   locale = "en",
+  recenterRequestId = 0,
 }: MapProps) {
   // Centralized hover state — one Popup for the whole map avoids per-marker mount churn.
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
@@ -70,7 +78,14 @@ export default function Map({
 
   // Guards — each fires at most once per mount
   const fittedBoundsRef = useRef(false);
-  const flownToUserRef = useRef(false);
+  // Tracks the last recenterRequestId that triggered a flyTo. The effect fires
+  // when recenterRequestId changes (explicit locate tap) OR when userLocation
+  // first arrives passively (recenterRequestId stays 0). Using a ref avoids
+  // adding it to the dependency array and breaking the passive-center behavior.
+  const lastRecenterIdRef = useRef(-1);
+  // Tracks whether the passive initial center has already fired (recenterRequestId
+  // === 0 path), so watchPosition jitter doesn't re-center without a tap.
+  const passiveFlownRef = useRef(false);
 
   // ── Reduced-motion helper ─────────────────────────────────────────────────
   // Evaluated lazily (not at module scope) so SSR never touches window.
@@ -131,13 +146,35 @@ export default function Map({
     }
   }, [selectedVenueId, venues, prefersReducedMotion]);
 
-  // ── User-location flyTo — 600ms, zoom 14, fires once, venue has priority ──
+  // ── User-location flyTo — 600ms, zoom 14 ────────────────────────────────────
+  //
+  // Two triggers, each handled exactly once:
+  //
+  // 1. Passive initial center (recenterRequestId === 0):
+  //    Fires when userLocation first resolves after mount. passiveFlownRef
+  //    prevents re-triggering on subsequent watchPosition jitter.
+  //
+  // 2. Explicit recenter tap (recenterRequestId > 0):
+  //    Fires every time recenterRequestId increments (i.e. user tapped locate).
+  //    lastRecenterIdRef tracks the last processed id so the same tap value
+  //    does not re-fire when userLocation jitters. (#60)
+  //
+  // Venue flyTo (selectedVenueId effect above) takes priority — we skip if a
+  // venue is selected.
   useEffect(() => {
     if (!userLocation) return;
-    if (flownToUserRef.current) return;
     if (selectedVenueId !== null) return; // venue flyTo takes priority
 
-    flownToUserRef.current = true;
+    const isExplicitTap = recenterRequestId > 0 && recenterRequestId !== lastRecenterIdRef.current;
+    const isPassiveFirst = recenterRequestId === 0 && !passiveFlownRef.current;
+
+    if (!isExplicitTap && !isPassiveFirst) return;
+
+    if (isExplicitTap) {
+      lastRecenterIdRef.current = recenterRequestId;
+    } else {
+      passiveFlownRef.current = true;
+    }
 
     if (prefersReducedMotion()) {
       mapRef.current?.jumpTo({
@@ -151,7 +188,7 @@ export default function Map({
         duration: 600,
       });
     }
-  }, [userLocation, selectedVenueId, prefersReducedMotion]);
+  }, [userLocation, selectedVenueId, recenterRequestId, prefersReducedMotion]);
 
   // ── Marker interaction handlers ───────────────────────────────────────────
 

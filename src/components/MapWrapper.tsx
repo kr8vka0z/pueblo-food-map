@@ -126,9 +126,16 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
     // so this effect fires even when permission stays "denied" across retries.
   }, [geo.state]);
 
-  // Wraps geo.request() to stamp the request timestamp.
+  // ── Explicit recenter counter — incremented on each user-initiated locate tap ──
+  // Map.tsx's flyTo effect depends on this value so the map re-centers every
+  // time the user taps LocateButton, not just on the first geolocation event. (#60)
+  const [recenterRequestId, setRecenterRequestId] = useState(0);
+
+  // Wraps geo.request() to stamp the request timestamp and increment the
+  // recenter counter so Map.tsx re-centers even if userLocation hasn't changed.
   const handleLocateRequest = useCallback(() => {
     userRequestedAtRef.current = Date.now();
+    setRecenterRequestId((n) => n + 1);
     geo.request();
   }, [geo]);
 
@@ -263,6 +270,7 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         selectedVenueId={selectedVenueId}
         userLocation={userLocation}
         userDistances={userDistances}
+        recenterRequestId={recenterRequestId}
         onSelectVenue={(id) => {
           setSelectedVenueId(id);
           if (!isMobile) {

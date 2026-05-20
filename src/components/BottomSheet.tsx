@@ -56,11 +56,13 @@ const DAY_LABELS: Record<DayKey, string> = {
 interface BottomSheetProps {
   venue: (Venue & { distanceMiles?: number }) | null;
   onClose: () => void;
+  /** Called when the snap point changes — e.g. to hide overlapping UI when fully expanded. */
+  onSnapChange?: (snap: SnapPoint) => void;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
 
-export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
+export default function BottomSheet({ venue, onClose, onSnapChange }: BottomSheetProps) {
   const [snap, setSnap] = useState<SnapPoint>(SNAP_PEEK);
 
   // When a new venue is selected, reset to quick snap
@@ -74,6 +76,7 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
     if (s === null) return;
     if (SNAP_POINTS.includes(s as SnapPoint)) {
       setSnap(s as SnapPoint);
+      onSnapChange?.(s as SnapPoint);
     }
   }
 

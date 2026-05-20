@@ -104,6 +104,9 @@ const en: Record<string, string> = {
 
   // Sponsor credit (#69)
   "sponsor.text": "Sponsored by Pueblo Food Project",
+
+  // Legend (#72)
+  "legend.button_label": "Map legend",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -210,6 +213,9 @@ const es: Record<string, string> = {
 
   // Sponsor credit (#69)
   "sponsor.text": "Patrocinado por Pueblo Food Project",
+
+  // Legend (#72)
+  "legend.button_label": "Leyenda del mapa",
 };
 
 /** Substitute simple {key} placeholders. */

@@ -30,6 +30,7 @@ import SearchBar from "./SearchBar";
 import LocateButton from "./LocateButton";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
+import SponsorCredit from "./SponsorCredit";
 import EmptySearchPopover from "./EmptySearchPopover";
 import LocationDeniedBanner from "./LocationDeniedBanner";
 import { useGeolocation } from "@/lib/useGeolocation";
@@ -157,6 +158,9 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
 
   // ── Desktop window expanded state (PR 5) ─────────────────────────────────────
   const [windowExpanded, setWindowExpanded] = useState(false);
+
+  // ── BottomSheet snap state — used to hide SponsorCredit when sheet is full (#69) ──
+  const [sheetFullyExpanded, setSheetFullyExpanded] = useState(false);
 
   // ── Map instance — passed up from Map via onMapReady (wired in #47) ────────
   // Stored in state so changes trigger re-render in DesktopVenueWindow.
@@ -308,12 +312,19 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         />
       )}
 
+      {/* SponsorCredit — bottom-right, hidden when BottomSheet is fully expanded (#69) */}
+      <SponsorCredit hidden={isMobile && sheetFullyExpanded} />
+
       {/* BottomSheet — mobile only (vaul v2, venue-centric API) */}
       {isMobile && (
         <BottomSheet
           key={selectedVenueId ?? "empty"}
           venue={selectedVenue}
-          onClose={() => setSelectedVenueId(null)}
+          onClose={() => {
+            setSelectedVenueId(null);
+            setSheetFullyExpanded(false);
+          }}
+          onSnapChange={(snap) => setSheetFullyExpanded(snap === 0.9)}
         />
       )}
 

@@ -312,6 +312,7 @@ export default function BottomSheet({ venue, onClose, onSnapChange }: BottomShee
                       }
                     >
                       {DAY_LABELS[day]}
+                      {isToday && <span className="sr-only">, today</span>}
                     </dt>
                     <dd
                       className={
@@ -325,11 +326,6 @@ export default function BottomSheet({ venue, onClose, onSnapChange }: BottomShee
                         ? slots.map(formatSlot).join(", ")
                         : "Closed"}
                     </dd>
-                    {isToday && (
-                      <span className="text-xs text-[var(--color-sage-600)] font-medium ml-auto">
-                        Today
-                      </span>
-                    )}
                   </div>
                 );
               })}

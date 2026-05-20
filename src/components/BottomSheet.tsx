@@ -22,6 +22,7 @@ import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus, formatSlot } from "@/lib/hours";
+import { t, type Locale } from "@/lib/i18n";
 
 // ─── Snap points ─────────────────────────────────────────────────────────────
 // vaul accepts pixel strings and fractions (0-1 = % of viewport height).
@@ -58,11 +59,13 @@ interface BottomSheetProps {
   onClose: () => void;
   /** Called when the snap point changes — e.g. to hide overlapping UI when fully expanded. */
   onSnapChange?: (snap: SnapPoint) => void;
+  /** Locale forwarded from MapWrapper. Defaults to "en". */
+  locale?: Locale;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
 
-export default function BottomSheet({ venue, onClose, onSnapChange }: BottomSheetProps) {
+export default function BottomSheet({ venue, onClose, onSnapChange, locale = "en" }: BottomSheetProps) {
   const [snap, setSnap] = useState<SnapPoint>(SNAP_PEEK);
 
   // When a new venue is selected, reset to quick snap
@@ -258,12 +261,12 @@ export default function BottomSheet({ venue, onClose, onSnapChange }: BottomShee
           className={
             "flex items-center justify-center gap-2 w-full h-12 rounded-[var(--radius-md)] " +
             "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-            "text-base font-semibold transition-colors duration-150 " +
+            "text-xl font-semibold transition-colors duration-150 " +
             "hover:bg-[var(--color-sage-600)] focus-visible:outline-none " +
             "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
           }
         >
-          Get directions →
+          {t("detail.getDirections", locale)}
         </a>
 
         {/* SNAP/WIC badges */}

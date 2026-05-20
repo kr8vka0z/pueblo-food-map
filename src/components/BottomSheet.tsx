@@ -137,6 +137,21 @@ export default function BottomSheet({ venue, onClose, onSnapChange, locale = "en
         </button>
       </div>
 
+      {/* Operator attribution */}
+      {venue.operator && (
+        <p className="text-xs text-[var(--color-ink-500)] -mt-1">
+          {t("operator.operated_by", locale)}{" "}
+          <a
+            href="https://pueblofoodproject.org/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+          >
+            {venue.operator}
+          </a>
+        </p>
+      )}
+
       {/* Category badge + SNAP/WIC pills */}
       <div className="flex flex-wrap items-center gap-2">
         <span
@@ -226,11 +241,24 @@ export default function BottomSheet({ venue, onClose, onSnapChange, locale = "en
         {/* Venue name */}
         <div>
           <h2
-            className="text-2xl font-normal text-[var(--color-ink-900)] leading-tight mb-2"
+            className="text-2xl font-normal text-[var(--color-ink-900)] leading-tight mb-1"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {venue.name}
           </h2>
+          {venue.operator && (
+            <p className="text-xs text-[var(--color-ink-500)] mb-2">
+              {t("operator.operated_by", locale)}{" "}
+              <a
+                href="https://pueblofoodproject.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+              >
+                {venue.operator}
+              </a>
+            </p>
+          )}
           <span
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium text-[var(--color-bone-50)]"
             style={{ backgroundColor: categoryColors[venue.category] }}

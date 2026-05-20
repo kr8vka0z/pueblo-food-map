@@ -24,6 +24,7 @@ export const pfpVenues: Venue[] = [
     url: "https://pueblofoodproject.org/cgsp/",
     notes:
       "Weekly volunteer work days Wed 4-7pm. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
+    operator: "Pueblo Food Project",
     source: "pueblofoodproject.org/cgsp",
     last_verified: "2026-05-12",
   },
@@ -38,6 +39,7 @@ export const pfpVenues: Venue[] = [
     url: "https://pueblofoodproject.org/cgsp/",
     notes:
       "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
+    operator: "Pueblo Food Project",
     source: "pueblofoodproject.org/cgsp",
     last_verified: "2026-05-12",
   },
@@ -52,6 +54,7 @@ export const pfpVenues: Venue[] = [
     url: "https://pueblofoodproject.org/cgsp/",
     notes:
       "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
+    operator: "Pueblo Food Project",
     source: "pueblofoodproject.org/cgsp",
     last_verified: "2026-05-12",
   },
@@ -66,6 +69,7 @@ export const pfpVenues: Venue[] = [
     url: "https://pueblofoodproject.org/cgsp/",
     notes:
       "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
+    operator: "Pueblo Food Project",
     source: "pueblofoodproject.org/cgsp",
     last_verified: "2026-05-12",
   },
@@ -80,6 +84,7 @@ export const pfpVenues: Venue[] = [
     url: "https://pueblofoodproject.org/cgsp/",
     notes:
       "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
+    operator: "Pueblo Food Project",
     source: "pueblofoodproject.org/cgsp",
     last_verified: "2026-05-12",
   },
@@ -94,6 +99,7 @@ export const pfpVenues: Venue[] = [
     url: "https://pueblofoodproject.org/cgsp/",
     notes:
       "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
+    operator: "Pueblo Food Project",
     source: "pueblofoodproject.org/cgsp",
     last_verified: "2026-05-12",
   },
@@ -106,6 +112,7 @@ export const pfpVenues: Venue[] = [
     address: "Mineral Palace Park, Pueblo, CO",
     url: "https://pueblofoodproject.org/cgsp/",
     notes: "Public edible landscape installation.",
+    operator: "Pueblo Food Project",
     source: "pueblofoodproject.org/cgsp",
     last_verified: "2026-05-12",
   },
@@ -118,6 +125,7 @@ export const pfpVenues: Venue[] = [
     address: "1st & Main, Pueblo, CO",
     url: "https://pueblofoodproject.org/cgsp/",
     notes: "Public edible landscape installation in downtown Pueblo.",
+    operator: "Pueblo Food Project",
     source: "pueblofoodproject.org/cgsp",
     last_verified: "2026-05-12",
   },
@@ -130,6 +138,7 @@ export const pfpVenues: Venue[] = [
     address: "600 Maryland Ave, Pueblo, CO",
     url: "https://pueblofoodproject.org/cgsp/",
     notes: "Public edible landscape installation.",
+    operator: "Pueblo Food Project",
     source: "pueblofoodproject.org/cgsp",
     last_verified: "2026-05-12",
   },
@@ -142,6 +151,7 @@ export const pfpVenues: Venue[] = [
     address: "400 S Union Ave, Pueblo, CO 81003",
     url: "https://pueblofoodproject.org/cgsp/",
     notes: "Edible landscape at Pueblo's first food hall.",
+    operator: "Pueblo Food Project",
     source: "pueblofoodproject.org/cgsp",
     last_verified: "2026-05-12",
   },

@@ -22,7 +22,7 @@ import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus, formatSlot } from "@/lib/hours";
-import { t } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 
 // ─── Snap points ─────────────────────────────────────────────────────────────
 // vaul accepts pixel strings and fractions (0-1 = % of viewport height).
@@ -59,8 +59,8 @@ interface BottomSheetProps {
   onClose: () => void;
   /** Called when the snap point changes — e.g. to hide overlapping UI when fully expanded. */
   onSnapChange?: (snap: SnapPoint) => void;
-  /** BCP 47 locale tag forwarded from MapWrapper. Defaults to "en". */
-  locale?: string;
+  /** Locale forwarded from MapWrapper. Defaults to "en". */
+  locale?: Locale;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────

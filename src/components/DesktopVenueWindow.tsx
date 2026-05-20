@@ -47,7 +47,7 @@ import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus, formatSlot } from "@/lib/hours";
-import { t } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -146,8 +146,8 @@ interface DesktopVenueWindowProps {
   onExpand: () => void;
   onCollapse: () => void;
   onClose: () => void;
-  /** BCP 47 locale tag forwarded from MapWrapper. Defaults to "en". */
-  locale?: string;
+  /** Locale forwarded from MapWrapper. Defaults to "en". */
+  locale?: Locale;
 }
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────

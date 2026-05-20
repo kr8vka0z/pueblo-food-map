@@ -28,6 +28,7 @@ import {
 import dynamic from "next/dynamic";
 import SearchBar from "./SearchBar";
 import LocateButton from "./LocateButton";
+import Legend from "./Legend";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
 import SponsorCredit from "./SponsorCredit";
@@ -300,6 +301,9 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
 
       {/* LocateButton — absolute top-right, z-index 1000 */}
       <LocateButton geoState={geo.state} onRequest={handleLocateRequest} />
+
+      {/* Legend — collapsible category color legend, below LocateButton (#72) */}
+      <Legend />
 
       {/* LocationDeniedBanner — appears only after active re-tap → denial */}
       {bannerVisible && (

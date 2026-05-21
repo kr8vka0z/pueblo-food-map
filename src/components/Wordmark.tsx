@@ -55,14 +55,14 @@ export default function Wordmark({ size = 'xl', className = '', onClick, locale 
         onClick={onClick}
         aria-label={ariaLabel}
         className={[
-          `wordmark ${SIZE_CLASSES[size]}`,
+          'wordmark',
           // Positioning — absolute top-left, same z layer as SearchBar/LocateButton
           'absolute top-4 left-4',
           // Visual — pill bg matching other map controls
           'bg-white/90 backdrop-blur-sm rounded-xl shadow-sm',
           // Mobile: min 44×44px tap target
           'min-h-[44px] min-w-[44px] px-3 py-2',
-          // Typography size override for map context
+          // Typography size for map context (sole font-size declaration on this element)
           'text-sm md:text-base',
           // Interactive states
           'hover:bg-white active:scale-95',

@@ -37,6 +37,7 @@ import DesktopVenueWindow from "./DesktopVenueWindow";
 import SponsorCredit from "./SponsorCredit";
 import EmptySearchPopover from "./EmptySearchPopover";
 import SearchResultsPopover, {
+  MAX_VISIBLE,
   type VenueWithDistance,
   optionId,
 } from "./SearchResultsPopover";
@@ -343,9 +344,10 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
           setActiveIndex(0);
           return;
         }
-        setActiveIndex((prev) =>
-          prev < filteredVenues.length - 1 ? prev + 1 : prev,
-        );
+        setActiveIndex((prev) => {
+          const lastRendered = Math.min(filteredVenues.length - 1, MAX_VISIBLE - 1);
+          return prev < lastRendered ? prev + 1 : prev;
+        });
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         if (!popoverVisible) return;

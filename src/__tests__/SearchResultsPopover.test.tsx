@@ -310,3 +310,45 @@ describe("SearchResultsPopover — distance aria-label", () => {
     expect(span).not.toBeNull();
   });
 });
+
+// ─── 11. aria-activedescendant invariant — index must reference a rendered <li> ──
+//
+// Regression guard for the blocker fixed in PR #90:
+//   MapWrapper clamped ArrowDown to filteredVenues.length - 1, which could exceed
+//   MAX_VISIBLE - 1 when there are more than MAX_VISIBLE matches. The popover only
+//   renders MAX_VISIBLE rows, so any activeIndex > MAX_VISIBLE - 1 pointed to a
+//   non-existent DOM id — a screen-reader dead zone.
+//
+// Fix: ArrowDown is now clamped to Math.min(filteredVenues.length - 1, MAX_VISIBLE - 1).
+// This test verifies the invariant from the component side: the last rendered option
+// (index MAX_VISIBLE - 1) must exist in the DOM, and nothing beyond it is rendered.
+
+describe("SearchResultsPopover — aria-activedescendant invariant", () => {
+  const EXTRA = 3;
+  const venues = Array.from({ length: MAX_VISIBLE + EXTRA }, (_, i) =>
+    makePantry(`v${i}`, i * 0.1),
+  );
+
+  test("option at MAX_VISIBLE - 1 (last rendered) exists in DOM — valid aria-activedescendant target", () => {
+    renderPopover(venues, { activeIndex: MAX_VISIBLE - 1 });
+    const el = document.getElementById(optionId(LISTBOX_ID, MAX_VISIBLE - 1));
+    expect(el).not.toBeNull();
+    expect(el?.getAttribute("role")).toBe("option");
+  });
+
+  test("option at MAX_VISIBLE (first truncated) does NOT exist in DOM — would be an invalid aria-activedescendant target", () => {
+    // This is the index that was reachable before the fix. It must never be rendered.
+    renderPopover(venues, { activeIndex: MAX_VISIBLE });
+    const el = document.getElementById(optionId(LISTBOX_ID, MAX_VISIBLE));
+    expect(el).toBeNull();
+  });
+
+  test("active row is aria-selected=true only up to the last rendered option", () => {
+    renderPopover(venues, { activeIndex: MAX_VISIBLE - 1 });
+    const options = screen.getAllByRole("option");
+    // Exactly MAX_VISIBLE options rendered
+    expect(options.length).toBe(MAX_VISIBLE);
+    // Last rendered option is highlighted
+    expect(options[MAX_VISIBLE - 1].getAttribute("aria-selected")).toBe("true");
+  });
+});

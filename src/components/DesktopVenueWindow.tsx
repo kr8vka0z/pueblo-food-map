@@ -4,12 +4,20 @@
  * DesktopVenueWindow — marker-anchored floating panel for desktop (≥768px).
  *
  * Two states, same component:
- *   quick  (~360×220): name, category badge, SNAP/WIC pills, distance,
- *                      hours-today, notes (2 lines), "See full details →",
- *                      close X
- *   expanded (~420×720): full venue detail, hours table (today highlighted),
- *                        address, Get directions, phone, SNAP/WIC, notes,
- *                        close X, collapse button
+ *   collapsed  (~360×auto): persistent header bar, then body with name, category
+ *                           badge, SNAP/WIC pills, distance, hours-today, notes
+ *                           (2 lines).
+ *   expanded   (~420×720):  persistent header bar, then scrollable body with full
+ *                           venue detail, hours table (today highlighted), address,
+ *                           Get directions, phone, SNAP/WIC, notes.
+ *
+ * Persistent header bar (issue #64):
+ *   - Always visible, same height (~44px), same background in both states.
+ *   - Left: "Show details" / "Hide details" toggle (replaces chevron + text-link).
+ *   - Right: X-close (clears selectedVenueId).
+ *   - Tab order: X-close → Show/Hide details → body content.
+ *   - Venue title lives in the body, same layout container in both states
+ *     (no title jump between states).
  *
  * Anchoring:
  *   Rendered OUTSIDE the Leaflet map container (sibling div, absolute over map).
@@ -26,7 +34,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { X, MapPin, Phone, Clock, ChevronDown } from "lucide-react";
+import { MapPin, Phone, Clock } from "lucide-react";
 
 /**
  * Minimal interface covering the mapboxgl.Map methods DesktopVenueWindow uses.
@@ -48,6 +56,7 @@ import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus, formatSlot } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
+import VenuePopupHeader from "@/components/VenuePopupHeader";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -216,36 +225,25 @@ export default function DesktopVenueWindow({
     windowRef.current?.focus();
   }, [venue.id]);
 
-  // ── Quick content ─────────────────────────────────────────────────────────
+  // ── Shared body top: name + operator ─────────────────────────────────────
+  // Venue title is always at the top of the body, same layout in both states.
+  // This prevents any visual position jump when toggling collapsed ↔ expanded.
 
-  const quickContent = (
-    <div className="flex flex-col p-4 gap-3">
-      {/* Header: name + close */}
-      <div className="flex items-start gap-2">
-        <h2
-          className="flex-1 text-lg font-normal text-[var(--color-ink-900)] leading-tight"
-          style={{ fontFamily: "var(--font-display)" }}
-          id={`venue-window-title-${venue.id}`}
-        >
-          {venue.name}
-        </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={t("detail.close", locale)}
-          className={
-            "flex items-center justify-center w-8 h-8 -mr-1 rounded-md shrink-0 " +
-            "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-          }
-        >
-          <X size={16} aria-hidden />
-        </button>
-      </div>
-
-      {/* Operator attribution */}
+  const venueNameBlock = (
+    <div>
+      <h2
+        className={
+          (expanded ? "text-xl" : "text-lg") +
+          " font-normal text-[var(--color-ink-900)] leading-tight" +
+          (expanded ? " mb-1" : "")
+        }
+        style={{ fontFamily: "var(--font-display)" }}
+        id={`venue-window-title-${venue.id}`}
+      >
+        {venue.name}
+      </h2>
       {venue.operator && (
-        <p className="text-xs text-[var(--color-ink-500)] -mt-1">
+        <p className={`text-xs text-[var(--color-ink-500)]${expanded ? " mb-2" : ""}`}>
           {t("operator.operated_by", locale)}{" "}
           <a
             href="https://pueblofoodproject.org/"
@@ -257,6 +255,14 @@ export default function DesktopVenueWindow({
           </a>
         </p>
       )}
+    </div>
+  );
+
+  // ── Collapsed body content ────────────────────────────────────────────────
+
+  const collapsedBody = (
+    <div className="flex flex-col p-4 gap-3">
+      {venueNameBlock}
 
       {/* Category + SNAP/WIC */}
       <div className="flex flex-wrap items-center gap-2">
@@ -305,214 +311,149 @@ export default function DesktopVenueWindow({
           {venue.notes}
         </p>
       )}
-
-      {/* See full details */}
-      <button
-        type="button"
-        onClick={onExpand}
-        className={
-          "mt-1 text-xs font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] " +
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-          "rounded text-left"
-        }
-      >
-        {t("detail.seeFullDetails", locale)}
-      </button>
     </div>
   );
 
-  // ── Expanded content ──────────────────────────────────────────────────────
+  // ── Expanded body content ─────────────────────────────────────────────────
 
-  const expandedContent = (
-    <div className="flex flex-col h-full">
-      {/* Sticky header */}
-      <div className="flex items-center gap-2 px-4 h-11 border-b border-[var(--color-bone-200)] shrink-0 sticky top-0 bg-[var(--color-bone-50)] z-10">
-        <button
-          type="button"
-          onClick={onCollapse}
-          aria-label={t("detail.collapseToSummary", locale)}
-          className={
-            "flex items-center justify-center w-8 h-8 -ml-1 rounded-md " +
-            "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-          }
-        >
-          <ChevronDown size={16} aria-hidden />
-        </button>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={t("detail.close", locale)}
-          className={
-            "flex items-center justify-center w-8 h-8 -mr-1 rounded-md " +
-            "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-          }
-        >
-          <X size={16} aria-hidden />
-        </button>
-      </div>
+  const expandedBody = (
+    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      {venueNameBlock}
 
-      {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {/* Name */}
+      {/* Category badge */}
+      <span
+        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--color-bone-50)]"
+        style={{ backgroundColor: categoryColors[venue.category] }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" aria-hidden />
+        {categoryLabels[venue.category]}
+      </span>
+
+      {/* Address */}
+      <div className="flex gap-2">
+        <MapPin size={14} className="text-[var(--color-ink-400)] shrink-0 mt-0.5" aria-hidden />
         <div>
-          <h2
-            className="text-xl font-normal text-[var(--color-ink-900)] leading-tight mb-1"
-            style={{ fontFamily: "var(--font-display)" }}
-            id={`venue-window-title-${venue.id}`}
-          >
-            {venue.name}
-          </h2>
-          {venue.operator && (
-            <p className="text-xs text-[var(--color-ink-500)] mb-2">
-              {t("operator.operated_by", locale)}{" "}
-              <a
-                href="https://pueblofoodproject.org/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
-              >
-                {venue.operator}
-              </a>
+          <p className="text-sm text-[var(--color-ink-700)]">{venue.address}</p>
+          {venue.distanceMiles !== undefined && (
+            <p className="text-xs text-[var(--color-ink-400)] font-mono mt-0.5">
+              {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
             </p>
           )}
-          <span
-            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--color-bone-50)]"
-            style={{ backgroundColor: categoryColors[venue.category] }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" aria-hidden />
-            {categoryLabels[venue.category]}
-          </span>
         </div>
-
-        {/* Address */}
-        <div className="flex gap-2">
-          <MapPin size={14} className="text-[var(--color-ink-400)] shrink-0 mt-0.5" aria-hidden />
-          <div>
-            <p className="text-sm text-[var(--color-ink-700)]">{venue.address}</p>
-            {venue.distanceMiles !== undefined && (
-              <p className="text-xs text-[var(--color-ink-400)] font-mono mt-0.5">
-                {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Get directions */}
-        <a
-          href={directionsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={
-            "flex items-center justify-center gap-2 w-full h-10 rounded-[var(--radius-md)] " +
-            "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-            "text-lg font-semibold transition-colors duration-150 " +
-            "hover:bg-[var(--color-sage-600)] focus-visible:outline-none " +
-            "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
-          }
-        >
-          {t("detail.getDirections", locale)}
-        </a>
-
-        {/* SNAP/WIC */}
-        {(venue.accepts_snap || venue.accepts_wic) && (
-          <div className="flex flex-wrap gap-2">
-            {venue.accepts_snap && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                {t("detail.acceptsSnap", locale)}
-              </span>
-            )}
-            {venue.accepts_wic && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                {t("detail.acceptsWic", locale)}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Hours table */}
-        {venue.hours_weekly && (
-          <section aria-label={t("detail.hours", locale)}>
-            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-              {t("detail.hours", locale)}
-            </h3>
-            <dl className="space-y-0.5">
-              {DAY_KEYS.map((day) => {
-                const slots = venue.hours_weekly![day];
-                const isToday = day === today;
-                return (
-                  <div
-                    key={day}
-                    className={
-                      "flex items-baseline gap-2 py-0.5 " +
-                      (isToday
-                        ? "border-l-[3px] pl-2 border-[var(--color-sage-500)]"
-                        : "pl-3")
-                    }
-                    aria-current={isToday ? "true" : undefined}
-                  >
-                    <dt
-                      className={
-                        "w-7 text-xs shrink-0 " +
-                        (isToday
-                          ? "font-semibold text-[var(--color-sage-700)]"
-                          : "text-[var(--color-ink-500)]")
-                      }
-                    >
-                      {t(`day.${day}`, locale)}
-                      {isToday && (
-                        <span className="sr-only">, {t("detail.today", locale)}</span>
-                      )}
-                    </dt>
-                    <dd
-                      className={
-                        "text-xs font-mono " +
-                        (isToday
-                          ? "text-[var(--color-sage-700)]"
-                          : "text-[var(--color-ink-700)]")
-                      }
-                    >
-                      {slots && slots.length > 0
-                        ? slots.map(formatSlot).join(", ")
-                        : t("hours.closed", locale)}
-                    </dd>
-                  </div>
-                );
-              })}
-            </dl>
-          </section>
-        )}
-
-        {/* Phone */}
-        {venue.phone && (
-          <section aria-label={t("detail.contact", locale)}>
-            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-              {t("detail.contact", locale)}
-            </h3>
-            <a
-              href={`tel:${venue.phone}`}
-              className="flex items-center gap-2 text-sm text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
-            >
-              <Phone size={13} className="text-[var(--color-ink-400)]" aria-hidden />
-              {venue.phone}
-            </a>
-          </section>
-        )}
-
-        {/* Notes */}
-        {venue.notes && (
-          <section aria-label={t("detail.about", locale)}>
-            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-              {t("detail.about", locale)}
-            </h3>
-            <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
-              {venue.notes}
-            </p>
-          </section>
-        )}
       </div>
+
+      {/* Get directions */}
+      <a
+        href={directionsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={
+          "flex items-center justify-center gap-2 w-full h-10 rounded-[var(--radius-md)] " +
+          "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
+          "text-lg font-semibold transition-colors duration-150 " +
+          "hover:bg-[var(--color-sage-600)] focus-visible:outline-none " +
+          "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
+        }
+      >
+        {t("detail.getDirections", locale)}
+      </a>
+
+      {/* SNAP/WIC */}
+      {(venue.accepts_snap || venue.accepts_wic) && (
+        <div className="flex flex-wrap gap-2">
+          {venue.accepts_snap && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
+              {t("detail.acceptsSnap", locale)}
+            </span>
+          )}
+          {venue.accepts_wic && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
+              {t("detail.acceptsWic", locale)}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Hours table */}
+      {venue.hours_weekly && (
+        <section aria-label={t("detail.hours", locale)}>
+          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
+            {t("detail.hours", locale)}
+          </h3>
+          <dl className="space-y-0.5">
+            {DAY_KEYS.map((day) => {
+              const slots = venue.hours_weekly![day];
+              const isToday = day === today;
+              return (
+                <div
+                  key={day}
+                  className={
+                    "flex items-baseline gap-2 py-0.5 " +
+                    (isToday
+                      ? "border-l-[3px] pl-2 border-[var(--color-sage-500)]"
+                      : "pl-3")
+                  }
+                  aria-current={isToday ? "true" : undefined}
+                >
+                  <dt
+                    className={
+                      "w-7 text-xs shrink-0 " +
+                      (isToday
+                        ? "font-semibold text-[var(--color-sage-700)]"
+                        : "text-[var(--color-ink-500)]")
+                    }
+                  >
+                    {t(`day.${day}`, locale)}
+                    {isToday && (
+                      <span className="sr-only">, {t("detail.today", locale)}</span>
+                    )}
+                  </dt>
+                  <dd
+                    className={
+                      "text-xs font-mono " +
+                      (isToday
+                        ? "text-[var(--color-sage-700)]"
+                        : "text-[var(--color-ink-700)]")
+                    }
+                  >
+                    {slots && slots.length > 0
+                      ? slots.map(formatSlot).join(", ")
+                      : t("hours.closed", locale)}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        </section>
+      )}
+
+      {/* Phone */}
+      {venue.phone && (
+        <section aria-label={t("detail.contact", locale)}>
+          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
+            {t("detail.contact", locale)}
+          </h3>
+          <a
+            href={`tel:${venue.phone}`}
+            className="flex items-center gap-2 text-sm text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+          >
+            <Phone size={13} className="text-[var(--color-ink-400)]" aria-hidden />
+            {venue.phone}
+          </a>
+        </section>
+      )}
+
+      {/* Notes */}
+      {venue.notes && (
+        <section aria-label={t("detail.about", locale)}>
+          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
+            {t("detail.about", locale)}
+          </h3>
+          <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+            {venue.notes}
+          </p>
+        </section>
+      )}
     </div>
   );
 
@@ -544,7 +485,26 @@ export default function DesktopVenueWindow({
         maxHeight: "calc(100% - 24px)",
       }}
     >
-      {expanded ? expandedContent : quickContent}
+      {/* Persistent header bar — always visible in both states */}
+      <VenuePopupHeader
+        venueId={venue.id}
+        expanded={expanded}
+        onToggle={expanded ? onCollapse : onExpand}
+        onClose={onClose}
+        locale={locale}
+      />
+
+      {/* Body — collapsed or expanded. id wired to toggle's aria-controls. */}
+      {expanded ? (
+        <div
+          id={`venue-popup-body-${venue.id}`}
+          className="flex flex-col flex-1 overflow-hidden"
+        >
+          {expandedBody}
+        </div>
+      ) : (
+        <div id={`venue-popup-body-${venue.id}`}>{collapsedBody}</div>
+      )}
     </div>
   );
 }

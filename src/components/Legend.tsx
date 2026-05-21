@@ -37,7 +37,7 @@ const LEGEND_CATEGORIES: VenueCategory[] = [
 ];
 
 interface LegendProps {
-  /** Locale for button aria-label. Category labels use categoryLabels (EN) until #68 lands. */
+  /** Locale for button aria-label and category labels. Both use i18n keys from src/lib/i18n.ts (EN + ES). */
   locale?: Locale;
 }
 
@@ -95,6 +95,7 @@ export default function Legend({ locale = "en" }: LegendProps) {
         type="button"
         aria-label={buttonLabel}
         aria-expanded={open}
+        aria-controls="legend-panel"
         onClick={toggle}
         className={
           "flex items-center justify-center " +
@@ -125,6 +126,7 @@ export default function Legend({ locale = "en" }: LegendProps) {
       {/* Expandable panel */}
       {open && (
         <div
+          id="legend-panel"
           role="region"
           aria-label={buttonLabel}
           style={{

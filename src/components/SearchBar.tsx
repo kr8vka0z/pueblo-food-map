@@ -10,6 +10,11 @@
  * - Near-full-width on mobile (16px margins each side).
  * - ~520px centered on desktop (≥768px).
  * - Controlled: value/onChange/onSubmit wired by PR 6 (MapWrapper).
+ *
+ * ARIA combobox pattern (issue #67):
+ * - role="combobox" on the input; aria-expanded/aria-controls/aria-activedescendant
+ *   are controlled by parent (MapWrapper) and passed as comboboxProps.
+ * - onFocus / onBlur / onKeyDown for popover lifecycle are also passed by parent.
  */
 
 import { useCallback } from "react";
@@ -24,6 +29,25 @@ interface SearchBarProps {
   placeholder?: string;
   /** aria-label text for the search input. */
   ariaLabel?: string;
+
+  // ── Combobox / typeahead wiring (issue #67) ──────────────────────────────
+  /** When true, renders role="combobox" with ARIA expansion attrs on the input. */
+  comboboxEnabled?: boolean;
+  /** aria-expanded — true when the results popover is open. */
+  comboboxExpanded?: boolean;
+  /** aria-controls — id of the results listbox element. */
+  comboboxControls?: string;
+  /** aria-activedescendant — id of the currently highlighted option. */
+  comboboxActiveDescendant?: string;
+  /** Focus handler — parent uses this to open the popover. */
+  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  /** Blur handler — parent uses this to schedule closing the popover. */
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  /**
+   * Additional keydown handler — parent handles ArrowUp / ArrowDown / Escape.
+   * This is called BEFORE the internal Enter handler so parent can intercept.
+   */
+  onKeyDownExtra?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
 export default function SearchBar({
@@ -32,16 +56,40 @@ export default function SearchBar({
   onSubmit,
   placeholder = "Search venues or categories",
   ariaLabel = "Search venues or categories",
+  comboboxEnabled = false,
+  comboboxExpanded = false,
+  comboboxControls,
+  comboboxActiveDescendant,
+  onFocus,
+  onBlur,
+  onKeyDownExtra,
 }: SearchBarProps) {
   const handleKey = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // Let parent handle arrow keys, Escape, and Enter-on-highlighted-option first.
+      onKeyDownExtra?.(e);
+      // If parent already prevented default (e.g. selected via Enter), skip submit.
+      if (e.defaultPrevented) return;
       if (e.key === "Enter") {
         e.currentTarget.blur();
         onSubmit?.();
       }
     },
-    [onSubmit],
+    [onSubmit, onKeyDownExtra],
   );
+
+  // Build combobox ARIA attrs only when the feature is enabled.
+  const comboboxAttrs = comboboxEnabled
+    ? {
+        role: "combobox" as const,
+        "aria-expanded": comboboxExpanded,
+        "aria-controls": comboboxControls,
+        "aria-haspopup": "listbox" as const,
+        "aria-autocomplete": "list" as const,
+        "aria-activedescendant": comboboxActiveDescendant ?? undefined,
+        autoComplete: "off",
+      }
+    : {};
 
   return (
     <div
@@ -78,8 +126,11 @@ export default function SearchBar({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKey}
+          onFocus={onFocus}
+          onBlur={onBlur}
           placeholder={placeholder}
           aria-label={ariaLabel}
+          {...comboboxAttrs}
           className={
             "w-full h-11 md:h-[52px] " +
             "pl-9 md:pl-10 pr-4 " +

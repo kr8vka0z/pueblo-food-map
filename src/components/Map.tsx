@@ -7,15 +7,19 @@
  * #45: Venue markers wired (VenueMarker SVG pins, selection ring, click handler).
  * #46: Hover tooltips, user-location dot, attribution control.
  * #47: flyTo / fitBounds / locate flow + reduced-motion guards (this PR).
+ * #62: Pan/zoom constraint (maxBounds + minZoom) + inverted county mask layer.
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import MapGL, {
   Popup,
   Marker,
   AttributionControl,
+  Source,
+  Layer,
 } from "react-map-gl/mapbox";
 import type { MapRef } from "react-map-gl/mapbox";
+import type { LayerProps } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Venue } from "@/types/venue";
 import type { Locale } from "@/lib/i18n";
@@ -23,6 +27,7 @@ import { t } from "@/lib/i18n";
 import { categoryLabels } from "@/data/venues";
 import VenueMarker from "@/components/VenueMarker";
 import type mapboxgl from "mapbox-gl";
+import { PUEBLO_COUNTY_BBOX, PUEBLO_COUNTY_MIN_ZOOM } from "@/data/pueblo-bbox";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -40,6 +45,43 @@ const PUEBLO_LNG = -104.6091;
 // Design tokens (mirrors globals.css @theme)
 const BRAND_NAVY = "#190F3F";
 const SAGE_500 = "#4A8466";
+
+// ─── County mask constants ─────────────────────────────────────────────────────
+//
+// The mask is a GeoJSON polygon with two rings:
+//   1. A world-covering outer ring (CCW — standard GeoJSON exterior winding).
+//   2. The county boundary as a hole (CW — GeoJSON hole winding).
+//
+// This causes the fill layer to cover everything EXCEPT the county, creating
+// the dimmed-surroundings effect (#62).
+//
+// The county boundary ring coordinates are sourced from
+// public/data/pueblo-county-boundary.geojson (Census TIGER/Line, FIPS 08-101,
+// simplified to ~17 KB via mapshaper dp 60%). We load the URL at runtime so
+// the boundary data is not bundled into the JS.
+
+const COUNTY_BOUNDARY_URL = "/data/pueblo-county-boundary.geojson";
+
+// Mask fill layer: black @ 50% opacity covers out-of-county area.
+const COUNTY_MASK_FILL_LAYER: LayerProps = {
+  id: "pueblo-county-mask-fill",
+  type: "fill",
+  paint: {
+    "fill-color": "#000000",
+    "fill-opacity": 0.5,
+  },
+};
+
+// County border line layer: thin brand-navy line traces the county edge.
+const COUNTY_BORDER_LAYER: LayerProps = {
+  id: "pueblo-county-border",
+  type: "line",
+  paint: {
+    "line-color": BRAND_NAVY,
+    "line-width": 1.5,
+    "line-opacity": 0.7,
+  },
+};
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +115,53 @@ export default function Map({
 }: MapProps) {
   // Centralized hover state — one Popup for the whole map avoids per-marker mount churn.
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
+
+  // ── County boundary for inverted mask (#62) ───────────────────────────────
+  // Fetched once on mount; null until loaded. The boundary URL is a public
+  // static file (/data/pueblo-county-boundary.geojson) served from the Worker
+  // assets, so no auth or CORS complexity.
+  const [countyRing, setCountyRing] = useState<number[][] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(COUNTY_BOUNDARY_URL)
+      .then((r) => r.json())
+      .then((geojson) => {
+        if (cancelled) return;
+        const ring = geojson?.features?.[0]?.geometry?.coordinates?.[0];
+        if (Array.isArray(ring) && ring.length > 0) {
+          setCountyRing(ring as number[][]);
+        }
+      })
+      .catch(() => {
+        // Mask silently absent on fetch failure — map is still functional.
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Build the inverted mask GeoJSON: world outer ring (CCW) + county hole (CW).
+  // Memoized on countyRing so it only rebuilds when the boundary data arrives.
+  const maskGeoJSON = useMemo(() => {
+    if (!countyRing) return null;
+    // GeoJSON spec: exterior ring = CCW, holes = CW.
+    // The Census ring is already CCW; reverse it for the hole winding.
+    const holeRing = [...countyRing].reverse();
+    return {
+      type: "Feature" as const,
+      properties: {},
+      geometry: {
+        type: "Polygon" as const,
+        coordinates: [
+          // Outer ring: entire world (CCW)
+          [
+            [-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90],
+          ],
+          // Hole: county boundary (CW)
+          holeRing,
+        ],
+      },
+    };
+  }, [countyRing]);
 
   const mapRef = useRef<MapRef>(null);
 
@@ -223,9 +312,41 @@ export default function Map({
       style={{ width: "100%", height: "100%" }}
       attributionControl={false}
       onLoad={handleLoad}
+      maxBounds={PUEBLO_COUNTY_BBOX}
+      minZoom={PUEBLO_COUNTY_MIN_ZOOM}
     >
       {/* Attribution — bottom-left per spec §10.3; styled in globals.css */}
       <AttributionControl position="bottom-left" compact={true} />
+
+      {/* County mask — inverted fill + border line (#62).
+          Rendered only after the boundary GeoJSON has loaded.
+          The mask source uses inline GeoJSON data (not a URL) so we don't need
+          a second network round-trip after the boundary fetch completes. */}
+      {maskGeoJSON && (
+        <Source
+          id="pueblo-county-mask"
+          type="geojson"
+          data={maskGeoJSON}
+        >
+          <Layer {...COUNTY_MASK_FILL_LAYER} />
+        </Source>
+      )}
+      {countyRing && (
+        <Source
+          id="pueblo-county-boundary"
+          type="geojson"
+          data={{
+            type: "Feature" as const,
+            properties: {},
+            geometry: {
+              type: "Polygon" as const,
+              coordinates: [countyRing],
+            },
+          }}
+        >
+          <Layer {...COUNTY_BORDER_LAYER} />
+        </Source>
+      )}
 
       {/* Venue markers */}
       {venues.map((venue) => (

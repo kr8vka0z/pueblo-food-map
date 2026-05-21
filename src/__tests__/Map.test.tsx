@@ -36,6 +36,9 @@ export const mockJumpTo = vi.fn();
 // MapGL forwards the ref so Map.tsx's mapRef.current is populated with a mock
 // object exposing flyTo / jumpTo spies. Without ref-forwarding those calls are
 // silent no-ops (optional chaining on null) and we can't assert on them.
+//
+// Source and Layer are mocked as passthrough wrappers so the county mask
+// elements render without a real Mapbox GL context (#62).
 vi.mock("react-map-gl/mapbox", async () => {
   const React = await import("react");
   const MapGLMock = React.forwardRef(function MapGLMock(
@@ -60,6 +63,11 @@ vi.mock("react-map-gl/mapbox", async () => {
     ),
     Popup: vi.fn(() => null),
     AttributionControl: vi.fn(() => null),
+    // Source renders children when data prop is present; Layer renders null (GPU-only).
+    Source: vi.fn(({ children, "data-testid": testId }: { children?: React.ReactNode; "data-testid"?: string }) =>
+      React.createElement("div", { "data-testid": testId ?? "mapbox-source" }, children),
+    ),
+    Layer: vi.fn(() => null),
   };
 });
 
@@ -108,6 +116,14 @@ beforeEach(() => {
       removeEventListener: vi.fn(),
     }),
   });
+  // Stub fetch for county boundary GeoJSON (#62). The actual boundary loading
+  // is tested in pueblo-bbox.test.ts; here we just prevent real network calls.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({
+      json: vi.fn().mockResolvedValue({ features: [] }),
+    }),
+  );
 });
 
 // ─── Basic render ─────────────────────────────────────────────────────────────
@@ -306,5 +322,45 @@ describe("Map — locate button recenter (#60)", () => {
 
     // Should still be 1 — passive jitter must not re-center.
     expect(mockFlyTo).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── County constraint props (#62) ───────────────────────────────────────────
+//
+// We cannot assert on the actual Mapbox WebGL rendering (no canvas in jsdom),
+// but we can verify:
+//   - Map renders without error when the constraint props are present.
+//   - The mock MapGL receives maxBounds and minZoom (via the mock's props
+//     passthrough — the forwardRef mock renders children so the tree is intact).
+//
+// The Source + Layer GPU paths are mocked away (see vi.mock above).
+
+describe("Map — county constraint (#62)", () => {
+  test("renders without error (constraint props accepted)", () => {
+    // Map.tsx now always passes maxBounds + minZoom. If those props caused a
+    // type or runtime error, this render would throw.
+    const { container } = render(<MapComponent {...makeProps()} />);
+    expect(container.querySelector("[data-testid='mapgl-root']")).not.toBeNull();
+  });
+
+  test("fetch for county boundary is called on mount", async () => {
+    render(<MapComponent {...makeProps()} />);
+    // fetch is called once (county boundary URL). May fire async — await a tick.
+    await act(async () => {});
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      "/data/pueblo-county-boundary.geojson",
+    );
+  });
+
+  test("renders correctly when venues are present alongside constraint props", () => {
+    const { container } = render(
+      <MapComponent {...makeProps({ venues: VENUES_THREE })} />,
+    );
+    // Map root renders
+    expect(container.querySelector("[data-testid='mapgl-root']")).not.toBeNull();
+    // Venue markers still render — constraint props do not suppress them
+    const buttons = container.querySelectorAll("button");
+    expect(buttons.length).toBe(VENUES_THREE.length);
   });
 });

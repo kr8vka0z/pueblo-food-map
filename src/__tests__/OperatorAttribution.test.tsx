@@ -24,9 +24,26 @@
  *   react-map-gl/mapbox is not used by these components — no mock needed here.
  */
 
-import { describe, test, expect, vi } from "vitest";
+import { describe, test, expect, vi, beforeAll } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+// ─── jsdom shims required by vaul ────────────────────────────────────────────
+// vaul's Drawer.Content calls event.target.setPointerCapture() in onPointerDown.
+// jsdom does not implement setPointerCapture / releasePointerCapture on Element.
+// Without these stubs, every userEvent interaction with a vaul Drawer produces
+// an unhandled TypeError that escapes the test boundary and fails the run.
+beforeAll(() => {
+  if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = vi.fn();
+  }
+  if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = vi.fn();
+  }
+  if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = vi.fn().mockReturnValue(false);
+  }
+});
 
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
 import BottomSheet from "@/components/BottomSheet";

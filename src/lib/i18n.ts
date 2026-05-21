@@ -150,6 +150,11 @@ const en: Record<string, string> = {
 
   // Wordmark (#61)
   "wordmark.ariaLabel": "Pueblo Food Map — reset map view",
+
+  // Search typeahead (#67)
+  "typeahead.matchCount": "{count} venues match",
+  "typeahead.moreMatches": "+{count} more matches",
+  "typeahead.noMatch": "No venues match",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -302,6 +307,11 @@ const es: Record<string, string> = {
 
   // Wordmark (#61)
   "wordmark.ariaLabel": "Mapa de alimentos de Pueblo — restablecer vista",
+
+  // Search typeahead (#67)
+  "typeahead.matchCount": "{count} lugares coinciden",
+  "typeahead.moreMatches": "+{count} más resultados",
+  "typeahead.noMatch": "Ningún lugar coincide",
 };
 
 /** Substitute simple {key} placeholders. */

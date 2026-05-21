@@ -27,6 +27,7 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import SearchBar from "./SearchBar";
+import Wordmark from "./Wordmark";
 import LocateButton from "./LocateButton";
 import LanguageToggle from "./LanguageToggle";
 import Legend from "./Legend";
@@ -242,6 +243,27 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
     setSelectedCategories(null);
   }
 
+  // ── Wordmark reset handler (#61) ─────────────────────────────────────────────
+  // Recenters the map on Pueblo, clears selected venue, filters, and search.
+  // Does NOT re-show the splash screen (splash is a one-time onboarding gate).
+  const handleWordmarkReset = useCallback(() => {
+    setSelectedVenueId(null);
+    setSelectedCategories(null);
+    setQuery("");
+
+    if (!mapboxMap) return;
+
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reducedMotion) {
+      mapboxMap.jumpTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: 13 });
+    } else {
+      mapboxMap.flyTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: 13 });
+    }
+  }, [mapboxMap]);
+
   // Pre-compute distance map for Map.tsx (aria-labels on markers)
   const userDistances = useMemo(() => {
     const m = new Map<string, number>();
@@ -290,6 +312,9 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         }}
         onMapReady={(map) => setMapboxMap(map)}
       />
+
+      {/* Wordmark — persistent brand anchor, top-left; clicking resets map state (#61) */}
+      <Wordmark onClick={handleWordmarkReset} locale={locale} size="sm" />
 
       {/* SearchBar — controlled (PR 6) */}
       <SearchBar

@@ -20,16 +20,20 @@
 
 import { CATEGORY_OPTIONS } from "@/lib/searchVenues";
 import { categoryColors } from "@/data/venues";
+import { t, type Locale } from "@/lib/i18n";
 
 interface EmptySearchPopoverProps {
   query: string;
-  /** Called when a chip is clicked. Receives the readable category label. */
+  /** Called when a chip is clicked. Receives the EN readable category label. */
   onSelectCategory: (label: string) => void;
+  /** Locale for i18n. Defaults to "en". */
+  locale?: Locale;
 }
 
 export default function EmptySearchPopover({
   query,
   onSelectCategory,
+  locale = "en",
 }: EmptySearchPopoverProps) {
   return (
     <div
@@ -53,23 +57,25 @@ export default function EmptySearchPopover({
     >
       {/* Title */}
       <p className="text-sm font-semibold text-[var(--color-ink-700)] mb-1">
-        No matches for &ldquo;{query}&rdquo;
+        {t("empty.noMatches", locale, { query })}
       </p>
 
       {/* Subtitle */}
       <p className="text-xs text-[var(--color-ink-400)] mb-3">
-        Try a category instead:
+        {t("empty.tryCategoryInstead", locale)}
       </p>
 
       {/* Category chip grid */}
       <div className="flex flex-wrap gap-2">
         {CATEGORY_OPTIONS.map(({ key, label }) => {
           const color = categoryColors[key];
+          // Use locale-aware category label from i18n
+          const displayLabel = t(`category.full.${key}`, locale);
           return (
             <button
               key={key}
               type="button"
-              aria-label={`Show ${label} venues`}
+              aria-label={t("empty.showCategoryAria", locale, { label: displayLabel })}
               onClick={() => onSelectCategory(label)}
               className={
                 "flex items-center gap-1.5 px-3 h-8 " +
@@ -87,7 +93,7 @@ export default function EmptySearchPopover({
                 style={{ backgroundColor: color }}
                 aria-hidden
               />
-              {label}
+              {displayLabel}
             </button>
           );
         })}

@@ -236,6 +236,46 @@ describe("DesktopVenueWindow — aria-expanded on toggle", () => {
   });
 });
 
+// ─── aria-controls on toggle ─────────────────────────────────────────────────
+
+describe("DesktopVenueWindow — toggle aria-controls", () => {
+  test("toggle aria-controls targets the body region id (collapsed)", () => {
+    const venue = makeVenue();
+    renderWindow({ expanded: false, venue });
+    const toggle = screen.getByRole("button", { name: /show details/i });
+    expect(toggle.getAttribute("aria-controls")).toBe(
+      `venue-popup-body-${venue.id}`,
+    );
+    expect(
+      document.getElementById(`venue-popup-body-${venue.id}`),
+    ).not.toBeNull();
+  });
+
+  test("toggle aria-controls targets the body region id (expanded)", () => {
+    const venue = makeVenue();
+    renderWindow({ expanded: true, venue });
+    const toggle = screen.getByRole("button", { name: /hide details/i });
+    expect(toggle.getAttribute("aria-controls")).toBe(
+      `venue-popup-body-${venue.id}`,
+    );
+    expect(
+      document.getElementById(`venue-popup-body-${venue.id}`),
+    ).not.toBeNull();
+  });
+});
+
+// ─── Tab order: X-close before toggle ────────────────────────────────────────
+
+describe("DesktopVenueWindow — tab order", () => {
+  test("X-close appears before toggle in DOM order (tab order)", () => {
+    renderWindow({ expanded: false });
+    const closeBtn = screen.getByRole("button", { name: /close/i });
+    const toggle = screen.getByRole("button", { name: /show details/i });
+    // compareDocumentPosition: DOCUMENT_POSITION_FOLLOWING = 4
+    expect(closeBtn.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
 // ─── i18n — ES locale ────────────────────────────────────────────────────────
 
 describe("DesktopVenueWindow — ES locale strings", () => {

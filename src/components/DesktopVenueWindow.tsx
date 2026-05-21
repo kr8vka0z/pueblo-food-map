@@ -487,19 +487,23 @@ export default function DesktopVenueWindow({
     >
       {/* Persistent header bar — always visible in both states */}
       <VenuePopupHeader
+        venueId={venue.id}
         expanded={expanded}
         onToggle={expanded ? onCollapse : onExpand}
         onClose={onClose}
         locale={locale}
       />
 
-      {/* Body — collapsed or expanded */}
+      {/* Body — collapsed or expanded. id wired to toggle's aria-controls. */}
       {expanded ? (
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div
+          id={`venue-popup-body-${venue.id}`}
+          className="flex flex-col flex-1 overflow-hidden"
+        >
           {expandedBody}
         </div>
       ) : (
-        collapsedBody
+        <div id={`venue-popup-body-${venue.id}`}>{collapsedBody}</div>
       )}
     </div>
   );

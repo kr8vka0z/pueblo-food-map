@@ -147,6 +147,9 @@ const en: Record<string, string> = {
   "banner.body": "We can’t show food near you without your location. You can still browse the Pueblo map below, or try again.",
   "banner.retry": "Try again",
   "banner.dismiss": "Browse Pueblo map",
+
+  // Wordmark (#61)
+  "wordmark.ariaLabel": "Pueblo Food Map — reset map view",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -296,6 +299,9 @@ const es: Record<string, string> = {
   "banner.body": "No podemos mostrar alimentos cercanos sin tu ubicación. Aún puedes explorar el mapa de Pueblo, o intentarlo de nuevo.",
   "banner.retry": "Intentar de nuevo",
   "banner.dismiss": "Explorar el mapa de Pueblo",
+
+  // Wordmark (#61)
+  "wordmark.ariaLabel": "Mapa de alimentos de Pueblo — restablecer vista",
 };
 
 /** Substitute simple {key} placeholders. */

@@ -4,7 +4,7 @@
  * Verifies:
  *   - PUEBLO_COUNTY_BBOX has the correct structure and sane values.
  *   - PUEBLO_COUNTY_MIN_ZOOM is a reasonable floor.
- *   - All 112 venues in src/data/venues.ts fall within the bbox
+ *   - All 108 venues in src/data/venues.ts fall within the bbox
  *     (so no venue becomes unreachable after pan constraint is applied).
  */
 
@@ -96,7 +96,7 @@ describe("Venue containment — all venues inside PUEBLO_COUNTY_BBOX", () => {
     expect(outside).toEqual([]);
   });
 
-  test("venue count matches expected dataset size (~112)", () => {
+  test("venue count matches expected dataset size (~108)", () => {
     // Guard against accidental data shrinkage breaking this test suite.
     expect(venues.length).toBeGreaterThanOrEqual(100);
   });

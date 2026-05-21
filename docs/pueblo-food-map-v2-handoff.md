@@ -107,7 +107,7 @@ When coding, override the Tailwind palette in `tailwind.config.js` so these toke
   - offline: service worker cache renders the shell + last-known pin locations; banner: "You're offline. Showing cached venues."
 - Data sources:
   - Geolocation: `navigator.geolocation.watchPosition` (consider `getCurrentPosition` for battery)
-  - Venues: `/api/venues` (or static JSON build artifact). 112 venues live as of 2026-05-15.
+  - Venues: `/api/venues` (or static JSON build artifact). 108 venues live as of 2026-05-20.
 - Props: `viewport: { center: LatLng, zoom: number }`, `selectedVenueId?: string`
 - Accessibility:
   - Search bar: `<input type="search" aria-label="Search venues or categories">`. Submit on Enter.

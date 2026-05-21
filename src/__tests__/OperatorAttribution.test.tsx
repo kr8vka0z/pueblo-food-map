@@ -224,7 +224,8 @@ describe("BottomSheet — operator attribution (quick snap)", () => {
     render(
       <BottomSheet venue={venue} onClose={vi.fn()} locale="es" />,
     );
-    const peekBtn = screen.getByRole("button", { name: /expand details/i });
+    // #68: aria-label is now locale-aware — ES says "Expandir detalles de {name}"
+    const peekBtn = screen.getByRole("button", { name: /expandir detalles/i });
     await user.click(peekBtn);
     expect(screen.getByText(/Operado por/)).toBeDefined();
   });

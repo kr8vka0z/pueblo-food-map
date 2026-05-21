@@ -66,16 +66,6 @@ function todayKey(): DayKey {
   return map[idx] ?? "mon";
 }
 
-const DAY_LABELS: Record<DayKey, string> = {
-  mon: "Mon",
-  tue: "Tue",
-  wed: "Wed",
-  thu: "Thu",
-  fri: "Fri",
-  sat: "Sat",
-  sun: "Sun",
-};
-
 // ─── Edge-flip math ───────────────────────────────────────────────────────────
 
 interface WindowPosition {
@@ -242,7 +232,7 @@ export default function DesktopVenueWindow({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close venue details"
+          aria-label={t("detail.close", locale)}
           className={
             "flex items-center justify-center w-8 h-8 -mr-1 rounded-md shrink-0 " +
             "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
@@ -279,12 +269,12 @@ export default function DesktopVenueWindow({
         </span>
         {venue.accepts_snap && (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-            SNAP
+            {t("badge.snap", locale)}
           </span>
         )}
         {venue.accepts_wic && (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-            WIC
+            {t("badge.wic", locale)}
           </span>
         )}
       </div>
@@ -294,17 +284,17 @@ export default function DesktopVenueWindow({
         {venue.distanceMiles !== undefined && (
           <span className="flex items-center gap-1">
             <MapPin size={12} aria-hidden className="text-[var(--color-ink-400)]" />
-            {formatMiles(venue.distanceMiles)} from you
+            {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
           </span>
         )}
         {status && status.state !== "no_hours" && (
           <span className="flex items-center gap-1">
             <Clock size={12} aria-hidden className="text-[var(--color-ink-400)]" />
             {status.state === "open"
-              ? `Open · closes ${status.time}`
+              ? `${t("badge.openNow", locale)} · ${t("badge.closesAt", locale, { time: status.time })}`
               : status.state === "opens_at"
-              ? `Opens at ${status.time}`
-              : "Closed today"}
+              ? t("badge.opensAt", locale, { time: status.time })
+              : t("badge.closedToday", locale)}
           </span>
         )}
       </div>
@@ -326,7 +316,7 @@ export default function DesktopVenueWindow({
           "rounded text-left"
         }
       >
-        See full details →
+        {t("detail.seeFullDetails", locale)}
       </button>
     </div>
   );
@@ -340,7 +330,7 @@ export default function DesktopVenueWindow({
         <button
           type="button"
           onClick={onCollapse}
-          aria-label="Collapse to quick summary"
+          aria-label={t("detail.collapseToSummary", locale)}
           className={
             "flex items-center justify-center w-8 h-8 -ml-1 rounded-md " +
             "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
@@ -353,7 +343,7 @@ export default function DesktopVenueWindow({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close venue details"
+          aria-label={t("detail.close", locale)}
           className={
             "flex items-center justify-center w-8 h-8 -mr-1 rounded-md " +
             "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
@@ -404,7 +394,7 @@ export default function DesktopVenueWindow({
             <p className="text-sm text-[var(--color-ink-700)]">{venue.address}</p>
             {venue.distanceMiles !== undefined && (
               <p className="text-xs text-[var(--color-ink-400)] font-mono mt-0.5">
-                {formatMiles(venue.distanceMiles)} from you
+                {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
               </p>
             )}
           </div>
@@ -431,12 +421,12 @@ export default function DesktopVenueWindow({
           <div className="flex flex-wrap gap-2">
             {venue.accepts_snap && (
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                Accepts SNAP
+                {t("detail.acceptsSnap", locale)}
               </span>
             )}
             {venue.accepts_wic && (
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                Accepts WIC
+                {t("detail.acceptsWic", locale)}
               </span>
             )}
           </div>
@@ -444,9 +434,9 @@ export default function DesktopVenueWindow({
 
         {/* Hours table */}
         {venue.hours_weekly && (
-          <section aria-label="Hours">
+          <section aria-label={t("detail.hours", locale)}>
             <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-              Hours
+              {t("detail.hours", locale)}
             </h3>
             <dl className="space-y-0.5">
               {DAY_KEYS.map((day) => {
@@ -471,8 +461,10 @@ export default function DesktopVenueWindow({
                           : "text-[var(--color-ink-500)]")
                       }
                     >
-                      {DAY_LABELS[day]}
-                      {isToday && <span className="sr-only">, today</span>}
+                      {t(`day.${day}`, locale)}
+                      {isToday && (
+                        <span className="sr-only">, {t("detail.today", locale)}</span>
+                      )}
                     </dt>
                     <dd
                       className={
@@ -484,7 +476,7 @@ export default function DesktopVenueWindow({
                     >
                       {slots && slots.length > 0
                         ? slots.map(formatSlot).join(", ")
-                        : "Closed"}
+                        : t("hours.closed", locale)}
                     </dd>
                   </div>
                 );
@@ -495,9 +487,9 @@ export default function DesktopVenueWindow({
 
         {/* Phone */}
         {venue.phone && (
-          <section aria-label="Contact">
+          <section aria-label={t("detail.contact", locale)}>
             <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-              Contact
+              {t("detail.contact", locale)}
             </h3>
             <a
               href={`tel:${venue.phone}`}
@@ -511,9 +503,9 @@ export default function DesktopVenueWindow({
 
         {/* Notes */}
         {venue.notes && (
-          <section aria-label="About">
+          <section aria-label={t("detail.about", locale)}>
             <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-              About
+              {t("detail.about", locale)}
             </h3>
             <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
               {venue.notes}

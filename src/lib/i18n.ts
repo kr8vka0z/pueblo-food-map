@@ -74,10 +74,17 @@ const en: Record<string, string> = {
   "detail.acceptsWic": "Accepts WIC",
   "detail.today": "Today",
   "detail.closedToday": "Closed today",
+  "detail.seeFullDetails": "See full details →",
+  "detail.collapseToSummary": "Collapse to quick summary",
+  "detail.venueDetailsPanel": "Venue details panel",
+  "detail.venueDetails": "venue details",
+  "detail.dragToExpand": "Drag to expand or close venue details",
+  "detail.expandDetails": "Expand details for {name}",
 
   // Badges
   "badge.openNow": "Open now",
   "badge.opensAt": "Opens at {time}",
+  "badge.closesAt": "Closes {time}",
   "badge.closedToday": "Closed today",
   "badge.snap": "SNAP",
   "badge.wic": "WIC",
@@ -101,6 +108,9 @@ const en: Record<string, string> = {
   // Empty state (PR 3)
   "empty.title": "No places match your filters.",
   "empty.clear": "Clear filters",
+  "empty.noMatches": "No matches for \"{query}\"",
+  "empty.tryCategoryInstead": "Try a category instead:",
+  "empty.showCategoryAria": "Show {label} venues",
 
   // Sponsor credit (#69)
   "sponsor.text": "Sponsored by Pueblo Food Project",
@@ -110,6 +120,31 @@ const en: Record<string, string> = {
 
   // Operator attribution (#63)
   "operator.operated_by": "Operated by",
+
+  // Splash page (#68)
+  "splash.tagline": "Find food close to home — pantries, gardens, grocery, and more.",
+  "splash.cta.primary": "Find food near me",
+  "splash.cta.secondary": "Show the Pueblo map",
+  "splash.cta.secondary.aria": "Show the Pueblo map without using my location",
+  "splash.microcopy": "We only use your location to show food nearby. Nothing is saved.",
+  "splash.whatYoullFind": "What you'll find",
+  "splash.howItWorks": "How it works →",
+  "splash.comingSoon": "Coming soon",
+
+  // Splash categories (#68) — kept in sync with CATEGORIES array in SplashScreen.tsx
+  "splash.cat.pantry": "Food pantry",
+  "splash.cat.grocery": "Grocery store",
+  "splash.cat.convenience": "Convenience store",
+  "splash.cat.farm": "Farm",
+  "splash.cat.garden": "Community garden",
+  "splash.cat.edible_landscape": "Edible landscape",
+  "splash.cat.meal_site": "Meal site",
+
+  // Location denied banner (#68)
+  "banner.title": "Location turned off",
+  "banner.body": "We can’t show food near you without your location. You can still browse the Pueblo map below, or try again.",
+  "banner.retry": "Try again",
+  "banner.dismiss": "Browse Pueblo map",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -186,10 +221,17 @@ const es: Record<string, string> = {
   "detail.acceptsWic": "Acepta WIC",
   "detail.today": "Hoy",
   "detail.closedToday": "Cerrado hoy",
+  "detail.seeFullDetails": "Ver detalles completos →",
+  "detail.collapseToSummary": "Contraer al resumen",
+  "detail.venueDetailsPanel": "Panel de detalles del lugar",
+  "detail.venueDetails": "detalles del lugar",
+  "detail.dragToExpand": "Arrastrar para expandir o cerrar detalles",
+  "detail.expandDetails": "Expandir detalles de {name}",
 
   // Badges
   "badge.openNow": "Abierto ahora",
   "badge.opensAt": "Abre a las {time}",
+  "badge.closesAt": "Cierra a las {time}",
   "badge.closedToday": "Cerrado hoy",
   "badge.snap": "SNAP",
   "badge.wic": "WIC",
@@ -213,6 +255,9 @@ const es: Record<string, string> = {
   // Empty state (PR 3)
   "empty.title": "Ningún lugar coincide con tus filtros.",
   "empty.clear": "Borrar filtros",
+  "empty.noMatches": "Sin resultados para \"{query}\"",
+  "empty.tryCategoryInstead": "Prueba una categoría:",
+  "empty.showCategoryAria": "Mostrar lugares de {label}",
 
   // Sponsor credit (#69)
   "sponsor.text": "Patrocinado por Pueblo Food Project",
@@ -222,6 +267,31 @@ const es: Record<string, string> = {
 
   // Operator attribution (#63)
   "operator.operated_by": "Operado por",
+
+  // Splash page (#68)
+  "splash.tagline": "Encuentra alimentos cerca de casa — despensas, huertos, supermercados y más.",
+  "splash.cta.primary": "Buscar alimentos cerca de mí",
+  "splash.cta.secondary": "Ver el mapa de Pueblo",
+  "splash.cta.secondary.aria": "Ver el mapa de Pueblo sin usar mi ubicación",
+  "splash.microcopy": "Solo usamos tu ubicación para mostrar alimentos cercanos. Nada se guarda.",
+  "splash.whatYoullFind": "Qué encontrarás",
+  "splash.howItWorks": "Cómo funciona →",
+  "splash.comingSoon": "Próximamente",
+
+  // Splash categories (#68)
+  "splash.cat.pantry": "Despensa de alimentos",
+  "splash.cat.grocery": "Supermercado",
+  "splash.cat.convenience": "Tienda de conveniencia",
+  "splash.cat.farm": "Granja",
+  "splash.cat.garden": "Huerto comunitario",
+  "splash.cat.edible_landscape": "Paisaje comestible", // [CHECK]
+  "splash.cat.meal_site": "Comedor comunitario",
+
+  // Location denied banner (#68)
+  "banner.title": "Ubicación desactivada",
+  "banner.body": "No podemos mostrar alimentos cercanos sin tu ubicación. Aún puedes explorar el mapa de Pueblo, o intentarlo de nuevo.",
+  "banner.retry": "Intentar de nuevo",
+  "banner.dismiss": "Explorar el mapa de Pueblo",
 };
 
 /** Substitute simple {key} placeholders. */

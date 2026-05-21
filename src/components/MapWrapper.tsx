@@ -28,6 +28,7 @@ import {
 import dynamic from "next/dynamic";
 import SearchBar from "./SearchBar";
 import LocateButton from "./LocateButton";
+import LanguageToggle from "./LanguageToggle";
 import Legend from "./Legend";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
@@ -35,6 +36,8 @@ import SponsorCredit from "./SponsorCredit";
 import EmptySearchPopover from "./EmptySearchPopover";
 import LocationDeniedBanner from "./LocationDeniedBanner";
 import { useGeolocation } from "@/lib/useGeolocation";
+import { useLocale } from "@/lib/LocaleContext";
+import { t } from "@/lib/i18n";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
@@ -93,6 +96,9 @@ interface MapWrapperProps {
 }
 
 export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperProps) {
+  // ── Locale — from context ─────────────────────────────────────────────────────
+  const { locale } = useLocale();
+
   // ── Geolocation — v2 hook ────────────────────────────────────────────────────
   const geo = useGeolocation();
   // When viewport === 'located', prefer the user's real position if available;
@@ -289,6 +295,8 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
       <SearchBar
         value={query}
         onChange={setQuery}
+        placeholder={t("search.placeholder", locale)}
+        ariaLabel={t("search.aria", locale)}
       />
 
       {/* EmptySearchPopover — shown when query is non-empty but yields no results */}
@@ -296,11 +304,20 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         <EmptySearchPopover
           query={query.trim()}
           onSelectCategory={(label) => setQuery(label)}
+          locale={locale}
         />
       )}
 
+      {/* LanguageToggle — absolute top-right above LocateButton, z-index 1001 */}
+      <div
+        className="absolute top-4"
+        style={{ zIndex: 1001, right: "calc(1rem + 44px + 8px)" }}
+      >
+        <LanguageToggle />
+      </div>
+
       {/* LocateButton — absolute top-right, z-index 1000 */}
-      <LocateButton geoState={geo.state} onRequest={handleLocateRequest} />
+      <LocateButton geoState={geo.state} onRequest={handleLocateRequest} locale={locale} />
 
       {/* Legend — collapsible category color legend, below LocateButton (#72) */}
       <Legend />
@@ -313,11 +330,12 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
             handleLocateRequest();
           }}
           onDismiss={() => setBannerVisible(false)}
+          locale={locale}
         />
       )}
 
       {/* SponsorCredit — bottom-right, hidden when BottomSheet is fully expanded (#69) */}
-      <SponsorCredit hidden={isMobile && sheetFullyExpanded} />
+      <SponsorCredit hidden={isMobile && sheetFullyExpanded} locale={locale} />
 
       {/* BottomSheet — mobile only (vaul v2, venue-centric API) */}
       {isMobile && (
@@ -329,6 +347,7 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
             setSheetFullyExpanded(false);
           }}
           onSnapChange={(snap) => setSheetFullyExpanded(snap === 0.9)}
+          locale={locale}
         />
       )}
 
@@ -345,6 +364,7 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
             setSelectedVenueId(null);
             setWindowExpanded(false);
           }}
+          locale={locale}
         />
       )}
     </div>

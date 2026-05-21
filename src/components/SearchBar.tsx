@@ -22,6 +22,8 @@ interface SearchBarProps {
   /** Called when the user presses Enter to commit the current query. */
   onSubmit?: () => void;
   placeholder?: string;
+  /** aria-label text for the search input. */
+  ariaLabel?: string;
 }
 
 export default function SearchBar({
@@ -29,6 +31,7 @@ export default function SearchBar({
   onChange,
   onSubmit,
   placeholder = "Search venues or categories",
+  ariaLabel = "Search venues or categories",
 }: SearchBarProps) {
   const handleKey = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -76,7 +79,7 @@ export default function SearchBar({
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKey}
           placeholder={placeholder}
-          aria-label="Search venues or categories"
+          aria-label={ariaLabel}
           className={
             "w-full h-11 md:h-[52px] " +
             "pl-9 md:pl-10 pr-4 " +

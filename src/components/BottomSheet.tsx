@@ -22,6 +22,7 @@ import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus, formatSlot } from "@/lib/hours";
+import { t, type Locale } from "@/lib/i18n";
 
 // ─── Snap points ─────────────────────────────────────────────────────────────
 // vaul accepts pixel strings and fractions (0-1 = % of viewport height).
@@ -41,26 +42,20 @@ function todayKey(): DayKey {
   return map[idx] ?? "mon";
 }
 
-const DAY_LABELS: Record<DayKey, string> = {
-  mon: "Mon",
-  tue: "Tue",
-  wed: "Wed",
-  thu: "Thu",
-  fri: "Fri",
-  sat: "Sat",
-  sun: "Sun",
-};
-
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface BottomSheetProps {
   venue: (Venue & { distanceMiles?: number }) | null;
   onClose: () => void;
+  /** Called when the snap point changes — e.g. to hide overlapping UI when fully expanded. */
+  onSnapChange?: (snap: SnapPoint) => void;
+  /** Locale forwarded from MapWrapper. Defaults to "en". */
+  locale?: Locale;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
 
-export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
+export default function BottomSheet({ venue, onClose, onSnapChange, locale = "en" }: BottomSheetProps) {
   const [snap, setSnap] = useState<SnapPoint>(SNAP_PEEK);
 
   // When a new venue is selected, reset to quick snap
@@ -74,6 +69,7 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
     if (s === null) return;
     if (SNAP_POINTS.includes(s as SnapPoint)) {
       setSnap(s as SnapPoint);
+      onSnapChange?.(s as SnapPoint);
     }
   }
 
@@ -96,7 +92,7 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset " +
         "focus-visible:ring-[var(--color-sage-500)]"
       }
-      aria-label={`Expand details for ${venue.name}`}
+      aria-label={t("detail.expandDetails", locale, { name: venue.name })}
     >
       <span className="flex-1 text-base font-semibold text-[var(--color-ink-900)] truncate">
         {venue.name}
@@ -120,7 +116,7 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close venue details"
+          aria-label={t("detail.close", locale)}
           className={
             "flex items-center justify-center w-8 h-8 -mr-1 rounded-md " +
             "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
@@ -130,6 +126,21 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
           <X size={18} aria-hidden />
         </button>
       </div>
+
+      {/* Operator attribution */}
+      {venue.operator && (
+        <p className="text-xs text-[var(--color-ink-500)] -mt-1">
+          {t("operator.operated_by", locale)}{" "}
+          <a
+            href="https://pueblofoodproject.org/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+          >
+            {venue.operator}
+          </a>
+        </p>
+      )}
 
       {/* Category badge + SNAP/WIC pills */}
       <div className="flex flex-wrap items-center gap-2">
@@ -142,12 +153,12 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
         </span>
         {venue.accepts_snap && (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-            SNAP
+            {t("badge.snap", locale)}
           </span>
         )}
         {venue.accepts_wic && (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-            WIC
+            {t("badge.wic", locale)}
           </span>
         )}
       </div>
@@ -157,17 +168,17 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
         {venue.distanceMiles !== undefined && (
           <span className="flex items-center gap-1.5">
             <MapPin size={14} aria-hidden className="text-[var(--color-ink-400)]" />
-            {formatMiles(venue.distanceMiles)} from you
+            {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
           </span>
         )}
         {status && status.state !== "no_hours" && (
           <span className="flex items-center gap-1.5">
             <Clock size={14} aria-hidden className="text-[var(--color-ink-400)]" />
             {status.state === "open"
-              ? `Open · closes ${status.time}`
+              ? `${t("badge.openNow", locale)} · ${t("badge.closesAt", locale, { time: status.time })}`
               : status.state === "opens_at"
-              ? `Opens at ${status.time}`
-              : "Closed today"}
+              ? t("badge.opensAt", locale, { time: status.time })
+              : t("badge.closedToday", locale)}
           </span>
         )}
       </div>
@@ -189,7 +200,7 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
           "rounded text-left"
         }
       >
-        See full details →
+        {t("detail.seeFullDetails", locale)}
       </button>
     </div>
   ) : null;
@@ -204,7 +215,7 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
         <button
           type="button"
           onClick={() => setSnap(SNAP_QUICK)}
-          aria-label="Collapse to quick summary"
+          aria-label={t("detail.collapseToSummary", locale)}
           className={
             "flex items-center justify-center w-9 h-9 -mr-2 rounded-md " +
             "text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] transition-colors " +
@@ -220,11 +231,24 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
         {/* Venue name */}
         <div>
           <h2
-            className="text-2xl font-normal text-[var(--color-ink-900)] leading-tight mb-2"
+            className="text-2xl font-normal text-[var(--color-ink-900)] leading-tight mb-1"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {venue.name}
           </h2>
+          {venue.operator && (
+            <p className="text-xs text-[var(--color-ink-500)] mb-2">
+              {t("operator.operated_by", locale)}{" "}
+              <a
+                href="https://pueblofoodproject.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+              >
+                {venue.operator}
+              </a>
+            </p>
+          )}
           <span
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium text-[var(--color-bone-50)]"
             style={{ backgroundColor: categoryColors[venue.category] }}
@@ -241,7 +265,7 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
             <p className="text-sm text-[var(--color-ink-700)]">{venue.address}</p>
             {venue.distanceMiles !== undefined && (
               <p className="text-sm text-[var(--color-ink-400)] font-mono mt-0.5">
-                {formatMiles(venue.distanceMiles)} from you
+                {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
               </p>
             )}
           </div>
@@ -255,12 +279,12 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
           className={
             "flex items-center justify-center gap-2 w-full h-12 rounded-[var(--radius-md)] " +
             "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-            "text-base font-semibold transition-colors duration-150 " +
+            "text-xl font-semibold transition-colors duration-150 " +
             "hover:bg-[var(--color-sage-600)] focus-visible:outline-none " +
             "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
           }
         >
-          Get directions →
+          {t("detail.getDirections", locale)}
         </a>
 
         {/* SNAP/WIC badges */}
@@ -268,12 +292,12 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
           <div className="flex flex-wrap gap-2">
             {venue.accepts_snap && (
               <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                Accepts SNAP
+                {t("detail.acceptsSnap", locale)}
               </span>
             )}
             {venue.accepts_wic && (
               <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                Accepts WIC
+                {t("detail.acceptsWic", locale)}
               </span>
             )}
           </div>
@@ -281,9 +305,9 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
 
         {/* Hours table (Mon-Sun, today highlighted with aria-current) */}
         {venue.hours_weekly && (
-          <section aria-label="Hours">
+          <section aria-label={t("detail.hours", locale)}>
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-              Hours
+              {t("detail.hours", locale)}
             </h3>
             <dl className="space-y-1">
               {DAY_KEYS.map((day) => {
@@ -308,7 +332,10 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
                           : "text-[var(--color-ink-500)]")
                       }
                     >
-                      {DAY_LABELS[day]}
+                      {t(`day.${day}`, locale)}
+                      {isToday && (
+                        <span className="sr-only">, {t("detail.today", locale)}</span>
+                      )}
                     </dt>
                     <dd
                       className={
@@ -320,13 +347,8 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
                     >
                       {slots && slots.length > 0
                         ? slots.map(formatSlot).join(", ")
-                        : "Closed"}
+                        : t("hours.closed", locale)}
                     </dd>
-                    {isToday && (
-                      <span className="text-xs text-[var(--color-sage-600)] font-medium ml-auto">
-                        Today
-                      </span>
-                    )}
                   </div>
                 );
               })}
@@ -336,9 +358,9 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
 
         {/* Phone */}
         {venue.phone && (
-          <section aria-label="Contact">
+          <section aria-label={t("detail.contact", locale)}>
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-              Contact
+              {t("detail.contact", locale)}
             </h3>
             <a
               href={`tel:${venue.phone}`}
@@ -352,9 +374,9 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
 
         {/* Notes / Description */}
         {venue.notes && (
-          <section aria-label="About">
+          <section aria-label={t("detail.about", locale)}>
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-              About
+              {t("detail.about", locale)}
             </h3>
             <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
               {venue.notes}
@@ -388,11 +410,11 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
             "focus:outline-none"
           }
           style={{ maxHeight: "calc(100dvh - 100px)" }}
-          aria-label="Venue details panel"
+          aria-label={t("detail.venueDetailsPanel", locale)}
         >
           {/* Drawer.Title — required by Radix to fix a11y missing-title violation */}
           <Drawer.Title className="sr-only">
-            {venue ? `${venue.name} venue details` : "Venue details"}
+            {venue ? `${venue.name} ${t("detail.venueDetails", locale)}` : t("detail.venueDetailsPanel", locale)}
           </Drawer.Title>
 
           {/* Drag handle — keyboard focusable, toggles peek ↔ quick */}
@@ -400,7 +422,7 @@ export default function BottomSheet({ venue, onClose }: BottomSheetProps) {
             className="flex-shrink-0 flex justify-center pt-3 pb-1"
             role="button"
             tabIndex={0}
-            aria-label="Drag to expand or close venue details"
+            aria-label={t("detail.dragToExpand", locale)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();

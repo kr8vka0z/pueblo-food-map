@@ -16,6 +16,7 @@
  *
  * No sidebar. No category rail. No desktop split-pane.
  * Search behavior wired in PR 6: query state + searchVenues filter + EmptySearchPopover.
+ * Typeahead dropdown wired in #67: SearchResultsPopover + ARIA combobox.
  */
 
 import {
@@ -27,12 +28,23 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import SearchBar from "./SearchBar";
+import Wordmark from "./Wordmark";
 import LocateButton from "./LocateButton";
+import LanguageToggle from "./LanguageToggle";
+import Legend from "./Legend";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
+import SponsorCredit from "./SponsorCredit";
 import EmptySearchPopover from "./EmptySearchPopover";
+import SearchResultsPopover, {
+  MAX_VISIBLE,
+  type VenueWithDistance,
+  optionId,
+} from "./SearchResultsPopover";
 import LocationDeniedBanner from "./LocationDeniedBanner";
 import { useGeolocation } from "@/lib/useGeolocation";
+import { useLocale } from "@/lib/LocaleContext";
+import { t } from "@/lib/i18n";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
@@ -52,6 +64,9 @@ const LeafletMap = dynamic(() => import("./Map"), {
 });
 
 const PUEBLO_CENTER = { lat: 38.2544, lng: -104.6091 };
+
+// Stable listbox id — used for aria-controls on the search input and id on the listbox.
+const LISTBOX_ID = "search-results-listbox";
 
 // ─── Viewport prop (from PR 3 splash gate) ────────────────────────────────────
 // 'located'      → use the user's geolocation position as initial map center.
@@ -91,6 +106,9 @@ interface MapWrapperProps {
 }
 
 export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperProps) {
+  // ── Locale — from context ─────────────────────────────────────────────────────
+  const { locale } = useLocale();
+
   // ── Geolocation — v2 hook ────────────────────────────────────────────────────
   const geo = useGeolocation();
   // When viewport === 'located', prefer the user's real position if available;
@@ -126,9 +144,16 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
     // so this effect fires even when permission stays "denied" across retries.
   }, [geo.state]);
 
-  // Wraps geo.request() to stamp the request timestamp.
+  // ── Explicit recenter counter — incremented on each user-initiated locate tap ──
+  // Map.tsx's flyTo effect depends on this value so the map re-centers every
+  // time the user taps LocateButton, not just on the first geolocation event. (#60)
+  const [recenterRequestId, setRecenterRequestId] = useState(0);
+
+  // Wraps geo.request() to stamp the request timestamp and increment the
+  // recenter counter so Map.tsx re-centers even if userLocation hasn't changed.
   const handleLocateRequest = useCallback(() => {
     userRequestedAtRef.current = Date.now();
+    setRecenterRequestId((n) => n + 1);
     geo.request();
   }, [geo]);
 
@@ -151,11 +176,22 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
   // ── Desktop window expanded state (PR 5) ─────────────────────────────────────
   const [windowExpanded, setWindowExpanded] = useState(false);
 
+  // ── BottomSheet snap state — used to hide SponsorCredit when sheet is full (#69) ──
+  const [sheetFullyExpanded, setSheetFullyExpanded] = useState(false);
+
   // ── Map instance — passed up from Map via onMapReady (wired in #47) ────────
   // Stored in state so changes trigger re-render in DesktopVenueWindow.
   // Typed as unknown; DesktopVenueWindow narrows it via its MapboxMap interface.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [mapboxMap, setMapboxMap] = useState<any>(null);
+
+  // ── Typeahead popover state (issue #67) ──────────────────────────────────────
+  // isPopoverOpen: true when input is focused + query is non-empty + matches exist.
+  // activeIndex: keyboard-highlighted row (-1 = none).
+  // blurTimerRef: grace timer so mousedown-inside-popover doesn't lose the click.
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Category toggle ──────────────────────────────────────────────────────────
   const handleToggleCategory = useCallback((cat: VenueCategory | null) => {
@@ -224,6 +260,27 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
     setSelectedCategories(null);
   }
 
+  // ── Wordmark reset handler (#61) ─────────────────────────────────────────────
+  // Recenters the map on Pueblo, clears selected venue, filters, and search.
+  // Does NOT re-show the splash screen (splash is a one-time onboarding gate).
+  const handleWordmarkReset = useCallback(() => {
+    setSelectedVenueId(null);
+    setSelectedCategories(null);
+    setQuery("");
+
+    if (!mapboxMap) return;
+
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reducedMotion) {
+      mapboxMap.jumpTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: 13 });
+    } else {
+      mapboxMap.flyTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: 13 });
+    }
+  }, [mapboxMap]);
+
   // Pre-compute distance map for Map.tsx (aria-labels on markers)
   const userDistances = useMemo(() => {
     const m = new Map<string, number>();
@@ -253,6 +310,91 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
     [filteredVenues, venuesWithDistance, selectedVenueId],
   );
 
+  // ── Typeahead popover handlers (issue #67) ───────────────────────────────────
+  // These come after filteredVenues / isMobile are declared so closures are valid.
+
+  /** Open the popover when the input gains focus. */
+  const handleSearchFocus = useCallback(() => {
+    if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+    setIsPopoverOpen(true);
+    // Don't reset activeIndex on focus — keeps highlight if user refocuses.
+  }, []);
+
+  /**
+   * Schedule popover close on blur with a grace period.
+   * The grace period allows a mousedown inside the popover (which fires before
+   * blur) to call e.preventDefault(), keeping the click target alive.
+   */
+  const handleSearchBlur = useCallback(() => {
+    blurTimerRef.current = setTimeout(() => {
+      setIsPopoverOpen(false);
+      setActiveIndex(-1);
+    }, 150);
+  }, []);
+
+  /** Keyboard handler forwarded from SearchBar: ArrowDown/Up/Enter/Escape/Tab. */
+  const handleSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      const popoverVisible = isPopoverOpen && filteredVenues.length > 0;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (!popoverVisible) {
+          setIsPopoverOpen(true);
+          setActiveIndex(0);
+          return;
+        }
+        setActiveIndex((prev) => {
+          const lastRendered = Math.min(filteredVenues.length - 1, MAX_VISIBLE - 1);
+          return prev < lastRendered ? prev + 1 : prev;
+        });
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (!popoverVisible) return;
+        setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setIsPopoverOpen(false);
+        setActiveIndex(-1);
+      } else if (e.key === "Tab") {
+        setIsPopoverOpen(false);
+        setActiveIndex(-1);
+      } else if (e.key === "Enter") {
+        if (popoverVisible && activeIndex >= 0 && activeIndex < filteredVenues.length) {
+          e.preventDefault();
+          const venue = filteredVenues[activeIndex];
+          setSelectedVenueId(venue.id);
+          if (!isMobile) setWindowExpanded(false);
+          setIsPopoverOpen(false);
+          setActiveIndex(-1);
+        }
+      }
+    },
+    // filteredVenues reference is stable between renders with same query/filters.
+    [isPopoverOpen, filteredVenues, activeIndex, isMobile],
+  );
+
+  /** Called when user clicks/taps a result row inside the popover. */
+  const handleSelectVenueFromPopover = useCallback(
+    (venueId: string) => {
+      setSelectedVenueId(venueId);
+      if (!isMobile) setWindowExpanded(false);
+      setIsPopoverOpen(false);
+      setActiveIndex(-1);
+    },
+    [isMobile],
+  );
+
+  // Derive the active option id for aria-activedescendant.
+  const activeDescendantId =
+    isPopoverOpen && activeIndex >= 0
+      ? optionId(LISTBOX_ID, activeIndex)
+      : undefined;
+
+  // The popover should show: focused + non-empty query + has matches.
+  const showResultsPopover =
+    isPopoverOpen && query.trim() !== "" && filteredVenues.length > 0;
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -263,6 +405,7 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         selectedVenueId={selectedVenueId}
         userLocation={userLocation}
         userDistances={userDistances}
+        recenterRequestId={recenterRequestId}
         onSelectVenue={(id) => {
           setSelectedVenueId(id);
           if (!isMobile) {
@@ -272,22 +415,67 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         onMapReady={(map) => setMapboxMap(map)}
       />
 
-      {/* SearchBar — controlled (PR 6) */}
+      {/* Wordmark — persistent brand anchor, top-left; clicking resets map state (#61) */}
+      <Wordmark onClick={handleWordmarkReset} locale={locale} size="sm" />
+
+      {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67) */}
       <SearchBar
         value={query}
-        onChange={setQuery}
+        onChange={(next) => {
+          setQuery(next);
+          // Reset activeIndex on every keystroke — new results set.
+          setActiveIndex(-1);
+        }}
+        placeholder={t("search.placeholder", locale)}
+        ariaLabel={t("search.aria", locale)}
+        comboboxEnabled={true}
+        comboboxExpanded={showResultsPopover}
+        comboboxControls={LISTBOX_ID}
+        comboboxActiveDescendant={activeDescendantId}
+        onFocus={handleSearchFocus}
+        onBlur={handleSearchBlur}
+        onKeyDownExtra={handleSearchKeyDown}
       />
 
-      {/* EmptySearchPopover — shown when query is non-empty but yields no results */}
+      {/* SearchResultsPopover — shown when query is non-empty AND has matches (#67).
+          Mutually exclusive with EmptySearchPopover. */}
+      {showResultsPopover && (
+        <SearchResultsPopover
+          venues={filteredVenues as VenueWithDistance[]}
+          activeIndex={activeIndex}
+          listboxId={LISTBOX_ID}
+          onSelect={handleSelectVenueFromPopover}
+          onClose={() => {
+            setIsPopoverOpen(false);
+            setActiveIndex(-1);
+          }}
+          locale={locale}
+        />
+      )}
+
+      {/* EmptySearchPopover — shown when query is non-empty but yields no results.
+          Mutually exclusive with SearchResultsPopover (they depend on filteredVenues.length). */}
       {query.trim() !== "" && filteredVenues.length === 0 && (
         <EmptySearchPopover
           query={query.trim()}
           onSelectCategory={(label) => setQuery(label)}
+          locale={locale}
         />
       )}
 
+      {/* LanguageToggle — absolute top-right above LocateButton, z-index 1001 */}
+      <div
+        className="absolute top-4"
+        style={{ zIndex: 1001, right: "calc(1rem + 44px + 8px)" }}
+      >
+        <LanguageToggle />
+      </div>
+
       {/* LocateButton — absolute top-right, z-index 1000 */}
-      <LocateButton geoState={geo.state} onRequest={handleLocateRequest} />
+      <LocateButton geoState={geo.state} onRequest={handleLocateRequest} locale={locale} />
+
+      {/* Legend — collapsible category color legend, below LocateButton (#72) */}
+      <Legend />
 
       {/* LocationDeniedBanner — appears only after active re-tap → denial */}
       {bannerVisible && (
@@ -297,15 +485,24 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
             handleLocateRequest();
           }}
           onDismiss={() => setBannerVisible(false)}
+          locale={locale}
         />
       )}
+
+      {/* SponsorCredit — bottom-right, hidden when BottomSheet is fully expanded (#69) */}
+      <SponsorCredit hidden={isMobile && sheetFullyExpanded} locale={locale} />
 
       {/* BottomSheet — mobile only (vaul v2, venue-centric API) */}
       {isMobile && (
         <BottomSheet
           key={selectedVenueId ?? "empty"}
           venue={selectedVenue}
-          onClose={() => setSelectedVenueId(null)}
+          onClose={() => {
+            setSelectedVenueId(null);
+            setSheetFullyExpanded(false);
+          }}
+          onSnapChange={(snap) => setSheetFullyExpanded(snap === 0.9)}
+          locale={locale}
         />
       )}
 
@@ -322,6 +519,7 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
             setSelectedVenueId(null);
             setWindowExpanded(false);
           }}
+          locale={locale}
         />
       )}
     </div>

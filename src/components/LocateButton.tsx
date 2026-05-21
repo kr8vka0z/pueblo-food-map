@@ -18,15 +18,19 @@
 
 import { Locate, LocateFixed } from "lucide-react";
 import type { GeoState } from "@/lib/useGeolocation";
+import { t, type Locale } from "@/lib/i18n";
 
 interface LocateButtonProps {
   geoState: GeoState;
   onRequest: () => void;
+  /** Locale for aria-label translation. Defaults to "en". */
+  locale?: Locale;
 }
 
 export default function LocateButton({
   geoState,
   onRequest,
+  locale = "en",
 }: LocateButtonProps) {
   const isActive =
     geoState.permission === "granted" && geoState.position !== null;
@@ -48,7 +52,7 @@ export default function LocateButton({
     <button
       type="button"
       onClick={onRequest}
-      aria-label="Use my location"
+      aria-label={t("topbar.locate", locale)}
       className={
         // Positioning — absolute top-right, above Leaflet tiles
         "absolute top-4 right-4 " +

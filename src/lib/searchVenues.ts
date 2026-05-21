@@ -24,7 +24,7 @@ const CATEGORY_LABELS: Record<VenueCategory, string> = {
 /**
  * Filter venues by a free-text query against venue name and readable category.
  *
- * - No debounce: 112 venues is fast enough for live-filter on each keystroke.
+ * - No debounce: 108 venues is fast enough for live-filter on each keystroke.
  * - No fuzzy match: substring is sufficient for the demo; revisit post-demo.
  * - Empty query returns the full list unchanged.
  *

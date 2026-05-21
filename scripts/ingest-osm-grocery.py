@@ -3,6 +3,7 @@
 
 Input:  data/raw/pueblo-grocery.json (Overpass `out center` payload — see
         scripts/README.md for the query used)
+        public/data/pueblo-county-boundary.geojson (Census TIGER/Line polygon)
 Output: src/data/grocery-osm.ts
 
 Run from the repo root: `python3 scripts/ingest-osm-grocery.py`.
@@ -11,6 +12,7 @@ Filtering rules:
   * Element must have a `name` tag (unnamed nodes are dropped).
   * Element must have coordinates (`lat`/`lon` for nodes, `center.lat`/`center.lon`
     for ways).
+  * Venue must be inside the Pueblo County boundary polygon (ray-casting PIP).
 
 Tag mapping:
   shop=supermarket -> category "grocery"
@@ -28,6 +30,33 @@ from datetime import date
 REPO = pathlib.Path(__file__).resolve().parents[1]
 SRC = REPO / "data" / "raw" / "pueblo-grocery.json"
 DST = REPO / "src" / "data" / "grocery-osm.ts"
+BOUNDARY = REPO / "public" / "data" / "pueblo-county-boundary.geojson"
+
+
+def load_county_polygon() -> list[tuple[float, float]]:
+    """Return the exterior ring of the Pueblo County boundary polygon as (lng, lat) pairs."""
+    data = json.loads(BOUNDARY.read_text(encoding="utf-8"))
+    # FeatureCollection with a single Polygon feature
+    for feature in data.get("features", []):
+        geom = feature.get("geometry", {})
+        if geom.get("type") == "Polygon":
+            return geom["coordinates"][0]
+    raise ValueError(f"No Polygon feature found in {BOUNDARY}")
+
+
+def point_in_polygon(lat: float, lng: float, poly: list[tuple[float, float]]) -> bool:
+    """Ray-casting PIP test. poly is a list of (lng, lat) coordinate pairs."""
+    x, y = lng, lat
+    inside = False
+    n = len(poly)
+    j = n - 1
+    for i in range(n):
+        xi, yi = poly[i]
+        xj, yj = poly[j]
+        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    return inside
 
 CATEGORY = {
     "supermarket": "grocery",
@@ -96,11 +125,13 @@ def slugify(name: str) -> str:
 def main() -> int:
     data = json.loads(SRC.read_text(encoding="utf-8"))
     elements = data.get("elements", [])
+    county_poly = load_county_polygon()
 
     kept: list[dict] = []
     dropped_no_name = 0
     dropped_no_coords = 0
     dropped_unknown_shop = 0
+    dropped_outside_county = 0
 
     for el in elements:
         tags = el.get("tags", {})
@@ -117,8 +148,11 @@ def main() -> int:
         if category is None:
             dropped_unknown_shop += 1
             continue
-
         lat, lon = latlon
+        if not point_in_polygon(lat, lon, county_poly):
+            dropped_outside_county += 1
+            continue
+
         osm_id = f"osm-{el['type']}-{el['id']}"
         notes_bits: list[str] = []
         if (oh := tags.get("opening_hours")):
@@ -168,6 +202,7 @@ def main() -> int:
     lines.append(f"// Dropped (no name): {dropped_no_name}")
     lines.append(f"// Dropped (no coords): {dropped_no_coords}")
     lines.append(f"// Dropped (unknown shop tag): {dropped_unknown_shop}")
+    lines.append(f"// Dropped (outside Pueblo County): {dropped_outside_county}")
     lines.append("")
     lines.append('import type { Venue } from "@/types/venue";')
     lines.append("")
@@ -194,7 +229,7 @@ def main() -> int:
 
     DST.write_text("\n".join(lines), encoding="utf-8")
     print(f"Wrote {DST.relative_to(REPO)}")
-    print(f"  kept={len(kept)} dropped_no_name={dropped_no_name} dropped_no_coords={dropped_no_coords} dropped_unknown_shop={dropped_unknown_shop}")
+    print(f"  kept={len(kept)} dropped_no_name={dropped_no_name} dropped_no_coords={dropped_no_coords} dropped_unknown_shop={dropped_unknown_shop} dropped_outside_county={dropped_outside_county}")
     return 0
 
 

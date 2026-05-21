@@ -20,17 +20,21 @@
 
 import { useEffect, useRef } from "react";
 import { AlertTriangle, X } from "lucide-react";
+import { t, type Locale } from "@/lib/i18n";
 
 interface LocationDeniedBannerProps {
   /** Re-request geolocation. If denied again, the parent's useEffect re-triggers. */
   onRetry: () => void;
   /** Dismiss the banner. Map stays at Pueblo center. */
   onDismiss: () => void;
+  /** Locale for i18n. Defaults to "en". */
+  locale?: Locale;
 }
 
 export default function LocationDeniedBanner({
   onRetry,
   onDismiss,
+  locale = "en",
 }: LocationDeniedBannerProps) {
   const retryRef = useRef<HTMLButtonElement>(null);
 
@@ -81,7 +85,7 @@ export default function LocationDeniedBanner({
         <button
           type="button"
           onClick={onDismiss}
-          aria-label="Dismiss"
+          aria-label={t("detail.close", locale)}
           className={
             "absolute top-2 right-2 " +
             "w-8 h-8 " +
@@ -109,7 +113,7 @@ export default function LocationDeniedBanner({
             className="text-[18px] leading-snug font-[var(--font-display)] text-[var(--color-brand-navy)]"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Location turned off
+            {t("banner.title", locale)}
           </h2>
         </div>
 
@@ -117,8 +121,7 @@ export default function LocationDeniedBanner({
         <p
           className="text-[14px] leading-relaxed text-[var(--color-ink-700)]"
         >
-          We can&rsquo;t show food near you without your location. You can still
-          browse the Pueblo map below, or try again.
+          {t("banner.body", locale)}
         </p>
 
         {/* Actions */}
@@ -139,7 +142,7 @@ export default function LocationDeniedBanner({
               "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
             }
           >
-            Try again
+            {t("banner.retry", locale)}
           </button>
 
           {/* Tertiary: Browse Pueblo map — text link */}
@@ -156,7 +159,7 @@ export default function LocationDeniedBanner({
               "rounded-sm"
             }
           >
-            Browse Pueblo map
+            {t("banner.dismiss", locale)}
           </button>
         </div>
       </div>

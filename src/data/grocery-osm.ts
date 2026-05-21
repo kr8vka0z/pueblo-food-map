@@ -2,10 +2,11 @@
 // Do not edit by hand — re-run the script and commit the diff.
 //
 // Source elements: 77
-// Kept:            64
+// Kept:            60
 // Dropped (no name): 13
 // Dropped (no coords): 0
 // Dropped (unknown shop tag): 0
+// Dropped (outside Pueblo County): 4
 
 import type { Venue } from "@/types/venue";
 
@@ -20,7 +21,7 @@ export const groceryOsmVenues: Venue[] = [
     phone: "+1 719-564-0447",
     url: "https://www.7-eleven.com/locations/co/pueblo/2727-south-prairie-13111",
     source: "OpenStreetMap (node/4041375052)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12199987090",
@@ -30,7 +31,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.621195,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/12199987090)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12478967185",
@@ -40,7 +41,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.611215,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/12478967185)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-505568940",
@@ -53,7 +54,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://www.7-eleven.com/locations/co/pueblo/804-e-4th-st-20638",
     notes: "Hours (OSM opening_hours): 24/7",
     source: "OpenStreetMap (way/505568940)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-535650928",
@@ -64,7 +65,7 @@ export const groceryOsmVenues: Venue[] = [
     address: "3522 North Elizabeth Street, Pueblo, CO 81008",
     notes: "Operated by 7-Eleven",
     source: "OpenStreetMap (way/535650928)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-4041145706",
@@ -74,7 +75,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.586859,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/4041145706)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-9330967204",
@@ -84,17 +85,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.612008,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/9330967204)",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "osm-node-10239175368",
-    name: "Alta Convenience",
-    category: "convenience",
-    lat: 38.131236,
-    lng: -104.0247,
-    address: "Address not in OpenStreetMap",
-    source: "OpenStreetMap (node/10239175368)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12259768973",
@@ -104,7 +95,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.614027,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/12259768973)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-535656814",
@@ -115,7 +106,7 @@ export const groceryOsmVenues: Venue[] = [
     address: "2801 North Elizabeth Street, Pueblo, CO 81008",
     notes: "Operated by Alta",
     source: "OpenStreetMap (way/535656814)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-5409829684",
@@ -126,7 +117,7 @@ export const groceryOsmVenues: Venue[] = [
     address: "410 Main Street, Boone",
     notes: "Hours (OSM opening_hours): Mo-Su 08:00-17:00",
     source: "OpenStreetMap (node/5409829684)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-535379550",
@@ -137,7 +128,7 @@ export const groceryOsmVenues: Venue[] = [
     address: "601 West US Highway 50, Pueblo, CO 81008",
     notes: "Hours (OSM opening_hours): 24/7 · Operated by Corner Store",
     source: "OpenStreetMap (way/535379550)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-4041375053",
@@ -147,7 +138,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.643326,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/4041375053)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-1135823373",
@@ -157,7 +148,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.643387,
     address: "1242 South Prairie Avenue, Pueblo 81004",
     source: "OpenStreetMap (way/1135823373)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-499816958",
@@ -168,7 +159,7 @@ export const groceryOsmVenues: Venue[] = [
     address: "8950 Abbey Road, Colorado City, CO 81004",
     notes: "Hours (OSM opening_hours): 24/7 · Convenience Store;Gas Station",
     source: "OpenStreetMap (way/499816958)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-499816944",
@@ -178,7 +169,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.79703,
     address: "6654 State Highway 165, Colorado City, CO 81004",
     source: "OpenStreetMap (way/499816944)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-535378006",
@@ -189,7 +180,7 @@ export const groceryOsmVenues: Venue[] = [
     address: "615 Eagleridge Boulevard, Pueblo, CO 81008",
     notes: "Hours (OSM opening_hours): 24/7 · Operated by J R's Country Store",
     source: "OpenStreetMap (way/535378006)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-1266766543",
@@ -199,18 +190,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.817532,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (way/1266766543)",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "osm-node-3520944581",
-    name: "KiKi's Place",
-    category: "convenience",
-    lat: 38.166165,
-    lng: -103.943013,
-    address: "Warner Avenue, Olney Springs, CO 81062",
-    phone: "+1-719-269-3177",
-    source: "OpenStreetMap (node/3520944581)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-4043068646",
@@ -220,7 +200,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.745053,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/4043068646)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-4041363163",
@@ -230,7 +210,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.628526,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/4041363163)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-4041374999",
@@ -241,7 +221,7 @@ export const groceryOsmVenues: Venue[] = [
     address: "1201 West Pueblo Boulevard, Pueblo, CO 81004",
     notes: "Hours (OSM opening_hours): 24/7 · Operated by Loaf 'N Jug",
     source: "OpenStreetMap (node/4041374999)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-4041375005",
@@ -251,7 +231,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.638885,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/4041375005)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-4043068526",
@@ -261,7 +241,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.745238,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/4043068526)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12079476149",
@@ -271,7 +251,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.57943,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/12079476149)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12184485110",
@@ -281,7 +261,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.349524,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/12184485110)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12496998446",
@@ -291,7 +271,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.624074,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/12496998446)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12528946501",
@@ -301,7 +281,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.565459,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/12528946501)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12706112997",
@@ -311,7 +291,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.662294,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/12706112997)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12839229515",
@@ -321,7 +301,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.458933,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/12839229515)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12849787149",
@@ -331,7 +311,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.599331,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/12849787149)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-535378000",
@@ -342,7 +322,7 @@ export const groceryOsmVenues: Venue[] = [
     address: "Address not in OpenStreetMap",
     notes: "Operated by Loaf 'N Jug",
     source: "OpenStreetMap (way/535378000)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-535379543",
@@ -352,7 +332,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.620024,
     address: "905 West US Highway 50, Pueblo, CO 81008",
     source: "OpenStreetMap (way/535379543)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-547529779",
@@ -362,7 +342,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.644771,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (way/547529779)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-591851971",
@@ -373,7 +353,7 @@ export const groceryOsmVenues: Venue[] = [
     address: "2119 East 4th Street, Pueblo, CO 81001",
     notes: "Hours (OSM opening_hours): 24/7",
     source: "OpenStreetMap (way/591851971)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-659620782",
@@ -383,7 +363,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.606481,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (way/659620782)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-946614791",
@@ -393,7 +373,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.59641,
     address: "1002 Bonforte Boulevard, Pueblo, CO 81001",
     source: "OpenStreetMap (way/946614791)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-947245256",
@@ -403,7 +383,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.666376,
     address: "4125 Thames Drive, Pueblo, CO 81005",
     source: "OpenStreetMap (way/947245256)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-974172860",
@@ -413,7 +393,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.572577,
     address: "2120 Oakshire Lane, Pueblo, CO 81001",
     source: "OpenStreetMap (way/974172860)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-1079237907",
@@ -423,17 +403,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.702067,
     address: "136 South Purcell Boulevard, Pueblo West, CO",
     source: "OpenStreetMap (way/1079237907)",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "osm-way-480235190",
-    name: "Loaf and Jug",
-    category: "convenience",
-    lat: 38.129981,
-    lng: -104.01785,
-    address: "Address not in OpenStreetMap",
-    source: "OpenStreetMap (way/480235190)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-535686236",
@@ -443,7 +413,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.49248,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (way/535686236)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-224603771",
@@ -453,7 +423,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.622958,
     address: "6470 North Elizabeth Street, Pueblo, CO 81008",
     source: "OpenStreetMap (way/224603771)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-4041363143",
@@ -463,7 +433,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.625627,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/4041363143)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-13398740836",
@@ -473,7 +443,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.663068,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/13398740836)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-4041297300",
@@ -483,7 +453,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.631284,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/4041297300)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-10239124452",
@@ -493,7 +463,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.496445,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/10239124452)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-4041363156",
@@ -504,7 +474,7 @@ export const groceryOsmVenues: Venue[] = [
     address: "3201 Lake Avenue, Pueblo, CO 81004",
     notes: "Hours (OSM opening_hours): 24/7 · Operated by Western Convenience Store",
     source: "OpenStreetMap (node/4041363156)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12599529663",
@@ -517,7 +487,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://www.facebook.com/ditomasofarms1/",
     notes: "Hours (OSM opening_hours): Mo-Su 08:00-17:00",
     source: "OpenStreetMap (node/12599529663)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-12599529644",
@@ -531,7 +501,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://maurofarms.com/",
     notes: "Hours (OSM opening_hours): Mo-Su 09:00-16:00 · Identifies as Women owned",
     source: "OpenStreetMap (node/12599529644)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-971896407",
@@ -545,7 +515,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://www.mussofarmschileroom.com/",
     notes: "Hours (OSM opening_hours): Mo-Sa 08:00-18:00 · surcharge for using cards",
     source: "OpenStreetMap (way/971896407)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-544400971",
@@ -557,7 +527,7 @@ export const groceryOsmVenues: Venue[] = [
     phone: "+1 719-543-5671",
     url: "https://local.albertsons.com/co/pueblo/1601-hwy-50-w.html",
     source: "OpenStreetMap (way/544400971)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-node-11550915644",
@@ -567,7 +537,7 @@ export const groceryOsmVenues: Venue[] = [
     lng: -104.621343,
     address: "Address not in OpenStreetMap",
     source: "OpenStreetMap (node/11550915644)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-439892313",
@@ -580,7 +550,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://www.kingsoopers.com/stores/details/620/00043",
     notes: "Hours (OSM opening_hours): 05:00-24:00",
     source: "OpenStreetMap (way/439892313)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-946612238",
@@ -593,7 +563,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://www.kingsoopers.com/stores/details/620/00012",
     notes: "Hours (OSM opening_hours): 05:00-24:00",
     source: "OpenStreetMap (way/946612238)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-439892311",
@@ -606,7 +576,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://www.naturalgrocers.com/store/pueblo",
     notes: "Hours (OSM opening_hours): Mo,Tu,Th-Sa 08:30-21:06; We 08:00-21:06; Su 09:00-19:35",
     source: "OpenStreetMap (way/439892311)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-264728293",
@@ -618,7 +588,7 @@ export const groceryOsmVenues: Venue[] = [
     phone: "+1 719-547-2108",
     url: "https://local.safeway.com/safeway/co/pueblo/1017-n-market-plaza.html",
     source: "OpenStreetMap (way/264728293)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-946612229",
@@ -631,7 +601,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://local.safeway.com/safeway/co/pueblo/1231-s-prairie-ave.html",
     notes: "Hours (OSM opening_hours): 06:00-23:00",
     source: "OpenStreetMap (way/946612229)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-946614803",
@@ -644,17 +614,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://savealot.com/grocery-stores/pueblo-81001-23844/",
     notes: "Hours (OSM opening_hours): 08:00-21:00",
     source: "OpenStreetMap (way/946614803)",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "osm-node-10239175372",
-    name: "Thaxton market",
-    category: "grocery",
-    lat: 38.130416,
-    lng: -104.024116,
-    address: "Address not in OpenStreetMap",
-    source: "OpenStreetMap (node/10239175372)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-682492473",
@@ -667,7 +627,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://www.walmart.com/store/5828/pueblo-co",
     notes: "Hours (OSM opening_hours): Mo-Su 06:00-23:00 · Operated by Walmart",
     source: "OpenStreetMap (way/682492473)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-466464064",
@@ -680,7 +640,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://www.walmart.com/store/3382-pueblo-west-co",
     notes: "Hours (OSM opening_hours): 24/7 · Operated by Walmart",
     source: "OpenStreetMap (way/466464064)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-536454112",
@@ -693,7 +653,7 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://www.walmart.com/store/842-pueblo-co",
     notes: "Hours (OSM opening_hours): Mo-Su 06:00-24:00 · Operated by Walmart",
     source: "OpenStreetMap (way/536454112)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
   {
     id: "osm-way-682492454",
@@ -706,6 +666,6 @@ export const groceryOsmVenues: Venue[] = [
     url: "https://www.walmart.com/store/1001-pueblo-co",
     notes: "Hours (OSM opening_hours): Mo-Su 06:00-24:00 · Operated by Walmart",
     source: "OpenStreetMap (way/682492454)",
-    last_verified: "2026-05-12",
+    last_verified: "2026-05-20",
   },
 ];

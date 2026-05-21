@@ -25,6 +25,7 @@ export interface Venue {
   email?: string;
   url?: string;
   notes?: string;
+  operator?: string;
   source: string;
   last_verified: string;
 }

@@ -24,7 +24,7 @@ import { t, type Locale } from "@/lib/i18n";
 
 interface EmptySearchPopoverProps {
   query: string;
-  /** Called when a chip is clicked. Receives the EN readable category label. */
+  /** Called when a chip is clicked. Receives the locale-aware readable category label. */
   onSelectCategory: (label: string) => void;
   /** Locale for i18n. Defaults to "en". */
   locale?: Locale;
@@ -67,7 +67,7 @@ export default function EmptySearchPopover({
 
       {/* Category chip grid */}
       <div className="flex flex-wrap gap-2">
-        {CATEGORY_OPTIONS.map(({ key, label }) => {
+        {CATEGORY_OPTIONS.map(({ key }) => {
           const color = categoryColors[key];
           // Use locale-aware category label from i18n
           const displayLabel = t(`category.full.${key}`, locale);
@@ -76,7 +76,7 @@ export default function EmptySearchPopover({
               key={key}
               type="button"
               aria-label={t("empty.showCategoryAria", locale, { label: displayLabel })}
-              onClick={() => onSelectCategory(label)}
+              onClick={() => onSelectCategory(displayLabel)}
               className={
                 "flex items-center gap-1.5 px-3 h-8 " +
                 "rounded-[var(--radius-full)] " +

@@ -84,6 +84,7 @@ const en: Record<string, string> = {
   // Badges
   "badge.openNow": "Open now",
   "badge.opensAt": "Opens at {time}",
+  "badge.closesAt": "Closes {time}",
   "badge.closedToday": "Closed today",
   "badge.snap": "SNAP",
   "badge.wic": "WIC",
@@ -230,6 +231,7 @@ const es: Record<string, string> = {
   // Badges
   "badge.openNow": "Abierto ahora",
   "badge.opensAt": "Abre a las {time}",
+  "badge.closesAt": "Cierra a las {time}",
   "badge.closedToday": "Cerrado hoy",
   "badge.snap": "SNAP",
   "badge.wic": "WIC",

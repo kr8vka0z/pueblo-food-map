@@ -85,7 +85,7 @@ export default function LocationDeniedBanner({
         <button
           type="button"
           onClick={onDismiss}
-          aria-label="Dismiss"
+          aria-label={t("detail.close", locale)}
           className={
             "absolute top-2 right-2 " +
             "w-8 h-8 " +

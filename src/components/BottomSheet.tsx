@@ -175,7 +175,7 @@ export default function BottomSheet({ venue, onClose, onSnapChange, locale = "en
           <span className="flex items-center gap-1.5">
             <Clock size={14} aria-hidden className="text-[var(--color-ink-400)]" />
             {status.state === "open"
-              ? `${t("badge.openNow", locale)} · ${t("detail.close", locale).toLowerCase()} ${status.time}`
+              ? `${t("badge.openNow", locale)} · ${t("badge.closesAt", locale, { time: status.time })}`
               : status.state === "opens_at"
               ? t("badge.opensAt", locale, { time: status.time })
               : t("badge.closedToday", locale)}

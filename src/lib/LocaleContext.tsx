@@ -18,7 +18,7 @@
  *   samesite: Lax
  */
 
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 
 // ─── Cookie helpers ───────────────────────────────────────────────────────────
@@ -88,6 +88,11 @@ export function LocaleProvider({
     setLocaleState(next);
     writeLocaleCookie(next);
   }, []);
+
+  // Keep <html lang> in sync with the active locale for screen-reader pronunciation.
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   return (
     <LocaleContext.Provider value={{ locale, setLocale }}>

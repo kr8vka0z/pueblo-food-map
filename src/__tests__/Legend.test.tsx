@@ -65,7 +65,7 @@ describe("Legend — expand/collapse", () => {
     expect(btn.getAttribute("aria-expanded")).toBe("false");
   });
 
-  test("Escape key closes the panel", () => {
+  test("Escape key closes the panel and returns focus to trigger button", () => {
     render(<Legend />);
     const btn = screen.getByRole("button", { name: "Map legend" });
     fireEvent.click(btn);
@@ -73,6 +73,24 @@ describe("Legend — expand/collapse", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("region")).toBeNull();
     expect(btn.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(btn);
+  });
+});
+
+describe("Legend — ARIA disclosure wiring", () => {
+  test("trigger button has aria-controls pointing at the panel id", () => {
+    render(<Legend />);
+    const btn = screen.getByRole("button", { name: "Map legend" });
+    expect(btn.getAttribute("aria-controls")).toBe("legend-panel");
+  });
+
+  test("panel element has id matching aria-controls on the trigger", () => {
+    render(<Legend />);
+    const btn = screen.getByRole("button", { name: "Map legend" });
+    fireEvent.click(btn);
+    const region = screen.getByRole("region", { name: "Map legend" });
+    expect(region.getAttribute("id")).toBe("legend-panel");
+    expect(btn.getAttribute("aria-controls")).toBe(region.getAttribute("id"));
   });
 });
 

@@ -107,6 +107,9 @@ const en: Record<string, string> = {
 
   // Legend (#72)
   "legend.button_label": "Map legend",
+
+  // Operator attribution (#63)
+  "operator.operated_by": "Operated by",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -216,6 +219,9 @@ const es: Record<string, string> = {
 
   // Legend (#72)
   "legend.button_label": "Leyenda del mapa",
+
+  // Operator attribution (#63)
+  "operator.operated_by": "Operado por",
 };
 
 /** Substitute simple {key} placeholders. */

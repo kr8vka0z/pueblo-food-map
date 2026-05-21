@@ -253,6 +253,21 @@ export default function DesktopVenueWindow({
         </button>
       </div>
 
+      {/* Operator attribution */}
+      {venue.operator && (
+        <p className="text-xs text-[var(--color-ink-500)] -mt-1">
+          {t("operator.operated_by", locale)}{" "}
+          <a
+            href="https://pueblofoodproject.org/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+          >
+            {venue.operator}
+          </a>
+        </p>
+      )}
+
       {/* Category + SNAP/WIC */}
       <div className="flex flex-wrap items-center gap-2">
         <span
@@ -354,12 +369,25 @@ export default function DesktopVenueWindow({
         {/* Name */}
         <div>
           <h2
-            className="text-xl font-normal text-[var(--color-ink-900)] leading-tight mb-2"
+            className="text-xl font-normal text-[var(--color-ink-900)] leading-tight mb-1"
             style={{ fontFamily: "var(--font-display)" }}
             id={`venue-window-title-${venue.id}`}
           >
             {venue.name}
           </h2>
+          {venue.operator && (
+            <p className="text-xs text-[var(--color-ink-500)] mb-2">
+              {t("operator.operated_by", locale)}{" "}
+              <a
+                href="https://pueblofoodproject.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+              >
+                {venue.operator}
+              </a>
+            </p>
+          )}
           <span
             className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--color-bone-50)]"
             style={{ backgroundColor: categoryColors[venue.category] }}

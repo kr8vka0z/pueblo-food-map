@@ -3,12 +3,13 @@
  *
  * Handles venue suggestion submissions from SuggestForm:
  *   1. Validate Content-Type + JSON shape.
- *   2. Honeypot check (spam bots fill hidden fields; legit users don't).
- *   3. IP-based rate limit: max 5 submissions per IP per hour (in-process
+ *   2. Cloudflare Turnstile token verification (rejects bots before further processing).
+ *   3. Honeypot check (spam bots fill hidden fields; legit users don't).
+ *   4. IP-based rate limit: max 5 submissions per IP per hour (in-process
  *      Map — resets on Worker restart; sufficient for v1 spam deterrence).
- *   4. Server-side field validation (mirrors client validation).
- *   5. Send email via Resend to suggestions@pueblofoodmap.com.
- *   6. Return JSON {ok: true} or {ok: false, error: string}.
+ *   5. Server-side field validation (mirrors client validation).
+ *   6. Send email via Resend to suggestions@pueblofoodmap.com.
+ *   7. Return JSON {ok: true} or {ok: false, error: string}.
  *
  * PII policy: IP addresses are used only for rate-limiting and are never
  * logged or persisted. The optional submitter email is forwarded to Resend as
@@ -17,6 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { VENUE_CATEGORIES, type VenueCategoryKey } from "@/lib/suggestTypes";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 // Simple in-process sliding window. Keyed by IP string.
@@ -137,6 +139,8 @@ interface SubmitPayload {
   submitterEmail?: string;
   /** Honeypot — must be empty string or absent */
   website?: string;
+  /** Cloudflare Turnstile response token from the client widget */
+  turnstileToken?: string;
 }
 
 function validate(body: SubmitPayload): string | null {
@@ -171,6 +175,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
 
+  // IP header — used for both Turnstile remoteip and rate-limit
+  const ip =
+    req.headers.get("cf-connecting-ip") ??
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "unknown";
+
+  // Turnstile verification — must pass before any further processing
+  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY ?? "";
+  const turnstileValid = await verifyTurnstileToken(
+    body.turnstileToken,
+    turnstileSecret,
+    ip,
+  );
+  if (!turnstileValid) {
+    return NextResponse.json(
+      { ok: false, error: "turnstile_failed" },
+      { status: 400 },
+    );
+  }
+
   // Honeypot check — bots fill hidden fields; humans don't
   if (body.website && body.website.trim() !== "") {
     // Return 200 to bots so they think it worked
@@ -178,12 +202,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // IP-based rate limit
-  // CF Workers sets CF-Connecting-IP; fall back to x-forwarded-for for local dev.
-  const ip =
-    req.headers.get("cf-connecting-ip") ??
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    "unknown";
-
   if (!checkRateLimit(ip)) {
     return NextResponse.json(
       { ok: false, error: "rate_limit" },

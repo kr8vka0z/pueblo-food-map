@@ -50,6 +50,7 @@ import { haversineMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
 import { searchVenues } from "@/lib/searchVenues";
 import type { VenueCategory } from "@/types/venue";
+import HamburgerMenu from "./HamburgerMenu";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
 // dynamic import here in a Client Component as required by Next.js 16
@@ -463,18 +464,22 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         />
       )}
 
-      {/* LanguageToggle — absolute top-right above LocateButton, z-index 1001 */}
+      {/* HamburgerMenu — top-right, above the control stack (#71) */}
+      <HamburgerMenu locale={locale} />
+
+      {/* LanguageToggle — to the left of LocateButton; shifted down by hamburger height (#71) */}
+      {/* Hamburger: top-4(16px) + h-11(44px) + 8px gap = 68px */}
       <div
-        className="absolute top-4"
-        style={{ zIndex: 1001, right: "calc(1rem + 44px + 8px)" }}
+        className="absolute"
+        style={{ zIndex: 1001, top: "68px", right: "calc(1rem + 44px + 8px)" }}
       >
         <LanguageToggle />
       </div>
 
-      {/* LocateButton — absolute top-right, z-index 1000 */}
+      {/* LocateButton — below hamburger; top offset set via inline style in component (#71) */}
       <LocateButton geoState={geo.state} onRequest={handleLocateRequest} locale={locale} />
 
-      {/* Legend — collapsible category color legend, below LocateButton (#72) */}
+      {/* Legend — below LocateButton; hamburger(44)+gap(8)+locate(44)+gap(8) = top-[120px] (#71, #72) */}
       <Legend />
 
       {/* LocationDeniedBanner — appears only after active re-tap → denial */}

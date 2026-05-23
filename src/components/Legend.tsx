@@ -83,8 +83,8 @@ export default function Legend({ locale = "en" }: LegendProps) {
       ref={containerRef}
       style={{
         position: "absolute",
-        // Sit below LocateButton (top-4 = 16px, h-11 = 44px → 16+44+8=68px)
-        top: "68px",
+        // Sit below LocateButton (#71: hamburger top-4=16+h-11=44+8gap=68; locate h-11=44+8gap=8 → 68+44+8=120px)
+        top: "120px",
         right: "16px",
         zIndex: 1000,
       }}

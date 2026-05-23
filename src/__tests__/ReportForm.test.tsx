@@ -15,12 +15,32 @@
  *  11. Honeypot field is present in DOM but hidden from real users.
  *  12. ES locale: submit button shows "Enviar reporte".
  *  13. Rate-limit error from server shows inline error on description.
+ *  14. Turnstile widget div is present in DOM.
+ *  15. turnstile_failed error from server shows inline error + resets widget.
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ReportForm from "@/components/ReportForm";
+
+// ─── Turnstile mock ───────────────────────────────────────────────────────────
+// window.turnstile is injected by the CF script at runtime. In tests we stub
+// it with a synchronous implementation that immediately invokes the callback,
+// which sets the token and enables the submit button.
+
+let capturedCallback: ((token: string) => void) | undefined;
+
+const mockTurnstile = {
+  render: vi.fn((container: HTMLElement, opts: { callback?: (t: string) => void }) => {
+    capturedCallback = opts.callback;
+    // Immediately resolve with a fake token so the submit button is enabled
+    if (opts.callback) opts.callback("test-turnstile-token");
+    return "widget-id-1";
+  }),
+  reset: vi.fn(),
+  remove: vi.fn(),
+};
 
 // ─── fetch mock ──────────────────────────────────────────────────────────────
 
@@ -29,10 +49,18 @@ const mockFetch = vi.fn();
 beforeEach(() => {
   mockFetch.mockClear();
   vi.stubGlobal("fetch", mockFetch);
+  // Reset turnstile mock state
+  mockTurnstile.render.mockClear();
+  mockTurnstile.reset.mockClear();
+  mockTurnstile.remove.mockClear();
+  capturedCallback = undefined;
+  // Mount turnstile global before each render so useEffect sees it
+  vi.stubGlobal("turnstile", mockTurnstile);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -46,6 +74,18 @@ function renderForm(locale: "en" | "es" = "en") {
       locale={locale}
     />,
   );
+}
+
+/**
+ * Wait for the Turnstile widget mock to fire its callback and enable the
+ * submit button. Required before any test that clicks the submit button.
+ */
+async function waitForSubmitEnabled() {
+  await waitFor(() => {
+    const btn = screen.getByRole("button", { name: /Submit report/i });
+    expect(btn).toBeDefined();
+    expect((btn as HTMLButtonElement).disabled).toBe(false);
+  });
 }
 
 function mockSuccess() {
@@ -80,9 +120,18 @@ describe("ReportForm — rendering", () => {
     expect(screen.getByLabelText(/Your email/i)).toBeDefined();
   });
 
-  test("renders submit button", () => {
+  test("renders submit button (enabled after Turnstile resolves)", async () => {
     renderForm();
-    expect(screen.getByRole("button", { name: /Submit report/i })).toBeDefined();
+    // After useEffect fires, turnstile mock resolves synchronously,
+    // enabling the submit button with the normal label.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Submit report/i })).toBeDefined();
+    });
+  });
+
+  test("Turnstile widget div is present in DOM", () => {
+    renderForm();
+    expect(screen.getByTestId("turnstile-widget")).toBeDefined();
   });
 
   test("honeypot input is present in DOM (hidden with aria-hidden wrapper)", () => {
@@ -94,9 +143,11 @@ describe("ReportForm — rendering", () => {
     expect(wrapper?.getAttribute("aria-hidden")).toBe("true");
   });
 
-  test("ES locale: submit button shows Spanish label", () => {
+  test("ES locale: submit button shows Spanish label after Turnstile resolves", async () => {
     renderForm("es");
-    expect(screen.getByRole("button", { name: /Enviar reporte/i })).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Enviar reporte/i })).toBeDefined();
+    });
   });
 });
 
@@ -104,6 +155,7 @@ describe("ReportForm — client validation", () => {
   test("shows issueType error when issue type not selected", async () => {
     const user = userEvent.setup();
     renderForm();
+    await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => {
       expect(screen.getByText(/Please select an issue type/i)).toBeDefined();
@@ -123,6 +175,7 @@ describe("ReportForm — client validation", () => {
     const textarea = screen.getByLabelText(/Description/i);
     await user.type(textarea, "short");
 
+    await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => {
       expect(
@@ -145,6 +198,7 @@ describe("ReportForm — client validation", () => {
     const emailInput = screen.getByLabelText(/Your email/i);
     await user.type(emailInput, "not-an-email");
 
+    await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => {
       expect(screen.getByText(/valid email address/i)).toBeDefined();
@@ -166,6 +220,7 @@ describe("ReportForm — client validation", () => {
     const emailInput = screen.getByLabelText(/Your email/i);
     await user.type(emailInput, "test@example.com");
 
+    await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => {
       expect(screen.queryByText(/valid email address/i)).toBeNull();
@@ -184,6 +239,7 @@ describe("ReportForm — client validation", () => {
     const textarea = screen.getByLabelText(/Description/i);
     await user.type(textarea, "This is a long enough description.");
 
+    await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledOnce();
@@ -192,7 +248,7 @@ describe("ReportForm — client validation", () => {
 });
 
 describe("ReportForm — submit flow", () => {
-  test("sends correct JSON payload on submit", async () => {
+  test("sends correct JSON payload on submit (includes turnstileToken)", async () => {
     mockSuccess();
     const user = userEvent.setup();
     renderForm();
@@ -203,6 +259,7 @@ describe("ReportForm — submit flow", () => {
     const textarea = screen.getByLabelText(/Description/i);
     await user.type(textarea, "The pin is in the wrong spot entirely.");
 
+    await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
 
@@ -217,6 +274,8 @@ describe("ReportForm — submit flow", () => {
     expect(body.description).toBe("The pin is in the wrong spot entirely.");
     // Honeypot should be empty string (real user)
     expect(body.website).toBe("");
+    // Turnstile token from our mock
+    expect(body.turnstileToken).toBe("test-turnstile-token");
   });
 
   test("renders success state after successful submit", async () => {
@@ -230,6 +289,7 @@ describe("ReportForm — submit flow", () => {
     const textarea = screen.getByLabelText(/Description/i);
     await user.type(textarea, "This place closed down last month.");
 
+    await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => {
       expect(screen.getByText(/Thank you!/i)).toBeDefined();
@@ -248,6 +308,7 @@ describe("ReportForm — submit flow", () => {
     const textarea = screen.getByLabelText(/Description/i);
     await user.type(textarea, "This place closed down last month.");
 
+    await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => {
       expect(screen.getByText(/Something went wrong/i)).toBeDefined();
@@ -265,6 +326,7 @@ describe("ReportForm — submit flow", () => {
     const textarea = screen.getByLabelText(/Description/i);
     await user.type(textarea, "This place closed down last month.");
 
+    await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => {
       expect(screen.getByText(/Something went wrong/i)).toBeDefined();
@@ -277,6 +339,7 @@ describe("ReportForm — submit flow", () => {
     await waitFor(() => {
       expect(screen.queryByText(/Something went wrong/i)).toBeNull();
     });
+    // Token is still set (widget not destroyed), so Submit label shows
     expect(screen.getByRole("button", { name: /Submit report/i })).toBeDefined();
   });
 
@@ -291,6 +354,7 @@ describe("ReportForm — submit flow", () => {
     const textarea = screen.getByLabelText(/Description/i);
     await user.type(textarea, "This place closed down last month.");
 
+    await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Submit report/i }));
     await waitFor(() => {
       expect(
@@ -299,5 +363,32 @@ describe("ReportForm — submit flow", () => {
     });
     // Should NOT show global error banner (returns to idle with inline error)
     expect(screen.queryByText(/Something went wrong/i)).toBeNull();
+  });
+
+  test("turnstile_failed error from server shows Turnstile error message", async () => {
+    mockError("turnstile_failed");
+    const user = userEvent.setup();
+    renderForm();
+
+    const select = screen.getByLabelText(/What's wrong/i) as HTMLSelectElement;
+    await user.selectOptions(select, "closed");
+
+    const textarea = screen.getByLabelText(/Description/i);
+    await user.type(textarea, "This place closed down last month.");
+
+    await waitForSubmitEnabled();
+    await user.click(screen.getByRole("button", { name: /Submit report/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("alert", { hidden: false })).toBeDefined();
+      const alerts = screen.getAllByRole("alert");
+      const turnstileAlert = alerts.find((el) =>
+        el.textContent?.includes("verify") && el.textContent?.includes("human"),
+      );
+      expect(turnstileAlert).toBeDefined();
+    });
+    // Should NOT show global error banner
+    expect(screen.queryByText(/Something went wrong/i)).toBeNull();
+    // Widget reset should have been called
+    expect(mockTurnstile.reset).toHaveBeenCalled();
   });
 });

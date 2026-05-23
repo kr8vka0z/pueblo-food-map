@@ -8,6 +8,7 @@
  *   - Description textarea (required, ≥10 chars)
  *   - Optional contact email
  *   - Honeypot field (hidden from real users, caught server-side)
+ *   - Cloudflare Turnstile widget (bot protection)
  *   - Client-side validation with accessible error announcements
  *   - Success state with "Back to map" link
  *   - Error state with "Try again" preserving form data
@@ -15,10 +16,31 @@
  *   - Keyboard accessible: all controls labeled, errors linked via aria-describedby
  */
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import Script from "next/script";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
+
+// ─── Turnstile global type ────────────────────────────────────────────────────
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: string | HTMLElement,
+        options: {
+          sitekey: string;
+          callback?: (token: string) => void;
+          "error-callback"?: () => void;
+          "expired-callback"?: () => void;
+        },
+      ) => string;
+      reset: (widgetId: string) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -71,8 +93,60 @@ export default function ReportForm({
   const [contactEmail, setContactEmail] = useState<string>("");
   const [honeypot, setHoneypot] = useState<string>("");
 
+  // Turnstile state
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileError, setTurnstileError] = useState<boolean>(false);
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetId = useRef<string | null>(null);
+
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+
+  // ── Turnstile widget render ────────────────────────────────────────────────
+  // Called once the CF Turnstile script has loaded. Re-runs if the container
+  // mounts after script load (e.g. error state reset).
+
+  function mountTurnstile() {
+    if (!turnstileContainerRef.current || !window.turnstile) return;
+    if (turnstileWidgetId.current) return; // already mounted
+
+    const sitekey =
+      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+
+    turnstileWidgetId.current = window.turnstile.render(
+      turnstileContainerRef.current,
+      {
+        sitekey,
+        callback: (token) => {
+          setTurnstileToken(token);
+          setTurnstileError(false);
+        },
+        "error-callback": () => {
+          setTurnstileToken(null);
+          setTurnstileError(true);
+        },
+        "expired-callback": () => {
+          setTurnstileToken(null);
+          setTurnstileError(false);
+        },
+      },
+    );
+  }
+
+  // When the form returns from success/error states the widget container
+  // re-mounts. Try to render if the script already loaded.
+  useEffect(() => {
+    if (window.turnstile) {
+      mountTurnstile();
+    }
+    return () => {
+      if (window.turnstile && turnstileWidgetId.current) {
+        window.turnstile.remove(turnstileWidgetId.current);
+        turnstileWidgetId.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Submission ────────────────────────────────────────────────────────────
 
@@ -107,6 +181,7 @@ export default function ReportForm({
           description: description.trim(),
           contactEmail: contactEmail.trim() || undefined,
           website: honeypot, // honeypot field
+          turnstileToken: turnstileToken ?? "",
         }),
       });
 
@@ -116,6 +191,14 @@ export default function ReportForm({
         setStatus("success");
       } else if (data.error === "rate_limit") {
         setErrors({ description: t("report.error.rateLimit", locale) });
+        setStatus("idle");
+      } else if (data.error === "turnstile_failed") {
+        setTurnstileError(true);
+        setTurnstileToken(null);
+        // Reset widget so user can retry
+        if (window.turnstile && turnstileWidgetId.current) {
+          window.turnstile.reset(turnstileWidgetId.current);
+        }
         setStatus("idle");
       } else {
         setStatus("error");
@@ -170,6 +253,13 @@ export default function ReportForm({
   const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
 
   return (
+    <>
+      {/* Cloudflare Turnstile JS — loads after page is interactive */}
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+        strategy="afterInteractive"
+        onLoad={mountTurnstile}
+      />
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
       {/* Global error state banner */}
       {status === "error" && (
@@ -295,10 +385,26 @@ export default function ReportForm({
         />
       </div>
 
+      {/* Cloudflare Turnstile widget */}
+      <div>
+        <div
+          ref={turnstileContainerRef}
+          data-testid="turnstile-widget"
+        />
+        {turnstileError && (
+          <p
+            role="alert"
+            className="mt-1 text-xs text-red-600"
+          >
+            {"Couldn’t verify you’re human — please retry."}
+          </p>
+        )}
+      </div>
+
       {/* Submit */}
       <button
         type="submit"
-        disabled={status === "submitting"}
+        disabled={status === "submitting" || !turnstileToken}
         className={
           "w-full h-11 rounded-[var(--radius-md)] " +
           "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
@@ -308,10 +414,12 @@ export default function ReportForm({
           "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
           "disabled:opacity-60 disabled:cursor-not-allowed"
         }
-        aria-disabled={status === "submitting"}
+        aria-disabled={status === "submitting" || !turnstileToken}
       >
         {status === "submitting"
           ? t("report.submitting", locale)
+          : !turnstileToken
+          ? "Verifying…"
           : t("report.submit", locale)}
       </button>
 
@@ -333,5 +441,6 @@ export default function ReportForm({
         </button>
       )}
     </form>
+    </>
   );
 }

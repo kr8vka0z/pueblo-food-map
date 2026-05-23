@@ -13,6 +13,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { NextRequest } from "next/server";
 
 describe("checkRateLimit — sliding window", () => {
   // We import the exported function directly, but must reset the module's
@@ -93,7 +94,6 @@ describe("Honeypot logic — integration with POST handler", () => {
   });
 
   function makeRequest(body: Record<string, unknown>, ip = "127.0.0.1") {
-    const { NextRequest } = require("next/server") as typeof import("next/server");
     return new NextRequest("http://localhost/report/submit", {
       method: "POST",
       headers: {

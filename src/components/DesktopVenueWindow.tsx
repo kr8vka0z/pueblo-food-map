@@ -57,6 +57,7 @@ import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus, formatSlot } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
 import VenuePopupHeader from "@/components/VenuePopupHeader";
+import ReportVenueButton from "@/components/ReportVenueButton";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -357,6 +358,9 @@ export default function DesktopVenueWindow({
       >
         {t("detail.getDirections", locale)}
       </a>
+
+      {/* Report an issue — secondary action (#70) */}
+      <ReportVenueButton venueId={venue.id} locale={locale} />
 
       {/* SNAP/WIC */}
       {(venue.accepts_snap || venue.accepts_wic) && (

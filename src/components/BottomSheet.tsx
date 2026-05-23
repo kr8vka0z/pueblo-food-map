@@ -23,6 +23,7 @@ import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus, formatSlot } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
+import ReportVenueButton from "@/components/ReportVenueButton";
 
 // ─── Snap points ─────────────────────────────────────────────────────────────
 // vaul accepts pixel strings and fractions (0-1 = % of viewport height).
@@ -286,6 +287,9 @@ export default function BottomSheet({ venue, onClose, onSnapChange, locale = "en
         >
           {t("detail.getDirections", locale)}
         </a>
+
+        {/* Report an issue — secondary action (#70) */}
+        <ReportVenueButton venueId={venue.id} locale={locale} />
 
         {/* SNAP/WIC badges */}
         {(venue.accepts_snap || venue.accepts_wic) && (

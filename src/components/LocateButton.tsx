@@ -54,8 +54,8 @@ export default function LocateButton({
       onClick={onRequest}
       aria-label={t("topbar.locate", locale)}
       className={
-        // Positioning — absolute top-right, above Leaflet tiles
-        "absolute top-4 right-4 " +
+        // Positioning — absolute top-right, below HamburgerMenu (#71: top-[68px] = 16+44+8)
+        "absolute right-4 " +
         // Size — 44×44 mobile / 52×52 desktop
         "w-11 h-11 md:w-[52px] md:h-[52px] " +
         "flex items-center justify-center " +
@@ -67,7 +67,7 @@ export default function LocateButton({
         "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
         "elevation-2"
       }
-      style={{ zIndex: 1000 }}
+      style={{ zIndex: 1000, top: "68px" }}
     >
       {/* Mobile icon: 18×18 */}
       {isActive ? (

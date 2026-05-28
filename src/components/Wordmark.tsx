@@ -28,6 +28,8 @@ interface WordmarkSpanProps {
   className?: string;
   onClick?: undefined;
   locale?: Locale;
+  /** Accepted but ignored in display-only (span) mode. Only applies to button mode. */
+  selfPositioned?: boolean;
 }
 
 // ─── Map-reset button mode (#61) ───────────────────────────────────────────

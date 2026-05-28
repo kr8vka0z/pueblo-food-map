@@ -416,8 +416,17 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         onMapReady={(map) => setMapboxMap(map)}
       />
 
-      {/* Wordmark — persistent brand anchor, top-left; clicking resets map state (#61) */}
-      <Wordmark onClick={handleWordmarkReset} locale={locale} size="sm" />
+      {/* Top-left cluster: Wordmark + EN/ES toggle (#97)
+           - Positioned absolute top-4 left-4, z-index 1000.
+           - Wordmark uses selfPositioned=false so it doesn't add its own absolute styles.
+           - Both fit side-by-side at 375px without wrapping. */}
+      <div
+        className="absolute top-4 left-4 flex items-center gap-2"
+        style={{ zIndex: 1000 }}
+      >
+        <Wordmark onClick={handleWordmarkReset} locale={locale} size="sm" selfPositioned={false} />
+        <LanguageToggle />
+      </div>
 
       {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67) */}
       <SearchBar
@@ -466,15 +475,6 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
 
       {/* HamburgerMenu — top-right, above the control stack (#71) */}
       <HamburgerMenu locale={locale} />
-
-      {/* LanguageToggle — to the left of LocateButton; shifted down by hamburger height (#71) */}
-      {/* Hamburger: top-4(16px) + h-11(44px) + 8px gap = 68px */}
-      <div
-        className="absolute"
-        style={{ zIndex: 1001, top: "68px", right: "calc(1rem + 44px + 8px)" }}
-      >
-        <LanguageToggle />
-      </div>
 
       {/* LocateButton — below hamburger; top offset set via inline style in component (#71) */}
       <LocateButton geoState={geo.state} onRequest={handleLocateRequest} locale={locale} />

@@ -44,6 +44,10 @@ function renderMenu(locale: "en" | "es" = "en") {
   return render(<HamburgerMenu locale={locale} />);
 }
 
+function renderMenuWithWelcome(onShowWelcome = vi.fn(), locale: "en" | "es" = "en") {
+  return { onShowWelcome, ...render(<HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} />) };
+}
+
 describe("HamburgerMenu — collapsed state", () => {
   test("renders hamburger trigger button", () => {
     renderMenu();
@@ -200,5 +204,136 @@ describe("HamburgerMenu — locale", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: /Sugerir un lugar/i })).toBeDefined();
     });
+  });
+});
+
+// ─── #96: About Pueblo Food Project ──────────────────────────────────────────
+
+describe("#96 — About Pueblo Food Project menu item", () => {
+  test("'About' item renders in the open panel (EN)", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByText("About Pueblo Food Project")).toBeDefined();
+    });
+  });
+
+  test("'About' link href is correct", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
+      expect((link as HTMLAnchorElement).href).toContain("pueblofoodproject.org/about/");
+    });
+  });
+
+  test("'About' link has target='_blank'", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
+      expect((link as HTMLAnchorElement).target).toBe("_blank");
+    });
+  });
+
+  test("'About' link has rel containing noopener and noreferrer", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
+      const rel = (link as HTMLAnchorElement).rel;
+      expect(rel).toContain("noopener");
+      expect(rel).toContain("noreferrer");
+    });
+  });
+
+  test("'About' item renders in ES locale too (proper noun stays English)", async () => {
+    const user = userEvent.setup();
+    renderMenu("es");
+    await user.click(screen.getByRole("button", { name: /Abrir menú/i }));
+    await waitFor(() => {
+      // "Pueblo Food Project" stays in English per spec
+      expect(screen.getByText("About Pueblo Food Project")).toBeDefined();
+    });
+  });
+});
+
+// ─── #99: Show welcome screen ─────────────────────────────────────────────────
+
+describe("#99 — Show welcome screen menu item", () => {
+  test("item does NOT render when onShowWelcome is not passed", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.queryByText("Show welcome screen")).toBeNull();
+    });
+  });
+
+  test("item renders when onShowWelcome is passed (EN)", async () => {
+    const user = userEvent.setup();
+    renderMenuWithWelcome();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Show welcome screen")).toBeDefined();
+    });
+  });
+
+  test("item renders in ES locale", async () => {
+    const user = userEvent.setup();
+    renderMenuWithWelcome(vi.fn(), "es");
+    await user.click(screen.getByRole("button", { name: /Abrir menú/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Mostrar pantalla de bienvenida")).toBeDefined();
+    });
+  });
+
+  test("clicking the item calls onShowWelcome", async () => {
+    const user = userEvent.setup();
+    const { onShowWelcome } = renderMenuWithWelcome();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Show welcome screen")).toBeDefined();
+    });
+    await user.click(screen.getByText("Show welcome screen"));
+    await waitFor(() => {
+      expect(onShowWelcome).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  test("menu closes after clicking 'Show welcome screen'", async () => {
+    const user = userEvent.setup();
+    renderMenuWithWelcome();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("menu")).toBeDefined();
+    });
+    await user.click(screen.getByText("Show welcome screen"));
+    await waitFor(() => {
+      expect(screen.queryByRole("menu")).toBeNull();
+    });
+  });
+
+  test("clicking 'Show welcome screen' does NOT mutate localStorage", async () => {
+    const user = userEvent.setup();
+    const GATE_KEY = "pfm.splash.seen.v2";
+    // Pre-set the gate key (simulating a returning user)
+    localStorage.setItem(GATE_KEY, "1");
+
+    renderMenuWithWelcome();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => expect(screen.getByText("Show welcome screen")).toBeDefined());
+
+    await user.click(screen.getByText("Show welcome screen"));
+
+    // Gate key must still be '1' — not cleared
+    expect(localStorage.getItem(GATE_KEY)).toBe("1");
+
+    // Cleanup
+    localStorage.removeItem(GATE_KEY);
   });
 });

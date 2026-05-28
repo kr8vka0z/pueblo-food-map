@@ -156,10 +156,15 @@ const en: Record<string, string> = {
   "typeahead.moreMatches": "+{count} more matches",
   "typeahead.noMatch": "No venues match",
 
-  // Hamburger menu (#71)
+  // Hamburger menu (#71, #96, #99)
   "menu.open": "Open menu",
   "menu.close": "Close menu",
   "menu.suggest": "Suggest a venue",
+  "menu.about": "About Pueblo Food Project",
+  "menu.showWelcome": "Show welcome screen",
+
+  // Category browse dropdown (#95)
+  "categoryBrowse.clearFilter": "Clear category filter",
 
   // Suggest form (#71)
   "suggest.title": "Suggest a venue",
@@ -392,10 +397,15 @@ const es: Record<string, string> = {
   "typeahead.moreMatches": "+{count} más resultados",
   "typeahead.noMatch": "Ningún lugar coincide",
 
-  // Hamburger menu (#71)
+  // Hamburger menu (#71, #96, #99)
   "menu.open": "Abrir menú",
   "menu.close": "Cerrar menú",
   "menu.suggest": "Sugerir un lugar",
+  "menu.about": "About Pueblo Food Project",
+  "menu.showWelcome": "Mostrar pantalla de bienvenida",
+
+  // Category browse dropdown (#95)
+  "categoryBrowse.clearFilter": "Borrar filtro de categoría",
 
   // Suggest form (#71)
   "suggest.title": "Sugerir un lugar",

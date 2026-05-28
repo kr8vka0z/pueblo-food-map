@@ -18,7 +18,7 @@
  */
 
 import { useCallback } from "react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 interface SearchBarProps {
   /** Controlled value — owned by MapWrapper. */
@@ -48,6 +48,18 @@ interface SearchBarProps {
    * This is called BEFORE the internal Enter handler so parent can intercept.
    */
   onKeyDownExtra?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+
+  // ── Category filter chip (#95) ──────��─────────────────────────────────────
+  /**
+   * When set, renders a removable chip inside the search bar to the left of
+   * the placeholder, indicating an active category filter.
+   */
+  filterChip?: {
+    label: string;
+    /** aria-label for the × button. */
+    clearAriaLabel?: string;
+    onClear: () => void;
+  };
 }
 
 export default function SearchBar({
@@ -63,6 +75,7 @@ export default function SearchBar({
   onFocus,
   onBlur,
   onKeyDownExtra,
+  filterChip,
 }: SearchBarProps) {
   const handleKey = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -101,25 +114,64 @@ export default function SearchBar({
         className="relative w-full mx-4 md:mx-0 md:w-[520px]"
         style={{ pointerEvents: "auto" }}
       >
-        {/* Search icon — 16×16 mobile, 18×18 desktop */}
-        <Search
-          size={16}
-          className={
-            "absolute left-3 top-1/2 -translate-y-1/2 " +
-            "text-[var(--color-ink-400)] pointer-events-none " +
-            "md:hidden"
-          }
-          aria-hidden
-        />
-        <Search
-          size={18}
-          className={
-            "hidden absolute left-3.5 top-1/2 -translate-y-1/2 " +
-            "text-[var(--color-ink-400)] pointer-events-none " +
-            "md:block"
-          }
-          aria-hidden
-        />
+        {/* Search icon — 16×16 mobile, 18×18 desktop. Hidden when chip is active. */}
+        {!filterChip && (
+          <>
+            <Search
+              size={16}
+              className={
+                "absolute left-3 top-1/2 -translate-y-1/2 " +
+                "text-[var(--color-ink-400)] pointer-events-none " +
+                "md:hidden"
+              }
+              aria-hidden
+            />
+            <Search
+              size={18}
+              className={
+                "hidden absolute left-3.5 top-1/2 -translate-y-1/2 " +
+                "text-[var(--color-ink-400)] pointer-events-none " +
+                "md:block"
+              }
+              aria-hidden
+            />
+          </>
+        )}
+
+        {/* Active category filter chip — rendered inside the search bar (#95) */}
+        {filterChip && (
+          <div
+            className={
+              "absolute left-3 top-1/2 -translate-y-1/2 " +
+              "flex items-center gap-1 " +
+              "bg-[var(--color-sage-100,#e8f1ed)] " +
+              "text-[var(--color-sage-700,#2d6e52)] " +
+              "text-xs font-semibold " +
+              "rounded-full px-2 py-0.5 " +
+              "max-w-[40%]"
+            }
+          >
+            <span className="truncate">{filterChip.label}</span>
+            <button
+              type="button"
+              aria-label={filterChip.clearAriaLabel ?? `Clear filter: ${filterChip.label}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                filterChip.onClear();
+              }}
+              className={
+                "flex-shrink-0 flex items-center justify-center " +
+                "rounded-full w-3.5 h-3.5 " +
+                "hover:bg-[var(--color-sage-200,#d0e4da)] " +
+                "transition-colors duration-100 " +
+                "focus-visible:outline-none focus-visible:ring-1 " +
+                "focus-visible:ring-[var(--color-sage-500)]"
+              }
+            >
+              <X size={10} aria-hidden />
+            </button>
+          </div>
+        )}
 
         <input
           type="search"
@@ -133,7 +185,8 @@ export default function SearchBar({
           {...comboboxAttrs}
           className={
             "w-full h-11 md:h-[52px] " +
-            "pl-9 md:pl-10 pr-4 " +
+            (filterChip ? "pl-[calc(40%+8px)] " : "pl-9 md:pl-10 ") +
+            "pr-4 " +
             "text-sm text-[var(--color-ink-700)] " +
             "bg-[var(--color-bone-50)] " +
             "border border-[var(--color-bone-300)] " +

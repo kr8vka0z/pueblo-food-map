@@ -31,7 +31,7 @@ import SearchBar from "./SearchBar";
 import Wordmark from "./Wordmark";
 import LocateButton from "./LocateButton";
 import LanguageToggle from "./LanguageToggle";
-import Legend from "./Legend";
+import CategoryDropdown from "./CategoryDropdown";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
 import SponsorCredit from "./SponsorCredit";
@@ -104,9 +104,14 @@ function useIsMobile(): boolean {
 interface MapWrapperProps {
   /** Optional: viewport mode from splash gate (PR 3). Defaults to 'pueblo-center'. */
   viewport?: SplashViewport;
+  /**
+   * Called when the user activates "Show welcome screen" from the hamburger
+   * menu (#99). Re-shows the SplashScreen WITHOUT clearing localStorage.
+   */
+  onShowWelcome?: () => void;
 }
 
-export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperProps) {
+export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }: MapWrapperProps) {
   // ── Locale — from context ─────────────────────────────────────────────────────
   const { locale } = useLocale();
 
@@ -171,6 +176,12 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
   const [filterSnap] = useState(false);
   const [filterWalking] = useState(false);
 
+  // ── Category browse filter (#95) ─────────────────────────────────────────────
+  // Single-select filter driven from the search-focus category dropdown.
+  // Syncs into selectedCategories for the venue render path.
+  const [activeCategoryFilter, setActiveCategoryFilter] =
+    useState<VenueCategory | null>(null);
+
   // ── Selected venue ───────────────────────────────────────────────────────────
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
 
@@ -209,6 +220,28 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         return next;
       });
     }
+  }, []);
+
+  // ── Category browse handler (#95) ─────────────────────────────────────────────
+  // Selects/toggles a single category from the dropdown; syncs selectedCategories.
+  const handleCategoryBrowseSelect = useCallback(
+    (cat: VenueCategory | null) => {
+      setActiveCategoryFilter(cat);
+      setSelectedCategories(cat !== null ? new Set([cat]) : null);
+    },
+    [],
+  );
+
+  // ── Total venue counts per category — from all venues (not filtered) ─────────
+  // Used by CategoryDropdown to show stable counts alongside each category row.
+  const allVenueCounts = useMemo(() => {
+    return allVenues.reduce<Partial<Record<VenueCategory, number>>>(
+      (acc, v) => {
+        acc[v.category] = (acc[v.category] ?? 0) + 1;
+        return acc;
+      },
+      {},
+    );
   }, []);
 
   // ── Computed venues ──────────────────────────────────────────────────────────
@@ -259,6 +292,7 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
 
   function handleClearFilters() {
     setSelectedCategories(null);
+    setActiveCategoryFilter(null);
   }
 
   // ── Wordmark reset handler (#61) ─────────────────────────────────────────────
@@ -267,6 +301,7 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
   const handleWordmarkReset = useCallback(() => {
     setSelectedVenueId(null);
     setSelectedCategories(null);
+    setActiveCategoryFilter(null);
     setQuery("");
 
     if (!mapboxMap) return;
@@ -392,9 +427,18 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
       ? optionId(LISTBOX_ID, activeIndex)
       : undefined;
 
-  // The popover should show: focused + non-empty query + has matches.
+  // The results popover should show: focused + non-empty query + has matches.
   const showResultsPopover =
     isPopoverOpen && query.trim() !== "" && filteredVenues.length > 0;
+
+  // Category browse dropdown: focused + empty query (#95).
+  const showCategoryDropdown = isPopoverOpen && query.trim() === "";
+
+  // Cancel blur timer when mousedown fires inside the category dropdown —
+  // same grace-period pattern as the results popover.
+  const handleCategoryDropdownMouseDown = useCallback(() => {
+    if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+  }, []);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -416,10 +460,20 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         onMapReady={(map) => setMapboxMap(map)}
       />
 
-      {/* Wordmark — persistent brand anchor, top-left; clicking resets map state (#61) */}
-      <Wordmark onClick={handleWordmarkReset} locale={locale} size="sm" />
+      {/* Top-left cluster: Wordmark + EN/ES toggle (#97)
+           - Positioned absolute top-4 left-4, z-index 1000.
+           - Wordmark uses selfPositioned=false so it doesn't add its own absolute styles.
+           - Both fit side-by-side at 375px without wrapping. */}
+      <div
+        className="absolute top-4 left-4 flex items-center gap-2"
+        style={{ zIndex: 1000 }}
+      >
+        <Wordmark onClick={handleWordmarkReset} locale={locale} size="sm" selfPositioned={false} />
+        <LanguageToggle />
+      </div>
 
-      {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67) */}
+      {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67)
+          filterChip shows the active category filter (#95). */}
       <SearchBar
         value={query}
         onChange={(next) => {
@@ -430,12 +484,21 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         placeholder={t("search.placeholder", locale)}
         ariaLabel={t("search.aria", locale)}
         comboboxEnabled={true}
-        comboboxExpanded={showResultsPopover}
+        comboboxExpanded={showResultsPopover || showCategoryDropdown}
         comboboxControls={LISTBOX_ID}
         comboboxActiveDescendant={activeDescendantId}
         onFocus={handleSearchFocus}
         onBlur={handleSearchBlur}
         onKeyDownExtra={handleSearchKeyDown}
+        filterChip={
+          activeCategoryFilter !== null
+            ? {
+                label: t(`category.full.${activeCategoryFilter}`, locale),
+                clearAriaLabel: t("categoryBrowse.clearFilter", locale),
+                onClear: () => handleCategoryBrowseSelect(null),
+              }
+            : undefined
+        }
       />
 
       {/* SearchResultsPopover — shown when query is non-empty AND has matches (#67).
@@ -454,6 +517,22 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
         />
       )}
 
+      {/* CategoryDropdown — shown when search is focused + query is empty (#95).
+          Mutually exclusive with SearchResultsPopover and EmptySearchPopover. */}
+      {showCategoryDropdown && (
+        <CategoryDropdown
+          counts={allVenueCounts}
+          activeCategory={activeCategoryFilter}
+          onSelect={(cat) => {
+            handleCategoryBrowseSelect(cat);
+            // Close dropdown after selection
+            setIsPopoverOpen(false);
+          }}
+          onMouseDown={handleCategoryDropdownMouseDown}
+          locale={locale}
+        />
+      )}
+
       {/* EmptySearchPopover — shown when query is non-empty but yields no results.
           Mutually exclusive with SearchResultsPopover (they depend on filteredVenues.length). */}
       {query.trim() !== "" && filteredVenues.length === 0 && (
@@ -465,22 +544,12 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
       )}
 
       {/* HamburgerMenu — top-right, above the control stack (#71) */}
-      <HamburgerMenu locale={locale} />
-
-      {/* LanguageToggle — to the left of LocateButton; shifted down by hamburger height (#71) */}
-      {/* Hamburger: top-4(16px) + h-11(44px) + 8px gap = 68px */}
-      <div
-        className="absolute"
-        style={{ zIndex: 1001, top: "68px", right: "calc(1rem + 44px + 8px)" }}
-      >
-        <LanguageToggle />
-      </div>
+      <HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} />
 
       {/* LocateButton — below hamburger; top offset set via inline style in component (#71) */}
       <LocateButton geoState={geo.state} onRequest={handleLocateRequest} locale={locale} />
 
-      {/* Legend — below LocateButton; hamburger(44)+gap(8)+locate(44)+gap(8) = top-[120px] (#71, #72) */}
-      <Legend />
+      {/* Legend removed: category browse is now in the search-focus dropdown (#95) */}
 
       {/* LocationDeniedBanner — appears only after active re-tap → denial */}
       {bannerVisible && (

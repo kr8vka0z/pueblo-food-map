@@ -28,6 +28,8 @@ interface WordmarkSpanProps {
   className?: string;
   onClick?: undefined;
   locale?: Locale;
+  /** Accepted but ignored in display-only (span) mode. Only applies to button mode. */
+  selfPositioned?: boolean;
 }
 
 // ─── Map-reset button mode (#61) ───────────────────────────────────────────
@@ -39,11 +41,16 @@ interface WordmarkButtonProps {
   className?: string;
   /** Locale for aria-label translation. Defaults to "en". */
   locale?: Locale;
+  /**
+   * When false, omits the built-in `absolute top-4 left-4` positioning classes
+   * so a parent container can own placement. Defaults to true.
+   */
+  selfPositioned?: boolean;
 }
 
 type WordmarkProps = WordmarkSpanProps | WordmarkButtonProps;
 
-export default function Wordmark({ size = 'xl', className = '', onClick, locale = 'en' }: WordmarkProps) {
+export default function Wordmark({ size = 'xl', className = '', onClick, locale = 'en', selfPositioned = true }: WordmarkProps) {
   const appName = t('app.name', locale);
 
   if (onClick) {
@@ -56,8 +63,8 @@ export default function Wordmark({ size = 'xl', className = '', onClick, locale 
         aria-label={ariaLabel}
         className={[
           'wordmark',
-          // Positioning — absolute top-left, same z layer as SearchBar/LocateButton
-          'absolute top-4 left-4',
+          // Positioning — absolute top-left when self-positioned
+          ...(selfPositioned ? ['absolute top-4 left-4'] : []),
           // Visual — pill bg matching other map controls
           'bg-white/90 backdrop-blur-sm rounded-xl shadow-sm',
           // Mobile: min 44×44px tap target

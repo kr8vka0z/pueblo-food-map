@@ -22,7 +22,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ExternalLink } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import { t, type Locale } from "@/lib/i18n";
 
@@ -267,8 +267,17 @@ export default function HamburgerMenu({ locale = "en" }: HamburgerMenuProps) {
             </button>
           </div>
 
-          {/* Menu item list */}
+          {/* Menu item list — order: About → Show welcome screen → Suggest a venue */}
           <ul role="none" className="py-2">
+            {/* About Pueblo Food Project (#96) — external link */}
+            <HamburgerMenuItem
+              label={t("menu.about", locale)}
+              href="https://pueblofoodproject.org/about/"
+              isExternal={true}
+              icon={<ExternalLink size={14} />}
+              ariaLabel={`${t("menu.about", locale)} (opens in new tab)`}
+            />
+            {/* Suggest a venue (#71) */}
             <HamburgerMenuItem
               label={t("menu.suggest", locale)}
               href="/suggest"

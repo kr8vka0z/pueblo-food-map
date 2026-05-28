@@ -202,3 +202,58 @@ describe("HamburgerMenu — locale", () => {
     });
   });
 });
+
+// ─── #96: About Pueblo Food Project ──────────────────────────────────────────
+
+describe("#96 — About Pueblo Food Project menu item", () => {
+  test("'About' item renders in the open panel (EN)", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByText("About Pueblo Food Project")).toBeDefined();
+    });
+  });
+
+  test("'About' link href is correct", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
+      expect((link as HTMLAnchorElement).href).toContain("pueblofoodproject.org/about/");
+    });
+  });
+
+  test("'About' link has target='_blank'", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
+      expect((link as HTMLAnchorElement).target).toBe("_blank");
+    });
+  });
+
+  test("'About' link has rel containing noopener and noreferrer", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
+      const rel = (link as HTMLAnchorElement).rel;
+      expect(rel).toContain("noopener");
+      expect(rel).toContain("noreferrer");
+    });
+  });
+
+  test("'About' item renders in ES locale too (proper noun stays English)", async () => {
+    const user = userEvent.setup();
+    renderMenu("es");
+    await user.click(screen.getByRole("button", { name: /Abrir menú/i }));
+    await waitFor(() => {
+      // "Pueblo Food Project" stays in English per spec
+      expect(screen.getByText("About Pueblo Food Project")).toBeDefined();
+    });
+  });
+});

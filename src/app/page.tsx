@@ -11,9 +11,13 @@
  *
  * Renders null during the initial SSR-safe render to avoid a
  * hydration mismatch (localStorage is unavailable server-side).
+ *
+ * #99: showSplashAgain() re-shows the splash WITHOUT clearing localStorage
+ * (so future page loads still skip straight to the map). Pass down as
+ * onShowWelcome to MapWrapper → HamburgerMenu.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import SplashScreen from '@/components/SplashScreen';
 import MapWrapper from '@/components/MapWrapper';
 
@@ -51,6 +55,15 @@ export default function HomePage() {
     setSplashShown(false);
   };
 
+  /**
+   * Re-show the splash on demand (#99: "Show welcome screen" menu item).
+   * Does NOT clear the localStorage gate — future page loads still skip it.
+   * The user returns to the map (with same state) after re-dismissing.
+   */
+  const showSplashAgain = useCallback(() => {
+    setSplashShown(true);
+  }, []);
+
   // SSR-safe: render nothing until we know whether splash is needed
   if (splashShown === null) return null;
 
@@ -61,7 +74,7 @@ export default function HomePage() {
     />
   ) : (
     <main className="flex-1 flex flex-col min-h-0">
-      <MapWrapper viewport={viewport} />
+      <MapWrapper viewport={viewport} onShowWelcome={showSplashAgain} />
     </main>
   );
 }

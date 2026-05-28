@@ -22,19 +22,24 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Menu, X, ExternalLink } from "lucide-react";
+import { Menu, X, ExternalLink, RotateCcw } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import { t, type Locale } from "@/lib/i18n";
 
 interface HamburgerMenuProps {
   locale?: Locale;
+  /**
+   * Called when the user clicks "Show welcome screen" (#99).
+   * Re-shows the splash WITHOUT clearing localStorage.
+   */
+  onShowWelcome?: () => void;
 }
 
 // All focusable elements inside the panel for tab-trap.
 const FOCUSABLE =
   'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export default function HamburgerMenu({ locale = "en" }: HamburgerMenuProps) {
+export default function HamburgerMenu({ locale = "en", onShowWelcome }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -277,6 +282,17 @@ export default function HamburgerMenu({ locale = "en" }: HamburgerMenuProps) {
               icon={<ExternalLink size={14} />}
               ariaLabel={`${t("menu.about", locale)} (opens in new tab)`}
             />
+            {/* Show welcome screen (#99) — re-shows splash without clearing localStorage */}
+            {onShowWelcome && (
+              <HamburgerMenuItem
+                label={t("menu.showWelcome", locale)}
+                onClick={() => {
+                  close();
+                  onShowWelcome();
+                }}
+                icon={<RotateCcw size={14} />}
+              />
+            )}
             {/* Suggest a venue (#71) */}
             <HamburgerMenuItem
               label={t("menu.suggest", locale)}

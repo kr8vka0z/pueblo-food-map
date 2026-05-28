@@ -104,9 +104,14 @@ function useIsMobile(): boolean {
 interface MapWrapperProps {
   /** Optional: viewport mode from splash gate (PR 3). Defaults to 'pueblo-center'. */
   viewport?: SplashViewport;
+  /**
+   * Called when the user activates "Show welcome screen" from the hamburger
+   * menu (#99). Re-shows the SplashScreen WITHOUT clearing localStorage.
+   */
+  onShowWelcome?: () => void;
 }
 
-export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperProps) {
+export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }: MapWrapperProps) {
   // ── Locale — from context ─────────────────────────────────────────────────────
   const { locale } = useLocale();
 
@@ -539,7 +544,7 @@ export default function MapWrapper({ viewport = 'pueblo-center' }: MapWrapperPro
       )}
 
       {/* HamburgerMenu — top-right, above the control stack (#71) */}
-      <HamburgerMenu locale={locale} />
+      <HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} />
 
       {/* LocateButton — below hamburger; top offset set via inline style in component (#71) */}
       <LocateButton geoState={geo.state} onRequest={handleLocateRequest} locale={locale} />

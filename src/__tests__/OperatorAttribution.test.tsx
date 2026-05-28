@@ -296,11 +296,18 @@ describe("venues data — operator field integrity", () => {
     });
   });
 
-  test("no grocery venue in combined venues list has an operator field", () => {
+  test("any grocery venue operator field, if present, is a non-empty string (not an OSM artifact)", () => {
+    // issue #98: OSM-derived grocery venues may have operator set (e.g. "Walmart").
+    // This invariant changed from "must be undefined" to "if set, must be clean string".
     const groceries = venues.filter((v) => v.category === "grocery");
     expect(groceries.length).toBeGreaterThan(0);
     groceries.forEach((v) => {
-      expect(v.operator).toBeUndefined();
+      if (v.operator !== undefined) {
+        expect(typeof v.operator).toBe("string");
+        expect(v.operator.length).toBeGreaterThan(0);
+        expect(v.operator).not.toMatch(/osm/i);
+        expect(v.operator).not.toMatch(/openstreetmap/i);
+      }
     });
   });
 });

@@ -184,8 +184,8 @@ export default function BottomSheet({ venue, onClose, onSnapChange, locale = "en
         )}
       </div>
 
-      {/* Description (notes), max two lines */}
-      {venue.notes && (
+      {/* Description (notes), max two lines — guard: never render OSM artifact strings */}
+      {venue.notes && !/osm/i.test(venue.notes) && (
         <p className="text-sm text-[var(--color-ink-700)] leading-relaxed line-clamp-2">
           {venue.notes}
         </p>
@@ -259,11 +259,15 @@ export default function BottomSheet({ venue, onClose, onSnapChange, locale = "en
           </span>
         </div>
 
-        {/* Address */}
+        {/* Address — guard: never render "Address not in OpenStreetMap" placeholder */}
         <div className="flex gap-2.5">
           <MapPin size={16} className="text-[var(--color-ink-400)] shrink-0 mt-0.5" aria-hidden />
           <div>
-            <p className="text-sm text-[var(--color-ink-700)]">{venue.address}</p>
+            <p className="text-sm text-[var(--color-ink-700)]">
+              {venue.address === "Address not in OpenStreetMap"
+                ? `${venue.lat}, ${venue.lng}`
+                : venue.address}
+            </p>
             {venue.distanceMiles !== undefined && (
               <p className="text-sm text-[var(--color-ink-400)] font-mono mt-0.5">
                 {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
@@ -376,8 +380,8 @@ export default function BottomSheet({ venue, onClose, onSnapChange, locale = "en
           </section>
         )}
 
-        {/* Notes / Description */}
-        {venue.notes && (
+        {/* Notes / Description — guard: never render OSM artifact strings */}
+        {venue.notes && !/osm/i.test(venue.notes) && (
           <section aria-label={t("detail.about", locale)}>
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
               {t("detail.about", locale)}

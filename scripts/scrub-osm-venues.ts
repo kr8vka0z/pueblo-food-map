@@ -301,7 +301,7 @@ async function main() {
 
     // Find the closing brace of this venue object
     let depth = 0;
-    let blockStart = patched.lastIndexOf("{", venueStart);
+    const blockStart = patched.lastIndexOf("{", venueStart);
     let pos = blockStart;
     for (; pos < patched.length; pos++) {
       if (patched[pos] === "{") depth++;

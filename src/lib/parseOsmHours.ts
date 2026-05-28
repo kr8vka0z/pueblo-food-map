@@ -78,7 +78,7 @@ export function parseOsmHours(raw: string): ParseResult {
   // Strip any trailing "· ..." residue before parsing hours
   // Residue separator is " · " (OSM convention for taginfo extras)
   const bulletIdx = trimmed.indexOf(" · ");
-  let hoursStr = bulletIdx >= 0 ? trimmed.slice(0, bulletIdx).trim() : trimmed;
+  const hoursStr = bulletIdx >= 0 ? trimmed.slice(0, bulletIdx).trim() : trimmed;
   const residueRaw = bulletIdx >= 0 ? trimmed.slice(bulletIdx + 3).trim() : undefined;
 
   // "24/7" shorthand → all days 00:00-24:00
@@ -89,7 +89,6 @@ export function parseOsmHours(raw: string): ParseResult {
   }
 
   const hours_weekly: WeeklyHours = {};
-  let parseFailed = false;
 
   // Split into semicolon-separated rules (for compound expressions)
   const rules = hoursStr.split(";").map((r) => r.trim()).filter(Boolean);
@@ -106,13 +105,10 @@ export function parseOsmHours(raw: string): ParseResult {
       const daySel = m[1];
       const timeRange = m[2];
       const days = expandDaySelector(daySel);
-      if (days.length > 0) {
-        for (const d of days) {
-          hours_weekly[d] = [timeRange];
-        }
-      } else {
-        parseFailed = true;
+      for (const d of days) {
+        hours_weekly[d] = [timeRange];
       }
+      // days.length === 0 means unrecognized selector — partial parse; continue
     } else {
       // Try bare time range (no day prefix)
       const bareTime = rule.match(/^(\d{2}:\d{2}-\d{2}:\d{2})$/);
@@ -121,9 +117,7 @@ export function parseOsmHours(raw: string): ParseResult {
         for (const d of ALL_DAYS) {
           hours_weekly[d] = [timeRange];
         }
-      } else {
-        // Unrecognized rule — mark parse as partial but keep what we have
-        parseFailed = true;
+        // else: unrecognized rule — partial parse; keep what we have
       }
     }
   }

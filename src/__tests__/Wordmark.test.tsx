@@ -48,10 +48,12 @@ describe("Wordmark — display-only mode (no onClick)", () => {
     expect(span?.className).toContain("wordmark");
   });
 
-  test("applies the xl size class by default", () => {
+  test("applies the xl size class by default (responsive: text-4xl md:text-6xl)", () => {
     const { container } = render(<Wordmark />);
     const span = container.querySelector("span");
-    expect(span?.className).toContain("text-5xl");
+    // xl was updated to a responsive pair; assert both the mobile and desktop tokens
+    expect(span?.className).toContain("text-4xl");
+    expect(span?.className).toContain("md:text-6xl");
   });
 
   test("applies the sm size class when size='sm'", () => {

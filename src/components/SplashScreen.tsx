@@ -77,16 +77,21 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
+    // Outer layer: fixed full-viewport overlay (scrim + scroll container).
+    // overflow-y-auto enables scroll when content exceeds viewport height on
+    // small phones — content centers when it fits, scrolls when it doesn't.
+    // z-[9000] clears Mapbox (z=2) and all map controls (z=1000).
+    //
+    // Frosted scrim: semi-transparent bone-450 + backdrop-blur so the live map
+    // is faintly visible behind the splash text (which stays clearly readable).
+    // To tune the effect, change the two CSS custom properties:
+    //   --splash-scrim-opacity  (default 0.25) — higher = more opaque, less peek-through
+    //   --splash-scrim-blur     (default 4px)  — higher = more frosted
+    //
+    // LanguageToggle + SponsorCredit are positioned on this outer fixed container
+    // so they pin to the viewport corners and do NOT scroll with the content.
     <div
-      // Full-viewport overlay above the map. z-[9000] clears Mapbox (z=2) and
-      // all map controls (z=1000). Fixed so it doesn't scroll with content.
-      //
-      // Frosted scrim: semi-transparent bone-50 + backdrop-blur so the live map
-      // is faintly visible behind the splash text (which stays clearly readable).
-      // To tune the effect, change the two CSS custom properties below:
-      //   --splash-scrim-opacity  (default 0.25) — higher = more opaque, less peek-through
-      //   --splash-scrim-blur     (default 4px)  — higher = more frosted
-      className="fixed inset-0 z-[9000] flex items-center justify-center"
+      className="fixed inset-0 z-[9000] overflow-y-auto"
       style={{
         // Frosted translucent scrim: ~bone-450 (interpolated darker tint) at ~25% opacity, 4px blur
         backgroundColor: 'rgba(182, 172, 139, var(--splash-scrim-opacity, 0.25))',
@@ -99,71 +104,74 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
       aria-modal="true"
       aria-label="Welcome — find food near you"
     >
-      {/* ── Language toggle — top-right corner ── */}
+      {/* ── Language toggle — top-right corner (viewport-pinned) ── */}
       <div className="absolute top-4 right-4" style={{ zIndex: 10 }}>
         <LanguageToggle />
       </div>
 
-      {/* ── Content column ── */}
-      <div
-        className={[
-          // Mobile: full-width, capped at 520px, centered with side padding
-          'relative z-10 flex flex-col w-full max-w-[520px] text-center',
-          'px-6 py-10 pt-16',
-          // Mobile: comfortable spacing between blocks
-          'gap-5',
-          // Desktop: a touch more padding, same single-column layout
-          'md:px-12 md:py-16 md:pt-16',
-        ].join(' ')}
-      >
-        {/* Wordmark */}
-        <div>
-          <Wordmark
-            size="xl"
-            className="text-[var(--color-brand-navy)] block splash-text-outline"
-          />
-        </div>
+      {/* ── Inner flex wrapper: centers content when it fits, lets it scroll naturally when tall ── */}
+      <div className="flex min-h-full items-center justify-center">
+        {/* ── Content column ── */}
+        <div
+          className={[
+            // Full-width, capped at 520px, centered with side padding
+            'relative z-10 flex flex-col w-full max-w-[520px] text-center',
+            'px-6 py-10 pt-16',
+            // Comfortable spacing between blocks
+            'gap-5',
+            // Desktop: a touch more padding, same single-column layout
+            'md:px-12 md:py-16 md:pt-16',
+          ].join(' ')}
+        >
+          {/* Wordmark */}
+          <div>
+            <Wordmark
+              size="xl"
+              className="text-[var(--color-brand-navy)] block splash-text-outline"
+            />
+          </div>
 
-        {/* Tagline + purpose */}
-        <div className="flex flex-col gap-2">
-          <p className="text-xl font-semibold leading-snug text-[var(--color-brand-navy)] max-w-md mx-auto splash-text-outline">
-            {t('splash.tagline', locale)}
+          {/* Tagline + purpose */}
+          <div className="flex flex-col gap-2">
+            <p className="text-2xl md:text-3xl font-semibold leading-snug text-[var(--color-brand-navy)] max-w-md mx-auto splash-text-outline">
+              {t('splash.tagline', locale)}
+            </p>
+            <p
+              className="text-base md:text-lg leading-relaxed text-[var(--color-ink-500)] max-w-md mx-auto splash-text-outline"
+              data-testid="splash-purpose"
+            >
+              {t('splash.purpose', locale)}
+            </p>
+          </div>
+
+          {/* CTA */}
+          <div className="flex flex-col gap-3 mt-1">
+            {/* Primary CTA */}
+            <button
+              type="button"
+              onClick={handlePrimaryClick}
+              className={[
+                'w-full rounded-[var(--radius-md)] px-6 py-4 md:py-5',
+                'text-lg md:text-xl font-semibold leading-none',
+                'bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)]',
+                'hover:brightness-105 active:brightness-95',
+                'transition-[filter] duration-150',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+                'focus-visible:outline-[var(--color-brand-orange)]',
+              ].join(' ')}
+            >
+              {t('splash.cta.primary', locale)}
+            </button>
+          </div>
+
+          {/* Microcopy */}
+          <p className="text-sm md:text-base leading-relaxed text-[var(--color-ink-500)] splash-text-outline">
+            {t('splash.microcopy', locale)}
           </p>
-          <p
-            className="text-[15px] leading-relaxed text-[var(--color-ink-500)] max-w-md mx-auto splash-text-outline"
-            data-testid="splash-purpose"
-          >
-            {t('splash.purpose', locale)}
-          </p>
         </div>
-
-        {/* CTA */}
-        <div className="flex flex-col gap-3 mt-1">
-          {/* Primary CTA */}
-          <button
-            type="button"
-            onClick={handlePrimaryClick}
-            className={[
-              'w-full rounded-[var(--radius-md)] px-6 py-4',
-              'text-base font-semibold leading-none',
-              'bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)]',
-              'hover:brightness-105 active:brightness-95',
-              'transition-[filter] duration-150',
-              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
-              'focus-visible:outline-[var(--color-brand-orange)]',
-            ].join(' ')}
-          >
-            {t('splash.cta.primary', locale)}
-          </button>
-        </div>
-
-        {/* Microcopy */}
-        <p className="text-[13px] leading-relaxed text-[var(--color-ink-500)] splash-text-outline">
-          {t('splash.microcopy', locale)}
-        </p>
       </div>
 
-      {/* ── Sponsor credit — bottom-right corner (mirrors map) ── */}
+      {/* ── Sponsor credit — bottom-right corner (viewport-pinned, mirrors map) ── */}
       <SponsorCredit locale={locale} />
     </div>
   );

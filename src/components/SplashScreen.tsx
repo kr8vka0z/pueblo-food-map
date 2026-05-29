@@ -88,8 +88,8 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
       //   --splash-scrim-blur     (default 4px)  — higher = more frosted
       className="fixed inset-0 z-[9000] flex items-center justify-center"
       style={{
-        // Frosted translucent scrim: bone-50 at ~25% opacity, light blur
-        backgroundColor: 'rgba(251, 250, 246, var(--splash-scrim-opacity, 0.25))',
+        // Frosted translucent scrim: bone-300 (slightly darker tint) at ~25% opacity, 4px blur
+        backgroundColor: 'rgba(212, 205, 184, var(--splash-scrim-opacity, 0.25))',
         backdropFilter: 'blur(var(--splash-scrim-blur, 4px))',
         WebkitBackdropFilter: 'blur(var(--splash-scrim-blur, 4px))',
       }}

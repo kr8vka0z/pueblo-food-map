@@ -84,12 +84,12 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
       // Frosted scrim: semi-transparent bone-50 + backdrop-blur so the live map
       // is faintly visible behind the splash text (which stays clearly readable).
       // To tune the effect, change the two CSS custom properties below:
-      //   --splash-scrim-opacity  (default 0.88) — higher = more opaque, less peek-through
+      //   --splash-scrim-opacity  (default 0.5) — higher = more opaque, less peek-through
       //   --splash-scrim-blur     (default 8px)  — higher = more frosted
       className="fixed inset-0 z-[9000] flex items-center justify-center"
       style={{
-        // Frosted translucent scrim: bone-50 at ~88% opacity
-        backgroundColor: 'rgba(251, 250, 246, var(--splash-scrim-opacity, 0.88))',
+        // Frosted translucent scrim: bone-50 at ~50% opacity
+        backgroundColor: 'rgba(251, 250, 246, var(--splash-scrim-opacity, 0.5))',
         backdropFilter: 'blur(var(--splash-scrim-blur, 8px))',
         WebkitBackdropFilter: 'blur(var(--splash-scrim-blur, 8px))',
       }}

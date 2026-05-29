@@ -70,7 +70,6 @@ export default function HomePage() {
   return splashShown ? (
     <SplashScreen
       onPrimary={(mode) => dismissSplash(mode)}
-      onSecondary={() => dismissSplash('pueblo-center')}
     />
   ) : (
     <main className="flex-1 flex flex-col min-h-0">

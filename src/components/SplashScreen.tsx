@@ -12,12 +12,22 @@
  *   - Layout: single centered column, mobile-first, no-scroll at 375×812.
  *     Desktop: same column, max-w 520px, vertically centered with generous spacing.
  *
+ * v3 review changes:
+ *   - Removed secondary CTA ("Show the Pueblo map") — primary CTA is now the
+ *     only entry point. Fallback to pueblo-center still applies when geo is
+ *     denied or dismissed (existing onPrimary('pueblo-center') path unchanged).
+ *   - Sponsor credit moved to bottom-right corner (mirrors SponsorCredit on map).
+ *     Uses SponsorCredit component directly; splash.sponsor.* i18n keys removed.
+ *   - Removed hairline divider (no longer needed without in-column credit).
+ *   - onSecondary prop removed.
+ *
  * Props interface and localStorage gate (pfm.splash.seen.v2) are unchanged.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import Wordmark from './Wordmark';
 import LanguageToggle from './LanguageToggle';
+import SponsorCredit from './SponsorCredit';
 import { useGeolocation } from '@/lib/useGeolocation';
 import { useLocale } from '@/lib/LocaleContext';
 import { t } from '@/lib/i18n';
@@ -27,13 +37,11 @@ import { t } from '@/lib/i18n';
 interface SplashScreenProps {
   /** Called after geo request resolves (granted → 'located') or is denied → 'pueblo-center' */
   onPrimary: (mode: 'located' | 'pueblo-center') => void;
-  /** Called when user skips geo — always 'pueblo-center' */
-  onSecondary: () => void;
 }
 
 // ─── SplashScreen ──────────────────────────────────────────────────────────────
 
-export default function SplashScreen({ onPrimary, onSecondary }: SplashScreenProps) {
+export default function SplashScreen({ onPrimary }: SplashScreenProps) {
   const geo = useGeolocation();
   const { locale } = useLocale();
 
@@ -65,10 +73,6 @@ export default function SplashScreen({ onPrimary, onSecondary }: SplashScreenPro
     setGeoRequested(true);
     geo.request();
   }, [geo, onPrimary]);
-
-  // ── i18n values ──────────────────────────────────────────────────────────────
-  const sponsorPrefix = t('splash.sponsor.prefix', locale);
-  const sponsorLinkLabel = `Pueblo Food Project (${t('splash.sponsor.newTab', locale)})`;
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -125,7 +129,7 @@ export default function SplashScreen({ onPrimary, onSecondary }: SplashScreenPro
           </p>
         </div>
 
-        {/* CTAs */}
+        {/* CTA */}
         <div className="flex flex-col gap-3 mt-1">
           {/* Primary CTA */}
           <button
@@ -143,57 +147,16 @@ export default function SplashScreen({ onPrimary, onSecondary }: SplashScreenPro
           >
             {t('splash.cta.primary', locale)}
           </button>
-
-          {/* Secondary CTA */}
-          <button
-            type="button"
-            onClick={onSecondary}
-            aria-label={t('splash.cta.secondary.aria', locale)}
-            className={[
-              'w-full py-3 px-6 text-base font-medium',
-              'text-[var(--color-bone-100)] underline underline-offset-2',
-              'hover:text-[var(--color-bone-50)]',
-              'transition-colors duration-150',
-              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
-              'focus-visible:outline-[var(--color-bone-100)] rounded-sm',
-            ].join(' ')}
-          >
-            {t('splash.cta.secondary', locale)}
-          </button>
         </div>
 
         {/* Microcopy */}
         <p className="text-[13px] leading-relaxed text-[var(--color-ink-400)]">
           {t('splash.microcopy', locale)}
         </p>
-
-        {/* Divider */}
-        <div
-          aria-hidden="true"
-          className="w-full border-t border-white/10"
-        />
-
-        {/* Sponsor credit */}
-        <p className="text-[13px] text-[var(--color-ink-400)] leading-snug">
-          <span>{sponsorPrefix}</span>
-          <a
-            href="https://pueblofoodproject.org/"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={sponsorLinkLabel}
-            className={[
-              'font-medium text-[var(--color-bone-100)]',
-              'underline underline-offset-2 decoration-white/30',
-              'hover:text-[var(--color-bone-50)] hover:decoration-white/60',
-              'transition-colors duration-150',
-              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
-              'focus-visible:outline-[var(--color-bone-100)] rounded-sm',
-            ].join(' ')}
-          >
-            Pueblo Food Project
-          </a>
-        </p>
       </div>
+
+      {/* ── Sponsor credit — bottom-right corner (mirrors map) ── */}
+      <SponsorCredit locale={locale} />
     </div>
   );
 }

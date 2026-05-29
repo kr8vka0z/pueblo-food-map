@@ -1,14 +1,16 @@
 /**
- * SplashScreen tests — issue #100 splash refresh.
+ * SplashScreen tests — issue #100 splash refresh + review revisions.
  *
  * Covers:
  *   - Renders purpose line in EN and ES
  *   - Sponsor credit has correct href, target, and rel
  *   - "How it works" element is absent
  *   - Category list (mobile swatches) is absent
- *   - Primary and secondary CTAs still present
+ *   - Secondary CTA ("Show the Pueblo map") is absent (removed in review)
+ *   - Primary CTA still present
  *   - Tagline, microcopy still present
- *   - Sponsor link accessible label includes "opens in new tab"
+ *   - Sponsor credit renders in bottom-right corner (absolute/fixed position)
+ *   - Sponsor link accessible label (sponsor.text contains org name)
  */
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
@@ -34,7 +36,7 @@ function renderSplash(locale: "en" | "es" = "en") {
     locale,
     setLocale: vi.fn(),
   });
-  return render(<SplashScreen onPrimary={vi.fn()} onSecondary={vi.fn()} />);
+  return render(<SplashScreen onPrimary={vi.fn()} />);
 }
 
 // ── Purpose line ──────────────────────────────────────────────────────────────
@@ -82,27 +84,39 @@ describe("sponsor credit link", () => {
     expect((link as HTMLAnchorElement).rel).toContain("noreferrer");
   });
 
-  test("aria-label includes 'opens in new tab'", () => {
+  test("renders EN sponsor text", () => {
     renderSplash("en");
-    const link = screen.getByRole("link", { name: /opens in new tab/i });
-    expect(link).toBeTruthy();
+    expect(screen.getByText(/sponsored by pueblo food project/i)).toBeTruthy();
   });
 
-  test("renders EN sponsor prefix", () => {
-    renderSplash("en");
-    // "Sponsored by" prefix text should be in the DOM
-    expect(screen.getByText(/sponsored by/i)).toBeTruthy();
-  });
-
-  test("renders ES sponsor prefix", () => {
+  test("renders ES sponsor text", () => {
     renderSplash("es");
-    expect(screen.getByText(/patrocinado por/i)).toBeTruthy();
+    expect(screen.getByText(/patrocinado por pueblo food project/i)).toBeTruthy();
+  });
+
+  test("sponsor credit container is absolutely positioned (bottom-right corner)", () => {
+    const { container } = renderSplash("en");
+    // SponsorCredit renders a div with position:absolute, bottom:8, right:8
+    const creditWrapper = container.querySelector<HTMLElement>(
+      'div[style*="position: absolute"][style*="bottom: 8"][style*="right: 8"]',
+    );
+    expect(creditWrapper).toBeTruthy();
   });
 });
 
 // ── Removed elements ──────────────────────────────────────────────────────────
 
 describe("removed elements", () => {
+  test("secondary CTA is not rendered (EN)", () => {
+    renderSplash("en");
+    expect(screen.queryByRole("button", { name: /show the pueblo map/i })).toBeNull();
+  });
+
+  test("secondary CTA is not rendered (ES)", () => {
+    renderSplash("es");
+    expect(screen.queryByRole("button", { name: /ver el mapa de pueblo/i })).toBeNull();
+  });
+
   test("'How it works' tile is not rendered", () => {
     renderSplash("en");
     expect(screen.queryByText(/how it works/i)).toBeNull();
@@ -120,13 +134,11 @@ describe("removed elements", () => {
 
   test("'Coming soon' toast is not rendered", () => {
     renderSplash("en");
-    // The toast element itself should not be in the DOM at all
     expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 
   test("mobile category list is not rendered (Food pantry swatch absent)", () => {
     renderSplash("en");
-    // Category swatches would show these labels; they should be absent
     expect(screen.queryByText("Food pantry")).toBeNull();
     expect(screen.queryByText("Grocery store")).toBeNull();
   });
@@ -148,15 +160,6 @@ describe("preserved elements", () => {
     renderSplash("en");
     expect(
       screen.getByRole("button", { name: /find food near me/i }),
-    ).toBeTruthy();
-  });
-
-  test("secondary CTA is present (EN)", () => {
-    renderSplash("en");
-    expect(
-      screen.getByRole("button", {
-        name: /show the pueblo map without using my location/i,
-      }),
     ).toBeTruthy();
   });
 

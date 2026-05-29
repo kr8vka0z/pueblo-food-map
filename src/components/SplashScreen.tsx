@@ -84,14 +84,14 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
       // Frosted scrim: semi-transparent bone-50 + backdrop-blur so the live map
       // is faintly visible behind the splash text (which stays clearly readable).
       // To tune the effect, change the two CSS custom properties below:
-      //   --splash-scrim-opacity  (default 0.3) — higher = more opaque, less peek-through
-      //   --splash-scrim-blur     (default 8px)  — higher = more frosted
+      //   --splash-scrim-opacity  (default 0.1) — higher = more opaque, less peek-through
+      //   --splash-scrim-blur     (default 2px)  — higher = more frosted
       className="fixed inset-0 z-[9000] flex items-center justify-center"
       style={{
-        // Frosted translucent scrim: bone-50 at ~30% opacity
-        backgroundColor: 'rgba(251, 250, 246, var(--splash-scrim-opacity, 0.3))',
-        backdropFilter: 'blur(var(--splash-scrim-blur, 8px))',
-        WebkitBackdropFilter: 'blur(var(--splash-scrim-blur, 8px))',
+        // Frosted translucent scrim: bone-50 at ~10% opacity, light blur
+        backgroundColor: 'rgba(251, 250, 246, var(--splash-scrim-opacity, 0.1))',
+        backdropFilter: 'blur(var(--splash-scrim-blur, 2px))',
+        WebkitBackdropFilter: 'blur(var(--splash-scrim-blur, 2px))',
       }}
       // Trap focus within the splash while it's shown.
       // role=dialog + aria-modal tells ATs this is a modal overlay.

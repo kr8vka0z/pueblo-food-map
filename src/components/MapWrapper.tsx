@@ -66,8 +66,11 @@ const LeafletMap = dynamic(() => import("./Map"), {
 
 const PUEBLO_CENTER = { lat: 38.2544, lng: -104.6091 };
 
-// Stable listbox id — used for aria-controls on the search input and id on the listbox.
+// Stable listbox ids — used for aria-controls on the search input and id on each listbox.
 const LISTBOX_ID = "search-results-listbox";
+// Mirrors the LISTBOX_ID constant inside CategoryDropdown — kept in sync here so
+// MapWrapper can compute the correct aria-controls without importing a private const.
+const CATEGORY_LISTBOX_ID = "category-browse-listbox";
 
 // ─── Viewport prop (from PR 3 splash gate) ────────────────────────────────────
 // 'located'      → use the user's geolocation position as initial map center.
@@ -485,7 +488,13 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
         ariaLabel={t("search.aria", locale)}
         comboboxEnabled={true}
         comboboxExpanded={showResultsPopover || showCategoryDropdown}
-        comboboxControls={LISTBOX_ID}
+        comboboxControls={
+          showCategoryDropdown
+            ? CATEGORY_LISTBOX_ID
+            : showResultsPopover
+              ? LISTBOX_ID
+              : undefined
+        }
         comboboxActiveDescendant={activeDescendantId}
         onFocus={handleSearchFocus}
         onBlur={handleSearchBlur}

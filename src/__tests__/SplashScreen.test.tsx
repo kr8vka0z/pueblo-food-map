@@ -174,12 +174,14 @@ describe("preserved elements", () => {
 // ── Light theme — background and wordmark color ───────────────────────────────
 
 describe("light theme", () => {
-  test("root element uses frosted bone-50 background (semi-transparent, not navy)", () => {
+  test("root element uses a frosted, semi-transparent scrim background (not opaque navy)", () => {
     const { container } = renderSplash("en");
     const root = container.firstElementChild as HTMLElement;
-    // Background is now a frosted scrim: rgba(bone-50 hex, opacity) for the
-    // see-through overlay effect. Check it contains the bone-50 hex value.
-    expect(root.style.backgroundColor).toContain("251, 250, 246");
+    // Background is a frosted translucent scrim: rgba(<tint>, var(--splash-scrim-opacity, …)).
+    // The tint color is tunable, so assert the STRUCTURE (rgba + the scrim-opacity var),
+    // not a specific color value — keeps this test stable across tint adjustments.
+    expect(root.style.backgroundColor).toMatch(/^rgba\(/);
+    expect(root.style.backgroundColor).toContain("--splash-scrim-opacity");
   });
 
   test("root element is a fixed overlay with dialog role", () => {

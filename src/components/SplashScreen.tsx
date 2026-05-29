@@ -108,7 +108,7 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
       <div
         className={[
           // Mobile: full-width, capped at 520px, centered with side padding
-          'relative z-10 flex flex-col w-full max-w-[520px]',
+          'relative z-10 flex flex-col w-full max-w-[520px] text-center',
           'px-6 py-10 pt-16',
           // Mobile: comfortable spacing between blocks
           'gap-5',
@@ -120,17 +120,17 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
         <div>
           <Wordmark
             size="xl"
-            className="text-[var(--color-brand-navy)] block"
+            className="text-[var(--color-brand-navy)] block splash-text-outline"
           />
         </div>
 
         {/* Tagline + purpose */}
         <div className="flex flex-col gap-2">
-          <p className="text-xl font-semibold leading-snug text-[var(--color-brand-navy)] max-w-md">
+          <p className="text-xl font-semibold leading-snug text-[var(--color-brand-navy)] max-w-md mx-auto splash-text-outline">
             {t('splash.tagline', locale)}
           </p>
           <p
-            className="text-[15px] leading-relaxed text-[var(--color-ink-500)] max-w-md"
+            className="text-[15px] leading-relaxed text-[var(--color-ink-500)] max-w-md mx-auto splash-text-outline"
             data-testid="splash-purpose"
           >
             {t('splash.purpose', locale)}
@@ -158,7 +158,7 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
         </div>
 
         {/* Microcopy */}
-        <p className="text-[13px] leading-relaxed text-[var(--color-ink-500)]">
+        <p className="text-[13px] leading-relaxed text-[var(--color-ink-500)] splash-text-outline">
           {t('splash.microcopy', locale)}
         </p>
       </div>

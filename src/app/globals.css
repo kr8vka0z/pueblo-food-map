@@ -201,3 +201,15 @@ body {
 .pfm-user-dot {
   animation: pfm-pulse 2s ease-in-out infinite;
 }
+
+/* ─── Splash text outline ───────────────────────────────────────────────────
+   Small white outline (8-direction text-shadow) on the splash welcome text so
+   it stays readable over the live map showing through the translucent scrim.
+   Applied to the wordmark, tagline, purpose line, and microcopy — NOT the
+   button label (which sits on a solid orange background). */
+.splash-text-outline {
+  text-shadow:
+    -1px -1px 0 #fff, 0 -1px 0 #fff, 1px -1px 0 #fff,
+    -1px  0   0 #fff,                1px  0   0 #fff,
+    -1px  1px 0 #fff, 0  1px 0 #fff, 1px  1px 0 #fff;
+}

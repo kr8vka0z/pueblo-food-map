@@ -78,8 +78,26 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
 
   return (
     <div
-      className="relative min-h-screen w-full flex items-center justify-center"
-      style={{ backgroundColor: 'var(--color-bone-50)' }}
+      // Full-viewport overlay above the map. z-[9000] clears Mapbox (z=2) and
+      // all map controls (z=1000). Fixed so it doesn't scroll with content.
+      //
+      // Frosted scrim: semi-transparent bone-50 + backdrop-blur so the live map
+      // is faintly visible behind the splash text (which stays clearly readable).
+      // To tune the effect, change the two CSS custom properties below:
+      //   --splash-scrim-opacity  (default 0.88) — higher = more opaque, less peek-through
+      //   --splash-scrim-blur     (default 8px)  — higher = more frosted
+      className="fixed inset-0 z-[9000] flex items-center justify-center"
+      style={{
+        // Frosted translucent scrim: bone-50 at ~88% opacity
+        backgroundColor: 'rgba(251, 250, 246, var(--splash-scrim-opacity, 0.88))',
+        backdropFilter: 'blur(var(--splash-scrim-blur, 8px))',
+        WebkitBackdropFilter: 'blur(var(--splash-scrim-blur, 8px))',
+      }}
+      // Trap focus within the splash while it's shown.
+      // role=dialog + aria-modal tells ATs this is a modal overlay.
+      role="dialog"
+      aria-modal="true"
+      aria-label="Welcome — find food near you"
     >
       {/* ── Language toggle — top-right corner ── */}
       <div className="absolute top-4 right-4" style={{ zIndex: 10 }}>

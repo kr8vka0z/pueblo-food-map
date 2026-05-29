@@ -174,10 +174,20 @@ describe("preserved elements", () => {
 // ── Light theme — background and wordmark color ───────────────────────────────
 
 describe("light theme", () => {
-  test("root element uses bone-50 background (not navy)", () => {
+  test("root element uses frosted bone-50 background (semi-transparent, not navy)", () => {
     const { container } = renderSplash("en");
     const root = container.firstElementChild as HTMLElement;
-    expect(root.style.backgroundColor).toBe("var(--color-bone-50)");
+    // Background is now a frosted scrim: rgba(bone-50 hex, opacity) for the
+    // see-through overlay effect. Check it contains the bone-50 hex value.
+    expect(root.style.backgroundColor).toContain("251, 250, 246");
+  });
+
+  test("root element is a fixed overlay with dialog role", () => {
+    const { container } = renderSplash("en");
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.getAttribute("role")).toBe("dialog");
+    expect(root.className).toContain("fixed");
+    expect(root.className).toContain("inset-0");
   });
 
   test("wordmark uses navy text class", () => {

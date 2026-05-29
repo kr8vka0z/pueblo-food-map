@@ -205,11 +205,20 @@ body {
 /* ─── Splash text outline ───────────────────────────────────────────────────
    Small white outline (8-direction text-shadow) on the splash welcome text so
    it stays readable over the live map showing through the translucent scrim.
-   Applied to the wordmark, tagline, purpose line, and microcopy — NOT the
-   button label (which sits on a solid orange background). */
+   Applied to the wordmark + tagline; the purpose line and microcopy use the
+   thinner .splash-text-outline-sm variant below. NOT the button label
+   (which sits on a solid orange background). */
 .splash-text-outline {
   text-shadow:
     -1px -1px 0 #fff, 0 -1px 0 #fff, 1px -1px 0 #fff,
     -1px  0   0 #fff,                1px  0   0 #fff,
     -1px  1px 0 #fff, 0  1px 0 #fff, 1px  1px 0 #fff;
+}
+
+/* Thinner variant for the smaller text (purpose line, microcopy) — a lighter
+   0.5px outline so it doesn't read as heavy at small sizes. */
+.splash-text-outline-sm {
+  text-shadow:
+    -0.5px -0.5px 0 #fff, 0.5px -0.5px 0 #fff,
+    -0.5px  0.5px 0 #fff, 0.5px  0.5px 0 #fff;
 }

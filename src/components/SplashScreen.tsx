@@ -114,11 +114,12 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
         {/* ── Content column ── */}
         <div
           className={[
-            // Full-width, capped at 520px, centered with side padding
-            'relative z-10 flex flex-col w-full max-w-[520px] text-center',
+            // Full-width, capped at 820px, centered with side padding.
+            // Wider cap lets "Pueblo Food Map" sit on one line at desktop sizes.
+            'relative z-10 flex flex-col w-full max-w-[820px] text-center',
             'px-6 py-10 pt-16',
-            // Comfortable spacing between blocks
-            'gap-5',
+            // Roomier spacing between blocks so the text isn't bunched together
+            'gap-7 md:gap-8',
             // Desktop: a touch more padding, same single-column layout
             'md:px-12 md:py-16 md:pt-16',
           ].join(' ')}
@@ -132,12 +133,12 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
           </div>
 
           {/* Tagline + purpose */}
-          <div className="flex flex-col gap-2">
-            <p className="text-2xl md:text-3xl font-semibold leading-snug text-[var(--color-brand-navy)] max-w-md mx-auto splash-text-outline">
+          <div className="flex flex-col gap-3">
+            <p className="text-2xl md:text-3xl font-semibold leading-normal text-[var(--color-brand-navy)] max-w-md mx-auto splash-text-outline">
               {t('splash.tagline', locale)}
             </p>
             <p
-              className="text-base md:text-lg leading-relaxed text-[var(--color-ink-500)] max-w-md mx-auto splash-text-outline"
+              className="text-base md:text-lg leading-relaxed text-[var(--color-ink-500)] max-w-md mx-auto splash-text-outline-sm"
               data-testid="splash-purpose"
             >
               {t('splash.purpose', locale)}
@@ -165,7 +166,7 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
           </div>
 
           {/* Microcopy */}
-          <p className="text-sm md:text-base leading-relaxed text-[var(--color-ink-500)] splash-text-outline">
+          <p className="text-sm md:text-base leading-relaxed text-[var(--color-ink-500)] splash-text-outline-sm">
             {t('splash.microcopy', locale)}
           </p>
         </div>

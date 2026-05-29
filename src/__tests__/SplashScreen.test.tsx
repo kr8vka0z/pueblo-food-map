@@ -147,11 +147,11 @@ describe("removed elements", () => {
 // ── Preserved elements ────────────────────────────────────────────────────────
 
 describe("preserved elements", () => {
-  test("tagline is present (EN)", () => {
+  test("purpose subtitle is present (EN)", () => {
     renderSplash("en");
     expect(
       screen.getByText(
-        /find food close to home/i,
+        /a free, community-built map/i,
       ),
     ).toBeTruthy();
   });
@@ -160,6 +160,13 @@ describe("preserved elements", () => {
     renderSplash("en");
     expect(
       screen.getByRole("button", { name: /find food near me/i }),
+    ).toBeTruthy();
+  });
+
+  test("Spanish-entry CTA is present (switches site to ES on click)", () => {
+    renderSplash("en");
+    expect(
+      screen.getByRole("button", { name: /encuentra comida/i }),
     ).toBeTruthy();
   });
 
@@ -174,10 +181,22 @@ describe("preserved elements", () => {
 // ── Light theme — background and wordmark color ───────────────────────────────
 
 describe("light theme", () => {
-  test("root element uses bone-50 background (not navy)", () => {
+  test("root element uses a frosted, semi-transparent scrim background (not opaque navy)", () => {
     const { container } = renderSplash("en");
     const root = container.firstElementChild as HTMLElement;
-    expect(root.style.backgroundColor).toBe("var(--color-bone-50)");
+    // Background is a frosted translucent scrim: rgba(<tint>, var(--splash-scrim-opacity, …)).
+    // The tint color is tunable, so assert the STRUCTURE (rgba + the scrim-opacity var),
+    // not a specific color value — keeps this test stable across tint adjustments.
+    expect(root.style.backgroundColor).toMatch(/^rgba\(/);
+    expect(root.style.backgroundColor).toContain("--splash-scrim-opacity");
+  });
+
+  test("root element is a fixed overlay with dialog role", () => {
+    const { container } = renderSplash("en");
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.getAttribute("role")).toBe("dialog");
+    expect(root.className).toContain("fixed");
+    expect(root.className).toContain("inset-0");
   });
 
   test("wordmark uses navy text class", () => {

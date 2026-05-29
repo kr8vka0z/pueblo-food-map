@@ -18,7 +18,9 @@ const SIZE_CLASSES = {
   sm: 'text-xl font-semibold',
   md: 'text-2xl font-semibold',
   lg: 'text-4xl font-bold',
-  xl: 'text-5xl font-bold',
+  // xl is used exclusively in SplashScreen (display-only span mode).
+  // Responsive: 4xl on mobile (safe at 375px) → 6xl on md+.
+  xl: 'text-4xl md:text-6xl font-bold',
 } as const;
 
 // ─── Display-only mode (SplashScreen usage) ────────────────────────────────

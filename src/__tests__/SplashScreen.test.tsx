@@ -147,11 +147,11 @@ describe("removed elements", () => {
 // ── Preserved elements ────────────────────────────────────────────────────────
 
 describe("preserved elements", () => {
-  test("tagline is present (EN)", () => {
+  test("purpose subtitle is present (EN)", () => {
     renderSplash("en");
     expect(
       screen.getByText(
-        /find food close to home/i,
+        /a free, community-built map/i,
       ),
     ).toBeTruthy();
   });

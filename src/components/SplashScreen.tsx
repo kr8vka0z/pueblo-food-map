@@ -132,13 +132,10 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
             />
           </div>
 
-          {/* Tagline + purpose */}
+          {/* Purpose subtitle (replaces the former tagline; takes its size + prominence) */}
           <div className="flex flex-col gap-3">
-            <p className="text-2xl md:text-3xl font-semibold leading-normal text-[var(--color-brand-navy)] max-w-md mx-auto splash-text-outline">
-              {t('splash.tagline', locale)}
-            </p>
             <p
-              className="text-base md:text-lg leading-relaxed text-[var(--color-ink-500)] max-w-md mx-auto splash-text-outline-sm"
+              className="text-2xl md:text-3xl font-semibold leading-normal text-[var(--color-brand-navy)] max-w-md mx-auto splash-text-outline"
               data-testid="splash-purpose"
             >
               {t('splash.purpose', locale)}
@@ -166,7 +163,7 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
           </div>
 
           {/* Microcopy */}
-          <p className="text-sm md:text-base leading-relaxed text-[var(--color-ink-500)] splash-text-outline-sm">
+          <p className="text-base md:text-lg leading-relaxed text-[var(--color-ink-500)] splash-text-outline-sm">
             {t('splash.microcopy', locale)}
           </p>
         </div>

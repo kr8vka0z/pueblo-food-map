@@ -85,13 +85,13 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
       // is faintly visible behind the splash text (which stays clearly readable).
       // To tune the effect, change the two CSS custom properties below:
       //   --splash-scrim-opacity  (default 0.25) — higher = more opaque, less peek-through
-      //   --splash-scrim-blur     (default 2px)  — higher = more frosted
+      //   --splash-scrim-blur     (default 4px)  — higher = more frosted
       className="fixed inset-0 z-[9000] flex items-center justify-center"
       style={{
         // Frosted translucent scrim: bone-50 at ~25% opacity, light blur
         backgroundColor: 'rgba(251, 250, 246, var(--splash-scrim-opacity, 0.25))',
-        backdropFilter: 'blur(var(--splash-scrim-blur, 2px))',
-        WebkitBackdropFilter: 'blur(var(--splash-scrim-blur, 2px))',
+        backdropFilter: 'blur(var(--splash-scrim-blur, 4px))',
+        WebkitBackdropFilter: 'blur(var(--splash-scrim-blur, 4px))',
       }}
       // Trap focus within the splash while it's shown.
       // role=dialog + aria-modal tells ATs this is a modal overlay.

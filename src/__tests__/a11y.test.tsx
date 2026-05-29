@@ -64,7 +64,7 @@ import SplashScreen from "@/components/SplashScreen";
 describe("SplashScreen a11y", () => {
   test("has no axe violations", async () => {
     const { container } = render(
-      <SplashScreen onPrimary={vi.fn()} onSecondary={vi.fn()} />,
+      <SplashScreen onPrimary={vi.fn()} />,
     );
     const results = await runAxe(container);
     expect(

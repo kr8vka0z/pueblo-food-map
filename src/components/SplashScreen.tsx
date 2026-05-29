@@ -1,95 +1,26 @@
 'use client';
 
 /**
- * SplashScreen — v2 first-visit entry.
+ * SplashScreen — v3 refresh (issue #100).
  *
- * Spec: docs/pueblo-food-map-v2-handoff.md
- *   §Mobile · 375 x 812 · splash
- *   §Desktop · 1440 x 900 · splash
- *   Open questions #4, #5, #8, #9
+ * Changes from v2:
+ *   - Removed: CATEGORIES array, CategorySwatch, CategoryCard, mobile category
+ *     color-dot list, desktop 2-column "WHAT YOU'LL FIND" grid, "How it works"
+ *     stub tile, ComingSoonToast, handleHowItWorksClick, toast timer state/effect.
+ *   - Added: purpose line (splash.purpose), sponsor credit with hyperlink
+ *     (splash.sponsor.prefix → "Pueblo Food Project" → pueblofoodproject.org).
+ *   - Layout: single centered column, mobile-first, no-scroll at 375×812.
+ *     Desktop: same column, max-w 520px, vertically centered with generous spacing.
  *
- * - Single responsive component; md: breakpoint (≥768px) switches to 2-column desktop layout.
- * - Geolocation requested ONLY on primary CTA tap (open question #5).
- * - Desktop layout: "WHAT YOU'LL FIND" header lives above the right-column category grid (option b, open question #8).
- * - "How it works" 8th card fires a "Coming soon" toast (open question #9 stub).
- * - EN/ES toggle top-right corner (#68).
+ * Props interface and localStorage gate (pfm.splash.seen.v2) are unchanged.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Wordmark from './Wordmark';
 import LanguageToggle from './LanguageToggle';
 import { useGeolocation } from '@/lib/useGeolocation';
 import { useLocale } from '@/lib/LocaleContext';
 import { t } from '@/lib/i18n';
-
-// ─── Category data ─────────────────────────────────────────────────────────────
-// Keys must match splash.cat.* i18n keys. colorVar stays hardcoded (design token).
-
-const CATEGORIES = [
-  { key: 'splash.cat.pantry',           colorVar: 'var(--color-cat-pantry)' },
-  { key: 'splash.cat.grocery',          colorVar: 'var(--color-cat-grocery)' },
-  { key: 'splash.cat.convenience',      colorVar: 'var(--color-cat-convenience)' },
-  { key: 'splash.cat.farm',             colorVar: 'var(--color-cat-farm)' },
-  { key: 'splash.cat.garden',           colorVar: 'var(--color-cat-garden)' },
-  { key: 'splash.cat.edible_landscape', colorVar: 'var(--color-cat-landscape)' },
-  { key: 'splash.cat.meal_site',        colorVar: 'var(--color-cat-meal)' },
-] as const;
-
-// ─── Sub-components ────────────────────────────────────────────────────────────
-
-function CategorySwatch({ label, colorVar }: { label: string; colorVar: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span
-        className="w-4 h-4 rounded-full flex-shrink-0"
-        style={{ backgroundColor: colorVar }}
-        aria-hidden="true"
-      />
-      <span className="text-sm font-medium text-[var(--color-bone-100)] leading-tight">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-function CategoryCard({ label, colorVar }: { label: string; colorVar: string }) {
-  return (
-    <div
-      className="flex items-center gap-3 rounded-[var(--radius-md)] px-4 py-3 bg-white/10"
-    >
-      <span
-        className="w-4 h-4 rounded-full flex-shrink-0"
-        style={{ backgroundColor: colorVar }}
-        aria-hidden="true"
-      />
-      <span className="text-sm font-semibold text-[var(--color-bone-100)] leading-tight">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-// ─── Toast ─────────────────────────────────────────────────────────────────────
-
-function ComingSoonToast({ visible, message }: { visible: boolean; message: string }) {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-      className={[
-        'fixed bottom-6 left-1/2 -translate-x-1/2 z-50',
-        'px-5 py-3 rounded-[var(--radius-full)]',
-        'bg-[var(--color-bone-100)] text-[var(--color-brand-navy)]',
-        'text-sm font-semibold shadow-lg',
-        'transition-opacity duration-300',
-        visible ? 'opacity-100' : 'opacity-0 pointer-events-none',
-      ].join(' ')}
-    >
-      {message}
-    </div>
-  );
-}
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
@@ -109,19 +40,11 @@ export default function SplashScreen({ onPrimary, onSecondary }: SplashScreenPro
   // Track whether a geo request is in flight so we know to watch for state changes.
   const [geoRequested, setGeoRequested] = useState(false);
 
-  // "Coming soon" toast state
-  const [toastVisible, setToastVisible] = useState(false);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   // ── Resolve after geo request ────────────────────────────────────────────────
-  // When the user taps the primary CTA, we call geo.request() and then
-  // watch for the state to leave 'prompt'. Once it settles we call onPrimary.
   useEffect(() => {
     if (!geoRequested) return;
-    // Still waiting for browser prompt to resolve
     if (geo.state.permission === 'prompt') return;
 
-    // State has settled — granted or denied
     const mode: 'located' | 'pueblo-center' =
       geo.state.permission === 'granted' && geo.state.position !== null
         ? 'located'
@@ -131,51 +54,54 @@ export default function SplashScreen({ onPrimary, onSecondary }: SplashScreenPro
   }, [geoRequested, geo.state, onPrimary]);
 
   const handlePrimaryClick = useCallback(() => {
-    // If already granted with a position (e.g. they refreshed after prior grant),
-    // skip the browser prompt entirely.
     if (geo.state.permission === 'granted' && geo.state.position !== null) {
       onPrimary('located');
       return;
     }
-    // If already denied, skip straight to Pueblo center.
     if (geo.state.permission === 'denied') {
       onPrimary('pueblo-center');
       return;
     }
-    // Otherwise request; the useEffect above will fire once state settles.
     setGeoRequested(true);
     geo.request();
   }, [geo, onPrimary]);
 
-  const handleHowItWorksClick = useCallback(() => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastVisible(true);
-    toastTimerRef.current = setTimeout(() => setToastVisible(false), 3000);
-  }, []);
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
+  // ── i18n values ──────────────────────────────────────────────────────────────
+  const sponsorPrefix = t('splash.sponsor.prefix', locale);
+  const sponsorLinkLabel = `Pueblo Food Project (${t('splash.sponsor.newTab', locale)})`;
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div
-      className="min-h-screen w-full flex flex-col md:flex-row"
+      className="relative min-h-screen w-full flex items-center justify-center"
       style={{ backgroundColor: 'var(--color-brand-navy)' }}
     >
-      {/* ── Mobile layout (default) + Desktop left column ── */}
+      {/* Subtle radial highlight — visual polish, not structural */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(ellipse 70% 55% at 50% 40%, rgba(247,148,60,0.07) 0%, transparent 70%)',
+        }}
+      />
+
+      {/* ── Language toggle — top-right corner ── */}
+      <div className="absolute top-4 right-4" style={{ zIndex: 10 }}>
+        <LanguageToggle />
+      </div>
+
+      {/* ── Content column ── */}
       <div
         className={[
-          // Mobile: full-width vertical stack with 24px side padding
-          'flex flex-col justify-center gap-8 px-6 py-10',
-          // Desktop: fixed ~480px wide left column with 64px padding
-          'md:w-[480px] md:flex-shrink-0 md:px-16 md:py-16',
-          // Top padding on mobile to make room for the toggle
-          'pt-16 md:pt-16',
+          // Mobile: full-width, capped at 520px, centered with side padding
+          'relative z-10 flex flex-col w-full max-w-[520px]',
+          'px-6 py-10 pt-16',
+          // Mobile: comfortable spacing between blocks
+          'gap-5',
+          // Desktop: a touch more padding, same single-column layout
+          'md:px-12 md:py-16 md:pt-16',
         ].join(' ')}
       >
         {/* Wordmark */}
@@ -186,26 +112,21 @@ export default function SplashScreen({ onPrimary, onSecondary }: SplashScreenPro
           />
         </div>
 
-        {/* Tagline */}
-        <p
-          className="text-lg leading-relaxed text-[var(--color-bone-100)] font-medium max-w-sm"
-        >
-          {t('splash.tagline', locale)}
-        </p>
-
-        {/* Mobile-only: categories list (desktop gets the right column grid) */}
-        <div className="flex flex-col gap-4 md:hidden">
-          {CATEGORIES.map((cat) => (
-            <CategorySwatch
-              key={cat.key}
-              label={t(cat.key, locale)}
-              colorVar={cat.colorVar}
-            />
-          ))}
+        {/* Tagline + purpose */}
+        <div className="flex flex-col gap-2">
+          <p className="text-xl font-semibold leading-snug text-[var(--color-bone-50)] max-w-md">
+            {t('splash.tagline', locale)}
+          </p>
+          <p
+            className="text-[15px] leading-relaxed text-[var(--color-ink-400)] max-w-md"
+            data-testid="splash-purpose"
+          >
+            {t('splash.purpose', locale)}
+          </p>
         </div>
 
         {/* CTAs */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 mt-1">
           {/* Primary CTA */}
           <button
             type="button"
@@ -242,65 +163,37 @@ export default function SplashScreen({ onPrimary, onSecondary }: SplashScreenPro
         </div>
 
         {/* Microcopy */}
-        <p
-          className="text-[14px] leading-relaxed text-[var(--color-ink-400)]"
-        >
+        <p className="text-[13px] leading-relaxed text-[var(--color-ink-400)]">
           {t('splash.microcopy', locale)}
         </p>
-      </div>
 
-      {/* ── Desktop right column: "WHAT YOU'LL FIND" header + category grid ── */}
-      {/* Hidden on mobile; shown md+ */}
-      <div
-        className={[
-          'hidden md:flex md:flex-col md:flex-1',
-          'justify-center px-12 py-16',
-          'border-l border-white/10',
-        ].join(' ')}
-      >
-        {/* Header above grid — option (b) from open question #8 */}
-        <h2
-          className="text-xs font-bold tracking-widest uppercase text-[var(--color-ink-400)] mb-6"
-        >
-          {t('splash.whatYoullFind', locale)}
-        </h2>
+        {/* Divider */}
+        <div
+          aria-hidden="true"
+          className="w-full border-t border-white/10"
+        />
 
-        {/* 2-column category card grid (7 categories + 1 stub = 8 cells) */}
-        <div className="grid grid-cols-2 gap-3 max-w-lg">
-          {CATEGORIES.map((cat) => (
-            <CategoryCard
-              key={cat.key}
-              label={t(cat.key, locale)}
-              colorVar={cat.colorVar}
-            />
-          ))}
-
-          {/* 8th cell: "How it works" stub (open question #9) */}
-          <button
-            type="button"
-            onClick={handleHowItWorksClick}
+        {/* Sponsor credit */}
+        <p className="text-[13px] text-[var(--color-ink-400)] leading-snug">
+          <span>{sponsorPrefix}</span>
+          <a
+            href="https://pueblofoodproject.org/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={sponsorLinkLabel}
             className={[
-              'flex items-center gap-3 rounded-[var(--radius-md)] px-4 py-3',
-              'bg-white/5 border border-white/20',
-              'hover:bg-white/10 transition-colors duration-150',
-              'text-sm font-semibold text-[var(--color-bone-100)] leading-tight',
+              'font-medium text-[var(--color-bone-100)]',
+              'underline underline-offset-2 decoration-white/30',
+              'hover:text-[var(--color-bone-50)] hover:decoration-white/60',
+              'transition-colors duration-150',
               'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
-              'focus-visible:outline-[var(--color-bone-100)]',
-              'cursor-pointer',
+              'focus-visible:outline-[var(--color-bone-100)] rounded-sm',
             ].join(' ')}
           >
-            {t('splash.howItWorks', locale)}
-          </button>
-        </div>
+            Pueblo Food Project
+          </a>
+        </p>
       </div>
-
-      {/* ── Language toggle — top-right corner ── */}
-      <div className="absolute top-4 right-4" style={{ zIndex: 10 }}>
-        <LanguageToggle />
-      </div>
-
-      {/* Toast for "How it works" stub */}
-      <ComingSoonToast visible={toastVisible} message={t('splash.comingSoon', locale)} />
     </div>
   );
 }

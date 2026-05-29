@@ -123,15 +123,15 @@ const en: Record<string, string> = {
   // Operator attribution (#63)
   "operator.operated_by": "Operated by",
 
-  // Splash page (#68)
+  // Splash page (#68, #100)
   "splash.tagline": "Find food close to home — pantries, gardens, grocery, and more.",
+  "splash.purpose": "A free, community-built map of food resources across Pueblo County.",
   "splash.cta.primary": "Find food near me",
   "splash.cta.secondary": "Show the Pueblo map",
   "splash.cta.secondary.aria": "Show the Pueblo map without using my location",
   "splash.microcopy": "We only use your location to show food nearby. Nothing is saved.",
-  "splash.whatYoullFind": "What you'll find",
-  "splash.howItWorks": "How it works →",
-  "splash.comingSoon": "Coming soon",
+  "splash.sponsor.prefix": "Sponsored by ",
+  "splash.sponsor.newTab": "opens in new tab",
 
   // Splash categories (#68) — kept in sync with CATEGORIES array in SplashScreen.tsx
   "splash.cat.pantry": "Food pantry",
@@ -364,15 +364,15 @@ const es: Record<string, string> = {
   // Operator attribution (#63)
   "operator.operated_by": "Operado por",
 
-  // Splash page (#68)
+  // Splash page (#68, #100)
   "splash.tagline": "Encuentra alimentos cerca de casa — despensas, huertos, supermercados y más.",
+  "splash.purpose": "Un mapa comunitario y gratuito de recursos alimentarios en el condado de Pueblo.",
   "splash.cta.primary": "Buscar alimentos cerca de mí",
   "splash.cta.secondary": "Ver el mapa de Pueblo",
   "splash.cta.secondary.aria": "Ver el mapa de Pueblo sin usar mi ubicación",
   "splash.microcopy": "Solo usamos tu ubicación para mostrar alimentos cercanos. Nada se guarda.",
-  "splash.whatYoullFind": "Qué encontrarás",
-  "splash.howItWorks": "Cómo funciona →",
-  "splash.comingSoon": "Próximamente",
+  "splash.sponsor.prefix": "Patrocinado por ",
+  "splash.sponsor.newTab": "se abre en una nueva pestaña",
 
   // Splash categories (#68)
   "splash.cat.pantry": "Despensa de alimentos",

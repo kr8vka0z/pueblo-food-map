@@ -26,7 +26,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Wordmark from './Wordmark';
-import LanguageToggle from './LanguageToggle';
 import SponsorCredit from './SponsorCredit';
 import { useGeolocation } from '@/lib/useGeolocation';
 import { useLocale } from '@/lib/LocaleContext';
@@ -43,7 +42,7 @@ interface SplashScreenProps {
 
 export default function SplashScreen({ onPrimary }: SplashScreenProps) {
   const geo = useGeolocation();
-  const { locale } = useLocale();
+  const { locale, setLocale } = useLocale();
 
   // Track whether a geo request is in flight so we know to watch for state changes.
   const [geoRequested, setGeoRequested] = useState(false);
@@ -74,6 +73,16 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
     geo.request();
   }, [geo, onPrimary]);
 
+  // Each splash CTA sets the site language to its own language, then runs the
+  // standard find-food flow. (The EN/ES toggle lives on the map view, not here.)
+  const handleCtaClick = useCallback(
+    (lang: 'en' | 'es') => {
+      setLocale(lang);
+      handlePrimaryClick();
+    },
+    [setLocale, handlePrimaryClick],
+  );
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -88,8 +97,9 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
     //   --splash-scrim-opacity  (default 0.25) — higher = more opaque, less peek-through
     //   --splash-scrim-blur     (default 4px)  — higher = more frosted
     //
-    // LanguageToggle + SponsorCredit are positioned on this outer fixed container
-    // so they pin to the viewport corners and do NOT scroll with the content.
+    // SponsorCredit is positioned on this outer fixed container so it pins to the
+    // viewport corner and does NOT scroll with the content. There is no EN/ES toggle
+    // on the splash — the two CTAs below set the language; the toggle lives on the map.
     <div
       className="fixed inset-0 z-[9000] overflow-y-auto"
       style={{
@@ -104,11 +114,6 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
       aria-modal="true"
       aria-label="Welcome — find food near you"
     >
-      {/* ── Language toggle — top-right corner (viewport-pinned) ── */}
-      <div className="absolute top-4 right-4" style={{ zIndex: 10 }}>
-        <LanguageToggle />
-      </div>
-
       {/* ── Inner flex wrapper: centers content when it fits, lets it scroll naturally when tall ── */}
       <div className="flex min-h-full items-center justify-center">
         {/* ── Content column ── */}
@@ -142,12 +147,14 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
             </p>
           </div>
 
-          {/* CTA */}
+          {/* CTAs — one per language. Clicking sets the site language, then runs
+              the find-food flow. (No EN/ES toggle on the splash.) */}
           <div className="flex flex-col gap-3 mt-1">
-            {/* Primary CTA */}
+            {/* English entry */}
             <button
               type="button"
-              onClick={handlePrimaryClick}
+              lang="en"
+              onClick={() => handleCtaClick('en')}
               className={[
                 'w-full rounded-[var(--radius-md)] px-6 py-4 md:py-5',
                 'text-lg md:text-xl font-semibold leading-none',
@@ -158,7 +165,25 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
                 'focus-visible:outline-[var(--color-brand-orange)]',
               ].join(' ')}
             >
-              {t('splash.cta.primary', locale)}
+              {t('splash.cta.primary', 'en')}
+            </button>
+
+            {/* Spanish entry — also switches the whole site to Spanish */}
+            <button
+              type="button"
+              lang="es"
+              onClick={() => handleCtaClick('es')}
+              className={[
+                'w-full rounded-[var(--radius-md)] px-6 py-4 md:py-5',
+                'text-lg md:text-xl font-semibold leading-none',
+                'bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)]',
+                'hover:brightness-105 active:brightness-95',
+                'transition-[filter] duration-150',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+                'focus-visible:outline-[var(--color-brand-orange)]',
+              ].join(' ')}
+            >
+              {t('splash.cta.primary', 'es')}
             </button>
           </div>
 

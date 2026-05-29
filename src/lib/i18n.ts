@@ -363,7 +363,7 @@ const es: Record<string, string> = {
   // Splash page (#68, #100)
   "splash.tagline": "Encuentra alimentos cerca de casa — despensas, huertos, supermercados y más.",
   "splash.purpose": "Un mapa comunitario y gratuito de recursos alimentarios en el condado de Pueblo.",
-  "splash.cta.primary": "Buscar alimentos cerca de mí",
+  "splash.cta.primary": "Encuentra comida cerca de mí",
   "splash.microcopy": "Solo usamos tu ubicación para mostrar alimentos cercanos. Nada se guarda.",
 
   // Splash categories (#68)

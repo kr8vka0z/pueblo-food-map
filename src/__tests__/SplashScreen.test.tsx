@@ -163,6 +163,13 @@ describe("preserved elements", () => {
     ).toBeTruthy();
   });
 
+  test("Spanish-entry CTA is present (switches site to ES on click)", () => {
+    renderSplash("en");
+    expect(
+      screen.getByRole("button", { name: /encuentra comida/i }),
+    ).toBeTruthy();
+  });
+
   test("microcopy is present (EN)", () => {
     renderSplash("en");
     expect(

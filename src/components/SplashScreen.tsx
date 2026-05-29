@@ -79,18 +79,8 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
   return (
     <div
       className="relative min-h-screen w-full flex items-center justify-center"
-      style={{ backgroundColor: 'var(--color-brand-navy)' }}
+      style={{ backgroundColor: 'var(--color-bone-50)' }}
     >
-      {/* Subtle radial highlight — visual polish, not structural */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 70% 55% at 50% 40%, rgba(247,148,60,0.07) 0%, transparent 70%)',
-        }}
-      />
-
       {/* ── Language toggle — top-right corner ── */}
       <div className="absolute top-4 right-4" style={{ zIndex: 10 }}>
         <LanguageToggle />
@@ -112,17 +102,17 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
         <div>
           <Wordmark
             size="xl"
-            className="text-[var(--color-bone-50)] block"
+            className="text-[var(--color-brand-navy)] block"
           />
         </div>
 
         {/* Tagline + purpose */}
         <div className="flex flex-col gap-2">
-          <p className="text-xl font-semibold leading-snug text-[var(--color-bone-50)] max-w-md">
+          <p className="text-xl font-semibold leading-snug text-[var(--color-brand-navy)] max-w-md">
             {t('splash.tagline', locale)}
           </p>
           <p
-            className="text-[15px] leading-relaxed text-[var(--color-ink-400)] max-w-md"
+            className="text-[15px] leading-relaxed text-[var(--color-ink-500)] max-w-md"
             data-testid="splash-purpose"
           >
             {t('splash.purpose', locale)}
@@ -150,7 +140,7 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
         </div>
 
         {/* Microcopy */}
-        <p className="text-[13px] leading-relaxed text-[var(--color-ink-400)]">
+        <p className="text-[13px] leading-relaxed text-[var(--color-ink-500)]">
           {t('splash.microcopy', locale)}
         </p>
       </div>

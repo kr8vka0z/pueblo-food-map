@@ -39,10 +39,10 @@ export default function SponsorCredit({
         rel="noopener noreferrer"
         style={{ fontSize: 12 }}
         className={
-          "text-[var(--color-ink-400)] " +
-          "hover:text-[var(--color-ink-600)] hover:underline " +
+          "text-[var(--color-ink-500)] " +
+          "hover:text-[var(--color-ink-700)] hover:underline " +
           "focus-visible:outline-none focus-visible:underline " +
-          "focus-visible:text-[var(--color-ink-600)] " +
+          "focus-visible:text-[var(--color-ink-700)] " +
           "transition-colors duration-150"
         }
       >

@@ -170,3 +170,34 @@ describe("preserved elements", () => {
     ).toBeTruthy();
   });
 });
+
+// ── Light theme — background and wordmark color ───────────────────────────────
+
+describe("light theme", () => {
+  test("root element uses bone-50 background (not navy)", () => {
+    const { container } = renderSplash("en");
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.style.backgroundColor).toBe("var(--color-bone-50)");
+  });
+
+  test("wordmark uses navy text class", () => {
+    const { container } = renderSplash("en");
+    const wordmark = container.querySelector(".wordmark");
+    expect(wordmark?.className).toContain("text-[var(--color-brand-navy)]");
+  });
+
+  test("orange CTA button retains navy text (navy-on-orange)", () => {
+    renderSplash("en");
+    const cta = screen.getByRole("button", { name: /find food near me/i });
+    expect(cta.className).toContain("text-[var(--color-brand-navy)]");
+  });
+
+  test("no dark radial glow overlay rendered", () => {
+    const { container } = renderSplash("en");
+    // The old dark-era glow was an aria-hidden div with a radial-gradient style
+    const glowDivs = Array.from(container.querySelectorAll('[aria-hidden="true"]')).filter(
+      (el) => (el as HTMLElement).style.background?.includes("radial-gradient"),
+    );
+    expect(glowDivs).toHaveLength(0);
+  });
+});

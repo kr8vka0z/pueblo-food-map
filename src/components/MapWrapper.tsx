@@ -26,6 +26,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type mapboxgl from "mapbox-gl";
 import dynamic from "next/dynamic";
 import SearchBar from "./SearchBar";
 import Wordmark from "./Wordmark";
@@ -50,6 +51,7 @@ import { computeOpenStatus } from "@/lib/hours";
 import { searchVenues } from "@/lib/searchVenues";
 import type { VenueCategory } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
+import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
 // dynamic import here in a Client Component as required by Next.js 16
@@ -64,6 +66,47 @@ const LeafletMap = dynamic(() => import("./Map"), {
 });
 
 const PUEBLO_CENTER = { lat: 38.2544, lng: -104.6091 };
+
+/**
+ * Drift-detection padding (in degrees).
+ * The "Re-center" button appears when the user-location dot is this far
+ * outside the visible map viewport. 0.002° ≈ 220m — gives the dot a small
+ * inset buffer so the button doesn't flicker at the exact edge.
+ * Easy to tune for live review: increase for more generous hide threshold.
+ */
+export const DRIFT_PAD_DEG = 0.002;
+
+/**
+ * Checks whether a lat/lng point is inside the given viewport bounds,
+ * shrunk by DRIFT_PAD_DEG on every edge.
+ */
+export function isPointInBounds(
+  point: { lat: number; lng: number },
+  bounds: mapboxgl.LngLatBounds,
+): boolean {
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  return (
+    point.lng >= sw.lng + DRIFT_PAD_DEG &&
+    point.lng <= ne.lng - DRIFT_PAD_DEG &&
+    point.lat >= sw.lat + DRIFT_PAD_DEG &&
+    point.lat <= ne.lat - DRIFT_PAD_DEG
+  );
+}
+
+/**
+ * Returns true if the resolved position is outside the Pueblo County maxBounds.
+ * Tied to the same bbox constant used by Map.tsx so they stay in sync.
+ */
+export function isOutsideCounty(point: { lat: number; lng: number }): boolean {
+  const [[lngWest, latSouth], [lngEast, latNorth]] = PUEBLO_COUNTY_BBOX;
+  return (
+    point.lng < lngWest ||
+    point.lng > lngEast ||
+    point.lat < latSouth ||
+    point.lat > latNorth
+  );
+}
 
 // Stable listbox ids — used for aria-controls on the search input and id on each listbox.
 const LISTBOX_ID = "search-results-listbox";
@@ -157,13 +200,70 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
   // time the user taps LocateButton, not just on the first geolocation event. (#60)
   const [recenterRequestId, setRecenterRequestId] = useState(0);
 
+  // ── Locating state — true while a geo request is in flight (#108) ────────────
+  // Rendered by LocateButton as the "Locating…" spinner state.
+  const [isLocating, setIsLocating] = useState(false);
+  // geoRequestedAtRef: epoch ms of last in-flight locate request (ref, not state,
+  // so the useEffect below doesn't depend on isLocating itself).
+  const geoRequestedAtRef = useRef<number>(0);
+  const loadingClearedAtRef = useRef<number>(0); // epoch ms of last time spinner was cleared
+
+  // ── Drift detection (#108) ───────────────────────────────────────────────────
+  // isDrifted: true when the user-location dot has left the visible viewport.
+  const [isDrifted, setIsDrifted] = useState(false);
+
+  // ── Outside-county message (#108) ────────────────────────────────────────────
+  const [outsideCountyVisible, setOutsideCountyVisible] = useState(false);
+
+  // Watch geo.state for resolution of an in-flight locate request.
+  // Mirrors the existing bannerVisible effect: use refs (not isLocating state)
+  // as the gate so this effect never depends on the state it sets.
+  useEffect(() => {
+    if (geo.state.permission === "prompt") return;
+    if (geoRequestedAtRef.current <= loadingClearedAtRef.current) return;
+    // Geo request resolved — clear locating spinner and check outside-county
+    loadingClearedAtRef.current = Date.now();
+    setIsLocating(false);
+    if (geo.state.permission === "granted" && geo.state.position !== null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOutsideCountyVisible(isOutsideCounty(geo.state.position));
+    }
+  // Only re-run when geo.state (object ref) changes — same pattern as bannerVisible.
+  }, [geo.state]);
+
+  // Handle map moveend: update drift state (called from Map's onMoveEnd prop).
+  // Runs from a DOM event callback, not from a React effect.
+  const handleMoveEnd = useCallback(
+    (bounds: mapboxgl.LngLatBounds) => {
+      const pos = geo.state.permission === "granted" ? geo.state.position : null;
+      if (!pos) {
+        setIsDrifted(false);
+        return;
+      }
+      setIsDrifted(!isPointInBounds(pos, bounds));
+    },
+    [geo.state],
+  );
+
   // Wraps geo.request() to stamp the request timestamp and increment the
   // recenter counter so Map.tsx re-centers even if userLocation hasn't changed.
   const handleLocateRequest = useCallback(() => {
     userRequestedAtRef.current = Date.now();
     setRecenterRequestId((n) => n + 1);
+    setOutsideCountyVisible(false);
+
+    const alreadyLocated =
+      geo.state.permission === "granted" && geo.state.position !== null;
+    if (!alreadyLocated) {
+      geoRequestedAtRef.current = Date.now();
+      setIsLocating(true);
+    } else {
+      // Already located — this is a Re-center tap; clear drift immediately
+      setIsDrifted(false);
+    }
     geo.request();
-  }, [geo]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geo.request, geo.state]);
 
   // ── Mobile detection ─────────────────────────────────────────────────────────
   const isMobile = useIsMobile();
@@ -460,6 +560,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
           }
         }}
         onMapReady={(map) => setMapboxMap(map)}
+        onMoveEnd={handleMoveEnd}
       />
 
       {/* Top-left cluster: Wordmark (#97; EN/ES toggle moved to hamburger menu #109)
@@ -552,8 +653,50 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
       {/* HamburgerMenu — top-right, above the control stack (#71) */}
       <HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} />
 
-      {/* LocateButton — below hamburger; top offset set via inline style in component (#71) */}
-      <LocateButton geoState={geo.state} onRequest={handleLocateRequest} locale={locale} />
+      {/* LocateButton — bottom-center, morphing control (#108).
+          sheetVisible: mobile AND sheet is showing (not fully expanded — that's sheetFullyExpanded).
+          The button hides itself when sheetFullyExpanded. */}
+      <LocateButton
+        geoState={geo.state}
+        isLocating={isLocating}
+        isDrifted={isDrifted}
+        onRequest={handleLocateRequest}
+        sheetVisible={isMobile}
+        sheetFullyExpanded={isMobile && sheetFullyExpanded}
+        locale={locale}
+      />
+
+      {/* Outside-county message — appears when resolved position is beyond maxBounds (#108) */}
+      {outsideCountyVisible && (
+        <div
+          role="alert"
+          aria-live="polite"
+          style={{
+            position: "absolute",
+            bottom: isMobile ? 88 + 12 + 52 : 24 + 52, // above locate button
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1001,
+            whiteSpace: "nowrap",
+          }}
+          className={[
+            "flex items-center gap-2 px-4 py-2 rounded-full",
+            "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]",
+            "text-sm font-medium",
+            "elevation-2",
+          ].join(" ")}
+        >
+          <span>{t("locate.outsideCounty", locale)}</span>
+          <button
+            type="button"
+            aria-label={t("detail.close", locale)}
+            onClick={() => setOutsideCountyVisible(false)}
+            className="text-[var(--color-clay-500)] hover:text-[var(--color-clay-700)] transition-colors"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Legend removed: category browse is now in the search-focus dropdown (#95) */}
 

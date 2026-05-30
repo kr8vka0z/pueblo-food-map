@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.3...v0.1.4) (2026-05-30)
+
+
+### Added
+
+* add Send-us-feedback form to hamburger menu ([#116](https://github.com/kr8vka0z/pueblo-food-map/issues/116)) ([#117](https://github.com/kr8vka0z/pueblo-food-map/issues/117)) ([f17cb59](https://github.com/kr8vka0z/pueblo-food-map/commit/f17cb596ed7dab2ab2fab9aafe50fa2657163269))
+* auto-zoom map to fit the selected category ([#111](https://github.com/kr8vka0z/pueblo-food-map/issues/111)) ([#115](https://github.com/kr8vka0z/pueblo-food-map/issues/115)) ([f13167b](https://github.com/kr8vka0z/pueblo-food-map/commit/f13167bd28fcc224ad2bf06e9bcf92d96e5ee8bd))
+* map chrome and menu refresh ([#97](https://github.com/kr8vka0z/pueblo-food-map/issues/97), [#95](https://github.com/kr8vka0z/pueblo-food-map/issues/95), [#96](https://github.com/kr8vka0z/pueblo-food-map/issues/96), [#99](https://github.com/kr8vka0z/pueblo-food-map/issues/99)) ([#103](https://github.com/kr8vka0z/pueblo-food-map/issues/103)) ([e2dfc95](https://github.com/kr8vka0z/pueblo-food-map/commit/e2dfc955b0dc955ced225321fa6114163d36de9b))
+* move EN/ES language switch into the hamburger menu ([#109](https://github.com/kr8vka0z/pueblo-food-map/issues/109)) ([#113](https://github.com/kr8vka0z/pueblo-food-map/issues/113)) ([df597b0](https://github.com/kr8vka0z/pueblo-food-map/commit/df597b00048ad2d8feaf66de38f46fe4c8f822c1))
+* single bottom-center location control with locating/re-center states ([#108](https://github.com/kr8vka0z/pueblo-food-map/issues/108)) ([#114](https://github.com/kr8vka0z/pueblo-food-map/issues/114)) ([e351311](https://github.com/kr8vka0z/pueblo-food-map/commit/e351311b3965ca1cd3643589ac1f649cdc9b24f5))
+* **splash:** frosted overlay over live map with map lock ([#107](https://github.com/kr8vka0z/pueblo-food-map/issues/107)) ([808606f](https://github.com/kr8vka0z/pueblo-food-map/commit/808606f8e774b4f91a37e52f02db27f6a38e4e29))
+* **splash:** refresh splash screen layout and content ([#100](https://github.com/kr8vka0z/pueblo-food-map/issues/100)) ([#106](https://github.com/kr8vka0z/pueblo-food-map/issues/106)) ([7913151](https://github.com/kr8vka0z/pueblo-food-map/commit/791315168085b7d445f06d6b7e8da1dc09f7e960))
+
+
+### Fixed
+
+* **#98:** scrub OSM artifacts from venue cards — clean hours strings, geocode missing addresses ([#102](https://github.com/kr8vka0z/pueblo-food-map/issues/102)) ([c1e4536](https://github.com/kr8vka0z/pueblo-food-map/commit/c1e4536df1e55a57486233d7e5a0e9f1e2da9235))
+* **a11y:** dynamic aria-controls for search combobox per active listbox ([#105](https://github.com/kr8vka0z/pueblo-food-map/issues/105)) ([e08eee5](https://github.com/kr8vka0z/pueblo-food-map/commit/e08eee58df1411d61d236aeb686fbfa46510e22b))
+* bump search input to 16px on mobile to stop iOS focus-zoom ([#110](https://github.com/kr8vka0z/pueblo-food-map/issues/110)) ([#112](https://github.com/kr8vka0z/pueblo-food-map/issues/112)) ([d9310f8](https://github.com/kr8vka0z/pueblo-food-map/commit/d9310f8546694cdeb097b33895240dac8f67086b))
+
 ## [0.1.3](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.2...v0.1.3) (2026-05-28)
 
 

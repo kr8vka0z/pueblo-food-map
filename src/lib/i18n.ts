@@ -152,6 +152,11 @@ const en: Record<string, string> = {
   "typeahead.moreMatches": "+{count} more matches",
   "typeahead.noMatch": "No venues match",
 
+  // Location control (#108)
+  "locate.locating": "Locating…",
+  "locate.recenter": "Re-center",
+  "locate.outsideCounty": "Your location is outside Pueblo County",
+
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Open menu",
   "menu.close": "Close menu",
@@ -389,6 +394,11 @@ const es: Record<string, string> = {
   "typeahead.matchCount": "{count} lugares coinciden",
   "typeahead.moreMatches": "+{count} más resultados",
   "typeahead.noMatch": "Ningún lugar coincide",
+
+  // Location control (#108)
+  "locate.locating": "Localizando…",
+  "locate.recenter": "Recentrar",
+  "locate.outsideCounty": "Tu ubicación está fuera del condado de Pueblo",
 
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Abrir menú",

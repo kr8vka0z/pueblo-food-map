@@ -115,9 +115,9 @@ const GEO_GRANTED: GeoState = {
 const GEO_DENIED: GeoState = { permission: "denied", position: null };
 
 describe("LocateButton a11y", () => {
-  test("idle state has no axe violations", async () => {
+  test("findFood state has no axe violations", async () => {
     const { container } = render(
-      <LocateButton geoState={GEO_IDLE} onRequest={vi.fn()} />,
+      <LocateButton geoState={GEO_IDLE} isLocating={false} isDrifted={false} onRequest={vi.fn()} />,
     );
     const results = await runAxe(container);
     expect(
@@ -126,9 +126,9 @@ describe("LocateButton a11y", () => {
     ).toBe(0);
   });
 
-  test("granted state has no axe violations", async () => {
+  test("locating state has no axe violations", async () => {
     const { container } = render(
-      <LocateButton geoState={GEO_GRANTED} onRequest={vi.fn()} />,
+      <LocateButton geoState={GEO_IDLE} isLocating={true} isDrifted={false} onRequest={vi.fn()} />,
     );
     const results = await runAxe(container);
     expect(
@@ -137,9 +137,20 @@ describe("LocateButton a11y", () => {
     ).toBe(0);
   });
 
-  test("denied state has no axe violations", async () => {
+  test("reCenter state has no axe violations", async () => {
     const { container } = render(
-      <LocateButton geoState={GEO_DENIED} onRequest={vi.fn()} />,
+      <LocateButton geoState={GEO_GRANTED} isLocating={false} isDrifted={true} onRequest={vi.fn()} />,
+    );
+    const results = await runAxe(container);
+    expect(
+      results.violations.length,
+      `Violations found:\n${describeViolations(results)}`,
+    ).toBe(0);
+  });
+
+  test("denied state (findFood) has no axe violations", async () => {
+    const { container } = render(
+      <LocateButton geoState={GEO_DENIED} isLocating={false} isDrifted={false} onRequest={vi.fn()} />,
     );
     const results = await runAxe(container);
     expect(

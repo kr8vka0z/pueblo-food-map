@@ -101,6 +101,12 @@ interface MapProps {
    * does NOT re-center. Defaults to 0 (no explicit recenter requested yet).
    */
   recenterRequestId?: number;
+  /**
+   * Called after each pan/zoom completes (moveend). Receives the current
+   * viewport bounds so MapWrapper can detect whether the user-location dot
+   * has drifted off-screen (#108 drift detection).
+   */
+  onMoveEnd?: (bounds: mapboxgl.LngLatBounds) => void;
 }
 
 export default function Map({
@@ -112,6 +118,7 @@ export default function Map({
   onMapReady,
   locale = "en",
   recenterRequestId = 0,
+  onMoveEnd,
 }: MapProps) {
   // Centralized hover state — one Popup for the whole map avoids per-marker mount churn.
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
@@ -303,6 +310,16 @@ export default function Map({
     [onMapReady],
   );
 
+  // ── moveend: notify MapWrapper so it can update drift detection (#108) ────
+  const handleMoveEnd = useCallback(
+    (e: { target: mapboxgl.Map }) => {
+      if (!onMoveEnd) return;
+      const bounds = e.target.getBounds();
+      if (bounds) onMoveEnd(bounds);
+    },
+    [onMoveEnd],
+  );
+
   return (
     <MapGL
       ref={mapRef}
@@ -312,6 +329,7 @@ export default function Map({
       style={{ width: "100%", height: "100%" }}
       attributionControl={false}
       onLoad={handleLoad}
+      onMoveEnd={handleMoveEnd}
       maxBounds={PUEBLO_COUNTY_BBOX}
       minZoom={PUEBLO_COUNTY_MIN_ZOOM}
     >

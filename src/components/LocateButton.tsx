@@ -1,106 +1,155 @@
 "use client";
 
 /**
- * LocateButton — v2 circular geolocation trigger, positioned absolute top-right.
+ * LocateButton — v3 bottom-center location control (#108).
  *
- * Spec: docs/pueblo-food-map-v2-handoff.md §Mobile·375×812·map(located),
- *       §Desktop·1440×900·map(located), and Open question #3.
+ * Single morphing pill, three visible states:
+ *   findFood  — no location yet; label "Find food near me"; always visible
+ *   locating  — geolocation in flight; spinner + "Locating…"
+ *   reCenter  — located but user has panned so the dot is off-screen; label "Re-center"
+ *   hidden    — located AND the dot is on-screen; button is not rendered
  *
- * States:
- *   idle   — navy bg, white Locate icon
- *   active — sage-500 bg, white LocateFixed icon (position fresh)
- *   denied — bone-200 bg, ink-500 Locate icon (still tappable)
+ * Placement: bottom-center, floating above the bottom sheet (mobile) and
+ * above the Mapbox attribution (desktop). Hidden when the sheet is at the
+ * full 90vh snap (map mostly covered) to avoid overlap with sheet content.
  *
- * Size: 44×44 mobile / 52×52 desktop (≥768px).
- * Icon: 18×18 mobile / 22×22 desktop.
- * Position: absolute top-4 right-4, z-index 1000.
+ * Styling: mirrors the SplashScreen CTA — orange pill, navy text.
+ * Fades/slides in & out; respects prefers-reduced-motion.
+ *
+ * Positioning constants (easy to tune for live review):
+ *   BOTTOM_OFFSET_DEFAULT_PX — distance from the viewport bottom, no sheet
+ *   BOTTOM_OFFSET_SHEET_PEEK_PX — extra clearance above the peek bar (88px)
  */
 
-import { Locate, LocateFixed } from "lucide-react";
+import { Locate, LocateFixed, Loader2 } from "lucide-react";
 import type { GeoState } from "@/lib/useGeolocation";
 import { t, type Locale } from "@/lib/i18n";
 
+// ─── Tunable layout constants ─────────────────────────────────────────────────
+
+/** px from viewport bottom when no bottom sheet is visible (desktop + mobile no-sheet). */
+export const BOTTOM_OFFSET_DEFAULT_PX = 24;
+
+/** px from viewport bottom on mobile when the peek bar (88px) is showing.
+ *  The peek bar sits at the bottom; add a small gap above it. */
+export const BOTTOM_OFFSET_SHEET_PEEK_PX = 88 + 12; // peek bar height + gap
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+export type LocateButtonVariant = "findFood" | "locating" | "reCenter" | "hidden";
+
 interface LocateButtonProps {
+  /** Current geolocation state from useGeolocation. */
   geoState: GeoState;
+  /** Whether a geolocation request is currently in flight. */
+  isLocating: boolean;
+  /** Whether the user-dot has drifted off the visible map area. */
+  isDrifted: boolean;
+  /** Called when the user taps the button. */
   onRequest: () => void;
-  /** Locale for aria-label translation. Defaults to "en". */
+  /** True on mobile with the bottom sheet showing (not fully expanded). */
+  sheetVisible?: boolean;
+  /** True when the bottom sheet is at the full 90vh snap — hide the button. */
+  sheetFullyExpanded?: boolean;
+  /** Locale for i18n. Defaults to "en". */
   locale?: Locale;
 }
 
+// ─── LocateButton ─────────────────────────────────────────────────────────────
+
 export default function LocateButton({
   geoState,
+  isLocating,
+  isDrifted,
   onRequest,
+  sheetVisible = false,
+  sheetFullyExpanded = false,
   locale = "en",
 }: LocateButtonProps) {
-  const isActive =
-    geoState.permission === "granted" && geoState.position !== null;
-  const isDenied = geoState.permission === "denied";
+  // Determine which variant to show
+  const variant: LocateButtonVariant = (() => {
+    if (sheetFullyExpanded) return "hidden";
+    if (isLocating) return "locating";
+    if (geoState.permission === "granted" && geoState.position !== null) {
+      // Located — show Re-center only if the dot has drifted off-screen
+      return isDrifted ? "reCenter" : "hidden";
+    }
+    // Not yet located (prompt or denied): always show Find food
+    return "findFood";
+  })();
 
-  // bg color
-  const bg = isDenied
-    ? "bg-[var(--color-bone-200)]"
-    : isActive
-      ? "bg-[var(--color-sage-500)]"
-      : "bg-[var(--color-brand-navy)]";
+  if (variant === "hidden") return null;
 
-  // icon color
-  const iconColor = isDenied
-    ? "var(--color-ink-500)"
-    : "#ffffff";
+  // Bottom offset depends on whether the mobile bottom sheet peek bar is visible
+  const bottomPx = sheetVisible
+    ? BOTTOM_OFFSET_SHEET_PEEK_PX
+    : BOTTOM_OFFSET_DEFAULT_PX;
+
+  const label =
+    variant === "locating"
+      ? t("locate.locating", locale)
+      : variant === "reCenter"
+        ? t("locate.recenter", locale)
+        : t("splash.cta.primary", locale); // "Find food near me" — reuse splash CTA key
+
+  const ariaLabel =
+    variant === "locating"
+      ? t("locate.locating", locale)
+      : variant === "reCenter"
+        ? t("locate.recenter", locale)
+        : t("splash.cta.primary", locale);
+
+  const icon =
+    variant === "locating" ? (
+      <Loader2
+        size={18}
+        aria-hidden
+        className="animate-spin motion-reduce:animate-none shrink-0"
+      />
+    ) : variant === "reCenter" ? (
+      <LocateFixed size={18} aria-hidden className="shrink-0" />
+    ) : (
+      <Locate size={18} aria-hidden className="shrink-0" />
+    );
 
   return (
     <button
       type="button"
-      onClick={onRequest}
-      aria-label={t("topbar.locate", locale)}
-      className={
-        // Positioning — absolute top-right, below HamburgerMenu (#71: top-[68px] = 16+44+8)
-        "absolute right-4 " +
-        // Size — 44×44 mobile / 52×52 desktop
-        "w-11 h-11 md:w-[52px] md:h-[52px] " +
-        "flex items-center justify-center " +
-        "rounded-full " +
-        bg + " " +
-        "transition-[background-color,opacity] duration-150 " +
-        "hover:opacity-90 active:scale-95 " +
-        "focus-visible:outline-none focus-visible:ring-2 " +
-        "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-        "elevation-2"
-      }
-      style={{ zIndex: 1000, top: "68px" }}
+      onClick={variant !== "locating" ? onRequest : undefined}
+      disabled={variant === "locating"}
+      aria-label={ariaLabel}
+      aria-busy={variant === "locating"}
+      data-testid="locate-button"
+      data-variant={variant}
+      style={{
+        position: "absolute",
+        bottom: bottomPx,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 1000,
+      }}
+      className={[
+        // Orange pill, navy text — mirrors SplashScreen CTA exactly
+        "flex items-center gap-2",
+        "px-5 py-3 rounded-full",
+        "bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)]",
+        "text-sm font-semibold leading-none",
+        "whitespace-nowrap",
+        // Hover / active states
+        "hover:brightness-105 active:brightness-95",
+        variant !== "locating" ? "cursor-pointer" : "cursor-default",
+        // Focus ring
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+        "focus-visible:outline-[var(--color-brand-orange)]",
+        // Elevation
+        "elevation-2",
+        // Fade + slide in/out animation — respects prefers-reduced-motion
+        "transition-[opacity,transform,bottom] duration-200",
+        "motion-safe:animate-[locateButtonIn_200ms_ease-out]",
+      ].join(" ")}
     >
-      {/* Mobile icon: 18×18 */}
-      {isActive ? (
-        <>
-          <LocateFixed
-            size={18}
-            className="md:hidden"
-            style={{ color: iconColor }}
-            aria-hidden
-          />
-          <LocateFixed
-            size={22}
-            className="hidden md:block"
-            style={{ color: iconColor }}
-            aria-hidden
-          />
-        </>
-      ) : (
-        <>
-          <Locate
-            size={18}
-            className="md:hidden"
-            style={{ color: iconColor }}
-            aria-hidden
-          />
-          <Locate
-            size={22}
-            className="hidden md:block"
-            style={{ color: iconColor }}
-            aria-hidden
-          />
-        </>
-      )}
+      {icon}
+      <span>{label}</span>
     </button>
   );
 }

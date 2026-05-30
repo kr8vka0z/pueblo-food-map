@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Menu, X, ExternalLink, RotateCcw } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
+import LanguageToggle from "./LanguageToggle";
 import { t, type Locale } from "@/lib/i18n";
 
 interface HamburgerMenuProps {
@@ -298,6 +299,16 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome }: Hamburge
               label={t("menu.suggest", locale)}
               href="/suggest"
             />
+            {/* Language toggle (#109) — last item; label + inline EN/ES control */}
+            <li
+              role="menuitem"
+              className="flex items-center justify-between px-5 py-3 border-t border-[var(--color-bone-200)]"
+            >
+              <span className="text-sm font-medium text-[var(--color-ink-800)]">
+                {t("menu.language", locale)}
+              </span>
+              <LanguageToggle />
+            </li>
           </ul>
         </div>
       )}

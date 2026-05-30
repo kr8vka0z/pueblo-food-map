@@ -6,7 +6,7 @@
  * Features:
  *   - Feedback type select (required, 4 types from FEEDBACK_TYPES)
  *   - Message textarea (required)
- *   - Your email input (optional — for follow-up; validated if provided)
+ *   - Your email input (required — so we can follow up)
  *   - Honeypot field (hidden from real users, caught server-side)
  *   - Cloudflare Turnstile widget (bot protection)
  *   - Client-side validation with accessible error announcements
@@ -65,7 +65,9 @@ function validate(
   if (!message.trim()) {
     errors.message = t("feedback.validation.messageRequired", locale);
   }
-  if (contactEmail && !EMAIL_RE.test(contactEmail)) {
+  if (!contactEmail.trim()) {
+    errors.contactEmail = t("feedback.validation.emailRequired", locale);
+  } else if (!EMAIL_RE.test(contactEmail)) {
     errors.contactEmail = t("feedback.validation.emailInvalid", locale);
   }
   return errors;
@@ -168,7 +170,7 @@ export default function FeedbackForm({ locale = "en" }: FeedbackFormProps) {
         body: JSON.stringify({
           feedbackType,
           message: message.trim(),
-          contactEmail: contactEmail.trim() || undefined,
+          contactEmail: contactEmail.trim(),
           website: honeypot, // honeypot field
           turnstileToken: turnstileToken ?? "",
         }),
@@ -324,10 +326,11 @@ export default function FeedbackForm({ locale = "en" }: FeedbackFormProps) {
         )}
       </div>
 
-      {/* Optional contact email */}
+      {/* Contact email (required) */}
       <div>
         <label htmlFor="feedback-email" className={labelClass}>
-          {t("feedback.email.label", locale)}
+          {t("feedback.email.label", locale)}{" "}
+          <span aria-hidden className="text-red-500">*</span>
         </label>
         <input
           type="email"
@@ -336,6 +339,8 @@ export default function FeedbackForm({ locale = "en" }: FeedbackFormProps) {
           onChange={(e) => setContactEmail(e.target.value)}
           placeholder={t("feedback.email.placeholder", locale)}
           autoComplete="email"
+          required
+          aria-required="true"
           aria-describedby={
             errors.contactEmail
               ? "feedback-email-error"

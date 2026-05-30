@@ -110,6 +110,7 @@ describe("Honeypot logic — integration with POST handler (feedback)", () => {
     const req = makeRequest({
       feedbackType: "positive",
       message: "Great map!",
+      contactEmail: "user@example.com",
       website: "http://spam.example.com", // honeypot filled
       turnstileToken: "valid-test-token",
     });
@@ -133,11 +134,26 @@ describe("Honeypot logic — integration with POST handler (feedback)", () => {
     expect(res.status).toBe(422);
   });
 
+  test("missing contactEmail → 422", async () => {
+    vi.stubGlobal("fetch", mockTurnstileSuccess());
+    const req = makeRequest({
+      feedbackType: "positive",
+      message: "Great map!",
+      contactEmail: "",
+      website: "",
+      turnstileToken: "valid-test-token",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(422);
+  });
+
   test("invalid feedbackType → 422", async () => {
     vi.stubGlobal("fetch", mockTurnstileSuccess());
     const req = makeRequest({
       feedbackType: "not_a_valid_type",
       message: "Hello",
+      contactEmail: "user@example.com",
       website: "",
       turnstileToken: "valid-test-token",
     });
@@ -151,6 +167,7 @@ describe("Honeypot logic — integration with POST handler (feedback)", () => {
     const req = makeRequest({
       feedbackType: "feature",
       message: "  ", // whitespace-only
+      contactEmail: "user@example.com",
       website: "",
       turnstileToken: "valid-test-token",
     });
@@ -166,6 +183,7 @@ describe("Honeypot logic — integration with POST handler (feedback)", () => {
     const validBody = {
       feedbackType: "positive",
       message: "Great map!",
+      contactEmail: "user@example.com",
       website: "",
       turnstileToken: "valid-test-token",
     };
@@ -228,6 +246,7 @@ describe("Turnstile verification — /feedback/submit", () => {
   const validBody = {
     feedbackType: "feature",
     message: "Please add a filter for WIC-only venues.",
+    contactEmail: "user@example.com",
     website: "",
   };
 

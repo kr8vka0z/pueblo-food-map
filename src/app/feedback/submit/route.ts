@@ -12,7 +12,7 @@
  *   7. Return JSON {ok: true} or {ok: false, error: string}.
  *
  * PII policy: IP addresses are used only for rate-limiting and are never
- * logged or persisted. The optional contact email is forwarded to Resend as
+ * logged or persisted. The required contact email is forwarded to Resend as
  * part of the email body and is NOT logged by this handler.
  */
 
@@ -57,7 +57,7 @@ export function checkRateLimit(ip: string): boolean {
 async function sendFeedbackEmail(payload: {
   feedbackType: FeedbackTypeKey;
   message: string;
-  contactEmail?: string;
+  contactEmail: string;
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -74,10 +74,8 @@ async function sendFeedbackEmail(payload: {
     payload.message,
   ];
 
-  if (payload.contactEmail) {
-    lines.push(``);
-    lines.push(`Submitter contact: ${payload.contactEmail}`);
-  }
+  lines.push(``);
+  lines.push(`Submitter contact: ${payload.contactEmail}`);
 
   const emailBody = lines.join("\n");
 
@@ -108,7 +106,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 interface SubmitPayload {
   feedbackType: string;
   message: string;
-  contactEmail?: string;
+  contactEmail: string;
   /** Honeypot — must be empty string or absent */
   website?: string;
   /** Cloudflare Turnstile response token from the client widget */
@@ -122,7 +120,10 @@ function validate(body: SubmitPayload): string | null {
   if (!body.message || typeof body.message !== "string" || !body.message.trim()) {
     return "Missing message";
   }
-  if (body.contactEmail && !EMAIL_RE.test(body.contactEmail)) {
+  if (!body.contactEmail || typeof body.contactEmail !== "string" || !body.contactEmail.trim()) {
+    return "Missing email";
+  }
+  if (!EMAIL_RE.test(body.contactEmail)) {
     return "Invalid email format";
   }
   return null; // valid
@@ -192,7 +193,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     await sendFeedbackEmail({
       feedbackType: body.feedbackType as FeedbackTypeKey,
       message: body.message.trim(),
-      contactEmail: body.contactEmail || undefined,
+      contactEmail: body.contactEmail.trim(),
     });
   } catch (err) {
     // Log the error type/status only — not the body which may contain PII

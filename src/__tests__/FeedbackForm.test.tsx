@@ -6,9 +6,9 @@
  *   2. Client validation: error when feedback type not selected.
  *   3. Client validation: error when message is empty.
  *   4. Client validation: error for invalid email format.
- *   5. Valid email passes (no error).
- *   6. Empty email passes (optional field).
- *   7. Submit sends correct JSON payload (includes turnstileToken, feedbackType, message).
+ *   5. Client validation: error when email is empty (now required).
+ *   6. Valid email passes (no error).
+ *   7. Submit sends correct JSON payload (includes turnstileToken, feedbackType, message, email).
  *   8. Success state rendered after successful submit.
  *   9. Error state rendered after failed submit.
  *  10. "Try again" button resets error state.
@@ -101,9 +101,11 @@ describe("FeedbackForm — rendering", () => {
     expect(screen.getByLabelText(/Message/i)).toBeDefined();
   });
 
-  test("renders optional email input", () => {
+  test("renders required email input", () => {
     renderForm();
-    expect(screen.getByLabelText(/Your email/i)).toBeDefined();
+    const emailInput = screen.getByLabelText(/Your email/i);
+    expect(emailInput).toBeDefined();
+    expect((emailInput as HTMLInputElement).required).toBe(true);
   });
 
   test("renders submit button (enabled after Turnstile resolves)", async () => {
@@ -205,8 +207,7 @@ describe("FeedbackForm — client validation", () => {
     expect(mockFetch).toHaveBeenCalledOnce();
   });
 
-  test("empty email passes validation (field is optional)", async () => {
-    mockSuccess();
+  test("empty email is rejected (field is required)", async () => {
     const user = userEvent.setup();
     renderForm();
 
@@ -216,16 +217,18 @@ describe("FeedbackForm — client validation", () => {
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Just a general note.");
 
+    // Leave email blank (required)
     await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Send feedback/i }));
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledOnce();
+      expect(screen.getByText(/Please enter your email address/i)).toBeDefined();
     });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 
 describe("FeedbackForm — submit flow", () => {
-  test("sends correct JSON payload on submit (includes turnstileToken)", async () => {
+  test("sends correct JSON payload on submit (includes turnstileToken and email)", async () => {
     mockSuccess();
     const user = userEvent.setup();
     renderForm();
@@ -235,6 +238,9 @@ describe("FeedbackForm — submit flow", () => {
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Please add a printer-friendly view.");
+
+    const emailInput = screen.getByLabelText(/Your email/i);
+    await user.type(emailInput, "test@example.com");
 
     await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Send feedback/i }));
@@ -247,6 +253,7 @@ describe("FeedbackForm — submit flow", () => {
     const body = JSON.parse(opts.body as string);
     expect(body.feedbackType).toBe("feature");
     expect(body.message).toBe("Please add a printer-friendly view.");
+    expect(body.contactEmail).toBe("test@example.com");
     // Honeypot should be empty string (real user)
     expect(body.website).toBe("");
     // Turnstile token from our mock
@@ -263,6 +270,9 @@ describe("FeedbackForm — submit flow", () => {
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Love the map!");
+
+    const emailInput = screen.getByLabelText(/Your email/i);
+    await user.type(emailInput, "test@example.com");
 
     await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Send feedback/i }));
@@ -283,6 +293,9 @@ describe("FeedbackForm — submit flow", () => {
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Something is broken.");
 
+    const emailInput = screen.getByLabelText(/Your email/i);
+    await user.type(emailInput, "test@example.com");
+
     await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Send feedback/i }));
     await waitFor(() => {
@@ -300,6 +313,9 @@ describe("FeedbackForm — submit flow", () => {
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Something is broken.");
+
+    const emailInput = screen.getByLabelText(/Your email/i);
+    await user.type(emailInput, "test@example.com");
 
     await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Send feedback/i }));
@@ -325,6 +341,9 @@ describe("FeedbackForm — submit flow", () => {
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "A message.");
 
+    const emailInput = screen.getByLabelText(/Your email/i);
+    await user.type(emailInput, "test@example.com");
+
     await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Send feedback/i }));
     await waitFor(() => {
@@ -344,6 +363,9 @@ describe("FeedbackForm — submit flow", () => {
 
     const textarea = screen.getByLabelText(/Message/i);
     await user.type(textarea, "Would love dark mode.");
+
+    const emailInput = screen.getByLabelText(/Your email/i);
+    await user.type(emailInput, "test@example.com");
 
     await waitForSubmitEnabled();
     await user.click(screen.getByRole("button", { name: /Send feedback/i }));

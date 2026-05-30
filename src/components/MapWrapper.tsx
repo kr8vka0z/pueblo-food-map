@@ -49,7 +49,7 @@ import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
 import { searchVenues } from "@/lib/searchVenues";
-import type { VenueCategory } from "@/types/venue";
+import type { Venue, VenueCategory } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
 import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
 
@@ -106,6 +106,42 @@ export function isOutsideCounty(point: { lat: number; lng: number }): boolean {
     point.lat < latSouth ||
     point.lat > latNorth
   );
+}
+
+// ─── Category autozoom constants (#111) ───────────────────────────────────────
+//
+// Padding (px) around the fitBounds result so pins aren't hidden behind chrome.
+// Mobile: extra bottom clearance for the bottom-sheet peek bar (≈88px) + some top
+//   clearance for the search bar (≈72px). Desktop: extra top clearance for the
+//   search bar (≈72px) and right clearance for the control stack (≈60px).
+//
+// Tune these values during live review — they are the first thing to eyeball.
+export const CATEGORY_FIT_PADDING_MOBILE = { top: 80, bottom: 120, left: 40, right: 40 };
+export const CATEGORY_FIT_PADDING_DESKTOP = { top: 80, bottom: 60, left: 60, right: 80 };
+
+/**
+ * Maximum zoom level applied when fitting a category's bounds.
+ * Prevents sparse categories (2–3 venues in a tight cluster) from slamming
+ * to street level. Tune during live review.
+ */
+export const CATEGORY_FIT_MAX_ZOOM = 14;
+
+/**
+ * Compute the [[lngW, latS], [lngE, latN]] bounding box for a list of venues.
+ * Returns null if the array is empty.
+ */
+export function computeCategoryBounds(
+  venues: Pick<Venue, "lat" | "lng">[],
+): [[number, number], [number, number]] | null {
+  if (venues.length === 0) return null;
+  let lngW = Infinity, latS = Infinity, lngE = -Infinity, latN = -Infinity;
+  for (const v of venues) {
+    if (v.lng < lngW) lngW = v.lng;
+    if (v.lng > lngE) lngE = v.lng;
+    if (v.lat < latS) latS = v.lat;
+    if (v.lat > latN) latN = v.lat;
+  }
+  return [[lngW, latS], [lngE, latN]];
 }
 
 // Stable listbox ids — used for aria-controls on the search input and id on each listbox.
@@ -418,6 +454,55 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
       mapboxMap.flyTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: 13 });
     }
   }, [mapboxMap]);
+
+  // ── Category autozoom (#111) ─────────────────────────────────────────────────
+  // When a single category is activated from the dropdown, fit the map to all
+  // venues in that category. When cleared, return to the all-venues overview.
+  //
+  // Fires after `activeCategoryFilter` changes, so it runs on every select/clear.
+  // `mapboxMap` may be null on first render (map not yet loaded) — the guard
+  // below is safe; the user can't open the dropdown before the map loads anyway.
+  //
+  // Interaction with #108 drift detection: `fitBounds` will fire a `moveend`
+  // event which calls `handleMoveEnd` → may set `isDrifted`. That's expected;
+  // the Re-center button will appear if the user-dot isn't in the new view, which
+  // is correct UX. No loop risk because `handleMoveEnd` only reads bounds, it
+  // does not change `activeCategoryFilter`.
+  useEffect(() => {
+    if (!mapboxMap) return;
+
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (activeCategoryFilter === null) {
+      // Cleared — return to all-venues overview (mirrors wordmark reset zoom).
+      const allBounds = computeCategoryBounds(allVenues);
+      if (!allBounds) return;
+      mapboxMap.fitBounds(allBounds, {
+        padding: isMobile ? CATEGORY_FIT_PADDING_MOBILE : CATEGORY_FIT_PADDING_DESKTOP,
+        maxZoom: CATEGORY_FIT_MAX_ZOOM,
+        duration: reducedMotion ? 0 : 600,
+      });
+      return;
+    }
+
+    // Single category selected — compute bounds from all (unfiltered) venues in
+    // this category so the view doesn't depend on other active filters.
+    const categoryVenues = allVenues.filter((v) => v.category === activeCategoryFilter);
+    const bounds = computeCategoryBounds(categoryVenues);
+    if (!bounds) return;
+
+    mapboxMap.fitBounds(bounds, {
+      padding: isMobile ? CATEGORY_FIT_PADDING_MOBILE : CATEGORY_FIT_PADDING_DESKTOP,
+      maxZoom: CATEGORY_FIT_MAX_ZOOM,
+      duration: reducedMotion ? 0 : 600,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCategoryFilter, mapboxMap]);
+  // Note: `isMobile` intentionally excluded from deps — we want the padding that
+  // was current at the time the category was selected, not re-zoom on resize.
+  // `allVenues` is a module-level constant (stable ref); no dep needed.
 
   // Pre-compute distance map for Map.tsx (aria-labels on markers)
   const userDistances = useMemo(() => {

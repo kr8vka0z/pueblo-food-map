@@ -18,6 +18,7 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import HamburgerMenu from "@/components/HamburgerMenu";
+import { LocaleProvider } from "@/lib/LocaleContext";
 
 // Mock next/link — renders a plain <a> in tests
 vi.mock("next/link", () => ({
@@ -46,6 +47,14 @@ function renderMenu(locale: "en" | "es" = "en") {
 
 function renderMenuWithWelcome(onShowWelcome = vi.fn(), locale: "en" | "es" = "en") {
   return { onShowWelcome, ...render(<HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} />) };
+}
+
+function renderMenuWithLocaleProvider(locale: "en" | "es" = "en", initialLocale: "en" | "es" = "en") {
+  return render(
+    <LocaleProvider initialLocale={initialLocale}>
+      <HamburgerMenu locale={locale} />
+    </LocaleProvider>,
+  );
 }
 
 describe("HamburgerMenu — collapsed state", () => {
@@ -335,5 +344,91 @@ describe("#99 — Show welcome screen menu item", () => {
 
     // Cleanup
     localStorage.removeItem(GATE_KEY);
+  });
+});
+
+// ─── #109: Language toggle in hamburger menu ──────────────────────────────────
+
+describe("#109 — Language toggle as last menu item", () => {
+  test("language row renders 'Language / Idioma' label when menu is open", async () => {
+    const user = userEvent.setup();
+    renderMenuWithLocaleProvider();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Language / Idioma")).toBeDefined();
+    });
+  });
+
+  test("EN button is present in the language row", async () => {
+    const user = userEvent.setup();
+    renderMenuWithLocaleProvider();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Language: English/i })).toBeDefined();
+    });
+  });
+
+  test("ES button is present in the language row", async () => {
+    const user = userEvent.setup();
+    renderMenuWithLocaleProvider();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Language: Spanish/i })).toBeDefined();
+    });
+  });
+
+  test("clicking ES button in the menu updates locale (ES becomes active)", async () => {
+    const user = userEvent.setup();
+    renderMenuWithLocaleProvider();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Language: Spanish/i })).toBeDefined();
+    });
+    const esBtn = screen.getByRole("button", { name: /Language: Spanish/i });
+    await user.click(esBtn);
+    await waitFor(() => {
+      expect(esBtn.getAttribute("aria-pressed")).toBe("true");
+    });
+  });
+
+  test("clicking EN button in the menu keeps EN active", async () => {
+    const user = userEvent.setup();
+    renderMenuWithLocaleProvider();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Language: English/i })).toBeDefined();
+    });
+    const enBtn = screen.getByRole("button", { name: /Language: English/i });
+    await user.click(enBtn);
+    await waitFor(() => {
+      expect(enBtn.getAttribute("aria-pressed")).toBe("true");
+    });
+  });
+
+  test("language row has role=menuitem", async () => {
+    const user = userEvent.setup();
+    const { container } = renderMenuWithLocaleProvider();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Language / Idioma")).toBeDefined();
+    });
+    // Find the li that contains the language label
+    const langLabel = screen.getByText("Language / Idioma");
+    const li = langLabel.closest("li");
+    expect(li).not.toBeNull();
+    expect(li!.getAttribute("role")).toBe("menuitem");
+    void container; // suppress unused warning
+  });
+
+  test("language row is the last item in the menu list", async () => {
+    const user = userEvent.setup();
+    renderMenuWithLocaleProvider();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Language / Idioma")).toBeDefined();
+    });
+    const menuItems = screen.getAllByRole("menuitem");
+    const lastItem = menuItems[menuItems.length - 1];
+    expect(lastItem.textContent).toContain("Language / Idioma");
   });
 });

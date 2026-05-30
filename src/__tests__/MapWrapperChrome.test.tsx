@@ -1,8 +1,9 @@
 /**
- * MapWrapper chrome layout tests — issues #97, #95 (partial), #96, #99
+ * MapWrapper chrome layout tests — issues #97, #95 (partial), #96, #99, #109
  *
- * #97: EN/ES toggle renders in the top-left cluster beside the wordmark,
- *      not in a standalone top-right mount.
+ * #97: Wordmark is in the top-left cluster. EN/ES toggle was here but moved
+ *      to the hamburger menu in #109 — top-left cluster now holds only the Wordmark.
+ * #109: EN/ES toggle is in the hamburger menu (covered in HamburgerMenu.test.tsx).
  * #95: CategoryDropdown renders listbox with all 7 categories + venue counts;
  *      clicking a category fires onSelect; active category has aria-selected;
  *      SearchBar shows filterChip when active category is set.
@@ -15,7 +16,6 @@ import { describe, test, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LocaleProvider } from "@/lib/LocaleContext";
-import LanguageToggle from "@/components/LanguageToggle";
 import Wordmark from "@/components/Wordmark";
 import CategoryDropdown, { BROWSE_CATEGORIES } from "@/components/CategoryDropdown";
 import SearchBar from "@/components/SearchBar";
@@ -25,49 +25,32 @@ import SearchBar from "@/components/SearchBar";
 function renderTopLeftCluster() {
   return render(
     <LocaleProvider>
-      {/* Simulate the top-left container from MapWrapper */}
+      {/* Simulate the top-left container from MapWrapper (#109: toggle removed) */}
       <div
         data-testid="top-left-cluster"
         style={{ position: "absolute", top: 16, left: 16, display: "flex", gap: 8, alignItems: "center" }}
       >
         <Wordmark onClick={vi.fn()} locale="en" size="sm" selfPositioned={false} />
-        <LanguageToggle />
       </div>
     </LocaleProvider>,
   );
 }
 
-// ─── #97: Language toggle position ───────────────────────────────────────────
+// ─── #97 / #109: Top-left cluster contains Wordmark (toggle moved to hamburger menu) ───
 
-describe("#97 — LanguageToggle in top-left cluster with Wordmark", () => {
-  test("Wordmark and LanguageToggle are siblings inside the top-left container", () => {
+describe("#97/#109 — top-left cluster contains Wordmark; language toggle is in hamburger menu", () => {
+  test("Wordmark renders inside the top-left container", () => {
     renderTopLeftCluster();
     const cluster = screen.getByTestId("top-left-cluster");
-    // Both should be children of the same container
     const wordmark = screen.getByRole("button", { name: /Pueblo Food Map/i });
-    const enBtn = screen.getByRole("button", { name: /english/i });
     expect(cluster.contains(wordmark)).toBe(true);
-    expect(cluster.contains(enBtn)).toBe(true);
   });
 
-  test("EN button is present in the cluster", () => {
+  test("EN/ES toggle buttons are NOT in the top-left cluster (#109)", () => {
     renderTopLeftCluster();
-    expect(screen.getByRole("button", { name: /english/i })).toBeDefined();
-  });
-
-  test("ES button is present in the cluster", () => {
-    renderTopLeftCluster();
-    expect(screen.getByRole("button", { name: /spanish/i })).toBeDefined();
-  });
-
-  test("language toggle still switches locale after move", async () => {
-    const user = userEvent.setup();
-    renderTopLeftCluster();
-    const esBtn = screen.getByRole("button", { name: /spanish/i });
-    await user.click(esBtn);
-    expect(esBtn.getAttribute("aria-pressed")).toBe("true");
-    const enBtn = screen.getByRole("button", { name: /english/i });
-    expect(enBtn.getAttribute("aria-pressed")).toBe("false");
+    // After #109, language toggle is not in the top-left cluster
+    expect(screen.queryByRole("button", { name: /english/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /spanish/i })).toBeNull();
   });
 
   test("Wordmark does NOT carry absolute positioning classes when selfPositioned=false", () => {

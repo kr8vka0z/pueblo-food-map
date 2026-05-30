@@ -187,7 +187,7 @@ export default function SearchBar({
             "w-full h-11 md:h-[52px] " +
             (filterChip ? "pl-[calc(40%+8px)] " : "pl-9 md:pl-10 ") +
             "pr-4 " +
-            "text-sm text-[var(--color-ink-700)] " +
+            "text-base md:text-sm text-[var(--color-ink-700)] " +
             "bg-[var(--color-bone-50)] " +
             "border border-[var(--color-bone-300)] " +
             "rounded-[var(--radius-full)] " +

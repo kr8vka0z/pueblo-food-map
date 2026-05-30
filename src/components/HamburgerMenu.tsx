@@ -22,7 +22,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Menu, X, ExternalLink, RotateCcw, MessageSquare } from "lucide-react";
+import { Menu, X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import { t, type Locale } from "@/lib/i18n";
@@ -298,6 +298,7 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome }: Hamburge
             <HamburgerMenuItem
               label={t("menu.suggest", locale)}
               href="/suggest"
+              icon={<MapPinPlus size={14} />}
             />
             {/* Send us feedback (#116) */}
             <HamburgerMenuItem

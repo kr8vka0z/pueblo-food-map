@@ -26,6 +26,9 @@ import { Menu, X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Phone } fr
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import { t, type Locale } from "@/lib/i18n";
+import type { Venue } from "@/types/venue";
+import { categoryColors } from "@/data/venues";
+import { formatMiles } from "@/lib/distance";
 
 interface HamburgerMenuProps {
   locale?: Locale;
@@ -34,13 +37,17 @@ interface HamburgerMenuProps {
    * Re-shows the splash WITHOUT clearing localStorage.
    */
   onShowWelcome?: () => void;
+  /** Favorited venues (nearest-first), shown in the "Saved places" section (#132). */
+  savedVenues?: Array<Venue & { distanceMiles?: number }>;
+  /** Called when a saved venue row is tapped — selects it on the map. */
+  onSelectVenue?: (id: string) => void;
 }
 
 // All focusable elements inside the panel for tab-trap.
 const FOCUSABLE =
   'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export default function HamburgerMenu({ locale = "en", onShowWelcome }: HamburgerMenuProps) {
+export default function HamburgerMenu({ locale = "en", onShowWelcome, savedVenues = [], onSelectVenue }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -275,6 +282,50 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome }: Hamburge
 
           {/* Menu item list — About is the last item (#124) */}
           <ul role="none" className="py-2">
+            {/* Saved places (#132) — favorited venues; tap to open on the map */}
+            {savedVenues.length > 0 && (
+              <>
+                <li role="presentation" className="pt-1">
+                  <p className="px-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
+                    {t("menu.saved.heading", locale)}
+                  </p>
+                </li>
+                {savedVenues.map((v) => (
+                  <li role="menuitem" key={v.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        close();
+                        onSelectVenue?.(v.id);
+                      }}
+                      className={
+                        "flex items-center gap-2.5 w-full text-left px-5 py-2.5 text-sm font-medium " +
+                        "text-[var(--color-ink-800)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
+                        "transition-colors duration-100"
+                      }
+                    >
+                      <span
+                        className="inline-block w-2.5 h-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: categoryColors[v.category] }}
+                        aria-hidden="true"
+                      />
+                      <span className="flex-1 min-w-0 truncate">{v.name}</span>
+                      {v.distanceMiles !== undefined && (
+                        <span className="shrink-0 font-mono text-xs text-[var(--color-ink-500)] tabular-nums">
+                          {formatMiles(v.distanceMiles)}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+                <li
+                  role="presentation"
+                  aria-hidden="true"
+                  className="mt-1 mb-1 border-t border-[var(--color-bone-200)]"
+                />
+              </>
+            )}
             {/* Show welcome screen (#99) — re-shows splash without clearing localStorage */}
             {onShowWelcome && (
               <HamburgerMenuItem

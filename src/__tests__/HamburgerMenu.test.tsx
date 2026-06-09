@@ -373,6 +373,83 @@ describe("#99 — Show welcome screen menu item", () => {
   });
 });
 
+// ─── #132 9c: Saved places section ───────────────────────────────────────────
+
+describe("HamburgerMenu — Saved places (#132)", () => {
+  const savedVenueFixtures = [
+    {
+      id: "saved-v1",
+      name: "Eastside Food Pantry",
+      category: "pantry" as const,
+      lat: 38.26,
+      lng: -104.6,
+      address: "100 Main St, Pueblo, CO 81001",
+      source: "test",
+      last_verified: "2025-01-01",
+      distanceMiles: 0.5,
+    },
+    {
+      id: "saved-v2",
+      name: "Community Garden",
+      category: "garden" as const,
+      lat: 38.27,
+      lng: -104.61,
+      address: "200 Oak Ave, Pueblo, CO 81001",
+      source: "test",
+      last_verified: "2025-01-01",
+      distanceMiles: 1.2,
+    },
+  ];
+
+  test("saved places heading does NOT appear when savedVenues is omitted", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      // menu is open — confirm by checking a known item
+      expect(screen.getByRole("link", { name: /Suggest a venue/i })).toBeDefined();
+      // heading must not be present
+      expect(screen.queryByText(/saved places/i)).toBeNull();
+    });
+  });
+
+  test("saved places heading does NOT appear when savedVenues is empty", async () => {
+    const user = userEvent.setup();
+    render(<HamburgerMenu locale="en" savedVenues={[]} />);
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /Suggest a venue/i })).toBeDefined();
+      expect(screen.queryByText(/saved places/i)).toBeNull();
+    });
+  });
+
+  test("saved places heading and venue names visible when savedVenues has entries", async () => {
+    const user = userEvent.setup();
+    render(<HamburgerMenu locale="en" savedVenues={savedVenueFixtures} onSelectVenue={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/saved places/i)).toBeDefined();
+      expect(screen.getByText("Eastside Food Pantry")).toBeDefined();
+      expect(screen.getByText("Community Garden")).toBeDefined();
+    });
+  });
+
+  test("clicking a saved venue row calls onSelectVenue with that venue id exactly once", async () => {
+    const user = userEvent.setup();
+    const onSelectVenue = vi.fn();
+    render(<HamburgerMenu locale="en" savedVenues={savedVenueFixtures} onSelectVenue={onSelectVenue} />);
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Eastside Food Pantry")).toBeDefined();
+    });
+    await user.click(screen.getByText("Eastside Food Pantry"));
+    await waitFor(() => {
+      expect(onSelectVenue).toHaveBeenCalledTimes(1);
+      expect(onSelectVenue).toHaveBeenCalledWith("saved-v1");
+    });
+  });
+});
+
 // ─── #109: Language toggle in hamburger menu ──────────────────────────────────
 
 describe("#109 — Language toggle as last menu item", () => {

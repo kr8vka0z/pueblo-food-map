@@ -159,6 +159,9 @@ const en: Record<string, string> = {
   "locate.recenter": "Re-center",
   "locate.outsideCounty": "Your location is outside Pueblo County",
 
+  // Saved places (#132)
+  "menu.saved.heading": "Saved places",
+
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Open menu",
   "menu.close": "Close menu",
@@ -448,6 +451,9 @@ const es: Record<string, string> = {
   "locate.locating": "Localizando…",
   "locate.recenter": "Recentrar",
   "locate.outsideCounty": "Tu ubicación está fuera del condado de Pueblo",
+
+  // Saved places (#132)
+  "menu.saved.heading": "Lugares guardados",
 
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Abrir menú",

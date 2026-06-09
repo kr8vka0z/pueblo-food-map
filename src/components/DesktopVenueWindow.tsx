@@ -36,6 +36,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MapPin, Phone, Clock, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
+import ShareButton from "@/components/ShareButton";
 
 /**
  * Minimal interface covering the mapboxgl.Map methods DesktopVenueWindow uses.
@@ -262,7 +263,10 @@ export default function DesktopVenueWindow({
           </p>
         )}
       </div>
-      <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} />
+      <div className="flex items-center gap-0.5 shrink-0">
+        <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} />
+        <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} />
+      </div>
     </div>
   );
 

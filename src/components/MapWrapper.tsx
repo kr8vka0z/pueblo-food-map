@@ -190,9 +190,11 @@ interface MapWrapperProps {
    * menu (#99). Re-shows the SplashScreen WITHOUT clearing localStorage.
    */
   onShowWelcome?: () => void;
+  /** Deep link (#132): venue id from a ?venue=<id> URL to open on load. */
+  initialVenueId?: string | null;
 }
 
-export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }: MapWrapperProps) {
+export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, initialVenueId }: MapWrapperProps) {
   // ── Locale — from context ─────────────────────────────────────────────────────
   const { locale } = useLocale();
 
@@ -357,6 +359,21 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
   // Typed as unknown; DesktopVenueWindow narrows it via its MapboxMap interface.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [mapboxMap, setMapboxMap] = useState<any>(null);
+
+  // ── Deep link (#132) ──────────────────────────────────────────────────────────
+  // Opened with ?venue=<id> → select that venue once the map is ready to fly.
+  // Waiting for mapboxMap ensures the selected-venue flyTo (Map.tsx) actually
+  // centers, instead of firing before the map has loaded.
+  const deepLinkDoneRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkDoneRef.current) return;
+    if (!mapboxMap) return; // wait until the map can fly
+    deepLinkDoneRef.current = true;
+    if (initialVenueId && allVenues.some((v) => v.id === initialVenueId)) {
+      queueMicrotask(() => setSelectedVenueId(initialVenueId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapboxMap]);
 
   // ── Typeahead popover state (issue #67) ──────────────────────────────────────
   // isPopoverOpen: true when input is focused + query is non-empty + matches exist.

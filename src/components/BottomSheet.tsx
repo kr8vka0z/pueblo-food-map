@@ -19,7 +19,7 @@
 
 import { useState } from "react";
 import { Drawer } from "vaul";
-import { X, ChevronUp, ChevronDown, MapPin, Phone, Clock } from "lucide-react";
+import { X, ChevronUp, ChevronDown, MapPin, Phone, Clock, ExternalLink } from "lucide-react";
 import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
@@ -337,6 +337,25 @@ export default function BottomSheet({ venue, onClose, onExpandedChange, locale =
                             {venue.phone}
                           </a>
                         </section>
+                      )}
+
+                      {/* See full details on Plentiful (#128) — Plentiful-sourced venues only */}
+                      {venue.source.toLowerCase().includes("plentiful") && venue.url && (
+                        <a
+                          href={venue.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={
+                            "flex items-center justify-between gap-2 w-full px-4 py-3 " +
+                            "rounded-[var(--radius-md)] border border-[var(--color-sage-300)] " +
+                            "bg-[var(--color-sage-50)] text-sm font-medium text-[var(--color-sage-700)] " +
+                            "hover:bg-[var(--color-sage-100)] transition-colors " +
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                          }
+                        >
+                          <span>{t("detail.plentifulLink", locale)}</span>
+                          <ExternalLink size={15} className="shrink-0" aria-hidden />
+                        </a>
                       )}
 
                       {/* Report venue */}

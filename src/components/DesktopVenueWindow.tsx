@@ -34,7 +34,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { MapPin, Phone, Clock } from "lucide-react";
+import { MapPin, Phone, Clock, ExternalLink } from "lucide-react";
 
 /**
  * Minimal interface covering the mapboxgl.Map methods DesktopVenueWindow uses.
@@ -464,6 +464,25 @@ export default function DesktopVenueWindow({
             {venue.notes}
           </p>
         </section>
+      )}
+
+      {/* See full details on Plentiful (#128) — Plentiful-sourced venues only */}
+      {venue.source.toLowerCase().includes("plentiful") && venue.url && (
+        <a
+          href={venue.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={
+            "flex items-center justify-between gap-2 w-full px-3 py-2.5 " +
+            "rounded-[var(--radius-md)] border border-[var(--color-sage-300)] " +
+            "bg-[var(--color-sage-50)] text-sm font-medium text-[var(--color-sage-700)] " +
+            "hover:bg-[var(--color-sage-100)] transition-colors " +
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          }
+        >
+          <span>{t("detail.plentifulLink", locale)}</span>
+          <ExternalLink size={14} className="shrink-0" aria-hidden />
+        </a>
       )}
     </div>
   );

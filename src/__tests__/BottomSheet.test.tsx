@@ -141,3 +141,28 @@ describe("BottomSheet — close button", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("BottomSheet — Plentiful link (#128)", () => {
+  test("shows the Plentiful link (new tab) for Plentiful-sourced venues when expanded", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue({
+      source: "directory.plentiful.org/colorado/pueblo",
+      url: "https://directory.plentiful.org/colorado/pueblo/test-pantry",
+    });
+    render(<BottomSheet venue={venue} onClose={() => {}} />);
+    // Collapsed: the link is part of the detail, so it should not be present yet.
+    expect(screen.queryByRole("link", { name: /on Plentiful/i })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /show details/i }));
+    const link = screen.getByRole("link", { name: /on Plentiful/i }) as HTMLAnchorElement;
+    expect(link.href).toContain("directory.plentiful.org");
+    expect(link.target).toBe("_blank");
+  });
+
+  test("no Plentiful link for non-Plentiful venues", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue({ source: "OpenStreetMap", url: "https://example.com/x" });
+    render(<BottomSheet venue={venue} onClose={() => {}} />);
+    await user.click(screen.getByRole("button", { name: /show details/i }));
+    expect(screen.queryByRole("link", { name: /on Plentiful/i })).toBeNull();
+  });
+});

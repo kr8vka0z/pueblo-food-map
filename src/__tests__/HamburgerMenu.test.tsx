@@ -113,6 +113,29 @@ describe("HamburgerMenu — open state", () => {
     });
   });
 
+  test("Get help section renders the four assistance links (#131)", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      const co211 = screen.getByRole("link", { name: /2-1-1 Colorado/i }) as HTMLAnchorElement;
+      const snap = screen.getByRole("link", { name: /Apply for SNAP/i }) as HTMLAnchorElement;
+      const wic = screen.getByRole("link", { name: /Apply for WIC/i }) as HTMLAnchorElement;
+      const hotline = screen.getByRole("link", { name: /Food hotline/i }) as HTMLAnchorElement;
+
+      expect(co211.href).toContain("211colorado.org");
+      expect(snap.href).toContain("cdhs.colorado.gov/snap");
+      expect(wic.href).toContain("coloradowic.gov");
+      expect(hotline.href).toContain("tel:");
+      expect(hotline.href).toContain("8558554626");
+
+      // Web resources open in a new tab; the hotline is a tap-to-call link.
+      expect(co211.target).toBe("_blank");
+      expect(snap.target).toBe("_blank");
+      expect(wic.target).toBe("_blank");
+    });
+  });
+
   test("X close button is present in panel", async () => {
     const user = userEvent.setup();
     renderMenu();

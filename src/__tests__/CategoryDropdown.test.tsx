@@ -207,3 +207,70 @@ describe("CategoryDropdown — Accepts WIC toggle", () => {
     expect(option).toHaveAttribute("aria-selected", "false");
   });
 });
+
+describe("CategoryDropdown — Favorites toggle", () => {
+  test("renders 'Favorites' option with count when favoritesCount > 0", () => {
+    const onToggleFavorites = vi.fn();
+    render(
+      <CategoryDropdown
+        {...baseProps}
+        favoritesCount={3}
+        favoritesActive={false}
+        onToggleFavorites={onToggleFavorites}
+      />,
+    );
+
+    const option = screen.getByRole("option", { name: /^Favorites/i });
+    expect(option).toBeTruthy();
+    expect(option.textContent).toContain("3");
+  });
+
+  test("clicking Favorites option calls onToggleFavorites once", () => {
+    const onToggleFavorites = vi.fn();
+    render(
+      <CategoryDropdown
+        {...baseProps}
+        favoritesCount={3}
+        favoritesActive={false}
+        onToggleFavorites={onToggleFavorites}
+      />,
+    );
+
+    const option = screen.getByRole("option", { name: /^Favorites/i });
+    fireEvent.click(option);
+    expect(onToggleFavorites).toHaveBeenCalledTimes(1);
+  });
+
+  test("option has aria-selected='true' when favoritesActive=true", () => {
+    render(
+      <CategoryDropdown
+        {...baseProps}
+        favoritesCount={3}
+        favoritesActive={true}
+        onToggleFavorites={vi.fn()}
+      />,
+    );
+
+    const option = screen.getByRole("option", { name: /^Favorites/i });
+    expect(option).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("Favorites row does NOT render when favoritesCount=0", () => {
+    render(
+      <CategoryDropdown
+        {...baseProps}
+        favoritesCount={0}
+        favoritesActive={false}
+        onToggleFavorites={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(/^Favorites/i)).toBeNull();
+  });
+
+  test("Favorites row does NOT render when favoritesCount is omitted", () => {
+    render(<CategoryDropdown {...baseProps} />);
+
+    expect(screen.queryByText(/^Favorites/i)).toBeNull();
+  });
+});

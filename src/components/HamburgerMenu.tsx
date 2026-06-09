@@ -330,6 +330,13 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome }: Hamburge
               ariaLabel={`${t("menu.help.wic", locale)} (opens in new tab)`}
             />
             <HamburgerMenuItem
+              label={t("menu.help.doubleup", locale)}
+              href="https://doubleupcolorado.org/"
+              isExternal={true}
+              icon={<ExternalLink size={14} />}
+              ariaLabel={`${t("menu.help.doubleup", locale)} (opens in new tab)`}
+            />
+            <HamburgerMenuItem
               label={t("menu.help.hotline", locale)}
               href="tel:+18558554626"
               isExternal={true}

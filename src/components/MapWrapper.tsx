@@ -45,6 +45,7 @@ import LocationDeniedBanner from "./LocationDeniedBanner";
 import { useGeolocation } from "@/lib/useGeolocation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
+import { useFavorites } from "@/lib/favorites";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
@@ -432,6 +433,16 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     }));
   }, [origin]);
 
+  // ── Saved venues (#132 9c) ──────────────────────────────────────────────────
+  // Favorited venues, nearest-first, for the "Saved places" menu section.
+  const favoriteIds = useFavorites();
+  const savedVenues = useMemo(() => {
+    const ids = new Set(favoriteIds);
+    return venuesWithDistance
+      .filter((v) => ids.has(v.id))
+      .sort((a, b) => a.distanceMiles - b.distanceMiles);
+  }, [favoriteIds, venuesWithDistance]);
+
   const openNowCount = useMemo(
     () =>
       venuesWithDistance.filter(
@@ -651,6 +662,24 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     [isPopoverOpen, filteredVenues, activeIndex, isMobile],
   );
 
+  // Select a venue from the Saved list (#132 9c). Clears active filters + search
+  // so the venue is in the filtered set — that makes its pin visible and lets the
+  // map fly to it (Map.tsx's selected-venue flyTo reads the filtered set) — then
+  // opens its detail card.
+  const handleSelectSavedVenue = useCallback(
+    (venueId: string) => {
+      setSelectedCategories(null);
+      setActiveCategoryFilter(null);
+      setFilterOpenNow(false);
+      setFilterSnap(false);
+      setFilterWic(false);
+      setQuery("");
+      setSelectedVenueId(venueId);
+      if (!isMobile) setWindowExpanded(false);
+    },
+    [isMobile],
+  );
+
   /** Called when user clicks/taps a result row inside the popover. */
   const handleSelectVenueFromPopover = useCallback(
     (venueId: string) => {
@@ -799,7 +828,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       )}
 
       {/* HamburgerMenu — top-right, above the control stack (#71) */}
-      <HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} />
+      <HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} savedVenues={savedVenues} onSelectVenue={handleSelectSavedVenue} />
 
       {/* LocateButton — bottom-center, morphing control (#108).
           sheetVisible: mobile AND sheet is showing (not fully expanded — that's sheetFullyExpanded).

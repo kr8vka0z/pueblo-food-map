@@ -103,6 +103,8 @@ function renderCategoryDropdown(
         counts={SAMPLE_COUNTS}
         activeCategory={activeCategory}
         onSelect={onSelect}
+        openNowActive={false}
+        onToggleOpenNow={vi.fn()}
       />
     </div>,
   );
@@ -114,10 +116,10 @@ describe("#95 — CategoryDropdown rendering", () => {
     expect(screen.getByRole("listbox")).toBeDefined();
   });
 
-  test("renders 7 option rows", () => {
+  test("renders 8 option rows (Open now + 7 categories)", () => {
     renderCategoryDropdown();
     const options = screen.getAllByRole("option");
-    expect(options).toHaveLength(7);
+    expect(options).toHaveLength(8);
   });
 
   test("BROWSE_CATEGORIES exports all 7 categories in legend order", () => {
@@ -147,8 +149,8 @@ describe("#95 — CategoryDropdown interaction", () => {
     const onSelect = vi.fn();
     renderCategoryDropdown(null, onSelect);
     const options = screen.getAllByRole("option");
-    // Click first option (pantry)
-    fireEvent.click(options[0]);
+    // options[0] is "Open now"; options[1] is pantry (first category)
+    fireEvent.click(options[1]);
     expect(onSelect).toHaveBeenCalledWith("pantry");
   });
 
@@ -156,18 +158,18 @@ describe("#95 — CategoryDropdown interaction", () => {
     const onSelect = vi.fn();
     renderCategoryDropdown("pantry", onSelect);
     const options = screen.getAllByRole("option");
-    // Click the active pantry option again
-    fireEvent.click(options[0]);
+    // options[0] is "Open now"; options[1] is pantry
+    fireEvent.click(options[1]);
     expect(onSelect).toHaveBeenCalledWith(null);
   });
 
   test("active category option has aria-selected=true", () => {
     renderCategoryDropdown("grocery");
     const options = screen.getAllByRole("option");
-    // grocery is index 1 in BROWSE_CATEGORIES
-    expect(options[1].getAttribute("aria-selected")).toBe("true");
+    // options[0] is "Open now"; options[1] is pantry; options[2] is grocery
+    expect(options[2].getAttribute("aria-selected")).toBe("true");
     // pantry should be false
-    expect(options[0].getAttribute("aria-selected")).toBe("false");
+    expect(options[1].getAttribute("aria-selected")).toBe("false");
   });
 
   test("no category active: all options have aria-selected=false", () => {
@@ -188,6 +190,8 @@ describe("#95 — CategoryDropdown ES locale", () => {
           activeCategory={null}
           onSelect={vi.fn()}
           locale="es"
+          openNowActive={false}
+          onToggleOpenNow={vi.fn()}
         />
       </div>,
     );

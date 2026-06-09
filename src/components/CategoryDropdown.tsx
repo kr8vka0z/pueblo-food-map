@@ -19,6 +19,7 @@
  */
 
 import { useRef } from "react";
+import { Clock } from "lucide-react";
 import { categoryColors } from "@/data/venues";
 import { t, type Locale } from "@/lib/i18n";
 import type { VenueCategory } from "@/types/venue";
@@ -47,6 +48,12 @@ interface CategoryDropdownProps {
    */
   onMouseDown?: (e: React.MouseEvent) => void;
   locale?: Locale;
+  /** Whether the "Open now" filter is currently active. */
+  openNowActive: boolean;
+  /** Called when the "Open now" toggle row is clicked. */
+  onToggleOpenNow: () => void;
+  /** Number of venues currently open (shown as count on the row). */
+  openNowCount?: number;
 }
 
 const LISTBOX_ID = "category-browse-listbox";
@@ -57,6 +64,9 @@ export default function CategoryDropdown({
   onSelect,
   onMouseDown,
   locale = "en",
+  openNowActive,
+  onToggleOpenNow,
+  openNowCount,
 }: CategoryDropdownProps) {
   const listboxRef = useRef<HTMLDivElement>(null);
 
@@ -81,6 +91,35 @@ export default function CategoryDropdown({
         "py-1"
       }
     >
+        {/* Open now toggle row */}
+        <div
+          role="option"
+          aria-selected={openNowActive}
+          onClick={onToggleOpenNow}
+          className={
+            "flex items-center gap-3 px-4 py-2.5 cursor-pointer " +
+            "text-sm " +
+            "transition-colors duration-100 " +
+            (openNowActive
+              ? "bg-[var(--color-bone-200)] text-[var(--color-ink-900)]"
+              : "text-[var(--color-ink-800)] hover:bg-[var(--color-bone-100)]")
+          }
+        >
+          <Clock
+            aria-hidden="true"
+            size={12}
+            style={{ flexShrink: 0 }}
+          />
+          <span className="flex-1 font-medium">{t("filter.openNow", locale)}</span>
+          {openNowCount !== undefined && (
+            <span className="text-[var(--color-ink-400)] text-xs tabular-nums">
+              {openNowCount}
+            </span>
+          )}
+        </div>
+        {/* Divider between Open now and category rows */}
+        <div className="border-b border-[var(--color-bone-200)] mx-4 my-1" aria-hidden="true" />
+
         {BROWSE_CATEGORIES.map((cat) => {
           const active = activeCategory === cat;
           const count = counts[cat] ?? 0;

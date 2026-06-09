@@ -327,7 +327,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
   // ── Filter state — kept minimal; further filter controls are deferred ────────
   const [selectedCategories, setSelectedCategories] =
     useState<Set<VenueCategory> | null>(null);
-  const [filterOpenNow] = useState(false);
+  const [filterOpenNow, setFilterOpenNow] = useState(false);
   const [filterSnap] = useState(false);
   const [filterWalking] = useState(false);
 
@@ -413,6 +413,14 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
       distanceMiles: haversineMiles(origin, { lat: v.lat, lng: v.lng }),
     }));
   }, [origin]);
+
+  const openNowCount = useMemo(
+    () =>
+      venuesWithDistance.filter(
+        (v) => computeOpenStatus(v.hours_weekly, new Date()).state === "open",
+      ).length,
+    [venuesWithDistance],
+  );
 
   const filteredVenues = useMemo(() => {
     const now = new Date();
@@ -744,6 +752,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
           }}
           onMouseDown={handleCategoryDropdownMouseDown}
           locale={locale}
+          openNowActive={filterOpenNow}
+          openNowCount={openNowCount}
+          onToggleOpenNow={() => setFilterOpenNow((v) => !v)}
         />
       )}
 

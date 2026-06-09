@@ -335,6 +335,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const [filterOpenNow, setFilterOpenNow] = useState(false);
   const [filterSnap, setFilterSnap] = useState(false);
   const [filterWic, setFilterWic] = useState(false);
+  const [filterFavorites, setFilterFavorites] = useState(false);
   const [filterWalking] = useState(false);
 
   // ── Category browse filter (#95) ─────────────────────────────────────────────
@@ -448,6 +449,10 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       .sort((a, b) => a.distanceMiles - b.distanceMiles);
   }, [favoriteIds, venuesWithDistance]);
 
+  // Favorited venues present in the dataset — powers the Favorites filter.
+  const favoriteSet = useMemo(() => new Set(savedVenues.map((v) => v.id)), [savedVenues]);
+  const favoritesCount = favoriteSet.size;
+
   const openNowCount = useMemo(
     () =>
       venuesWithDistance.filter(
@@ -474,6 +479,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         }
         if (filterSnap && !v.accepts_snap) return false;
         if (filterWic && !v.accepts_wic) return false;
+        if (filterFavorites && favoriteSet.size > 0 && !favoriteSet.has(v.id)) return false;
         if (filterWalking && (v.distanceMiles ?? Infinity) > 1) return false;
         return true;
       })
@@ -487,6 +493,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     filterOpenNow,
     filterSnap,
     filterWic,
+    filterFavorites,
+    favoriteSet,
     filterWalking,
     query,
   ]);
@@ -496,6 +504,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     filterOpenNow ||
     filterSnap ||
     filterWic ||
+    (filterFavorites && favoriteSet.size > 0) ||
     filterWalking;
 
   function handleClearFilters() {
@@ -854,6 +863,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           wicActive={filterWic}
           wicCount={wicCount}
           onToggleWic={() => setFilterWic((v) => !v)}
+          favoritesActive={filterFavorites}
+          favoritesCount={favoritesCount}
+          onToggleFavorites={() => setFilterFavorites((v) => !v)}
         />
       )}
 

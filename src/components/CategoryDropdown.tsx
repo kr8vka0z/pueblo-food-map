@@ -19,7 +19,7 @@
  */
 
 import { useRef } from "react";
-import { Clock, CreditCard, Apple } from "lucide-react";
+import { Clock, CreditCard, Apple, Star } from "lucide-react";
 import { categoryColors } from "@/data/venues";
 import { t, type Locale } from "@/lib/i18n";
 import type { VenueCategory } from "@/types/venue";
@@ -66,6 +66,12 @@ interface CategoryDropdownProps {
   onToggleWic: () => void;
   /** Number of venues that accept WIC (shown as count on the row). */
   wicCount?: number;
+  /** Whether the "Favorites" filter is active. */
+  favoritesActive?: boolean;
+  /** Called when the "Favorites" toggle row is clicked. */
+  onToggleFavorites?: () => void;
+  /** Number of starred venues (row only renders when > 0). */
+  favoritesCount?: number;
 }
 
 const LISTBOX_ID = "category-browse-listbox";
@@ -85,6 +91,9 @@ export default function CategoryDropdown({
   wicActive,
   onToggleWic,
   wicCount,
+  favoritesActive,
+  onToggleFavorites,
+  favoritesCount,
 }: CategoryDropdownProps) {
   const listboxRef = useRef<HTMLDivElement>(null);
 
@@ -187,6 +196,29 @@ export default function CategoryDropdown({
             </span>
           )}
         </div>
+        {/* Favorites toggle row — only shown when the user has starred something */}
+        {favoritesCount !== undefined && favoritesCount > 0 && onToggleFavorites && (
+          <div
+            role="option"
+            aria-selected={!!favoritesActive}
+            onClick={onToggleFavorites}
+            className={
+              "flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm transition-colors duration-100 " +
+              (favoritesActive
+                ? "bg-[var(--color-bone-200)] text-[var(--color-ink-900)]"
+                : "text-[var(--color-ink-800)] hover:bg-[var(--color-bone-100)]")
+            }
+          >
+            <Star
+              aria-hidden="true"
+              size={12}
+              style={{ flexShrink: 0 }}
+              fill={favoritesActive ? "currentColor" : "none"}
+            />
+            <span className="flex-1 font-medium">{t("filter.favorites", locale)}</span>
+            <span className="text-[var(--color-ink-400)] text-xs tabular-nums">{favoritesCount}</span>
+          </div>
+        )}
         {/* Divider between filter rows and category rows */}
         <div className="border-b border-[var(--color-bone-200)] mx-4 my-1" aria-hidden="true" />
 

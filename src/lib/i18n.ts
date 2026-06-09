@@ -49,6 +49,7 @@ const en: Record<string, string> = {
   "filter.snap": "Accepts SNAP",
   "filter.wic": "Accepts WIC",
   "filter.walkingDistance": "Walking distance",
+  "filter.favorites": "Favorites",
 
   // Bottom sheet / list
   "sheet.places": "{count} places near you",
@@ -352,6 +353,7 @@ const es: Record<string, string> = {
   "filter.snap": "Acepta SNAP",
   "filter.wic": "Acepta WIC",
   "filter.walkingDistance": "Distancia caminando",
+  "filter.favorites": "Favoritos",
 
   // Bottom sheet / list
   "sheet.places": "{count} lugares cerca de ti",

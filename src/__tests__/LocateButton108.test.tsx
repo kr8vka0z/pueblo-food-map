@@ -228,30 +228,32 @@ describe("LocateButton — hidden when sheet fully expanded", () => {
   });
 });
 
-// ─── Bottom-offset: sheetVisible adjusts positioning ─────────────────────────
+// ─── Placement: mobile anchors to top (below search bar), desktop to bottom ──
 
-describe("LocateButton — bottom offset for sheet", () => {
-  test("bottom is higher when sheetVisible=true (sheet peek bar clearance)", () => {
-    const { container: withSheet } = renderButton({
+describe("LocateButton — placement adapts to mobile vs desktop", () => {
+  test("anchors to the top (below search bar) on mobile; bottom-center on desktop", () => {
+    const { container: mobile } = renderButton({
       geoState: GEO_PROMPT,
       isLocating: false,
       isDrifted: false,
       sheetVisible: true,
     });
-    const { container: withoutSheet } = renderButton({
+    const { container: desktop } = renderButton({
       geoState: GEO_PROMPT,
       isLocating: false,
       isDrifted: false,
       sheetVisible: false,
     });
-    const btnWithSheet = withSheet.querySelector<HTMLElement>("[data-testid='locate-button']");
-    const btnWithoutSheet = withoutSheet.querySelector<HTMLElement>("[data-testid='locate-button']");
-    expect(btnWithSheet).not.toBeNull();
-    expect(btnWithoutSheet).not.toBeNull();
-    // sheetVisible adds 88+12=100px; default is 24px → with sheet is larger bottom
-    const bottomWith = parseInt(btnWithSheet!.style.bottom, 10);
-    const bottomWithout = parseInt(btnWithoutSheet!.style.bottom, 10);
-    expect(bottomWith).toBeGreaterThan(bottomWithout);
+    const btnMobile = mobile.querySelector<HTMLElement>("[data-testid='locate-button']");
+    const btnDesktop = desktop.querySelector<HTMLElement>("[data-testid='locate-button']");
+    expect(btnMobile).not.toBeNull();
+    expect(btnDesktop).not.toBeNull();
+    // Mobile (sheetVisible): anchored to the top, not the bottom.
+    expect(btnMobile!.style.top).not.toBe("");
+    expect(btnMobile!.style.bottom).toBe("");
+    // Desktop: anchored to the bottom, not the top.
+    expect(btnDesktop!.style.bottom).not.toBe("");
+    expect(btnDesktop!.style.top).toBe("");
   });
 });
 

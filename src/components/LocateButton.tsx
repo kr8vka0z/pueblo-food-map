@@ -9,16 +9,16 @@
  *   reCenter  — located but user has panned so the dot is off-screen; label "Re-center"
  *   hidden    — located AND the dot is on-screen; button is not rendered
  *
- * Placement: bottom-center, floating above the bottom sheet (mobile) and
- * above the Mapbox attribution (desktop). Hidden when the sheet is at the
- * full 90vh snap (map mostly covered) to avoid overlap with sheet content.
+ * Placement: mobile — top-center, just below the search bar so it never
+ * overlaps the venue bottom-sheet. Desktop — bottom-center, above the Mapbox
+ * attribution. Still hidden when the venue sheet is fully expanded.
  *
  * Styling: mirrors the SplashScreen CTA — orange pill, navy text.
  * Fades/slides in & out; respects prefers-reduced-motion.
  *
  * Positioning constants (easy to tune for live review):
- *   BOTTOM_OFFSET_DEFAULT_PX — distance from the viewport bottom, no sheet
- *   BOTTOM_OFFSET_SHEET_PEEK_PX — extra clearance above the peek bar (88px)
+ *   BOTTOM_OFFSET_DEFAULT_PX — desktop: distance from the viewport bottom
+ *   TOP_OFFSET_MOBILE_PX — mobile: distance from the viewport top (below search)
  */
 
 import { Locate, LocateFixed, Loader2 } from "lucide-react";
@@ -27,12 +27,13 @@ import { t, type Locale } from "@/lib/i18n";
 
 // ─── Tunable layout constants ─────────────────────────────────────────────────
 
-/** px from viewport bottom when no bottom sheet is visible (desktop + mobile no-sheet). */
+/** px from viewport bottom — desktop placement (bottom-center). */
 export const BOTTOM_OFFSET_DEFAULT_PX = 24;
 
-/** px from viewport bottom on mobile when the peek bar (88px) is showing.
- *  The peek bar sits at the bottom; add a small gap above it. */
-export const BOTTOM_OFFSET_SHEET_PEEK_PX = 88 + 12; // peek bar height + gap
+/** px from viewport top — mobile placement, just below the search bar
+ *  (top-4 = 16px + ~44px bar + gap), so the button never overlaps the venue
+ *  bottom-sheet (#122 follow-up). */
+export const TOP_OFFSET_MOBILE_PX = 72;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -80,10 +81,11 @@ export default function LocateButton({
 
   if (variant === "hidden") return null;
 
-  // Bottom offset depends on whether the mobile bottom sheet peek bar is visible
-  const bottomPx = sheetVisible
-    ? BOTTOM_OFFSET_SHEET_PEEK_PX
-    : BOTTOM_OFFSET_DEFAULT_PX;
+  // Placement: on mobile (sheetVisible) anchor just below the search bar so the
+  // button never overlaps the venue bottom-sheet; on desktop, bottom-center.
+  const placement = sheetVisible
+    ? { top: TOP_OFFSET_MOBILE_PX }
+    : { bottom: BOTTOM_OFFSET_DEFAULT_PX };
 
   const label =
     variant === "locating"
@@ -123,7 +125,7 @@ export default function LocateButton({
       data-variant={variant}
       style={{
         position: "absolute",
-        bottom: bottomPx,
+        ...placement,
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 1000,
@@ -144,7 +146,7 @@ export default function LocateButton({
         // Elevation
         "elevation-2",
         // Fade + slide in/out animation — respects prefers-reduced-motion
-        "transition-[opacity,transform,bottom] duration-200",
+        "transition-[opacity,transform,top,bottom] duration-200",
         "motion-safe:animate-[locateButtonIn_200ms_ease-out]",
       ].join(" ")}
     >

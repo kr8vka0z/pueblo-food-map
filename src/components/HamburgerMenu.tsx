@@ -22,7 +22,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Menu, X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus } from "lucide-react";
+import { Menu, X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Phone } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import { t, type Locale } from "@/lib/i18n";
@@ -298,6 +298,45 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome }: Hamburge
               href="/feedback"
               icon={<MessageSquare size={14} />}
             />
+
+            {/* Get help — curated external assistance resources (#131) */}
+            <li
+              role="presentation"
+              className="mt-1 border-t border-[var(--color-bone-200)] pt-2"
+            >
+              <p className="px-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
+                {t("menu.help.heading", locale)}
+              </p>
+            </li>
+            <HamburgerMenuItem
+              label={t("menu.help.211", locale)}
+              href="https://www.211colorado.org/food-assistance/"
+              isExternal={true}
+              icon={<ExternalLink size={14} />}
+              ariaLabel={`${t("menu.help.211", locale)} (opens in new tab)`}
+            />
+            <HamburgerMenuItem
+              label={t("menu.help.snap", locale)}
+              href="https://cdhs.colorado.gov/snap"
+              isExternal={true}
+              icon={<ExternalLink size={14} />}
+              ariaLabel={`${t("menu.help.snap", locale)} (opens in new tab)`}
+            />
+            <HamburgerMenuItem
+              label={t("menu.help.wic", locale)}
+              href="https://www.coloradowic.gov/eligibility/apply"
+              isExternal={true}
+              icon={<ExternalLink size={14} />}
+              ariaLabel={`${t("menu.help.wic", locale)} (opens in new tab)`}
+            />
+            <HamburgerMenuItem
+              label={t("menu.help.hotline", locale)}
+              href="tel:+18558554626"
+              isExternal={true}
+              icon={<Phone size={14} />}
+              ariaLabel={t("menu.help.hotline", locale)}
+            />
+
             {/* About Pueblo Food Project (#96) — moved to the bottom of the nav
                 links per #124; sits above the language control (kept last per #109). */}
             <HamburgerMenuItem

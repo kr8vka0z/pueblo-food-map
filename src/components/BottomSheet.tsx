@@ -93,34 +93,13 @@ export default function BottomSheet({ venue, onClose, onExpandedChange, locale =
             {venue ? `${venue.name} ${t("detail.venueDetails", locale)}` : t("detail.venueDetailsPanel", locale)}
           </Drawer.Title>
 
-          {/* Drag handle — keyboard focusable, toggles expanded */}
-          <div
-            className="flex-shrink-0 flex justify-center pt-3 pb-1"
-            role="button"
-            tabIndex={0}
-            aria-label={t("detail.dragToExpand", locale)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                setExpanded((v) => {
-                  const n = !v;
-                  onExpandedChange?.(n);
-                  return n;
-                });
-              }
-              if (e.key === "Escape") onClose();
-            }}
-          >
-            <div
-              className="w-9 h-1 rounded-full bg-[var(--color-ink-400)] opacity-30"
-              aria-hidden
-            />
-          </div>
-
-          {/* Single scrollable body */}
+          {/* Single scrollable body.
+              No drag handle: the "Show details" button is the one expand
+              affordance — a grabber bar wrongly implied swipe-to-expand (#122
+              follow-up). vaul still allows swipe-down-to-dismiss on the content. */}
           {venue && (
             <div className="flex-1 overflow-y-auto">
-              <div className="flex flex-col px-5 py-4 gap-3">
+              <div className="flex flex-col px-5 pt-5 pb-4 gap-3">
                 {/* Header row: title + close */}
                 <div className="flex items-start gap-2">
                   <h2

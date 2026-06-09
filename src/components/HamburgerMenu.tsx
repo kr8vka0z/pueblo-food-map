@@ -251,10 +251,10 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome }: Hamburge
           {/* Close button (X) — visible at top of panel */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-bone-200)]">
             <span
-              className="text-sm font-semibold text-[var(--color-ink-700)] uppercase tracking-wider"
+              className="text-base font-semibold text-[var(--color-ink-800)]"
               aria-hidden="true"
             >
-              Menu
+              {t("menu.title", locale)}
             </span>
             <button
               type="button"
@@ -273,16 +273,8 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome }: Hamburge
             </button>
           </div>
 
-          {/* Menu item list — order: About → Show welcome screen → Suggest a venue */}
+          {/* Menu item list — About is the last item (#124) */}
           <ul role="none" className="py-2">
-            {/* About Pueblo Food Project (#96) — external link */}
-            <HamburgerMenuItem
-              label={t("menu.about", locale)}
-              href="https://pueblofoodproject.org/about/"
-              isExternal={true}
-              icon={<ExternalLink size={14} />}
-              ariaLabel={`${t("menu.about", locale)} (opens in new tab)`}
-            />
             {/* Show welcome screen (#99) — re-shows splash without clearing localStorage */}
             {onShowWelcome && (
               <HamburgerMenuItem
@@ -305,6 +297,15 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome }: Hamburge
               label={t("menu.feedback", locale)}
               href="/feedback"
               icon={<MessageSquare size={14} />}
+            />
+            {/* About Pueblo Food Project (#96) — moved to the bottom of the nav
+                links per #124; sits above the language control (kept last per #109). */}
+            <HamburgerMenuItem
+              label={t("menu.about", locale)}
+              href="https://pueblofoodproject.org/about/"
+              isExternal={true}
+              icon={<ExternalLink size={14} />}
+              ariaLabel={`${t("menu.about", locale)} (opens in new tab)`}
             />
             {/* Language toggle (#109) — last item; label + inline EN/ES control */}
             <li

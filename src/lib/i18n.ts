@@ -160,6 +160,7 @@ const en: Record<string, string> = {
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Open menu",
   "menu.close": "Close menu",
+  "menu.title": "Pueblo Food Map",
   "menu.suggest": "Suggest a venue",
   "menu.about": "About Pueblo Food Project",
   "menu.showWelcome": "Show welcome screen",
@@ -435,6 +436,7 @@ const es: Record<string, string> = {
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Abrir menú",
   "menu.close": "Cerrar menú",
+  "menu.title": "Pueblo Food Map",
   "menu.suggest": "Sugerir un lugar",
   "menu.about": "About Pueblo Food Project",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",

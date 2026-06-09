@@ -450,6 +450,94 @@ describe("HamburgerMenu — Saved places (#132)", () => {
   });
 });
 
+// ─── #view-toggle-in-menu: Map | List view toggle moved into hamburger menu ───
+
+describe("HamburgerMenu — view toggle (#view-toggle-in-menu)", () => {
+  test("View label and both Map/List buttons are visible when viewMode is passed and menu is open", async () => {
+    const user = userEvent.setup();
+    render(
+      <HamburgerMenu
+        locale="en"
+        viewMode="map"
+        onViewModeChange={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByText("View")).toBeDefined();
+      expect(screen.getByRole("button", { name: /^Map$/i })).toBeDefined();
+      expect(screen.getByRole("button", { name: /^List$/i })).toBeDefined();
+    });
+  });
+
+  test("Map button is aria-pressed=true when viewMode=map", async () => {
+    const user = userEvent.setup();
+    render(
+      <HamburgerMenu
+        locale="en"
+        viewMode="map"
+        onViewModeChange={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      const mapBtn = screen.getByRole("button", { name: /^Map$/i });
+      expect(mapBtn.getAttribute("aria-pressed")).toBe("true");
+    });
+  });
+
+  test("clicking List button calls onViewModeChange once with 'list'", async () => {
+    const user = userEvent.setup();
+    const onViewModeChange = vi.fn();
+    render(
+      <HamburgerMenu
+        locale="en"
+        viewMode="map"
+        onViewModeChange={onViewModeChange}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^List$/i })).toBeDefined();
+    });
+    await user.click(screen.getByRole("button", { name: /^List$/i }));
+    await waitFor(() => {
+      expect(onViewModeChange).toHaveBeenCalledTimes(1);
+      expect(onViewModeChange).toHaveBeenCalledWith("list");
+    });
+  });
+
+  test("clicking List button closes the menu", async () => {
+    const user = userEvent.setup();
+    render(
+      <HamburgerMenu
+        locale="en"
+        viewMode="map"
+        onViewModeChange={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("menu")).toBeDefined();
+    });
+    await user.click(screen.getByRole("button", { name: /^List$/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole("menu")).toBeNull();
+    });
+  });
+
+  test("View row does NOT render when viewMode is not passed", async () => {
+    const user = userEvent.setup();
+    render(<HamburgerMenu locale="en" />);
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => {
+      // menu open — confirm by checking a known item
+      expect(screen.getByRole("link", { name: /Suggest a venue/i })).toBeDefined();
+      expect(screen.queryByText("View")).toBeNull();
+    });
+  });
+});
+
 // ─── #109: Language toggle in hamburger menu ──────────────────────────────────
 
 describe("#109 — Language toggle as last menu item", () => {

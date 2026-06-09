@@ -177,6 +177,7 @@ const en: Record<string, string> = {
   "menu.about": "About Pueblo Food Project",
   "menu.showWelcome": "Show welcome screen",
   "menu.language": "Language / Idioma",
+  "menu.view": "View",
 
   // Category browse dropdown (#95)
   "categoryBrowse.clearFilter": "Clear category filter",
@@ -481,6 +482,7 @@ const es: Record<string, string> = {
   "menu.about": "About Pueblo Food Project",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.language": "Language / Idioma",
+  "menu.view": "Vista",
 
   // Category browse dropdown (#95)
   "categoryBrowse.clearFilter": "Borrar filtro de categoría",

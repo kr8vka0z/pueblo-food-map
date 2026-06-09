@@ -16,7 +16,8 @@ export default function ViewToggle({ mode, onChange, locale = "en" }: ViewToggle
     <div
       role="group"
       aria-label={t("view.toggleAria", locale)}
-      className="absolute left-1/2 -translate-x-1/2 top-[72px] z-[1000] flex items-center gap-0.5 rounded-full bg-[var(--color-bone-50)] p-0.5 elevation-2"
+      className="flex items-center rounded-full border border-[var(--color-bone-300)] bg-[var(--color-bone-100)] overflow-hidden"
+      style={{ height: 28 }}
     >
       {(["map", "list"] as const).map((m) => {
         const active = mode === m;
@@ -28,14 +29,14 @@ export default function ViewToggle({ mode, onChange, locale = "en" }: ViewToggle
             aria-pressed={active}
             onClick={() => onChange(m)}
             className={
-              "flex items-center gap-1.5 px-3 h-8 rounded-full text-sm font-medium transition-colors " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+              "flex items-center gap-1 px-2.5 text-xs font-semibold transition-colors duration-150 h-full " +
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
               (active
-                ? "bg-[var(--color-sage-500)] text-[var(--color-bone-50)]"
-                : "text-[var(--color-ink-600)] hover:bg-[var(--color-bone-100)]")
+                ? "bg-[var(--color-ink-700)] text-[var(--color-bone-50)]"
+                : "text-[var(--color-ink-500)] hover:text-[var(--color-ink-700)]")
             }
           >
-            <Icon size={15} aria-hidden />
+            <Icon size={13} aria-hidden />
             {t(m === "map" ? "view.map" : "view.list", locale)}
           </button>
         );

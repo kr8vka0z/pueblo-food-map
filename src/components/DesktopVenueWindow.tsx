@@ -186,13 +186,16 @@ export default function DesktopVenueWindow({
       // Mapbox project takes [lng, lat] (opposite of Leaflet's [lat, lng])
       const pt = mapboxMap.project([venue.lng, venue.lat]);
       const container = mapboxMap.getContainer();
+      // Use the card's actual rendered size so anchoring tracks the
+      // content-hugged height (#121); fall back to design constants pre-layout.
+      const el = windowRef.current;
       const pos = computeWindowPosition(
         pt.x,
         pt.y,
         container.offsetWidth,
         container.offsetHeight,
-        windowW,
-        windowH,
+        el?.offsetWidth || windowW,
+        el?.offsetHeight || windowH,
       );
       setPosition(pos);
     }
@@ -488,8 +491,7 @@ export default function DesktopVenueWindow({
         left: position.left,
         top: position.top,
         width: windowW,
-        height: expanded ? windowH : "auto",
-        minHeight: WINDOW_QUICK_H,
+        height: "auto",
         maxHeight: "calc(100% - 24px)",
       }}
     >

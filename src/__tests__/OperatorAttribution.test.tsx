@@ -189,49 +189,39 @@ describe("DesktopVenueWindow — operator attribution (expanded view)", () => {
   });
 });
 
-// ─── BottomSheet — quick snap ─────────────────────────────────────────────────
-// vaul renders via a Portal. @testing-library render() with baseElement default
-// captures portal content when document.body is the portal target.
+// ─── BottomSheet — operator attribution (v3 boolean-toggle model) ─────────────
+// The v3 BottomSheet removed the three-snap-point model (peek → quick → full).
+// Operator attribution is now visible in the summary (collapsed) state — no
+// interaction required to see it.
 
 describe("BottomSheet — operator attribution (quick snap)", () => {
-  test("shows operator line at quick snap when venue.operator is set", async () => {
+  test("shows operator line at quick snap when venue.operator is set", () => {
     const venue = makeVenue({ operator: "Pueblo Food Project" });
-    const user = userEvent.setup();
     render(
       <BottomSheet venue={venue} onClose={vi.fn()} locale="en" />,
     );
-    // BottomSheet starts at SNAP_PEEK — click the peek bar to reach quick snap
-    const peekBtn = screen.getByRole("button", { name: /expand details/i });
-    await user.click(peekBtn);
     expect(screen.getByText(/Operated by/)).toBeDefined();
     expect(screen.getByText("Pueblo Food Project")).toBeDefined();
   });
 
-  test("omits operator line at quick snap when venue.operator is undefined", async () => {
+  test("omits operator line at quick snap when venue.operator is undefined", () => {
     const venue = makeVenue({ category: "pantry", operator: undefined });
-    const user = userEvent.setup();
     render(
       <BottomSheet venue={venue} onClose={vi.fn()} locale="en" />,
     );
-    const peekBtn = screen.getByRole("button", { name: /expand details/i });
-    await user.click(peekBtn);
     expect(screen.queryByText(/Operated by/)).toBeNull();
   });
 
-  test("shows ES 'Operado por' at quick snap", async () => {
+  test("shows ES 'Operado por' at quick snap", () => {
     const venue = makeVenue({ operator: "Pueblo Food Project" });
-    const user = userEvent.setup();
     render(
       <BottomSheet venue={venue} onClose={vi.fn()} locale="es" />,
     );
-    // #68: aria-label is now locale-aware — ES says "Expandir detalles de {name}"
-    const peekBtn = screen.getByRole("button", { name: /expandir detalles/i });
-    await user.click(peekBtn);
     expect(screen.getByText(/Operado por/)).toBeDefined();
   });
 });
 
-// ─── BottomSheet — full snap ──────────────────────────────────────────────────
+// ─── BottomSheet — full snap (expanded detail) ───────────────────────────────
 
 describe("BottomSheet — operator attribution (full snap)", () => {
   test("shows operator line at full snap", async () => {
@@ -240,13 +230,12 @@ describe("BottomSheet — operator attribution (full snap)", () => {
     render(
       <BottomSheet venue={venue} onClose={vi.fn()} locale="en" />,
     );
-    // Advance to full snap via "See full details" button (at quick snap first)
-    const peekBtn = screen.getByRole("button", { name: /expand details/i });
-    await user.click(peekBtn);
-    const fullBtn = screen.getByRole("button", { name: /see full details/i });
-    await user.click(fullBtn);
+    // Operator is always visible (in summary), no interaction needed.
     expect(screen.getByText(/Operated by/)).toBeDefined();
     expect(screen.getByText("Pueblo Food Project")).toBeDefined();
+    // It also stays visible after expanding
+    await user.click(screen.getByRole("button", { name: /show details/i }));
+    expect(screen.getByText(/Operated by/)).toBeDefined();
   });
 
   test("omits operator line at full snap when undefined", async () => {
@@ -255,10 +244,10 @@ describe("BottomSheet — operator attribution (full snap)", () => {
     render(
       <BottomSheet venue={venue} onClose={vi.fn()} locale="en" />,
     );
-    const peekBtn = screen.getByRole("button", { name: /expand details/i });
-    await user.click(peekBtn);
-    const fullBtn = screen.getByRole("button", { name: /see full details/i });
-    await user.click(fullBtn);
+    // No operator in summary
+    expect(screen.queryByText(/Operated by/)).toBeNull();
+    // Still absent after expanding
+    await user.click(screen.getByRole("button", { name: /show details/i }));
     expect(screen.queryByText(/Operated by/)).toBeNull();
   });
 });

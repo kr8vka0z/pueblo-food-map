@@ -329,6 +329,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
   // ── BottomSheet snap state — used to hide SponsorCredit when sheet is full (#69) ──
   const [sheetFullyExpanded, setSheetFullyExpanded] = useState(false);
 
+  // Reset expanded state when a new venue is selected (issue #122).
+  // queueMicrotask defers the setState out of the synchronous effect body to
+  // satisfy the react-hooks/set-state-in-effect lint rule.
+  useEffect(() => { queueMicrotask(() => setSheetFullyExpanded(false)); }, [selectedVenueId]);
+
   // ── Map instance — passed up from Map via onMapReady (wired in #47) ────────
   // Stored in state so changes trigger re-render in DesktopVenueWindow.
   // Typed as unknown; DesktopVenueWindow narrows it via its MapboxMap interface.
@@ -809,7 +814,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
             setSelectedVenueId(null);
             setSheetFullyExpanded(false);
           }}
-          onSnapChange={(snap) => setSheetFullyExpanded(snap === 0.9)}
+          onExpandedChange={setSheetFullyExpanded}
           locale={locale}
         />
       )}

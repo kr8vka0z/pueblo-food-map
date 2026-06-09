@@ -52,7 +52,7 @@ import { computeOpenStatus } from "@/lib/hours";
 import { searchVenues } from "@/lib/searchVenues";
 import type { Venue, VenueCategory } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
-import ViewToggle, { type ViewMode } from "./ViewToggle";
+import { type ViewMode } from "./ViewToggle";
 import ListView from "./ListView";
 import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
 
@@ -879,13 +879,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* Map | List toggle (#129) — hidden while a search popover is open */}
-      {!(showResultsPopover || showCategoryDropdown) && (
-        <ViewToggle mode={viewMode} onChange={setViewMode} locale={locale} />
-      )}
-
       {/* HamburgerMenu — top-right, above the control stack (#71) */}
-      <HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} savedVenues={savedVenues} onSelectVenue={handleSelectSavedVenue} />
+      <HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} savedVenues={savedVenues} onSelectVenue={handleSelectSavedVenue} viewMode={viewMode} onViewModeChange={setViewMode} />
 
       {/* LocateButton — bottom-center, morphing control (#108). Map mode only (#129). */}
       {viewMode === "map" && (

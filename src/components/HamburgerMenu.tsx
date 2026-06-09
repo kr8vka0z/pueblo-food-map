@@ -25,6 +25,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Menu, X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Phone } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
+import ViewToggle, { type ViewMode } from "./ViewToggle";
 import { t, type Locale } from "@/lib/i18n";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
@@ -41,13 +42,17 @@ interface HamburgerMenuProps {
   savedVenues?: Array<Venue & { distanceMiles?: number }>;
   /** Called when a saved venue row is tapped — selects it on the map. */
   onSelectVenue?: (id: string) => void;
+  /** Current map/list view mode (#view-toggle-in-menu). */
+  viewMode?: ViewMode;
+  /** Called when the user picks a view mode from the menu. */
+  onViewModeChange?: (mode: ViewMode) => void;
 }
 
 // All focusable elements inside the panel for tab-trap.
 const FOCUSABLE =
   'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export default function HamburgerMenu({ locale = "en", onShowWelcome, savedVenues = [], onSelectVenue }: HamburgerMenuProps) {
+export default function HamburgerMenu({ locale = "en", onShowWelcome, savedVenues = [], onSelectVenue, viewMode, onViewModeChange }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -282,6 +287,25 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome, savedVenue
 
           {/* Menu item list — About is the last item (#124) */}
           <ul role="none" className="py-2">
+            {/* View mode (Map | List) — moved here from a floating control */}
+            {viewMode && onViewModeChange && (
+              <li
+                role="menuitem"
+                className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-bone-200)]"
+              >
+                <span className="text-sm font-medium text-[var(--color-ink-800)]">
+                  {t("menu.view", locale)}
+                </span>
+                <ViewToggle
+                  mode={viewMode}
+                  locale={locale}
+                  onChange={(m) => {
+                    onViewModeChange(m);
+                    close();
+                  }}
+                />
+              </li>
+            )}
             {/* Saved places (#132) — favorited venues; tap to open on the map */}
             {savedVenues.length > 0 && (
               <>

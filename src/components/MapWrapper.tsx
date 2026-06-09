@@ -301,6 +301,23 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geo.request, geo.state]);
 
+  // ── Splash "Find food near me" → auto-locate on entry ─────────────────────────
+  // The user enters the map via the splash CTA, which sets viewport='located'
+  // (only after the splash's own geo grant). SplashScreen and MapWrapper use
+  // SEPARATE useGeolocation instances, so the map starts with no position — which
+  // is why a second "recenter" tap used to be needed. Run the locate flow once
+  // here so the map centers on the user immediately; permission is already
+  // granted, so getCurrentPosition resolves without re-prompting.
+  const autoLocateDoneRef = useRef(false);
+  useEffect(() => {
+    if (viewport !== 'located') return;
+    if (autoLocateDoneRef.current) return;
+    autoLocateDoneRef.current = true;
+    // Defer out of the effect body (set-state-in-effect lint rule).
+    queueMicrotask(() => handleLocateRequest());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport]);
+
   // ── Mobile detection ─────────────────────────────────────────────────────────
   const isMobile = useIsMobile();
 

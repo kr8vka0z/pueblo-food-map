@@ -251,6 +251,12 @@ const en: Record<string, string> = {
   "feedback.validation.emailInvalid": "Please enter a valid email address.",
   "feedback.error.rateLimit": "Too many submissions from this address. Please try again in an hour.",
 
+  // Favorites (#132)
+  "favorite.add": "Add {name} to saved",
+  "favorite.remove": "Remove {name} from saved",
+  "favorite.addGeneric": "Add to saved",
+  "favorite.removeGeneric": "Remove from saved",
+
   // Report form (#70)
   "report.button": "Report an issue with this venue",
   "report.title": "Report an issue",
@@ -534,6 +540,12 @@ const es: Record<string, string> = {
   "feedback.validation.emailRequired": "Por favor ingresa tu correo electrónico.",
   "feedback.validation.emailInvalid": "Por favor ingresa un correo electrónico válido.",
   "feedback.error.rateLimit": "Demasiados envíos desde esta dirección. Por favor intenta de nuevo en una hora.",
+
+  // Favorites (#132)
+  "favorite.add": "Agregar {name} a guardados",
+  "favorite.remove": "Quitar {name} de guardados",
+  "favorite.addGeneric": "Agregar a guardados",
+  "favorite.removeGeneric": "Quitar de guardados",
 
   // Report form (#70)
   "report.button": "Reportar un problema con este lugar",

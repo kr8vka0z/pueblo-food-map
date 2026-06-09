@@ -35,6 +35,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MapPin, Phone, Clock, ExternalLink } from "lucide-react";
+import FavoriteButton from "@/components/FavoriteButton";
 
 /**
  * Minimal interface covering the mapboxgl.Map methods DesktopVenueWindow uses.
@@ -234,31 +235,34 @@ export default function DesktopVenueWindow({
   // This prevents any visual position jump when toggling collapsed ↔ expanded.
 
   const venueNameBlock = (
-    <div>
-      <h2
-        className={
-          (expanded ? "text-xl" : "text-lg") +
-          " font-normal text-[var(--color-ink-900)] leading-tight" +
-          (expanded ? " mb-1" : "")
-        }
-        style={{ fontFamily: "var(--font-display)" }}
-        id={`venue-window-title-${venue.id}`}
-      >
-        {venue.name}
-      </h2>
-      {venue.operator && (
-        <p className={`text-xs text-[var(--color-ink-500)]${expanded ? " mb-2" : ""}`}>
-          {t("operator.operated_by", locale)}{" "}
-          <a
-            href="https://pueblofoodproject.org/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
-          >
-            {venue.operator}
-          </a>
-        </p>
-      )}
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <h2
+          className={
+            (expanded ? "text-xl" : "text-lg") +
+            " font-normal text-[var(--color-ink-900)] leading-tight" +
+            (expanded ? " mb-1" : "")
+          }
+          style={{ fontFamily: "var(--font-display)" }}
+          id={`venue-window-title-${venue.id}`}
+        >
+          {venue.name}
+        </h2>
+        {venue.operator && (
+          <p className={`text-xs text-[var(--color-ink-500)]${expanded ? " mb-2" : ""}`}>
+            {t("operator.operated_by", locale)}{" "}
+            <a
+              href="https://pueblofoodproject.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+            >
+              {venue.operator}
+            </a>
+          </p>
+        )}
+      </div>
+      <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} />
     </div>
   );
 

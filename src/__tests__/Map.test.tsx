@@ -325,6 +325,88 @@ describe("Map — locate button recenter (#60)", () => {
   });
 });
 
+// ─── Recenter with a venue selected — issue #123 ─────────────────────────────
+//
+// Reproduces: with a venue selected, tapping recenter left the map on the venue
+// (the user-location flyTo bailed whenever a venue was selected). Fix: an
+// explicit recenter tap flies to the user even with a venue selected, while
+// passive watchPosition jitter still does not yank the map off the venue.
+
+describe("Map — recenter with a venue selected (#123)", () => {
+  const USER_LOC = { lat: 38.26, lng: -104.62 };
+
+  test("explicit recenter tap flies to the USER even when a venue is selected", () => {
+    const { rerender } = render(
+      <MapComponent
+        {...makeProps({
+          venues: VENUES_ONE,
+          selectedVenueId: "v1",
+          userLocation: USER_LOC,
+          recenterRequestId: 1,
+        })}
+      />,
+    );
+    // Initial render may fire both the venue flyTo and the first recenter.
+    // Clear, then simulate a fresh recenter tap (id → 2).
+    mockFlyTo.mockClear();
+    mockJumpTo.mockClear();
+
+    act(() => {
+      rerender(
+        <MapComponent
+          {...makeProps({
+            venues: VENUES_ONE,
+            selectedVenueId: "v1",
+            userLocation: USER_LOC,
+            recenterRequestId: 2,
+          })}
+        />,
+      );
+    });
+
+    // The tap must fly to the user's coords (zoom 14), not the venue's.
+    expect(mockFlyTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        center: [USER_LOC.lng, USER_LOC.lat],
+        zoom: 14,
+      }),
+    );
+  });
+
+  test("passive jitter does NOT recenter while a venue is selected", () => {
+    const { rerender } = render(
+      <MapComponent
+        {...makeProps({
+          venues: VENUES_ONE,
+          selectedVenueId: "v1",
+          userLocation: USER_LOC,
+          recenterRequestId: 1,
+        })}
+      />,
+    );
+    mockFlyTo.mockClear();
+
+    // watchPosition jitter — new userLocation, recenterRequestId unchanged.
+    act(() => {
+      rerender(
+        <MapComponent
+          {...makeProps({
+            venues: VENUES_ONE,
+            selectedVenueId: "v1",
+            userLocation: { lat: 38.2601, lng: -104.6201 },
+            recenterRequestId: 1,
+          })}
+        />,
+      );
+    });
+
+    // No user-location flyTo (zoom 14) — the map stays on the venue.
+    expect(mockFlyTo).not.toHaveBeenCalledWith(
+      expect.objectContaining({ zoom: 14 }),
+    );
+  });
+});
+
 // ─── County constraint props (#62) ───────────────────────────────────────────
 //
 // We cannot assert on the actual Mapbox WebGL rendering (no canvas in jsdom),

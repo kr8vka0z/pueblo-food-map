@@ -255,16 +255,20 @@ export default function Map({
   //    lastRecenterIdRef tracks the last processed id so the same tap value
   //    does not re-fire when userLocation jitters. (#60)
   //
-  // Venue flyTo (selectedVenueId effect above) takes priority — we skip if a
-  // venue is selected.
+  // Venue flyTo (selectedVenueId effect above) takes priority for PASSIVE
+  // centering only. An explicit recenter tap always flies to the user, even
+  // when a venue is selected (#123).
   useEffect(() => {
     if (!userLocation) return;
-    if (selectedVenueId !== null) return; // venue flyTo takes priority
 
     const isExplicitTap = recenterRequestId > 0 && recenterRequestId !== lastRecenterIdRef.current;
     const isPassiveFirst = recenterRequestId === 0 && !passiveFlownRef.current;
 
     if (!isExplicitTap && !isPassiveFirst) return;
+
+    // Don't yank the map off a selected venue on first-fix / watchPosition
+    // jitter — but DO honor an explicit recenter tap (#123).
+    if (selectedVenueId !== null && !isExplicitTap) return;
 
     if (isExplicitTap) {
       lastRecenterIdRef.current = recenterRequestId;

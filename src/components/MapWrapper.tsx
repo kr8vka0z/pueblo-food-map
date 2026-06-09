@@ -52,6 +52,8 @@ import { computeOpenStatus } from "@/lib/hours";
 import { searchVenues } from "@/lib/searchVenues";
 import type { Venue, VenueCategory } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
+import ViewToggle, { type ViewMode } from "./ViewToggle";
+import ListView from "./ListView";
 import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
@@ -343,6 +345,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   // ── Selected venue ───────────────────────────────────────────────────────────
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
+
+  // ── View mode (#129) — map (default) or full-screen list ────────────────────
+  const [viewMode, setViewMode] = useState<ViewMode>("map");
 
   // ── Desktop window expanded state (PR 5) ─────────────────────────────────────
   const [windowExpanded, setWindowExpanded] = useState(false);
@@ -652,6 +657,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           e.preventDefault();
           const venue = filteredVenues[activeIndex];
           setSelectedVenueId(venue.id);
+          setViewMode("map");
           if (!isMobile) setWindowExpanded(false);
           setIsPopoverOpen(false);
           setActiveIndex(-1);
@@ -675,6 +681,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       setFilterWic(false);
       setQuery("");
       setSelectedVenueId(venueId);
+      setViewMode("map");
       if (!isMobile) setWindowExpanded(false);
     },
     [isMobile],
@@ -684,12 +691,33 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const handleSelectVenueFromPopover = useCallback(
     (venueId: string) => {
       setSelectedVenueId(venueId);
+      setViewMode("map");
       if (!isMobile) setWindowExpanded(false);
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     },
     [isMobile],
   );
+
+  // Select a venue from the list (#129) — switch back to the map, centered on it.
+  const handleSelectFromList = useCallback(
+    (venueId: string) => {
+      setSelectedVenueId(venueId);
+      setViewMode("map");
+      if (!isMobile) setWindowExpanded(false);
+    },
+    [isMobile],
+  );
+
+  // Clear ALL filters + search (used by the list empty state) (#129).
+  const handleClearAllFilters = useCallback(() => {
+    setSelectedCategories(null);
+    setActiveCategoryFilter(null);
+    setFilterOpenNow(false);
+    setFilterSnap(false);
+    setFilterWic(false);
+    setQuery("");
+  }, []);
 
   // Derive the active option id for aria-activedescendant.
   const activeDescendantId =
@@ -730,6 +758,18 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         onMapReady={(map) => setMapboxMap(map)}
         onMoveEnd={handleMoveEnd}
       />
+
+      {/* List view (#129) — full-screen overlay above the map, below top chrome */}
+      {viewMode === "list" && (
+        <ListView
+          venues={filteredVenues}
+          selectedVenueId={selectedVenueId}
+          onSelect={handleSelectFromList}
+          onClearFilters={handleClearAllFilters}
+          showClearFilters={anyFilterActive || query.trim() !== ""}
+          locale={locale}
+        />
+      )}
 
       {/* Top-left cluster: Wordmark (#97; EN/ES toggle moved to hamburger menu #109)
            - Positioned absolute top-4 left-4, z-index 1000.
@@ -827,24 +867,29 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
+      {/* Map | List toggle (#129) — hidden while a search popover is open */}
+      {!(showResultsPopover || showCategoryDropdown) && (
+        <ViewToggle mode={viewMode} onChange={setViewMode} locale={locale} />
+      )}
+
       {/* HamburgerMenu — top-right, above the control stack (#71) */}
       <HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} savedVenues={savedVenues} onSelectVenue={handleSelectSavedVenue} />
 
-      {/* LocateButton — bottom-center, morphing control (#108).
-          sheetVisible: mobile AND sheet is showing (not fully expanded — that's sheetFullyExpanded).
-          The button hides itself when sheetFullyExpanded. */}
-      <LocateButton
-        geoState={geo.state}
-        isLocating={isLocating}
-        isDrifted={isDrifted}
-        onRequest={handleLocateRequest}
-        sheetVisible={isMobile}
-        sheetFullyExpanded={isMobile && sheetFullyExpanded}
-        locale={locale}
-      />
+      {/* LocateButton — bottom-center, morphing control (#108). Map mode only (#129). */}
+      {viewMode === "map" && (
+        <LocateButton
+          geoState={geo.state}
+          isLocating={isLocating}
+          isDrifted={isDrifted}
+          onRequest={handleLocateRequest}
+          sheetVisible={isMobile}
+          sheetFullyExpanded={isMobile && sheetFullyExpanded}
+          locale={locale}
+        />
+      )}
 
-      {/* Outside-county message — appears when resolved position is beyond maxBounds (#108) */}
-      {outsideCountyVisible && (
+      {/* Outside-county message — appears when resolved position is beyond maxBounds (#108). Map mode only (#129). */}
+      {viewMode === "map" && outsideCountyVisible && (
         <div
           role="alert"
           aria-live="polite"
@@ -877,8 +922,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
       {/* Legend removed: category browse is now in the search-focus dropdown (#95) */}
 
-      {/* LocationDeniedBanner — appears only after active re-tap → denial */}
-      {bannerVisible && (
+      {/* LocationDeniedBanner — appears only after active re-tap → denial. Map mode only (#129). */}
+      {viewMode === "map" && bannerVisible && (
         <LocationDeniedBanner
           onRetry={() => {
             // Re-request; if still denied, the useEffect above re-shows the banner.
@@ -889,11 +934,13 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* SponsorCredit — bottom-right, hidden when BottomSheet is fully expanded (#69) */}
-      <SponsorCredit hidden={isMobile && sheetFullyExpanded} locale={locale} />
+      {/* SponsorCredit — bottom-right, hidden when BottomSheet is fully expanded (#69). Map mode only (#129). */}
+      {viewMode === "map" && (
+        <SponsorCredit hidden={isMobile && sheetFullyExpanded} locale={locale} />
+      )}
 
-      {/* BottomSheet — mobile only (vaul v2, venue-centric API) */}
-      {isMobile && (
+      {/* BottomSheet — mobile only (vaul v2, venue-centric API). Map mode only (#129). */}
+      {isMobile && viewMode === "map" && (
         <BottomSheet
           key={selectedVenueId ?? "empty"}
           venue={selectedVenue}
@@ -906,8 +953,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* DesktopVenueWindow — marker-anchored, desktop only */}
-      {!isMobile && selectedVenue && (
+      {/* DesktopVenueWindow — marker-anchored, desktop only. Map mode only (#129). */}
+      {!isMobile && viewMode === "map" && selectedVenue && (
         <DesktopVenueWindow
           key={selectedVenueId}
           venue={selectedVenue}

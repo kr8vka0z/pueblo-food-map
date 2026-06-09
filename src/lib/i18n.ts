@@ -265,6 +265,11 @@ const en: Record<string, string> = {
   "share.labelGeneric": "Share this place",
   "share.copied": "Link copied",
 
+  // View toggle (#129)
+  "view.map": "Map",
+  "view.list": "List",
+  "view.toggleAria": "Choose map or list view",
+
   // Report form (#70)
   "report.button": "Report an issue with this venue",
   "report.title": "Report an issue",
@@ -562,6 +567,11 @@ const es: Record<string, string> = {
   "share.label": "Compartir {name}",
   "share.labelGeneric": "Compartir este lugar",
   "share.copied": "Enlace copiado",
+
+  // View toggle (#129)
+  "view.map": "Mapa",
+  "view.list": "Lista",
+  "view.toggleAria": "Elegir vista de mapa o lista",
 
   // Report form (#70)
   "report.button": "Reportar un problema con este lugar",

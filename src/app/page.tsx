@@ -39,6 +39,8 @@ export default function HomePage() {
   // effect determines the true value without a hydration mismatch.
   const [splashShown, setSplashShown] = useState<boolean | null>(null);
   const [viewport, setViewport] = useState<'located' | 'pueblo-center'>('pueblo-center');
+  // Deep link (#132): a ?venue=<id> URL opens straight to that pin.
+  const [initialVenueId, setInitialVenueId] = useState<string | null>(null);
 
   // Ref to the map container element — focus moves here on splash dismiss.
   const mapContainerRef = useRef<HTMLElement | null>(null);
@@ -53,7 +55,10 @@ export default function HomePage() {
     // which flags synchronous setState in effect bodies. The queueMicrotask
     // ensures we're in the microtask queue, not the synchronous effect body.
     queueMicrotask(() => {
-      setSplashShown(!readGate());
+      const venueParam = new URLSearchParams(window.location.search).get('venue');
+      setInitialVenueId(venueParam);
+      // A shared ?venue= link goes straight to the pin — skip the splash.
+      setSplashShown(venueParam ? false : !readGate());
     });
   }, []);
 
@@ -94,7 +99,7 @@ export default function HomePage() {
         inert={splashShown || undefined}
         aria-hidden={splashShown || undefined}
       >
-        <MapWrapper viewport={viewport} onShowWelcome={showSplashAgain} />
+        <MapWrapper viewport={viewport} onShowWelcome={showSplashAgain} initialVenueId={initialVenueId} />
       </main>
 
       {/* Splash overlay — full-viewport frosted scrim on top of the map */}

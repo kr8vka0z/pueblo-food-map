@@ -260,6 +260,11 @@ const en: Record<string, string> = {
   "favorite.addGeneric": "Add to saved",
   "favorite.removeGeneric": "Remove from saved",
 
+  // Share (#132)
+  "share.label": "Share {name}",
+  "share.labelGeneric": "Share this place",
+  "share.copied": "Link copied",
+
   // Report form (#70)
   "report.button": "Report an issue with this venue",
   "report.title": "Report an issue",
@@ -552,6 +557,11 @@ const es: Record<string, string> = {
   "favorite.remove": "Quitar {name} de guardados",
   "favorite.addGeneric": "Agregar a guardados",
   "favorite.removeGeneric": "Quitar de guardados",
+
+  // Share (#132)
+  "share.label": "Compartir {name}",
+  "share.labelGeneric": "Compartir este lugar",
+  "share.copied": "Enlace copiado",
 
   // Report form (#70)
   "report.button": "Reportar un problema con este lugar",

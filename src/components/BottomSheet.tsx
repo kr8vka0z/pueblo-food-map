@@ -27,6 +27,7 @@ import { computeOpenStatus, formatSlot } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
+import ShareButton from "@/components/ShareButton";
 
 // ─── Day keys ─────────────────────────────────────────────────────────────────
 
@@ -109,6 +110,7 @@ export default function BottomSheet({ venue, onClose, onExpandedChange, locale =
                   >
                     {venue.name}
                   </h2>
+                  <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} />
                   <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} />
                   <button
                     type="button"

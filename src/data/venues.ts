@@ -1,6 +1,7 @@
 import type { Venue } from "@/types/venue";
 import { groceryOsmVenues } from "@/data/grocery-osm";
 import { plentifulPantries } from "@/data/pantries-plentiful";
+import { benefitFlags } from "@/data/benefit-flags";
 
 // v1 seed data — Pueblo Food Project Community Garden Sustainability Project (CGSP)
 // and edible landscapes. Source: https://pueblofoodproject.org/cgsp/ (verified 2026-05-12).
@@ -159,7 +160,17 @@ export const pfpVenues: Venue[] = [
 
 // Combined venue list rendered on the map. PFP first so its richer metadata
 // (notes, partnerships) wins any future de-dup pass.
-export const venues: Venue[] = [...pfpVenues, ...groceryOsmVenues, ...plentifulPantries];
+// Public venue list. SNAP/WIC benefit flags are applied as an overlay from
+// benefit-flags.ts (keyed by id) so they survive regeneration of the
+// auto-generated OSM / Plentiful data (#127).
+export const venues: Venue[] = [
+  ...pfpVenues,
+  ...groceryOsmVenues,
+  ...plentifulPantries,
+].map((v) => {
+  const f = benefitFlags[v.id];
+  return f ? { ...v, accepts_snap: f.snap, accepts_wic: f.wic } : v;
+});
 
 export const categoryLabels: Record<Venue["category"], string> = {
   pantry: "Food Pantry",

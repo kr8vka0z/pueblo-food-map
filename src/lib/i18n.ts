@@ -47,6 +47,7 @@ const en: Record<string, string> = {
   // Filters
   "filter.openNow": "Open now",
   "filter.snap": "Accepts SNAP",
+  "filter.wic": "Accepts WIC",
   "filter.walkingDistance": "Walking distance",
 
   // Bottom sheet / list
@@ -329,6 +330,7 @@ const es: Record<string, string> = {
   // Filters
   "filter.openNow": "Abierto ahora",
   "filter.snap": "Acepta SNAP",
+  "filter.wic": "Acepta WIC",
   "filter.walkingDistance": "Distancia caminando",
 
   // Bottom sheet / list

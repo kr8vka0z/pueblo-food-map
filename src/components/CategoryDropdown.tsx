@@ -19,7 +19,7 @@
  */
 
 import { useRef } from "react";
-import { Clock } from "lucide-react";
+import { Clock, CreditCard, Apple } from "lucide-react";
 import { categoryColors } from "@/data/venues";
 import { t, type Locale } from "@/lib/i18n";
 import type { VenueCategory } from "@/types/venue";
@@ -54,6 +54,18 @@ interface CategoryDropdownProps {
   onToggleOpenNow: () => void;
   /** Number of venues currently open (shown as count on the row). */
   openNowCount?: number;
+  /** Whether the "Accepts SNAP" filter is currently active. */
+  snapActive: boolean;
+  /** Called when the "Accepts SNAP" toggle row is clicked. */
+  onToggleSnap: () => void;
+  /** Number of venues that accept SNAP (shown as count on the row). */
+  snapCount?: number;
+  /** Whether the "Accepts WIC" filter is currently active. */
+  wicActive: boolean;
+  /** Called when the "Accepts WIC" toggle row is clicked. */
+  onToggleWic: () => void;
+  /** Number of venues that accept WIC (shown as count on the row). */
+  wicCount?: number;
 }
 
 const LISTBOX_ID = "category-browse-listbox";
@@ -67,6 +79,12 @@ export default function CategoryDropdown({
   openNowActive,
   onToggleOpenNow,
   openNowCount,
+  snapActive,
+  onToggleSnap,
+  snapCount,
+  wicActive,
+  onToggleWic,
+  wicCount,
 }: CategoryDropdownProps) {
   const listboxRef = useRef<HTMLDivElement>(null);
 
@@ -117,7 +135,59 @@ export default function CategoryDropdown({
             </span>
           )}
         </div>
-        {/* Divider between Open now and category rows */}
+        {/* Accepts SNAP toggle row */}
+        <div
+          role="option"
+          aria-selected={snapActive}
+          onClick={onToggleSnap}
+          className={
+            "flex items-center gap-3 px-4 py-2.5 cursor-pointer " +
+            "text-sm " +
+            "transition-colors duration-100 " +
+            (snapActive
+              ? "bg-[var(--color-bone-200)] text-[var(--color-ink-900)]"
+              : "text-[var(--color-ink-800)] hover:bg-[var(--color-bone-100)]")
+          }
+        >
+          <CreditCard
+            aria-hidden="true"
+            size={12}
+            style={{ flexShrink: 0 }}
+          />
+          <span className="flex-1 font-medium">{t("filter.snap", locale)}</span>
+          {snapCount !== undefined && (
+            <span className="text-[var(--color-ink-400)] text-xs tabular-nums">
+              {snapCount}
+            </span>
+          )}
+        </div>
+        {/* Accepts WIC toggle row */}
+        <div
+          role="option"
+          aria-selected={wicActive}
+          onClick={onToggleWic}
+          className={
+            "flex items-center gap-3 px-4 py-2.5 cursor-pointer " +
+            "text-sm " +
+            "transition-colors duration-100 " +
+            (wicActive
+              ? "bg-[var(--color-bone-200)] text-[var(--color-ink-900)]"
+              : "text-[var(--color-ink-800)] hover:bg-[var(--color-bone-100)]")
+          }
+        >
+          <Apple
+            aria-hidden="true"
+            size={12}
+            style={{ flexShrink: 0 }}
+          />
+          <span className="flex-1 font-medium">{t("filter.wic", locale)}</span>
+          {wicCount !== undefined && (
+            <span className="text-[var(--color-ink-400)] text-xs tabular-nums">
+              {wicCount}
+            </span>
+          )}
+        </div>
+        {/* Divider between filter rows and category rows */}
         <div className="border-b border-[var(--color-bone-200)] mx-4 my-1" aria-hidden="true" />
 
         {BROWSE_CATEGORIES.map((cat) => {

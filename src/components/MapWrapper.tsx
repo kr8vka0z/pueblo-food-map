@@ -328,7 +328,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
   const [selectedCategories, setSelectedCategories] =
     useState<Set<VenueCategory> | null>(null);
   const [filterOpenNow, setFilterOpenNow] = useState(false);
-  const [filterSnap] = useState(false);
+  const [filterSnap, setFilterSnap] = useState(false);
+  const [filterWic, setFilterWic] = useState(false);
   const [filterWalking] = useState(false);
 
   // ── Category browse filter (#95) ─────────────────────────────────────────────
@@ -422,6 +423,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
     [venuesWithDistance],
   );
 
+  const snapCount = useMemo(() => venuesWithDistance.filter((v) => v.accepts_snap).length, [venuesWithDistance]);
+  const wicCount = useMemo(() => venuesWithDistance.filter((v) => v.accepts_wic).length, [venuesWithDistance]);
+
   const filteredVenues = useMemo(() => {
     const now = new Date();
 
@@ -436,6 +440,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
           if (status.state !== "open") return false;
         }
         if (filterSnap && !v.accepts_snap) return false;
+        if (filterWic && !v.accepts_wic) return false;
         if (filterWalking && (v.distanceMiles ?? Infinity) > 1) return false;
         return true;
       })
@@ -448,6 +453,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
     selectedCategories,
     filterOpenNow,
     filterSnap,
+    filterWic,
     filterWalking,
     query,
   ]);
@@ -456,6 +462,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
     (selectedCategories !== null && selectedCategories.size > 0) ||
     filterOpenNow ||
     filterSnap ||
+    filterWic ||
     filterWalking;
 
   function handleClearFilters() {
@@ -755,6 +762,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome }
           openNowActive={filterOpenNow}
           openNowCount={openNowCount}
           onToggleOpenNow={() => setFilterOpenNow((v) => !v)}
+          snapActive={filterSnap}
+          snapCount={snapCount}
+          onToggleSnap={() => setFilterSnap((v) => !v)}
+          wicActive={filterWic}
+          wicCount={wicCount}
+          onToggleWic={() => setFilterWic((v) => !v)}
         />
       )}
 

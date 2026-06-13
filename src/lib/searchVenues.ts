@@ -1,16 +1,48 @@
 import type { Venue, VenueCategory } from "@/types/venue";
 
 /**
- * Human-readable category labels used for search matching.
- *
- * These are the canonical EN labels for the search index. They deliberately
- * differ from `categoryLabels` in data/venues.ts (which is used for map
- * display). The shorter forms ("Grocery store" vs "Grocery / Supermarket")
- * match what a user is more likely to type.
- *
- * Spec: docs/pueblo-food-map-v2-handoff.md §Scope §2
- * Decision: EN-only for demo; locale toggle is deferred (open question #11).
+ * Category search index: English labels, Spanish labels, and Pueblo aliases.
+ * We always union every term so "despensa" matches in EN mode and "pantry" in ES mode.
+ * EmptySearchPopover chip labels must stay inside this set or search will miss them.
  */
+const CATEGORY_SEARCH_TERMS: Record<VenueCategory, readonly string[]> = {
+  pantry: [
+    "food pantry",
+    "pantry",
+    "despensa",
+    "despensa de alimentos",
+    "comida",
+  ],
+  grocery: [
+    "grocery store",
+    "grocery",
+    "supermarket",
+    "supermercado",
+    "mercado",
+  ],
+  convenience: [
+    "convenience store",
+    "convenience",
+    "tienda de conveniencia",
+    "conveniencia",
+  ],
+  farm: ["farm", "market", "granja", "mercado"],
+  garden: ["community garden", "garden", "huerto", "huerto comunitario"],
+  edible_landscape: [
+    "edible landscape",
+    "paisaje comestible",
+  ],
+  meal_site: ["meal site", "meal", "comedor", "comedor comunitario"],
+};
+
+/**
+ * Benefit queries filter venue flags, not category.
+ * "estampillas" is common Pueblo wording for SNAP; it should return every accepts_snap venue.
+ */
+const SNAP_SEARCH_TERMS = ["snap", "estampillas", "cupones", "food stamps"];
+const WIC_SEARCH_TERMS = ["wic"];
+
+/** Primary EN label per category for EmptySearchPopover CATEGORY_OPTIONS. */
 const CATEGORY_LABELS: Record<VenueCategory, string> = {
   pantry: "Food pantry",
   grocery: "Grocery store",
@@ -22,21 +54,46 @@ const CATEGORY_LABELS: Record<VenueCategory, string> = {
 };
 
 /**
- * Filter venues by a free-text query against venue name and readable category.
+ * Users type partial category words in either language.
+ * Match both directions so short queries like "super" still surface grocery venues.
+ */
+function matchesCategoryTerms(category: VenueCategory, q: string): boolean {
+  return CATEGORY_SEARCH_TERMS[category].some((term) =>
+    term.toLowerCase().includes(q) || q.includes(term.toLowerCase()),
+  );
+}
+
+function matchesSnapBenefit(q: string): boolean {
+  return SNAP_SEARCH_TERMS.some(
+    (term) => term.includes(q) || q.includes(term),
+  );
+}
+
+function matchesWicBenefit(q: string): boolean {
+  return WIC_SEARCH_TERMS.some((term) => term.includes(q) || q.includes(term));
+}
+
+/**
+ * Filter venues by a free-text query against venue name, category terms (EN + ES),
+ * and benefit-program aliases (SNAP / WIC).
  *
  * - No debounce: 108 venues is fast enough for live-filter on each keystroke.
  * - No fuzzy match: substring is sufficient for the demo; revisit post-demo.
  * - Empty query returns the full list unchanged.
- *
- * Spec: docs/pueblo-food-map-v2-handoff.md §Scope §2
  */
 export function searchVenues(venues: Venue[], query: string): Venue[] {
   const q = query.trim().toLowerCase();
   if (!q) return venues;
+
+  const snapQuery = matchesSnapBenefit(q);
+  const wicQuery = matchesWicBenefit(q);
+
   return venues.filter((v) => {
-    const name = v.name.toLowerCase();
-    const cat = CATEGORY_LABELS[v.category].toLowerCase();
-    return name.includes(q) || cat.includes(q);
+    if (v.name.toLowerCase().includes(q)) return true;
+    if (matchesCategoryTerms(v.category, q)) return true;
+    if (snapQuery && v.accepts_snap) return true;
+    if (wicQuery && v.accepts_wic) return true;
+    return false;
   });
 }
 

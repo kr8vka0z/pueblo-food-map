@@ -515,7 +515,7 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
             role="alert"
             className="mt-1 text-xs text-red-600"
           >
-            {"Couldn't verify you're human — please retry."}
+            {t("form.turnstile.error", locale)}
           </p>
         )}
       </div>
@@ -538,7 +538,7 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
         {status === "submitting"
           ? t("suggest.submitting", locale)
           : !turnstileToken
-          ? "Verifying…"
+          ? t("form.turnstile.verifying", locale)
           : t("suggest.submit", locale)}
       </button>
 

@@ -390,7 +390,7 @@ export default function FeedbackForm({ locale = "en" }: FeedbackFormProps) {
             role="alert"
             className="mt-1 text-xs text-red-600"
           >
-            {"Couldn't verify you're human — please retry."}
+            {t("form.turnstile.error", locale)}
           </p>
         )}
       </div>
@@ -413,7 +413,7 @@ export default function FeedbackForm({ locale = "en" }: FeedbackFormProps) {
         {status === "submitting"
           ? t("feedback.submitting", locale)
           : !turnstileToken
-          ? "Verifying…"
+          ? t("form.turnstile.verifying", locale)
           : t("feedback.submit", locale)}
       </button>
 

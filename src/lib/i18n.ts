@@ -303,6 +303,26 @@ const en: Record<string, string> = {
   "report.validation.descriptionRequired": "Please describe the issue (at least 10 characters).",
   "report.validation.emailInvalid": "Please enter a valid email address.",
   "report.error.rateLimit": "Too many submissions from this address. Please try again in an hour.",
+
+  // Turnstile (#162)
+  "form.turnstile.verifying": "Verifying…",
+  "form.turnstile.error": "Couldn't verify you're human — please retry.",
+
+  // Splash dialog (#162)
+  "splash.dialogLabel": "Welcome — find food near you",
+
+  // Short pin aria labels. category.full.* stays longer for chips and detail panels.
+  // Screen readers hear each pin in a cluster, so ES copy stays conversational per #162.
+  "marker.category.pantry": "Food pantry",
+  "marker.category.grocery": "Grocery store",
+  "marker.category.convenience": "Convenience store",
+  "marker.category.farm": "Farm",
+  "marker.category.garden": "Community garden",
+  "marker.category.edible_landscape": "Edible landscape",
+  "marker.category.meal_site": "Meal site",
+
+  // External links (#162)
+  "menu.opensInNewTab": "(opens in new tab)",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -479,7 +499,7 @@ const es: Record<string, string> = {
   "menu.help.doubleup": "Double Up Food Bucks",
   "menu.help.hotline": "Línea de ayuda: 855-855-4626",
   "menu.suggest": "Sugerir un lugar",
-  "menu.about": "About Pueblo Food Project",
+  "menu.about": "Acerca de Pueblo Food Project",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.language": "Language / Idioma",
   "menu.view": "Vista",
@@ -608,6 +628,25 @@ const es: Record<string, string> = {
   "report.validation.descriptionRequired": "Por favor describe el problema (al menos 10 caracteres).",
   "report.validation.emailInvalid": "Por favor ingresa un correo electrónico válido.",
   "report.error.rateLimit": "Demasiados envíos desde esta dirección. Por favor intenta de nuevo en una hora.",
+
+  // Turnstile (#162)
+  "form.turnstile.verifying": "Verificando…",
+  "form.turnstile.error": "No pudimos verificar que eres humano. Por favor intenta de nuevo.",
+
+  // Splash dialog (#162)
+  "splash.dialogLabel": "Bienvenido — encuentra comida cerca de ti",
+
+  // Map marker aria — short conversational labels (#162)
+  "marker.category.pantry": "Despensa",
+  "marker.category.grocery": "Supermercado",
+  "marker.category.convenience": "Conveniencia",
+  "marker.category.farm": "Granja",
+  "marker.category.garden": "Huerto",
+  "marker.category.edible_landscape": "Paisaje comestible",
+  "marker.category.meal_site": "Comedor",
+
+  // External links (#162)
+  "menu.opensInNewTab": "(se abre en una pestaña nueva)",
 };
 
 /** Substitute simple {key} placeholders. */
@@ -625,3 +664,9 @@ export function t(
   const raw = dict[key] ?? en[key] ?? key;
   return vars ? interpolate(raw, vars) : raw;
 }
+
+/**
+ * Exposed for test parity checks only, not runtime UI.
+ * Key sets and placeholders must stay aligned between en and es when adding copy.
+ */
+export const I18N_DICTIONARIES = { en, es } as const;

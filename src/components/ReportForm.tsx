@@ -396,7 +396,7 @@ export default function ReportForm({
             role="alert"
             className="mt-1 text-xs text-red-600"
           >
-            {"Couldn’t verify you’re human — please retry."}
+            {t("form.turnstile.error", locale)}
           </p>
         )}
       </div>
@@ -419,7 +419,7 @@ export default function ReportForm({
         {status === "submitting"
           ? t("report.submitting", locale)
           : !turnstileToken
-          ? "Verifying…"
+          ? t("form.turnstile.verifying", locale)
           : t("report.submit", locale)}
       </button>
 

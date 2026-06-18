@@ -485,7 +485,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       })
       .sort((a, b) => a.distanceMiles - b.distanceMiles);
 
-    // PR 6: apply text search (name + readable category, substring, EN-only).
+    // Text search: name + bilingual category terms + benefit aliases (#162).
     return searchVenues(afterFilters, query);
   }, [
     venuesWithDistance,

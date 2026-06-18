@@ -39,6 +39,24 @@ function renderSplash(locale: "en" | "es" = "en") {
   return render(<SplashScreen onPrimary={vi.fn()} />);
 }
 
+// ── Dialog aria-label (#162) ──────────────────────────────────────────────────
+
+describe("dialog aria-label", () => {
+  test("EN locale uses English dialog label", () => {
+    renderSplash("en");
+    expect(screen.getByRole("dialog").getAttribute("aria-label")).toMatch(
+      /Welcome/i,
+    );
+  });
+
+  test("ES locale uses Spanish dialog label", () => {
+    renderSplash("es");
+    expect(screen.getByRole("dialog").getAttribute("aria-label")).toMatch(
+      /Bienvenido/i,
+    );
+  });
+});
+
 // ── Purpose line ──────────────────────────────────────────────────────────────
 
 describe("purpose line", () => {

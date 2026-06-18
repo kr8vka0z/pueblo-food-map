@@ -166,6 +166,12 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome, savedVenue
 
   const menuLabel = t("menu.open", locale);
   const closeLabel = t("menu.close", locale);
+  /**
+   * External menu links open a new tab; screen readers need that called out in the active locale.
+   * Compose label and suffix once so each item stays aligned with i18n keys.
+   */
+  const externalAriaLabel = (labelKey: string) =>
+    `${t(labelKey, locale)} ${t("menu.opensInNewTab", locale)}`;
 
   // Panel positioning style: fixed side-sheet on mobile, absolute dropdown on desktop
   const panelStyle: React.CSSProperties = isMobile
@@ -388,28 +394,28 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome, savedVenue
               href="https://www.211colorado.org/food-assistance/"
               isExternal={true}
               icon={<ExternalLink size={14} />}
-              ariaLabel={`${t("menu.help.211", locale)} (opens in new tab)`}
+              ariaLabel={externalAriaLabel("menu.help.211")}
             />
             <HamburgerMenuItem
               label={t("menu.help.snap", locale)}
               href="https://cdhs.colorado.gov/snap"
               isExternal={true}
               icon={<ExternalLink size={14} />}
-              ariaLabel={`${t("menu.help.snap", locale)} (opens in new tab)`}
+              ariaLabel={externalAriaLabel("menu.help.snap")}
             />
             <HamburgerMenuItem
               label={t("menu.help.wic", locale)}
               href="https://www.coloradowic.gov/eligibility/apply"
               isExternal={true}
               icon={<ExternalLink size={14} />}
-              ariaLabel={`${t("menu.help.wic", locale)} (opens in new tab)`}
+              ariaLabel={externalAriaLabel("menu.help.wic")}
             />
             <HamburgerMenuItem
               label={t("menu.help.doubleup", locale)}
               href="https://doubleupcolorado.org/"
               isExternal={true}
               icon={<ExternalLink size={14} />}
-              ariaLabel={`${t("menu.help.doubleup", locale)} (opens in new tab)`}
+              ariaLabel={externalAriaLabel("menu.help.doubleup")}
             />
             <HamburgerMenuItem
               label={t("menu.help.hotline", locale)}
@@ -426,7 +432,7 @@ export default function HamburgerMenu({ locale = "en", onShowWelcome, savedVenue
               href="https://pueblofoodproject.org/about/"
               isExternal={true}
               icon={<ExternalLink size={14} />}
-              ariaLabel={`${t("menu.about", locale)} (opens in new tab)`}
+              ariaLabel={externalAriaLabel("menu.about")}
             />
             {/* Language toggle (#109) — last item; label + inline EN/ES control */}
             <li

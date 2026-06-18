@@ -112,7 +112,7 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
       // role=dialog + aria-modal tells ATs this is a modal overlay.
       role="dialog"
       aria-modal="true"
-      aria-label="Welcome — find food near you"
+      aria-label={t("splash.dialogLabel", locale)}
     >
       {/* ── Inner flex wrapper: centers content when it fits, lets it scroll naturally when tall ── */}
       <div className="flex min-h-full items-center justify-center">

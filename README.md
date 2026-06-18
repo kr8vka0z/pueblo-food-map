@@ -1,73 +1,146 @@
-# Pueblo Food Access Map
+# Pueblo Food Map
 
-A mobile-first web map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, grocery stores — with walking + bus directions powered by Pueblo Transit GTFS data.
+A mobile-first, bilingual (EN/ES) web map of free and low-cost food resources
+in Pueblo County, Colorado — community gardens, edible landscapes, food
+pantries, grocery stores, convenience stores, farms, and meal sites.
 
-Built for [Pueblo Food Project](https://pueblofoodproject.org). Proof of concept targeting the 2026-06-09 PFP team meeting.
+Built for and with [Pueblo Food Project](https://pueblofoodproject.org).
+Maintained long-term by volunteers and occasional contributors.
 
-## Status
+**Live:** <https://pueblofoodmap.com>
 
-Phase 2 complete (Mapbox migration). The map renders 108 venue markers across 7 categories on a Mapbox GL JS vector basemap, with Lucide MapPin markers by category color, sage selection ring, hover tooltips, user-location dot with bilingual "You are here" label, and a flyTo / fitBounds geolocation flow. Demo-ready as of 2026-05-17.
+---
 
-PFP garden coordinates were re-geocoded against Nominatim on 2026-05-14 (see [`scripts/geocode-pfp.py`](scripts/geocode-pfp.py) and [`data/raw/pfp-geocodes.json`](data/raw/pfp-geocodes.json)). One venue — Ray Aguilera Community Garden — uses a manual coordinate supplied by PFP because the garden plot sits south of the OSM Ray Aguilera Park centroid.
+## Who it's for
 
-## Live preview
+Pueblo County residents who are food-insecure or seeking community food
+resources — including Spanish-speaking residents (full EN/ES UI). Works on
+any smartphone browser; no app install required.
 
-- Production: <https://pueblofoodmap.com> — auto-deploys on every merge to `main` via Cloudflare Workers Builds.
-- Every pull request gets its own preview URL via the Cloudflare Workers ↔ GitHub integration; the link is posted as a status check on the PR.
-
-## Stack
-
-- Next.js 16 (App Router) + TypeScript
-- Tailwind CSS v4
-- Mapbox GL JS + react-map-gl (Mapbox vector tiles, `streets-v12` basemap)
-- Static venue data committed in `src/data/venues.ts`
-
-## Roadmap
-
-See the project PRD in the Pueblo Food Project research vault for the full plan. Short version:
-
-1. Base map with 10 PFP gardens + edible landscapes — **done**.
-2. Ingest grocery / convenience / farm venues from OpenStreetMap Overpass API — **done** (64 venues).
-3. Re-geocode the PFP venues against a real address service so pins land at the right buildings — **done** (Nominatim, 2026-05-14).
-4. Add 40+ Pueblo pantries from Plentiful directory (`directory.plentiful.org/colorado/pueblo`).
-5. Category filters and venue detail panels.
-6. Google Maps directions deep link on every venue card (`https://www.google.com/maps/dir/?api=1&destination=…&travelmode=transit`). Pueblo Transit's GTFS already feeds Google's transit routing, so one `<a href>` per venue covers walking, transit, and driving without standing up any routing infrastructure. Revisit self-hosted OpenTripPlanner + Pueblo Transit GTFS (`data.trilliumtransit.com/gtfs/pueblo-co-us/pueblo-co-us.zip`) later if PFP needs in-app routing, offline support, or custom paratransit.
-7. Live demo + implementation plan at the 2026-06-09 PFP meeting.
+---
 
 ## Local development
 
+Requirements: Node.js 20 LTS or later.
+
 ```bash
+git clone https://github.com/kr8vka0z/pueblo-food-map.git
+cd pueblo-food-map
+cp .env.local.example .env.local   # fill in NEXT_PUBLIC_MAPBOX_TOKEN
 npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>. The dev server uses Turbopack and hot-reloads on save.
+Open <http://localhost:3000>. Hot-reloads on save (Turbopack).
 
-## Project infrastructure
+### Key scripts
 
-- **CI:** `lint → typecheck → build` runs on every PR and on every push to `main` via [`.github/workflows/ci.yml`](.github/workflows/ci.yml). The job name "Lint, typecheck, build" is the required status check on `main`.
-- **Preview deploys:** Cloudflare Workers Builds creates a preview environment for every pull request and rebuilds production on every merge to `main`.
-- **Dependency updates:** [Dependabot](.github/dependabot.yml) opens weekly PRs for npm packages and GitHub Actions, with non-breaking updates grouped into single PRs. ESLint major-version bumps are currently gated until `eslint-plugin-react` ships ESLint 10 support.
-- **Code review:** every human-authored pull request is reviewed by the [Claude Code GitHub Action](.github/workflows/claude-code-review.yml); mention `@claude` in a comment to ask follow-up questions.
-- **Branch protection:** `main` requires a passing CI status check, a linear history, an up-to-date branch, and resolved conversations on every PR.
+| Script | Purpose |
+|---|---|
+| `npm run dev` | Dev server with hot reload |
+| `npm run build` | Production build |
+| `npm run lint` | ESLint check |
+| `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
+| `npm run test` | Jest unit tests |
+| `npm run preview` | OpenNext build + local Worker emulator at :8788 |
+| `npm run deploy` | OpenNext build + wrangler deploy to production |
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup details and branch/commit
+conventions.
+
+---
+
+## Folder map
+
+```
+src/
+  app/             Next.js App Router pages and API route handlers
+    page.tsx         Root page (splash gate + map)
+    layout.tsx       Root layout (locale cookie read; LocaleProvider)
+    report/          Venue issue-report form + POST handler
+    suggest/         Suggest-a-venue form + POST handler
+    feedback/        General feedback form + POST handler
+  components/      React components (map canvas, bottom sheet, search, etc.)
+  data/            Static venue data (committed TypeScript modules)
+    venues.ts        Aggregated venue list — single import for all components
+    grocery-osm.ts   Auto-generated from OSM Overpass (do not edit by hand)
+    pantries-plentiful.ts  Auto-generated from Plentiful directory
+    benefit-flags.ts Auto-generated SNAP/WIC overlay
+    pueblo-bbox.ts   Pueblo County geographic constants
+  lib/             Shared utilities (i18n, hours, favorites, distance, etc.)
+  types/
+    venue.ts         Canonical Venue interface and VenueCategory type
+
+data/
+  raw/             Raw source files (OSM JSON, PFP geocodes, etc.)
+
+scripts/           One-off ingestion scripts (run locally; not imported by app)
+  ingest-osm-grocery.py   Overpass → src/data/grocery-osm.ts
+  scrape-plentiful.py     Plentiful → src/data/pantries-plentiful.ts
+  match-benefits.py       USDA FNS + CDPHE → src/data/benefit-flags.ts
+  geocode-pfp.py          Nominatim geocoder for PFP venues
+```
+
+---
+
+## Stack
+
+- **Next.js 16.2** (App Router) + TypeScript
+- **Tailwind CSS v4**
+- **Mapbox GL JS v3** + `react-map-gl` v8 (vector tiles, `streets-v12` basemap)
+- **vaul** (bottom sheet on mobile)
+- **lucide-react** (icons)
+- **Cloudflare Turnstile** (bot protection on submission forms)
+- **Resend** (transactional email for form submissions)
+- **Deployed to Cloudflare Workers** via `@opennextjs/cloudflare`
+
+---
+
+## Deploy and infrastructure
+
+- **CI:** `lint → typecheck → build` on every PR and push to `main`
+  ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+- **Deploys:** Cloudflare Workers Builds (connected via CF dashboard, no
+  Actions YAML). Push to `main` → production; open a PR → preview URL.
+- **Rollback:** CF dashboard → Workers & Pages → `pueblo-food-map` →
+  Deployments → pick a previous build → "Rollback to this deployment".
+
+See [AGENTS.md](AGENTS.md) for token management, environment variables,
+preview-deploy URL restrictions, and the full deploy runbook.
+
+---
+
+## Architecture
+
+For the mental model — data-aggregator pattern, MapWrapper state machine,
+i18n design, form-route triad, and hosting decisions — see
+[ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
 
 ## Data sources
 
 | Layer | Source | Refresh |
 |---|---|---|
-| Gardens + landscapes | Pueblo Food Project CGSP page | Manual, currently |
-| Pantries | Plentiful public directory | Scheduled scrape (not yet wired) |
-| Grocery / convenience / farms | OpenStreetMap Overpass API | Scheduled query (not yet wired) |
-| Bus routes + stops + schedules | Pueblo Transit GTFS via Trillium | Nightly fetch (not yet wired) |
+| Gardens + landscapes | Pueblo Food Project CGSP page | Manual |
+| Pantries + meal sites | Plentiful public directory (`directory.plentiful.org/colorado/pueblo`) | Re-run `scripts/scrape-plentiful.py` |
+| Grocery / convenience / farms | OpenStreetMap Overpass API | Re-run `scripts/ingest-osm-grocery.py` |
+| SNAP / WIC flags | USDA FNS + CDPHE public data | Re-run `scripts/match-benefits.py` |
+
+PFP garden coordinates geocoded against Nominatim (OpenStreetMap) on
+2026-05-14 via `scripts/geocode-pfp.py` — audit trail in
+`data/raw/pfp-geocodes.json`.
+
+---
 
 ## License
 
-MIT (code). Venue data licensing pending coordination with Pueblo Food Project, Care & Share Food Bank of Southern Colorado, and other source organizations.
+MIT (code). Venue data licensing is coordinated with Pueblo Food Project,
+Care & Share Food Bank of Southern Colorado, and other source organizations.
 
 ## Acknowledgments
 
-- Pueblo Food Project — primary stakeholder + data source for gardens and landscapes
-- Pueblo Transit — GTFS feed
-- Trillium Solutions — GTFS hosting
-- OpenStreetMap contributors — base tiles + grocery data
-- Plentiful — pantry directory data
+- Pueblo Food Project — primary stakeholder and PFP garden/landscape data
+- OpenStreetMap contributors — base tiles and grocery data
+- Plentiful — pantry and meal-site directory data
+- Pueblo Transit / Trillium Solutions — GTFS feed (directions, future)

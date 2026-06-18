@@ -86,7 +86,8 @@ export default function VenueMarker({
   onClick,
   onHover,
   onLeave,
-  locale: _locale = "en",
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  locale: _locale = "en", // intentional stub — wired for future i18n of aria strings
 }: VenueMarkerProps) {
   const color = CATEGORY_COLORS[venue.category];
   const readableName = CATEGORY_READABLE[venue.category];

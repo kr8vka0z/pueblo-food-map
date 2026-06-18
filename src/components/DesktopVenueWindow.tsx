@@ -56,7 +56,12 @@ interface MapboxMap {
 import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
-import { computeOpenStatus, formatSlot } from "@/lib/hours";
+import {
+  computeOpenStatus,
+  formatSlot,
+  todayKey,
+  DISPLAY_DAY_KEYS as DAY_KEYS,
+} from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
 import VenuePopupHeader from "@/components/VenuePopupHeader";
 import ReportVenueButton from "@/components/ReportVenueButton";
@@ -68,15 +73,6 @@ const WINDOW_QUICK_H = 220;
 const WINDOW_EXPANDED_W = 420;
 const WINDOW_EXPANDED_H = 720;
 const MARKER_GAP = 12; // px gap between marker tip and window edge
-
-const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
-type DayKey = (typeof DAY_KEYS)[number];
-
-function todayKey(): DayKey {
-  const idx = new Date().getDay();
-  const map: DayKey[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-  return map[idx] ?? "mon";
-}
 
 // ─── Edge-flip math ───────────────────────────────────────────────────────────
 

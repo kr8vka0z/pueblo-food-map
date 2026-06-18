@@ -19,6 +19,14 @@ export const PUEBLO_COUNTY_BBOX: [[number, number], [number, number]] = [
 ];
 
 /**
+ * Downtown Pueblo, CO — the default map center / distance-filter origin.
+ * Single source of truth for the lat/lng pair; call sites assemble their own
+ * shape from these scalars (react-map-gl viewState vs a plain {lat,lng} point).
+ */
+export const PUEBLO_CENTER_LAT = 38.2544;
+export const PUEBLO_CENTER_LNG = -104.6091;
+
+/**
  * Minimum zoom level for the map.
  *
  * At zoom 9 on a 375px-wide viewport the full county (~90km N–S,

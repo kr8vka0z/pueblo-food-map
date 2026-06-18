@@ -27,14 +27,19 @@ import { t } from "@/lib/i18n";
 import { categoryLabels } from "@/data/venues";
 import VenueMarker from "@/components/VenueMarker";
 import type mapboxgl from "mapbox-gl";
-import { PUEBLO_COUNTY_BBOX, PUEBLO_COUNTY_MIN_ZOOM } from "@/data/pueblo-bbox";
+import {
+  PUEBLO_COUNTY_BBOX,
+  PUEBLO_COUNTY_MIN_ZOOM,
+  PUEBLO_CENTER_LAT,
+  PUEBLO_CENTER_LNG,
+} from "@/data/pueblo-bbox";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
 // Pueblo, CO city center
 const PUEBLO_CENTER = {
-  longitude: -104.6091,
-  latitude: 38.2544,
+  longitude: PUEBLO_CENTER_LNG,
+  latitude: PUEBLO_CENTER_LAT,
   zoom: 13,
 };
 

@@ -54,7 +54,11 @@ import type { Venue, VenueCategory } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
 import { type ViewMode } from "./ViewToggle";
 import ListView from "./ListView";
-import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
+import {
+  PUEBLO_COUNTY_BBOX,
+  PUEBLO_CENTER_LAT,
+  PUEBLO_CENTER_LNG,
+} from "@/data/pueblo-bbox";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
 // dynamic import here in a Client Component as required by Next.js 16
@@ -68,7 +72,7 @@ const LeafletMap = dynamic(() => import("./Map"), {
   ),
 });
 
-const PUEBLO_CENTER = { lat: 38.2544, lng: -104.6091 };
+const PUEBLO_CENTER = { lat: PUEBLO_CENTER_LAT, lng: PUEBLO_CENTER_LNG };
 
 /**
  * Drift-detection padding (in degrees).

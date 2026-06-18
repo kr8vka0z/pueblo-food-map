@@ -5,8 +5,10 @@
  * a discriminated-union status: "open", "opens_at", "closed_today", or
  * "no_hours". Components use this to render the open/closed badge.
  *
- * formatSlot() converts an internal "HH:MM-HH:MM" slot string to a human-
- * readable "9am – 5pm" form for the hours panel in VenueDetail.
+ * formatSlot() converts a slot string to a human-readable "9am – 5pm" form for
+ * the hours panel in VenueDetail / BottomSheet / DesktopVenueWindow. Accepts
+ * both the 24h form ("HH:MM-HH:MM") and the 12h Plentiful form
+ * ("H:MM AM - H:MM PM") — both produce identical output style.
  *
  * Note: DAY_KEYS and the todayKey derivation are scheduled to move here from
  * VenueDetail and DesktopVenueWindow in a pending refactor; inline docs for
@@ -177,11 +179,22 @@ function formatTime(hour: number, min: number): string {
   return `${h}${m}${period}`;
 }
 
-/** Format a slot string like "09:00-17:00" as "9am – 5pm" for display. */
+/**
+ * Format a slot string as "9am – 5pm" for display.
+ *
+ * Accepts both the 24h form ("09:00-17:00") and the 12h Plentiful form
+ * ("10:30 AM - 12:00 PM"). Delegates parsing to parseSlot() so both formats
+ * share the same minute-conversion logic and guarantee the panel text matches
+ * the open/closed badge exactly.
+ *
+ * Returns the raw slot string unchanged on malformed input (fail-safe).
+ */
 export function formatSlot(slot: string): string {
-  const [start, end] = slot.split("-");
-  if (!start || !end) return slot;
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  return `${formatTime(sh ?? 0, sm ?? 0)} – ${formatTime(eh ?? 0, em ?? 0)}`;
+  const parsed = parseSlot(slot);
+  if (!parsed) return slot;
+  const openHour = Math.floor(parsed.open / 60);
+  const openMin = parsed.open % 60;
+  const closeHour = Math.floor(parsed.close / 60);
+  const closeMin = parsed.close % 60;
+  return `${formatTime(openHour, openMin)} – ${formatTime(closeHour, closeMin)}`;
 }

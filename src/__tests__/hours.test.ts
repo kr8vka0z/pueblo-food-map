@@ -1,14 +1,15 @@
 /**
- * Unit tests for computeOpenStatus() in src/lib/hours.ts.
+ * Unit tests for computeOpenStatus() and formatSlot() in src/lib/hours.ts.
  *
  * Uses the injectable `now: Date` parameter throughout — no real-clock calls.
  * Covers: 24h slots, 12h AM/PM slots, reversed multi-slot ordering,
- * currently-open, closed_today, no_hours, noon/midnight boundaries, and a
- * real pantry shape from pantries-plentiful.ts.
+ * currently-open, closed_today, no_hours, noon/midnight boundaries, a
+ * real pantry shape from pantries-plentiful.ts, and formatSlot display
+ * formatting for both 24h and 12h slot strings.
  */
 
 import { describe, test, expect } from "vitest";
-import { computeOpenStatus } from "@/lib/hours";
+import { computeOpenStatus, formatSlot } from "@/lib/hours";
 import type { WeeklyHours } from "@/types/venue";
 
 /** Helper: create a Date at a given local clock time on a Monday */
@@ -209,5 +210,58 @@ describe("real Plentiful pantry — Pueblo Community Soup Kitchen", () => {
     // 2026-06-14 is a Sunday
     const sunday = new Date(2026, 5, 14, 10, 0, 0, 0);
     expect(computeOpenStatus(soupKitchen, sunday)).toEqual({ state: "closed_today" });
+  });
+});
+
+// ─── formatSlot display formatting ───────────────────────────────────────────
+//
+// formatSlot must handle both slot formats and produce identical output style.
+// 24h slots must render byte-identically to before (regression guard).
+// 12h slots must preserve minutes — the P0 display bug this commit fixes.
+
+describe("formatSlot", () => {
+  // ── 12-hour Plentiful format ─────────────────────────────────────────────
+
+  test("12h slot with minutes on start: 10:30 AM - 12:00 PM → 10:30am – 12pm", () => {
+    // Before fix: formatSlot split on "-" producing start="10:30 AM " end=" 12:00 PM"
+    // which parsed as NaN minutes → "10am – 12pm" (minutes silently dropped)
+    expect(formatSlot("10:30 AM - 12:00 PM")).toBe("10:30am – 12pm");
+  });
+
+  test("12h slot with minutes on both sides: 8:30 AM - 9:30 AM → 8:30am – 9:30am", () => {
+    expect(formatSlot("8:30 AM - 9:30 AM")).toBe("8:30am – 9:30am");
+  });
+
+  test("12h slot with no minutes on either side: 1:00 PM - 5:00 PM → 1pm – 5pm", () => {
+    expect(formatSlot("1:00 PM - 5:00 PM")).toBe("1pm – 5pm");
+  });
+
+  test("12h slot spanning noon: 10:00 AM - 12:00 PM → 10am – 12pm", () => {
+    expect(formatSlot("10:00 AM - 12:00 PM")).toBe("10am – 12pm");
+  });
+
+  // ── 24-hour format — regression guard (output must be byte-identical to before) ─
+
+  test("24h slot whole hours: 09:00-17:00 → 9am – 5pm", () => {
+    expect(formatSlot("09:00-17:00")).toBe("9am – 5pm");
+  });
+
+  test("24h slot with minutes on open: 09:30-17:00 → 9:30am – 5pm", () => {
+    expect(formatSlot("09:30-17:00")).toBe("9:30am – 5pm");
+  });
+
+  test("24h slot with minutes on close: 09:00-17:30 → 9am – 5:30pm", () => {
+    expect(formatSlot("09:00-17:30")).toBe("9am – 5:30pm");
+  });
+
+  test("24h slot noon close: 09:00-13:00 → 9am – 1pm", () => {
+    // Used by HoursList.test.tsx fixtures — must stay unchanged
+    expect(formatSlot("9:00-13:00")).toBe("9am – 1pm");
+  });
+
+  // ── Fail-safe ────────────────────────────────────────────────────────────
+
+  test("malformed slot returns raw slot unchanged (no throw)", () => {
+    expect(formatSlot("not-a-slot")).toBe("not-a-slot");
   });
 });

@@ -1,3 +1,13 @@
+# Pueblo Food Map — Agent Operations
+
+> **Start here for structural understanding:** [README.md](README.md) (human
+> entry point) and [ARCHITECTURE.md](ARCHITECTURE.md) (mental model: data
+> aggregator, MapWrapper state machine, i18n, form-route triad, hosting).
+> This file covers operational details only — tokens, deploy, rollback, env
+> vars, and runtime gotchas for AI coders.
+
+---
+
 # Map library — Mapbox GL JS via react-map-gl
 
 - **Libraries:** `mapbox-gl` v3 + `react-map-gl` v8 (react-map-gl/mapbox import path).

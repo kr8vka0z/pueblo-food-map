@@ -1,3 +1,17 @@
+/**
+ * Open-status logic for venue hours.
+ *
+ * computeOpenStatus() takes a Venue's hours_weekly map and a Date, and returns
+ * a discriminated-union status: "open", "opens_at", "closed_today", or
+ * "no_hours". Components use this to render the open/closed badge.
+ *
+ * formatSlot() converts an internal "HH:MM-HH:MM" slot string to a human-
+ * readable "9am – 5pm" form for the hours panel in VenueDetail.
+ *
+ * Note: DAY_KEYS and the todayKey derivation are scheduled to move here from
+ * VenueDetail and DesktopVenueWindow in a pending refactor; inline docs for
+ * those will follow.
+ */
 import type { WeeklyHours } from "@/types/venue";
 
 export type OpenStatus =

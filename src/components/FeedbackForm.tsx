@@ -139,7 +139,6 @@ export default function FeedbackForm({ locale = "en" }: FeedbackFormProps) {
         turnstileWidgetId.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Submission ────────────────────────────────────────────────────────────

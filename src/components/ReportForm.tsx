@@ -145,7 +145,6 @@ export default function ReportForm({
         turnstileWidgetId.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Submission ────────────────────────────────────────────────────────────

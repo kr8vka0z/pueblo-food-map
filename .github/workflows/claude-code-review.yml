@@ -18,11 +18,13 @@ permissions:
 
 jobs:
   claude-review:
-    # Auto-review every PR from a human author; skip Dependabot.
+    # Auto-review every PR from a human author; skip ALL bots (Dependabot,
+    # release-please, etc.) — bot PRs auto-merge or release on their own and the
+    # action refuses non-human actors, which otherwise shows up as a red check.
     # Also respond to @claude mentions in PR comments for ad-hoc reviews.
     if: >-
       (github.event_name == 'pull_request' &&
-       github.event.pull_request.user.login != 'dependabot[bot]') ||
+       github.event.pull_request.user.type != 'Bot') ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request != null &&
        contains(github.event.comment.body, '@claude'))

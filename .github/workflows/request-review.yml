@@ -1,0 +1,33 @@
+name: Request review on human PRs
+
+# When a human (non-bot, not the repo owner) opens or un-drafts a PR, request
+# kr8vka0z as a reviewer. That puts the PR in Kyle's "Awaiting your review" queue
+# and fires a GitHub notification / mobile push — the signal that a human PR needs
+# a merge decision. Bots auto-merge via CI and never need this; Kyle's own PRs are
+# skipped (you can't review your own PR).
+#
+# Uses pull_request_target so it also works on PRs from forks (external
+# contributors), where a plain `pull_request` run would only get a read-only token
+# and couldn't request a reviewer. This job NEVER checks out or runs the PR's code —
+# it only calls the GitHub API — so pull_request_target is safe here.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  request-review:
+    if: >-
+      github.event.pull_request.user.type != 'Bot' &&
+      github.event.pull_request.user.login != 'kr8vka0z' &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request Kyle as reviewer
+        run: gh pr edit "$PR_URL" --add-reviewer kr8vka0z
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

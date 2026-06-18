@@ -38,7 +38,7 @@ export default function CategoryChips({
       <div
         className="flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar"
         role="group"
-        aria-label="Filter by category"
+        aria-label={t("chips.filterByCategory", locale)}
       >
         {/* "All" chip */}
         <button

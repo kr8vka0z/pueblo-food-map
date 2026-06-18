@@ -27,7 +27,7 @@ import { MapPin } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import type { Venue, VenueCategory } from "@/types/venue";
 import { formatMiles } from "@/lib/distance";
-import type { Locale } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 
 // ─── Category color map (mirrors --color-cat-* tokens in globals.css) ─────────
 // Hardcoded hex values so the icon is renderable without DOM/CSSOM.
@@ -39,17 +39,6 @@ const CATEGORY_COLORS: Record<VenueCategory, string> = {
   garden: "#2C5F4F",
   edible_landscape: "#58772B",
   meal_site: "#6B3FA0",
-};
-
-// ─── Accessible readable-name labels ──────────────────────────────────────────
-const CATEGORY_READABLE: Record<VenueCategory, string> = {
-  pantry: "Food pantry",
-  grocery: "Grocery store",
-  convenience: "Convenience store",
-  farm: "Farm",
-  garden: "Community garden",
-  edible_landscape: "Edible landscape",
-  meal_site: "Meal site",
 };
 
 // ─── Sage selected ring color (--color-sage-500) ──────────────────────────────
@@ -73,7 +62,6 @@ interface VenueMarkerProps {
   onHover?: (id: string) => void;
   /** Called on mouseleave/focusout — dismisses hover tooltip in Map.tsx. */
   onLeave?: () => void;
-  /** Locale for future i18n of aria strings (currently unused but wired). */
   locale?: Locale;
 }
 
@@ -86,11 +74,11 @@ export default function VenueMarker({
   onClick,
   onHover,
   onLeave,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  locale: _locale = "en", // intentional stub — wired for future i18n of aria strings
+  locale = "en",
 }: VenueMarkerProps) {
   const color = CATEGORY_COLORS[venue.category];
-  const readableName = CATEGORY_READABLE[venue.category];
+  // marker.category.* stays short; category.full.* is for chips and detail panels (#162).
+  const readableName = t(`marker.category.${venue.category}`, locale);
   const pinSize = selected ? SIZE_SELECTED : SIZE_DEFAULT;
   const totalSize = selected ? pinSize + RING_PAD * 2 : pinSize;
 

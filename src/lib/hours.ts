@@ -1,3 +1,17 @@
+/**
+ * Open-status logic for venue hours.
+ *
+ * computeOpenStatus() takes a Venue's hours_weekly map and a Date, and returns
+ * a discriminated-union status: "open", "opens_at", "closed_today", or
+ * "no_hours". Components use this to render the open/closed badge.
+ *
+ * formatSlot() converts an internal "HH:MM-HH:MM" slot string to a human-
+ * readable "9am – 5pm" form for the hours panel in VenueDetail.
+ *
+ * Note: DAY_KEYS and the todayKey derivation are scheduled to move here from
+ * VenueDetail and DesktopVenueWindow in a pending refactor; inline docs for
+ * those will follow.
+ */
 import type { WeeklyHours } from "@/types/venue";
 
 export type OpenStatus =
@@ -7,7 +21,30 @@ export type OpenStatus =
   | { state: "no_hours" };
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
-type DayKey = (typeof DAY_KEYS)[number];
+
+/**
+ * Display ordering for weekly-hours rows (Monday-first), distinct from the
+ * Sunday-first DAY_KEYS above which is indexed by Date.getDay() (0 = Sunday).
+ * Shared by VenueDetail / DesktopVenueWindow, which render hours Monday→Sunday.
+ */
+export const DISPLAY_DAY_KEYS = [
+  "mon",
+  "tue",
+  "wed",
+  "thu",
+  "fri",
+  "sat",
+  "sun",
+] as const;
+
+export type DayKey = (typeof DISPLAY_DAY_KEYS)[number];
+
+/** The DayKey for today (local time), e.g. to highlight the current row. */
+export function todayKey(): DayKey {
+  const idx = new Date().getDay(); // 0=Sun
+  const map: DayKey[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+  return map[idx] ?? "mon";
+}
 
 /** Parse "HH:MM" into minutes-since-midnight. */
 function toMinutes(hhmm: string): number {

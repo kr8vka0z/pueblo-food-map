@@ -1,3 +1,11 @@
+/**
+ * Canonical Venue type and VenueCategory union.
+ *
+ * Every data source (src/data/venues.ts, grocery-osm.ts, pantries-plentiful.ts)
+ * conforms to this interface. Components import from here — never from
+ * individual data files — so the type definition stays in one place.
+ */
+
 export type VenueCategory =
   | "pantry"
   | "grocery"

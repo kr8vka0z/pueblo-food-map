@@ -4,18 +4,14 @@ import { X, ArrowLeft, MapPin, Phone, Mail, Clock } from "lucide-react";
 import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
-import { computeOpenStatus, formatSlot } from "@/lib/hours";
+import {
+  computeOpenStatus,
+  formatSlot,
+  todayKey,
+  DISPLAY_DAY_KEYS as DAY_KEYS,
+} from "@/lib/hours";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
-
-const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
-type DayKey = (typeof DAY_KEYS)[number];
-
-function todayKey(): DayKey {
-  const idx = new Date().getDay(); // 0=Sun
-  const map: DayKey[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-  return map[idx] ?? "mon";
-}
 
 interface VenueDetailProps {
   venue: Venue & { distanceMiles?: number };

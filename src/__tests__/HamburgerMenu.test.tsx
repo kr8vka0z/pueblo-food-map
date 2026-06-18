@@ -286,13 +286,12 @@ describe("#96 — About Pueblo Food Project menu item", () => {
     });
   });
 
-  test("'About' item renders in ES locale too (proper noun stays English)", async () => {
+  test("'About' item renders in ES locale with Spanish label", async () => {
     const user = userEvent.setup();
     renderMenu("es");
     await user.click(screen.getByRole("button", { name: /Abrir menú/i }));
     await waitFor(() => {
-      // "Pueblo Food Project" stays in English per spec
-      expect(screen.getByText("About Pueblo Food Project")).toBeDefined();
+      expect(screen.getByText("Acerca de Pueblo Food Project")).toBeDefined();
     });
   });
 });

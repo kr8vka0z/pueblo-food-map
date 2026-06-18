@@ -237,6 +237,22 @@ describe("VenueMarker — aria-label", () => {
     });
     expect(btn).toBeDefined();
   });
+
+  test("ES locale: category in aria-label is Spanish", () => {
+    const venue = makeVenue({ name: "La Familia Pantry", category: "pantry" });
+    render(
+      <VenueMarker
+        venue={venue}
+        selected={false}
+        locale="es"
+        onClick={vi.fn()}
+      />,
+    );
+    const btn = screen.getByRole("button", {
+      name: "La Familia Pantry, Despensa",
+    });
+    expect(btn).toBeDefined();
+  });
 });
 
 // ─── Hover / focus callbacks ──────────────────────────────────────────────────

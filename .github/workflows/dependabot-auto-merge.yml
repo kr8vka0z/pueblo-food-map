@@ -1,0 +1,43 @@
+name: Dependabot auto-merge
+
+# Auto-merges Dependabot PRs once required CI passes — but ONLY patch and minor
+# bumps (including the grouped minor/patch PRs). Major bumps are left open and
+# labelled for a human, because majors can carry breaking changes.
+#
+# Why this is safe: branch protection on `main` requires the "Lint, typecheck,
+# build" check, so `gh pr merge --auto` waits for green CI before it merges —
+# it never merges a red build. We use only the built-in GITHUB_TOKEN (no custom
+# secrets), so Dependabot's restricted token works once `permissions:` elevates it.
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge for patch & minor bumps
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Hold major bumps for manual review
+        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+        run: |
+          gh pr edit "$PR_URL" --add-label "needs-manual-review"
+          gh pr comment "$PR_URL" --body "🛑 Major version bump — held for manual review (auto-merge covers only patch/minor). Check the changelog for breaking changes before merging."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

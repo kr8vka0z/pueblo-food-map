@@ -19,38 +19,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FEEDBACK_TYPES, type FeedbackTypeKey } from "@/lib/feedbackTypes";
 import { verifyTurnstileToken } from "@/lib/turnstile";
+import { createRateLimiter, EMAIL_RE } from "@/lib/rateLimit";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
-// Simple in-process sliding window. Keyed by IP string.
-// Resets when the Worker cold-starts. Good enough for v1.
+// Private in-process sliding window for this route (own 5/hr-per-IP bucket).
 
-const RATE_LIMIT_MAX = 5;
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-
-interface RateLimitEntry {
-  count: number;
-  windowStart: number;
-}
-
-const rateLimitStore = new Map<string, RateLimitEntry>();
-
-export function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitStore.get(ip);
-
-  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
-    // New window
-    rateLimitStore.set(ip, { count: 1, windowStart: now });
-    return true; // allowed
-  }
-
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return false; // blocked
-  }
-
-  entry.count += 1;
-  return true; // allowed
-}
+export const checkRateLimit = createRateLimiter();
 
 // ─── Email sender ─────────────────────────────────────────────────────────────
 
@@ -100,8 +74,6 @@ async function sendFeedbackEmail(payload: {
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface SubmitPayload {
   feedbackType: string;

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.5...v0.1.6) (2026-06-18)
+
+
+### Added
+
+* improvements for spanish translations ([#169](https://github.com/kr8vka0z/pueblo-food-map/issues/169)) ([56a4d27](https://github.com/kr8vka0z/pueblo-food-map/commit/56a4d27024beb9f816c9dfa8d3de285cf68e48c0))
+
 ## [0.1.5](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.4...v0.1.5) (2026-06-18)
 
 

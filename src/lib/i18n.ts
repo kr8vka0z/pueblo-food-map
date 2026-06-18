@@ -323,6 +323,18 @@ const en: Record<string, string> = {
 
   // External links (#162)
   "menu.opensInNewTab": "(opens in new tab)",
+
+  // Map loading fallback — shown while dynamic import resolves (#i18n-leaks)
+  "map.loading": "Loading map…",
+
+  // LanguageToggle group aria-label (#i18n-leaks)
+  "lang.toggle.label": "Language selection",
+
+  // CategoryChips group aria-label (#i18n-leaks)
+  "chips.filterByCategory": "Filter by category",
+
+  // SuggestForm SNAP/WIC fieldset legend — WCAG 1.3.1 (#i18n-leaks)
+  "suggest.benefits.legend": "Accepted benefits",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -647,6 +659,18 @@ const es: Record<string, string> = {
 
   // External links (#162)
   "menu.opensInNewTab": "(se abre en una pestaña nueva)",
+
+  // Map loading fallback (#i18n-leaks)
+  "map.loading": "Cargando mapa…",
+
+  // LanguageToggle group aria-label (#i18n-leaks)
+  "lang.toggle.label": "Selección de idioma",
+
+  // CategoryChips group aria-label (#i18n-leaks)
+  "chips.filterByCategory": "Filtrar por categoría",
+
+  // SuggestForm SNAP/WIC fieldset legend (#i18n-leaks)
+  "suggest.benefits.legend": "Beneficios aceptados",
 };
 
 /** Substitute simple {key} placeholders. */

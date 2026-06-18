@@ -28,6 +28,7 @@ import {
 } from "react";
 import type mapboxgl from "mapbox-gl";
 import dynamic from "next/dynamic";
+import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
 import Wordmark from "./Wordmark";
 import LocateButton from "./LocateButton";
@@ -63,13 +64,12 @@ import {
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
 // dynamic import here in a Client Component as required by Next.js 16
 // (ssr:false only works in Client Components per the lazy-loading doc).
+// Wrapping MapLoadingFallback in an arrow function satisfies the
+// DynamicOptionsLoadingProps signature while still rendering the locale-aware
+// component (which reads locale from LocaleContext internally).
 const LeafletMap = dynamic(() => import("./Map"), {
   ssr: false,
-  loading: () => (
-    <div className="flex h-full w-full items-center justify-center bg-[var(--color-bone-100)] text-[var(--color-ink-400)] text-sm motion-safe:animate-pulse">
-      Loading map…
-    </div>
-  ),
+  loading: () => <MapLoadingFallback />,
 });
 
 const PUEBLO_CENTER = { lat: PUEBLO_CENTER_LAT, lng: PUEBLO_CENTER_LNG };

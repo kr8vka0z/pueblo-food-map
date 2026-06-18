@@ -402,9 +402,10 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
       </div>
 
       {/* SNAP / WIC checkboxes */}
+      {/* legend is required for WCAG 1.3.1 (fieldset must have accessible name) */}
       <fieldset className="space-y-2">
         <legend className={labelClass.replace("mb-1", "mb-2")}>
-          {/* No i18n key needed — individual labels cover it */}
+          {t("suggest.benefits.legend", locale)}
         </legend>
         <label className="flex items-center gap-2 text-sm text-[var(--color-ink-700)] cursor-pointer">
           <input

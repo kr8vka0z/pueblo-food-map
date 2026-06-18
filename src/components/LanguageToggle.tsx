@@ -13,7 +13,7 @@
  */
 
 import { useLocale } from "@/lib/LocaleContext";
-import type { Locale } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 
 const LABELS: Record<Locale, string> = {
   en: "EN",
@@ -31,7 +31,7 @@ export default function LanguageToggle() {
   return (
     <div
       role="group"
-      aria-label="Language selection"
+      aria-label={t("lang.toggle.label", locale)}
       className="flex items-center rounded-full border border-[var(--color-bone-300)] bg-[var(--color-bone-100)] overflow-hidden"
       style={{ height: 28 }}
     >

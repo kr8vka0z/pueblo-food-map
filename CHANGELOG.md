@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.4...v0.1.5) (2026-06-18)
+
+
+### Added
+
+* **#126:** "Open now" filter toggle in the category dropdown ([#143](https://github.com/kr8vka0z/pueblo-food-map/issues/143)) ([038e1aa](https://github.com/kr8vka0z/pueblo-food-map/commit/038e1aa271ef82a20afac7cf79391049bb6083e9)), closes [#126](https://github.com/kr8vka0z/pueblo-food-map/issues/126)
+* **#127:** SNAP/WIC benefit flags (sourced) + filters ([#145](https://github.com/kr8vka0z/pueblo-food-map/issues/145)) ([4f0cf87](https://github.com/kr8vka0z/pueblo-food-map/commit/4f0cf8704a4c5b04bcb144d989bde9f9514ece5f)), closes [#127](https://github.com/kr8vka0z/pueblo-food-map/issues/127)
+* **#128:** prominent "See on Plentiful" link in venue detail ([#144](https://github.com/kr8vka0z/pueblo-food-map/issues/144)) ([424cb27](https://github.com/kr8vka0z/pueblo-food-map/commit/424cb27ed96cbaf47f7a90ce1373a51486f31f61)), closes [#128](https://github.com/kr8vka0z/pueblo-food-map/issues/128)
+* **#129:** Map | List view toggle with full-screen nearest-first list ([#152](https://github.com/kr8vka0z/pueblo-food-map/issues/152)) ([3146a10](https://github.com/kr8vka0z/pueblo-food-map/commit/3146a106b892e81dfb89c34d2294b17944e8fe12))
+* **#131:** add "Get help" assistance links to the menu ([#142](https://github.com/kr8vka0z/pueblo-food-map/issues/142)) ([ee4a109](https://github.com/kr8vka0z/pueblo-food-map/commit/ee4a10935642da7849f81b24f2bfdc38e6fa2595)), closes [#131](https://github.com/kr8vka0z/pueblo-food-map/issues/131)
+* **#132:** "Saved places" list in the menu (slice 9c) ([#149](https://github.com/kr8vka0z/pueblo-food-map/issues/149)) ([a02249c](https://github.com/kr8vka0z/pueblo-food-map/commit/a02249c8367d06c859d89e9abce34343534c4c0f))
+* **#132:** on-device favorites store + star control on detail cards ([#148](https://github.com/kr8vka0z/pueblo-food-map/issues/148)) ([c08f065](https://github.com/kr8vka0z/pueblo-food-map/commit/c08f06571bf60041ee8d0fb570f2ebee1c4864a5))
+* **#132:** share a place via native share sheet + copy-link (slice 9d) ([#151](https://github.com/kr8vka0z/pueblo-food-map/issues/151)) ([1e7c4ac](https://github.com/kr8vka0z/pueblo-food-map/commit/1e7c4ac698dee6e5ba5d82caa718966f1a68a64d))
+* **#132:** venue deep-link routing (?venue=&lt;id&gt;) ([#147](https://github.com/kr8vka0z/pueblo-food-map/issues/147)) ([2232adf](https://github.com/kr8vka0z/pueblo-food-map/commit/2232adfd9d0c4082d402d30a6e2af5dd65028e5d))
+* add a "Favorites" filter to the search dropdown ([#153](https://github.com/kr8vka0z/pueblo-food-map/issues/153)) ([b8e35e1](https://github.com/kr8vka0z/pueblo-food-map/commit/b8e35e13b5bb8b5bd31fbdc46d4c5e60bd2ddb40))
+* add Double Up Food Bucks to the "Get help" menu ([#146](https://github.com/kr8vka0z/pueblo-food-map/issues/146)) ([f23ecf7](https://github.com/kr8vka0z/pueblo-food-map/commit/f23ecf793a072bd4e7f7e7e1eff6b1beca8a0662))
+* move the Map/List toggle into the hamburger menu ([#154](https://github.com/kr8vka0z/pueblo-food-map/issues/154)) ([9b93479](https://github.com/kr8vka0z/pueblo-food-map/commit/9b9347982d3d9aec9f5be474ccaf20ed54a6bf74))
+
+
+### Fixed
+
+* **#121:** venue detail card hugs content height (no dead space) ([#137](https://github.com/kr8vka0z/pueblo-food-map/issues/137)) ([e65d195](https://github.com/kr8vka0z/pueblo-food-map/commit/e65d195ae2ecd47656561212c75a48e42d132e07)), closes [#121](https://github.com/kr8vka0z/pueblo-food-map/issues/121)
+* **#122:** mobile card polish — drop drag handle, move locate button up ([#138](https://github.com/kr8vka0z/pueblo-food-map/issues/138)) ([f5031ee](https://github.com/kr8vka0z/pueblo-food-map/commit/f5031eecf28f42ac576b47609ffffa3b09b20851))
+* **#122:** mobile venue card expand via Show/Hide details toggle ([#135](https://github.com/kr8vka0z/pueblo-food-map/issues/135)) ([f469ed9](https://github.com/kr8vka0z/pueblo-food-map/commit/f469ed9ca37efc2ef1e9ce7c9e08a707953e3516)), closes [#122](https://github.com/kr8vka0z/pueblo-food-map/issues/122)
+* **#123:** recenter flies to user even with a venue selected ([#139](https://github.com/kr8vka0z/pueblo-food-map/issues/139)) ([1bb6de5](https://github.com/kr8vka0z/pueblo-food-map/commit/1bb6de5fdb35785a324600356c22e67703f24e74)), closes [#123](https://github.com/kr8vka0z/pueblo-food-map/issues/123)
+* **#124:** menu title "Pueblo Food Map"; move About to the bottom ([#140](https://github.com/kr8vka0z/pueblo-food-map/issues/140)) ([3c8764a](https://github.com/kr8vka0z/pueblo-food-map/commit/3c8764a3ad26331270ca44a63dbf80f7a377f870)), closes [#124](https://github.com/kr8vka0z/pueblo-food-map/issues/124)
+* splash "Find food near me" locates immediately (no second tap) ([#141](https://github.com/kr8vka0z/pueblo-food-map/issues/141)) ([39117db](https://github.com/kr8vka0z/pueblo-food-map/commit/39117db3dba916460fb103b365eb1b5566d9dac3))
+
 ## [0.1.4](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.3...v0.1.4) (2026-05-30)
 
 

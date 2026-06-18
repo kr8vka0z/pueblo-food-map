@@ -149,7 +149,6 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
         turnstileWidgetId.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Submission ────────────────────────────────────────────────────────────

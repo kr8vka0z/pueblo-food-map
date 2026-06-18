@@ -34,11 +34,12 @@ import {
 // it with a synchronous implementation that immediately invokes the callback,
 // which sets the token and enables the submit button.
 
-let capturedCallback: ((token: string) => void) | undefined;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+let _capturedCallback: ((token: string) => void) | undefined;
 
 const mockTurnstile = {
   render: vi.fn((container: HTMLElement, opts: { callback?: (t: string) => void }) => {
-    capturedCallback = opts.callback;
+    _capturedCallback = opts.callback;
     // Immediately resolve with a fake token so the submit button is enabled
     if (opts.callback) opts.callback("test-turnstile-token");
     return "widget-id-1";
@@ -58,7 +59,7 @@ beforeEach(() => {
   mockTurnstile.render.mockClear();
   mockTurnstile.reset.mockClear();
   mockTurnstile.remove.mockClear();
-  capturedCallback = undefined;
+  _capturedCallback = undefined;
   // Mount turnstile global before each render so useEffect sees it
   vi.stubGlobal("turnstile", mockTurnstile);
 });

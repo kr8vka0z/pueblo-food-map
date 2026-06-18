@@ -207,10 +207,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   // ── Geolocation — v2 hook ────────────────────────────────────────────────────
   const geo = useGeolocation();
-  // When viewport === 'located', prefer the user's real position if available;
-  // fall back to null which will resolve to PUEBLO_CENTER in the origin derivation below.
-  const userLocation =
-    viewport === 'located' ? geo.state.position : geo.state.position;
+  // Prefer the user's real position if available; fall back to null which will
+  // resolve to PUEBLO_CENTER in the origin derivation below.
+  const userLocation = geo.state.position;
 
   // ── Location-denied banner (PR 7) ────────────────────────────────────────────
   // Shows only when the user ACTIVELY re-taps locate (not on initial mount when
@@ -394,23 +393,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const [activeIndex, setActiveIndex] = useState(-1);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Category toggle ──────────────────────────────────────────────────────────
-  const handleToggleCategory = useCallback((cat: VenueCategory | null) => {
-    if (cat === null) {
-      setSelectedCategories(null);
-    } else {
-      setSelectedCategories((prev) => {
-        const next = new Set(prev ?? []);
-        if (next.has(cat)) {
-          next.delete(cat);
-          return next.size === 0 ? null : next;
-        }
-        next.add(cat);
-        return next;
-      });
-    }
-  }, []);
-
   // ── Category browse handler (#95) ─────────────────────────────────────────────
   // Selects/toggles a single category from the dropdown; syncs selectedCategories.
   const handleCategoryBrowseSelect = useCallback(
@@ -511,11 +493,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     (filterFavorites && favoriteSet.size > 0) ||
     filterWalking;
 
-  function handleClearFilters() {
-    setSelectedCategories(null);
-    setActiveCategoryFilter(null);
-  }
-
   // ── Wordmark reset handler (#61) ─────────────────────────────────────────────
   // Recenters the map on Pueblo, clears selected venue, filters, and search.
   // Does NOT re-show the splash screen (splash is a one-time onboarding gate).
@@ -595,17 +572,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     }
     return m;
   }, [venuesWithDistance]);
-
-  // Category counts over the filtered set
-  const categoryCounts = useMemo(() => {
-    return filteredVenues.reduce<Partial<Record<VenueCategory, number>>>(
-      (acc, v) => {
-        acc[v.category] = (acc[v.category] ?? 0) + 1;
-        return acc;
-      },
-      {},
-    );
-  }, [filteredVenues]);
 
   // Selected venue object — used by BottomSheet (mobile) and DesktopVenueWindow (desktop)
   const selectedVenue = useMemo(

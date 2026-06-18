@@ -79,7 +79,8 @@ describe("parseOsmHours", () => {
   });
 
   test("24/7 · Operated by Walmart → hours + residue", () => {
-    const { hours_weekly, residue } = parseOsmHours("24/7 · Operated by Walmart");
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { hours_weekly, residue: _residue } = parseOsmHours("24/7 · Operated by Walmart");
     // Note: "24/7 · ..." — residue parsing happens after 24/7 check
     // Actually 24/7 is checked before residue split, so residue should be extracted
     // Let's verify the actual implementation handles this

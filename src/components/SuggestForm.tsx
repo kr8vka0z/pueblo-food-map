@@ -26,6 +26,16 @@ import Script from "next/script";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { VENUE_CATEGORIES, type VenueCategoryKey } from "@/lib/suggestTypes";
+import { FIELD_LIMITS } from "@/lib/fieldLimits";
+
+const {
+  SUGGEST_VENUE_NAME,
+  SUGGEST_ADDRESS,
+  SUGGEST_HOURS,
+  SUGGEST_CONTACT,
+  SUGGEST_NOTES,
+  EMAIL,
+} = FIELD_LIMITS;
 
 // ─── Turnstile global type (shared declaration; ReportForm has same) ──────────
 
@@ -291,6 +301,7 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
           value={venueName}
           onChange={(e) => setVenueName(e.target.value)}
           placeholder={t("suggest.venueName.placeholder", locale)}
+          maxLength={SUGGEST_VENUE_NAME}
           aria-required="true"
           aria-describedby={errors.venueName ? "suggest-name-error" : undefined}
           aria-invalid={errors.venueName ? "true" : undefined}
@@ -320,6 +331,7 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder={t("suggest.address.placeholder", locale)}
+          maxLength={SUGGEST_ADDRESS}
           aria-required="true"
           aria-describedby={errors.address ? "suggest-address-error" : undefined}
           aria-invalid={errors.address ? "true" : undefined}
@@ -382,6 +394,7 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
           value={hours}
           onChange={(e) => setHours(e.target.value)}
           placeholder={t("suggest.hours.placeholder", locale)}
+          maxLength={SUGGEST_HOURS}
           className={`${inputBase} border-[var(--color-bone-300)]`}
         />
       </div>
@@ -397,6 +410,7 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
           value={contact}
           onChange={(e) => setContact(e.target.value)}
           placeholder={t("suggest.contact.placeholder", locale)}
+          maxLength={SUGGEST_CONTACT}
           className={`${inputBase} border-[var(--color-bone-300)]`}
         />
       </div>
@@ -450,6 +464,7 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder={t("suggest.notes.placeholder", locale)}
+          maxLength={SUGGEST_NOTES}
           className={`${inputBase} border-[var(--color-bone-300)] resize-y min-h-[72px]`}
         />
       </div>
@@ -466,6 +481,7 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
           onChange={(e) => setSubmitterEmail(e.target.value)}
           placeholder={t("suggest.submitterEmail.placeholder", locale)}
           autoComplete="email"
+          maxLength={EMAIL}
           aria-describedby={
             errors.submitterEmail
               ? "suggest-email-error"
@@ -488,6 +504,16 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
             {t("suggest.submitterEmail.hint", locale)}
           </p>
         )}
+        {/* Privacy disclosure (#160 1.7): brief reassurance for a vulnerable population */}
+        <p className="mt-1 text-xs text-[var(--color-ink-400)]">
+          {t("privacy.emailDisclosure", locale)}{" "}
+          <Link
+            href="/privacy"
+            className="underline hover:text-[var(--color-sage-600)] transition-colors"
+          >
+            {t("privacy.linkLabel", locale)}
+          </Link>
+        </p>
       </div>
 
       {/* Honeypot — visually hidden from real users */}

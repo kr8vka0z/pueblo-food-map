@@ -21,6 +21,10 @@ import Script from "next/script";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
+import { FIELD_LIMITS } from "@/lib/fieldLimits";
+
+// Expose limits to the module scope for use in JSX maxlength attrs.
+const { REPORT_DESCRIPTION, EMAIL } = FIELD_LIMITS;
 
 // ─── Turnstile global type ────────────────────────────────────────────────────
 
@@ -84,8 +88,9 @@ interface ReportFormProps {
 
 export default function ReportForm({
   venueId,
-  venueName,
-  venueAddress,
+  // venueName and venueAddress are passed by the page (it reads them from the
+  // static venue list) but the form no longer sends them to the server.
+  // The server now re-looks them up from venueId (#160 1.3).
   locale = "en",
 }: ReportFormProps) {
   const [issueType, setIssueType] = useState<string>("");
@@ -174,8 +179,8 @@ export default function ReportForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           venueId,
-          venueName,
-          venueAddress,
+          // venueName and venueAddress intentionally omitted: the server looks
+          // them up from venueId to prevent client-side subject-line injection.
           issueType,
           description: description.trim(),
           contactEmail: contactEmail.trim() || undefined,
@@ -317,6 +322,7 @@ export default function ReportForm({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={t("report.description.placeholder", locale)}
+          maxLength={REPORT_DESCRIPTION}
           aria-required="true"
           aria-describedby={errors.description ? "report-description-error" : undefined}
           aria-invalid={errors.description ? "true" : undefined}
@@ -346,6 +352,7 @@ export default function ReportForm({
           onChange={(e) => setContactEmail(e.target.value)}
           placeholder={t("report.email.placeholder", locale)}
           autoComplete="email"
+          maxLength={EMAIL}
           aria-describedby={
             errors.contactEmail
               ? "report-email-error"
@@ -368,6 +375,16 @@ export default function ReportForm({
             {t("report.email.hint", locale)}
           </p>
         )}
+        {/* Privacy disclosure (#160 1.7): brief reassurance for a vulnerable population */}
+        <p className="mt-1 text-xs text-[var(--color-ink-400)]">
+          {t("privacy.emailDisclosure", locale)}{" "}
+          <Link
+            href="/privacy"
+            className="underline hover:text-[var(--color-sage-600)] transition-colors"
+          >
+            {t("privacy.linkLabel", locale)}
+          </Link>
+        </p>
       </div>
 
       {/* Honeypot — visually hidden from real users */}

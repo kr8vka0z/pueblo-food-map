@@ -21,6 +21,9 @@ import Script from "next/script";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { FEEDBACK_TYPES, type FeedbackTypeKey } from "@/lib/feedbackTypes";
+import { FIELD_LIMITS } from "@/lib/fieldLimits";
+
+const { FEEDBACK_MESSAGE, EMAIL } = FIELD_LIMITS;
 
 // ─── Turnstile global type ────────────────────────────────────────────────────
 
@@ -308,6 +311,7 @@ export default function FeedbackForm({ locale = "en" }: FeedbackFormProps) {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder={t("feedback.message.placeholder", locale)}
+          maxLength={FEEDBACK_MESSAGE}
           aria-required="true"
           aria-describedby={errors.message ? "feedback-message-error" : undefined}
           aria-invalid={errors.message ? "true" : undefined}
@@ -339,6 +343,7 @@ export default function FeedbackForm({ locale = "en" }: FeedbackFormProps) {
           placeholder={t("feedback.email.placeholder", locale)}
           autoComplete="email"
           required
+          maxLength={EMAIL}
           aria-required="true"
           aria-describedby={
             errors.contactEmail
@@ -362,6 +367,16 @@ export default function FeedbackForm({ locale = "en" }: FeedbackFormProps) {
             {t("feedback.email.hint", locale)}
           </p>
         )}
+        {/* Privacy disclosure (#160 1.7): brief reassurance for a vulnerable population */}
+        <p className="mt-1 text-xs text-[var(--color-ink-400)]">
+          {t("privacy.emailDisclosure", locale)}{" "}
+          <Link
+            href="/privacy"
+            className="underline hover:text-[var(--color-sage-600)] transition-colors"
+          >
+            {t("privacy.linkLabel", locale)}
+          </Link>
+        </p>
       </div>
 
       {/* Honeypot — visually hidden from real users */}

@@ -263,7 +263,9 @@ describe("ReportForm — submit flow", () => {
 
     const body = JSON.parse(opts.body as string);
     expect(body.venueId).toBe("garden-rmser");
-    expect(body.venueName).toBe("RMSER Community Garden");
+    // venueName is intentionally absent: the server looks it up from venueId
+    // to prevent client-side subject-line injection (#160 1.3).
+    expect(body.venueName).toBeUndefined();
     expect(body.issueType).toBe("location");
     expect(body.description).toBe("The pin is in the wrong spot entirely.");
     // Honeypot should be empty string (real user)

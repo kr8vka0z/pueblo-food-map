@@ -97,6 +97,21 @@ def build_address(tags: dict) -> str:
     return ", ".join(parts) if parts else "Address not in OpenStreetMap"
 
 
+def safe_url(url: str | None) -> str | None:
+    """Return url only if it starts with http:// or https://, else None.
+
+    OSM website tags come from community editors — anyone can set
+    website=javascript:alert(1). We drop anything that isn't http(s)
+    at ingest time so the TypeScript bundle never carries a dangerous URL.
+    """
+    if not url:
+        return None
+    lowered = url.lower().strip()
+    if lowered.startswith("http://") or lowered.startswith("https://"):
+        return url
+    return None
+
+
 def ts_literal(value):
     if value is None:
         return "undefined"
@@ -180,7 +195,9 @@ def main() -> int:
                 "address": build_address(tags),
                 "accepts_snap": accepts_snap,
                 "phone": tags.get("phone"),
-                "url": tags.get("website"),
+                # safe_url: OSM website tags come from community edits — anyone
+                # can set website=javascript:alert(1). Drop non-http(s) at ingest.
+                "url": safe_url(tags.get("website")),
                 "notes": notes,
                 "source": f"OpenStreetMap ({el['type']}/{el['id']})",
                 "last_verified": str(date.today()),

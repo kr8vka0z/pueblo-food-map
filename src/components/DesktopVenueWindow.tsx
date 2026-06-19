@@ -37,6 +37,7 @@ import { useEffect, useRef, useState } from "react";
 import { MapPin, Phone, Clock, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
+import { safeUrl } from "@/lib/safeUrl";
 
 /**
  * Minimal interface covering the mapboxgl.Map methods DesktopVenueWindow uses.
@@ -471,9 +472,10 @@ export default function DesktopVenueWindow({
       )}
 
       {/* See full details on Plentiful (#128) — Plentiful-sourced venues only */}
-      {venue.source.toLowerCase().includes("plentiful") && venue.url && (
+      {/* safeUrl: venue.url comes from OSM (anyone can edit); reject non-http(s) */}
+      {venue.source.toLowerCase().includes("plentiful") && safeUrl(venue.url) && (
         <a
-          href={venue.url}
+          href={safeUrl(venue.url)!}
           target="_blank"
           rel="noopener noreferrer"
           className={

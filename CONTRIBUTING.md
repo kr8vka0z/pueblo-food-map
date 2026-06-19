@@ -23,11 +23,11 @@ performance).
 
 1. Fork the repository and create a feature branch from `main`.
 2. Make your change with focused commits — see [Commit messages](#commit-messages).
-3. Run `npm run lint`, `npm run typecheck`, and `npm run build` locally
-   before opening a pull request.
-4. Open a pull request against `main`. CI runs lint, typecheck, and build
-   on every PR and must pass before merge — `main` is a protected branch
-   and requires the CI status check.
+3. Run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`
+   locally before opening a pull request.
+4. Open a pull request against `main`. CI runs lint, typecheck, tests, and
+   build on every PR and must pass before merge — `main` is a protected
+   branch and requires the CI status check.
 
 ## Development setup
 
@@ -51,9 +51,9 @@ The dev server runs at <http://localhost:3000>.
 | `npm start` | Serve the production build |
 | `npm run lint` | ESLint check on the whole project |
 | `npm run typecheck` | TypeScript check with no emit (`tsc --noEmit`) |
-
-Test runner and formatter scripts will be added as the project grows; this
-list reflects what's installed today.
+| `npm test` | Run unit tests in watch mode (vitest) |
+| `npm run test:ci` | Run unit tests once, CI mode (no watch) |
+| `npm run test:coverage` | Run tests with V8 coverage report |
 
 ## Commit messages
 

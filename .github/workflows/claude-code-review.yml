@@ -14,6 +14,8 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  # OIDC is required by the Claude action in trusted contexts.
+  # Keep this enabled so same repository pull requests can mint a token.
   id-token: write
 
 jobs:
@@ -22,9 +24,13 @@ jobs:
     # release-please, etc.) — bot PRs auto-merge or release on their own and the
     # action refuses non-human actors, which otherwise shows up as a red check.
     # Also respond to @claude mentions in PR comments for ad-hoc reviews.
+    # Fork pull requests do not get OIDC tokens for this job.
+    # We skip those runs to avoid false red checks and keep required CI signal clean.
+    # Maintainers can still request an explicit review through @claude comments.
     if: >-
       (github.event_name == 'pull_request' &&
-       github.event.pull_request.user.type != 'Bot') ||
+       github.event.pull_request.user.type != 'Bot' &&
+       github.event.pull_request.head.repo.fork == false) ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request != null &&
        contains(github.event.comment.body, '@claude'))

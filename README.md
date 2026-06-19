@@ -41,7 +41,8 @@ Open <http://localhost:3000>. Hot-reloads on save (Turbopack).
 | `npm run build` | Production build |
 | `npm run lint` | ESLint check |
 | `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
-| `npm run test` | Jest unit tests |
+| `npm run test` | Unit tests (vitest, watch mode) |
+| `npm run test:ci` | Unit tests, CI mode (single run) |
 | `npm run preview` | OpenNext build + local Worker emulator at :8788 |
 | `npm run deploy` | OpenNext build + wrangler deploy to production |
 
@@ -98,7 +99,8 @@ scripts/           One-off ingestion scripts (run locally; not imported by app)
 
 ## Deploy and infrastructure
 
-- **CI:** `lint → typecheck → build` on every PR and push to `main`
+- **CI:** `lint → typecheck → test (with coverage) → audit → build` on every
+  PR and push to `main`
   ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 - **Deploys:** Cloudflare Workers Builds (connected via CF dashboard, no
   Actions YAML). Push to `main` → production; open a PR → preview URL.

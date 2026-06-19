@@ -25,6 +25,7 @@ import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus, formatSlot } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
+import { safeUrl } from "@/lib/safeUrl";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
@@ -344,9 +345,10 @@ export default function BottomSheet({ venue, onClose, onExpandedChange, locale =
                       )}
 
                       {/* See full details on Plentiful (#128) — Plentiful-sourced venues only */}
-                      {venue.source.toLowerCase().includes("plentiful") && venue.url && (
+                      {/* safeUrl: venue.url comes from OSM (anyone can edit); reject non-http(s) */}
+                      {venue.source.toLowerCase().includes("plentiful") && safeUrl(venue.url) && (
                         <a
-                          href={venue.url}
+                          href={safeUrl(venue.url)!}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={

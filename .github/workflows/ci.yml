@@ -15,9 +15,9 @@ permissions:
 
 jobs:
   ci:
-    name: Lint, typecheck, build
+    name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -37,8 +37,26 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm run test:ci
+      - name: Test with coverage
+        # Runs the full test suite and generates lcov for visibility.
+        # No global percentage floor — coverage thresholds reward junk tests
+        # on solo projects. Required coverage lives in specific test files
+        # (filter/search pipeline, hours, 3 API routes, i18n, axe/a11y).
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        # Publish the lcov report as a CI artifact for visibility in the PR.
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: npm audit (production deps, high/critical only)
+        # Only production deps are shipped to the Worker; dev CVEs stay local.
+        # --audit-level=high skips moderate/low. --omit=dev excludes dev deps.
+        run: npm audit --audit-level=high --omit=dev
 
       - name: Build
         run: npm run build

@@ -335,6 +335,14 @@ const en: Record<string, string> = {
 
   // SuggestForm SNAP/WIC fieldset legend — WCAG 1.3.1 (#i18n-leaks)
   "suggest.benefits.legend": "Accepted benefits",
+
+  // Privacy disclosure (#160 1.7) — shown near email fields on all 3 forms
+  // and on the /privacy page. One sentence that fits below an email input.
+  "privacy.emailDisclosure": "Your email is used only to follow up on your submission. It is never sold or shared.",
+  "privacy.linkLabel": "Privacy",
+  "privacy.pageTitle": "Privacy — Pueblo Food Map",
+  "privacy.heading": "Privacy",
+  "privacy.body": "Pueblo Food Map collects only the information you type into our forms (venue reports, suggestions, and feedback). That information is used to review your submission and, if you provide an email address, to follow up with you. We do not sell, share, or store your contact information beyond what is needed to respond. IP addresses are used only for spam protection and are not logged or retained. No tracking cookies, advertising pixels, or analytics services are used.",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -671,6 +679,13 @@ const es: Record<string, string> = {
 
   // SuggestForm SNAP/WIC fieldset legend (#i18n-leaks)
   "suggest.benefits.legend": "Beneficios aceptados",
+
+  // Privacy disclosure (#160 1.7)
+  "privacy.emailDisclosure": "Tu correo solo se usa para darte seguimiento. Nunca lo vendemos ni compartimos.",
+  "privacy.linkLabel": "Privacidad",
+  "privacy.pageTitle": "Privacidad — Pueblo Food Map",
+  "privacy.heading": "Privacidad",
+  "privacy.body": "Pueblo Food Map solo recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). Esa información se usa para revisar tu envío y, si proporcionas un correo, para darte seguimiento. No vendemos, compartimos ni guardamos tu información de contacto más allá de lo necesario para responder. Las direcciones IP solo se usan para protección contra spam y no se registran ni retienen. No usamos cookies de seguimiento, píxeles de publicidad ni servicios de análisis.",
 };
 
 /** Substitute simple {key} placeholders. */

@@ -20,6 +20,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { VENUE_CATEGORIES, type VenueCategoryKey } from "@/lib/suggestTypes";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { createRateLimiter, EMAIL_RE } from "@/lib/rateLimit";
+import { FIELD_LIMITS } from "@/lib/fieldLimits";
+
+/** Strip CR and LF from a string to prevent header/subject line injection. */
+function stripLineBreaks(s: string): string {
+  return s.replace(/[\r\n]/g, " ");
+}
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 // Private in-process sliding window for this route (own 5/hr-per-IP bucket).
@@ -119,11 +125,29 @@ function validate(body: SubmitPayload): string | null {
   if (!body.venueName || typeof body.venueName !== "string" || !body.venueName.trim()) {
     return "Missing venue name";
   }
+  if (body.venueName.length > FIELD_LIMITS.SUGGEST_VENUE_NAME) {
+    return `Venue name must be ${FIELD_LIMITS.SUGGEST_VENUE_NAME} characters or fewer`;
+  }
   if (!body.address || typeof body.address !== "string" || !body.address.trim()) {
     return "Missing address";
   }
+  if (body.address.length > FIELD_LIMITS.SUGGEST_ADDRESS) {
+    return `Address must be ${FIELD_LIMITS.SUGGEST_ADDRESS} characters or fewer`;
+  }
   if (!body.category || !(body.category in VENUE_CATEGORIES)) {
     return "Invalid category";
+  }
+  if (body.hours && body.hours.length > FIELD_LIMITS.SUGGEST_HOURS) {
+    return `Hours must be ${FIELD_LIMITS.SUGGEST_HOURS} characters or fewer`;
+  }
+  if (body.contact && body.contact.length > FIELD_LIMITS.SUGGEST_CONTACT) {
+    return `Contact must be ${FIELD_LIMITS.SUGGEST_CONTACT} characters or fewer`;
+  }
+  if (body.notes && body.notes.length > FIELD_LIMITS.SUGGEST_NOTES) {
+    return `Notes must be ${FIELD_LIMITS.SUGGEST_NOTES} characters or fewer`;
+  }
+  if (body.submitterEmail && body.submitterEmail.length > FIELD_LIMITS.EMAIL) {
+    return "Email address too long";
   }
   if (body.submitterEmail && !EMAIL_RE.test(body.submitterEmail)) {
     return "Invalid email format";
@@ -154,7 +178,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     "unknown";
 
   // Turnstile verification — must pass before any further processing
-  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY ?? "";
+  // Throw instead of silently falling back to "": an empty secret makes
+  // Cloudflare's siteverify accept the always-pass test sitekey from anyone.
+  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
+  if (!turnstileSecret) {
+    throw new Error("TURNSTILE_SECRET_KEY not configured");
+  }
   const turnstileValid = await verifyTurnstileToken(
     body.turnstileToken,
     turnstileSecret,
@@ -193,15 +222,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Send email — no PII logging; submitter email goes only to Resend
   try {
     await sendSuggestionEmail({
-      venueName: body.venueName.trim(),
-      address: body.address.trim(),
+      venueName: stripLineBreaks(body.venueName.trim()),
+      address: stripLineBreaks(body.address.trim()),
       category: body.category as VenueCategoryKey,
-      hours: body.hours || undefined,
-      contact: body.contact || undefined,
+      hours: body.hours ? stripLineBreaks(body.hours) : undefined,
+      contact: body.contact ? stripLineBreaks(body.contact) : undefined,
       acceptsSnap: Boolean(body.acceptsSnap),
       acceptsWic: Boolean(body.acceptsWic),
-      notes: body.notes || undefined,
-      submitterEmail: body.submitterEmail || undefined,
+      notes: body.notes ? stripLineBreaks(body.notes) : undefined,
+      submitterEmail: body.submitterEmail ? stripLineBreaks(body.submitterEmail) : undefined,
     });
   } catch (err) {
     // Log the error type/status only — not the body which may contain PII

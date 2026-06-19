@@ -20,6 +20,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { FEEDBACK_TYPES, type FeedbackTypeKey } from "@/lib/feedbackTypes";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { createRateLimiter, EMAIL_RE } from "@/lib/rateLimit";
+import { FIELD_LIMITS } from "@/lib/fieldLimits";
+
+/** Strip CR and LF from a string to prevent header/subject line injection. */
+function stripLineBreaks(s: string): string {
+  return s.replace(/[\r\n]/g, " ");
+}
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 // Private in-process sliding window for this route (own 5/hr-per-IP bucket).
@@ -92,8 +98,14 @@ function validate(body: SubmitPayload): string | null {
   if (!body.message || typeof body.message !== "string" || !body.message.trim()) {
     return "Missing message";
   }
+  if (body.message.length > FIELD_LIMITS.FEEDBACK_MESSAGE) {
+    return `Message must be ${FIELD_LIMITS.FEEDBACK_MESSAGE} characters or fewer`;
+  }
   if (!body.contactEmail || typeof body.contactEmail !== "string" || !body.contactEmail.trim()) {
     return "Missing email";
+  }
+  if (body.contactEmail.length > FIELD_LIMITS.EMAIL) {
+    return "Email address too long";
   }
   if (!EMAIL_RE.test(body.contactEmail)) {
     return "Invalid email format";
@@ -124,7 +136,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     "unknown";
 
   // Turnstile verification — must pass before any further processing
-  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY ?? "";
+  // Throw instead of silently falling back to "": an empty secret makes
+  // Cloudflare's siteverify accept the always-pass test sitekey from anyone.
+  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
+  if (!turnstileSecret) {
+    throw new Error("TURNSTILE_SECRET_KEY not configured");
+  }
   const turnstileValid = await verifyTurnstileToken(
     body.turnstileToken,
     turnstileSecret,
@@ -164,8 +181,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     await sendFeedbackEmail({
       feedbackType: body.feedbackType as FeedbackTypeKey,
-      message: body.message.trim(),
-      contactEmail: body.contactEmail.trim(),
+      message: stripLineBreaks(body.message.trim()),
+      contactEmail: stripLineBreaks(body.contactEmail.trim()),
     });
   } catch (err) {
     // Log the error type/status only — not the body which may contain PII

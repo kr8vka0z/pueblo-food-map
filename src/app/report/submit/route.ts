@@ -20,6 +20,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { createRateLimiter, EMAIL_RE } from "@/lib/rateLimit";
+import { venues } from "@/data/venues";
+import { FIELD_LIMITS } from "@/lib/fieldLimits";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 // Private in-process sliding window for this route (own 5/hr-per-IP bucket).
@@ -85,8 +87,8 @@ async function sendReportEmail(payload: {
 
 interface SubmitPayload {
   venueId: string;
-  venueName: string;
-  venueAddress: string;
+  // venueName intentionally absent: the server looks it up from venueId so the
+  // client cannot inject arbitrary text into the email subject line (issue #160 1.3).
   issueType: string;
   description: string;
   contactEmail?: string;
@@ -96,9 +98,20 @@ interface SubmitPayload {
   turnstileToken?: string;
 }
 
+/** Strip CR and LF from a string to prevent header/subject line injection. */
+function stripLineBreaks(s: string): string {
+  return s.replace(/[\r\n]/g, " ");
+}
+
 function validate(body: SubmitPayload): string | null {
   if (!body.venueId || typeof body.venueId !== "string") {
     return "Missing venueId";
+  }
+  // Server-side venue lookup: reject unknown IDs so the client cannot supply
+  // an arbitrary venue name that flows into the email subject line.
+  const venue = venues.find((v) => v.id === body.venueId);
+  if (!venue) {
+    return "Unknown venueId";
   }
   if (!body.issueType || !(body.issueType in ISSUE_TYPES)) {
     return "Invalid issue type";
@@ -109,6 +122,12 @@ function validate(body: SubmitPayload): string | null {
     body.description.trim().length < 10
   ) {
     return "Description must be at least 10 characters";
+  }
+  if (body.description.length > FIELD_LIMITS.REPORT_DESCRIPTION) {
+    return `Description must be ${FIELD_LIMITS.REPORT_DESCRIPTION} characters or fewer`;
+  }
+  if (body.contactEmail && body.contactEmail.length > FIELD_LIMITS.EMAIL) {
+    return "Email address too long";
   }
   if (body.contactEmail && !EMAIL_RE.test(body.contactEmail)) {
     return "Invalid email format";
@@ -139,7 +158,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     "unknown";
 
   // Turnstile verification — must pass before any further processing
-  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY ?? "";
+  // Throw instead of silently falling back to "": an empty secret makes
+  // Cloudflare's siteverify accept the always-pass test sitekey from anyone.
+  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
+  if (!turnstileSecret) {
+    throw new Error("TURNSTILE_SECRET_KEY not configured");
+  }
   const turnstileValid = await verifyTurnstileToken(
     body.turnstileToken,
     turnstileSecret,
@@ -175,15 +199,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Resolve venue server-side (already validated above; re-find for the send call).
+  // We do NOT use body.venueName — the client cannot supply the venue name that
+  // flows into the email subject line (prevents header injection, issue #160 1.3).
+  const venue = venues.find((v) => v.id === body.venueId)!;
+
   // Send email — no PII logging; contact email goes only to Resend
   try {
     await sendReportEmail({
       venueId: body.venueId,
-      venueName: body.venueName || body.venueId,
-      venueAddress: body.venueAddress || "",
+      venueName: stripLineBreaks(venue.name),
+      venueAddress: stripLineBreaks(venue.address),
       issueType: body.issueType as IssueTypeKey,
-      description: body.description.trim(),
-      contactEmail: body.contactEmail || undefined,
+      description: stripLineBreaks(body.description.trim()),
+      contactEmail: body.contactEmail ? stripLineBreaks(body.contactEmail) : undefined,
     });
   } catch (err) {
     // Log the error type/status only — not the body which may contain PII

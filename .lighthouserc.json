@@ -3,7 +3,6 @@
     "collect": {
       "numberOfRuns": 3,
       "settings": {
-        "preset": "mobile",
         "throttling": {
           "cpuSlowdownMultiplier": 4
         }

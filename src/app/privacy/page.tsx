@@ -13,11 +13,14 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Privacy",
   description:
-    "Privacy policy for the Pueblo Food Map — what information is collected and how it is used.",
+    "Privacy policy for Pueblo Food Map — what information is collected and how it is used.",
+  alternates: { canonical: `${SITE_URL}/privacy` },
+  openGraph: { title: "Privacy", url: `${SITE_URL}/privacy` },
 };
 
 export default async function PrivacyPage() {

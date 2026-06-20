@@ -9,8 +9,9 @@
 export const SITE_URL = "https://pueblofoodmap.com";
 export const SITE_NAME = "Pueblo Food Map";
 export const OG_IMAGE = {
-  url: "/og-image.png",
+  url: `${SITE_URL}/og-image.png`,
   width: 1200,
   height: 630,
+  type: "image/png",
   alt: "Pueblo Food Map — find food pantries, gardens, grocery & meal sites in Pueblo County, Colorado",
 } as const;

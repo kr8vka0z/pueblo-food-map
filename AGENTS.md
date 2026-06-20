@@ -211,17 +211,29 @@ All three form routes (`suggest`, `report`, `feedback`) call `logFormFailure` fr
 Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
 
 - **OG + Twitter metadata** — lives in `src/app/layout.tsx` (`metadata` export). Uses the
-  App Router `Metadata` type. `metadataBase` is set so relative paths resolve to absolute
-  URLs for crawlers.
-- **Preview image** — `public/og-image.png` (1200 × 630). Referenced via `OG_IMAGE` from
-  `src/lib/site.ts`. Do not move or rename it without updating the constant.
+  App Router `Metadata` type. `metadataBase` is set so any future relative paths resolve to
+  absolute URLs for crawlers and social platforms.
+- **Canonical strategy** — the root layout deliberately sets **no** canonical. A root-level
+  `alternates.canonical` propagates to every child route via Next.js metadata inheritance,
+  causing `/suggest`, `/feedback`, and `/privacy` to all report `"/"` as their canonical
+  (de-index risk). Instead, each utility page sets its own canonical via `alternates.canonical`
+  in its own `export const metadata`.
+- **Preview image** — `public/og-image.png` (1200 × 630). `OG_IMAGE.url` in `src/lib/site.ts`
+  is absolute (`${SITE_URL}/og-image.png`). Do not move or rename the file without updating
+  the constant.
 - **Sitemap** — `src/app/sitemap.ts` (static public routes only: `/`, `/suggest`, `/feedback`,
   `/privacy`). Generates `/sitemap.xml` at runtime via the App Router `MetadataRoute.Sitemap`
-  convention.
+  convention. No `lastModified` field — the value was non-deterministic (`new Date()` on every
+  request), which prevented stable caching and could confuse crawlers into treating every page
+  as perpetually updated.
 - **Robots** — `src/app/robots.ts` (allows `/`, disallows `/api/`, points to sitemap).
-  Generates `/robots.txt` at runtime.
+  Generates `/robots.txt` at runtime. No `host` field — Google ignores it.
 - **Shared constants** — canonical origin, site name, and OG image metadata all live in
   `src/lib/site.ts` (single source of truth; reused by metadata, sitemap, robots).
+- **Known bilingual limitation** — the EN/ES language toggle is cookie-based: both locales
+  serve the same URL. Crawlers only index the English version. Proper bilingual SEO (separate
+  `/es/` URL tree or `hreflang` link tags) requires separate routes and is a deferred
+  follow-up beyond #164.
 - **Planned follow-up (PR2, issue #164 items 6.3 + 6.4):** JSON-LD structured data and
   per-venue `/venue/[id]` pages. The sitemap will be extended with venue URLs at that point.
 

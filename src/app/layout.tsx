@@ -10,30 +10,35 @@ const DESCRIPTION =
   "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores — with walking and bus directions via Pueblo Transit.";
 
 export const metadata: Metadata = {
-  // WHY: metadataBase is required so relative paths like OG_IMAGE.url resolve
-  // to absolute URLs for crawlers and social platforms.
+  // WHY: metadataBase is required so relative paths resolve to absolute URLs
+  // for crawlers and social platforms. OG_IMAGE.url is now absolute, but
+  // metadataBase is still needed for any other relative path Next.js resolves.
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Pueblo Food Access Map",
+    default: "Pueblo Food Map — Food Resources in Pueblo County, CO",
     // Template lets child pages set short titles; root appends the brand name.
-    template: "%s · Pueblo Food Access Map",
+    template: "%s · Pueblo Food Map",
   },
   description: DESCRIPTION,
-  alternates: { canonical: "/" },
+  // WHY: No canonical set here. A root-level canonical propagates to every
+  // child route via Next.js metadata inheritance, causing /suggest, /feedback,
+  // and /privacy to all report "/" as their canonical — a de-indexing risk.
+  // Each page that needs a canonical sets its own (see per-page metadata).
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
-    title: "Pueblo Food Access Map",
+    title: "Pueblo Food Map — Food Resources in Pueblo County, CO",
     description: DESCRIPTION,
     url: SITE_URL,
     locale: "en_US",
+    alternateLocale: ["es_US"],
     images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pueblo Food Access Map",
+    title: "Pueblo Food Map — Food Resources in Pueblo County, CO",
     description: DESCRIPTION,
-    images: [OG_IMAGE.url],
+    images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
   },
 };
 

@@ -10,7 +10,7 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { SITE_URL, OG_IMAGE } from "@/lib/site";
+import { SITE_URL, SITE_NAME, OG_IMAGE } from "@/lib/site";
 import sitemap from "@/app/sitemap";
 import robots from "@/app/robots";
 
@@ -110,8 +110,12 @@ describe("site constants", () => {
     expect(SITE_URL).toBe("https://pueblofoodmap.com");
   });
 
-  test("OG_IMAGE references og-image.png", () => {
-    expect(OG_IMAGE.url).toContain("og-image");
+  test("SITE_NAME is the correct brand", () => {
+    expect(SITE_NAME).toBe("Pueblo Food Map");
+  });
+
+  test("OG_IMAGE.url is absolute", () => {
+    expect(OG_IMAGE.url).toBe(`${SITE_URL}/og-image.png`);
   });
 
   test("OG_IMAGE width is 1200", () => {
@@ -120,5 +124,9 @@ describe("site constants", () => {
 
   test("OG_IMAGE height is 630", () => {
     expect(OG_IMAGE.height).toBe(630);
+  });
+
+  test("OG_IMAGE type is image/png", () => {
+    expect(OG_IMAGE.type).toBe("image/png");
   });
 });

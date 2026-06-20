@@ -11,11 +11,14 @@ import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import SuggestForm from "@/components/SuggestForm";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Suggest a Venue",
   description:
-    "Know a food pantry, community garden, or other food resource missing from the map? Submit it here.",
+    "Know a food pantry, community garden, or other food resource missing from the map? Suggest it for Pueblo Food Map.",
+  alternates: { canonical: `${SITE_URL}/suggest` },
+  openGraph: { title: "Suggest a Venue", url: `${SITE_URL}/suggest` },
 };
 
 export default async function SuggestPage() {

@@ -206,6 +206,27 @@ All three form routes (`suggest`, `report`, `feedback`) call `logFormFailure` fr
 - **Filter/alert:** In CF Workers Logs, filter on `form_submit_failure` for a full failure
   stream, or narrow to `send_failed` for actionable outage alerts.
 
+# Discoverability / SEO (#164)
+
+Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
+
+- **OG + Twitter metadata** — lives in `src/app/layout.tsx` (`metadata` export). Uses the
+  App Router `Metadata` type. `metadataBase` is set so relative paths resolve to absolute
+  URLs for crawlers.
+- **Preview image** — `public/og-image.png` (1200 × 630). Referenced via `OG_IMAGE` from
+  `src/lib/site.ts`. Do not move or rename it without updating the constant.
+- **Sitemap** — `src/app/sitemap.ts` (static public routes only: `/`, `/suggest`, `/feedback`,
+  `/privacy`). Generates `/sitemap.xml` at runtime via the App Router `MetadataRoute.Sitemap`
+  convention.
+- **Robots** — `src/app/robots.ts` (allows `/`, disallows `/api/`, points to sitemap).
+  Generates `/robots.txt` at runtime.
+- **Shared constants** — canonical origin, site name, and OG image metadata all live in
+  `src/lib/site.ts` (single source of truth; reused by metadata, sitemap, robots).
+- **Planned follow-up (PR2, issue #164 items 6.3 + 6.4):** JSON-LD structured data and
+  per-venue `/venue/[id]` pages. The sitemap will be extended with venue URLs at that point.
+
+---
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

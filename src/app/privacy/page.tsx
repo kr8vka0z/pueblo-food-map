@@ -14,11 +14,11 @@ import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 
-export async function generateMetadata(): Promise<Metadata> {
-  return {
-    title: "Privacy | Pueblo Food Map",
-  };
-}
+export const metadata: Metadata = {
+  title: "Privacy",
+  description:
+    "Privacy policy for the Pueblo Food Map — what information is collected and how it is used.",
+};
 
 export default async function PrivacyPage() {
   const cookieStore = await cookies();

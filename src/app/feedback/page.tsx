@@ -13,7 +13,9 @@ import { t } from "@/lib/i18n";
 import FeedbackForm from "@/components/FeedbackForm";
 
 export const metadata: Metadata = {
-  title: "Send feedback | Pueblo Food Map",
+  title: "Send Feedback",
+  description:
+    "Share feedback, report a problem, or suggest an improvement to the Pueblo Food Map.",
 };
 
 export default async function FeedbackPage() {

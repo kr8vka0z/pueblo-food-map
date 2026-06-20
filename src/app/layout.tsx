@@ -4,11 +4,37 @@ import "./globals.css";
 import { cookies } from "next/headers";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import type { Locale } from "@/lib/i18n";
+import { SITE_URL, SITE_NAME, OG_IMAGE } from "@/lib/site";
+
+const DESCRIPTION =
+  "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores — with walking and bus directions via Pueblo Transit.";
 
 export const metadata: Metadata = {
-  title: "Pueblo Food Access Map",
-  description:
-    "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores — with walking and bus directions via Pueblo Transit.",
+  // WHY: metadataBase is required so relative paths like OG_IMAGE.url resolve
+  // to absolute URLs for crawlers and social platforms.
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Pueblo Food Access Map",
+    // Template lets child pages set short titles; root appends the brand name.
+    template: "%s · Pueblo Food Access Map",
+  },
+  description: DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: "Pueblo Food Access Map",
+    description: DESCRIPTION,
+    url: SITE_URL,
+    locale: "en_US",
+    images: [OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Pueblo Food Access Map",
+    description: DESCRIPTION,
+    images: [OG_IMAGE.url],
+  },
 };
 
 export default async function RootLayout({

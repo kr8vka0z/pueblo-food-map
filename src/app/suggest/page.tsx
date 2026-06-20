@@ -13,7 +13,9 @@ import { t } from "@/lib/i18n";
 import SuggestForm from "@/components/SuggestForm";
 
 export const metadata: Metadata = {
-  title: "Suggest a venue | Pueblo Food Map",
+  title: "Suggest a Venue",
+  description:
+    "Know a food pantry, community garden, or other food resource missing from the map? Submit it here.",
 };
 
 export default async function SuggestPage() {

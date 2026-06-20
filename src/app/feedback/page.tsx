@@ -11,10 +11,14 @@ import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import FeedbackForm from "@/components/FeedbackForm";
+import { buildPageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: "Send feedback | Pueblo Food Map",
-};
+export const metadata: Metadata = buildPageMetadata({
+  title: "Send Feedback",
+  description:
+    "Share feedback, report a problem, or suggest an improvement to Pueblo Food Map.",
+  path: "/feedback",
+});
 
 export default async function FeedbackPage() {
   // Read locale cookie server-side — same pattern as suggest/page.tsx

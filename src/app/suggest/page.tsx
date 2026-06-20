@@ -11,10 +11,14 @@ import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import SuggestForm from "@/components/SuggestForm";
+import { buildPageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: "Suggest a venue | Pueblo Food Map",
-};
+export const metadata: Metadata = buildPageMetadata({
+  title: "Suggest a Venue",
+  description:
+    "Know a food pantry, community garden, or other food resource missing from the map? Suggest it for Pueblo Food Map.",
+  path: "/suggest",
+});
 
 export default async function SuggestPage() {
   // Read locale cookie server-side — same pattern as report/[venueId]/page.tsx

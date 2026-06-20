@@ -206,6 +206,49 @@ All three form routes (`suggest`, `report`, `feedback`) call `logFormFailure` fr
 - **Filter/alert:** In CF Workers Logs, filter on `form_submit_failure` for a full failure
   stream, or narrow to `send_failed` for actionable outage alerts.
 
+# Discoverability / SEO (#164)
+
+Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
+
+- **OG + Twitter metadata** — lives in `src/app/layout.tsx` (`metadata` export). Uses the
+  App Router `Metadata` type. `metadataBase` is set so any future relative paths resolve to
+  absolute URLs for crawlers and social platforms.
+- **Canonical strategy** — the root layout deliberately sets **no** canonical. A root-level
+  `alternates.canonical` propagates to every child route via Next.js metadata inheritance,
+  causing `/suggest`, `/feedback`, and `/privacy` to all report `"/"` as their canonical
+  (de-index risk). Instead, each utility page sets its own canonical via `alternates.canonical`
+  in its own `export const metadata`.
+- **Preview image** — `public/og-image.png` (1200 × 630). `OG_IMAGE.url` in `src/lib/site.ts`
+  is absolute (`${SITE_URL}/og-image.png`). Do not move or rename the file without updating
+  the constant.
+- **Sitemap** — `src/app/sitemap.ts` (static public routes only: `/`, `/suggest`, `/feedback`,
+  `/privacy`). Generates `/sitemap.xml` at runtime via the App Router `MetadataRoute.Sitemap`
+  convention. No `lastModified` field — the value was non-deterministic (`new Date()` on every
+  request), which prevented stable caching and could confuse crawlers into treating every page
+  as perpetually updated.
+- **Robots** — `src/app/robots.ts` (allows `/`, disallows `/api/`, points to sitemap).
+  Generates `/robots.txt` at runtime. No `host` field — Google ignores it.
+- **Shared constants** — canonical origin, site name, and OG image metadata all live in
+  `src/lib/site.ts` (single source of truth; reused by metadata, sitemap, robots).
+- **Subpage metadata helper** — `/suggest`, `/feedback`, and `/privacy` use `buildPageMetadata`
+  from `src/lib/site.ts` instead of a raw `metadata` literal. WHY: Next.js shallow-merges
+  metadata — a child `openGraph` object REPLACES the parent's entirely (not deep-merged; see
+  Next docs "Merging"). A subpage setting only `{title, url}` drops the inherited OG image and
+  other brand fields. `buildPageMetadata` emits the full `openGraph`/`twitter` block (brand
+  image, siteName, type, locale) so link previews on subpages retain the brand image.
+- **Known bilingual limitation** — the EN/ES language toggle is cookie-based: both locales
+  serve the same URL. Crawlers only index the English version. Proper bilingual SEO (separate
+  `/es/` URL tree or `hreflang` link tags) requires separate routes and is a deferred
+  follow-up beyond #164.
+- **Deferred: explicit homepage canonical** — the client-component homepage would need a server
+  wrapper to own `alternates.canonical`. Implicit self-canonical is acceptable (Google ignores
+  `fbclid`/`utm` params); revisit if tracking-param duplicate indexing shows up in Search
+  Console.
+- **Planned follow-up (PR2, issue #164 items 6.3 + 6.4):** JSON-LD structured data and
+  per-venue `/venue/[id]` pages. The sitemap will be extended with venue URLs at that point.
+
+---
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

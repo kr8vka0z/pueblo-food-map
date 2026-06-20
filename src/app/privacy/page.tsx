@@ -13,12 +13,14 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
+import { buildPageMetadata } from "@/lib/site";
 
-export async function generateMetadata(): Promise<Metadata> {
-  return {
-    title: "Privacy | Pueblo Food Map",
-  };
-}
+export const metadata: Metadata = buildPageMetadata({
+  title: "Privacy",
+  description:
+    "Privacy policy for Pueblo Food Map — what information is collected and how it is used.",
+  path: "/privacy",
+});
 
 export default async function PrivacyPage() {
   const cookieStore = await cookies();

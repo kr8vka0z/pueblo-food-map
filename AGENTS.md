@@ -101,6 +101,73 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 2. Update value in 1Password at `op://VPS/Mapbox Access Token - Full Scope/credential`.
 3. No CF env var to update (secret tokens must never go there).
 
+## Resend Email Key Management
+
+The three public forms (report a closure, suggest a venue, general feedback) send email via the
+[Resend](https://resend.com) API from the Cloudflare Worker at **runtime** — not at build time.
+The Worker reads `process.env.RESEND_API_KEY` server-side; the value is never exposed to the
+client bundle or any `NEXT_PUBLIC_*` variable.
+
+### Sending key — Worker runtime (`RESEND_API_KEY`)
+
+- **Resend key name:** `Pueblo Food Map - Worker (sending)`
+- **Permissions:** sending-only, domain-scoped to `pueblofoodmap.com`
+- **1Password:** `op://VPS/Resend API - PFM Worker Sending/credential`
+- **CF env type:** Runtime secret (`secret_text`) — set via CF dashboard → Workers & Pages →
+  `pueblo-food-map` → Settings → Variables and Secrets, or:
+  ```bash
+  wrangler secret put RESEND_API_KEY
+  ```
+  This is a **runtime** secret. Unlike `NEXT_PUBLIC_*` build variables, it does not need to be
+  present at build time — it is injected into the Worker process at request time.
+- **WHY sending-only + domain-scoped:** The form handler is internet-exposed. Limiting the key to
+  send-only on one domain caps the blast radius if the key leaks — an attacker can send mail from
+  `pueblofoodmap.com`, but cannot read, delete, or manage the Resend account or other domains. Full
+  account takeover requires the admin key (below), which never touches the Worker.
+
+### Admin key — management only, NOT for the Worker
+
+- **Resend key name:** `Atlas Admin (full access)`
+- **Permissions:** `full_access`
+- **1Password:** `op://VPS/Resend API - Full access/credential`
+- **NEVER** place this key in the Worker, client code, git, or any `NEXT_PUBLIC_*` / public env var.
+- Use it only for Resend API management operations (create/list/delete keys and domains).
+- **Resend API base:** `https://api.resend.com`. The list-keys endpoint returns metadata only — it
+  never returns token values, so rotation is always create-new → swap → revoke-old.
+
+### Local dev (no plaintext secrets)
+
+`.env.local` holds a 1Password **reference**, not the secret value:
+
+```
+RESEND_API_KEY=op://VPS/Resend API - PFM Worker Sending/credential
+```
+
+Start the dev server through `op run` so the value is injected in memory only — it never touches disk:
+
+```bash
+op run --env-file=.env.local -- npm run dev
+```
+
+> **Note:** `TURNSTILE_SECRET_KEY` is also required for local form testing — the submit routes throw
+> if it is missing (hardened in #160). Store it in 1Password and reference it the same way in
+> `.env.local`.
+
+### Rotation procedure
+
+1. Resend dashboard → API Keys → create a new key with **sending** permission, domain `pueblofoodmap.com`.
+2. Update the value in 1Password at `op://VPS/Resend API - PFM Worker Sending/credential`.
+3. Update the CF Worker runtime secret (`wrangler secret put RESEND_API_KEY` — requires a CF token
+   with Workers edit permission) or via the CF dashboard under Variables and Secrets.
+4. Verify: submit a test message through a live form, confirm delivery in the Resend dashboard.
+5. Revoke the old key in the Resend dashboard.
+
+### History
+
+Originally the Worker ran on a full-access key kept in plaintext `.env.local`. Rotated to this
+least-privilege arrangement on 2026-06-19 (#160, item 1.6); the full-access admin key was also
+rotated at the same time.
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

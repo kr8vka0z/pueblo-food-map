@@ -376,9 +376,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   useEffect(() => {
     if (!isWebGLAvailable()) {
-      // queueMicrotask defers the setState out of the synchronous effect body —
-      // same pattern used elsewhere in this file — to satisfy react-hooks/set-state-in-effect.
-      queueMicrotask(handleMapError);
+      // Intentional post-hydration, client-only correction: WebGL can only be
+      // probed on the client, so we flip to the list fallback here. Synchronous
+      // (not deferred) so the suppressed map never gets an extra render frame.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleMapError();
     }
   }, [handleMapError]);
 

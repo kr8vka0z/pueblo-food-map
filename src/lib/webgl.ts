@@ -34,6 +34,17 @@ export function isWebGLAvailable(): boolean {
       (canvas.getContext(
         "experimental-webgl",
       ) as WebGLRenderingContext | null);
+    // Free the probe context immediately — on GPUs with a small context budget,
+    // a leaked probe context can starve Mapbox's own context and cause a false
+    // "unavailable" fallback. (Panel finding, Codex.)
+    if (ctx) {
+      // Cast to a minimal interface; real WebGL contexts always have getExtension,
+      // but test doubles may not — the optional chain guards both cases.
+      (ctx as { getExtension?: (s: string) => { loseContext(): void } | null })
+        .getExtension?.("WEBGL_lose_context")?.loseContext();
+      canvas.width = 0;
+      canvas.height = 0;
+    }
     return ctx !== null;
   } catch {
     // Some environments throw during getContext (e.g. privacy-hardened browsers).

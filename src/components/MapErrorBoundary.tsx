@@ -1,20 +1,27 @@
 "use client";
 
 /**
- * MapErrorBoundary — catches synchronous Mapbox/WebGL init failures.
+ * MapErrorBoundary — catches React-visible (render/commit-phase) Mapbox init
+ * failures.
  *
  * WHY a class-component error boundary:
  * React error boundaries must be class components; functional components
  * cannot use componentDidCatch / getDerivedStateFromError. next/dynamic does
  * NOT catch render-phase errors thrown inside the dynamic chunk — without this
- * boundary, a "Failed to initialize WebGL" throw from Mapbox leaves the user
- * with a blank screen and no indication of why.
+ * boundary, a "Failed to initialize WebGL" throw from Mapbox during the render
+ * or commit phase leaves the user with a blank screen and no indication of why.
+ *
+ * SCOPE: this boundary catches only render/commit-phase throws. It does NOT
+ * catch async Mapbox errors from callbacks, timers, workers, or event handlers
+ * — those fire outside React's call stack. Async Mapbox errors are handled
+ * separately by the onError logger in Map.tsx; the up-front WebGL probe in
+ * MapWrapper handles the common "no WebGL at all" case (probe → skip mount
+ * entirely). This boundary is a safety net for the rare case where the probe
+ * passes but Mapbox still throws during the React render/commit cycle (e.g.
+ * some older Android WebViews).
  *
  * On error: renders null (invisible) and fires onError() so the orchestrator
- * (MapWrapper) can switch to the list fallback. The WebGL probe in MapWrapper
- * handles the common case (probe → skip mount entirely); this boundary is a
- * safety net for devices where the probe passes but Mapbox still throws during
- * init (rare but real on some older Android WebViews).
+ * (MapWrapper) can switch to the list fallback.
  */
 
 import { Component } from "react";

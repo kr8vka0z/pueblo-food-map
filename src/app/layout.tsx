@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 // Fonts are self-hosted via @font-face in globals.css — no next/font/google import.
 import "./globals.css";
+import { preload } from "react-dom";
 import { cookies } from "next/headers";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import type { Locale } from "@/lib/i18n";
@@ -55,38 +56,25 @@ export default async function RootLayout({
   const initialLocale: Locale =
     rawLocale === "en" || rawLocale === "es" ? rawLocale : "en";
 
+  // WHY preload() here instead of a <head> element: React 19's preload() API
+  // is idiomatic for App Router — it coexists with the Metadata API without
+  // producing duplicate or misplaced <head> tags or hydration mismatches.
+  // crossOrigin is required because font fetches are always CORS-mode; without
+  // it the browser treats the preload as a different cache entry and double-fetches.
+  // WHY only Public Sans: Fraunces is a display serif used sparingly — preloading
+  // it competes for critical-path bandwidth and can regress mobile LCP. It loads
+  // via @font-face in globals.css with font-display:swap instead.
+  preload("/fonts/PublicSans-Variable.woff2", {
+    as: "font",
+    type: "font/woff2",
+    crossOrigin: "anonymous",
+  });
+
   return (
     <html
       lang={initialLocale}
       className="h-full antialiased"
     >
-      <head>
-        {/*
-         * Preload self-hosted variable fonts so text renders in the brand
-         * typeface on first paint rather than flashing unstyled.
-         *
-         * WHY crossOrigin="anonymous": browsers always fetch fonts in CORS
-         * mode (regardless of same-origin), so a preload link without
-         * crossOrigin is treated as a different cache entry — the browser
-         * would fetch the font twice: once for the preload (no CORS header)
-         * and once when the @font-face rule fires (CORS mode). The duplicate
-         * fetch defeats the preload entirely and makes LCP worse.
-         */}
-        <link
-          rel="preload"
-          href="/fonts/PublicSans-Variable.woff2"
-          as="font"
-          type="font/woff2"
-          crossOrigin="anonymous"
-        />
-        <link
-          rel="preload"
-          href="/fonts/Fraunces-Variable.woff2"
-          as="font"
-          type="font/woff2"
-          crossOrigin="anonymous"
-        />
-      </head>
       <body className="h-full flex flex-col">
         {/* WebSite JSON-LD — sitewide structured data for search engines */}
         <script

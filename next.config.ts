@@ -30,20 +30,15 @@ const nextConfig: NextConfig = {
     // dynamic <Image> components today.
     unoptimized: true,
   },
-  async redirects() {
-    return [
-      {
-        // Legacy venue share links used /?venue=<id>; canonical is now /venue/<id>.
-        // Done via next.config (routes manifest) NOT proxy/middleware: Next 16 proxy
-        // is Node-runtime-only and OpenNext/Cloudflare Workers can't run Node middleware.
-        // The `runtime` option throws in proxy files, so Edge is not an escape hatch.
-        source: "/",
-        has: [{ type: "query", key: "venue", value: "(?<id>.*)" }],
-        destination: "/venue/:id",
-        permanent: true,
-      },
-    ];
-  },
+  // NOTE (2026-06-20 hotfix): a next.config redirect for legacy
+  // /?venue=<id> → /venue/<id> was REMOVED here. On OpenNext/Cloudflare
+  // Workers, a redirect with a `has` query rule on `source: "/"` returned
+  // HTTP 500 on EVERY homepage request at runtime — it built clean, so only
+  // the live homepage failed (not the build/tests). Legacy ?venue= links
+  // still work: the homepage reads the query param client-side and opens that
+  // pin. Do NOT re-add a `source: "/"` redirect without verifying the LIVE
+  // homepage (a green build is not enough). A proper OpenNext-compatible
+  // legacy redirect is a deferred follow-up.
   async headers() {
     return [
       {

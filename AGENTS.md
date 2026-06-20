@@ -253,15 +253,18 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   `LocalBusiness` / `GroceryStore` / `FoodEstablishment` / `Place` `@type` mapped from the
   venue category. `generateStaticParams` restricts the route to known venue ids; unknown ids 404.
   WHY dynamically rendered: the `cookies()` call to read locale opts the route out of SSG.
-- **Legacy redirect** — `src/proxy.ts` issues a 308 Permanent Redirect from `/?venue=<id>`
-  to `/venue/<id>`. Scoped to `matcher: "/"` only. Named `proxy` per the Next.js 16 file
-  convention (`middleware` was deprecated in v16). Crawlers and old shared links land on the
-  rich page automatically. The id is path-encoded and other query params (utm_*, etc.) are
-  preserved — only the `venue` param is removed.
+- **Legacy redirect** — `next.config.ts` `redirects()` issues a 308 Permanent Redirect from
+  `/?venue=<id>` to `/venue/<id>` via the Next.js routes manifest. Crawlers and old shared
+  links land on the rich venue page automatically.
+  - **WHY `next.config` not middleware/proxy:** Next.js 16 `proxy.ts` (the renamed middleware
+    entrypoint) defaults to the Node.js runtime. The `runtime` config option throws in proxy
+    files (not allowed), so switching to Edge is not possible. OpenNext/Cloudflare Workers does
+    not support Node-runtime middleware — it is NOT viable on this stack. Use `next.config`
+    `redirects()`/`rewrites()` for any server-side routing that would otherwise be middleware.
 - **Fragment bypass** — the "View on the map" CTA on each venue page uses `/#venue=<id>` (a
   URL fragment, not a query param). Fragments are never sent to the server, so they bypass the
-  middleware redirect. The homepage `useEffect` reads both `window.location.search` (`?venue=`)
-  and `window.location.hash` (`#venue=`) so both forms open the right pin.
+  `next.config` redirect. The homepage `useEffect` reads both `window.location.search`
+  (`?venue=`) and `window.location.hash` (`#venue=`) so both forms open the right pin.
 - **`venueShareUrl` canonical form** — updated in `src/lib/share.ts` from `/?venue=<id>` to
   `/venue/<id>`. The middleware 308 covers any legacy links still in the wild.
 - **Structured data helpers** — `src/lib/venueSchema.ts` (pure, no Next server deps): exports

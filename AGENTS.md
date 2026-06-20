@@ -195,10 +195,10 @@ All three form routes (`suggest`, `report`, `feedback`) call `logFormFailure` fr
 **Log shape (single-line JSON, emitted to Cloudflare Workers Logs):**
 
 ```json
-{ "event": "form_submit_failure", "form": "suggest|report|feedback", "reason": "turnstile_failed|send_failed", "status": 429, "message": "Resend API error …" }
+{ "event": "form_submit_failure", "form": "suggest|report|feedback", "reason": "turnstile_failed|send_failed", "message": "Resend API error 502: …" }
 ```
 
-- `status` and `message` are present only when passed by the caller (send_failed path only).
+- `message` is included on the `send_failed` path only (it carries the Resend error text + status code). The `turnstile_failed` path logs no `message`. The logger also supports an optional numeric `status` field, currently reserved for future use — no caller passes it yet.
 - `reason: "turnstile_failed"` → `console.warn` (bot traffic — high volume, low signal).
 - `reason: "send_failed"` → `console.error` (real outage — warrants alerting).
 - **PII-free by design.** The logger accepts only typed structured fields — no IPs, emails,

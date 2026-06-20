@@ -10,7 +10,7 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { SITE_URL, SITE_NAME, OG_IMAGE } from "@/lib/site";
+import { SITE_URL, SITE_NAME, OG_IMAGE, buildPageMetadata } from "@/lib/site";
 import sitemap from "@/app/sitemap";
 import robots from "@/app/robots";
 
@@ -128,5 +128,55 @@ describe("site constants", () => {
 
   test("OG_IMAGE type is image/png", () => {
     expect(OG_IMAGE.type).toBe("image/png");
+  });
+});
+
+// ─── buildPageMetadata ────────────────────────────────────────────────────────
+//
+// WHY: Regression guard for the OG image shallow-merge bug. Next.js replaces
+// (not deep-merges) a child openGraph object — so a subpage setting only
+// {title,url} drops the inherited image. buildPageMetadata must emit the full
+// object including images on every call.
+
+describe("buildPageMetadata", () => {
+  const m = buildPageMetadata({
+    title: "Suggest a Venue",
+    description: "d",
+    path: "/suggest",
+  });
+
+  test("alternates.canonical is the page URL", () => {
+    expect(m.alternates?.canonical).toBe(`${SITE_URL}/suggest`);
+  });
+
+  test("openGraph.url is the page URL", () => {
+    // openGraph is Metadata['openGraph'] — cast to access typed fields
+    const og = m.openGraph as { url?: string };
+    expect(og.url).toBe(`${SITE_URL}/suggest`);
+  });
+
+  test("openGraph.title is the page title", () => {
+    const og = m.openGraph as { title?: string };
+    expect(og.title).toBe("Suggest a Venue");
+  });
+
+  test("openGraph.images contains the brand OG image (regression guard)", () => {
+    // images is OGImage | OGImage[] | string | string[] — normalise to array
+    const og = m.openGraph as { images?: unknown };
+    const images = Array.isArray(og.images) ? og.images : [og.images];
+    const hasOgImage = images.some(
+      (img) => img && typeof img === "object" && (img as { url?: string }).url === OG_IMAGE.url,
+    );
+    expect(hasOgImage).toBe(true);
+  });
+
+  test("twitter.card is summary_large_image", () => {
+    const tw = m.twitter as { card?: string };
+    expect(tw.card).toBe("summary_large_image");
+  });
+
+  test("twitter.images[0].url is the brand OG image URL", () => {
+    const tw = m.twitter as { images?: Array<{ url?: string }> };
+    expect(tw.images?.[0]?.url).toBe(OG_IMAGE.url);
   });
 });

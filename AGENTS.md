@@ -230,10 +230,20 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   Generates `/robots.txt` at runtime. No `host` field — Google ignores it.
 - **Shared constants** — canonical origin, site name, and OG image metadata all live in
   `src/lib/site.ts` (single source of truth; reused by metadata, sitemap, robots).
+- **Subpage metadata helper** — `/suggest`, `/feedback`, and `/privacy` use `buildPageMetadata`
+  from `src/lib/site.ts` instead of a raw `metadata` literal. WHY: Next.js shallow-merges
+  metadata — a child `openGraph` object REPLACES the parent's entirely (not deep-merged; see
+  Next docs "Merging"). A subpage setting only `{title, url}` drops the inherited OG image and
+  other brand fields. `buildPageMetadata` emits the full `openGraph`/`twitter` block (brand
+  image, siteName, type, locale) so link previews on subpages retain the brand image.
 - **Known bilingual limitation** — the EN/ES language toggle is cookie-based: both locales
   serve the same URL. Crawlers only index the English version. Proper bilingual SEO (separate
   `/es/` URL tree or `hreflang` link tags) requires separate routes and is a deferred
   follow-up beyond #164.
+- **Deferred: explicit homepage canonical** — the client-component homepage would need a server
+  wrapper to own `alternates.canonical`. Implicit self-canonical is acceptable (Google ignores
+  `fbclid`/`utm` params); revisit if tracking-param duplicate indexing shows up in Search
+  Console.
 - **Planned follow-up (PR2, issue #164 items 6.3 + 6.4):** JSON-LD structured data and
   per-venue `/venue/[id]` pages. The sitemap will be extended with venue URLs at that point.
 

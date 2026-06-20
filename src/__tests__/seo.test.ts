@@ -13,6 +13,7 @@ import { describe, test, expect } from "vitest";
 import { SITE_URL, SITE_NAME, OG_IMAGE, buildPageMetadata } from "@/lib/site";
 import sitemap from "@/app/sitemap";
 import robots from "@/app/robots";
+import { venues } from "@/data/venues";
 
 // ─── sitemap ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,30 @@ describe("sitemap", () => {
     const urls = entries.map((e) => e.url);
     const unique = new Set(urls);
     expect(unique.size).toBe(urls.length);
+  });
+
+  // PR2 (#164 6.3/6.4) — venue URLs are now included
+  test("includes venue URLs (length > 4)", () => {
+    const entries = sitemap();
+    expect(entries.length).toBeGreaterThan(4);
+  });
+
+  test("contains at least one /venue/ URL for a real venue id", () => {
+    const entries = sitemap();
+    const urls = entries.map((e) => e.url);
+    const firstVenueUrl = `${SITE_URL}/venue/${venues[0].id}`;
+    expect(urls).toContain(firstVenueUrl);
+  });
+
+  test("all venue URLs start with SITE_URL/venue/", () => {
+    const entries = sitemap();
+    const venueEntries = entries.filter((e) =>
+      e.url.includes("/venue/"),
+    );
+    expect(venueEntries.length).toBe(venues.length);
+    for (const entry of venueEntries) {
+      expect(entry.url.startsWith(`${SITE_URL}/venue/`)).toBe(true);
+    }
   });
 });
 

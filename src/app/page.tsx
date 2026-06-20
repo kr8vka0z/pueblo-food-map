@@ -25,6 +25,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import SplashScreen from '@/components/SplashScreen';
 import MapWrapper from '@/components/MapWrapper';
+import { buildVenueListJsonLd } from '@/lib/venueSchema';
+import { venues } from '@/data/venues';
 
 const GATE_KEY = 'pfm.splash.seen.v2';
 
@@ -56,9 +58,15 @@ export default function HomePage() {
     // ensures we're in the microtask queue, not the synchronous effect body.
     queueMicrotask(() => {
       const venueParam = new URLSearchParams(window.location.search).get('venue');
-      setInitialVenueId(venueParam);
-      // A shared ?venue= link goes straight to the pin — skip the splash.
-      setSplashShown(venueParam ? false : !readGate());
+      // Also read #venue=<id> fragment: used by /venue/[id] "View on the map" CTA
+      // so the fragment bypasses the /?venue= → /venue/<id> middleware redirect.
+      const hashParam = window.location.hash.startsWith('#venue=')
+        ? window.location.hash.slice('#venue='.length)
+        : null;
+      const resolvedId = venueParam ?? hashParam;
+      setInitialVenueId(resolvedId);
+      // A shared venue link (either form) goes straight to the pin — skip the splash.
+      setSplashShown(resolvedId ? false : !readGate());
     });
   }, []);
 
@@ -85,8 +93,16 @@ export default function HomePage() {
   // SSR-safe: render nothing until we know whether splash is needed
   if (splashShown === null) return null;
 
+  // Build ItemList JSON-LD once (referentially stable — venues array is static).
+  const itemListJsonLd = buildVenueListJsonLd(venues);
+
   return (
     <>
+      {/* ItemList JSON-LD — crawlable venue index for search engines, on / only */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+      />
       {/* Map is always mounted — visible behind the splash overlay when splash is shown */}
       <main
         className="flex-1 flex flex-col min-h-0"

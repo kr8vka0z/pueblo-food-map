@@ -244,8 +244,32 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   wrapper to own `alternates.canonical`. Implicit self-canonical is acceptable (Google ignores
   `fbclid`/`utm` params); revisit if tracking-param duplicate indexing shows up in Search
   Console.
-- **Planned follow-up (PR2, issue #164 items 6.3 + 6.4):** JSON-LD structured data and
-  per-venue `/venue/[id]` pages. The sitemap will be extended with venue URLs at that point.
+
+**PR2 (items 6.3 + 6.4) — shipped.**
+
+- **Per-venue pages** — `src/app/venue/[id]/page.tsx` (SSG, `dynamicParams = false`). Each
+  page carries a venue-specific `<title>` + `<meta description>` + OpenGraph/Twitter metadata
+  via `buildPageMetadata`, and a `<script type="application/ld+json">` block with a
+  `LocalBusiness` / `GroceryStore` / `FoodEstablishment` / `Place` `@type` mapped from the
+  venue category. `generateStaticParams` pre-builds a page for every venue at compile time.
+- **Legacy redirect** — `src/proxy.ts` issues a 308 Permanent Redirect from `/?venue=<id>`
+  to `/venue/<id>`. Scoped to `matcher: "/"` only. Named `proxy` per the Next.js 16 file
+  convention (`middleware` was deprecated in v16). Crawlers and old shared links land on the
+  rich page automatically.
+- **Fragment bypass** — the "View on the map" CTA on each venue page uses `/#venue=<id>` (a
+  URL fragment, not a query param). Fragments are never sent to the server, so they bypass the
+  middleware redirect. The homepage `useEffect` reads both `window.location.search` (`?venue=`)
+  and `window.location.hash` (`#venue=`) so both forms open the right pin.
+- **`venueShareUrl` canonical form** — updated in `src/lib/share.ts` from `/?venue=<id>` to
+  `/venue/<id>`. The middleware 308 covers any legacy links still in the wild.
+- **Structured data helpers** — `src/lib/venueSchema.ts` (pure, no Next server deps): exports
+  `getVenueById`, `venuePath`, `buildVenueJsonLd`, `buildVenueListJsonLd`, `buildWebSiteJsonLd`.
+- **WebSite JSON-LD** — rendered server-side in `src/app/layout.tsx` body (sitewide; 1 tag on
+  every page).
+- **ItemList JSON-LD** — rendered client-side in `src/app/page.tsx` (homepage `/` only). Lists
+  all venues by id/name/url/position for crawlers that read client-rendered markup.
+- **Sitemap** — `src/app/sitemap.ts` now includes all per-venue URLs (`changeFrequency:
+  "monthly"`, `priority: 0.7`). The static-routes-only TODO comment was removed.
 
 ---
 

@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import type { Locale } from "@/lib/i18n";
 import { SITE_URL, SITE_NAME, OG_IMAGE } from "@/lib/site";
+import { buildWebSiteJsonLd } from "@/lib/venueSchema";
 
 const DESCRIPTION =
   "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores — with walking and bus directions via Pueblo Transit.";
@@ -60,6 +61,13 @@ export default async function RootLayout({
       className="h-full antialiased"
     >
       <body className="h-full flex flex-col">
+        {/* WebSite JSON-LD — sitewide structured data for search engines */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(buildWebSiteJsonLd()),
+          }}
+        />
         <LocaleProvider initialLocale={initialLocale}>
           {children}
         </LocaleProvider>

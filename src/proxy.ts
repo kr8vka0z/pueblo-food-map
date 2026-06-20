@@ -23,8 +23,8 @@ export function proxy(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("venue");
   if (id) {
     const url = req.nextUrl.clone();
-    url.pathname = `/venue/${id}`;
-    url.search = "";
+    url.pathname = `/venue/${encodeURIComponent(id)}`;
+    url.searchParams.delete("venue"); // keep any other params (utm_*, etc.)
     return NextResponse.redirect(url, 308);
   }
   return NextResponse.next();

@@ -25,7 +25,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import SplashScreen from '@/components/SplashScreen';
 import MapWrapper from '@/components/MapWrapper';
-import { buildVenueListJsonLd } from '@/lib/venueSchema';
+import { buildVenueListJsonLd, serializeJsonLd } from '@/lib/venueSchema';
 import { venues } from '@/data/venues';
 
 const GATE_KEY = 'pfm.splash.seen.v2';
@@ -101,7 +101,7 @@ export default function HomePage() {
       {/* ItemList JSON-LD — crawlable venue index for search engines, on / only */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(itemListJsonLd) }}
       />
       {/* Map is always mounted — visible behind the splash overlay when splash is shown */}
       <main

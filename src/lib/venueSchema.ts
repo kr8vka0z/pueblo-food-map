@@ -11,7 +11,7 @@
  */
 
 import type { Venue } from "@/types/venue";
-import { venues } from "@/data/venues";
+import { venues, categoryLabels } from "@/data/venues";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
 
 /** @type record maps VenueCategory → schema.org @type value */
@@ -34,6 +34,21 @@ function extractPostalCode(address: string): string | undefined {
 /** Extract the street portion (up to the first comma) from an address. */
 function extractStreetAddress(address: string): string {
   return address.split(",")[0].trim();
+}
+
+/**
+ * Serialize a JSON-LD object for safe injection into a <script> tag.
+ *
+ * WHY: JSON.stringify does NOT escape `<`, so a `</script>` (or `<!--`) in any
+ * field (e.g. a future user-suggested venue name) would break out of the
+ * script element — a markup-injection/XSS vector. Escaping <, >, & to \uXXXX
+ * keeps the JSON valid while making break-out impossible. Used for every
+ * JSON-LD block (venue, WebSite, ItemList).
+ */
+export function serializeJsonLd(value: unknown): string {
+  return JSON.stringify(value).replace(/[<>&]/g, (c) =>
+    c === "<" ? "\\u003c" : c === ">" ? "\\u003e" : "\\u0026",
+  );
 }
 
 export function getVenueById(id: string): Venue | undefined {
@@ -60,6 +75,7 @@ export function buildVenueJsonLd(venue: Venue): Record<string, unknown> {
     "@context": "https://schema.org",
     "@type": CATEGORY_SCHEMA_TYPE[venue.category],
     name: venue.name,
+    description: `${categoryLabels[venue.category]} in Pueblo, CO.`,
     url: `${SITE_URL}/venue/${venue.id}`,
     address,
     geo: {

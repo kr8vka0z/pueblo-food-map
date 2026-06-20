@@ -12,6 +12,7 @@ import {
   buildVenueJsonLd,
   buildVenueListJsonLd,
   buildWebSiteJsonLd,
+  serializeJsonLd,
 } from "@/lib/venueSchema";
 import { venues } from "@/data/venues";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
@@ -119,6 +120,15 @@ describe("buildVenueJsonLd", () => {
       expect(values.every((v) => v !== null && v !== undefined)).toBe(true);
     }
   });
+
+  test("has a non-empty description", () => {
+    // WHY: description reduces GSC "missing recommended field" warnings.
+    for (const venue of venues.slice(0, 5)) {
+      const ld = buildVenueJsonLd(venue);
+      expect(typeof ld["description"]).toBe("string");
+      expect((ld["description"] as string).length).toBeGreaterThan(0);
+    }
+  });
 });
 
 // ─── buildVenueListJsonLd ─────────────────────────────────────────────────────
@@ -181,5 +191,41 @@ describe("buildWebSiteJsonLd", () => {
 
   test("inLanguage is en", () => {
     expect(ld["inLanguage"]).toBe("en");
+  });
+});
+
+// ─── serializeJsonLd ──────────────────────────────────────────────────────────
+
+describe("serializeJsonLd", () => {
+  test("prevents </script> break-out — no literal </script> in output", () => {
+    // WHY: If a venue name or any field contains </script>, JSON.stringify
+    // would emit it verbatim, ending the <script> element early (XSS vector).
+    // serializeJsonLd escapes < > & to Unicode escapes so break-out is impossible.
+    const payload = { name: "</script><script>alert(1)</script>" };
+    const result = serializeJsonLd(payload);
+    expect(result).not.toContain("</script>");
+    expect(result).toContain("\\u003c");
+  });
+
+  test("output round-trips through JSON.parse to the original object", () => {
+    // WHY: Unicode escape sequences (< etc.) are valid JSON — parsers
+    // decode them back to the original characters. Verifies no data loss.
+    const original = { name: "</script><script>alert(1)</script>", count: 42 };
+    const serialized = serializeJsonLd(original);
+    expect(JSON.parse(serialized)).toEqual(original);
+  });
+
+  test("escapes > and & as well as <", () => {
+    const result = serializeJsonLd({ a: ">", b: "&", c: "<" });
+    expect(result).toContain("\\u003e");
+    expect(result).toContain("\\u0026");
+    expect(result).toContain("\\u003c");
+  });
+
+  test("leaves safe characters unchanged", () => {
+    const safe = { name: "Pueblo Community Garden", lat: 38.27 };
+    const result = serializeJsonLd(safe);
+    expect(result).toContain("Pueblo Community Garden");
+    expect(result).toContain("38.27");
   });
 });

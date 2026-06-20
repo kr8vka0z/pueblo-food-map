@@ -1,13 +1,16 @@
 /**
- * /venue/[id] — per-venue static page with structured data.
+ * /venue/[id] — per-venue dynamically rendered page with structured data.
  *
  * WHY: Gives each venue its own crawlable URL with a venue-specific title,
  * meta description, Open Graph tags, and LocalBusiness/FoodEstablishment
  * JSON-LD — enabling rich search results and accurate link previews for
  * shared venue links. Issue #164 item 6.4.
  *
- * generateStaticParams builds all pages at compile time (SSG). dynamicParams
- * false means an unknown id returns 404 rather than a runtime 500.
+ * WHY dynamically rendered (not SSG): the cookies() call to read the locale
+ * preference opts this route out of static generation — Next.js treats any
+ * use of dynamic server APIs as dynamic rendering. generateStaticParams +
+ * dynamicParams=false still restrict the route to known venue ids (unknown ids
+ * return 404), but each request is rendered at runtime, not at compile time.
  *
  * params is a Promise in Next.js 16 App Router — must be awaited.
  */
@@ -23,6 +26,7 @@ import {
   getVenueById,
   venuePath,
   buildVenueJsonLd,
+  serializeJsonLd,
 } from "@/lib/venueSchema";
 import { venues, categoryLabels } from "@/data/venues";
 import { DISPLAY_DAY_KEYS, formatSlot } from "@/lib/hours";
@@ -71,7 +75,7 @@ export default async function VenuePage({
       {/* Venue-specific JSON-LD structured data */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildVenueJsonLd(v)) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildVenueJsonLd(v)) }}
       />
 
       {/* Top nav bar — matches privacy.tsx / suggest.tsx pattern */}
@@ -102,7 +106,7 @@ export default async function VenuePage({
           >
             {v.name}
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-600)]">{v.address}</p>
+          <p className="mt-1 text-sm text-[var(--color-ink-500)]">{v.address}</p>
         </header>
 
         {/* SNAP / WIC badges */}
@@ -164,7 +168,7 @@ export default async function VenuePage({
               {t("detail.sources", locale)}
             </h2>
             {v.operator && (
-              <p className="text-sm text-[var(--color-ink-600)]">
+              <p className="text-sm text-[var(--color-ink-500)]">
                 {t("operator.operated_by", locale)}: {v.operator}
               </p>
             )}
@@ -193,7 +197,7 @@ export default async function VenuePage({
             href={viewOnMapHref}
             className={
               "inline-flex items-center justify-center px-4 py-2 rounded " +
-              "border border-[var(--color-sage-300)] text-[var(--color-sage-700)] text-sm font-medium " +
+              "border border-[var(--color-sage-500)] text-[var(--color-sage-700)] text-sm font-medium " +
               "hover:bg-[var(--color-sage-50)] transition-colors " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
             }

@@ -247,15 +247,17 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
 
 **PR2 (items 6.3 + 6.4) — shipped.**
 
-- **Per-venue pages** — `src/app/venue/[id]/page.tsx` (SSG, `dynamicParams = false`). Each
-  page carries a venue-specific `<title>` + `<meta description>` + OpenGraph/Twitter metadata
+- **Per-venue pages** — `src/app/venue/[id]/page.tsx` (dynamically rendered, `dynamicParams = false`).
+  Each page carries a venue-specific `<title>` + `<meta description>` + OpenGraph/Twitter metadata
   via `buildPageMetadata`, and a `<script type="application/ld+json">` block with a
   `LocalBusiness` / `GroceryStore` / `FoodEstablishment` / `Place` `@type` mapped from the
-  venue category. `generateStaticParams` pre-builds a page for every venue at compile time.
+  venue category. `generateStaticParams` restricts the route to known venue ids; unknown ids 404.
+  WHY dynamically rendered: the `cookies()` call to read locale opts the route out of SSG.
 - **Legacy redirect** — `src/proxy.ts` issues a 308 Permanent Redirect from `/?venue=<id>`
   to `/venue/<id>`. Scoped to `matcher: "/"` only. Named `proxy` per the Next.js 16 file
   convention (`middleware` was deprecated in v16). Crawlers and old shared links land on the
-  rich page automatically.
+  rich page automatically. The id is path-encoded and other query params (utm_*, etc.) are
+  preserved — only the `venue` param is removed.
 - **Fragment bypass** — the "View on the map" CTA on each venue page uses `/#venue=<id>` (a
   URL fragment, not a query param). Fragments are never sent to the server, so they bypass the
   middleware redirect. The homepage `useEffect` reads both `window.location.search` (`?venue=`)
@@ -263,11 +265,23 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
 - **`venueShareUrl` canonical form** — updated in `src/lib/share.ts` from `/?venue=<id>` to
   `/venue/<id>`. The middleware 308 covers any legacy links still in the wild.
 - **Structured data helpers** — `src/lib/venueSchema.ts` (pure, no Next server deps): exports
-  `getVenueById`, `venuePath`, `buildVenueJsonLd`, `buildVenueListJsonLd`, `buildWebSiteJsonLd`.
+  `getVenueById`, `venuePath`, `buildVenueJsonLd`, `buildVenueListJsonLd`, `buildWebSiteJsonLd`,
+  and `serializeJsonLd`.
+- **`serializeJsonLd`** — all three JSON-LD blocks (venue, WebSite, ItemList) are injected via
+  this helper, which escapes `<`, `>`, and `&` to `\uXXXX` Unicode sequences. WHY: `JSON.stringify`
+  does not escape `<`, so a `</script>` in any string field (e.g. a future user-suggested venue
+  name fed through #133) would terminate the `<script>` element early — a markup-injection/XSS
+  vector. The escaping keeps the JSON valid (parsers decode back to the original characters) while
+  making break-out impossible.
 - **WebSite JSON-LD** — rendered server-side in `src/app/layout.tsx` body (sitewide; 1 tag on
   every page).
 - **ItemList JSON-LD** — rendered client-side in `src/app/page.tsx` (homepage `/` only). Lists
   all venues by id/name/url/position for crawlers that read client-rendered markup.
+  - **Deferred: server-render the homepage ItemList JSON-LD** — currently client-rendered
+    (acceptable for Google, which renders JS, but weaker than SSR). Server-rendering requires
+    splitting the homepage into a server wrapper + client map child; deferred because it risks
+    the live map and `page.test.tsx` and pairs naturally with the deferred explicit-homepage-canonical
+    refactor.
 - **Sitemap** — `src/app/sitemap.ts` now includes all per-venue URLs (`changeFrequency:
   "monthly"`, `priority: 0.7`). The static-routes-only TODO comment was removed.
 

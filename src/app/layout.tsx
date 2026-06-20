@@ -60,6 +60,33 @@ export default async function RootLayout({
       lang={initialLocale}
       className="h-full antialiased"
     >
+      <head>
+        {/*
+         * Preload self-hosted variable fonts so text renders in the brand
+         * typeface on first paint rather than flashing unstyled.
+         *
+         * WHY crossOrigin="anonymous": browsers always fetch fonts in CORS
+         * mode (regardless of same-origin), so a preload link without
+         * crossOrigin is treated as a different cache entry — the browser
+         * would fetch the font twice: once for the preload (no CORS header)
+         * and once when the @font-face rule fires (CORS mode). The duplicate
+         * fetch defeats the preload entirely and makes LCP worse.
+         */}
+        <link
+          rel="preload"
+          href="/fonts/PublicSans-Variable.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/Fraunces-Variable.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="h-full flex flex-col">
         {/* WebSite JSON-LD — sitewide structured data for search engines */}
         <script

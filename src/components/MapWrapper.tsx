@@ -365,6 +365,15 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     setMapUnavailable(true);
     setViewMode("list");
   }, []);
+
+  // Switch to map view — but never while the map is unavailable (#165). Selecting
+  // a venue (from the list, search, or saved) should reveal it without bouncing
+  // the user to a suppressed/blank map; selection still highlights via
+  // selectedVenueId and the list stays put.
+  const showVenueOnMap = useCallback(() => {
+    if (!mapUnavailable) setViewMode("map");
+  }, [mapUnavailable]);
+
   useEffect(() => {
     if (!isWebGLAvailable()) {
       // queueMicrotask defers the setState out of the synchronous effect body —
@@ -656,7 +665,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           e.preventDefault();
           const venue = filteredVenues[activeIndex];
           setSelectedVenueId(venue.id);
-          setViewMode("map");
+          showVenueOnMap();
           if (!isMobile) setWindowExpanded(false);
           setIsPopoverOpen(false);
           setActiveIndex(-1);
@@ -664,7 +673,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       }
     },
     // filteredVenues reference is stable between renders with same query/filters.
-    [isPopoverOpen, filteredVenues, activeIndex, isMobile],
+    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap],
   );
 
   // Select a venue from the Saved list (#132 9c). Clears active filters + search
@@ -680,32 +689,33 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       setFilterWic(false);
       setQuery("");
       setSelectedVenueId(venueId);
-      setViewMode("map");
+      showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [isMobile],
+    [isMobile, showVenueOnMap],
   );
 
   /** Called when user clicks/taps a result row inside the popover. */
   const handleSelectVenueFromPopover = useCallback(
     (venueId: string) => {
       setSelectedVenueId(venueId);
-      setViewMode("map");
+      showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     },
-    [isMobile],
+    [isMobile, showVenueOnMap],
   );
 
   // Select a venue from the list (#129) — switch back to the map, centered on it.
+  // showVenueOnMap guards against bouncing to a suppressed/blank map when mapUnavailable (#165).
   const handleSelectFromList = useCallback(
     (venueId: string) => {
       setSelectedVenueId(venueId);
-      setViewMode("map");
+      showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [isMobile],
+    [isMobile, showVenueOnMap],
   );
 
   // Clear ALL filters + search (used by the list empty state) (#129).
@@ -763,32 +773,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         </MapErrorBoundary>
       )}
 
-      {/* Map-unavailable banner (#165) — shown when WebGL/Mapbox cannot load.
-          Friendly, non-dismissible; explains why the list is showing instead.
-          Uses bone/clay tokens for a calm informational tone (not alarming). */}
-      {mapUnavailable && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={[
-            "w-full px-4 py-3",
-            "flex items-start gap-3",
-            "bg-[var(--color-bone-100)] border-b border-[var(--color-bone-300)]",
-            "text-[var(--color-ink-700)]",
-          ].join(" ")}
-        >
-          <span className="flex-1">
-            <strong className="block text-sm font-semibold mb-0.5">
-              {t("map.unavailableTitle", locale)}
-            </strong>
-            <span className="text-sm">
-              {t("map.unavailableBody", locale)}
-            </span>
-          </span>
-        </div>
-      )}
-
-      {/* List view (#129) — full-screen overlay above the map, below top chrome */}
+      {/* List view (#129) — full-screen overlay above the map, below top chrome.
+          When mapUnavailable, the notice prop carries the fallback banner (#165)
+          so it renders inside ListView's z-[700] stacking context and stays visible. */}
       {viewMode === "list" && (
         <ListView
           venues={filteredVenues}
@@ -797,6 +784,22 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           onClearFilters={handleClearAllFilters}
           showClearFilters={anyFilterActive || query.trim() !== ""}
           locale={locale}
+          notice={
+            mapUnavailable ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="w-full px-4 py-3 flex items-start gap-3 bg-[var(--color-bone-100)] border-b border-[var(--color-bone-300)] text-[var(--color-ink-700)]"
+              >
+                <span className="flex-1">
+                  <strong className="block text-sm font-semibold mb-0.5">
+                    {t("map.unavailableTitle", locale)}
+                  </strong>
+                  <span className="text-sm">{t("map.unavailableBody", locale)}</span>
+                </span>
+              </div>
+            ) : undefined
+          }
         />
       )}
 

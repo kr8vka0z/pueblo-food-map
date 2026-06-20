@@ -341,6 +341,19 @@ export default function Map({
       onMoveEnd={handleMoveEnd}
       maxBounds={PUEBLO_COUNTY_BBOX}
       minZoom={PUEBLO_COUNTY_MIN_ZOOM}
+      onError={(e) => {
+        /*
+         * WHY only warn, not switch to list view:
+         * react-map-gl's onError fires for ALL map errors — tile 404s, single
+         * failed requests, network blips — not just fatal init failures. Switching
+         * to list on any error would nuke a working map every time a tile fails to
+         * load. Fatal init failures (e.g. "Failed to initialize WebGL") are caught
+         * by the WebGL probe (before mount) and MapErrorBoundary (render-phase
+         * throw), both of which correctly activate the list fallback. This handler
+         * is intentionally observation-only.
+         */
+        console.warn("[Map] Mapbox error:", e.error);
+      }}
     >
       {/* Attribution — bottom-left per spec §10.3; styled in globals.css */}
       <AttributionControl position="bottom-left" compact={true} />

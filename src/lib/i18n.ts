@@ -327,6 +327,10 @@ const en: Record<string, string> = {
   // Map loading fallback — shown while dynamic import resolves (#i18n-leaks)
   "map.loading": "Loading map…",
 
+  // Map unavailable fallback — shown when WebGL/Mapbox cannot initialize (#165)
+  "map.unavailableTitle": "Map unavailable",
+  "map.unavailableBody": "The interactive map can't load on this device, so we're showing the list instead.",
+
   // LanguageToggle group aria-label (#i18n-leaks)
   "lang.toggle.label": "Language selection",
 
@@ -670,6 +674,10 @@ const es: Record<string, string> = {
 
   // Map loading fallback (#i18n-leaks)
   "map.loading": "Cargando mapa…",
+
+  // Map unavailable fallback (#165)
+  "map.unavailableTitle": "Mapa no disponible",
+  "map.unavailableBody": "El mapa interactivo no se puede cargar en este dispositivo, así que mostramos la lista.",
 
   // LanguageToggle group aria-label (#i18n-leaks)
   "lang.toggle.label": "Selección de idioma",

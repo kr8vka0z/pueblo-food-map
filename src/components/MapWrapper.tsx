@@ -43,9 +43,11 @@ import SearchResultsPopover, {
   optionId,
 } from "./SearchResultsPopover";
 import LocationDeniedBanner from "./LocationDeniedBanner";
+import MapErrorBoundary from "./MapErrorBoundary";
 import { useGeolocation } from "@/lib/useGeolocation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
+import { isWebGLAvailable } from "@/lib/webgl";
 import { useFavorites } from "@/lib/favorites";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
@@ -352,6 +354,22 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   // ── View mode (#129) — map (default) or full-screen list ────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("map");
+
+  // ── WebGL / Mapbox unavailable (#165) ────────────────────────────────────────
+  // Starts false so server + first client render both assume WebGL is available
+  // (no hydration mismatch). A useEffect below flips it client-side only when
+  // WebGL is genuinely absent. MapErrorBoundary also calls handleMapError() if
+  // Mapbox throws a fatal error during init despite the probe passing.
+  const [mapUnavailable, setMapUnavailable] = useState(false);
+  const handleMapError = useCallback(() => {
+    setMapUnavailable(true);
+    setViewMode("list");
+  }, []);
+  useEffect(() => {
+    if (!isWebGLAvailable()) {
+      handleMapError();
+    }
+  }, [handleMapError]);
 
   // ── Desktop window expanded state (PR 5) ─────────────────────────────────────
   const [windowExpanded, setWindowExpanded] = useState(false);
@@ -721,22 +739,52 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   return (
     <div className="relative h-full w-full">
-      {/* Map — fills viewport */}
-      <LeafletMap
-        venues={filteredVenues}
-        selectedVenueId={selectedVenueId}
-        userLocation={userLocation}
-        userDistances={userDistances}
-        recenterRequestId={recenterRequestId}
-        onSelectVenue={(id) => {
-          setSelectedVenueId(id);
-          if (!isMobile) {
-            setWindowExpanded(false);
-          }
-        }}
-        onMapReady={(map) => setMapboxMap(map)}
-        onMoveEnd={handleMoveEnd}
-      />
+      {/* Map — fills viewport; skipped entirely when WebGL is unavailable (#165).
+          MapErrorBoundary catches fatal init throws as a secondary safety net. */}
+      {!mapUnavailable && (
+        <MapErrorBoundary onError={handleMapError}>
+          <LeafletMap
+            venues={filteredVenues}
+            selectedVenueId={selectedVenueId}
+            userLocation={userLocation}
+            userDistances={userDistances}
+            recenterRequestId={recenterRequestId}
+            onSelectVenue={(id) => {
+              setSelectedVenueId(id);
+              if (!isMobile) {
+                setWindowExpanded(false);
+              }
+            }}
+            onMapReady={(map) => setMapboxMap(map)}
+            onMoveEnd={handleMoveEnd}
+          />
+        </MapErrorBoundary>
+      )}
+
+      {/* Map-unavailable banner (#165) — shown when WebGL/Mapbox cannot load.
+          Friendly, non-dismissible; explains why the list is showing instead.
+          Uses bone/clay tokens for a calm informational tone (not alarming). */}
+      {mapUnavailable && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={[
+            "w-full px-4 py-3",
+            "flex items-start gap-3",
+            "bg-[var(--color-bone-100)] border-b border-[var(--color-bone-300)]",
+            "text-[var(--color-ink-700)]",
+          ].join(" ")}
+        >
+          <span className="flex-1">
+            <strong className="block text-sm font-semibold mb-0.5">
+              {t("map.unavailableTitle", locale)}
+            </strong>
+            <span className="text-sm">
+              {t("map.unavailableBody", locale)}
+            </span>
+          </span>
+        </div>
+      )}
 
       {/* List view (#129) — full-screen overlay above the map, below top chrome */}
       {viewMode === "list" && (
@@ -849,8 +897,22 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* HamburgerMenu — top-right, above the control stack (#71) */}
-      <HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} savedVenues={savedVenues} onSelectVenue={handleSelectSavedVenue} viewMode={viewMode} onViewModeChange={setViewMode} />
+      {/* HamburgerMenu — top-right, above the control stack (#71).
+          When mapUnavailable, intercept onViewModeChange so selecting "map"
+          is a no-op — prevents the user from landing on a blank screen. */}
+      <HamburgerMenu
+        locale={locale}
+        onShowWelcome={onShowWelcome}
+        savedVenues={savedVenues}
+        onSelectVenue={handleSelectSavedVenue}
+        viewMode={viewMode}
+        onViewModeChange={(mode) => {
+          // WHY: ignore "map" selection while unavailable — map mount is
+          // suppressed, so switching to map view would show a blank screen.
+          if (mapUnavailable && mode === "map") return;
+          setViewMode(mode);
+        }}
+      />
 
       {/* LocateButton — bottom-center, morphing control (#108). Map mode only (#129). */}
       {viewMode === "map" && (

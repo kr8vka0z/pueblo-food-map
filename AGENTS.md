@@ -168,6 +168,44 @@ Originally the Worker ran on a full-access key kept in plaintext `.env.local`. R
 least-privilege arrangement on 2026-06-19 (#160, item 1.6); the full-access admin key was also
 rotated at the same time.
 
+# Observability (#163)
+
+## Health endpoint — `GET /api/health`
+
+- **Route:** `src/app/api/health/route.ts`
+- **Response shape:** `{ status: "ok", version: string, timestamp: string }`
+  - `status` — always the literal `"ok"` (HTTP 200)
+  - `version` — imported from `package.json` at build time; aids deploy verification
+  - `timestamp` — `new Date().toISOString()` at request time; confirms freshness
+- **No external calls** — intentional. A health probe that calls Resend, Mapbox, or any
+  third party fails alongside that dependency, turning a single-service outage into a
+  cascading alert storm. This endpoint proves only that the Worker process is up.
+- **Caching:** `export const dynamic = "force-dynamic"` + `Cache-Control: no-store` — uptime
+  monitors must see live availability, not a CDN-cached copy.
+- **Uptime monitoring:** Point monitors at `https://pueblofoodmap.com/api/health` **and**
+  `https://pueblofoodmap.com` (the homepage). A free UptimeRobot account supports both.
+  > **Pending manual step for Kyle:** Create the free UptimeRobot account and add the two
+  > monitors. This is NOT automated — it is a one-time human task.
+
+## Form-failure structured logging
+
+All three form routes (`suggest`, `report`, `feedback`) call `logFormFailure` from
+`src/lib/logger.ts` on Turnstile rejections and email send failures.
+
+**Log shape (single-line JSON, emitted to Cloudflare Workers Logs):**
+
+```json
+{ "event": "form_submit_failure", "form": "suggest|report|feedback", "reason": "turnstile_failed|send_failed", "message": "Resend API error 502: …" }
+```
+
+- `message` is included on the `send_failed` path only (it carries the Resend error text + status code). The `turnstile_failed` path logs no `message`. The logger also supports an optional numeric `status` field, currently reserved for future use — no caller passes it yet.
+- `reason: "turnstile_failed"` → `console.warn` (bot traffic — high volume, low signal).
+- `reason: "send_failed"` → `console.error` (real outage — warrants alerting).
+- **PII-free by design.** The logger accepts only typed structured fields — no IPs, emails,
+  names, addresses, or message bodies ever appear in these log entries.
+- **Filter/alert:** In CF Workers Logs, filter on `form_submit_failure` for a full failure
+  stream, or narrow to `send_failed` for actionable outage alerts.
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

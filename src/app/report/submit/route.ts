@@ -22,6 +22,7 @@ import { verifyTurnstileToken } from "@/lib/turnstile";
 import { createRateLimiter, EMAIL_RE } from "@/lib/rateLimit";
 import { venues } from "@/data/venues";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
+import { logFormFailure } from "@/lib/logger";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 // Private in-process sliding window for this route (own 5/hr-per-IP bucket).
@@ -170,6 +171,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ip,
   );
   if (!turnstileValid) {
+    logFormFailure("report", "turnstile_failed");
     return NextResponse.json(
       { ok: false, error: "turnstile_failed" },
       { status: 400 },
@@ -215,11 +217,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       contactEmail: body.contactEmail ? stripLineBreaks(body.contactEmail) : undefined,
     });
   } catch (err) {
-    // Log the error type/status only — not the body which may contain PII
-    console.error(
-      "[report/submit] Email send failed:",
-      err instanceof Error ? err.message : "unknown error",
-    );
+    // Structured log: error type/message only — no PII (no body, IP, or email)
+    logFormFailure("report", "send_failed", {
+      message: err instanceof Error ? err.message : "unknown error",
+    });
     return NextResponse.json(
       { ok: false, error: "send_failed" },
       { status: 502 },

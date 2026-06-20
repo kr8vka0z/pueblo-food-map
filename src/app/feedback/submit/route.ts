@@ -21,6 +21,7 @@ import { FEEDBACK_TYPES, type FeedbackTypeKey } from "@/lib/feedbackTypes";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { createRateLimiter, EMAIL_RE } from "@/lib/rateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
+import { logFormFailure } from "@/lib/logger";
 
 /** Strip CR and LF from a string to prevent header/subject line injection. */
 function stripLineBreaks(s: string): string {
@@ -148,6 +149,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ip,
   );
   if (!turnstileValid) {
+    logFormFailure("feedback", "turnstile_failed");
     return NextResponse.json(
       { ok: false, error: "turnstile_failed" },
       { status: 400 },
@@ -185,11 +187,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       contactEmail: stripLineBreaks(body.contactEmail.trim()),
     });
   } catch (err) {
-    // Log the error type/status only — not the body which may contain PII
-    console.error(
-      "[feedback/submit] Email send failed:",
-      err instanceof Error ? err.message : "unknown error",
-    );
+    // Structured log: error type/message only — no PII (no body, IP, or email)
+    logFormFailure("feedback", "send_failed", {
+      message: err instanceof Error ? err.message : "unknown error",
+    });
     return NextResponse.json(
       { ok: false, error: "send_failed" },
       { status: 502 },

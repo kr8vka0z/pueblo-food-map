@@ -253,20 +253,28 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   `LocalBusiness` / `GroceryStore` / `FoodEstablishment` / `Place` `@type` mapped from the
   venue category. `generateStaticParams` restricts the route to known venue ids; unknown ids 404.
   WHY dynamically rendered: the `cookies()` call to read locale opts the route out of SSG.
-- **Legacy redirect** — `next.config.ts` `redirects()` issues a 308 Permanent Redirect from
-  `/?venue=<id>` to `/venue/<id>` via the Next.js routes manifest. Crawlers and old shared
-  links land on the rich venue page automatically.
-  - **WHY `next.config` not middleware/proxy:** Next.js 16 `proxy.ts` (the renamed middleware
-    entrypoint) defaults to the Node.js runtime. The `runtime` config option throws in proxy
-    files (not allowed), so switching to Edge is not possible. OpenNext/Cloudflare Workers does
-    not support Node-runtime middleware — it is NOT viable on this stack. Use `next.config`
-    `redirects()`/`rewrites()` for any server-side routing that would otherwise be middleware.
-- **Fragment bypass** — the "View on the map" CTA on each venue page uses `/#venue=<id>` (a
-  URL fragment, not a query param). Fragments are never sent to the server, so they bypass the
-  `next.config` redirect. The homepage `useEffect` reads both `window.location.search`
-  (`?venue=`) and `window.location.hash` (`#venue=`) so both forms open the right pin.
+- **Legacy `?venue=` links — handled CLIENT-SIDE (no server redirect).** New shares use the
+  canonical `/venue/<id>`. Old `/?venue=<id>` links still work: the homepage reads the `venue`
+  query param client-side and opens that pin. There is intentionally **no** server-side redirect
+  — see the OpenNext routing traps below. A proper OpenNext-compatible legacy redirect (so old
+  links also get the rich preview for crawlers) is a deferred follow-up.
+  - **⚠️ OpenNext/Cloudflare routing traps on `/` — BOTH server-side approaches we tried failed:**
+    1. **`proxy.ts` (Next 16's renamed middleware) fails the BUILD.** It defaults to the Node.js
+       runtime; the `runtime` option throws in proxy files, so Edge is not an escape hatch; and
+       OpenNext/CF cannot run Node-runtime middleware (`opennextjs-cloudflare build` errors out).
+    2. **`next.config` `redirects()` with a `has` query rule on `source: "/"` fails at RUNTIME.**
+       It builds clean AND passes the CF "Workers Builds" check, but **500'd every homepage
+       request on the live worker** (2026-06-20 prod incident; removed in hotfix). Other routes
+       were unaffected.
+  - **LESSON: a green build / CF-check does NOT prove the page works on this stack. After every
+    deploy, curl the LIVE homepage** (`https://pueblo-food-map.kyle-boyd.workers.dev/` bypasses
+    CDN cache) for HTTP 200 — not just the build. Avoid server-side routing rules scoped to `/`.
+- **Fragment for in-app deep links** — the "View on the map" CTA on each venue page uses
+  `/#venue=<id>` (a URL fragment, not a query param). The homepage `useEffect` reads both
+  `window.location.search` (`?venue=`) and `window.location.hash` (`#venue=`) so both forms open
+  the right pin.
 - **`venueShareUrl` canonical form** — updated in `src/lib/share.ts` from `/?venue=<id>` to
-  `/venue/<id>`. The middleware 308 covers any legacy links still in the wild.
+  `/venue/<id>`. Legacy `/?venue=` links still resolve via the homepage's client-side query read.
 - **Structured data helpers** — `src/lib/venueSchema.ts` (pure, no Next server deps): exports
   `getVenueById`, `venuePath`, `buildVenueJsonLd`, `buildVenueListJsonLd`, `buildWebSiteJsonLd`,
   and `serializeJsonLd`.

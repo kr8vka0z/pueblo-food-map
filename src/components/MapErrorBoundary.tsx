@@ -18,7 +18,7 @@
  */
 
 import { Component } from "react";
-import type { ReactNode, ErrorInfo } from "react";
+import type { ReactNode } from "react";
 
 interface Props {
   /** Called when the Map throws during render/init. Use to activate fallback. */
@@ -40,7 +40,7 @@ export default class MapErrorBoundary extends Component<Props, State> {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, _info: ErrorInfo): void {
+  componentDidCatch(error: Error): void {
     // Log for diagnostics; do not surface to the user (the onError callback
     // handles the visible fallback transition).
     console.error("[MapErrorBoundary] Map failed to initialize:", error);

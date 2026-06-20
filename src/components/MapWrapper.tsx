@@ -367,7 +367,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   }, []);
   useEffect(() => {
     if (!isWebGLAvailable()) {
-      handleMapError();
+      // queueMicrotask defers the setState out of the synchronous effect body —
+      // same pattern used elsewhere in this file — to satisfy react-hooks/set-state-in-effect.
+      queueMicrotask(handleMapError);
     }
   }, [handleMapError]);
 

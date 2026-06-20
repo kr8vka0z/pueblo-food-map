@@ -30,6 +30,20 @@ const nextConfig: NextConfig = {
     // dynamic <Image> components today.
     unoptimized: true,
   },
+  async redirects() {
+    return [
+      {
+        // Legacy venue share links used /?venue=<id>; canonical is now /venue/<id>.
+        // Done via next.config (routes manifest) NOT proxy/middleware: Next 16 proxy
+        // is Node-runtime-only and OpenNext/Cloudflare Workers can't run Node middleware.
+        // The `runtime` option throws in proxy files, so Edge is not an escape hatch.
+        source: "/",
+        has: [{ type: "query", key: "venue", value: "(?<id>.*)" }],
+        destination: "/venue/:id",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

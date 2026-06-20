@@ -8,14 +8,15 @@ import { venueShareUrl, shareVenue } from "@/lib/share";
 // ─── venueShareUrl ────────────────────────────────────────────────────────────
 
 describe("venueShareUrl", () => {
-  test("ends with /?venue=abc for plain id", () => {
+  // Updated in PR2 (#164 6.4): canonical form is now /venue/<id> not /?venue=<id>.
+  test("ends with /venue/abc for plain id", () => {
     const url = venueShareUrl("abc");
-    expect(url.endsWith("/?venue=abc")).toBe(true);
+    expect(url.endsWith("/venue/abc")).toBe(true);
   });
 
   test("encodes spaces in id (a b → a%20b)", () => {
     const url = venueShareUrl("a b");
-    expect(url).toContain("?venue=a%20b");
+    expect(url).toContain("/venue/a%20b");
   });
 });
 
@@ -50,7 +51,7 @@ describe("shareVenue — navigator.share available and resolves", () => {
     expect(result).toBe("shared");
     expect(shareMock).toHaveBeenCalledTimes(1);
     const callArg = shareMock.mock.calls[0][0] as { url: string };
-    expect(callArg.url.endsWith("/?venue=v1")).toBe(true);
+    expect(callArg.url.endsWith("/venue/v1")).toBe(true);
   });
 });
 
@@ -138,6 +139,6 @@ describe("shareVenue — no navigator.share, clipboard available", () => {
     expect(result).toBe("copied");
     expect(writeTextMock).toHaveBeenCalledTimes(1);
     const calledWith = writeTextMock.mock.calls[0][0] as string;
-    expect(calledWith.endsWith("/?venue=v1")).toBe(true);
+    expect(calledWith.endsWith("/venue/v1")).toBe(true);
   });
 });

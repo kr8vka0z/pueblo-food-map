@@ -6,13 +6,19 @@
 
 export type ShareResult = "shared" | "copied" | "cancelled" | "unsupported";
 
-/** Build the deep-link URL for a venue (the `/?venue=<id>` form from slice 9a). */
+/**
+ * Build the canonical share URL for a venue: /venue/<id>.
+ *
+ * WHY: Changed from /?venue=<id> to /venue/<id> in PR2 (#164 6.4). The new
+ * form is the rich per-venue page — better crawlability, better link previews,
+ * and a permanent redirect from the old form covers legacy shares.
+ */
 export function venueShareUrl(venueId: string): string {
   const origin =
     typeof window !== "undefined" && window.location?.origin
       ? window.location.origin
       : "https://pueblofoodmap.com";
-  return `${origin}/?venue=${encodeURIComponent(venueId)}`;
+  return `${origin}/venue/${encodeURIComponent(venueId)}`;
 }
 
 interface ShareVenueOptions {

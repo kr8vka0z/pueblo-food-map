@@ -244,8 +244,49 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   wrapper to own `alternates.canonical`. Implicit self-canonical is acceptable (Google ignores
   `fbclid`/`utm` params); revisit if tracking-param duplicate indexing shows up in Search
   Console.
-- **Planned follow-up (PR2, issue #164 items 6.3 + 6.4):** JSON-LD structured data and
-  per-venue `/venue/[id]` pages. The sitemap will be extended with venue URLs at that point.
+
+**PR2 (items 6.3 + 6.4) — shipped.**
+
+- **Per-venue pages** — `src/app/venue/[id]/page.tsx` (dynamically rendered, `dynamicParams = false`).
+  Each page carries a venue-specific `<title>` + `<meta description>` + OpenGraph/Twitter metadata
+  via `buildPageMetadata`, and a `<script type="application/ld+json">` block with a
+  `LocalBusiness` / `GroceryStore` / `FoodEstablishment` / `Place` `@type` mapped from the
+  venue category. `generateStaticParams` restricts the route to known venue ids; unknown ids 404.
+  WHY dynamically rendered: the `cookies()` call to read locale opts the route out of SSG.
+- **Legacy redirect** — `next.config.ts` `redirects()` issues a 308 Permanent Redirect from
+  `/?venue=<id>` to `/venue/<id>` via the Next.js routes manifest. Crawlers and old shared
+  links land on the rich venue page automatically.
+  - **WHY `next.config` not middleware/proxy:** Next.js 16 `proxy.ts` (the renamed middleware
+    entrypoint) defaults to the Node.js runtime. The `runtime` config option throws in proxy
+    files (not allowed), so switching to Edge is not possible. OpenNext/Cloudflare Workers does
+    not support Node-runtime middleware — it is NOT viable on this stack. Use `next.config`
+    `redirects()`/`rewrites()` for any server-side routing that would otherwise be middleware.
+- **Fragment bypass** — the "View on the map" CTA on each venue page uses `/#venue=<id>` (a
+  URL fragment, not a query param). Fragments are never sent to the server, so they bypass the
+  `next.config` redirect. The homepage `useEffect` reads both `window.location.search`
+  (`?venue=`) and `window.location.hash` (`#venue=`) so both forms open the right pin.
+- **`venueShareUrl` canonical form** — updated in `src/lib/share.ts` from `/?venue=<id>` to
+  `/venue/<id>`. The middleware 308 covers any legacy links still in the wild.
+- **Structured data helpers** — `src/lib/venueSchema.ts` (pure, no Next server deps): exports
+  `getVenueById`, `venuePath`, `buildVenueJsonLd`, `buildVenueListJsonLd`, `buildWebSiteJsonLd`,
+  and `serializeJsonLd`.
+- **`serializeJsonLd`** — all three JSON-LD blocks (venue, WebSite, ItemList) are injected via
+  this helper, which escapes `<`, `>`, and `&` to `\uXXXX` Unicode sequences. WHY: `JSON.stringify`
+  does not escape `<`, so a `</script>` in any string field (e.g. a future user-suggested venue
+  name fed through #133) would terminate the `<script>` element early — a markup-injection/XSS
+  vector. The escaping keeps the JSON valid (parsers decode back to the original characters) while
+  making break-out impossible.
+- **WebSite JSON-LD** — rendered server-side in `src/app/layout.tsx` body (sitewide; 1 tag on
+  every page).
+- **ItemList JSON-LD** — rendered client-side in `src/app/page.tsx` (homepage `/` only). Lists
+  all venues by id/name/url/position for crawlers that read client-rendered markup.
+  - **Deferred: server-render the homepage ItemList JSON-LD** — currently client-rendered
+    (acceptable for Google, which renders JS, but weaker than SSR). Server-rendering requires
+    splitting the homepage into a server wrapper + client map child; deferred because it risks
+    the live map and `page.test.tsx` and pairs naturally with the deferred explicit-homepage-canonical
+    refactor.
+- **Sitemap** — `src/app/sitemap.ts` now includes all per-venue URLs (`changeFrequency:
+  "monthly"`, `priority: 0.7`). The static-routes-only TODO comment was removed.
 
 ---
 

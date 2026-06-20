@@ -1,16 +1,18 @@
 /**
- * Static XML sitemap for Pueblo Food Map.
+ * XML sitemap for Pueblo Food Map.
  *
  * WHY: Tells search crawlers which pages exist and their relative importance.
- * Per-venue URLs (6.4) will be added in a follow-up PR once the /venue/[id]
- * route exists — add a dynamic entry loop there.
+ * Static routes are listed first, then per-venue pages (74+ entries) are
+ * appended dynamically from the venues array. Venue pages use monthly
+ * changeFrequency and 0.7 priority — meaningful but below the homepage.
  */
 
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/site";
+import { venues } from "@/data/venues";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [
+  const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: SITE_URL,
       changeFrequency: "weekly",
@@ -31,7 +33,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly",
       priority: 0.3,
     },
-    // TODO (PR2 — issue #164, items 6.3/6.4): add per-venue entries here
-    // once the /venue/[id] dynamic route ships.
   ];
+
+  const venueRoutes: MetadataRoute.Sitemap = venues.map((v) => ({
+    url: `${SITE_URL}/venue/${v.id}`,
+    changeFrequency: "monthly",
+    priority: 0.7,
+  }));
+
+  return [...staticRoutes, ...venueRoutes];
 }

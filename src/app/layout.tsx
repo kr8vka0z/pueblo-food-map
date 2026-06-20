@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 // Fonts are self-hosted via @font-face in globals.css — no next/font/google import.
 import "./globals.css";
+import { preload } from "react-dom";
 import { cookies } from "next/headers";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import type { Locale } from "@/lib/i18n";
@@ -54,6 +55,20 @@ export default async function RootLayout({
   const rawLocale = cookieStore.get("pfm-locale")?.value;
   const initialLocale: Locale =
     rawLocale === "en" || rawLocale === "es" ? rawLocale : "en";
+
+  // WHY preload() here instead of a <head> element: React 19's preload() API
+  // is idiomatic for App Router — it coexists with the Metadata API without
+  // producing duplicate or misplaced <head> tags or hydration mismatches.
+  // crossOrigin is required because font fetches are always CORS-mode; without
+  // it the browser treats the preload as a different cache entry and double-fetches.
+  // WHY only Public Sans: Fraunces is a display serif used sparingly — preloading
+  // it competes for critical-path bandwidth and can regress mobile LCP. It loads
+  // via @font-face in globals.css with font-display:swap instead.
+  preload("/fonts/PublicSans-Variable.woff2", {
+    as: "font",
+    type: "font/woff2",
+    crossOrigin: "anonymous",
+  });
 
   return (
     <html

@@ -43,9 +43,11 @@ import SearchResultsPopover, {
   optionId,
 } from "./SearchResultsPopover";
 import LocationDeniedBanner from "./LocationDeniedBanner";
+import MapErrorBoundary from "./MapErrorBoundary";
 import { useGeolocation } from "@/lib/useGeolocation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
+import { isWebGLAvailable } from "@/lib/webgl";
 import { useFavorites } from "@/lib/favorites";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
@@ -353,6 +355,35 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // ── View mode (#129) — map (default) or full-screen list ────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("map");
 
+  // ── WebGL / Mapbox unavailable (#165) ────────────────────────────────────────
+  // Starts false so server + first client render both assume WebGL is available
+  // (no hydration mismatch). A useEffect below flips it client-side only when
+  // WebGL is genuinely absent. MapErrorBoundary also calls handleMapError() if
+  // Mapbox throws a fatal error during init despite the probe passing.
+  const [mapUnavailable, setMapUnavailable] = useState(false);
+  const handleMapError = useCallback(() => {
+    setMapUnavailable(true);
+    setViewMode("list");
+  }, []);
+
+  // Switch to map view — but never while the map is unavailable (#165). Selecting
+  // a venue (from the list, search, or saved) should reveal it without bouncing
+  // the user to a suppressed/blank map; selection still highlights via
+  // selectedVenueId and the list stays put.
+  const showVenueOnMap = useCallback(() => {
+    if (!mapUnavailable) setViewMode("map");
+  }, [mapUnavailable]);
+
+  useEffect(() => {
+    if (!isWebGLAvailable()) {
+      // Intentional post-hydration, client-only correction: WebGL can only be
+      // probed on the client, so we flip to the list fallback here. Synchronous
+      // (not deferred) so the suppressed map never gets an extra render frame.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleMapError();
+    }
+  }, [handleMapError]);
+
   // ── Desktop window expanded state (PR 5) ─────────────────────────────────────
   const [windowExpanded, setWindowExpanded] = useState(false);
 
@@ -636,7 +667,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           e.preventDefault();
           const venue = filteredVenues[activeIndex];
           setSelectedVenueId(venue.id);
-          setViewMode("map");
+          showVenueOnMap();
           if (!isMobile) setWindowExpanded(false);
           setIsPopoverOpen(false);
           setActiveIndex(-1);
@@ -644,7 +675,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       }
     },
     // filteredVenues reference is stable between renders with same query/filters.
-    [isPopoverOpen, filteredVenues, activeIndex, isMobile],
+    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap],
   );
 
   // Select a venue from the Saved list (#132 9c). Clears active filters + search
@@ -660,32 +691,33 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       setFilterWic(false);
       setQuery("");
       setSelectedVenueId(venueId);
-      setViewMode("map");
+      showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [isMobile],
+    [isMobile, showVenueOnMap],
   );
 
   /** Called when user clicks/taps a result row inside the popover. */
   const handleSelectVenueFromPopover = useCallback(
     (venueId: string) => {
       setSelectedVenueId(venueId);
-      setViewMode("map");
+      showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     },
-    [isMobile],
+    [isMobile, showVenueOnMap],
   );
 
   // Select a venue from the list (#129) — switch back to the map, centered on it.
+  // showVenueOnMap guards against bouncing to a suppressed/blank map when mapUnavailable (#165).
   const handleSelectFromList = useCallback(
     (venueId: string) => {
       setSelectedVenueId(venueId);
-      setViewMode("map");
+      showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [isMobile],
+    [isMobile, showVenueOnMap],
   );
 
   // Clear ALL filters + search (used by the list empty state) (#129).
@@ -721,24 +753,31 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   return (
     <div className="relative h-full w-full">
-      {/* Map — fills viewport */}
-      <LeafletMap
-        venues={filteredVenues}
-        selectedVenueId={selectedVenueId}
-        userLocation={userLocation}
-        userDistances={userDistances}
-        recenterRequestId={recenterRequestId}
-        onSelectVenue={(id) => {
-          setSelectedVenueId(id);
-          if (!isMobile) {
-            setWindowExpanded(false);
-          }
-        }}
-        onMapReady={(map) => setMapboxMap(map)}
-        onMoveEnd={handleMoveEnd}
-      />
+      {/* Map — fills viewport; skipped entirely when WebGL is unavailable (#165).
+          MapErrorBoundary catches fatal init throws as a secondary safety net. */}
+      {!mapUnavailable && (
+        <MapErrorBoundary onError={handleMapError}>
+          <LeafletMap
+            venues={filteredVenues}
+            selectedVenueId={selectedVenueId}
+            userLocation={userLocation}
+            userDistances={userDistances}
+            recenterRequestId={recenterRequestId}
+            onSelectVenue={(id) => {
+              setSelectedVenueId(id);
+              if (!isMobile) {
+                setWindowExpanded(false);
+              }
+            }}
+            onMapReady={(map) => setMapboxMap(map)}
+            onMoveEnd={handleMoveEnd}
+          />
+        </MapErrorBoundary>
+      )}
 
-      {/* List view (#129) — full-screen overlay above the map, below top chrome */}
+      {/* List view (#129) — full-screen overlay above the map, below top chrome.
+          When mapUnavailable, the notice prop carries the fallback banner (#165)
+          so it renders inside ListView's z-[700] stacking context and stays visible. */}
       {viewMode === "list" && (
         <ListView
           venues={filteredVenues}
@@ -747,6 +786,22 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           onClearFilters={handleClearAllFilters}
           showClearFilters={anyFilterActive || query.trim() !== ""}
           locale={locale}
+          notice={
+            mapUnavailable ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="w-full px-4 py-3 flex items-start gap-3 bg-[var(--color-bone-100)] border-b border-[var(--color-bone-300)] text-[var(--color-ink-700)]"
+              >
+                <span className="flex-1">
+                  <strong className="block text-sm font-semibold mb-0.5">
+                    {t("map.unavailableTitle", locale)}
+                  </strong>
+                  <span className="text-sm">{t("map.unavailableBody", locale)}</span>
+                </span>
+              </div>
+            ) : undefined
+          }
         />
       )}
 
@@ -849,8 +904,22 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* HamburgerMenu — top-right, above the control stack (#71) */}
-      <HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} savedVenues={savedVenues} onSelectVenue={handleSelectSavedVenue} viewMode={viewMode} onViewModeChange={setViewMode} />
+      {/* HamburgerMenu — top-right, above the control stack (#71).
+          When mapUnavailable, intercept onViewModeChange so selecting "map"
+          is a no-op — prevents the user from landing on a blank screen. */}
+      <HamburgerMenu
+        locale={locale}
+        onShowWelcome={onShowWelcome}
+        savedVenues={savedVenues}
+        onSelectVenue={handleSelectSavedVenue}
+        viewMode={viewMode}
+        onViewModeChange={(mode) => {
+          // WHY: ignore "map" selection while unavailable — map mount is
+          // suppressed, so switching to map view would show a blank screen.
+          if (mapUnavailable && mode === "map") return;
+          setViewMode(mode);
+        }}
+      />
 
       {/* LocateButton — bottom-center, morphing control (#108). Map mode only (#129). */}
       {viewMode === "map" && (

@@ -9,6 +9,7 @@
       }
     },
     "assert": {
+      "_comment": "performance floor is 0.65 (not 0.70) — production mobile medians hover near 0.70 and dip to 0.69, so a 0.70 hard gate flakes. Raise to 0.70 after #202 reduces TBT.",
       "assertions": {
         "categories:performance": ["error", { "minScore": 0.65 }],
         "categories:accessibility": ["error", { "minScore": 0.95 }],

@@ -23,7 +23,7 @@ performance).
 
 1. Fork the repository and create a feature branch from `main`.
 2. Make your change with focused commits — see [Commit messages](#commit-messages).
-3. Run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`
+3. Run `npm run lint`, `npm run typecheck`, `npm run test:ci`, and `npm run build`
    locally before opening a pull request.
 4. Open a pull request against `main`. CI runs lint, typecheck, tests, and
    build on every PR and must pass before merge — `main` is a protected

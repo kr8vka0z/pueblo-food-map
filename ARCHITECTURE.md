@@ -277,8 +277,12 @@ compile to Worker fetch handlers. The in-process rate-limit `Map` is in
 Worker memory — it resets on cold-start, which is acceptable for v1 volume.
 
 **Environment variables:** `NEXT_PUBLIC_*` vars are baked into the client
-bundle at build time. They must be set in both the Production and Preview
-environments in the CF dashboard before triggering a build.
+bundle at build time — set them as **build variables** (Settings → Build →
+Build variables) before triggering a build. Workers Builds has one shared
+build-variable set and a single `production` environment; there is no separate
+Preview environment (that's a Cloudflare Pages concept). Runtime secrets
+(`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`) are set separately under Settings
+→ Variables and Secrets.
 
 See [AGENTS.md](AGENTS.md) for deploy, rollback, env-var management, and
 Mapbox token management.

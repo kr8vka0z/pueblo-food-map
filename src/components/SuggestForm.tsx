@@ -37,27 +37,8 @@ const {
   EMAIL,
 } = FIELD_LIMITS;
 
-// ─── Turnstile global type (shared declaration; ReportForm has same) ──────────
-
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        container: string | HTMLElement,
-        options: {
-          sitekey: string;
-          callback?: (token: string) => void;
-          "error-callback"?: () => void;
-          "expired-callback"?: () => void;
-        },
-      ) => string;
-      reset: (widgetId: string) => void;
-      remove: (widgetId: string) => void;
-    };
-  }
-}
-
 // ─── Validation ───────────────────────────────────────────────────────────────
+// Turnstile Window type lives in src/types/turnstile.d.ts (deduplicated in #166 8.6).
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

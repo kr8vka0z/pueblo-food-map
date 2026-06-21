@@ -52,8 +52,7 @@ import HamburgerMenu from "./HamburgerMenu";
 import ListView from "./ListView";
 import {
   PUEBLO_COUNTY_BBOX,
-  PUEBLO_CENTER_LAT,
-  PUEBLO_CENTER_LNG,
+  PUEBLO_CENTER,
 } from "@/data/pueblo-bbox";
 import { useMapFilters } from "@/lib/useMapFilters";
 import { useMapUI } from "@/lib/useMapUI";
@@ -68,8 +67,6 @@ const LeafletMap = dynamic(() => import("./Map"), {
   ssr: false,
   loading: () => <MapLoadingFallback />,
 });
-
-const PUEBLO_CENTER = { lat: PUEBLO_CENTER_LAT, lng: PUEBLO_CENTER_LNG };
 
 /**
  * Drift-detection padding (in degrees).

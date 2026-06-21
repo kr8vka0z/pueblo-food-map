@@ -26,27 +26,8 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 // Expose limits to the module scope for use in JSX maxlength attrs.
 const { REPORT_DESCRIPTION, EMAIL } = FIELD_LIMITS;
 
-// ─── Turnstile global type ────────────────────────────────────────────────────
-
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        container: string | HTMLElement,
-        options: {
-          sitekey: string;
-          callback?: (token: string) => void;
-          "error-callback"?: () => void;
-          "expired-callback"?: () => void;
-        },
-      ) => string;
-      reset: (widgetId: string) => void;
-      remove: (widgetId: string) => void;
-    };
-  }
-}
-
 // ─── Validation ───────────────────────────────────────────────────────────────
+// Turnstile Window type lives in src/types/turnstile.d.ts (deduplicated in #166 8.6).
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

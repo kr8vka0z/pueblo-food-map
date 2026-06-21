@@ -42,7 +42,7 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 
 - **Build logs:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab
 - **Rollback:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab → find a previous successful deployment → "Rollback to this deployment". Production traffic switches in ~30 seconds.
-- **Environment variables:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Settings → Variables and Secrets. `NEXT_PUBLIC_*` vars are baked into the client bundle at build time (same model as Vercel). Set them in both the "Production" and "Preview" environments.
+- **Environment variables — two kinds, two places.** (1) Build-time `NEXT_PUBLIC_*` are inlined by `next build` → set under **Settings → Build → Build variables**. (2) Runtime server secrets (`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`) are read at request time → set under **Settings → Variables and Secrets**. **Workers Builds has ONE shared build-variable set and a single `production` environment — there is NO separate Preview environment** (that's Cloudflare Pages). The same build vars apply to production deploys and PR preview builds.
 
 ## Mapbox Token Management
 
@@ -52,7 +52,7 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 - **1Password:** `op://VPS/Mapbox  - PFP Public/credential` (note: double-space in item name is intentional — do not rename)
 - **Env var:** `NEXT_PUBLIC_MAPBOX_TOKEN`
 - **Local dev:** `.env.local` (gitignored — never commit this file)
-- **Production/preview builds:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Settings → Variables and Secrets → Build variables. Set in both the **Production** and **Preview** environments. `NEXT_PUBLIC_*` vars are baked into the client bundle at build time; they must be present at build time, not just runtime.
+- **Build variable:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Settings → Build → Build variables. Workers Builds has one shared build-variable set and a single `production` environment — there is NO separate Preview environment (that's Cloudflare Pages). The same build vars apply to prod deploys and PR preview builds. `NEXT_PUBLIC_*` vars are inlined into the client bundle by `next build`; they must be present at build time, not runtime.
 - **Scopes:** `styles:read`, `fonts:read`, `tilesets:read`
 - **URL restrictions (bare hostnames, no protocol, no wildcards):**
   - `pueblofoodmap.com`
@@ -69,6 +69,7 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 - **URL restrictions:** Optional. Branch slugs follow `<branch-sanitized>-pueblo-food-map.kyle-boyd.workers.dev`; no wildcard support, so either omit restrictions or add per-branch. Omitting is pragmatic for a public map-tiles-only token.
 - **Lighthouse fallback:** When this secret is absent, the Lighthouse workflow falls back to the production URL and emits a `::warning` in CI. The error-threshold gate still runs — just against prod, not preview.
 - **Provisioning:** Mapbox Studio → Access tokens → Create token → Public, scopes above → copy → GitHub repo Settings → Secrets and variables → Actions → `MAPBOX_PREVIEW_TOKEN`.
+- **⚠️ Arming preview gating is NOT just adding this GitHub secret.** The GH secret only flips the Lighthouse workflow to target the preview URL. Workers Builds bakes the *same shared* build-var token into preview builds (the URL-restricted prod token), so the preview map renders "site not authorized" and scores collapse below the prod fallback. To truly arm it, swap the token per-branch in the build command via the `WORKERS_CI_BRANCH` build env var (non-`main` → an unrestricted preview token). **Deferred 2026-06-21 (option A):** prod Lighthouse perf is Mapbox-GL-runtime-bound (~0.5), so preview gating won't turn the gate green — it only buys deterministic per-branch measurement. See #161 item 2.2.
 
 ### Secret token (backend / admin, `sk.*`)
 
@@ -91,7 +92,7 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 
 1. Mapbox Studio dashboard → Access tokens → revoke old token, create new (check only `styles:read`, `fonts:read`, `tilesets:read`; copy URL restrictions from old token).
 2. Update value in 1Password at `op://VPS/Mapbox  - PFP Public/credential`.
-3. Update `NEXT_PUBLIC_MAPBOX_TOKEN` in CF Workers Builds (both Production + Preview environments).
+3. Update the `NEXT_PUBLIC_MAPBOX_TOKEN` **build variable** in CF Workers Builds (single shared set; Settings → Build).
 4. Update local `.env.local`.
 5. Trigger a redeploy (push a commit or manually trigger from CF dashboard).
 

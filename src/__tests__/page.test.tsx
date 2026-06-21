@@ -13,11 +13,43 @@
  * and trigger dismiss.
  *
  * navigator.permissions is stubbed so useGeolocation doesn't throw.
+ *
+ * WHY next/dynamic is mocked: page.tsx uses next/dynamic (ssr:false) to
+ * code-split MapWrapper and SplashScreen for TBT reduction (#202). In Vitest
+ * (jsdom, no Next.js runtime), next/dynamic's lazy resolution never settles —
+ * components render null and tests see an empty DOM. The mock makes dynamic()
+ * behave like a synchronous require() so tests exercise the real render path.
+ * Only the ssr:false dynamic() calls in this test's subject (page.tsx) need
+ * this; nested dynamic() calls inside MapWrapper/SplashScreen are already
+ * covered by their own module mocks.
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, fireEvent } from "@testing-library/react";
+import React from "react";
 import HomePage from "@/app/page";
+
+// ─── Mock next/dynamic — resolve synchronously in Vitest/jsdom ───────────────
+// WHY: next/dynamic's real implementation relies on webpack/Turbopack chunk
+// loading that doesn't exist in Vitest. Without this mock, dynamic()'d
+// components render null indefinitely and all overlay-architecture assertions
+// fail (#202 made MapWrapper + SplashScreen dynamic for TBT reduction).
+//
+// The mock calls the import factory immediately, resolves in a microtask, and
+// returns a wrapper that re-evaluates on each render. The setTimeout(0) in
+// renderPage() gives the microtask time to settle before assertions run.
+vi.mock("next/dynamic", () => ({
+  default: (factory: () => Promise<{ default: React.ComponentType<Record<string, unknown>> }>) => {
+    // Per-call-site closure — each dynamic() invocation gets its own slot.
+    let ResolvedComponent: React.ComponentType<Record<string, unknown>> | null = null;
+    factory().then((mod) => { ResolvedComponent = mod.default; });
+    function DynamicWrapper(props: Record<string, unknown>) {
+      return ResolvedComponent ? React.createElement(ResolvedComponent, props) : null;
+    }
+    DynamicWrapper.displayName = "DynamicWrapper";
+    return DynamicWrapper;
+  },
+}));
 
 // ─── Mock MapWrapper — renders a testid sentinel; no WebGL needed ─────────────
 vi.mock("@/components/MapWrapper", () => ({
@@ -25,6 +57,25 @@ vi.mock("@/components/MapWrapper", () => ({
     <div data-testid="map-wrapper" tabIndex={-1}>
       <button type="button" onClick={onShowWelcome} data-testid="show-welcome-btn">
         Show welcome
+      </button>
+    </div>
+  )),
+}));
+
+// ─── Mock SplashScreen — renders dialog role + dismiss CTA sentinel ───────────
+// WHY: SplashScreen is now dynamically imported (ssr:false) for TBT reduction
+// (#202). The real component depends on useGeolocation, useLocale, and i18n
+// which are complex to wire in jsdom. The mock preserves the interface that
+// matters for these tests: role="dialog" overlay + "Find food near me" CTA.
+vi.mock("@/components/SplashScreen", () => ({
+  default: vi.fn(({ onPrimary }: { onPrimary?: (mode: "located" | "pueblo-center") => void }) => (
+    <div role="dialog" aria-modal="true" data-testid="splash-screen">
+      <button
+        type="button"
+        onClick={() => onPrimary?.("located")}
+        data-testid="find-food-btn"
+      >
+        Find food near me
       </button>
     </div>
   )),
@@ -54,11 +105,16 @@ afterEach(() => {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Render the page and flush the queueMicrotask-deferred state update. */
+/** Render the page, flush queueMicrotask state update, and settle Suspense. */
 async function renderPage() {
   let result!: ReturnType<typeof render>;
   await act(async () => {
     result = render(<HomePage />);
+    // Flush multiple microtask ticks to settle:
+    // 1. queueMicrotask in page.tsx that sets splashShown
+    // 2. React.lazy Promise resolution for dynamic components
+    // 3. React re-render after Suspense resolution
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
   });
   return result;
 }

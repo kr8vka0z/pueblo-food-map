@@ -23,23 +23,13 @@ import { X, ChevronUp, ChevronDown, MapPin, Phone, Clock, ExternalLink } from "l
 import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
-import { computeOpenStatus, formatSlot } from "@/lib/hours";
+import { computeOpenStatus } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
 import { safeUrl } from "@/lib/safeUrl";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
-
-// ─── Day keys ─────────────────────────────────────────────────────────────────
-
-const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
-type DayKey = (typeof DAY_KEYS)[number];
-
-function todayKey(): DayKey {
-  const idx = new Date().getDay(); // 0=Sun
-  const map: DayKey[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-  return map[idx] ?? "mon";
-}
+import HoursList from "@/components/HoursList";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -59,7 +49,6 @@ export default function BottomSheet({ venue, onClose, onExpandedChange, locale =
 
   const open = venue !== null;
   const status = venue ? computeOpenStatus(venue.hours_weekly) : null;
-  const today = todayKey();
 
   function handleOpenChange(isOpen: boolean) {
     if (!isOpen) onClose();
@@ -275,56 +264,17 @@ export default function BottomSheet({ venue, onClose, onExpandedChange, locale =
                         </div>
                       )}
 
-                      {/* Full weekly Hours table (today highlighted + aria-current) */}
+                      {/* Full weekly hours table — today highlighted + aria-current */}
                       {venue.hours_weekly && (
                         <section aria-label={t("detail.hours", locale)}>
                           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
                             {t("detail.hours", locale)}
                           </h3>
-                          <dl className="space-y-1">
-                            {DAY_KEYS.map((day) => {
-                              const slots = venue.hours_weekly![day];
-                              const isToday = day === today;
-                              return (
-                                <div
-                                  key={day}
-                                  className={
-                                    "flex items-baseline gap-3 py-0.5 " +
-                                    (isToday
-                                      ? "border-l-[3px] pl-2 border-[var(--color-sage-500)]"
-                                      : "pl-3")
-                                  }
-                                  aria-current={isToday ? "true" : undefined}
-                                >
-                                  <dt
-                                    className={
-                                      "w-8 text-sm shrink-0 " +
-                                      (isToday
-                                        ? "font-semibold text-[var(--color-sage-700)]"
-                                        : "text-[var(--color-ink-500)]")
-                                    }
-                                  >
-                                    {t(`day.${day}`, locale)}
-                                    {isToday && (
-                                      <span className="sr-only">, {t("detail.today", locale)}</span>
-                                    )}
-                                  </dt>
-                                  <dd
-                                    className={
-                                      "text-sm font-mono " +
-                                      (isToday
-                                        ? "text-[var(--color-sage-700)]"
-                                        : "text-[var(--color-ink-700)]")
-                                    }
-                                  >
-                                    {slots && slots.length > 0
-                                      ? slots.map(formatSlot).join(", ")
-                                      : t("hours.closed", locale)}
-                                  </dd>
-                                </div>
-                              );
-                            })}
-                          </dl>
+                          <HoursList
+                            hours_weekly={venue.hours_weekly}
+                            locale={locale}
+                            compact={false}
+                          />
                         </section>
                       )}
 

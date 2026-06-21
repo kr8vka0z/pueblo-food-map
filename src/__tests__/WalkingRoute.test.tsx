@@ -20,7 +20,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
 import MapComponent from "@/components/Map";
-import { buildWalkingRouteUrl } from "@/components/MapWrapper";
+import { buildWalkingRouteUrl, parseWalkSteps } from "@/components/MapWrapper";
 import type { Venue } from "@/types/venue";
 
 // ─── Reuse the Map.test.tsx mock strategy ─────────────────────────────────────
@@ -205,5 +205,120 @@ describe("buildWalkingRouteUrl — URL params (#134 enhancement)", () => {
   test("URL targets Mapbox walking profile", () => {
     const url = buildWalkingRouteUrl(ORIGIN_LNG, ORIGIN_LAT, DEST_LNG, DEST_LAT, TOKEN, "en");
     expect(url).toContain("mapbox/walking");
+  });
+});
+
+// ─── parseWalkSteps — step parsing edge cases (FIX 3) ────────────────────────
+//
+// parseWalkSteps is extracted from the handleWalkRoute async callback so the
+// parse logic can be unit-tested without mounting MapWrapper (WebGL required).
+// Tests cover the highest-risk paths: malformed API responses that would
+// previously throw → be caught → silently discard the entire route.
+
+describe("parseWalkSteps — step parsing edge cases (FIX 3)", () => {
+  test("normal multi-step route returns all steps with instruction + distance", () => {
+    const route = {
+      legs: [{
+        steps: [
+          { maneuver: { instruction: "Head north on Main St" }, distance: 50 },
+          { maneuver: { instruction: "Turn right on Union Ave" }, distance: 300 },
+          { maneuver: { instruction: "Arrive at destination" }, distance: 0 },
+        ],
+      }],
+    };
+    const steps = parseWalkSteps(route);
+    expect(steps).toHaveLength(3);
+    expect(steps[0]).toEqual({ instruction: "Head north on Main St", distance: 50 });
+    expect(steps[1]).toEqual({ instruction: "Turn right on Union Ave", distance: 300 });
+    expect(steps[2]).toEqual({ instruction: "Arrive at destination", distance: 0 });
+  });
+
+  test("empty legs array returns empty steps", () => {
+    const steps = parseWalkSteps({ legs: [] });
+    expect(steps).toHaveLength(0);
+  });
+
+  test("missing legs field returns empty steps", () => {
+    const steps = parseWalkSteps({});
+    expect(steps).toHaveLength(0);
+  });
+
+  test("step missing maneuver field is dropped (not thrown)", () => {
+    // WHY: the API response is consumed via an `as` cast — missing maneuver
+    // was previously an uncaught throw that discarded the entire route.
+    const route = {
+      legs: [{
+        steps: [
+          { maneuver: { instruction: "Head north on Main St" }, distance: 50 },
+          { distance: 200 } as never, // no maneuver field
+          { maneuver: { instruction: "Arrive at destination" }, distance: 0 },
+        ],
+      }],
+    };
+    const steps = parseWalkSteps(route);
+    // The malformed step (no maneuver) is dropped; valid steps are kept
+    expect(steps).toHaveLength(2);
+    expect(steps[0].instruction).toBe("Head north on Main St");
+    expect(steps[1].instruction).toBe("Arrive at destination");
+  });
+
+  test("step with maneuver but missing instruction is dropped", () => {
+    const route = {
+      legs: [{
+        steps: [
+          { maneuver: { instruction: "Head north on Main St" }, distance: 50 },
+          { maneuver: {}, distance: 200 } as never, // maneuver present, instruction absent
+          { maneuver: { instruction: "Arrive at destination" }, distance: 0 },
+        ],
+      }],
+    };
+    const steps = parseWalkSteps(route);
+    expect(steps).toHaveLength(2);
+    expect(steps[0].instruction).toBe("Head north on Main St");
+  });
+
+  test("step with empty-string instruction is dropped", () => {
+    const route = {
+      legs: [{
+        steps: [
+          { maneuver: { instruction: "" }, distance: 100 },
+          { maneuver: { instruction: "Turn left" }, distance: 50 },
+        ],
+      }],
+    };
+    const steps = parseWalkSteps(route);
+    expect(steps).toHaveLength(1);
+    expect(steps[0].instruction).toBe("Turn left");
+  });
+
+  test("arrival step (distance 0) is kept by the parser", () => {
+    // WHY: distance 0 formatting is handled by formatStepDistance (returns ""),
+    // not by the parser. The parser keeps the step so the arrival instruction
+    // ("Arrive at destination") is visible in the list.
+    const route = {
+      legs: [{
+        steps: [
+          { maneuver: { instruction: "Arrive at destination" }, distance: 0 },
+        ],
+      }],
+    };
+    const steps = parseWalkSteps(route);
+    expect(steps).toHaveLength(1);
+    expect(steps[0].distance).toBe(0);
+    expect(steps[0].instruction).toBe("Arrive at destination");
+  });
+
+  test("all steps malformed returns empty array without throwing", () => {
+    const route = {
+      legs: [{
+        steps: [
+          { distance: 100 } as never,
+          { maneuver: {}, distance: 200 } as never,
+        ],
+      }],
+    };
+    expect(() => parseWalkSteps(route)).not.toThrow();
+    const steps = parseWalkSteps(route);
+    expect(steps).toHaveLength(0);
   });
 });

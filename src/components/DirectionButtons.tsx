@@ -31,7 +31,7 @@
  * language= query param (set to the active locale in MapWrapper). No client translation needed.
  */
 
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { Venue } from "@/types/venue";
 import { t, type Locale } from "@/lib/i18n";
 
@@ -145,11 +145,6 @@ const externalClass =
 
 // ─── DirectionButtons ─────────────────────────────────────────────────────────
 
-// Stable ID for the step list — used by aria-controls on the toggle.
-// WHY a constant string (not useId): the list is per-component instance, and
-// there will never be two DirectionButtons on the same page for the same venue.
-const STEPS_LIST_ID = "walk-steps-list";
-
 export default function DirectionButtons({
   venue,
   onWalk,
@@ -161,6 +156,32 @@ export default function DirectionButtons({
 }: DirectionButtonsProps) {
   // Toggle state for the step list — collapsed by default.
   const [stepsExpanded, setStepsExpanded] = useState(false);
+
+  // FIX 2: Reset stepsExpanded to collapsed when the venue changes.
+  // WHY useRef to track the previous id: we want to reset only on a real change,
+  // not on every render. A direct dep on venue.id in the effect captures the right
+  // moment — a new venue always means the old route's steps are gone and the new
+  // one should start collapsed. Using a ref avoids reading stale closure state.
+  //
+  // NOTE: this effect also fires when walkSteps changes identity (new route same
+  // venue) if we depended on walkSteps, but venue.id is sufficient — it covers
+  // the cross-venue case (the primary bug) without over-firing on re-fetches for
+  // the same venue (e.g. locale change triggering a re-fetch, FIX 5 path).
+  const prevVenueIdRef = useRef<string>(venue.id);
+  useEffect(() => {
+    if (prevVenueIdRef.current !== venue.id) {
+      prevVenueIdRef.current = venue.id;
+      setStepsExpanded(false);
+    }
+  }, [venue.id]);
+
+  // FIX 6: Per-instance id for the step list <ol>.
+  // WHY useId (not a module constant): React's useId() generates a unique id per
+  // component instance, which is robust if two DirectionButtons ever mount
+  // simultaneously (e.g. future side-by-side compare view). The module constant
+  // "walk-steps-list" was shared across all instances — fragile.
+  // data-testid="walk-steps-list" is unchanged — tests query by testid, not id.
+  const stepsListId = useId();
 
   const busUrl = googleMapsUrl(venue.lat, venue.lng, "transit");
   const driveUrl = googleMapsUrl(venue.lat, venue.lng, "driving");
@@ -251,7 +272,7 @@ export default function DirectionButtons({
             type="button"
             data-testid="walk-steps-toggle"
             aria-expanded={stepsExpanded}
-            aria-controls={STEPS_LIST_ID}
+            aria-controls={stepsListId}
             onClick={() => setStepsExpanded((v) => !v)}
             className={
               "text-sm font-medium text-[var(--color-sage-600)] " +
@@ -265,13 +286,26 @@ export default function DirectionButtons({
           </button>
 
           {/* WHY hidden attribute over CSS display:none: screen readers skip hidden elements.
-              The list must not be announced when collapsed. */}
+              The list must not be announced when collapsed.
+              FIX 4: max-h-48 + overflow-y-auto so a long step list scrolls internally and
+              keeps the Walk button + route readout visible on mobile without pushing them
+              below the viewport fold. The BottomSheet body already scrolls (overflow-y-auto),
+              so this inner scroll is intentionally nested — it caps the list specifically.
+              KNOWN LIMITATION (FIX 5 deferred): Mapbox-sourced turn instructions do not
+              refresh when the user toggles EN/ES while a route is active. The t()-localized
+              toggle label and distance readout update immediately, but instruction text stays
+              in the language active at fetch time until the user re-taps Walk. Fixing this
+              requires a locale-change effect in MapWrapper that re-fetches the active route
+              with the new language= param. Deferred because: (a) it adds an async fetch
+              effect triggered by locale change — a new async path that needs race-guarding
+              itself; (b) the most common user path is to set language once before tapping
+              Walk. The current behavior is a minor UX limitation, not a breakage. */}
           <ol
-            id={STEPS_LIST_ID}
+            id={stepsListId}
             data-testid="walk-steps-list"
             aria-label={t("directions.stepsListLabel", locale)}
             hidden={!stepsExpanded}
-            className="mt-2 space-y-1.5 text-sm text-[var(--color-ink-700)]"
+            className="mt-2 space-y-1.5 text-sm text-[var(--color-ink-700)] max-h-48 overflow-y-auto"
           >
             {walkSteps!.map((step, i) => {
               const distText = formatStepDistance(step.distance, locale);

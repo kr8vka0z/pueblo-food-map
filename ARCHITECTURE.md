@@ -135,6 +135,10 @@ Key state atoms and their roles:
 | `walkingRouteInfo` | `WalkingRouteInfo \| null` | Distance + time text for the route info pill overlay |
 | `walkingRouteSteps` | `WalkStep[] \| null` | Turn-by-turn steps from Mapbox (pre-localized via `language=` param); threaded to DirectionButtons for the collapsible step list |
 | `walkingRouteVenueId` | `string \| null` | Which venue the current route targets; used to auto-clear when selection changes |
+| `latestWalkRequestRef` | `ref<string>` | Stale-route race guard: stores the venue id of the most recent in-flight walk fetch. On resolution, if the ref no longer matches the fetched id, state is not committed — prevents a slow A→B sequence from drawing A's route line while B is selected |
+
+**Walking route step parsing:**
+`parseWalkSteps(route)` is an exported pure function in `MapWrapper.tsx`. It converts the raw Mapbox Directions API legs/steps array to `WalkStep[]`, with defensive optional-chaining on `maneuver?.instruction` so a malformed step is dropped (not thrown). Exported for unit testing without mounting MapWrapper (mirrors `buildWalkingRouteUrl` pattern).
 
 **Filtering pipeline** (computed in `useMemo`, run on every state change):
 

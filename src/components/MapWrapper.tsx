@@ -204,6 +204,47 @@ export function buildWalkingRouteUrl(
   ].join("/");
 }
 
+// ─── Walking step parser (pure, exported for unit tests) ─────────────────────
+
+/**
+ * Parse turn-by-turn steps from a Mapbox Directions API route object.
+ *
+ * Exported as a pure function so tests can exercise the parse logic without
+ * mounting MapWrapper (same pattern as buildWalkingRouteUrl). This mirrors the
+ * existing exported-pure-function convention in this module.
+ *
+ * WHY defensive access (s.maneuver?.instruction): the Mapbox API response is
+ * consumed via an `as` cast — there is no runtime guarantee that every step
+ * has `maneuver` or `instruction`. A missing field would throw inside a
+ * `.map()` and be caught by the surrounding try/catch, silently discarding
+ * the ENTIRE route (line + info + steps). Defensive access + empty-string
+ * filter lets valid steps through while dropping malformed ones.
+ *
+ * WHY filter distance === 0 separately: the arrival step always has distance 0
+ * and an empty or trivial instruction. It is kept here (dropped in formatting
+ * via formatStepDistance) rather than filtered at parse time so callers that
+ * want to show the arrival step can still do so.
+ */
+export function parseWalkSteps(
+  route: {
+    legs?: Array<{
+      steps?: Array<{
+        maneuver?: { instruction?: string };
+        distance: number;
+      }>;
+    }>;
+  },
+): WalkStep[] {
+  const rawSteps = route.legs?.[0]?.steps ?? [];
+  return rawSteps.flatMap((s) => {
+    const instruction = s.maneuver?.instruction ?? "";
+    // Drop steps whose instruction is missing or empty — they are malformed
+    // API responses that would render as blank list items.
+    if (!instruction) return [];
+    return [{ instruction, distance: s.distance }];
+  });
+}
+
 // ─── MapWrapper ───────────────────────────────────────────────────────────────
 
 interface MapWrapperProps {
@@ -310,6 +351,19 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const [walkingRouteSteps, setWalkingRouteSteps] = useState<WalkStep[] | null>(null);
   const [walkingRouteVenueId, setWalkingRouteVenueId] = useState<string | null>(null);
 
+  // ── Stale-route race guard (FIX 1) ──────────────────────────────────────────
+  // handleWalkRoute is async. If the user taps Walk on venue A then selects
+  // venue B before A's fetch resolves, A's resolution must NOT commit state —
+  // doing so would draw A's route line on the map while B is selected.
+  //
+  // WHY a ref (not state): the guard is inspected inside an async closure. A
+  // state variable would capture a stale value at the time the fetch was
+  // initiated. A ref always reflects the latest value when read.
+  //
+  // Cleared to "" on toggle-off and route-clear so a resolved fetch that arrives
+  // after a manual clear is also discarded.
+  const latestWalkRequestRef = useRef<string>("");
+
   // Clear walking route when selected venue changes to a different venue or is deselected.
   // WHY: if the user taps a new pin or deselects, the old route is stale and visually
   // disconnected — clearing it avoids a confusing "whose route is this?" state.
@@ -318,6 +372,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   useEffect(() => {
     if (selectedVenueId !== walkingRouteVenueId) {
       queueMicrotask(() => {
+        latestWalkRequestRef.current = ""; // invalidate any in-flight fetch
         setWalkingRoute(null);
         setWalkingRouteInfo(null);
         setWalkingRouteSteps(null);
@@ -331,12 +386,19 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const handleWalkRoute = useCallback(async (venue: import("@/types/venue").Venue) => {
     // If user re-taps Walk on the already-active route, clear it (toggle off).
     if (walkingRouteVenueId === venue.id) {
+      latestWalkRequestRef.current = ""; // invalidate any in-flight fetch
       setWalkingRoute(null);
       setWalkingRouteInfo(null);
       setWalkingRouteSteps(null);
       setWalkingRouteVenueId(null);
       return;
     }
+
+    // Stamp this request as the latest. Any earlier in-flight fetch that resolves
+    // after this point will compare its requestedId to latestWalkRequestRef.current
+    // and bail if they don't match — preventing stale route data from being written.
+    const requestedId = venue.id;
+    latestWalkRequestRef.current = requestedId;
 
     // WHY userLocation as origin: the Directions API requires a from-coordinate.
     // If user has not shared location, fall back to Pueblo center so the route
@@ -373,12 +435,16 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           duration: number;  // seconds
           legs?: Array<{
             steps?: Array<{
-              maneuver: { instruction: string };
+              maneuver?: { instruction?: string };
               distance: number; // meters
             }>;
           }>;
         }>;
       };
+
+      // Stale-route guard: bail if the user has selected a different venue
+      // (or cleared the route) since this fetch was initiated.
+      if (latestWalkRequestRef.current !== requestedId) return;
 
       const route = data.routes?.[0];
       if (!route) return;
@@ -387,11 +453,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       const miles = (route.distance / 1609.34).toFixed(1);
       const minutes = Math.round(route.duration / 60);
 
-      // Parse turn-by-turn steps from the first leg (walking routes have one leg).
-      const steps: WalkStep[] = (route.legs?.[0]?.steps ?? []).map((s) => ({
-        instruction: s.maneuver.instruction,
-        distance: s.distance,
-      }));
+      // Parse turn-by-turn steps via the extracted pure function (FIX 3).
+      const steps = parseWalkSteps(route);
 
       setWalkingRoute({
         type: "Feature",
@@ -412,6 +475,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   /** Clear the walking route (e.g. when Walk button is tapped while route is active). */
   const handleClearWalkingRoute = useCallback(() => {
+    latestWalkRequestRef.current = ""; // invalidate any in-flight fetch
     setWalkingRoute(null);
     setWalkingRouteInfo(null);
     setWalkingRouteSteps(null);

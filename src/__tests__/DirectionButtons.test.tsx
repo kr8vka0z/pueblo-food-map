@@ -19,7 +19,7 @@
  */
 
 import { describe, test, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DirectionButtons from "@/components/DirectionButtons";
 import type { Venue } from "@/types/venue";
@@ -684,5 +684,107 @@ describe("DirectionButtons — in-card route readout (#134 FIX 1+2)", () => {
     expect(screen.getByTestId("walking-route-distance").textContent).toBe("0.4 mi caminando");
     // ES: "{duration}" → "8 min" (pure passthrough — allowlisted as identical EN/ES)
     expect(screen.getByTestId("walking-route-duration").textContent).toBe("8 min");
+  });
+});
+
+// ─── stepsExpanded resets on venue change (FIX 2) ────────────────────────────
+//
+// DirectionButtons is NOT remounted between venue selections. Once stepsExpanded
+// is true it must reset to false when the venue prop changes — otherwise every
+// subsequent venue's step list renders already expanded, violating "collapsed by
+// default."
+
+describe("DirectionButtons — stepsExpanded resets on venue change (FIX 2)", () => {
+  const STEPS = [
+    { instruction: "Head north on Main St", distance: 50 },
+    { instruction: "Arrive at destination", distance: 0 },
+  ];
+
+  test("step list is initially collapsed", () => {
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue({ id: "venue-a", name: "Venue A" })}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.3 mi", duration: "6 min" }}
+        walkSteps={STEPS}
+      />,
+    );
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  test("expanding on venue A then switching to venue B resets to collapsed", async () => {
+    const user = userEvent.setup();
+    const { container, rerender } = render(
+      <DirectionButtons
+        venue={makeVenue({ id: "venue-a", name: "Venue A" })}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.3 mi", duration: "6 min" }}
+        walkSteps={STEPS}
+      />,
+    );
+
+    // Expand on venue A
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+    // Switch to venue B (simulate parent re-render with a different venue prop)
+    act(() => {
+      rerender(
+        <DirectionButtons
+          venue={makeVenue({ id: "venue-b", name: "Venue B" })}
+          onWalk={vi.fn()}
+          locale="en"
+          isRouteActive={true}
+          routeInfo={{ distance: "0.8 mi", duration: "15 min" }}
+          walkSteps={STEPS}
+        />,
+      );
+    });
+
+    // Toggle should be collapsed again on venue B
+    const toggleAfter = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    expect(toggleAfter.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  test("same venue re-render does NOT reset stepsExpanded", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue({ id: "venue-a", name: "Venue A" });
+    const { container, rerender } = render(
+      <DirectionButtons
+        venue={venue}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.3 mi", duration: "6 min" }}
+        walkSteps={STEPS}
+      />,
+    );
+
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+    // Re-render with same venue (e.g. routeInfo update)
+    act(() => {
+      rerender(
+        <DirectionButtons
+          venue={venue}
+          onWalk={vi.fn()}
+          locale="en"
+          isRouteActive={true}
+          routeInfo={{ distance: "0.3 mi", duration: "6 min" }}
+          walkSteps={STEPS}
+        />,
+      );
+    });
+
+    // Expanded state should persist
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
   });
 });

@@ -26,7 +26,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { WalkingRouteGeoJSON, WalkingRouteInfo } from "@/components/Map";
+import type { WalkingRouteGeoJSON, WalkingRouteInfo, WalkStep } from "@/components/Map";
 import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
@@ -182,6 +182,28 @@ function useIsMobile(): boolean {
   return isMobile;
 }
 
+// ─── Walking route URL builder (pure, exported for unit tests) ───────────────
+
+/**
+ * Build the Mapbox Directions API URL for a walking route.
+ * Exported so tests can assert on URL params (steps=true, language=) without
+ * needing to mount MapWrapper (which requires WebGL / Mapbox GL).
+ */
+export function buildWalkingRouteUrl(
+  originLng: number,
+  originLat: number,
+  destLng: number,
+  destLat: number,
+  token: string,
+  locale: string,
+): string {
+  return [
+    "https://api.mapbox.com/directions/v5/mapbox/walking",
+    `${originLng},${originLat};${destLng},${destLat}`,
+    `?geometries=geojson&overview=full&steps=true&language=${locale}&access_token=${token}`,
+  ].join("/");
+}
+
 // ─── MapWrapper ───────────────────────────────────────────────────────────────
 
 interface MapWrapperProps {
@@ -274,6 +296,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // ── Walking route (#134) ──────────────────────────────────────────────────────
   // walkingRoute: the fetched GeoJSON for the current walking route, or null.
   // walkingRouteInfo: human-readable distance + duration text for the overlay.
+  // walkingRouteSteps: turn-by-turn steps from Mapbox (pre-localized via language= param).
   // walkingRouteVenueId: which venue the current route targets — used to clear
   //   the route when selection changes to a different venue (or is cleared).
   //
@@ -284,6 +307,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // component). Map.tsx just receives walkingRoute + walkingRouteInfo as props.
   const [walkingRoute, setWalkingRoute] = useState<WalkingRouteGeoJSON | null>(null);
   const [walkingRouteInfo, setWalkingRouteInfo] = useState<WalkingRouteInfo | null>(null);
+  const [walkingRouteSteps, setWalkingRouteSteps] = useState<WalkStep[] | null>(null);
   const [walkingRouteVenueId, setWalkingRouteVenueId] = useState<string | null>(null);
 
   // Clear walking route when selected venue changes to a different venue or is deselected.
@@ -296,6 +320,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       queueMicrotask(() => {
         setWalkingRoute(null);
         setWalkingRouteInfo(null);
+        setWalkingRouteSteps(null);
         setWalkingRouteVenueId(null);
       });
     }
@@ -308,6 +333,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     if (walkingRouteVenueId === venue.id) {
       setWalkingRoute(null);
       setWalkingRouteInfo(null);
+      setWalkingRouteSteps(null);
       setWalkingRouteVenueId(null);
       return;
     }
@@ -324,11 +350,15 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       return;
     }
 
-    const url = [
-      "https://api.mapbox.com/directions/v5/mapbox/walking",
-      `${origin.lng},${origin.lat};${venue.lng},${venue.lat}`,
-      `?geometries=geojson&overview=full&access_token=${token}`,
-    ].join("/");
+    // WHY steps=true: enables turn-by-turn instruction text in the response.
+    // WHY language=${locale}: Mapbox returns pre-localized instruction strings,
+    // so Spanish users get Spanish turn instructions without client-side translation.
+    const url = buildWalkingRouteUrl(
+      origin.lng, origin.lat,
+      venue.lng, venue.lat,
+      token,
+      locale,
+    );
 
     try {
       const res = await fetch(url);
@@ -341,6 +371,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           geometry: { type: "LineString"; coordinates: number[][] };
           distance: number;  // meters
           duration: number;  // seconds
+          legs?: Array<{
+            steps?: Array<{
+              maneuver: { instruction: string };
+              distance: number; // meters
+            }>;
+          }>;
         }>;
       };
 
@@ -351,6 +387,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       const miles = (route.distance / 1609.34).toFixed(1);
       const minutes = Math.round(route.duration / 60);
 
+      // Parse turn-by-turn steps from the first leg (walking routes have one leg).
+      const steps: WalkStep[] = (route.legs?.[0]?.steps ?? []).map((s) => ({
+        instruction: s.maneuver.instruction,
+        distance: s.distance,
+      }));
+
       setWalkingRoute({
         type: "Feature",
         properties: {},
@@ -360,17 +402,19 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         distance: `${miles} mi`,
         duration: `${minutes} min`,
       });
+      setWalkingRouteSteps(steps.length > 0 ? steps : null);
       setWalkingRouteVenueId(venue.id);
     } catch (err) {
       // Network failure — fail silently. The user can still use the Bus/Drive deeplinks.
       console.warn("[MapWrapper] Directions fetch failed:", err);
     }
-  }, [userLocation, walkingRouteVenueId]);
+  }, [locale, userLocation, walkingRouteVenueId]);
 
   /** Clear the walking route (e.g. when Walk button is tapped while route is active). */
   const handleClearWalkingRoute = useCallback(() => {
     setWalkingRoute(null);
     setWalkingRouteInfo(null);
+    setWalkingRouteSteps(null);
     setWalkingRouteVenueId(null);
   }, []);
 
@@ -957,6 +1001,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
               ? walkingRouteInfo
               : null
           }
+          walkRouteSteps={
+            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+              ? walkingRouteSteps
+              : null
+          }
         />
       )}
 
@@ -981,6 +1030,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           walkRouteInfo={
             selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
               ? walkingRouteInfo
+              : null
+          }
+          walkRouteSteps={
+            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+              ? walkingRouteSteps
               : null
           }
         />

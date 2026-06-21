@@ -358,6 +358,17 @@ const en: Record<string, string> = {
   "directions.routeDistance": "{distance} walk",
   "directions.routeDuration": "{duration}",
   "directions.clearRoute": "Clear walking route",
+  // Turn-by-turn step list (#134 enhancement)
+  "directions.showSteps": "Show steps",
+  "directions.hideSteps": "Hide steps",
+  "directions.stepsListLabel": "Turn-by-turn directions",
+  // Per-step distance suffixes — used when formatting short distances in the step list.
+  // "ft" for sub-528 ft steps (sub-0.1 mi), otherwise the decimal miles value.
+  "directions.stepFt": "{distance} ft",
+  "directions.stepMi": "{distance} mi",
+  // Google Maps walk handoff (#134 enhancement)
+  "directions.openInGoogleMaps": "Open in Google Maps",
+  "directions.openInGoogleMapsAria": "Open walking directions to {name} in Google Maps (opens in new tab)",
 
   // About page (#155) — DRAFT copy pending final text from Kyle / Pueblo Food Project
   "about.heading": "About Pueblo Food Map",
@@ -738,6 +749,16 @@ const es: Record<string, string> = {
   "directions.routeDistance": "{distance} caminando",
   "directions.routeDuration": "{duration}",
   "directions.clearRoute": "Eliminar ruta a pie",
+  // Turn-by-turn step list (#134 enhancement)
+  "directions.showSteps": "Ver indicaciones",
+  "directions.hideSteps": "Ocultar indicaciones",
+  "directions.stepsListLabel": "Indicaciones paso a paso",
+  // Per-step distance suffixes
+  "directions.stepFt": "{distance} pies",
+  "directions.stepMi": "{distance} mi",
+  // Google Maps walk handoff (#134 enhancement)
+  "directions.openInGoogleMaps": "Abrir en Google Maps",
+  "directions.openInGoogleMapsAria": "Abrir indicaciones a pie a {name} en Google Maps (se abre en una pestaña nueva)",
 
   // About page (#155) — BORRADOR de texto pendiente aprobación de Kyle / Pueblo Food Project
   "about.heading": "Acerca de Pueblo Food Map",

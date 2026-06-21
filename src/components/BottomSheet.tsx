@@ -31,7 +31,7 @@ import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import HoursList from "@/components/HoursList";
-import DirectionButtons, { type RouteInfo } from "@/components/DirectionButtons";
+import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -50,6 +50,8 @@ interface BottomSheetProps {
   onClearWalkRoute?: () => void;
   /** Walking route distance + duration for the in-card readout (threaded from MapWrapper). */
   walkRouteInfo?: RouteInfo | null;
+  /** Turn-by-turn steps from Mapbox (pre-localized). Shown as a collapsible list in DirectionButtons. */
+  walkRouteSteps?: WalkStep[] | null;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
@@ -63,6 +65,7 @@ export default function BottomSheet({
   isWalkRouteActive = false,
   onClearWalkRoute,
   walkRouteInfo,
+  walkRouteSteps,
 }: BottomSheetProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -197,7 +200,8 @@ export default function BottomSheet({
                 )}
 
                 {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
-                    routeInfo threads distance+duration down for the in-card readout. */}
+                    routeInfo threads distance+duration down for the in-card readout.
+                    walkSteps provides the collapsible turn-by-turn list. */}
                 <DirectionButtons
                   venue={venue}
                   onWalk={onWalkRoute ?? (() => {})}
@@ -205,6 +209,7 @@ export default function BottomSheet({
                   isRouteActive={isWalkRouteActive}
                   onClearRoute={onClearWalkRoute}
                   routeInfo={isWalkRouteActive ? walkRouteInfo : null}
+                  walkSteps={isWalkRouteActive ? walkRouteSteps : null}
                 />
 
                 {/* Show/Hide details toggle */}

@@ -41,7 +41,7 @@ Next.js App Router (Cloudflare Worker, SSR)
   └── src/app/suggest/page.tsx + submit/route.ts
   └── src/app/feedback/page.tsx + submit/route.ts
 
-  └── DirectionButtons.tsx  (Walk / Bus / Drive buttons; Walk triggers in-app route, Bus/Drive open Google Maps)
+  └── DirectionButtons.tsx  (Walk / Bus / Drive buttons; Walk triggers in-app route + collapsible turn-by-turn step list + "Open in Google Maps" walk handoff; Bus/Drive open Google Maps)
 
 Data layer (static TS modules, no API calls at render time)
   └── src/data/venues.ts          (aggregator — see "Data aggregator" below)
@@ -133,6 +133,7 @@ Key state atoms and their roles:
 | `mapboxMap` | `mapboxgl.Map \| null` | Map instance; received via `onMapReady` callback from Map.tsx |
 | `walkingRoute` | `WalkingRouteGeoJSON \| null` | Active walking route GeoJSON (Mapbox Directions API) — passed to Map.tsx as a prop |
 | `walkingRouteInfo` | `WalkingRouteInfo \| null` | Distance + time text for the route info pill overlay |
+| `walkingRouteSteps` | `WalkStep[] \| null` | Turn-by-turn steps from Mapbox (pre-localized via `language=` param); threaded to DirectionButtons for the collapsible step list |
 | `walkingRouteVenueId` | `string \| null` | Which venue the current route targets; used to auto-clear when selection changes |
 
 **Filtering pipeline** (computed in `useMemo`, run on every state change):

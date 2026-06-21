@@ -14,11 +14,13 @@
  *   2. Walking route source is NOT rendered when walkingRoute is null.
  *   3. Walking route source IS rendered when walkingRoute GeoJSON is provided.
  *   4. Map renders correctly with all props including walking route.
+ *   5. buildWalkingRouteUrl includes steps=true and language= params (#134 enhancement).
  */
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
 import MapComponent from "@/components/Map";
+import { buildWalkingRouteUrl } from "@/components/MapWrapper";
 import type { Venue } from "@/types/venue";
 
 // ─── Reuse the Map.test.tsx mock strategy ─────────────────────────────────────
@@ -153,5 +155,55 @@ describe("Map — walking route layer (#134)", () => {
       />,
     );
     expect(container.querySelector("[data-testid='walking-route-info']")).toBeNull();
+  });
+});
+
+// ─── buildWalkingRouteUrl — URL param contract (#134 enhancement) ─────────────
+//
+// These tests assert on the URL params added for turn-by-turn (#134 enhancement)
+// without mounting MapWrapper (which requires WebGL / Mapbox GL in jsdom).
+
+describe("buildWalkingRouteUrl — URL params (#134 enhancement)", () => {
+  const ORIGIN_LNG = -104.6091;
+  const ORIGIN_LAT = 38.2544;
+  const DEST_LNG = -104.6080;
+  const DEST_LAT = 38.2555;
+  const TOKEN = "pk.test_token";
+
+  test("URL includes steps=true", () => {
+    const url = buildWalkingRouteUrl(ORIGIN_LNG, ORIGIN_LAT, DEST_LNG, DEST_LAT, TOKEN, "en");
+    expect(url).toContain("steps=true");
+  });
+
+  test("URL includes language= param (en)", () => {
+    const url = buildWalkingRouteUrl(ORIGIN_LNG, ORIGIN_LAT, DEST_LNG, DEST_LAT, TOKEN, "en");
+    expect(url).toContain("language=en");
+  });
+
+  test("URL includes language= param (es)", () => {
+    const url = buildWalkingRouteUrl(ORIGIN_LNG, ORIGIN_LAT, DEST_LNG, DEST_LAT, TOKEN, "es");
+    expect(url).toContain("language=es");
+  });
+
+  test("URL includes geometries=geojson and overview=full", () => {
+    const url = buildWalkingRouteUrl(ORIGIN_LNG, ORIGIN_LAT, DEST_LNG, DEST_LAT, TOKEN, "en");
+    expect(url).toContain("geometries=geojson");
+    expect(url).toContain("overview=full");
+  });
+
+  test("URL includes origin and destination coordinates", () => {
+    const url = buildWalkingRouteUrl(ORIGIN_LNG, ORIGIN_LAT, DEST_LNG, DEST_LAT, TOKEN, "en");
+    expect(url).toContain(`${ORIGIN_LNG},${ORIGIN_LAT}`);
+    expect(url).toContain(`${DEST_LNG},${DEST_LAT}`);
+  });
+
+  test("URL includes access_token", () => {
+    const url = buildWalkingRouteUrl(ORIGIN_LNG, ORIGIN_LAT, DEST_LNG, DEST_LAT, TOKEN, "en");
+    expect(url).toContain(`access_token=${TOKEN}`);
+  });
+
+  test("URL targets Mapbox walking profile", () => {
+    const url = buildWalkingRouteUrl(ORIGIN_LNG, ORIGIN_LAT, DEST_LNG, DEST_LAT, TOKEN, "en");
+    expect(url).toContain("mapbox/walking");
   });
 });

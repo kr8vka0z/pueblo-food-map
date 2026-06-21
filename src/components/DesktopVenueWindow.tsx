@@ -59,6 +59,7 @@ import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 import VenuePopupHeader from "@/components/VenuePopupHeader";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import HoursList from "@/components/HoursList";
@@ -154,8 +155,10 @@ export default function DesktopVenueWindow({
   onExpand,
   onCollapse,
   onClose,
-  locale = "en",
+  locale: localeProp,
 }: DesktopVenueWindowProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   const windowRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<WindowPosition>({ left: 0, top: 0 });
 
@@ -393,7 +396,6 @@ export default function DesktopVenueWindow({
           </h3>
           <HoursList
             hours_weekly={venue.hours_weekly}
-            locale={locale}
             compact={true}
           />
         </section>

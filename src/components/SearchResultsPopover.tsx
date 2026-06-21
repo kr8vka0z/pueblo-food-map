@@ -24,6 +24,7 @@
 
 import { useRef, useEffect } from "react";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 import type { Venue, VenueCategory } from "@/types/venue";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -71,8 +72,10 @@ export default function SearchResultsPopover({
   listboxId,
   onSelect,
   onClose,
-  locale = "en",
+  locale: localeProp,
 }: SearchResultsPopoverProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   const listRef = useRef<HTMLUListElement>(null);
 
   // Scroll active item into view when activeIndex changes via keyboard.

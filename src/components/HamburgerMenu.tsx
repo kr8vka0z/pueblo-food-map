@@ -27,6 +27,7 @@ import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import ViewToggle, { type ViewMode } from "./ViewToggle";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
@@ -52,7 +53,9 @@ interface HamburgerMenuProps {
 const FOCUSABLE =
   'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export default function HamburgerMenu({ locale = "en", onShowWelcome, savedVenues = [], onSelectVenue, viewMode, onViewModeChange }: HamburgerMenuProps) {
+export default function HamburgerMenu({ locale: localeProp, onShowWelcome, savedVenues = [], onSelectVenue, viewMode, onViewModeChange }: HamburgerMenuProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   const [open, setOpen] = useState(false);
 
   const triggerRef = useRef<HTMLButtonElement>(null);

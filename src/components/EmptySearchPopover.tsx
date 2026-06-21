@@ -21,20 +21,23 @@
 import { CATEGORY_OPTIONS } from "@/lib/searchVenues";
 import { categoryColors } from "@/data/venues";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 
 interface EmptySearchPopoverProps {
   query: string;
   /** Called when a chip is clicked. Receives the locale-aware readable category label. */
   onSelectCategory: (label: string) => void;
-  /** Locale for i18n. Defaults to "en". */
+  /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
 }
 
 export default function EmptySearchPopover({
   query,
   onSelectCategory,
-  locale = "en",
+  locale: localeProp,
 }: EmptySearchPopoverProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   return (
     <div
       role="status"

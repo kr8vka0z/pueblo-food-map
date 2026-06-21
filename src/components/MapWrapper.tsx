@@ -642,7 +642,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           onSelect={handleSelectFromList}
           onClearFilters={handleClearAllFilters}
           showClearFilters={anyFilterActive || query.trim() !== ""}
-          locale={locale}
           notice={
             mapUnavailable ? (
               <div
@@ -669,7 +668,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         className="absolute top-4 left-4 flex items-center gap-2"
         style={{ zIndex: 1000 }}
       >
-        <Wordmark onClick={handleWordmarkReset} locale={locale} size="sm" selfPositioned={false} />
+        <Wordmark onClick={handleWordmarkReset} size="sm" selfPositioned={false} />
       </div>
 
       {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67)
@@ -719,7 +718,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             setIsPopoverOpen(false);
             setActiveIndex(-1);
           }}
-          locale={locale}
         />
       )}
 
@@ -735,7 +733,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             setIsPopoverOpen(false);
           }}
           onMouseDown={handleCategoryDropdownMouseDown}
-          locale={locale}
           openNowActive={filterOpenNow}
           openNowCount={openNowCount}
           onToggleOpenNow={() => setFilterOpenNow((v) => !v)}
@@ -757,7 +754,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         <EmptySearchPopover
           query={query.trim()}
           onSelectCategory={(label) => setQuery(label)}
-          locale={locale}
         />
       )}
 
@@ -765,7 +761,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           When mapUnavailable, intercept onViewModeChange so selecting "map"
           is a no-op — prevents the user from landing on a blank screen. */}
       <HamburgerMenu
-        locale={locale}
         onShowWelcome={onShowWelcome}
         savedVenues={savedVenues}
         onSelectVenue={handleSelectSavedVenue}
@@ -787,7 +782,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           onRequest={handleLocateRequest}
           sheetVisible={isMobile}
           sheetFullyExpanded={isMobile && sheetFullyExpanded}
-          locale={locale}
         />
       )}
 
@@ -833,13 +827,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             handleLocateRequest();
           }}
           onDismiss={() => setBannerVisible(false)}
-          locale={locale}
         />
       )}
 
       {/* SponsorCredit — bottom-right, hidden when BottomSheet is fully expanded (#69). Map mode only (#129). */}
       {viewMode === "map" && (
-        <SponsorCredit hidden={isMobile && sheetFullyExpanded} locale={locale} />
+        <SponsorCredit hidden={isMobile && sheetFullyExpanded} />
       )}
 
       {/* BottomSheet — mobile only (vaul v2, venue-centric API). Map mode only (#129). */}
@@ -852,7 +845,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             setSheetFullyExpanded(false);
           }}
           onExpandedChange={setSheetFullyExpanded}
-          locale={locale}
         />
       )}
 
@@ -869,7 +861,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             setSelectedVenueId(null);
             setWindowExpanded(false);
           }}
-          locale={locale}
         />
       )}
     </div>

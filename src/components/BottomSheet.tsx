@@ -25,6 +25,7 @@ import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 import { safeUrl } from "@/lib/safeUrl";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
@@ -38,13 +39,15 @@ interface BottomSheetProps {
   onClose: () => void;
   /** Called when expanded state changes — e.g. to hide overlapping UI when expanded. */
   onExpandedChange?: (expanded: boolean) => void;
-  /** Locale forwarded from MapWrapper. Defaults to "en". */
+  /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
 
-export default function BottomSheet({ venue, onClose, onExpandedChange, locale = "en" }: BottomSheetProps) {
+export default function BottomSheet({ venue, onClose, onExpandedChange, locale: localeProp }: BottomSheetProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   const [expanded, setExpanded] = useState(false);
 
   const open = venue !== null;
@@ -272,7 +275,6 @@ export default function BottomSheet({ venue, onClose, onExpandedChange, locale =
                           </h3>
                           <HoursList
                             hours_weekly={venue.hours_weekly}
-                            locale={locale}
                             compact={false}
                           />
                         </section>

@@ -13,11 +13,13 @@
 
 import { todayKey, DISPLAY_DAY_KEYS, formatSlot } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 import type { WeeklyHours } from "@/types/venue";
 
 interface HoursListProps {
   hours_weekly: WeeklyHours;
-  locale: Locale;
+  /** Override locale for testing. If omitted, reads from LocaleContext. */
+  locale?: Locale;
   /**
    * compact=true → text-xs (DesktopVenueWindow)
    * compact=false → text-sm (BottomSheet)
@@ -25,7 +27,9 @@ interface HoursListProps {
   compact?: boolean;
 }
 
-export default function HoursList({ hours_weekly, locale, compact = false }: HoursListProps) {
+export default function HoursList({ hours_weekly, locale: localeProp, compact = false }: HoursListProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   const today = todayKey();
   const textSize = compact ? "text-xs" : "text-sm";
 

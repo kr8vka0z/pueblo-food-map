@@ -290,7 +290,7 @@ describe("useMapFilters — anyFilterActive", () => {
 describe("useMapFilters — nearest-first sort", () => {
   test("filteredVenues are sorted ascending by distanceMiles", () => {
     const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
-    const distances = result.current.filteredVenues.map((v) => v.distanceMiles);
+    const distances = result.current.filteredVenues.map((v) => (v as unknown as { distanceMiles: number }).distanceMiles);
     for (let i = 1; i < distances.length; i++) {
       expect(distances[i]!).toBeGreaterThanOrEqual(distances[i - 1]!);
     }
@@ -309,8 +309,8 @@ describe("useMapFilters — nearest-first sort", () => {
     const farOrigin = { lat: 40.0, lng: -105.0 }; // Boulder area
     const { result: r2 } = renderHook(() => useMapFilters(farOrigin));
     // Distances from Boulder should be larger on average than from Pueblo center
-    const avgPueblo = r1.current.filteredVenues.reduce((s, v) => s + v.distanceMiles, 0) / r1.current.filteredVenues.length;
-    const avgBoulder = r2.current.filteredVenues.reduce((s, v) => s + v.distanceMiles, 0) / r2.current.filteredVenues.length;
+    const avgPueblo = r1.current.filteredVenues.reduce((s, v) => s + (v as unknown as { distanceMiles: number }).distanceMiles, 0) / r1.current.filteredVenues.length;
+    const avgBoulder = r2.current.filteredVenues.reduce((s, v) => s + (v as unknown as { distanceMiles: number }).distanceMiles, 0) / r2.current.filteredVenues.length;
     expect(avgBoulder).toBeGreaterThan(avgPueblo);
   });
 });

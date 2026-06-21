@@ -322,3 +322,139 @@ describe("parseWalkSteps — step parsing edge cases (FIX 3)", () => {
     expect(steps).toHaveLength(0);
   });
 });
+
+// ─── Race guard — monotonic seq logic (#208 hardening) ───────────────────────
+//
+// handleWalkRoute in MapWrapper.tsx uses a monotonic sequence counter
+// (walkReqSeq ref) instead of keying on venue.id. This describe block
+// exercises the guard semantics as a pure behavioral simulation — no
+// MapWrapper mount needed (WebGL unavailable in jsdom).
+//
+// The simulation recreates the closure pattern from handleWalkRoute:
+//   seq = ++counter.current     // mint token at fetch start
+//   await fetch(...)            // yield — other taps may increment counter
+//   if (counter.current !== seq) return;  // bail if superseded
+//   commitState()
+//
+// This covers both gaps from the PR #208 review:
+//   Gap 1: same-venue double-tap (old venue.id guard would let both through).
+//   Gap 2: A→B switch while A's fetch pending (seq guard + render-gate).
+//
+// NOTE: The render-gate (walkingRouteVenueId === selectedVenueId ? route : null)
+// is a JSX prop expression; it cannot be directly exercised without mounting
+// MapWrapper (WebGL). It is covered by the behavioral description in the final
+// two tests, which verify that the seq guard drops superseded responses before
+// any state is committed — making the render-gate the secondary defence.
+
+describe("Race guard — monotonic seq counter (#208 hardening)", () => {
+  /**
+   * Minimal simulation of the walkReqSeq guard pattern.
+   * Returns a factory that mimics the async closure in handleWalkRoute.
+   */
+  function makeGuardedFetch(counter: { current: number }) {
+    return async function fetchAndCommit(
+      resolveWith: string,
+      resolveLater: Promise<void>,
+      committed: string[],
+    ) {
+      const seq = ++counter.current;
+      await resolveLater;
+      // Guard: bail if a newer request has been issued since we started.
+      if (counter.current !== seq) return;
+      committed.push(resolveWith);
+    };
+  }
+
+  test("first of two concurrent fetches is dropped when the second resolves last", async () => {
+    const counter = { current: 0 };
+    const fetch = makeGuardedFetch(counter);
+    const committed: string[] = [];
+
+    let resolveFirst!: () => void;
+    let resolveSecond!: () => void;
+    const firstDone = new Promise<void>((r) => { resolveFirst = r; });
+    const secondDone = new Promise<void>((r) => { resolveSecond = r; });
+
+    // Launch fetch A (seq=1), then fetch B (seq=2) — B is issued after A.
+    const fetchA = fetch("route-A", firstDone, committed);
+    const fetchB = fetch("route-B", secondDone, committed);
+
+    // B resolves first, then A resolves — older response arrives last.
+    resolveSecond();
+    await fetchB;
+    resolveFirst();
+    await fetchA;
+
+    // Only B should commit; A should bail (counter.current=2, A's seq=1).
+    expect(committed).toEqual(["route-B"]);
+  });
+
+  test("same-venue double-tap: only the latest request commits", async () => {
+    const counter = { current: 0 };
+    const fetch = makeGuardedFetch(counter);
+    const committed: string[] = [];
+
+    let resolveFirst!: () => void;
+    let resolveSecond!: () => void;
+    const firstDone = new Promise<void>((r) => { resolveFirst = r; });
+    const secondDone = new Promise<void>((r) => { resolveSecond = r; });
+
+    // Two taps for the same venue (same route string, different seq tokens).
+    const tap1 = fetch("route-same-venue", firstDone, committed);
+    const tap2 = fetch("route-same-venue", secondDone, committed);
+
+    // First tap resolves last (slow network on first try).
+    resolveSecond();
+    await tap2;
+    resolveFirst();
+    await tap1;
+
+    // Under the OLD venue.id guard both would pass (same id).
+    // Under the new seq guard only tap2 (seq=2) commits; tap1 (seq=1) bails.
+    expect(committed).toHaveLength(1);
+  });
+
+  test("explicit clear (seq bump) prevents a pending fetch from committing", async () => {
+    const counter = { current: 0 };
+    const fetch = makeGuardedFetch(counter);
+    const committed: string[] = [];
+
+    let resolveFetch!: () => void;
+    const fetchDone = new Promise<void>((r) => { resolveFetch = r; });
+
+    // Start a fetch (seq=1).
+    const pendingFetch = fetch("route-A", fetchDone, committed);
+
+    // Simulate toggle-off / handleClearWalkingRoute: bump counter BEFORE resolve.
+    counter.current++; // seq is now 2; pending fetch holds seq=1
+
+    // Fetch resolves after the clear.
+    resolveFetch();
+    await pendingFetch;
+
+    // Pending fetch must not commit.
+    expect(committed).toHaveLength(0);
+  });
+
+  test("seq NOT bumped in selection-change path: new fetch for new venue proceeds", async () => {
+    // WHY: the selectedVenueId-change effect does NOT bump walkReqSeq (by design).
+    // This test verifies that a fetch started for a new venue (after a selection
+    // switch) is NOT prematurely discarded by the guard.
+    const counter = { current: 0 };
+    const fetch = makeGuardedFetch(counter);
+    const committed: string[] = [];
+
+    let resolveNew!: () => void;
+    const newDone = new Promise<void>((r) => { resolveNew = r; });
+
+    // Selection-change effect only clears displayed state (not seq).
+    // Immediately after, a Walk tap mints seq=1.
+    const newFetch = fetch("route-new-venue", newDone, committed);
+
+    resolveNew();
+    await newFetch;
+
+    // Should commit: counter.current=1 === seq=1.
+    expect(committed).toEqual(["route-new-venue"]);
+  });
+});

@@ -351,28 +351,47 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const [walkingRouteSteps, setWalkingRouteSteps] = useState<WalkStep[] | null>(null);
   const [walkingRouteVenueId, setWalkingRouteVenueId] = useState<string | null>(null);
 
-  // ── Stale-route race guard (FIX 1) ──────────────────────────────────────────
+  // ── Stale-route race guard (FIX 1 — hardened) ───────────────────────────────
   // handleWalkRoute is async. If the user taps Walk on venue A then selects
   // venue B before A's fetch resolves, A's resolution must NOT commit state —
   // doing so would draw A's route line on the map while B is selected.
   //
-  // WHY a ref (not state): the guard is inspected inside an async closure. A
-  // state variable would capture a stale value at the time the fetch was
-  // initiated. A ref always reflects the latest value when read.
+  // WHY a monotonic sequence counter instead of keying on venue.id (original
+  // design): keying on venue.id lets two overlapping Walk taps for the SAME
+  // venue both pass the guard — the older, slower response can overwrite the
+  // newer one if userLocation changed between taps (last-resolve-wins instead
+  // of last-request-wins). A monotonic integer gives each fetch a unique token
+  // regardless of which venue it targets.
   //
-  // Cleared to "" on toggle-off and route-clear so a resolved fetch that arrives
-  // after a manual clear is also discarded.
-  const latestWalkRequestRef = useRef<string>("");
+  // WHY a ref (not state): the counter is read inside an async closure. State
+  // would capture a stale value at fetch launch; a ref always reflects the
+  // current value at resolution time.
+  //
+  // WHY the seq is bumped on toggle-off and clear (but NOT in the
+  // selectedVenueId-change effect): bumping on explicit user actions (toggle-off,
+  // handleClearWalkingRoute) ensures a pending fetch can never repopulate a
+  // route the user just cleared. We intentionally do NOT touch the seq in the
+  // selectedVenueId-change effect — not touching it lets a same-task
+  // select+walk-for-the-new-venue succeed. The render-gate below (gating
+  // walkingRoute on walkingRouteVenueId === selectedVenueId) is the real safety
+  // net for the selection-switch case.
+  const walkReqSeq = useRef(0);
 
   // Clear walking route when selected venue changes to a different venue or is deselected.
   // WHY: if the user taps a new pin or deselects, the old route is stale and visually
   // disconnected — clearing it avoids a confusing "whose route is this?" state.
   // queueMicrotask satisfies the react-hooks/set-state-in-effect rule: setState must not
   // be called synchronously at the top level of an effect body (cascading-render risk).
+  //
+  // WHY we do NOT touch walkReqSeq here: see the comment above walkReqSeq. The
+  // render-gate on the Map line prop (walkingRouteVenueId === selectedVenueId)
+  // prevents a stale-venue route from ever drawing, so there is no need to
+  // invalidate in-flight fetches here. Bumping the seq here would break the
+  // same-task select+walk-for-new-venue flow (latent footgun if future UX
+  // allows it).
   useEffect(() => {
     if (selectedVenueId !== walkingRouteVenueId) {
       queueMicrotask(() => {
-        latestWalkRequestRef.current = ""; // invalidate any in-flight fetch
         setWalkingRoute(null);
         setWalkingRouteInfo(null);
         setWalkingRouteSteps(null);
@@ -386,7 +405,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const handleWalkRoute = useCallback(async (venue: import("@/types/venue").Venue) => {
     // If user re-taps Walk on the already-active route, clear it (toggle off).
     if (walkingRouteVenueId === venue.id) {
-      latestWalkRequestRef.current = ""; // invalidate any in-flight fetch
+      // Bump the seq so any pending fetch (same venue, stale userLocation) cannot
+      // repopulate the route after the user explicitly toggled it off.
+      walkReqSeq.current++;
       setWalkingRoute(null);
       setWalkingRouteInfo(null);
       setWalkingRouteSteps(null);
@@ -394,11 +415,10 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       return;
     }
 
-    // Stamp this request as the latest. Any earlier in-flight fetch that resolves
-    // after this point will compare its requestedId to latestWalkRequestRef.current
-    // and bail if they don't match — preventing stale route data from being written.
-    const requestedId = venue.id;
-    latestWalkRequestRef.current = requestedId;
+    // Mint a unique request token. Any earlier in-flight fetch — including one
+    // for the SAME venue — that resolves after this point will compare its seq
+    // snapshot to walkReqSeq.current and bail if they differ (latest-REQUEST-wins).
+    const seq = ++walkReqSeq.current;
 
     // WHY userLocation as origin: the Directions API requires a from-coordinate.
     // If user has not shared location, fall back to Pueblo center so the route
@@ -442,9 +462,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         }>;
       };
 
-      // Stale-route guard: bail if the user has selected a different venue
-      // (or cleared the route) since this fetch was initiated.
-      if (latestWalkRequestRef.current !== requestedId) return;
+      // Stale-route guard: bail if a newer Walk request (or a clear/toggle-off)
+      // has been issued since this fetch was initiated. Uses the monotonic seq
+      // so same-venue double-taps are caught too (latest-REQUEST-wins, not
+      // latest-resolve-wins).
+      if (walkReqSeq.current !== seq) return;
 
       const route = data.routes?.[0];
       if (!route) return;
@@ -475,7 +497,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   /** Clear the walking route (e.g. when Walk button is tapped while route is active). */
   const handleClearWalkingRoute = useCallback(() => {
-    latestWalkRequestRef.current = ""; // invalidate any in-flight fetch
+    // Bump seq so any pending fetch cannot repopulate the route after an
+    // explicit clear — same invariant as the toggle-off branch above.
+    walkReqSeq.current++;
     setWalkingRoute(null);
     setWalkingRouteInfo(null);
     setWalkingRouteSteps(null);
@@ -837,7 +861,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             }}
             onMapReady={(map) => setMapboxMap(map)}
             onMoveEnd={handleMoveEnd}
-            walkingRoute={walkingRoute}
+            walkingRoute={walkingRouteVenueId === selectedVenueId ? walkingRoute : null}
           />
         </MapErrorBoundary>
       )}

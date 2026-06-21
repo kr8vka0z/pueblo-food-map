@@ -19,12 +19,25 @@
  * WHY origin is omitted: Google Maps automatically uses the device's current location when no
  * origin is specified — this is better than using a stale origin or asking the user to share
  * location again in Google Maps.
+ *
+ * WHY routeInfo renders in-card (not as a map overlay): the map overlay (position:absolute
+ * bottom:48px inside MapGL) sits behind the mobile BottomSheet (fixed bottom-0 z-[800]),
+ * making it invisible on mobile. The in-card readout renders in the same surface as the Walk
+ * button, so it is always visible regardless of mobile/desktop context (#134 FIX 1).
  */
 
 import type { Venue } from "@/types/venue";
 import { t, type Locale } from "@/lib/i18n";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
+
+/** Walking route distance + duration for the in-card readout. Raw values; localized via t(). */
+export interface RouteInfo {
+  /** Miles as string, e.g. "0.4" — interpolated into directions.routeDistance as {distance} */
+  distance: string;
+  /** Duration string, e.g. "8 min" — interpolated into directions.routeDuration as {duration} */
+  duration: string;
+}
 
 interface DirectionButtonsProps {
   venue: Venue;
@@ -38,6 +51,11 @@ interface DirectionButtonsProps {
   isRouteActive?: boolean;
   /** Called when the user taps the Walk button while a route is already active. */
   onClearRoute?: () => void;
+  /**
+   * Walking route distance + duration — shown below the buttons when the route is active.
+   * Localized via directions.routeDistance / directions.routeDuration i18n keys (#134 FIX 2).
+   */
+  routeInfo?: RouteInfo | null;
 }
 
 // ─── Google Maps deeplink builder ────────────────────────────────────────────
@@ -90,6 +108,7 @@ export default function DirectionButtons({
   locale,
   isRouteActive = false,
   onClearRoute,
+  routeInfo = null,
 }: DirectionButtonsProps) {
   const busUrl = googleMapsUrl(venue.lat, venue.lng, "transit");
   const driveUrl = googleMapsUrl(venue.lat, venue.lng, "driving");
@@ -112,38 +131,61 @@ export default function DirectionButtons({
     : t("directions.walk", locale);
 
   return (
-    <div className="flex gap-2">
-      {/* Walk — in-app route */}
-      <button
-        type="button"
-        aria-label={walkLabel}
-        onClick={handleWalkClick}
-        className={isRouteActive ? walkActiveClass : walkInactiveClass}
-      >
-        {walkVisibleLabel}
-      </button>
+    <div>
+      <div className="flex gap-2">
+        {/* Walk — in-app route */}
+        <button
+          type="button"
+          aria-label={walkLabel}
+          onClick={handleWalkClick}
+          className={isRouteActive ? walkActiveClass : walkInactiveClass}
+        >
+          {walkVisibleLabel}
+        </button>
 
-      {/* Bus — Google Maps transit deeplink */}
-      <a
-        href={busUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={t("directions.busAriaLabel", locale, { name: venue.name })}
-        className={externalClass}
-      >
-        {t("directions.bus", locale)}
-      </a>
+        {/* Bus — Google Maps transit deeplink */}
+        <a
+          href={busUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t("directions.busAriaLabel", locale, { name: venue.name })}
+          className={externalClass}
+        >
+          {t("directions.bus", locale)}
+        </a>
 
-      {/* Drive — Google Maps driving deeplink */}
-      <a
-        href={driveUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={t("directions.driveAriaLabel", locale, { name: venue.name })}
-        className={externalClass}
-      >
-        {t("directions.drive", locale)}
-      </a>
+        {/* Drive — Google Maps driving deeplink */}
+        <a
+          href={driveUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t("directions.driveAriaLabel", locale, { name: venue.name })}
+          className={externalClass}
+        >
+          {t("directions.drive", locale)}
+        </a>
+      </div>
+
+      {/* In-card walking route readout — distance + duration below the buttons.
+          Shown only when a route is active for this venue. Uses i18n keys so
+          Spanish users see localized unit strings (e.g. "{distance} caminando"). */}
+      {isRouteActive && routeInfo && (
+        <div
+          data-testid="walking-route-info"
+          className={[
+            "mt-2 flex items-center justify-center gap-2",
+            "text-sm font-semibold text-[var(--color-sage-700)]",
+          ].join(" ")}
+        >
+          <span data-testid="walking-route-distance">
+            {t("directions.routeDistance", locale, { distance: routeInfo.distance })}
+          </span>
+          <span aria-hidden>·</span>
+          <span data-testid="walking-route-duration">
+            {t("directions.routeDuration", locale, { duration: routeInfo.duration })}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,21 +2,22 @@
  * WalkingRoute tests — issue #134 in-app walking route layer on Map.
  *
  * The walking route is a GeoJSON LineString drawn as a layer on the Mapbox map.
- * State (walkingRoute GeoJSON + distanceText + durationText) is passed as props
- * to Map.tsx so MapWrapper owns the fetch and clearing logic.
+ * State (walkingRoute GeoJSON) is passed as a prop to Map.tsx so MapWrapper
+ * owns the fetch and clearing logic.
+ *
+ * The distance + duration readout was moved from a map overlay pill to the
+ * in-card DirectionButtons component (FIX 1: overlay was hidden behind the
+ * mobile BottomSheet). See DirectionButtons.test.tsx for readout tests.
  *
  * Verifies:
  *   1. Map renders without error when walkingRoute is null (default).
- *   2. Map renders the walking route source when walkingRoute is a GeoJSON feature.
- *   3. Walking route info (distance/time) is rendered when provided.
- *   4. Walking route info is NOT present when walkingRoute is null.
- *
- * Note: The actual Mapbox Directions API fetch is MapWrapper's responsibility
- * (tested in MapWrapperChrome tests). Map.tsx is a purely controlled component.
+ *   2. Walking route source is NOT rendered when walkingRoute is null.
+ *   3. Walking route source IS rendered when walkingRoute GeoJSON is provided.
+ *   4. Map renders correctly with all props including walking route.
  */
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import MapComponent from "@/components/Map";
 import type { Venue } from "@/types/venue";
 
@@ -134,43 +135,23 @@ describe("Map — walking route layer (#134)", () => {
     ).not.toBeNull();
   });
 
-  test("walking route info panel is absent when walkingRoute is null", () => {
-    render(
-      <MapComponent
-        {...makeProps({
-          walkingRoute: null,
-          walkingRouteInfo: undefined,
-        })}
-      />,
-    );
-    // Should not find any route-distance or route-duration text
-    expect(screen.queryByTestId("walking-route-info")).toBeNull();
-  });
-
-  test("walking route info panel is present when walkingRouteInfo is provided", () => {
-    render(
-      <MapComponent
-        {...makeProps({
-          walkingRoute: SAMPLE_ROUTE_GEOJSON,
-          walkingRouteInfo: { distance: "0.4 mi", duration: "8 min" },
-        })}
-      />,
-    );
-    const infoPanel = screen.getByTestId("walking-route-info");
-    expect(infoPanel).toBeDefined();
-    expect(infoPanel.textContent).toContain("0.4 mi");
-    expect(infoPanel.textContent).toContain("8 min");
-  });
-
-  test("renders correctly with all props including walking route", () => {
+  test("renders correctly with walking route prop", () => {
     const { container } = render(
       <MapComponent
-        {...makeProps({
-          walkingRoute: SAMPLE_ROUTE_GEOJSON,
-          walkingRouteInfo: { distance: "0.4 mi", duration: "8 min" },
-        })}
+        {...makeProps({ walkingRoute: SAMPLE_ROUTE_GEOJSON })}
       />,
     );
     expect(container.querySelector("[data-testid='mapgl-root']")).not.toBeNull();
+  });
+
+  test("walking-route-info is NOT rendered in Map (readout moved to DirectionButtons card)", () => {
+    // The distance/time overlay was removed from Map.tsx (FIX 1: it was hidden
+    // behind the mobile BottomSheet). The readout now lives in DirectionButtons.
+    const { container } = render(
+      <MapComponent
+        {...makeProps({ walkingRoute: SAMPLE_ROUTE_GEOJSON })}
+      />,
+    );
+    expect(container.querySelector("[data-testid='walking-route-info']")).toBeNull();
   });
 });

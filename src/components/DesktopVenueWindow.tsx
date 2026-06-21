@@ -38,7 +38,7 @@ import { MapPin, Phone, Clock, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import { safeUrl } from "@/lib/safeUrl";
-import DirectionButtons from "@/components/DirectionButtons";
+import DirectionButtons, { type RouteInfo } from "@/components/DirectionButtons";
 
 /**
  * Minimal interface covering the mapboxgl.Map methods DesktopVenueWindow uses.
@@ -151,6 +151,8 @@ interface DesktopVenueWindowProps {
   isWalkRouteActive?: boolean;
   /** Called when the user taps Walk while a route is active (clears it). */
   onClearWalkRoute?: () => void;
+  /** Walking route distance + duration for the in-card readout (threaded from MapWrapper). */
+  walkRouteInfo?: RouteInfo | null;
 }
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
@@ -166,6 +168,7 @@ export default function DesktopVenueWindow({
   onWalkRoute,
   isWalkRouteActive = false,
   onClearWalkRoute,
+  walkRouteInfo,
 }: DesktopVenueWindowProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -327,13 +330,15 @@ export default function DesktopVenueWindow({
         </p>
       )}
 
-      {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive */}
+      {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
+          routeInfo threads distance+duration for the in-card readout. */}
       <DirectionButtons
         venue={venue}
         onWalk={onWalkRoute ?? (() => {})}
         locale={locale}
         isRouteActive={isWalkRouteActive}
         onClearRoute={onClearWalkRoute}
+        routeInfo={isWalkRouteActive ? walkRouteInfo : null}
       />
     </div>
   );
@@ -370,13 +375,15 @@ export default function DesktopVenueWindow({
         </div>
       </div>
 
-      {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive */}
+      {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
+          routeInfo threads distance+duration for the in-card readout. */}
       <DirectionButtons
         venue={venue}
         onWalk={onWalkRoute ?? (() => {})}
         locale={locale}
         isRouteActive={isWalkRouteActive}
         onClearRoute={onClearWalkRoute}
+        routeInfo={isWalkRouteActive ? walkRouteInfo : null}
       />
 
       {/* Report an issue — secondary action (#70) */}

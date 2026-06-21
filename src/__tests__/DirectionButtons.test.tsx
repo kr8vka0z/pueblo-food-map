@@ -242,3 +242,67 @@ describe("DirectionButtons — walking route active state", () => {
     expect(btn).toBeDefined();
   });
 });
+
+describe("DirectionButtons — in-card route readout (#134 FIX 1+2)", () => {
+  test("no readout when isRouteActive=false even if routeInfo is provided", () => {
+    render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={false}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+      />,
+    );
+    expect(screen.queryByTestId("walking-route-info")).toBeNull();
+  });
+
+  test("no readout when isRouteActive=true but routeInfo is null", () => {
+    render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={null}
+      />,
+    );
+    expect(screen.queryByTestId("walking-route-info")).toBeNull();
+  });
+
+  test("readout shown with EN localized strings when route is active", () => {
+    render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+      />,
+    );
+    const readout = screen.getByTestId("walking-route-info");
+    expect(readout).toBeDefined();
+    // EN: "{distance} walk" → "0.4 mi walk"
+    expect(screen.getByTestId("walking-route-distance").textContent).toBe("0.4 mi walk");
+    // EN: "{duration}" → "8 min"
+    expect(screen.getByTestId("walking-route-duration").textContent).toBe("8 min");
+  });
+
+  test("readout shown with ES localized strings when route is active", () => {
+    render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="es"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+      />,
+    );
+    const readout = screen.getByTestId("walking-route-info");
+    expect(readout).toBeDefined();
+    // ES: "{distance} caminando" → "0.4 mi caminando"
+    expect(screen.getByTestId("walking-route-distance").textContent).toBe("0.4 mi caminando");
+    // ES: "{duration}" → "8 min" (pure passthrough — allowlisted as identical EN/ES)
+    expect(screen.getByTestId("walking-route-duration").textContent).toBe("8 min");
+  });
+});

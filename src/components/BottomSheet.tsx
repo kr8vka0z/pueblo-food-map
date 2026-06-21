@@ -31,7 +31,7 @@ import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import HoursList from "@/components/HoursList";
-import DirectionButtons from "@/components/DirectionButtons";
+import DirectionButtons, { type RouteInfo } from "@/components/DirectionButtons";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -48,6 +48,8 @@ interface BottomSheetProps {
   isWalkRouteActive?: boolean;
   /** Called when the user taps Walk while a route is active (clears it). */
   onClearWalkRoute?: () => void;
+  /** Walking route distance + duration for the in-card readout (threaded from MapWrapper). */
+  walkRouteInfo?: RouteInfo | null;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
@@ -60,6 +62,7 @@ export default function BottomSheet({
   onWalkRoute,
   isWalkRouteActive = false,
   onClearWalkRoute,
+  walkRouteInfo,
 }: BottomSheetProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -193,13 +196,15 @@ export default function BottomSheet({
                   </p>
                 )}
 
-                {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive */}
+                {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
+                    routeInfo threads distance+duration down for the in-card readout. */}
                 <DirectionButtons
                   venue={venue}
                   onWalk={onWalkRoute ?? (() => {})}
                   locale={locale}
                   isRouteActive={isWalkRouteActive}
                   onClearRoute={onClearWalkRoute}
+                  routeInfo={isWalkRouteActive ? walkRouteInfo : null}
                 />
 
                 {/* Show/Hide details toggle */}

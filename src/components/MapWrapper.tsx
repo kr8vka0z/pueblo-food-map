@@ -730,7 +730,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             onMapReady={(map) => setMapboxMap(map)}
             onMoveEnd={handleMoveEnd}
             walkingRoute={walkingRoute}
-            walkingRouteInfo={walkingRouteInfo}
           />
         </MapErrorBoundary>
       )}
@@ -953,6 +952,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
           }
           onClearWalkRoute={handleClearWalkingRoute}
+          walkRouteInfo={
+            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+              ? walkingRouteInfo
+              : null
+          }
         />
       )}
 
@@ -974,6 +978,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
           }
           onClearWalkRoute={handleClearWalkingRoute}
+          walkRouteInfo={
+            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+              ? walkingRouteInfo
+              : null
+          }
         />
       )}
     </div>

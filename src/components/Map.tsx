@@ -86,7 +86,13 @@ export interface WalkingRouteGeoJSON {
   };
 }
 
-/** Distance + time text to display in the route info overlay. */
+/**
+ * Distance + time text for the walking route.
+ * Previously used for a map overlay pill; now consumed by DirectionButtons
+ * in-card so the readout is visible on mobile (the overlay was hidden behind
+ * the BottomSheet). Kept here as the canonical type; MapWrapper imports it
+ * to type its walkingRouteInfo state.
+ */
 export interface WalkingRouteInfo {
   distance: string; // e.g. "0.4 mi"
   duration: string; // e.g. "8 min"
@@ -158,11 +164,6 @@ interface MapProps {
    * Passed as a controlled prop from MapWrapper, which owns the Directions API fetch.
    */
   walkingRoute?: WalkingRouteGeoJSON | null;
-  /**
-   * Distance + time text for the walking route info overlay (#134).
-   * Displayed as a small pill over the map near the route when walkingRoute is set.
-   */
-  walkingRouteInfo?: WalkingRouteInfo | null;
 }
 
 export default function Map({
@@ -176,7 +177,6 @@ export default function Map({
   recenterRequestId = 0,
   onMoveEnd,
   walkingRoute = null,
-  walkingRouteInfo = null,
 }: MapProps) {
   // Centralized hover state — one Popup for the whole map avoids per-marker mount churn.
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
@@ -455,35 +455,6 @@ export default function Map({
         >
           <Layer {...WALKING_ROUTE_LINE_LAYER} />
         </Source>
-      )}
-
-      {/* Walking route info overlay (#134) — distance + time pill.
-          Rendered as an absolute div inside MapGL's relative container so it
-          floats over the map canvas without needing portal or z-index fighting. */}
-      {walkingRoute && walkingRouteInfo && (
-        <div
-          data-testid="walking-route-info"
-          style={{
-            position: "absolute",
-            bottom: 48,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 10,
-            pointerEvents: "none",
-          }}
-          className={[
-            "flex items-center gap-2 px-4 py-2 rounded-full",
-            "bg-[var(--color-sage-500)] text-[var(--color-bone-50)]",
-            "text-sm font-semibold",
-            "shadow-[0_2px_8px_rgba(0,0,0,0.25)]",
-          ].join(" ")}
-          aria-live="polite"
-          role="status"
-        >
-          <span>{walkingRouteInfo.distance}</span>
-          <span aria-hidden>·</span>
-          <span>{walkingRouteInfo.duration}</span>
-        </div>
       )}
 
       {/* Venue markers */}

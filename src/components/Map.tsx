@@ -51,6 +51,47 @@ const PUEBLO_LNG = -104.6091;
 const BRAND_NAVY = "#190F3F";
 const SAGE_500 = "#4A8466";
 
+// ─── Walking route layer constants (#134) ─────────────────────────────────────
+//
+// The walking route is drawn as a GeoJSON LineString source + line layer.
+// Source id and layer id are stable strings so react-map-gl can diff them
+// correctly when the route data changes without tearing down the layer.
+
+const WALKING_ROUTE_SOURCE_ID = "pfm-walking-route";
+const WALKING_ROUTE_LAYER_ID = "pfm-walking-route-line";
+
+// WHY sage-500 (#4A8466): matches the brand primary action color used on
+// the Walk button so the on-map route reads as visually connected to the UI.
+const WALKING_ROUTE_LINE_LAYER: LayerProps = {
+  id: WALKING_ROUTE_LAYER_ID,
+  type: "line",
+  layout: {
+    "line-join": "round",
+    "line-cap": "round",
+  },
+  paint: {
+    "line-color": SAGE_500,
+    "line-width": 4,
+    "line-opacity": 0.9,
+  },
+};
+
+/** GeoJSON Feature with a LineString geometry — the Mapbox Directions API response shape. */
+export interface WalkingRouteGeoJSON {
+  type: "Feature";
+  properties: Record<string, unknown>;
+  geometry: {
+    type: "LineString";
+    coordinates: number[][];
+  };
+}
+
+/** Distance + time text to display in the route info overlay. */
+export interface WalkingRouteInfo {
+  distance: string; // e.g. "0.4 mi"
+  duration: string; // e.g. "8 min"
+}
+
 // ─── County mask constants ─────────────────────────────────────────────────────
 //
 // The mask is a GeoJSON polygon with two rings:
@@ -112,6 +153,16 @@ interface MapProps {
    * has drifted off-screen (#108 drift detection).
    */
   onMoveEnd?: (bounds: mapboxgl.LngLatBounds) => void;
+  /**
+   * Walking route GeoJSON to draw on the map (#134). Null = no route shown.
+   * Passed as a controlled prop from MapWrapper, which owns the Directions API fetch.
+   */
+  walkingRoute?: WalkingRouteGeoJSON | null;
+  /**
+   * Distance + time text for the walking route info overlay (#134).
+   * Displayed as a small pill over the map near the route when walkingRoute is set.
+   */
+  walkingRouteInfo?: WalkingRouteInfo | null;
 }
 
 export default function Map({
@@ -124,6 +175,8 @@ export default function Map({
   locale = "en",
   recenterRequestId = 0,
   onMoveEnd,
+  walkingRoute = null,
+  walkingRouteInfo = null,
 }: MapProps) {
   // Centralized hover state — one Popup for the whole map avoids per-marker mount churn.
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
@@ -386,6 +439,51 @@ export default function Map({
         >
           <Layer {...COUNTY_BORDER_LAYER} />
         </Source>
+      )}
+
+      {/* Walking route (#134) — GeoJSON LineString drawn as a sage-colored line.
+          Rendered only when MapWrapper has fetched a route for the selected venue.
+          WHY conditional Source (not always-mounted empty source): react-map-gl
+          re-uses the source by id; mounting it with null data and later patching
+          data works, but conditionally mounting/unmounting is simpler and avoids
+          a stale-data bug when the route is cleared while a new fetch is in flight. */}
+      {walkingRoute && (
+        <Source
+          id={WALKING_ROUTE_SOURCE_ID}
+          type="geojson"
+          data={walkingRoute}
+        >
+          <Layer {...WALKING_ROUTE_LINE_LAYER} />
+        </Source>
+      )}
+
+      {/* Walking route info overlay (#134) — distance + time pill.
+          Rendered as an absolute div inside MapGL's relative container so it
+          floats over the map canvas without needing portal or z-index fighting. */}
+      {walkingRoute && walkingRouteInfo && (
+        <div
+          data-testid="walking-route-info"
+          style={{
+            position: "absolute",
+            bottom: 48,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 10,
+            pointerEvents: "none",
+          }}
+          className={[
+            "flex items-center gap-2 px-4 py-2 rounded-full",
+            "bg-[var(--color-sage-500)] text-[var(--color-bone-50)]",
+            "text-sm font-semibold",
+            "shadow-[0_2px_8px_rgba(0,0,0,0.25)]",
+          ].join(" ")}
+          aria-live="polite"
+          role="status"
+        >
+          <span>{walkingRouteInfo.distance}</span>
+          <span aria-hidden>·</span>
+          <span>{walkingRouteInfo.duration}</span>
+        </div>
       )}
 
       {/* Venue markers */}

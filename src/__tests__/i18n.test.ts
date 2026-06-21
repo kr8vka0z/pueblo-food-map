@@ -21,6 +21,9 @@ const IDENTICAL_ALLOWLIST = new Set([
   "suggest.address.placeholder",
   "report.email.placeholder",
   "feedback.email.placeholder",
+  // directions.routeDuration is a pure placeholder — both locales output only {duration}
+  // with no surrounding text, so identical EN/ES is correct (#134).
+  "directions.routeDuration",
 ]);
 
 /** Keys that must differ between EN and ES. */

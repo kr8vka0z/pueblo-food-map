@@ -12,17 +12,21 @@
 
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 
 interface SponsorCreditProps {
+  /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
   /** Hide the credit (e.g. when BottomSheet is fully expanded on mobile). */
   hidden?: boolean;
 }
 
 export default function SponsorCredit({
-  locale = "en",
+  locale: localeProp,
   hidden = false,
 }: SponsorCreditProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   return (
     <div
       style={{

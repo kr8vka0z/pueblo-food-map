@@ -6,13 +6,9 @@
  * "no_hours". Components use this to render the open/closed badge.
  *
  * formatSlot() converts a slot string to a human-readable "9am – 5pm" form for
- * the hours panel in VenueDetail / BottomSheet / DesktopVenueWindow. Accepts
- * both the 24h form ("HH:MM-HH:MM") and the 12h Plentiful form
- * ("H:MM AM - H:MM PM") — both produce identical output style.
- *
- * Note: DAY_KEYS and the todayKey derivation are scheduled to move here from
- * VenueDetail and DesktopVenueWindow in a pending refactor; inline docs for
- * those will follow.
+ * the hours panel in BottomSheet / DesktopVenueWindow. Accepts both the 24h
+ * form ("HH:MM-HH:MM") and the 12h Plentiful form ("H:MM AM - H:MM PM") —
+ * both produce identical output style.
  */
 import type { WeeklyHours } from "@/types/venue";
 
@@ -27,7 +23,7 @@ const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 /**
  * Display ordering for weekly-hours rows (Monday-first), distinct from the
  * Sunday-first DAY_KEYS above which is indexed by Date.getDay() (0 = Sunday).
- * Shared by VenueDetail / DesktopVenueWindow, which render hours Monday→Sunday.
+ * Shared by BottomSheet / DesktopVenueWindow (via HoursList), which render hours Monday→Sunday.
  */
 export const DISPLAY_DAY_KEYS = [
   "mon",

@@ -233,11 +233,20 @@ react-map-gl / Mapbox GL JS (README: "Phase 2 complete (Mapbox migration)").
 The commit that performed this migration is not present in the current
 shallow git history. See open questions below.
 
-**SSR exclusion:** `mapbox-gl` calls `globalThis` and requires a WebGL canvas;
-it cannot run server-side. `MapWrapper.tsx` uses `next/dynamic` with
-`ssr: false` to load `Map.tsx` only on the client. This dynamic import must
-stay in a Client Component (`"use client"`) — `ssr: false` is silently
-ignored in Server Components per the Next.js lazy-loading docs.
+**SSR exclusion and TBT reduction:** `mapbox-gl` calls `globalThis` and
+requires a WebGL canvas; it cannot run server-side. `MapWrapper.tsx` uses
+`next/dynamic` with `ssr: false` to load `Map.tsx` only on the client. This
+dynamic import must stay in a Client Component (`"use client"`) — `ssr: false`
+is silently ignored in Server Components per the Next.js lazy-loading docs.
+
+**Page-level code-splitting (#202):** `page.tsx` also dynamically imports
+`MapWrapper` and `SplashScreen` (both with `ssr: false`). WHY: the page
+returns `null` during SSR (hydration-safe), so `ssr: false` has no effect on
+server output — it moves ~200KB of synchronous client JS (vaul bottom sheet,
+Radix UI, geolocation hooks, venue data) from the blocking initial parse/exec
+window into async chunks, reducing TBT on throttled mobile. Mapbox GL JS
+(1.7MB) was already async via the nested dynamic in MapWrapper; this change
+eliminates the remaining sync JS that dominated TBT after Mapbox.
 
 **Token scopes:** the public token (`pk.*`, `NEXT_PUBLIC_MAPBOX_TOKEN`) needs
 only `styles:read`, `fonts:read`, `tilesets:read`. Narrowing the scope

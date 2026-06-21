@@ -22,6 +22,7 @@ import { useRef } from "react";
 import { Clock, CreditCard, Apple, Star } from "lucide-react";
 import { categoryColors } from "@/data/venues";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 import type { VenueCategory } from "@/types/venue";
 
 // Ordered list — matches existing legend order
@@ -81,7 +82,7 @@ export default function CategoryDropdown({
   activeCategory,
   onSelect,
   onMouseDown,
-  locale = "en",
+  locale: localeProp,
   openNowActive,
   onToggleOpenNow,
   openNowCount,
@@ -95,6 +96,8 @@ export default function CategoryDropdown({
   onToggleFavorites,
   favoritesCount,
 }: CategoryDropdownProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   const listboxRef = useRef<HTMLDivElement>(null);
 
   return (

@@ -60,17 +60,26 @@ describe("i18n dictionary parity", () => {
     }
   });
 
-  test("non-allowlisted keys should not be identical EN/ES (spot check)", () => {
+  test("non-allowlisted keys should not be identical EN/ES", () => {
+    // Any key with identical EN and ES copy must be in IDENTICAL_ALLOWLIST (program
+    // names, URLs, emails, shared symbols). The old substring escape
+    // (!key.includes("placeholder") && !key.includes("email")) was removed: the four
+    // affected keys (suggest.submitterEmail.placeholder, suggest.address.placeholder,
+    // report.email.placeholder, feedback.email.placeholder) are already in IDENTICAL_ALLOWLIST,
+    // so the escape was redundant and silently bypassed the guard for any future key
+    // whose name happened to contain those substrings.
     const identicalUnexpected: string[] = [];
     for (const key of Object.keys(en)) {
       if (!(key in es)) continue;
       if (IDENTICAL_ALLOWLIST.has(key)) continue;
-      if (en[key] === es[key] && !key.includes("placeholder") && !key.includes("email")) {
+      if (en[key] === es[key]) {
         identicalUnexpected.push(key);
       }
     }
-    // menu.about was the known bug; ensure it is not in the unexpected list
-    expect(identicalUnexpected).not.toContain("menu.about");
+    expect(
+      identicalUnexpected,
+      `Keys with identical EN/ES copy not in IDENTICAL_ALLOWLIST: ${identicalUnexpected.join(", ")}`,
+    ).toEqual([]);
   });
 
   test("no empty ES values", () => {

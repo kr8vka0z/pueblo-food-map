@@ -57,15 +57,12 @@ interface MapboxMap {
 import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
-import {
-  computeOpenStatus,
-  formatSlot,
-  todayKey,
-  DISPLAY_DAY_KEYS as DAY_KEYS,
-} from "@/lib/hours";
+import { computeOpenStatus } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 import VenuePopupHeader from "@/components/VenuePopupHeader";
 import ReportVenueButton from "@/components/ReportVenueButton";
+import HoursList from "@/components/HoursList";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -158,15 +155,16 @@ export default function DesktopVenueWindow({
   onExpand,
   onCollapse,
   onClose,
-  locale = "en",
+  locale: localeProp,
 }: DesktopVenueWindowProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   const windowRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<WindowPosition>({ left: 0, top: 0 });
 
   const windowW = expanded ? WINDOW_EXPANDED_W : WINDOW_QUICK_W;
   const windowH = expanded ? WINDOW_EXPANDED_H : WINDOW_QUICK_H;
 
-  const today = todayKey();
   const status = computeOpenStatus(venue.hours_weekly);
 
   const directionsUrl = `https://maps.google.com/?q=${venue.lat},${venue.lng}`;
@@ -396,50 +394,10 @@ export default function DesktopVenueWindow({
           <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
             {t("detail.hours", locale)}
           </h3>
-          <dl className="space-y-0.5">
-            {DAY_KEYS.map((day) => {
-              const slots = venue.hours_weekly![day];
-              const isToday = day === today;
-              return (
-                <div
-                  key={day}
-                  className={
-                    "flex items-baseline gap-2 py-0.5 " +
-                    (isToday
-                      ? "border-l-[3px] pl-2 border-[var(--color-sage-500)]"
-                      : "pl-3")
-                  }
-                  aria-current={isToday ? "true" : undefined}
-                >
-                  <dt
-                    className={
-                      "w-7 text-xs shrink-0 " +
-                      (isToday
-                        ? "font-semibold text-[var(--color-sage-700)]"
-                        : "text-[var(--color-ink-500)]")
-                    }
-                  >
-                    {t(`day.${day}`, locale)}
-                    {isToday && (
-                      <span className="sr-only">, {t("detail.today", locale)}</span>
-                    )}
-                  </dt>
-                  <dd
-                    className={
-                      "text-xs font-mono " +
-                      (isToday
-                        ? "text-[var(--color-sage-700)]"
-                        : "text-[var(--color-ink-700)]")
-                    }
-                  >
-                    {slots && slots.length > 0
-                      ? slots.map(formatSlot).join(", ")
-                      : t("hours.closed", locale)}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
+          <HoursList
+            hours_weekly={venue.hours_weekly}
+            compact={true}
+          />
         </section>
       )}
 

@@ -9,6 +9,7 @@
       }
     },
     "assert": {
+      "_comment": "Performance floor 0.65 is the standing target. CI Lighthouse currently runs against PRODUCTION (MAPBOX_PREVIEW_TOKEN absent — preview-URL gating not yet armed, #161 item 2.2), and prod has not yet received the #202 bundle cut (sync entry JS 212KB->48KB), so this gate is EXPECTED to be advisory-RED until that deploys. Lighthouse is not a required check, so it does not block merge. After the cut deploys (or the preview token lets CI measure the branch), re-measure and set a verified floor, then raise toward 0.70.",
       "assertions": {
         "categories:performance": ["error", { "minScore": 0.65 }],
         "categories:accessibility": ["error", { "minScore": 0.95 }],

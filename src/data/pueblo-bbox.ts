@@ -20,11 +20,20 @@ export const PUEBLO_COUNTY_BBOX: [[number, number], [number, number]] = [
 
 /**
  * Downtown Pueblo, CO — the default map center / distance-filter origin.
- * Single source of truth for the lat/lng pair; call sites assemble their own
- * shape from these scalars (react-map-gl viewState vs a plain {lat,lng} point).
+ * Single source of truth for the lat/lng pair.
+ *
+ * PUEBLO_CENTER_LAT / PUEBLO_CENTER_LNG are the raw scalars for consumers
+ * that need a specific shape (e.g. react-map-gl viewState uses
+ * { latitude, longitude }).
+ *
+ * PUEBLO_CENTER is the {lat,lng} form used by the filter pipeline and
+ * distance calculations. Exported here so MapWrapper and tests share one
+ * constant (#166 8.6 dedup).
  */
 export const PUEBLO_CENTER_LAT = 38.2544;
 export const PUEBLO_CENTER_LNG = -104.6091;
+/** Downtown Pueblo as a plain {lat, lng} point — use for distance math and filter origin. */
+export const PUEBLO_CENTER = { lat: PUEBLO_CENTER_LAT, lng: PUEBLO_CENTER_LNG };
 
 /**
  * Minimum zoom level for the map.

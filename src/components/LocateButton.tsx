@@ -24,6 +24,7 @@
 import { Locate, LocateFixed, Loader2 } from "lucide-react";
 import type { GeoState } from "@/lib/useGeolocation";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 
 // ─── Tunable layout constants ─────────────────────────────────────────────────
 
@@ -65,8 +66,10 @@ export default function LocateButton({
   onRequest,
   sheetVisible = false,
   sheetFullyExpanded = false,
-  locale = "en",
+  locale: localeProp,
 }: LocateButtonProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   // Determine which variant to show
   const variant: LocateButtonVariant = (() => {
     if (sheetFullyExpanded) return "hidden";

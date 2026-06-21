@@ -26,7 +26,6 @@ import {
   useRef,
   useState,
 } from "react";
-import type mapboxgl from "mapbox-gl";
 import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
@@ -47,21 +46,16 @@ import MapErrorBoundary from "./MapErrorBoundary";
 import { useGeolocation } from "@/lib/useGeolocation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
-import { isWebGLAvailable } from "@/lib/webgl";
-import { useFavorites } from "@/lib/favorites";
 import { venues as allVenues } from "@/data/venues";
-import { haversineMiles } from "@/lib/distance";
-import { computeOpenStatus } from "@/lib/hours";
-import { searchVenues } from "@/lib/searchVenues";
 import type { Venue, VenueCategory } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
-import { type ViewMode } from "./ViewToggle";
 import ListView from "./ListView";
 import {
   PUEBLO_COUNTY_BBOX,
-  PUEBLO_CENTER_LAT,
-  PUEBLO_CENTER_LNG,
+  PUEBLO_CENTER,
 } from "@/data/pueblo-bbox";
+import { useMapFilters } from "@/lib/useMapFilters";
+import { useMapUI } from "@/lib/useMapUI";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
 // dynamic import here in a Client Component as required by Next.js 16
@@ -73,8 +67,6 @@ const LeafletMap = dynamic(() => import("./Map"), {
   ssr: false,
   loading: () => <MapLoadingFallback />,
 });
-
-const PUEBLO_CENTER = { lat: PUEBLO_CENTER_LAT, lng: PUEBLO_CENTER_LNG };
 
 /**
  * Drift-detection padding (in degrees).
@@ -213,6 +205,23 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // resolve to PUEBLO_CENTER in the origin derivation below.
   const userLocation = geo.state.position;
 
+  // ── UI / selection state — extracted hook ────────────────────────────────────
+  const {
+    selectedVenueId,
+    setSelectedVenueId,
+    viewMode,
+    setViewMode,
+    mapUnavailable,
+    handleMapError,
+    showVenueOnMap,
+    windowExpanded,
+    setWindowExpanded,
+    sheetFullyExpanded,
+    setSheetFullyExpanded,
+    mapboxMap,
+    setMapboxMap,
+  } = useMapUI();
+
   // ── Location-denied banner (PR 7) ────────────────────────────────────────────
   // Shows only when the user ACTIVELY re-taps locate (not on initial mount when
   // permission is already denied — that path uses silent Pueblo-center fallback).
@@ -331,75 +340,45 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // ── Mobile detection ─────────────────────────────────────────────────────────
   const isMobile = useIsMobile();
 
-  // ── Search query state (PR 6) ────────────────────────────────────────────────
-  const [query, setQuery] = useState("");
+  // ── Origin — user position or Pueblo center fallback ─────────────────────────
+  const origin = userLocation ?? PUEBLO_CENTER;
 
-  // ── Filter state — kept minimal; further filter controls are deferred ────────
-  const [selectedCategories, setSelectedCategories] =
-    useState<Set<VenueCategory> | null>(null);
-  const [filterOpenNow, setFilterOpenNow] = useState(false);
-  const [filterSnap, setFilterSnap] = useState(false);
-  const [filterWic, setFilterWic] = useState(false);
-  const [filterFavorites, setFilterFavorites] = useState(false);
-  const [filterWalking] = useState(false);
+  // ── Filter pipeline — extracted hook (testable independently of map render) ──
+  const {
+    query,
+    setQuery,
+    selectedCategories,
+    filterOpenNow,
+    setFilterOpenNow,
+    filterSnap,
+    setFilterSnap,
+    filterWic,
+    setFilterWic,
+    filterFavorites,
+    setFilterFavorites,
+    activeCategoryFilter,
+    setActiveCategoryFilter,
+    venuesWithDistance,
+    filteredVenues,
+    savedVenues,
+    favoriteSet,
+    favoritesCount,
+    anyFilterActive,
+    allVenueCounts,
+    openNowCount,
+    snapCount,
+    wicCount,
+    handleCategoryBrowseSelect,
+    handleClearAllFilters,
+  } = useMapFilters(origin);
 
-  // ── Category browse filter (#95) ─────────────────────────────────────────────
-  // Single-select filter driven from the search-focus category dropdown.
-  // Syncs into selectedCategories for the venue render path.
-  const [activeCategoryFilter, setActiveCategoryFilter] =
-    useState<VenueCategory | null>(null);
-
-  // ── Selected venue ───────────────────────────────────────────────────────────
-  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
-
-  // ── View mode (#129) — map (default) or full-screen list ────────────────────
-  const [viewMode, setViewMode] = useState<ViewMode>("map");
-
-  // ── WebGL / Mapbox unavailable (#165) ────────────────────────────────────────
-  // Starts false so server + first client render both assume WebGL is available
-  // (no hydration mismatch). A useEffect below flips it client-side only when
-  // WebGL is genuinely absent. MapErrorBoundary also calls handleMapError() if
-  // Mapbox throws a fatal error during init despite the probe passing.
-  const [mapUnavailable, setMapUnavailable] = useState(false);
-  const handleMapError = useCallback(() => {
-    setMapUnavailable(true);
-    setViewMode("list");
-  }, []);
-
-  // Switch to map view — but never while the map is unavailable (#165). Selecting
-  // a venue (from the list, search, or saved) should reveal it without bouncing
-  // the user to a suppressed/blank map; selection still highlights via
-  // selectedVenueId and the list stays put.
-  const showVenueOnMap = useCallback(() => {
-    if (!mapUnavailable) setViewMode("map");
-  }, [mapUnavailable]);
-
-  useEffect(() => {
-    if (!isWebGLAvailable()) {
-      // Intentional post-hydration, client-only correction: WebGL can only be
-      // probed on the client, so we flip to the list fallback here. Synchronous
-      // (not deferred) so the suppressed map never gets an extra render frame.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      handleMapError();
-    }
-  }, [handleMapError]);
-
-  // ── Desktop window expanded state (PR 5) ─────────────────────────────────────
-  const [windowExpanded, setWindowExpanded] = useState(false);
-
-  // ── BottomSheet snap state — used to hide SponsorCredit when sheet is full (#69) ──
-  const [sheetFullyExpanded, setSheetFullyExpanded] = useState(false);
-
-  // Reset expanded state when a new venue is selected (issue #122).
-  // queueMicrotask defers the setState out of the synchronous effect body to
-  // satisfy the react-hooks/set-state-in-effect lint rule.
-  useEffect(() => { queueMicrotask(() => setSheetFullyExpanded(false)); }, [selectedVenueId]);
-
-  // ── Map instance — passed up from Map via onMapReady (wired in #47) ────────
-  // Stored in state so changes trigger re-render in DesktopVenueWindow.
-  // Typed as unknown; DesktopVenueWindow narrows it via its MapboxMap interface.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [mapboxMap, setMapboxMap] = useState<any>(null);
+  // ── Typeahead popover state (issue #67) ──────────────────────────────────────
+  // isPopoverOpen: true when input is focused + query is non-empty + matches exist.
+  // activeIndex: keyboard-highlighted row (-1 = none).
+  // blurTimerRef: grace timer so mousedown-inside-popover doesn't lose the click.
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Deep link (#132) ──────────────────────────────────────────────────────────
   // Opened with ?venue=<id> → select that venue once the map is ready to fly.
@@ -416,122 +395,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapboxMap]);
 
-  // ── Typeahead popover state (issue #67) ──────────────────────────────────────
-  // isPopoverOpen: true when input is focused + query is non-empty + matches exist.
-  // activeIndex: keyboard-highlighted row (-1 = none).
-  // blurTimerRef: grace timer so mousedown-inside-popover doesn't lose the click.
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ── Category browse handler (#95) ─────────────────────────────────────────────
-  // Selects/toggles a single category from the dropdown; syncs selectedCategories.
-  const handleCategoryBrowseSelect = useCallback(
-    (cat: VenueCategory | null) => {
-      setActiveCategoryFilter(cat);
-      setSelectedCategories(cat !== null ? new Set([cat]) : null);
-    },
-    [],
-  );
-
-  // ── Total venue counts per category — from all venues (not filtered) ─────────
-  // Used by CategoryDropdown to show stable counts alongside each category row.
-  const allVenueCounts = useMemo(() => {
-    return allVenues.reduce<Partial<Record<VenueCategory, number>>>(
-      (acc, v) => {
-        acc[v.category] = (acc[v.category] ?? 0) + 1;
-        return acc;
-      },
-      {},
-    );
-  }, []);
-
-  // ── Computed venues ──────────────────────────────────────────────────────────
-  const origin = userLocation ?? PUEBLO_CENTER;
-
-  const venuesWithDistance = useMemo(() => {
-    return allVenues.map((v) => ({
-      ...v,
-      distanceMiles: haversineMiles(origin, { lat: v.lat, lng: v.lng }),
-    }));
-  }, [origin]);
-
-  // ── Saved venues (#132 9c) ──────────────────────────────────────────────────
-  // Favorited venues, nearest-first, for the "Saved places" menu section.
-  const favoriteIds = useFavorites();
-  const savedVenues = useMemo(() => {
-    const ids = new Set(favoriteIds);
-    return venuesWithDistance
-      .filter((v) => ids.has(v.id))
-      .sort((a, b) => a.distanceMiles - b.distanceMiles);
-  }, [favoriteIds, venuesWithDistance]);
-
-  // Favorited venues present in the dataset — powers the Favorites filter.
-  const favoriteSet = useMemo(() => new Set(savedVenues.map((v) => v.id)), [savedVenues]);
-  const favoritesCount = favoriteSet.size;
-
-  const openNowCount = useMemo(
-    () =>
-      venuesWithDistance.filter(
-        (v) => computeOpenStatus(v.hours_weekly, new Date()).state === "open",
-      ).length,
-    [venuesWithDistance],
-  );
-
-  const snapCount = useMemo(() => venuesWithDistance.filter((v) => v.accepts_snap).length, [venuesWithDistance]);
-  const wicCount = useMemo(() => venuesWithDistance.filter((v) => v.accepts_wic).length, [venuesWithDistance]);
-
-  const filteredVenues = useMemo(() => {
-    const now = new Date();
-
-    // Apply existing category / boolean filters first, then layer search on top.
-    const afterFilters = venuesWithDistance
-      .filter((v) => {
-        if (selectedCategories !== null && selectedCategories.size > 0) {
-          if (!selectedCategories.has(v.category)) return false;
-        }
-        if (filterOpenNow) {
-          const status = computeOpenStatus(v.hours_weekly, now);
-          if (status.state !== "open") return false;
-        }
-        if (filterSnap && !v.accepts_snap) return false;
-        if (filterWic && !v.accepts_wic) return false;
-        if (filterFavorites && favoriteSet.size > 0 && !favoriteSet.has(v.id)) return false;
-        if (filterWalking && (v.distanceMiles ?? Infinity) > 1) return false;
-        return true;
-      })
-      .sort((a, b) => a.distanceMiles - b.distanceMiles);
-
-    // Text search: name + bilingual category terms + benefit aliases (#162).
-    return searchVenues(afterFilters, query);
-  }, [
-    venuesWithDistance,
-    selectedCategories,
-    filterOpenNow,
-    filterSnap,
-    filterWic,
-    filterFavorites,
-    favoriteSet,
-    filterWalking,
-    query,
-  ]);
-
-  const anyFilterActive =
-    (selectedCategories !== null && selectedCategories.size > 0) ||
-    filterOpenNow ||
-    filterSnap ||
-    filterWic ||
-    (filterFavorites && favoriteSet.size > 0) ||
-    filterWalking;
-
   // ── Wordmark reset handler (#61) ─────────────────────────────────────────────
   // Recenters the map on Pueblo, clears selected venue, filters, and search.
   // Does NOT re-show the splash screen (splash is a one-time onboarding gate).
   const handleWordmarkReset = useCallback(() => {
     setSelectedVenueId(null);
-    setSelectedCategories(null);
-    setActiveCategoryFilter(null);
-    setQuery("");
+    handleClearAllFilters();
 
     if (!mapboxMap) return;
 
@@ -544,7 +413,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     } else {
       mapboxMap.flyTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: 13 });
     }
-  }, [mapboxMap]);
+  }, [handleClearAllFilters, mapboxMap]);
 
   // ── Category autozoom (#111) ─────────────────────────────────────────────────
   // When a single category is activated from the dropdown, fit the map to all
@@ -684,17 +553,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // opens its detail card.
   const handleSelectSavedVenue = useCallback(
     (venueId: string) => {
-      setSelectedCategories(null);
-      setActiveCategoryFilter(null);
-      setFilterOpenNow(false);
-      setFilterSnap(false);
-      setFilterWic(false);
-      setQuery("");
+      handleClearAllFilters();
       setSelectedVenueId(venueId);
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [isMobile, showVenueOnMap],
+    [handleClearAllFilters, isMobile, showVenueOnMap],
   );
 
   /** Called when user clicks/taps a result row inside the popover. */
@@ -719,16 +583,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     },
     [isMobile, showVenueOnMap],
   );
-
-  // Clear ALL filters + search (used by the list empty state) (#129).
-  const handleClearAllFilters = useCallback(() => {
-    setSelectedCategories(null);
-    setActiveCategoryFilter(null);
-    setFilterOpenNow(false);
-    setFilterSnap(false);
-    setFilterWic(false);
-    setQuery("");
-  }, []);
 
   // Derive the active option id for aria-activedescendant.
   const activeDescendantId =
@@ -785,7 +639,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           onSelect={handleSelectFromList}
           onClearFilters={handleClearAllFilters}
           showClearFilters={anyFilterActive || query.trim() !== ""}
-          locale={locale}
           notice={
             mapUnavailable ? (
               <div
@@ -812,7 +665,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         className="absolute top-4 left-4 flex items-center gap-2"
         style={{ zIndex: 1000 }}
       >
-        <Wordmark onClick={handleWordmarkReset} locale={locale} size="sm" selfPositioned={false} />
+        <Wordmark onClick={handleWordmarkReset} size="sm" selfPositioned={false} />
       </div>
 
       {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67)
@@ -862,7 +715,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             setIsPopoverOpen(false);
             setActiveIndex(-1);
           }}
-          locale={locale}
         />
       )}
 
@@ -878,7 +730,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             setIsPopoverOpen(false);
           }}
           onMouseDown={handleCategoryDropdownMouseDown}
-          locale={locale}
           openNowActive={filterOpenNow}
           openNowCount={openNowCount}
           onToggleOpenNow={() => setFilterOpenNow((v) => !v)}
@@ -900,7 +751,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         <EmptySearchPopover
           query={query.trim()}
           onSelectCategory={(label) => setQuery(label)}
-          locale={locale}
         />
       )}
 
@@ -908,7 +758,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           When mapUnavailable, intercept onViewModeChange so selecting "map"
           is a no-op — prevents the user from landing on a blank screen. */}
       <HamburgerMenu
-        locale={locale}
         onShowWelcome={onShowWelcome}
         savedVenues={savedVenues}
         onSelectVenue={handleSelectSavedVenue}
@@ -930,7 +779,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           onRequest={handleLocateRequest}
           sheetVisible={isMobile}
           sheetFullyExpanded={isMobile && sheetFullyExpanded}
-          locale={locale}
         />
       )}
 
@@ -976,13 +824,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             handleLocateRequest();
           }}
           onDismiss={() => setBannerVisible(false)}
-          locale={locale}
         />
       )}
 
       {/* SponsorCredit — bottom-right, hidden when BottomSheet is fully expanded (#69). Map mode only (#129). */}
       {viewMode === "map" && (
-        <SponsorCredit hidden={isMobile && sheetFullyExpanded} locale={locale} />
+        <SponsorCredit hidden={isMobile && sheetFullyExpanded} />
       )}
 
       {/* BottomSheet — mobile only (vaul v2, venue-centric API). Map mode only (#129). */}
@@ -995,7 +842,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             setSheetFullyExpanded(false);
           }}
           onExpandedChange={setSheetFullyExpanded}
-          locale={locale}
         />
       )}
 
@@ -1012,7 +858,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             setSelectedVenueId(null);
             setWindowExpanded(false);
           }}
-          locale={locale}
         />
       )}
     </div>

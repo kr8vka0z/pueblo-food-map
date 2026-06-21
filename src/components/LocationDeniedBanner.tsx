@@ -21,21 +21,24 @@
 import { useEffect, useRef } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 
 interface LocationDeniedBannerProps {
   /** Re-request geolocation. If denied again, the parent's useEffect re-triggers. */
   onRetry: () => void;
   /** Dismiss the banner. Map stays at Pueblo center. */
   onDismiss: () => void;
-  /** Locale for i18n. Defaults to "en". */
+  /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
 }
 
 export default function LocationDeniedBanner({
   onRetry,
   onDismiss,
-  locale = "en",
+  locale: localeProp,
 }: LocationDeniedBannerProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   const retryRef = useRef<HTMLButtonElement>(null);
 
   // Focus the primary action when the banner mounts.

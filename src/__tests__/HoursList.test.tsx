@@ -97,10 +97,10 @@ describe("DesktopVenueWindow hours list — today row highlight", () => {
     unmount();
   });
 
-  // 2. Today row has aria-current="true"
-  test("exactly one dl > div has aria-current='true'", () => {
+  // 2. Today row has aria-current="date" (correct ARIA value for the current date row)
+  test("exactly one dl > div has aria-current='date'", () => {
     const { container, unmount } = renderExpanded(1); // Monday
-    const rows = container.querySelectorAll("dl > div[aria-current='true']");
+    const rows = container.querySelectorAll("dl > div[aria-current='date']");
     expect(rows.length).toBe(1);
     unmount();
   });

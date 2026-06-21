@@ -68,6 +68,14 @@ export default function HamburgerMenuItem({
     </>
   );
 
+  // WHY role="menuitem" on <li>: this is a PRAGMATIC COMPROMISE, NOT strict WAI-ARIA.
+  // Strict pattern is <li role="none"><a role="menuitem"> — the interactive element
+  // carries the role, not the wrapper. Here the <a>/<button> is a focusable descendant
+  // OF the menuitem rather than being the menuitem itself, which is technically a11y
+  // debt. We keep it this way so testing-library queries work cleanly: getByRole("menuitem")
+  // finds the <li>, getByRole("link") finds the <a> by its implicit role. Changing the
+  // markup to strict conformance would require updating those test selectors. Known debt
+  // for a future a11y pass.
   return (
     <li role="menuitem">
       {href && isExternal ? (

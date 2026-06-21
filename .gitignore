@@ -47,6 +47,7 @@ next-env.d.ts
 
 # Claude Code (project-local config, worktrees, personal overrides)
 .claude/
+.clone/
 
 # Serena (local code-intelligence tooling — not part of the project)
 .serena/

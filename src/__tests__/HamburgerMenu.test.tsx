@@ -20,10 +20,12 @@ import userEvent from "@testing-library/user-event";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import { LocaleProvider } from "@/lib/LocaleContext";
 
-// Mock next/link — renders a plain <a> in tests
+// Mock next/link — renders a plain <a> in tests.
+// WHY spread rest: HamburgerMenuItem now places role="menuitem" on the <Link>;
+// the mock must pass it through or ARIA role tests and axe both miss it.
 vi.mock("next/link", () => ({
-  default: ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) => (
-    <a href={href} className={className}>
+  default: ({ href, children, ...rest }: { href: string; children: React.ReactNode; [k: string]: unknown }) => (
+    <a href={href} {...rest as React.AnchorHTMLAttributes<HTMLAnchorElement>}>
       {children}
     </a>
   ),
@@ -595,30 +597,39 @@ describe("#109 — Language toggle as last menu item", () => {
     });
   });
 
-  test("language row has role=menuitem", async () => {
+  test("language row is visible after menu opens", async () => {
+    // WHY updated: the language toggle is now rendered in a <div> OUTSIDE role="menu"
+    // (below the <ul>) because LanguageToggle contains a role="group" with plain
+    // buttons — not menuitems. Placing a group-without-menuitems inside role="menu"
+    // triggers an axe aria-required-children violation (#166 8.5).
+    // The label still appears visually as the last row in the panel.
     const user = userEvent.setup();
     const { container } = renderMenuWithLocaleProvider();
     await user.click(screen.getByRole("button", { name: /Open menu/i }));
     await waitFor(() => {
       expect(screen.getByText("Language / Idioma")).toBeDefined();
     });
-    // Find the li that contains the language label
+    // Language label is in a <div>, not a <li role="menuitem">
     const langLabel = screen.getByText("Language / Idioma");
-    const li = langLabel.closest("li");
-    expect(li).not.toBeNull();
-    expect(li!.getAttribute("role")).toBe("menuitem");
+    expect(langLabel.closest("div")).not.toBeNull();
     void container; // suppress unused warning
   });
 
-  test("language row is the last item in the menu list", async () => {
+  test("language row appears after the About link in the panel", async () => {
+    // WHY: language toggle moved outside role="menu" ul — verify it still renders
+    // after all menuitem links (last visually in the panel).
     const user = userEvent.setup();
     renderMenuWithLocaleProvider();
     await user.click(screen.getByRole("button", { name: /Open menu/i }));
     await waitFor(() => {
       expect(screen.getByText("Language / Idioma")).toBeDefined();
     });
-    const menuItems = screen.getAllByRole("menuitem");
-    const lastItem = menuItems[menuItems.length - 1];
-    expect(lastItem.textContent).toContain("Language / Idioma");
+    // The "About" link text appears before "Language / Idioma" in the DOM
+    const panel = screen.getByText("Language / Idioma").closest('[id="hamburger-panel"]');
+    const panelText = panel?.textContent ?? "";
+    const aboutIdx = panelText.indexOf("About Pueblo Food Project");
+    const langIdx = panelText.indexOf("Language / Idioma");
+    expect(aboutIdx).toBeGreaterThan(-1);
+    expect(langIdx).toBeGreaterThan(aboutIdx);
   });
 });

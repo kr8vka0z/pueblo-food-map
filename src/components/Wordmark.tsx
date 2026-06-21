@@ -13,6 +13,7 @@
  */
 
 import { t, type Locale } from '@/lib/i18n';
+import { useLocale } from '@/lib/LocaleContext';
 
 const SIZE_CLASSES = {
   sm: 'text-xl font-semibold',
@@ -52,7 +53,9 @@ interface WordmarkButtonProps {
 
 type WordmarkProps = WordmarkSpanProps | WordmarkButtonProps;
 
-export default function Wordmark({ size = 'xl', className = '', onClick, locale = 'en', selfPositioned = true }: WordmarkProps) {
+export default function Wordmark({ size = 'xl', className = '', onClick, locale: localeProp, selfPositioned = true }: WordmarkProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   const appName = t('app.name', locale);
 
   if (onClick) {

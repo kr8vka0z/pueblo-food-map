@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { Venue } from "@/types/venue";
 import { t, type Locale } from "@/lib/i18n";
 import VenueCard from "@/components/VenueCard";
+import { useLocale } from "@/lib/LocaleContext";
 
 interface ListViewProps {
   venues: Array<Venue & { distanceMiles?: number }>;
@@ -11,6 +12,7 @@ interface ListViewProps {
   onSelect: (id: string) => void;
   onClearFilters?: () => void;
   showClearFilters?: boolean;
+  /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
   /** Optional notice banner rendered below the floating chrome spacer, above the scroll container. */
   notice?: ReactNode;
@@ -22,9 +24,11 @@ export default function ListView({
   onSelect,
   onClearFilters,
   showClearFilters = false,
-  locale = "en",
+  locale: localeProp,
   notice,
 }: ListViewProps) {
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
   return (
     <div className="absolute inset-0 z-[700] flex flex-col bg-[var(--color-bone-50)] overflow-hidden">
       {/* Spacer clears the floating SearchBar + ViewToggle that sit above the list */}

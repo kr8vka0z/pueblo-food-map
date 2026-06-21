@@ -19,6 +19,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1.0,
     },
     {
+      // WHY 0.8: About is the primary discovery page for new visitors — higher
+      // than the utility forms (suggest/feedback/privacy) but below the homepage.
+      url: `${SITE_URL}/about`,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
       url: `${SITE_URL}/suggest`,
       changeFrequency: "monthly",
       priority: 0.6,

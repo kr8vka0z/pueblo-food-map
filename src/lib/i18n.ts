@@ -348,6 +348,17 @@ const en: Record<string, string> = {
   "privacy.heading": "Privacy",
   "privacy.body": "Pueblo Food Map collects only the information you type into our forms (venue reports, suggestions, and feedback). That information is used to review your submission and, if you provide an email address, to follow up with you. We do not sell, share, or store your contact information beyond what is needed to respond. IP addresses are used only for spam protection and are not logged or retained. No tracking cookies, advertising pixels, or analytics services are used.",
 
+  // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
+  "directions.walk": "Walk",
+  "directions.bus": "Bus",
+  "directions.drive": "Drive",
+  "directions.walkAriaLabel": "Walking directions to {name} (opens on map)",
+  "directions.busAriaLabel": "Bus directions to {name} (opens in new tab)",
+  "directions.driveAriaLabel": "Drive directions to {name} (opens in new tab)",
+  "directions.routeDistance": "{distance} walk",
+  "directions.routeDuration": "{duration}",
+  "directions.clearRoute": "Clear walking route",
+
   // About page (#155) — DRAFT copy pending final text from Kyle / Pueblo Food Project
   "about.heading": "About Pueblo Food Map",
   "about.backToMap": "Back to map",
@@ -716,6 +727,17 @@ const es: Record<string, string> = {
   "privacy.pageTitle": "Privacidad — Pueblo Food Map",
   "privacy.heading": "Privacidad",
   "privacy.body": "Pueblo Food Map solo recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). Esa información se usa para revisar tu envío y, si proporcionas un correo, para darte seguimiento. No vendemos, compartimos ni guardamos tu información de contacto más allá de lo necesario para responder. Las direcciones IP solo se usan para protección contra spam y no se registran ni retienen. No usamos cookies de seguimiento, píxeles de publicidad ni servicios de análisis.",
+
+  // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
+  "directions.walk": "Caminar",
+  "directions.bus": "Autobús",
+  "directions.drive": "Manejar",
+  "directions.walkAriaLabel": "Cómo llegar caminando a {name} (se muestra en el mapa)",
+  "directions.busAriaLabel": "Cómo llegar en autobús a {name} (se abre en una pestaña nueva)",
+  "directions.driveAriaLabel": "Cómo llegar manejando a {name} (se abre en una pestaña nueva)",
+  "directions.routeDistance": "{distance} caminando",
+  "directions.routeDuration": "{duration}",
+  "directions.clearRoute": "Eliminar ruta a pie",
 
   // About page (#155) — BORRADOR de texto pendiente aprobación de Kyle / Pueblo Food Project
   "about.heading": "Acerca de Pueblo Food Map",

@@ -38,6 +38,7 @@ import { MapPin, Phone, Clock, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import { safeUrl } from "@/lib/safeUrl";
+import DirectionButtons, { type RouteInfo } from "@/components/DirectionButtons";
 
 /**
  * Minimal interface covering the mapboxgl.Map methods DesktopVenueWindow uses.
@@ -144,6 +145,14 @@ interface DesktopVenueWindowProps {
   onClose: () => void;
   /** Locale forwarded from MapWrapper. Defaults to "en". */
   locale?: Locale;
+  /** Called when the user taps the Walk direction button. MapWrapper fetches the route. */
+  onWalkRoute?: (venue: Venue) => void;
+  /** True when a walking route for this venue is currently drawn on the map. */
+  isWalkRouteActive?: boolean;
+  /** Called when the user taps Walk while a route is active (clears it). */
+  onClearWalkRoute?: () => void;
+  /** Walking route distance + duration for the in-card readout (threaded from MapWrapper). */
+  walkRouteInfo?: RouteInfo | null;
 }
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
@@ -156,6 +165,10 @@ export default function DesktopVenueWindow({
   onCollapse,
   onClose,
   locale: localeProp,
+  onWalkRoute,
+  isWalkRouteActive = false,
+  onClearWalkRoute,
+  walkRouteInfo,
 }: DesktopVenueWindowProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -166,8 +179,6 @@ export default function DesktopVenueWindow({
   const windowH = expanded ? WINDOW_EXPANDED_H : WINDOW_QUICK_H;
 
   const status = computeOpenStatus(venue.hours_weekly);
-
-  const directionsUrl = `https://maps.google.com/?q=${venue.lat},${venue.lng}`;
 
   // ── Position computation ─────────────────────────────────────────────────
   // Recomputes position on mount and whenever the map pans/zooms.
@@ -318,6 +329,17 @@ export default function DesktopVenueWindow({
           {venue.notes}
         </p>
       )}
+
+      {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
+          routeInfo threads distance+duration for the in-card readout. */}
+      <DirectionButtons
+        venue={venue}
+        onWalk={onWalkRoute ?? (() => {})}
+        locale={locale}
+        isRouteActive={isWalkRouteActive}
+        onClearRoute={onClearWalkRoute}
+        routeInfo={isWalkRouteActive ? walkRouteInfo : null}
+      />
     </div>
   );
 
@@ -353,21 +375,16 @@ export default function DesktopVenueWindow({
         </div>
       </div>
 
-      {/* Get directions */}
-      <a
-        href={directionsUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={
-          "flex items-center justify-center gap-2 w-full h-10 rounded-[var(--radius-md)] " +
-          "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-          "text-lg font-semibold transition-colors duration-150 " +
-          "hover:bg-[var(--color-sage-600)] focus-visible:outline-none " +
-          "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
-        }
-      >
-        {t("detail.getDirections", locale)}
-      </a>
+      {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
+          routeInfo threads distance+duration for the in-card readout. */}
+      <DirectionButtons
+        venue={venue}
+        onWalk={onWalkRoute ?? (() => {})}
+        locale={locale}
+        isRouteActive={isWalkRouteActive}
+        onClearRoute={onClearWalkRoute}
+        routeInfo={isWalkRouteActive ? walkRouteInfo : null}
+      />
 
       {/* Report an issue — secondary action (#70) */}
       <ReportVenueButton venueId={venue.id} locale={locale} />

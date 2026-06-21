@@ -51,6 +51,53 @@ const PUEBLO_LNG = -104.6091;
 const BRAND_NAVY = "#190F3F";
 const SAGE_500 = "#4A8466";
 
+// ─── Walking route layer constants (#134) ─────────────────────────────────────
+//
+// The walking route is drawn as a GeoJSON LineString source + line layer.
+// Source id and layer id are stable strings so react-map-gl can diff them
+// correctly when the route data changes without tearing down the layer.
+
+const WALKING_ROUTE_SOURCE_ID = "pfm-walking-route";
+const WALKING_ROUTE_LAYER_ID = "pfm-walking-route-line";
+
+// WHY sage-500 (#4A8466): matches the brand primary action color used on
+// the Walk button so the on-map route reads as visually connected to the UI.
+const WALKING_ROUTE_LINE_LAYER: LayerProps = {
+  id: WALKING_ROUTE_LAYER_ID,
+  type: "line",
+  layout: {
+    "line-join": "round",
+    "line-cap": "round",
+  },
+  paint: {
+    "line-color": SAGE_500,
+    "line-width": 4,
+    "line-opacity": 0.9,
+  },
+};
+
+/** GeoJSON Feature with a LineString geometry — the Mapbox Directions API response shape. */
+export interface WalkingRouteGeoJSON {
+  type: "Feature";
+  properties: Record<string, unknown>;
+  geometry: {
+    type: "LineString";
+    coordinates: number[][];
+  };
+}
+
+/**
+ * Distance + time text for the walking route.
+ * Previously used for a map overlay pill; now consumed by DirectionButtons
+ * in-card so the readout is visible on mobile (the overlay was hidden behind
+ * the BottomSheet). Kept here as the canonical type; MapWrapper imports it
+ * to type its walkingRouteInfo state.
+ */
+export interface WalkingRouteInfo {
+  distance: string; // e.g. "0.4 mi"
+  duration: string; // e.g. "8 min"
+}
+
 // ─── County mask constants ─────────────────────────────────────────────────────
 //
 // The mask is a GeoJSON polygon with two rings:
@@ -112,6 +159,11 @@ interface MapProps {
    * has drifted off-screen (#108 drift detection).
    */
   onMoveEnd?: (bounds: mapboxgl.LngLatBounds) => void;
+  /**
+   * Walking route GeoJSON to draw on the map (#134). Null = no route shown.
+   * Passed as a controlled prop from MapWrapper, which owns the Directions API fetch.
+   */
+  walkingRoute?: WalkingRouteGeoJSON | null;
 }
 
 export default function Map({
@@ -124,6 +176,7 @@ export default function Map({
   locale = "en",
   recenterRequestId = 0,
   onMoveEnd,
+  walkingRoute = null,
 }: MapProps) {
   // Centralized hover state — one Popup for the whole map avoids per-marker mount churn.
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
@@ -385,6 +438,22 @@ export default function Map({
           }}
         >
           <Layer {...COUNTY_BORDER_LAYER} />
+        </Source>
+      )}
+
+      {/* Walking route (#134) — GeoJSON LineString drawn as a sage-colored line.
+          Rendered only when MapWrapper has fetched a route for the selected venue.
+          WHY conditional Source (not always-mounted empty source): react-map-gl
+          re-uses the source by id; mounting it with null data and later patching
+          data works, but conditionally mounting/unmounting is simpler and avoids
+          a stale-data bug when the route is cleared while a new fetch is in flight. */}
+      {walkingRoute && (
+        <Source
+          id={WALKING_ROUTE_SOURCE_ID}
+          type="geojson"
+          data={walkingRoute}
+        >
+          <Layer {...WALKING_ROUTE_LINE_LAYER} />
         </Source>
       )}
 

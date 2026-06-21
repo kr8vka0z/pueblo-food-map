@@ -41,6 +41,8 @@ Next.js App Router (Cloudflare Worker, SSR)
   └── src/app/suggest/page.tsx + submit/route.ts
   └── src/app/feedback/page.tsx + submit/route.ts
 
+  └── DirectionButtons.tsx  (Walk / Bus / Drive buttons; Walk triggers in-app route, Bus/Drive open Google Maps)
+
 Data layer (static TS modules, no API calls at render time)
   └── src/data/venues.ts          (aggregator — see "Data aggregator" below)
   └── src/data/grocery-osm.ts     (OSM Overpass, auto-generated)
@@ -129,6 +131,9 @@ Key state atoms and their roles:
 | `sheetFullyExpanded` | `boolean` | Bottom sheet snap; hides SponsorCredit when true |
 | `windowExpanded` | `boolean` | Desktop venue window expanded state |
 | `mapboxMap` | `mapboxgl.Map \| null` | Map instance; received via `onMapReady` callback from Map.tsx |
+| `walkingRoute` | `WalkingRouteGeoJSON \| null` | Active walking route GeoJSON (Mapbox Directions API) — passed to Map.tsx as a prop |
+| `walkingRouteInfo` | `WalkingRouteInfo \| null` | Distance + time text for the route info pill overlay |
+| `walkingRouteVenueId` | `string \| null` | Which venue the current route targets; used to auto-clear when selection changes |
 
 **Filtering pipeline** (computed in `useMemo`, run on every state change):
 

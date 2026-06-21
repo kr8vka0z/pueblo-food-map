@@ -26,6 +26,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { WalkingRouteGeoJSON, WalkingRouteInfo } from "@/components/Map";
 import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
@@ -269,6 +270,109 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   // ── Outside-county message (#108) ────────────────────────────────────────────
   const [outsideCountyVisible, setOutsideCountyVisible] = useState(false);
+
+  // ── Walking route (#134) ──────────────────────────────────────────────────────
+  // walkingRoute: the fetched GeoJSON for the current walking route, or null.
+  // walkingRouteInfo: human-readable distance + duration text for the overlay.
+  // walkingRouteVenueId: which venue the current route targets — used to clear
+  //   the route when selection changes to a different venue (or is cleared).
+  //
+  // WHY MapWrapper owns the fetch: the Directions API call requires the Mapbox
+  // token (NEXT_PUBLIC_MAPBOX_TOKEN), which is available client-side. Keeping
+  // the fetch here separates data-fetching from map rendering, matching the
+  // existing pattern (MapWrapper handles all state, Map.tsx is a controlled
+  // component). Map.tsx just receives walkingRoute + walkingRouteInfo as props.
+  const [walkingRoute, setWalkingRoute] = useState<WalkingRouteGeoJSON | null>(null);
+  const [walkingRouteInfo, setWalkingRouteInfo] = useState<WalkingRouteInfo | null>(null);
+  const [walkingRouteVenueId, setWalkingRouteVenueId] = useState<string | null>(null);
+
+  // Clear walking route when selected venue changes to a different venue or is deselected.
+  // WHY: if the user taps a new pin or deselects, the old route is stale and visually
+  // disconnected — clearing it avoids a confusing "whose route is this?" state.
+  // queueMicrotask satisfies the react-hooks/set-state-in-effect rule: setState must not
+  // be called synchronously at the top level of an effect body (cascading-render risk).
+  useEffect(() => {
+    if (selectedVenueId !== walkingRouteVenueId) {
+      queueMicrotask(() => {
+        setWalkingRoute(null);
+        setWalkingRouteInfo(null);
+        setWalkingRouteVenueId(null);
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVenueId]);
+
+  /** Fetch a walking route from Mapbox Directions API and draw it on the map. */
+  const handleWalkRoute = useCallback(async (venue: import("@/types/venue").Venue) => {
+    // If user re-taps Walk on the already-active route, clear it (toggle off).
+    if (walkingRouteVenueId === venue.id) {
+      setWalkingRoute(null);
+      setWalkingRouteInfo(null);
+      setWalkingRouteVenueId(null);
+      return;
+    }
+
+    // WHY userLocation as origin: the Directions API requires a from-coordinate.
+    // If user has not shared location, fall back to Pueblo center so the route
+    // still draws (from downtown to the venue), which is better than silently failing.
+    const origin = userLocation ?? PUEBLO_CENTER;
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+
+    if (!token) {
+      // No token — Directions API will fail. Fail silently; map still works.
+      console.warn("[MapWrapper] NEXT_PUBLIC_MAPBOX_TOKEN missing — walking route unavailable");
+      return;
+    }
+
+    const url = [
+      "https://api.mapbox.com/directions/v5/mapbox/walking",
+      `${origin.lng},${origin.lat};${venue.lng},${venue.lat}`,
+      `?geometries=geojson&overview=full&access_token=${token}`,
+    ].join("/");
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.warn("[MapWrapper] Directions API error:", res.status);
+        return;
+      }
+      const data = await res.json() as {
+        routes?: Array<{
+          geometry: { type: "LineString"; coordinates: number[][] };
+          distance: number;  // meters
+          duration: number;  // seconds
+        }>;
+      };
+
+      const route = data.routes?.[0];
+      if (!route) return;
+
+      // Convert distance (m) → miles and duration (s) → "N min".
+      const miles = (route.distance / 1609.34).toFixed(1);
+      const minutes = Math.round(route.duration / 60);
+
+      setWalkingRoute({
+        type: "Feature",
+        properties: {},
+        geometry: route.geometry,
+      });
+      setWalkingRouteInfo({
+        distance: `${miles} mi`,
+        duration: `${minutes} min`,
+      });
+      setWalkingRouteVenueId(venue.id);
+    } catch (err) {
+      // Network failure — fail silently. The user can still use the Bus/Drive deeplinks.
+      console.warn("[MapWrapper] Directions fetch failed:", err);
+    }
+  }, [userLocation, walkingRouteVenueId]);
+
+  /** Clear the walking route (e.g. when Walk button is tapped while route is active). */
+  const handleClearWalkingRoute = useCallback(() => {
+    setWalkingRoute(null);
+    setWalkingRouteInfo(null);
+    setWalkingRouteVenueId(null);
+  }, []);
 
   // Watch geo.state for resolution of an in-flight locate request.
   // Mirrors the existing bannerVisible effect: use refs (not isLocating state)
@@ -625,6 +729,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             }}
             onMapReady={(map) => setMapboxMap(map)}
             onMoveEnd={handleMoveEnd}
+            walkingRoute={walkingRoute}
+            walkingRouteInfo={walkingRouteInfo}
           />
         </MapErrorBoundary>
       )}
@@ -842,6 +948,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             setSheetFullyExpanded(false);
           }}
           onExpandedChange={setSheetFullyExpanded}
+          onWalkRoute={handleWalkRoute}
+          isWalkRouteActive={
+            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+          }
+          onClearWalkRoute={handleClearWalkingRoute}
         />
       )}
 
@@ -858,6 +969,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             setSelectedVenueId(null);
             setWindowExpanded(false);
           }}
+          onWalkRoute={handleWalkRoute}
+          isWalkRouteActive={
+            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+          }
+          onClearWalkRoute={handleClearWalkingRoute}
         />
       )}
     </div>

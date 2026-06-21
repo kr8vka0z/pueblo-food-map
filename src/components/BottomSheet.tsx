@@ -31,6 +31,7 @@ import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import HoursList from "@/components/HoursList";
+import DirectionButtons from "@/components/DirectionButtons";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -41,11 +42,25 @@ interface BottomSheetProps {
   onExpandedChange?: (expanded: boolean) => void;
   /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
+  /** Called when the user taps the Walk direction button. MapWrapper fetches the route. */
+  onWalkRoute?: (venue: Venue) => void;
+  /** True when a walking route for this venue is currently drawn on the map. */
+  isWalkRouteActive?: boolean;
+  /** Called when the user taps Walk while a route is active (clears it). */
+  onClearWalkRoute?: () => void;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
 
-export default function BottomSheet({ venue, onClose, onExpandedChange, locale: localeProp }: BottomSheetProps) {
+export default function BottomSheet({
+  venue,
+  onClose,
+  onExpandedChange,
+  locale: localeProp,
+  onWalkRoute,
+  isWalkRouteActive = false,
+  onClearWalkRoute,
+}: BottomSheetProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
   const [expanded, setExpanded] = useState(false);
@@ -56,10 +71,6 @@ export default function BottomSheet({ venue, onClose, onExpandedChange, locale: 
   function handleOpenChange(isOpen: boolean) {
     if (!isOpen) onClose();
   }
-
-  const directionsUrl = venue
-    ? `https://maps.google.com/?q=${venue.lat},${venue.lng}`
-    : "#";
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -182,21 +193,14 @@ export default function BottomSheet({ venue, onClose, onExpandedChange, locale: 
                   </p>
                 )}
 
-                {/* Get directions — primary action */}
-                <a
-                  href={directionsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={
-                    "flex items-center justify-center gap-2 w-full h-12 rounded-[var(--radius-md)] " +
-                    "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-                    "text-xl font-semibold transition-colors duration-150 " +
-                    "hover:bg-[var(--color-sage-600)] focus-visible:outline-none " +
-                    "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
-                  }
-                >
-                  {t("detail.getDirections", locale)}
-                </a>
+                {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive */}
+                <DirectionButtons
+                  venue={venue}
+                  onWalk={onWalkRoute ?? (() => {})}
+                  locale={locale}
+                  isRouteActive={isWalkRouteActive}
+                  onClearRoute={onClearWalkRoute}
+                />
 
                 {/* Show/Hide details toggle */}
                 <button

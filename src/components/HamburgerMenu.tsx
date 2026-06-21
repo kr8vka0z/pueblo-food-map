@@ -261,12 +261,17 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
       )}
 
       {/* ── Panel ───────────────────────────────────────────────────────────── */}
+      {/* WHY role="menu" is on <ul> not the outer div: ARIA requires role="menu"
+          children to be menuitem elements. The outer panel also contains the
+          close button header which is not a menuitem — putting role="menu" on
+          the outer div triggers aria-required-children violations. The <ul>
+          contains only menuitem-role elements, so role="menu" belongs there.
+          aria-controls on the trigger still points to the outer panel id so
+          focus management and AT can locate the panel. */}
       {open && (
         <div
           id="hamburger-panel"
           ref={panelRef}
-          role="menu"
-          aria-label={menuLabel}
           style={panelStyle}
         >
           {/* Close button (X) — visible at top of panel */}
@@ -295,11 +300,14 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
           </div>
 
           {/* Menu item list — About is the last item (#124) */}
-          <ul role="none" className="py-2">
+          <ul role="menu" aria-label={menuLabel} className="py-2">
             {/* View mode (Map | List) — moved here from a floating control */}
+            {/* WHY role="none": this row contains a composite widget (ViewToggle),
+                not a simple menuitem. role="menuitem" must be on the interactive
+                element, not a container. Using role="none" avoids aria-required-children. */}
             {viewMode && onViewModeChange && (
               <li
-                role="menuitem"
+                role="none"
                 className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-bone-200)]"
               >
                 <span className="text-sm font-medium text-[var(--color-ink-800)]">
@@ -437,17 +445,21 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
               icon={<ExternalLink size={14} />}
               ariaLabel={externalAriaLabel("menu.about")}
             />
-            {/* Language toggle (#109) — last item; label + inline EN/ES control */}
-            <li
-              role="menuitem"
-              className="flex items-center justify-between px-5 py-3 border-t border-[var(--color-bone-200)]"
-            >
-              <span className="text-sm font-medium text-[var(--color-ink-800)]">
-                {t("menu.language", locale)}
-              </span>
-              <LanguageToggle />
-            </li>
           </ul>
+          {/* Language toggle (#109) — placed OUTSIDE role="menu" because LanguageToggle
+              is a composite widget (role="group" with aria-pressed buttons), not a
+              menuitem. WAI-ARIA aria-required-children requires menu children to be
+              menuitem, group > menuitem, or separator — a group without menuitem
+              children is non-conformant. Moving the toggle below the <ul> keeps the
+              visual position while satisfying the ARIA constraint. */}
+          <div
+            className="flex items-center justify-between px-5 py-3 border-t border-[var(--color-bone-200)]"
+          >
+            <span className="text-sm font-medium text-[var(--color-ink-800)]">
+              {t("menu.language", locale)}
+            </span>
+            <LanguageToggle />
+          </div>
         </div>
       )}
     </div>

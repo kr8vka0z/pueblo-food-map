@@ -68,6 +68,12 @@ export default function HamburgerMenuItem({
     </>
   );
 
+  // WHY role="menuitem" on <li>: the <li> IS the interactive menu item in the
+  // accessibility tree when placed inside role="menu". The <a>/<button> inside
+  // is a native interactive descendant — screens readers understand this pattern.
+  // We keep role="menuitem" on <li> (not <a>/<button>) so that testing-library
+  // role queries like getByRole("link") can still select the <a> by its implicit
+  // link role, and getByRole("menuitem") selects the <li> wrapper.
   return (
     <li role="menuitem">
       {href && isExternal ? (

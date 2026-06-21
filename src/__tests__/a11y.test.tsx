@@ -28,8 +28,10 @@
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import type AxeCore from "axe-core";
+import type { Venue } from "@/types/venue";
 
 // ─── Mock navigator.permissions (jsdom doesn't implement it) ─────────────────
 beforeEach(() => {
@@ -177,6 +179,147 @@ describe("LocationDeniedBanner a11y", () => {
   });
 });
 
+// ─── BottomSheet ─────────────────────────────────────────────────────────────
+// vaul Drawer.Portal requires a real DOM portal unavailable in jsdom.
+// Mock the entire module (same approach as BottomSheet.test.tsx) so children
+// render as plain divs, enabling structural/ARIA a11y checks.
+
+vi.mock("vaul", () => {
+  const DrawerRoot = ({ children, open }: { children: React.ReactNode; open: boolean }) =>
+    open ? <div data-testid="vaul-root">{children}</div> : null;
+  const DrawerPortal = ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="vaul-portal">{children}</div>
+  );
+  const DrawerContent = ({ children, ...rest }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
+    <div data-testid="vaul-content" {...rest}>{children}</div>
+  );
+  const DrawerTitle = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <h2 data-testid="vaul-title" className={className}>{children}</h2>
+  );
+  return { Drawer: { Root: DrawerRoot, Portal: DrawerPortal, Content: DrawerContent, Title: DrawerTitle } };
+});
+
+import BottomSheet from "@/components/BottomSheet";
+
+function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: number } {
+  return {
+    id: "a11y-venue",
+    name: "A11y Test Pantry",
+    category: "pantry",
+    lat: 38.2544,
+    lng: -104.6091,
+    address: "123 Test St, Pueblo, CO 81003",
+    phone: "(719) 555-0000",
+    hours_weekly: { mon: ["09:00-12:00"], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] },
+    source: "test",
+    last_verified: "2026-01-01",
+    ...overrides,
+  };
+}
+
+describe("BottomSheet a11y", () => {
+  test("collapsed state has no axe violations", async () => {
+    const { container } = render(
+      <BottomSheet venue={makeVenue()} onClose={() => {}} />,
+    );
+    const results = await runAxe(container);
+    expect(
+      results.violations.length,
+      `Violations found:\n${describeViolations(results)}`,
+    ).toBe(0);
+  });
+});
+
+// ─── HamburgerMenu ────────────────────────────────────────────────────────────
+// matchMedia stub: jsdom lacks it; used for mobile breakpoint detection.
+// next/link: renders as plain <a> in tests.
+
+import HamburgerMenu from "@/components/HamburgerMenu";
+
+vi.mock("next/link", () => ({
+  // Pass all HTML attrs (including role, aria-label) through to the <a> element.
+  default: ({ href, children, ...rest }: { href: string; children: React.ReactNode; [k: string]: unknown }) => (
+    <a href={href} {...rest as React.AnchorHTMLAttributes<HTMLAnchorElement>}>{children}</a>
+  ),
+}));
+
+describe("HamburgerMenu a11y", () => {
+  beforeEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    });
+  });
+
+  test("closed state (trigger only) has no axe violations", async () => {
+    const { container } = render(<HamburgerMenu />);
+    const results = await runAxe(container);
+    expect(
+      results.violations.length,
+      `Violations found:\n${describeViolations(results)}`,
+    ).toBe(0);
+  });
+
+  test("open state has no axe violations", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<HamburgerMenu />);
+    await user.click(container.querySelector("button")!);
+    const results = await runAxe(container);
+    expect(
+      results.violations.length,
+      `Violations found:\n${describeViolations(results)}`,
+    ).toBe(0);
+  });
+});
+
+// ─── DesktopVenueWindow ───────────────────────────────────────────────────────
+// mapboxMap is optional for structural rendering; pass null to skip positioning.
+// Tests both collapsed and expanded states.
+
+import DesktopVenueWindow from "@/components/DesktopVenueWindow";
+
+describe("DesktopVenueWindow a11y", () => {
+  test("collapsed state has no axe violations", async () => {
+    const { container } = render(
+      <DesktopVenueWindow
+        venue={makeVenue()}
+        expanded={false}
+        mapboxMap={null}
+        onExpand={() => {}}
+        onCollapse={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    const results = await runAxe(container);
+    expect(
+      results.violations.length,
+      `Violations found:\n${describeViolations(results)}`,
+    ).toBe(0);
+  });
+
+  test("expanded state has no axe violations", async () => {
+    const { container } = render(
+      <DesktopVenueWindow
+        venue={makeVenue({ accepts_snap: true, accepts_wic: true })}
+        expanded={true}
+        mapboxMap={null}
+        onExpand={() => {}}
+        onCollapse={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    const results = await runAxe(container);
+    expect(
+      results.violations.length,
+      `Violations found:\n${describeViolations(results)}`,
+    ).toBe(0);
+  });
+});
+
 // ─── VenueMarker ─────────────────────────────────────────────────────────────
 // Mock react-map-gl/mapbox Marker so the button child is testable in jsdom.
 // Map.tsx itself is excluded (needs WebGL canvas — verified via Lighthouse).
@@ -193,7 +336,6 @@ vi.mock("react-map-gl/mapbox", () => ({
 }));
 
 import VenueMarker from "@/components/VenueMarker";
-import type { Venue } from "@/types/venue";
 
 function makeAxeVenue(category: Venue["category"] = "pantry"): Venue {
   return {

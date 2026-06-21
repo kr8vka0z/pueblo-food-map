@@ -3,6 +3,8 @@
  *
  * Server component: reads locale from cookie and renders FeedbackForm
  * client component. Mirrors the /suggest page pattern exactly.
+ *
+ * Updated in #155: SiteFooter added.
  */
 
 import type { Metadata } from "next";
@@ -12,6 +14,7 @@ import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import FeedbackForm from "@/components/FeedbackForm";
 import { buildPageMetadata } from "@/lib/site";
+import SiteFooter from "@/components/SiteFooter";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Send Feedback",
@@ -63,6 +66,8 @@ export default async function FeedbackPage() {
           {t("feedback.fallback", locale)}
         </p>
       </div>
+
+      <SiteFooter />
     </main>
   );
 }

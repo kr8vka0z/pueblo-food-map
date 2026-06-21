@@ -30,9 +30,13 @@ Browser
         ├── HamburgerMenu    (saved places, help links, language, view toggle)
         └── ListView         (full-screen nearest-first list, map mode off)
 
+Shared utility components
+  └── src/components/SiteFooter.tsx  (slim nav footer on utility pages: /about, /privacy, /suggest, /feedback)
+
 Next.js App Router (Cloudflare Worker, SSR)
   └── src/app/layout.tsx      (reads pfm-locale cookie; wraps with LocaleProvider)
   └── src/app/page.tsx        (splash gate; mounts MapWrapper)
+  └── src/app/about/page.tsx  (mission, vision, origin story, venue sourcing — #155)
   └── src/app/report/[venueId]/page.tsx + submit/route.ts
   └── src/app/suggest/page.tsx + submit/route.ts
   └── src/app/feedback/page.tsx + submit/route.ts

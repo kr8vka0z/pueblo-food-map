@@ -5,6 +5,9 @@
  * the email field to inform users from a vulnerable population what their
  * contact information is used for. Issue #160 item 1.7.
  *
+ * Updated in #155: SiteFooter added so the About link is reachable from all
+ * utility pages (required for footer AC).
+ *
  * Server component: reads locale from cookie, same pattern as other form pages.
  */
 
@@ -14,6 +17,7 @@ import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
+import SiteFooter from "@/components/SiteFooter";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Privacy",
@@ -56,6 +60,8 @@ export default async function PrivacyPage() {
           {t("privacy.body", locale)}
         </p>
       </div>
+
+      <SiteFooter />
     </main>
   );
 }

@@ -3,6 +3,8 @@
  *
  * Server component: reads locale from cookie and renders SuggestForm
  * client component.
+ *
+ * Updated in #155: SiteFooter added.
  */
 
 import type { Metadata } from "next";
@@ -12,6 +14,7 @@ import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import SuggestForm from "@/components/SuggestForm";
 import { buildPageMetadata } from "@/lib/site";
+import SiteFooter from "@/components/SiteFooter";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Suggest a Venue",
@@ -63,6 +66,8 @@ export default async function SuggestPage() {
           {t("suggest.fallback", locale)}
         </p>
       </div>
+
+      <SiteFooter />
     </main>
   );
 }

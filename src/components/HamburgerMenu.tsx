@@ -22,7 +22,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Menu, X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Phone } from "lucide-react";
+import { Menu, X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Phone, Info } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import ViewToggle, { type ViewMode } from "./ViewToggle";
@@ -389,6 +389,12 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
               label={t("menu.feedback", locale)}
               href="/feedback"
               icon={<MessageSquare size={14} />}
+            />
+            {/* About this map (#155) — internal link, no external icon */}
+            <HamburgerMenuItem
+              label={t("nav.about", locale)}
+              href="/about"
+              icon={<Info size={14} />}
             />
 
             {/* Get help — curated external assistance resources (#131) */}

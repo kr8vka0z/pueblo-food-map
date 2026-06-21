@@ -358,6 +358,28 @@ const en: Record<string, string> = {
   "directions.routeDistance": "{distance} walk",
   "directions.routeDuration": "{duration}",
   "directions.clearRoute": "Clear walking route",
+
+  // About page (#155) — DRAFT copy pending final text from Kyle / Pueblo Food Project
+  "about.heading": "About Pueblo Food Map",
+  "about.backToMap": "Back to map",
+  "about.mission.heading": "Our mission",
+  "about.mission.body": "Pueblo Food Map puts every free and low-cost food resource in Pueblo County on one mobile-friendly map — so anyone, in any neighborhood, can find what they need in minutes.",
+  "about.vision.heading": "Our vision",
+  "about.vision.body": "A Pueblo County where no one goes hungry because they couldn't find the resources already available in their community.",
+  "about.origin.heading": "How it started",
+  "about.origin.body": "Finding food assistance in Pueblo meant juggling separate tools — the Pueblo Food Project site, Plentiful, FoodFinder, Pueblo Transit, and 211. Pueblo Food Map consolidates those sources into a single, bilingual map that works on any smartphone, no app install required.",
+  "about.howWeSource.heading": "How venues are added",
+  "about.howWeSource.body": "Venue data comes from Pueblo Food Project, OpenStreetMap, Plentiful's public directory, and USDA benefit data. All listings are reviewed before going live. If you know of a resource we're missing, please suggest it.",
+  "about.suggest.heading": "Know something we're missing?",
+  "about.suggest.body": "If you know of a food pantry, community garden, or other resource that isn't on the map yet, let us know.",
+  "about.suggest.cta": "Suggest a venue",
+
+  // Nav and footer shared strings (#155)
+  "nav.about": "About this map",
+  "footer.backToMap": "Back to map",
+  "footer.about": "About",
+  "footer.privacy": "Privacy",
+  "footer.suggest": "Suggest a venue",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -716,6 +738,28 @@ const es: Record<string, string> = {
   "directions.routeDistance": "{distance} caminando",
   "directions.routeDuration": "{duration}",
   "directions.clearRoute": "Eliminar ruta a pie",
+
+  // About page (#155) — BORRADOR de texto pendiente aprobación de Kyle / Pueblo Food Project
+  "about.heading": "Acerca de Pueblo Food Map",
+  "about.backToMap": "Volver al mapa",
+  "about.mission.heading": "Nuestra misión",
+  "about.mission.body": "Pueblo Food Map pone todos los recursos de alimentos gratuitos y de bajo costo del condado de Pueblo en un mapa fácil de usar en el celular, para que cualquier persona, en cualquier colonia, pueda encontrar lo que necesita en minutos.",
+  "about.vision.heading": "Nuestra visión",
+  "about.vision.body": "Un condado de Pueblo donde nadie pase hambre por no poder encontrar los recursos disponibles en su comunidad.",
+  "about.origin.heading": "Cómo comenzó",
+  "about.origin.body": "Encontrar apoyo alimentario en Pueblo requería usar varias herramientas por separado: el sitio de Pueblo Food Project, Plentiful, FoodFinder, Pueblo Transit y el 211. Pueblo Food Map consolida esas fuentes en un solo mapa bilingüe que funciona en cualquier celular, sin necesidad de instalar una aplicación.",
+  "about.howWeSource.heading": "Cómo agregamos lugares",
+  "about.howWeSource.body": "Los datos de los lugares provienen de Pueblo Food Project, OpenStreetMap, el directorio público de Plentiful y datos de beneficios del USDA. Todos los registros se revisan antes de publicarse. Si conoces un recurso que no está en el mapa, puedes sugerirlo.",
+  "about.suggest.heading": "¿Sabes de algo que nos falta?",
+  "about.suggest.body": "Si conoces una despensa comunitaria, huerto o algún otro recurso alimentario que aún no está en el mapa, cuéntanos.",
+  "about.suggest.cta": "Sugerir un lugar",
+
+  // Nav and footer shared strings (#155)
+  "nav.about": "Acerca de este mapa",
+  "footer.backToMap": "Volver al mapa",
+  "footer.about": "Acerca de",
+  "footer.privacy": "Privacidad",
+  "footer.suggest": "Sugerir un lugar",
 };
 
 /** Substitute simple {key} placeholders. */

@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Derive the target URL:
       # - PRs: use the CF preview subdomain if the preview token is available,

@@ -24,6 +24,9 @@ const IDENTICAL_ALLOWLIST = new Set([
   // directions.routeDuration is a pure placeholder — both locales output only {duration}
   // with no surrounding text, so identical EN/ES is correct (#134).
   "directions.routeDuration",
+  // directions.stepMi uses the same "mi" abbreviation in both EN and ES — international
+  // convention; "mi" is understood universally in the Pueblo CO context (#134).
+  "directions.stepMi",
 ]);
 
 /** Keys that must differ between EN and ES. */

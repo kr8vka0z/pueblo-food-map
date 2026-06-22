@@ -98,6 +98,16 @@ export interface WalkingRouteInfo {
   duration: string; // e.g. "8 min"
 }
 
+/**
+ * A single turn-by-turn step from the Mapbox Directions API.
+ * `instruction` comes pre-localized (Mapbox `language=` param).
+ * `distance` is raw meters from `step.distance`.
+ */
+export interface WalkStep {
+  instruction: string;
+  distance: number; // meters
+}
+
 // ─── County mask constants ─────────────────────────────────────────────────────
 //
 // The mask is a GeoJSON polygon with two rings:

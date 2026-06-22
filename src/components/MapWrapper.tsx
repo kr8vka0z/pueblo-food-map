@@ -26,7 +26,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { WalkingRouteGeoJSON, WalkingRouteInfo } from "@/components/Map";
+import type { WalkingRouteGeoJSON, WalkingRouteInfo, WalkStep } from "@/components/Map";
 import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
@@ -182,6 +182,69 @@ function useIsMobile(): boolean {
   return isMobile;
 }
 
+// ─── Walking route URL builder (pure, exported for unit tests) ───────────────
+
+/**
+ * Build the Mapbox Directions API URL for a walking route.
+ * Exported so tests can assert on URL params (steps=true, language=) without
+ * needing to mount MapWrapper (which requires WebGL / Mapbox GL).
+ */
+export function buildWalkingRouteUrl(
+  originLng: number,
+  originLat: number,
+  destLng: number,
+  destLat: number,
+  token: string,
+  locale: string,
+): string {
+  return [
+    "https://api.mapbox.com/directions/v5/mapbox/walking",
+    `${originLng},${originLat};${destLng},${destLat}`,
+    `?geometries=geojson&overview=full&steps=true&language=${locale}&access_token=${token}`,
+  ].join("/");
+}
+
+// ─── Walking step parser (pure, exported for unit tests) ─────────────────────
+
+/**
+ * Parse turn-by-turn steps from a Mapbox Directions API route object.
+ *
+ * Exported as a pure function so tests can exercise the parse logic without
+ * mounting MapWrapper (same pattern as buildWalkingRouteUrl). This mirrors the
+ * existing exported-pure-function convention in this module.
+ *
+ * WHY defensive access (s.maneuver?.instruction): the Mapbox API response is
+ * consumed via an `as` cast — there is no runtime guarantee that every step
+ * has `maneuver` or `instruction`. A missing field would throw inside a
+ * `.map()` and be caught by the surrounding try/catch, silently discarding
+ * the ENTIRE route (line + info + steps). Defensive access + empty-string
+ * filter lets valid steps through while dropping malformed ones.
+ *
+ * WHY filter distance === 0 separately: the arrival step always has distance 0
+ * and an empty or trivial instruction. It is kept here (dropped in formatting
+ * via formatStepDistance) rather than filtered at parse time so callers that
+ * want to show the arrival step can still do so.
+ */
+export function parseWalkSteps(
+  route: {
+    legs?: Array<{
+      steps?: Array<{
+        maneuver?: { instruction?: string };
+        distance: number;
+      }>;
+    }>;
+  },
+): WalkStep[] {
+  const rawSteps = route.legs?.[0]?.steps ?? [];
+  return rawSteps.flatMap((s) => {
+    const instruction = s.maneuver?.instruction ?? "";
+    // Drop steps whose instruction is missing or empty — they are malformed
+    // API responses that would render as blank list items.
+    if (!instruction) return [];
+    return [{ instruction, distance: s.distance }];
+  });
+}
+
 // ─── MapWrapper ───────────────────────────────────────────────────────────────
 
 interface MapWrapperProps {
@@ -274,6 +337,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // ── Walking route (#134) ──────────────────────────────────────────────────────
   // walkingRoute: the fetched GeoJSON for the current walking route, or null.
   // walkingRouteInfo: human-readable distance + duration text for the overlay.
+  // walkingRouteSteps: turn-by-turn steps from Mapbox (pre-localized via language= param).
   // walkingRouteVenueId: which venue the current route targets — used to clear
   //   the route when selection changes to a different venue (or is cleared).
   //
@@ -284,18 +348,53 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // component). Map.tsx just receives walkingRoute + walkingRouteInfo as props.
   const [walkingRoute, setWalkingRoute] = useState<WalkingRouteGeoJSON | null>(null);
   const [walkingRouteInfo, setWalkingRouteInfo] = useState<WalkingRouteInfo | null>(null);
+  const [walkingRouteSteps, setWalkingRouteSteps] = useState<WalkStep[] | null>(null);
   const [walkingRouteVenueId, setWalkingRouteVenueId] = useState<string | null>(null);
+
+  // ── Stale-route race guard (FIX 1 — hardened) ───────────────────────────────
+  // handleWalkRoute is async. If the user taps Walk on venue A then selects
+  // venue B before A's fetch resolves, A's resolution must NOT commit state —
+  // doing so would draw A's route line on the map while B is selected.
+  //
+  // WHY a monotonic sequence counter instead of keying on venue.id (original
+  // design): keying on venue.id lets two overlapping Walk taps for the SAME
+  // venue both pass the guard — the older, slower response can overwrite the
+  // newer one if userLocation changed between taps (last-resolve-wins instead
+  // of last-request-wins). A monotonic integer gives each fetch a unique token
+  // regardless of which venue it targets.
+  //
+  // WHY a ref (not state): the counter is read inside an async closure. State
+  // would capture a stale value at fetch launch; a ref always reflects the
+  // current value at resolution time.
+  //
+  // WHY the seq is bumped on toggle-off and clear (but NOT in the
+  // selectedVenueId-change effect): bumping on explicit user actions (toggle-off,
+  // handleClearWalkingRoute) ensures a pending fetch can never repopulate a
+  // route the user just cleared. We intentionally do NOT touch the seq in the
+  // selectedVenueId-change effect — not touching it lets a same-task
+  // select+walk-for-the-new-venue succeed. The render-gate below (gating
+  // walkingRoute on walkingRouteVenueId === selectedVenueId) is the real safety
+  // net for the selection-switch case.
+  const walkReqSeq = useRef(0);
 
   // Clear walking route when selected venue changes to a different venue or is deselected.
   // WHY: if the user taps a new pin or deselects, the old route is stale and visually
   // disconnected — clearing it avoids a confusing "whose route is this?" state.
   // queueMicrotask satisfies the react-hooks/set-state-in-effect rule: setState must not
   // be called synchronously at the top level of an effect body (cascading-render risk).
+  //
+  // WHY we do NOT touch walkReqSeq here: see the comment above walkReqSeq. The
+  // render-gate on the Map line prop (walkingRouteVenueId === selectedVenueId)
+  // prevents a stale-venue route from ever drawing, so there is no need to
+  // invalidate in-flight fetches here. Bumping the seq here would break the
+  // same-task select+walk-for-new-venue flow (latent footgun if future UX
+  // allows it).
   useEffect(() => {
     if (selectedVenueId !== walkingRouteVenueId) {
       queueMicrotask(() => {
         setWalkingRoute(null);
         setWalkingRouteInfo(null);
+        setWalkingRouteSteps(null);
         setWalkingRouteVenueId(null);
       });
     }
@@ -306,11 +405,20 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const handleWalkRoute = useCallback(async (venue: import("@/types/venue").Venue) => {
     // If user re-taps Walk on the already-active route, clear it (toggle off).
     if (walkingRouteVenueId === venue.id) {
+      // Bump the seq so any pending fetch (same venue, stale userLocation) cannot
+      // repopulate the route after the user explicitly toggled it off.
+      walkReqSeq.current++;
       setWalkingRoute(null);
       setWalkingRouteInfo(null);
+      setWalkingRouteSteps(null);
       setWalkingRouteVenueId(null);
       return;
     }
+
+    // Mint a unique request token. Any earlier in-flight fetch — including one
+    // for the SAME venue — that resolves after this point will compare its seq
+    // snapshot to walkReqSeq.current and bail if they differ (latest-REQUEST-wins).
+    const seq = ++walkReqSeq.current;
 
     // WHY userLocation as origin: the Directions API requires a from-coordinate.
     // If user has not shared location, fall back to Pueblo center so the route
@@ -324,11 +432,15 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       return;
     }
 
-    const url = [
-      "https://api.mapbox.com/directions/v5/mapbox/walking",
-      `${origin.lng},${origin.lat};${venue.lng},${venue.lat}`,
-      `?geometries=geojson&overview=full&access_token=${token}`,
-    ].join("/");
+    // WHY steps=true: enables turn-by-turn instruction text in the response.
+    // WHY language=${locale}: Mapbox returns pre-localized instruction strings,
+    // so Spanish users get Spanish turn instructions without client-side translation.
+    const url = buildWalkingRouteUrl(
+      origin.lng, origin.lat,
+      venue.lng, venue.lat,
+      token,
+      locale,
+    );
 
     try {
       const res = await fetch(url);
@@ -341,8 +453,20 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           geometry: { type: "LineString"; coordinates: number[][] };
           distance: number;  // meters
           duration: number;  // seconds
+          legs?: Array<{
+            steps?: Array<{
+              maneuver?: { instruction?: string };
+              distance: number; // meters
+            }>;
+          }>;
         }>;
       };
+
+      // Stale-route guard: bail if a newer Walk request (or a clear/toggle-off)
+      // has been issued since this fetch was initiated. Uses the monotonic seq
+      // so same-venue double-taps are caught too (latest-REQUEST-wins, not
+      // latest-resolve-wins).
+      if (walkReqSeq.current !== seq) return;
 
       const route = data.routes?.[0];
       if (!route) return;
@@ -350,6 +474,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       // Convert distance (m) → miles and duration (s) → "N min".
       const miles = (route.distance / 1609.34).toFixed(1);
       const minutes = Math.round(route.duration / 60);
+
+      // Parse turn-by-turn steps via the extracted pure function (FIX 3).
+      const steps = parseWalkSteps(route);
 
       setWalkingRoute({
         type: "Feature",
@@ -360,17 +487,22 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         distance: `${miles} mi`,
         duration: `${minutes} min`,
       });
+      setWalkingRouteSteps(steps.length > 0 ? steps : null);
       setWalkingRouteVenueId(venue.id);
     } catch (err) {
       // Network failure — fail silently. The user can still use the Bus/Drive deeplinks.
       console.warn("[MapWrapper] Directions fetch failed:", err);
     }
-  }, [userLocation, walkingRouteVenueId]);
+  }, [locale, userLocation, walkingRouteVenueId]);
 
   /** Clear the walking route (e.g. when Walk button is tapped while route is active). */
   const handleClearWalkingRoute = useCallback(() => {
+    // Bump seq so any pending fetch cannot repopulate the route after an
+    // explicit clear — same invariant as the toggle-off branch above.
+    walkReqSeq.current++;
     setWalkingRoute(null);
     setWalkingRouteInfo(null);
+    setWalkingRouteSteps(null);
     setWalkingRouteVenueId(null);
   }, []);
 
@@ -729,7 +861,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             }}
             onMapReady={(map) => setMapboxMap(map)}
             onMoveEnd={handleMoveEnd}
-            walkingRoute={walkingRoute}
+            walkingRoute={walkingRouteVenueId === selectedVenueId ? walkingRoute : null}
           />
         </MapErrorBoundary>
       )}
@@ -957,6 +1089,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
               ? walkingRouteInfo
               : null
           }
+          walkRouteSteps={
+            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+              ? walkingRouteSteps
+              : null
+          }
         />
       )}
 
@@ -981,6 +1118,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           walkRouteInfo={
             selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
               ? walkingRouteInfo
+              : null
+          }
+          walkRouteSteps={
+            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+              ? walkingRouteSteps
               : null
           }
         />

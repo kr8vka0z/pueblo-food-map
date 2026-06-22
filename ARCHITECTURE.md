@@ -41,7 +41,7 @@ Next.js App Router (Cloudflare Worker, SSR)
   └── src/app/suggest/page.tsx + submit/route.ts
   └── src/app/feedback/page.tsx + submit/route.ts
 
-  └── DirectionButtons.tsx  (Walk / Bus / Drive buttons; Walk triggers in-app route, Bus/Drive open Google Maps)
+  └── DirectionButtons.tsx  (Walk / Bus / Drive buttons; Walk triggers in-app route + collapsible turn-by-turn step list + "Open in Google Maps" walk handoff; Bus/Drive open Google Maps)
 
 Data layer (static TS modules, no API calls at render time)
   └── src/data/venues.ts          (aggregator — see "Data aggregator" below)
@@ -133,7 +133,12 @@ Key state atoms and their roles:
 | `mapboxMap` | `mapboxgl.Map \| null` | Map instance; received via `onMapReady` callback from Map.tsx |
 | `walkingRoute` | `WalkingRouteGeoJSON \| null` | Active walking route GeoJSON (Mapbox Directions API) — passed to Map.tsx as a prop |
 | `walkingRouteInfo` | `WalkingRouteInfo \| null` | Distance + time text for the route info pill overlay |
+| `walkingRouteSteps` | `WalkStep[] \| null` | Turn-by-turn steps from Mapbox (pre-localized via `language=` param); threaded to DirectionButtons for the collapsible step list |
 | `walkingRouteVenueId` | `string \| null` | Which venue the current route targets; used to auto-clear when selection changes |
+| `walkReqSeq` | `ref<number>` | Monotonic sequence counter for in-flight walk fetches. Incremented at the start of each `handleWalkRoute` call (non-toggle path), and on every explicit clear (toggle-off, `handleClearWalkingRoute`). On resolution the fetch's captured `seq` snapshot is compared to the current counter; if they differ the result is discarded (latest-REQUEST-wins, not latest-resolve-wins). Keys on a monotonic int rather than `venue.id` so same-venue double-taps with a changed `userLocation` are also caught. NOT bumped in the `selectedVenueId`-change effect — the render-gate on the Map `walkingRoute` prop (`walkingRouteVenueId === selectedVenueId ? walkingRoute : null`) is the safety net for selection-switch races, preserving the seq so a same-task select+walk-for-new-venue can succeed |
+
+**Walking route step parsing:**
+`parseWalkSteps(route)` is an exported pure function in `MapWrapper.tsx`. It converts the raw Mapbox Directions API legs/steps array to `WalkStep[]`, with defensive optional-chaining on `maneuver?.instruction` so a malformed step is dropped (not thrown). Exported for unit testing without mounting MapWrapper (mirrors `buildWalkingRouteUrl` pattern).
 
 **Filtering pipeline** (computed in `useMemo`, run on every state change):
 

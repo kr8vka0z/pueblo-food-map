@@ -38,7 +38,7 @@ import { MapPin, Phone, Clock, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import { safeUrl } from "@/lib/safeUrl";
-import DirectionButtons, { type RouteInfo } from "@/components/DirectionButtons";
+import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 
 /**
  * Minimal interface covering the mapboxgl.Map methods DesktopVenueWindow uses.
@@ -153,6 +153,8 @@ interface DesktopVenueWindowProps {
   onClearWalkRoute?: () => void;
   /** Walking route distance + duration for the in-card readout (threaded from MapWrapper). */
   walkRouteInfo?: RouteInfo | null;
+  /** Turn-by-turn steps from Mapbox (pre-localized). Shown as a collapsible list in DirectionButtons. */
+  walkRouteSteps?: WalkStep[] | null;
 }
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
@@ -169,6 +171,7 @@ export default function DesktopVenueWindow({
   isWalkRouteActive = false,
   onClearWalkRoute,
   walkRouteInfo,
+  walkRouteSteps,
 }: DesktopVenueWindowProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -331,7 +334,8 @@ export default function DesktopVenueWindow({
       )}
 
       {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
-          routeInfo threads distance+duration for the in-card readout. */}
+          routeInfo threads distance+duration for the in-card readout.
+          walkSteps provides the collapsible turn-by-turn list. */}
       <DirectionButtons
         venue={venue}
         onWalk={onWalkRoute ?? (() => {})}
@@ -339,6 +343,7 @@ export default function DesktopVenueWindow({
         isRouteActive={isWalkRouteActive}
         onClearRoute={onClearWalkRoute}
         routeInfo={isWalkRouteActive ? walkRouteInfo : null}
+        walkSteps={isWalkRouteActive ? walkRouteSteps : null}
       />
     </div>
   );
@@ -376,7 +381,8 @@ export default function DesktopVenueWindow({
       </div>
 
       {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
-          routeInfo threads distance+duration for the in-card readout. */}
+          routeInfo threads distance+duration for the in-card readout.
+          walkSteps provides the collapsible turn-by-turn list. */}
       <DirectionButtons
         venue={venue}
         onWalk={onWalkRoute ?? (() => {})}
@@ -384,6 +390,7 @@ export default function DesktopVenueWindow({
         isRouteActive={isWalkRouteActive}
         onClearRoute={onClearWalkRoute}
         routeInfo={isWalkRouteActive ? walkRouteInfo : null}
+        walkSteps={isWalkRouteActive ? walkRouteSteps : null}
       />
 
       {/* Report an issue — secondary action (#70) */}

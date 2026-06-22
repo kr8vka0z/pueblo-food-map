@@ -13,10 +13,13 @@
  *   9. Google Maps deeplinks use api=1 param (required for params to work).
  *  10. Google Maps deeplinks OMIT origin (uses user's current location automatically).
  *  11. Google Maps deeplinks do NOT include dir_action=navigate.
+ *  12. Turn-by-turn step list renders when steps are provided.
+ *  13. Show/Hide steps toggle expands/collapses list and flips aria-expanded.
+ *  14. Google Maps walk link has correct href (travelmode=walking) and safe rel.
  */
 
 import { describe, test, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DirectionButtons from "@/components/DirectionButtons";
 import type { Venue } from "@/types/venue";
@@ -243,6 +246,383 @@ describe("DirectionButtons — walking route active state", () => {
   });
 });
 
+// ─── Sample steps for turn-by-turn tests ─────────────────────────────────────
+
+const SAMPLE_STEPS = [
+  { instruction: "Head north on Main St", distance: 50 },    // 50 m = ~164 ft → ft display
+  { instruction: "Turn right on Union Ave", distance: 300 }, // 300 m = ~0.19 mi → mi display
+  { instruction: "Arrive at destination", distance: 0 },
+];
+
+describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () => {
+  test("step list is NOT rendered when no steps are provided", () => {
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+      />,
+    );
+    expect(container.querySelector("[data-testid='walk-steps-list']")).toBeNull();
+    // Toggle button also absent when no steps
+    expect(container.querySelector("[data-testid='walk-steps-toggle']")).toBeNull();
+  });
+
+  test("step list is NOT rendered when steps is an empty array", () => {
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={[]}
+      />,
+    );
+    expect(container.querySelector("[data-testid='walk-steps-list']")).toBeNull();
+    expect(container.querySelector("[data-testid='walk-steps-toggle']")).toBeNull();
+  });
+
+  test("toggle button is rendered when steps are present", () => {
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={SAMPLE_STEPS}
+      />,
+    );
+    expect(container.querySelector("[data-testid='walk-steps-toggle']")).not.toBeNull();
+  });
+
+  test("step list is initially collapsed (hidden)", () => {
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={SAMPLE_STEPS}
+      />,
+    );
+    // List exists in DOM but not visible (hidden attribute or aria-hidden) OR absent until toggled
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    // List should be hidden when collapsed
+    const list = container.querySelector("[data-testid='walk-steps-list']");
+    // Either list is absent or it has hidden attribute
+    if (list) {
+      expect(list.getAttribute("hidden")).not.toBeNull();
+    }
+  });
+
+  test("clicking toggle expands the step list and flips aria-expanded", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={SAMPLE_STEPS}
+      />,
+    );
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    // List should now be visible
+    const list = container.querySelector("[data-testid='walk-steps-list']");
+    expect(list).not.toBeNull();
+    expect((list as HTMLElement).getAttribute("hidden")).toBeNull();
+  });
+
+  test("clicking toggle twice collapses again", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={SAMPLE_STEPS}
+      />,
+    );
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    await user.click(toggle);
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  test("expanded list contains one item per step", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={SAMPLE_STEPS}
+      />,
+    );
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    await user.click(toggle);
+    const list = container.querySelector("[data-testid='walk-steps-list']") as HTMLOListElement;
+    expect(list.tagName).toBe("OL");
+    const items = list.querySelectorAll("li");
+    expect(items.length).toBe(SAMPLE_STEPS.length);
+  });
+
+  test("expanded list shows instruction text", async () => {
+    const user = userEvent.setup();
+    render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={SAMPLE_STEPS}
+      />,
+    );
+    const toggle = screen.getByTestId("walk-steps-toggle");
+    await user.click(toggle);
+    expect(screen.getByText("Head north on Main St")).toBeDefined();
+    expect(screen.getByText("Turn right on Union Ave")).toBeDefined();
+  });
+
+  test("short steps (<528 ft threshold) show distance in feet", async () => {
+    const user = userEvent.setup();
+    render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={[{ instruction: "Head north on Main St", distance: 50 }]}
+      />,
+    );
+    await user.click(screen.getByTestId("walk-steps-toggle"));
+    // 50m ≈ 164 ft
+    expect(screen.getByTestId("walk-steps-list").textContent).toContain("ft");
+  });
+
+  test("long steps show distance in miles", async () => {
+    const user = userEvent.setup();
+    render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={[{ instruction: "Continue on Union Ave", distance: 500 }]}
+      />,
+    );
+    await user.click(screen.getByTestId("walk-steps-toggle"));
+    // 500m ≈ 0.31 mi
+    expect(screen.getByTestId("walk-steps-list").textContent).toContain("mi");
+  });
+
+  test("toggle has aria-controls pointing at list id", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={SAMPLE_STEPS}
+      />,
+    );
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    const controlsId = toggle.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+    await user.click(toggle);
+    const list = container.querySelector("[data-testid='walk-steps-list']") as HTMLElement;
+    expect(list.id).toBe(controlsId);
+  });
+
+  test("step list has an accessible name", async () => {
+    const user = userEvent.setup();
+    render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={SAMPLE_STEPS}
+      />,
+    );
+    await user.click(screen.getByTestId("walk-steps-toggle"));
+    const list = screen.getByTestId("walk-steps-list");
+    // aria-label or aria-labelledby must be present
+    const hasA11yName =
+      list.getAttribute("aria-label") || list.getAttribute("aria-labelledby");
+    expect(hasA11yName).toBeTruthy();
+  });
+
+  test("toggle button shows 'Show steps' when collapsed (EN)", () => {
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={SAMPLE_STEPS}
+      />,
+    );
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    expect(toggle.textContent).toContain("Show steps");
+  });
+
+  test("toggle button shows 'Hide steps' when expanded (EN)", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={SAMPLE_STEPS}
+      />,
+    );
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    await user.click(toggle);
+    expect(toggle.textContent).toContain("Hide steps");
+  });
+
+  test("toggle shows 'Ver indicaciones' (ES) when collapsed", () => {
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="es"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        walkSteps={SAMPLE_STEPS}
+      />,
+    );
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    expect(toggle.textContent).toContain("Ver indicaciones");
+  });
+});
+
+describe("DirectionButtons — Google Maps walk link (#134 enhancement)", () => {
+  test("walk link is rendered when route is active", () => {
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+      />,
+    );
+    expect(container.querySelector("[data-testid='walk-googlemaps-link']")).not.toBeNull();
+  });
+
+  test("walk link is NOT rendered when route is inactive", () => {
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={false}
+      />,
+    );
+    expect(container.querySelector("[data-testid='walk-googlemaps-link']")).toBeNull();
+  });
+
+  test("walk link uses travelmode=walking", () => {
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+      />,
+    );
+    const link = container.querySelector("[data-testid='walk-googlemaps-link']") as HTMLAnchorElement;
+    expect(decodeURIComponent(link.href)).toContain("travelmode=walking");
+  });
+
+  test("walk link has destination matching venue lat,lng", () => {
+    const venue = makeVenue({ lat: 38.2544, lng: -104.6091 });
+    const { container } = render(
+      <DirectionButtons venue={venue} onWalk={vi.fn()} locale="en" isRouteActive={true} routeInfo={{ distance: "0.4 mi", duration: "8 min" }} />,
+    );
+    const link = container.querySelector("[data-testid='walk-googlemaps-link']") as HTMLAnchorElement;
+    expect(decodeURIComponent(link.href)).toContain("destination=38.2544,-104.6091");
+  });
+
+  test("walk link includes api=1", () => {
+    const { container } = render(
+      <DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" isRouteActive={true} routeInfo={{ distance: "0.4 mi", duration: "8 min" }} />,
+    );
+    const link = container.querySelector("[data-testid='walk-googlemaps-link']") as HTMLAnchorElement;
+    expect(link.href).toContain("api=1");
+  });
+
+  test("walk link omits origin", () => {
+    const { container } = render(
+      <DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" isRouteActive={true} routeInfo={{ distance: "0.4 mi", duration: "8 min" }} />,
+    );
+    const link = container.querySelector("[data-testid='walk-googlemaps-link']") as HTMLAnchorElement;
+    expect(link.href).not.toContain("origin=");
+  });
+
+  test("walk link opens in new tab", () => {
+    const { container } = render(
+      <DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" isRouteActive={true} routeInfo={{ distance: "0.4 mi", duration: "8 min" }} />,
+    );
+    const link = container.querySelector("[data-testid='walk-googlemaps-link']") as HTMLAnchorElement;
+    expect(link.target).toBe("_blank");
+  });
+
+  test("walk link has rel=noopener noreferrer", () => {
+    const { container } = render(
+      <DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" isRouteActive={true} routeInfo={{ distance: "0.4 mi", duration: "8 min" }} />,
+    );
+    const link = container.querySelector("[data-testid='walk-googlemaps-link']") as HTMLAnchorElement;
+    expect(link.rel).toContain("noopener");
+    expect(link.rel).toContain("noreferrer");
+  });
+
+  test("walk link has accessible aria-label (EN)", () => {
+    const venue = makeVenue({ name: "Test Food Pantry" });
+    const { container } = render(
+      <DirectionButtons venue={venue} onWalk={vi.fn()} locale="en" isRouteActive={true} routeInfo={{ distance: "0.4 mi", duration: "8 min" }} />,
+    );
+    const link = container.querySelector("[data-testid='walk-googlemaps-link']") as HTMLAnchorElement;
+    expect(link.getAttribute("aria-label")).toContain("Test Food Pantry");
+  });
+
+  test("walk link has accessible aria-label (ES)", () => {
+    const venue = makeVenue({ name: "Test Food Pantry" });
+    const { container } = render(
+      <DirectionButtons venue={venue} onWalk={vi.fn()} locale="es" isRouteActive={true} routeInfo={{ distance: "0.4 mi", duration: "8 min" }} />,
+    );
+    const link = container.querySelector("[data-testid='walk-googlemaps-link']") as HTMLAnchorElement;
+    // ES aria-label should include venue name and mention Google Maps
+    expect(link.getAttribute("aria-label")).toContain("Test Food Pantry");
+    expect(link.getAttribute("aria-label")).toContain("Google Maps");
+  });
+});
+
 describe("DirectionButtons — in-card route readout (#134 FIX 1+2)", () => {
   test("no readout when isRouteActive=false even if routeInfo is provided", () => {
     render(
@@ -304,5 +684,107 @@ describe("DirectionButtons — in-card route readout (#134 FIX 1+2)", () => {
     expect(screen.getByTestId("walking-route-distance").textContent).toBe("0.4 mi caminando");
     // ES: "{duration}" → "8 min" (pure passthrough — allowlisted as identical EN/ES)
     expect(screen.getByTestId("walking-route-duration").textContent).toBe("8 min");
+  });
+});
+
+// ─── stepsExpanded resets on venue change (FIX 2) ────────────────────────────
+//
+// DirectionButtons is NOT remounted between venue selections. Once stepsExpanded
+// is true it must reset to false when the venue prop changes — otherwise every
+// subsequent venue's step list renders already expanded, violating "collapsed by
+// default."
+
+describe("DirectionButtons — stepsExpanded resets on venue change (FIX 2)", () => {
+  const STEPS = [
+    { instruction: "Head north on Main St", distance: 50 },
+    { instruction: "Arrive at destination", distance: 0 },
+  ];
+
+  test("step list is initially collapsed", () => {
+    const { container } = render(
+      <DirectionButtons
+        venue={makeVenue({ id: "venue-a", name: "Venue A" })}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.3 mi", duration: "6 min" }}
+        walkSteps={STEPS}
+      />,
+    );
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  test("expanding on venue A then switching to venue B resets to collapsed", async () => {
+    const user = userEvent.setup();
+    const { container, rerender } = render(
+      <DirectionButtons
+        venue={makeVenue({ id: "venue-a", name: "Venue A" })}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.3 mi", duration: "6 min" }}
+        walkSteps={STEPS}
+      />,
+    );
+
+    // Expand on venue A
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+    // Switch to venue B (simulate parent re-render with a different venue prop)
+    act(() => {
+      rerender(
+        <DirectionButtons
+          venue={makeVenue({ id: "venue-b", name: "Venue B" })}
+          onWalk={vi.fn()}
+          locale="en"
+          isRouteActive={true}
+          routeInfo={{ distance: "0.8 mi", duration: "15 min" }}
+          walkSteps={STEPS}
+        />,
+      );
+    });
+
+    // Toggle should be collapsed again on venue B
+    const toggleAfter = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    expect(toggleAfter.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  test("same venue re-render does NOT reset stepsExpanded", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue({ id: "venue-a", name: "Venue A" });
+    const { container, rerender } = render(
+      <DirectionButtons
+        venue={venue}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.3 mi", duration: "6 min" }}
+        walkSteps={STEPS}
+      />,
+    );
+
+    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+    // Re-render with same venue (e.g. routeInfo update)
+    act(() => {
+      rerender(
+        <DirectionButtons
+          venue={venue}
+          onWalk={vi.fn()}
+          locale="en"
+          isRouteActive={true}
+          routeInfo={{ distance: "0.3 mi", duration: "6 min" }}
+          walkSteps={STEPS}
+        />,
+      );
+    });
+
+    // Expanded state should persist
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
   });
 });

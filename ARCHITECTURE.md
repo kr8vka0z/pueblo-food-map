@@ -12,6 +12,8 @@ A static, mobile-first civic web map of free and low-cost food resources in
 Pueblo County, Colorado. The audience is low-income and food-insecure
 residents, many of whom are Spanish-speaking. Venue data is served from
 static TypeScript modules committed to the repo — no backend database.
+Visual identity is codified in [DESIGN.md](DESIGN.md) (agent-facing token
+mirror and aesthetic guide; `globals.css @theme` is the canonical token source).
 
 ---
 

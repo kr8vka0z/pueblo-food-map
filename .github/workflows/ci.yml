@@ -34,6 +34,18 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Design tokens — lint (report-only)
+        # Alpha CLI: non-blocking. A lint error here is informational only and must
+        # never break the build — the tool is pre-stable and may produce false positives.
+        run: npm run design:lint
+        continue-on-error: true
+
+      - name: Design tokens — drift guard (blocking)
+        # Blocking invariant: DESIGN.md must mirror globals.css @theme for colors,
+        # spacing, and radius tokens. Uses a tool-agnostic pure-Node script so this
+        # gate survives any change to the designmd CLI version or availability.
+        run: npm run design:drift
+
       - name: Typecheck
         run: npm run typecheck
 

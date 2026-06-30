@@ -49,8 +49,8 @@ jobs:
           prompt: |
             You are a senior software engineer reviewing this pull request
             for the Pueblo Food Access Map — a Next.js 16 + TypeScript +
-            Tailwind v4 + Leaflet community project that helps Pueblo County
-            residents find food resources.
+            Tailwind v4 + Mapbox (react-map-gl) community project that helps Pueblo
+            County residents find food resources.
 
             Review the diff in this PR. Focus areas, in priority order:
 

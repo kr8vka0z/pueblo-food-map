@@ -64,7 +64,7 @@ import { useMapUI } from "@/lib/useMapUI";
 // Wrapping MapLoadingFallback in an arrow function satisfies the
 // DynamicOptionsLoadingProps signature while still rendering the locale-aware
 // component (which reads locale from LocaleContext internally).
-const LeafletMap = dynamic(() => import("./Map"), {
+const MapCanvas = dynamic(() => import("./Map"), {
   ssr: false,
   loading: () => <MapLoadingFallback />,
 });
@@ -847,7 +847,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           MapErrorBoundary catches fatal init throws as a secondary safety net. */}
       {!mapUnavailable && (
         <MapErrorBoundary onError={handleMapError}>
-          <LeafletMap
+          <MapCanvas
             venues={filteredVenues}
             selectedVenueId={selectedVenueId}
             userLocation={userLocation}

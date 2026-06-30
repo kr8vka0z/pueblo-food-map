@@ -6,7 +6,7 @@
  * Spec: docs/pueblo-food-map-v2-handoff.md §Mobile·375×812·map(located)
  * and §Desktop·1440×900·map(located)
  *
- * - Floats above Leaflet tiles (z-index 1000 — Leaflet uses 200–800).
+ * - Floats above the Mapbox GL map canvas and controls (z-index 1000).
  * - Near-full-width on mobile (16px margins each side).
  * - ~520px centered on desktop (≥768px).
  * - Controlled: value/onChange/onSubmit wired by PR 6 (MapWrapper).

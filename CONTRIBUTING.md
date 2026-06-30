@@ -24,7 +24,9 @@ performance).
 1. Fork the repository and create a feature branch from `main`.
 2. Make your change with focused commits — see [Commit messages](#commit-messages).
 3. Run `npm run lint`, `npm run typecheck`, `npm run test:ci`, and `npm run build`
-   locally before opening a pull request.
+   locally before opening a pull request. If your change touches UI or design
+   tokens, also run `npm run design:drift` — `globals.css @theme` is the
+   canonical token source; keep DESIGN.md in sync with any token changes.
 4. Open a pull request against `main`. CI runs lint, typecheck, tests, and
    build on every PR and must pass before merge — `main` is a protected
    branch and requires the CI status check.
@@ -54,6 +56,7 @@ The dev server runs at <http://localhost:3000>.
 | `npm test` | Run unit tests in watch mode (vitest) |
 | `npm run test:ci` | Run unit tests once, CI mode (no watch) |
 | `npm run test:coverage` | Run tests with V8 coverage report |
+| `npm run design:drift` | Token parity check: globals.css vs DESIGN.md |
 
 ## Commit messages
 

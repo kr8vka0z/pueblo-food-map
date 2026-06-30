@@ -299,6 +299,27 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
 
 ---
 
+# Design system — DESIGN.md
+
+[DESIGN.md](DESIGN.md) is the agent-facing visual-identity reference. Read it before
+any UI work — it documents the token palette, typography rules, spacing scale, elevation,
+motion, component shapes, and explicit Do's/Don'ts for this design language.
+
+**Token source of truth:** `src/app/globals.css @theme` is canonical. Tailwind v4 reads
+it directly. DESIGN.md mirrors the token values and adds prose rationale; it does NOT
+generate or override `globals.css`.
+
+**Keeping them in sync:** when you change a token in `globals.css`, also update the
+matching value in DESIGN.md and run `npm run design:drift` locally. CI runs this check
+as a blocking gate — a mismatch fails the build.
+
+**CLI note:** the binary is `designmd` (never `design.md` — Windows treats `.md` as a
+file extension). The `design:lint` script runs the alpha CLI in report-only mode
+(`continue-on-error: true` in CI); the `design:drift` script is the real gate and uses
+only Node built-ins so it is not affected by CLI version changes.
+
+---
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

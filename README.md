@@ -45,6 +45,8 @@ Open <http://localhost:3000>. Hot-reloads on save (Turbopack).
 | `npm run test:ci` | Unit tests, CI mode (single run) |
 | `npm run preview` | OpenNext build + local Worker emulator at :8788 |
 | `npm run deploy` | OpenNext build + wrangler deploy to production |
+| `npm run design:lint` | design.md CLI lint on DESIGN.md (report-only) |
+| `npm run design:drift` | Token parity check: globals.css vs DESIGN.md (blocking) |
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup details and branch/commit
 conventions.
@@ -117,6 +119,18 @@ preview-deploy URL restrictions, and the full deploy runbook.
 For the mental model — data-aggregator pattern, MapWrapper state machine,
 i18n design, form-route triad, and hosting decisions — see
 [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
+## Design system
+
+Visual identity tokens and aesthetic rules live in [DESIGN.md](DESIGN.md).
+`globals.css @theme` is the canonical token source; DESIGN.md mirrors those
+values and adds prose rationale, Do's/Don'ts, and component guidance for
+human and AI contributors. Read DESIGN.md before any UI work.
+
+To verify DESIGN.md is in sync with `globals.css`: `npm run design:drift`.
+CI enforces this automatically (blocking gate).
 
 ---
 

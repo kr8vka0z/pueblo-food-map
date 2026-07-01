@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.6...v0.1.7) (2026-06-30)
+
+
+### Added
+
+* /about page + site footer ([#155](https://github.com/kr8vka0z/pueblo-food-map/issues/155)) ([97eae3e](https://github.com/kr8vka0z/pueblo-food-map/commit/97eae3e7422b333bd98f8029b9a1d3d5064189bc))
+* observability — health endpoint + structured form-error logging ([#163](https://github.com/kr8vka0z/pueblo-food-map/issues/163)) ([#196](https://github.com/kr8vka0z/pueblo-food-map/issues/196)) ([7a8103d](https://github.com/kr8vka0z/pueblo-food-map/commit/7a8103de5240390e01856510ce3ff401b29ef5f0))
+* per-venue pages + structured data ([#164](https://github.com/kr8vka0z/pueblo-food-map/issues/164) 6.3/6.4) ([#198](https://github.com/kr8vka0z/pueblo-food-map/issues/198)) ([52b644b](https://github.com/kr8vka0z/pueblo-food-map/commit/52b644b4edbd0973ef16e47d3cb517fd94c65165))
+* SEO metadata, OG preview image, sitemap & robots ([#164](https://github.com/kr8vka0z/pueblo-food-map/issues/164)) ([#197](https://github.com/kr8vka0z/pueblo-food-map/issues/197)) ([765c7f6](https://github.com/kr8vka0z/pueblo-food-map/commit/765c7f65f4d8dc02f40db247bf523d8d9ffaaa69))
+* update favicon ([#190](https://github.com/kr8vka0z/pueblo-food-map/issues/190)) ([844b9c1](https://github.com/kr8vka0z/pueblo-food-map/commit/844b9c1e78defcb9968ad498316fe5be2a400cf1))
+* Walk/Bus/Drive directions on venue cards ([#134](https://github.com/kr8vka0z/pueblo-food-map/issues/134)) ([50d28ff](https://github.com/kr8vka0z/pueblo-food-map/commit/50d28ff15d71a7eb851dc11cf8cfa4d92e062d0d))
+* walking turn-by-turn directions + Google Maps walk handoff ([#208](https://github.com/kr8vka0z/pueblo-food-map/issues/208)) ([3a9732a](https://github.com/kr8vka0z/pueblo-food-map/commit/3a9732a559d849910f28091d2c74b24854db2dda))
+
+
+### Fixed
+
+* parse 12-hour AM/PM venue hours so open/closed status is correct ([#188](https://github.com/kr8vka0z/pueblo-food-map/issues/188)) ([b63bf8d](https://github.com/kr8vka0z/pueblo-food-map/commit/b63bf8d7fc3edf01fdfc6d914371782a5a8b1b12))
+* route remaining hardcoded UI strings through i18n (es support) ([#189](https://github.com/kr8vka0z/pueblo-food-map/issues/189)) ([6040908](https://github.com/kr8vka0z/pueblo-food-map/commit/6040908130db1acfdd9d76ee1070d711aeece5df))
+* **security:** harden public forms & site surface ([#160](https://github.com/kr8vka0z/pueblo-food-map/issues/160)) ([#193](https://github.com/kr8vka0z/pueblo-food-map/issues/193)) ([a8140f4](https://github.com/kr8vka0z/pueblo-food-map/commit/a8140f4fd9d0c90134b1ce4933580dd14fe9440d))
+* **seo:** remove next.config ?venue= redirect that 500'd the homepage on OpenNext ([443eecc](https://github.com/kr8vka0z/pueblo-food-map/commit/443eeccfd4f4e19c2d8c3265a7f51e5c73956789))
+
+
+### Changed
+
+* **agents:** correct legacy ?venue= redirect section after hotfix ([#199](https://github.com/kr8vka0z/pueblo-food-map/issues/199)) ([ad6f80b](https://github.com/kr8vka0z/pueblo-food-map/commit/ad6f80b85c1417fb8815913a0b51e98cf7cdfe7a))
+* **agents:** document Resend email key arrangement ([#195](https://github.com/kr8vka0z/pueblo-food-map/issues/195)) ([695d3f6](https://github.com/kr8vka0z/pueblo-food-map/commit/695d3f62c00a1c8a2dbb3d36fdabc763171c0f6c))
+* bring repo to Documentation & Comment Standard ([#183](https://github.com/kr8vka0z/pueblo-food-map/issues/183)) ([baebba4](https://github.com/kr8vka0z/pueblo-food-map/commit/baebba44fb5bfea46fbf69439bef732347778521))
+* correct CF Workers Builds env-var model (no Preview environment) ([#204](https://github.com/kr8vka0z/pueblo-food-map/issues/204)) ([5d182f0](https://github.com/kr8vka0z/pueblo-food-map/commit/5d182f05e76f362ae2d3dc661d0f3468321d4df3))
+* dedupe shared helpers (rate limiter, day keys, Pueblo center) ([#184](https://github.com/kr8vka0z/pueblo-food-map/issues/184)) ([83e3c5a](https://github.com/kr8vka0z/pueblo-food-map/commit/83e3c5a61b7532332a37ebc1df11b2b9b2ec6383))
+* drop stale Leaflet naming in map components ([#222](https://github.com/kr8vka0z/pueblo-food-map/issues/222)) ([6c36181](https://github.com/kr8vka0z/pueblo-food-map/commit/6c3618135ade70d0902b220b943ed96d41cb8554))
+* Lane A quality foundation — code health ([#166](https://github.com/kr8vka0z/pueblo-food-map/issues/166)), TBT cut ([#202](https://github.com/kr8vka0z/pueblo-food-map/issues/202)), i18n guard ([#177](https://github.com/kr8vka0z/pueblo-food-map/issues/177)), CI gates ([#161](https://github.com/kr8vka0z/pueblo-food-map/issues/161)) ([664eb2b](https://github.com/kr8vka0z/pueblo-food-map/commit/664eb2b722f2631718c6c655e050ea086e145ed9))
+
 ## [0.1.6](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.5...v0.1.6) (2026-06-18)
 
 

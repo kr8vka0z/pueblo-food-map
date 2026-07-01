@@ -4,10 +4,11 @@ name: Dependabot auto-merge
 # bumps (including the grouped minor/patch PRs). Major bumps are left open and
 # labelled for a human, because majors can carry breaking changes.
 #
-# Why this is safe: branch protection on `main` requires the "Lint, typecheck,
-# build" check, so `gh pr merge --auto` waits for green CI before it merges —
-# it never merges a red build. We use only the built-in GITHUB_TOKEN (no custom
-# secrets), so Dependabot's restricted token works once `permissions:` elevates it.
+# Why this is safe: a repository ruleset on `main` requires the "Lint, typecheck,
+# build" and "Workers Builds: pueblo-food-map" status checks, so `gh pr merge
+# --auto` waits for green CI before it merges — it never merges a red build. We
+# use only the built-in GITHUB_TOKEN (no custom secrets), so Dependabot's
+# restricted token works once `permissions:` elevates it.
 
 on: pull_request
 

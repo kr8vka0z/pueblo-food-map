@@ -58,7 +58,7 @@ jobs:
 
       - name: Upload coverage report
         # Publish the lcov report as a CI artifact for visibility in the PR.
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage/lcov.info

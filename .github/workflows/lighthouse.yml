@@ -11,12 +11,12 @@ name: Lighthouse CI
 # we skip preview and fall back to the production URL so the gate stays green
 # while the token is being provisioned (see 2.2 in issue #161).
 #
-# Thresholds (mobile preset): accessibility >= 0.95 (error), performance >= 0.65
-# (error, standing target). WHY advisory-RED is expected: CI targets production
-# (MAPBOX_PREVIEW_TOKEN absent — preview-URL gating not yet armed, #161 item 2.2),
-# and prod has not yet received the #202 bundle cut (sync entry JS 212KB->48KB).
-# Lighthouse is not a required status check so it does not block merge. After
-# the cut deploys (or the preview token arms), re-measure and raise toward 0.70.
+# Thresholds (mobile preset): accessibility >= 0.95 (error — the hard gate),
+# performance >= 0.65 (WARN only). Performance is warn-not-error because prod
+# Lighthouse perf is Mapbox-GL-runtime-bound (~0.47 mobile), so a hard floor was
+# permanently red and masked real regressions; the lazy-load-map fix that will
+# raise it is tracked in #226 (re-promote to error at a verified floor once it
+# lands). Lighthouse is not a required status check so it does not block merge.
 # best-practices and SEO remain warn-only.
 on:
   pull_request:

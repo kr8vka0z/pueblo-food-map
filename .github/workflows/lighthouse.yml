@@ -1,15 +1,15 @@
 name: Lighthouse CI
 
-# Runs on every PR and on pushes to main.
+# Runs on every PR and on pushes to main. Both measure PRODUCTION
+# (https://pueblofoodmap.com/).
 #
-# PR runs target the Cloudflare Workers preview URL so regressions are caught
-# before merge, not after. The preview URL uses a dedicated Mapbox token
-# (MAPBOX_PREVIEW_TOKEN) scoped to *.kyle-boyd.workers.dev subdomains; without
-# it the map renders "not authorized" and performance / a11y scores collapse.
-#
-# Safety valve: when MAPBOX_PREVIEW_TOKEN is absent (secret not yet added),
-# we skip preview and fall back to the production URL so the gate stays green
-# while the token is being provisioned (see 2.2 in issue #161).
+# Per-branch preview-URL gating is deferred (#161 item 2.2). CF Workers Builds
+# does not publish a <branch>-pueblo-food-map.kyle-boyd.workers.dev alias, so
+# targeting it 404'd every PR run (Lighthouse errored before scoring); and prod
+# Lighthouse perf is Mapbox-GL-runtime-bound, so measuring a preview wouldn't
+# change the outcome. The MAPBOX_PREVIEW_TOKEN secret is retained for when
+# preview gating is genuinely wired (real preview URL + per-branch Mapbox token
+# swap); until then PR runs measure prod too.
 #
 # Thresholds (mobile preset): accessibility >= 0.95 (error — the hard gate),
 # performance >= 0.65 (WARN only). Performance is warn-not-error because prod
@@ -34,31 +34,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # Derive the target URL:
-      # - PRs: use the CF preview subdomain if the preview token is available,
-      #        otherwise fall back to production (avoids self-blocking).
-      # - main pushes: always use production (preview URL doesn't apply).
+      # Target production for both PRs and main pushes. Per-branch preview
+      # gating is deferred (#161 item 2.2) — see the header comment.
       - name: Resolve Lighthouse target URL
         id: url
-        env:
-          HAS_PREVIEW_TOKEN: ${{ secrets.MAPBOX_PREVIEW_TOKEN != '' }}
-          PR_BRANCH: ${{ github.head_ref }}
-          EVENT: ${{ github.event_name }}
-        run: |
-          if [ "$EVENT" = "pull_request" ] && [ "$HAS_PREVIEW_TOKEN" = "true" ]; then
-            # CF Workers preview URL pattern: <branch-slug>-pueblo-food-map.kyle-boyd.workers.dev
-            BRANCH_SLUG=$(echo "$PR_BRANCH" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-50)
-            echo "url=https://${BRANCH_SLUG}-pueblo-food-map.kyle-boyd.workers.dev" >> "$GITHUB_OUTPUT"
-            echo "token_present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "url=https://pueblofoodmap.com/" >> "$GITHUB_OUTPUT"
-            echo "token_present=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Warn when preview token is absent (PR only)
-        if: github.event_name == 'pull_request' && steps.url.outputs.token_present == 'false'
-        run: |
-          echo "::warning title=Lighthouse running against production::MAPBOX_PREVIEW_TOKEN secret is not set. Lighthouse is targeting the production URL instead of the PR preview. Add the secret to fully arm preview-URL gating (see issue #161 checklist item 2.2)."
+        run: echo "url=https://pueblofoodmap.com/" >> "$GITHUB_OUTPUT"
 
       - name: Run Lighthouse
         uses: treosh/lighthouse-ci-action@v12

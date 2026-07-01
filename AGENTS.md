@@ -59,17 +59,16 @@ npm run deploy    # OpenNext build + wrangler deploy to production
   - `www.pueblofoodmap.com`
   - `localhost:3000`
   - `pueblo-food-map.kyle-boyd.workers.dev`
-- **Preview deploy warning:** Per-branch preview deploys land on subdomains like `<branch>-pueblo-food-map.kyle-boyd.workers.dev`. Mapbox dropped wildcard URL support, so these will trigger "site not authorized" errors. If you need to demo a specific preview, add that exact subdomain to the token's URL restrictions (or demo from production instead).
+- **Preview deploy warning:** A PR's CF preview deploy is reachable at the URL Cloudflare posts as a check on the PR (do not guess a `<branch>-…workers.dev` subdomain — that pattern does not resolve and 404s). Its map throws "site not authorized" unless that exact subdomain is added to the token's URL restrictions (Mapbox dropped wildcard support), so for a quick demo it is usually easier to demo from production.
 
-### CI preview token (`pk.*`, GitHub secret only)
+### Lighthouse CI build token (`pk.*`, GitHub secret only)
 
-- **Purpose:** Lets the Lighthouse CI job target the CF Workers preview URL (with a working map) instead of production. Without it, preview maps render "not authorized" and Lighthouse a11y/perf scores collapse.
-- **GitHub secret name:** `MAPBOX_PREVIEW_TOKEN`
-- **Type:** Public (`pk.*`) — same scopes as the production token (`styles:read`, `fonts:read`, `tilesets:read`). Must be created in Mapbox Studio dashboard (cannot mint `pk` tokens via API).
-- **URL restrictions:** Optional. Branch slugs follow `<branch-sanitized>-pueblo-food-map.kyle-boyd.workers.dev`; no wildcard support, so either omit restrictions or add per-branch. Omitting is pragmatic for a public map-tiles-only token.
-- **Lighthouse fallback:** When this secret is absent, the Lighthouse workflow falls back to the production URL and emits a `::warning` in CI. The error-threshold gate still runs — just against prod, not preview.
-- **Provisioning:** Mapbox Studio → Access tokens → Create token → Public, scopes above → copy → GitHub repo Settings → Secrets and variables → Actions → `MAPBOX_PREVIEW_TOKEN`.
-- **⚠️ Arming preview gating is NOT just adding this GitHub secret.** The GH secret only flips the Lighthouse workflow to target the preview URL. Workers Builds bakes the *same shared* build-var token into preview builds (the URL-restricted prod token), so the preview map renders "site not authorized" and scores collapse below the prod fallback. To truly arm it, swap the token per-branch in the build command via the `WORKERS_CI_BRANCH` build env var (non-`main` → an unrestricted preview token). **Deferred 2026-06-21 (option A):** prod Lighthouse perf is Mapbox-GL-runtime-bound (~0.5), so preview gating won't turn the gate green — it only buys deterministic per-branch measurement. See #161 item 2.2.
+- **Purpose:** The Lighthouse CI job builds this commit's code and serves it on a local server (`next start` at `localhost:3000`), then audits that — so a PR is graded on its own changes, not on production (see `.github/workflows/lighthouse.yml`). This token is passed to that build as `NEXT_PUBLIC_MAPBOX_TOKEN` so the map renders during the audit instead of an "unauthorized" blank.
+- **GitHub secret name:** `MAPBOX_PREVIEW_TOKEN` (legacy name — it is a build token, not a preview-URL token).
+- **Type:** Public (`pk.*`) — same scopes as the production token (`styles:read`, `fonts:read`, `tilesets:read`). Must be created in the Mapbox Studio dashboard (cannot mint `pk` tokens via API).
+- **URL restrictions:** MUST be unrestricted (or explicitly allow `localhost:3000`) so the map authorizes on the CI's local server. A prod-URL-restricted token would render "not authorized" and skew the audit.
+- **If the secret is absent:** the build still succeeds and accessibility is still measured, but the map renders blank ("not authorized"), so the performance score is unrepresentative. There is **no** production fallback — the job always audits the local build of the commit under test.
+- **Provisioning:** Mapbox Studio → Access tokens → Create token → Public, scopes above, no URL restrictions → copy → GitHub repo Settings → Secrets and variables → Actions → `MAPBOX_PREVIEW_TOKEN`.
 
 ### Secret token (backend / admin, `sk.*`)
 

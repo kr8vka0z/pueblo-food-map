@@ -1,23 +1,20 @@
 name: Lighthouse CI
 
-# Runs on every PR and on pushes to main. Both measure PRODUCTION
-# (https://pueblofoodmap.com/).
+# Runs on every PR and on pushes to main. Builds THIS commit's code and serves
+# it on a throwaway localhost server, then audits that — so a pull request is
+# measured on its own changes (a real pre-merge gate), not on whatever is
+# already live in production.
 #
-# Per-branch preview-URL gating is deferred (#161 item 2.2). CF Workers Builds
-# does not publish a <branch>-pueblo-food-map.kyle-boyd.workers.dev alias, so
-# targeting it 404'd every PR run (Lighthouse errored before scoring); and prod
-# Lighthouse perf is Mapbox-GL-runtime-bound, so measuring a preview wouldn't
-# change the outcome. The MAPBOX_PREVIEW_TOKEN secret is retained for when
-# preview gating is genuinely wired (real preview URL + per-branch Mapbox token
-# swap); until then PR runs measure prod too.
+# Map token: the build reads NEXT_PUBLIC_MAPBOX_TOKEN from the
+# MAPBOX_PREVIEW_TOKEN secret (unrestricted, so it authorizes on localhost).
+# Without it the map renders "not authorized" and skews the audit.
 #
 # Thresholds (mobile preset): accessibility >= 0.95 (error — the hard gate),
-# performance >= 0.65 (WARN only). Performance is warn-not-error because prod
-# Lighthouse perf is Mapbox-GL-runtime-bound (~0.47 mobile), so a hard floor was
-# permanently red and masked real regressions; the lazy-load-map fix that will
-# raise it is tracked in #226 (re-promote to error at a verified floor once it
-# lands). Lighthouse is not a required status check so it does not block merge.
-# best-practices and SEO remain warn-only.
+# performance >= 0.65 (WARN only). Performance is warn-not-error because the map
+# (Mapbox GL) is runtime-heavy (~0.47 mobile) and dominates the score; the
+# lazy-load-map fix that will raise it is tracked in #226 (re-promote to error
+# at a verified floor once it lands). Lighthouse is not a required status check
+# so it does not block merge. best-practices and SEO remain warn-only.
 on:
   pull_request:
   push:
@@ -34,16 +31,43 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # Target production for both PRs and main pushes. Per-branch preview
-      # gating is deferred (#161 item 2.2) — see the header comment.
-      - name: Resolve Lighthouse target URL
-        id: url
-        run: echo "url=https://pueblofoodmap.com/" >> "$GITHUB_OUTPUT"
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (production build of this commit's code)
+        run: npm run build
+        env:
+          # Real map token so the audited page renders the map instead of an
+          # "unauthorized" blank. The preview token is unrestricted → works on
+          # localhost. Falls back to empty (map blank, a11y still measured) if
+          # the secret is ever removed.
+          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PREVIEW_TOKEN }}
+
+      - name: Start the app and wait until it responds
+        run: |
+          npm run start &
+          # Poll the local server; fail loudly after ~60s instead of letting
+          # Lighthouse hit a dead port and report a misleading 404/error.
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/ >/dev/null; then
+              echo "app ready after $((i * 2))s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error title=App never started::localhost:3000 did not respond within 60s"
+          exit 1
 
       - name: Run Lighthouse
         uses: treosh/lighthouse-ci-action@v12
         with:
-          urls: ${{ steps.url.outputs.url }}
+          urls: http://localhost:3000/
           configPath: ./.lighthouserc.json
           uploadArtifacts: true
           temporaryPublicStorage: true

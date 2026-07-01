@@ -9,7 +9,7 @@
       }
     },
     "assert": {
-      "_comment": "Accessibility (>=0.95) is the hard gate. Performance is intentionally 'warn', not 'error': prod Lighthouse performance is Mapbox-GL-runtime-bound (measured ~0.47 mobile, throttled 4x CPU), so a hard 0.65 floor stayed permanently red and drowned out real regressions. As a warning the check is green when healthy and only reddens on an accessibility regression. The real fix — lazy-loading the map to raise the score — is tracked in #226; re-promote performance to 'error' at a verified floor once that lands. Lighthouse is not a required status check, so it never blocks merge regardless.",
+      "_comment": "Measured against a local production build of the commit under test (see .github/workflows/lighthouse.yml), so a PR is graded on its own code. Accessibility (>=0.95) is the hard gate. Performance is intentionally 'warn', not 'error': Lighthouse performance is Mapbox-GL-runtime-bound (~0.47 mobile, throttled 4x CPU), so a hard 0.65 floor stayed permanently red and drowned out real regressions. As a warning the check is green when healthy and only reddens on an accessibility regression. The real fix — lazy-loading the map to raise the score — is tracked in #226; re-promote performance to 'error' at a verified floor once that lands. Lighthouse is not a required status check, so it never blocks merge regardless.",
       "assertions": {
         "categories:performance": ["warn", { "minScore": 0.65 }],
         "categories:accessibility": ["error", { "minScore": 0.95 }],

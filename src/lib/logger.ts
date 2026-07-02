@@ -74,3 +74,38 @@ export function logFormFailure(
 export function logAdminAuthFailure(reason: AccessDeniedReason): void {
   console.warn(JSON.stringify({ event: "admin_auth_failure", reason }));
 }
+
+export type PublishOutcome = "success" | "failure";
+
+interface PublishResultDetail {
+  /** The bot-branch PR URL — present on success, and on a failure that got
+   *  as far as opening/reusing a PR before a later step failed. */
+  prUrl?: string;
+  /** Error text only — never PII (no admin email, no venue data). */
+  message?: string;
+}
+
+/**
+ * Emit a single-line JSON structured log entry for a POST /api/admin/publish
+ * outcome (#237 checkpoint d; spec §8 "Structured logging" names
+ * `event: "publish_result"` alongside the existing admin_auth_failure /
+ * refresh_ingest_result convention). Logged at error level on failure so a
+ * broken publish (e.g. the GitHub commit step failing, per the NB1 ordering
+ * note in src/lib/publishVenues.ts) surfaces the same way a Resend outage
+ * does today.
+ */
+export function logPublishResult(
+  outcome: PublishOutcome,
+  detail?: PublishResultDetail,
+): void {
+  const entry: Record<string, unknown> = { event: "publish_result", outcome };
+  if (detail?.prUrl !== undefined) entry.prUrl = detail.prUrl;
+  if (detail?.message !== undefined) entry.message = detail.message;
+
+  const line = JSON.stringify(entry);
+  if (outcome === "success") {
+    console.log(line);
+  } else {
+    console.error(line);
+  }
+}

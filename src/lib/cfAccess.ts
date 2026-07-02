@@ -23,7 +23,8 @@ export type AccessDeniedReason =
   | "missing_assertion"
   | "invalid_token"
   | "no_email_claim"
-  | "misconfigured";
+  | "misconfigured"
+  | "bad_origin";
 
 /**
  * Thrown by requireAccessIdentity() (and, transitively, getAdminDb()) on any
@@ -156,4 +157,36 @@ export async function requireAccessIdentity(
     throw new AccessDeniedError("no_email_claim");
   }
   return { email };
+}
+
+/**
+ * The admin UI's own origin — the only origin a legitimate, browser-issued
+ * /api/admin/* mutation can arrive from. Used by requireAdminOrigin() below.
+ */
+export const ADMIN_ORIGIN = "https://admin.pueblofoodmap.com";
+
+/**
+ * CSRF defense for non-GET /api/admin/* mutations (spec §8, "I7").
+ *
+ * WHY needed on top of the JWT check above: the Cloudflare Access session
+ * cookie (`CF_Authorization`) is ambient — a browser attaches it
+ * automatically to same-site requests, so an authenticated admin's browser
+ * could be tricked into firing a cross-site mutating request without their
+ * intent. requireAccessIdentity() proves the CALLER carries a valid Access
+ * token; it says nothing about WHERE the request originated. This is a
+ * second, independent layer: every non-GET /api/admin/* handler EXCEPT
+ * /api/admin/refresh/ingest must additionally call this before mutating.
+ * (refresh/ingest is exempt — it's authenticated by a CF Access Service
+ * Token + bearer token, called by a GitHub Actions runner rather than a
+ * browser, so it never carries the ambient session cookie CSRF defends
+ * against and wouldn't reliably send a matching Origin header either.)
+ *
+ * Throws the SAME AccessDeniedError used by requireAccessIdentity() (new
+ * reason: "bad_origin") so every /api/admin/* route handler can share one
+ * catch block and one 403 response shape regardless of which check failed.
+ */
+export function requireAdminOrigin(headers: HeaderSource): void {
+  if (headers.get("Origin") !== ADMIN_ORIGIN) {
+    throw new AccessDeniedError("bad_origin");
+  }
 }

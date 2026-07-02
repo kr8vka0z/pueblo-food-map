@@ -206,6 +206,77 @@ All three form routes (`suggest`, `report`, `feedback`) call `logFormFailure` fr
 - **Filter/alert:** In CF Workers Logs, filter on `form_submit_failure` for a full failure
   stream, or narrow to `send_failed` for actionable outage alerts.
 
+# Admin authentication (Cloudflare Access) (#237)
+
+Full design: `docs/admin/cloudflare-native-admin-spec.md` §3.1 (auth) and §8
+(security). This section is the operational summary — set env vars, know the
+choke point, don't relitigate the design here.
+
+**Edge gate + why in-app verification is still required.** A Cloudflare
+Access application (Google SSO + email allowlist) gates
+`admin.pueblofoodmap.com` at Cloudflare's edge — an unauthenticated or
+non-allowlisted visitor never executes a line of this app's code on that
+hostname. But the admin route group (`src/app/admin/**`,
+`src/app/api/admin/**`) ships inside the **same Worker** as the public app
+(§3.4), and that Worker answers on hostnames an Access policy scoped to
+`admin.pueblofoodmap.com` does **not** cover:
+
+1. The bare fallback URL, `pueblo-food-map.kyle-boyd.workers.dev/admin`.
+2. Any Workers **version preview URL** (`<version-prefix>-pueblo-food-map.
+   kyle-boyd.workers.dev/admin`) — binds **production** D1.
+3. The public apex itself, `pueblofoodmap.com/admin` — the one with the
+   lowest bar to stumble onto by accident, since it's the site's own
+   marketed domain.
+
+Every `/admin/*` page and `/api/admin/*` route handler therefore
+re-verifies the `Cf-Access-Jwt-Assertion` header in application code
+(`src/lib/cfAccess.ts`, `jose`'s `jwtVerify` against Cloudflare's JWKS —
+signature, issuer, audience, expiry), so a request to any of the three
+hostnames above still fails without a real, current Access token.
+
+**`getAdminDb()` (`src/lib/adminDb.ts`) is the single choke point.** It calls
+`requireAccessIdentity()` before it will hand back the `ADMIN_DB` D1 binding
+at all — there is no code path (page or route handler, first load or
+client-side navigation) that can reach admin data without passing the
+check. This exists because Next.js App Router layouts run once per mount,
+not on every client-side navigation between sibling routes — a guard placed
+only in a shared layout would miss a client-nav to another `/admin/*` page.
+Any new admin code must fetch D1 through `getAdminDb()`, never
+`getCloudflareContext()` directly.
+
+**Two enforcement shapes, both required, both go through the same check:**
+Server Component pages call Next 16's `forbidden()` (from `next/navigation`)
+on `AccessDeniedError`, rendered by `src/app/forbidden.tsx` (a real HTTP
+403 — requires `experimental.authInterrupts: true` in `next.config.ts`,
+still an experimental Next API). Route handlers return an explicit
+`new Response("Forbidden", { status: 403 })` instead — there is no
+route-handler equivalent of `forbidden()`. Both paths log through
+`src/lib/logger.ts`'s `logAdminAuthFailure()` (`event: "admin_auth_failure"`,
+same PII-free single-line-JSON convention as `form_submit_failure` above).
+
+**Env vars Kyle sets — after, and only after, creating the live CF Access
+application** (Zero Trust dashboard → Access → Applications):
+
+- `CF_ACCESS_TEAM_DOMAIN` — e.g. `https://<team-name>.cloudflareaccess.com`.
+- `CF_ACCESS_AUD` — that Access application's audience tag.
+
+Both are **runtime secrets** (not `NEXT_PUBLIC_*`) — set via
+`wrangler secret put` or CF dashboard → Settings → Variables and Secrets,
+same as `RESEND_API_KEY`/`TURNSTILE_SECRET_KEY` above. Until they're set,
+`requireAccessIdentity()` fails closed (`AccessDeniedError("misconfigured")`)
+on every request — this is intentional, not a bug to work around.
+
+**Typing `ADMIN_DB` — don't run bare `wrangler types`.** This app targets
+the DOM (`lib: ["dom", ...]` — Mapbox, forms). Wrangler's default
+`wrangler types` bundles the full Workers runtime type set, which includes
+Cloudflare's HTMLRewriter `Element` type — it collides with lib.dom's
+`Element` and silently corrupts unrelated DOM types project-wide (observed:
+every `as HTMLSelectElement` cast in the form tests broke). Regenerate
+`worker-configuration.d.ts` with `npx wrangler types --include-runtime=false`
+after any `wrangler.jsonc` binding change; `cloudflare-env.d.ts` imports just
+the specific runtime types this project's code actually references (e.g.
+`D1Database`) from `@cloudflare/workers-types/experimental` instead.
+
 # Discoverability / SEO (#164)
 
 Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**

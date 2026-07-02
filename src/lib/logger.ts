@@ -1,10 +1,13 @@
 /**
- * Structured form-failure logger for Cloudflare Workers log search.
+ * Structured logger for Cloudflare Workers log search.
  *
  * WHY this exists: the three form routes previously emitted free-text
  * console.error messages on email failures and no log at all on Turnstile
  * rejections. Structured JSON on a single line makes it trivial to filter
  * and alert in the Cloudflare Workers Logs dashboard by `event` or `reason`.
+ * The admin surface (#237) reuses the same convention for its own event
+ * family — see logAdminAuthFailure below — so every log line this app
+ * emits, form or admin, is filterable the same way.
  *
  * WHY console.warn for turnstile_failed vs console.error for send_failed:
  * Turnstile failures are mostly bots — high volume, low signal. Keeping them
@@ -17,6 +20,8 @@
  * or any user-supplied content. The logger enforces this by design — it
  * accepts only typed parameters with no free-form string fields.
  */
+
+import type { AccessDeniedReason } from "./cfAccess";
 
 export type FormName = "suggest" | "report" | "feedback";
 export type FormFailureReason = "turnstile_failed" | "send_failed";
@@ -55,4 +60,17 @@ export function logFormFailure(
   } else {
     console.error(line);
   }
+}
+
+/**
+ * Emit a single-line JSON structured log entry for an admin-surface auth
+ * denial (Cloudflare Access JWT missing/invalid/misconfigured — see
+ * src/lib/cfAccess.ts). `reason` is the same coarse, machine-readable
+ * classification AccessDeniedError carries — never the token itself, never
+ * a claim value. Logged at warn level: most denials are ordinary
+ * unauthenticated traffic hitting an admin URL (high volume, low signal,
+ * same reasoning as turnstile_failed above), not necessarily an attack.
+ */
+export function logAdminAuthFailure(reason: AccessDeniedReason): void {
+  console.warn(JSON.stringify({ event: "admin_auth_failure", reason }));
 }

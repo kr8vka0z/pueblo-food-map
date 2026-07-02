@@ -51,3 +51,7 @@ next-env.d.ts
 
 # Serena (local code-intelligence tooling — not part of the project)
 .serena/
+
+# generated SQL from scripts/seed-admin-db.ts — derivable from committed
+# src/data/*.ts; regenerate with `bun run scripts/seed-admin-db.ts` (#237)
+scripts/generated/

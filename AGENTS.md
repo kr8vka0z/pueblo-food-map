@@ -206,6 +206,152 @@ All three form routes (`suggest`, `report`, `feedback`) call `logFormFailure` fr
 - **Filter/alert:** In CF Workers Logs, filter on `form_submit_failure` for a full failure
   stream, or narrow to `send_failed` for actionable outage alerts.
 
+# Admin authentication (Cloudflare Access) (#237)
+
+Full design: `docs/admin/cloudflare-native-admin-spec.md` §3.1 (auth) and §8
+(security). This section is the operational summary — set env vars, know the
+choke point, don't relitigate the design here.
+
+**Edge gate + why in-app verification is still required.** A Cloudflare
+Access application (Google SSO + email allowlist) gates
+`admin.pueblofoodmap.com` at Cloudflare's edge — an unauthenticated or
+non-allowlisted visitor never executes a line of this app's code on that
+hostname. But the admin route group (`src/app/admin/**`,
+`src/app/api/admin/**`) ships inside the **same Worker** as the public app
+(§3.4), and that Worker answers on hostnames an Access policy scoped to
+`admin.pueblofoodmap.com` does **not** cover:
+
+1. The bare fallback URL, `pueblo-food-map.kyle-boyd.workers.dev/admin`.
+2. Any Workers **version preview URL** (`<version-prefix>-pueblo-food-map.
+   kyle-boyd.workers.dev/admin`) — binds **production** D1.
+3. The public apex itself, `pueblofoodmap.com/admin` — the one with the
+   lowest bar to stumble onto by accident, since it's the site's own
+   marketed domain.
+
+Every `/admin/*` page and `/api/admin/*` route handler therefore
+re-verifies the `Cf-Access-Jwt-Assertion` header in application code
+(`src/lib/cfAccess.ts`, `jose`'s `jwtVerify` against Cloudflare's JWKS —
+signature, issuer, audience, expiry), so a request to any of the three
+hostnames above still fails without a real, current Access token.
+
+**`getAdminDb()` (`src/lib/adminDb.ts`) is the single choke point.** It calls
+`requireAccessIdentity()` before it will hand back the `ADMIN_DB` D1 binding
+at all — there is no code path (page or route handler, first load or
+client-side navigation) that can reach admin data without passing the
+check. This exists because Next.js App Router layouts run once per mount,
+not on every client-side navigation between sibling routes — a guard placed
+only in a shared layout would miss a client-nav to another `/admin/*` page.
+Any new admin code must fetch D1 through `getAdminDb()`, never
+`getCloudflareContext()` directly.
+
+**Two enforcement shapes, both required, both go through the same check:**
+Server Component pages call Next 16's `forbidden()` (from `next/navigation`)
+on `AccessDeniedError`, rendered by `src/app/forbidden.tsx` (a real HTTP
+403 — requires `experimental.authInterrupts: true` in `next.config.ts`,
+still an experimental Next API). Route handlers return an explicit
+`new Response("Forbidden", { status: 403 })` instead — there is no
+route-handler equivalent of `forbidden()`. Both paths log through
+`src/lib/logger.ts`'s `logAdminAuthFailure()` (`event: "admin_auth_failure"`,
+same PII-free single-line-JSON convention as `form_submit_failure` above).
+
+**Env vars Kyle sets — after, and only after, creating the live CF Access
+application** (Zero Trust dashboard → Access → Applications):
+
+- `CF_ACCESS_TEAM_DOMAIN` — e.g. `https://<team-name>.cloudflareaccess.com`.
+- `CF_ACCESS_AUD` — that Access application's audience tag.
+
+Both are **runtime secrets** (not `NEXT_PUBLIC_*`) — set via
+`wrangler secret put` or CF dashboard → Settings → Variables and Secrets,
+same as `RESEND_API_KEY`/`TURNSTILE_SECRET_KEY` above. Until they're set,
+`requireAccessIdentity()` fails closed (`AccessDeniedError("misconfigured")`)
+on every request — this is intentional, not a bug to work around.
+
+**Typing `ADMIN_DB` — don't run bare `wrangler types`.** This app targets
+the DOM (`lib: ["dom", ...]` — Mapbox, forms). Wrangler's default
+`wrangler types` bundles the full Workers runtime type set, which includes
+Cloudflare's HTMLRewriter `Element` type — it collides with lib.dom's
+`Element` and silently corrupts unrelated DOM types project-wide (observed:
+every `as HTMLSelectElement` cast in the form tests broke). Regenerate
+`worker-configuration.d.ts` with `npx wrangler types --include-runtime=false`
+after any `wrangler.jsonc` binding change; `cloudflare-env.d.ts` imports just
+the specific runtime types this project's code actually references (e.g.
+`D1Database`) from `@cloudflare/workers-types/experimental` instead.
+
+## Publish → static (#237)
+
+Full design: `docs/admin/cloudflare-native-admin-spec.md` §3.3 (why the
+public map stays static), §3.5 (the PUBLISH PATH sequence), §8 (the NB1
+ordering note). This section is the operational summary.
+
+**The flow, end to end:** an admin's D1 edits (drafts) never reach the
+public map until an explicit "Publish" click. `POST /api/admin/publish`
+(`src/app/api/admin/publish/route.ts`, logic in `src/lib/publishVenues.ts`)
+then: (1) snapshots every `draft`+`published` row from D1, (2) validates
+each row against the `Venue` shape and strips the admin-only columns
+(`status`, `source_type`, `outside_county`, every audit column), (3)
+serializes the result to `src/data/published-venues.ts`'s source text, (4)
+commits that file via the GitHub Contents API to a fixed bot branch
+(`publish-bot`, force-reset to `main`'s tip on every publish), opens or
+reuses that branch's PR, and enables auto-merge via the GraphQL API (the
+REST API has no "enable future auto-merge" endpoint — only the GraphQL
+`enablePullRequestAutoMerge` mutation does), (5) **only once step 4
+succeeds**, promotes the exact draft ids captured in step 1 to `published`
+and writes one `audit_log` row, atomically via a single `db.batch()`. Once
+the PR auto-merges, the existing Workers Builds pipeline (unmodified)
+redeploys production like any other push to `main`.
+
+**`published-venues.ts` is now the public map's data source, not the three
+source arrays.** `src/data/venues.ts` imports `publishedVenues` from
+`src/data/published-venues.ts` and applies the `benefit-flags.ts`
+SNAP/WIC overlay on top — `pfpVenues`, `groceryOsmVenues`, and
+`plentifulPantries` no longer feed the public build directly (they still
+exist; `published-venues.ts` — and, before checkpoint b/c wiring, the seed
+script — read them, but the public app doesn't). This is a build-time
+static ESM import exactly like before checkpoint d's refactor: zero fetch,
+zero D1, zero KV on the public request path. Nothing about `next build` or
+`opennextjs-cloudflare build` talks to D1 — only the live Publish button
+does, decoupled from any build, so a D1 outage can never silently ship an
+empty map.
+
+**NB1 — commit before promote, not the other way around.** The GitHub
+commit/PR/auto-merge call is attempted BEFORE any D1 write. If it fails,
+the route returns `502` and D1 is untouched: every draft stays a draft, and
+nothing is falsely marked `published`. Only after that whole GitHub
+sequence resolves does `promotePublishedDrafts()` run its one atomic
+`db.batch()`. This ordering is load-bearing — `src/app/api/admin/publish/route.test.ts`
+asserts D1's `batch()` is never called when any step of the GitHub call
+fails, and IS called exactly once when it succeeds. Getting this backwards
+(as the spec's own v1.0 draft did) can mark drafts "published" in D1 even
+when the file never actually shipped.
+
+**Concurrent publishes — "last snapshot wins" via a fixed bot branch.**
+Every publish resets the SAME `publish-bot` branch to `main`'s current tip
+and force-pushes its own snapshot, so two publishes landing close together
+collapse into whichever GitHub call completes last — no separate D1
+publish-lock needed. Opening a PR when one's already open for that branch
+fails with GitHub's own `422` "already exists" response; that specific case
+is treated as reuse (fetch the existing open PR and continue) rather than
+a failure. This 422-string-match reuse detection is a deliberate
+simplification (`ponytail:` comment at `PUBLISH_BOT_BRANCH`'s declaration
+in `publishVenues.ts`) — a pre-check GET call is the upgrade path if it
+ever proves fragile.
+
+**`GITHUB_PUBLISH_TOKEN` — Kyle must provision this before the first live
+publish.** A fine-grained PAT scoped to *only* `kr8vka0z/pueblo-food-map`,
+with both **Contents: Read/Write** and **Pull requests: Read/Write**
+permissions (Contents alone covers the commit but not opening/auto-merging
+the PR). Set as a runtime secret the same way as `RESEND_API_KEY` /
+`TURNSTILE_SECRET_KEY` / `CF_ACCESS_AUD` above (`wrangler secret put
+GITHUB_PUBLISH_TOKEN` or via the CF dashboard). Until it's set, the publish
+route throws immediately (matches the existing missing-secret convention in
+`src/app/feedback/submit/route.ts`) rather than silently no-op'ing.
+
+**No admin email in the published file.** `published-venues.ts`'s
+auto-generated header comment carries only a publish timestamp, never the
+publishing admin's email — that file lands in this **public** repo, and the
+admin identity is already recorded where an audit trail belongs: D1's
+private `audit_log.actor_email` / `venues.published_by`.
+
 # Discoverability / SEO (#164)
 
 Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**

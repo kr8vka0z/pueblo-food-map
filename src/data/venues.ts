@@ -1,173 +1,31 @@
 import type { Venue } from "@/types/venue";
-import { groceryOsmVenues } from "@/data/grocery-osm";
-import { plentifulPantries } from "@/data/pantries-plentiful";
+import { publishedVenues } from "@/data/published-venues";
 import { benefitFlags } from "@/data/benefit-flags";
 
-// v1 seed data — Pueblo Food Project Community Garden Sustainability Project (CGSP)
-// and edible landscapes. Source: https://pueblofoodproject.org/cgsp/ (verified 2026-05-12).
-//
-// Coordinates geocoded against Nominatim (OpenStreetMap) on 2026-05-14 via
-// scripts/geocode-pfp.py — see data/raw/pfp-geocodes.json for the full
-// audit trail (matched_query, display_name, OSM osm_id, miles shifted from
-// the prior placeholder). Ray Aguilera Community Garden uses a manual
-// coordinate supplied by PFP because the garden plot sits south of the
-// OSM Ray Aguilera Park centroid.
-export const pfpVenues: Venue[] = [
-  {
-    id: "garden-rmser",
-    name: "RMSER Community Garden",
-    category: "garden",
-    lat: 38.254427,
-    lng: -104.620381,
-    address: "330 Lake Ave, Pueblo, CO 81004",
-    hours_weekly: { wed: ["16:00-19:00"] },
-    email: "garden@pueblofoodproject.org",
-    url: "https://pueblofoodproject.org/cgsp/",
-    notes:
-      "Weekly volunteer work days Wed 4-7pm. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
-    operator: "Pueblo Food Project",
-    source: "pueblofoodproject.org/cgsp",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "garden-la-familia",
-    name: "La Familia Community Garden",
-    category: "garden",
-    lat: 38.271769,
-    lng: -104.596439,
-    address: "814 E 5th St, Pueblo, CO 81001",
-    email: "garden@pueblofoodproject.org",
-    url: "https://pueblofoodproject.org/cgsp/",
-    notes:
-      "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
-    operator: "Pueblo Food Project",
-    source: "pueblofoodproject.org/cgsp",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "garden-ray-aguilera",
-    name: "Ray Aguilera Community Garden",
-    category: "garden",
-    lat: 38.231170,
-    lng: -104.625036,
-    address: "Lake Ave near the Fire Station, Pueblo, CO",
-    email: "garden@pueblofoodproject.org",
-    url: "https://pueblofoodproject.org/cgsp/",
-    notes:
-      "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
-    operator: "Pueblo Food Project",
-    source: "pueblofoodproject.org/cgsp",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "garden-midway",
-    name: "Midway Community Garden",
-    category: "garden",
-    lat: 38.260521,
-    lng: -104.621467,
-    address: "110 Midway Dr, Pueblo, CO",
-    email: "garden@pueblofoodproject.org",
-    url: "https://pueblofoodproject.org/cgsp/",
-    notes:
-      "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
-    operator: "Pueblo Food Project",
-    source: "pueblofoodproject.org/cgsp",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "garden-steelworks",
-    name: "Steelworks Museum Garden",
-    category: "garden",
-    lat: 38.237869,
-    lng: -104.612428,
-    address: "215 Canal St, Pueblo, CO 81004",
-    email: "garden@pueblofoodproject.org",
-    url: "https://pueblofoodproject.org/cgsp/",
-    notes:
-      "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
-    operator: "Pueblo Food Project",
-    source: "pueblofoodproject.org/cgsp",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "garden-bethany-lutheran",
-    name: "Bethany Lutheran Church Garden",
-    category: "garden",
-    lat: 38.297496,
-    lng: -104.591039,
-    address: "1802 Sheridan Rd, Pueblo, CO 81001",
-    email: "garden@pueblofoodproject.org",
-    url: "https://pueblofoodproject.org/cgsp/",
-    notes:
-      "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
-    operator: "Pueblo Food Project",
-    source: "pueblofoodproject.org/cgsp",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "landscape-mineral-palace",
-    name: "Mineral Palace Park Edible Landscape",
-    category: "edible_landscape",
-    lat: 38.283229,
-    lng: -104.607842,
-    address: "Mineral Palace Park, Pueblo, CO",
-    url: "https://pueblofoodproject.org/cgsp/",
-    notes: "Public edible landscape installation.",
-    operator: "Pueblo Food Project",
-    source: "pueblofoodproject.org/cgsp",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "landscape-central-plaza",
-    name: "Central Plaza Edible Landscape",
-    category: "edible_landscape",
-    lat: 38.268172,
-    lng: -104.608897,
-    address: "1st & Main, Pueblo, CO",
-    url: "https://pueblofoodproject.org/cgsp/",
-    notes: "Public edible landscape installation in downtown Pueblo.",
-    operator: "Pueblo Food Project",
-    source: "pueblofoodproject.org/cgsp",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "landscape-jj-raigoza",
-    name: "JJ Raigoza Park Edible Landscape",
-    category: "edible_landscape",
-    lat: 38.222062,
-    lng: -104.617207,
-    address: "600 Maryland Ave, Pueblo, CO",
-    url: "https://pueblofoodproject.org/cgsp/",
-    notes: "Public edible landscape installation.",
-    operator: "Pueblo Food Project",
-    source: "pueblofoodproject.org/cgsp",
-    last_verified: "2026-05-12",
-  },
-  {
-    id: "landscape-fuel-iron",
-    name: "Fuel & Iron Edible Landscape",
-    category: "edible_landscape",
-    lat: 38.262121,
-    lng: -104.615912,
-    address: "400 S Union Ave, Pueblo, CO 81003",
-    url: "https://pueblofoodproject.org/cgsp/",
-    notes: "Edible landscape at Pueblo's first food hall.",
-    operator: "Pueblo Food Project",
-    source: "pueblofoodproject.org/cgsp",
-    last_verified: "2026-05-12",
-  },
-];
+// The 10 hand-curated Pueblo Food Project (CGSP) records. Re-exported here
+// unchanged for backward compatibility — scripts/seed-admin-db.ts and two
+// existing tests (OperatorAttribution.test.tsx, seed-admin-db.test.ts)
+// import pfpVenues from this module specifically. The literal data now
+// lives in src/data/pfp-venues.ts (#237 checkpoint d, the published-venues.ts
+// refactor) — see that file's header for why it had to move out of here
+// (avoids a circular import with published-venues.ts, which this module
+// now imports from, below).
+export { pfpVenues } from "@/data/pfp-venues";
 
-// Combined venue list rendered on the map. PFP first so its richer metadata
-// (notes, partnerships) wins any future de-dup pass.
-// Public venue list. SNAP/WIC benefit flags are applied as an overlay from
+// Public venue list, sourced from the last published snapshot
+// (published-venues.ts — see that file's header for what it is and how it's
+// regenerated). SNAP/WIC benefit flags are applied as a runtime overlay from
 // benefit-flags.ts (keyed by id) so they survive regeneration of the
-// auto-generated OSM / Plentiful data (#127).
-export const venues: Venue[] = [
-  ...pfpVenues,
-  ...groceryOsmVenues,
-  ...plentifulPantries,
-].map((v) => {
+// auto-generated OSM / Plentiful data (#127). This overlay is intentionally
+// BYTE-IDENTICAL to its behavior before the #237 checkpoint d
+// published-venues.ts extraction (proved by
+// src/__tests__/publishedVenues.test.ts) — the NULL-guard fix that lets an
+// admin's explicit D1 edit win over this overlay (spec §7 step 1, "NB4") is
+// Phase 2 work, once accepts_snap/accepts_wic are actually admin-editable in
+// D1. Doing that guard now, before Phase 2 ships, would be a behavior change
+// with nothing yet able to set a competing value — explicitly out of scope
+// here.
+export const venues: Venue[] = publishedVenues.map((v) => {
   const f = benefitFlags[v.id];
   return f ? { ...v, accepts_snap: f.snap, accepts_wic: f.wic } : v;
 });

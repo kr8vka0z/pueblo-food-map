@@ -16,5 +16,13 @@
       "binding": "WORKER_SELF_REFERENCE",
       "service": "pueblo-food-map"
     }
+  ],
+  "d1_databases": [
+    {
+      "binding": "ADMIN_DB",
+      "database_name": "pueblo-food-map-admin",
+      "database_id": "d6ea5afd-5283-49ed-a686-527dd274c119",
+      "preview_database_id": "95160a48-bb42-43a2-bfc7-c016af11d3dc"
+    }
   ]
 }

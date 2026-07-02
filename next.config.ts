@@ -23,6 +23,14 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Required for next/navigation's forbidden() (used by src/app/admin/page.tsx,
+  // #237 checkpoint c) — still an experimental API on this Next version; the
+  // flag opts in per next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/authInterrupts.md.
+  // Renders src/app/forbidden.tsx and returns a real HTTP 403 instead of a
+  // generic error page.
+  experimental: {
+    authInterrupts: true,
+  },
   images: {
     // Cloudflare Workers does not support the Node.js APIs that Next.js image
     // optimization relies on. `unoptimized: true` disables the optimizer so

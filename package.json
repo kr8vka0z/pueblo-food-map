@@ -15,9 +15,11 @@
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "design:lint": "npx designmd lint DESIGN.md",
     "design:export": "npx designmd export --format css-tailwind DESIGN.md",
-    "design:drift": "node scripts/check-design-drift.mjs"
+    "design:drift": "node scripts/check-design-drift.mjs",
+    "seed:admin": "bun run scripts/seed-admin-db.ts"
   },
   "dependencies": {
+    "jose": "^6.2.3",
     "lucide-react": "^1.22.0",
     "mapbox-gl": "^3.25.0",
     "next": "16.2.9",
@@ -27,6 +29,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260702.1",
     "@google/design.md": "0.3.0",
     "@opennextjs/cloudflare": "1.20.1",
     "@tailwindcss/postcss": "^4",

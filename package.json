@@ -15,7 +15,8 @@
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "design:lint": "npx designmd lint DESIGN.md",
     "design:export": "npx designmd export --format css-tailwind DESIGN.md",
-    "design:drift": "node scripts/check-design-drift.mjs"
+    "design:drift": "node scripts/check-design-drift.mjs",
+    "seed:admin": "bun run scripts/seed-admin-db.ts"
   },
   "dependencies": {
     "lucide-react": "^1.22.0",

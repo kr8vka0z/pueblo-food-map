@@ -226,8 +226,10 @@ describe("validateSnapshot", () => {
     if (!result.ok) expect(result.error).toContain("bad");
   });
 
-  test("empty snapshot is valid (zero venues)", () => {
-    expect(validateSnapshot([])).toEqual({ ok: true, venues: [] });
+  test("empty snapshot is REFUSED (safety floor — never blank the live map)", () => {
+    const result = validateSnapshot([]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("empty");
   });
 });
 
@@ -254,6 +256,39 @@ describe("venuesToLiteralArray / serializePublishedVenuesFile", () => {
       { publishedAt: "2026-07-01T00:00:00.000Z" },
     );
     expect(text).not.toContain("@pueblofoodmap.com");
+  });
+
+  test("injection-proof: hostile venue strings survive as inert string data (regression guard for #133 user content)", () => {
+    // A future user-suggested venue (#133) could carry any of these in a name,
+    // address, or notes field. The serializer emits a .ts file that gets
+    // committed and BUILT, so a value that broke out of its string literal
+    // could break the build or inject code. JSON.stringify is what makes that
+    // impossible — every char is escaped, so parsing the output back yields
+    // EXACTLY the input. This test pins that property: if anyone later rewrites
+    // the serializer with template-literal interpolation, this deep-equal fails.
+    const hostile: Venue[] = [
+      {
+        id: "hostile-1",
+        name: "a`+process.env.SECRET+`b", // template-literal breakout attempt
+        category: "pantry",
+        lat: 38.25,
+        lng: -104.6,
+        address: "*/ dropTable() /*", // block-comment / statement injection
+        notes: "l1\nl2  \\end </script>", // newlines, JS line seps, backslash, script-close
+        operator: "${danger}", // template placeholder
+        source: "s",
+        last_verified: "2026-01-01",
+      },
+    ];
+    // The array-literal the file embeds parses straight back to the input —
+    // every hostile char survived as escaped string data, not TS syntax.
+    const literal = venuesToLiteralArray(hostile);
+    expect(JSON.parse(literal)).toEqual(hostile);
+    // And the FULL committed file embeds exactly that inert JSON literal, so a
+    // backtick / ${ / */ in the data can't open a template or comment in the
+    // generated TS.
+    const fileText = serializePublishedVenuesFile(hostile, { publishedAt: "2026-07-01T00:00:00.000Z" });
+    expect(fileText).toContain(literal);
   });
 
   test("round-trip: serializing the 108 real seeded venues deep-equals the Part-1 published-venues.ts baseline", () => {

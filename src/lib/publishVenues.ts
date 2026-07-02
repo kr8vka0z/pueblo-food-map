@@ -156,6 +156,23 @@ export type ValidateSnapshotResult =
  * plausible UX upgrade but isn't what was asked for here.
  */
 export function validateSnapshot(rows: VenueRow[]): ValidateSnapshotResult {
+  // Safety floor (Fable review, checkpoint d): refuse to publish an EMPTY
+  // snapshot. An empty set is technically "all rows valid," but committing an
+  // empty published-venues.ts would blank the live public map through an
+  // otherwise-green pipeline (valid file -> passes CI -> auto-merges). The
+  // spec's "no window can silently produce an empty map" guarantee (§3.3)
+  // covers build failures, not a legitimately-authenticated publish of zero
+  // rows after D1 is emptied or mis-bound. There is no real scenario for this
+  // civic map where publishing zero venues is intended, so failing closed here
+  // — a structural guard, not a warning — is the safe default.
+  if (rows.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Publish aborted: the venue snapshot is empty. Refusing to publish an empty venue set (this would blank the public map). No file was written and no D1 row changed.",
+    };
+  }
+
   const venues: Venue[] = [];
   for (const row of rows) {
     const result = validateAndMapRow(row);

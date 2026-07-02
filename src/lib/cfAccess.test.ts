@@ -215,4 +215,26 @@ describe("requireAccessIdentity", () => {
       "invalid_token",
     );
   });
+
+  test("rejects a token with perfect claims signed by the WRONG key", async () => {
+    // Signature-verification regression guard. Every OTHER rejection test
+    // fails at a claim check (issuer/audience/expiry/email) or at parse — none
+    // of them would fail against a hypothetical claims-only decoder that
+    // skipped the cryptographic signature check. This one would: the token has
+    // a correct issuer, audience, email, and even the trusted `kid`, so a
+    // claims-only path would ACCEPT it. It must be rejected because the
+    // signature was produced by an attacker keypair, not the key in the JWKS —
+    // the single property defending all three bypass hostnames (spec §3.1/§8).
+    const { jwks } = await buildTestJwks(); // trusted public key
+    const { privateKey: attackerKey } = await buildTestJwks(); // attacker's key
+    _setJwksGetterForTest(() => jwks);
+    const token = await signTestToken(attackerKey, {
+      email: "admin@pueblofoodmap.com",
+    });
+
+    await expectDenied(
+      requireAccessIdentity(headersWith(token)),
+      "invalid_token",
+    );
+  });
 });

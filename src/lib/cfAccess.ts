@@ -134,6 +134,12 @@ export async function requireAccessIdentity(
     const { payload } = await jwtVerify(token, keySet, {
       issuer: teamDomain,
       audience,
+      // Pin the accepted signature algorithm. Cloudflare Access signs its
+      // assertions with RS256; a remote JWKS of asymmetric keys already
+      // forecloses `alg:none` and HS256-confusion, but explicitly allowlisting
+      // the one algorithm we expect is cheap belt-and-braces on an auth gate —
+      // jose will reject a token whose header advertises any other `alg`.
+      algorithms: ["RS256"],
     });
     email = payload.email;
   } catch (err) {

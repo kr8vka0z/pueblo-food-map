@@ -12,7 +12,7 @@
  *   7. Return JSON {ok: true} or {ok: false, error: string}.
  *
  * PII policy: IP addresses are used only for rate-limiting and are never
- * logged or persisted. The optional submitter email is forwarded to Resend as
+ * logged or persisted. The required submitter email is forwarded to Resend as
  * part of the email body and is NOT logged by this handler.
  */
 
@@ -44,7 +44,7 @@ async function sendSuggestionEmail(payload: {
   acceptsSnap: boolean;
   acceptsWic: boolean;
   notes?: string;
-  submitterEmail?: string;
+  submitterEmail: string;
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -77,10 +77,8 @@ async function sendSuggestionEmail(payload: {
     lines.push(payload.notes);
   }
 
-  if (payload.submitterEmail) {
-    lines.push(``);
-    lines.push(`Submitter contact: ${payload.submitterEmail}`);
-  }
+  lines.push(``);
+  lines.push(`Submitter contact: ${payload.submitterEmail}`);
 
   const emailBody = lines.join("\n");
 
@@ -115,7 +113,7 @@ interface SubmitPayload {
   acceptsSnap?: boolean;
   acceptsWic?: boolean;
   notes?: string;
-  submitterEmail?: string;
+  submitterEmail: string;
   /** Honeypot — must be empty string or absent */
   website?: string;
   /** Cloudflare Turnstile response token from the client widget */
@@ -147,10 +145,15 @@ function validate(body: SubmitPayload): string | null {
   if (body.notes && body.notes.length > FIELD_LIMITS.SUGGEST_NOTES) {
     return `Notes must be ${FIELD_LIMITS.SUGGEST_NOTES} characters or fewer`;
   }
-  if (body.submitterEmail && body.submitterEmail.length > FIELD_LIMITS.EMAIL) {
+  // #232: submitterEmail is required (was optional) — never trust the client's
+  // required-field enforcement, so this mirrors feedback/submit/route.ts's check.
+  if (!body.submitterEmail || typeof body.submitterEmail !== "string" || !body.submitterEmail.trim()) {
+    return "Missing email";
+  }
+  if (body.submitterEmail.length > FIELD_LIMITS.EMAIL) {
     return "Email address too long";
   }
-  if (body.submitterEmail && !EMAIL_RE.test(body.submitterEmail)) {
+  if (!EMAIL_RE.test(body.submitterEmail)) {
     return "Invalid email format";
   }
   return null; // valid
@@ -232,7 +235,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       acceptsSnap: Boolean(body.acceptsSnap),
       acceptsWic: Boolean(body.acceptsWic),
       notes: body.notes ? stripLineBreaks(body.notes) : undefined,
-      submitterEmail: body.submitterEmail ? stripLineBreaks(body.submitterEmail) : undefined,
+      submitterEmail: stripLineBreaks(body.submitterEmail.trim()),
     });
   } catch (err) {
     // Structured log: error type/message only — no PII (no body, IP, or email)

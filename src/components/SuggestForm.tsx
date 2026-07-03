@@ -11,7 +11,7 @@
  *   - Contact info input (optional — phone / email / URL)
  *   - SNAP / WIC checkboxes (optional)
  *   - Notes textarea (optional)
- *   - Submitter email (optional)
+ *   - Submitter email (required — #232)
  *   - Honeypot field (hidden from real users, caught server-side)
  *   - Cloudflare Turnstile widget (bot protection)
  *   - Client-side validation with accessible error announcements
@@ -66,7 +66,9 @@ function validate(
   if (!category) {
     errors.category = t("suggest.validation.categoryRequired", locale);
   }
-  if (submitterEmail && !EMAIL_RE.test(submitterEmail)) {
+  if (!submitterEmail.trim()) {
+    errors.submitterEmail = t("suggest.validation.emailRequired", locale);
+  } else if (!EMAIL_RE.test(submitterEmail)) {
     errors.submitterEmail = t("suggest.validation.emailInvalid", locale);
   }
   return errors;
@@ -178,7 +180,7 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
           acceptsSnap,
           acceptsWic,
           notes: notes.trim() || undefined,
-          submitterEmail: submitterEmail.trim() || undefined,
+          submitterEmail: submitterEmail.trim(),
           website: honeypot, // honeypot field
           turnstileToken: turnstileToken ?? "",
         }),
@@ -450,10 +452,11 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
         />
       </div>
 
-      {/* Submitter email (optional) */}
+      {/* Submitter email (required — #232) */}
       <div>
         <label htmlFor="suggest-email" className={labelClass}>
-          {t("suggest.submitterEmail.label", locale)}
+          {t("suggest.submitterEmail.label", locale)}{" "}
+          <span aria-hidden className="text-red-500">*</span>
         </label>
         <input
           type="email"
@@ -462,7 +465,9 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
           onChange={(e) => setSubmitterEmail(e.target.value)}
           placeholder={t("suggest.submitterEmail.placeholder", locale)}
           autoComplete="email"
+          required
           maxLength={EMAIL}
+          aria-required="true"
           aria-describedby={
             errors.submitterEmail
               ? "suggest-email-error"

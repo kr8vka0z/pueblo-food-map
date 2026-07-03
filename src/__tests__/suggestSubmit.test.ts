@@ -156,6 +156,41 @@ describe("Honeypot logic — integration with POST handler", () => {
     expect(res.status).toBe(422);
   });
 
+  // #232: submitterEmail is now required (was optional).
+  test("missing submitterEmail → 422", async () => {
+    vi.stubGlobal("fetch", mockTurnstileSuccess());
+    const req = makeRequest({
+      venueName: "Test Pantry",
+      address: "123 Main St, Pueblo, CO",
+      category: "pantry",
+      acceptsSnap: false,
+      acceptsWic: false,
+      submitterEmail: "",
+      website: "",
+      turnstileToken: "valid-test-token",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(422);
+  });
+
+  test("invalid submitterEmail format → 422", async () => {
+    vi.stubGlobal("fetch", mockTurnstileSuccess());
+    const req = makeRequest({
+      venueName: "Test Pantry",
+      address: "123 Main St, Pueblo, CO",
+      category: "pantry",
+      acceptsSnap: false,
+      acceptsWic: false,
+      submitterEmail: "not-an-email",
+      website: "",
+      turnstileToken: "valid-test-token",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(422);
+  });
+
   test("rate limit returns 429 after 5 submissions", async () => {
     vi.useFakeTimers();
     const ip = "192.168.1.200";
@@ -166,6 +201,7 @@ describe("Honeypot logic — integration with POST handler", () => {
       category: "pantry",
       acceptsSnap: false,
       acceptsWic: false,
+      submitterEmail: "test@example.com",
       website: "",
       turnstileToken: "valid-test-token",
     };
@@ -231,6 +267,7 @@ describe("Turnstile verification — /suggest/submit", () => {
     category: "pantry",
     acceptsSnap: false,
     acceptsWic: false,
+    submitterEmail: "test@example.com",
     website: "",
   };
 

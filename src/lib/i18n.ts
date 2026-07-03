@@ -206,7 +206,7 @@ const en: Record<string, string> = {
   "suggest.wic.label": "Accepts WIC",
   "suggest.notes.label": "Additional notes (optional)",
   "suggest.notes.placeholder": "Anything else we should know?",
-  "suggest.submitterEmail.label": "Your email (optional)",
+  "suggest.submitterEmail.label": "Your email",
   "suggest.submitterEmail.placeholder": "email@example.com",
   "suggest.submitterEmail.hint": "Only used if we need to follow up with you.",
   "suggest.submit": "Submit suggestion",
@@ -221,6 +221,7 @@ const en: Record<string, string> = {
   "suggest.validation.nameRequired": "Please enter a venue name.",
   "suggest.validation.addressRequired": "Please enter an address.",
   "suggest.validation.categoryRequired": "Please select a category.",
+  "suggest.validation.emailRequired": "Please enter your email address.",
   "suggest.validation.emailInvalid": "Please enter a valid email address.",
   "suggest.error.rateLimit": "Too many submissions from this address. Please try again in an hour.",
 
@@ -599,7 +600,7 @@ const es: Record<string, string> = {
   "suggest.wic.label": "Acepta WIC",
   "suggest.notes.label": "Notas adicionales (opcional)",
   "suggest.notes.placeholder": "¿Algo más que debamos saber?",
-  "suggest.submitterEmail.label": "Tu correo electrónico (opcional)",
+  "suggest.submitterEmail.label": "Tu correo electrónico",
   "suggest.submitterEmail.placeholder": "correo@ejemplo.com",
   "suggest.submitterEmail.hint": "Solo se usa si necesitamos hacerte un seguimiento.",
   "suggest.submit": "Enviar sugerencia",
@@ -614,6 +615,7 @@ const es: Record<string, string> = {
   "suggest.validation.nameRequired": "Por favor ingresa el nombre del lugar.",
   "suggest.validation.addressRequired": "Por favor ingresa una dirección.",
   "suggest.validation.categoryRequired": "Por favor selecciona una categoría.",
+  "suggest.validation.emailRequired": "Por favor ingresa tu correo electrónico.",
   "suggest.validation.emailInvalid": "Por favor ingresa un correo electrónico válido.",
   "suggest.error.rateLimit": "Demasiados envíos desde esta dirección. Por favor intenta de nuevo en una hora.",
 

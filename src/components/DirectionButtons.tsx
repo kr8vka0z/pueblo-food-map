@@ -8,6 +8,10 @@
  *   the callback and optionally shows an active/clear state.
  *   When a route is active, shows a collapsible turn-by-turn step list (walkSteps prop)
  *   and a secondary "Open in Google Maps" text link for users who want native GPS (#134).
+ *   When Walk is tapped with no shared location, MapWrapper requests geolocation
+ *   instead of drawing a route from downtown; if that's denied/unavailable it sets
+ *   showLocationHint, and this component renders a localized "share your location"
+ *   status message instead of silently doing nothing (#207).
  *
  * Bus / Drive: open Google Maps in a new tab with travelmode preset.
  *   Deeplink format: https://www.google.com/maps/dir/?api=1&destination=<LAT>,<LNG>&travelmode=<MODE>
@@ -80,6 +84,13 @@ interface DirectionButtonsProps {
    * Rendered as a collapsible list when the route is active.
    */
   walkSteps?: Array<{ instruction: string; distance: number }> | null;
+  /**
+   * True when Walk was tapped with no shared location and the resulting
+   * geolocation request was denied or is unavailable (#207). Renders a
+   * localized "share your location" hint instead of silently doing nothing —
+   * MapWrapper never falls back to drawing a route from PUEBLO_CENTER.
+   */
+  showLocationHint?: boolean;
 }
 
 // ─── Google Maps deeplink builder ────────────────────────────────────────────
@@ -153,6 +164,7 @@ export default function DirectionButtons({
   onClearRoute,
   routeInfo = null,
   walkSteps = null,
+  showLocationHint = false,
 }: DirectionButtonsProps) {
   // Toggle state for the step list — collapsed by default.
   const [stepsExpanded, setStepsExpanded] = useState(false);
@@ -182,6 +194,10 @@ export default function DirectionButtons({
   // "walk-steps-list" was shared across all instances — fragile.
   // data-testid="walk-steps-list" is unchanged — tests query by testid, not id.
   const stepsListId = useId();
+
+  // Per-instance id for the "share your location" hint (#207) — aria-describedby
+  // target on the Walk button below, same useId reasoning as stepsListId.
+  const locationHintId = useId();
 
   const busUrl = googleMapsUrl(venue.lat, venue.lng, "transit");
   const driveUrl = googleMapsUrl(venue.lat, venue.lng, "driving");
@@ -213,6 +229,7 @@ export default function DirectionButtons({
         <button
           type="button"
           aria-label={walkLabel}
+          aria-describedby={showLocationHint ? locationHintId : undefined}
           onClick={handleWalkClick}
           className={isRouteActive ? walkActiveClass : walkInactiveClass}
         >
@@ -241,6 +258,26 @@ export default function DirectionButtons({
           {t("directions.drive", locale)}
         </a>
       </div>
+
+      {/* Location-needed hint (#207) — shown when Walk requested geolocation
+          (because userLocation was null) and the browser denied it or it's
+          unavailable. role="status" + aria-live announces it immediately for
+          screen reader users; aria-describedby on the Walk button above links
+          it for users who tab back later. !isRouteActive is defensive — the
+          two states shouldn't ever coexist (MapWrapper clears this the instant
+          a new Walk tap starts, and a successful fetch never sets it), but the
+          guard makes that invariant explicit here too. */}
+      {!isRouteActive && showLocationHint && (
+        <p
+          id={locationHintId}
+          data-testid="walk-location-hint"
+          role="status"
+          aria-live="polite"
+          className="mt-2 text-sm text-[var(--color-ink-500)]"
+        >
+          {t("directions.locationHint", locale)}
+        </p>
+      )}
 
       {/* In-card walking route readout — distance + duration below the buttons.
           Shown only when a route is active for this venue. Uses i18n keys so

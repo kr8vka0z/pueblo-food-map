@@ -44,7 +44,7 @@ import SearchResultsPopover, {
 } from "./SearchResultsPopover";
 import LocationDeniedBanner from "./LocationDeniedBanner";
 import MapErrorBoundary from "./MapErrorBoundary";
-import { useGeolocation } from "@/lib/useGeolocation";
+import { useGeolocation, type GeoState } from "@/lib/useGeolocation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import { venues as allVenues } from "@/data/venues";
@@ -246,6 +246,46 @@ export function parseWalkSteps(
   });
 }
 
+// ─── Walk-resume decision (#207, pure) ────────────────────────────────────────
+
+/** Outcome of a Walk-triggered geolocation request once it has resolved. */
+export type WalkResumeAction =
+  | { kind: "fetch"; origin: { lat: number; lng: number } }
+  | { kind: "show-hint" }
+  | { kind: "noop" };
+
+/**
+ * Decide what to do once a Walk-triggered geolocation request has resolved
+ * (i.e. geoState.permission is no longer "prompt").
+ *
+ * Extracted as a pure function — same pattern as buildWalkingRouteUrl /
+ * parseWalkSteps above — so the decision matrix is unit-testable without
+ * mounting MapWrapper (WebGL is unavailable in jsdom).
+ *
+ * WHY the stale-selection check: if the user switches to a different venue
+ * while the browser's permission prompt is still open, the eventual grant or
+ * denial belongs to the venue that asked, not whatever is selected when it
+ * resolves. Drawing a route (or showing a hint) for the wrong venue would be
+ * the same "whose route is this?" bug the walkingRouteVenueId/selectedVenueId
+ * render-gate already guards against for the fetch path (#208).
+ */
+export function decideWalkResume(
+  awaitingVenueId: string,
+  selectedVenueId: string | null,
+  geoState: GeoState,
+): WalkResumeAction {
+  if (awaitingVenueId !== selectedVenueId) return { kind: "noop" };
+
+  if (geoState.permission === "granted" && geoState.position !== null) {
+    return { kind: "fetch", origin: geoState.position };
+  }
+
+  // Denied, or geolocation unavailable — useGeolocation's request() reports
+  // both outcomes as permission: "denied". Never fall back to PUEBLO_CENTER (#207):
+  // a walking route drawn from downtown when the user is elsewhere is misleading.
+  return { kind: "show-hint" };
+}
+
 // ─── MapWrapper ───────────────────────────────────────────────────────────────
 
 interface MapWrapperProps {
@@ -335,6 +375,31 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // ── Outside-county message (#108) ────────────────────────────────────────────
   const [outsideCountyVisible, setOutsideCountyVisible] = useState(false);
 
+  // Wraps geo.request() to stamp the request timestamp and increment the
+  // recenter counter so Map.tsx re-centers even if userLocation hasn't changed.
+  //
+  // WHY declared here (moved up from its original spot near handleMoveEnd):
+  // handleWalkRoute below (#207) also calls this to request location when a
+  // Walk tap has none, instead of falling back to PUEBLO_CENTER — it must be
+  // declared before handleWalkRoute's useCallback deps array references it.
+  const handleLocateRequest = useCallback(() => {
+    userRequestedAtRef.current = Date.now();
+    setRecenterRequestId((n) => n + 1);
+    setOutsideCountyVisible(false);
+
+    const alreadyLocated =
+      geo.state.permission === "granted" && geo.state.position !== null;
+    if (!alreadyLocated) {
+      geoRequestedAtRef.current = Date.now();
+      setIsLocating(true);
+    } else {
+      // Already located — this is a Re-center tap; clear drift immediately
+      setIsDrifted(false);
+    }
+    geo.request();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geo.request, geo.state]);
+
   // ── Walking route (#134) ──────────────────────────────────────────────────────
   // walkingRoute: the fetched GeoJSON for the current walking route, or null.
   // walkingRouteInfo: human-readable distance + duration text for the overlay.
@@ -351,6 +416,19 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const [walkingRouteInfo, setWalkingRouteInfo] = useState<WalkingRouteInfo | null>(null);
   const [walkingRouteSteps, setWalkingRouteSteps] = useState<WalkStep[] | null>(null);
   const [walkingRouteVenueId, setWalkingRouteVenueId] = useState<string | null>(null);
+
+  // ── Walk-without-location (#207) ─────────────────────────────────────────────
+  // walkAwaitingVenueIdRef: the venue a Walk tap is waiting on geolocation for.
+  //   Set when handleWalkRoute is called with no userLocation (instead of
+  //   falling back to PUEBLO_CENTER); consumed by the resume effect below once
+  //   geo.state resolves. A ref, not state — read only inside that effect,
+  //   never rendered; same "avoid a stale closure" reasoning as walkReqSeq.
+  // walkLocationHintVenueId: which venue's Walk tap resulted in a denied/
+  //   unavailable geolocation request — drives the localized "share your
+  //   location" hint in DirectionButtons. Render-gated on selectedVenueId in
+  //   the JSX below, same pattern as walkingRouteVenueId.
+  const walkAwaitingVenueIdRef = useRef<string | null>(null);
+  const [walkLocationHintVenueId, setWalkLocationHintVenueId] = useState<string | null>(null);
 
   // ── Stale-route race guard (FIX 1 — hardened) ───────────────────────────────
   // handleWalkRoute is async. If the user taps Walk on venue A then selects
@@ -399,34 +477,28 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         setWalkingRouteVenueId(null);
       });
     }
+    // #207: a stale "share your location" hint belongs to the venue that
+    // triggered it, not whatever is selected now — drop it on selection
+    // change, same invariant as the walking route itself just above.
+    if (selectedVenueId !== walkLocationHintVenueId) {
+      queueMicrotask(() => setWalkLocationHintVenueId(null));
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVenueId]);
 
-  /** Fetch a walking route from Mapbox Directions API and draw it on the map. */
-  const handleWalkRoute = useCallback(async (venue: import("@/types/venue").Venue) => {
-    // If user re-taps Walk on the already-active route, clear it (toggle off).
-    if (walkingRouteVenueId === venue.id) {
-      // Bump the seq so any pending fetch (same venue, stale userLocation) cannot
-      // repopulate the route after the user explicitly toggled it off.
-      walkReqSeq.current++;
-      setWalkingRoute(null);
-      setWalkingRouteInfo(null);
-      setWalkingRouteSteps(null);
-      setWalkingRouteVenueId(null);
-      return;
-    }
-
+  /**
+   * Fetch a walking route from Mapbox Directions API and draw it on the map.
+   * origin is passed explicitly (not read from userLocation) so the resume
+   * effect below can call this with a just-resolved geo.state.position
+   * without waiting on a re-render to see it (#207).
+   */
+  const fetchWalkingRoute = useCallback(async (venue: Venue, origin: { lat: number; lng: number }) => {
     // Mint a unique request token. Any earlier in-flight fetch — including one
     // for the SAME venue — that resolves after this point will compare its seq
     // snapshot to walkReqSeq.current and bail if they differ (latest-REQUEST-wins).
     const seq = ++walkReqSeq.current;
 
-    // WHY userLocation as origin: the Directions API requires a from-coordinate.
-    // If user has not shared location, fall back to Pueblo center so the route
-    // still draws (from downtown to the venue), which is better than silently failing.
-    const origin = userLocation ?? PUEBLO_CENTER;
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-
     if (!token) {
       // No token — Directions API will fail. Fail silently; map still works.
       console.warn("[MapWrapper] NEXT_PUBLIC_MAPBOX_TOKEN missing — walking route unavailable");
@@ -494,7 +566,49 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       // Network failure — fail silently. The user can still use the Bus/Drive deeplinks.
       console.warn("[MapWrapper] Directions fetch failed:", err);
     }
-  }, [locale, userLocation, walkingRouteVenueId]);
+  }, [locale]);
+
+  /**
+   * Handle a Walk tap: toggle off an active route, fetch one from the user's
+   * real location, or — if location hasn't been shared yet — request it
+   * instead of silently drawing from PUEBLO_CENTER (#207). A walking route
+   * from downtown when the user is elsewhere is misleading; Bus/Drive are
+   * unaffected because their Google Maps deeplinks omit origin entirely and
+   * let Google use the device's own location.
+   */
+  const handleWalkRoute = useCallback((venue: Venue) => {
+    // If user re-taps Walk on the already-active route, clear it (toggle off).
+    if (walkingRouteVenueId === venue.id) {
+      // Bump the seq so any pending fetch (same venue, stale userLocation) cannot
+      // repopulate the route after the user explicitly toggled it off.
+      walkReqSeq.current++;
+      setWalkingRoute(null);
+      setWalkingRouteInfo(null);
+      setWalkingRouteSteps(null);
+      setWalkingRouteVenueId(null);
+      return;
+    }
+
+    // A fresh tap deserves a fresh outcome — drop any stale hint from a
+    // previous denied attempt before trying again.
+    setWalkLocationHintVenueId(null);
+
+    if (!userLocation) {
+      // No shared location yet. Ask for it via the SAME geolocation flow the
+      // locate button uses (geo.request(), wrapped by handleLocateRequest) —
+      // not a second getCurrentPosition implementation. The resume effect
+      // below picks up the result: fetches the route on grant, shows the
+      // hint on denial. Skip re-requesting if already awaiting this exact
+      // venue (rapid double-tap while the browser's permission prompt is open).
+      if (walkAwaitingVenueIdRef.current !== venue.id) {
+        walkAwaitingVenueIdRef.current = venue.id;
+        handleLocateRequest();
+      }
+      return;
+    }
+
+    void fetchWalkingRoute(venue, userLocation);
+  }, [walkingRouteVenueId, userLocation, handleLocateRequest, fetchWalkingRoute]);
 
   /** Clear the walking route (e.g. when Walk button is tapped while route is active). */
   const handleClearWalkingRoute = useCallback(() => {
@@ -523,6 +637,40 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // Only re-run when geo.state (object ref) changes — same pattern as bannerVisible.
   }, [geo.state]);
 
+  // ── Resume a Walk request once its triggered geolocation resolves (#207) ────
+  // handleWalkRoute stashes the tapped venue's id in walkAwaitingVenueIdRef and
+  // calls handleLocateRequest() instead of falling back to PUEBLO_CENTER when
+  // userLocation is null. This effect watches geo.state for that request's
+  // resolution and applies decideWalkResume's verdict (fetch / show-hint / noop).
+  useEffect(() => {
+    const awaitingId = walkAwaitingVenueIdRef.current;
+    if (!awaitingId) return;
+    if (geo.state.permission === "prompt") return; // still waiting on the browser
+    // WHY this second guard: useGeolocation's Permissions API onchange listener
+    // can independently flip permission to "granted" (position still null,
+    // since onchange doesn't call getCurrentPosition) slightly BEFORE the
+    // getCurrentPosition call this same Walk tap triggered delivers its actual
+    // fix. Treating {granted, position:null} as "resolved" here would consume
+    // the ref and show the hint prematurely, then silently drop the real
+    // position when it arrives a moment later (the ref is one-shot). Both
+    // getCurrentPosition branches (success/error) always settle within 8s
+    // (its own timeout option), so this can't wait forever.
+    if (geo.state.permission === "granted" && geo.state.position === null) return;
+
+    walkAwaitingVenueIdRef.current = null; // one resolution per request
+
+    const action = decideWalkResume(awaitingId, selectedVenueId, geo.state);
+    if (action.kind === "fetch") {
+      const venue = allVenues.find((v) => v.id === awaitingId);
+      if (venue) void fetchWalkingRoute(venue, action.origin);
+    } else if (action.kind === "show-hint") {
+      setWalkLocationHintVenueId(awaitingId);
+    }
+    // action.kind === "noop": the venue that asked is no longer selected —
+    // nothing to attach the result to (see decideWalkResume's WHY comment).
+  // Only re-run when geo.state (object ref) changes — same pattern as bannerVisible.
+  }, [geo.state, selectedVenueId, fetchWalkingRoute]);
+
   // Handle map moveend: update drift state (called from Map's onMoveEnd prop).
   // Runs from a DOM event callback, not from a React effect.
   const handleMoveEnd = useCallback(
@@ -536,26 +684,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     },
     [geo.state],
   );
-
-  // Wraps geo.request() to stamp the request timestamp and increment the
-  // recenter counter so Map.tsx re-centers even if userLocation hasn't changed.
-  const handleLocateRequest = useCallback(() => {
-    userRequestedAtRef.current = Date.now();
-    setRecenterRequestId((n) => n + 1);
-    setOutsideCountyVisible(false);
-
-    const alreadyLocated =
-      geo.state.permission === "granted" && geo.state.position !== null;
-    if (!alreadyLocated) {
-      geoRequestedAtRef.current = Date.now();
-      setIsLocating(true);
-    } else {
-      // Already located — this is a Re-center tap; clear drift immediately
-      setIsDrifted(false);
-    }
-    geo.request();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geo.request, geo.state]);
 
   // ── Splash "Find food near me" → auto-locate on entry ─────────────────────────
   // The user enters the map via the splash CTA, which sets viewport='located'
@@ -1098,6 +1226,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
               ? walkingRouteSteps
               : null
           }
+          showWalkLocationHint={
+            selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
+          }
         />
       )}
 
@@ -1128,6 +1259,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
               ? walkingRouteSteps
               : null
+          }
+          showWalkLocationHint={
+            selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
           }
         />
       )}

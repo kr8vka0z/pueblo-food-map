@@ -359,6 +359,9 @@ const en: Record<string, string> = {
   "directions.routeDistance": "{distance} walk",
   "directions.routeDuration": "{duration}",
   "directions.clearRoute": "Clear walking route",
+  // Walk-without-location hint (#207) — shown when Walk requests geolocation
+  // (userLocation was null) and the browser denies it or it's unavailable.
+  "directions.locationHint": "Share your location to see walking directions.",
   // Turn-by-turn step list (#134 enhancement)
   "directions.showSteps": "Show steps",
   "directions.hideSteps": "Hide steps",
@@ -751,6 +754,8 @@ const es: Record<string, string> = {
   "directions.routeDistance": "{distance} caminando",
   "directions.routeDuration": "{duration}",
   "directions.clearRoute": "Eliminar ruta a pie",
+  // Walk-without-location hint (#207)
+  "directions.locationHint": "Comparte tu ubicación para ver cómo llegar a pie.",
   // Turn-by-turn step list (#134 enhancement)
   "directions.showSteps": "Ver indicaciones",
   "directions.hideSteps": "Ocultar indicaciones",

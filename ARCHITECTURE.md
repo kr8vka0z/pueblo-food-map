@@ -163,9 +163,26 @@ Key state atoms and their roles:
 | `walkingRouteSteps` | `WalkStep[] \| null` | Turn-by-turn steps from Mapbox (pre-localized via `language=` param); threaded to DirectionButtons for the collapsible step list |
 | `walkingRouteVenueId` | `string \| null` | Which venue the current route targets; used to auto-clear when selection changes |
 | `walkReqSeq` | `ref<number>` | Monotonic sequence counter for in-flight walk fetches. Incremented at the start of each `handleWalkRoute` call (non-toggle path), and on every explicit clear (toggle-off, `handleClearWalkingRoute`). On resolution the fetch's captured `seq` snapshot is compared to the current counter; if they differ the result is discarded (latest-REQUEST-wins, not latest-resolve-wins). Keys on a monotonic int rather than `venue.id` so same-venue double-taps with a changed `userLocation` are also caught. NOT bumped in the `selectedVenueId`-change effect — the render-gate on the Map `walkingRoute` prop (`walkingRouteVenueId === selectedVenueId ? walkingRoute : null`) is the safety net for selection-switch races, preserving the seq so a same-task select+walk-for-new-venue can succeed |
+| `walkAwaitingVenueIdRef` | `ref<string \| null>` | Set by `handleWalkRoute` (#207) when Walk is tapped and `userLocation` is `null` — the venue whose Walk tap is waiting on a just-triggered geolocation request. Consumed (nulled) by the resume effect the first time `geo.state` resolves out of `"prompt"` (and out of the `{granted, position:null}` transient — see that effect's WHY comment) |
+| `walkLocationHintVenueId` | `string \| null` | Which venue's Walk tap resulted in a denied/unavailable geolocation request (#207) — render-gated on `selectedVenueId`, same pattern as `walkingRouteVenueId`, and threaded to `DirectionButtons` as `showLocationHint` |
 
 **Walking route step parsing:**
 `parseWalkSteps(route)` is an exported pure function in `MapWrapper.tsx`. It converts the raw Mapbox Directions API legs/steps array to `WalkStep[]`, with defensive optional-chaining on `maneuver?.instruction` so a malformed step is dropped (not thrown). Exported for unit testing without mounting MapWrapper (mirrors `buildWalkingRouteUrl` pattern).
+
+**Walk-without-location (#207):**
+`handleWalkRoute` never falls back to `PUEBLO_CENTER` as a walking-route origin — a route drawn from downtown when the user is elsewhere is misleading (Bus/Drive are unaffected: their Google Maps deeplinks omit `origin` entirely and let Google use the device's own location). Instead, when `userLocation` is `null`:
+
+```
+Walk tapped, userLocation === null
+  → handleWalkRoute stashes venue.id in walkAwaitingVenueIdRef
+  → calls handleLocateRequest()   (same geo.request() flow the locate button uses)
+  → resume effect watches geo.state, applies decideWalkResume(awaitingVenueId, selectedVenueId, geo.state):
+      granted + position     → fetchWalkingRoute(venue, position)   — draws the real route
+      denied / unavailable   → setWalkLocationHintVenueId(venue.id) — "share your location" hint, no route
+      stale (venue no longer selected) → noop, nothing drawn or shown
+```
+
+`decideWalkResume` is an exported pure function (same testable-without-mounting pattern as `parseWalkSteps`) — it owns only the post-resolution decision; the effect itself additionally waits out the transient `{granted, position:null}` state (Permissions API `onchange` can fire fractionally before `getCurrentPosition`'s own success callback) so a real grant is never mistaken for a denial. `fetchWalkingRoute` takes `origin` as an explicit parameter (not read from `userLocation`) precisely so the resume effect can call it with a just-resolved `geo.state.position` without waiting on a re-render.
 
 **Filtering pipeline** (computed in `useMemo`, run on every state change):
 

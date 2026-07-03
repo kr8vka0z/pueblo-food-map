@@ -306,6 +306,48 @@ window into async chunks, reducing TBT on throttled mobile. Mapbox GL JS
 (1.7MB) was already async via the nested dynamic in MapWrapper; this change
 eliminates the remaining sync JS that dominated TBT after Mapbox.
 
+**Deferred interactive-map load (#226):** being code-split (#202, above) was
+not enough on its own. `next/dynamic`'s factory (`() => import("./Map")`)
+fires the instant React first *renders* the resulting component — not when
+`dynamic()` is merely declared at module scope (confirmed against this
+version's own lazy-loading doc: conditionally rendering a dynamic component
+is the documented way to defer its import). MapWrapper used to render
+`<MapCanvas>` unconditionally (gated only by the #165 WebGL probe below,
+which starts optimistic), so the mapbox-gl chunk fetch — and the WebGL/tile
+work that follows — began the instant MapWrapper mounted, dominating the
+mobile Lighthouse performance audit (`.lighthouserc.json`'s
+`performance: "warn"` comment has the measured history).
+
+`useDeferredMapLoad` (`src/lib/useDeferredMapLoad.ts`) now gates whether
+`<MapCanvas>` is rendered at all. Until its returned flag is true, MapWrapper
+renders `ListView` in the map's place instead — reusing the existing
+component rather than a new skeleton, so the placeholder is already fully
+interactive (tapping a venue card both selects it and counts as the
+interaction that loads the map). Both `ListView` and `Map.tsx`'s own root
+fill the same `absolute inset-0` / 100%-of-parent box, whose own size is
+flex/viewport-driven (never content-driven) — so the swap introduces no
+layout shift. The flag flips true on whichever fires first: `requestIdleCallback`
+(bounded by a timeout so a permanently busy main thread can't starve it
+forever), a `setTimeout` fallback for browsers without `requestIdleCallback`
+(Safari), or the user's first interaction — pointerdown, touchstart, scroll,
+keydown, or focusin. keydown/focusin are included alongside the pointer/touch
+events specifically so a keyboard or assistive-tech user tabbing toward the
+map gets the same early trigger a mouse/touch user does; the idle/timeout
+fallback also guarantees eventual load with zero interaction at all, so no
+user is ever gated behind a pointer-only path.
+
+**Deep-link exception — eager, never deferred.** A shared venue link
+(`?venue=<id>`, or `/venue/<id>`'s "View on the map" CTA which lands on
+`/#venue=<id>`) must open on that pin immediately, not after an idle
+deadline. `page.tsx` parses both forms into `initialVenueId` exactly as
+before #226 (unchanged). MapWrapper passes `Boolean(initialVenueId)` as
+`useDeferredMapLoad`'s `eager` argument, which seeds the trigger flag
+already-true on mount whenever a deep link is present, so `<MapCanvas>` (and
+its `import("./Map")`) fires on the very first render — same as pre-#226
+behavior, for that one case only. The existing deep-link effect (#132,
+unchanged) still waits on `mapboxMap` before calling `setSelectedVenueId`, so
+the venue still opens once the now-eagerly-loaded map reports ready.
+
 **Token scopes:** the public token (`pk.*`, `NEXT_PUBLIC_MAPBOX_TOKEN`) needs
 only `styles:read`, `fonts:read`, `tilesets:read`. Narrowing the scope
 reduces the blast radius if the token leaks via client bundle inspection.

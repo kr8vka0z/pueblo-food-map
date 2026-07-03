@@ -785,26 +785,52 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   // ── Category autozoom (#111) ─────────────────────────────────────────────────
   // When a single category is activated from the dropdown, fit the map to all
-  // venues in that category. When cleared, return to the all-venues overview.
+  // venues in that category. When the user CLEARS an active category, return
+  // to the all-venues overview.
   //
-  // Fires after `activeCategoryFilter` changes, so it runs on every select/clear.
-  // `mapboxMap` may be null on first render (map not yet loaded) — the guard
-  // below is safe; the user can't open the dropdown before the map loads anyway.
+  // Fires after `activeCategoryFilter` or `mapboxMap` changes — including the
+  // map's first ready run, when `mapboxMap` flips from null to real. The
+  // category dropdown is interactive before the map loads, so a filter can
+  // already be set (or cleared) by then. `prevActiveCategoryFilterRef` (below)
+  // tells that first-ready run apart from a genuine user clear so it never
+  // fitBounds-to-all-venues over the #231 fixed home view on a fresh load (#247).
   //
   // Interaction with #108 drift detection: `fitBounds` will fire a `moveend`
   // event which calls `handleMoveEnd` → may set `isDrifted`. That's expected;
   // the Re-center button will appear if the user-dot isn't in the new view, which
   // is correct UX. No loop risk because `handleMoveEnd` only reads bounds, it
   // does not change `activeCategoryFilter`.
+
+  // Previous `activeCategoryFilter`, updated only on runs where `mapboxMap` is
+  // ready — `undefined` means "the map has never been ready before." Filter
+  // churn that happens before the map exists to zoom on is invisible to this
+  // ref, so it can't be mistaken for a real clear once the map finally loads.
+  const prevActiveCategoryFilterRef = useRef<VenueCategory | null | undefined>(undefined);
+
   useEffect(() => {
     if (!mapboxMap) return;
+
+    // Compare against, then overwrite with, the CURRENT value — only for runs
+    // that reach here (map ready). Pre-ready renders bail above without
+    // touching the ref.
+    const prevActiveCategoryFilter = prevActiveCategoryFilterRef.current;
+    prevActiveCategoryFilterRef.current = activeCategoryFilter;
 
     const reducedMotion =
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     if (activeCategoryFilter === null) {
-      // Cleared — return to all-venues overview (mirrors wordmark reset zoom).
+      // Skip unless a real category was active on the previous ready run —
+      // `== null` catches both "map's first ready run" (undefined) and
+      // "filter was already null." Only a genuine non-null → null transition
+      // below is a real clear; otherwise whatever view is already showing
+      // (the #231 home view, on a fresh load) stands untouched.
+      if (prevActiveCategoryFilter == null) return;
+
+      // Real clear — fit the all-venues bounds, capped at CATEGORY_FIT_MAX_ZOOM.
+      // NOT the wordmark/home zoom: this is a computed bounds-fit over the
+      // whole venue set, a different view than PUEBLO_CENTER/PUEBLO_DEFAULT_ZOOM.
       const allBounds = computeCategoryBounds(allVenues);
       if (!allBounds) return;
       mapboxMap.fitBounds(allBounds, {

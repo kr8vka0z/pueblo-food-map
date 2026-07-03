@@ -7,10 +7,10 @@
  *   - CATEGORY_FIT_PADDING_MOBILE / CATEGORY_FIT_PADDING_DESKTOP: padding shapes
  *
  * The fitBounds side-effect in MapWrapper itself is driven by a useEffect on
- * activeCategoryFilter. We verify the effect triggers fitBounds via a focused
- * integration test that mounts the sub-components the same way MapWrapper tests
- * do elsewhere (no full MapWrapper — Mapbox WebGL unavailable in jsdom).
- * Instead we test the map instance mock directly through the exported helpers.
+ * activeCategoryFilter and mapboxMap — that effect's own lifecycle (including
+ * its interaction with the #231 fixed home view on initial load) is covered
+ * by the full-MapWrapper-mount integration test in
+ * src/__tests__/CategoryAutoZoomHomeView.test.tsx (#247), not here.
  */
 
 import { describe, test, expect } from "vitest";

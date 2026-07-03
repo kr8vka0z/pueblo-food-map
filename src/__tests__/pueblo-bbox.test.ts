@@ -9,7 +9,13 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { PUEBLO_COUNTY_BBOX, PUEBLO_COUNTY_MIN_ZOOM } from "@/data/pueblo-bbox";
+import {
+  PUEBLO_COUNTY_BBOX,
+  PUEBLO_COUNTY_MIN_ZOOM,
+  PUEBLO_CENTER_LAT,
+  PUEBLO_CENTER_LNG,
+  PUEBLO_DEFAULT_ZOOM,
+} from "@/data/pueblo-bbox";
 import { venues } from "@/data/venues";
 
 // ─── Bbox structure ───────────────────────────────────────────────────────────
@@ -68,6 +74,31 @@ describe("PUEBLO_COUNTY_MIN_ZOOM", () => {
   test("is between 7 and 11 (practical floor for county-scale view)", () => {
     expect(PUEBLO_COUNTY_MIN_ZOOM).toBeGreaterThanOrEqual(7);
     expect(PUEBLO_COUNTY_MIN_ZOOM).toBeLessThanOrEqual(11);
+  });
+});
+
+// ─── PUEBLO_DEFAULT_ZOOM (#231) ───────────────────────────────────────────────
+//
+// Single source of truth for the default/home-view zoom level, shared by
+// Map.tsx's initial viewport and MapWrapper's logo/wordmark reset so the two
+// can never drift apart.
+
+describe("PUEBLO_DEFAULT_ZOOM", () => {
+  test("is a number", () => {
+    expect(typeof PUEBLO_DEFAULT_ZOOM).toBe("number");
+  });
+
+  test("is above the county min zoom and at a neighborhood-visible scale (12-15)", () => {
+    expect(PUEBLO_DEFAULT_ZOOM).toBeGreaterThan(PUEBLO_COUNTY_MIN_ZOOM);
+    expect(PUEBLO_DEFAULT_ZOOM).toBeGreaterThanOrEqual(12);
+    expect(PUEBLO_DEFAULT_ZOOM).toBeLessThanOrEqual(15);
+  });
+
+  test("PUEBLO_CENTER_LAT/LNG remain the paired default-view coordinates", () => {
+    // Sanity guard: the default view is this lat/lng at PUEBLO_DEFAULT_ZOOM —
+    // pinned here so a future edit to either half of the pair is deliberate.
+    expect(PUEBLO_CENTER_LAT).toBe(38.2544);
+    expect(PUEBLO_CENTER_LNG).toBe(-104.6091);
   });
 });
 

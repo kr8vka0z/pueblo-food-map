@@ -8,6 +8,10 @@
  * #46: Hover tooltips, user-location dot, attribution control.
  * #47: flyTo / fitBounds / locate flow + reduced-motion guards (this PR).
  * #62: Pan/zoom constraint (maxBounds + minZoom) + inverted county mask layer.
+ * #231: Removed the mount-time fitBounds-to-venues effect. initialViewState
+ *       is now the only thing that sets the starting view — a fixed constant,
+ *       so it no longer drifts with the venue set (matches the logo/wordmark
+ *       reset). Deep-link and geolocation flyTo/jumpTo are unaffected.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
@@ -32,20 +36,19 @@ import {
   PUEBLO_COUNTY_MIN_ZOOM,
   PUEBLO_CENTER_LAT,
   PUEBLO_CENTER_LNG,
+  PUEBLO_DEFAULT_ZOOM,
 } from "@/data/pueblo-bbox";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-// Pueblo, CO city center
+// Pueblo, CO city center — the map's fixed initial view (#231). Also the
+// logo/wordmark reset target in MapWrapper.tsx, via the same PUEBLO_DEFAULT_ZOOM
+// constant, so the two views can never drift apart.
 const PUEBLO_CENTER = {
   longitude: PUEBLO_CENTER_LNG,
   latitude: PUEBLO_CENTER_LAT,
-  zoom: 13,
+  zoom: PUEBLO_DEFAULT_ZOOM,
 };
-
-// Downtown Pueblo for 15-mile filter
-const PUEBLO_LAT = 38.2544;
-const PUEBLO_LNG = -104.6091;
 
 // Design tokens (mirrors globals.css @theme)
 const BRAND_NAVY = "#190F3F";
@@ -240,8 +243,6 @@ export default function Map({
 
   const mapRef = useRef<MapRef>(null);
 
-  // Guards — each fires at most once per mount
-  const fittedBoundsRef = useRef(false);
   // Tracks the last recenterRequestId that triggered a flyTo. The effect fires
   // when recenterRequestId changes (explicit locate tap) OR when userLocation
   // first arrives passively (recenterRequestId stays 0). Using a ref avoids
@@ -259,38 +260,6 @@ export default function Map({
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
     );
   }, []);
-
-  // ── fitBounds-on-mount: fit to venues within 15mi of downtown Pueblo ──────
-  useEffect(() => {
-    if (fittedBoundsRef.current) return;
-    if (venues.length === 0) return;
-
-    fittedBoundsRef.current = true;
-
-    const inCity = venues.filter((v) => {
-      const dLat = v.lat - PUEBLO_LAT;
-      const dLng = v.lng - PUEBLO_LNG;
-      // Approximate miles: 1 deg lat ≈ 69mi, 1 deg lng ≈ 54mi at this latitude
-      const miles = Math.sqrt((dLat * 69) ** 2 + (dLng * 54) ** 2);
-      return miles <= 15;
-    });
-
-    const source = inCity.length > 0 ? inCity : venues;
-
-    // Mapbox fitBounds: [[lngWest, latSouth], [lngEast, latNorth]]
-    const lngs = source.map((v) => v.lng);
-    const lats = source.map((v) => v.lat);
-    const bounds: [[number, number], [number, number]] = [
-      [Math.min(...lngs), Math.min(...lats)],
-      [Math.max(...lngs), Math.max(...lats)],
-    ];
-
-    // Schedule after first render so mapRef is populated
-    const id = setTimeout(() => {
-      mapRef.current?.fitBounds(bounds, { padding: 30, duration: 0 });
-    }, 0);
-    return () => clearTimeout(id);
-  }, [venues]);
 
   // ── Selected-venue flyTo — 800ms, zoom 16, reduced-motion guard ───────────
   useEffect(() => {

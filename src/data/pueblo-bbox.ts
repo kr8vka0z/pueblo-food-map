@@ -43,3 +43,13 @@ export const PUEBLO_CENTER = { lat: PUEBLO_CENTER_LAT, lng: PUEBLO_CENTER_LNG };
  * the county as a small object; 9 is the practical floor.
  */
 export const PUEBLO_COUNTY_MIN_ZOOM = 9;
+
+/**
+ * Default/home-view zoom level, paired with PUEBLO_CENTER.
+ *
+ * Single source of truth for "the fixed Pueblo home view" — Map.tsx's
+ * initial viewport on first load AND MapWrapper's logo/wordmark reset both
+ * read this constant so the two can never drift apart (#231: a fresh load
+ * must open at the exact same view a logo click resets to).
+ */
+export const PUEBLO_DEFAULT_ZOOM = 13;

@@ -24,5 +24,46 @@
       "database_id": "d6ea5afd-5283-49ed-a686-527dd274c119",
       "preview_database_id": "95160a48-bb42-43a2-bfc7-c016af11d3dc"
     }
-  ]
+  ],
+  // Staging (#223 step 1): repo-config only, NOT yet wired to a deploy pipeline
+  // or DNS route. Named environments do not inherit bindings (assets,
+  // services, d1_databases) from the top level in wrangler — only `main`,
+  // `compatibility_date`, and `compatibility_flags` are inherited — so every
+  // binding below is redeclared for this environment.
+  "env": {
+    "staging": {
+      "name": "pueblo-food-map-staging",
+      "routes": [
+        { "pattern": "dev.pueblofoodmap.com", "custom_domain": true }
+      ],
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      // Self-reference must point at the staging Worker, not prod — OpenNext
+      // uses this binding for internal self-calls, so pointing it at prod
+      // would make staging silently call into production.
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "pueblo-food-map-staging"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "ADMIN_DB",
+          "database_name": "pueblo-food-map-admin",
+          // ponytail: reuses prod's existing PREVIEW d1 id, not prod's real
+          // admin DB (d6ea5afd-...) — keeps prod admin data untouched and
+          // avoids provisioning a new D1 for a binding that's fail-closed
+          // anyway: CF_ACCESS_TEAM_DOMAIN/CF_ACCESS_AUD are unset on the
+          // staging Worker, so requireAccessIdentity() rejects every
+          // /admin request and this DB is never actually queried. Upgrade
+          // path: provision a dedicated pueblo-food-map-admin-staging D1
+          // with seeded test data if staging admin is ever enabled.
+          "database_id": "95160a48-bb42-43a2-bfc7-c016af11d3dc"
+        }
+      ]
+    }
+  }
 }

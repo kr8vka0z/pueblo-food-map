@@ -58,6 +58,7 @@ import {
 } from "@/data/pueblo-bbox";
 import { useMapFilters } from "@/lib/useMapFilters";
 import { useMapUI } from "@/lib/useMapUI";
+import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
 // dynamic import here in a Client Component as required by Next.js 16
@@ -326,6 +327,18 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     mapboxMap,
     setMapboxMap,
   } = useMapUI();
+
+  // ── Deferred map load (#226) ─────────────────────────────────────────────────
+  // Perf: mapbox-gl is a large WebGL payload that used to fire the instant
+  // MapWrapper mounted (the dynamic import factory runs on first render of
+  // <MapCanvas>, not on interaction) — it dominated the mobile Lighthouse
+  // performance audit. eager=true whenever a venue deep link is present so a
+  // shared link (?venue=/#venue=) still opens on its pin immediately; see the
+  // hook doc for the idle/interaction triggers that fire otherwise. While
+  // false, the render below shows ListView in the map's place instead of
+  // mounting <MapCanvas> — same absolute-fill box, so there is no layout shift
+  // when the swap happens.
+  const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId));
 
   // ── Location-denied banner (PR 7) ────────────────────────────────────────────
   // Shows only when the user ACTIVELY re-taps locate (not on initial mount when
@@ -1001,9 +1014,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   return (
     <div className="relative h-full w-full">
-      {/* Map — fills viewport; skipped entirely when WebGL is unavailable (#165).
+      {/* Map — fills viewport; skipped entirely when WebGL is unavailable (#165)
+          or the interactive load hasn't been triggered yet (#226 — see
+          useDeferredMapLoad; ListView below covers this same window).
           MapErrorBoundary catches fatal init throws as a secondary safety net. */}
-      {!mapUnavailable && (
+      {!mapUnavailable && mapLoadTriggered && (
         <MapErrorBoundary onError={handleMapError}>
           <MapCanvas
             venues={filteredVenues}
@@ -1026,8 +1041,15 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
       {/* List view (#129) — full-screen overlay above the map, below top chrome.
           When mapUnavailable, the notice prop carries the fallback banner (#165)
-          so it renders inside ListView's z-[700] stacking context and stays visible. */}
-      {viewMode === "list" && (
+          so it renders inside ListView's z-[700] stacking context and stays visible.
+          Also doubles as the #226 pre-load placeholder: while !mapLoadTriggered
+          (viewMode is still "map" — this does not touch viewMode itself), this
+          same branch covers the map's box so cold load never mounts mapbox-gl
+          before idle/interaction. Reusing ListView (rather than a new skeleton)
+          means the placeholder is already fully interactive — tapping a venue
+          card both selects it and counts as the interaction that triggers the
+          real map load. */}
+      {(viewMode === "list" || !mapLoadTriggered) && (
         <ListView
           venues={filteredVenues}
           selectedVenueId={selectedVenueId}

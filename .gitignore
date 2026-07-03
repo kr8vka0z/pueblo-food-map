@@ -41,6 +41,10 @@ yarn-error.log*
 .open-next
 .wrangler
 
+# wrangler dry-run validation outdirs (#223 step 1 — never a real deploy)
+.wrangler-dryrun/
+.wrangler-dryrun-prod/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

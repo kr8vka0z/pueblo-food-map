@@ -54,6 +54,7 @@ import ListView from "./ListView";
 import {
   PUEBLO_COUNTY_BBOX,
   PUEBLO_CENTER,
+  PUEBLO_DEFAULT_ZOOM,
 } from "@/data/pueblo-bbox";
 import { useMapFilters } from "@/lib/useMapFilters";
 import { useMapUI } from "@/lib/useMapUI";
@@ -634,6 +635,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // ── Wordmark reset handler (#61) ─────────────────────────────────────────────
   // Recenters the map on Pueblo, clears selected venue, filters, and search.
   // Does NOT re-show the splash screen (splash is a one-time onboarding gate).
+  // WHY PUEBLO_DEFAULT_ZOOM (not a literal): this is the SAME target Map.tsx's
+  // initialViewState uses for the fixed initial view (#231) — sharing the
+  // constant keeps a fresh load and a logo-click reset from ever drifting apart.
   const handleWordmarkReset = useCallback(() => {
     setSelectedVenueId(null);
     handleClearAllFilters();
@@ -645,9 +649,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     if (reducedMotion) {
-      mapboxMap.jumpTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: 13 });
+      mapboxMap.jumpTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: PUEBLO_DEFAULT_ZOOM });
     } else {
-      mapboxMap.flyTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: 13 });
+      mapboxMap.flyTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: PUEBLO_DEFAULT_ZOOM });
     }
   }, [handleClearAllFilters, mapboxMap]);
 

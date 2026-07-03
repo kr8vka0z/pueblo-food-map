@@ -18,12 +18,15 @@
  *   - User-location dot is present when userLocation is set
  *   - onSelectVenue is called when a VenueMarker button is clicked
  *   - locate button recenters on every tap, not just the first (#60)
+ *   - initial view is the fixed Pueblo home view, independent of venues,
+ *     with deep-link / geolocation overrides preserved (#231)
  */
 
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import MapComponent from "@/components/Map";
 import type { Venue } from "@/types/venue";
+import { PUEBLO_CENTER_LAT, PUEBLO_CENTER_LNG, PUEBLO_DEFAULT_ZOOM } from "@/data/pueblo-bbox";
 
 // ─── Stub mapbox-gl CSS (no-op in jsdom) ─────────────────────────────────────
 vi.mock("mapbox-gl/dist/mapbox-gl.css", () => ({}));
@@ -31,11 +34,18 @@ vi.mock("mapbox-gl/dist/mapbox-gl.css", () => ({}));
 // Shared spy instances — reset in beforeEach
 export const mockFlyTo = vi.fn();
 export const mockJumpTo = vi.fn();
+export const mockFitBounds = vi.fn();
+
+// Captures the `initialViewState` prop passed to MapGL on the most recent
+// render, so tests can assert it stays fixed regardless of the venues prop
+// (#231 — initial view must not depend on the venue set).
+let lastInitialViewState: unknown = undefined;
 
 // ─── Mock react-map-gl/mapbox ─────────────────────────────────────────────────
 // MapGL forwards the ref so Map.tsx's mapRef.current is populated with a mock
-// object exposing flyTo / jumpTo spies. Without ref-forwarding those calls are
-// silent no-ops (optional chaining on null) and we can't assert on them.
+// object exposing flyTo / jumpTo / fitBounds spies. Without ref-forwarding
+// those calls are silent no-ops (optional chaining on null) and we can't
+// assert on them.
 //
 // Source and Layer are mocked as passthrough wrappers so the county mask
 // elements render without a real Mapbox GL context (#62).
@@ -44,15 +54,23 @@ vi.mock("react-map-gl/mapbox", async () => {
   const MapGLMock = React.forwardRef(function MapGLMock(
     {
       children,
+      initialViewState,
     }: {
       children: React.ReactNode;
       onLoad?: (e: { target: object }) => void;
+      initialViewState?: unknown;
     },
-    ref: React.Ref<{ flyTo: typeof mockFlyTo; jumpTo: typeof mockJumpTo }>,
+    ref: React.Ref<{
+      flyTo: typeof mockFlyTo;
+      jumpTo: typeof mockJumpTo;
+      fitBounds: typeof mockFitBounds;
+    }>,
   ) {
+    lastInitialViewState = initialViewState;
     React.useImperativeHandle(ref, () => ({
       flyTo: mockFlyTo,
       jumpTo: mockJumpTo,
+      fitBounds: mockFitBounds,
     }));
     return React.createElement("div", { "data-testid": "mapgl-root" }, children);
   });
@@ -107,6 +125,7 @@ function makeProps(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  lastInitialViewState = undefined;
   // Stub window.matchMedia for reduced-motion guard inside Map component
   Object.defineProperty(window, "matchMedia", {
     writable: true,
@@ -444,5 +463,109 @@ describe("Map — county constraint (#62)", () => {
     // Venue markers still render — constraint props do not suppress them
     const buttons = container.querySelectorAll("button");
     expect(buttons.length).toBe(VENUES_THREE.length);
+  });
+});
+
+// ─── Default home view on initial load (#231) ────────────────────────────────
+//
+// Reproduces: on a fresh load, the map used to fitBounds to the venue set
+// shortly after mount, so the starting zoom/center drifted as venues were
+// added/removed instead of opening at the fixed Pueblo home view (the same
+// view the logo/wordmark reset flies to).
+//
+// Fix: initialViewState is a fixed constant (PUEBLO_CENTER/PUEBLO_DEFAULT_ZOOM,
+// shared with MapWrapper's wordmark reset) and there is no more mount-time
+// fitBounds call, so the starting view no longer depends on `venues`.
+//
+// fitBounds-on-mount previously fired from a setTimeout(0); fake timers make
+// sure we give any such scheduled call a chance to run before asserting it
+// did not fire.
+
+describe("Map — default home view on initial load (#231)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("fitBounds is never called on mount when venues are present", () => {
+    render(<MapComponent {...makeProps({ venues: VENUES_THREE })} />);
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(mockFitBounds).not.toHaveBeenCalled();
+  });
+
+  test("fitBounds is never called on mount when venues are empty", () => {
+    render(<MapComponent {...makeProps({ venues: VENUES_EMPTY })} />);
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(mockFitBounds).not.toHaveBeenCalled();
+  });
+
+  test("initial view state is the fixed Pueblo home center + zoom", () => {
+    render(<MapComponent {...makeProps({ venues: VENUES_THREE })} />);
+    expect(lastInitialViewState).toEqual(
+      expect.objectContaining({
+        longitude: PUEBLO_CENTER_LNG,
+        latitude: PUEBLO_CENTER_LAT,
+        zoom: PUEBLO_DEFAULT_ZOOM,
+      }),
+    );
+  });
+
+  test("initial view state is identical regardless of the venue set (one venue)", () => {
+    render(<MapComponent {...makeProps({ venues: VENUES_ONE })} />);
+    const withOneVenue = lastInitialViewState;
+
+    render(<MapComponent {...makeProps({ venues: VENUES_THREE })} />);
+    const withThreeVenues = lastInitialViewState;
+
+    render(<MapComponent {...makeProps({ venues: VENUES_EMPTY })} />);
+    const withNoVenues = lastInitialViewState;
+
+    expect(withOneVenue).toEqual(withThreeVenues);
+    expect(withThreeVenues).toEqual(withNoVenues);
+  });
+
+  test("deep-link precedence: selectedVenueId on mount flies to that venue, not fitBounds/home", () => {
+    render(
+      <MapComponent
+        {...makeProps({ venues: VENUES_THREE, selectedVenueId: "v2" })}
+      />,
+    );
+    act(() => {
+      vi.runAllTimers();
+    });
+    const target = VENUES_THREE.find((v) => v.id === "v2")!;
+    expect(mockFlyTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        center: [target.lng, target.lat],
+        zoom: 16,
+      }),
+    );
+    expect(mockFitBounds).not.toHaveBeenCalled();
+  });
+
+  test("geolocation precedence: passive userLocation on mount flies to the user, not fitBounds/home", () => {
+    const USER_LOC = { lat: 38.26, lng: -104.62 };
+    render(
+      <MapComponent
+        {...makeProps({ venues: VENUES_THREE, userLocation: USER_LOC })}
+      />,
+    );
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(mockFlyTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        center: [USER_LOC.lng, USER_LOC.lat],
+        zoom: 14,
+      }),
+    );
+    expect(mockFitBounds).not.toHaveBeenCalled();
   });
 });

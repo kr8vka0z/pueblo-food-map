@@ -15,13 +15,19 @@
  *   3. Walking route source IS rendered when walkingRoute GeoJSON is provided.
  *   4. Map renders correctly with all props including walking route.
  *   5. buildWalkingRouteUrl includes steps=true and language= params (#134 enhancement).
+ *   6. decideWalkResume — the Walk-without-location resume decision (#207):
+ *      never falls back to PUEBLO_CENTER; fetches from the real resolved
+ *      position on grant; shows a hint (never a route) on denial/unavailable;
+ *      drops a stale resolution if the venue that asked is no longer selected.
  */
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
 import MapComponent from "@/components/Map";
-import { buildWalkingRouteUrl, parseWalkSteps } from "@/components/MapWrapper";
+import { buildWalkingRouteUrl, parseWalkSteps, decideWalkResume } from "@/components/MapWrapper";
 import type { Venue } from "@/types/venue";
+import type { GeoState } from "@/lib/useGeolocation";
+import { PUEBLO_CENTER } from "@/data/pueblo-bbox";
 
 // ─── Reuse the Map.test.tsx mock strategy ─────────────────────────────────────
 vi.mock("mapbox-gl/dist/mapbox-gl.css", () => ({}));
@@ -456,5 +462,60 @@ describe("Race guard — monotonic seq counter (#208 hardening)", () => {
 
     // Should commit: counter.current=1 === seq=1.
     expect(committed).toEqual(["route-new-venue"]);
+  });
+});
+
+// ─── decideWalkResume — Walk-without-location resume decision (#207) ─────────
+//
+// When Walk is tapped with no userLocation, MapWrapper no longer falls back
+// to PUEBLO_CENTER — it requests geolocation and resumes via this pure
+// decision function once geo.state resolves. Extracted (same pattern as
+// buildWalkingRouteUrl/parseWalkSteps above) so the grant/deny/stale-selection
+// matrix is unit-testable without mounting MapWrapper (WebGL unavailable in
+// jsdom).
+
+describe("decideWalkResume — Walk-without-location resume decision (#207)", () => {
+  // Deliberately NOT Pueblo center — proves a "fetch" verdict's origin comes
+  // from the real resolved position, never a hardcoded downtown fallback.
+  const REAL_POSITION = { lat: 38.3012, lng: -104.5511 };
+
+  const GEO_GRANTED: GeoState = { permission: "granted", position: REAL_POSITION };
+  const GEO_GRANTED_NULL: GeoState = { permission: "granted", position: null };
+  const GEO_DENIED: GeoState = { permission: "denied", position: null };
+
+  test("grant: fetches from the real resolved position, never PUEBLO_CENTER", () => {
+    const action = decideWalkResume("v1", "v1", GEO_GRANTED);
+    expect(action).toEqual({ kind: "fetch", origin: REAL_POSITION });
+    expect(action.kind === "fetch" ? action.origin : null).not.toEqual(PUEBLO_CENTER);
+  });
+
+  test("deny: shows a hint — the action shape structurally cannot carry a route origin", () => {
+    const action = decideWalkResume("v1", "v1", GEO_DENIED);
+    expect(action).toEqual({ kind: "show-hint" });
+    expect(action).not.toHaveProperty("origin");
+  });
+
+  test("granted but position still null: treated as show-hint, never fabricates an origin", () => {
+    // Defensive: real callers never hit this branch (MapWrapper's resume
+    // effect treats granted+null as "still resolving" and waits — see its
+    // WHY comment) but the pure function stays safe even if that precondition
+    // is violated: no route is ever drawn without a real coordinate.
+    const action = decideWalkResume("v1", "v1", GEO_GRANTED_NULL);
+    expect(action).toEqual({ kind: "show-hint" });
+  });
+
+  test("stale selection: user switched venues while awaiting — noop even on grant", () => {
+    const action = decideWalkResume("v1", "v2", GEO_GRANTED);
+    expect(action).toEqual({ kind: "noop" });
+  });
+
+  test("stale selection: noop on denial too (nothing selected to attach the hint to)", () => {
+    const action = decideWalkResume("v1", null, GEO_DENIED);
+    expect(action).toEqual({ kind: "noop" });
+  });
+
+  test("same venue still selected: denial correctly attaches the hint to it", () => {
+    const action = decideWalkResume("v1", "v1", GEO_DENIED);
+    expect(action).toEqual({ kind: "show-hint" });
   });
 });

@@ -155,6 +155,12 @@ interface DesktopVenueWindowProps {
   walkRouteInfo?: RouteInfo | null;
   /** Turn-by-turn steps from Mapbox (pre-localized). Shown as a collapsible list in DirectionButtons. */
   walkRouteSteps?: WalkStep[] | null;
+  /**
+   * True when this venue's Walk tap requested geolocation and it was denied
+   * or is unavailable (#207). Tells DirectionButtons to show the localized
+   * "share your location" hint instead of silently doing nothing.
+   */
+  showWalkLocationHint?: boolean;
 }
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
@@ -172,6 +178,7 @@ export default function DesktopVenueWindow({
   onClearWalkRoute,
   walkRouteInfo,
   walkRouteSteps,
+  showWalkLocationHint = false,
 }: DesktopVenueWindowProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -344,6 +351,7 @@ export default function DesktopVenueWindow({
         onClearRoute={onClearWalkRoute}
         routeInfo={isWalkRouteActive ? walkRouteInfo : null}
         walkSteps={isWalkRouteActive ? walkRouteSteps : null}
+        showLocationHint={showWalkLocationHint}
       />
     </div>
   );
@@ -391,6 +399,7 @@ export default function DesktopVenueWindow({
         onClearRoute={onClearWalkRoute}
         routeInfo={isWalkRouteActive ? walkRouteInfo : null}
         walkSteps={isWalkRouteActive ? walkRouteSteps : null}
+        showLocationHint={showWalkLocationHint}
       />
 
       {/* Report an issue — secondary action (#70) */}

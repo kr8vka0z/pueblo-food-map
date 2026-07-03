@@ -788,3 +788,100 @@ describe("DirectionButtons — stepsExpanded resets on venue change (FIX 2)", ()
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
   });
 });
+
+// ─── Location-needed hint (#207) ──────────────────────────────────────────────
+//
+// When Walk is tapped with no shared location, MapWrapper requests geolocation
+// (reusing the locate-button flow) instead of drawing a route from
+// PUEBLO_CENTER. If that request is denied or unavailable, it tells
+// DirectionButtons to show a localized "share your location" hint via the
+// showLocationHint prop — this block covers the presentational contract for
+// that hint. See WalkingRoute.test.tsx for the decideWalkResume decision logic.
+
+describe("DirectionButtons — location-needed hint (#207)", () => {
+  test("no hint by default (showLocationHint omitted)", () => {
+    render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
+    expect(screen.queryByTestId("walk-location-hint")).toBeNull();
+  });
+
+  test("no hint when showLocationHint=false", () => {
+    render(
+      <DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" showLocationHint={false} />,
+    );
+    expect(screen.queryByTestId("walk-location-hint")).toBeNull();
+  });
+
+  test("hint renders when showLocationHint=true", () => {
+    render(
+      <DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" showLocationHint={true} />,
+    );
+    const hint = screen.getByTestId("walk-location-hint");
+    expect(hint).toBeDefined();
+    expect(hint.textContent).toBe("Share your location to see walking directions.");
+  });
+
+  test("hint shows ES localized copy in ES locale", () => {
+    render(
+      <DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="es" showLocationHint={true} />,
+    );
+    const hint = screen.getByTestId("walk-location-hint");
+    expect(hint.textContent).toBe("Comparte tu ubicación para ver cómo llegar a pie.");
+  });
+
+  test("hint has role=status and aria-live=polite for screen reader announcement", () => {
+    render(
+      <DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" showLocationHint={true} />,
+    );
+    const hint = screen.getByTestId("walk-location-hint");
+    expect(hint.getAttribute("role")).toBe("status");
+    expect(hint.getAttribute("aria-live")).toBe("polite");
+  });
+
+  test("Walk button's aria-describedby points at the hint's id when shown", () => {
+    render(
+      <DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" showLocationHint={true} />,
+    );
+    const walkBtn = screen.getByRole("button", { name: /walk/i });
+    const hint = screen.getByTestId("walk-location-hint");
+    expect(walkBtn.getAttribute("aria-describedby")).toBe(hint.id);
+    expect(hint.id).toBeTruthy();
+  });
+
+  test("Walk button has no aria-describedby when the hint is not shown", () => {
+    render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} locale="en" />);
+    const walkBtn = screen.getByRole("button", { name: /walk/i });
+    expect(walkBtn.hasAttribute("aria-describedby")).toBe(false);
+  });
+
+  test("hint does NOT render when a route is active, even if showLocationHint=true (defensive guard)", () => {
+    // These two states shouldn't coexist in practice (MapWrapper clears the
+    // hint the instant a new Walk tap starts, and a successful fetch never
+    // sets it) — this asserts the component-level guard holds regardless.
+    render(
+      <DirectionButtons
+        venue={makeVenue()}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        routeInfo={{ distance: "0.4 mi", duration: "8 min" }}
+        showLocationHint={true}
+      />,
+    );
+    expect(screen.queryByTestId("walk-location-hint")).toBeNull();
+  });
+
+  test("hint tapping Walk still fires onWalk (hint doesn't disable the button)", async () => {
+    // The chosen fix is trigger-geolocation, not disable-with-hint — Walk must
+    // stay tappable (a retry) while the hint is showing.
+    const onWalk = vi.fn();
+    const user = userEvent.setup();
+    const venue = makeVenue();
+    render(
+      <DirectionButtons venue={venue} onWalk={onWalk} locale="en" showLocationHint={true} />,
+    );
+    const walkBtn = screen.getByRole("button", { name: /walk/i }) as HTMLButtonElement;
+    expect(walkBtn.disabled).toBe(false);
+    await user.click(walkBtn);
+    expect(onWalk).toHaveBeenCalledWith(venue);
+  });
+});

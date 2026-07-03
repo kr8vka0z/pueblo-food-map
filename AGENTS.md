@@ -20,28 +20,43 @@
 # Hosting — Cloudflare Workers via OpenNext
 
 - **Live production URL:** https://pueblofoodmap.com/ (primary)
-- **Direct Worker URL:** https://pueblo-food-map.kyle-boyd.workers.dev/ (fallback / bypass CDN)
+- **Staging URL:** https://dev.pueblofoodmap.com/ — private, gated by
+  Cloudflare Access (email-code/OTP, Kyle's emails only), not linked or
+  indexed anywhere public. This is what a push to `main` deploys.
+- **Direct Worker URL:** https://pueblo-food-map.kyle-boyd.workers.dev/ (production fallback / bypass CDN)
 - **HTTP/www redirect:** HTTP requests and `www.pueblofoodmap.com` both 301-redirect to `https://pueblofoodmap.com` via Cloudflare zone redirect rule + Always-Use-HTTPS.
-- **Hosting:** Cloudflare Workers, project name `pueblo-food-map` (configured in `wrangler.jsonc`)
+- **Hosting:** Cloudflare Workers. `wrangler.jsonc` defines two Worker
+  configs (see its header comment for the full rationale) — **the
+  top-level config is STAGING** (`pueblo-food-map-staging`), and
+  **`env.production` is real production** (`pueblo-food-map`).
 - **Adapter:** `@opennextjs/cloudflare` — translates Next.js App Router output into Worker format
-- **CI/CD:** Cloudflare Workers Builds, connected to this GitHub repo via the CF dashboard. There is NO GitHub Actions YAML for deploys — wiring is entirely in the CF dashboard.
-  - Push to `main` → production deploy (automatic)
-  - Open a PR → unique preview deploy URL (posted as a check on the PR, visible in the CF dashboard under that build)
-  - **Build command:** `npx opennextjs-cloudflare build`
-  - **Deploy command:** `npx wrangler deploy` (CF default)
+- **CI/CD (#223 — deploy model inverted, main deploys staging):**
+  Cloudflare Workers Builds, connected to this GitHub repo via the CF
+  dashboard. There is NO GitHub Actions YAML for deploys — wiring is
+  entirely in the CF dashboard, and it is **unchanged**: build command
+  `npx opennextjs-cloudflare build`, deploy command `npx wrangler deploy`
+  (CF default, no `--env`). Only the *target* of that unchanged pipeline
+  moved, because the top-level `wrangler.jsonc` config it resolves is now
+  staging.
+  - Push to `main` → **staging** auto-deploy at `dev.pueblofoodmap.com` (automatic).
+  - Open a PR → unique preview deploy URL (posted as a check on the PR, visible in the CF dashboard under that build) — unchanged.
+  - **Production is a manual promote, never automatic:** `wrangler deploy --env production` (or `npm run deploy:prod`). No CI job and no CF dashboard trigger runs this — a human runs it deliberately, after checking staging.
+  - **Footgun:** an unqualified `wrangler deploy` (no `--env`) now targets staging, not prod. If you mean prod, say so explicitly.
 
 ## Build and preview locally
 
 ```bash
-npm run preview   # OpenNext build + local Worker emulator at http://127.0.0.1:8788
-npm run deploy    # OpenNext build + wrangler deploy to production
-                  # Requires `wrangler login` first; rarely needed — CI handles deploys
+npm run preview        # OpenNext build + local Worker emulator at http://127.0.0.1:8788
+npm run deploy:staging # OpenNext build + wrangler deploy to staging (dev.pueblofoodmap.com)
+                        # Same target a push to `main` deploys; requires `wrangler login` first
+npm run deploy:prod    # OpenNext build + `wrangler deploy --env production` — promotes to
+                        # pueblofoodmap.com. Manual and deliberate; confirm staging first.
 ```
 
 ## Operational notes
 
-- **Build logs:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab
-- **Rollback:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab → find a previous successful deployment → "Rollback to this deployment". Production traffic switches in ~30 seconds.
+- **Build logs:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` (production) or `pueblo-food-map-staging` (staging) → Deployments tab
+- **Rollback:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` (production — the `env.production` Worker) → Deployments tab → find a previous successful deployment → "Rollback to this deployment". Production traffic switches in ~30 seconds.
 - **Environment variables — two kinds, two places.** (1) Build-time `NEXT_PUBLIC_*` are inlined by `next build` → set under **Settings → Build → Build variables**. (2) Runtime server secrets (`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`) are read at request time → set under **Settings → Variables and Secrets**. **Workers Builds has ONE shared build-variable set and a single `production` environment — there is NO separate Preview environment** (that's Cloudflare Pages). The same build vars apply to production deploys and PR preview builds.
 
 ## Mapbox Token Management

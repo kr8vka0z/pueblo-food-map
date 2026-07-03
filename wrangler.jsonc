@@ -1,67 +1,112 @@
 {
+  // ─────────────────────────────────────────────────────────────────────
+  // DEPLOY MODEL IS INVERTED (#223). Read this before touching bindings.
+  //
+  // Top-level config = STAGING. A bare `wrangler deploy` — exactly what
+  // Cloudflare Workers Builds runs on every push to `main` (build command
+  // `npx opennextjs-cloudflare build`, deploy command `npx wrangler deploy`,
+  // no `--env` — wired in the CF dashboard, not visible anywhere in this
+  // repo) — deploys the private staging Worker at dev.pueblofoodmap.com,
+  // never production.
+  //
+  // PRODUCTION (pueblofoodmap.com) is `env.production` below, and is a
+  // DELIBERATE manual promote: `wrangler deploy --env production`
+  // (`npm run deploy:prod`). WHY invert instead of changing the CF
+  // dashboard directly: Cloudflare does not expose the Workers Builds
+  // deploy command to its API, so the dashboard can't be scripted/reviewed
+  // — swapping which config a bare `wrangler deploy` resolves is the only
+  // in-repo, reviewable, reversible way to make "push to main" land
+  // somewhere other than prod.
+  //
+  // FOOTGUN: an unqualified `wrangler deploy` (no --env) now targets
+  // STAGING, never prod. If you want prod, you must say so explicitly.
+  //
+  // `env.production` sets `"routes": []` (NOT omitted — see below).
+  // Production's `*.pueblofoodmap.com/*` route is managed in the Cloudflare
+  // dashboard and must stay untouched by wrangler. WHY an explicit empty
+  // array and not just leaving the key out: `routes` is NOT in wrangler's
+  // non-inherited-bindings list — unlike `assets`/`services`/`d1_databases`
+  // (which never inherit into a named env), `routes` DOES inherit from the
+  // top level into a named environment that doesn't declare its own.
+  // Confirmed via `wrangler deploy --env production --dry-run`: omitting
+  // `routes` here made wrangler warn it would reassign the STAGING route
+  // (`dev.pueblofoodmap.com`) away from the staging Worker onto prod on
+  // deploy. `"routes": []` is the documented way to opt an environment out
+  // of route inheritance entirely, which is what leaves the dashboard-
+  // managed prod route alone.
+  // ─────────────────────────────────────────────────────────────────────
   "$schema": "node_modules/wrangler/config-schema.json",
   "main": ".open-next/worker.js",
-  "name": "pueblo-food-map",
   "compatibility_date": "2025-12-01",
   "compatibility_flags": [
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
+
+  // ── STAGING (top-level) — what a bare `wrangler deploy` resolves ──
+  "name": "pueblo-food-map-staging",
+  "routes": [
+    { "pattern": "dev.pueblofoodmap.com", "custom_domain": true }
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Self-reference must point at the staging Worker, not prod — OpenNext
+  // uses this binding for internal self-calls, so pointing it at prod
+  // would make staging silently call into production.
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "pueblo-food-map"
+      "service": "pueblo-food-map-staging"
     }
   ],
   "d1_databases": [
     {
       "binding": "ADMIN_DB",
       "database_name": "pueblo-food-map-admin",
-      "database_id": "d6ea5afd-5283-49ed-a686-527dd274c119",
-      "preview_database_id": "95160a48-bb42-43a2-bfc7-c016af11d3dc"
+      // ponytail: reuses prod's existing PREVIEW d1 id, not prod's real
+      // admin DB (d6ea5afd-...) — isolates staging admin data from
+      // production and avoids provisioning a new D1 for a binding that's
+      // fail-closed anyway: CF_ACCESS_TEAM_DOMAIN/CF_ACCESS_AUD are unset on
+      // the staging Worker, so requireAccessIdentity() rejects every
+      // /admin request and this DB is never actually queried. Upgrade
+      // path: provision a dedicated pueblo-food-map-admin-staging D1 with
+      // seeded test data if staging admin is ever enabled.
+      "database_id": "95160a48-bb42-43a2-bfc7-c016af11d3dc"
     }
   ],
-  // Staging (#223 step 1): repo-config only, NOT yet wired to a deploy pipeline
-  // or DNS route. Named environments do not inherit bindings (assets,
-  // services, d1_databases) from the top level in wrangler — only `main`,
-  // `compatibility_date`, and `compatibility_flags` are inherited — so every
-  // binding below is redeclared for this environment.
+
+  // ── PRODUCTION — manual promote only: `wrangler deploy --env production` ──
+  // Named environments do not inherit bindings (assets, services,
+  // d1_databases) from the top level in wrangler — only `main`,
+  // `compatibility_date`, and `compatibility_flags` are inherited — so
+  // every binding below is redeclared for this environment.
   "env": {
-    "staging": {
-      "name": "pueblo-food-map-staging",
-      "routes": [
-        { "pattern": "dev.pueblofoodmap.com", "custom_domain": true }
-      ],
+    "production": {
+      "name": "pueblo-food-map",
+      // Deliberately EMPTY, not omitted — see file header. Without this,
+      // wrangler inherits the top-level (staging) `routes` array into this
+      // environment and would reassign dev.pueblofoodmap.com from staging
+      // to prod on deploy. An empty array opts out of inheritance, leaving
+      // the dashboard-managed *.pueblofoodmap.com/* route untouched.
+      "routes": [],
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"
       },
-      // Self-reference must point at the staging Worker, not prod — OpenNext
-      // uses this binding for internal self-calls, so pointing it at prod
-      // would make staging silently call into production.
       "services": [
         {
           "binding": "WORKER_SELF_REFERENCE",
-          "service": "pueblo-food-map-staging"
+          "service": "pueblo-food-map"
         }
       ],
       "d1_databases": [
         {
           "binding": "ADMIN_DB",
           "database_name": "pueblo-food-map-admin",
-          // ponytail: reuses prod's existing PREVIEW d1 id, not prod's real
-          // admin DB (d6ea5afd-...) — keeps prod admin data untouched and
-          // avoids provisioning a new D1 for a binding that's fail-closed
-          // anyway: CF_ACCESS_TEAM_DOMAIN/CF_ACCESS_AUD are unset on the
-          // staging Worker, so requireAccessIdentity() rejects every
-          // /admin request and this DB is never actually queried. Upgrade
-          // path: provision a dedicated pueblo-food-map-admin-staging D1
-          // with seeded test data if staging admin is ever enabled.
-          "database_id": "95160a48-bb42-43a2-bfc7-c016af11d3dc"
+          "database_id": "d6ea5afd-5283-49ed-a686-527dd274c119",
+          "preview_database_id": "95160a48-bb42-43a2-bfc7-c016af11d3dc"
         }
       ]
     }

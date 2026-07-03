@@ -44,7 +44,8 @@ Open <http://localhost:3000>. Hot-reloads on save (Turbopack).
 | `npm run test` | Unit tests (vitest, watch mode) |
 | `npm run test:ci` | Unit tests, CI mode (single run) |
 | `npm run preview` | OpenNext build + local Worker emulator at :8788 |
-| `npm run deploy` | OpenNext build + wrangler deploy to production |
+| `npm run deploy:staging` | OpenNext build + wrangler deploy to staging (`dev.pueblofoodmap.com`) — same as a push to `main` |
+| `npm run deploy:prod` | OpenNext build + `wrangler deploy --env production` — manual promote to `pueblofoodmap.com`, never automatic |
 | `npm run design:lint` | design.md CLI lint on DESIGN.md (report-only) |
 | `npm run design:drift` | Token parity check: globals.css vs DESIGN.md (blocking) |
 
@@ -105,9 +106,15 @@ scripts/           One-off ingestion scripts (run locally; not imported by app)
   PR and push to `main`
   ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 - **Deploys:** Cloudflare Workers Builds (connected via CF dashboard, no
-  Actions YAML). Push to `main` → production; open a PR → preview URL.
-- **Rollback:** CF dashboard → Workers & Pages → `pueblo-food-map` →
-  Deployments → pick a previous build → "Rollback to this deployment".
+  Actions YAML). Push to `main` → **staging** auto-deploy at
+  `dev.pueblofoodmap.com` (private, Cloudflare Access-gated); open a PR →
+  preview build. **Production is a manual promote** —
+  `npm run deploy:prod` (`wrangler deploy --env production`) — never
+  automatic. See `wrangler.jsonc`'s header comment for the inverted-env
+  model this relies on.
+- **Rollback:** CF dashboard → Workers & Pages → `pueblo-food-map` (the
+  production Worker) → Deployments → pick a previous build → "Rollback to
+  this deployment".
 
 See [AGENTS.md](AGENTS.md) for token management, environment variables,
 preview-deploy URL restrictions, and the full deploy runbook.

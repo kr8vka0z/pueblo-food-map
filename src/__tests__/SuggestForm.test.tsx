@@ -9,7 +9,7 @@
  *   5. Client validation: error when category not selected.
  *   6. Client validation: error for invalid submitter email.
  *   7. Valid email passes (no error).
- *   8. Empty email passes (optional field).
+ *   8. Empty email is rejected (field is required, #232).
  *   9. Submit sends correct JSON payload (includes turnstileToken).
  *  10. Success state rendered after successful submit.
  *  11. Error state rendered after failed submit.
@@ -80,6 +80,9 @@ function mockError(error = "send_failed") {
   });
 }
 
+// WHY email is filled here too: submitterEmail became required in #232, so every
+// caller of this shared helper needs a valid email to reach the submit network
+// call — fixing it once here (root cause) instead of patching each call site.
 async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
   const nameInput = screen.getByLabelText(/Venue name/i);
   await user.type(nameInput, "Test Food Pantry");
@@ -89,6 +92,9 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
 
   const categorySelect = screen.getByLabelText(/Category/i) as HTMLSelectElement;
   await user.selectOptions(categorySelect, "pantry");
+
+  const emailInput = screen.getByLabelText(/Your email/i);
+  await user.type(emailInput, "test@example.com");
 }
 
 async function fillRequiredFieldsEs(user: ReturnType<typeof userEvent.setup>) {
@@ -100,6 +106,9 @@ async function fillRequiredFieldsEs(user: ReturnType<typeof userEvent.setup>) {
 
   const categorySelect = screen.getByLabelText(/Categoría/i) as HTMLSelectElement;
   await user.selectOptions(categorySelect, "pantry");
+
+  const emailInput = screen.getByLabelText(/correo/i);
+  await user.type(emailInput, "test@example.com");
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -145,9 +154,11 @@ describe("SuggestForm — rendering", () => {
     expect(screen.getByLabelText(/Additional notes/i)).toBeDefined();
   });
 
-  test("renders submitter email input", () => {
+  test("renders required submitter email input", () => {
     renderForm();
-    expect(screen.getByLabelText(/Your email/i)).toBeDefined();
+    const emailInput = screen.getByLabelText(/Your email/i);
+    expect(emailInput).toBeDefined();
+    expect((emailInput as HTMLInputElement).required).toBe(true);
   });
 
   test("renders submit button (enabled after Turnstile resolves)", async () => {
@@ -221,7 +232,10 @@ describe("SuggestForm — client validation", () => {
     renderForm();
     await fillRequiredFields(user);
 
+    // fillRequiredFields already typed a valid email — clear it before
+    // overwriting with an invalid one (user.type appends, it doesn't replace).
     const emailInput = screen.getByLabelText(/Your email/i);
+    await user.clear(emailInput);
     await user.type(emailInput, "not-an-email");
 
     await waitForSubmitEnabled("suggest");
@@ -236,10 +250,8 @@ describe("SuggestForm — client validation", () => {
     mockSuccess();
     const user = userEvent.setup();
     renderForm();
+    // fillRequiredFields already types a valid email — nothing more to fill.
     await fillRequiredFields(user);
-
-    const emailInput = screen.getByLabelText(/Your email/i);
-    await user.type(emailInput, "test@example.com");
 
     await waitForSubmitEnabled("suggest");
     await user.click(screen.getByRole("button", { name: /Submit suggestion/i }));
@@ -249,16 +261,20 @@ describe("SuggestForm — client validation", () => {
     expect(mockFetch).toHaveBeenCalledOnce();
   });
 
-  test("empty email passes validation (optional)", async () => {
-    mockSuccess();
+  test("shows email error when email is empty (field is required, #232)", async () => {
     const user = userEvent.setup();
     renderForm();
-    await fillRequiredFields(user);
+    await user.type(screen.getByLabelText(/Venue name/i), "Test Pantry");
+    await user.type(screen.getByLabelText(/Address/i), "123 Main St");
+    const categorySelect = screen.getByLabelText(/Category/i) as HTMLSelectElement;
+    await user.selectOptions(categorySelect, "pantry");
+    // Leave email blank (required)
     await waitForSubmitEnabled("suggest");
     await user.click(screen.getByRole("button", { name: /Submit suggestion/i }));
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledOnce();
+      expect(screen.getByText(/Please enter your email address/i)).toBeDefined();
     });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 
@@ -275,6 +291,7 @@ describe("SuggestForm — submit flow", () => {
 
     await user.type(screen.getByLabelText(/Hours/i), "Mon-Fri 9am-5pm");
     await user.click(screen.getByLabelText(/Accepts SNAP/i));
+    await user.type(screen.getByLabelText(/Your email/i), "suggester@example.com");
 
     await waitForSubmitEnabled("suggest");
     await user.click(screen.getByRole("button", { name: /Submit suggestion/i }));
@@ -291,6 +308,7 @@ describe("SuggestForm — submit flow", () => {
     expect(body.hours).toBe("Mon-Fri 9am-5pm");
     expect(body.acceptsSnap).toBe(true);
     expect(body.acceptsWic).toBe(false);
+    expect(body.submitterEmail).toBe("suggester@example.com");
     // Honeypot should be empty string (real user)
     expect(body.website).toBe("");
     // Turnstile token from our mock

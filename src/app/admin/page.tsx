@@ -1,16 +1,21 @@
 /**
  * /admin — Cloudflare Access-gated admin shell (#237 checkpoint c; venue
- * list added #253; "Add place" link added #254).
+ * list added #253; "Add place" link added #254; Publish panel added #256).
  *
  * Proves the full auth chain end-to-end: Cloudflare Access (edge) → this
  * Server Component's own JWT re-verification (getAdminDb, src/lib/adminDb.ts)
- * → a real D1 binding handed back only on success — then renders a
- * read-only table of every venues row (draft + published + archived), plus
- * an "Add place" link to /admin/venues/new (src/app/admin/venues/new/page.tsx),
- * the only mutation entry point that exists so far. This page itself still
- * performs no mutation and issues no non-GET request, so it has no
- * requireAdminOrigin() CSRF check here — that guard exists only for
- * non-GET /api/admin/* mutations (src/lib/cfAccess.ts).
+ * → a real D1 binding handed back only on success — then renders the
+ * Publish panel (PublishPanel, below) above a read-only table of every
+ * venues row (draft + published + archived), plus an "Add place" link to
+ * /admin/venues/new (src/app/admin/venues/new/page.tsx), the only OTHER
+ * mutation entry point besides Publish. This page itself still performs no
+ * mutation and issues no non-GET request, so it has no requireAdminOrigin()
+ * CSRF check here — that guard exists only for non-GET /api/admin/*
+ * mutations (src/lib/cfAccess.ts).
+ *
+ * summarizePublishChanges() (src/lib/adminVenues.ts) computes PublishPanel's
+ * new/edited/archived counts from the SAME rows already SELECTed for
+ * VenueListView below — no second query.
  *
  * On AccessDeniedError this calls Next's forbidden() control-flow function,
  * which renders src/app/forbidden.tsx and returns a real HTTP 403 — not a
@@ -30,7 +35,9 @@ import Link from "next/link";
 import { getAdminDb } from "@/lib/adminDb";
 import { AccessDeniedError } from "@/lib/cfAccess";
 import { logAdminAuthFailure } from "@/lib/logger";
+import { summarizePublishChanges } from "@/lib/adminVenues";
 import VenueListView from "@/components/VenueListView";
+import PublishPanel from "@/components/PublishPanel";
 import type { AdminVenueRow } from "@/types/venue";
 
 export default async function AdminPage() {
@@ -80,6 +87,7 @@ export default async function AdminPage() {
         </div>
       </header>
       <div className="px-4 py-6 sm:px-6">
+        <PublishPanel summary={summarizePublishChanges(venues)} />
         <VenueListView venues={venues} />
       </div>
     </main>

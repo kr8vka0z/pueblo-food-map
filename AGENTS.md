@@ -519,6 +519,77 @@ publishing admin's email — that file lands in this **public** repo, and the
 admin identity is already recorded where an audit trail belongs: D1's
 private `audit_log.actor_email` / `venues.published_by`.
 
+## Admin publish button (#256)
+
+Full design: this file's own "Publish → static" section above (the engine);
+this section is the UI wired on top of it. `PublishPanel`
+(src/components/PublishPanel.tsx, rendered by src/app/admin/page.tsx above
+`VenueListView`) is the admin's only way to trigger a publish — a plain
+change-summary, a native `window.confirm()` gate, then `POST
+/api/admin/publish`.
+
+**Change-summary counts, no new query.** `summarizePublishChanges()`
+(src/lib/adminVenues.ts) computes `{ newDrafts, editedSincePublish,
+archived }` from the exact same `SELECT *` rows `/admin` already loads for
+`VenueListView` — `newDrafts` = every `draft` row; `editedSincePublish` =
+`published` rows edited since their last publish; `archived` = `archived`
+rows that were **previously published** (`published_at !== null`) and will
+therefore actually disappear from the public map on the next publish. A
+draft that gets archived without ever publishing does NOT count — it was
+never live, so archiving it changes nothing the public map shows. All
+three at zero disables the Publish button (a publish would just re-ship an
+identical file) and shows "The public map is up to date" instead of the
+counts.
+
+**`GITHUB_PUBLISH_TOKEN` unset -> `503`, not a `500`.** Before #256, a
+missing token made the route `throw`, surfacing to any caller as a bare
+HTTP 500 with no readable body. `POST /api/admin/publish`
+(src/app/api/admin/publish/route.ts) now returns
+`{ ok: false, error: "publish_not_configured" }` at `503` instead, placed
+at the exact same spot in the handler (after auth, before the snapshot) —
+nothing about the snapshot/validate/serialize/commit/promote sequence or
+the NB1 commit-before-D1-write ordering changed. `PublishPanel` maps this
+to a calm "the publish key isn't set up yet" message rather than a scary
+generic error — expected and normal until Kyle provisions the PAT (#260).
+
+**Response -> message mapping** (`PublishPanel`'s `friendlyErrorMessage`):
+`200` -> success banner with the published count and a link to the PR
+(`target="_blank" rel="noopener noreferrer"`), plus a note that the public
+map can take a minute to update; `503 publish_not_configured` -> the
+not-set-up-yet message above; `502 github_commit_failed` -> "couldn't
+reach GitHub, nothing was changed, try again"; `422` -> a validation
+message (includes the server's error string); `403` -> "session expired,
+reload and sign in again" (this route returns plain-text `Forbidden` on
+403, not JSON — the mapping keys off `status`, not a parsed error field,
+for this one case); anything else (including a network-level throw) -> a
+generic friendly retry message. No branch ever claims success unless the
+response is exactly `200` with `{ ok: true, ... }`.
+
+**Button color: sage, not orange.** Publish is this screen's primary
+action, but DESIGN.md reserves brand-orange ("ButtonPrimary") for exactly
+two elements on the PUBLIC map (the splash CTA and the LocateButton pill),
+with an explicit Don't against using it anywhere else. Sage is documented
+as this design system's general primary-interactive color, and filled
+sage-500/sage-600-hover is already the admin surface's established
+"primary submit" treatment (`AddVenueForm`'s submit button, `/admin`'s "Add
+place" link) — the strongest tier this system offers here. `PublishPanel`
+reuses those exact classes rather than inventing a new, bolder button.
+
+**On success, `router.refresh()`.** By the time the `200` response
+returns, D1's `promotePublishedDrafts()` has already run (NB1 ordering) —
+the drafts are already `published` rows in D1. Refreshing re-runs the
+Server Component page so `summarizePublishChanges()` recomputes against
+the new rows immediately, instead of leaving stale non-zero counts
+visible right after a successful publish. The success message itself
+persists underneath (same DOM position, component doesn't unmount).
+
+**Confirm step: native `window.confirm()`**, same convention as
+`ArchiveVenueButton` (#255) — no modal dependency in this codebase, and
+none is needed for one confirmation. The message states the counts and
+that this opens an auto-merging change request, e.g. `Publish 2 new places
+and 1 edited place to the public map? 0 places will be removed. This opens
+a change request that auto-merges.`
+
 # Discoverability / SEO (#164)
 
 Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**

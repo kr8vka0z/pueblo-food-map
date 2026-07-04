@@ -5,7 +5,12 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { STATUS_LABELS, hasUnpublishedChanges, formatLastVerified } from "@/lib/adminVenues";
+import {
+  STATUS_LABELS,
+  hasUnpublishedChanges,
+  formatLastVerified,
+  summarizePublishChanges,
+} from "@/lib/adminVenues";
 import type { AdminVenueRow } from "@/types/venue";
 
 function makeRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
@@ -77,6 +82,79 @@ describe("hasUnpublishedChanges", () => {
       updated_at: "2026-01-01T00:00:00.000Z",
     });
     expect(hasUnpublishedChanges(row)).toBe(false);
+  });
+});
+
+describe("summarizePublishChanges", () => {
+  test("all-zero case: nothing to publish", () => {
+    const rows = [makeRow({ status: "published", published_at: "2026-02-01T00:00:00.000Z", updated_at: "2026-02-01T00:00:00.000Z" })];
+    expect(summarizePublishChanges(rows)).toEqual({ newDrafts: 0, editedSincePublish: 0, archived: 0 });
+  });
+
+  test("newDrafts counts every draft row, regardless of published_at", () => {
+    const rows = [
+      makeRow({ id: "a", status: "draft", published_at: null }),
+      makeRow({ id: "b", status: "draft", published_at: null }),
+      makeRow({ id: "c", status: "published" }),
+    ];
+    expect(summarizePublishChanges(rows)).toEqual({ newDrafts: 2, editedSincePublish: 0, archived: 0 });
+  });
+
+  test("editedSincePublish counts a published row edited after its last publish", () => {
+    const rows = [
+      makeRow({
+        status: "published",
+        published_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-02-01T00:00:00.000Z",
+      }),
+    ];
+    expect(summarizePublishChanges(rows)).toEqual({ newDrafts: 0, editedSincePublish: 1, archived: 0 });
+  });
+
+  test("editedSincePublish does not count a published row unedited since its last publish", () => {
+    const rows = [
+      makeRow({
+        status: "published",
+        published_at: "2026-02-01T00:00:00.000Z",
+        updated_at: "2026-02-01T00:00:00.000Z",
+      }),
+    ];
+    expect(summarizePublishChanges(rows)).toEqual({ newDrafts: 0, editedSincePublish: 0, archived: 0 });
+  });
+
+  test("archived counts a PREVIOUSLY-PUBLISHED venue that was then archived (will be removed)", () => {
+    const rows = [makeRow({ status: "archived", published_at: "2026-01-01T00:00:00.000Z" })];
+    expect(summarizePublishChanges(rows)).toEqual({ newDrafts: 0, editedSincePublish: 0, archived: 1 });
+  });
+
+  test("archived does NOT count a draft that was archived without ever being published", () => {
+    // published_at is null -> this venue was never live, so archiving it
+    // changes nothing the public map would show; it must not inflate the
+    // "will be removed" count.
+    const rows = [makeRow({ status: "archived", published_at: null })];
+    expect(summarizePublishChanges(rows)).toEqual({ newDrafts: 0, editedSincePublish: 0, archived: 0 });
+  });
+
+  test("sums each count independently across a mixed set of rows", () => {
+    const rows = [
+      makeRow({ id: "a", status: "draft", published_at: null }),
+      makeRow({ id: "b", status: "draft", published_at: null }),
+      makeRow({
+        id: "c",
+        status: "published",
+        published_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-02-01T00:00:00.000Z",
+      }),
+      makeRow({
+        id: "d",
+        status: "published",
+        published_at: "2026-02-01T00:00:00.000Z",
+        updated_at: "2026-02-01T00:00:00.000Z",
+      }),
+      makeRow({ id: "e", status: "archived", published_at: "2026-01-01T00:00:00.000Z" }),
+      makeRow({ id: "f", status: "archived", published_at: null }),
+    ];
+    expect(summarizePublishChanges(rows)).toEqual({ newDrafts: 2, editedSincePublish: 1, archived: 1 });
   });
 });
 

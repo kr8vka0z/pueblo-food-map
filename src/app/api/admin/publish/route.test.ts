@@ -278,16 +278,23 @@ describe("POST /api/admin/publish", () => {
     },
   );
 
-  test("missing GITHUB_PUBLISH_TOKEN -> throws before touching D1", async () => {
+  test("missing GITHUB_PUBLISH_TOKEN -> 503 publish_not_configured, GitHub and D1 never touched (#256 AC5)", async () => {
     delete process.env.GITHUB_PUBLISH_TOKEN;
     const { db, batch } = makeFakeDb([makeRow()]);
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    vi.stubGlobal("fetch", makeGithubFetchMock());
+    const githubMock = makeGithubFetchMock();
+    vi.stubGlobal("fetch", githubMock);
     const token = await buildValidToken();
 
-    await expect(POST(makeRequest({ token, origin: ADMIN_ORIGIN }))).rejects.toThrow(
-      /GITHUB_PUBLISH_TOKEN/,
-    );
+    const res = await POST(makeRequest({ token, origin: ADMIN_ORIGIN }));
+    expect(res.status).toBe(503);
+    const data = (await res.json()) as { ok: boolean; error: string };
+    expect(data.ok).toBe(false);
+    expect(data.error).toBe("publish_not_configured");
+
+    // The guard sits before the snapshot (route.ts), so neither the GitHub
+    // commit sequence nor any D1 write is ever reached on this path.
+    expect(githubMock).not.toHaveBeenCalled();
     expect(batch).not.toHaveBeenCalled();
   });
 });

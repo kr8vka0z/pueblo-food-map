@@ -429,10 +429,10 @@ src/lib/adminVenues.ts) when it's a draft, or when a published row has been
 edited since its last publish (`updated_at > published_at`) — so an admin
 can see at a glance what a Publish click would actually change.
 
-This page is read-only: no add/edit/delete/archive yet (a later slice per
-docs/admin/cloudflare-native-admin-spec.md §11), so it has no
-`requireAdminOrigin()` CSRF check — that guard only applies to mutating
-`/api/admin/*` routes.
+This page itself is still read-only — it only SELECTs, so it has no
+`requireAdminOrigin()` CSRF check (that guard only applies to mutating
+`/api/admin/*` routes) — but since #254 (next section) it links to
+`/admin/venues/new`, the admin's first mutation path.
 
 **`AdminVenueRow`** (src/types/venue.ts) mirrors the full D1 `venues` row,
 admin-only columns included, but is a deliberately separate type from
@@ -443,6 +443,48 @@ conforms to — importing from a `lib/` module, risking the same circular
 import this codebase already hit once (see "Why `pfp-venues.ts` lives in
 its own file" above); a few duplicated field names is cheaper than that
 failure mode.
+
+---
+
+## Admin — venue creation (#254)
+
+Adding a venue is split the same way the rest of the admin is: a
+Server-Component page owns the auth gate, a Client Component owns the
+form, and a route handler owns the authoritative write.
+
+- **`/admin/venues/new`** (src/app/admin/venues/new/page.tsx) — re-verifies
+  Cloudflare Access via `getAdminDb()` (same fail-closed `forbidden()`
+  pattern as `/admin`) purely for the gate and the signed-in-email header;
+  it has nothing to `SELECT`. Renders `AddVenueForm`.
+- **`AddVenueForm`** (src/components/AddVenueForm.tsx) — presentational and
+  self-contained: owns all field state, a lightweight client-side
+  `validateClient()` (fast feedback, not authoritative), and the `fetch`
+  call to `POST /api/admin/venues`. It takes no D1/auth props, so it's
+  renderable standalone with an optional `initialValues` prop for a
+  sample-data preview. On a `201` response it calls `router.push("/admin")`
+  + `router.refresh()`; on a `422` it renders the server's field errors
+  inline (same field-name keys both layers use, so no remapping step is
+  needed between client and server error shapes).
+- **`POST /api/admin/venues`** (src/app/api/admin/venues/route.ts) — the
+  authoritative boundary. Auth mirrors `/api/admin/publish`: `getAdminDb()`
+  then `requireAdminOrigin()`, both throwing `AccessDeniedError` into one
+  403 shape. Validation (`src/lib/adminVenueValidation.ts`) re-checks every
+  field regardless of what the client already checked, because SQLite's own
+  CHECK constraints (migrations/0001_init_admin_schema.sql) only cover the
+  `category`/`status`/`source_type` enums — lat/lng bounds, a parseable
+  `last_verified` date, and the `hours_weekly` JSON shape have no DB-level
+  backstop otherwise. On success, one atomic `db.batch()` inserts the new
+  `venues` row (`status='draft'`, `source_type='manual'`,
+  `id = manual-${crypto.randomUUID()}`) and one `audit_log` row
+  (`action='create'`) together — matching the same "write + its own audit
+  row, atomically" shape `promotePublishedDrafts()` already uses for
+  Publish (previous section), just for a single record instead of a bulk
+  promotion.
+
+A venue created this way is a plain draft — identical in every respect to
+one seeded by `scripts/seed-admin-db.ts` or one that will exist once the
+change-proposal approval queue (docs/admin/cloudflare-native-admin-spec.md
+§6) ships. It reaches the public map only via the existing Publish flow.
 
 ---
 

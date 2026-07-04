@@ -277,18 +277,66 @@ after any `wrangler.jsonc` binding change; `cloudflare-env.d.ts` imports just
 the specific runtime types this project's code actually references (e.g.
 `D1Database`) from `@cloudflare/workers-types/experimental` instead.
 
-## Admin venue list (read-only) (#253)
+## Admin venue list (#253)
 
-`/admin` (src/app/admin/page.tsx) now renders every `venues` row — draft,
+`/admin` (src/app/admin/page.tsx) renders every `venues` row — draft,
 published, archived — as a searchable/filterable table (`VenueListView`,
 src/components/VenueListView.tsx). See ARCHITECTURE.md's "Admin —
 read-only venue list" section for the full picture; this note just anchors
 the operational facts. Data still flows through the same `getAdminDb()`
 choke point as the rest of this section — `SELECT * FROM venues ORDER BY
-name COLLATE NOCASE ASC`, never `getCloudflareContext()` directly.
-Read-only: no mutation route exists yet, so this page skips
+name COLLATE NOCASE ASC`, never `getCloudflareContext()` directly. This
+page itself still issues no mutation (it only SELECTs), so it skips
 `requireAdminOrigin()` (that guard is for non-GET `/api/admin/*` routes
-only).
+only) — but since #254 it links to `/admin/venues/new` via an "Add place"
+button, the admin's first mutation path.
+
+## Admin venue creation (#254)
+
+`POST /api/admin/venues` (src/app/api/admin/venues/route.ts) is the admin's
+first mutation route — everything before this inserted rows only via
+`scripts/seed-admin-db.ts`, a one-time offline script, not a live endpoint.
+
+**Auth — both checks, same order as `/api/admin/publish`:** `getAdminDb()`
+first (JWT identity via the same choke point as every other admin route),
+then `requireAdminOrigin()` (CSRF — this route mutates, so unlike the
+read-only list page above it needs it). Either failure logs through
+`logAdminAuthFailure()` and returns a `403`.
+
+**Validation is authoritative here, not just a courtesy mirror of the
+client.** `src/lib/adminVenueValidation.ts` re-checks every field
+server-side (required fields, the 7-value category enum, lat/lng finite
+and in real-world range, the `hours_weekly` JSON shape, the
+accepts_snap/accepts_wic tri-state) and collects every violation in one
+pass, returning a field-name-keyed error map on failure (`422`) — SQLite's
+own CHECK constraints only cover `category`/`status`/`source_type`, so
+lat/lng bounds and the hours shape have no DB-level backstop otherwise.
+
+**Every create is one atomic `db.batch()`:** an INSERT into `venues` with
+`id = manual-${crypto.randomUUID()}`, `status='draft'`,
+`source_type='manual'`, `created_by`/`updated_by` set to the caller's
+verified email, `published_at`/`published_by` left `NULL` — plus one
+`audit_log` row (`action='create'`, `before_json` NULL, `after_json` the
+new row). `created_at`/`updated_at` are deliberately omitted from the
+INSERT's column list so D1's own `DEFAULT (strftime(...))` fills them,
+matching `scripts/seed-admin-db.ts`'s established convention — for the same
+reason, the audit row's `after_json` doesn't echo those two columns either
+(this process never observes their DB-assigned value within the request).
+A created row is a plain draft: nothing here touches the public map until
+an explicit Publish (previous section).
+
+**The form** (`/admin/venues/new`, src/app/admin/venues/new/page.tsx +
+`AddVenueForm`, src/components/AddVenueForm.tsx) follows the same
+Server-Component-gate / Client-Component-form split as the rest of the
+admin: the page re-verifies Cloudflare Access and renders the signed-in
+email; the form itself holds no auth and is fully self-contained (owns its
+own field state, client-side validation, and the POST call), so it's
+renderable in isolation with sample `initialValues` for a design preview.
+On a `201`, it calls `router.push("/admin")` + `router.refresh()` so the
+new draft appears in the list immediately. The per-day hours editor is
+deliberately basic (one comma-separated text field per day, not a
+scheduler) — see the file header for why. Lat/lng are plain number inputs;
+a map-click picker is noted as a future enhancement, not built here.
 
 ## Publish → static (#237)
 

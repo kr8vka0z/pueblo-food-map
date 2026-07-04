@@ -720,14 +720,30 @@ kind/target) is unchanged.
   field and clicks "Add venue" themselves — approval only actually commits
   when that create POST fires (with `submissionId` in its body), same as
   any other venue create.
-- **closure approve is a single click.** The card's "Approve — remove from
-  map" button gates on the same native `window.confirm()` convention
-  `ArchiveVenueButton` established (#255), then POSTs the EXISTING archive
-  route directly — `fetch("/api/admin/venues/<target_venue_id>/archive",
-  { method: "POST", body: JSON.stringify({ submissionId }) })` — using
-  `target_venue_id`, a real column on the submission row itself (not
-  something inside the parsed payload), so this action still works even on
-  a row whose JSON payload failed to parse.
+- **closure approve now opens the edit screen first, matching new_venue
+  (#270).** The card's "Review & approve" is now a plain navigation `Link`
+  to `/admin/venues/<target_venue_id>/edit?submission=<id>` — not a
+  one-click archive — because a closure report doesn't always mean "this
+  place is gone"; it might only mean the hours or contact info changed.
+  That edit page (src/app/admin/venues/[id]/edit/page.tsx) accepts the same
+  `?submission=<id>` convention `/admin/venues/new` established for
+  new_venue, but matches it against the venue actually being edited
+  (`target_venue_id === id`, not just id + kind + pending) before accepting
+  it — a sanity check with no new_venue equivalent, since new_venue has no
+  existing venue to cross-check against. When accepted, it renders a
+  clay-accented context banner (the report's issue type + description,
+  parsed defensively — a malformed payload degrades to generic copy without
+  losing the submissionId, same `parseError`-tolerant philosophy as
+  `SubmissionsReviewView`'s own closure card) and threads the id through as
+  `ArchiveVenueButton`'s new optional `submissionId` prop
+  (src/components/ArchiveVenueButton.tsx). Archiving from that screen POSTs
+  the SAME existing archive route with `{ submissionId }` — no new mutation
+  route, riding that route's existing atomic batch (previous bullet) — and
+  redirects back to `/admin/submissions` instead of `/admin` afterward.
+  Editing the venue WITHOUT clicking archive leaves the submission
+  `pending` — the admin corrects the venue's details (e.g. new hours) and
+  simply doesn't archive; the report itself is dismissed by rejecting it
+  from the queue if it was wrong, exactly like any other submission.
 
 **The `AND status = 'pending'` clause is a deliberate idempotency ceiling,
 not an oversight.** `ponytail:` comments at both call sites name it: a

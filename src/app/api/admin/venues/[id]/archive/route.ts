@@ -26,13 +26,18 @@
  * time this route runs, confirmation has already happened.
  *
  * #259 review-queue extension: an OPTIONAL JSON body `{ submissionId }`
- * (sent only by SubmissionsReviewView's "Approve — remove from map" action
- * for a closure-report submission) appends a THIRD statement to the same
+ * (sent by ArchiveVenueButton — src/components/ArchiveVenueButton.tsx —
+ * when it's rendered from /admin/venues/[id]/edit's `?submission=<id>`
+ * closure-report context, #270) appends a THIRD statement to the same
  * atomic `db.batch()` below, flipping that submission to `status='approved'`
  * — same technique and same reasoning as POST /api/admin/venues's own
  * (#259) submissionId extension. Parsing the body is defensive (empty/
  * missing/non-JSON body never throws) specifically so ArchiveVenueButton's
- * existing bodyless call keeps working unchanged.
+ * plain, no-submission call (the common case) keeps working unchanged.
+ * (Before #270, this body was sent one level up, directly from
+ * SubmissionsReviewView's own one-click closure-approve button — that
+ * action now opens the edit page first instead; this route's own logic is
+ * unchanged either way, since it never cared who calls it.)
  */
 
 import { NextResponse, type NextRequest } from "next/server";

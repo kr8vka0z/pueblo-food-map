@@ -15,16 +15,23 @@
  * comparison genuinely suits VenueListView, a handful of pending
  * submissions read better as review cards.
  *
- * Two independent mutations per card, reusing existing routes rather than
- * inventing new ones:
- *   - new_venue "Review & approve" is a plain navigation Link, not a
- *     fetch — it hands off to /admin/venues/new?submission=<id>, where the
- *     actual approve happens inside POST /api/admin/venues's existing
- *     atomic batch (see that route's header). Nothing to POST from here.
- *   - closure "Approve — remove from map" POSTs the EXISTING
- *     /api/admin/venues/<targetVenueId>/archive route with a submissionId,
- *     which approves the submission in the SAME atomic batch as the
- *     archive (see that route's header) — same technique, different route.
+ * Approve is a plain navigation Link for BOTH kinds (#270 made closure
+ * match new_venue) — reusing existing routes rather than inventing new
+ * ones, and nothing to POST from this component for either approve path:
+ *   - new_venue "Review & approve" hands off to
+ *     /admin/venues/new?submission=<id>, where the actual approve happens
+ *     inside POST /api/admin/venues's existing atomic batch (see that
+ *     route's header).
+ *   - closure "Review & approve" hands off to
+ *     /admin/venues/<targetVenueId>/edit?submission=<id> — that page shows
+ *     the report's details and lets the admin verify/fix the venue (or
+ *     remove it) before approving; the actual approve happens inside
+ *     POST /api/admin/venues/<id>/archive's existing atomic batch when
+ *     ArchiveVenueButton is used from that context (see that route's and
+ *     ArchiveVenueButton's headers). Originally a one-click confirm+archive
+ *     button; changed because a closure report can mean "the hours
+ *     changed," not only "this place is gone" — the admin should get the
+ *     same edit-before-approve review new_venue already gets.
  *   - Reject (either kind) is the one write this slice adds:
  *     POST /api/admin/submissions/<id>/reject.
  *
@@ -160,37 +167,12 @@ type ActionState = { status: "idle" } | { status: "submitting" } | { status: "er
 
 function SubmissionCard({ submission }: { submission: ReviewSubmission }) {
   const router = useRouter();
-  const [approveState, setApproveState] = useState<ActionState>({ status: "idle" });
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [rejectState, setRejectState] = useState<ActionState>({ status: "idle" });
 
   const badge = KIND_BADGE[submission.kind];
   const reasonFieldId = `reject-reason-${submission.id}`;
-
-  async function handleApproveClosure(venueName: string, targetVenueId: string) {
-    const confirmed = window.confirm(
-      `Approve this closure report and remove "${venueName}" from the map? It will stop appearing on the ` +
-        `next publish, but its record is kept, not deleted.`,
-    );
-    if (!confirmed) return;
-
-    setApproveState({ status: "submitting" });
-    try {
-      const res = await fetch(`/api/admin/venues/${targetVenueId}/archive`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submissionId: submission.id }),
-      });
-      if (res.status === 200) {
-        router.refresh();
-        return;
-      }
-      setApproveState({ status: "error", message: "Something went wrong. The report was not approved. Try again." });
-    } catch {
-      setApproveState({ status: "error", message: "Something went wrong. The report was not approved. Try again." });
-    }
-  }
 
   async function handleConfirmReject() {
     setRejectState({ status: "submitting" });
@@ -241,15 +223,18 @@ function SubmissionCard({ submission }: { submission: ReviewSubmission }) {
             Review &amp; approve
           </Link>
         )}
-        {!submission.parseError && submission.kind === "closure" && submission.targetVenueId && (
-          <button
-            type="button"
-            onClick={() => handleApproveClosure(submission.payload.venueName, submission.targetVenueId as string)}
-            disabled={approveState.status === "submitting"}
+        {submission.kind === "closure" && submission.targetVenueId && (
+          // No `!submission.parseError` gate here (unlike new_venue above):
+          // target_venue_id is a real column, independent of the parsed
+          // payload, so a row whose JSON failed to parse can still be
+          // reviewed on the edit page — same reasoning the parseError
+          // branch below still offers Reject.
+          <Link
+            href={`/admin/venues/${submission.targetVenueId}/edit?submission=${submission.id}`}
             className={primaryButtonClass}
           >
-            {approveState.status === "submitting" ? "Approving…" : "Approve — remove from map"}
-          </button>
+            Review &amp; approve
+          </Link>
         )}
         {!rejectOpen && (
           <button type="button" onClick={() => setRejectOpen(true)} className={secondaryButtonClass}>
@@ -257,12 +242,6 @@ function SubmissionCard({ submission }: { submission: ReviewSubmission }) {
           </button>
         )}
       </div>
-
-      {approveState.status === "error" && (
-        <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
-          {approveState.message}
-        </p>
-      )}
 
       {rejectOpen && (
         <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">

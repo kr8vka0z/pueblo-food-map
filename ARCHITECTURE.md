@@ -694,22 +694,33 @@ with no venue-side counterpart and no `audit_log` row — a reject changes
 nothing about `venues`, so there is nothing for that table's audit trail to
 describe.
 
-**new_venue approve is two steps; closure approve is one.** A `new_venue`
-card's "Review & approve" is a plain link to
-`/admin/venues/new?submission=<id>` — that page fetches and parses the
+**Both approve paths are now two-step hand-offs (#270 changed closure to
+match new_venue).** A `new_venue` card's "Review & approve" is a plain link
+to `/admin/venues/new?submission=<id>` — that page fetches and parses the
 still-pending row itself, maps it (`src/lib/adminVenueForm.ts`'s
 `mapSubmissionPayloadToFormValues()`, the inverse-shaped sibling of
 `mapVenueRowToFormValues()` from the "venue edit" section above) to
 `AddVenueForm`'s `initialValues`, and threads the submission id through as
 its new `submissionId` prop. The admin still reviews/edits every field and
 clicks "Add venue" themselves; approval only commits when that POST fires.
-A `closure` card's "Approve — remove from map" instead POSTs the existing
-archive route directly with `{ submissionId }`, gated by the same native
-`window.confirm()` convention `ArchiveVenueButton` established (#255) — one
-click, no intermediate page, because there's no form to fill in for a
-removal. It targets `target_venue_id`, a real column on the submission row
-itself (not something inside the parsed JSON payload), so this action
-still works even on a row whose payload failed to parse.
+A `closure` card's "Review & approve" is now the SAME shape of hand-off: a
+plain link to `/admin/venues/<target_venue_id>/edit?submission=<id>`
+(`target_venue_id`, a real column on the submission row itself, not
+something inside the parsed JSON payload, so this link still works even on
+a row whose payload failed to parse). That edit page cross-checks the
+submission's `target_venue_id` against the venue actually being edited
+before accepting it — new_venue has no existing venue to cross-check
+against, so this guard has no new_venue equivalent — and, once accepted,
+shows a clay-accented banner with the report's details and threads the id
+through as `ArchiveVenueButton`'s new optional `submissionId` prop. The
+admin can fix the venue's details, remove it (archiving POSTs the existing
+archive route with `{ submissionId }`, gated by the same native
+`window.confirm()` convention `ArchiveVenueButton` established at #255,
+then redirects to `/admin/submissions` instead of `/admin`), or simply
+leave it pending and reject the report from the queue instead if it turns
+out to be wrong. Originally closure approve was one click straight to
+archive; changed because a closure report can mean "the hours changed,"
+not only "this place is gone."
 
 **Per-row parse isolation, not a whole-query try/catch.** `payload` is one
 opaque JSON TEXT column carrying two different shapes depending on `kind`

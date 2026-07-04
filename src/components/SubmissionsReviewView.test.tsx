@@ -10,8 +10,13 @@
  *   - AC3/AC5: the shared Reject flow (both kinds) — reveal reason textarea,
  *     POST /api/admin/submissions/<id>/reject, refresh on success, inline
  *     error on failure.
- *   - AC4: a closure card's confirm-gated "Approve — remove from map" POSTs
- *     /api/admin/venues/<targetVenueId>/archive with {submissionId}.
+ *   - AC4 (updated #270): a closure card's "Review & approve" is a real
+ *     link to /admin/venues/<target_venue_id>/edit?submission=<id> —
+ *     edit-before-approve, matching new_venue's own hand-off shape; the
+ *     actual archive-and-approve happens on that page via
+ *     ArchiveVenueButton, covered by its own test file. Originally a
+ *     one-click confirm+archive; changed because a closure report can mean
+ *     "the hours changed," not only "this place is gone."
  *
  * next/navigation's useRouter is mocked module-wide, same pattern as
  * ArchiveVenueButton.test.tsx / AddVenueForm.test.tsx.
@@ -134,44 +139,34 @@ describe("SubmissionsReviewView — closure card (AC1, AC4)", () => {
     expect(screen.getAllByText(/reporter@example\.com/).length).toBeGreaterThanOrEqual(1);
   });
 
-  test("declining the confirm dialog never calls fetch", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
-    const user = userEvent.setup();
-    render(<SubmissionsReviewView submissions={[makeClosureSubmission()]} />);
+  test("'Review & approve' is a real link to /admin/venues/<target_venue_id>/edit?submission=<id> (#270)", () => {
+    render(
+      <SubmissionsReviewView
+        submissions={[makeClosureSubmission({ id: 9, targetVenueId: "manual-existing-1" })]}
+      />,
+    );
 
-    await user.click(screen.getByRole("button", { name: /Approve — remove from map/i }));
-
-    expect(window.confirm).toHaveBeenCalledTimes(1);
+    const link = screen.getByRole("link", { name: /Review & approve/i });
+    expect(link.getAttribute("href")).toBe("/admin/venues/manual-existing-1/edit?submission=9");
     expect(mockFetch).not.toHaveBeenCalled();
   });
+});
 
-  test("accepting the confirm dialog POSTs the archive route with {submissionId}, then refreshes", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true }) });
-    const user = userEvent.setup();
-    render(<SubmissionsReviewView submissions={[makeClosureSubmission({ id: 9, targetVenueId: "manual-existing-1" })]} />);
+describe("SubmissionsReviewView — closure parseError still allows approve (#270)", () => {
+  test("a parseError closure row with a target_venue_id still renders the Review & approve link (target_venue_id is a real column, not from the unparseable payload)", () => {
+    const broken: ReviewSubmission = {
+      id: 12,
+      kind: "closure",
+      createdAt: "2026-07-02T00:00:00.000Z",
+      submitterEmail: null,
+      targetVenueId: "manual-existing-2",
+      parseError: true,
+      payload: null,
+    };
+    render(<SubmissionsReviewView submissions={[broken]} />);
 
-    await user.click(screen.getByRole("button", { name: /Approve — remove from map/i }));
-
-    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
-    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/api/admin/venues/manual-existing-1/archive");
-    expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({ submissionId: 9 });
-
-    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
-  });
-
-  test("a non-200 archive response shows an inline error and does not refresh", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    mockFetch.mockResolvedValueOnce({ status: 404, json: async () => ({ ok: false, error: "Not found" }) });
-    const user = userEvent.setup();
-    render(<SubmissionsReviewView submissions={[makeClosureSubmission()]} />);
-
-    await user.click(screen.getByRole("button", { name: /Approve — remove from map/i }));
-
-    expect(await screen.findByRole("alert")).toBeDefined();
-    expect(mockRefresh).not.toHaveBeenCalled();
+    const link = screen.getByRole("link", { name: /Review & approve/i });
+    expect(link.getAttribute("href")).toBe("/admin/venues/manual-existing-2/edit?submission=12");
   });
 });
 

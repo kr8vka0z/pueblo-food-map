@@ -1,10 +1,17 @@
 /**
- * ArchiveVenueButton tests (#255).
+ * ArchiveVenueButton tests (#255; optional `submissionId` prop added #270).
  *
  * Covers AC2 end to end at the component layer: the confirm() gate (decline
  * -> fetch never called; accept -> POST /api/admin/venues/<id>/archive),
  * the success redirect, a failure banner on a non-200 response, and the
  * already-archived informational state (no actionable button at all).
+ *
+ * #270: when this button is rendered from the venue edit page's
+ * `?submission=<id>` closure-report context, it carries a `submissionId` —
+ * covered in its own describe block below (POST body gains
+ * `{submissionId}`, success redirects back to the review queue instead of
+ * the venue list). The pre-#270 bodyless/`/admin`-redirect behavior stays
+ * the default when `submissionId` is omitted, unchanged.
  *
  * next/navigation's useRouter is mocked module-wide, same pattern as
  * AddVenueForm.test.tsx (the first client component in this codebase to
@@ -109,5 +116,43 @@ describe("ArchiveVenueButton — already archived", () => {
 
     expect(screen.queryByRole("button", { name: /Remove from map/i })).toBeNull();
     expect(screen.getByText(/removed from the map/i)).toBeDefined();
+  });
+});
+
+describe("ArchiveVenueButton — optional submissionId (#270)", () => {
+  test("with submissionId: the archive POST body includes {submissionId}, success redirects to /admin/submissions", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc", status: "archived" }) });
+    const user = userEvent.setup();
+    render(
+      <ArchiveVenueButton venueId="manual-abc" venueName="Eastside Pantry" alreadyArchived={false} submissionId={9} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Remove from map/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/admin/venues/manual-abc/archive");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ submissionId: 9 });
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/submissions"));
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  test("without submissionId: the archive POST has no body, success redirects to /admin", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc", status: "archived" }) });
+    const user = userEvent.setup();
+    render(<ArchiveVenueButton venueId="manual-abc" venueName="Eastside Pantry" alreadyArchived={false} />);
+
+    await user.click(screen.getByRole("button", { name: /Remove from map/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/admin/venues/manual-abc/archive");
+    expect(init.body).toBeUndefined();
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin"));
   });
 });

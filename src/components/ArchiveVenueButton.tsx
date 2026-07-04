@@ -26,6 +26,18 @@
  * this one destructive action per DESIGN.md's "one clear accent per role"
  * convention (sage = interactive, clay = informational emphasis, orange =
  * the one primary CTA per screen, danger = destructive).
+ *
+ * #270: an optional `submissionId` prop lets this button double as the
+ * approve action for a pending closure report reviewed from
+ * /admin/venues/[id]/edit's `?submission=<id>` context. When present, it's
+ * sent as a JSON body `{ submissionId }` — the archive route already
+ * accepts this optional field and, in the SAME atomic batch as the status
+ * flip, marks that closure submission approved (see that route's header;
+ * same technique SubmissionsReviewView's closure card used before #270
+ * moved that action to this edit-page flow). Redirecting back to the
+ * review queue (rather than the venue list) afterward completes that loop.
+ * When absent, every part of this component behaves exactly as before
+ * #270 — this is additive, not a fork.
  */
 
 import { useState } from "react";
@@ -37,6 +49,8 @@ export interface ArchiveVenueButtonProps {
   /** When true, the venue is already archived — render an informational
    *  state instead of an actionable button (there is nothing to confirm). */
   alreadyArchived: boolean;
+  /** #270: set when reviewing a pending closure report (see file header). */
+  submissionId?: number;
 }
 
 const dangerButtonClass =
@@ -46,7 +60,12 @@ const dangerButtonClass =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
-export default function ArchiveVenueButton({ venueId, venueName, alreadyArchived }: ArchiveVenueButtonProps) {
+export default function ArchiveVenueButton({
+  venueId,
+  venueName,
+  alreadyArchived,
+  submissionId,
+}: ArchiveVenueButtonProps) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
 
@@ -59,9 +78,18 @@ export default function ArchiveVenueButton({ venueId, venueName, alreadyArchived
 
     setStatus("submitting");
     try {
-      const res = await fetch(`/api/admin/venues/${venueId}/archive`, { method: "POST" });
+      const res = await fetch(
+        `/api/admin/venues/${venueId}/archive`,
+        submissionId != null
+          ? {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ submissionId }),
+            }
+          : { method: "POST" },
+      );
       if (res.status === 200) {
-        router.push("/admin");
+        router.push(submissionId != null ? "/admin/submissions" : "/admin");
         router.refresh();
         return;
       }

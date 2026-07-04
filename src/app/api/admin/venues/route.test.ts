@@ -222,6 +222,56 @@ describe("POST /api/admin/venues", () => {
     expect(afterJson.updated_by).toBe(ADMIN_EMAIL);
   });
 
+  test("valid payload + submissionId -> db.batch() called once with THREE statements, the 3rd approving the submission (#259)", async () => {
+    const { db, batch } = makeFakeDb();
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    const token = await buildValidToken();
+
+    const res = await POST(
+      makeRequest({ token, origin: ADMIN_ORIGIN, body: validPayload({ submissionId: 42 }) }),
+    );
+    expect(res.status).toBe(201);
+    const data = (await res.json()) as { id: string };
+
+    expect(batch).toHaveBeenCalledTimes(1);
+    const stmts = batch.mock.calls[0][0] as BoundStatement[];
+    expect(stmts).toHaveLength(3);
+
+    const [venueStmt, auditStmt, approveStmt] = stmts;
+    expect(venueStmt.sql).toContain("INSERT INTO venues");
+    expect(auditStmt.sql).toContain("INSERT INTO audit_log");
+
+    // The submission approval piggybacks on the SAME atomic batch as the
+    // venue create — see route.ts header for why (venue + submission-approval
+    // commit together, or neither does).
+    expect(approveStmt.sql).toContain("UPDATE public_submissions");
+    expect(approveStmt.sql).toContain("status = 'approved'");
+    expect(approveStmt.sql).toContain("WHERE id = ?");
+    expect(approveStmt.sql).toContain("status = 'pending'");
+    // A create can only legitimately approve a 'new_venue' submission — see
+    // route.ts's APPROVE_SUBMISSION_SQL comment for why this guard exists.
+    expect(approveStmt.sql).toContain("kind = 'new_venue'");
+    expect(approveStmt.args).toContain(ADMIN_EMAIL);
+    expect(approveStmt.args).toContain(42);
+    expect(data.id).toBeTruthy();
+  });
+
+  test("submissionId is ignored when not a positive integer (string, zero, negative, float) — still 2 statements", async () => {
+    const { db, batch } = makeFakeDb();
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    const token = await buildValidToken();
+
+    for (const badSubmissionId of ["42", 0, -1, 1.5]) {
+      batch.mockClear();
+      const res = await POST(
+        makeRequest({ token, origin: ADMIN_ORIGIN, body: validPayload({ submissionId: badSubmissionId }) }),
+      );
+      expect(res.status).toBe(201);
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(2);
+    }
+  });
+
   test("optional fields (hours_weekly, tri-state, contact info) are bound correctly when provided", async () => {
     const { db, batch } = makeFakeDb();
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });

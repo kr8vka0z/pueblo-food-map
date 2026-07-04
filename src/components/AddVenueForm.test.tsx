@@ -226,6 +226,74 @@ describe("AddVenueForm — edit mode (#255)", () => {
   });
 });
 
+describe("AddVenueForm — submissionId threading (#259)", () => {
+  test("create mode + submissionId -> POST body includes submissionId", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm submissionId={42} />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Add venue/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.submissionId).toBe(42);
+  });
+
+  test("create mode WITHOUT submissionId -> POST body omits submissionId entirely", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Add venue/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.submissionId).toBeUndefined();
+  });
+
+  test("a successful create WITH submissionId redirects to /admin/submissions (back to the queue), not /admin", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm submissionId={42} />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Add venue/i }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/submissions"));
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  test("a successful create WITHOUT submissionId still redirects to /admin (unchanged)", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Add venue/i }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin"));
+  });
+
+  test("edit mode ignores submissionId entirely: PATCH body omits it, redirect still goes to /admin", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm venueId="manual-abc" submissionId={42} />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Save changes/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.submissionId).toBeUndefined();
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin"));
+  });
+});
+
 describe("AddVenueForm — geocode (Find location from address)", () => {
   test("the button is disabled while the address field is blank", () => {
     render(<AddVenueForm />);

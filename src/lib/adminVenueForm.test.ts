@@ -9,8 +9,9 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
+import { mapVenueRowToFormValues, mapSubmissionPayloadToFormValues } from "@/lib/adminVenueForm";
 import type { AdminVenueRow } from "@/types/venue";
+import type { NewVenuePayload } from "@/lib/publicSubmissions";
 
 function makeRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
   return {
@@ -114,5 +115,76 @@ describe("mapVenueRowToFormValues", () => {
     expect(values.hours).toEqual({
       mon: "", tue: "", wed: "", thu: "", fri: "", sat: "", sun: "",
     });
+  });
+});
+
+// ─── mapSubmissionPayloadToFormValues (#259) ────────────────────────────────
+
+function makePayload(overrides: Partial<NewVenuePayload> = {}): NewVenuePayload {
+  return {
+    venueName: "Eastside Pantry",
+    address: "123 Test St, Pueblo, CO",
+    category: "pantry",
+    hours: "Mon-Fri 9-5",
+    contact: "719-555-0100",
+    acceptsSnap: true,
+    acceptsWic: false,
+    notes: "Enter through the side door.",
+    submitterEmail: "suggester@example.com",
+    ...overrides,
+  };
+}
+
+describe("mapSubmissionPayloadToFormValues", () => {
+  test("maps name/address directly", () => {
+    const values = mapSubmissionPayloadToFormValues(makePayload());
+    expect(values.name).toBe("Eastside Pantry");
+    expect(values.address).toBe("123 Test St, Pueblo, CO");
+  });
+
+  test("a category that matches a real VenueCategory passes through unchanged", () => {
+    for (const category of ["pantry", "grocery", "convenience", "farm", "garden", "edible_landscape", "meal_site"]) {
+      expect(mapSubmissionPayloadToFormValues(makePayload({ category })).category).toBe(category);
+    }
+  });
+
+  test("an unrecognized category falls back to '' (admin picks it) rather than emitting an invalid value", () => {
+    const values = mapSubmissionPayloadToFormValues(makePayload({ category: "not-a-real-category" }));
+    expect(values.category).toBe("");
+  });
+
+  test("acceptsSnap/acceptsWic booleans map to the tri-state '1'/'0' strings", () => {
+    expect(mapSubmissionPayloadToFormValues(makePayload({ acceptsSnap: true, acceptsWic: false })).acceptsSnap).toBe("1");
+    expect(mapSubmissionPayloadToFormValues(makePayload({ acceptsSnap: true, acceptsWic: false })).acceptsWic).toBe("0");
+    expect(mapSubmissionPayloadToFormValues(makePayload({ acceptsSnap: false, acceptsWic: true })).acceptsSnap).toBe("0");
+    expect(mapSubmissionPayloadToFormValues(makePayload({ acceptsSnap: false, acceptsWic: true })).acceptsWic).toBe("1");
+  });
+
+  test("notes prefill carries the submitter's notes plus hours/contact/submitterEmail so nothing submitted is lost", () => {
+    const values = mapSubmissionPayloadToFormValues(makePayload());
+    expect(values.notes).toContain("Enter through the side door.");
+    expect(values.notes).toContain("Mon-Fri 9-5");
+    expect(values.notes).toContain("719-555-0100");
+    expect(values.notes).toContain("suggester@example.com");
+  });
+
+  test("notes prefill still includes hours/contact/submitterEmail even when the submitter left notes blank", () => {
+    const values = mapSubmissionPayloadToFormValues(makePayload({ notes: undefined }));
+    expect(values.notes).toContain("Mon-Fri 9-5");
+    expect(values.notes).toContain("719-555-0100");
+    expect(values.notes).toContain("suggester@example.com");
+  });
+
+  test("notes prefill omits hours/contact lines entirely when the submitter didn't provide them", () => {
+    const values = mapSubmissionPayloadToFormValues(makePayload({ hours: undefined, contact: undefined, notes: undefined }));
+    expect(values.notes).not.toContain("Hours:");
+    expect(values.notes).not.toContain("Contact:");
+    expect(values.notes).toContain("suggester@example.com");
+  });
+
+  test("lat/lng are left blank for the admin to geocode", () => {
+    const values = mapSubmissionPayloadToFormValues(makePayload());
+    expect(values.lat).toBeUndefined();
+    expect(values.lng).toBeUndefined();
   });
 });

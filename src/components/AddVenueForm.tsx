@@ -27,6 +27,15 @@
  * form; edit mode is just that same prop combined with `venueId`, wired by
  * the edit page (src/app/admin/venues/[id]/edit/page.tsx) via
  * src/lib/adminVenueForm.ts's mapVenueRowToFormValues().
+ *
+ * #259: an optional `submissionId` prop (create mode only) rides along in
+ * the POST body so the create route can approve the originating
+ * `public_submissions` row atomically with the venue insert — wired by
+ * src/app/admin/venues/new/page.tsx when opened as `?submission=<id>`, with
+ * initialValues supplied by src/lib/adminVenueForm.ts's
+ * mapSubmissionPayloadToFormValues(). On success that path redirects back
+ * to /admin/submissions instead of /admin, so the admin lands back on the
+ * queue rather than the plain venue list.
  */
 
 import { useState } from "react";
@@ -92,6 +101,17 @@ export interface AddVenueFormProps {
    * component does not fetch the row itself.
    */
   venueId?: string;
+  /**
+   * The `public_submissions` row id this create was reached FROM (#259):
+   * set only when /admin/venues/new was opened via a review-queue
+   * "Approve" link (?submission=<id>), never by the plain "Add place" flow.
+   * Meaningful only in CREATE mode — ignored entirely in edit mode, since a
+   * submission is only ever approved into a brand-new venue, never onto an
+   * edit of an existing one. Threaded straight through to the POST body so
+   * POST /api/admin/venues can flip that submission to `status='approved'`
+   * in the SAME atomic batch as the venue insert (see that route's header).
+   */
+  submissionId?: number;
 }
 
 type FieldErrorKey =
@@ -208,7 +228,7 @@ function validateClient(values: AddVenueFormValues): FieldErrors {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function AddVenueForm({ initialValues, venueId }: AddVenueFormProps) {
+export default function AddVenueForm({ initialValues, venueId, submissionId }: AddVenueFormProps) {
   const router = useRouter();
   const isEditMode = venueId !== undefined;
   const [values, setValues] = useState<AddVenueFormValues>(() => defaultValues(initialValues));
@@ -309,6 +329,10 @@ export default function AddVenueForm({ initialValues, venueId }: AddVenueFormPro
       operator: values.operator.trim() || undefined,
       notes: values.notes.trim() || undefined,
       outside_county: values.outsideCounty ? 1 : 0,
+      // #259: only ever sent on a fresh create reached from the review
+      // queue — never in edit mode (submissionId is meaningless there; see
+      // this prop's own doc comment above).
+      ...(!isEditMode && submissionId != null ? { submissionId } : {}),
     };
 
     // Create POSTs /api/admin/venues (201 on success); edit PATCHes
@@ -327,7 +351,10 @@ export default function AddVenueForm({ initialValues, venueId }: AddVenueFormPro
       });
 
       if (res.status === successStatus) {
-        router.push("/admin");
+        // #259: a create that approved a submission returns to the review
+        // queue (so the admin picks up the next pending card) rather than
+        // the plain venue list; every other path is unchanged.
+        router.push(!isEditMode && submissionId != null ? "/admin/submissions" : "/admin");
         router.refresh();
         return;
       }

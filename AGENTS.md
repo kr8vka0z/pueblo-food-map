@@ -652,6 +652,146 @@ npx wrangler d1 migrations apply pueblo-food-map-admin --local   # local dev/tes
 npx wrangler d1 migrations apply pueblo-food-map-admin --remote  # production — run at merge time
 ```
 
+## Public submissions review queue (#259)
+
+`/admin/submissions` (src/app/admin/submissions/page.tsx +
+src/components/SubmissionsReviewView.tsx) is the review screen the previous
+section's "No review UI yet" note deferred: it lists every
+`public_submissions` row `WHERE status = 'pending' ORDER BY created_at DESC`
+(newest first) as a card — not a dense table like `VenueListView`, since a
+submission carries far more per-row prose (address, hours, a closure's
+description) than that table's columns fit — and lets an admin approve or
+reject each. `payload` is parsed PER ROW (`parseSubmissionRow` in the page)
+so one malformed row degrades to that single card's own "couldn't read
+details" state (`SubmissionsReviewView`'s `parseError` branch) rather than
+blanking the whole queue or 500ing the page. Same auth gate as every other
+admin page: `getAdminDb()` -> `forbidden()` fail-closed on
+`AccessDeniedError`; this page only `SELECT`s, so — like `/admin` itself —
+it has no `requireAdminOrigin()` CSRF check of its own.
+
+**Approve reuses the existing create/archive routes — it does not write a
+parallel mutation path.** Both `POST /api/admin/venues` (#254) and
+`POST /api/admin/venues/[id]/archive` (#255) gained an OPTIONAL
+`submissionId` field. When present, each route appends a THIRD statement to
+the SAME atomic `db.batch()` that already inserts the venue (create) or
+flips its status (archive) — flipping the originating `public_submissions`
+row to `status = 'approved'`. Riding the existing batch, rather than a
+second separate write, is what guarantees the venue mutation and the
+submission's approval commit together or not at all — there is no window
+where a venue exists but its originating submission still shows as
+pending, or vice versa. Neither route's pre-existing behavior changes when
+`submissionId` is absent (the plain "Add place" and `ArchiveVenueButton`
+call shapes both still work unmodified — the archive route's own body
+parse is fully defensive so a bodyless call, ArchiveVenueButton's real
+one, never throws trying to read a JSON body that isn't there).
+
+**The approve UPDATE's WHERE clause matches on kind (and, for archive,
+target) — not just id + pending — closing a cross-kind approval gap.** A
+crafted `submissionId` naming an unrelated pending row used to be able to
+mark that row approved while the venue create/archive acted on a
+completely different venue. `POST /api/admin/venues`'s statement is now
+`UPDATE public_submissions SET status = 'approved', reviewed_by = ?,
+reviewed_at = ? WHERE id = ? AND status = 'pending' AND kind = 'new_venue'`
+— a create can only ever legitimately approve a `new_venue` submission.
+`POST /api/admin/venues/[id]/archive`'s statement is now `UPDATE
+public_submissions SET status = 'approved', reviewed_by = ?, reviewed_at =
+? WHERE id = ? AND status = 'pending' AND kind = 'closure' AND
+target_venue_id = ?`, binding the archived venue's `id` (the `[id]` route
+param) as `target_venue_id` — a closure approval must target the very
+venue being archived. On a mismatch (wrong kind, or wrong target for an
+archive), the venue is still created/archived — that's the admin's
+explicit action — but the approve statement now affects 0 rows instead of
+silently marking the wrong submission approved. The happy path (matching
+kind/target) is unchanged.
+
+- **new_venue approve is a two-step hand-off, not a single click.** The
+  card's "Review & approve" is a plain navigation `Link` to
+  `/admin/venues/new?submission=<id>` — NOT a fetch. That page
+  (src/app/admin/venues/new/page.tsx) fetches the still-pending row itself
+  (`WHERE id = ? AND kind = 'new_venue' AND status = 'pending'`), parses its
+  `payload` (`NewVenuePayload`, src/lib/publicSubmissions.ts), maps it via
+  `src/lib/adminVenueForm.ts`'s new `mapSubmissionPayloadToFormValues()` to
+  `AddVenueForm`'s `initialValues`, and threads the id through as
+  `AddVenueForm`'s new `submissionId` prop. Any failure mode — the param
+  absent, non-numeric, unknown id, wrong kind, already reviewed, or
+  malformed stored JSON — silently falls back to exactly the same blank
+  form this page rendered before #259; a stale or mistyped link never 404s
+  or 500s, it just can't pre-fill. The admin still reviews/edits every
+  field and clicks "Add venue" themselves — approval only actually commits
+  when that create POST fires (with `submissionId` in its body), same as
+  any other venue create.
+- **closure approve now opens the edit screen first, matching new_venue
+  (#270).** The card's "Review & approve" is now a plain navigation `Link`
+  to `/admin/venues/<target_venue_id>/edit?submission=<id>` — not a
+  one-click archive — because a closure report doesn't always mean "this
+  place is gone"; it might only mean the hours or contact info changed.
+  That edit page (src/app/admin/venues/[id]/edit/page.tsx) accepts the same
+  `?submission=<id>` convention `/admin/venues/new` established for
+  new_venue, but matches it against the venue actually being edited
+  (`target_venue_id === id`, not just id + kind + pending) before accepting
+  it — a sanity check with no new_venue equivalent, since new_venue has no
+  existing venue to cross-check against. When accepted, it renders a
+  clay-accented context banner (the report's issue type + description,
+  parsed defensively — a malformed payload degrades to generic copy without
+  losing the submissionId, same `parseError`-tolerant philosophy as
+  `SubmissionsReviewView`'s own closure card) and threads the id through as
+  `ArchiveVenueButton`'s new optional `submissionId` prop
+  (src/components/ArchiveVenueButton.tsx). Archiving from that screen POSTs
+  the SAME existing archive route with `{ submissionId }` — no new mutation
+  route, riding that route's existing atomic batch (previous bullet) — and
+  redirects back to `/admin/submissions` instead of `/admin` afterward.
+  Editing the venue WITHOUT clicking archive leaves the submission
+  `pending` — the admin corrects the venue's details (e.g. new hours) and
+  simply doesn't archive; the report itself is dismissed by rejecting it
+  from the queue if it was wrong, exactly like any other submission.
+
+**The `AND status = 'pending'` clause is a deliberate idempotency ceiling,
+not an oversight.** `ponytail:` comments at both call sites name it: a
+double-approve (two admins, or one admin double-clicking) affects 0 rows on
+the submission side and is silently a no-op there, while the venue
+create/archive itself still succeeds either way. Acceptable for this
+single-admin internal tool; the upgrade path if it ever isn't is surfacing
+`D1Result.meta.changes` back to the client so a stale/already-actioned card
+can be flagged instead of quietly re-succeeding.
+
+**`POST /api/admin/submissions/[id]/reject`** (new route, #259) is the one
+genuinely new mutation this slice adds — a standalone `UPDATE
+public_submissions SET status = 'rejected', review_reason = ?, reviewed_by
+= ?, reviewed_at = ? WHERE id = ? AND status = 'pending'`, used by BOTH
+card kinds (the reject flow is identical regardless of `kind`). Same auth
+pair as every other mutation (`getAdminDb()` then `requireAdminOrigin()`).
+`D1Result.meta.changes === 0` (unknown id, or already reviewed) returns
+`404`, not a silent `200` — the one place this slice DOES surface that
+D1 count to the caller, since a reject has no atomic-batch partner to fall
+back on. **Rejecting writes no `audit_log` row** — unlike every venue
+mutation on this admin surface, a reject touches no `venues` row at all, so
+there is nothing for that table's audit trail to describe; the
+`public_submissions` row's own `status`/`reviewed_by`/`reviewed_at`/
+`review_reason` columns are its complete history.
+
+**Category reconciliation in the payload->form mapper.** The public suggest
+form's category comes from `VENUE_CATEGORIES` / `VenueCategoryKey`
+(src/lib/suggestTypes.ts) — a separately-maintained 7-value map that
+matches `VenueCategory` (src/types/venue.ts) key-for-key today, but the two
+share no import, so nothing enforces that they stay in sync.
+`mapSubmissionPayloadToFormValues()` checks the submitted category against
+the real `VenueCategory` enum and falls back to `""` (the form's own
+"select a category" empty state) on anything unrecognized, rather than
+ever passing through a value that could fail `validateCreateVenuePayload()`
+outright. The mapper's notes prefill is deliberately lossy-but-safe:
+`hours`/`contact`/`submitterEmail` have no dedicated `AddVenueForm` fields
+of their own (the submitter's free-text hours aren't the structured
+per-day shape the form's hours grid edits), so they're folded into the
+free-text notes field under a labeled separator instead of silently
+dropped — the admin reviews and edits notes before saving regardless.
+
+**Nav link from `/admin` to `/admin/submissions`.** `/admin`
+(src/app/admin/page.tsx) links to the review queue via a "Review queue"
+link in its header, styled as the same secondary sage-underline link this
+admin shell already uses elsewhere (e.g. "Back to venue list") so "Add
+place" stays the header's one primary action — shipped as a follow-up
+after this slice, not folded into #259's original scope.
+
 # Discoverability / SEO (#164)
 
 Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**

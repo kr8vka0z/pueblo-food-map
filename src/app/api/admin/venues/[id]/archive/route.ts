@@ -20,10 +20,24 @@
  *
  * Auth: identical two-check pattern to every other admin mutation —
  * getAdminDb() then requireAdminOrigin(), both throwing AccessDeniedError
- * into one 403 shape. No request body: the UI gates this action behind a
- * confirm() dialog (src/components/ArchiveVenueButton.tsx) before ever
- * calling this endpoint, so by the time this route runs, confirmation has
- * already happened client-side.
+ * into one 403 shape. No request body from ArchiveVenueButton's own call
+ * (src/components/ArchiveVenueButton.tsx) — it gates this action behind a
+ * confirm() dialog client-side, then POSTs with no body at all, so by the
+ * time this route runs, confirmation has already happened.
+ *
+ * #259 review-queue extension: an OPTIONAL JSON body `{ submissionId }`
+ * (sent by ArchiveVenueButton — src/components/ArchiveVenueButton.tsx —
+ * when it's rendered from /admin/venues/[id]/edit's `?submission=<id>`
+ * closure-report context, #270) appends a THIRD statement to the same
+ * atomic `db.batch()` below, flipping that submission to `status='approved'`
+ * — same technique and same reasoning as POST /api/admin/venues's own
+ * (#259) submissionId extension. Parsing the body is defensive (empty/
+ * missing/non-JSON body never throws) specifically so ArchiveVenueButton's
+ * plain, no-submission call (the common case) keeps working unchanged.
+ * (Before #270, this body was sent one level up, directly from
+ * SubmissionsReviewView's own one-click closure-approve button — that
+ * action now opens the edit page first instead; this route's own logic is
+ * unchanged either way, since it never cared who calls it.)
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -40,6 +54,35 @@ async function authorizeArchiveRequest(headers: HeaderSource): Promise<AdminDbAc
 
 const AUDIT_INSERT_SQL =
   "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+// The `AND kind = 'closure' AND target_venue_id = ?` guard (mirrors the
+// create route's own `kind = 'new_venue'` guard) closes a cross-kind/
+// cross-target approval gap: a closure approval must target the very venue
+// being archived, so a submissionId pointing at a 'new_venue' row, or at a
+// closure report for a DIFFERENT venue, now affects 0 rows here — the
+// archive still succeeds, but the wrong submission is never silently
+// marked approved.
+const APPROVE_SUBMISSION_SQL =
+  "UPDATE public_submissions SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending' AND kind = 'closure' AND target_venue_id = ?";
+
+/**
+ * Reads an optional `{ submissionId }` from the request body without ever
+ * throwing — ArchiveVenueButton's real call sends no body at all (see this
+ * file's header), so a missing/empty/non-JSON body must degrade to "no
+ * submission to approve," not a crash. Mirrors POST /api/admin/venues's own
+ * (#259) `readOptionalSubmissionId`, but that route always has a real JSON
+ * body (validateCreateVenuePayload already required one); this one doesn't,
+ * hence the try/catch here instead of a plain field read there.
+ */
+async function readOptionalSubmissionId(req: NextRequest): Promise<number | null> {
+  try {
+    const body: unknown = await req.json();
+    const rawSid = (body as { submissionId?: unknown })?.submissionId;
+    return typeof rawSid === "number" && Number.isInteger(rawSid) && rawSid > 0 ? rawSid : null;
+  } catch {
+    return null; // no/empty/non-JSON body — the established bodyless call shape
+  }
+}
 
 export async function POST(
   req: NextRequest,
@@ -63,6 +106,8 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
+  const submissionId = await readOptionalSubmissionId(req);
+
   const timestamp = new Date().toISOString();
   const afterRow: AdminVenueRow = {
     ...existing,
@@ -78,8 +123,20 @@ export async function POST(
     .prepare(AUDIT_INSERT_SQL)
     .bind(identity.email, "venue", id, "archive", JSON.stringify(existing), JSON.stringify(afterRow), timestamp);
 
-  // Atomic: the status flip and its own audit trail either both land or neither does.
-  await db.batch([archiveVenue, insertAudit]);
+  // ponytail: same `AND status = 'pending'` idempotency ceiling as POST
+  // /api/admin/venues's (#259) approveSubmission — a double-approve or a
+  // stale card silently no-ops on the submission row (0 rows affected)
+  // rather than erroring, while the archive itself still succeeds either
+  // way. Acceptable for this single-admin internal tool; surfacing
+  // D1Result.meta.changes to flag a stale card is the upgrade path.
+  const approveSubmission =
+    submissionId !== null
+      ? db.prepare(APPROVE_SUBMISSION_SQL).bind(identity.email, timestamp, submissionId, id)
+      : null;
+
+  // Atomic: the status flip, its own audit trail, and (#259) the
+  // originating submission's approval either all land together or none does.
+  await db.batch([archiveVenue, insertAudit, ...(approveSubmission !== null ? [approveSubmission] : [])]);
 
   return NextResponse.json({ ok: true, id, status: "archived" });
 }

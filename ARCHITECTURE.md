@@ -671,6 +671,87 @@ commit-before-D1-write ordering are byte-for-byte unchanged.
 
 ---
 
+## Admin — review queue (#259)
+
+`public_submissions` (#258, previous "Public submissions queue" section in
+AGENTS.md) went from write-only to read+actionable: `/admin/submissions`
+(src/app/admin/submissions/page.tsx) reads every `pending` row, newest
+first, and renders it as a card
+(src/components/SubmissionsReviewView.tsx) an admin can approve or reject.
+
+**Mental model: this slice adds ONE new mutation and re-shapes TWO existing
+ones, rather than inventing a parallel "approve a submission" pipeline.**
+`POST /api/admin/venues` and `POST /api/admin/venues/[id]/archive` each
+gained an optional `submissionId` field that appends a third statement —
+flipping the originating `public_submissions` row to `status='approved'`
+— to the SAME atomic `db.batch()` that already does the venue insert or
+the archive `UPDATE`. That's the load-bearing design choice: a venue
+mutation and its originating submission's approval either land together in
+one transaction or neither lands at all, with no separate D1 round trip
+that could succeed on one side and fail on the other. The one truly new
+route, `POST /api/admin/submissions/[id]/reject`, is a standalone `UPDATE`
+with no venue-side counterpart and no `audit_log` row — a reject changes
+nothing about `venues`, so there is nothing for that table's audit trail to
+describe.
+
+**Both approve paths are now two-step hand-offs (#270 changed closure to
+match new_venue).** A `new_venue` card's "Review & approve" is a plain link
+to `/admin/venues/new?submission=<id>` — that page fetches and parses the
+still-pending row itself, maps it (`src/lib/adminVenueForm.ts`'s
+`mapSubmissionPayloadToFormValues()`, the inverse-shaped sibling of
+`mapVenueRowToFormValues()` from the "venue edit" section above) to
+`AddVenueForm`'s `initialValues`, and threads the submission id through as
+its new `submissionId` prop. The admin still reviews/edits every field and
+clicks "Add venue" themselves; approval only commits when that POST fires.
+A `closure` card's "Review & approve" is now the SAME shape of hand-off: a
+plain link to `/admin/venues/<target_venue_id>/edit?submission=<id>`
+(`target_venue_id`, a real column on the submission row itself, not
+something inside the parsed JSON payload, so this link still works even on
+a row whose payload failed to parse). That edit page cross-checks the
+submission's `target_venue_id` against the venue actually being edited
+before accepting it — new_venue has no existing venue to cross-check
+against, so this guard has no new_venue equivalent — and, once accepted,
+shows a clay-accented banner with the report's details and threads the id
+through as `ArchiveVenueButton`'s new optional `submissionId` prop. The
+admin can fix the venue's details, remove it (archiving POSTs the existing
+archive route with `{ submissionId }`, gated by the same native
+`window.confirm()` convention `ArchiveVenueButton` established at #255,
+then redirects to `/admin/submissions` instead of `/admin`), or simply
+leave it pending and reject the report from the queue instead if it turns
+out to be wrong. Originally closure approve was one click straight to
+archive; changed because a closure report can mean "the hours changed,"
+not only "this place is gone."
+
+**Per-row parse isolation, not a whole-query try/catch.** `payload` is one
+opaque JSON TEXT column carrying two different shapes depending on `kind`
+(`NewVenuePayload` vs. `ClosurePayload`, both in
+src/lib/publicSubmissions.ts, added alongside that file's existing
+`PublicSubmissionInsert`/`insertPublicSubmission` — same module, since it
+already owns this queue's write shape). The review-queue page parses each
+row independently (`parseSubmissionRow`) so one malformed row degrades to
+that single card's own "couldn't read details" state
+(`SubmissionsReviewView`'s `parseError` branch — still offers Reject, since
+rejecting needs only the row's id) rather than withholding the whole queue
+behind one bad row.
+
+**Category reconciliation is a mapper concern, not a schema one.** The
+public suggest form's category (`VenueCategoryKey`,
+src/lib/suggestTypes.ts) and the venues table's `VenueCategory`
+(src/types/venue.ts) are two independently-maintained 7-value enums that
+happen to match key-for-key today, with no shared import enforcing that.
+`mapSubmissionPayloadToFormValues()` checks the incoming value against the
+real `VenueCategory` set and falls back to `""` (the form's own
+unselected-category state) on anything it doesn't recognize, so a future
+drift between the two enums degrades to "the admin picks the category by
+hand," never a broken pre-fill or a create that fails
+`validateCreateVenuePayload()`. The same function's notes prefill is
+deliberately lossy-but-safe: hours/contact/submitter email have no
+dedicated `AddVenueForm` fields, so they fold into the free-text notes
+field under a labeled separator rather than being silently dropped — the
+admin reads and edits notes before saving either way.
+
+---
+
 ## Open questions
 
 These could not be confirmed from the current git history or code comments.

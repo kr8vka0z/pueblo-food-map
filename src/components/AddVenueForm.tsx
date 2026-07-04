@@ -1,21 +1,32 @@
 "use client";
 
 /**
- * AddVenueForm — client component for the admin "Add a venue" form (#254).
+ * AddVenueForm — client component for the admin "Add a venue" / "Edit a
+ * venue" form (#254 create; edit mode added #255).
  *
  * Presentational + self-contained: owns all field state, client-side
- * validation, and the POST to /api/admin/venues. No auth/D1 in scope here —
- * the Cloudflare Access gate lives in the parent Server Component
- * (src/app/admin/venues/new/page.tsx, same pattern as AGENTS.md "Admin
- * authentication"). This mirrors SuggestForm.tsx's own form/route split;
- * this component imitates SuggestForm's input/label/error token classes
- * (bone borders, sage focus rings) directly rather than importing them —
- * no shared form-component library exists between the public and admin
- * surfaces, so each form owns its own copy, same as SuggestForm already does.
+ * validation, and the fetch call to the venues API. No auth/D1 in scope
+ * here — the Cloudflare Access gate lives in the parent Server Component
+ * (src/app/admin/venues/new/page.tsx or .../[id]/edit/page.tsx, same
+ * pattern as AGENTS.md "Admin authentication"). This mirrors SuggestForm.tsx's
+ * own form/route split; this component imitates SuggestForm's
+ * input/label/error token classes (bone borders, sage focus rings) directly
+ * rather than importing them — no shared form-component library exists
+ * between the public and admin surfaces, so each form owns its own copy,
+ * same as SuggestForm already does.
  *
- * On a successful create (201), redirects to /admin and calls
- * router.refresh() so the Server Component's venues query re-runs and the
- * new draft appears in the list immediately (next/navigation's useRouter).
+ * ONE component serves both modes (#255 explicitly asked for this, not a
+ * forked near-identical form) — create and edit submit the identical field
+ * set and share every validation rule, so the only real difference is which
+ * endpoint/method to call and what to say on the button. The optional
+ * `venueId` prop is the mode switch: absent -> POST /api/admin/venues
+ * (create); present -> PATCH /api/admin/venues/<venueId> (edit). Both modes
+ * share the same success handling: redirect to /admin + router.refresh() so
+ * the Server Component's venues query re-runs and the change is visible
+ * immediately. `initialValues` (pre-#255) already covered pre-filling the
+ * form; edit mode is just that same prop combined with `venueId`, wired by
+ * the edit page (src/app/admin/venues/[id]/edit/page.tsx) via
+ * src/lib/adminVenueForm.ts's mapVenueRowToFormValues().
  */
 
 import { useState } from "react";
@@ -73,6 +84,14 @@ export interface AddVenueFormProps {
    * empty/default value.
    */
   initialValues?: Partial<AddVenueFormValues>;
+  /**
+   * The mode switch (#255): omitted -> create mode (POST /api/admin/venues,
+   * "Add venue" button). Present -> edit mode (PATCH
+   * /api/admin/venues/<venueId>, "Save changes" button). The edit page
+   * always passes both this AND `initialValues` (the existing row); this
+   * component does not fetch the row itself.
+   */
+  venueId?: string;
 }
 
 type FieldErrorKey =
@@ -189,8 +208,9 @@ function validateClient(values: AddVenueFormValues): FieldErrors {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function AddVenueForm({ initialValues }: AddVenueFormProps) {
+export default function AddVenueForm({ initialValues, venueId }: AddVenueFormProps) {
   const router = useRouter();
+  const isEditMode = venueId !== undefined;
   const [values, setValues] = useState<AddVenueFormValues>(() => defaultValues(initialValues));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
@@ -291,14 +311,22 @@ export default function AddVenueForm({ initialValues }: AddVenueFormProps) {
       outside_county: values.outsideCounty ? 1 : 0,
     };
 
+    // Create POSTs /api/admin/venues (201 on success); edit PATCHes
+    // /api/admin/venues/<venueId> (200 on success) — see this component's
+    // header for why one function/component covers both instead of two
+    // near-identical submit paths.
+    const endpoint = isEditMode ? `/api/admin/venues/${venueId}` : "/api/admin/venues";
+    const method = isEditMode ? "PATCH" : "POST";
+    const successStatus = isEditMode ? 200 : 201;
+
     try {
-      const res = await fetch("/api/admin/venues", {
-        method: "POST",
+      const res = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
-      if (res.status === 201) {
+      if (res.status === successStatus) {
         router.push("/admin");
         router.refresh();
         return;
@@ -746,7 +774,7 @@ export default function AddVenueForm({ initialValues }: AddVenueFormProps) {
         }
         aria-disabled={status === "submitting"}
       >
-        {status === "submitting" ? "Saving…" : "Add venue"}
+        {status === "submitting" ? "Saving…" : isEditMode ? "Save changes" : "Add venue"}
       </button>
     </form>
   );

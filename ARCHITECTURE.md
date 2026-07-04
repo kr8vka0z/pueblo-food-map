@@ -589,6 +589,75 @@ mutation of its own and remains read-only.
 
 ---
 
+## Admin — publish button (#256)
+
+Slice 3 of the admin Phase 2 build (previous section is slice 2). Where
+#254/#255 each added a mutation route plus its own page, #256 adds no new
+route or page — it wires a UI onto the publish engine that already existed
+(`POST /api/admin/publish`, "Publish → static" section above), following
+the same Server-Component-data / Client-Component-action split as every
+other admin surface.
+
+**Split:** `/admin` (src/app/admin/page.tsx) computes
+`summarizePublishChanges(venues)` (src/lib/adminVenues.ts) from the rows it
+already `SELECT *`s for `VenueListView` — no second query — and passes the
+resulting `{ newDrafts, editedSincePublish, archived }` to `PublishPanel`
+(src/components/PublishPanel.tsx, rendered above `VenueListView` so the
+admin sees "what will publish" before scrolling the list) as one typed
+prop. `PublishPanel` holds no auth of its own, same as `AddVenueForm` and
+`ArchiveVenueButton` — the page's Server Component owns the Cloudflare
+Access gate, and the route re-verifies identity + Origin itself.
+
+**Why `archived` only counts previously-published rows.** A venue can be
+archived from either `draft` or `published`. Only the latter is a real
+subtraction from the live public map — a drafted-then-archived venue was
+never live, so publishing after archiving it changes nothing about what
+the public map shows. `summarizePublishChanges` therefore gates the
+`archived` bucket on `published_at !== null`, deliberately narrower than
+`hasUnpublishedChanges`'s own second branch (src/lib/adminVenues.ts, #253),
+which isn't status-gated at all — the two functions answer different
+questions (`hasUnpublishedChanges`: "does this ONE row have a pending
+change worth flagging in the table," including an archived-since-live row;
+`summarizePublishChanges`: "put this row in exactly one of three
+publish-outcome buckets, un-double-counted").
+
+**Confirm gate, then one `fetch`.** `PublishPanel` is a small state machine
+(`idle -> submitting -> success | error`) gated by a native
+`window.confirm()` — the same pattern `ArchiveVenueButton` established for
+#255, still with no modal dependency in this codebase. Only a confirmed
+click calls `fetch("/api/admin/publish", { method: "POST" })`; the response
+is mapped to exactly one of five friendly states (success, not-configured,
+GitHub-commit-failed, validation-failed, session-expired) or a generic
+retry message for anything else (a non-matching status or a network-level
+throw) — see AGENTS.md's "Admin publish button" section for the full
+status -> message table. A successful publish calls `router.refresh()`:
+D1's promotion already happened server-side by the time the `200` arrives
+(NB1 ordering, "Publish → static" section above), so refreshing brings the
+panel's own counts back toward zero immediately rather than showing a
+stale non-zero summary right after a publish that already succeeded.
+
+**Why sage, not orange, for the Publish button.** DESIGN.md scopes
+brand-orange to exactly two elements, both on the *public* map (the splash
+CTA, the LocateButton pill), with an explicit Don't against reuse
+elsewhere — extending it to a third, admin-only context would break that
+rule. Filled sage-500/sage-600-hover is already this admin surface's
+established primary-action treatment (`AddVenueForm`'s submit button,
+`/admin`'s "Add place" link); `PublishPanel` reuses it rather than
+inventing a new tier, since it is already the strongest CTA treatment this
+design system offers outside the reserved public-map orange.
+
+**The one backend change this slice needed.** Before #256, a missing
+`GITHUB_PUBLISH_TOKEN` made `POST /api/admin/publish` `throw`, which
+surfaces to any caller as an opaque `500` with no body — `PublishPanel`
+couldn't tell "not configured yet" (expected, pending #260) apart from a
+real crash. The route now returns
+`{ ok: false, error: "publish_not_configured" }` at `503` from the exact
+same guard location (after auth, before the snapshot) — the
+snapshot/validate/serialize/commit/promote sequence and the NB1
+commit-before-D1-write ordering are byte-for-byte unchanged.
+
+---
+
 ## Open questions
 
 These could not be confirmed from the current git history or code comments.

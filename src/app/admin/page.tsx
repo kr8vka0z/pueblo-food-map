@@ -1,13 +1,14 @@
 /**
  * /admin — Cloudflare Access-gated admin shell (#237 checkpoint c; venue
- * list added #253).
+ * list added #253; "Add place" link added #254).
  *
  * Proves the full auth chain end-to-end: Cloudflare Access (edge) → this
  * Server Component's own JWT re-verification (getAdminDb, src/lib/adminDb.ts)
  * → a real D1 binding handed back only on success — then renders a
- * read-only table of every venues row (draft + published + archived).
- * Still no mutations: add/edit/delete/archive is a later slice
- * (docs/admin/cloudflare-native-admin-spec.md §11), so there's no
+ * read-only table of every venues row (draft + published + archived), plus
+ * an "Add place" link to /admin/venues/new (src/app/admin/venues/new/page.tsx),
+ * the only mutation entry point that exists so far. This page itself still
+ * performs no mutation and issues no non-GET request, so it has no
  * requireAdminOrigin() CSRF check here — that guard exists only for
  * non-GET /api/admin/* mutations (src/lib/cfAccess.ts).
  *
@@ -25,6 +26,7 @@
 
 import { headers } from "next/headers";
 import { forbidden } from "next/navigation";
+import Link from "next/link";
 import { getAdminDb } from "@/lib/adminDb";
 import { AccessDeniedError } from "@/lib/cfAccess";
 import { logAdminAuthFailure } from "@/lib/logger";
@@ -56,12 +58,26 @@ export default async function AdminPage() {
         <h1 className="wordmark text-2xl text-[var(--color-ink-900)]">
           Pueblo Food Map Admin
         </h1>
-        <p className="text-sm text-[var(--color-ink-500)]">
-          Signed in as{" "}
-          <span className="font-medium text-[var(--color-sage-700)]">
-            {email}
-          </span>
-        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <Link
+            href="/admin/venues/new"
+            className={
+              "inline-flex items-center justify-center rounded-[var(--radius-md)] " +
+              "bg-[var(--color-sage-500)] px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] " +
+              "transition-colors duration-150 hover:bg-[var(--color-sage-600)] " +
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+              "focus-visible:ring-offset-2"
+            }
+          >
+            Add place
+          </Link>
+          <p className="text-sm text-[var(--color-ink-500)]">
+            Signed in as{" "}
+            <span className="font-medium text-[var(--color-sage-700)]">
+              {email}
+            </span>
+          </p>
+        </div>
       </header>
       <div className="px-4 py-6 sm:px-6">
         <VenueListView venues={venues} />

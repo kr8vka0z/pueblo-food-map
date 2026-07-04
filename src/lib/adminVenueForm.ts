@@ -1,23 +1,34 @@
 /**
  * adminVenueForm.ts — maps a full D1 `venues` row to AddVenueForm's
- * `initialValues` shape (#255, "Edit or remove a venue").
+ * `initialValues` shape (#255, "Edit or remove a venue"); also maps a
+ * pending `public_submissions` "new_venue" payload to that same shape
+ * (#259, the review queue's "Approve" -> pre-filled create form).
  *
  * Kept as a plain, framework-free function (no "use client") so both the
- * Server Component edit page (src/app/admin/venues/[id]/edit/page.tsx,
- * which cannot import runtime code from a "use client" module) and this
- * file's own unit tests can call it directly — same lib/component split as
+ * Server Component pages (src/app/admin/venues/[id]/edit/page.tsx and
+ * src/app/admin/venues/new/page.tsx, neither of which can import runtime
+ * code from a "use client" module) and this file's own unit tests can call
+ * these mappers directly — same lib/component split as
  * adminVenueValidation.ts vs. AddVenueForm.tsx's client-side validateClient().
  *
- * This is the inverse of AddVenueForm.tsx's own buildHoursWeekly(): that
- * function goes form-draft -> WeeklyHours JSON for a POST/PATCH body; this
- * one goes a stored `hours_weekly` JSON column -> form-draft text so an
- * existing venue's hours pre-fill the same per-day text inputs a fresh
- * create form uses.
+ * mapVenueRowToFormValues() is the inverse of AddVenueForm.tsx's own
+ * buildHoursWeekly(): that function goes form-draft -> WeeklyHours JSON for
+ * a POST/PATCH body; this one goes a stored `hours_weekly` JSON column ->
+ * form-draft text so an existing venue's hours pre-fill the same per-day
+ * text inputs a fresh create form uses.
  */
 
 import type { AddVenueFormValues } from "@/components/AddVenueForm";
 import { DISPLAY_DAY_KEYS, type DayKey } from "@/lib/hours";
-import type { AdminVenueRow, WeeklyHours } from "@/types/venue";
+import { categoryLabels } from "@/data/venues";
+import type { AdminVenueRow, VenueCategory, WeeklyHours } from "@/types/venue";
+import type { NewVenuePayload } from "@/lib/publicSubmissions";
+
+// Same technique adminVenueValidation.ts's VALID_CATEGORIES and
+// VenueListView.tsx's ALL_CATEGORIES already use: the category labels map's
+// own keys as the 7-value enum source of truth, rather than a 5th
+// hand-maintained copy of the list.
+const VALID_CATEGORIES = new Set(Object.keys(categoryLabels) as VenueCategory[]);
 
 /** D1 tri-state (NULL=unknown, 0=no, 1=yes) -> the form's select value. */
 function triStateToFormValue(value: number | null): "" | "1" | "0" {
@@ -75,5 +86,61 @@ export function mapVenueRowToFormValues(row: AdminVenueRow): Partial<AddVenueFor
     notes: row.notes ?? "",
     source: row.source,
     outsideCounty: row.outside_county === 1,
+  };
+}
+
+/**
+ * Maps a pending `public_submissions` "new_venue" payload (#258's write
+ * shape, src/lib/publicSubmissions.ts's NewVenuePayload) to
+ * `Partial<AddVenueFormValues>` — the same target shape
+ * mapVenueRowToFormValues() above produces, so /admin/venues/new can render
+ * `<AddVenueForm initialValues={...} />` identically regardless of which
+ * mapper filled it in.
+ *
+ * Category reconciliation: the public suggest form's category comes from
+ * VENUE_CATEGORIES / VenueCategoryKey (src/lib/suggestTypes.ts) — a
+ * separately-maintained 7-value map that happens to match VenueCategory
+ * (src/types/venue.ts) key-for-key today (both files' own comments say so),
+ * but the two are independent sources with no shared import, so nothing
+ * stops them from drifting apart later. Passing through blindly risks
+ * validateCreateVenuePayload() (src/lib/adminVenueValidation.ts) rejecting
+ * the create outright the moment they ever do — checking against
+ * VALID_CATEGORIES and falling back to "" (the form's own "select a
+ * category" empty state) instead means a future drift degrades to "admin
+ * picks the category," never a broken pre-fill.
+ *
+ * ponytail: the notes prefill is lossy-but-safe — hours/contact/
+ * submitterEmail have no dedicated AddVenueForm fields of their own (hours
+ * here is unstructured submitter text, not the per-day WeeklyHours shape
+ * the form's own hours grid edits), so they're folded into the free-text
+ * notes field under a labeled separator rather than silently dropped. The
+ * admin reads and edits notes before saving either way. Upgrade path if this
+ * ever proves lossy in practice: parse the submitter's free-text hours into
+ * the structured per-day grid instead of leaving that to prose.
+ */
+export function mapSubmissionPayloadToFormValues(payload: NewVenuePayload): Partial<AddVenueFormValues> {
+  const category = VALID_CATEGORIES.has(payload.category as VenueCategory)
+    ? (payload.category as VenueCategory)
+    : "";
+
+  const notes = [
+    payload.notes,
+    "",
+    "— From public submission —",
+    payload.hours && `Hours: ${payload.hours}`,
+    payload.contact && `Contact: ${payload.contact}`,
+    `Submitted by: ${payload.submitterEmail}`,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+
+  return {
+    name: payload.venueName,
+    address: payload.address,
+    category,
+    acceptsSnap: payload.acceptsSnap ? "1" : "0",
+    acceptsWic: payload.acceptsWic ? "1" : "0",
+    notes,
+    source: "Public suggestion",
   };
 }

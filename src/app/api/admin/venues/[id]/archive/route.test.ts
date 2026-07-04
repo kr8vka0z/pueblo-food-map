@@ -222,4 +222,85 @@ describe("POST /api/admin/venues/[id]/archive", () => {
     expect(res.status).toBe(200);
     expect(batch).toHaveBeenCalledTimes(1);
   });
+
+  test("archive with a JSON {submissionId} body -> db.batch() called once with THREE statements, the 3rd approving the submission (#259)", async () => {
+    const existing = makeExistingRow();
+    const { db, batch } = makeFakeDb(existing);
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    const token = await buildValidToken();
+
+    const req = new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
+      method: "POST",
+      headers: { "Cf-Access-Jwt-Assertion": token, Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
+      body: JSON.stringify({ submissionId: 7 }),
+    });
+
+    const res = await callArchive(req);
+    expect(res.status).toBe(200);
+
+    expect(batch).toHaveBeenCalledTimes(1);
+    const stmts = batch.mock.calls[0][0] as BoundStatement[];
+    expect(stmts).toHaveLength(3);
+
+    const [archiveStmt, auditStmt, approveStmt] = stmts;
+    expect(archiveStmt.sql).toContain("UPDATE venues SET");
+    expect(auditStmt.sql).toContain("INSERT INTO audit_log");
+
+    expect(approveStmt.sql).toContain("UPDATE public_submissions");
+    expect(approveStmt.sql).toContain("status = 'approved'");
+    expect(approveStmt.sql).toContain("status = 'pending'");
+    expect(approveStmt.args).toContain(ADMIN_EMAIL);
+    expect(approveStmt.args).toContain(7);
+  });
+
+  test("archive with NO body (ArchiveVenueButton's real call shape) still works — 2 statements, no crash reading the body", async () => {
+    const existing = makeExistingRow();
+    const { db, batch } = makeFakeDb(existing);
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    const token = await buildValidToken();
+
+    // Identical to makeRequest(): no body, no Content-Type — proves the
+    // (#259) optional-body parse can't break the pre-existing bodyless caller.
+    const res = await callArchive(makeRequest({ token, origin: ADMIN_ORIGIN }));
+    expect(res.status).toBe(200);
+    expect(batch).toHaveBeenCalledTimes(1);
+    const stmts = batch.mock.calls[0][0] as BoundStatement[];
+    expect(stmts).toHaveLength(2);
+  });
+
+  test("archive with a non-JSON body doesn't crash — degrades to 2 statements", async () => {
+    const existing = makeExistingRow();
+    const { db, batch } = makeFakeDb(existing);
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    const token = await buildValidToken();
+
+    const req = new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
+      method: "POST",
+      headers: { "Cf-Access-Jwt-Assertion": token, Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
+      body: "{not valid json",
+    });
+
+    const res = await callArchive(req);
+    expect(res.status).toBe(200);
+    const stmts = batch.mock.calls[0][0] as BoundStatement[];
+    expect(stmts).toHaveLength(2);
+  });
+
+  test("submissionId is ignored when not a positive integer — still 2 statements", async () => {
+    const existing = makeExistingRow();
+    const { db, batch } = makeFakeDb(existing);
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    const token = await buildValidToken();
+
+    const req = new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
+      method: "POST",
+      headers: { "Cf-Access-Jwt-Assertion": token, Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
+      body: JSON.stringify({ submissionId: "7" }),
+    });
+
+    const res = await callArchive(req);
+    expect(res.status).toBe(200);
+    const stmts = batch.mock.calls[0][0] as BoundStatement[];
+    expect(stmts).toHaveLength(2);
+  });
 });

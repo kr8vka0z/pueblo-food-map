@@ -37,6 +37,60 @@ export interface PublicSubmissionInsert {
   submitterEmail: string | null;
 }
 
+// ─── Review queue shapes (#259) ─────────────────────────────────────────────
+// Added alongside the write-path types above (same file — this module
+// already owns the queue's write shape, so its read/payload shapes belong
+// here too rather than in a third module) for the admin review screen
+// (src/app/admin/submissions/page.tsx) to consume.
+
+/** One full row of the D1 `public_submissions` table (migrations/0002_public_submissions.sql). */
+export interface PublicSubmissionRow {
+  id: number;
+  kind: PublicSubmissionKind;
+  /** Raw JSON text — NewVenuePayload for kind="new_venue", ClosurePayload for kind="closure". */
+  payload: string;
+  target_venue_id: string | null;
+  submitter_email: string | null;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_reason: string | null;
+}
+
+/**
+ * The parsed `payload` shape a kind="new_venue" row's JSON deserializes to —
+ * exactly the `sanitized` object src/app/suggest/submit/route.ts writes.
+ * Duplicated here (not imported) because that route module is a
+ * "use server"-adjacent route handler with its own local types, not a
+ * shared lib — same reasoning AddVenueForm.tsx already gives for declaring
+ * its own local copy of GeocodeMatch instead of importing a route's types.
+ */
+export interface NewVenuePayload {
+  venueName: string;
+  address: string;
+  category: string;
+  hours?: string;
+  contact?: string;
+  acceptsSnap: boolean;
+  acceptsWic: boolean;
+  notes?: string;
+  submitterEmail: string;
+}
+
+/**
+ * The parsed `payload` shape a kind="closure" row's JSON deserializes to —
+ * exactly the `sanitized` object src/app/report/submit/route.ts writes.
+ */
+export interface ClosurePayload {
+  venueId: string;
+  venueName: string;
+  venueAddress: string;
+  issueType: string;
+  description: string;
+  contactEmail?: string;
+}
+
 // `status` is intentionally absent from both the column list and the bound
 // values below — the schema's own DEFAULT 'pending' applies (matches this
 // app's established convention of letting D1 DEFAULTs fill columns the

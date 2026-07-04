@@ -26,6 +26,7 @@
 import { categoryLabels } from "@/data/venues";
 import { DISPLAY_DAY_KEYS } from "@/lib/hours";
 import { EMAIL_RE } from "@/lib/rateLimit";
+import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import type { VenueCategory, WeeklyHours } from "@/types/venue";
 
 // Reuses the category labels map's own keys as the enum source of truth
@@ -162,7 +163,17 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
 
   const phone = optionalString(b.phone, "phone", errors);
   const email = optionalString(b.email, "email", errors);
-  if (email && !EMAIL_RE.test(email)) errors.email = "Enter a valid email address.";
+  // Cap length BEFORE the regex: EMAIL_RE (src/lib/rateLimit.ts) backtracks
+  // polynomially, so running it on unbounded input is a ReDoS vector even
+  // behind admin auth (a self-inflicted Worker-CPU DoS). Bounding to the RFC
+  // 5321 max first keeps the regex on <=254 chars — the same guard the public
+  // form routes already apply. Also clears the CodeQL polynomial-ReDoS alert
+  // this call site otherwise trips.
+  if (email && email.length > FIELD_LIMITS.EMAIL) {
+    errors.email = `Email must be ${FIELD_LIMITS.EMAIL} characters or fewer.`;
+  } else if (email && !EMAIL_RE.test(email)) {
+    errors.email = "Enter a valid email address.";
+  }
   const url = optionalString(b.url, "url", errors);
   const notes = optionalString(b.notes, "notes", errors);
   const operator = optionalString(b.operator, "operator", errors);

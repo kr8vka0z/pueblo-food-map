@@ -249,6 +249,15 @@ describe("validateCreateVenuePayload — optional email format", () => {
     expect(result.errors.email).toBeTruthy();
   });
 
+  test("rejects an over-length email — bounds the regex against pathological input", () => {
+    const result = validateCreateVenuePayload(
+      validPayload({ email: "a".repeat(255) + "@example.org" }),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.email).toBeTruthy();
+  });
+
   test("omitted email is valid (optional field)", () => {
     const result = validateCreateVenuePayload(validPayload());
     expect(result.ok).toBe(true);

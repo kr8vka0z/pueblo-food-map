@@ -486,6 +486,19 @@ one seeded by `scripts/seed-admin-db.ts` or one that will exist once the
 change-proposal approval queue (docs/admin/cloudflare-native-admin-spec.md
 §6) ships. It reaches the public map only via the existing Publish flow.
 
+**Address → coordinates (`GET /api/admin/geocode`).** Before submitting,
+`AddVenueForm` can call `GET /api/admin/geocode?q=<address>`
+(src/app/api/admin/geocode/route.ts) to auto-fill lat/lng from the
+Address field instead of requiring the admin to hand-type coordinates.
+This route is read-only (`getAdminDb()` for auth, no `requireAdminOrigin()`
+— same shape as `GET /api/admin/whoami`) and calls the free US Census
+Bureau geocoder server-side (never Mapbox — the public Mapbox token is
+URL-restricted to public hostnames and doesn't cover
+`admin.pueblofoodmap.com`, and Census needs no key to provision or leak).
+It has no effect on `POST /api/admin/venues` itself: lat/lng arrive in the
+same request body either way, hand-typed or geocode-filled, so the create
+route's validation and atomic `db.batch()` are unchanged by this addition.
+
 ---
 
 ## Open questions

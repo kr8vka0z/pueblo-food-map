@@ -335,8 +335,43 @@ renderable in isolation with sample `initialValues` for a design preview.
 On a `201`, it calls `router.push("/admin")` + `router.refresh()` so the
 new draft appears in the list immediately. The per-day hours editor is
 deliberately basic (one comma-separated text field per day, not a
-scheduler) — see the file header for why. Lat/lng are plain number inputs;
-a map-click picker is noted as a future enhancement, not built here.
+scheduler) — see the file header for why. Lat/lng are plain number
+inputs, editable by hand and also auto-fillable via the geocode lookup
+below — the manual path stays available as the precise source of truth and
+the fallback when geocoding can't help.
+
+**Address → map coordinates (geocoding).** `GET /api/admin/geocode?q=<address>`
+(src/app/api/admin/geocode/route.ts) lets an admin type a street address and
+auto-fill lat/lng instead of hand-typing coordinates. `AddVenueForm`'s "Find
+location from address" button (a secondary, sage-bordered action — not the
+primary sage-filled submit) calls this route with the current Address field
+value:
+
+- **One match** — fills lat/lng and shows a confirmation
+  (`Found: <matchedAddress>`).
+- **Multiple matches** — renders each as a real `<button>` in a labeled
+  pick list (native buttons are inherently keyboard-reachable, so no custom
+  ARIA widget is needed); picking one fills lat/lng.
+- **Zero matches, a non-200 response, or a network failure** — shows an
+  inline fallback message ("check the address or enter coordinates below")
+  and never blocks the form; lat/lng stay manually editable throughout.
+
+**Provider: the free US Census Bureau geocoder, not Mapbox.** The app's
+Mapbox public token (see "Mapbox Token Management" above) is
+URL-restricted to the public hostnames and does **not** include
+`admin.pueblofoodmap.com`, so a browser-side Mapbox geocoding call would
+fail on the admin surface — and Mapbox's secret token must never reach a
+Worker or client bundle just to add one more scope. The Census geocoder
+(`geocoding.geo.census.gov`) needs no key, token, or URL allowlist to
+provision or rotate, and covers US street addresses (Pueblo is US) — a
+clean fit with nothing new to rotate or leak. It also sends no CORS
+headers, so the lookup happens **server-side** in the route handler, not as
+a direct browser fetch from `AddVenueForm`.
+
+**Auth is the read-only shape, like `/api/admin/whoami`:** `getAdminDb()`
+only — no `requireAdminOrigin()`. That CSRF guard exists for non-GET
+`/api/admin/*` mutations (an ambient session cookie ridden cross-site);
+this route mutates nothing, so there's nothing for CSRF to protect.
 
 ## Publish → static (#237)
 

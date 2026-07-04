@@ -164,3 +164,92 @@ describe("AddVenueForm — submit", () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 });
+
+describe("AddVenueForm — geocode (Find location from address)", () => {
+  test("the button is disabled while the address field is blank", () => {
+    render(<AddVenueForm />);
+    expect(screen.getByRole("button", { name: /Find location from address/i })).toBeDisabled();
+  });
+
+  test("a single match calls /api/admin/geocode, fills lat/lng, and shows a confirmation", async () => {
+    mockFetch.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ({
+        matches: [{ lat: 38.25, lng: -104.6, matchedAddress: "123 MAIN ST, PUEBLO, CO, 81003" }],
+      }),
+    });
+    const user = userEvent.setup();
+    render(<AddVenueForm />);
+    await user.type(screen.getByLabelText(/^Address/i), "123 Main St, Pueblo, CO");
+
+    await user.click(screen.getByRole("button", { name: /Find location from address/i }));
+
+    expect(await screen.findByText(/Found: 123 MAIN ST, PUEBLO, CO, 81003/i)).toBeDefined();
+    expect((screen.getByLabelText(/^Latitude/i) as HTMLInputElement).value).toBe("38.25");
+    expect((screen.getByLabelText(/^Longitude/i) as HTMLInputElement).value).toBe("-104.6");
+
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toBe("/api/admin/geocode?q=" + encodeURIComponent("123 Main St, Pueblo, CO"));
+  });
+
+  test("multiple matches render a labeled, keyboard-reachable pick list; choosing one fills lat/lng", async () => {
+    mockFetch.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ({
+        matches: [
+          { lat: 38.25, lng: -104.6, matchedAddress: "123 MAIN ST, PUEBLO, CO, 81003" },
+          { lat: 38.26, lng: -104.61, matchedAddress: "123 MAIN AVE, PUEBLO, CO, 81003" },
+        ],
+      }),
+    });
+    const user = userEvent.setup();
+    render(<AddVenueForm />);
+    await user.type(screen.getByLabelText(/^Address/i), "123 Main, Pueblo, CO");
+
+    await user.click(screen.getByRole("button", { name: /Find location from address/i }));
+
+    // A real <button> in the pick list (not a div with a click handler) is
+    // inherently reachable via Tab and operable via Enter/Space — asserting
+    // getByRole("button", ...) finds it IS the keyboard-navigable guarantee.
+    const candidate = await screen.findByRole("button", { name: "123 MAIN AVE, PUEBLO, CO, 81003" });
+    await user.click(candidate);
+
+    expect((screen.getByLabelText(/^Latitude/i) as HTMLInputElement).value).toBe("38.26");
+    expect((screen.getByLabelText(/^Longitude/i) as HTMLInputElement).value).toBe("-104.61");
+  });
+
+  test("0 matches shows a no-match message and leaves lat/lng untouched", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ matches: [] }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm />);
+    await user.type(screen.getByLabelText(/^Address/i), "a nonsense address");
+
+    await user.click(screen.getByRole("button", { name: /Find location from address/i }));
+
+    expect(await screen.findByText(/No match found/i)).toBeDefined();
+    expect((screen.getByLabelText(/^Latitude/i) as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText(/^Longitude/i) as HTMLInputElement).value).toBe("");
+  });
+
+  test("a non-200 response shows the fallback message instead of crashing", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 502, json: async () => ({ error: "boom" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm />);
+    await user.type(screen.getByLabelText(/^Address/i), "123 Main St, Pueblo, CO");
+
+    await user.click(screen.getByRole("button", { name: /Find location from address/i }));
+
+    expect(await screen.findByText(/Location lookup is unavailable right now/i)).toBeDefined();
+  });
+
+  test("a network-level failure shows the fallback message instead of crashing", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("network down"));
+    const user = userEvent.setup();
+    render(<AddVenueForm />);
+    await user.type(screen.getByLabelText(/^Address/i), "123 Main St, Pueblo, CO");
+
+    await user.click(screen.getByRole("button", { name: /Find location from address/i }));
+
+    expect(await screen.findByText(/Location lookup is unavailable right now/i)).toBeDefined();
+  });
+});

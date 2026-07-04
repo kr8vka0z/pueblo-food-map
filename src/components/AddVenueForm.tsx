@@ -29,6 +29,21 @@ import type { VenueCategory, WeeklyHours } from "@/types/venue";
 type TriStateValue = "" | "1" | "0";
 type HoursDraft = Record<DayKey, string>;
 
+/**
+ * Shape returned by GET /api/admin/geocode (src/app/api/admin/geocode/route.ts).
+ * Declared locally rather than imported from the route module — same
+ * client/server duplication this file already uses for EMAIL_RE below,
+ * since the route's own validation is the authoritative trust boundary and
+ * this copy only needs to describe an already-trusted response.
+ */
+interface GeocodeMatch {
+  lat: number;
+  lng: number;
+  matchedAddress: string;
+}
+
+type GeocodeStatus = "idle" | "loading" | "found" | "no-match" | "multiple" | "error";
+
 export interface AddVenueFormValues {
   name: string;
   category: VenueCategory | "";
@@ -179,6 +194,9 @@ export default function AddVenueForm({ initialValues }: AddVenueFormProps) {
   const [values, setValues] = useState<AddVenueFormValues>(() => defaultValues(initialValues));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
+  const [geocodeStatus, setGeocodeStatus] = useState<GeocodeStatus>("idle");
+  const [geocodeMessage, setGeocodeMessage] = useState("");
+  const [geocodeCandidates, setGeocodeCandidates] = useState<GeocodeMatch[]>([]);
 
   function setField<K extends keyof AddVenueFormValues>(key: K, value: AddVenueFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -186,6 +204,60 @@ export default function AddVenueForm({ initialValues }: AddVenueFormProps) {
 
   function setHourDay(day: DayKey, value: string) {
     setValues((prev) => ({ ...prev, hours: { ...prev.hours, [day]: value } }));
+  }
+
+  /** Sets lat/lng from a chosen geocode match and clears any stale lat/lng field errors. */
+  function applyGeocodeMatch(match: GeocodeMatch) {
+    setValues((prev) => ({ ...prev, lat: String(match.lat), lng: String(match.lng) }));
+    setErrors((prev) => {
+      if (!prev.lat && !prev.lng) return prev;
+      const next = { ...prev };
+      delete next.lat;
+      delete next.lng;
+      return next;
+    });
+    setGeocodeCandidates([]);
+    setGeocodeStatus("found");
+    setGeocodeMessage(`Found: ${match.matchedAddress}`);
+  }
+
+  /**
+   * Calls GET /api/admin/geocode with the current address field. Every
+   * branch (0 matches, many matches, non-200, network failure) degrades to
+   * an inline message rather than throwing — the lat/lng inputs stay
+   * editable regardless, so a lookup failure never blocks adding a venue.
+   */
+  async function handleGeocode() {
+    const q = values.address.trim();
+    if (!q) return;
+
+    setGeocodeStatus("loading");
+    setGeocodeMessage("Looking up…");
+    setGeocodeCandidates([]);
+
+    try {
+      const res = await fetch(`/api/admin/geocode?q=${encodeURIComponent(q)}`);
+      if (res.status !== 200) {
+        setGeocodeStatus("error");
+        setGeocodeMessage("Location lookup is unavailable right now — enter coordinates below.");
+        return;
+      }
+      const data = (await res.json()) as { matches: GeocodeMatch[] };
+
+      if (data.matches.length === 0) {
+        setGeocodeStatus("no-match");
+        setGeocodeMessage("No match found — check the address or enter coordinates below.");
+      } else if (data.matches.length === 1) {
+        applyGeocodeMatch(data.matches[0]);
+      } else {
+        setGeocodeStatus("multiple");
+        setGeocodeCandidates(data.matches);
+        setGeocodeMessage(`Found ${data.matches.length} possible matches — choose one below.`);
+      }
+    } catch {
+      setGeocodeStatus("error");
+      setGeocodeMessage("Location lookup is unavailable right now — enter coordinates below.");
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -254,6 +326,29 @@ export default function AddVenueForm({ initialValues }: AddVenueFormProps) {
     hasError ? "border-red-500" : "border-[var(--color-bone-300)]";
   const errorClass = "mt-1 text-xs text-red-600";
   const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
+  // Secondary (bordered, sage-text) action — visually lower weight than the
+  // primary sage-filled submit button below, but still sage per DESIGN.md
+  // ("use sage for every interactive affordance"), not the ink-toned
+  // secondary style ReportVenueButton.tsx uses for its lower-stakes action.
+  const secondaryButtonClass =
+    "inline-flex items-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
+    "px-3 py-1.5 text-sm font-medium text-[var(--color-sage-600)] bg-transparent " +
+    "transition-colors duration-150 hover:bg-[var(--color-sage-50)] " +
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
+    "disabled:opacity-50 disabled:cursor-not-allowed";
+  // Informational-emphasis tones per DESIGN.md's Do's/Don'ts: sage for a calm
+  // positive confirmation (same hue as the "Show details" / operator-link
+  // convention), clay for "didn't work, here's guidance" (the same role clay
+  // already plays in LocationDeniedBanner/VenueListView) — never red, since
+  // these never block submission the way a field validation error does.
+  const geocodeToneClass: Record<GeocodeStatus, string> = {
+    idle: "",
+    loading: "text-[var(--color-ink-500)]",
+    found: "text-[var(--color-sage-600)]",
+    "no-match": "text-[var(--color-clay-700)]",
+    multiple: "text-[var(--color-ink-500)]",
+    error: "text-[var(--color-clay-700)]",
+  };
   const requiredMark = (
     <span aria-hidden className="text-red-500">
       {" "}
@@ -342,6 +437,49 @@ export default function AddVenueForm({ initialValues }: AddVenueFormProps) {
         )}
       </div>
 
+      {/* Find location from address (US Census geocoder — see
+          src/app/api/admin/geocode/route.ts for why Census, not Mapbox) */}
+      <div>
+        <button
+          type="button"
+          onClick={handleGeocode}
+          disabled={!values.address.trim() || geocodeStatus === "loading"}
+          className={secondaryButtonClass}
+        >
+          {geocodeStatus === "loading" ? "Looking up…" : "Find location from address"}
+        </button>
+        {geocodeMessage && (
+          <p aria-live="polite" className={`mt-2 text-sm ${geocodeToneClass[geocodeStatus]}`}>
+            {geocodeMessage}
+          </p>
+        )}
+        {geocodeCandidates.length > 0 && (
+          <div className="mt-2 space-y-1.5">
+            <p id="geocode-candidates-label" className="text-xs font-medium text-[var(--color-ink-500)]">
+              Choose the correct address:
+            </p>
+            <ul aria-labelledby="geocode-candidates-label" className="space-y-1.5">
+              {geocodeCandidates.map((match, i) => (
+                <li key={`${match.lat}-${match.lng}-${i}`}>
+                  <button
+                    type="button"
+                    onClick={() => applyGeocodeMatch(match)}
+                    className={
+                      "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
+                      "px-3 py-2 text-left text-sm text-[var(--color-ink-700)] " +
+                      "transition-colors duration-150 hover:bg-[var(--color-sage-50)] hover:border-[var(--color-sage-500)] " +
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                    }
+                  >
+                    {match.matchedAddress}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
       {/* Last verified */}
       <div>
         <label htmlFor="venue-last-verified" className={labelClass}>
@@ -365,10 +503,13 @@ export default function AddVenueForm({ initialValues }: AddVenueFormProps) {
       </div>
 
       {/* Latitude / Longitude */}
-      {/* ponytail: plain number inputs for now — a map-click picker (drop a
-          pin, autofill lat/lng from the click) is the natural upgrade once
-          hand-typing coordinates becomes the bottleneck; no ceiling here
-          beyond that UX gap. */}
+      {/* ponytail: number inputs, auto-fillable via "Find location from
+          address" above but still hand-editable — the precise source of
+          truth and the fallback when geocoding finds no match or is down.
+          A map-click picker (drop a pin, read lat/lng from the click) is
+          the next upgrade if geocoding ever proves too imprecise (e.g. a
+          venue set back from its mailing address); no ceiling here beyond
+          that remaining UX gap. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="venue-lat" className={labelClass}>

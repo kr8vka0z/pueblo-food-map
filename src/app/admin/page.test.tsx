@@ -116,6 +116,10 @@ describe("AdminPage — auth guard", () => {
     expect(screen.getByText("admin@example.com")).toBeDefined();
     expect(screen.getByText("Eastside Pantry")).toBeDefined();
     expect(screen.getByText("Main Street Grocery")).toBeDefined();
+    // Nav link to the review queue (#259 follow-up) — reachable from the
+    // admin home instead of only by typing the URL.
+    const reviewQueueLink = screen.getByRole("link", { name: "Review queue" });
+    expect(reviewQueueLink.getAttribute("href")).toBe("/admin/submissions");
     expect(forbidden).not.toHaveBeenCalled();
   });
 

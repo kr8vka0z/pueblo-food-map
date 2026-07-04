@@ -751,10 +751,12 @@ per-day shape the form's hours grid edits), so they're folded into the
 free-text notes field under a labeled separator instead of silently
 dropped — the admin reviews and edits notes before saving regardless.
 
-**Not yet wired: a nav link from `/admin` to `/admin/submissions`.** This
-slice ships the page, but nothing on the main admin shell links to it yet —
-today it's reachable only by typing the URL. Left for a follow-up rather
-than folded into this slice's scope.
+**Nav link from `/admin` to `/admin/submissions`.** `/admin`
+(src/app/admin/page.tsx) links to the review queue via a "Review queue"
+link in its header, styled as the same secondary sage-underline link this
+admin shell already uses elsewhere (e.g. "Back to venue list") so "Add
+place" stays the header's one primary action — shipped as a follow-up
+after this slice, not folded into #259's original scope.
 
 # Discoverability / SEO (#164)
 

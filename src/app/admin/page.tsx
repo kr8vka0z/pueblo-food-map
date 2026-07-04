@@ -1,6 +1,7 @@
 /**
  * /admin — Cloudflare Access-gated admin shell (#237 checkpoint c; venue
- * list added #253; "Add place" link added #254; Publish panel added #256).
+ * list added #253; "Add place" link added #254; Publish panel added #256;
+ * "Review queue" nav link added as a #259 follow-up).
  *
  * Proves the full auth chain end-to-end: Cloudflare Access (edge) → this
  * Server Component's own JWT re-verification (getAdminDb, src/lib/adminDb.ts)
@@ -8,10 +9,15 @@
  * Publish panel (PublishPanel, below) above a read-only table of every
  * venues row (draft + published + archived), plus an "Add place" link to
  * /admin/venues/new (src/app/admin/venues/new/page.tsx), the only OTHER
- * mutation entry point besides Publish. This page itself still performs no
- * mutation and issues no non-GET request, so it has no requireAdminOrigin()
- * CSRF check here — that guard exists only for non-GET /api/admin/*
- * mutations (src/lib/cfAccess.ts).
+ * mutation entry point besides Publish, and a "Review queue" link to
+ * /admin/submissions (src/app/admin/submissions/page.tsx) — a plain
+ * navigation link, not a mutation entry point, styled as the same
+ * secondary sage-underline link this admin shell already uses elsewhere
+ * (e.g. "Back to venue list") so "Add place" stays the header's one
+ * primary action. This page itself still performs no mutation and issues
+ * no non-GET request, so it has no requireAdminOrigin() CSRF check here —
+ * that guard exists only for non-GET /api/admin/* mutations
+ * (src/lib/cfAccess.ts).
  *
  * summarizePublishChanges() (src/lib/adminVenues.ts) computes PublishPanel's
  * new/edited/archived counts from the SAME rows already SELECTed for
@@ -77,6 +83,12 @@ export default async function AdminPage() {
             }
           >
             Add place
+          </Link>
+          <Link
+            href="/admin/submissions"
+            className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+          >
+            Review queue
           </Link>
           <p className="text-sm text-[var(--color-ink-500)]">
             Signed in as{" "}

@@ -414,6 +414,38 @@ parallel. While the splash is visible, `main` receives `inert` and
 
 ---
 
+## Admin — read-only venue list (#253)
+
+`/admin` (src/app/admin/page.tsx) is a Cloudflare Access-gated Server
+Component (see AGENTS.md "Admin authentication" for the auth chain). It
+fetches every `venues` row — draft, published, and archived — via
+`getAdminDb()` (src/lib/adminDb.ts, the single D1 choke point) and renders
+them through `VenueListView` (src/components/VenueListView.tsx), a Client
+Component that owns search (name/address, case-insensitive) and status/
+category filter state entirely client-side — 108 rows total today, well
+under where server-side filtering would earn its complexity. A row is
+flagged "Unpublished changes" (`hasUnpublishedChanges()`,
+src/lib/adminVenues.ts) when it's a draft, or when a published row has been
+edited since its last publish (`updated_at > published_at`) — so an admin
+can see at a glance what a Publish click would actually change.
+
+This page is read-only: no add/edit/delete/archive yet (a later slice per
+docs/admin/cloudflare-native-admin-spec.md §11), so it has no
+`requireAdminOrigin()` CSRF check — that guard only applies to mutating
+`/api/admin/*` routes.
+
+**`AdminVenueRow`** (src/types/venue.ts) mirrors the full D1 `venues` row,
+admin-only columns included, but is a deliberately separate type from
+`src/lib/publishVenues.ts`'s `VenueRow` (the pre-validation publish-pipeline
+shape, with `category` loosely typed as `string`). Unifying them would mean
+`src/types/venue.ts` — today a zero-import leaf module every data source
+conforms to — importing from a `lib/` module, risking the same circular
+import this codebase already hit once (see "Why `pfp-venues.ts` lives in
+its own file" above); a few duplicated field names is cheaper than that
+failure mode.
+
+---
+
 ## Open questions
 
 These could not be confirmed from the current git history or code comments.

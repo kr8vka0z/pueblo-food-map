@@ -277,6 +277,19 @@ after any `wrangler.jsonc` binding change; `cloudflare-env.d.ts` imports just
 the specific runtime types this project's code actually references (e.g.
 `D1Database`) from `@cloudflare/workers-types/experimental` instead.
 
+## Admin venue list (read-only) (#253)
+
+`/admin` (src/app/admin/page.tsx) now renders every `venues` row — draft,
+published, archived — as a searchable/filterable table (`VenueListView`,
+src/components/VenueListView.tsx). See ARCHITECTURE.md's "Admin —
+read-only venue list" section for the full picture; this note just anchors
+the operational facts. Data still flows through the same `getAdminDb()`
+choke point as the rest of this section — `SELECT * FROM venues ORDER BY
+name COLLATE NOCASE ASC`, never `getCloudflareContext()` directly.
+Read-only: no mutation route exists yet, so this page skips
+`requireAdminOrigin()` (that guard is for non-GET `/api/admin/*` routes
+only).
+
 ## Publish → static (#237)
 
 Full design: `docs/admin/cloudflare-native-admin-spec.md` §3.3 (why the

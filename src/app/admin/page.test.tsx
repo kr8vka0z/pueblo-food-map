@@ -36,11 +36,16 @@ vi.mock("next/headers", () => ({
 
 // Real Next.js forbidden() is a control-flow signal (it throws internally
 // to unwind to the nearest forbidden boundary) -- throwing here lets the
-// test assert it fired via `.rejects.toThrow`.
+// test assert it fired via `.rejects.toThrow`. useRouter is stubbed too
+// (#256): the page's tree now includes PublishPanel, a Client Component
+// that calls useRouter() for its post-publish router.refresh() -- this
+// file's focus is the auth guard, not Publish, so a plain no-op stub is
+// enough to let PublishPanel mount without crashing.
 vi.mock("next/navigation", () => ({
   forbidden: vi.fn(() => {
     throw new Error("FORBIDDEN_CALLED");
   }),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
 vi.mock("@/lib/logger", () => ({

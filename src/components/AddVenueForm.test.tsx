@@ -165,6 +165,67 @@ describe("AddVenueForm — submit", () => {
   });
 });
 
+describe("AddVenueForm — edit mode (#255)", () => {
+  test("venueId present -> submit button reads 'Save changes', not 'Add venue'", () => {
+    render(<AddVenueForm venueId="manual-abc" initialValues={{ name: "Eastside Pantry" }} />);
+    expect(screen.getByRole("button", { name: /Save changes/i })).toBeDefined();
+    expect(screen.queryByRole("button", { name: /^Add venue$/i })).toBeNull();
+  });
+
+  test("a valid submit PATCHes /api/admin/venues/<id> (not POST /api/admin/venues)", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm venueId="manual-abc" />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Save changes/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/admin/venues/manual-abc");
+    expect(init.method).toBe("PATCH");
+  });
+
+  test("a successful (200) edit submit redirects to /admin and refreshes", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm venueId="manual-abc" />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Save changes/i }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin"));
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  test("a server 422 response on edit renders the returned per-field error inline, no redirect", async () => {
+    mockFetch.mockResolvedValueOnce({
+      status: 422,
+      json: async () => ({ ok: false, errors: { name: "That name is already in use." } }),
+    });
+    const user = userEvent.setup();
+    render(<AddVenueForm venueId="manual-abc" />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Save changes/i }));
+
+    expect(await screen.findByText("That name is already in use.")).toBeDefined();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  test("a 201 response (create's success status) is NOT treated as success in edit mode", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm venueId="manual-abc" />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Save changes/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+});
+
 describe("AddVenueForm — geocode (Find location from address)", () => {
   test("the button is disabled while the address field is blank", () => {
     render(<AddVenueForm />);

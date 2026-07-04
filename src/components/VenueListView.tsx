@@ -1,17 +1,20 @@
 "use client";
 
 /**
- * VenueListView — the admin's read-only, searchable/filterable venue table
- * (#253). Receives every D1 `venues` row (draft + published + archived) as
- * a prop and owns all search/filter UI state client-side — 108 rows total
- * today, comfortably small enough that no server-side pagination or
- * search endpoint is warranted yet.
+ * VenueListView — the admin's searchable/filterable venue table (read-only
+ * list #253; per-row Edit link added #255). Receives every D1 `venues` row
+ * (draft + published + archived) as a prop and owns all search/filter UI
+ * state client-side — 108 rows total today, comfortably small enough that
+ * no server-side pagination or search endpoint is warranted yet.
  *
  * Presentational + interactive only: no data fetching (that's the Server
- * Component page, src/app/admin/page.tsx) and no mutations (P1 is
- * read-only; add/edit/delete/archive is a later slice).
+ * Component page, src/app/admin/page.tsx) and no mutation of its own — the
+ * Edit link below only navigates to /admin/venues/[id]/edit
+ * (src/app/admin/venues/[id]/edit/page.tsx), where AddVenueForm and
+ * ArchiveVenueButton own the actual mutations.
  */
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { categoryLabels } from "@/data/venues";
 import { STATUS_LABELS, hasUnpublishedChanges, formatLastVerified } from "@/lib/adminVenues";
@@ -147,6 +150,9 @@ export default function VenueListView({ venues }: VenueListViewProps) {
                 <th scope="col" className="px-4 py-3 font-medium">
                   Unpublished changes
                 </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -174,6 +180,17 @@ export default function VenueListView({ venues }: VenueListViewProps) {
                         Unpublished changes
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/admin/venues/${venue.id}/edit`}
+                      className={
+                        "text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2 " +
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
+                      }
+                    >
+                      Edit
+                    </Link>
                   </td>
                 </tr>
               ))}

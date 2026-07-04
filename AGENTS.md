@@ -373,6 +373,77 @@ only — no `requireAdminOrigin()`. That CSRF guard exists for non-GET
 `/api/admin/*` mutations (an ambient session cookie ridden cross-site);
 this route mutates nothing, so there's nothing for CSRF to protect.
 
+## Admin venue edit & archive (#255)
+
+Slice 2 of the admin Phase 2 build (#254 above is slice 1). Two new
+mutation routes, both nested under the venue's id:
+
+- **`PATCH /api/admin/venues/[id]`** (src/app/api/admin/venues/[id]/route.ts)
+  — full-field edit. Auth mirrors create: `getAdminDb()` then
+  `requireAdminOrigin()`. Validation reuses `validateCreateVenuePayload()`
+  (src/lib/adminVenueValidation.ts) **verbatim** — an edit submits the same
+  full field set a create does (same form component, see below), so no
+  separate edit/partial validator was written. On success, one atomic
+  `db.batch()` runs an `UPDATE venues SET ...` and writes an `audit_log` row
+  (`action='update'`, `before_json` = the row exactly as it was fetched,
+  `after_json` = the row after the edit). A missing id returns `404`.
+  **`status` is never in the UPDATE column list** — that's what guarantees
+  editing a `published` venue leaves it `published`: not a runtime check,
+  a structural one (there is no code path in that file that can touch
+  `status` at all). `created_at`/`created_by`/`published_at`/`published_by`/
+  `source_type` are likewise never touched by an edit.
+- **`POST /api/admin/venues/[id]/archive`** (src/app/api/admin/venues/[id]/archive/route.ts)
+  — "Remove from map." Same auth pair as edit. Sets `status='archived'` via
+  an `UPDATE` (never `DELETE FROM venues` — the row and its full audit
+  history are retained) and writes an `audit_log` row (`action='archive'`).
+  An archived row simply stops being selected by the Publish flow's
+  `fetchPublishSnapshot()` (`WHERE status IN ('draft','published')`,
+  previous section) — so it silently drops off the public map on the next
+  Publish without ever being destroyed. Idempotent: archiving an
+  already-archived venue succeeds and writes another audit row rather than
+  erroring. Kept as its own action-shaped route (mirroring
+  `POST /api/admin/publish`'s own convention) rather than a `status` field
+  on the PATCH body, precisely so the edit route above never has to reason
+  about status transitions.
+
+**One form, two modes.** `AddVenueForm` (src/components/AddVenueForm.tsx,
+#254) was generalized rather than forked: an optional `venueId` prop is the
+mode switch — absent means create (`POST /api/admin/venues`, "Add venue"
+button); present means edit (`PATCH /api/admin/venues/<venueId>`, "Save
+changes" button). Both modes share every field, all client-side validation,
+and the same post-success `router.push("/admin")` + `router.refresh()`.
+
+**The edit page** (`/admin/venues/[id]/edit`,
+src/app/admin/venues/[id]/edit/page.tsx) follows the same
+Server-Component-auth-gate pattern as `/admin/venues/new`, but also has a
+row to `SELECT` — `getAdminDb()` serves both the auth check and the read.
+An unknown id calls Next's `notFound()` (same convention as
+`/venue/[id]/page.tsx`). `src/lib/adminVenueForm.ts`'s
+`mapVenueRowToFormValues()` converts the stored `AdminVenueRow` (tri-state
+integers, JSON `hours_weekly`, nullable text columns) into the
+`Partial<AddVenueFormValues>` shape the form's `initialValues` prop already
+accepted — the inverse of the form's own `buildHoursWeekly()`. This mapper
+is a plain, framework-free function (not exported from the "use client"
+form module) specifically so the Server Component page can call it
+directly. Below the form, a "Danger zone" section renders
+`ArchiveVenueButton` (src/components/ArchiveVenueButton.tsx) — a small,
+separate Client Component (kept out of `AddVenueForm` for the same reason
+the form wasn't forked: archive-only UI has no business inside the
+shared create/edit form). It gates the archive call behind a native
+`window.confirm()` dialog (AC2's "confirm dialog," no new dependency, no
+existing modal component in this codebase to reuse) and, on success,
+redirects to `/admin` the same way the form does. Its "Remove from map"
+button reaches for the semantic `--color-danger` design token
+(globals.css `@theme` / DESIGN.md) — defined since #237 checkpoint c but
+unused until now — rather than a literal Tailwind red utility, since this
+is the app's one genuinely destructive admin action.
+
+**Row `Edit` link.** `VenueListView` (previous "read-only venue list"
+section) gained one more table column: a per-row `Edit` link to
+`/admin/venues/<id>/edit`, styled as a plain sage text link matching the
+"Back to venue list" link already used on the create/edit pages. The list
+itself still issues no mutation and stays read-only.
+
 ## Publish → static (#237)
 
 Full design: `docs/admin/cloudflare-native-admin-spec.md` §3.3 (why the

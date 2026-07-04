@@ -8,21 +8,29 @@
  *   4. IP-based rate limit: max 5 submissions per IP per hour (in-process
  *      Map — resets on Worker restart; sufficient for v1 spam deterrence).
  *   5. Server-side field validation (mirrors client validation).
- *   6. Send email via Resend to issues@pueblofoodmap.com.
- *   7. Return JSON {ok: true} or {ok: false, error: string}.
+ *   6. Insert a pending row into public_submissions (#258) — best-effort; a
+ *      D1 failure here is logged (db_write_failed) and does NOT block the
+ *      email or fail the submission (see insertPublicSubmission below).
+ *   7. Send email via Resend to issues@pueblofoodmap.com.
+ *   8. Return JSON {ok: true} or {ok: false, error: string}.
  *
  * PII policy: IP addresses are used only for rate-limiting and are never
  * logged or persisted. The optional contact email is forwarded to Resend as
- * part of the email body and is NOT logged by this handler.
+ * part of the email body, and, since #258, also persisted in the
+ * public_submissions D1 row (submitter_email column + inside payload, when
+ * provided) for admin review — it is still never written to a log line by
+ * this handler.
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { createRateLimiter, EMAIL_RE } from "@/lib/rateLimit";
 import { venues } from "@/data/venues";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
+import { insertPublicSubmission } from "@/lib/publicSubmissions";
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 // Private in-process sliding window for this route (own 5/hr-per-IP bucket).
@@ -206,16 +214,37 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // flows into the email subject line (prevents header injection, issue #160 1.3).
   const venue = venues.find((v) => v.id === body.venueId)!;
 
+  // Sanitized fields shared by the D1 queue row and the outgoing email —
+  // computed once so the two can never drift apart.
+  const sanitized = {
+    venueId: body.venueId,
+    venueName: stripLineBreaks(venue.name),
+    venueAddress: stripLineBreaks(venue.address),
+    issueType: body.issueType as IssueTypeKey,
+    description: stripLineBreaks(body.description.trim()),
+    contactEmail: body.contactEmail ? stripLineBreaks(body.contactEmail) : undefined,
+  };
+
+  // #258: best-effort durable queue row. A D1 outage must never block the
+  // email or fail the user's submission — caught and logged here, then
+  // execution continues to the (unchanged) email send below either way.
+  try {
+    const { env } = getCloudflareContext();
+    await insertPublicSubmission(env.ADMIN_DB, {
+      kind: "closure",
+      payload: sanitized,
+      targetVenueId: sanitized.venueId,
+      submitterEmail: sanitized.contactEmail ?? null,
+    });
+  } catch (err) {
+    logFormFailure("report", "db_write_failed", {
+      message: err instanceof Error ? err.message : "unknown error",
+    });
+  }
+
   // Send email — no PII logging; contact email goes only to Resend
   try {
-    await sendReportEmail({
-      venueId: body.venueId,
-      venueName: stripLineBreaks(venue.name),
-      venueAddress: stripLineBreaks(venue.address),
-      issueType: body.issueType as IssueTypeKey,
-      description: stripLineBreaks(body.description.trim()),
-      contactEmail: body.contactEmail ? stripLineBreaks(body.contactEmail) : undefined,
-    });
+    await sendReportEmail(sanitized);
   } catch (err) {
     // Structured log: error type/message only — no PII (no body, IP, or email)
     logFormFailure("report", "send_failed", {

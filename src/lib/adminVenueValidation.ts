@@ -171,7 +171,12 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
   // this call site otherwise trips.
   if (email && email.length > FIELD_LIMITS.EMAIL) {
     errors.email = `Email must be ${FIELD_LIMITS.EMAIL} characters or fewer.`;
-  } else if (email && !EMAIL_RE.test(email)) {
+  } else if (email && !EMAIL_RE.test(email.slice(0, FIELD_LIMITS.EMAIL))) {
+    // .slice() is a no-op here (the guard above already rejected anything
+    // longer than the cap), but it makes the regex operand's length bound
+    // explicit to static analysis — CodeQL's polynomial-ReDoS taint tracking
+    // doesn't treat the length guard alone as a sanitizer, so without this the
+    // (now-harmless) alert re-attaches to this line on every scan.
     errors.email = "Enter a valid email address.";
   }
   const url = optionalString(b.url, "url", errors);

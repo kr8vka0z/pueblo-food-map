@@ -248,6 +248,9 @@ describe("POST /api/admin/venues", () => {
     expect(approveStmt.sql).toContain("status = 'approved'");
     expect(approveStmt.sql).toContain("WHERE id = ?");
     expect(approveStmt.sql).toContain("status = 'pending'");
+    // A create can only legitimately approve a 'new_venue' submission — see
+    // route.ts's APPROVE_SUBMISSION_SQL comment for why this guard exists.
+    expect(approveStmt.sql).toContain("kind = 'new_venue'");
     expect(approveStmt.args).toContain(ADMIN_EMAIL);
     expect(approveStmt.args).toContain(42);
     expect(data.id).toBeTruthy();

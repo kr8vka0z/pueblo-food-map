@@ -249,8 +249,13 @@ describe("POST /api/admin/venues/[id]/archive", () => {
     expect(approveStmt.sql).toContain("UPDATE public_submissions");
     expect(approveStmt.sql).toContain("status = 'approved'");
     expect(approveStmt.sql).toContain("status = 'pending'");
+    // A closure approval must target the very venue being archived — see
+    // route.ts's APPROVE_SUBMISSION_SQL comment for why this guard exists.
+    expect(approveStmt.sql).toContain("kind = 'closure'");
+    expect(approveStmt.sql).toContain("target_venue_id = ?");
     expect(approveStmt.args).toContain(ADMIN_EMAIL);
     expect(approveStmt.args).toContain(7);
+    expect(approveStmt.args).toContain(VENUE_ID); // bound as target_venue_id
   });
 
   test("archive with NO body (ArchiveVenueButton's real call shape) still works — 2 statements, no crash reading the body", async () => {

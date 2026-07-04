@@ -101,8 +101,14 @@ function readOptionalSubmissionId(body: unknown): number | null {
   return typeof rawSid === "number" && Number.isInteger(rawSid) && rawSid > 0 ? rawSid : null;
 }
 
+// The `AND kind = 'new_venue'` guard (mirrors the archive route's own
+// `kind = 'closure' AND target_venue_id = ?` guard) closes a cross-kind
+// approval gap: a create only ever legitimately approves a 'new_venue'
+// submission, so a submissionId pointing at a 'closure' row (or any other
+// mismatch) now affects 0 rows here — the venue still creates, but the
+// wrong submission is never silently marked approved.
 const APPROVE_SUBMISSION_SQL =
-  "UPDATE public_submissions SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending'";
+  "UPDATE public_submissions SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending' AND kind = 'new_venue'";
 
 export async function POST(req: NextRequest): Promise<Response> {
   let access: AdminDbAccess;

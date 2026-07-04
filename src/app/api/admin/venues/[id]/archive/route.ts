@@ -50,8 +50,15 @@ async function authorizeArchiveRequest(headers: HeaderSource): Promise<AdminDbAc
 const AUDIT_INSERT_SQL =
   "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
+// The `AND kind = 'closure' AND target_venue_id = ?` guard (mirrors the
+// create route's own `kind = 'new_venue'` guard) closes a cross-kind/
+// cross-target approval gap: a closure approval must target the very venue
+// being archived, so a submissionId pointing at a 'new_venue' row, or at a
+// closure report for a DIFFERENT venue, now affects 0 rows here — the
+// archive still succeeds, but the wrong submission is never silently
+// marked approved.
 const APPROVE_SUBMISSION_SQL =
-  "UPDATE public_submissions SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending'";
+  "UPDATE public_submissions SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending' AND kind = 'closure' AND target_venue_id = ?";
 
 /**
  * Reads an optional `{ submissionId }` from the request body without ever
@@ -119,7 +126,7 @@ export async function POST(
   // D1Result.meta.changes to flag a stale card is the upgrade path.
   const approveSubmission =
     submissionId !== null
-      ? db.prepare(APPROVE_SUBMISSION_SQL).bind(identity.email, timestamp, submissionId)
+      ? db.prepare(APPROVE_SUBMISSION_SQL).bind(identity.email, timestamp, submissionId, id)
       : null;
 
   // Atomic: the status flip, its own audit trail, and (#259) the

@@ -672,19 +672,37 @@ it has no `requireAdminOrigin()` CSRF check of its own.
 **Approve reuses the existing create/archive routes — it does not write a
 parallel mutation path.** Both `POST /api/admin/venues` (#254) and
 `POST /api/admin/venues/[id]/archive` (#255) gained an OPTIONAL
-`submissionId` field. When present, each route appends a THIRD statement —
+`submissionId` field. When present, each route appends a THIRD statement to
+the SAME atomic `db.batch()` that already inserts the venue (create) or
+flips its status (archive) — flipping the originating `public_submissions`
+row to `status = 'approved'`. Riding the existing batch, rather than a
+second separate write, is what guarantees the venue mutation and the
+submission's approval commit together or not at all — there is no window
+where a venue exists but its originating submission still shows as
+pending, or vice versa. Neither route's pre-existing behavior changes when
+`submissionId` is absent (the plain "Add place" and `ArchiveVenueButton`
+call shapes both still work unmodified — the archive route's own body
+parse is fully defensive so a bodyless call, ArchiveVenueButton's real
+one, never throws trying to read a JSON body that isn't there).
+
+**The approve UPDATE's WHERE clause matches on kind (and, for archive,
+target) — not just id + pending — closing a cross-kind approval gap.** A
+crafted `submissionId` naming an unrelated pending row used to be able to
+mark that row approved while the venue create/archive acted on a
+completely different venue. `POST /api/admin/venues`'s statement is now
 `UPDATE public_submissions SET status = 'approved', reviewed_by = ?,
-reviewed_at = ? WHERE id = ? AND status = 'pending'` — to the SAME atomic
-`db.batch()` that already inserts the venue (create) or flips its status
-(archive). Riding the existing batch, rather than a second separate write,
-is what guarantees the venue mutation and the submission's approval commit
-together or not at all — there is no window where a venue exists but its
-originating submission still shows as pending, or vice versa. Neither
-route's pre-existing behavior changes when `submissionId` is absent (the
-plain "Add place" and `ArchiveVenueButton` call shapes both still work
-unmodified — the archive route's own body parse is fully defensive so a
-bodyless call, ArchiveVenueButton's real one, never throws trying to read a
-JSON body that isn't there).
+reviewed_at = ? WHERE id = ? AND status = 'pending' AND kind = 'new_venue'`
+— a create can only ever legitimately approve a `new_venue` submission.
+`POST /api/admin/venues/[id]/archive`'s statement is now `UPDATE
+public_submissions SET status = 'approved', reviewed_by = ?, reviewed_at =
+? WHERE id = ? AND status = 'pending' AND kind = 'closure' AND
+target_venue_id = ?`, binding the archived venue's `id` (the `[id]` route
+param) as `target_venue_id` — a closure approval must target the very
+venue being archived. On a mismatch (wrong kind, or wrong target for an
+archive), the venue is still created/archived — that's the admin's
+explicit action — but the approve statement now affects 0 rows instead of
+silently marking the wrong submission approved. The happy path (matching
+kind/target) is unchanged.
 
 - **new_venue approve is a two-step hand-off, not a single click.** The
   card's "Review & approve" is a plain navigation `Link` to

@@ -265,6 +265,19 @@ Each route handler (`src/app/*/submit/route.ts`) runs the same pipeline:
 5. Server-side field validation (mirrors client-side).
 6. Email via Resend to the appropriate `@pueblofoodmap.com` address.
 
+**#258 — `/suggest/submit` and `/report/submit` only, NOT `/feedback/submit`:**
+after step 5 passes, these two routes also insert one pending row into the
+`public_submissions` D1 table — a durable, admin-reviewable record
+(`migrations/0002_public_submissions.sql`; AGENTS.md "Public submissions
+queue") — before the step-6 email. The insert is wrapped in its own
+try/catch: a D1 failure is logged (`db_write_failed`) and does NOT block
+the email or change the route's response, so the email stays the
+pipeline's authoritative success signal exactly as it was before this
+table existed. `/feedback/submit` is deliberately untouched and still ends
+at step 6 — the queue exists only for the two flows whose submissions
+describe map data an admin might act on (a new venue, a reported closure);
+general feedback has no such action to queue.
+
 **Why Turnstile over reCAPTCHA:** the app runs on Cloudflare Workers.
 Turnstile is a first-party Cloudflare product with a simpler integration
 model and no Google dependency — appropriate for a civic app serving

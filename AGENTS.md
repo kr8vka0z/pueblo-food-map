@@ -590,6 +590,68 @@ that this opens an auto-merging change request, e.g. `Publish 2 new places
 and 1 edited place to the public map? 0 places will be removed. This opens
 a change request that auto-merges.`
 
+## Public submissions queue (#258)
+
+`migrations/0002_public_submissions.sql` adds a `public_submissions` table
+to the SAME `pueblo-food-map-admin` D1 database the admin surface above
+uses. `POST /suggest/submit` and `POST /report/submit` (the two PUBLIC,
+unauthenticated form routes — see "Resend Email Key Management" and
+"Form-failure structured logging" above) each insert one pending row here,
+placed AFTER their existing anti-abuse guards (Turnstile -> honeypot ->
+rate-limit) and field validation already pass — so a row is only ever
+written for an accepted submission, never for a bot or an invalid one.
+
+**Not through `getAdminDb()`.** These are PUBLIC routes with no Cloudflare
+Access identity to verify, so they reach the D1 binding directly —
+`getCloudflareContext().env.ADMIN_DB` (imported from `@opennextjs/cloudflare`,
+the same binding the admin surface uses) — never `getAdminDb()`
+(src/lib/adminDb.ts), which gates on `requireAccessIdentity()` and exists
+specifically for AUTHENTICATED `/admin/**` routes. Both routes write only
+`public_submissions`, via the shared `insertPublicSubmission()` helper
+(src/lib/publicSubmissions.ts, a fully parameterized `.bind(...)` INSERT) —
+never `venues` or `audit_log`.
+
+**Best-effort, never blocking.** The insert is wrapped in its own
+try/catch, placed BEFORE the (unchanged) Resend email send. A D1 failure —
+or a missing/misconfigured Cloudflare context, the same code path — logs
+`db_write_failed` via `logFormFailure` (src/lib/logger.ts, see
+"Form-failure structured logging" above) and execution continues to the
+email exactly as it did before this feature existed: the email stays the
+incumbent reliable channel; this table is the new best-effort durable
+record on top of it. Both routes build one `sanitized` fields object
+shared by the D1 payload and the email call, so the two can never observe
+different values for the same submission.
+
+**`kind` / `target_venue_id` mapping:** `/suggest/submit` writes
+`kind='new_venue'`, `target_venue_id=NULL` (no existing venue to target).
+`/report/submit` writes `kind='closure'`, `target_venue_id=<the reported
+venue's id>` — the same `body.venueId` the route's own `validate()` already
+confirmed exists in `src/data/venues.ts` before this point, so it is never
+NULL for a closure report. `submitter_email` is nullable at the schema
+level because `/report/submit`'s contact email is optional (unlike
+`/suggest/submit`'s, which is required).
+
+**No review UI yet.** This migration and the two write paths are the whole
+of #258 — nothing in the app reads from `public_submissions`. The admin
+review screen (approve -> create/edit the target venue, reject -> dismiss)
+is a separate, later slice (#259).
+
+**Applying the migration — NOT part of a Worker deploy.** Unlike
+`published-venues.ts` (a build-time static import — "Publish -> static"
+above), a D1 schema migration is a database operation, independent of
+`wrangler deploy` / Workers Builds — there is no `migrations_dir`
+configured in `wrangler.jsonc`, so a deploy never auto-applies a migration
+file. Apply explicitly; the table must exist in production D1 BEFORE the
+deployed routes' writes can succeed against it (a D1 failure is caught and
+logged per above, so a deploy that lands ahead of the migration degrades
+gracefully rather than breaking submissions — but the queue silently drops
+every row until the migration is applied):
+
+```bash
+npx wrangler d1 migrations apply pueblo-food-map-admin --local   # local dev/testing only
+npx wrangler d1 migrations apply pueblo-food-map-admin --remote  # production — run at merge time
+```
+
 # Discoverability / SEO (#164)
 
 Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**

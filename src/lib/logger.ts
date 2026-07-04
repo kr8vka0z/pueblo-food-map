@@ -13,7 +13,11 @@
  * Turnstile failures are mostly bots — high volume, low signal. Keeping them
  * out of the error stream prevents alert fatigue when scraping bots hit the
  * forms. send_failed means Resend is down or the key is broken — a real
- * outage that warrants an error-level alert.
+ * outage that warrants an error-level alert. db_write_failed (#258, the
+ * public_submissions D1 queue) is error-level for the same reason as
+ * send_failed — arguably more so, since the route still returns {ok: true}
+ * on this path (the email is unaffected), so this log line is the ONLY
+ * signal that a submission's durable queue row never landed.
  *
  * PII RULE: Callers must pass ONLY the fixed structured fields below.
  * Never pass IPs, email addresses, names, venue addresses, message bodies,
@@ -24,7 +28,7 @@
 import type { AccessDeniedReason } from "./cfAccess";
 
 export type FormName = "suggest" | "report" | "feedback";
-export type FormFailureReason = "turnstile_failed" | "send_failed";
+export type FormFailureReason = "turnstile_failed" | "send_failed" | "db_write_failed";
 
 interface FailureDetail {
   status?: number;

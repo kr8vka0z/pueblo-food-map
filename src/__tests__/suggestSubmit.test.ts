@@ -40,10 +40,13 @@ function makeFakeD1(opts: { failRun?: boolean } = {}) {
     if (opts.failRun) throw new Error("D1 write failed (simulated)");
     return { success: true, results: [], meta: {} };
   });
-  // vi.fn() records every call's args in .mock.calls regardless of whether
-  // the wrapped implementation itself declares/reads them.
-  const bindMock = vi.fn(() => ({ run: runMock }));
-  const prepareMock = vi.fn(() => ({ bind: bindMock }));
+  // Explicit vi.fn<T>() call-signature (rather than inferring it from the
+  // implementation below, which ignores its args) so .mock.calls is typed
+  // as unknown[][] instead of a zero-length tuple -- the implementation
+  // itself declares no named params, so there's nothing for
+  // @typescript-eslint/no-unused-vars to flag either.
+  const bindMock = vi.fn<(...args: unknown[]) => { run: typeof runMock }>(() => ({ run: runMock }));
+  const prepareMock = vi.fn<(...args: unknown[]) => { bind: typeof bindMock }>(() => ({ bind: bindMock }));
   const db = { prepare: prepareMock } as unknown as D1Database;
   return { db, prepareMock, bindMock, runMock };
 }

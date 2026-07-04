@@ -60,11 +60,16 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const token = process.env.GITHUB_PUBLISH_TOKEN;
   if (!token) {
-    // Matches the existing RESEND_API_KEY / TURNSTILE_SECRET_KEY convention
-    // (src/app/feedback/submit/route.ts) — throw rather than silently no-op,
-    // so a deploy missing this secret fails loudly instead of pretending to
-    // work. Expected until Kyle provisions the PAT at cutover.
-    throw new Error("GITHUB_PUBLISH_TOKEN not configured");
+    // #256 AC5: a thrown Error here surfaces to the client as a bare 500 with
+    // no readable body, indistinguishable from a real crash — the admin's
+    // Publish button (src/components/PublishPanel.tsx) needs a catchable,
+    // machine-readable signal instead so it can show a calm "not set up yet"
+    // message rather than a scary generic error. Expected/normal until Kyle
+    // provisions the PAT (#260) — not a fail-loud case like the
+    // RESEND_API_KEY/TURNSTILE_SECRET_KEY convention this used to match
+    // (src/app/feedback/submit/route.ts), because those routes have no UI
+    // surface distinguishing "not configured" from "broken."
+    return NextResponse.json({ ok: false, error: "publish_not_configured" }, { status: 503 });
   }
 
   // 1. snapshot

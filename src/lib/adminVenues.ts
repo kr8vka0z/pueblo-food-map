@@ -30,6 +30,52 @@ export function hasUnpublishedChanges(row: AdminVenueRow): boolean {
   return row.published_at !== null && row.updated_at > row.published_at;
 }
 
+export interface PublishChangeSummary {
+  newDrafts: number;
+  editedSincePublish: number;
+  archived: number;
+}
+
+/**
+ * Change-summary counts for the admin's Publish panel (#256): what a Publish
+ * click would actually do, computed from the same `SELECT *` rows
+ * src/app/admin/page.tsx already loads for VenueListView — no second query.
+ *
+ * - `newDrafts`: every `draft` row (never been on the public map).
+ * - `editedSincePublish`: `published` rows edited since their last publish
+ *   (`updated_at > published_at`) — the published branch of
+ *   `hasUnpublishedChanges` above, but explicitly gated on
+ *   `status === 'published'` here (that function's second branch isn't
+ *   status-gated at all) so an archived row can never double-count into
+ *   this bucket too.
+ * - `archived`: `archived` rows that were PREVIOUSLY PUBLISHED
+ *   (`published_at !== null`) — these are what will actually disappear from
+ *   the public map on the next publish. A draft that got archived
+ *   (`published_at` still null) was never live, so archiving it changes
+ *   nothing the public map shows; it must not inflate this count.
+ */
+export function summarizePublishChanges(rows: AdminVenueRow[]): PublishChangeSummary {
+  let newDrafts = 0;
+  let editedSincePublish = 0;
+  let archived = 0;
+
+  for (const row of rows) {
+    switch (row.status) {
+      case "draft":
+        newDrafts += 1;
+        break;
+      case "published":
+        if (row.published_at !== null && row.updated_at > row.published_at) editedSincePublish += 1;
+        break;
+      case "archived":
+        if (row.published_at !== null) archived += 1;
+        break;
+    }
+  }
+
+  return { newDrafts, editedSincePublish, archived };
+}
+
 /**
  * Formats an ISO date (or date-only "YYYY-MM-DD") string for the "Last
  * verified" column. Pinned to UTC: `last_verified` carries no time

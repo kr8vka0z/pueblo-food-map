@@ -501,6 +501,94 @@ route's validation and atomic `db.batch()` are unchanged by this addition.
 
 ---
 
+## Admin — venue edit & archive (#255)
+
+Slice 2 of the admin Phase 2 build (previous section is slice 1). Edit and
+archive are two independent mutations, each with its own route, sharing the
+same auth pattern as create:
+
+- **`PATCH /api/admin/venues/[id]`** (src/app/api/admin/venues/[id]/route.ts)
+  — full-field edit. Reuses `validateCreateVenuePayload()`
+  (src/lib/adminVenueValidation.ts) exactly as-is: an edit submits the
+  identical full field set a create does, because it is the same form
+  component (below) in a different mode, so there is nothing a dedicated
+  edit validator would check differently. On success, one atomic
+  `db.batch()` runs an `UPDATE` and writes an `audit_log` row
+  (`action='update'`, `before_json`/`after_json` = the row before/after).
+  `status` (and `source_type`/`created_at`/`created_by`/`published_at`/
+  `published_by`) never appears in the UPDATE's column list — this is a
+  structural guarantee, not a runtime check, that editing a `published`
+  venue cannot change its status: there is no code path in this file that
+  touches that column at all. Unlike create's INSERT (where
+  `created_at`/`updated_at` are DB-assigned defaults this process never
+  observes exactly), an UPDATE has no such default — SQLite only applies a
+  column `DEFAULT` on `INSERT` — so `updated_at` is computed once in JS and
+  reused identically for the SQL bind, the audit row's timestamp, and
+  `after_json`, guaranteeing all three agree exactly.
+- **`POST /api/admin/venues/[id]/archive`** (src/app/api/admin/venues/[id]/archive/route.ts)
+  — "Remove from map." A dedicated action route (same "verb-shaped action"
+  convention as `POST /api/admin/publish`) rather than a `status` field on
+  the PATCH body — keeping it separate means the edit route above never has
+  to reason about status transitions. Sets `status='archived'` via an
+  `UPDATE` (never `DELETE FROM venues` — the row and its audit history are
+  retained) and writes an `audit_log` row (`action='archive'`). An archived
+  row simply stops matching `fetchPublishSnapshot()`'s `WHERE status IN
+  ('draft','published')` (previous "Publish → static" section), so it drops
+  off the public map on the next Publish without the row ever being
+  destroyed. Idempotent by design: archiving an already-archived row still
+  succeeds and still writes an audit row, rather than special-casing a
+  no-op.
+
+**`AddVenueForm` gained an edit mode instead of being forked.** An optional
+`venueId` prop is the switch: absent -> create (`POST /api/admin/venues`,
+button reads "Add venue"); present -> edit (`PATCH
+/api/admin/venues/<venueId>`, button reads "Save changes"). Every field,
+all client-side validation, and the post-success `router.push("/admin")` +
+`router.refresh()` are shared between both modes — the two submit paths
+differ only in endpoint, HTTP method, and the status code that counts as
+success (201 vs. 200).
+
+**The edit page** (`/admin/venues/[id]/edit`,
+src/app/admin/venues/[id]/edit/page.tsx) is the same
+Server-Component-auth-gate shape as `/admin/venues/new`, but also has a row
+to `SELECT` by id — `getAdminDb()` serves both the auth check and the read
+in one call, same as `/admin`'s list query. An id with no matching row
+calls Next's `notFound()` (same convention `/venue/[id]/page.tsx` already
+established for the public side). `src/lib/adminVenueForm.ts`'s
+`mapVenueRowToFormValues()` is the inverse of the form's own internal
+`buildHoursWeekly()`: it converts a stored `AdminVenueRow` (tri-state
+integers, JSON-text `hours_weekly`, nullable text columns) into the
+`Partial<AddVenueFormValues>` shape `initialValues` already accepted before
+#255. It is a deliberately plain, framework-free function — not exported
+from `AddVenueForm.tsx` itself — because that file is a `"use client"`
+module and a Server Component page cannot safely import and call runtime
+code from one; keeping the mapper in its own `lib/` module is what lets the
+Server Component page call it directly (and lets it be unit-tested without
+mounting anything, same rationale as `adminVenueValidation.ts` and
+`adminVenues.ts`).
+
+Below the form, a "Danger zone" section renders `ArchiveVenueButton`
+(src/components/ArchiveVenueButton.tsx) — a small Client Component kept
+separate from `AddVenueForm` for the same reason the form itself wasn't
+forked: archive-only UI has no reason to live inside the shared create/edit
+form. It gates the archive call behind a native `window.confirm()` dialog
+(no new dependency; this codebase has no existing modal/dialog component to
+reuse — vaul's `Drawer` is scoped to the public map's mobile `BottomSheet`,
+an unrelated concern) and, on a `200`, redirects to `/admin` the same way
+the form does. Its button reaches for the `--color-danger` design token
+(defined in `globals.css` `@theme` / mirrored in `DESIGN.md` since #237
+checkpoint c, but unused by any component until now) rather than a literal
+Tailwind red utility — this is the app's one genuinely destructive admin
+action, and DESIGN.md's semantic-color set already had a token reserved for
+exactly this role.
+
+**`VenueListView` gained a per-row `Edit` link** to `/admin/venues/<id>/edit`
+— a plain sage text link matching the "Back to venue list" link style
+already used on the create/edit pages. The list itself still issues no
+mutation of its own and remains read-only.
+
+---
+
 ## Open questions
 
 These could not be confirmed from the current git history or code comments.

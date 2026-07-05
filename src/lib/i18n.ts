@@ -395,6 +395,12 @@ const en: Record<string, string> = {
   "footer.about": "About",
   "footer.privacy": "Privacy",
   "footer.suggest": "Suggest a venue",
+
+  // Venues directory (#PR4)
+  "nav.venuesList": "Browse all venues",
+  "venues.heading": "All food resources",
+  "venues.intro": "Every pantry, grocery store, community garden, farm, and meal site on the map — grouped by type, with addresses and hours.",
+  "venues.noHours": "Hours not listed",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -788,6 +794,12 @@ const es: Record<string, string> = {
   "footer.about": "Acerca de",
   "footer.privacy": "Privacidad",
   "footer.suggest": "Sugerir un lugar",
+
+  // Venues directory (#PR4)
+  "nav.venuesList": "Ver todos los lugares",
+  "venues.heading": "Todos los recursos alimentarios",
+  "venues.intro": "Cada despensa, supermercado, huerto comunitario, granja y comedor del mapa — agrupados por tipo, con direcciones y horarios.",
+  "venues.noHours": "Horario no disponible",
 };
 
 /** Substitute simple {key} placeholders. */

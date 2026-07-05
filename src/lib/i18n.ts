@@ -401,6 +401,21 @@ const en: Record<string, string> = {
   "venues.heading": "All food resources",
   "venues.intro": "Every pantry, grocery store, community garden, farm, and meal site on the map — grouped by type, with addresses and hours.",
   "venues.noHours": "Hours not listed",
+
+  // About page FAQ + stats (#PR4)
+  "about.faq.heading": "Frequently asked questions",
+  "about.faq.q1": "Is Pueblo Food Map free to use?",
+  "about.faq.a1": "Yes — completely free, with no account or sign-in. It's a community project, not a business.",
+  "about.faq.q2": "Do I need ID, proof of income, or to share my immigration status to get food?",
+  "about.faq.a2": "It depends on the location. Many pantries and meal sites serve anyone who comes — no ID or proof of income required; some ask only for basic details like household size. When a listing links to Plentiful, you can check what to bring before you go — and it's always okay to call ahead and ask.",
+  "about.faq.q3": "Does the map show which places accept SNAP or WIC?",
+  "about.faq.a3": "Yes. Places that accept SNAP or WIC show a badge, and you can filter the map to show only those. We mark SNAP/WIC where we've confirmed it, mainly for grocery stores and markets.",
+  "about.faq.q4": "What if a listing is wrong, out of date, or a place has closed?",
+  "about.faq.a4": "Please tell us. Every place has a 'Report an issue' option, and you can suggest one we're missing. We review every report and update the map as we confirm changes.",
+  "about.faq.q5": "How current is the information?",
+  "about.faq.a5": "Each place shows a 'last verified' date so you can judge how recent it is. Hours can still change — especially around holidays — so for anything time-sensitive, call ahead when a phone number is listed.",
+  "about.faq.q6": "How do I get directions?",
+  "about.faq.a6": "Open any place and choose Walk, Bus, or Drive. Walking directions show right on the map; bus and driving directions open in Google Maps.",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -800,6 +815,21 @@ const es: Record<string, string> = {
   "venues.heading": "Todos los recursos alimentarios",
   "venues.intro": "Cada despensa, supermercado, huerto comunitario, granja y comedor del mapa — agrupados por tipo, con direcciones y horarios.",
   "venues.noHours": "Horario no disponible",
+
+  // About page FAQ + stats (#PR4)
+  "about.faq.heading": "Preguntas frecuentes",
+  "about.faq.q1": "¿Es gratis usar Pueblo Food Map?",
+  "about.faq.a1": "Sí, es completamente gratis y no necesitas crear una cuenta ni iniciar sesión. Es un proyecto comunitario, no un negocio.",
+  "about.faq.q2": "¿Necesito identificación, comprobante de ingresos o compartir mi estatus migratorio para recibir alimentos?",
+  "about.faq.a2": "Depende del lugar. Muchas despensas y comedores atienden a cualquier persona que llegue, sin necesidad de identificación ni comprobante de ingresos; algunos solo piden datos básicos, como cuántas personas viven en tu hogar. Cuando un lugar tiene enlace a Plentiful, puedes ver qué llevar antes de ir, y siempre puedes llamar antes para preguntar.",
+  "about.faq.q3": "¿El mapa muestra qué lugares aceptan SNAP o WIC?",
+  "about.faq.a3": "Sí. Los lugares que aceptan SNAP o WIC muestran una etiqueta, y puedes filtrar el mapa para ver solo esos. Marcamos SNAP/WIC donde lo hemos confirmado, principalmente en supermercados y mercados.",
+  "about.faq.q4": "¿Qué hago si un lugar tiene información incorrecta, desactualizada o ya cerró?",
+  "about.faq.a4": "Por favor avísanos. Cada lugar tiene la opción 'Reportar un problema', y también puedes sugerir uno que falte. Revisamos cada reporte y actualizamos el mapa a medida que confirmamos los cambios.",
+  "about.faq.q5": "¿Qué tan actualizada está la información?",
+  "about.faq.a5": "Cada lugar muestra una fecha de 'última verificación' para que sepas qué tan reciente es. Los horarios pueden cambiar, sobre todo en días festivos, así que para algo urgente conviene llamar antes cuando hay un número de teléfono.",
+  "about.faq.q6": "¿Cómo obtengo indicaciones para llegar?",
+  "about.faq.a6": "Abre cualquier lugar y elige Caminar, Autobús o Manejar. Las indicaciones a pie se muestran en el mapa; las de autobús y automóvil se abren en Google Maps.",
 };
 
 /** Substitute simple {key} placeholders. */

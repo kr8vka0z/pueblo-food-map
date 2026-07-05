@@ -147,6 +147,29 @@ export function buildVenueListJsonLd(
 }
 
 /**
+ * Build schema.org FAQPage JSON-LD from resolved question/answer pairs.
+ *
+ * WHY it takes plain strings (not i18n keys): the /about page resolves each
+ * Q&A through t() for the request's locale and passes them in, so the
+ * structured data always matches the FAQ actually rendered on the page —
+ * this lib stays pure (no next/headers, no i18n import), same as every other
+ * builder here.
+ */
+export function buildFaqJsonLd(
+  items: { question: string; answer: string }[],
+): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
+  };
+}
+
+/**
  * WHY @graph instead of a flat WebSite object: a bare WebSite node has no
  * identity separate from the page it's declared on. Wrapping WebSite +
  * Organization in one @graph, linked by publisher/@id, makes the site itself

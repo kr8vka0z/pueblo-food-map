@@ -913,6 +913,13 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   `/venue/<id>` page. Registered in `src/app/sitemap.ts` at priority 0.7. Exists for the same
   reason the ItemList JSON-LD above does — the homepage map is JS-only — but as readable HTML a
   crawler or answer engine can scan directly, not just structured data.
+- **`/about` FAQ + FAQPage JSON-LD** — `src/app/about/page.tsx` renders a 6-question FAQ and
+  injects a schema.org `FAQPage` `<script type="application/ld+json">` (built by `buildFaqJsonLd`
+  in `src/lib/venueSchema.ts`, serialized via `serializeJsonLd`). FAQ content is localized — the
+  JSON-LD is built from the same request-locale `about.faq.*` strings the page renders, so
+  structured data and visible text never diverge. The page also carries a live venue-count line
+  (`venues.length`) and a cited Feeding America (Map the Meal Gap, 2023) food-insecurity stat —
+  AEO item S8.
 
 ---
 

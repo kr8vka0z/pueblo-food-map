@@ -15,6 +15,11 @@ import type { NextConfig } from "next";
 //   the origin to external sites, reducing leakage of URL parameters.
 //
 // Full CSP is deferred — see issue #160 item 1.5 comment.
+//
+// poweredByHeader: false (below) drops the `X-Powered-By: Next.js` response
+// header for the same reason as the headers above — one less signal telling
+// an attacker which framework/version this app runs, in case a future
+// framework CVE targets Next.js specifically. Issue #164 quick win (S7a).
 
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
@@ -23,6 +28,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   // Required for next/navigation's forbidden() (used by src/app/admin/page.tsx,
   // #237 checkpoint c) — still an experimental API on this Next version; the
   // flag opts in per next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/authInterrupts.md.

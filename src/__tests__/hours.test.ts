@@ -1,15 +1,17 @@
 /**
- * Unit tests for computeOpenStatus() and formatSlot() in src/lib/hours.ts.
+ * Unit tests for computeOpenStatus(), formatSlot(), and slotToIsoTimes() in
+ * src/lib/hours.ts.
  *
  * Uses the injectable `now: Date` parameter throughout — no real-clock calls.
  * Covers: 24h slots, 12h AM/PM slots, reversed multi-slot ordering,
  * currently-open, closed_today, no_hours, noon/midnight boundaries, a
- * real pantry shape from pantries-plentiful.ts, and formatSlot display
- * formatting for both 24h and 12h slot strings.
+ * real pantry shape from pantries-plentiful.ts, formatSlot display
+ * formatting for both 24h and 12h slot strings, and slotToIsoTimes's
+ * ISO-8601 ("HH:MM") conversion for JSON-LD (venueSchema.ts).
  */
 
 import { describe, test, expect } from "vitest";
-import { computeOpenStatus, formatSlot } from "@/lib/hours";
+import { computeOpenStatus, formatSlot, slotToIsoTimes } from "@/lib/hours";
 import type { WeeklyHours } from "@/types/venue";
 
 /** Helper: create a Date at a given local clock time on a Monday */
@@ -263,5 +265,27 @@ describe("formatSlot", () => {
 
   test("malformed slot returns raw slot unchanged (no throw)", () => {
     expect(formatSlot("not-a-slot")).toBe("not-a-slot");
+  });
+});
+
+// ─── slotToIsoTimes — ISO 8601 conversion for JSON-LD ─────────────────────────
+//
+// Thin wrapper over the same parseSlot() minutes-since-midnight logic covered
+// above — schema.org OpeningHoursSpecification needs "HH:MM" strings, not the
+// "9am"-style display text formatSlot produces.
+
+describe("slotToIsoTimes", () => {
+  test("24h slot: 09:00-17:00 → { opens: '09:00', closes: '17:00' }", () => {
+    expect(slotToIsoTimes("09:00-17:00")).toEqual({ opens: "09:00", closes: "17:00" });
+  });
+
+  test("AM/PM slot: 9:00 AM - 5:00 PM → { opens: '09:00', closes: '17:00' } (12h→24h + zero-pad)", () => {
+    // Proves both the AM/PM-to-24h hour conversion (5 PM → 17) and zero-padding
+    // of single-digit hours (9 → "09"), not just a pass-through of the input.
+    expect(slotToIsoTimes("9:00 AM - 5:00 PM")).toEqual({ opens: "09:00", closes: "17:00" });
+  });
+
+  test("malformed slot returns null", () => {
+    expect(slotToIsoTimes("not-a-slot")).toBeNull();
   });
 });

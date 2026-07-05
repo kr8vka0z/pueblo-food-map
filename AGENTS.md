@@ -833,10 +833,9 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   serve the same URL. Crawlers only index the English version. Proper bilingual SEO (separate
   `/es/` URL tree or `hreflang` link tags) requires separate routes and is a deferred
   follow-up beyond #164.
-- **Deferred: explicit homepage canonical** — the client-component homepage would need a server
-  wrapper to own `alternates.canonical`. Implicit self-canonical is acceptable (Google ignores
-  `fbclid`/`utm` params); revisit if tracking-param duplicate indexing shows up in Search
-  Console.
+- **Done: explicit homepage canonical** — `src/app/page.tsx` is now a Server Component and sets
+  `export const metadata = buildPageMetadata({ path: "/", ... })` directly, giving `/` the same
+  explicit self-canonical every other page already had (previously implicit/inherited).
 
 **PR2 (items 6.3 + 6.4) — shipped.**
 
@@ -888,13 +887,16 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   `src/lib/hours.ts`'s `slotToIsoTimes` converts a slot string to ISO 8601 `"HH:MM"` open/close
   times, reusing the same private `parseSlot` minutes-since-midnight logic `computeOpenStatus`/
   `formatSlot` already rely on — one parser, three consumers.
-- **ItemList JSON-LD** — rendered client-side in `src/app/page.tsx` (homepage `/` only). Lists
-  all venues by id/name/url/position for crawlers that read client-rendered markup.
-  - **Deferred: server-render the homepage ItemList JSON-LD** — currently client-rendered
-    (acceptable for Google, which renders JS, but weaker than SSR). Server-rendering requires
-    splitting the homepage into a server wrapper + client map child; deferred because it risks
-    the live map and `page.test.tsx` and pairs naturally with the deferred explicit-homepage-canonical
-    refactor.
+- **ItemList JSON-LD** — rendered server-side in `src/app/page.tsx` (homepage `/` only). It's now
+  a synchronous Server Component that emits the JSON-LD `<script>` directly in the server
+  response body (with `HomePageClient` holding the interactive splash/map body as a child), so
+  even crawlers that don't execute JS see the full venue index — not just crawlers that read
+  client-rendered markup.
+  - **Done: server-render the homepage ItemList JSON-LD** — `src/app/page.tsx` splits the
+    homepage into a synchronous Server Component wrapper (JSON-LD script + a sr-only `<h1>`,
+    both unconditional) and `src/app/HomePageClient.tsx` (the former homepage's splash-gate/map
+    logic, now a client child). Pairs with the explicit-homepage-canonical fix above (PR1) — both
+    land in the same server wrapper.
 - **Sitemap** — `src/app/sitemap.ts` now includes all per-venue URLs (`changeFrequency:
   "monthly"`, `priority: 0.7`). The static-routes-only TODO comment was removed. Each venue
   entry also carries `lastModified: v.last_verified` — issue #164 quick win (S6) — a real,
@@ -905,6 +907,19 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   e.g. `"${name} — ${category} in Pueblo, CO. ${address}."` — issue #164 quick win (S4). Before
   this, every venue sharing a category got a byte-identical description string (a duplicate-
   content SEO problem); see `src/app/venue/[id]/page.test.tsx` for the regression guard.
+- **`/venues` directory page** — `src/app/venues/page.tsx`, a server-rendered, crawlable index of
+  every venue grouped by category (`groupVenuesByCategory`, category order matches
+  `categoryLabels`, items name-sorted within each group), each row linking to its own
+  `/venue/<id>` page. Registered in `src/app/sitemap.ts` at priority 0.7. Exists for the same
+  reason the ItemList JSON-LD above does — the homepage map is JS-only — but as readable HTML a
+  crawler or answer engine can scan directly, not just structured data.
+- **`/about` FAQ + FAQPage JSON-LD** — `src/app/about/page.tsx` renders a 6-question FAQ and
+  injects a schema.org `FAQPage` `<script type="application/ld+json">` (built by `buildFaqJsonLd`
+  in `src/lib/venueSchema.ts`, serialized via `serializeJsonLd`). FAQ content is localized — the
+  JSON-LD is built from the same request-locale `about.faq.*` strings the page renders, so
+  structured data and visible text never diverge. The page also carries a live venue-count line
+  (`venues.length`) and a cited Feeding America (Map the Meal Gap, 2023) food-insecurity stat —
+  AEO item S8.
 
 ---
 

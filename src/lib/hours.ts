@@ -173,8 +173,13 @@ export function computeOpenStatus(
 }
 
 function formatTime(hour: number, min: number): string {
-  const period = hour >= 12 ? "pm" : "am";
-  const h = hour % 12 === 0 ? 12 : hour % 12;
+  // hour can be 24 — a slot closing at "24:00" (midnight), e.g. OSM's
+  // "00:00-24:00" 24-hour venues. Normalize into 0–23 so 24:00 renders as
+  // "12am" (midnight), not "12pm": without the %24, a full-day close read as
+  // "closes at noon" — wrong hours on every 24-hour store.
+  const h24 = hour % 24;
+  const period = h24 >= 12 ? "pm" : "am";
+  const h = h24 % 12 === 0 ? 12 : h24 % 12;
   const m = min > 0 ? `:${String(min).padStart(2, "0")}` : "";
   return `${h}${m}${period}`;
 }
@@ -192,6 +197,11 @@ function formatTime(hour: number, min: number): string {
 export function formatSlot(slot: string): string {
   const parsed = parseSlot(slot);
   if (!parsed) return slot;
+  // A slot spanning a full 24 hours (e.g. OSM's "00:00-24:00") reads far
+  // clearer as "Open 24 hours" than "12am – 12am". English string to match
+  // this function's existing locale-agnostic output (slot times always render
+  // as English am/pm regardless of page locale).
+  if (parsed.close - parsed.open >= 24 * 60) return "Open 24 hours";
   const openHour = Math.floor(parsed.open / 60);
   const openMin = parsed.open % 60;
   const closeHour = Math.floor(parsed.close / 60);

@@ -17,6 +17,8 @@ import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
+import { venues } from "@/data/venues";
+import { serializeJsonLd, buildFaqJsonLd } from "@/lib/venueSchema";
 import SiteFooter from "@/components/SiteFooter";
 
 export const metadata: Metadata = buildPageMetadata({
@@ -31,8 +33,23 @@ export default async function AboutPage() {
   const rawLocale = cookieStore.get("pfm-locale")?.value;
   const locale: Locale = rawLocale === "en" || rawLocale === "es" ? rawLocale : "en";
 
+  // Built once so the visible FAQ and the FAQPage JSON-LD below are guaranteed
+  // to render the exact same question/answer pairs — one source, not two
+  // copies that could drift (#PR4 S8).
+  const faqNums = [1, 2, 3, 4, 5, 6] as const;
+  const faqItems = faqNums.map((n) => ({
+    question: t(`about.faq.q${n}`, locale),
+    answer: t(`about.faq.a${n}`, locale),
+  }));
+
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
+      {/* FAQPage structured data — mirrors the visible FAQ section below (#PR4) */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildFaqJsonLd(faqItems)) }}
+      />
+
       {/* DRAFT COPY — pending final text from Kyle / Pueblo Food Project (#155) */}
 
       {/* Top nav bar */}
@@ -72,6 +89,16 @@ export default async function AboutPage() {
           </p>
         </section>
 
+        {/* Context stat — why the map matters + current coverage (approved copy, PR4 S8) */}
+        <div className="border-l-2 border-[var(--color-sage-500)] pl-4 space-y-2">
+          <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+            {t("about.stat.insecurity", locale)}
+          </p>
+          <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+            {t("about.stat.count", locale, { count: String(venues.length) })}
+          </p>
+        </div>
+
         {/* Vision */}
         <section aria-labelledby="vision-heading">
           <h2
@@ -109,6 +136,25 @@ export default async function AboutPage() {
           <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
             {t("about.howWeSource.body", locale)}
           </p>
+        </section>
+
+        {/* FAQ — approved copy (PR4 S8); mirrored in the FAQPage JSON-LD injected above */}
+        <section aria-labelledby="faq-heading">
+          <h2 id="faq-heading" className="text-lg font-semibold text-[var(--color-ink-800)] mb-3">
+            {t("about.faq.heading", locale)}
+          </h2>
+          <div className="space-y-5">
+            {faqNums.map((n) => (
+              <div key={n}>
+                <h3 className="text-base font-semibold text-[var(--color-ink-800)] mb-1">
+                  {t(`about.faq.q${n}`, locale)}
+                </h3>
+                <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+                  {t(`about.faq.a${n}`, locale)}
+                </p>
+              </div>
+            ))}
+          </div>
         </section>
 
         {/* Suggest CTA */}

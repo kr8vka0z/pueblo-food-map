@@ -26,6 +26,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
+      // WHY 0.7: a browse/discovery page (the crawlable counterpart to the
+      // JS-only homepage map) — below /about's 0.8, above the utility forms.
+      url: `${SITE_URL}/venues`,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+    {
       url: `${SITE_URL}/suggest`,
       changeFrequency: "monthly",
       priority: 0.6,

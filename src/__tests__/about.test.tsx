@@ -7,6 +7,8 @@
  *   3. i18n keys for about.* are present and differ EN/ES (parity check).
  *   4. SiteFooter renders an About link (render test).
  *   5. HamburgerMenu contains an About link when open.
+ *   6. buildFaqJsonLd produces valid FAQPage structured data (#PR4).
+ *   7. about.stat.count is parameterized with a live count, not hardcoded (#PR4).
  */
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
@@ -16,6 +18,7 @@ import { SITE_URL } from "@/lib/site";
 import { buildPageMetadata } from "@/lib/site";
 import sitemap from "@/app/sitemap";
 import { I18N_DICTIONARIES, t } from "@/lib/i18n";
+import { buildFaqJsonLd } from "@/lib/venueSchema";
 import SiteFooter from "@/components/SiteFooter";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import { LocaleProvider } from "@/lib/LocaleContext";
@@ -114,6 +117,21 @@ describe("i18n — about.* keys", () => {
     "nav.about",
     "footer.backToMap",
     "footer.about",
+    "about.faq.heading",
+    "about.faq.q1",
+    "about.faq.q2",
+    "about.faq.q3",
+    "about.faq.q4",
+    "about.faq.q5",
+    "about.faq.q6",
+    "about.faq.a1",
+    "about.faq.a2",
+    "about.faq.a3",
+    "about.faq.a4",
+    "about.faq.a5",
+    "about.faq.a6",
+    "about.stat.insecurity",
+    "about.stat.count",
   ] as const;
 
   test("all about.* keys exist in EN dictionary", () => {
@@ -219,5 +237,53 @@ describe("HamburgerMenu — About link", () => {
       const links = document.querySelectorAll("a[href='/about']");
       expect(links.length).toBeGreaterThan(0);
     });
+  });
+});
+
+// ─── 6. buildFaqJsonLd (#PR4) ─────────────────────────────────────────────────
+
+describe("buildFaqJsonLd", () => {
+  const sample = [
+    { question: "Is this free?", answer: "Yes, completely free." },
+    { question: "How current is it?", answer: "Updated as reports come in." },
+  ];
+  const jsonLd = buildFaqJsonLd(sample) as {
+    "@type": string;
+    mainEntity: {
+      "@type": string;
+      name: string;
+      acceptedAnswer: { "@type": string; text: string };
+    }[];
+  };
+
+  test("@type is FAQPage", () => {
+    expect(jsonLd["@type"]).toBe("FAQPage");
+  });
+
+  test("mainEntity has one entry per input item", () => {
+    expect(jsonLd.mainEntity.length).toBe(2);
+  });
+
+  test("each entry is a Question whose name/answer match the input", () => {
+    jsonLd.mainEntity.forEach((entry, i) => {
+      expect(entry["@type"]).toBe("Question");
+      expect(entry.name).toBe(sample[i].question);
+      expect(entry.acceptedAnswer["@type"]).toBe("Answer");
+      expect(entry.acceptedAnswer.text).toBe(sample[i].answer);
+    });
+  });
+});
+
+// ─── 7. about.stat.count — live venue count, not hardcoded (#PR4) ────────────
+
+describe("about.stat.count interpolation", () => {
+  test("EN template carries a {count} placeholder", () => {
+    expect(en["about.stat.count"]).toContain("{count}");
+  });
+
+  test("t() substitutes {count} with the live value and leaves no placeholder", () => {
+    const result = t("about.stat.count", "en", { count: "42" });
+    expect(result).toContain("42");
+    expect(result).not.toContain("{count}");
   });
 });

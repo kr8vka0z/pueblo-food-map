@@ -872,6 +872,12 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   making break-out impossible.
 - **WebSite JSON-LD** — rendered server-side in `src/app/layout.tsx` body (sitewide; 1 tag on
   every page).
+- **Venue opening hours in JSON-LD** — `buildVenueJsonLd` (`src/lib/venueSchema.ts`) adds an
+  `openingHoursSpecification` array (one entry per parseable hours slot, omitted entirely when
+  a venue has no `hours_weekly` or no slot parses) plus `address.addressCountry: "US"`.
+  `src/lib/hours.ts`'s `slotToIsoTimes` converts a slot string to ISO 8601 `"HH:MM"` open/close
+  times, reusing the same private `parseSlot` minutes-since-midnight logic `computeOpenStatus`/
+  `formatSlot` already rely on — one parser, three consumers.
 - **ItemList JSON-LD** — rendered client-side in `src/app/page.tsx` (homepage `/` only). Lists
   all venues by id/name/url/position for crawlers that read client-rendered markup.
   - **Deferred: server-render the homepage ItemList JSON-LD** — currently client-rendered

@@ -1,5 +1,6 @@
 /**
- * Unit tests for src/lib/venueSchema.ts — pure schema helpers for #164 (6.3/6.4).
+ * Unit tests for src/lib/venueSchema.ts — pure schema helpers for #164 (6.3/6.4)
+ * plus venue opening-hours + addressCountry enrichment.
  *
  * Tests are kept pure (no DOM, no Next.js server APIs) so they run in jsdom without
  * any mocking beyond this file.
@@ -92,12 +93,13 @@ describe("buildVenueJsonLd", () => {
     expect(geo["longitude"]).toBe(grocery.lng);
   });
 
-  test("address has PostalAddress type with Pueblo/CO", () => {
+  test("address has PostalAddress type with Pueblo/CO/US", () => {
     const ld = buildVenueJsonLd(grocery);
     const addr = ld["address"] as Record<string, unknown>;
     expect(addr["@type"]).toBe("PostalAddress");
     expect(addr["addressLocality"]).toBe("Pueblo");
     expect(addr["addressRegion"]).toBe("CO");
+    expect(addr["addressCountry"]).toBe("US");
   });
 
   test("telephone present when phone exists", () => {
@@ -111,6 +113,31 @@ describe("buildVenueJsonLd", () => {
     const venueWithoutPhone = venues.find((v) => !v.phone)!;
     const ld = buildVenueJsonLd(venueWithoutPhone);
     expect("telephone" in ld).toBe(false);
+  });
+
+  test("openingHoursSpecification present with correct shape when hours_weekly exists", () => {
+    const venueWithHours = venues.find(
+      (v) => v.hours_weekly && Object.keys(v.hours_weekly).length > 0,
+    )!;
+    const ld = buildVenueJsonLd(venueWithHours);
+    const specs = ld["openingHoursSpecification"] as Array<
+      Record<string, unknown>
+    >;
+    expect(Array.isArray(specs)).toBe(true);
+    expect(specs.length).toBeGreaterThan(0);
+    for (const spec of specs) {
+      expect(spec["@type"]).toBe("OpeningHoursSpecification");
+      expect(typeof spec["dayOfWeek"]).toBe("string");
+      expect(spec["dayOfWeek"]).toMatch(/^https:\/\/schema\.org\/\w+day$/);
+      expect(spec["opens"]).toMatch(/^\d{2}:\d{2}$/);
+      expect(spec["closes"]).toMatch(/^\d{2}:\d{2}$/);
+    }
+  });
+
+  test("openingHoursSpecification absent when hours_weekly is missing", () => {
+    const venueWithoutHours = venues.find((v) => !v.hours_weekly)!;
+    const ld = buildVenueJsonLd(venueWithoutHours);
+    expect("openingHoursSpecification" in ld).toBe(false);
   });
 
   test("no null or undefined values in the object", () => {

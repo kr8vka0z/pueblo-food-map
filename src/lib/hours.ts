@@ -9,6 +9,10 @@
  * the hours panel in BottomSheet / DesktopVenueWindow. Accepts both the 24h
  * form ("HH:MM-HH:MM") and the 12h Plentiful form ("H:MM AM - H:MM PM") —
  * both produce identical output style.
+ *
+ * slotToIsoTimes() converts a slot string to ISO 8601 "HH:MM" open/close
+ * strings for schema.org OpeningHoursSpecification (src/lib/venueSchema.ts) —
+ * a machine-readable sibling to formatSlot()'s human-readable output.
  */
 import type { WeeklyHours } from "@/types/venue";
 
@@ -193,4 +197,21 @@ export function formatSlot(slot: string): string {
   const closeHour = Math.floor(parsed.close / 60);
   const closeMin = parsed.close % 60;
   return `${formatTime(openHour, openMin)} – ${formatTime(closeHour, closeMin)}`;
+}
+
+/**
+ * Convert a slot string to ISO 8601 time-of-day strings ("HH:MM", 24h) for
+ * schema.org OpeningHoursSpecification's opens/closes fields. Delegates to
+ * parseSlot() for both slot formats — see parseSlot's doc comment above.
+ *
+ * Returns null on the same malformed input parseSlot itself rejects.
+ */
+export function slotToIsoTimes(
+  slot: string,
+): { opens: string; closes: string } | null {
+  const parsed = parseSlot(slot);
+  if (!parsed) return null;
+  const pad = (mins: number) =>
+    `${String(Math.floor(mins / 60) % 24).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+  return { opens: pad(parsed.open), closes: pad(parsed.close) };
 }

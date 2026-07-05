@@ -13,6 +13,7 @@
 import type { Venue } from "@/types/venue";
 import { venues, categoryLabels } from "@/data/venues";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
+import { DISPLAY_DAY_KEYS, slotToIsoTimes } from "@/lib/hours";
 
 /** @type record maps VenueCategory → schema.org @type value */
 const CATEGORY_SCHEMA_TYPE: Record<Venue["category"], string> = {
@@ -23,6 +24,17 @@ const CATEGORY_SCHEMA_TYPE: Record<Venue["category"], string> = {
   garden: "Place",
   edible_landscape: "Place",
   meal_site: "FoodEstablishment",
+};
+
+/** Maps a WeeklyHours day key to its schema.org DayOfWeek IRI. */
+const SCHEMA_DAY: Record<string, string> = {
+  mon: "https://schema.org/Monday",
+  tue: "https://schema.org/Tuesday",
+  wed: "https://schema.org/Wednesday",
+  thu: "https://schema.org/Thursday",
+  fri: "https://schema.org/Friday",
+  sat: "https://schema.org/Saturday",
+  sun: "https://schema.org/Sunday",
 };
 
 /** Extract a 5-digit zip code from an address string, if present. */
@@ -66,6 +78,7 @@ export function buildVenueJsonLd(venue: Venue): Record<string, unknown> {
     streetAddress: extractStreetAddress(venue.address),
     addressLocality: "Pueblo",
     addressRegion: "CO",
+    addressCountry: "US",
   };
   if (postalCode) {
     address["postalCode"] = postalCode;
@@ -88,6 +101,31 @@ export function buildVenueJsonLd(venue: Venue): Record<string, unknown> {
   // Only include telephone when a phone number is present — omit rather than null.
   if (venue.phone) {
     result["telephone"] = venue.phone;
+  }
+
+  // Only include openingHoursSpecification when hours_weekly exists and yields
+  // at least one parseable slot — omit rather than an empty array, same
+  // omit-when-empty convention as telephone above.
+  if (venue.hours_weekly) {
+    const hoursWeekly = venue.hours_weekly;
+    const specs = DISPLAY_DAY_KEYS.flatMap((day) =>
+      (hoursWeekly[day] ?? []).flatMap((slot) => {
+        const iso = slotToIsoTimes(slot);
+        return iso
+          ? [
+              {
+                "@type": "OpeningHoursSpecification",
+                dayOfWeek: SCHEMA_DAY[day],
+                opens: iso.opens,
+                closes: iso.closes,
+              },
+            ]
+          : [];
+      }),
+    );
+    if (specs.length > 0) {
+      result["openingHoursSpecification"] = specs;
+    }
   }
 
   return result;

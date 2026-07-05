@@ -17,6 +17,7 @@ import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
+import { venues } from "@/data/venues";
 import { serializeJsonLd, buildFaqJsonLd } from "@/lib/venueSchema";
 import SiteFooter from "@/components/SiteFooter";
 
@@ -87,6 +88,16 @@ export default async function AboutPage() {
             {t("about.mission.body", locale)}
           </p>
         </section>
+
+        {/* Context stat — why the map matters + current coverage (approved copy, PR4 S8) */}
+        <div className="border-l-2 border-[var(--color-sage-500)] pl-4 space-y-2">
+          <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+            {t("about.stat.insecurity", locale)}
+          </p>
+          <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+            {t("about.stat.count", locale, { count: String(venues.length) })}
+          </p>
+        </div>
 
         {/* Vision */}
         <section aria-labelledby="vision-heading">

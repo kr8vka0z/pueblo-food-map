@@ -403,6 +403,8 @@ const en: Record<string, string> = {
   "venues.noHours": "Hours not listed",
 
   // About page FAQ + stats (#PR4)
+  "about.stat.insecurity": "According to Feeding America's Map the Meal Gap (2023 data), about 1 in 6 Pueblo County residents — roughly 16.5% — faces food insecurity, including nearly 1 in 5 children.",
+  "about.stat.count": "Pueblo Food Map currently maps {count} of the free and low-cost food resources that can help.",
   "about.faq.heading": "Frequently asked questions",
   "about.faq.q1": "Is Pueblo Food Map free to use?",
   "about.faq.a1": "Yes — completely free, with no account or sign-in. It's a community project, not a business.",
@@ -817,6 +819,8 @@ const es: Record<string, string> = {
   "venues.noHours": "Horario no disponible",
 
   // About page FAQ + stats (#PR4)
+  "about.stat.insecurity": "Según el estudio Map the Meal Gap de Feeding America (datos de 2023), aproximadamente 1 de cada 6 residentes del condado de Pueblo — cerca del 16.5% — vive con inseguridad alimentaria, incluyendo casi 1 de cada 5 niños.",
+  "about.stat.count": "Pueblo Food Map incluye actualmente {count} de los recursos de alimentos gratuitos y de bajo costo que pueden ayudar.",
   "about.faq.heading": "Preguntas frecuentes",
   "about.faq.q1": "¿Es gratis usar Pueblo Food Map?",
   "about.faq.a1": "Sí, es completamente gratis y no necesitas crear una cuenta ni iniciar sesión. Es un proyecto comunitario, no un negocio.",

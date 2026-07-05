@@ -121,7 +121,7 @@ export default async function VenuesPage() {
                       <Link
                         href={`/venue/${v.id}`}
                         className={
-                          "text-sm font-medium text-[var(--color-sage-600)] " +
+                          "text-base font-semibold text-[var(--color-sage-600)] " +
                           "hover:text-[var(--color-sage-700)] transition-colors " +
                           "focus-visible:outline-none focus-visible:ring-2 " +
                           "focus-visible:ring-[var(--color-sage-500)] rounded"

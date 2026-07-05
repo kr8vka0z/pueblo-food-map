@@ -261,6 +261,22 @@ describe("formatSlot", () => {
     expect(formatSlot("9:00-13:00")).toBe("9am – 1pm");
   });
 
+  // ── Full-day / midnight close (the 24-hour-store bug) ────────────────────
+
+  test("full-day slot 00:00-24:00 → 'Open 24 hours' (was '12am – 12pm')", () => {
+    // OSM tags 7-Eleven / Circle K as "00:00-24:00" on every day. The old
+    // formatTime read the 24:00 close as 12pm, so a 24-hour store displayed
+    // as "12am – 12pm" (i.e. closes at noon) — wrong hours on the new,
+    // crawler-facing /venues page. A full-day span now renders "Open 24 hours".
+    expect(formatSlot("00:00-24:00")).toBe("Open 24 hours");
+  });
+
+  test("partial slot closing at midnight 09:00-24:00 → 9am – 12am (not 12pm)", () => {
+    // Not a full 24h span, so it still renders as a range — but the 24:00
+    // close must read as midnight "12am", proving the formatTime %24 fix.
+    expect(formatSlot("09:00-24:00")).toBe("9am – 12am");
+  });
+
   // ── Fail-safe ────────────────────────────────────────────────────────────
 
   test("malformed slot returns raw slot unchanged (no throw)", () => {

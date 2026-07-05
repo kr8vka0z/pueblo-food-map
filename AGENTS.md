@@ -871,7 +871,10 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   vector. The escaping keeps the JSON valid (parsers decode back to the original characters) while
   making break-out impossible.
 - **WebSite JSON-LD** — rendered server-side in `src/app/layout.tsx` body (sitewide; 1 tag on
-  every page).
+  every page). Shipped as an `@graph` of `WebSite` + `Organization` (linked by
+  `publisher`/`@id`), not a flat `WebSite` object — gives the site itself a
+  linkable schema.org entity, with a `sameAs` back to its own canonical
+  presences (pueblofoodproject.org, pueblofoodmap.com).
 - **Venue opening hours in JSON-LD** — `buildVenueJsonLd` (`src/lib/venueSchema.ts`) adds an
   `openingHoursSpecification` array (one entry per parseable hours slot, omitted entirely when
   a venue has no `hours_weekly` or no slot parses) plus `address.addressCountry: "US"`.

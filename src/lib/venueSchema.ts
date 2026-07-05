@@ -146,14 +146,35 @@ export function buildVenueListJsonLd(
   };
 }
 
+/**
+ * WHY @graph instead of a flat WebSite object: a bare WebSite node has no
+ * identity separate from the page it's declared on. Wrapping WebSite +
+ * Organization in one @graph, linked by publisher/@id, makes the site itself
+ * a linkable schema.org Organization entity (with a sameAs back to its own
+ * canonical presences) — search engines can then associate the WebSite with
+ * a known, cross-referenced entity instead of an anonymous node.
+ */
 export function buildWebSiteJsonLd(): Record<string, unknown> {
   return {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: SITE_NAME,
-    url: SITE_URL,
-    description:
-      "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores.",
-    inLanguage: "en",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${SITE_URL}/#website`,
+        name: SITE_NAME,
+        url: SITE_URL,
+        description:
+          "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores.",
+        inLanguage: "en",
+        publisher: { "@id": `${SITE_URL}/#organization` },
+      },
+      {
+        "@type": "Organization",
+        "@id": `${SITE_URL}/#organization`,
+        name: SITE_NAME,
+        url: "https://pueblofoodmap.com",
+        sameAs: ["https://pueblofoodproject.org", "https://pueblofoodmap.com"],
+      },
+    ],
   };
 }

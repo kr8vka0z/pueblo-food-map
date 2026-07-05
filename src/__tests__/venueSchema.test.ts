@@ -1,6 +1,6 @@
 /**
  * Unit tests for src/lib/venueSchema.ts — pure schema helpers for #164 (6.3/6.4)
- * plus venue opening-hours + addressCountry enrichment.
+ * plus the structured-data enrichment PR (opening hours + Organization @graph).
  *
  * Tests are kept pure (no DOM, no Next.js server APIs) so they run in jsdom without
  * any mocking beyond this file.
@@ -196,28 +196,52 @@ describe("buildVenueListJsonLd", () => {
 });
 
 // ─── buildWebSiteJsonLd ───────────────────────────────────────────────────────
+//
+// Shipped as an @graph of WebSite + Organization (not a flat WebSite object) so
+// the site itself is a linkable schema.org entity — see the Organization block
+// below and its sameAs array.
 
 describe("buildWebSiteJsonLd", () => {
   const ld = buildWebSiteJsonLd();
+  const graph = ld["@graph"] as Array<Record<string, unknown>>;
+  const website = graph[0];
+  const organization = graph[1];
 
   test("@context is schema.org", () => {
     expect(ld["@context"]).toBe("https://schema.org");
   });
 
-  test("@type is WebSite", () => {
-    expect(ld["@type"]).toBe("WebSite");
+  test("@graph[0] is the WebSite", () => {
+    expect(website["@type"]).toBe("WebSite");
   });
 
-  test("url is SITE_URL", () => {
-    expect(ld["url"]).toBe(SITE_URL);
+  test("WebSite @id is SITE_URL/#website", () => {
+    expect(website["@id"]).toBe(`${SITE_URL}/#website`);
   });
 
-  test("name is SITE_NAME", () => {
-    expect(ld["name"]).toBe(SITE_NAME);
+  test("WebSite url is SITE_URL", () => {
+    expect(website["url"]).toBe(SITE_URL);
   });
 
-  test("inLanguage is en", () => {
-    expect(ld["inLanguage"]).toBe("en");
+  test("WebSite name is SITE_NAME", () => {
+    expect(website["name"]).toBe(SITE_NAME);
+  });
+
+  test("WebSite inLanguage is en", () => {
+    expect(website["inLanguage"]).toBe("en");
+  });
+
+  test("@graph[1] is the Organization, with a sameAs array", () => {
+    expect(organization["@type"]).toBe("Organization");
+    expect(organization["@id"]).toBe(`${SITE_URL}/#organization`);
+    expect(Array.isArray(organization["sameAs"])).toBe(true);
+    expect(organization["sameAs"]).toContain("https://pueblofoodproject.org");
+    expect(organization["sameAs"]).toContain("https://pueblofoodmap.com");
+  });
+
+  test("WebSite.publisher @id matches Organization @id", () => {
+    const publisher = website["publisher"] as Record<string, unknown>;
+    expect(publisher["@id"]).toBe(organization["@id"]);
   });
 });
 

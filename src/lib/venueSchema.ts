@@ -172,7 +172,7 @@ export function buildWebSiteJsonLd(): Record<string, unknown> {
         "@type": "Organization",
         "@id": `${SITE_URL}/#organization`,
         name: SITE_NAME,
-        url: "https://pueblofoodmap.com",
+        url: SITE_URL,
         sameAs: ["https://pueblofoodproject.org", "https://pueblofoodmap.com"],
       },
     ],

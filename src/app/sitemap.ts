@@ -44,6 +44,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const venueRoutes: MetadataRoute.Sitemap = venues.map((v) => ({
     url: `${SITE_URL}/venue/${v.id}`,
+    // Unlike the static routes above (no per-page last-modified source),
+    // every venue row already tracks last_verified — a real signal crawlers
+    // can use to prioritize re-crawling changed venues over unchanged ones.
+    lastModified: v.last_verified,
     changeFrequency: "monthly",
     priority: 0.7,
   }));

@@ -47,7 +47,10 @@ export async function generateMetadata({
   if (!v) return {};
   return buildPageMetadata({
     title: v.name,
-    description: `${categoryLabels[v.category]} in Pueblo, CO. Hours, SNAP/WIC info, and directions on Pueblo Food Map.`,
+    // WHY name + address (not just category): the prior description was
+    // byte-identical for every venue sharing a category — a duplicate-content
+    // SEO problem search engines can penalize. Issue #164 quick win (S4).
+    description: `${v.name} — ${categoryLabels[v.category]} in Pueblo, CO. ${v.address}.`,
     path: venuePath(v.id),
   });
 }

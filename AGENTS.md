@@ -809,11 +809,18 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   the constant.
 - **Sitemap** — `src/app/sitemap.ts` (static public routes only: `/`, `/suggest`, `/feedback`,
   `/privacy`). Generates `/sitemap.xml` at runtime via the App Router `MetadataRoute.Sitemap`
-  convention. No `lastModified` field — the value was non-deterministic (`new Date()` on every
-  request), which prevented stable caching and could confuse crawlers into treating every page
-  as perpetually updated.
-- **Robots** — `src/app/robots.ts` (allows `/`, disallows `/api/`, points to sitemap).
-  Generates `/robots.txt` at runtime. No `host` field — Google ignores it.
+  convention. The static routes above still carry no `lastModified` field — there's no per-page
+  last-modified source for them, and a non-deterministic value (`new Date()` on every request)
+  would prevent stable caching and could confuse crawlers into treating every page as perpetually
+  updated. (Per-venue routes DO carry a real `lastModified` — see PR2 below.)
+- **Robots** — `src/app/robots.ts` (allows `/`, disallows `/api/` and `/admin/`, points to
+  sitemap). Generates `/robots.txt` at runtime. No `host` field — Google ignores it. A second
+  rule explicitly blocks named bulk-training scrapers (`CCBot`, `Bytespider`, `Amazonbot`,
+  `Applebot-Extended`, `meta-externalagent`) while leaving citation/answer-engine crawlers
+  (GPTBot, ClaudeBot, Google-Extended, PerplexityBot, Bingbot, Googlebot) uncovered by any
+  disallow-all rule, so they fall through to the permissive `"*"` rule — issue #164 quick win
+  (S7b). This re-establishes in version-controlled code a bot policy that previously lived only
+  as a Cloudflare dashboard bot-management rule.
 - **Shared constants** — canonical origin, site name, and OG image metadata all live in
   `src/lib/site.ts` (single source of truth; reused by metadata, sitemap, robots).
 - **Subpage metadata helper** — `/suggest`, `/feedback`, and `/privacy` use `buildPageMetadata`
@@ -889,7 +896,15 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
     the live map and `page.test.tsx` and pairs naturally with the deferred explicit-homepage-canonical
     refactor.
 - **Sitemap** — `src/app/sitemap.ts` now includes all per-venue URLs (`changeFrequency:
-  "monthly"`, `priority: 0.7`). The static-routes-only TODO comment was removed.
+  "monthly"`, `priority: 0.7`). The static-routes-only TODO comment was removed. Each venue
+  entry also carries `lastModified: v.last_verified` — issue #164 quick win (S6) — a real,
+  deterministic per-venue signal (unlike the static routes above, which have no equivalent
+  per-page source and so still omit the field).
+- **Venue description uniqueness** — `generateMetadata` in `src/app/venue/[id]/page.tsx` builds
+  each venue's `<meta description>` from that venue's own name + address (not just its category),
+  e.g. `"${name} — ${category} in Pueblo, CO. ${address}."` — issue #164 quick win (S4). Before
+  this, every venue sharing a category got a byte-identical description string (a duplicate-
+  content SEO problem); see `src/app/venue/[id]/page.test.tsx` for the regression guard.
 
 ---
 

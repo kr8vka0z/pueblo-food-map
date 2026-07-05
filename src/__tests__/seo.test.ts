@@ -88,6 +88,25 @@ describe("sitemap", () => {
       expect(entry.url.startsWith(`${SITE_URL}/venue/`)).toBe(true);
     }
   });
+
+  // S6 (#164 quick win) — venue entries carry a real lastModified so crawlers
+  // can tell which venue pages actually changed, instead of re-crawling every
+  // page as if it were equally fresh.
+  test("every venue entry includes lastModified", () => {
+    const entries = sitemap();
+    const venueEntries = entries.filter((e) => e.url.includes("/venue/"));
+    expect(venueEntries.length).toBeGreaterThan(0);
+    for (const entry of venueEntries) {
+      expect(entry.lastModified).toBeDefined();
+    }
+  });
+
+  test("a venue's lastModified matches its last_verified date", () => {
+    const entries = sitemap();
+    const v = venues[0];
+    const entry = entries.find((e) => e.url === `${SITE_URL}/venue/${v.id}`);
+    expect(entry?.lastModified).toBe(v.last_verified);
+  });
 });
 
 // ─── robots ──────────────────────────────────────────────────────────────────
@@ -120,6 +139,51 @@ describe("robots", () => {
       return disallow.includes("/api/");
     });
     expect(hasDisallowApi).toBe(true);
+  });
+
+  // S7b (#164 quick win) — explicit AI-bot policy: /admin/ is never
+  // crawlable content, bulk-training scrapers are blocked outright, and
+  // citation/answer-engine crawlers are deliberately left uncovered by any
+  // disallow-all rule so they fall under the permissive "*" allow.
+  test("disallow includes /admin/", () => {
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const hasDisallowAdmin = rules.some((rule) => {
+      if (!rule) return false;
+      const disallow = Array.isArray(rule.disallow)
+        ? rule.disallow
+        : [rule.disallow];
+      return disallow.includes("/admin/");
+    });
+    expect(hasDisallowAdmin).toBe(true);
+  });
+
+  test("blocks a bulk-training scraper (CCBot) entirely", () => {
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const blockedRule = rules.find((rule) => {
+      if (!rule) return false;
+      const agents = Array.isArray(rule.userAgent) ? rule.userAgent : [rule.userAgent];
+      return agents.includes("CCBot");
+    });
+    expect(blockedRule).toBeDefined();
+    const disallow = Array.isArray(blockedRule!.disallow)
+      ? blockedRule!.disallow
+      : [blockedRule!.disallow];
+    expect(disallow).toContain("/");
+  });
+
+  test("does not block a citation crawler (GPTBot) with a disallow-all rule", () => {
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const targetedRule = rules.find((rule) => {
+      if (!rule) return false;
+      const agents = Array.isArray(rule.userAgent) ? rule.userAgent : [rule.userAgent];
+      return agents.includes("GPTBot");
+    });
+    // GPTBot must not appear in the bulk-scraper block list — it's meant to
+    // fall through to the permissive "*" rule instead.
+    expect(targetedRule).toBeUndefined();
   });
 });
 

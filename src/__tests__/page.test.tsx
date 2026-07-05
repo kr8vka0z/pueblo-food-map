@@ -8,20 +8,27 @@
  *   - After dismiss: map container has neither attribute
  *   - showSplashAgain (re-show path, #99) re-applies inert + aria-hidden
  *
+ * Also verifies the SEO PR1 server/client split (page.tsx + HomePageClient):
+ *   - The ItemList JSON-LD <script> and the sr-only <h1> render on the
+ *     PLAIN synchronous render, before any effect/microtask flush — proof
+ *     they now come from page.tsx's server output, not from client state
+ *     that resolves later (the bug this PR fixes).
+ *
  * MapWrapper is mocked because it depends on next/dynamic + mapbox WebGL.
  * SplashScreen is rendered real (no mock) so we can verify its overlay role
  * and trigger dismiss.
  *
  * navigator.permissions is stubbed so useGeolocation doesn't throw.
  *
- * WHY next/dynamic is mocked: page.tsx uses next/dynamic (ssr:false) to
- * code-split MapWrapper and SplashScreen for TBT reduction (#202). In Vitest
- * (jsdom, no Next.js runtime), next/dynamic's lazy resolution never settles —
- * components render null and tests see an empty DOM. The mock makes dynamic()
- * behave like a synchronous require() so tests exercise the real render path.
- * Only the ssr:false dynamic() calls in this test's subject (page.tsx) need
- * this; nested dynamic() calls inside MapWrapper/SplashScreen are already
- * covered by their own module mocks.
+ * WHY next/dynamic is mocked: HomePageClient.tsx uses next/dynamic
+ * (ssr:false) to code-split MapWrapper and SplashScreen for TBT reduction
+ * (#202). In Vitest (jsdom, no Next.js runtime), next/dynamic's lazy
+ * resolution never settles — components render null and tests see an empty
+ * DOM. The mock makes dynamic() behave like a synchronous require() so tests
+ * exercise the real render path. Only the ssr:false dynamic() calls in this
+ * test's subject (HomePageClient.tsx, rendered by page.tsx) need this;
+ * nested dynamic() calls inside MapWrapper/SplashScreen are already covered
+ * by their own module mocks.
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
@@ -126,6 +133,29 @@ async function dismissSplash() {
     fireEvent.click(btn);
   });
 }
+
+// ─── Server-rendered SEO content (SEO PR1) ───────────────────────────────────
+// Asserted on a PLAIN synchronous render — no `act(async...)` microtask flush —
+// because the whole point is that this markup must exist before HomePageClient's
+// client-side state ever resolves, i.e. it comes from page.tsx's server render.
+
+describe("server-rendered SEO content", () => {
+  test("renders the ItemList JSON-LD script synchronously", () => {
+    const { container } = render(<HomePage />);
+    const script = container.querySelector('script[type="application/ld+json"]');
+    expect(script).not.toBeNull();
+    const json = JSON.parse(script!.innerHTML) as { "@type": string; itemListElement: unknown[] };
+    expect(json["@type"]).toBe("ItemList");
+    expect(Array.isArray(json.itemListElement)).toBe(true);
+  });
+
+  test("renders a sr-only <h1> synchronously", () => {
+    render(<HomePage />);
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toBeTruthy();
+    expect(heading.className).toContain("sr-only");
+  });
+});
 
 // ─── Map always mounted ───────────────────────────────────────────────────────
 

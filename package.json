@@ -20,9 +20,9 @@
   },
   "dependencies": {
     "jose": "^6.2.3",
-    "lucide-react": "^1.22.0",
+    "lucide-react": "^1.23.0",
     "mapbox-gl": "^3.25.0",
-    "next": "16.2.9",
+    "next": "16.2.10",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "react-map-gl": "^8.1.1",

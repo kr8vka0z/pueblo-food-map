@@ -41,16 +41,16 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.3",
-    "@vitest/coverage-v8": "^4.1.9",
+    "@vitest/coverage-v8": "^4.1.10",
     "axe-core": "^4.12.1",
     "esbuild": "^0.28.1",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.2.10",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "typescript": "^6",
     "vitest": "^4.1.9",
     "vitest-axe": "^0.1.0",
-    "wrangler": "^4.105.0"
+    "wrangler": "^4.107.0"
   }
 }

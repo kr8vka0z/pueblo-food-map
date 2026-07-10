@@ -37,7 +37,7 @@ SLEEP_S = 1.1  # Nominatim: strictly < 1 req/sec
 def get_mapbox_token() -> Optional[str]:
     try:
         result = subprocess.run(
-            ["op", "read", "op://VPS/Mapbox Access Token - Full Scope/credential"],
+            ["op", "read", "op://Atlas/Mapbox Access Token - Full Scope/credential"],
             capture_output=True,
             text=True,
             check=True,

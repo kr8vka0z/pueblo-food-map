@@ -91,7 +91,7 @@ async function reverseGeoNominatim(
 function getMapboxToken(): string {
   try {
     return execSync(
-      'op read "op://VPS/Mapbox Access Token - Full Scope/credential"',
+      'op read "op://Atlas/Mapbox Access Token - Full Scope/credential"',
       { encoding: "utf-8" }
     ).trim();
   } catch {

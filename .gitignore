@@ -59,3 +59,7 @@ next-env.d.ts
 # generated SQL from scripts/seed-admin-db.ts — derivable from committed
 # src/data/*.ts; regenerate with `bun run scripts/seed-admin-db.ts` (#237)
 scripts/generated/
+
+# Local ops secret-reference map -- keeps op:// paths out of this public repo
+OPS-SECRETS.local.md
+*.local.md

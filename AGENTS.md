@@ -46,10 +46,12 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 
 ## Mapbox Token Management
 
+> **1Password references are intentionally omitted from this public repo.** Each secret below maps to an `op://...` reference in the gitignored `OPS-SECRETS.local.md` (create it locally from the team vault). This keeps the credential inventory out of public view.
+
 ### Public token (client-side, `pk.*`)
 
 - **Purpose:** Used by the Next.js client bundle to render the map.
-- **1Password:** `op://VPS/Mapbox  - PFP Public/credential` (note: double-space in item name is intentional — do not rename)
+- **1Password:** see `OPS-SECRETS.local.md` (gitignored -- 1Password refs are kept out of this public repo)
 - **Env var:** `NEXT_PUBLIC_MAPBOX_TOKEN`
 - **Local dev:** `.env.local` (gitignored — never commit this file)
 - **Build variable:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Settings → Build → Build variables. Workers Builds has one shared build-variable set and a single `production` environment — there is NO separate Preview environment (that's Cloudflare Pages). The same build vars apply to prod deploys and PR preview builds. `NEXT_PUBLIC_*` vars are inlined into the client bundle by `next build`; they must be present at build time, not runtime.
@@ -73,7 +75,7 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 ### Secret token (backend / admin, `sk.*`)
 
 - **Purpose:** Mapbox API operations — managing tokens, uploading tilesets, managing Studio styles.
-- **1Password:** `op://VPS/Mapbox Access Token - Full Scope/credential`
+- **1Password:** see `OPS-SECRETS.local.md` (gitignored -- 1Password refs are kept out of this public repo)
 - **NEVER** put this in client code, browser-exposed env vars, or git.
 - Used by agents performing API-side Mapbox work (token management, tileset uploads, style edits).
 - **Mapbox API base:** `https://api.mapbox.com`, username: `kr8vka0z`
@@ -90,7 +92,7 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 **Public token:**
 
 1. Mapbox Studio dashboard → Access tokens → revoke old token, create new (check only `styles:read`, `fonts:read`, `tilesets:read`; copy URL restrictions from old token).
-2. Update value in 1Password at `op://VPS/Mapbox  - PFP Public/credential`.
+2. Update the value in 1Password (reference in `OPS-SECRETS.local.md`).
 3. Update the `NEXT_PUBLIC_MAPBOX_TOKEN` **build variable** in CF Workers Builds (single shared set; Settings → Build).
 4. Update local `.env.local`.
 5. Trigger a redeploy (push a commit or manually trigger from CF dashboard).
@@ -98,7 +100,7 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 **Secret token:**
 
 1. Mapbox Studio dashboard → Access tokens → revoke old token, create new with only the specific secret scopes needed.
-2. Update value in 1Password at `op://VPS/Mapbox Access Token - Full Scope/credential`.
+2. Update the value in 1Password (reference in `OPS-SECRETS.local.md`).
 3. No CF env var to update (secret tokens must never go there).
 
 ## Resend Email Key Management
@@ -112,7 +114,7 @@ client bundle or any `NEXT_PUBLIC_*` variable.
 
 - **Resend key name:** `Pueblo Food Map - Worker (sending)`
 - **Permissions:** sending-only, domain-scoped to `pueblofoodmap.com`
-- **1Password:** `op://VPS/Resend API - PFM Worker Sending/credential`
+- **1Password:** see `OPS-SECRETS.local.md` (gitignored -- 1Password refs are kept out of this public repo)
 - **CF env type:** Runtime secret (`secret_text`) — set via CF dashboard → Workers & Pages →
   `pueblo-food-map` → Settings → Variables and Secrets, or:
   ```bash
@@ -129,7 +131,7 @@ client bundle or any `NEXT_PUBLIC_*` variable.
 
 - **Resend key name:** `Atlas Admin (full access)`
 - **Permissions:** `full_access`
-- **1Password:** `op://VPS/Resend API - Full access/credential`
+- **1Password:** see `OPS-SECRETS.local.md` (gitignored -- 1Password refs are kept out of this public repo)
 - **NEVER** place this key in the Worker, client code, git, or any `NEXT_PUBLIC_*` / public env var.
 - Use it only for Resend API management operations (create/list/delete keys and domains).
 - **Resend API base:** `https://api.resend.com`. The list-keys endpoint returns metadata only — it
@@ -140,7 +142,7 @@ client bundle or any `NEXT_PUBLIC_*` variable.
 `.env.local` holds a 1Password **reference**, not the secret value:
 
 ```
-RESEND_API_KEY=op://VPS/Resend API - PFM Worker Sending/credential
+RESEND_API_KEY=op://<vault>/<item>/credential   # real reference in gitignored OPS-SECRETS.local.md
 ```
 
 Start the dev server through `op run` so the value is injected in memory only — it never touches disk:
@@ -156,7 +158,7 @@ op run --env-file=.env.local -- npm run dev
 ### Rotation procedure
 
 1. Resend dashboard → API Keys → create a new key with **sending** permission, domain `pueblofoodmap.com`.
-2. Update the value in 1Password at `op://VPS/Resend API - PFM Worker Sending/credential`.
+2. Update the value in 1Password (reference in `OPS-SECRETS.local.md`).
 3. Update the CF Worker runtime secret (`wrangler secret put RESEND_API_KEY` — requires a CF token
    with Workers edit permission) or via the CF dashboard under Variables and Secrets.
 4. Verify: submit a test message through a live form, confirm delivery in the Resend dashboard.

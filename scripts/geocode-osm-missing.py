@@ -16,7 +16,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import sys
 import time
 import urllib.error
@@ -35,17 +34,19 @@ SLEEP_S = 1.1  # Nominatim: strictly < 1 req/sec
 
 
 def get_mapbox_token() -> Optional[str]:
-    try:
-        result = subprocess.run(
-            ["op", "read", "op://VPS/Mapbox Access Token - Full Scope/credential"],
-            capture_output=True,
-            text=True,
-            check=True,
+    # Read the resolved token from the environment. Do NOT hardcode a 1Password
+    # reference here -- this repo is public. Provide the sk token via a gitignored
+    # .env.local (see OPS-SECRETS.local.md) and run through:
+    #   op run --env-file=.env.local -- python scripts/geocode-osm-missing.py
+    token = os.environ.get("MAPBOX_TOKEN")
+    if not token:
+        print(
+            "  [warn] MAPBOX_TOKEN not set. Run via: "
+            "op run --env-file=.env.local -- python scripts/geocode-osm-missing.py",
+            file=sys.stderr,
         )
-        return result.stdout.strip()
-    except Exception as e:
-        print(f"  [warn] Could not get Mapbox token: {e}", file=sys.stderr)
         return None
+    return token.strip()
 
 
 def nominatim_reverse(lat: float, lng: float) -> Optional[str]:

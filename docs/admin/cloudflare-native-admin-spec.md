@@ -1237,7 +1237,7 @@ admin's browser does. This needs its own, narrowly-scoped credentials —
 - **App: `REFRESH_INGEST_TOKEN`** — a bearer secret, set via
   `wrangler secret put` (the same mechanism already used for
   `RESEND_API_KEY`/`TURNSTILE_SECRET_KEY`, AGENTS.md), stored in 1Password
-  (`op://VPS/...`) and provided to the GitHub Action as a repo secret (same
+  (1Password) and provided to the GitHub Action as a repo secret (same
   pattern as `MAPBOX_PREVIEW_TOKEN`, AGENTS.md). Checked inside the route
   handler itself, same as every other `/api/admin/*` check.
 - Together they authenticate exactly **one** route —
@@ -1472,11 +1472,11 @@ edge and app — neither alone is trusted (fixes Important-4b):
 - **Edge: a Cloudflare Access Service Token** (§3.1, I4) — lets the GitHub
   Action's non-interactive request pass the `admin.pueblofoodmap.com`
   Access application without Google SSO. `CF-Access-Client-Id` /
-  `CF-Access-Client-Secret`, 1Password `op://VPS/...`, GitHub Actions repo
+  `CF-Access-Client-Secret`, 1Password, GitHub Actions repo
   secrets. This is what lets the ingest route live on the protected admin
   hostname instead of one of the three bypass hostnames (§3.1, §8).
 - **App: `REFRESH_INGEST_TOKEN`** — bearer secret, `wrangler secret put`,
-  1Password `op://VPS/...`, GitHub Actions repo secret. Checked inside the
+  1Password, GitHub Actions repo secret. Checked inside the
   route handler itself, same as every other `/api/admin/*` check (§3.1).
   Scoped to exactly one route (`/api/admin/refresh/ingest`). Distinct from,
   and no more powerful than, the ability to propose changes a human still
@@ -1874,7 +1874,7 @@ published rows, with no merge step against separate arrays (§3.5 step 4).
   `event: "publish_result"` /  `event: "refresh_ingest_result"` alongside the
   existing `form_submit_failure` convention, so Cloudflare Workers Logs
   filtering stays consistent app-wide.
-- **Secrets** (all in Kyle's existing `op://VPS/...` 1Password vault; most
+- **Secrets** (all in Kyle's 1Password vault; most
   applied via `wrangler secret put`, the one exception noted below):
   - `CF_ACCESS_AUD` — the Access application's audience tag (not secret, but
     environment-scoped config, not hardcoded).
@@ -1951,7 +1951,7 @@ This is the section the rest of the document exists to support.
 | DNS | `admin.pueblofoodmap.com` added to the CF zone Kyle already controls | N/A directly, but the Firebase project's auth domain and any Firebase Hosting/Functions config would live under the new Google project |
 | Identity/auth backend | Cloudflare Access (Zero Trust), same account, same dashboard as the rest of PFM's Cloudflare config | Firebase Authentication, inside the new Google Cloud project |
 | Data store | D1, same Cloudflare account, `wrangler d1` tooling already installed (`wrangler ^4.105.0` is a project devDependency today) | Firestore, inside the new Google Cloud project |
-| Secrets | Kyle's existing 1Password VPS vault (`op://VPS/...`), same pattern as every other PFM credential (Mapbox, Resend, Turnstile) | A new Firebase service-account JSON key — a new *kind* of credential this project has never held before |
+| Secrets | Kyle's 1Password vault, same pattern as every other PFM credential (Mapbox, Resend, Turnstile) | A new Firebase service-account JSON key — a new *kind* of credential this project has never held before |
 | Billing | Same Cloudflare account/billing already in place; free tier covers this (§10) | A new Google Cloud billing relationship, even if it stays on Firebase's free Spark plan |
 | New account signups required | **Zero** | At least one: a Google Cloud project with Firestore/Auth enabled, owned by *someone's* Google identity |
 

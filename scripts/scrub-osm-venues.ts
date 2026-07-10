@@ -16,7 +16,6 @@
  *         Redirect to src/data/grocery-osm.ts to apply.
  */
 
-import { execSync } from "child_process";
 import { readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -89,14 +88,17 @@ async function reverseGeoNominatim(
 // ─── Mapbox ──────────────────────────────────────────────────────────────────
 
 function getMapboxToken(): string {
-  try {
-    return execSync(
-      'op read "op://VPS/Mapbox Access Token - Full Scope/credential"',
-      { encoding: "utf-8" }
-    ).trim();
-  } catch {
-    throw new Error("Could not read Mapbox token from 1Password");
+  // Read the resolved token from the environment. Do NOT hardcode a 1Password
+  // reference here -- this repo is public. Provide the sk token via a gitignored
+  // .env.local (see OPS-SECRETS.local.md) and run through:
+  //   op run --env-file=.env.local -- npx tsx scripts/scrub-osm-venues.ts
+  const token = process.env.MAPBOX_TOKEN;
+  if (!token) {
+    throw new Error(
+      "MAPBOX_TOKEN not set. Run via: op run --env-file=.env.local -- npx tsx scripts/scrub-osm-venues.ts"
+    );
   }
+  return token.trim();
 }
 
 async function reverseGeoMapbox(

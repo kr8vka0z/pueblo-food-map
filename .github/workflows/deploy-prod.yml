@@ -65,7 +65,10 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 20
+          # 22, not ci.yml's 20: wrangler >=4.x refuses to run on Node <22
+          # (hard version check at startup, observed in run 29660459443).
+          # Matches ToastHoster's deploy workflows.
+          node-version: 22
           cache: npm
       - run: npm ci
       # Same gate deploy-dev.yml and ci.yml run — a broken build must never

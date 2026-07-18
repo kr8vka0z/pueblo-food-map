@@ -1,8 +1,13 @@
 name: CI
 
 on:
+  # `dev` is now a permanent deploy branch (deploy-dev.yml auto-deploys every push to
+  # dev.pueblofoodmap.com), not just a staging area feeding `main` — PRs into it deserve
+  # the same lint/typecheck/test/build gate `main` PRs already get. Found during the
+  # robot-deploy rollout: PR #302 merged into `dev` with no CI run at all, since this
+  # trigger only ever covered `main`.
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   push:
     branches: [main]
 

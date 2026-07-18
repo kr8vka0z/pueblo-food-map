@@ -1,6 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "main": ".open-next/worker.js",
+  // Points at the wrapper worker (custom-worker.ts), not .open-next/worker.js directly —
+  // @opennextjs/cloudflare only exports a fetch handler by default; the wrapper re-exports
+  // it and adds scheduled() for the uptime dead-man's-switch below. See custom-worker.ts
+  // header comment for the official how-to this follows.
+  "main": "custom-worker.ts",
   "name": "pueblo-food-map",
   "compatibility_date": "2025-12-01",
   "compatibility_flags": [
@@ -25,6 +29,30 @@
       "preview_database_id": "95160a48-bb42-43a2-bfc7-c016af11d3dc"
     }
   ],
+  // Uptime dead-man's-switch (Phase 2 slice 2, mirrors ToastHoster's wrangler.toml).
+  // custom-worker.ts's scheduled() pings this Healthchecks.io check every 5 min; HC.io
+  // itself alerts (Telegram via n8n webhook, same channel ToastHoster's check already
+  // uses) if no ping arrives within the check's period+grace window. PROD ONLY — a plain
+  // [vars]-equivalent string, not a wrangler secret: it's a capability URL with a
+  // low-sensitivity worst case (a leak lets someone falsely mark the check "up" — no
+  // data exposure, no write access to anything). ponytail.
+  "vars": {
+    "HC_PING_URL": "https://hc-ping.com/3d8c7693-8506-49d3-a4a4-d34426f3ea9a"
+  },
+  // PROD ONLY. `env.staging.triggers.crons: []` below is a REQUIRED explicit override,
+  // not just tidy — verified against this repo's own installed wrangler
+  // (node_modules/wrangler/wrangler-dist/cli.js: `triggers: inheritable(...)`) that
+  // `triggers` DOES inherit into named environments, unlike `vars`/`assets`/`services`/
+  // `d1_databases` (all `notInheritable`/redeclare-required, per the existing comment
+  // below). Left undeclared, `env.staging` would silently inherit this cron and either
+  // poke the Access-gated staging worker every 5 min for no reason, or — worse — inherit
+  // `HC_PING_URL` too (also not inheritable, so this specific double-ping risk doesn't
+  // actually materialize) and double-ping the PROD Healthchecks.io check from a second
+  // worker. Zeroing crons is the same defensive pattern regardless — a stray staging cron
+  // would be actively wrong, not just redundant.
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   // Staging (#223 step 1): repo-config only, NOT yet wired to a deploy pipeline
   // or DNS route. Named environments do not inherit bindings (assets,
   // services, d1_databases) from the top level in wrangler — only `main`,
@@ -62,7 +90,15 @@
           "database_name": "pueblo-food-map-admin-staging",
           "database_id": "909e74b2-29c0-4edc-b53e-f0f876b59e1d"
         }
-      ]
+      ],
+      // Explicit no-op override — NOT redundant. `triggers` IS inheritable (unlike the
+      // bindings above); omitting this would silently inherit the prod cron. See the
+      // top-level `triggers` comment for the full WHY. dev.pueblofoodmap.com is
+      // Access-gated and low-value to monitor via cron anyway — the health endpoint
+      // (AGENTS.md "Observability") is a better fit for staging if that's ever wanted.
+      "triggers": {
+        "crons": []
+      }
     }
   }
 }

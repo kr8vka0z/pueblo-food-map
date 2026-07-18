@@ -184,10 +184,54 @@ rotated at the same time.
   cascading alert storm. This endpoint proves only that the Worker process is up.
 - **Caching:** `export const dynamic = "force-dynamic"` + `Cache-Control: no-store` — uptime
   monitors must see live availability, not a CDN-cached copy.
-- **Uptime monitoring:** Point monitors at `https://pueblofoodmap.com/api/health` **and**
-  `https://pueblofoodmap.com` (the homepage). A free UptimeRobot account supports both.
+- **Uptime monitoring (external pull-check, still pending):** Point monitors at
+  `https://pueblofoodmap.com/api/health` **and** `https://pueblofoodmap.com` (the
+  homepage). A free UptimeRobot account supports both.
   > **Pending manual step for Kyle:** Create the free UptimeRobot account and add the two
   > monitors. This is NOT automated — it is a one-time human task.
+
+## Uptime dead-man's-switch (Healthchecks.io) — robot-deploy Phase 2 slice 2
+
+Complementary to the pull-check above, not a replacement — this is a PUSH check: the
+Worker itself proves it's alive by pinging out, rather than waiting for an external
+monitor to poll in. `custom-worker.ts`'s `scheduled()` handler pings a Healthchecks.io
+check (`pueblo-food-map-prod`, 5-min period, 3-min grace) every 5 minutes; HC.io alerts
+Kyle's Telegram (via the same n8n webhook channel ToastHoster's own uptime check already
+uses) if no ping arrives within period+grace — mirrors ToastHoster's
+`src/index.ts`/`wrangler.toml` design exactly (see that repo's `scheduled()` WHY
+comments for the full rationale: dead-man's-switch alerts on absence, not presence, of a
+signal; a bare heartbeat is used instead of a self-fetch of the site's own domain, which
+trips a Cloudflare loop-guard and reports a false "down").
+
+- **`custom-worker.ts`** (repo root) wraps `.open-next/worker.js`'s generated fetch
+  handler and adds `scheduled()` — `@opennextjs/cloudflare` only exports a fetch handler
+  by default (https://opennext.js.org/cloudflare/howtos/custom-worker). `wrangler.jsonc`
+  `main` points here instead of directly at the generated worker.
+- **`wrangler.jsonc` top-level `vars.HC_PING_URL`** — the check's ping URL, a plain var
+  (not a wrangler secret): a low-sensitivity capability URL, same treatment ToastHoster
+  gives its own. **`env.staging` deliberately does not define it** — a missing var must
+  never throw out of the cron handler (`custom-worker.ts` guards with `if
+  (!env.HC_PING_URL) return;`).
+- **`wrangler.jsonc` top-level `triggers.crons`** — `*/5 * * * *`, PROD ONLY.
+  `env.staging.triggers.crons: []` is a REQUIRED explicit override, not tidiness —
+  verified against this repo's own installed wrangler
+  (`node_modules/wrangler/wrangler-dist/cli.js`: `triggers: inheritable(...)`) that
+  `triggers` uniquely inherits into named environments, unlike `vars`/`assets`/
+  `services`/`d1_databases` (all `notInheritable`). Left undeclared, `env.staging` would
+  silently inherit the prod cron.
+- **Deploy-failure belt-and-suspenders** — both `deploy-dev.yml` and `deploy-prod.yml`
+  end with an `if: failure()` step that pings `${{ secrets.HC_PING_URL }}/fail`
+  (Healthchecks.io's explicit-failure endpoint), so a broken deploy alerts immediately
+  instead of waiting for the next missed heartbeat. Both workflows share the one
+  `HC_PING_URL` GitHub secret (same check either way) — this repo has no per-env
+  Healthchecks.io check yet, matching the single shared `CLOUDFLARE_API_TOKEN` both
+  workflows already reuse.
+- **Reading `ExecutionContext`/`ExportedHandler`/`ScheduledController` types** —
+  `custom-worker.ts` imports these three by name from
+  `@cloudflare/workers-types/experimental`, the same narrow-import pattern
+  `cloudflare-env.d.ts` already uses for `D1Database` (see "Typing `ADMIN_DB`" above) —
+  never a bare `wrangler types` full-runtime include, which would reintroduce the
+  `Element`/DOM collision that section documents.
 
 ## Form-failure structured logging
 

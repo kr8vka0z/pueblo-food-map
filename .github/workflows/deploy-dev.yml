@@ -81,3 +81,14 @@ jobs:
       # (no `--` separator needed, unlike a generic passthrough CLI).
       - run: npx opennextjs-cloudflare build --env staging
       - run: npx opennextjs-cloudflare deploy --env staging
+      # Belt and suspenders on top of the HC.io dead-man's-switch (wrangler.jsonc
+      # `triggers`/`vars`, custom-worker.ts `scheduled()`): that switch only fires on
+      # SILENCE (no ping within period+grace, prod cron only). A failed deploy here
+      # pushes an explicit red into the SAME check immediately instead of waiting up
+      # to 5+3 min for the next missed heartbeat — https://hc-ping.com/<uuid>/fail is
+      # Healthchecks.io's documented explicit-failure endpoint. Runs regardless of
+      # which prior step failed; never blocks/masks the real failure (curl exit code
+      # is not checked against the job's own status).
+      - name: Notify Healthchecks.io of deploy failure
+        if: failure()
+        run: curl -fsS --retry 3 "${{ secrets.HC_PING_URL }}/fail"

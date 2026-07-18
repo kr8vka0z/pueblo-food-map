@@ -22,6 +22,18 @@
 # (`npx wrangler d1 migrations apply pueblo-food-map-admin --remote`) — this
 # workflow reproduces that existing behavior exactly rather than inventing a
 # migration step Workers Builds never had either.
+#
+# Build-time NEXT_PUBLIC_* vars: `next build` inlines these into the client
+# bundle at BUILD time, not runtime (AGENTS.md "Environment variables — two
+# kinds, two places"). Workers Builds ran this build inside Cloudflare's own
+# environment, where its Build variables live; moving the build onto a
+# GitHub runner means these values must come from GH secrets instead, or the
+# deployed bundle ships with an undefined Mapbox token (blank "not
+# authorized" map) and an undefined Turnstile sitekey (forms' bot-check
+# widget fails to render). Two NEW secrets must exist BEFORE this workflow's
+# first prod run: NEXT_PUBLIC_MAPBOX_TOKEN (the real production-scoped
+# public token — see AGENTS.md "Mapbox Token Management") and
+# NEXT_PUBLIC_TURNSTILE_SITE_KEY (see .env.example).
 name: Deploy Prod
 
 on:
@@ -43,6 +55,10 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Consumed by `next build` inside `npm run deploy` below — see the
+      # file-header comment on why these must be GH secrets now.
+      NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
     steps:
       # Same pinned-SHA third-party actions as deploy-dev.yml — a mutable
       # tag could be repointed to malicious code; a SHA cannot.

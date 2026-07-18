@@ -16,6 +16,18 @@
 # deploy-prod.yml — this repo doesn't yet have a narrower per-env token
 # minted (ToastHoster's deploy-dev.yml uses a Worker/D1/zone-scoped token;
 # see PR description for the same follow-up here).
+#
+# Build-time NEXT_PUBLIC_MAPBOX_TOKEN: reuses the MAPBOX_PREVIEW_TOKEN
+# secret lighthouse.yml already provisions (AGENTS.md "Lighthouse CI build
+# token" — an UNRESTRICTED pk.* token, documented for exactly this case: a
+# CI build served on a hostname the production token's URL allowlist
+# doesn't cover). dev.pueblofoodmap.com is not on that allowlist either
+# (AGENTS.md "Mapbox Token Management" lists only the prod hostnames), so
+# the real prod token would 401 here — see PR description Surprises.
+# NEXT_PUBLIC_TURNSTILE_SITE_KEY reuses the same secret as prod (Turnstile
+# widgets support multiple allowed hostnames on one sitekey, unlike Mapbox's
+# no-wildcard restriction) — Kyle should confirm dev.pueblofoodmap.com is an
+# allowed hostname on that widget.
 name: Deploy Dev
 
 on:
@@ -37,6 +49,10 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Consumed by `next build` inside the opennextjs-cloudflare build step
+      # below — see the file-header comment on secret choice/reuse.
+      NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PREVIEW_TOKEN }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
     steps:
       # Same pinned-SHA third-party actions as deploy-prod.yml — a mutable
       # tag could be repointed to malicious code; a SHA cannot.

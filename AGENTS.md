@@ -24,25 +24,38 @@
 - **HTTP/www redirect:** HTTP requests and `www.pueblofoodmap.com` both 301-redirect to `https://pueblofoodmap.com` via Cloudflare zone redirect rule + Always-Use-HTTPS.
 - **Hosting:** Cloudflare Workers, project name `pueblo-food-map` (configured in `wrangler.jsonc`)
 - **Adapter:** `@opennextjs/cloudflare` — translates Next.js App Router output into Worker format
-- **CI/CD — TRANSITIONAL (robot-deploy rollout, Phase 2):** `dev` deploys via GitHub Actions (`.github/workflows/deploy-dev.yml` — push `dev` → staging worker at dev.pueblofoodmap.com). **Prod (`main`) still deploys via Cloudflare Workers Builds** (dashboard connection) until the gated cutover: disconnect Workers Builds in the CF dashboard, then `deploy-prod.yml` takes over on push to `main`. Until that flip, the Workers-Builds details below still hold for prod — and after it, rewrite this section.
-  - Push to `main` → production deploy (automatic, Workers Builds — until the flip above)
-  - Open a PR → unique preview deploy URL (posted as a check on the PR, visible in the CF dashboard under that build)
-  - **Build command:** `npx opennextjs-cloudflare build`
-  - **Deploy command:** `npx wrangler deploy` (CF default)
+
+## Deploy
+
+GitHub Actions is the deploy robot for this repo. Cloudflare Workers Builds (the old dashboard-connected build) was disconnected 2026-07-18 — nobody deploys from a laptop or the Cloudflare dashboard.
+
+1. Feature branch → PR into `dev`. CI runs; merging auto-deploys. `.github/workflows/deploy-dev.yml` runs the `predeploy` gate (lint + `design:drift` + typecheck + `test:ci`), applies the `pueblo-food-map-admin-staging` D1 migration remotely (`npx wrangler d1 migrations apply pueblo-food-map-admin-staging --remote --env staging`), then builds and deploys the `pueblo-food-map-staging` Worker at https://dev.pueblofoodmap.com (Cloudflare Access-gated, not public).
+2. `dev` → PR into `main`. Kyle signs off; merging auto-deploys. `.github/workflows/deploy-prod.yml` runs the same `predeploy` gate, then `npx opennextjs-cloudflare build` + `npx opennextjs-cloudflare deploy`, shipping the `pueblo-food-map` Worker at https://pueblofoodmap.com. On failure it pings the Healthchecks.io check's `/fail` endpoint (`HC_PING_URL` — see § Uptime dead-man's-switch below) so a broken prod deploy alerts immediately instead of waiting for the next missed heartbeat.
+3. After a `dev`→`main` cutover, merge `main` back into `dev` to realign the branches.
+
+Squash-only repo. Ruleset 19154488 protects `dev` and `main` from deletion and force-push. No manual `wrangler deploy` is needed or expected for either environment — both workflows deploy on push. Node 22 is required by both deploy workflows (`wrangler` >=4 refuses Node <22); `ci.yml` still tests on Node 20.
+
+**Deploy auth:** repo secrets `CLOUDFLARE_API_TOKEN` (scoped CI token, 1Password item "Cloudflare CI Token - Pueblo Food Map") + `CLOUDFLARE_ACCOUNT_ID` authenticate both workflows to Cloudflare — this is what the old Workers Builds dashboard connection used to provide.
 
 ## Build and preview locally
 
 ```bash
 npm run preview   # OpenNext build + local Worker emulator at http://127.0.0.1:8788
-npm run deploy    # OpenNext build + wrangler deploy to production
-                  # Requires `wrangler login` first; rarely needed — CI handles deploys
+npm run deploy    # OpenNext build + wrangler deploy — EMERGENCY ONLY, see § Deploy above
 ```
+
+`npm run deploy` bypasses the `predeploy` CI gate and isn't part of normal shipping — both Actions workflows above cover every ordinary deploy. If it's ever genuinely needed, it requires `wrangler login` or a local `CLOUDFLARE_API_TOKEN`; use it only when the Actions robot itself is unavailable.
+
+## Rollback
+
+**Prod rollback = `git revert <bad commit>` + push to `main`.** `deploy-prod.yml` picks up the revert commit and redeploys the previous-good code automatically — no manual `wrangler deploy` needed. Never `git reset --hard` + force-push to roll back — a revert is a forward commit, keeps history linear and honest, and is what the Actions robot is already wired to deploy. Rehearsed 2026-07-18: bad push → green deploy, `git revert` → push → green redeploy.
+
+**D1 schema damage** — `wrangler d1 time-travel` bookmark/restore against the affected database (`pueblo-food-map-admin` for prod, `pueblo-food-map-admin-staging` for dev, seeded with fake data via `scripts/seed-dev.sql`). Note: `time-travel restore` auto-confirms in a non-interactive shell — there is no `-y` flag to make that explicit, so run it somewhere you can see and answer the prompt.
 
 ## Operational notes
 
-- **Build logs:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab
-- **Rollback:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab → find a previous successful deployment → "Rollback to this deployment". Production traffic switches in ~30 seconds.
-- **Environment variables — two kinds, two places.** (1) Build-time `NEXT_PUBLIC_*` are inlined by `next build` → set under **Settings → Build → Build variables**. (2) Runtime server secrets (`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`) are read at request time → set under **Settings → Variables and Secrets**. **Workers Builds has ONE shared build-variable set and a single `production` environment — there is NO separate Preview environment** (that's Cloudflare Pages). The same build vars apply to production deploys and PR preview builds.
+- **Build logs:** GitHub Actions run logs (Actions tab → `deploy-prod.yml` / `deploy-dev.yml`) are the source of truth for what a deploy actually did — lint/typecheck/test output, the build, and the deploy step all live there. The Cloudflare dashboard's Workers & Pages Deployments tab still lists each resulting Worker version, but not the steps that produced it.
+- **Environment variables — two kinds, two places.** (1) Build-time `NEXT_PUBLIC_*` vars are inlined by `next build` at CI time → set as GitHub repo secrets (Settings → Secrets and variables → Actions) and read into the build step by the workflow. Dev builds with `MAPBOX_PREVIEW_TOKEN` in place of the prod Mapbox token, because the prod token's URL allowlist doesn't cover `dev.pueblofoodmap.com` (open issue #304 tracks minting a URL-restricted staging token instead). (2) Runtime server secrets (`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, `HC_PING_URL`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`, `GITHUB_PUBLISH_TOKEN`) are read at request time → set per-environment via `wrangler secret put` or the CF dashboard's Settings → Variables and Secrets.
 
 ## Mapbox Token Management
 
@@ -54,19 +67,19 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 - **1Password:** see `OPS-SECRETS.local.md` (gitignored -- 1Password refs are kept out of this public repo)
 - **Env var:** `NEXT_PUBLIC_MAPBOX_TOKEN`
 - **Local dev:** `.env.local` (gitignored — never commit this file)
-- **Build variable:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Settings → Build → Build variables. Workers Builds has one shared build-variable set and a single `production` environment — there is NO separate Preview environment (that's Cloudflare Pages). The same build vars apply to prod deploys and PR preview builds. `NEXT_PUBLIC_*` vars are inlined into the client bundle by `next build`; they must be present at build time, not runtime.
+- **Build-time secret:** GitHub repo secret `NEXT_PUBLIC_MAPBOX_TOKEN` (Settings → Secrets and variables → Actions), read into the build step by `deploy-prod.yml`. `NEXT_PUBLIC_*` vars are inlined into the client bundle by `next build`; they must be present at build time, not runtime — there is no Cloudflare-dashboard equivalent anymore now that Workers Builds is disconnected.
 - **Scopes:** `styles:read`, `fonts:read`, `tilesets:read`
 - **URL restrictions (bare hostnames, no protocol, no wildcards):**
   - `pueblofoodmap.com`
   - `www.pueblofoodmap.com`
   - `localhost:3000`
   - `pueblo-food-map.kyle-boyd.workers.dev`
-- **Preview deploy warning:** A PR's CF preview deploy is reachable at the URL Cloudflare posts as a check on the PR (do not guess a `<branch>-…workers.dev` subdomain — that pattern does not resolve and 404s). Its map throws "site not authorized" unless that exact subdomain is added to the token's URL restrictions (Mapbox dropped wildcard support), so for a quick demo it is usually easier to demo from production.
+- **Staging uses a different token.** `deploy-dev.yml` builds with `MAPBOX_PREVIEW_TOKEN` instead of this token, because this token's URL allowlist above doesn't cover `dev.pueblofoodmap.com` and Mapbox tokens don't support wildcards — open issue #304 tracks minting a URL-restricted staging-only token to close that gap (see "Lighthouse CI build token" below for that token's other use). There is no longer a per-PR Cloudflare preview deploy — that mechanism went away with Workers Builds. Demo a change on `dev.pueblofoodmap.com` (Access-gated) or locally via `npm run preview`.
 
 ### Lighthouse CI build token (`pk.*`, GitHub secret only)
 
 - **Purpose:** The Lighthouse CI job builds this commit's code and serves it on a local server (`next start` at `localhost:3000`), then audits that — so a PR is graded on its own changes, not on production (see `.github/workflows/lighthouse.yml`). This token is passed to that build as `NEXT_PUBLIC_MAPBOX_TOKEN` so the map renders during the audit instead of an "unauthorized" blank.
-- **GitHub secret name:** `MAPBOX_PREVIEW_TOKEN` (legacy name — it is a build token, not a preview-URL token).
+- **GitHub secret name:** `MAPBOX_PREVIEW_TOKEN`. Also reused by `deploy-dev.yml` as the staging build's Mapbox token (see "Public token" → "Staging uses a different token" above) until issue #304 mints a dedicated URL-restricted staging token — until then this one unrestricted CI token covers both jobs.
 - **Type:** Public (`pk.*`) — same scopes as the production token (`styles:read`, `fonts:read`, `tilesets:read`). Must be created in the Mapbox Studio dashboard (cannot mint `pk` tokens via API).
 - **URL restrictions:** MUST be unrestricted (or explicitly allow `localhost:3000`) so the map authorizes on the CI's local server. A prod-URL-restricted token would render "not authorized" and skew the audit.
 - **If the secret is absent:** the build still succeeds and accessibility is still measured, but the map renders blank ("not authorized"), so the performance score is unrepresentative. There is **no** production fallback — the job always audits the local build of the commit under test.
@@ -93,9 +106,9 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 
 1. Mapbox Studio dashboard → Access tokens → revoke old token, create new (check only `styles:read`, `fonts:read`, `tilesets:read`; copy URL restrictions from old token).
 2. Update the value in 1Password (reference in `OPS-SECRETS.local.md`).
-3. Update the `NEXT_PUBLIC_MAPBOX_TOKEN` **build variable** in CF Workers Builds (single shared set; Settings → Build).
+3. Update the `NEXT_PUBLIC_MAPBOX_TOKEN` GitHub repo secret (Settings → Secrets and variables → Actions).
 4. Update local `.env.local`.
-5. Trigger a redeploy (push a commit or manually trigger from CF dashboard).
+5. Trigger a redeploy (push a commit to `main`, or re-run the latest `deploy-prod.yml` run from the Actions tab).
 
 **Secret token:**
 
@@ -513,8 +526,8 @@ REST API has no "enable future auto-merge" endpoint — only the GraphQL
 `enablePullRequestAutoMerge` mutation does), (5) **only once step 4
 succeeds**, promotes the exact draft ids captured in step 1 to `published`
 and writes one `audit_log` row, atomically via a single `db.batch()`. Once
-the PR auto-merges, the existing Workers Builds pipeline (unmodified)
-redeploys production like any other push to `main`.
+the PR auto-merges, `deploy-prod.yml` (§ Deploy above) redeploys production
+like any other push to `main`.
 
 **`published-venues.ts` is now the public map's data source, not the three
 source arrays.** `src/data/venues.ts` imports `publishedVenues` from
@@ -685,12 +698,16 @@ of #258 — nothing in the app reads from `public_submissions`. The admin
 review screen (approve -> create/edit the target venue, reject -> dismiss)
 is a separate, later slice (#259).
 
-**Applying the migration — NOT part of a Worker deploy.** Unlike
-`published-venues.ts` (a build-time static import — "Publish -> static"
-above), a D1 schema migration is a database operation, independent of
-`wrangler deploy` / Workers Builds — there is no `migrations_dir`
-configured in `wrangler.jsonc`, so a deploy never auto-applies a migration
-file. Apply explicitly; the table must exist in production D1 BEFORE the
+**Applying the migration to production — NOT part of the deploy workflow.**
+Unlike `published-venues.ts` (a build-time static import — "Publish ->
+static" above), a D1 schema migration is a database operation independent
+of `deploy-prod.yml` — there is no `migrations_dir` configured in
+`wrangler.jsonc`, so a prod deploy never auto-applies a migration file.
+(Staging differs: `deploy-dev.yml` runs `wrangler d1 migrations apply
+pueblo-food-map-admin-staging --remote --env staging` as part of every dev
+deploy — see § Deploy above. Prod stays manual on purpose, so a schema
+change ships to production only when a human runs it.) Apply explicitly;
+the table must exist in production D1 BEFORE the
 deployed routes' writes can succeed against it (a D1 failure is caught and
 logged per above, so a deploy that lands ahead of the migration degrades
 gracefully rather than breaking submissions — but the queue silently drops

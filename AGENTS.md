@@ -184,10 +184,57 @@ rotated at the same time.
   cascading alert storm. This endpoint proves only that the Worker process is up.
 - **Caching:** `export const dynamic = "force-dynamic"` + `Cache-Control: no-store` — uptime
   monitors must see live availability, not a CDN-cached copy.
-- **Uptime monitoring:** Point monitors at `https://pueblofoodmap.com/api/health` **and**
-  `https://pueblofoodmap.com` (the homepage). A free UptimeRobot account supports both.
+- **Uptime monitoring (external pull-check, still pending):** Point monitors at
+  `https://pueblofoodmap.com/api/health` **and** `https://pueblofoodmap.com` (the
+  homepage). A free UptimeRobot account supports both.
   > **Pending manual step for Kyle:** Create the free UptimeRobot account and add the two
   > monitors. This is NOT automated — it is a one-time human task.
+
+## Uptime dead-man's-switch (Healthchecks.io) — robot-deploy Phase 2 slice 2
+
+Complementary to the pull-check above, not a replacement — this is a PUSH check: the
+Worker itself proves it's alive by pinging out, rather than waiting for an external
+monitor to poll in. `custom-worker.ts`'s `scheduled()` handler pings a Healthchecks.io
+check (`pueblo-food-map-prod`, 5-min period, 3-min grace) every 5 minutes; HC.io alerts
+Kyle's Telegram (via the same n8n webhook channel ToastHoster's own uptime check already
+uses) if no ping arrives within period+grace — mirrors ToastHoster's
+`src/index.ts`/`wrangler.toml` design exactly (see that repo's `scheduled()` WHY
+comments for the full rationale: dead-man's-switch alerts on absence, not presence, of a
+signal; a bare heartbeat is used instead of a self-fetch of the site's own domain, which
+trips a Cloudflare loop-guard and reports a false "down").
+
+- **`custom-worker.ts`** (repo root) wraps `.open-next/worker.js`'s generated fetch
+  handler and adds `scheduled()` — `@opennextjs/cloudflare` only exports a fetch handler
+  by default (https://opennext.js.org/cloudflare/howtos/custom-worker). `wrangler.jsonc`
+  `main` points here instead of directly at the generated worker.
+- **`HC_PING_URL` — a RUNTIME SECRET, never a committed var.** Set on the prod worker
+  via `wrangler secret put HC_PING_URL` (done at the robot-deploy flip; value in
+  1Password). ToastHoster commits its ping URL as a plain var, but that repo is
+  private — THIS repo is public, and a committed ping URL lets anyone ping the
+  success endpoint during a real outage and keep the dead-man's-switch green
+  (PR #305 review). **Staging never gets the secret** — a missing value must never
+  throw out of the cron handler (`custom-worker.ts` guards with `if
+  (!env.HC_PING_URL) return;`).
+- **`wrangler.jsonc` top-level `triggers.crons`** — `*/5 * * * *`, PROD ONLY.
+  `env.staging.triggers.crons: []` is a REQUIRED explicit override, not tidiness —
+  verified against this repo's own installed wrangler
+  (`node_modules/wrangler/wrangler-dist/cli.js`: `triggers: inheritable(...)`) that
+  `triggers` uniquely inherits into named environments, unlike `vars`/`assets`/
+  `services`/`d1_databases` (all `notInheritable`). Left undeclared, `env.staging` would
+  silently inherit the prod cron.
+- **Deploy-failure belt-and-suspenders — `deploy-prod.yml` ONLY.** It ends with an
+  `if: failure()` step that pings `${{ secrets.HC_PING_URL }}/fail` (Healthchecks.io's
+  explicit-failure endpoint), so a broken prod deploy alerts immediately instead of
+  waiting for the next missed heartbeat. `deploy-dev.yml` deliberately has NO such
+  step: the only check is the prod dead-man's-switch, and a staging-only deploy
+  failure must not page the prod alert channel — a red Actions run is the right
+  signal for dev (PR #305 review).
+- **Reading `ExecutionContext`/`ExportedHandler`/`ScheduledController` types** —
+  `custom-worker.ts` imports these three by name from
+  `@cloudflare/workers-types/experimental`, the same narrow-import pattern
+  `cloudflare-env.d.ts` already uses for `D1Database` (see "Typing `ADMIN_DB`" above) —
+  never a bare `wrangler types` full-runtime include, which would reintroduce the
+  `Element`/DOM collision that section documents.
 
 ## Form-failure structured logging
 

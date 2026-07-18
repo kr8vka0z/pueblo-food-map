@@ -81,3 +81,7 @@ jobs:
       # (no `--` separator needed, unlike a generic passthrough CLI).
       - run: npx opennextjs-cloudflare build --env staging
       - run: npx opennextjs-cloudflare deploy --env staging
+      # NO HC.io /fail step here (deploy-prod.yml has one): the only check is the
+      # PROD dead-man's-switch, and a staging-only deploy failure must not page the
+      # prod alert channel — a red Actions run is the right signal for dev
+      # (PR #305 review).

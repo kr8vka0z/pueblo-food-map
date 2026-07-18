@@ -1,0 +1,94 @@
+# PROD deploy via GitHub Actions robot. REPLACES Cloudflare Workers Builds.
+# Workers Builds MUST be disconnected on the pueblo-food-map Worker (CF
+# dashboard -> Workers & Pages -> pueblo-food-map -> Settings -> Builds)
+# BEFORE the first main push after this workflow merges, or a push to main
+# will double-deploy (Workers Builds AND this workflow both firing on the
+# same push).
+#
+# Deploys the TOP-LEVEL wrangler.jsonc config (prod worker `pueblo-food-map`,
+# route pueblofoodmap.com) via opennextjs-cloudflare build + deploy (no
+# --env) — the repo's documented manual deploy path (AGENTS.md "Build and
+# preview locally"). A functional superset of Workers Builds' bare
+# `npx wrangler deploy` (adds OpenNext's cache-populate step). Gated by
+# the same `predeploy` suite ci.yml runs (lint, design:drift, typecheck,
+# test) — a red build must never reach production. Mirrors deploy-dev.yml's
+# structure and pinned-action SHAs (matches the pattern proven in
+# ToastHoster's deploy-prod.yml/deploy-dev.yml) so prod and dev stay easy to
+# diff against each other.
+#
+# NOT included: a D1 remote-migrate step. AGENTS.md's "Applying the
+# migration — NOT part of a Worker deploy" section documents prod D1
+# migration as a manual step run separately at merge time
+# (`npx wrangler d1 migrations apply pueblo-food-map-admin --remote`) — this
+# workflow reproduces that existing behavior exactly rather than inventing a
+# migration step Workers Builds never had either.
+#
+# Build-time NEXT_PUBLIC_* vars: `next build` inlines these into the client
+# bundle at BUILD time, not runtime (AGENTS.md "Environment variables — two
+# kinds, two places"). Workers Builds ran this build inside Cloudflare's own
+# environment, where its Build variables live; moving the build onto a
+# GitHub runner means these values must come from GH secrets instead, or the
+# deployed bundle ships with an undefined Mapbox token (blank "not
+# authorized" map) and an undefined Turnstile sitekey (forms' bot-check
+# widget fails to render). Two NEW secrets must exist BEFORE this workflow's
+# first prod run: NEXT_PUBLIC_MAPBOX_TOKEN (the real production-scoped
+# public token — see AGENTS.md "Mapbox Token Management") and
+# NEXT_PUBLIC_TURNSTILE_SITE_KEY (see .env.example).
+name: Deploy Prod
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Predeploy checks, deploy (prod, top-level config)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Consumed by `next build` inside `npm run deploy` below — see the
+      # file-header comment on why these must be GH secrets now.
+      NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+    steps:
+      # Same pinned-SHA third-party actions as deploy-dev.yml — a mutable
+      # tag could be repointed to malicious code; a SHA cannot.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          # 22, not ci.yml's 20: wrangler >=4.x refuses to run on Node <22
+          # (hard version check at startup, observed in run 29660459443).
+          # Matches ToastHoster's deploy workflows.
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Same gate deploy-dev.yml and ci.yml run — a broken build must never
+      # reach production either.
+      - run: npm run predeploy
+      # No --env: resolves the top-level wrangler.jsonc config (prod worker
+      # `pueblo-food-map`, route pueblofoodmap.com). Do not add --env here.
+      # Raw CLI, not `npm run deploy`: npm auto-fires the `predeploy` script
+      # as a lifecycle pre-hook of `deploy`, which would re-run the explicit
+      # gate step above (~3 min duplicated inside the 15-min timeout).
+      - run: npx opennextjs-cloudflare build
+      - run: npx opennextjs-cloudflare deploy
+      # Belt and suspenders on top of the HC.io dead-man's-switch (wrangler.jsonc
+      # `triggers`/`vars`, custom-worker.ts `scheduled()`): that switch only fires on
+      # SILENCE (no ping within period+grace). A failed deploy here pushes an explicit
+      # red into the SAME check immediately instead of waiting up to 5+3 min for the
+      # next missed heartbeat — https://hc-ping.com/<uuid>/fail is Healthchecks.io's
+      # documented explicit-failure endpoint. Runs regardless of which prior step
+      # failed; never blocks/masks the real failure (curl exit code is not checked
+      # against the job's own status).
+      - name: Notify Healthchecks.io of deploy failure
+        if: failure()
+        run: curl -fsS --retry 3 "${{ secrets.HC_PING_URL }}/fail"

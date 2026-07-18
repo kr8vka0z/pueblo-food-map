@@ -11,6 +11,7 @@
     "test": "vitest",
     "test:ci": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "predeploy": "npm run lint && npm run design:drift && npm run typecheck && npm run test:ci",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "design:lint": "npx designmd lint DESIGN.md",

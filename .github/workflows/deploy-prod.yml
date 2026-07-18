@@ -6,10 +6,10 @@
 # same push).
 #
 # Deploys the TOP-LEVEL wrangler.jsonc config (prod worker `pueblo-food-map`,
-# route pueblofoodmap.com) via `npm run deploy` (opennextjs-cloudflare build
-# + opennextjs-cloudflare deploy, no --env) — the same command AGENTS.md's
-# "Manual deploy is emergency-only" section already documents as the
-# byte-for-byte equivalent of what Workers Builds has been running. Gated by
+# route pueblofoodmap.com) via opennextjs-cloudflare build + deploy (no
+# --env) — the repo's documented manual deploy path (AGENTS.md "Build and
+# preview locally"). A functional superset of Workers Builds' bare
+# `npx wrangler deploy` (adds OpenNext's cache-populate step). Gated by
 # the same `predeploy` suite ci.yml runs (lint, design:drift, typecheck,
 # test) — a red build must never reach production. Mirrors deploy-dev.yml's
 # structure and pinned-action SHAs (matches the pattern proven in
@@ -73,4 +73,8 @@ jobs:
       - run: npm run predeploy
       # No --env: resolves the top-level wrangler.jsonc config (prod worker
       # `pueblo-food-map`, route pueblofoodmap.com). Do not add --env here.
-      - run: npm run deploy
+      # Raw CLI, not `npm run deploy`: npm auto-fires the `predeploy` script
+      # as a lifecycle pre-hook of `deploy`, which would re-run the explicit
+      # gate step above (~3 min duplicated inside the 15-min timeout).
+      - run: npx opennextjs-cloudflare build
+      - run: npx opennextjs-cloudflare deploy

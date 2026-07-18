@@ -24,8 +24,8 @@
 - **HTTP/www redirect:** HTTP requests and `www.pueblofoodmap.com` both 301-redirect to `https://pueblofoodmap.com` via Cloudflare zone redirect rule + Always-Use-HTTPS.
 - **Hosting:** Cloudflare Workers, project name `pueblo-food-map` (configured in `wrangler.jsonc`)
 - **Adapter:** `@opennextjs/cloudflare` — translates Next.js App Router output into Worker format
-- **CI/CD:** Cloudflare Workers Builds, connected to this GitHub repo via the CF dashboard. There is NO GitHub Actions YAML for deploys — wiring is entirely in the CF dashboard.
-  - Push to `main` → production deploy (automatic)
+- **CI/CD — TRANSITIONAL (robot-deploy rollout, Phase 2):** `dev` deploys via GitHub Actions (`.github/workflows/deploy-dev.yml` — push `dev` → staging worker at dev.pueblofoodmap.com). **Prod (`main`) still deploys via Cloudflare Workers Builds** (dashboard connection) until the gated cutover: disconnect Workers Builds in the CF dashboard, then `deploy-prod.yml` takes over on push to `main`. Until that flip, the Workers-Builds details below still hold for prod — and after it, rewrite this section.
+  - Push to `main` → production deploy (automatic, Workers Builds — until the flip above)
   - Open a PR → unique preview deploy URL (posted as a check on the PR, visible in the CF dashboard under that build)
   - **Build command:** `npx opennextjs-cloudflare build`
   - **Deploy command:** `npx wrangler deploy` (CF default)

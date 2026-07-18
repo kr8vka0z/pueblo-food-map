@@ -29,27 +29,25 @@
       "preview_database_id": "95160a48-bb42-43a2-bfc7-c016af11d3dc"
     }
   ],
-  // Uptime dead-man's-switch (Phase 2 slice 2, mirrors ToastHoster's wrangler.toml).
-  // custom-worker.ts's scheduled() pings this Healthchecks.io check every 5 min; HC.io
-  // itself alerts (Telegram via n8n webhook, same channel ToastHoster's check already
-  // uses) if no ping arrives within the check's period+grace window. PROD ONLY — a plain
-  // [vars]-equivalent string, not a wrangler secret: it's a capability URL with a
-  // low-sensitivity worst case (a leak lets someone falsely mark the check "up" — no
-  // data exposure, no write access to anything). ponytail.
-  "vars": {
-    "HC_PING_URL": "https://hc-ping.com/3d8c7693-8506-49d3-a4a4-d34426f3ea9a"
-  },
+  // Uptime dead-man's-switch (Phase 2 slice 2, mirrors ToastHoster's design).
+  // custom-worker.ts's scheduled() pings a Healthchecks.io check (env.HC_PING_URL)
+  // every 5 min; HC.io itself alerts (Telegram via n8n webhook, same channel
+  // ToastHoster's check already uses) if no ping arrives within period+grace.
+  // HC_PING_URL is a RUNTIME SECRET (`wrangler secret put HC_PING_URL`, set on the
+  // prod worker at the robot-deploy flip), NOT a committed var — unlike ToastHoster
+  // (private repo), THIS repo is public, and a committed ping URL lets anyone ping
+  // the success endpoint during a real outage and keep the dead-man's-switch green
+  // (PR #305 review). env.staging never gets the secret; custom-worker.ts guards
+  // the unset case.
   // PROD ONLY. `env.staging.triggers.crons: []` below is a REQUIRED explicit override,
   // not just tidy — verified against this repo's own installed wrangler
   // (node_modules/wrangler/wrangler-dist/cli.js: `triggers: inheritable(...)`) that
   // `triggers` DOES inherit into named environments, unlike `vars`/`assets`/`services`/
   // `d1_databases` (all `notInheritable`/redeclare-required, per the existing comment
-  // below). Left undeclared, `env.staging` would silently inherit this cron and either
-  // poke the Access-gated staging worker every 5 min for no reason, or — worse — inherit
-  // `HC_PING_URL` too (also not inheritable, so this specific double-ping risk doesn't
-  // actually materialize) and double-ping the PROD Healthchecks.io check from a second
-  // worker. Zeroing crons is the same defensive pattern regardless — a stray staging cron
-  // would be actively wrong, not just redundant.
+  // below). Left undeclared, `env.staging` would silently inherit this cron and poke
+  // the staging worker every 5 min for no reason (harmlessly no-op'ing, since staging
+  // never gets the HC_PING_URL secret — but a stray staging cron would be actively
+  // wrong, not just redundant).
   "triggers": {
     "crons": ["*/5 * * * *"]
   },

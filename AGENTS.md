@@ -207,10 +207,13 @@ trips a Cloudflare loop-guard and reports a false "down").
   handler and adds `scheduled()` — `@opennextjs/cloudflare` only exports a fetch handler
   by default (https://opennext.js.org/cloudflare/howtos/custom-worker). `wrangler.jsonc`
   `main` points here instead of directly at the generated worker.
-- **`wrangler.jsonc` top-level `vars.HC_PING_URL`** — the check's ping URL, a plain var
-  (not a wrangler secret): a low-sensitivity capability URL, same treatment ToastHoster
-  gives its own. **`env.staging` deliberately does not define it** — a missing var must
-  never throw out of the cron handler (`custom-worker.ts` guards with `if
+- **`HC_PING_URL` — a RUNTIME SECRET, never a committed var.** Set on the prod worker
+  via `wrangler secret put HC_PING_URL` (done at the robot-deploy flip; value in
+  1Password). ToastHoster commits its ping URL as a plain var, but that repo is
+  private — THIS repo is public, and a committed ping URL lets anyone ping the
+  success endpoint during a real outage and keep the dead-man's-switch green
+  (PR #305 review). **Staging never gets the secret** — a missing value must never
+  throw out of the cron handler (`custom-worker.ts` guards with `if
   (!env.HC_PING_URL) return;`).
 - **`wrangler.jsonc` top-level `triggers.crons`** — `*/5 * * * *`, PROD ONLY.
   `env.staging.triggers.crons: []` is a REQUIRED explicit override, not tidiness —
@@ -219,13 +222,13 @@ trips a Cloudflare loop-guard and reports a false "down").
   `triggers` uniquely inherits into named environments, unlike `vars`/`assets`/
   `services`/`d1_databases` (all `notInheritable`). Left undeclared, `env.staging` would
   silently inherit the prod cron.
-- **Deploy-failure belt-and-suspenders** — both `deploy-dev.yml` and `deploy-prod.yml`
-  end with an `if: failure()` step that pings `${{ secrets.HC_PING_URL }}/fail`
-  (Healthchecks.io's explicit-failure endpoint), so a broken deploy alerts immediately
-  instead of waiting for the next missed heartbeat. Both workflows share the one
-  `HC_PING_URL` GitHub secret (same check either way) — this repo has no per-env
-  Healthchecks.io check yet, matching the single shared `CLOUDFLARE_API_TOKEN` both
-  workflows already reuse.
+- **Deploy-failure belt-and-suspenders — `deploy-prod.yml` ONLY.** It ends with an
+  `if: failure()` step that pings `${{ secrets.HC_PING_URL }}/fail` (Healthchecks.io's
+  explicit-failure endpoint), so a broken prod deploy alerts immediately instead of
+  waiting for the next missed heartbeat. `deploy-dev.yml` deliberately has NO such
+  step: the only check is the prod dead-man's-switch, and a staging-only deploy
+  failure must not page the prod alert channel — a red Actions run is the right
+  signal for dev (PR #305 review).
 - **Reading `ExecutionContext`/`ExportedHandler`/`ScheduledController` types** —
   `custom-worker.ts` imports these three by name from
   `@cloudflare/workers-types/experimental`, the same narrow-import pattern

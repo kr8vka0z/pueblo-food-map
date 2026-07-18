@@ -61,8 +61,9 @@ export default {
   // the worker is alive and scheduled; that IS the liveness signal. Pinging the success
   // URL unconditionally is the correct, simpler design.
   async scheduled(_event: ScheduledController, env: CloudflareEnv, ctx: ExecutionContext) {
-    // Guard: env.staging never defines HC_PING_URL (see wrangler.jsonc) — a missing var
-    // must never throw out of a cron handler, so bail out instead of fetching "undefined".
+    // Guard: HC_PING_URL is a prod-only runtime secret (`wrangler secret put`, see
+    // wrangler.jsonc) — staging never gets it, and a missing value must never throw
+    // out of a cron handler, so bail out instead of fetching "undefined".
     if (!env.HC_PING_URL) return;
     ctx.waitUntil(fetch(env.HC_PING_URL).catch(() => {}));
   },

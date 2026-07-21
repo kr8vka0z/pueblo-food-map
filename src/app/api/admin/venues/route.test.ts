@@ -30,7 +30,7 @@ import { _setJwksGetterForTest } from "@/lib/cfAccess";
 const TEAM_DOMAIN = "https://pfm-test.cloudflareaccess.com";
 const AUD = "test-audience-tag";
 const KID = "venues-route-test-key";
-const ADMIN_ORIGIN = "https://admin.pueblofoodmap.com";
+const ADMIN_ORIGIN = "https://pueblofoodmap.com";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 
 // Vitest hoists vi.mock() above this file's own imports, so route.ts (via
@@ -108,7 +108,7 @@ function makeRequest(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts.token !== undefined) headers["Cf-Access-Jwt-Assertion"] = opts.token;
   if (opts.origin !== undefined) headers["Origin"] = opts.origin;
-  return new NextRequest("https://admin.pueblofoodmap.com/api/admin/venues", {
+  return new NextRequest("https://pueblofoodmap.com/api/admin/venues", {
     method: "POST",
     headers,
     body: JSON.stringify(opts.body ?? validPayload()),
@@ -178,7 +178,7 @@ describe("POST /api/admin/venues", () => {
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
     const token = await buildValidToken();
 
-    const req = new NextRequest("https://admin.pueblofoodmap.com/api/admin/venues", {
+    const req = new NextRequest("https://pueblofoodmap.com/api/admin/venues", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

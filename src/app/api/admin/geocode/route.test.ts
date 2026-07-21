@@ -71,7 +71,7 @@ async function buildValidToken(): Promise<string> {
 function makeRequest(opts: { token?: string; q?: string } = {}): NextRequest {
   const headers: Record<string, string> = {};
   if (opts.token !== undefined) headers["Cf-Access-Jwt-Assertion"] = opts.token;
-  const url = new URL("https://admin.pueblofoodmap.com/api/admin/geocode");
+  const url = new URL("https://pueblofoodmap.com/api/admin/geocode");
   if (opts.q !== undefined) url.searchParams.set("q", opts.q);
   return new NextRequest(url, { headers });
 }

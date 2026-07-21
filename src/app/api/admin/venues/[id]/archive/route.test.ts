@@ -30,7 +30,7 @@ import type { AdminVenueRow } from "@/types/venue";
 const TEAM_DOMAIN = "https://pfm-test.cloudflareaccess.com";
 const AUD = "test-audience-tag";
 const KID = "venues-archive-route-test-key";
-const ADMIN_ORIGIN = "https://admin.pueblofoodmap.com";
+const ADMIN_ORIGIN = "https://pueblofoodmap.com";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 const VENUE_ID = "manual-existing-1";
 
@@ -122,7 +122,7 @@ function makeRequest(opts: { token?: string; origin?: string } = {}): NextReques
   const headers: Record<string, string> = {};
   if (opts.token !== undefined) headers["Cf-Access-Jwt-Assertion"] = opts.token;
   if (opts.origin !== undefined) headers["Origin"] = opts.origin;
-  return new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
+  return new NextRequest(`https://pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
     method: "POST",
     headers,
   });
@@ -237,7 +237,7 @@ describe("POST /api/admin/venues/[id]/archive", () => {
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
     const token = await buildValidToken();
 
-    const req = new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
+    const req = new NextRequest(`https://pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
       method: "POST",
       headers: { "Cf-Access-Jwt-Assertion": token, Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
       body: JSON.stringify({ submissionId: 7 }),
@@ -287,7 +287,7 @@ describe("POST /api/admin/venues/[id]/archive", () => {
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
     const token = await buildValidToken();
 
-    const req = new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
+    const req = new NextRequest(`https://pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
       method: "POST",
       headers: { "Cf-Access-Jwt-Assertion": token, Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
       body: "{not valid json",
@@ -305,7 +305,7 @@ describe("POST /api/admin/venues/[id]/archive", () => {
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
     const token = await buildValidToken();
 
-    const req = new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
+    const req = new NextRequest(`https://pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
       method: "POST",
       headers: { "Cf-Access-Jwt-Assertion": token, Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
       body: JSON.stringify({ submissionId: "7" }),

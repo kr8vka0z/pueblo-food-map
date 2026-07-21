@@ -57,10 +57,10 @@ describe("buildAuthOptions", () => {
       throw new Error("expected a dynamic baseURL config, got: " + String(baseURL));
     }
     expect(baseURL.protocol).toBe("https");
-    // ADMIN_ORIGIN (cfAccess.ts) is https://admin.pueblofoodmap.com — its
-    // bare host must be in the allow-list Better Auth uses to construct
-    // correct absolute URLs on that hostname.
-    expect(baseURL.allowedHosts).toContain("admin.pueblofoodmap.com");
+    // ADMIN_ORIGINS (cfAccess.ts) includes https://pueblofoodmap.com — the
+    // apex admin now serves /admin from — and its bare host must be in the
+    // allow-list Better Auth uses to construct correct absolute URLs there.
+    expect(baseURL.allowedHosts).toContain("pueblofoodmap.com");
   });
 });
 

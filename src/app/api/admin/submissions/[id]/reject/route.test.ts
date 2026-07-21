@@ -30,7 +30,7 @@ import { _setJwksGetterForTest } from "@/lib/cfAccess";
 const TEAM_DOMAIN = "https://pfm-test.cloudflareaccess.com";
 const AUD = "test-audience-tag";
 const KID = "submissions-reject-route-test-key";
-const ADMIN_ORIGIN = "https://admin.pueblofoodmap.com";
+const ADMIN_ORIGIN = "https://pueblofoodmap.com";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 const SUBMISSION_ID = 42;
 
@@ -96,7 +96,7 @@ function makeRequest(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts.token !== undefined) headers["Cf-Access-Jwt-Assertion"] = opts.token;
   if (opts.origin !== undefined) headers["Origin"] = opts.origin;
-  return new NextRequest(`https://admin.pueblofoodmap.com/api/admin/submissions/${SUBMISSION_ID}/reject`, {
+  return new NextRequest(`https://pueblofoodmap.com/api/admin/submissions/${SUBMISSION_ID}/reject`, {
     method: "POST",
     headers,
     body: opts.noBody ? undefined : JSON.stringify(opts.body ?? { reason: "Duplicate of an existing venue." }),
@@ -196,7 +196,7 @@ describe("POST /api/admin/submissions/[id]/reject", () => {
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
     const token = await buildValidToken();
 
-    const req = new NextRequest(`https://admin.pueblofoodmap.com/api/admin/submissions/${SUBMISSION_ID}/reject`, {
+    const req = new NextRequest(`https://pueblofoodmap.com/api/admin/submissions/${SUBMISSION_ID}/reject`, {
       method: "POST",
       headers: { "Cf-Access-Jwt-Assertion": token, Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
       body: "{not valid json",

@@ -2,19 +2,21 @@
  * cfAccess.ts — Cloudflare Access JWT verifier for the admin surface
  * (#237 checkpoint c).
  *
- * WHY in-app verification is required even though Cloudflare Access already
- * gates admin.pueblofoodmap.com at the edge: this Worker also answers on
- * hostnames an Access policy scoped to that one subdomain does NOT cover —
- * the bare `*.workers.dev` fallback URL, every Workers version-preview URL,
- * and (since the admin routes ship in the SAME Worker as the public app,
- * spec §3.4) the public apex pueblofoodmap.com/admin itself. Access is
- * scoped by hostname; none of those three are automatically protected.
- * requireAccessIdentity() re-verifies the `Cf-Access-Jwt-Assertion` header's
- * signature/issuer/audience/expiry against Cloudflare's own JWKS on every
- * request, so a request to any of those three hostnames still fails unless
- * it carries a real, current Access token — signing one requires
- * Cloudflare's private key, which an attacker hitting a bypass hostname
- * does not have. See docs/admin/cloudflare-native-admin-spec.md §3.1, §8.
+ * WHY in-app verification is still required even though Cloudflare Access
+ * gates the apex admin path (/admin* + /api/admin*, on pueblofoodmap.com and
+ * dev.pueblofoodmap.com) at the edge: this Worker also answers admin routes
+ * on hostnames a PATH-scoped Access application does NOT cover — the bare
+ * `*.workers.dev` fallback URL and every Workers version-preview URL, both
+ * of which still serve /admin/* pages since the admin routes ship in the
+ * SAME Worker as the public app (spec §3.4). Access applications are bound
+ * to specific custom hostnames; neither of those two is automatically
+ * protected. requireAccessIdentity() re-verifies the
+ * `Cf-Access-Jwt-Assertion` header's signature/issuer/audience/expiry
+ * against Cloudflare's own JWKS on every request, so a request to either of
+ * those hostnames still fails unless it carries a real, current Access
+ * token — signing one requires Cloudflare's private key, which an attacker
+ * hitting a bypass hostname does not have. See
+ * docs/admin/cloudflare-native-admin-spec.md §3.1, §8.
  */
 
 import { jwtVerify, createRemoteJWKSet, type JWTVerifyGetKey } from "jose";
@@ -166,10 +168,18 @@ export async function requireAccessIdentity(
 }
 
 /**
- * The admin UI's own origin — the only origin a legitimate, browser-issued
- * /api/admin/* mutation can arrive from. Used by requireAdminOrigin() below.
+ * The admin UI's own origins — the only origins a legitimate, browser-issued
+ * /api/admin/* mutation can arrive from. Admin now serves at the apex
+ * `/admin` path (prod pueblofoodmap.com, staging dev.pueblofoodmap.com),
+ * gated by a PATH-scoped Cloudflare Access application on /admin* +
+ * /api/admin* (configured out-of-band, not in this repo) — the
+ * admin.pueblofoodmap.com / dev.admin.pueblofoodmap.com subdomains are
+ * retired. Used by requireAdminOrigin() below.
  */
-export const ADMIN_ORIGIN = "https://admin.pueblofoodmap.com";
+export const ADMIN_ORIGINS = [
+  "https://pueblofoodmap.com", // prod apex — admin served at /admin
+  "https://dev.pueblofoodmap.com", // staging apex — admin served at /admin
+] as const;
 
 /**
  * CSRF defense for non-GET /api/admin/* mutations (spec §8, "I7").
@@ -192,7 +202,8 @@ export const ADMIN_ORIGIN = "https://admin.pueblofoodmap.com";
  * catch block and one 403 response shape regardless of which check failed.
  */
 export function requireAdminOrigin(headers: HeaderSource): void {
-  if (headers.get("Origin") !== ADMIN_ORIGIN) {
+  const origin = headers.get("Origin");
+  if (!origin || !(ADMIN_ORIGINS as readonly string[]).includes(origin)) {
     throw new AccessDeniedError("bad_origin");
   }
 }

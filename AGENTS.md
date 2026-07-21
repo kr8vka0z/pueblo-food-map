@@ -261,26 +261,26 @@ Full design: `docs/admin/cloudflare-native-admin-spec.md` §3.1 (auth) and §8
 (security). This section is the operational summary — set env vars, know the
 choke point, don't relitigate the design here.
 
-**Edge gate + why in-app verification is still required.** A Cloudflare
-Access application (Google SSO + email allowlist) gates
-`admin.pueblofoodmap.com` at Cloudflare's edge — an unauthenticated or
-non-allowlisted visitor never executes a line of this app's code on that
-hostname. But the admin route group (`src/app/admin/**`,
-`src/app/api/admin/**`) ships inside the **same Worker** as the public app
-(§3.4), and that Worker answers on hostnames an Access policy scoped to
-`admin.pueblofoodmap.com` does **not** cover:
+**Edge gate + why in-app verification is still required.** Admin lives at
+the apex `/admin` path — prod `pueblofoodmap.com/admin`, staging
+`dev.pueblofoodmap.com/admin`. A **PATH-scoped** Cloudflare Access
+application (Google SSO + email allowlist), scoped to `/admin*` and
+`/api/admin*`, gates that path at Cloudflare's edge — an unauthenticated or
+non-allowlisted visitor never executes a line of this app's code there. The
+`admin.pueblofoodmap.com` / `dev.admin.pueblofoodmap.com` subdomains that
+previously hosted admin are retired. But the admin route group
+(`src/app/admin/**`, `src/app/api/admin/**`) ships inside the **same
+Worker** as the public app (§3.4), and that Worker answers admin routes on
+hostnames a path-scoped Access application does **not** cover:
 
 1. The bare fallback URL, `pueblo-food-map.kyle-boyd.workers.dev/admin`.
 2. Any Workers **version preview URL** (`<version-prefix>-pueblo-food-map.
    kyle-boyd.workers.dev/admin`) — binds **production** D1.
-3. The public apex itself, `pueblofoodmap.com/admin` — the one with the
-   lowest bar to stumble onto by accident, since it's the site's own
-   marketed domain.
 
 Every `/admin/*` page and `/api/admin/*` route handler therefore
 re-verifies the `Cf-Access-Jwt-Assertion` header in application code
 (`src/lib/cfAccess.ts`, `jose`'s `jwtVerify` against Cloudflare's JWKS —
-signature, issuer, audience, expiry), so a request to any of the three
+signature, issuer, audience, expiry), so a request to either of the two
 hostnames above still fails without a real, current Access token.
 
 **`getAdminDb()` (`src/lib/adminDb.ts`) is the single choke point.** It calls
@@ -405,12 +405,11 @@ value:
   inline fallback message ("check the address or enter coordinates below")
   and never blocks the form; lat/lng stay manually editable throughout.
 
-**Provider: the free US Census Bureau geocoder, not Mapbox.** The app's
-Mapbox public token (see "Mapbox Token Management" above) is
-URL-restricted to the public hostnames and does **not** include
-`admin.pueblofoodmap.com`, so a browser-side Mapbox geocoding call would
-fail on the admin surface — and Mapbox's secret token must never reach a
-Worker or client bundle just to add one more scope. The Census geocoder
+**Provider: the free US Census Bureau geocoder, not Mapbox.** Admin now
+serves at the apex `/admin` path, which the app's Mapbox public token (see
+"Mapbox Token Management" above) does cover — but Mapbox's secret token
+must never reach a Worker or client bundle just to add one more scope. The
+Census geocoder
 (`geocoding.geo.census.gov`) needs no key, token, or URL allowlist to
 provision or rotate, and covers US street addresses (Pueblo is US) — a
 clean fit with nothing new to rotate or leak. It also sends no CORS
@@ -1079,10 +1078,10 @@ later-phase handoff, not done in Phase 1 (see Handoff below).
 
 `ADMIN_ALLOWED_HOSTS` in `auth-options.ts` mirrors the exact hostname set
 `cfAccess.ts`'s header comment documents the admin surface answering on
-(admin subdomain, dev subdomain, public apex, bare workers.dev fallback).
-NOT included: Workers version-preview URLs (dynamic per-deploy, can't be
-exact-matched) — a wildcard pattern is a Phase 2/3 decision once real
-login traffic needs it.
+(staging apex, public apex, bare workers.dev fallback — admin is a path on
+these hosts, not a separate subdomain). NOT included: Workers
+version-preview URLs (dynamic per-deploy, can't be exact-matched) — a
+wildcard pattern is a Phase 2/3 decision once real login traffic needs it.
 
 ## Plugins registered, not yet wired to any UI
 

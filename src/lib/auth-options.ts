@@ -41,14 +41,17 @@ import { logAdminAuthEvent } from "@/lib/logger";
 
 /**
  * Every hostname this Worker answers admin traffic on (mirrors
- * cfAccess.ts's ADMIN_ORIGIN + the hostname list documented in that file's
- * header comment: the Access-gated admin subdomain, the staging subdomain,
- * the public apex admin path, and the bare workers.dev fallback). Better
- * Auth needs this to construct correct absolute callback/redirect URLs
- * regardless of which hostname a request arrives on — the same
- * multi-hostname reality cfAccess.ts's in-app JWT re-verification exists to
- * cover, for the same underlying reason (Cloudflare Workers answer on more
- * hostnames than a single custom domain).
+ * cfAccess.ts's ADMIN_ORIGINS + the hostname list documented in that file's
+ * header comment: the public apex — where admin now serves at the `/admin`
+ * path, gated by a PATH-scoped Cloudflare Access application — the staging
+ * apex, and the bare workers.dev fallback). Better Auth needs this to
+ * construct correct absolute callback/redirect URLs regardless of which
+ * hostname a request arrives on — the same multi-hostname reality
+ * cfAccess.ts's in-app JWT re-verification exists to cover, for the same
+ * underlying reason (Cloudflare Workers answer on more hostnames than a
+ * single custom domain). The admin.pueblofoodmap.com /
+ * dev.admin.pueblofoodmap.com subdomains are retired — admin is a path on
+ * these same apex hosts, not a separate hostname.
  *
  * NOT included: Workers version-preview URLs (`<version-prefix>-pueblo-food-
  * map.kyle-boyd.workers.dev`) — those are dynamic per-deploy and can't be
@@ -59,12 +62,6 @@ import { logAdminAuthEvent } from "@/lib/logger";
  * hostnames real login traffic will actually use.
  */
 const ADMIN_ALLOWED_HOSTS = [
-  "admin.pueblofoodmap.com",
-  // Staging admin runs on its own subdomain (mirrors prod's
-  // admin.pueblofoodmap.com), not a /admin folder on the public staging site
-  // — Better Auth must build callback/redirect URLs and validate passkey
-  // ceremonies on this host. rpID "pueblofoodmap.com" (below) covers it.
-  "dev.admin.pueblofoodmap.com",
   "dev.pueblofoodmap.com",
   "pueblofoodmap.com",
   "pueblo-food-map.kyle-boyd.workers.dev",

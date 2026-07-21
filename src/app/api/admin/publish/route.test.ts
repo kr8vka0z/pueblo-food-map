@@ -36,7 +36,7 @@ import type { VenueRow } from "@/lib/publishVenues";
 const TEAM_DOMAIN = "https://pfm-test.cloudflareaccess.com";
 const AUD = "test-audience-tag";
 const KID = "publish-route-test-key";
-const ADMIN_ORIGIN = "https://admin.pueblofoodmap.com";
+const ADMIN_ORIGIN = "https://pueblofoodmap.com";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 
 // Vitest hoists vi.mock() above this file's own imports, so route.ts (via
@@ -129,7 +129,7 @@ function makeRequest(opts: { token?: string; origin?: string } = {}): NextReques
   const headers: Record<string, string> = {};
   if (opts.token !== undefined) headers["Cf-Access-Jwt-Assertion"] = opts.token;
   if (opts.origin !== undefined) headers["Origin"] = opts.origin;
-  return new NextRequest("https://admin.pueblofoodmap.com/api/admin/publish", {
+  return new NextRequest("https://pueblofoodmap.com/api/admin/publish", {
     method: "POST",
     headers,
   });

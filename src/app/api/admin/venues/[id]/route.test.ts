@@ -32,7 +32,7 @@ import type { AdminVenueRow } from "@/types/venue";
 const TEAM_DOMAIN = "https://pfm-test.cloudflareaccess.com";
 const AUD = "test-audience-tag";
 const KID = "venues-id-route-test-key";
-const ADMIN_ORIGIN = "https://admin.pueblofoodmap.com";
+const ADMIN_ORIGIN = "https://pueblofoodmap.com";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 const VENUE_ID = "manual-existing-1";
 
@@ -143,7 +143,7 @@ function makeRequest(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts.token !== undefined) headers["Cf-Access-Jwt-Assertion"] = opts.token;
   if (opts.origin !== undefined) headers["Origin"] = opts.origin;
-  return new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}`, {
+  return new NextRequest(`https://pueblofoodmap.com/api/admin/venues/${VENUE_ID}`, {
     method: "PATCH",
     headers,
     body: JSON.stringify(opts.body ?? validPayload()),
@@ -217,7 +217,7 @@ describe("PATCH /api/admin/venues/[id]", () => {
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
     const token = await buildValidToken();
 
-    const req = new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}`, {
+    const req = new NextRequest(`https://pueblofoodmap.com/api/admin/venues/${VENUE_ID}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",

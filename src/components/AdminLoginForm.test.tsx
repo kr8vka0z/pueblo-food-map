@@ -22,6 +22,11 @@ const mockUseListPasskeys = vi.fn();
 const mockSignInMagicLink = vi.fn();
 const mockSignInPasskey = vi.fn();
 const mockAddPasskey = vi.fn();
+const mockReplace = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mockReplace, push: vi.fn(), refresh: vi.fn() }),
+}));
 
 vi.mock("@/lib/authClient", () => ({
   authClient: {
@@ -45,6 +50,7 @@ beforeEach(() => {
   mockSignInMagicLink.mockReset();
   mockSignInPasskey.mockReset();
   mockAddPasskey.mockReset();
+  mockReplace.mockReset();
   mockUseSession.mockReturnValue({ data: null, isPending: false });
   // Default: no passkeys yet — matches the pre-existing "first-time" tests
   // below, which expect the setup prompt unless a test overrides this.
@@ -153,14 +159,14 @@ describe("AdminLoginForm — signed-in: passkey registration prompt", () => {
     expect(screen.getByRole("button", { name: /set up a passkey/i })).toBeDefined();
   });
 
-  test("a successful registration shows the 'passkey saved' confirmation", async () => {
+  test("a successful registration logs them straight into /admin (no extra screen)", async () => {
     mockAddPasskey.mockResolvedValue({ data: {}, error: null });
     const user = userEvent.setup();
     render(<AdminLoginForm />);
 
     await user.click(screen.getByRole("button", { name: /set up a passkey/i }));
 
-    expect(await screen.findByText(/passkey saved/i)).toBeDefined();
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/admin"));
   });
 
   test("a failed registration shows an error and offers to retry", async () => {
@@ -171,9 +177,10 @@ describe("AdminLoginForm — signed-in: passkey registration prompt", () => {
     await user.click(screen.getByRole("button", { name: /set up a passkey/i }));
 
     expect(await screen.findByText(/couldn.t set up a passkey/i)).toBeDefined();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  test("links to /admin to continue", () => {
+  test("offers a way into admin without a passkey", () => {
     render(<AdminLoginForm />);
 
     const link = screen.getByRole("link", { name: /continue to admin/i });
@@ -200,16 +207,17 @@ describe("AdminLoginForm — signed-in: returning admin who already has a passke
     expect(
       screen.queryByRole("button", { name: /set up a passkey/i }),
     ).toBeNull();
-    expect(screen.getByTestId("admin-login-passkey-prompt")).toHaveTextContent(
-      "kysboyd@gmail.com",
-    );
+    expect(screen.getByTestId("admin-login-passkey-prompt")).toBeDefined();
   });
 
-  test("still shows 'Continue to admin' as the primary action", () => {
+  test("redirects straight into /admin without a 'Continue' click", async () => {
     render(<AdminLoginForm />);
 
-    const link = screen.getByRole("link", { name: /continue to admin/i });
-    expect(link.getAttribute("href")).toBe("/admin");
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/admin"));
+    // No intermediate "Continue to admin" screen when a passkey already exists.
+    expect(
+      screen.queryByRole("link", { name: /continue to admin/i }),
+    ).toBeNull();
   });
 });
 
@@ -226,14 +234,14 @@ describe("AdminLoginForm — signed-in: passkey list still pending", () => {
     });
   });
 
-  test("does not flash the 'set up a passkey' prompt while the list is pending", () => {
+  test("does not flash the 'set up a passkey' prompt (or redirect) while the list is pending", () => {
     render(<AdminLoginForm />);
 
     expect(
       screen.queryByRole("button", { name: /set up a passkey/i }),
     ).toBeNull();
-    expect(screen.getByTestId("admin-login-passkey-prompt")).toHaveTextContent(
-      "kysboyd@gmail.com",
-    );
+    expect(screen.getByTestId("admin-login-passkey-prompt")).toBeDefined();
+    // Must not redirect before the passkey list has loaded.
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

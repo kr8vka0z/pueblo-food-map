@@ -79,9 +79,10 @@ async function whoamiDiagnostic(req: NextRequest): Promise<Response> {
 }
 
 export async function GET(req: NextRequest): Promise<Response> {
-  // TEMP DIAGNOSTIC branch — REVERT. Token-only gate (staging is single-user,
-  // token-gated, reads no D1) — the observed host is echoed in the payload.
-  if (new URL(req.url).searchParams.get("diag") === "pfmdiag2026") {
+  // TEMP DIAGNOSTIC branch — REVERT. Gated on a request HEADER (reliable via
+  // req.headers.get under OpenNext, unlike req.url query parsing). Send with
+  // `curl -H "x-pfm-diag: pfmdiag2026"`. Staging single-user, reads no D1.
+  if (req.headers.get("x-pfm-diag") === "pfmdiag2026") {
     return whoamiDiagnostic(req);
   }
 

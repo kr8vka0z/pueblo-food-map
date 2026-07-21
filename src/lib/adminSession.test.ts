@@ -21,9 +21,21 @@ vi.mock("@/lib/auth", () => ({
 
 import { requireAdminSession } from "@/lib/adminSession";
 
-function headersWithCookie(cookie: string | null): HeaderSource {
+// WHY a real `host` is included by default (fixed post-cutover — live 403
+// bug, admin/session-dynamic-baseurl-host): auth-options.ts's `baseURL` is a
+// dynamic multi-host config, and requireAdminSession() now forwards `host`
+// alongside `cookie` on every getSession() call — a helper that omitted it
+// would no longer represent a real caller (see adminSession.ts's header).
+function headersWithCookie(
+  cookie: string | null,
+  host = "dev.pueblofoodmap.com",
+): HeaderSource {
   return {
-    get: (name: string) => (name === "cookie" ? cookie : null),
+    get: (name: string) => {
+      if (name === "cookie") return cookie;
+      if (name === "host") return host;
+      return null;
+    },
   };
 }
 
@@ -69,18 +81,43 @@ describe("requireAdminSession", () => {
     ).resolves.toEqual({ email: "kysboyd@gmail.com" });
   });
 
-  test("forwards only the cookie header to getSession, as a real Headers object", async () => {
+  // Was "forwards only the cookie header" — updated because
+  // requireAdminSession() now ALSO forwards `host` (and, when present,
+  // `x-forwarded-host`) so Better Auth's dynamic baseURL can resolve a
+  // per-request base URL on this direct auth.api.getSession() call, matching
+  // the real HTTP endpoint's behavior. See adminSession.ts's header WHY.
+  test("forwards cookie and host to getSession, as a real Headers object", async () => {
     vi.stubEnv("ADMIN_ALLOWLIST", "kysboyd@gmail.com");
     mockGetSession.mockResolvedValue({
       session: { id: "s1" },
       user: { email: "kysboyd@gmail.com" },
     });
 
-    await requireAdminSession(headersWithCookie("__Host-session_token=abc"));
+    await requireAdminSession(
+      headersWithCookie("__Host-session_token=abc", "dev.pueblofoodmap.com"),
+    );
 
     expect(mockGetSession).toHaveBeenCalledTimes(1);
     const call = mockGetSession.mock.calls[0][0] as { headers: Headers };
     expect(call.headers).toBeInstanceOf(Headers);
     expect(call.headers.get("cookie")).toBe("__Host-session_token=abc");
+    expect(call.headers.get("host")).toBe("dev.pueblofoodmap.com");
+  });
+
+  test("still yields no_session for a cookieless call with no host header (fallback path)", async () => {
+    mockGetSession.mockResolvedValue(null);
+
+    // A caller with neither cookie nor host still reaches getSession() —
+    // requireAdminSession() only conditionally sets each header, never
+    // throws building the Headers object — and getSession()'s own
+    // no-session result maps to AccessDeniedError("no_session"), never
+    // "not_allowlisted" or an unhandled throw.
+    await expect(
+      requireAdminSession(headersWithCookie(null, "")),
+    ).rejects.toMatchObject(new AccessDeniedError("no_session"));
+
+    const call = mockGetSession.mock.calls[0][0] as { headers: Headers };
+    expect(call.headers.has("cookie")).toBe(false);
+    expect(call.headers.has("host")).toBe(false);
   });
 });

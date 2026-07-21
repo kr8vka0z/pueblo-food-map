@@ -98,6 +98,21 @@ export function buildAuthOptions(
     baseURL: {
       allowedHosts: ADMIN_ALLOWED_HOSTS,
       protocol: "https",
+      // WHY a fallback (fixed post-cutover — live 403 bug,
+      // admin/session-dynamic-baseurl-host): a dynamic baseURL with no
+      // fallback throws when a caller can't be resolved to one of
+      // ADMIN_ALLOWED_HOSTS via a host/x-forwarded-host header (verified in
+      // the installed better-auth source, dist/context/helpers.mjs's
+      // `pickSource`/`resolveDynamicContext`). adminSession.ts's
+      // requireAdminSession() now forwards `host` on every direct
+      // auth.api.getSession() call (see that file's header), so this
+      // fallback should rarely be hit in practice — it exists as the second
+      // half of a belt-and-suspenders fix so a header-stripped caller can
+      // never throw instead of cleanly resolving to "no session". Points at
+      // the public apex (first entry in ADMIN_ALLOWED_HOSTS above), not a
+      // staging/workers.dev host, since a fallback is inherently a single
+      // choice and prod is the canonical default.
+      fallback: "https://pueblofoodmap.com",
     },
     // #315 Phase 2 — CRITICAL: this admin has exactly one legitimate account-
     // creation path (an allowlisted email's first magic-link sign-in;

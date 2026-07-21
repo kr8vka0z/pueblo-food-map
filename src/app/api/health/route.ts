@@ -27,7 +27,6 @@ export async function GET(): Promise<NextResponse> {
       status: "ok",
       version: pkg.version,
       timestamp: new Date().toISOString(),
-      probe: "hx7-deploy-check",
     },
     {
       headers: {

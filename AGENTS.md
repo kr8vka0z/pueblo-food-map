@@ -1382,6 +1382,39 @@ working shell) — regenerate and diff against it before applying to remote
 D1, per that file's own header. Applying 0004 to remote/production D1 is
 NOT done as part of this phase, same convention as every prior migration.
 
+## Item 2 — Cloudflare edge rate limit (NOT in this repo — zone config)
+
+A second, complementary limiter lives at the Cloudflare **edge**, in front
+of the Worker — distinct from item 1's app-level Better Auth limiter and
+NOT expressed in this codebase (it's zone config, managed via the
+Cloudflare API/dashboard, not `wrangler.jsonc`). It blunts a volumetric
+flood of the admin auth surface before a request ever reaches the app.
+
+- **Zone:** `pueblofoodmap.com` (zone id `557eb74d0048cb71251282b82e99926e`),
+  `http_ratelimit` phase entrypoint ruleset `ebccb17e51e841e5976788756b9ca8dc`.
+- **Rule:** expression `starts_with(http.request.uri.path, "/api/auth/")`,
+  action `block`, count per `ip.src`+`cf.colo.id`, **>10 requests / 10s →
+  block 10s**. Only the Better Auth endpoints are scoped; the public map
+  and every visitor page are untouched.
+- **WHY these blunt numbers:** the zone is on the **Free** plan, which caps
+  the `http_ratelimit` phase at **one** rule, forces `mitigation_timeout`
+  to equal-or-exceed the counting `period` (so the block window is
+  effectively the 10s period), and allows IP-only counting. A single
+  path+IP rule is all Free permits — documented so nobody mistakes the
+  bluntness for a config error. Pro (2 rules) / Business (5) would allow a
+  longer block window and keeping a second rule; deliberately not purchased
+  (see the swap note next).
+- **The one free slot previously held a "Leaked credential check" rule**
+  (`cf.waf.credential_check.password_leaked`, block). It was **removed** at
+  #318 to free the slot: this admin is passwordless (magic link + passkey,
+  `emailAndPassword.enabled: false`), so no request ever submits a password
+  for that field to match — the rule was inert here. Net swap: an inert
+  stolen-password rule → an active auth-flood rule.
+- **To change it:** Cloudflare dashboard → Security → WAF → Rate limiting
+  rules, or the rulesets API on the zone/ruleset ids above (Global API key
+  — `op://Atlas/Cloudflare Global API`, header-auth `X-Auth-Email` /
+  `X-Auth-Key`).
+
 ---
 
 # Admin authentication — passkey isolation (#318): staging gets its own identity

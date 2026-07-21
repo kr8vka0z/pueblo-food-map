@@ -972,6 +972,145 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
 
 ---
 
+# Admin authentication — Better Auth engine (#314, Phase 1)
+
+Self-hosted [Better Auth](https://better-auth.com) replaces Cloudflare
+Access on the admin surface, rolled out in phases. **Phase 1 (this
+section) provisions the auth ENGINE only** — no login UI, no route
+gating, no cutover. **Cloudflare Access still gates `/admin/**` and
+`/api/admin/**` completely unmodified** (see "Admin authentication
+(Cloudflare Access)" above) through this phase and every phase after it,
+until an explicit later cutover. Nothing about how the admin is actually
+protected has changed yet.
+
+**Why replace Access at all:** out of scope for this section — see issue
+#314 for the rationale. This section covers only what Phase 1 built.
+
+## What Phase 1 provisions
+
+- **`src/lib/auth-options.ts`** — `buildAuthOptions(database)`, the shared
+  config (secret, `baseURL`, plugins) both the runtime and the CLI build on.
+  Returned via `satisfies BetterAuthOptions`, not a `: BetterAuthOptions`
+  annotation — the explicit annotation would widen the return type and
+  erase the literal `plugins` tuple `betterAuth()`'s generic inference needs
+  to type `auth.api.signInMagicLink` etc. (see the file's own WHY comment).
+- **`src/lib/auth.ts`** — `getAuth()`, a lazy async accessor mirroring
+  `adminDb.ts`'s `getAdminDb()` pattern: constructs the Better Auth instance
+  against the live `ADMIN_DB` D1 binding via `getCloudflareContext()`
+  (unavailable at module-import time on Workers), cached per-isolate.
+- **`src/app/api/auth/[...all]/route.ts`** — mounts Better Auth's own
+  handler via `toNextJsHandler()`. Boots the engine; nothing in the app
+  calls it yet, and it is NOT gated by `requireAccessIdentity()` (it IS the
+  auth system's own endpoints — sign-in/session/passkey ceremonies an
+  unauthenticated visitor must be able to reach — a separate concern from
+  the admin data `getAdminDb()` protects).
+- **`migrations/0003_better_auth_schema.sql`** — `user`, `session`,
+  `account`, `verification`, `passkey` tables, in the SAME
+  `pueblo-food-map-admin` D1 database every other admin table lives in.
+  **No Workers KV anywhere** — all auth state (sessions, magic-link/
+  verification tokens, passkey challenges) stays in D1, by design (one
+  store, one backup surface, no second binding).
+- **`scripts/auth-cli.config.ts`** — CLI-only config for
+  `@better-auth/cli generate`/`migrate`, never imported by runtime code.
+
+## Database adapter — core `better-auth`, no third-party package
+
+Core `better-auth` (via its bundled `@better-auth/kysely-adapter`
+dependency) has native, first-party D1 support: it structurally
+auto-detects a raw `D1Database` and dispatches to its own
+`D1SqliteDialect`, which uses D1's `batch()` API — never raw
+`BEGIN`/`COMMIT` (D1 disallows interactive transactions). Verified against
+better-auth's own installed source, not assumed from docs. The third-party
+`better-auth-cloudflare` package is NOT a dependency of this repo — it
+isn't needed.
+
+## `@better-auth/cli` schema generation — a real gotcha
+
+`@better-auth/cli@1.4.21` bundles its OWN pinned copy of
+`better-auth@1.4.21` in its own `node_modules` — a version released
+BEFORE D1 support existed. Its internal `getAdapter()`/`getMigrations()`
+resolve `better-auth/db` against that nested old copy, not this project's
+top-level `better-auth@1.6.23`, regardless of what's installed at the
+project root. Handing it a `D1Database` (real or stubbed) always throws
+`"Failed to initialize database adapter"` — a real gap in the CLI tool,
+not a config mistake.
+
+**Workaround (`scripts/auth-cli.config.ts`):** generate against an
+in-memory `better-sqlite3` database instead. This is safe because Better
+Auth's schema/migration generator branches on the coarse `databaseType`
+enum (`"sqlite" | "mysql" | "pg" | "mssql"`), not the specific physical
+driver — D1 IS SQLite-compatible SQL, so the generated CREATE TABLE output
+is identical either way. `better-sqlite3` + `@types/better-sqlite3` are
+pinned exact devDependencies for this reason; never imported by runtime
+app code, never bundled into the Worker.
+
+**Regenerating the schema after a future plugin/config change:**
+
+```bash
+npx @better-auth/cli generate --config scripts/auth-cli.config.ts --output migrations/000N_<name>.sql -y
+```
+
+Review the output for `BEGIN`/`COMMIT` before committing (D1 rejects
+interactive transactions) — Phase 1's generation had none, but re-verify
+on every regeneration since the CLI's behavior isn't within this repo's
+control.
+
+## Applying the migration
+
+Same convention as 0001/0002 (see "Public submissions queue" → "Applying
+the migration" above) — a D1 schema migration is independent of `wrangler
+deploy`, never auto-applied by a deploy.
+
+```bash
+npx wrangler d1 migrations apply pueblo-food-map-admin --local   # local dev/testing
+npx wrangler d1 migrations apply pueblo-food-map-admin --remote  # production — NOT run in Phase 1, see Handoff below
+```
+
+## `BETTER_AUTH_SECRET`
+
+Runtime, server-only — same convention as `RESEND_API_KEY`/
+`CF_ACCESS_TEAM_DOMAIN` (read via `process.env`, never declared in
+`wrangler.jsonc`). Local dev value lives in gitignored `.env.local`
+(generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`).
+Production value is set via `wrangler secret put BETTER_AUTH_SECRET` — a
+later-phase handoff, not done in Phase 1 (see Handoff below).
+
+## Multi-hostname `baseURL`
+
+`ADMIN_ALLOWED_HOSTS` in `auth-options.ts` mirrors the exact hostname set
+`cfAccess.ts`'s header comment documents the admin surface answering on
+(admin subdomain, dev subdomain, public apex, bare workers.dev fallback).
+NOT included: Workers version-preview URLs (dynamic per-deploy, can't be
+exact-matched) — a wildcard pattern is a Phase 2/3 decision once real
+login traffic needs it.
+
+## Plugins registered, not yet wired to any UI
+
+- **`magicLink`** — `sendMagicLink` throws (marked `// Phase 2:` in
+  `auth-options.ts`); registered so its schema (the `verification` table
+  shape) is correct now. Phase 2 wires a real Resend-backed implementation.
+- **`passkey`** (`@better-auth/passkey`) — `rpID`/`rpName`/static `origin`
+  array set; no registration/authentication UI exists yet.
+
+## Handoff — NOT done in Phase 1 (explicit, for a later phase)
+
+- **Production `BETTER_AUTH_SECRET`** — `wrangler secret put
+  BETTER_AUTH_SECRET` was NOT run. Requires Cloudflare deploy credentials
+  this phase's implementer didn't hold.
+- **Remote migration** — `0003_better_auth_schema.sql` was applied to
+  **local** D1 only and verified there. It was NOT applied to remote/
+  production D1, and no remote dry-run proof exists: the installed
+  wrangler (4.107.0) has no `--dry-run` flag on `d1 execute`/`d1 migrations
+  apply` (verified against its bundled CLI source — only `wrangler deploy`
+  has that flag), and no `CLOUDFLARE_API_TOKEN` was available to even
+  attempt a read-only remote check. Apply at whichever later phase's merge
+  actually cuts the admin over.
+- **Login UI, route gating, Access removal** — Phases 2, 3, and 5
+  respectively. Nothing in this phase changes how an admin actually signs
+  in.
+
+---
+
 # Design system — DESIGN.md
 
 [DESIGN.md](DESIGN.md) is the agent-facing visual-identity reference. Read it before

@@ -1,43 +1,56 @@
 /**
- * cfAccess.ts — Cloudflare Access JWT verifier for the admin surface
- * (#237 checkpoint c).
+ * cfAccess.ts — CSRF defense + shared admin-auth types, post-Cloudflare-Access
+ * cutover (auth/betterauth-sole-gate).
  *
- * WHY in-app verification is required even though Cloudflare Access already
- * gates admin.pueblofoodmap.com at the edge: this Worker also answers on
- * hostnames an Access policy scoped to that one subdomain does NOT cover —
- * the bare `*.workers.dev` fallback URL, every Workers version-preview URL,
- * and (since the admin routes ship in the SAME Worker as the public app,
- * spec §3.4) the public apex pueblofoodmap.com/admin itself. Access is
- * scoped by hostname; none of those three are automatically protected.
- * requireAccessIdentity() re-verifies the `Cf-Access-Jwt-Assertion` header's
- * signature/issuer/audience/expiry against Cloudflare's own JWKS on every
- * request, so a request to any of those three hostnames still fails unless
- * it carries a real, current Access token — signing one requires
- * Cloudflare's private key, which an attacker hitting a bypass hostname
- * does not have. See docs/admin/cloudflare-native-admin-spec.md §3.1, §8.
+ * WHY this file keeps its name despite no longer verifying a Cloudflare
+ * Access JWT: `requireAdminOrigin()` (the CSRF check below), `AccessDeniedError`,
+ * `AccessDeniedReason`, `AdminIdentity`, and `HeaderSource` are imported
+ * project-wide (adminDb.ts, adminSession.ts, adminAuthErrors.ts, every
+ * /api/admin/* route, every /admin/** page). Renaming the module is a bigger,
+ * unrelated diff than this cutover's scope — the name is now a historical
+ * label, not a description of what runs here.
+ *
+ * WHAT USED TO LIVE HERE: `requireAccessIdentity()` verified the
+ * `Cf-Access-Jwt-Assertion` header against Cloudflare's JWKS (jose's
+ * `jwtVerify`, signature/issuer/audience/expiry) as a second, in-app layer on
+ * top of the edge-level Access application gating `/admin*` +
+ * `/api/admin*`. Kyle cut the admin surface over to Better Auth as the SOLE
+ * identity gate (the Cloudflare Access application itself is removed from
+ * infrastructure in the same change) — `getAdminDb()` (adminDb.ts) now calls
+ * only `requireAdminSession()` (adminSession.ts). Grep git history for
+ * `requireAccessIdentity` if the JWKS-verification code is ever needed again
+ * (e.g. bench a hostname without Better Auth's own baseURL coverage) — it is
+ * NOT restored here; the removed helper's fail-closed reasons
+ * (`missing_assertion` / `invalid_token` / `no_email_claim` / `misconfigured`)
+ * are gone from `AccessDeniedReason` below along with it, since nothing in
+ * this codebase throws them anymore.
  */
 
-import { jwtVerify, createRemoteJWKSet, type JWTVerifyGetKey } from "jose";
-
 export type AccessDeniedReason =
-  | "missing_assertion"
-  | "invalid_token"
-  | "no_email_claim"
-  | "misconfigured"
-  | "bad_origin";
+  | "bad_origin"
+  // No live Better Auth session exists for this caller (adminSession.ts) —
+  // the one case that gets a different HTTP treatment than every other
+  // denial: a page redirects to /admin/login, a route handler returns 401
+  // instead of 403 (see adminAuthErrors.ts).
+  | "no_session"
+  // A live Better Auth session exists, but its email isn't on the admin
+  // allowlist (defense-in-depth — see adminSession.ts and
+  // adminAuthAllowlistPlugin.ts, which already blocks this at sign-in time).
+  | "not_allowlisted";
 
 /**
- * Thrown by requireAccessIdentity() (and, transitively, getAdminDb()) on any
- * auth failure. `reason` is a coarse, machine-readable, PII-free
+ * Thrown by requireAdminOrigin() below and by requireAdminSession()
+ * (adminSession.ts) — the two checks getAdminDb() (adminDb.ts) composes into
+ * one fail-closed gate. `reason` is a coarse, machine-readable, PII-free
  * classification — safe to pass to logAdminAuthFailure() (src/lib/logger.ts)
- * for Cloudflare Workers Logs filtering. Never carries token contents or
- * claim values.
+ * for Cloudflare Workers Logs filtering. Never carries token or session
+ * contents.
  */
 export class AccessDeniedError extends Error {
   readonly reason: AccessDeniedReason;
 
   constructor(reason: AccessDeniedReason, message?: string) {
-    super(message ?? `Cloudflare Access denied: ${reason}`);
+    super(message ?? `Admin access denied: ${reason}`);
     this.name = "AccessDeniedError";
     this.reason = reason;
   }
@@ -51,142 +64,46 @@ export interface AdminIdentity {
  * Anything with a Headers-like `.get()`. Both a route handler's
  * `Request.headers` and a Server Component's `next/headers` `headers()`
  * result satisfy this, so one function covers both /admin/* pages and
- * /api/admin/* route handlers (spec §3.1).
+ * /api/admin/* route handlers.
  */
 export interface HeaderSource {
   get(name: string): string | null;
 }
 
-const ACCESS_JWT_HEADER = "Cf-Access-Jwt-Assertion";
-const JWKS_PATH = "/cdn-cgi/access/certs";
-
-// Resolves a team domain to a JWTVerifyGetKey. Swappable for tests — see
-// _setJwksGetterForTest below.
-type JwksGetter = (teamDomain: string) => JWTVerifyGetKey;
-
-// Builds the default resolver: a lazily-created, memoized remote JWKS.
-//
-// WHY lazy, never built at module scope: the spec's own illustrative
-// skeleton (docs/admin/cloudflare-native-admin-spec.md §3.1) constructs
-// `createRemoteJWKSet(new URL(...))` at import time. But CF_ACCESS_TEAM_DOMAIN
-// is unset in dev, in tests, in CI, and in this very checkpoint's own deploy
-// (Kyle sets it only after creating the live Access application in the CF
-// dashboard — a step deliberately out of scope here). `new URL(undefined +
-// "/cdn-cgi/access/certs")` would throw the instant this module is
-// imported — before any caller reaches the fail-closed branch below, and
-// before any test file could even load it. Building the JWKS lazily, inside
-// the function that already checks for a configured team domain, turns that
-// import-time crash into an ordinary call-time AccessDeniedError, and gives
-// cfAccess.test.ts a seam to inject a fully offline JWKS (see
-// _setJwksGetterForTest) instead of hitting Cloudflare's real endpoint.
-function defaultJwksGetter(): JwksGetter {
-  let cached: { domain: string; keySet: JWTVerifyGetKey } | null = null;
-  return (teamDomain: string) => {
-    if (cached?.domain !== teamDomain) {
-      cached = {
-        domain: teamDomain,
-        keySet: createRemoteJWKSet(new URL(`${teamDomain}${JWKS_PATH}`)),
-      };
-    }
-    return cached.keySet;
-  };
-}
-
-let jwksGetter: JwksGetter = defaultJwksGetter();
-
 /**
- * Test-only seam: replace the JWKS resolver with a fake — e.g.
- * `jose.createLocalJWKSet()` built from an in-memory RSA keypair — so
- * cfAccess.test.ts can sign and verify a real JWT with zero network calls to
- * Cloudflare's real certs endpoint. Pass `null` to restore the default lazy
- * remote resolver. Not used by any production code path.
+ * The admin UI's own origins — the only origins a legitimate, browser-issued
+ * /api/admin/* mutation can arrive from. Admin serves at the apex `/admin`
+ * path (prod pueblofoodmap.com, staging dev.pueblofoodmap.com). Used by
+ * requireAdminOrigin() below.
  */
-export function _setJwksGetterForTest(getter: JwksGetter | null): void {
-  jwksGetter = getter ?? defaultJwksGetter();
-}
+export const ADMIN_ORIGINS = [
+  "https://pueblofoodmap.com", // prod apex — admin served at /admin
+  "https://dev.pueblofoodmap.com", // staging apex — admin served at /admin
+] as const;
 
 /**
- * Verifies the `Cf-Access-Jwt-Assertion` header against Cloudflare Access's
- * JWKS (signature, issuer, audience, expiry) and returns the caller's
- * verified email. Throws AccessDeniedError — and never returns a "denied but
- * still an identity" value — on every failure path, including
- * misconfiguration, so callers cannot accidentally fall through to treating
- * a denial as success.
- */
-export async function requireAccessIdentity(
-  headers: HeaderSource,
-): Promise<AdminIdentity> {
-  const token = headers.get(ACCESS_JWT_HEADER);
-  if (!token) throw new AccessDeniedError("missing_assertion");
-
-  const teamDomain = process.env.CF_ACCESS_TEAM_DOMAIN;
-  const audience = process.env.CF_ACCESS_AUD;
-  // Fail closed: an unset env var must never be treated as "trust any
-  // issuer" / "no audience restriction". Kyle populates these only after
-  // creating the live CF Access application — until then, every request
-  // (including a technically well-formed but unrelated JWT) is denied.
-  if (!teamDomain || !audience) {
-    throw new AccessDeniedError("misconfigured");
-  }
-
-  let email: unknown;
-  try {
-    const keySet = jwksGetter(teamDomain);
-    const { payload } = await jwtVerify(token, keySet, {
-      issuer: teamDomain,
-      audience,
-      // Pin the accepted signature algorithm. Cloudflare Access signs its
-      // assertions with RS256; a remote JWKS of asymmetric keys already
-      // forecloses `alg:none` and HS256-confusion, but explicitly allowlisting
-      // the one algorithm we expect is cheap belt-and-braces on an auth gate —
-      // jose will reject a token whose header advertises any other `alg`.
-      algorithms: ["RS256"],
-    });
-    email = payload.email;
-  } catch (err) {
-    if (err instanceof AccessDeniedError) throw err;
-    // Bad signature, wrong issuer, wrong audience, expired token, or a
-    // malformed JWT all land here as a jose verification error — collapsed
-    // to one reason because none of these should leak claim contents into
-    // logs, and the distinction has no operational value to an admin
-    // reading Workers Logs (every one of them means "reject this request").
-    throw new AccessDeniedError("invalid_token");
-  }
-
-  if (typeof email !== "string" || email.length === 0) {
-    throw new AccessDeniedError("no_email_claim");
-  }
-  return { email };
-}
-
-/**
- * The admin UI's own origin — the only origin a legitimate, browser-issued
- * /api/admin/* mutation can arrive from. Used by requireAdminOrigin() below.
- */
-export const ADMIN_ORIGIN = "https://admin.pueblofoodmap.com";
-
-/**
- * CSRF defense for non-GET /api/admin/* mutations (spec §8, "I7").
+ * CSRF defense for non-GET /api/admin/* mutations (spec §8, "I7") —
+ * independent of, and unaffected by, the Cloudflare Access cutover above.
  *
- * WHY needed on top of the JWT check above: the Cloudflare Access session
- * cookie (`CF_Authorization`) is ambient — a browser attaches it
- * automatically to same-site requests, so an authenticated admin's browser
- * could be tricked into firing a cross-site mutating request without their
- * intent. requireAccessIdentity() proves the CALLER carries a valid Access
- * token; it says nothing about WHERE the request originated. This is a
- * second, independent layer: every non-GET /api/admin/* handler EXCEPT
- * /api/admin/refresh/ingest must additionally call this before mutating.
- * (refresh/ingest is exempt — it's authenticated by a CF Access Service
- * Token + bearer token, called by a GitHub Actions runner rather than a
- * browser, so it never carries the ambient session cookie CSRF defends
- * against and wouldn't reliably send a matching Origin header either.)
+ * WHY needed on top of the Better Auth session check: the session cookie is
+ * ambient — a browser attaches it automatically to same-site requests, so an
+ * authenticated admin's browser could be tricked into firing a cross-site
+ * mutating request without their intent. requireAdminSession() proves the
+ * CALLER holds a valid session; it says nothing about WHERE the request
+ * originated. This is a second, independent layer: every non-GET
+ * /api/admin/* handler EXCEPT /api/admin/refresh/ingest must additionally
+ * call this before mutating. (refresh/ingest does not exist in this repo yet
+ * — the spec reserves it for a future GitHub-Actions-triggered ingest route
+ * authenticated by its own bearer token, never a browser, so CSRF wouldn't
+ * apply there either way.)
  *
- * Throws the SAME AccessDeniedError used by requireAccessIdentity() (new
+ * Throws the SAME AccessDeniedError used by requireAdminSession() (new
  * reason: "bad_origin") so every /api/admin/* route handler can share one
  * catch block and one 403 response shape regardless of which check failed.
  */
 export function requireAdminOrigin(headers: HeaderSource): void {
-  if (headers.get("Origin") !== ADMIN_ORIGIN) {
+  const origin = headers.get("Origin");
+  if (!origin || !(ADMIN_ORIGINS as readonly string[]).includes(origin)) {
     throw new AccessDeniedError("bad_origin");
   }
 }

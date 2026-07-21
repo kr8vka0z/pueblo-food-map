@@ -255,65 +255,79 @@ All three form routes (`suggest`, `report`, `feedback`) call `logFormFailure` fr
 - **Filter/alert:** In CF Workers Logs, filter on `form_submit_failure` for a full failure
   stream, or narrow to `send_failed` for actionable outage alerts.
 
-# Admin authentication (Cloudflare Access) (#237)
+# Admin authentication — Better Auth is the sole gate (#237, post-cutover)
 
-Full design: `docs/admin/cloudflare-native-admin-spec.md` §3.1 (auth) and §8
-(security). This section is the operational summary — set env vars, know the
-choke point, don't relitigate the design here.
+Full original design: `docs/admin/cloudflare-native-admin-spec.md` §3.1
+(auth) and §8 (security) — written when Cloudflare Access was the gate;
+read it for historical context on the multi-hostname problem, not as the
+current auth model. This section is the operational summary of the
+**current** state — set env vars, know the choke point, don't relitigate
+the design here.
 
-**Edge gate + why in-app verification is still required.** A Cloudflare
-Access application (Google SSO + email allowlist) gates
-`admin.pueblofoodmap.com` at Cloudflare's edge — an unauthenticated or
-non-allowlisted visitor never executes a line of this app's code on that
-hostname. But the admin route group (`src/app/admin/**`,
-`src/app/api/admin/**`) ships inside the **same Worker** as the public app
-(§3.4), and that Worker answers on hostnames an Access policy scoped to
-`admin.pueblofoodmap.com` does **not** cover:
+**Current state (`auth/betterauth-sole-gate`): admin is gated by Better
+Auth ALONE — magic link + passkey, one-email allowlist (see "Admin
+authentication — Better Auth engine/Phase 2/Phase 3" sections below for how
+that engine was built up in phases). Cloudflare Access has been removed
+from the admin path entirely — no Access application, no
+`Cf-Access-Jwt-Assertion` header, no JWKS re-verification.** This state is
+live on the `dev`/staging line as of this cutover; **production is cut over
+separately** by a later, explicit change (removing the live CF Access
+application from Cloudflare's dashboard is also a parent-owned
+infrastructure step outside this repo's code, done in lockstep with that
+prod cutover).
 
-1. The bare fallback URL, `pueblo-food-map.kyle-boyd.workers.dev/admin`.
-2. Any Workers **version preview URL** (`<version-prefix>-pueblo-food-map.
-   kyle-boyd.workers.dev/admin`) — binds **production** D1.
-3. The public apex itself, `pueblofoodmap.com/admin` — the one with the
-   lowest bar to stumble onto by accident, since it's the site's own
-   marketed domain.
+**Why in-app re-verification was needed under the old CF-Access model, and
+why that's now moot:** admin lives at the apex `/admin` path — prod
+`pueblofoodmap.com/admin`, staging `dev.pueblofoodmap.com/admin`. The admin
+route group (`src/app/admin/**`, `src/app/api/admin/**`) ships inside the
+**same Worker** as the public app (§3.4), and that Worker answers admin
+routes on hostnames a PATH-scoped CF Access application never covered
+anyway (the bare `pueblo-food-map.kyle-boyd.workers.dev/admin` fallback,
+and every Workers version-preview URL — both of which still bind
+**production** D1). Under Better Auth, this problem doesn't need a
+per-hostname workaround: a session cookie is checked the same way
+regardless of which hostname served the request, so there is no equivalent
+"bypass hostname" gap to re-verify against.
 
-Every `/admin/*` page and `/api/admin/*` route handler therefore
-re-verifies the `Cf-Access-Jwt-Assertion` header in application code
-(`src/lib/cfAccess.ts`, `jose`'s `jwtVerify` against Cloudflare's JWKS —
-signature, issuer, audience, expiry), so a request to any of the three
-hostnames above still fails without a real, current Access token.
-
-**`getAdminDb()` (`src/lib/adminDb.ts`) is the single choke point.** It calls
-`requireAccessIdentity()` before it will hand back the `ADMIN_DB` D1 binding
-at all — there is no code path (page or route handler, first load or
-client-side navigation) that can reach admin data without passing the
-check. This exists because Next.js App Router layouts run once per mount,
-not on every client-side navigation between sibling routes — a guard placed
-only in a shared layout would miss a client-nav to another `/admin/*` page.
-Any new admin code must fetch D1 through `getAdminDb()`, never
-`getCloudflareContext()` directly.
+**`getAdminDb()` (`src/lib/adminDb.ts`) is the single choke point.** It
+calls `requireAdminSession()` (`src/lib/adminSession.ts`) before it will
+hand back the `ADMIN_DB` D1 binding at all — there is no code path (page or
+route handler, first load or client-side navigation) that can reach admin
+data without a live, allowlisted Better Auth session. This exists because
+Next.js App Router layouts run once per mount, not on every client-side
+navigation between sibling routes — a guard placed only in a shared layout
+would miss a client-nav to another `/admin/*` page. Any new admin code must
+fetch D1 through `getAdminDb()`, never `getCloudflareContext()` directly.
 
 **Two enforcement shapes, both required, both go through the same check:**
 Server Component pages call Next 16's `forbidden()` (from `next/navigation`)
-on `AccessDeniedError`, rendered by `src/app/forbidden.tsx` (a real HTTP
-403 — requires `experimental.authInterrupts: true` in `next.config.ts`,
-still an experimental Next API). Route handlers return an explicit
-`new Response("Forbidden", { status: 403 })` instead — there is no
-route-handler equivalent of `forbidden()`. Both paths log through
-`src/lib/logger.ts`'s `logAdminAuthFailure()` (`event: "admin_auth_failure"`,
-same PII-free single-line-JSON convention as `form_submit_failure` above).
+on `AccessDeniedError` reasons other than `"no_session"` (a missing session
+instead `redirect()`s to `/admin/login` — see "Better Auth Phase 3" below
+for the full redirect-vs-403 / 401-vs-403 split, unchanged by this
+cutover), rendered by `src/app/forbidden.tsx` (a real HTTP 403 — requires
+`experimental.authInterrupts: true` in `next.config.ts`, still an
+experimental Next API). Route handlers return an explicit
+`new Response("Forbidden", { status: 403 })` (or a `401` for `no_session`)
+instead — there is no route-handler equivalent of `forbidden()`. Both paths
+log through `src/lib/logger.ts`'s `logAdminAuthFailure()`
+(`event: "admin_auth_failure"`, same PII-free single-line-JSON convention
+as `form_submit_failure` above).
 
-**Env vars Kyle sets — after, and only after, creating the live CF Access
-application** (Zero Trust dashboard → Access → Applications):
+**`CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` — retired, not read by any code
+path anymore.** `requireAccessIdentity()` (the JWT verifier that read these)
+was deleted from `src/lib/cfAccess.ts` in this cutover; the two secrets can
+be removed wherever they were set (`wrangler secret put` / CF dashboard) —
+nothing in this repo consults them. `src/lib/cfAccess.ts` now hosts only
+the CSRF check (`requireAdminOrigin()`, unaffected by this cutover — see
+below) and the shared `AccessDeniedError`/`AdminIdentity`/`HeaderSource`
+types the whole admin-auth stack imports; it keeps its historical filename
+despite no longer verifying Cloudflare Access.
 
-- `CF_ACCESS_TEAM_DOMAIN` — e.g. `https://<team-name>.cloudflareaccess.com`.
-- `CF_ACCESS_AUD` — that Access application's audience tag.
-
-Both are **runtime secrets** (not `NEXT_PUBLIC_*`) — set via
-`wrangler secret put` or CF dashboard → Settings → Variables and Secrets,
-same as `RESEND_API_KEY`/`TURNSTILE_SECRET_KEY` above. Until they're set,
-`requireAccessIdentity()` fails closed (`AccessDeniedError("misconfigured")`)
-on every request — this is intentional, not a bug to work around.
+**CSRF (`requireAdminOrigin()`) is untouched by this cutover** — it's an
+independent defense against a browser's ambient session cookie being
+ridden cross-site, applying to every non-GET `/api/admin/*` mutation
+regardless of what proves the caller's identity. See its own header comment
+in `src/lib/cfAccess.ts`.
 
 **Typing `ADMIN_DB` — don't run bare `wrangler types`.** This app targets
 the DOM (`lib: ["dom", ...]` — Mapbox, forms). Wrangler's default
@@ -347,10 +361,12 @@ first mutation route — everything before this inserted rows only via
 `scripts/seed-admin-db.ts`, a one-time offline script, not a live endpoint.
 
 **Auth — both checks, same order as `/api/admin/publish`:** `getAdminDb()`
-first (JWT identity via the same choke point as every other admin route),
-then `requireAdminOrigin()` (CSRF — this route mutates, so unlike the
-read-only list page above it needs it). Either failure logs through
-`logAdminAuthFailure()` and returns a `403`.
+first (Better Auth session identity via the same choke point as every other
+admin route), then `requireAdminOrigin()` (CSRF — this route mutates, so
+unlike the read-only list page above it needs it). Either failure logs
+through `logAdminAuthFailure()`; a missing session returns `401`, every
+other denial (including a bad Origin) returns `403` — see "Admin
+authentication" above.
 
 **Validation is authoritative here, not just a courtesy mirror of the
 client.** `src/lib/adminVenueValidation.ts` re-checks every field
@@ -377,8 +393,8 @@ an explicit Publish (previous section).
 **The form** (`/admin/venues/new`, src/app/admin/venues/new/page.tsx +
 `AddVenueForm`, src/components/AddVenueForm.tsx) follows the same
 Server-Component-gate / Client-Component-form split as the rest of the
-admin: the page re-verifies Cloudflare Access and renders the signed-in
-email; the form itself holds no auth and is fully self-contained (owns its
+admin: the page re-verifies the Better Auth session and renders the
+signed-in email; the form itself holds no auth and is fully self-contained (owns its
 own field state, client-side validation, and the POST call), so it's
 renderable in isolation with sample `initialValues` for a design preview.
 On a `201`, it calls `router.push("/admin")` + `router.refresh()` so the
@@ -405,12 +421,11 @@ value:
   inline fallback message ("check the address or enter coordinates below")
   and never blocks the form; lat/lng stay manually editable throughout.
 
-**Provider: the free US Census Bureau geocoder, not Mapbox.** The app's
-Mapbox public token (see "Mapbox Token Management" above) is
-URL-restricted to the public hostnames and does **not** include
-`admin.pueblofoodmap.com`, so a browser-side Mapbox geocoding call would
-fail on the admin surface — and Mapbox's secret token must never reach a
-Worker or client bundle just to add one more scope. The Census geocoder
+**Provider: the free US Census Bureau geocoder, not Mapbox.** Admin now
+serves at the apex `/admin` path, which the app's Mapbox public token (see
+"Mapbox Token Management" above) does cover — but Mapbox's secret token
+must never reach a Worker or client bundle just to add one more scope. The
+Census geocoder
 (`geocoding.geo.census.gov`) needs no key, token, or URL allowlist to
 provision or rotate, and covers US street addresses (Pueblo is US) — a
 clean fit with nothing new to rotate or leak. It also sends no CORS
@@ -557,8 +572,8 @@ publish.** A fine-grained PAT scoped to *only* `kr8vka0z/pueblo-food-map`,
 with both **Contents: Read/Write** and **Pull requests: Read/Write**
 permissions (Contents alone covers the commit but not opening/auto-merging
 the PR). Set as a runtime secret the same way as `RESEND_API_KEY` /
-`TURNSTILE_SECRET_KEY` / `CF_ACCESS_AUD` above (`wrangler secret put
-GITHUB_PUBLISH_TOKEN` or via the CF dashboard). Until it's set, the publish
+`TURNSTILE_SECRET_KEY` above (`wrangler secret put GITHUB_PUBLISH_TOKEN` or
+via the CF dashboard). Until it's set, the publish
 route throws immediately (matches the existing missing-secret convention in
 `src/app/feedback/submit/route.ts`) rather than silently no-op'ing.
 
@@ -650,11 +665,11 @@ placed AFTER their existing anti-abuse guards (Turnstile -> honeypot ->
 rate-limit) and field validation already pass — so a row is only ever
 written for an accepted submission, never for a bot or an invalid one.
 
-**Not through `getAdminDb()`.** These are PUBLIC routes with no Cloudflare
-Access identity to verify, so they reach the D1 binding directly —
+**Not through `getAdminDb()`.** These are PUBLIC routes with no admin
+identity to verify, so they reach the D1 binding directly —
 `getCloudflareContext().env.ADMIN_DB` (imported from `@opennextjs/cloudflare`,
 the same binding the admin surface uses) — never `getAdminDb()`
-(src/lib/adminDb.ts), which gates on `requireAccessIdentity()` and exists
+(src/lib/adminDb.ts), which gates on `requireAdminSession()` and exists
 specifically for AUTHENTICATED `/admin/**` routes. Both routes write only
 `public_submissions`, via the shared `insertPublicSubmission()` helper
 (src/lib/publicSubmissions.ts, a fully parameterized `.bind(...)` INSERT) —
@@ -1079,10 +1094,10 @@ later-phase handoff, not done in Phase 1 (see Handoff below).
 
 `ADMIN_ALLOWED_HOSTS` in `auth-options.ts` mirrors the exact hostname set
 `cfAccess.ts`'s header comment documents the admin surface answering on
-(admin subdomain, dev subdomain, public apex, bare workers.dev fallback).
-NOT included: Workers version-preview URLs (dynamic per-deploy, can't be
-exact-matched) — a wildcard pattern is a Phase 2/3 decision once real
-login traffic needs it.
+(staging apex, public apex, bare workers.dev fallback — admin is a path on
+these hosts, not a separate subdomain). NOT included: Workers
+version-preview URLs (dynamic per-deploy, can't be exact-matched) — a
+wildcard pattern is a Phase 2/3 decision once real login traffic needs it.
 
 ## Plugins registered, not yet wired to any UI
 
@@ -1211,6 +1226,113 @@ production needs `RESEND_API_KEY` confirmed to cover magic-link send (the
 existing key already covers the public forms' domain-scoped sending
 permission — verify it also authorizes this admin flow before the cutover
 that actually routes real traffic here).
+
+---
+
+# Admin authentication — Better Auth Phase 3 (#316-ish): dual-auth gate
+
+Layers a Better Auth session requirement ON TOP of Cloudflare Access —
+**logical AND, never OR.** After this phase, reaching any admin data
+requires BOTH a valid CF Access JWT AND a valid Better Auth session; either
+alone is refused. This is strictly MORE restrictive than Phase 2, which
+left Access as the only real gate (Better Auth existed but nothing
+required a session). Access is still NOT removed — that's a later,
+separate phase.
+
+## `getAdminDb()` — still the single choke point, now two checks
+
+`src/lib/adminDb.ts`'s `getAdminDb()` calls `requireAccessIdentity()`
+(CF Access — cheaper, pre-existing check) FIRST, then
+`requireAdminSession()` (`src/lib/adminSession.ts`, new) SECOND. Either
+throws `AccessDeniedError` and neither the D1 binding nor a Better Auth
+session lookup happens until Access has already passed — a caller with no
+CF Access JWT never even reaches the Better Auth check. `requireAdminSession`
+reads `auth.api.getSession({ headers })` (a fresh `Headers` object carrying
+only the caller's `cookie` header — better-auth's session-read path never
+consults anything else) and re-runs the SAME `isAllowlistedEmail()` check
+Phase 2's plugin already enforces at session-creation time — defense in
+depth, not redundant: a session created before an admin's email is removed
+from `ADMIN_ALLOWLIST` would otherwise stay valid until it expires.
+
+## Redirect-vs-403 / 401-vs-403 — one shared helper per call shape
+
+`src/lib/adminAuthErrors.ts` is the single place this branching logic
+lives, replacing what was a copy-pasted catch block per page/route:
+
+- **Server Component pages** — `handlePageAuthError(err)`: on
+  `reason === "no_session"`, `redirect("/admin/login")` (send them to sign
+  in); any other `AccessDeniedError` reason (e.g. `not_allowlisted`, or a
+  Phase 2-era reason) still calls `forbidden()` (a real 403), same as
+  before this phase.
+- **Route handlers** — `adminAuthErrorResponse(err)`: `no_session` → `401`;
+  every other reason → `403` (plain-text `Forbidden`, same body shape as
+  before). Both helpers still log through `logAdminAuthFailure()` first —
+  the PII-free convention is unchanged, only the branching moved into one
+  place.
+
+All 4 admin Server Component pages and all 7 `/api/admin/*` route handlers
+that call `getAdminDb()` were updated to call one of these two helpers
+instead of duplicating the `AccessDeniedError` catch. CSRF (`requireAdminOrigin()`
+on the 5 mutation routes) is unchanged — this phase only added a second
+identity check ahead of it, never touched origin verification.
+
+## `__Host-` session cookie
+
+`auth-options.ts`'s `advanced` block names the session cookie
+`__Host-session_token` explicitly. The `__Host-` prefix requires the
+browser see `Secure`, `Path=/`, and NO `Domain` attribute on the
+`Set-Cookie` line, or it silently drops the cookie — verified against the
+installed `better-auth` source (`node_modules/better-auth/dist/cookies/index.mjs`),
+not assumed from docs:
+
+- `useSecureCookies: false` — counterintuitive, but required: left at its
+  default in production, better-auth's own `createCookieGetter` auto-
+  prepends `__Secure-` ahead of any custom `.name`, producing a malformed
+  double-prefixed cookie name. Setting this `false` stops that
+  auto-prepend so the literal `__Host-session_token` name is used as-is.
+- `cookies.session_token.attributes.secure: true` — restores the `Secure`
+  flag by hand, since turning off the auto-prepend above also turns off
+  the attribute it would have set.
+- `Path=/` and no `Domain` are better-auth's defaults already — nothing
+  else needed for those two.
+
+`auth-options.test.ts` asserts the resolved config via better-auth's own
+`getCookies(options)` introspection (no live HTTP round trip needed to
+check the name/attributes it will produce). **What that test can't
+prove:** whether a real browser actually accepts and persists the
+resulting `Set-Cookie` header end to end — that requires a live preview
+(see Verification below).
+
+## Login-event logging — `databaseHooks.session.create.after`
+
+`auth-options.ts`'s top-level `databaseHooks.session.create.after` calls
+`logAdminAuthEvent("login")` (`src/lib/logger.ts`, new) — a single-line
+`{"event":"admin_auth_event","type":"login"}`, same PII-free convention as
+`logAdminAuthFailure`. Verified in better-auth's own context-creation
+source that plugin-level `databaseHooks` (Phase 2's
+`adminAuthAllowlistPlugin`'s `databaseHooks.user.create.before`) and this
+phase's new top-level `databaseHooks.session.create.after` are collected
+into one array and both run — no ordering conflict, no override.
+
+## Verification — what's headless-provable vs. what needs Kyle's live preview
+
+`lint` / `design:drift` / `typecheck` / `test:ci` / `opennextjs-cloudflare
+build` are all clean as of this phase (including new tests:
+`adminSession.test.ts`'s no_session/not_allowlisted/success/cookie-
+forwarding cases, and `auth-options.test.ts`'s `__Host-` cookie
+assertion). **NOT verifiable headlessly:** whether a real browser actually
+sets and sends the `__Host-session_token` cookie correctly through a full
+magic-link login round trip, and whether the redirect-to-`/admin/login`
+vs. 403 behavior renders as expected live. Needs Kyle's live preview
+before this phase is considered fully proven.
+
+**Superseded:** the "later, separate phase" that removes Cloudflare Access
+mentioned throughout this section has now happened
+(`auth/betterauth-sole-gate`) — see "Admin authentication — Better Auth is
+the sole gate (#237, post-cutover)" near the top of this file for the
+current state. `requireAccessIdentity()` no longer exists; `getAdminDb()`
+now calls only `requireAdminSession()`. This section is kept as the
+historical record of how the dual-auth gate it built was structured.
 
 ---
 

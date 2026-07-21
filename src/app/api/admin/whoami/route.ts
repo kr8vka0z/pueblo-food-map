@@ -19,8 +19,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/adminDb";
-import { AccessDeniedError } from "@/lib/cfAccess";
-import { logAdminAuthFailure } from "@/lib/logger";
+import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 
 export const dynamic = "force-dynamic";
 
@@ -29,10 +28,6 @@ export async function GET(req: NextRequest): Promise<Response> {
     const { identity } = await getAdminDb(req.headers);
     return NextResponse.json({ email: identity.email });
   } catch (err) {
-    if (err instanceof AccessDeniedError) {
-      logAdminAuthFailure(err.reason);
-      return new Response("Forbidden", { status: 403 });
-    }
-    throw err;
+    return adminAuthErrorResponse(err);
   }
 }

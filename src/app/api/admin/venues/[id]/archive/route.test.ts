@@ -5,38 +5,35 @@
  *
  * Same full-stack pattern as the sibling PATCH edit route's own test file
  * (src/app/api/admin/venues/[id]/route.test.ts): mocks
- * @opennextjs/cloudflare for a fake D1 binding, signs a real
- * Cloudflare-Access-shaped JWT via cfAccess.ts's own JWKS test seam, and
- * inspects db.batch()'s bound statements directly. Proves AC2: status flips
- * to 'archived', the row is retained (no DELETE statement anywhere), and one
- * audit_log row is written with action='archive'.
- *
- * WHY `node` environment: same jose/jsdom Uint8Array cross-realm issue
- * documented in cfAccess.test.ts's header.
+ * @opennextjs/cloudflare for a fake D1 binding and requireAdminSession()
+ * (src/lib/adminSession.ts, the sole identity check post
+ * Better-Auth-sole-gate cutover — auth/betterauth-sole-gate) as a
+ * controllable mock, then inspects db.batch()'s bound statements directly.
+ * Proves AC2: status flips to 'archived', the row is retained (no DELETE
+ * statement anywhere), and one audit_log row is written with
+ * action='archive'.
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { NextRequest } from "next/server";
-import {
-  SignJWT,
-  exportJWK,
-  generateKeyPair,
-  createLocalJWKSet,
-  type JWTVerifyGetKey,
-} from "jose";
-import { _setJwksGetterForTest } from "@/lib/cfAccess";
+import { AccessDeniedError } from "@/lib/cfAccess";
 import type { AdminVenueRow } from "@/types/venue";
 
-const TEAM_DOMAIN = "https://pfm-test.cloudflareaccess.com";
-const AUD = "test-audience-tag";
-const KID = "venues-archive-route-test-key";
-const ADMIN_ORIGIN = "https://admin.pueblofoodmap.com";
+const ADMIN_ORIGIN = "https://pueblofoodmap.com";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 const VENUE_ID = "manual-existing-1";
 
 const mockGetCloudflareContext = vi.fn();
 vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
+}));
+
+// Sole identity gate: a controllable mock, not a fixed resolved value, so
+// the "no session" test below can flip it to reject for one call — same
+// pattern as venues/route.test.ts.
+const mockRequireAdminSession = vi.fn();
+vi.mock("@/lib/adminSession", () => ({
+  requireAdminSession: (...args: unknown[]) => mockRequireAdminSession(...args),
 }));
 
 import { POST } from "@/app/api/admin/venues/[id]/archive/route";
@@ -93,28 +90,10 @@ function makeFakeDb(existingRow: AdminVenueRow | null) {
   return { db: { prepare, batch } as unknown as D1Database, batch };
 }
 
-async function buildValidToken(): Promise<string> {
-  const { publicKey, privateKey } = await generateKeyPair("RS256");
-  const jwk = await exportJWK(publicKey);
-  jwk.kid = KID;
-  jwk.alg = "RS256";
-  jwk.use = "sig";
-  _setJwksGetterForTest(() => createLocalJWKSet({ keys: [jwk] }) as JWTVerifyGetKey);
-
-  return new SignJWT({ email: ADMIN_EMAIL })
-    .setProtectedHeader({ alg: "RS256", kid: KID })
-    .setIssuedAt()
-    .setIssuer(TEAM_DOMAIN)
-    .setAudience(AUD)
-    .setExpirationTime("5m")
-    .sign(privateKey);
-}
-
-function makeRequest(opts: { token?: string; origin?: string } = {}): NextRequest {
+function makeRequest(opts: { origin?: string } = {}): NextRequest {
   const headers: Record<string, string> = {};
-  if (opts.token !== undefined) headers["Cf-Access-Jwt-Assertion"] = opts.token;
   if (opts.origin !== undefined) headers["Origin"] = opts.origin;
-  return new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
+  return new NextRequest(`https://pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
     method: "POST",
     headers,
   });
@@ -126,35 +105,33 @@ function callArchive(req: NextRequest, id: string = VENUE_ID) {
 
 describe("POST /api/admin/venues/[id]/archive", () => {
   beforeEach(() => {
-    process.env.CF_ACCESS_TEAM_DOMAIN = TEAM_DOMAIN;
-    process.env.CF_ACCESS_AUD = AUD;
     mockGetCloudflareContext.mockReset();
+    mockRequireAdminSession.mockReset();
+    mockRequireAdminSession.mockResolvedValue({ email: ADMIN_EMAIL });
   });
 
   afterEach(() => {
-    delete process.env.CF_ACCESS_TEAM_DOMAIN;
-    delete process.env.CF_ACCESS_AUD;
-    _setJwksGetterForTest(null);
+    vi.clearAllMocks();
   });
 
-  test("unauthenticated request -> 403, D1 never touched", async () => {
+  test("no Better Auth session -> 401, D1 never touched", async () => {
+    mockRequireAdminSession.mockRejectedValue(new AccessDeniedError("no_session"));
     const { db, batch } = makeFakeDb(makeExistingRow());
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
 
     const res = await callArchive(makeRequest({ origin: ADMIN_ORIGIN }));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
     expect(batch).not.toHaveBeenCalled();
   });
 
-  test("valid identity but wrong/missing Origin -> 403 (bad_origin), D1 never touched", async () => {
+  test("valid session but wrong/missing Origin -> 403 (bad_origin), D1 never touched", async () => {
     const { db, batch } = makeFakeDb(makeExistingRow());
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
-    const wrongOrigin = await callArchive(makeRequest({ token, origin: "https://evil.example.com" }));
+    const wrongOrigin = await callArchive(makeRequest({ origin: "https://evil.example.com" }));
     expect(wrongOrigin.status).toBe(403);
 
-    const missingOrigin = await callArchive(makeRequest({ token }));
+    const missingOrigin = await callArchive(makeRequest());
     expect(missingOrigin.status).toBe(403);
 
     expect(batch).not.toHaveBeenCalled();
@@ -163,9 +140,8 @@ describe("POST /api/admin/venues/[id]/archive", () => {
   test("no venue with that id -> 404, D1 batch never called", async () => {
     const { db, batch } = makeFakeDb(null);
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
-    const res = await callArchive(makeRequest({ token, origin: ADMIN_ORIGIN }));
+    const res = await callArchive(makeRequest({ origin: ADMIN_ORIGIN }));
     expect(res.status).toBe(404);
     expect(batch).not.toHaveBeenCalled();
   });
@@ -174,9 +150,8 @@ describe("POST /api/admin/venues/[id]/archive", () => {
     const existing = makeExistingRow();
     const { db, batch } = makeFakeDb(existing);
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
-    const res = await callArchive(makeRequest({ token, origin: ADMIN_ORIGIN }));
+    const res = await callArchive(makeRequest({ origin: ADMIN_ORIGIN }));
     expect(res.status).toBe(200);
     const data = (await res.json()) as { ok: boolean; id: string; status: string };
     expect(data.ok).toBe(true);
@@ -216,9 +191,8 @@ describe("POST /api/admin/venues/[id]/archive", () => {
     const existing = makeExistingRow({ status: "archived" });
     const { db, batch } = makeFakeDb(existing);
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
-    const res = await callArchive(makeRequest({ token, origin: ADMIN_ORIGIN }));
+    const res = await callArchive(makeRequest({ origin: ADMIN_ORIGIN }));
     expect(res.status).toBe(200);
     expect(batch).toHaveBeenCalledTimes(1);
   });
@@ -227,11 +201,10 @@ describe("POST /api/admin/venues/[id]/archive", () => {
     const existing = makeExistingRow();
     const { db, batch } = makeFakeDb(existing);
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
-    const req = new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
+    const req = new NextRequest(`https://pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
       method: "POST",
-      headers: { "Cf-Access-Jwt-Assertion": token, Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
+      headers: { Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
       body: JSON.stringify({ submissionId: 7 }),
     });
 
@@ -262,11 +235,10 @@ describe("POST /api/admin/venues/[id]/archive", () => {
     const existing = makeExistingRow();
     const { db, batch } = makeFakeDb(existing);
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
     // Identical to makeRequest(): no body, no Content-Type — proves the
     // (#259) optional-body parse can't break the pre-existing bodyless caller.
-    const res = await callArchive(makeRequest({ token, origin: ADMIN_ORIGIN }));
+    const res = await callArchive(makeRequest({ origin: ADMIN_ORIGIN }));
     expect(res.status).toBe(200);
     expect(batch).toHaveBeenCalledTimes(1);
     const stmts = batch.mock.calls[0][0] as BoundStatement[];
@@ -277,11 +249,10 @@ describe("POST /api/admin/venues/[id]/archive", () => {
     const existing = makeExistingRow();
     const { db, batch } = makeFakeDb(existing);
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
-    const req = new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
+    const req = new NextRequest(`https://pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
       method: "POST",
-      headers: { "Cf-Access-Jwt-Assertion": token, Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
+      headers: { Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
       body: "{not valid json",
     });
 
@@ -295,11 +266,10 @@ describe("POST /api/admin/venues/[id]/archive", () => {
     const existing = makeExistingRow();
     const { db, batch } = makeFakeDb(existing);
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
-    const req = new NextRequest(`https://admin.pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
+    const req = new NextRequest(`https://pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
       method: "POST",
-      headers: { "Cf-Access-Jwt-Assertion": token, Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
+      headers: { Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
       body: JSON.stringify({ submissionId: "7" }),
     });
 

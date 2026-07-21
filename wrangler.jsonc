@@ -60,6 +60,11 @@
     "staging": {
       "name": "pueblo-food-map-staging",
       "routes": [
+        // Admin serves at /admin on this same apex host — gated by a
+        // PATH-scoped Cloudflare Access application on /admin* +
+        // /api/admin* (configured out-of-band, not in this repo), not a
+        // separate subdomain route. The admin.pueblofoodmap.com /
+        // dev.admin.pueblofoodmap.com subdomains are retired.
         { "pattern": "dev.pueblofoodmap.com", "custom_domain": true }
       ],
       "assets": {

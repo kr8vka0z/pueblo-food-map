@@ -48,7 +48,7 @@ function buildTestAuth() {
 
 /** Minimum headers every direct auth.api call in this file needs — see file header WHY. */
 function requestHeaders(extra?: Record<string, string>): Headers {
-  return new Headers({ host: "admin.pueblofoodmap.com", ...extra });
+  return new Headers({ host: "pueblofoodmap.com", ...extra });
 }
 
 describe("magic-link allowlist gate (/sign-in/magic-link)", () => {

@@ -37,17 +37,21 @@ import { magicLink } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { adminAuthAllowlistPlugin } from "@/lib/adminAuthAllowlistPlugin";
 import { sendAdminMagicLinkEmail } from "@/lib/adminMagicLinkEmail";
+import { logAdminAuthEvent } from "@/lib/logger";
 
 /**
  * Every hostname this Worker answers admin traffic on (mirrors
- * cfAccess.ts's ADMIN_ORIGIN + the hostname list documented in that file's
- * header comment: the Access-gated admin subdomain, the staging subdomain,
- * the public apex admin path, and the bare workers.dev fallback). Better
- * Auth needs this to construct correct absolute callback/redirect URLs
- * regardless of which hostname a request arrives on — the same
- * multi-hostname reality cfAccess.ts's in-app JWT re-verification exists to
- * cover, for the same underlying reason (Cloudflare Workers answer on more
- * hostnames than a single custom domain).
+ * cfAccess.ts's ADMIN_ORIGINS + the hostname list documented in that file's
+ * header comment: the public apex — where admin now serves at the `/admin`
+ * path, gated by a PATH-scoped Cloudflare Access application — the staging
+ * apex, and the bare workers.dev fallback). Better Auth needs this to
+ * construct correct absolute callback/redirect URLs regardless of which
+ * hostname a request arrives on — the same multi-hostname reality
+ * cfAccess.ts's in-app JWT re-verification exists to cover, for the same
+ * underlying reason (Cloudflare Workers answer on more hostnames than a
+ * single custom domain). The admin.pueblofoodmap.com /
+ * dev.admin.pueblofoodmap.com subdomains are retired — admin is a path on
+ * these same apex hosts, not a separate hostname.
  *
  * NOT included: Workers version-preview URLs (`<version-prefix>-pueblo-food-
  * map.kyle-boyd.workers.dev`) — those are dynamic per-deploy and can't be
@@ -58,7 +62,6 @@ import { sendAdminMagicLinkEmail } from "@/lib/adminMagicLinkEmail";
  * hostnames real login traffic will actually use.
  */
 const ADMIN_ALLOWED_HOSTS = [
-  "admin.pueblofoodmap.com",
   "dev.pueblofoodmap.com",
   "pueblofoodmap.com",
   "pueblo-food-map.kyle-boyd.workers.dev",
@@ -95,6 +98,21 @@ export function buildAuthOptions(
     baseURL: {
       allowedHosts: ADMIN_ALLOWED_HOSTS,
       protocol: "https",
+      // WHY a fallback (fixed post-cutover — live 403 bug,
+      // admin/session-dynamic-baseurl-host): a dynamic baseURL with no
+      // fallback throws when a caller can't be resolved to one of
+      // ADMIN_ALLOWED_HOSTS via a host/x-forwarded-host header (verified in
+      // the installed better-auth source, dist/context/helpers.mjs's
+      // `pickSource`/`resolveDynamicContext`). adminSession.ts's
+      // requireAdminSession() now forwards `host` on every direct
+      // auth.api.getSession() call (see that file's header), so this
+      // fallback should rarely be hit in practice — it exists as the second
+      // half of a belt-and-suspenders fix so a header-stripped caller can
+      // never throw instead of cleanly resolving to "no session". Points at
+      // the public apex (first entry in ADMIN_ALLOWED_HOSTS above), not a
+      // staging/workers.dev host, since a fallback is inherently a single
+      // choice and prod is the canonical default.
+      fallback: "https://pueblofoodmap.com",
     },
     // #315 Phase 2 — CRITICAL: this admin has exactly one legitimate account-
     // creation path (an allowlisted email's first magic-link sign-in;
@@ -107,6 +125,37 @@ export function buildAuthOptions(
     // test asserting `auth.api.signUpEmail` doesn't exist on this config).
     emailAndPassword: {
       enabled: false,
+    },
+    // Phase 3 dual-auth — the session cookie MUST carry the `__Host-`
+    // prefix: browsers silently DROP a cookie whose name claims that
+    // prefix without also satisfying its invariants (Secure, Path=/, no
+    // Domain attribute), turning a config typo into an invisible "login
+    // never sticks" loop rather than a visible error. Verified against the
+    // installed better-auth source
+    // (node_modules/better-auth/dist/cookies/index.mjs, createCookieGetter):
+    // the final cookie name is `${secureCookiePrefix}${customName ||
+    // prefix + "." + cookieName}` — so leaving `useSecureCookies` at its
+    // default (true in production) would prepend better-auth's OWN
+    // `__Secure-` prefix ahead of our `__Host-` name below, producing the
+    // malformed `__Secure-__Host-session_token` and silently breaking
+    // login. Setting `useSecureCookies: false` here suppresses that
+    // auto-prefixing; `attributes.secure: true` (merged in LAST by that
+    // same function, after every other default) restores the Secure flag
+    // by hand so the `__Host-` invariant still holds. `path` defaults to
+    // "/" and no `crossSubDomainCookies` is configured anywhere in this
+    // file, so no `Domain` attribute is ever attached — the third
+    // `__Host-` invariant is satisfied by simply never opting in.
+    // auth-options.test.ts asserts the exact resolved name/attributes via
+    // better-auth's own `getCookies()` helper; a true end-to-end browser
+    // check still happens at Kyle's live preview (Phase 3 report).
+    advanced: {
+      useSecureCookies: false,
+      cookies: {
+        session_token: {
+          name: "__Host-session_token",
+          attributes: { secure: true },
+        },
+      },
     },
     plugins: [
       magicLink({
@@ -143,5 +192,28 @@ export function buildAuthOptions(
       // plugin matching a path a not-yet-registered plugin would also claim.
       adminAuthAllowlistPlugin(),
     ],
+    // Phase 3 dual-auth observability — the sibling of adminAuthAllowlistPlugin's
+    // own databaseHooks.user.create.before (that plugin's own file header):
+    // BOTH a plugin's databaseHooks AND this top-level databaseHooks are
+    // collected and run for the same lifecycle point (verified in the
+    // installed better-auth source, node_modules/better-auth/dist/context/
+    // create-context.mjs + context/helpers.mjs, which push() each of them
+    // into one shared `dbHooks` array), so this doesn't conflict with or
+    // replace that plugin's own hook — it's an independent addition at a
+    // different lifecycle point (session creation, not user creation).
+    // logAdminAuthEvent("login") (src/lib/logger.ts) is PII-free by design
+    // (a fixed event label, never the session's email/token/id) — durable
+    // per-login detail (timestamp, IP, user-agent) already lives in Better
+    // Auth's own `session` table; this line only makes a login ALSO visible
+    // in Cloudflare Workers Logs search, mirroring admin_auth_failure.
+    databaseHooks: {
+      session: {
+        create: {
+          after: async () => {
+            logAdminAuthEvent("login");
+          },
+        },
+      },
+    },
   } satisfies BetterAuthOptions;
 }

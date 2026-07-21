@@ -35,6 +35,8 @@
 import type { BetterAuthOptions } from "better-auth";
 import { magicLink } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
+import { adminAuthAllowlistPlugin } from "@/lib/adminAuthAllowlistPlugin";
+import { sendAdminMagicLinkEmail } from "@/lib/adminMagicLinkEmail";
 
 /**
  * Every hostname this Worker answers admin traffic on (mirrors
@@ -94,17 +96,22 @@ export function buildAuthOptions(
       allowedHosts: ADMIN_ALLOWED_HOSTS,
       protocol: "https",
     },
+    // #315 Phase 2 — CRITICAL: this admin has exactly one legitimate account-
+    // creation path (an allowlisted email's first magic-link sign-in;
+    // passkey registration only ever attaches to an EXISTING allowlisted
+    // session, never mints a new user on its own). Email/password is never
+    // enabled at all — Better Auth defaults `emailAndPassword` to disabled
+    // when the option is omitted entirely, but this repo states it
+    // explicitly rather than relying on that default staying true across a
+    // future Better Auth upgrade (see auth-options.test.ts's regression
+    // test asserting `auth.api.signUpEmail` doesn't exist on this config).
+    emailAndPassword: {
+      enabled: false,
+    },
     plugins: [
       magicLink({
-        // Phase 2: wire a real sendMagicLink implementation (Resend, matching
-        // this repo's existing email integration — see AGENTS.md "Resend
-        // Email Key Management"). Phase 1 only needs the plugin registered so
-        // its schema (the `verification` table shape it relies on) is part of
-        // the generated migration; no login UI calls this path yet.
-        sendMagicLink: async () => {
-          throw new Error(
-            "sendMagicLink not implemented — Phase 2 wires the real email send.",
-          );
+        sendMagicLink: async ({ email, url }) => {
+          await sendAdminMagicLinkEmail({ email, url });
         },
       }),
       passkey({
@@ -117,7 +124,24 @@ export function buildAuthOptions(
         // any of them. No dynamic-per-request origin resolution exists in
         // this plugin's options today.
         origin: ADMIN_ALLOWED_HOSTS.map((host) => `https://${host}`),
+        // Require user-verification (PIN/biometric on the authenticator,
+        // not just its mere presence) on every passkey ceremony — #315
+        // explicitly asks for this; Better Auth's default is `"preferred"`,
+        // which would let an authenticator skip it.
+        authenticatorSelection: {
+          userVerification: "required",
+        },
       }),
+      // #315 CRITICAL — must be the LAST plugin in this array. Better
+      // Auth's plugin hooks all run in registration order (dispatch.mjs's
+      // `getHooks()` flatMaps each plugin's `hooks.before` in array order),
+      // and this plugin's magic-link gate must run before magicLink's own
+      // endpoint executes regardless of where magicLink itself sits in this
+      // list — but placing it last keeps the ordering trivially correct by
+      // inspection: every other plugin's endpoints exist by the time this
+      // one's path-matched hooks are added, so there's no risk of this
+      // plugin matching a path a not-yet-registered plugin would also claim.
+      adminAuthAllowlistPlugin(),
     ],
   } satisfies BetterAuthOptions;
 }

@@ -79,11 +79,9 @@ async function whoamiDiagnostic(req: NextRequest): Promise<Response> {
 }
 
 export async function GET(req: NextRequest): Promise<Response> {
-  // TEMP DIAGNOSTIC branch — REVERT. Inert unless the token matches on staging.
-  if (
-    new URL(req.url).searchParams.get("diag") === "pfmdiag2026" &&
-    req.headers.get("host") === "dev.pueblofoodmap.com"
-  ) {
+  // TEMP DIAGNOSTIC branch — REVERT. Token-only gate (staging is single-user,
+  // token-gated, reads no D1) — the observed host is echoed in the payload.
+  if (new URL(req.url).searchParams.get("diag") === "pfmdiag2026") {
     return whoamiDiagnostic(req);
   }
 

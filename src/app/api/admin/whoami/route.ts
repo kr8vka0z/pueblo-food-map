@@ -24,6 +24,46 @@ import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest): Promise<Response> {
+  // TEMP DIAGNOSTIC (token-gated; REMOVE before merge to main) — dumps the raw
+  // shape of what server-side auth.api.getSession() returns for the CALLER, to
+  // find why a cookieless request hits the not_allowlisted branch instead of
+  // no_session. Token-gated so it never leaks internal shape to public traffic.
+  if (req.nextUrl.searchParams.get("diag") === "pfm-probe-9f3a") {
+    const { getAuth } = await import("@/lib/auth");
+    const { getAdminAllowlist } = await import("@/lib/adminAllowlist");
+    const out: Record<string, unknown> = {};
+    try {
+      const auth = await getAuth();
+      const cookie = req.headers.get("cookie") ?? "";
+      out.cookieLen = cookie.length;
+      const result = await auth.api.getSession({
+        headers: new Headers({ cookie }),
+      });
+      out.sessionNull = result === null;
+      const email = (result as { user?: { email?: string } } | null)?.user
+        ?.email;
+      out.hasEmail = Boolean(email);
+      out.emailDomain =
+        typeof email === "string" ? (email.split("@")[1] ?? null) : null;
+      const allow = getAdminAllowlist();
+      out.allowlistLen = allow.length;
+      out.isAllowlisted =
+        typeof email === "string"
+          ? allow
+              .map((a) => a.toLowerCase())
+              .includes(email.trim().toLowerCase())
+          : null;
+      out.resultKeys = result ? Object.keys(result as object) : null;
+      out.userKeys = (result as { user?: object } | null)?.user
+        ? Object.keys((result as { user: object }).user)
+        : null;
+    } catch (e) {
+      out.threw = true;
+      out.errName = (e as Error)?.name ?? "unknown";
+      out.errMsg = String((e as Error)?.message).slice(0, 300);
+    }
+    return NextResponse.json(out);
+  }
   try {
     const { identity } = await getAdminDb(req.headers);
     return NextResponse.json({ email: identity.email });

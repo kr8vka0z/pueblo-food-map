@@ -60,6 +60,11 @@ import { logAdminAuthEvent } from "@/lib/logger";
  */
 const ADMIN_ALLOWED_HOSTS = [
   "admin.pueblofoodmap.com",
+  // Staging admin runs on its own subdomain (mirrors prod's
+  // admin.pueblofoodmap.com), not a /admin folder on the public staging site
+  // — Better Auth must build callback/redirect URLs and validate passkey
+  // ceremonies on this host. rpID "pueblofoodmap.com" (below) covers it.
+  "dev.admin.pueblofoodmap.com",
   "dev.pueblofoodmap.com",
   "pueblofoodmap.com",
   "pueblo-food-map.kyle-boyd.workers.dev",

@@ -60,7 +60,15 @@
     "staging": {
       "name": "pueblo-food-map-staging",
       "routes": [
-        { "pattern": "dev.pueblofoodmap.com", "custom_domain": true }
+        { "pattern": "dev.pueblofoodmap.com", "custom_domain": true },
+        // Admin lives on its OWN subdomain (mirrors prod's
+        // admin.pueblofoodmap.com), never as a /admin folder on the public
+        // staging site. Gated by the dedicated "Pueblo Food Map - Staging
+        // Admin" CF Access app; the staging Worker's CF_ACCESS_AUD points at
+        // THAT app, so dev.pueblofoodmap.com/admin fails the in-app aud check
+        // (403) and admin is only reachable here. 3-label subdomain → CF
+        // auto-issues an advanced cert on deploy (~mins to validate).
+        { "pattern": "dev.admin.pueblofoodmap.com", "custom_domain": true }
       ],
       "assets": {
         "directory": ".open-next/assets",

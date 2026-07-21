@@ -1336,6 +1336,54 @@ historical record of how the dual-auth gate it built was structured.
 
 ---
 
+# Admin authentication — Better Auth Phase 4 (#318): rate limit + short sessions
+
+Two auth-hardening additions on top of the sole-gate cutover above, both in
+`src/lib/auth-options.ts`'s `buildAuthOptions()`. No login-UI, route-gating,
+or plugin-registration changes — this phase only tightens two existing
+config surfaces.
+
+**Item 1 — D1-backed rate limit on `/sign-in/magic-link`.** Reuses Better
+Auth's own native `rateLimit` engine (`storage: "database"`, no Workers KV
+— same one-store rule as everywhere else in this file) rather than a
+hand-rolled limiter; `src/lib/rateLimit.ts`'s in-process limiter is
+untouched (it covers the three public forms only, a separate surface).
+`enabled` is explicitly `process.env.NODE_ENV === "production"` — Better
+Auth's own default already gates rate limiting to production only, but
+this repo states it, mirroring `emailAndPassword.enabled: false`'s own
+"don't rely on an invisible default" precedent above. A `customRules`
+entry for the exact `/sign-in/magic-link` path sets window 3600s (1h) /
+max 5, overriding the magicLink plugin's own shorter 60s default — see
+`auth-options.ts`'s own WHY comment for the full source trace (every
+option pinned to an installed `node_modules/better-auth` file/line).
+**`migrations/0004_rate_limit_table.sql`** adds the `rateLimit` table this
+storage mode needs — same D1 database, same "not part of a Worker deploy"
+apply convention as 0001-0003.
+
+**Item 2 (spec item 5) — 12h rolling session, replacing the 7-day
+default.** `session: { expiresIn: 43200, updateAge: 3600 }` — an idle
+admin session expires within 12h of its last activity; an active one is
+refreshed (re-extended, one DB write) at most once an hour. Better Auth
+1.6.23 has no first-party option that adds a true absolute lifetime cap
+*on top of* this rolling window — the only related option
+(`disableSessionRefresh`) replaces the rolling behavior rather than adding
+to it (turns `expiresIn` into a fixed lifetime from account creation, with
+no idle-based extension at all) — so this rolling 12h window is the
+accepted floor, not a placeholder for a stricter mechanism that was simply
+skipped.
+
+**Handoff, same shape as every prior phase:** these are config-only
+changes, verified against installed source and by extending
+`auth-options.test.ts` (config introspection — no live request, no D1
+round trip). `migrations/0004_rate_limit_table.sql` was hand-derived from
+the installed generator source rather than produced by
+`npx @better-auth/cli generate` (the session that authored it had no
+working shell) — regenerate and diff against it before applying to remote
+D1, per that file's own header. Applying 0004 to remote/production D1 is
+NOT done as part of this phase, same convention as every prior migration.
+
+---
+
 # Design system — DESIGN.md
 
 [DESIGN.md](DESIGN.md) is the agent-facing visual-identity reference. Read it before

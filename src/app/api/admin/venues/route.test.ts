@@ -2,54 +2,40 @@
 /**
  * Route-level tests for POST /api/admin/venues (#254).
  *
- * Same full-stack pattern as src/app/api/admin/publish/route.test.ts: mocks
- * @opennextjs/cloudflare's getCloudflareContext for a fake D1 binding, signs
- * a real Cloudflare-Access-shaped JWT via cfAccess.ts's own JWKS test seam,
- * and inspects db.batch()'s bound statements directly instead of executing
- * real SQL — proving THIS route's call sequence (auth -> validate ->
- * atomic batch) is the goal, not re-implementing SQLite. Field-level
- * validation rules themselves are proved in adminVenueValidation.test.ts;
- * this file only proves the route wires validation + auth + D1 together in
- * the right order and shape.
- *
- * WHY `node` environment: same jose/jsdom Uint8Array cross-realm issue
- * documented in cfAccess.test.ts's header.
+ * Mocks @opennextjs/cloudflare's getCloudflareContext for a fake D1 binding
+ * and requireAdminSession() (src/lib/adminSession.ts, the sole identity
+ * check getAdminDb() runs post Better-Auth-sole-gate cutover —
+ * auth/betterauth-sole-gate) as a controllable mock, then inspects
+ * db.batch()'s bound statements directly instead of executing real SQL —
+ * proving THIS route's call sequence (auth -> validate -> atomic batch) is
+ * the goal, not re-implementing SQLite or Better Auth's own session logic
+ * (covered separately by adminSession.test.ts). Field-level validation rules
+ * themselves are proved in adminVenueValidation.test.ts; this file only
+ * proves the route wires validation + auth + D1 together in the right order
+ * and shape.
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { NextRequest } from "next/server";
-import {
-  SignJWT,
-  exportJWK,
-  generateKeyPair,
-  createLocalJWKSet,
-  type JWTVerifyGetKey,
-} from "jose";
-import { _setJwksGetterForTest } from "@/lib/cfAccess";
+import { AccessDeniedError } from "@/lib/cfAccess";
 
-const TEAM_DOMAIN = "https://pfm-test.cloudflareaccess.com";
-const AUD = "test-audience-tag";
-const KID = "venues-route-test-key";
 const ADMIN_ORIGIN = "https://pueblofoodmap.com";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 
 // Vitest hoists vi.mock() above this file's own imports, so route.ts (via
 // adminDb.ts) picks up the mocked @opennextjs/cloudflare with no dynamic
-// import needed — same pattern as publish/route.test.ts.
+// import needed.
 const mockGetCloudflareContext = vi.fn();
 vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 
-// Phase 3 dual-auth: getAdminDb() now ALSO requires a live Better Auth
-// session (src/lib/adminSession.ts) on top of the CF Access JWT this file
-// already signs. This route's own auth/CSRF/validation/D1 behavior is what
-// this file tests — not Better Auth's session plumbing (covered on its own
-// by adminSession.test.ts) — so requireAdminSession is stubbed to always
-// succeed, matching the "mock the one true I/O boundary" pattern this file
-// already uses for getCloudflareContext.
+// Sole identity gate (post Better-Auth-sole-gate cutover): a controllable
+// mock, not a fixed resolved value, so the "no session" test below can flip
+// it to reject for one call — same pattern as src/lib/adminDb.test.ts.
+const mockRequireAdminSession = vi.fn();
 vi.mock("@/lib/adminSession", () => ({
-  requireAdminSession: vi.fn().mockResolvedValue({ email: "admin@pueblofoodmap.com" }),
+  requireAdminSession: (...args: unknown[]) => mockRequireAdminSession(...args),
 }));
 
 import { POST } from "@/app/api/admin/venues/route";
@@ -72,23 +58,6 @@ function makeFakeDb() {
   return { db: { prepare, batch } as unknown as D1Database, batch };
 }
 
-async function buildValidToken(): Promise<string> {
-  const { publicKey, privateKey } = await generateKeyPair("RS256");
-  const jwk = await exportJWK(publicKey);
-  jwk.kid = KID;
-  jwk.alg = "RS256";
-  jwk.use = "sig";
-  _setJwksGetterForTest(() => createLocalJWKSet({ keys: [jwk] }) as JWTVerifyGetKey);
-
-  return new SignJWT({ email: ADMIN_EMAIL })
-    .setProtectedHeader({ alg: "RS256", kid: KID })
-    .setIssuedAt()
-    .setIssuer(TEAM_DOMAIN)
-    .setAudience(AUD)
-    .setExpirationTime("5m")
-    .sign(privateKey);
-}
-
 function validPayload(overrides: Record<string, unknown> = {}) {
   return {
     name: "Eastside Pantry",
@@ -102,11 +71,8 @@ function validPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeRequest(
-  opts: { token?: string; origin?: string; body?: unknown } = {},
-): NextRequest {
+function makeRequest(opts: { origin?: string; body?: unknown } = {}): NextRequest {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (opts.token !== undefined) headers["Cf-Access-Jwt-Assertion"] = opts.token;
   if (opts.origin !== undefined) headers["Origin"] = opts.origin;
   return new NextRequest("https://pueblofoodmap.com/api/admin/venues", {
     method: "POST",
@@ -117,35 +83,33 @@ function makeRequest(
 
 describe("POST /api/admin/venues", () => {
   beforeEach(() => {
-    process.env.CF_ACCESS_TEAM_DOMAIN = TEAM_DOMAIN;
-    process.env.CF_ACCESS_AUD = AUD;
     mockGetCloudflareContext.mockReset();
+    mockRequireAdminSession.mockReset();
+    mockRequireAdminSession.mockResolvedValue({ email: ADMIN_EMAIL });
   });
 
   afterEach(() => {
-    delete process.env.CF_ACCESS_TEAM_DOMAIN;
-    delete process.env.CF_ACCESS_AUD;
-    _setJwksGetterForTest(null);
+    vi.clearAllMocks();
   });
 
-  test("unauthenticated request (no Cf-Access-Jwt-Assertion header) -> 403, D1 never touched", async () => {
+  test("no Better Auth session -> 401, D1 never touched", async () => {
+    mockRequireAdminSession.mockRejectedValue(new AccessDeniedError("no_session"));
     const { db, batch } = makeFakeDb();
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
 
     const res = await POST(makeRequest({ origin: ADMIN_ORIGIN }));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
     expect(batch).not.toHaveBeenCalled();
   });
 
-  test("valid identity but wrong/missing Origin -> 403 (bad_origin), D1 never touched", async () => {
+  test("valid session but wrong/missing Origin -> 403 (bad_origin), D1 never touched", async () => {
     const { db, batch } = makeFakeDb();
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
-    const wrongOrigin = await POST(makeRequest({ token, origin: "https://evil.example.com" }));
+    const wrongOrigin = await POST(makeRequest({ origin: "https://evil.example.com" }));
     expect(wrongOrigin.status).toBe(403);
 
-    const missingOrigin = await POST(makeRequest({ token }));
+    const missingOrigin = await POST(makeRequest());
     expect(missingOrigin.status).toBe(403);
 
     expect(batch).not.toHaveBeenCalled();
@@ -154,11 +118,9 @@ describe("POST /api/admin/venues", () => {
   test("invalid payload (bad category, missing name, non-numeric lat) -> 422 with per-field errors, D1 never touched", async () => {
     const { db, batch } = makeFakeDb();
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
     const res = await POST(
       makeRequest({
-        token,
         origin: ADMIN_ORIGIN,
         body: validPayload({ name: "", category: "not-a-real-category", lat: "abc" }),
       }),
@@ -176,13 +138,11 @@ describe("POST /api/admin/venues", () => {
   test("malformed JSON body -> 400, D1 never touched", async () => {
     const { db, batch } = makeFakeDb();
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
     const req = new NextRequest("https://pueblofoodmap.com/api/admin/venues", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Cf-Access-Jwt-Assertion": token,
         Origin: ADMIN_ORIGIN,
       },
       body: "{not valid json",
@@ -196,9 +156,8 @@ describe("POST /api/admin/venues", () => {
   test("valid payload -> 201 + {id}, db.batch() called once with a venue INSERT + an audit_log INSERT", async () => {
     const { db, batch } = makeFakeDb();
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
-    const res = await POST(makeRequest({ token, origin: ADMIN_ORIGIN }));
+    const res = await POST(makeRequest({ origin: ADMIN_ORIGIN }));
     expect(res.status).toBe(201);
     const data = (await res.json()) as { id: string };
     expect(data.id).toMatch(/^manual-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
@@ -236,10 +195,9 @@ describe("POST /api/admin/venues", () => {
   test("valid payload + submissionId -> db.batch() called once with THREE statements, the 3rd approving the submission (#259)", async () => {
     const { db, batch } = makeFakeDb();
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
     const res = await POST(
-      makeRequest({ token, origin: ADMIN_ORIGIN, body: validPayload({ submissionId: 42 }) }),
+      makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ submissionId: 42 }) }),
     );
     expect(res.status).toBe(201);
     const data = (await res.json()) as { id: string };
@@ -270,12 +228,11 @@ describe("POST /api/admin/venues", () => {
   test("submissionId is ignored when not a positive integer (string, zero, negative, float) — still 2 statements", async () => {
     const { db, batch } = makeFakeDb();
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
     for (const badSubmissionId of ["42", 0, -1, 1.5]) {
       batch.mockClear();
       const res = await POST(
-        makeRequest({ token, origin: ADMIN_ORIGIN, body: validPayload({ submissionId: badSubmissionId }) }),
+        makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ submissionId: badSubmissionId }) }),
       );
       expect(res.status).toBe(201);
       const stmts = batch.mock.calls[0][0] as BoundStatement[];
@@ -286,11 +243,9 @@ describe("POST /api/admin/venues", () => {
   test("optional fields (hours_weekly, tri-state, contact info) are bound correctly when provided", async () => {
     const { db, batch } = makeFakeDb();
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-    const token = await buildValidToken();
 
     const res = await POST(
       makeRequest({
-        token,
         origin: ADMIN_ORIGIN,
         body: validPayload({
           hours_weekly: { mon: ["09:00-17:00"] },

@@ -83,5 +83,10 @@ describe("session cookie — __Host- prefix (Phase 3 dual-auth)", () => {
     expect(cookies.sessionToken.attributes.secure).toBe(true);
     expect(cookies.sessionToken.attributes.path).toBe("/");
     expect(cookies.sessionToken.attributes.domain).toBeUndefined();
+    // The manual `{secure:true}` merge must stay ADDITIVE over Better Auth's
+    // defaults — HttpOnly (no JS access to the session token) and SameSite
+    // (CSRF hardening) must survive the override, not get dropped by it.
+    expect(cookies.sessionToken.attributes.httpOnly).toBe(true);
+    expect(cookies.sessionToken.attributes.sameSite).toBe("lax");
   });
 });

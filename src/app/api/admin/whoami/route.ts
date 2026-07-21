@@ -23,15 +23,28 @@ import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 
 export const dynamic = "force-dynamic";
 
+// TEMP diagnostic build marker — REMOVE before merge to main. Presence of the
+// x-whoami-build response header proves THIS revision of the route is live.
+const BUILD_MARKER = "diag-v3";
+
+function stamp(res: Response): Response {
+  res.headers.set("x-whoami-build", BUILD_MARKER);
+  return res;
+}
+
 export async function GET(req: NextRequest): Promise<Response> {
-  // TEMP DIAGNOSTIC (token-gated; REMOVE before merge to main) — dumps the raw
-  // shape of what server-side auth.api.getSession() returns for the CALLER, to
-  // find why a cookieless request hits the not_allowlisted branch instead of
-  // no_session. Token-gated so it never leaks internal shape to public traffic.
-  if (req.nextUrl.searchParams.get("diag") === "pfm-probe-9f3a") {
+  // TEMP DIAGNOSTIC (REMOVE before merge to main) — triggered by the x-diag
+  // HEADER (query params may not populate under OpenNext) so it never fires on
+  // public traffic. Dumps the raw shape of what server-side
+  // auth.api.getSession() returns for a caller, to find why a cookieless
+  // request hits not_allowlisted instead of no_session.
+  const diag =
+    req.headers.get("x-diag") === "pfm-probe-9f3a" ||
+    req.nextUrl.searchParams.get("diag") === "pfm-probe-9f3a";
+  if (diag) {
     const { getAuth } = await import("@/lib/auth");
     const { getAdminAllowlist } = await import("@/lib/adminAllowlist");
-    const out: Record<string, unknown> = {};
+    const out: Record<string, unknown> = { marker: BUILD_MARKER };
     try {
       const auth = await getAuth();
       const cookie = req.headers.get("cookie") ?? "";
@@ -62,12 +75,12 @@ export async function GET(req: NextRequest): Promise<Response> {
       out.errName = (e as Error)?.name ?? "unknown";
       out.errMsg = String((e as Error)?.message).slice(0, 300);
     }
-    return NextResponse.json(out);
+    return stamp(NextResponse.json(out));
   }
   try {
     const { identity } = await getAdminDb(req.headers);
-    return NextResponse.json({ email: identity.email });
+    return stamp(NextResponse.json({ email: identity.email }));
   } catch (err) {
-    return adminAuthErrorResponse(err);
+    return stamp(adminAuthErrorResponse(err));
   }
 }

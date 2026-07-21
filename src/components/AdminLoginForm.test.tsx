@@ -18,6 +18,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockUseSession = vi.fn();
+const mockUseListPasskeys = vi.fn();
 const mockSignInMagicLink = vi.fn();
 const mockSignInPasskey = vi.fn();
 const mockAddPasskey = vi.fn();
@@ -25,6 +26,7 @@ const mockAddPasskey = vi.fn();
 vi.mock("@/lib/authClient", () => ({
   authClient: {
     useSession: () => mockUseSession(),
+    useListPasskeys: () => mockUseListPasskeys(),
     signIn: {
       magicLink: (...args: unknown[]) => mockSignInMagicLink(...args),
       passkey: (...args: unknown[]) => mockSignInPasskey(...args),
@@ -39,10 +41,14 @@ import AdminLoginForm from "@/components/AdminLoginForm";
 
 beforeEach(() => {
   mockUseSession.mockReset();
+  mockUseListPasskeys.mockReset();
   mockSignInMagicLink.mockReset();
   mockSignInPasskey.mockReset();
   mockAddPasskey.mockReset();
   mockUseSession.mockReturnValue({ data: null, isPending: false });
+  // Default: no passkeys yet — matches the pre-existing "first-time" tests
+  // below, which expect the setup prompt unless a test overrides this.
+  mockUseListPasskeys.mockReturnValue({ data: [], isPending: false, error: null });
 });
 
 afterEach(() => {
@@ -172,5 +178,62 @@ describe("AdminLoginForm — signed-in: passkey registration prompt", () => {
 
     const link = screen.getByRole("link", { name: /continue to admin/i });
     expect(link.getAttribute("href")).toBe("/admin");
+  });
+});
+
+describe("AdminLoginForm — signed-in: returning admin who already has a passkey", () => {
+  beforeEach(() => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: "kysboyd@gmail.com" } },
+      isPending: false,
+    });
+    mockUseListPasskeys.mockReturnValue({
+      data: [{ id: "cred-1" }],
+      isPending: false,
+      error: null,
+    });
+  });
+
+  test("does not render the 'set up a passkey' prompt when the user already has one", () => {
+    render(<AdminLoginForm />);
+
+    expect(
+      screen.queryByRole("button", { name: /set up a passkey/i }),
+    ).toBeNull();
+    expect(screen.getByTestId("admin-login-passkey-prompt")).toHaveTextContent(
+      "kysboyd@gmail.com",
+    );
+  });
+
+  test("still shows 'Continue to admin' as the primary action", () => {
+    render(<AdminLoginForm />);
+
+    const link = screen.getByRole("link", { name: /continue to admin/i });
+    expect(link.getAttribute("href")).toBe("/admin");
+  });
+});
+
+describe("AdminLoginForm — signed-in: passkey list still pending", () => {
+  beforeEach(() => {
+    mockUseSession.mockReturnValue({
+      data: { user: { email: "kysboyd@gmail.com" } },
+      isPending: false,
+    });
+    mockUseListPasskeys.mockReturnValue({
+      data: null,
+      isPending: true,
+      error: null,
+    });
+  });
+
+  test("does not flash the 'set up a passkey' prompt while the list is pending", () => {
+    render(<AdminLoginForm />);
+
+    expect(
+      screen.queryByRole("button", { name: /set up a passkey/i }),
+    ).toBeNull();
+    expect(screen.getByTestId("admin-login-passkey-prompt")).toHaveTextContent(
+      "kysboyd@gmail.com",
+    );
   });
 });

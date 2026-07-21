@@ -15,6 +15,17 @@
  * robust than juggling separate pages/redirects for what is really one
  * continuous flow for the one legitimate admin.
  *
+ * WHY the signed-in view gates "set up a passkey" on `useListPasskeys()`:
+ * without this, a returning admin who just signed in WITH a passkey was
+ * told to set one up anyway (the prompt never checked for an existing
+ * credential), and clicking it registered a duplicate. `@better-auth/
+ * passkey`'s client exposes a `listPasskeys` atom, which better-auth's
+ * react client auto-derives into the hook `useListPasskeys()` (its
+ * `getAtomKey` helper does `use${capitalize(atomName)}` — verified against
+ * the installed `better-auth/dist/client/react/index.mjs`, not assumed).
+ * Called unconditionally at the top alongside `useSession()`, same as any
+ * other React hook.
+ *
  * Anti-enumeration in the UI, not just the API (#315 CRITICAL): the
  * "link sent" confirmation is shown for EVERY submitted email, allowlisted
  * or not — copy never confirms or denies whether an address is registered
@@ -58,6 +69,10 @@ const secondaryButtonClass =
 
 export default function AdminLoginForm() {
   const { data: session, isPending: sessionPending } = authClient.useSession();
+  // Must be called unconditionally alongside useSession() above (React hook
+  // rules) even though its result is only read in the signed-in branch below.
+  const { data: passkeys, isPending: passkeysPending } =
+    authClient.useListPasskeys();
 
   const [email, setEmail] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -120,6 +135,12 @@ export default function AdminLoginForm() {
 
   // ─── Signed-in view: offer a passkey for next time ──────────────────────
   if (!sessionPending && session) {
+    // Gate the setup nag on whether this account already has a passkey —
+    // see file header WHY. `hasPasskey` only means anything once the list
+    // has actually loaded; while pending, fall through to a neutral state
+    // rather than assuming either way.
+    const hasPasskey = (passkeys?.length ?? 0) > 0;
+
     return (
       <div
         data-testid="admin-login-passkey-prompt"
@@ -134,6 +155,14 @@ export default function AdminLoginForm() {
           <p className="mb-4 rounded-[var(--radius-md)] bg-[var(--color-sage-50)] px-3 py-2 text-sm text-[var(--color-sage-700)]">
             Passkey saved. Next time you can sign in with it instead of a
             magic link.
+          </p>
+        ) : passkeysPending ? (
+          <p className="mb-4 text-sm text-[var(--color-ink-500)]">
+            Checking your saved passkeys…
+          </p>
+        ) : hasPasskey ? (
+          <p className="mb-4 text-sm text-[var(--color-ink-700)]">
+            You&apos;re all set — a passkey is saved for this account.
           </p>
         ) : (
           <>

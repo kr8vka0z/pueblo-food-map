@@ -43,8 +43,9 @@ import { logAdminAuthEvent } from "@/lib/logger";
  * Every hostname this Worker answers admin traffic on (mirrors
  * cfAccess.ts's ADMIN_ORIGINS + the hostname list documented in that file's
  * header comment: the public apex — where admin now serves at the `/admin`
- * path, gated by a PATH-scoped Cloudflare Access application — the staging
- * apex, and the bare workers.dev fallback). Better Auth needs this to
+ * path, gated by Better Auth alone (magic link + passkey; Cloudflare Access
+ * has been fully removed from this path) — the staging apex, and the bare
+ * workers.dev fallback). Better Auth needs this to
  * construct correct absolute callback/redirect URLs regardless of which
  * hostname a request arrives on — the same multi-hostname reality
  * cfAccess.ts's in-app JWT re-verification exists to cover, for the same
@@ -87,6 +88,11 @@ const ADMIN_ALLOWED_HOSTS = [
  */
 export function buildAuthOptions(
   database: NonNullable<BetterAuthOptions["database"]>,
+  // #318 passkey isolation — defaults to prod's rpID so a caller that passes
+  // nothing (production; see auth.ts's WHY) gets byte-for-byte the same
+  // config as before this parameter existed. Only staging ever passes an
+  // override.
+  rpID: string = "pueblofoodmap.com",
 ) {
   return {
     database,
@@ -278,8 +284,16 @@ export function buildAuthOptions(
           await sendAdminMagicLinkEmail({ email, url });
         },
       }),
+      // rpID is env-driven for per-environment passkey isolation (#318):
+      // WebAuthn binds a credential to the rpID the relying party presents
+      // at registration, so prod presenting "pueblofoodmap.com" and staging
+      // presenting "dev.pueblofoodmap.com" means a passkey registered on one
+      // is never offered or accepted by the other. The parameter DEFAULTS to
+      // "pueblofoodmap.com" so production (which passes no override) is
+      // unchanged; only staging passes an override, sourced from the
+      // Cloudflare env binding in auth.ts (see that file's WHY).
       passkey({
-        rpID: "pueblofoodmap.com",
+        rpID,
         rpName: "Pueblo Food Map Admin",
         // Phase 2/3 (real login UI): passkey's `origin` accepts a single
         // string, a string array, or null — a static array of every admin

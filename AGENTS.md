@@ -1384,6 +1384,46 @@ NOT done as part of this phase, same convention as every prior migration.
 
 ---
 
+# Admin authentication — passkey isolation (#318): staging gets its own identity
+
+Staging (`dev.pueblofoodmap.com`) now runs a **live** Better Auth engine
+with its OWN `BETTER_AUTH_SECRET` (a staging-worker secret, isolated from
+prod) and its OWN passkey **rpID**, `dev.pueblofoodmap.com` — set via
+`wrangler.jsonc`'s `env.staging.vars.BETTER_AUTH_RP_ID`.
+
+**Why a separate rpID:** WebAuthn credentials are bound to the rpID the
+relying party presented at registration time, not just to an origin URL.
+Giving staging a distinct rpID means a passkey registered on the test site
+can never authenticate against production, and vice-versa — by design, you
+register a NEW passkey on staging; your prod passkey simply won't work
+there. (The passkey `origin` allow-list is unaffected by this change — it
+already covered `https://dev.pueblofoodmap.com` via `ADMIN_ALLOWED_HOSTS`;
+only `rpID` needed a per-environment value.)
+
+**Prod is unchanged.** `buildAuthOptions()`'s `rpID` parameter
+(`src/lib/auth-options.ts`) defaults to `"pueblofoodmap.com"`, and prod's
+`wrangler.jsonc` config sets no `BETTER_AUTH_RP_ID` — so production's
+passkey config is byte-for-byte identical to before this change.
+
+**Where the override is read from — the Cloudflare env BINDING, not
+`process.env`.** `src/lib/auth.ts`'s `getAuth()` reads
+`env.BETTER_AUTH_RP_ID` off the object `getCloudflareContext()` returns
+(same binding `ADMIN_DB` comes through), not `process.env`. WHY: a
+wrangler `var`'s surfacing into `process.env` under OpenNext isn't
+guaranteed, and a silently-`undefined` override would break staging
+passkey isolation without ever throwing an error — the env binding is
+100% reliable. The type is declared as an optional field on
+`CloudflareEnv` in `cloudflare-env.d.ts` (unset/`undefined` on prod, a
+real string only on staging).
+
+**Stale secrets, safe to ignore or clean up:** `CF_ACCESS_AUD` /
+`CF_ACCESS_TEAM_DOMAIN` may still exist on the staging Worker from the
+pre-cutover Cloudflare Access era — they're dead (`cfAccess.ts` is
+CSRF-only now, reads neither), so leaving them set is harmless; deleting
+them is also safe.
+
+---
+
 # Design system — DESIGN.md
 
 [DESIGN.md](DESIGN.md) is the agent-facing visual-identity reference. Read it before

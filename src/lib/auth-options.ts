@@ -37,6 +37,7 @@ import { magicLink } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { adminAuthAllowlistPlugin } from "@/lib/adminAuthAllowlistPlugin";
 import { sendAdminMagicLinkEmail } from "@/lib/adminMagicLinkEmail";
+import { logAdminAuthEvent } from "@/lib/logger";
 
 /**
  * Every hostname this Worker answers admin traffic on (mirrors
@@ -108,6 +109,37 @@ export function buildAuthOptions(
     emailAndPassword: {
       enabled: false,
     },
+    // Phase 3 dual-auth — the session cookie MUST carry the `__Host-`
+    // prefix: browsers silently DROP a cookie whose name claims that
+    // prefix without also satisfying its invariants (Secure, Path=/, no
+    // Domain attribute), turning a config typo into an invisible "login
+    // never sticks" loop rather than a visible error. Verified against the
+    // installed better-auth source
+    // (node_modules/better-auth/dist/cookies/index.mjs, createCookieGetter):
+    // the final cookie name is `${secureCookiePrefix}${customName ||
+    // prefix + "." + cookieName}` — so leaving `useSecureCookies` at its
+    // default (true in production) would prepend better-auth's OWN
+    // `__Secure-` prefix ahead of our `__Host-` name below, producing the
+    // malformed `__Secure-__Host-session_token` and silently breaking
+    // login. Setting `useSecureCookies: false` here suppresses that
+    // auto-prefixing; `attributes.secure: true` (merged in LAST by that
+    // same function, after every other default) restores the Secure flag
+    // by hand so the `__Host-` invariant still holds. `path` defaults to
+    // "/" and no `crossSubDomainCookies` is configured anywhere in this
+    // file, so no `Domain` attribute is ever attached — the third
+    // `__Host-` invariant is satisfied by simply never opting in.
+    // auth-options.test.ts asserts the exact resolved name/attributes via
+    // better-auth's own `getCookies()` helper; a true end-to-end browser
+    // check still happens at Kyle's live preview (Phase 3 report).
+    advanced: {
+      useSecureCookies: false,
+      cookies: {
+        session_token: {
+          name: "__Host-session_token",
+          attributes: { secure: true },
+        },
+      },
+    },
     plugins: [
       magicLink({
         sendMagicLink: async ({ email, url }) => {
@@ -143,5 +175,28 @@ export function buildAuthOptions(
       // plugin matching a path a not-yet-registered plugin would also claim.
       adminAuthAllowlistPlugin(),
     ],
+    // Phase 3 dual-auth observability — the sibling of adminAuthAllowlistPlugin's
+    // own databaseHooks.user.create.before (that plugin's own file header):
+    // BOTH a plugin's databaseHooks AND this top-level databaseHooks are
+    // collected and run for the same lifecycle point (verified in the
+    // installed better-auth source, node_modules/better-auth/dist/context/
+    // create-context.mjs + context/helpers.mjs, which push() each of them
+    // into one shared `dbHooks` array), so this doesn't conflict with or
+    // replace that plugin's own hook — it's an independent addition at a
+    // different lifecycle point (session creation, not user creation).
+    // logAdminAuthEvent("login") (src/lib/logger.ts) is PII-free by design
+    // (a fixed event label, never the session's email/token/id) — durable
+    // per-login detail (timestamp, IP, user-agent) already lives in Better
+    // Auth's own `session` table; this line only makes a login ALSO visible
+    // in Cloudflare Workers Logs search, mirroring admin_auth_failure.
+    databaseHooks: {
+      session: {
+        create: {
+          after: async () => {
+            logAdminAuthEvent("login");
+          },
+        },
+      },
+    },
   } satisfies BetterAuthOptions;
 }

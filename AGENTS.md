@@ -1214,6 +1214,105 @@ that actually routes real traffic here).
 
 ---
 
+# Admin authentication — Better Auth Phase 3 (#316-ish): dual-auth gate
+
+Layers a Better Auth session requirement ON TOP of Cloudflare Access —
+**logical AND, never OR.** After this phase, reaching any admin data
+requires BOTH a valid CF Access JWT AND a valid Better Auth session; either
+alone is refused. This is strictly MORE restrictive than Phase 2, which
+left Access as the only real gate (Better Auth existed but nothing
+required a session). Access is still NOT removed — that's a later,
+separate phase.
+
+## `getAdminDb()` — still the single choke point, now two checks
+
+`src/lib/adminDb.ts`'s `getAdminDb()` calls `requireAccessIdentity()`
+(CF Access — cheaper, pre-existing check) FIRST, then
+`requireAdminSession()` (`src/lib/adminSession.ts`, new) SECOND. Either
+throws `AccessDeniedError` and neither the D1 binding nor a Better Auth
+session lookup happens until Access has already passed — a caller with no
+CF Access JWT never even reaches the Better Auth check. `requireAdminSession`
+reads `auth.api.getSession({ headers })` (a fresh `Headers` object carrying
+only the caller's `cookie` header — better-auth's session-read path never
+consults anything else) and re-runs the SAME `isAllowlistedEmail()` check
+Phase 2's plugin already enforces at session-creation time — defense in
+depth, not redundant: a session created before an admin's email is removed
+from `ADMIN_ALLOWLIST` would otherwise stay valid until it expires.
+
+## Redirect-vs-403 / 401-vs-403 — one shared helper per call shape
+
+`src/lib/adminAuthErrors.ts` is the single place this branching logic
+lives, replacing what was a copy-pasted catch block per page/route:
+
+- **Server Component pages** — `handlePageAuthError(err)`: on
+  `reason === "no_session"`, `redirect("/admin/login")` (send them to sign
+  in); any other `AccessDeniedError` reason (e.g. `not_allowlisted`, or a
+  Phase 2-era reason) still calls `forbidden()` (a real 403), same as
+  before this phase.
+- **Route handlers** — `adminAuthErrorResponse(err)`: `no_session` → `401`;
+  every other reason → `403` (plain-text `Forbidden`, same body shape as
+  before). Both helpers still log through `logAdminAuthFailure()` first —
+  the PII-free convention is unchanged, only the branching moved into one
+  place.
+
+All 4 admin Server Component pages and all 7 `/api/admin/*` route handlers
+that call `getAdminDb()` were updated to call one of these two helpers
+instead of duplicating the `AccessDeniedError` catch. CSRF (`requireAdminOrigin()`
+on the 5 mutation routes) is unchanged — this phase only added a second
+identity check ahead of it, never touched origin verification.
+
+## `__Host-` session cookie
+
+`auth-options.ts`'s `advanced` block names the session cookie
+`__Host-session_token` explicitly. The `__Host-` prefix requires the
+browser see `Secure`, `Path=/`, and NO `Domain` attribute on the
+`Set-Cookie` line, or it silently drops the cookie — verified against the
+installed `better-auth` source (`node_modules/better-auth/dist/cookies/index.mjs`),
+not assumed from docs:
+
+- `useSecureCookies: false` — counterintuitive, but required: left at its
+  default in production, better-auth's own `createCookieGetter` auto-
+  prepends `__Secure-` ahead of any custom `.name`, producing a malformed
+  double-prefixed cookie name. Setting this `false` stops that
+  auto-prepend so the literal `__Host-session_token` name is used as-is.
+- `cookies.session_token.attributes.secure: true` — restores the `Secure`
+  flag by hand, since turning off the auto-prepend above also turns off
+  the attribute it would have set.
+- `Path=/` and no `Domain` are better-auth's defaults already — nothing
+  else needed for those two.
+
+`auth-options.test.ts` asserts the resolved config via better-auth's own
+`getCookies(options)` introspection (no live HTTP round trip needed to
+check the name/attributes it will produce). **What that test can't
+prove:** whether a real browser actually accepts and persists the
+resulting `Set-Cookie` header end to end — that requires a live preview
+(see Verification below).
+
+## Login-event logging — `databaseHooks.session.create.after`
+
+`auth-options.ts`'s top-level `databaseHooks.session.create.after` calls
+`logAdminAuthEvent("login")` (`src/lib/logger.ts`, new) — a single-line
+`{"event":"admin_auth_event","type":"login"}`, same PII-free convention as
+`logAdminAuthFailure`. Verified in better-auth's own context-creation
+source that plugin-level `databaseHooks` (Phase 2's
+`adminAuthAllowlistPlugin`'s `databaseHooks.user.create.before`) and this
+phase's new top-level `databaseHooks.session.create.after` are collected
+into one array and both run — no ordering conflict, no override.
+
+## Verification — what's headless-provable vs. what needs Kyle's live preview
+
+`lint` / `design:drift` / `typecheck` / `test:ci` / `opennextjs-cloudflare
+build` are all clean as of this phase (including new tests:
+`adminSession.test.ts`'s no_session/not_allowlisted/success/cookie-
+forwarding cases, and `auth-options.test.ts`'s `__Host-` cookie
+assertion). **NOT verifiable headlessly:** whether a real browser actually
+sets and sends the `__Host-session_token` cookie correctly through a full
+magic-link login round trip, and whether the redirect-to-`/admin/login`
+vs. 403 behavior renders as expected live. Needs Kyle's live preview
+before this phase is considered fully proven.
+
+---
+
 # Design system — DESIGN.md
 
 [DESIGN.md](DESIGN.md) is the agent-facing visual-identity reference. Read it before

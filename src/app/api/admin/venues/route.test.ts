@@ -41,6 +41,17 @@ vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 
+// Phase 3 dual-auth: getAdminDb() now ALSO requires a live Better Auth
+// session (src/lib/adminSession.ts) on top of the CF Access JWT this file
+// already signs. This route's own auth/CSRF/validation/D1 behavior is what
+// this file tests — not Better Auth's session plumbing (covered on its own
+// by adminSession.test.ts) — so requireAdminSession is stubbed to always
+// succeed, matching the "mock the one true I/O boundary" pattern this file
+// already uses for getCloudflareContext.
+vi.mock("@/lib/adminSession", () => ({
+  requireAdminSession: vi.fn().mockResolvedValue({ email: "admin@pueblofoodmap.com" }),
+}));
+
 import { POST } from "@/app/api/admin/venues/route";
 
 // ─── Fixtures / helpers ─────────────────────────────────────────────────────

@@ -24,7 +24,13 @@ export type AccessDeniedReason =
   | "invalid_token"
   | "no_email_claim"
   | "misconfigured"
-  | "bad_origin";
+  | "bad_origin"
+  // Phase 3 dual-auth (src/lib/adminSession.ts): no live Better Auth
+  // session exists for an otherwise-valid CF Access caller.
+  | "no_session"
+  // Phase 3 dual-auth: a live Better Auth session exists, but its email
+  // isn't on the admin allowlist (defense-in-depth — see adminSession.ts).
+  | "not_allowlisted";
 
 /**
  * Thrown by requireAccessIdentity() (and, transitively, getAdminDb()) on any

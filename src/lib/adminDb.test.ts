@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
  * Tests for getAdminDb() — the single choke point for the ADMIN_DB D1
- * binding (#237 checkpoint c).
+ * binding (#237 checkpoint c; Phase 3 dual-auth added below).
  *
  * Only @opennextjs/cloudflare's getCloudflareContext() is mocked (the one
  * true I/O boundary here — it reaches Cloudflare's request-context, which
@@ -10,6 +10,14 @@
  * cfAccess.test.ts), so "never calls getCloudflareContext when
  * unauthenticated" below proves the actual ordering guarantee — not just
  * that two independently-mocked functions happen to both fire in some order.
+ *
+ * requireAdminSession() (src/lib/adminSession.ts) IS mocked here, the same
+ * way getCloudflareContext() is — it's covered on its own by
+ * adminSession.test.ts, and driving a real Better Auth session through this
+ * file would mean also mocking getAuth()'s own getCloudflareContext() call,
+ * duplicating that coverage for no extra signal. What this file proves is
+ * the ORDERING and WIRING: CF Access first, Better Auth session second,
+ * both required.
  *
  * WHY `node` environment: same jsdom/Uint8Array cross-realm issue as
  * cfAccess.test.ts (see that file's header) — signing a test JWT here hits
@@ -42,6 +50,11 @@ const KID = "admindb-test-key";
 const mockGetCloudflareContext = vi.fn();
 vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
+}));
+
+const mockRequireAdminSession = vi.fn();
+vi.mock("@/lib/adminSession", () => ({
+  requireAdminSession: (...args: unknown[]) => mockRequireAdminSession(...args),
 }));
 
 import { getAdminDb } from "@/lib/adminDb";
@@ -77,6 +90,8 @@ describe("getAdminDb", () => {
     process.env.CF_ACCESS_TEAM_DOMAIN = TEAM_DOMAIN;
     process.env.CF_ACCESS_AUD = AUD;
     mockGetCloudflareContext.mockReset();
+    mockRequireAdminSession.mockReset();
+    mockRequireAdminSession.mockResolvedValue({ email: "admin@pueblofoodmap.com" });
   });
 
   afterEach(() => {
@@ -85,14 +100,29 @@ describe("getAdminDb", () => {
     _setJwksGetterForTest(null);
   });
 
-  test("never calls getCloudflareContext when the caller is unauthenticated", async () => {
+  test("never calls getCloudflareContext or requireAdminSession when the caller is unauthenticated", async () => {
     await expect(getAdminDb(headersWith(null))).rejects.toBeInstanceOf(
       AccessDeniedError,
     );
     expect(mockGetCloudflareContext).not.toHaveBeenCalled();
+    // Phase 3 dual-auth ordering: CF Access is checked FIRST (cheaper, and
+    // covers hostnames Better Auth's own baseURL config doesn't need to
+    // reason about) — a caller failing that check never even reaches the
+    // Better Auth session check.
+    expect(mockRequireAdminSession).not.toHaveBeenCalled();
   });
 
-  test("returns the ADMIN_DB binding and identity once verified", async () => {
+  test("Phase 3: valid CF Access but no Better Auth session -> AccessDeniedError, D1 never touched", async () => {
+    mockRequireAdminSession.mockRejectedValue(new AccessDeniedError("no_session"));
+    const token = await buildValidToken();
+
+    await expect(getAdminDb(headersWith(token))).rejects.toMatchObject(
+      new AccessDeniedError("no_session"),
+    );
+    expect(mockGetCloudflareContext).not.toHaveBeenCalled();
+  });
+
+  test("returns the ADMIN_DB binding and CF Access identity once BOTH checks pass", async () => {
     const fakeDb = { __fake: "d1-binding" };
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: fakeDb } });
 
@@ -102,5 +132,6 @@ describe("getAdminDb", () => {
     expect(result.identity).toEqual({ email: "admin@pueblofoodmap.com" });
     expect(result.db).toBe(fakeDb);
     expect(mockGetCloudflareContext).toHaveBeenCalledWith({ async: true });
+    expect(mockRequireAdminSession).toHaveBeenCalledTimes(1);
   });
 });

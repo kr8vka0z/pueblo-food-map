@@ -38,6 +38,15 @@ vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 
+// Phase 3 dual-auth: see src/app/api/admin/venues/route.test.ts's own
+// comment on this same mock — requireAdminSession is stubbed to always
+// succeed since this file tests geocode's own auth/lookup behavior, not
+// Better Auth's session plumbing (covered separately by
+// adminSession.test.ts).
+vi.mock("@/lib/adminSession", () => ({
+  requireAdminSession: vi.fn().mockResolvedValue({ email: "admin@pueblofoodmap.com" }),
+}));
+
 import { GET } from "@/app/api/admin/geocode/route";
 
 // ─── Fixtures / helpers ─────────────────────────────────────────────────────

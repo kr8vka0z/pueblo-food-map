@@ -27,6 +27,7 @@
 import { describe, expect, test } from "vitest";
 import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
+import { getCookies } from "better-auth/cookies";
 import { buildAuthOptions } from "@/lib/auth-options";
 
 describe("buildAuthOptions", () => {
@@ -60,5 +61,27 @@ describe("buildAuthOptions", () => {
     // bare host must be in the allow-list Better Auth uses to construct
     // correct absolute URLs on that hostname.
     expect(baseURL.allowedHosts).toContain("admin.pueblofoodmap.com");
+  });
+});
+
+describe("session cookie — __Host- prefix (Phase 3 dual-auth)", () => {
+  // Build-time guard for the exact trap this config exists to avoid: a
+  // cookie whose name merely SAYS `__Host-` without also satisfying its
+  // three invariants (Secure, Path=/, no Domain) is silently dropped by the
+  // browser, turning login into an invisible retry loop. A real end-to-end
+  // browser check still happens at Kyle's live preview — see this repo's
+  // Phase 3 report — but this proves the resolved config is correct BEFORE
+  // that, using better-auth's own getCookies() helper (the exact function
+  // its runtime uses to compute the real Set-Cookie name/attributes; see
+  // auth-options.ts's own WHY comment on the `advanced` block for the
+  // source trace).
+  test("session_token resolves to __Host-session_token: Secure, Path=/, no Domain", () => {
+    const options = buildAuthOptions(new Database(":memory:"));
+    const cookies = getCookies(options);
+
+    expect(cookies.sessionToken.name).toBe("__Host-session_token");
+    expect(cookies.sessionToken.attributes.secure).toBe(true);
+    expect(cookies.sessionToken.attributes.path).toBe("/");
+    expect(cookies.sessionToken.attributes.domain).toBeUndefined();
   });
 });

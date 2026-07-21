@@ -27,11 +27,9 @@
  */
 
 import { headers } from "next/headers";
-import { forbidden } from "next/navigation";
 import Link from "next/link";
 import { getAdminDb } from "@/lib/adminDb";
-import { AccessDeniedError } from "@/lib/cfAccess";
-import { logAdminAuthFailure } from "@/lib/logger";
+import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import SubmissionsReviewView, { type ReviewSubmission } from "@/components/SubmissionsReviewView";
 import type { ClosurePayload, NewVenuePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
 
@@ -66,11 +64,7 @@ export default async function SubmissionsPage() {
       .all<PublicSubmissionRow>();
     submissions = result.results.map(parseSubmissionRow);
   } catch (err) {
-    if (err instanceof AccessDeniedError) {
-      logAdminAuthFailure(err.reason);
-      forbidden();
-    }
-    throw err;
+    handlePageAuthError(err);
   }
 
   return (

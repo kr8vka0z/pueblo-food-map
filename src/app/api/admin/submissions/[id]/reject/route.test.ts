@@ -39,6 +39,14 @@ vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 
+// Phase 3 dual-auth: see venues/route.test.ts's own comment on this same
+// mock — requireAdminSession is stubbed to always succeed since this file
+// tests reject's own auth/CSRF/D1 behavior, not Better Auth's session
+// plumbing (covered separately by adminSession.test.ts).
+vi.mock("@/lib/adminSession", () => ({
+  requireAdminSession: vi.fn().mockResolvedValue({ email: "admin@pueblofoodmap.com" }),
+}));
+
 import { POST } from "@/app/api/admin/submissions/[id]/reject/route";
 
 // ─── Fixtures / helpers ─────────────────────────────────────────────────────

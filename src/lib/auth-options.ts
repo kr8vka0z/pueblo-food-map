@@ -126,6 +126,121 @@ export function buildAuthOptions(
     emailAndPassword: {
       enabled: false,
     },
+    // #318 Phase 4 item 1 — D1-backed rate limit on the magic-link REQUEST
+    // endpoint. REUSES Better Auth's own native `rateLimit` engine rather
+    // than hand-rolling a limiter — src/lib/rateLimit.ts's in-process Map
+    // limiter is untouched (it covers the three PUBLIC forms only, a
+    // separate unauthenticated attack surface with no session/D1 concept).
+    //
+    // WHY `enabled` is explicit rather than left to the library default:
+    // verified in the installed source
+    // (node_modules/better-auth/dist/context/create-context.mjs:171) that
+    // better-auth's own default is `options.rateLimit?.enabled ?? isProduction`
+    // — rate limiting is OFF by default outside `NODE_ENV=production`
+    // (node_modules/@better-auth/core/dist/env/env-impl.mjs:30-32, a
+    // module-load-time const, not a lazy check). Writing the identical
+    // condition here makes "genuinely active in production" a visible,
+    // intentional statement in this file instead of an invisible inherited
+    // default — behavior is unchanged either way, including in this repo's
+    // test suite (vitest's NODE_ENV is "test", so this still resolves
+    // false there, same as before this change).
+    //
+    // WHY `storage: "database"` (never the library's default "memory" or
+    // "secondary-storage"): this file's own header WHY forbids Workers
+    // KV/secondaryStorage entirely — rate-limit counters must live in D1
+    // alongside every other auth table. Verified in
+    // node_modules/better-auth/dist/api/rate-limiter/index.mjs's
+    // `getRateLimitStorage()`: any storage value other than "memory" or
+    // "secondary-storage" falls through to `createDatabaseStorageWrapper(ctx)`,
+    // which reads/writes a `rateLimit` model via `ctx.adapter` (D1, same
+    // adapter as every other table here). That model's exact shape
+    // (`key`/`count`/`lastRequest` fields) is verified in
+    // node_modules/@better-auth/core/dist/db/get-tables.mjs's
+    // `rateLimitTable` literal — migrations/0004_rate_limit_table.sql adds
+    // it (see that file's own header for how its column types/constraints
+    // were hand-derived from the same installed source, since the
+    // `@better-auth/cli generate` workflow that produced 0003 could not be
+    // run this session — no working shell — and needs parent
+    // confirmation/regeneration before this lands on remote D1).
+    //
+    // WHY `customRules["/sign-in/magic-link"]` at 1h/5 (not the magicLink
+    // plugin's own baked-in 60s/5 default): verified in
+    // node_modules/better-auth/dist/plugins/magic-link/index.mjs:41 that
+    // `/sign-in/magic-link` is the exact literal path `signInMagicLink`'s
+    // endpoint registers — the same string this file's own
+    // `adminAuthAllowlistPlugin` gate already path-matches. That plugin
+    // ships its own default rate-limit rule at that identical path (window
+    // 60s/max 5 — magic-link/index.mjs:157-163), but
+    // node_modules/better-auth/dist/api/rate-limiter/index.mjs's
+    // `resolveRateLimitConfig()` resolves top-level `customRules` LAST —
+    // after the library's built-in `/sign-in*` special rule and after any
+    // plugin-contributed rule — so this exact-string entry reliably
+    // overrides the plugin's shorter window rather than racing it. 3600s/5
+    // mirrors src/lib/rateLimit.ts's own public-form threshold
+    // (`RATE_LIMIT_MAX = 5`, 1h window) for a consistent posture across
+    // every request-a-link surface this app exposes.
+    //
+    // NOT a landmine for adminAuthAllowlistPlugin.test.ts's real
+    // magic-link integration tests: verified in
+    // node_modules/better-auth/dist/api/index.mjs's `router()` that rate
+    // limiting is wired into the ROUTER's `onRequest` hook only (invoked
+    // by `auth.handler(request)`, the real HTTP entry point) — every call
+    // in that test file is a direct `auth.api.signInMagicLink(...)` call,
+    // which invokes the endpoint function directly and never passes
+    // through the router's `onRequest` at all. Real traffic through
+    // src/app/api/auth/[...all]/route.ts's `toNextJsHandler()` DOES go
+    // through `auth.handler`, so production requests are genuinely gated —
+    // but this repo's existing test suite needs no `rateLimit` table
+    // either way and is unaffected by this change.
+    rateLimit: {
+      enabled: process.env.NODE_ENV === "production",
+      storage: "database",
+      customRules: {
+        "/sign-in/magic-link": { window: 3600, max: 5 },
+      },
+    },
+    // #318 Phase 4 item 5 — short-lived session for this single
+    // high-privilege admin account, replacing Better Auth's 7-day default
+    // (node_modules/@better-auth/core/dist/types/init-options.d.mts:801,
+    // `@default 7 days`).
+    //
+    // WHY 12h `expiresIn` + 1h `updateAge`, ROLLING (not absolute):
+    // verified in node_modules/better-auth/dist/api/routes/session.mjs:203-238
+    // that a session refreshes — `expiresAt` is recomputed as
+    // `now + expiresIn` — once less than `updateAge` remains before it
+    // would expire (`shouldBeUpdated = expiresAt - expiresIn*1000 +
+    // updateAge*1000 <= now`), and that this refresh is a real DB write
+    // (`internalAdapter.updateSession`) gated by that check specifically
+    // so an active session doesn't rewrite its row on every single
+    // request — only roughly once per `updateAge` window. 12h/1h means an
+    // idle admin session dies within 12h of its last activity, and a
+    // continuously active one is re-checked/extended at most once an hour.
+    //
+    // WHY no separate hard-absolute-cap on top of this: the only
+    // mechanism 1.6.23 exposes that touches this is
+    // `disableSessionRefresh` (same init-options.d.mts, lines ~811-817;
+    // behavior confirmed in the session.mjs refresh check above via its
+    // `disableRefresh` short-circuit) — but that option does not ADD an
+    // absolute ceiling alongside the rolling window above; it REPLACES the
+    // rolling behavior outright, since disabling refresh means
+    // `expiresAt` (set once at sign-in) is never recomputed, silently
+    // turning `expiresIn` itself into a fixed lifetime from creation with
+    // no idle-based extension at all. That's not "compose simply" with
+    // the rolling/idle design this task also asks for (an `updateAge` that
+    // meaningfully avoids rewriting on every request) — it's a binary
+    // trade-off between the two, not an additive second cap. No other
+    // absolute-cap option exists in this version (confirmed by reading the
+    // full `session` block of init-options.d.mts, lines 797-924 — only
+    // `expiresIn`, `updateAge`, `disableSessionRefresh`, the unrelated
+    // cookie-cache block, and `freshAge` — a distinct "is this session
+    // fresh enough for a sensitive re-auth-gated action" check, not a
+    // session lifetime control). Per this task's own explicit fallback:
+    // the 12h rolling window above is the accepted floor, not a
+    // deliberately incomplete implementation.
+    session: {
+      expiresIn: 60 * 60 * 12, // 12h, rolling
+      updateAge: 60 * 60, // 1h — refresh cadence, not a rewrite-every-request
+    },
     // Phase 3 dual-auth — the session cookie MUST carry the `__Host-`
     // prefix: browsers silently DROP a cookie whose name claims that
     // prefix without also satisfying its invariants (Secure, Path=/, no

@@ -24,7 +24,7 @@
  * ceremony is wired yet — see auth-options.ts's own `// Phase 2:` markers).
  */
 
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getCookies } from "better-auth/cookies";
@@ -61,6 +61,51 @@ describe("buildAuthOptions", () => {
     // apex admin now serves /admin from — and its bare host must be in the
     // allow-list Better Auth uses to construct correct absolute URLs there.
     expect(baseURL.allowedHosts).toContain("pueblofoodmap.com");
+  });
+});
+
+describe("rate limit — D1-backed, magic-link custom rule (#318 Phase 4 item 1)", () => {
+  // Config introspection only — this doesn't need the `rateLimit` table to
+  // exist (migrations/0004_rate_limit_table.sql), since `auth.options` is
+  // read directly rather than exercised through a live request. See
+  // auth-options.ts's own `rateLimit` WHY comment for the full source
+  // trace behind every value asserted here.
+  test("rateLimit is enabled in production, D1-backed, with the magic-link custom rule", () => {
+    // WHY force NODE_ENV to "production" for this one assertion:
+    // auth-options.ts's `enabled` mirrors better-auth's own
+    // production-only default (create-context.mjs:171) — asserting
+    // `enabled === true` under vitest's real "test" NODE_ENV would fail
+    // for a reason unrelated to what this test checks. vi.stubEnv (not a
+    // direct `process.env.NODE_ENV =`) both bypasses Next's read-only
+    // NODE_ENV type AND is undone by vi.unstubAllEnvs() in `finally`, so
+    // no other test in this file observes the override.
+    vi.stubEnv("NODE_ENV", "production");
+
+    try {
+      const options = buildAuthOptions(new Database(":memory:"));
+
+      expect(options.rateLimit?.enabled).toBe(true);
+      expect(options.rateLimit?.storage).toBe("database");
+      expect(options.rateLimit?.customRules?.["/sign-in/magic-link"]).toEqual(
+        { window: 3600, max: 5 },
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  test("rateLimit stays disabled outside production (e.g. this test suite itself)", () => {
+    const options = buildAuthOptions(new Database(":memory:"));
+    expect(options.rateLimit?.enabled).toBe(false);
+  });
+});
+
+describe("session lifetime — 12h rolling (#318 Phase 4 item 5)", () => {
+  test("expiresIn is 12h and updateAge is 1h, not the 7-day/1-day library default", () => {
+    const options = buildAuthOptions(new Database(":memory:"));
+
+    expect(options.session?.expiresIn).toBe(60 * 60 * 12);
+    expect(options.session?.updateAge).toBe(60 * 60);
   });
 });
 

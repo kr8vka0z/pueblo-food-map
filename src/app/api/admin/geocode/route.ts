@@ -30,8 +30,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/adminDb";
-import { AccessDeniedError } from "@/lib/cfAccess";
-import { logAdminAuthFailure } from "@/lib/logger";
+import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 
 // WHY force-dynamic: same reasoning as GET /api/admin/whoami — this route
 // reads req.headers directly (not next/headers), so without this Next may
@@ -92,11 +91,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   try {
     await getAdminDb(req.headers);
   } catch (err) {
-    if (err instanceof AccessDeniedError) {
-      logAdminAuthFailure(err.reason);
-      return new Response("Forbidden", { status: 403 });
-    }
-    throw err;
+    return adminAuthErrorResponse(err);
   }
 
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";

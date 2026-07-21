@@ -24,38 +24,25 @@
 - **HTTP/www redirect:** HTTP requests and `www.pueblofoodmap.com` both 301-redirect to `https://pueblofoodmap.com` via Cloudflare zone redirect rule + Always-Use-HTTPS.
 - **Hosting:** Cloudflare Workers, project name `pueblo-food-map` (configured in `wrangler.jsonc`)
 - **Adapter:** `@opennextjs/cloudflare` — translates Next.js App Router output into Worker format
-
-## Deploy
-
-GitHub Actions is the deploy robot for this repo. Cloudflare Workers Builds (the old dashboard-connected build) was disconnected 2026-07-18 — nobody deploys from a laptop or the Cloudflare dashboard.
-
-1. Feature branch → PR into `dev`. CI runs; merging auto-deploys. `.github/workflows/deploy-dev.yml` runs the `predeploy` gate (lint + `design:drift` + typecheck + `test:ci`), applies the `pueblo-food-map-admin-staging` D1 migration remotely (`npx wrangler d1 migrations apply pueblo-food-map-admin-staging --remote --env staging`), then builds and deploys the `pueblo-food-map-staging` Worker at https://dev.pueblofoodmap.com (Cloudflare Access-gated, not public).
-2. `dev` → PR into `main`. Kyle signs off; merging auto-deploys. `.github/workflows/deploy-prod.yml` runs the same `predeploy` gate, then `npx opennextjs-cloudflare build` + `npx opennextjs-cloudflare deploy`, shipping the `pueblo-food-map` Worker at https://pueblofoodmap.com. On failure it pings the Healthchecks.io check's `/fail` endpoint (`HC_PING_URL` — see § Uptime dead-man's-switch below) so a broken prod deploy alerts immediately instead of waiting for the next missed heartbeat.
-3. After a `dev`→`main` cutover, merge `main` back into `dev` to realign the branches.
-
-Squash-only repo. Ruleset 19154488 protects `dev` and `main` from deletion and force-push. No manual `wrangler deploy` is needed or expected for either environment — both workflows deploy on push. Node 22 is required by both deploy workflows (`wrangler` >=4 refuses Node <22); `ci.yml` still tests on Node 20.
-
-**Deploy auth:** repo secrets `CLOUDFLARE_API_TOKEN` (scoped CI token, 1Password item "Cloudflare CI Token - Pueblo Food Map") + `CLOUDFLARE_ACCOUNT_ID` authenticate both workflows to Cloudflare — this is what the old Workers Builds dashboard connection used to provide.
+- **CI/CD — TRANSITIONAL (robot-deploy rollout, Phase 2):** `dev` deploys via GitHub Actions (`.github/workflows/deploy-dev.yml` — push `dev` → staging worker at dev.pueblofoodmap.com). **Prod (`main`) still deploys via Cloudflare Workers Builds** (dashboard connection) until the gated cutover: disconnect Workers Builds in the CF dashboard, then `deploy-prod.yml` takes over on push to `main`. Until that flip, the Workers-Builds details below still hold for prod — and after it, rewrite this section.
+  - Push to `main` → production deploy (automatic, Workers Builds — until the flip above)
+  - Open a PR → unique preview deploy URL (posted as a check on the PR, visible in the CF dashboard under that build)
+  - **Build command:** `npx opennextjs-cloudflare build`
+  - **Deploy command:** `npx wrangler deploy` (CF default)
 
 ## Build and preview locally
 
 ```bash
 npm run preview   # OpenNext build + local Worker emulator at http://127.0.0.1:8788
-npm run deploy    # OpenNext build + wrangler deploy — EMERGENCY ONLY, see § Deploy above
+npm run deploy    # OpenNext build + wrangler deploy to production
+                  # Requires `wrangler login` first; rarely needed — CI handles deploys
 ```
-
-`npm run deploy` bypasses the `predeploy` CI gate and isn't part of normal shipping — both Actions workflows above cover every ordinary deploy. If it's ever genuinely needed, it requires `wrangler login` or a local `CLOUDFLARE_API_TOKEN`; use it only when the Actions robot itself is unavailable.
-
-## Rollback
-
-**Prod rollback = `git revert <bad commit>` + push to `main`.** `deploy-prod.yml` picks up the revert commit and redeploys the previous-good code automatically — no manual `wrangler deploy` needed. Never `git reset --hard` + force-push to roll back — a revert is a forward commit, keeps history linear and honest, and is what the Actions robot is already wired to deploy. Rehearsed 2026-07-18: bad push → green deploy, `git revert` → push → green redeploy.
-
-**D1 schema damage** — `wrangler d1 time-travel` bookmark/restore against the affected database (`pueblo-food-map-admin` for prod, `pueblo-food-map-admin-staging` for dev, seeded with fake data via `scripts/seed-dev.sql`). Note: `time-travel restore` auto-confirms in a non-interactive shell — there is no `-y` flag to make that explicit, so run it somewhere you can see and answer the prompt.
 
 ## Operational notes
 
-- **Build logs:** GitHub Actions run logs (Actions tab → `deploy-prod.yml` / `deploy-dev.yml`) are the source of truth for what a deploy actually did — lint/typecheck/test output, the build, and the deploy step all live there. The Cloudflare dashboard's Workers & Pages Deployments tab still lists each resulting Worker version, but not the steps that produced it.
-- **Environment variables — two kinds, two places.** (1) Build-time `NEXT_PUBLIC_*` vars are inlined by `next build` at CI time → set as GitHub repo secrets (Settings → Secrets and variables → Actions) and read into the build step by the workflow. Dev builds with `MAPBOX_PREVIEW_TOKEN` in place of the prod Mapbox token, because the prod token's URL allowlist doesn't cover `dev.pueblofoodmap.com` (open issue #304 tracks minting a URL-restricted staging token instead). (2) Runtime server secrets (`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, `HC_PING_URL`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`, `GITHUB_PUBLISH_TOKEN`) are read at request time → set per-environment via `wrangler secret put` or the CF dashboard's Settings → Variables and Secrets.
+- **Build logs:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab
+- **Rollback:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab → find a previous successful deployment → "Rollback to this deployment". Production traffic switches in ~30 seconds.
+- **Environment variables — two kinds, two places.** (1) Build-time `NEXT_PUBLIC_*` are inlined by `next build` → set under **Settings → Build → Build variables**. (2) Runtime server secrets (`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`) are read at request time → set under **Settings → Variables and Secrets**. **Workers Builds has ONE shared build-variable set and a single `production` environment — there is NO separate Preview environment** (that's Cloudflare Pages). The same build vars apply to production deploys and PR preview builds.
 
 ## Mapbox Token Management
 
@@ -67,19 +54,19 @@ npm run deploy    # OpenNext build + wrangler deploy — EMERGENCY ONLY, see § 
 - **1Password:** see `OPS-SECRETS.local.md` (gitignored -- 1Password refs are kept out of this public repo)
 - **Env var:** `NEXT_PUBLIC_MAPBOX_TOKEN`
 - **Local dev:** `.env.local` (gitignored — never commit this file)
-- **Build-time secret:** GitHub repo secret `NEXT_PUBLIC_MAPBOX_TOKEN` (Settings → Secrets and variables → Actions), read into the build step by `deploy-prod.yml`. `NEXT_PUBLIC_*` vars are inlined into the client bundle by `next build`; they must be present at build time, not runtime — there is no Cloudflare-dashboard equivalent anymore now that Workers Builds is disconnected.
+- **Build variable:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Settings → Build → Build variables. Workers Builds has one shared build-variable set and a single `production` environment — there is NO separate Preview environment (that's Cloudflare Pages). The same build vars apply to prod deploys and PR preview builds. `NEXT_PUBLIC_*` vars are inlined into the client bundle by `next build`; they must be present at build time, not runtime.
 - **Scopes:** `styles:read`, `fonts:read`, `tilesets:read`
 - **URL restrictions (bare hostnames, no protocol, no wildcards):**
   - `pueblofoodmap.com`
   - `www.pueblofoodmap.com`
   - `localhost:3000`
   - `pueblo-food-map.kyle-boyd.workers.dev`
-- **Staging uses a different token.** `deploy-dev.yml` builds with `MAPBOX_PREVIEW_TOKEN` instead of this token, because this token's URL allowlist above doesn't cover `dev.pueblofoodmap.com` and Mapbox tokens don't support wildcards — open issue #304 tracks minting a URL-restricted staging-only token to close that gap (see "Lighthouse CI build token" below for that token's other use). There is no longer a per-PR Cloudflare preview deploy — that mechanism went away with Workers Builds. Demo a change on `dev.pueblofoodmap.com` (Access-gated) or locally via `npm run preview`.
+- **Preview deploy warning:** A PR's CF preview deploy is reachable at the URL Cloudflare posts as a check on the PR (do not guess a `<branch>-…workers.dev` subdomain — that pattern does not resolve and 404s). Its map throws "site not authorized" unless that exact subdomain is added to the token's URL restrictions (Mapbox dropped wildcard support), so for a quick demo it is usually easier to demo from production.
 
 ### Lighthouse CI build token (`pk.*`, GitHub secret only)
 
 - **Purpose:** The Lighthouse CI job builds this commit's code and serves it on a local server (`next start` at `localhost:3000`), then audits that — so a PR is graded on its own changes, not on production (see `.github/workflows/lighthouse.yml`). This token is passed to that build as `NEXT_PUBLIC_MAPBOX_TOKEN` so the map renders during the audit instead of an "unauthorized" blank.
-- **GitHub secret name:** `MAPBOX_PREVIEW_TOKEN`. Also reused by `deploy-dev.yml` as the staging build's Mapbox token (see "Public token" → "Staging uses a different token" above) until issue #304 mints a dedicated URL-restricted staging token — until then this one unrestricted CI token covers both jobs.
+- **GitHub secret name:** `MAPBOX_PREVIEW_TOKEN` (legacy name — it is a build token, not a preview-URL token).
 - **Type:** Public (`pk.*`) — same scopes as the production token (`styles:read`, `fonts:read`, `tilesets:read`). Must be created in the Mapbox Studio dashboard (cannot mint `pk` tokens via API).
 - **URL restrictions:** MUST be unrestricted (or explicitly allow `localhost:3000`) so the map authorizes on the CI's local server. A prod-URL-restricted token would render "not authorized" and skew the audit.
 - **If the secret is absent:** the build still succeeds and accessibility is still measured, but the map renders blank ("not authorized"), so the performance score is unrepresentative. There is **no** production fallback — the job always audits the local build of the commit under test.
@@ -106,9 +93,9 @@ npm run deploy    # OpenNext build + wrangler deploy — EMERGENCY ONLY, see § 
 
 1. Mapbox Studio dashboard → Access tokens → revoke old token, create new (check only `styles:read`, `fonts:read`, `tilesets:read`; copy URL restrictions from old token).
 2. Update the value in 1Password (reference in `OPS-SECRETS.local.md`).
-3. Update the `NEXT_PUBLIC_MAPBOX_TOKEN` GitHub repo secret (Settings → Secrets and variables → Actions).
+3. Update the `NEXT_PUBLIC_MAPBOX_TOKEN` **build variable** in CF Workers Builds (single shared set; Settings → Build).
 4. Update local `.env.local`.
-5. Trigger a redeploy (push a commit to `main`, or re-run the latest `deploy-prod.yml` run from the Actions tab).
+5. Trigger a redeploy (push a commit or manually trigger from CF dashboard).
 
 **Secret token:**
 
@@ -526,8 +513,8 @@ REST API has no "enable future auto-merge" endpoint — only the GraphQL
 `enablePullRequestAutoMerge` mutation does), (5) **only once step 4
 succeeds**, promotes the exact draft ids captured in step 1 to `published`
 and writes one `audit_log` row, atomically via a single `db.batch()`. Once
-the PR auto-merges, `deploy-prod.yml` (§ Deploy above) redeploys production
-like any other push to `main`.
+the PR auto-merges, the existing Workers Builds pipeline (unmodified)
+redeploys production like any other push to `main`.
 
 **`published-venues.ts` is now the public map's data source, not the three
 source arrays.** `src/data/venues.ts` imports `publishedVenues` from
@@ -698,16 +685,12 @@ of #258 — nothing in the app reads from `public_submissions`. The admin
 review screen (approve -> create/edit the target venue, reject -> dismiss)
 is a separate, later slice (#259).
 
-**Applying the migration to production — NOT part of the deploy workflow.**
-Unlike `published-venues.ts` (a build-time static import — "Publish ->
-static" above), a D1 schema migration is a database operation independent
-of `deploy-prod.yml` — there is no `migrations_dir` configured in
-`wrangler.jsonc`, so a prod deploy never auto-applies a migration file.
-(Staging differs: `deploy-dev.yml` runs `wrangler d1 migrations apply
-pueblo-food-map-admin-staging --remote --env staging` as part of every dev
-deploy — see § Deploy above. Prod stays manual on purpose, so a schema
-change ships to production only when a human runs it.) Apply explicitly;
-the table must exist in production D1 BEFORE the
+**Applying the migration — NOT part of a Worker deploy.** Unlike
+`published-venues.ts` (a build-time static import — "Publish -> static"
+above), a D1 schema migration is a database operation, independent of
+`wrangler deploy` / Workers Builds — there is no `migrations_dir`
+configured in `wrangler.jsonc`, so a deploy never auto-applies a migration
+file. Apply explicitly; the table must exist in production D1 BEFORE the
 deployed routes' writes can succeed against it (a D1 failure is caught and
 logged per above, so a deploy that lands ahead of the migration degrades
 gracefully rather than breaking submissions — but the queue silently drops
@@ -986,6 +969,347 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   structured data and visible text never diverge. The page also carries a live venue-count line
   (`venues.length`) and a cited Feeding America (Map the Meal Gap, 2023) food-insecurity stat —
   AEO item S8.
+
+---
+
+# Admin authentication — Better Auth engine (#314, Phase 1)
+
+Self-hosted [Better Auth](https://better-auth.com) replaces Cloudflare
+Access on the admin surface, rolled out in phases. **Phase 1 (this
+section) provisions the auth ENGINE only** — no login UI, no route
+gating, no cutover. **Cloudflare Access still gates `/admin/**` and
+`/api/admin/**` completely unmodified** (see "Admin authentication
+(Cloudflare Access)" above) through this phase and every phase after it,
+until an explicit later cutover. Nothing about how the admin is actually
+protected has changed yet.
+
+**Why replace Access at all:** out of scope for this section — see issue
+#314 for the rationale. This section covers only what Phase 1 built.
+
+## What Phase 1 provisions
+
+- **`src/lib/auth-options.ts`** — `buildAuthOptions(database)`, the shared
+  config (secret, `baseURL`, plugins) both the runtime and the CLI build on.
+  Returned via `satisfies BetterAuthOptions`, not a `: BetterAuthOptions`
+  annotation — the explicit annotation would widen the return type and
+  erase the literal `plugins` tuple `betterAuth()`'s generic inference needs
+  to type `auth.api.signInMagicLink` etc. (see the file's own WHY comment).
+- **`src/lib/auth.ts`** — `getAuth()`, a lazy async accessor mirroring
+  `adminDb.ts`'s `getAdminDb()` pattern: constructs the Better Auth instance
+  against the live `ADMIN_DB` D1 binding via `getCloudflareContext()`
+  (unavailable at module-import time on Workers), cached per-isolate.
+- **`src/app/api/auth/[...all]/route.ts`** — mounts Better Auth's own
+  handler via `toNextJsHandler()`. Boots the engine; nothing in the app
+  calls it yet, and it is NOT gated by `requireAccessIdentity()` (it IS the
+  auth system's own endpoints — sign-in/session/passkey ceremonies an
+  unauthenticated visitor must be able to reach — a separate concern from
+  the admin data `getAdminDb()` protects).
+- **`migrations/0003_better_auth_schema.sql`** — `user`, `session`,
+  `account`, `verification`, `passkey` tables, in the SAME
+  `pueblo-food-map-admin` D1 database every other admin table lives in.
+  **No Workers KV anywhere** — all auth state (sessions, magic-link/
+  verification tokens, passkey challenges) stays in D1, by design (one
+  store, one backup surface, no second binding).
+- **`scripts/auth-cli.config.ts`** — CLI-only config for
+  `@better-auth/cli generate`/`migrate`, never imported by runtime code.
+
+## Database adapter — core `better-auth`, no third-party package
+
+Core `better-auth` (via its bundled `@better-auth/kysely-adapter`
+dependency) has native, first-party D1 support: it structurally
+auto-detects a raw `D1Database` and dispatches to its own
+`D1SqliteDialect`, which uses D1's `batch()` API — never raw
+`BEGIN`/`COMMIT` (D1 disallows interactive transactions). Verified against
+better-auth's own installed source, not assumed from docs. The third-party
+`better-auth-cloudflare` package is NOT a dependency of this repo — it
+isn't needed.
+
+## `@better-auth/cli` schema generation — a real gotcha
+
+`@better-auth/cli@1.4.21` bundles its OWN pinned copy of
+`better-auth@1.4.21` in its own `node_modules` — a version released
+BEFORE D1 support existed. Its internal `getAdapter()`/`getMigrations()`
+resolve `better-auth/db` against that nested old copy, not this project's
+top-level `better-auth@1.6.23`, regardless of what's installed at the
+project root. Handing it a `D1Database` (real or stubbed) always throws
+`"Failed to initialize database adapter"` — a real gap in the CLI tool,
+not a config mistake.
+
+**Workaround (`scripts/auth-cli.config.ts`):** generate against an
+in-memory `better-sqlite3` database instead. This is safe because Better
+Auth's schema/migration generator branches on the coarse `databaseType`
+enum (`"sqlite" | "mysql" | "pg" | "mssql"`), not the specific physical
+driver — D1 IS SQLite-compatible SQL, so the generated CREATE TABLE output
+is identical either way. `better-sqlite3` + `@types/better-sqlite3` are
+pinned exact devDependencies for this reason; never imported by runtime
+app code, never bundled into the Worker.
+
+**Regenerating the schema after a future plugin/config change:**
+
+```bash
+npx @better-auth/cli generate --config scripts/auth-cli.config.ts --output migrations/000N_<name>.sql -y
+```
+
+Review the output for `BEGIN`/`COMMIT` before committing (D1 rejects
+interactive transactions) — Phase 1's generation had none, but re-verify
+on every regeneration since the CLI's behavior isn't within this repo's
+control.
+
+## Applying the migration
+
+Same convention as 0001/0002 (see "Public submissions queue" → "Applying
+the migration" above) — a D1 schema migration is independent of `wrangler
+deploy`, never auto-applied by a deploy.
+
+```bash
+npx wrangler d1 migrations apply pueblo-food-map-admin --local   # local dev/testing
+npx wrangler d1 migrations apply pueblo-food-map-admin --remote  # production — NOT run in Phase 1, see Handoff below
+```
+
+## `BETTER_AUTH_SECRET`
+
+Runtime, server-only — same convention as `RESEND_API_KEY`/
+`CF_ACCESS_TEAM_DOMAIN` (read via `process.env`, never declared in
+`wrangler.jsonc`). Local dev value lives in gitignored `.env.local`
+(generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`).
+Production value is set via `wrangler secret put BETTER_AUTH_SECRET` — a
+later-phase handoff, not done in Phase 1 (see Handoff below).
+
+## Multi-hostname `baseURL`
+
+`ADMIN_ALLOWED_HOSTS` in `auth-options.ts` mirrors the exact hostname set
+`cfAccess.ts`'s header comment documents the admin surface answering on
+(admin subdomain, dev subdomain, public apex, bare workers.dev fallback).
+NOT included: Workers version-preview URLs (dynamic per-deploy, can't be
+exact-matched) — a wildcard pattern is a Phase 2/3 decision once real
+login traffic needs it.
+
+## Plugins registered, not yet wired to any UI
+
+- **`magicLink`** — `sendMagicLink` throws (marked `// Phase 2:` in
+  `auth-options.ts`); registered so its schema (the `verification` table
+  shape) is correct now. Phase 2 wires a real Resend-backed implementation.
+- **`passkey`** (`@better-auth/passkey`) — `rpID`/`rpName`/static `origin`
+  array set; no registration/authentication UI exists yet.
+
+## Handoff — NOT done in Phase 1 (explicit, for a later phase)
+
+- **Production `BETTER_AUTH_SECRET`** — `wrangler secret put
+  BETTER_AUTH_SECRET` was NOT run. Requires Cloudflare deploy credentials
+  this phase's implementer didn't hold.
+- **Remote migration** — `0003_better_auth_schema.sql` was applied to
+  **local** D1 only and verified there. It was NOT applied to remote/
+  production D1, and no remote dry-run proof exists: the installed
+  wrangler (4.107.0) has no `--dry-run` flag on `d1 execute`/`d1 migrations
+  apply` (verified against its bundled CLI source — only `wrangler deploy`
+  has that flag), and no `CLOUDFLARE_API_TOKEN` was available to even
+  attempt a read-only remote check. Apply at whichever later phase's merge
+  actually cuts the admin over.
+- **Login UI, route gating, Access removal** — Phases 2, 3, and 5
+  respectively. Nothing in this phase changes how an admin actually signs
+  in. (Login UI + magic link + passkey now shipped in Phase 2, next
+  section — route gating and Access removal are still Phases 3/5.)
+
+# Admin authentication — Better Auth Phase 2 (#315): login, magic link, passkey, allowlist
+
+Builds the actual login experience on top of Phase 1's engine. **Still no
+route gating and no Access removal** — Cloudflare Access continues to gate
+`/admin/**`/`/api/admin/**` completely unmodified through this phase (see
+"Admin authentication (Cloudflare Access)" above). `/admin/login` is a new,
+intentionally UNGATED page — the one admin surface page that must render
+for an unauthenticated visitor.
+
+## The CRITICAL allowlist gate — `src/lib/adminAllowlist.ts` + `src/lib/adminAuthAllowlistPlugin.ts`
+
+Better Auth has no first-party "restrict sign-in to a fixed email list"
+option — this is bespoke, and it is the one piece of Phase 2 that must be
+correct. `getAdminAllowlist()`/`isAllowlistedEmail()`
+(`adminAllowlist.ts`) read `ADMIN_ALLOWLIST` (comma-separated, trimmed,
+lower-cased; defaults to `["kysboyd@gmail.com"]` if unset or empty —
+deliberately fails toward "only Kyle," never toward "everyone"). A custom
+Better Auth plugin (`adminAuthAllowlistPlugin.ts`) enforces it at every
+point a session or account could be minted, registered last in
+`auth-options.ts`'s `plugins` array (hook execution doesn't depend on
+array position — Better Auth flat-maps every plugin's `hooks` — kept last
+purely so the file reads top-to-bottom as "engine, then the gate on top of
+it"):
+
+1. **`hooks.before` matched on `/sign-in/magic-link`** — rejects a
+   non-allowlisted email BEFORE `magicLink`'s handler runs, so no
+   `verification` row is ever created and no email is ever sent for a
+   rejected address. Returns `ctx.json({ status: true })` — the exact same
+   response shape a real send produces — so the endpoint can never be used
+   to enumerate which emails are admins. `AdminLoginForm.tsx` mirrors this
+   in its own copy ("If `<email>` is registered..., a sign-in link is on
+   its way") for the same reason.
+2. **`hooks.before` matched on the two passkey-registration endpoints**
+   (`/passkey/generate-register-options`, `/passkey/verify-registration`)
+   — layers on top of, not instead of, `@better-auth/passkey`'s own
+   `freshSessionMiddleware` (confirmed in the installed plugin's own
+   source: both routes already require a session). Reads the caller's
+   session via `getSessionFromCtx`; throws `APIError("FORBIDDEN")` if
+   there's no session or its email isn't allowlisted.
+3. **`databaseHooks.user.create.before`** — defense-in-depth. Returns
+   `false` (blocking the DB write) for any non-allowlisted email, so even
+   a future code path that creates a `user` row through some endpoint the
+   two path-matched hooks above don't cover still can't mint one.
+
+`emailAndPassword.enabled: false` is set explicitly in `auth-options.ts`
+(Better Auth already defaults to disabled when the block is omitted, but
+the task calls for stating it, and `signUpEmail` throwing `BAD_REQUEST` is
+asserted directly in `adminAuthAllowlistPlugin.test.ts`) — there is no
+password-based path to create an account at all, allowlisted or not.
+
+**Tests:** `src/lib/adminAllowlist.test.ts` (plain-logic unit tests of the
+comparison) and `src/lib/adminAuthAllowlistPlugin.test.ts` (integration —
+boots a real `betterAuth()` instance against a `better-sqlite3`-migrated
+copy of `migrations/0003_better_auth_schema.sql` and calls the actual
+`auth.api.*` endpoints, including a full real magic-link → verify →
+session-cookie → passkey-registration-options round trip proving an
+allowlisted session is NOT blocked). 15 tests, all passing.
+
+## Real magic-link send — `src/lib/adminMagicLinkEmail.ts`
+
+Replaces Phase 1's throwing `sendMagicLink` stub. Same Resend
+sending-key convention as the public forms (see "Resend Email Key
+Management" above) — reads `RESEND_API_KEY` at request time, plain-text +
+HTML body with DESIGN.md's hex tokens hardcoded (email clients don't load
+CSS custom properties, so the `--color-*` variables `globals.css` defines
+can't be referenced directly). Throws on a missing key or a non-2xx Resend
+response; `sendMagicLink` in `auth-options.ts` does not swallow that
+throw, so a real send failure surfaces to the client as `result.error`
+(see the `AdminLoginForm.tsx` note below), not a false "sent" state.
+
+## Login page — `/admin/login`
+
+`src/app/admin/login/page.tsx` (Server Component shell, no auth logic) +
+`src/components/AdminLoginForm.tsx` (Client Component, owns the whole
+flow) + `src/lib/authClient.ts` (`createAuthClient` with `magicLinkClient`
++ `passkeyClient`, same-origin `baseURL`). One component switches views on
+`authClient.useSession()`: signed-out shows the email form + "use a
+passkey" button; signed-in shows a "set up a passkey" prompt (WebAuthn
+`userVerification: "required"`, set on `passkey()`'s
+`authenticatorSelection` in `auth-options.ts`) + a link to `/admin`.
+
+**better-auth's client resolves `{ data, error }` rather than throwing on
+a non-2xx response** (verified against `@better-fetch/fetch`'s default
+`throw: false`) — `handleMagicLinkSubmit` checks `result?.error` before
+showing the "sent" confirmation, exactly like the passkey handlers already
+did. Missing this check was caught live: a fake dev `RESEND_API_KEY`
+correctly 401s, and the API-level allowlist gate correctly let the request
+through and hit Resend — but the client, before this check was added,
+silently showed the "sent" confirmation anyway. Regression-guarded in
+`AdminLoginForm.test.tsx` ("an API-level error... shows the error state,
+not 'sent'").
+
+## Applying the migration / secrets — carried forward from Phase 1, still pending
+
+`0003_better_auth_schema.sql` is still applied to **local** D1 only.
+Production `BETTER_AUTH_SECRET` and remote migration are still NOT set —
+see Phase 1's Handoff list above, unchanged by this phase. Additionally,
+production needs `RESEND_API_KEY` confirmed to cover magic-link send (the
+existing key already covers the public forms' domain-scoped sending
+permission — verify it also authorizes this admin flow before the cutover
+that actually routes real traffic here).
+
+---
+
+# Admin authentication — Better Auth Phase 3 (#316-ish): dual-auth gate
+
+Layers a Better Auth session requirement ON TOP of Cloudflare Access —
+**logical AND, never OR.** After this phase, reaching any admin data
+requires BOTH a valid CF Access JWT AND a valid Better Auth session; either
+alone is refused. This is strictly MORE restrictive than Phase 2, which
+left Access as the only real gate (Better Auth existed but nothing
+required a session). Access is still NOT removed — that's a later,
+separate phase.
+
+## `getAdminDb()` — still the single choke point, now two checks
+
+`src/lib/adminDb.ts`'s `getAdminDb()` calls `requireAccessIdentity()`
+(CF Access — cheaper, pre-existing check) FIRST, then
+`requireAdminSession()` (`src/lib/adminSession.ts`, new) SECOND. Either
+throws `AccessDeniedError` and neither the D1 binding nor a Better Auth
+session lookup happens until Access has already passed — a caller with no
+CF Access JWT never even reaches the Better Auth check. `requireAdminSession`
+reads `auth.api.getSession({ headers })` (a fresh `Headers` object carrying
+only the caller's `cookie` header — better-auth's session-read path never
+consults anything else) and re-runs the SAME `isAllowlistedEmail()` check
+Phase 2's plugin already enforces at session-creation time — defense in
+depth, not redundant: a session created before an admin's email is removed
+from `ADMIN_ALLOWLIST` would otherwise stay valid until it expires.
+
+## Redirect-vs-403 / 401-vs-403 — one shared helper per call shape
+
+`src/lib/adminAuthErrors.ts` is the single place this branching logic
+lives, replacing what was a copy-pasted catch block per page/route:
+
+- **Server Component pages** — `handlePageAuthError(err)`: on
+  `reason === "no_session"`, `redirect("/admin/login")` (send them to sign
+  in); any other `AccessDeniedError` reason (e.g. `not_allowlisted`, or a
+  Phase 2-era reason) still calls `forbidden()` (a real 403), same as
+  before this phase.
+- **Route handlers** — `adminAuthErrorResponse(err)`: `no_session` → `401`;
+  every other reason → `403` (plain-text `Forbidden`, same body shape as
+  before). Both helpers still log through `logAdminAuthFailure()` first —
+  the PII-free convention is unchanged, only the branching moved into one
+  place.
+
+All 4 admin Server Component pages and all 7 `/api/admin/*` route handlers
+that call `getAdminDb()` were updated to call one of these two helpers
+instead of duplicating the `AccessDeniedError` catch. CSRF (`requireAdminOrigin()`
+on the 5 mutation routes) is unchanged — this phase only added a second
+identity check ahead of it, never touched origin verification.
+
+## `__Host-` session cookie
+
+`auth-options.ts`'s `advanced` block names the session cookie
+`__Host-session_token` explicitly. The `__Host-` prefix requires the
+browser see `Secure`, `Path=/`, and NO `Domain` attribute on the
+`Set-Cookie` line, or it silently drops the cookie — verified against the
+installed `better-auth` source (`node_modules/better-auth/dist/cookies/index.mjs`),
+not assumed from docs:
+
+- `useSecureCookies: false` — counterintuitive, but required: left at its
+  default in production, better-auth's own `createCookieGetter` auto-
+  prepends `__Secure-` ahead of any custom `.name`, producing a malformed
+  double-prefixed cookie name. Setting this `false` stops that
+  auto-prepend so the literal `__Host-session_token` name is used as-is.
+- `cookies.session_token.attributes.secure: true` — restores the `Secure`
+  flag by hand, since turning off the auto-prepend above also turns off
+  the attribute it would have set.
+- `Path=/` and no `Domain` are better-auth's defaults already — nothing
+  else needed for those two.
+
+`auth-options.test.ts` asserts the resolved config via better-auth's own
+`getCookies(options)` introspection (no live HTTP round trip needed to
+check the name/attributes it will produce). **What that test can't
+prove:** whether a real browser actually accepts and persists the
+resulting `Set-Cookie` header end to end — that requires a live preview
+(see Verification below).
+
+## Login-event logging — `databaseHooks.session.create.after`
+
+`auth-options.ts`'s top-level `databaseHooks.session.create.after` calls
+`logAdminAuthEvent("login")` (`src/lib/logger.ts`, new) — a single-line
+`{"event":"admin_auth_event","type":"login"}`, same PII-free convention as
+`logAdminAuthFailure`. Verified in better-auth's own context-creation
+source that plugin-level `databaseHooks` (Phase 2's
+`adminAuthAllowlistPlugin`'s `databaseHooks.user.create.before`) and this
+phase's new top-level `databaseHooks.session.create.after` are collected
+into one array and both run — no ordering conflict, no override.
+
+## Verification — what's headless-provable vs. what needs Kyle's live preview
+
+`lint` / `design:drift` / `typecheck` / `test:ci` / `opennextjs-cloudflare
+build` are all clean as of this phase (including new tests:
+`adminSession.test.ts`'s no_session/not_allowlisted/success/cookie-
+forwarding cases, and `auth-options.test.ts`'s `__Host-` cookie
+assertion). **NOT verifiable headlessly:** whether a real browser actually
+sets and sends the `__Host-session_token` cookie correctly through a full
+magic-link login round trip, and whether the redirect-to-`/admin/login`
+vs. 403 behavior renders as expected live. Needs Kyle's live preview
+before this phase is considered fully proven.
 
 ---
 

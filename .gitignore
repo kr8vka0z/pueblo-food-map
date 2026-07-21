@@ -34,6 +34,11 @@ yarn-error.log*
 .env*
 !.env.example
 
+# wrangler's own local-dev secret file (Better Auth's BETTER_AUTH_SECRET,
+# #314 Phase 1) -- NOT covered by the .env* pattern above (different
+# filename prefix: "dev" not "env"). Never commit a real secret value.
+.dev.vars
+
 # vercel
 .vercel
 

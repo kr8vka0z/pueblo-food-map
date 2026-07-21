@@ -23,11 +23,14 @@
  * new/edited/archived counts from the SAME rows already SELECTed for
  * VenueListView below — no second query.
  *
- * On AccessDeniedError this calls Next's forbidden() control-flow function,
- * which renders src/app/forbidden.tsx and returns a real HTTP 403 — not a
- * 200 with an inline error message. See AGENTS.md "Admin authentication"
- * for why an in-app check is required here even though Cloudflare Access
- * already gates this route at the edge.
+ * On AccessDeniedError this delegates to handlePageAuthError()
+ * (src/lib/adminAuthErrors.ts): a missing Better Auth session (Phase 3
+ * dual-auth) redirects to /admin/login; every other denial reason calls
+ * Next's forbidden() control-flow function, which renders
+ * src/app/forbidden.tsx and returns a real HTTP 403 — not a 200 with an
+ * inline error message. See AGENTS.md "Admin authentication" for why an
+ * in-app check is required here even though Cloudflare Access already
+ * gates this route at the edge.
  *
  * Not unit-tested directly — RSC page tests (real D1 binding + headers()+
  * forbidden()) are hard in this stack; coverage concentrates on
@@ -36,11 +39,9 @@
  */
 
 import { headers } from "next/headers";
-import { forbidden } from "next/navigation";
 import Link from "next/link";
 import { getAdminDb } from "@/lib/adminDb";
-import { AccessDeniedError } from "@/lib/cfAccess";
-import { logAdminAuthFailure } from "@/lib/logger";
+import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { summarizePublishChanges } from "@/lib/adminVenues";
 import VenueListView from "@/components/VenueListView";
 import PublishPanel from "@/components/PublishPanel";
@@ -58,11 +59,7 @@ export default async function AdminPage() {
       .all<AdminVenueRow>();
     venues = result.results;
   } catch (err) {
-    if (err instanceof AccessDeniedError) {
-      logAdminAuthFailure(err.reason);
-      forbidden();
-    }
-    throw err;
+    handlePageAuthError(err);
   }
 
   return (

@@ -26,10 +26,6 @@ export async function GET(): Promise<NextResponse> {
     {
       status: "ok",
       version: pkg.version,
-      // TEMP deploy-integrity marker (REVERT) — unique per this probe so a
-      // stale-vs-fresh deploy is unambiguous (pkg.version alone is unchanged
-      // across deploys and can't distinguish them).
-      probe: "deploy-integrity-5fed3b6-diag",
       timestamp: new Date().toISOString(),
     },
     {

@@ -1,25 +1,25 @@
 /**
  * adminAuthErrors.ts — shared AccessDeniedError catch-block handling for
- * every /admin/** page and /api/admin/** route handler (Phase 3 dual-auth
- * redirect-vs-403 split).
+ * every /admin/** page and /api/admin/** route handler (redirect-vs-403
+ * split, introduced in Better Auth Phase 3, unchanged by the later Phase 5
+ * Cloudflare-Access-removal cutover).
  *
- * WHY split by reason instead of one blanket denial: `"no_session"` means
- * the caller's Cloudflare Access JWT is fine but no Better Auth session
- * exists yet (src/lib/adminSession.ts) — the caller CAN fix this by signing
- * in at /admin/login, so a page redirects there instead of dead-ending on a
- * 403 with no obvious next step, and a route handler returns 401
- * (Unauthorized — "log in and retry") rather than 403 (Forbidden — "you
- * will never be let in"). Every OTHER AccessDeniedError reason (a real CF
- * Access denial, or the Phase 3 `"not_allowlisted"` defense-in-depth check)
- * still fails closed exactly as it did before Phase 3: forbidden()/403 on
+ * WHY split by reason instead of one blanket denial: `"no_session"` means no
+ * Better Auth session exists yet (src/lib/adminSession.ts) — the caller CAN
+ * fix this by signing in at /admin/login, so a page redirects there instead
+ * of dead-ending on a 403 with no obvious next step, and a route handler
+ * returns 401 (Unauthorized — "log in and retry") rather than 403
+ * (Forbidden — "you will never be let in"). Every OTHER AccessDeniedError
+ * reason (currently just `"not_allowlisted"` and `"bad_origin"` — see
+ * cfAccess.ts's `AccessDeniedReason`) still fails closed: forbidden()/403 on
  * pages, 403 on route handlers.
  *
  * WHY one shared function per surface instead of duplicating this branch
  * into every call site: five admin pages and seven /api/admin/* route
- * handlers each had the pre-Phase-3 version of this exact if/else copied
- * into their own catch block — a single change point means the
- * redirect-vs-403 rule can never drift between call sites (the same reason
- * getAdminDb() itself is a single choke point — see that file's header).
+ * handlers would otherwise each carry their own copy of this if/else — a
+ * single change point means the redirect-vs-403 rule can never drift
+ * between call sites (the same reason getAdminDb() itself is a single choke
+ * point — see that file's header).
  */
 
 import { redirect, forbidden } from "next/navigation";

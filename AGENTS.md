@@ -1107,7 +1107,110 @@ login traffic needs it.
   actually cuts the admin over.
 - **Login UI, route gating, Access removal** — Phases 2, 3, and 5
   respectively. Nothing in this phase changes how an admin actually signs
-  in.
+  in. (Login UI + magic link + passkey now shipped in Phase 2, next
+  section — route gating and Access removal are still Phases 3/5.)
+
+# Admin authentication — Better Auth Phase 2 (#315): login, magic link, passkey, allowlist
+
+Builds the actual login experience on top of Phase 1's engine. **Still no
+route gating and no Access removal** — Cloudflare Access continues to gate
+`/admin/**`/`/api/admin/**` completely unmodified through this phase (see
+"Admin authentication (Cloudflare Access)" above). `/admin/login` is a new,
+intentionally UNGATED page — the one admin surface page that must render
+for an unauthenticated visitor.
+
+## The CRITICAL allowlist gate — `src/lib/adminAllowlist.ts` + `src/lib/adminAuthAllowlistPlugin.ts`
+
+Better Auth has no first-party "restrict sign-in to a fixed email list"
+option — this is bespoke, and it is the one piece of Phase 2 that must be
+correct. `getAdminAllowlist()`/`isAllowlistedEmail()`
+(`adminAllowlist.ts`) read `ADMIN_ALLOWLIST` (comma-separated, trimmed,
+lower-cased; defaults to `["kysboyd@gmail.com"]` if unset or empty —
+deliberately fails toward "only Kyle," never toward "everyone"). A custom
+Better Auth plugin (`adminAuthAllowlistPlugin.ts`) enforces it at every
+point a session or account could be minted, registered last in
+`auth-options.ts`'s `plugins` array (hook execution doesn't depend on
+array position — Better Auth flat-maps every plugin's `hooks` — kept last
+purely so the file reads top-to-bottom as "engine, then the gate on top of
+it"):
+
+1. **`hooks.before` matched on `/sign-in/magic-link`** — rejects a
+   non-allowlisted email BEFORE `magicLink`'s handler runs, so no
+   `verification` row is ever created and no email is ever sent for a
+   rejected address. Returns `ctx.json({ status: true })` — the exact same
+   response shape a real send produces — so the endpoint can never be used
+   to enumerate which emails are admins. `AdminLoginForm.tsx` mirrors this
+   in its own copy ("If `<email>` is registered..., a sign-in link is on
+   its way") for the same reason.
+2. **`hooks.before` matched on the two passkey-registration endpoints**
+   (`/passkey/generate-register-options`, `/passkey/verify-registration`)
+   — layers on top of, not instead of, `@better-auth/passkey`'s own
+   `freshSessionMiddleware` (confirmed in the installed plugin's own
+   source: both routes already require a session). Reads the caller's
+   session via `getSessionFromCtx`; throws `APIError("FORBIDDEN")` if
+   there's no session or its email isn't allowlisted.
+3. **`databaseHooks.user.create.before`** — defense-in-depth. Returns
+   `false` (blocking the DB write) for any non-allowlisted email, so even
+   a future code path that creates a `user` row through some endpoint the
+   two path-matched hooks above don't cover still can't mint one.
+
+`emailAndPassword.enabled: false` is set explicitly in `auth-options.ts`
+(Better Auth already defaults to disabled when the block is omitted, but
+the task calls for stating it, and `signUpEmail` throwing `BAD_REQUEST` is
+asserted directly in `adminAuthAllowlistPlugin.test.ts`) — there is no
+password-based path to create an account at all, allowlisted or not.
+
+**Tests:** `src/lib/adminAllowlist.test.ts` (plain-logic unit tests of the
+comparison) and `src/lib/adminAuthAllowlistPlugin.test.ts` (integration —
+boots a real `betterAuth()` instance against a `better-sqlite3`-migrated
+copy of `migrations/0003_better_auth_schema.sql` and calls the actual
+`auth.api.*` endpoints, including a full real magic-link → verify →
+session-cookie → passkey-registration-options round trip proving an
+allowlisted session is NOT blocked). 15 tests, all passing.
+
+## Real magic-link send — `src/lib/adminMagicLinkEmail.ts`
+
+Replaces Phase 1's throwing `sendMagicLink` stub. Same Resend
+sending-key convention as the public forms (see "Resend Email Key
+Management" above) — reads `RESEND_API_KEY` at request time, plain-text +
+HTML body with DESIGN.md's hex tokens hardcoded (email clients don't load
+CSS custom properties, so the `--color-*` variables `globals.css` defines
+can't be referenced directly). Throws on a missing key or a non-2xx Resend
+response; `sendMagicLink` in `auth-options.ts` does not swallow that
+throw, so a real send failure surfaces to the client as `result.error`
+(see the `AdminLoginForm.tsx` note below), not a false "sent" state.
+
+## Login page — `/admin/login`
+
+`src/app/admin/login/page.tsx` (Server Component shell, no auth logic) +
+`src/components/AdminLoginForm.tsx` (Client Component, owns the whole
+flow) + `src/lib/authClient.ts` (`createAuthClient` with `magicLinkClient`
++ `passkeyClient`, same-origin `baseURL`). One component switches views on
+`authClient.useSession()`: signed-out shows the email form + "use a
+passkey" button; signed-in shows a "set up a passkey" prompt (WebAuthn
+`userVerification: "required"`, set on `passkey()`'s
+`authenticatorSelection` in `auth-options.ts`) + a link to `/admin`.
+
+**better-auth's client resolves `{ data, error }` rather than throwing on
+a non-2xx response** (verified against `@better-fetch/fetch`'s default
+`throw: false`) — `handleMagicLinkSubmit` checks `result?.error` before
+showing the "sent" confirmation, exactly like the passkey handlers already
+did. Missing this check was caught live: a fake dev `RESEND_API_KEY`
+correctly 401s, and the API-level allowlist gate correctly let the request
+through and hit Resend — but the client, before this check was added,
+silently showed the "sent" confirmation anyway. Regression-guarded in
+`AdminLoginForm.test.tsx` ("an API-level error... shows the error state,
+not 'sent'").
+
+## Applying the migration / secrets — carried forward from Phase 1, still pending
+
+`0003_better_auth_schema.sql` is still applied to **local** D1 only.
+Production `BETTER_AUTH_SECRET` and remote migration are still NOT set —
+see Phase 1's Handoff list above, unchanged by this phase. Additionally,
+production needs `RESEND_API_KEY` confirmed to cover magic-link send (the
+existing key already covers the public forms' domain-scoped sending
+permission — verify it also authorizes this admin flow before the cutover
+that actually routes real traffic here).
 
 ---
 

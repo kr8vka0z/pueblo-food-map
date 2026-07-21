@@ -24,12 +24,28 @@
  * repo's existing auth tests (cfAccess.test.ts, adminDb.test.ts) inject a
  * minimal `{ get() }` mock that only satisfies HeaderSource — widening every
  * one of those call sites to a full Headers just to satisfy this one new
- * function would ripple well outside this slice. Verified in the installed
- * better-auth source (node_modules/better-auth/dist/cookies/cookie-utils.mjs)
- * that reading an existing session only ever calls `headers.get("cookie")` —
- * no other header is consulted on this path — so this builds a minimal real
- * Headers object carrying just that one value, satisfying getSession()'s
+ * function would ripple well outside this slice. This builds a minimal real
+ * Headers object out of the specific fields below, satisfying getSession()'s
  * actual `HeadersInit` requirement without widening HeaderSource itself.
+ *
+ * WHY `host` / `x-forwarded-host` are ALSO forwarded, not just `cookie`
+ * (fixed post-cutover — live 403 bug, admin/session-dynamic-baseurl-host):
+ * `auth-options.ts`'s `baseURL` is a DYNAMIC object (`{ allowedHosts,
+ * protocol }`, no static string), a legitimate Better Auth multi-host
+ * config. Verified in the installed better-auth source
+ * (node_modules/better-auth/dist/api/to-auth-endpoints.mjs's
+ * `resolveDynamicContext` -> node_modules/better-auth/dist/context/
+ * helpers.mjs's `pickSource`): with a dynamic baseURL, EVERY direct
+ * `auth.api.*` call (not just this one) must resolve a per-request base URL
+ * from a `host`/`x-forwarded-host` header on the `Headers` it's given, or
+ * from `baseURL.fallback` if the config sets one. This function previously
+ * forwarded only `cookie` — correct for STATIC baseURL configs, wrong for
+ * this dynamic one, and the gap was invisible in tests because Better
+ * Auth's real HTTP dispatch (the `/api/auth/*` route) carries the actual
+ * `Host` header through automatically; only this DIRECT `auth.api.getSession`
+ * call path lacked it. A cookieless caller with no `host` header still
+ * resolves fine via `auth-options.ts`'s new `baseURL.fallback` — this fix
+ * and that one are belt-and-suspenders, not alternatives.
  */
 
 import { getAuth } from "./auth";
@@ -51,10 +67,15 @@ export async function requireAdminSession(
   headers: HeaderSource,
 ): Promise<AdminIdentity> {
   const auth = await getAuth();
-  const cookie = headers.get("cookie") ?? "";
-  const result = await auth.api.getSession({
-    headers: new Headers({ cookie }),
-  });
+  const forwarded = new Headers();
+  const cookie = headers.get("cookie");
+  if (cookie) forwarded.set("cookie", cookie);
+  const host = headers.get("host");
+  if (host) forwarded.set("host", host);
+  const forwardedHost = headers.get("x-forwarded-host");
+  if (forwardedHost) forwarded.set("x-forwarded-host", forwardedHost);
+
+  const result = await auth.api.getSession({ headers: forwarded });
 
   if (!result?.user?.email) {
     throw new AccessDeniedError("no_session");

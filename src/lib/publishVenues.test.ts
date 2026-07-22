@@ -506,10 +506,13 @@ describe("commitPublishedVenues", () => {
     expect(calledUrls.some((u) => u.endsWith("/git/refs"))).toBe(true);
     expect(calledUrls.some((u) => u.endsWith("/git/refs/heads/publish-bot"))).toBe(false);
 
-    // Auth header present on every call.
+    // Auth header present on every call. User-Agent too: GitHub 403s any
+    // request without one, and Workers' fetch adds no default — regression
+    // guard for the first-live-publish failure that a missing UA caused.
     for (const [, init] of mockFetch.mock.calls) {
       const headers = (init as RequestInit).headers as Record<string, string>;
       expect(headers.Authorization).toBe("Bearer test-token");
+      expect(headers["User-Agent"]).toBeTruthy();
     }
   });
 

@@ -1382,6 +1382,79 @@ working shell) — regenerate and diff against it before applying to remote
 D1, per that file's own header. Applying 0004 to remote/production D1 is
 NOT done as part of this phase, same convention as every prior migration.
 
+## Item 2 — Cloudflare edge rate limit (NOT in this repo — zone config)
+
+A second, complementary limiter lives at the Cloudflare **edge**, in front
+of the Worker — distinct from item 1's app-level Better Auth limiter and
+NOT expressed in this codebase (it's zone config, managed via the
+Cloudflare API/dashboard, not `wrangler.jsonc`). It blunts a volumetric
+flood of the admin auth surface before a request ever reaches the app.
+
+- **Zone:** `pueblofoodmap.com` (zone id `557eb74d0048cb71251282b82e99926e`),
+  `http_ratelimit` phase entrypoint ruleset `ebccb17e51e841e5976788756b9ca8dc`.
+- **Rule:** expression `starts_with(http.request.uri.path, "/api/auth/")`,
+  action `block`, count per `ip.src`+`cf.colo.id`, **>10 requests / 10s →
+  block 10s**. Only the Better Auth endpoints are scoped; the public map
+  and every visitor page are untouched.
+- **WHY these blunt numbers:** the zone is on the **Free** plan, which caps
+  the `http_ratelimit` phase at **one** rule, forces `mitigation_timeout`
+  to equal-or-exceed the counting `period` (so the block window is
+  effectively the 10s period), and allows IP-only counting. A single
+  path+IP rule is all Free permits — documented so nobody mistakes the
+  bluntness for a config error. Pro (2 rules) / Business (5) would allow a
+  longer block window and keeping a second rule; deliberately not purchased
+  (see the swap note next).
+- **The one free slot previously held a "Leaked credential check" rule**
+  (`cf.waf.credential_check.password_leaked`, block). It was **removed** at
+  #318 to free the slot: this admin is passwordless (magic link + passkey,
+  `emailAndPassword.enabled: false`), so no request ever submits a password
+  for that field to match — the rule was inert here. Net swap: an inert
+  stolen-password rule → an active auth-flood rule.
+- **To change it:** Cloudflare dashboard → Security → WAF → Rate limiting
+  rules, or the rulesets API on the zone/ruleset ids above (Global API key
+  — `op://Atlas/Cloudflare Global API`, header-auth `X-Auth-Email` /
+  `X-Auth-Key`).
+
+---
+
+# Admin authentication — passkey isolation (#318): staging gets its own identity
+
+Staging (`dev.pueblofoodmap.com`) now runs a **live** Better Auth engine
+with its OWN `BETTER_AUTH_SECRET` (a staging-worker secret, isolated from
+prod) and its OWN passkey **rpID**, `dev.pueblofoodmap.com` — set via
+`wrangler.jsonc`'s `env.staging.vars.BETTER_AUTH_RP_ID`.
+
+**Why a separate rpID:** WebAuthn credentials are bound to the rpID the
+relying party presented at registration time, not just to an origin URL.
+Giving staging a distinct rpID means a passkey registered on the test site
+can never authenticate against production, and vice-versa — by design, you
+register a NEW passkey on staging; your prod passkey simply won't work
+there. (The passkey `origin` allow-list is unaffected by this change — it
+already covered `https://dev.pueblofoodmap.com` via `ADMIN_ALLOWED_HOSTS`;
+only `rpID` needed a per-environment value.)
+
+**Prod is unchanged.** `buildAuthOptions()`'s `rpID` parameter
+(`src/lib/auth-options.ts`) defaults to `"pueblofoodmap.com"`, and prod's
+`wrangler.jsonc` config sets no `BETTER_AUTH_RP_ID` — so production's
+passkey config is byte-for-byte identical to before this change.
+
+**Where the override is read from — the Cloudflare env BINDING, not
+`process.env`.** `src/lib/auth.ts`'s `getAuth()` reads
+`env.BETTER_AUTH_RP_ID` off the object `getCloudflareContext()` returns
+(same binding `ADMIN_DB` comes through), not `process.env`. WHY: a
+wrangler `var`'s surfacing into `process.env` under OpenNext isn't
+guaranteed, and a silently-`undefined` override would break staging
+passkey isolation without ever throwing an error — the env binding is
+100% reliable. The type is declared as an optional field on
+`CloudflareEnv` in `cloudflare-env.d.ts` (unset/`undefined` on prod, a
+real string only on staging).
+
+**Stale secrets, safe to ignore or clean up:** `CF_ACCESS_AUD` /
+`CF_ACCESS_TEAM_DOMAIN` may still exist on the staging Worker from the
+pre-cutover Cloudflare Access era — they're dead (`cfAccess.ts` is
+CSRF-only now, reads neither), so leaving them set is harmless; deleting
+them is also safe.
+
 ---
 
 # Admin authentication — passkey isolation (#318): staging gets its own identity

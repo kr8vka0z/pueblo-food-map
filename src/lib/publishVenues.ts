@@ -344,11 +344,21 @@ export class GitHubApiError extends Error {
   }
 }
 
+// GitHub's REST API REJECTS any request without a User-Agent header with a
+// 403 "Request forbidden by administrative rules" (see docs/rest/overview
+// #user-agent-required). curl/browsers set one automatically, but the
+// Cloudflare Workers `fetch()` this runs on does NOT — so without this line
+// every publish fails at the very first call (getBranchSha on "main"). This
+// surfaced on the first-ever live publish (#260 provisioned the token). GitHub
+// recommends the app or account name as the value.
+const GITHUB_USER_AGENT = "pueblo-food-map-publish-bot";
+
 function githubHeaders(token: string, extra?: Record<string, string>): HeadersInit {
   return {
     Authorization: `Bearer ${token}`,
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": GITHUB_API_VERSION,
+    "User-Agent": GITHUB_USER_AGENT,
     ...extra,
   };
 }

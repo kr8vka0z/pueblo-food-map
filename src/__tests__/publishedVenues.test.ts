@@ -1,15 +1,11 @@
 /**
- * Byte-identical proof for the published-venues.ts extraction
- * (#237 checkpoint d, Part 1 / spec §7 step 1).
+ * Invariants for the venues data layer that survive admin publishes.
  *
- * This is the whole safety argument for the refactor: reconstruct the OLD
- * expression venues.ts used to compute inline
- * (`[...pfpVenues, ...groceryOsmVenues, ...plentifulPantries].map(overlay)`)
- * from the three raw source arrays directly, and assert the NEW `venues` /
- * `publishedVenues` exports are byte-for-byte identical via JSON.stringify
- * equality (deep structural equality alone wouldn't catch e.g. an
- * accidentally-added/reordered key — stringify does, given both sides
- * enumerate object keys in the same insertion order here).
+ * published-venues.ts is regenerated from Cloudflare D1 on every publish, so
+ * this file no longer pins its exact contents (that was a one-time #237
+ * extraction proof, now discharged). What it still guards: the benefit-flag
+ * overlay wiring in venues.ts, the seed-array split, the pfpVenues re-export
+ * matching its leaf module, and the untouched category maps.
  */
 
 import { describe, test, expect } from "vitest";
@@ -20,28 +16,22 @@ import { groceryOsmVenues } from "@/data/grocery-osm";
 import { plentifulPantries } from "@/data/pantries-plentiful";
 import { benefitFlags } from "@/data/benefit-flags";
 
-describe("published-venues.ts extraction is byte-identical to pre-refactor venues.ts", () => {
-  test("publishedVenues === the pre-refactor combined spread, byte for byte", () => {
-    const oldCombined: Venue[] = [...pfpVenues, ...groceryOsmVenues, ...plentifulPantries];
-    expect(JSON.stringify(publishedVenues)).toBe(JSON.stringify(oldCombined));
+describe("venues data-layer invariants", () => {
+  test("venues applies the benefit-flag overlay on top of publishedVenues", () => {
+    // venues.ts builds `venues` as publishedVenues.map(overlay); this pins that
+    // wiring. Anchored to publishedVenues (not the seed spread) so it stays
+    // valid after an admin publish regenerates published-venues.ts from D1.
+    const expected: Venue[] = publishedVenues.map((v) => {
+      const f = benefitFlags[v.id];
+      return f ? { ...v, accepts_snap: f.snap, accepts_wic: f.wic } : v;
+    });
+    expect(JSON.stringify(venues)).toBe(JSON.stringify(expected));
   });
 
-  test("venues === the pre-refactor overlay expression, byte for byte", () => {
-    const oldExpression: Venue[] = [...pfpVenues, ...groceryOsmVenues, ...plentifulPantries].map(
-      (v) => {
-        const f = benefitFlags[v.id];
-        return f ? { ...v, accepts_snap: f.snap, accepts_wic: f.wic } : v;
-      },
-    );
-    expect(JSON.stringify(venues)).toBe(JSON.stringify(oldExpression));
-  });
-
-  test("totals 108 records: 10 pfp + 60 osm + 38 plentiful", () => {
+  test("seed arrays total 108 records: 10 pfp + 60 osm + 38 plentiful", () => {
     expect(pfpVenues).toHaveLength(10);
     expect(groceryOsmVenues).toHaveLength(60);
     expect(plentifulPantries).toHaveLength(38);
-    expect(publishedVenues).toHaveLength(108);
-    expect(venues).toHaveLength(108);
   });
 
   test("pfpVenues re-exported from venues.ts matches the leaf module used to build publishedVenues", async () => {

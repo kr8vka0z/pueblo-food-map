@@ -23,7 +23,6 @@ import type { Venue } from "@/types/venue";
 import { pfpVenues } from "@/data/pfp-venues";
 import { groceryOsmVenues } from "@/data/grocery-osm";
 import { plentifulPantries } from "@/data/pantries-plentiful";
-import { publishedVenues } from "@/data/published-venues";
 import {
   validateAndMapRow,
   validateSnapshot,
@@ -291,7 +290,13 @@ describe("venuesToLiteralArray / serializePublishedVenuesFile", () => {
     expect(fileText).toContain(literal);
   });
 
-  test("round-trip: serializing the 108 real seeded venues deep-equals the Part-1 published-venues.ts baseline", () => {
+  test("round-trip: the full venueToRow → validateSnapshot → serialize pipeline preserves the real seeded venues exactly", () => {
+    // Runs the real seed data (108 venues) through the exact publish pipeline
+    // and asserts it survives byte-for-byte. Anchored to the seeds themselves,
+    // NOT to published-venues.ts: that file is regenerated from D1 on every
+    // admin publish (so it grows past 108), which is expected — pinning a test
+    // to it blocked every real publish. This still fully exercises the
+    // serializer against real venue shapes.
     const allVenues = [...pfpVenues, ...groceryOsmVenues, ...plentifulPantries];
     expect(allVenues).toHaveLength(108);
 
@@ -301,7 +306,7 @@ describe("venuesToLiteralArray / serializePublishedVenuesFile", () => {
     if (!validation.ok) return;
 
     const parsedBack = JSON.parse(venuesToLiteralArray(validation.venues));
-    expect(parsedBack).toEqual(JSON.parse(JSON.stringify(publishedVenues)));
+    expect(parsedBack).toEqual(JSON.parse(JSON.stringify(allVenues)));
   });
 });
 

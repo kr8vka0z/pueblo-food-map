@@ -24,11 +24,24 @@
  * ceremony is wired yet — see auth-options.ts's own `// Phase 2:` markers).
  */
 
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getCookies } from "better-auth/cookies";
 import { buildAuthOptions } from "@/lib/auth-options";
+
+// Full migrated schema (user/session/verification/passkey tables) — needed
+// only by the rpID-isolation describe block below, which drives a real
+// magic-link -> session -> passkey-registration-options ceremony. Every
+// other test in this file only introspects buildAuthOptions()'s returned
+// config object and needs no real tables.
+const MIGRATION_SQL = readFileSync(
+  join(process.cwd(), "migrations", "0003_better_auth_schema.sql"),
+  "utf-8",
+);
+const ALLOWLISTED_EMAIL = "kysboyd@gmail.com"; // matches adminAllowlist.ts's default
 
 describe("buildAuthOptions", () => {
   test("constructs a working Better Auth instance with the expected plugins wired", () => {
@@ -133,5 +146,99 @@ describe("session cookie — __Host- prefix (Phase 3 dual-auth)", () => {
     // (CSRF hardening) must survive the override, not get dropped by it.
     expect(cookies.sessionToken.attributes.httpOnly).toBe(true);
     expect(cookies.sessionToken.attributes.sameSite).toBe("lax");
+  });
+});
+
+describe("passkey rpID — per-environment isolation (#318)", () => {
+  // WHY the FULL ceremony (not a lighter introspection of auth.options):
+  // rpID isn't stored verbatim anywhere on the returned config object —
+  // @better-auth/passkey's own getRpID() (node_modules/@better-auth/passkey/
+  // dist/index.mjs) resolves it lazily, INSIDE the /passkey/generate-
+  // register-options endpoint handler, from `opts.rpID` (the plugin's own
+  // options object closed over the `rpID` argument this file's `passkey({
+  // rpID, ... })` call passes — see auth-options.ts). The only place that
+  // resolved value is externally observable is the endpoint's real response
+  // (`rp.id`, passed straight through from @simplewebauthn/server's
+  // generateRegistrationOptions() — verified at that same file's line ~161).
+  // So proving rpID wiring is correct means calling the real endpoint, not
+  // just inspecting `auth.options` — reuses the exact login -> verify ->
+  // session-cookie -> passkey-registration-options round trip
+  // adminAuthAllowlistPlugin.test.ts already established for this repo.
+  function buildTestAuth(rpID?: string) {
+    const db = new Database(":memory:");
+    db.exec(MIGRATION_SQL);
+    return betterAuth(buildAuthOptions(db, rpID));
+  }
+
+  function requestHeaders(extra?: Record<string, string>): Headers {
+    return new Headers({ host: "pueblofoodmap.com", ...extra });
+  }
+
+  /** Signs in via magic link and returns a real, usable session cookie
+   * header — the only legitimate way to obtain an authenticated session in
+   * this system (emailAndPassword.enabled is false). Mirrors
+   * adminAuthAllowlistPlugin.test.ts's own bootstrap exactly. */
+  async function signInAndGetSessionCookie(
+    auth: ReturnType<typeof buildTestAuth>,
+  ): Promise<string> {
+    await auth.api.signInMagicLink({
+      body: { email: ALLOWLISTED_EMAIL },
+      headers: requestHeaders(),
+    });
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const [, sendInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const sentBody = JSON.parse(sendInit.body as string);
+    const tokenMatch = /token=([^&\s"]+)/.exec(sentBody.text as string);
+    if (!tokenMatch) {
+      throw new Error("magic-link email did not contain a token URL");
+    }
+    const verifyResponse = await auth.api.magicLinkVerify({
+      query: { token: tokenMatch[1], callbackURL: "/" },
+      headers: requestHeaders(),
+      asResponse: true,
+    });
+    const setCookie = verifyResponse.headers.get("set-cookie");
+    if (!setCookie) {
+      throw new Error("magicLinkVerify did not set a session cookie");
+    }
+    return setCookie
+      .split(",")
+      .map((part) => part.split(";")[0].trim())
+      .join("; ");
+  }
+
+  beforeEach(() => {
+    process.env.BETTER_AUTH_SECRET =
+      "test-secret-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    process.env.RESEND_API_KEY = "test-resend-key";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("{}", { status: 200 }),
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test("with no override, the passkey ceremony's rpID is the prod default", async () => {
+    const auth = buildTestAuth(); // no rpID argument — prod's real call shape
+    const cookieHeader = await signInAndGetSessionCookie(auth);
+
+    const options = await auth.api.generatePasskeyRegistrationOptions({
+      headers: requestHeaders({ cookie: cookieHeader }),
+    });
+
+    expect(options.rp.id).toBe("pueblofoodmap.com");
+  });
+
+  test("with a staging override, the passkey ceremony's rpID is the override", async () => {
+    const auth = buildTestAuth("dev.pueblofoodmap.com");
+    const cookieHeader = await signInAndGetSessionCookie(auth);
+
+    const options = await auth.api.generatePasskeyRegistrationOptions({
+      headers: requestHeaders({ cookie: cookieHeader }),
+    });
+
+    expect(options.rp.id).toBe("dev.pueblofoodmap.com");
   });
 });

@@ -60,13 +60,23 @@
     "staging": {
       "name": "pueblo-food-map-staging",
       "routes": [
-        // Admin serves at /admin on this same apex host — gated by a
-        // PATH-scoped Cloudflare Access application on /admin* +
-        // /api/admin* (configured out-of-band, not in this repo), not a
-        // separate subdomain route. The admin.pueblofoodmap.com /
-        // dev.admin.pueblofoodmap.com subdomains are retired.
+        // Admin serves at /admin on this same apex host — gated by Better
+        // Auth alone (magic link + passkey; Cloudflare Access has been fully
+        // removed from this path), not a separate subdomain route. The
+        // admin.pueblofoodmap.com / dev.admin.pueblofoodmap.com subdomains
+        // are retired.
         { "pattern": "dev.pueblofoodmap.com", "custom_domain": true }
       ],
+      // #318 passkey isolation — staging-only. Named environments do NOT
+      // inherit `vars` from the top level (see the "Named environments do
+      // not inherit bindings" comment above), so prod gets no
+      // BETTER_AUTH_RP_ID at all and buildAuthOptions() falls back to its
+      // "pueblofoodmap.com" default. Giving staging its own rpID means a
+      // passkey registered on dev.pueblofoodmap.com can never authenticate
+      // against production, and vice-versa.
+      "vars": {
+        "BETTER_AUTH_RP_ID": "dev.pueblofoodmap.com"
+      },
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"
@@ -86,9 +96,9 @@
           // Dedicated staging D1 (#robot-deploy step 5) — replaces the
           // earlier ponytail shortcut of reusing prod's PREVIEW d1 id.
           // Provisioned + migrated + seeded with fake data specifically so
-          // dev.pueblofoodmap.com's admin surface has real rows to render
-          // once CF_ACCESS_TEAM_DOMAIN/CF_ACCESS_AUD are set on the staging
-          // Worker — prod admin data (pueblo-food-map-admin,
+          // dev.pueblofoodmap.com's admin surface has real rows to render —
+          // admin is gated by Better Auth alone (magic link + passkey), not
+          // Cloudflare Access — prod admin data (pueblo-food-map-admin,
           // d6ea5afd-...) is never read from or written to by this env.
           "database_name": "pueblo-food-map-admin-staging",
           "database_id": "909e74b2-29c0-4edc-b53e-f0f876b59e1d"
@@ -96,9 +106,10 @@
       ],
       // Explicit no-op override — NOT redundant. `triggers` IS inheritable (unlike the
       // bindings above); omitting this would silently inherit the prod cron. See the
-      // top-level `triggers` comment for the full WHY. dev.pueblofoodmap.com is
-      // Access-gated and low-value to monitor via cron anyway — the health endpoint
-      // (AGENTS.md "Observability") is a better fit for staging if that's ever wanted.
+      // top-level `triggers` comment for the full WHY. dev.pueblofoodmap.com is a
+      // low-traffic staging site, low-value to monitor via cron anyway — the health
+      // endpoint (AGENTS.md "Observability") is a better fit for staging if that's ever
+      // wanted.
       "triggers": {
         "crons": []
       }

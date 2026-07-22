@@ -37,8 +37,14 @@ declare global {
   // `declare global { interface CloudflareEnv {...} }` — a `type` alias
   // cannot merge with an existing interface of the same name and would fail
   // to compile (duplicate identifier) once both are in scope.
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  interface CloudflareEnv extends Env {}
+  interface CloudflareEnv extends Env {
+    // #318 passkey isolation — staging-only override of auth-options.ts's
+    // rpID (unset/undefined on prod). Declared here rather than regenerated
+    // via `npx wrangler types`, same rationale as this file's own D1Database
+    // import above: it's a plain wrangler `var`, not a binding worth a full
+    // runtime-type regen for one optional string field.
+    BETTER_AUTH_RP_ID?: string;
+  }
 }
 
 export {};

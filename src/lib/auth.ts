@@ -29,8 +29,8 @@ import { buildAuthOptions } from "./auth-options";
 // actual (more specific) return value as a type mismatch. Capturing the
 // concrete instantiation via `ReturnType<typeof createAuthInstance>`
 // preserves it.
-function createAuthInstance(database: D1Database) {
-  return betterAuth(buildAuthOptions(database));
+function createAuthInstance(database: D1Database, rpID?: string) {
+  return betterAuth(buildAuthOptions(database, rpID));
 }
 
 type Auth = ReturnType<typeof createAuthInstance>;
@@ -44,6 +44,13 @@ let cached: Auth | undefined;
 export async function getAuth(): Promise<Auth> {
   if (cached) return cached;
   const { env } = await getCloudflareContext({ async: true });
-  cached = createAuthInstance(env.ADMIN_DB);
+  // #318 passkey isolation — read from the Cloudflare env BINDING, not
+  // process.env: a wrangler `var` isn't guaranteed to surface in
+  // process.env under OpenNext, and a silently-undefined override here
+  // would break staging passkey isolation without erroring. env.BETTER_AUTH_RP_ID
+  // is undefined on prod (buildAuthOptions defaults to "pueblofoodmap.com")
+  // and set to "dev.pueblofoodmap.com" only via wrangler.jsonc's
+  // env.staging.vars.
+  cached = createAuthInstance(env.ADMIN_DB, env.BETTER_AUTH_RP_ID);
   return cached;
 }

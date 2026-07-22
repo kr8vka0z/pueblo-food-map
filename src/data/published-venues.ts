@@ -5,7 +5,7 @@
  * Source of truth is Cloudflare D1 (`pueblo-food-map-admin`.venues); this
  * file is the build-time snapshot the public map imports at request time
  * (docs/admin/cloudflare-native-admin-spec.md §3.3, §3.5 step 3).
- * Last published: 2026-07-22T03:27:10.031Z
+ * Last published: 2026-07-22T04:35:18.344Z
  */
 import type { Venue } from "@/types/venue";
 
@@ -159,11 +159,8 @@ export const publishedVenues: Venue[] = [
     "lng": -104.60580025592952,
     "address": "Mineral Palace Park",
     "hours_weekly": {
-      "mon": [
-        "0"
-      ],
       "sat": [
-        "0730-1200"
+        "07:30-12:00"
       ]
     },
     "accepts_snap": true,

@@ -1,0 +1,66 @@
+name: Weekly Security Audit
+
+on:
+  schedule:
+    # Runs every Sunday at 06:00 UTC (12:00 AM MST)
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+
+jobs:
+  semgrep-sast:
+    name: SAST Code Analysis (Semgrep)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Run Semgrep SAST Scan
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: p/default p/owasp-top-ten p/security-code-scan
+        env:
+          SEMGREP_SEND_METRICS: "off"
+
+  secret-scan:
+    name: Secret Leak Scan (TruffleHog)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog Secret Scanner
+        uses: trufflesecurity/trufflehog-actions-scan@v3.88.2
+        with:
+          extra_args: --only-verified
+
+  dependency-audit:
+    name: Dependency CVE Audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdaf5df # v4.1.0
+        with:
+          node-version: "22"
+
+      - name: Run NPM Dependency Audit
+        run: |
+          echo "### 📦 Dependency Security Audit" >> $GITHUB_STEP_SUMMARY
+          if npm audit --audit-level=high; then
+            echo "✅ No high/critical CVEs found in dependencies." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ High or critical vulnerability detected in packages!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

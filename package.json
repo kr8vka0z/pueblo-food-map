@@ -32,6 +32,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "express": "4.17.1",
     "@better-auth/cli": "1.4.21",
     "@cloudflare/workers-types": "^4.20260702.1",
     "@google/design.md": "0.3.0",

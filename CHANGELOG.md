@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.7...v0.1.8) (2026-07-23)
+
+
+### Added
+
+* **admin-auth:** Phase 3 dual-auth gate — Better Auth session on top of CF Access ([e1cb829](https://github.com/kr8vka0z/pueblo-food-map/commit/e1cb8295b2893f73fedf2aca3dc3cbd525bbc348))
+* **admin:** edit + remove venue ([#255](https://github.com/kr8vka0z/pueblo-food-map/issues/255)) ([#264](https://github.com/kr8vka0z/pueblo-food-map/issues/264)) ([eaeaac4](https://github.com/kr8vka0z/pueblo-food-map/commit/eaeaac49fe694afda7d1a972d37ca2539da09474))
+* **admin:** publish button ([#256](https://github.com/kr8vka0z/pueblo-food-map/issues/256)) ([#266](https://github.com/kr8vka0z/pueblo-food-map/issues/266)) ([8ab5bd8](https://github.com/kr8vka0z/pueblo-food-map/commit/8ab5bd87b024722ab45e609a4b2100aa5c78ddd2))
+* **admin:** read-only venue list ([#253](https://github.com/kr8vka0z/pueblo-food-map/issues/253)) ([#261](https://github.com/kr8vka0z/pueblo-food-map/issues/261)) ([d8ac19e](https://github.com/kr8vka0z/pueblo-food-map/commit/d8ac19e393b430d66e09280d11e184d22d3aea80))
+* **admin:** review queue ([#259](https://github.com/kr8vka0z/pueblo-food-map/issues/259)) ([24e3318](https://github.com/kr8vka0z/pueblo-food-map/commit/24e33182c2ecb2b3c40a7700849a6cd9b6888c6e))
+* GitHub Actions deploy pipeline (robot-for-everything, Phase 2) ([#302](https://github.com/kr8vka0z/pueblo-food-map/issues/302)) ([6ebd6f8](https://github.com/kr8vka0z/pueblo-food-map/commit/6ebd6f8c3de2aa2d98f55592f104749a977cf3ba))
+* Healthchecks.io dead-man's-switch + CI on dev PRs (Phase 2 slice 2) ([#305](https://github.com/kr8vka0z/pueblo-food-map/issues/305)) ([0008901](https://github.com/kr8vka0z/pueblo-food-map/commit/0008901bce8975ea81594979e5e49bb32efcc5bc))
+* Phase 2 — GitHub Actions robot deploy (dev → main cutover) ([#308](https://github.com/kr8vka0z/pueblo-food-map/issues/308)) ([40e8a85](https://github.com/kr8vka0z/pueblo-food-map/commit/40e8a85c422b8d8629420a8796145d523ebda349))
+* **seo:** /venues directory + /about FAQ, cited stat & FAQPage schema ([#277](https://github.com/kr8vka0z/pueblo-food-map/issues/277)) ([936c96e](https://github.com/kr8vka0z/pueblo-food-map/commit/936c96e811abcd6afc9ca9db15e5d406420780c9))
+* **seo:** enrich structured data — venue opening hours + Organization entity ([#275](https://github.com/kr8vka0z/pueblo-food-map/issues/275)) ([c8c15c8](https://github.com/kr8vka0z/pueblo-food-map/commit/c8c15c8d077d4e192106cce2f1adecc4b80639fd))
+* **seo:** unique venue descriptions, sitemap lastmod, config hardening + robots AI-bot policy ([#274](https://github.com/kr8vka0z/pueblo-food-map/issues/274)) ([18a19fa](https://github.com/kr8vka0z/pueblo-food-map/commit/18a19fa90a56c2efa7de45e5a1171a6e5500dd4b))
+* **suggest:** require submitter email (client + server + i18n + a11y) ([#243](https://github.com/kr8vka0z/pueblo-food-map/issues/243)) ([705c4e7](https://github.com/kr8vka0z/pueblo-food-map/commit/705c4e70e55a30a4c8b51244e0da61dc610d4204)), closes [#232](https://github.com/kr8vka0z/pueblo-food-map/issues/232)
+
+
+### Fixed
+
+* **admin:** forward host to Better Auth so admin session resolves post-cutover ([#323](https://github.com/kr8vka0z/pueblo-food-map/issues/323)) ([0b56c69](https://github.com/kr8vka0z/pueblo-food-map/commit/0b56c698d38fc5afee87a0adf36d0775b1457538))
+* **admin:** make Better Auth the sole admin identity gate ([bf55807](https://github.com/kr8vka0z/pueblo-food-map/commit/bf5580721ce60f14873d577806dc66c75d76b185))
+* **admin:** redirect signed-in admins with a passkey straight to /admin ([#325](https://github.com/kr8vka0z/pueblo-food-map/issues/325)) ([94dd10d](https://github.com/kr8vka0z/pueblo-food-map/commit/94dd10d5a670bd7e64328144f49b39ade9211471))
+* **admin:** stop nagging returning admins to set up a passkey ([#324](https://github.com/kr8vka0z/pueblo-food-map/issues/324)) ([3a0e00c](https://github.com/kr8vka0z/pueblo-food-map/commit/3a0e00c422add1e6122a39ac50f28a254274effd))
+* **ci:** update action refs in weekly security audit workflow ([63dc50f](https://github.com/kr8vka0z/pueblo-food-map/commit/63dc50f88971fe59063bcf702a2b0ae49fb15388))
+* deploy workflows need Node 22 (wrangler hard-requires &gt;=22) ([#303](https://github.com/kr8vka0z/pueblo-food-map/issues/303)) ([f10fc89](https://github.com/kr8vka0z/pueblo-food-map/commit/f10fc89b00ffc67c9a2791b622d0490e4566cd4c))
+* **directions:** request location on Walk instead of routing from downtown ([#245](https://github.com/kr8vka0z/pueblo-food-map/issues/245)) ([2ae1a1f](https://github.com/kr8vka0z/pueblo-food-map/commit/2ae1a1fa9583ac90e73de8c8be634f9f93ee7344)), closes [#207](https://github.com/kr8vka0z/pueblo-food-map/issues/207)
+* **map:** don't autozoom to all venues on initial load (complete [#231](https://github.com/kr8vka0z/pueblo-food-map/issues/231)) ([#249](https://github.com/kr8vka0z/pueblo-food-map/issues/249)) ([18f3bec](https://github.com/kr8vka0z/pueblo-food-map/commit/18f3bece68efff8205265e672ffea44da0b4cf04)), closes [#247](https://github.com/kr8vka0z/pueblo-food-map/issues/247)
+* **map:** open at default home view on initial load ([#244](https://github.com/kr8vka0z/pueblo-food-map/issues/244)) ([bfdf1d4](https://github.com/kr8vka0z/pueblo-food-map/commit/bfdf1d4a1906a3068d6889e482eb0f4bbdbb0b4f)), closes [#231](https://github.com/kr8vka0z/pueblo-food-map/issues/231)
+* **security:** upgrade express to 4.21.2 to resolve CVEs ([a9b237f](https://github.com/kr8vka0z/pueblo-food-map/commit/a9b237ff2474389a27e270c8c04b3b318e32c579))
+* **seo:** server-render homepage headline + venue index ([#276](https://github.com/kr8vka0z/pueblo-food-map/issues/276)) ([017503b](https://github.com/kr8vka0z/pueblo-food-map/commit/017503bb266ef8e0e06fda34d2756b4896e958d8))
+
+
+### Changed
+
+* add Cloudflare-native admin spec (accepted 2026-07-01) ([#241](https://github.com/kr8vka0z/pueblo-food-map/issues/241)) ([2075f74](https://github.com/kr8vka0z/pueblo-food-map/commit/2075f7411bee54bc5853c43ec49ef0fb80246c27))
+* **agents:** update Lighthouse CI section to the local-build model ([#230](https://github.com/kr8vka0z/pueblo-food-map/issues/230)) ([fdc375f](https://github.com/kr8vka0z/pueblo-food-map/commit/fdc375fe0922fdae6126366414167ce8c5d6786c)), closes [#229](https://github.com/kr8vka0z/pueblo-food-map/issues/229)
+* **ci:** correct auto-merge comment — ruleset, not branch protection ([#224](https://github.com/kr8vka0z/pueblo-food-map/issues/224)) ([b1c597f](https://github.com/kr8vka0z/pueblo-food-map/commit/b1c597f6bacff370b701e47203993e13cc4b4d5f))
+* **map:** defer Mapbox load until idle/interaction, eager on deep link ([#246](https://github.com/kr8vka0z/pueblo-food-map/issues/246)) ([7c36f47](https://github.com/kr8vka0z/pueblo-food-map/commit/7c36f47b744979f2d6ba733db522693c767e5917)), closes [#226](https://github.com/kr8vka0z/pueblo-food-map/issues/226)
+* retire admin-subdomain refs; record apex /admin decision ([04769a6](https://github.com/kr8vka0z/pueblo-food-map/commit/04769a645cf190931941a37db004642d0fa97690))
+* settle AGENTS.md on the GitHub Actions robot deploy model ([#309](https://github.com/kr8vka0z/pueblo-food-map/issues/309)) ([bd20fae](https://github.com/kr8vka0z/pueblo-food-map/commit/bd20faecee8135413763550ced16e4dd54b5112f))
+
 ## [0.1.7](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.6...v0.1.7) (2026-06-30)
 
 

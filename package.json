@@ -52,12 +52,12 @@
     "better-sqlite3": "12.11.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.11",
-    "jsdom": "^29.1.1",
+    "jsdom": "^30.0.1",
     "tailwindcss": "^4",
     "typescript": "^6",
     "vitest": "^4.1.10",
     "vitest-axe": "^0.1.0",
-    "wrangler": "^4.107.0"
+    "wrangler": "^4.125.0"
   },
   "overrides": {
     "sharp": ">=0.35.0",

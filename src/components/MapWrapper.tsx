@@ -1007,6 +1007,23 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     [isMobile, mapUnavailable, router, showVenueOnMap],
   );
 
+  const handleSelectVenueFromMap = useCallback(
+    (id: string) => {
+      setSelectedVenueId(id);
+      if (!isMobile) {
+        setWindowExpanded(false);
+      }
+    },
+    [isMobile, setSelectedVenueId, setWindowExpanded],
+  );
+
+  const handleMapReady = useCallback(
+    (map: mapboxgl.Map) => {
+      setMapboxMap(map);
+    },
+    [setMapboxMap],
+  );
+
   // Derive the active option id for aria-activedescendant.
   const activeDescendantId =
     isPopoverOpen && activeIndex >= 0
@@ -1042,13 +1059,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             userLocation={userLocation}
             userDistances={userDistances}
             recenterRequestId={recenterRequestId}
-            onSelectVenue={(id) => {
-              setSelectedVenueId(id);
-              if (!isMobile) {
-                setWindowExpanded(false);
-              }
-            }}
-            onMapReady={(map) => setMapboxMap(map)}
+            onSelectVenue={handleSelectVenueFromMap}
+            onMapReady={handleMapReady}
             onMoveEnd={handleMoveEnd}
             walkingRoute={walkingRouteVenueId === selectedVenueId ? walkingRoute : null}
           />

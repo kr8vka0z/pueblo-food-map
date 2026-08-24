@@ -14,6 +14,9 @@ const mockVenue: Venue = {
   category: "pantry",
   lat: 38.25,
   lng: -104.60,
+  address: "123 Main St, Pueblo, CO 81003",
+  source: "pfp",
+  last_verified: "2026-05-14",
 };
 
 describe("VenueMarker memoization (#291)", () => {

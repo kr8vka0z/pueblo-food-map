@@ -88,11 +88,13 @@ export function LocaleProvider({
   useEffect(() => {
     if (!initialLocale) {
       const saved = readLocaleCookie();
-      if (saved && saved !== locale) {
-        setLocaleState(saved);
+      if (saved) {
+        queueMicrotask(() => {
+          setLocaleState((prev) => (prev !== saved ? saved : prev));
+        });
       }
     }
-  }, [initialLocale, locale]);
+  }, [initialLocale]);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);

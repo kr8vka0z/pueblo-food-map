@@ -894,9 +894,11 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   other brand fields. `buildPageMetadata` emits the full `openGraph`/`twitter` block (brand
   image, siteName, type, locale) so link previews on subpages retain the brand image.
 - **Known bilingual limitation** — the EN/ES language toggle is cookie-based: both locales
-  serve the same URL. Crawlers only index the English version. Proper bilingual SEO (separate
-  `/es/` URL tree or `hreflang` link tags) requires separate routes and is a deferred
-  follow-up beyond #164.
+  serve the same URL. Static utility pages (`/about`, `/venues`, `/suggest`, `/feedback`, `/privacy`)
+  keep English `<title>` and `<meta>` tags (decision recorded in #287) so they remain 100%
+  statically cacheable on Cloudflare without per-request `cookies()` reads forcing dynamic execution.
+  Crawlers index the English metadata. Proper bilingual SEO (separate `/es/` URL tree or `hreflang`
+  link tags) requires separate routes and is a deferred follow-up beyond #164.
 - **Done: explicit homepage canonical** — `src/app/page.tsx` is now a Server Component and sets
   `export const metadata = buildPageMetadata({ path: "/", ... })` directly, giving `/` the same
   explicit self-canonical every other page already had (previously implicit/inherited).

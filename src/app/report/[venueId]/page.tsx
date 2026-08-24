@@ -10,7 +10,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { venues } from "@/data/venues";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
@@ -20,39 +20,31 @@ interface Props {
   params: Promise<{ venueId: string }>;
 }
 
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return venues.map((v) => ({ venueId: v.id }));
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { venueId } = await params;
   const venue = venues.find((v) => v.id === venueId);
   return {
     title: venue
-      ? `Report an issue — ${venue.name} | Pueblo Food Map`
-      : "Report an issue | Pueblo Food Map",
+      ? `Report an issue — ${venue.name}`
+      : "Report an issue",
   };
 }
 
 export default async function ReportPage({ params }: Props) {
   const { venueId } = await params;
 
-  // Read locale cookie server-side — same pattern as layout.tsx
-  const cookieStore = await cookies();
-  const rawLocale = cookieStore.get("pfm-locale")?.value;
-  const locale: Locale = rawLocale === "en" || rawLocale === "es" ? rawLocale : "en";
-
   const venue = venues.find((v) => v.id === venueId);
-
   if (!venue) {
-    return (
-      <main className="flex flex-col items-center justify-center min-h-screen p-6">
-        <p className="text-[var(--color-ink-700)] mb-4">Venue not found.</p>
-        <Link
-          href="/"
-          className="text-sm text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] font-medium"
-        >
-          {t("report.backToMap", locale)}
-        </Link>
-      </main>
-    );
+    notFound();
   }
+
+  const locale: Locale = "en";
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">

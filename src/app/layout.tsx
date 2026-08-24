@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 // Fonts are self-hosted via @font-face in globals.css — no next/font/google import.
 import "./globals.css";
 import { preload } from "react-dom";
-import { cookies } from "next/headers";
 import { LocaleProvider } from "@/lib/LocaleContext";
-import type { Locale } from "@/lib/i18n";
 import { SITE_URL, SITE_NAME, OG_IMAGE } from "@/lib/site";
 import { buildWebSiteJsonLd, serializeJsonLd } from "@/lib/venueSchema";
 
@@ -44,18 +42,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Read pfm-locale cookie server-side so the initial render uses the user's
-  // stored preference — no EN flash for ES users.
-  const cookieStore = await cookies();
-  const rawLocale = cookieStore.get("pfm-locale")?.value;
-  const initialLocale: Locale =
-    rawLocale === "en" || rawLocale === "es" ? rawLocale : "en";
-
   // WHY preload() here instead of a <head> element: React 19's preload() API
   // is idiomatic for App Router — it coexists with the Metadata API without
   // producing duplicate or misplaced <head> tags or hydration mismatches.
@@ -72,7 +63,7 @@ export default async function RootLayout({
 
   return (
     <html
-      lang={initialLocale}
+      lang="en"
       className="h-full antialiased"
     >
       <body className="h-full flex flex-col">
@@ -83,7 +74,7 @@ export default async function RootLayout({
             __html: serializeJsonLd(buildWebSiteJsonLd()),
           }}
         />
-        <LocaleProvider initialLocale={initialLocale}>
+        <LocaleProvider>
           {children}
         </LocaleProvider>
       </body>

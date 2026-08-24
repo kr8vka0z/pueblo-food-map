@@ -79,10 +79,22 @@ interface LocaleProviderProps {
 }
 
 export function LocaleProvider({
-  initialLocale = "en",
+  initialLocale,
   children,
 }: LocaleProviderProps) {
-  const [locale, setLocaleState] = useState<Locale>(initialLocale);
+  const [locale, setLocaleState] = useState<Locale>(initialLocale ?? "en");
+
+  // Sync client cookie on mount when no explicit initialLocale prop is provided (#289)
+  useEffect(() => {
+    if (!initialLocale) {
+      const saved = readLocaleCookie();
+      if (saved) {
+        queueMicrotask(() => {
+          setLocaleState((prev) => (prev !== saved ? saved : prev));
+        });
+      }
+    }
+  }, [initialLocale]);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);

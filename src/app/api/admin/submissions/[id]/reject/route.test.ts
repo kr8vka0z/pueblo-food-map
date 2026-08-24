@@ -16,9 +16,8 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { AccessDeniedError } from "@/lib/cfAccess";
+import { AccessDeniedError, ADMIN_ORIGIN } from "@/lib/cfAccess";
 
-const ADMIN_ORIGIN = "https://pueblofoodmap.com";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 const SUBMISSION_ID = 42;
 

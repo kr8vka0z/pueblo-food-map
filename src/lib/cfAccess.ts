@@ -81,6 +81,8 @@ export const ADMIN_ORIGINS = [
   "https://dev.pueblofoodmap.com", // staging apex — admin served at /admin
 ] as const;
 
+export const ADMIN_ORIGIN = ADMIN_ORIGINS[0];
+
 /**
  * CSRF defense for non-GET /api/admin/* mutations (spec §8, "I7") —
  * independent of, and unaffected by, the Cloudflare Access cutover above.

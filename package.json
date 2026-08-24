@@ -20,15 +20,15 @@
     "seed:admin": "bun run scripts/seed-admin-db.ts"
   },
   "dependencies": {
-    "@better-auth/passkey": "1.6.23",
-    "better-auth": "1.6.23",
-    "jose": "^6.2.3",
-    "lucide-react": "^1.25.0",
-    "mapbox-gl": "^3.26.0",
-    "next": "16.2.11",
-    "react": "19.2.7",
-    "react-dom": "19.2.7",
-    "react-map-gl": "^8.1.1",
+    "@better-auth/passkey": "1.7.1",
+    "better-auth": "1.7.1",
+    "jose": "^6.2.10",
+    "lucide-react": "^1.33.0",
+    "mapbox-gl": "^3.29.0",
+    "next": "16.3.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-map-gl": "^8.1.2",
     "vaul": "^1.1.2"
   },
   "devDependencies": {

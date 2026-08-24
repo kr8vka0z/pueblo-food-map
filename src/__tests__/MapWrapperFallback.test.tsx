@@ -15,14 +15,12 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/webgl", () => ({ isWebGLAvailable: () => false }));
 
 vi.mock("next/dynamic", () => ({
-  default: (factory: () => Promise<{ default: React.ComponentType<Record<string, unknown>> }>) => {
-    let ResolvedComponent: React.ComponentType<Record<string, unknown>> | null = null;
-    factory().then((mod) => { ResolvedComponent = mod.default; });
-    function DynamicWrapper(props: Record<string, unknown>) {
-      return ResolvedComponent ? React.createElement(ResolvedComponent, props) : null;
+  default: () => {
+    function DummyDynamic() {
+      return null;
     }
-    DynamicWrapper.displayName = "DynamicWrapper";
-    return DynamicWrapper;
+    DummyDynamic.displayName = "DummyDynamic";
+    return DummyDynamic;
   },
 }));
 

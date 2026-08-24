@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 
@@ -8,10 +7,8 @@ export const metadata: Metadata = {
   title: "Page Not Found",
 };
 
-export default async function NotFound() {
-  const cookieStore = await cookies();
-  const rawLocale = cookieStore.get("pfm-locale")?.value;
-  const locale: Locale = rawLocale === "en" || rawLocale === "es" ? rawLocale : "en";
+export default function NotFound() {
+  const locale: Locale = "en";
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)] items-center justify-center p-6 text-center">

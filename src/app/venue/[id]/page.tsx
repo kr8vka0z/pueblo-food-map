@@ -18,7 +18,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
@@ -64,10 +63,7 @@ export default async function VenuePage({
   const v = getVenueById(id);
   if (!v) notFound();
 
-  // Read locale cookie — same pattern as privacy.tsx and other server pages.
-  const cookieStore = await cookies();
-  const rawLocale = cookieStore.get("pfm-locale")?.value;
-  const locale: Locale = rawLocale === "en" || rawLocale === "es" ? rawLocale : "en";
+  const locale: Locale = "en";
 
   const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}`;
   // Fragment form — bypasses the /?venue= middleware redirect loop.

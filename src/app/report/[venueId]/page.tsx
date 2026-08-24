@@ -11,7 +11,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import { venues } from "@/data/venues";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
@@ -19,6 +18,12 @@ import ReportForm from "@/components/ReportForm";
 
 interface Props {
   params: Promise<{ venueId: string }>;
+}
+
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return venues.map((v) => ({ venueId: v.id }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -39,10 +44,7 @@ export default async function ReportPage({ params }: Props) {
     notFound();
   }
 
-  // Read locale cookie server-side — same pattern as layout.tsx
-  const cookieStore = await cookies();
-  const rawLocale = cookieStore.get("pfm-locale")?.value;
-  const locale: Locale = rawLocale === "en" || rawLocale === "es" ? rawLocale : "en";
+  const locale: Locale = "en";
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">

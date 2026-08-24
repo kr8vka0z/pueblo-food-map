@@ -26,6 +26,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import type { WalkingRouteGeoJSON, WalkingRouteInfo, WalkStep } from "@/components/Map";
 import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
@@ -302,6 +303,8 @@ interface MapWrapperProps {
 }
 
 export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, initialVenueId }: MapWrapperProps) {
+  const router = useRouter();
+
   // ── Locale — from context ─────────────────────────────────────────────────────
   const { locale } = useLocale();
 
@@ -962,33 +965,46 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     (venueId: string) => {
       handleClearAllFilters();
       setSelectedVenueId(venueId);
+      if (mapUnavailable) {
+        router.push(`/venue/${venueId}`);
+        return;
+      }
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [handleClearAllFilters, isMobile, showVenueOnMap],
+    [handleClearAllFilters, isMobile, mapUnavailable, router, showVenueOnMap],
   );
 
   /** Called when user clicks/taps a result row inside the popover. */
   const handleSelectVenueFromPopover = useCallback(
     (venueId: string) => {
       setSelectedVenueId(venueId);
+      if (mapUnavailable) {
+        router.push(`/venue/${venueId}`);
+        return;
+      }
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     },
-    [isMobile, showVenueOnMap],
+    [isMobile, mapUnavailable, router, showVenueOnMap],
   );
 
   // Select a venue from the list (#129) — switch back to the map, centered on it.
-  // showVenueOnMap guards against bouncing to a suppressed/blank map when mapUnavailable (#165).
+  // When mapUnavailable (#165 / #285), navigating to /venue/[id] reaches full venue details
+  // including hours, phone, SNAP/WIC details, notes, and directions.
   const handleSelectFromList = useCallback(
     (venueId: string) => {
       setSelectedVenueId(venueId);
+      if (mapUnavailable) {
+        router.push(`/venue/${venueId}`);
+        return;
+      }
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [isMobile, showVenueOnMap],
+    [isMobile, mapUnavailable, router, showVenueOnMap],
   );
 
   // Derive the active option id for aria-activedescendant.

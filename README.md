@@ -160,3 +160,5 @@ Care & Share Food Bank of Southern Colorado, and other source organizations.
 - OpenStreetMap contributors — base tiles and grocery data
 - Plentiful — pantry and meal-site directory data
 - Pueblo Transit / Trillium Solutions — GTFS feed (directions, future)
+
+<!-- ruleset-consolidation verification: throwaway line, remove on close -->

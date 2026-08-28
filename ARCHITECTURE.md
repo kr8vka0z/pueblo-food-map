@@ -412,9 +412,12 @@ Preview environment (that's a Cloudflare Pages concept). Runtime secrets
 See [AGENTS.md](AGENTS.md) for deploy, rollback, env-var management, and
 Mapbox token management.
 
-**Gap: Dependabot auto-merge can strand commits undeployed.**
-[`dependabot-auto-merge.yml`](.github/workflows/dependabot-auto-merge.yml)
-auto-merges patch/minor Dependabot PRs using `secrets.GITHUB_TOKEN`. GitHub
+**Fixed 2026-08-28: Dependabot auto-merge used to strand commits undeployed.**
+The history below is kept because the failure mode is silent and worth
+recognising if it ever returns.
+
+Previously, [`dependabot-auto-merge.yml`](.github/workflows/dependabot-auto-merge.yml)
+auto-merged patch/minor Dependabot PRs using `secrets.GITHUB_TOKEN`. GitHub
 deliberately does not start new workflow runs for pushes made with
 `GITHUB_TOKEN` (a recursion guard, so an auto-merge can't trigger another
 workflow that triggers another merge). But `deploy-prod.yml` fires on
@@ -442,10 +445,32 @@ Why the admin Publish flow doesn't have this problem: `publishVenues.ts`
 (the commit/PR logic behind `POST /api/admin/publish`) authenticates its
 GitHub calls with the `GITHUB_PUBLISH_TOKEN` fine-grained PAT (provisioned
 under #260), not `GITHUB_TOKEN` — a PAT-authored push isn't covered by the
-recursion guard, so it deploys normally. The permanent fix for
-Dependabot's auto-merge would be the same swap: merge with a PAT or
-GitHub App token instead of `GITHUB_TOKEN`. Not done — that's the repo
-owner's call, tracked as an open gap rather than fixed here.
+recursion guard, so it deploys normally.
+
+**The fix applied.** `dependabot-auto-merge.yml` now mints a short-lived
+installation token from the same GitHub App that backs release-please
+(`actions/create-github-app-token`) and enables auto-merge with that instead
+of `GITHUB_TOKEN`. An App token is not covered by the recursion guard, so the
+resulting push to `main` starts Deploy Prod normally.
+
+That swap forced a second change: on a plain `pull_request` event a Dependabot
+PR is handed the *Dependabot* secret store, which does not contain
+`RELEASE_PLEASE_APP_*`, so the App credentials would arrive empty. The
+workflow therefore runs on `pull_request_target`, which executes in the
+base-repo context and can read Actions secrets. `pull_request_target` is
+normally avoided because it pairs elevated secrets with untrusted PR code —
+that risk does not apply here, because the workflow never checks the PR out.
+It only reads Dependabot metadata and calls the `gh` CLI against the PR URL.
+
+`deploy-prod.yml` also gained a `workflow_dispatch:` trigger as a recovery
+hatch. Before that, a commit which reached `main` without firing a deploy
+could only be rescued by pushing another commit; now `main` can be deployed
+as-is from the Actions tab.
+
+**Still unverified at the time of writing:** no Dependabot PR has auto-merged
+since the swap, so the end-to-end path has not yet been observed producing a
+Deploy Prod run. The detection commands above are how to confirm it on the
+first real auto-merge.
 
 ---
 

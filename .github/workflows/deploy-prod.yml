@@ -39,6 +39,11 @@ name: Deploy Prod
 on:
   push:
     branches: [main]
+  # Recovery hatch. Without this there is no way to deploy `main` except by
+  # pushing another commit, so any commit that reaches `main` without firing
+  # this workflow can only be rescued by manufacturing an empty commit. Lets a
+  # stranded `main` be deployed as-is from the Actions tab.
+  workflow_dispatch:
 
 permissions:
   contents: read

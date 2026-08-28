@@ -1043,6 +1043,13 @@ isn't needed.
 
 ## `@better-auth/cli` schema generation — a real gotcha
 
+**Not a standing devDependency as of 2026-08-28** — its bundled
+`better-auth@1.4.21` copy carried 14 open Dependabot alerts (including the
+repo's only CRITICAL) with no newer `@better-auth/cli` release available to
+fix them. Removed from `package.json`; run it on demand via `npx
+@better-auth/cli@latest generate ...` (see command below) instead of a
+pinned install — same capability, no standing vulnerable copy on disk.
+
 `@better-auth/cli@1.4.21` bundles its OWN pinned copy of
 `better-auth@1.4.21` in its own `node_modules` — a version released
 BEFORE D1 support existed. Its internal `getAdapter()`/`getMigrations()`
@@ -1064,7 +1071,7 @@ app code, never bundled into the Worker.
 **Regenerating the schema after a future plugin/config change:**
 
 ```bash
-npx @better-auth/cli generate --config scripts/auth-cli.config.ts --output migrations/000N_<name>.sql -y
+npx @better-auth/cli@latest generate --config scripts/auth-cli.config.ts --output migrations/000N_<name>.sql -y
 ```
 
 Review the output for `BEGIN`/`COMMIT` before committing (D1 rejects

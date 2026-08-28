@@ -37,8 +37,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { AccessDeniedError, requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
-import { logAdminAuthFailure } from "@/lib/logger";
+import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
+import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
 import type { AdminVenueRow } from "@/types/venue";
 
@@ -139,11 +139,7 @@ export async function PATCH(
   try {
     access = await authorizeEditRequest(req.headers);
   } catch (err) {
-    if (err instanceof AccessDeniedError) {
-      logAdminAuthFailure(err.reason);
-      return new Response("Forbidden", { status: 403 });
-    }
-    throw err;
+    return adminAuthErrorResponse(err);
   }
   const { db, identity } = access;
   const { id } = await params;

@@ -3,10 +3,9 @@
 # both envs deploy via GitHub Actions, never the CF dashboard.
 #
 # Deploys the `dev` branch to the `pueblo-food-map-staging` Worker at
-# dev.pueblofoodmap.com (Access-gated — see AGENTS.md "Admin authentication
-# (Cloudflare Access)"; CF_ACCESS_TEAM_DOMAIN/CF_ACCESS_AUD are unset on
-# staging today, so /admin fails closed until those are provisioned — that
-# provisioning is a separate follow-up, not part of this pipeline). Gated by
+# dev.pueblofoodmap.com (/admin gated by Better Auth alone — magic link +
+# passkey, own allowlist and rpID; see AGENTS.md "Admin authentication —
+# Better Auth is the sole gate"). Gated by
 # the same `predeploy` suite deploy-prod.yml runs, plus a staging-D1
 # remote-migration step: unlike a Worker deploy, a D1 schema migration is a
 # separate database operation that never auto-applies on `wrangler deploy`

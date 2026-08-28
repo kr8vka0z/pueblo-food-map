@@ -1,0 +1,48 @@
+-- migrations/0004_rate_limit_table.sql
+--
+-- Adds the `rateLimit` table Better Auth's own database-backed rate
+-- limiter needs (#318 Phase 4 item 1 — see src/lib/auth-options.ts's
+-- `rateLimit: { storage: "database" }` WHY comment for the full picture).
+-- Without this table, an enabled `storage: "database"` rate limiter would
+-- throw at request time in production the first time it tries to read or
+-- write a counter row.
+--
+-- NOT generated via `npx @better-auth/cli generate` this time — unlike
+-- 0003, this file was hand-derived from the installed better-auth source
+-- because no working shell was available in the session that wrote it
+-- (see this repo's own coder-agent report for that session). It should
+-- still be byte-for-byte what the CLI would produce, since it follows the
+-- exact same generator logic 0003's header documents:
+--
+--   * Table/field shape verified in
+--     node_modules/@better-auth/core/dist/db/get-tables.mjs's
+--     `rateLimitTable` literal: fields `key` (string, unique, required),
+--     `count` (number, required), `lastRequest` (number, bigint: true,
+--     required) — added only when `options.rateLimit?.storage ===
+--     "database"` (`shouldAddRateLimitTable`), which this app now sets.
+--   * Column type/constraint mapping (field type -> SQL column type,
+--     `required`/`unique` -> `not null`/`unique`) verified in
+--     node_modules/@better-auth/cli/node_modules/better-auth/dist/db/get-migration.mjs's
+--     `getType()` + `toBeCreated` CREATE TABLE builder: sqlite `id` ->
+--     "text" primary key; sqlite `string` -> "text"; sqlite `number` ->
+--     "bigint" when `field.bigint` is true, else "integer" (SQLite has no
+--     true BIGINT storage class, but accepts any type-name string and
+--     assigns it INTEGER affinity because it contains "INT" — the same
+--     dynamic-typing behavior 0003's own `date`-typed columns already rely
+--     on for D1 compatibility). No column in this table has `field.index`
+--     set, so — unlike 0003's session/account/passkey tables — this
+--     migration adds no separate `create index` statement.
+--
+-- Before applying this to remote/production D1, parent should regenerate
+-- via the documented workflow (this repo's AGENTS.md, "Applying the
+-- migration" / `@better-auth/cli generate --config scripts/auth-cli.config.ts`)
+-- and diff the output against this file to confirm parity — this file was
+-- NOT produced by that CLI this session.
+--
+-- Applying this migration — NOT part of a Worker deploy, same convention
+-- as 0001/0002/0003 (see AGENTS.md "Applying the migration"): a D1 schema
+-- migration is independent of `wrangler deploy`.
+--   Local:  npx wrangler d1 migrations apply pueblo-food-map-admin --local
+--   Remote: npx wrangler d1 migrations apply pueblo-food-map-admin --remote
+
+create table "rateLimit" ("id" text not null primary key, "key" text not null unique, "count" integer not null, "lastRequest" bigint not null);

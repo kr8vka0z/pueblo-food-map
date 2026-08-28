@@ -13,7 +13,6 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
@@ -28,10 +27,8 @@ export const metadata: Metadata = buildPageMetadata({
   path: "/about",
 });
 
-export default async function AboutPage() {
-  const cookieStore = await cookies();
-  const rawLocale = cookieStore.get("pfm-locale")?.value;
-  const locale: Locale = rawLocale === "en" || rawLocale === "es" ? rawLocale : "en";
+export default function AboutPage() {
+  const locale: Locale = "en";
 
   // Built once so the visible FAQ and the FAQPage JSON-LD below are guaranteed
   // to render the exact same question/answer pairs — one source, not two

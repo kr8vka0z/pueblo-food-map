@@ -429,8 +429,8 @@ parallel. While the splash is visible, `main` receives `inert` and
 
 ## Admin — read-only venue list (#253)
 
-`/admin` (src/app/admin/page.tsx) is a Cloudflare Access-gated Server
-Component (see AGENTS.md "Admin authentication" for the auth chain). It
+`/admin` (src/app/admin/page.tsx) is a Better-Auth-gated Server Component
+(see AGENTS.md "Admin authentication" for the auth chain). It
 fetches every `venues` row — draft, published, and archived — via
 `getAdminDb()` (src/lib/adminDb.ts, the single D1 choke point) and renders
 them through `VenueListView` (src/components/VenueListView.tsx), a Client
@@ -466,7 +466,7 @@ Server-Component page owns the auth gate, a Client Component owns the
 form, and a route handler owns the authoritative write.
 
 - **`/admin/venues/new`** (src/app/admin/venues/new/page.tsx) — re-verifies
-  Cloudflare Access via `getAdminDb()` (same fail-closed `forbidden()`
+  the Better Auth session via `getAdminDb()` (same fail-closed `forbidden()`
   pattern as `/admin`) purely for the gate and the signed-in-email header;
   it has nothing to `SELECT`. Renders `AddVenueForm`.
 - **`AddVenueForm`** (src/components/AddVenueForm.tsx) — presentational and
@@ -505,9 +505,9 @@ change-proposal approval queue (docs/admin/cloudflare-native-admin-spec.md
 Address field instead of requiring the admin to hand-type coordinates.
 This route is read-only (`getAdminDb()` for auth, no `requireAdminOrigin()`
 — same shape as `GET /api/admin/whoami`) and calls the free US Census
-Bureau geocoder server-side (never Mapbox — the public Mapbox token is
-URL-restricted to public hostnames and doesn't cover
-`admin.pueblofoodmap.com`, and Census needs no key to provision or leak).
+Bureau geocoder server-side (never Mapbox — Census needs no key to provision
+or leak, keeping the admin's server-side geocoding off the public Mapbox
+token entirely).
 It has no effect on `POST /api/admin/venues` itself: lat/lng arrive in the
 same request body either way, hand-typed or geocode-filled, so the create
 route's validation and atomic `db.batch()` are unchanged by this addition.

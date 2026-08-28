@@ -34,11 +34,9 @@
  */
 
 import { headers } from "next/headers";
-import { forbidden } from "next/navigation";
 import Link from "next/link";
 import { getAdminDb } from "@/lib/adminDb";
-import { AccessDeniedError } from "@/lib/cfAccess";
-import { logAdminAuthFailure } from "@/lib/logger";
+import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import AddVenueForm, { type AddVenueFormValues } from "@/components/AddVenueForm";
 import { mapSubmissionPayloadToFormValues } from "@/lib/adminVenueForm";
 import type { NewVenuePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
@@ -92,11 +90,7 @@ export default async function NewVenuePage({
     const { submission } = searchParams ? await searchParams : {};
     prefill = await resolveSubmissionPrefill(db, submission);
   } catch (err) {
-    if (err instanceof AccessDeniedError) {
-      logAdminAuthFailure(err.reason);
-      forbidden();
-    }
-    throw err;
+    handlePageAuthError(err);
   }
 
   return (

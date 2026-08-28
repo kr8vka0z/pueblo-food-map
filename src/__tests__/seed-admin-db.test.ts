@@ -249,27 +249,28 @@ describe("findSimilarPairs", () => {
   });
 });
 
-// ─── Real 108-record seed set (acceptance criteria, spec §7 step 3) ────────
+// ─── Real 106-record seed set (acceptance criteria, spec §7 step 3) ────────
 
-describe("real 108-record seed set (acceptance criteria)", () => {
+describe("real 106-record seed set (acceptance criteria)", () => {
   const records = buildSourceRecords();
 
-  test("totals 108 records: 10 pfp + 60 osm + 38 plentiful", () => {
+  test("totals 106 records: 10 pfp + 60 osm + 36 plentiful", () => {
     expect(pfpVenues).toHaveLength(10);
     expect(groceryOsmVenues).toHaveLength(60);
-    expect(plentifulPantries).toHaveLength(38);
-    expect(records).toHaveLength(108);
+    expect(plentifulPantries).toHaveLength(36);
+    expect(records).toHaveLength(106);
   });
 
   test("no duplicate ids across the combined pfp+osm+plentiful namespace", () => {
     expect(findDuplicateIds(records)).toEqual([]);
   });
 
-  test("surfaces the known Plentiful soup-kitchen duplicate pair", () => {
+  test("surfaces only the 2 known shared-phone operator pairs (no duplicate venues remain, #278)", () => {
     const pairs = findSimilarPairs(records);
+    expect(pairs).toHaveLength(2);
     const flaggedIds = new Set(pairs.flatMap((p) => [p.aId, p.bId]));
-    expect(flaggedIds.has("plentiful-pueblo-community-soup-kitchen-1bc98af5")).toBe(true);
-    expect(flaggedIds.has("plentiful-pueblo-community-soup-kitchen-plentiful-3195")).toBe(true);
+    expect(flaggedIds.has("plentiful-pueblo-community-soup-kitchen-1bc98af5")).toBe(false);
+    expect(flaggedIds.has("plentiful-pueblo-cooperative-care-center-97ec4eda")).toBe(false);
   });
 
   test("every record is inside PUEBLO_COUNTY_BBOX", () => {

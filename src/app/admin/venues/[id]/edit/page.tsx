@@ -42,11 +42,10 @@
  */
 
 import { headers } from "next/headers";
-import { forbidden, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getAdminDb } from "@/lib/adminDb";
-import { AccessDeniedError } from "@/lib/cfAccess";
-import { logAdminAuthFailure } from "@/lib/logger";
+import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import AddVenueForm from "@/components/AddVenueForm";
 import ArchiveVenueButton from "@/components/ArchiveVenueButton";
 import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
@@ -126,11 +125,7 @@ export default async function EditVenuePage({
       closureContext = await resolveClosureReportContext(db, id, submission);
     }
   } catch (err) {
-    if (err instanceof AccessDeniedError) {
-      logAdminAuthFailure(err.reason);
-      forbidden();
-    }
-    throw err;
+    handlePageAuthError(err);
   }
 
   if (!venue) notFound();

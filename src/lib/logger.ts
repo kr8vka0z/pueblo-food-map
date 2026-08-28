@@ -79,6 +79,24 @@ export function logAdminAuthFailure(reason: AccessDeniedReason): void {
   console.warn(JSON.stringify({ event: "admin_auth_failure", reason }));
 }
 
+export type AdminAuthEvent = "login";
+
+/**
+ * Emit a single-line JSON structured log entry for a successful admin auth
+ * EVENT (Phase 3 dual-auth) — the observability counterpart to
+ * logAdminAuthFailure() above, for the success path. `event` is a fixed
+ * label only (currently just "login", emitted on Better Auth session
+ * creation — see auth-options.ts's databaseHooks.session.create.after) —
+ * NEVER an email, token, or session id, matching this file's PII rule.
+ * Durable per-login history (timestamp, IP, user-agent) already lives in
+ * Better Auth's own `session` table (D1); this line exists only so a login
+ * is ALSO visible in Cloudflare Workers Logs search/alerting, the same way
+ * admin_auth_failure already is.
+ */
+export function logAdminAuthEvent(event: AdminAuthEvent): void {
+  console.log(JSON.stringify({ event: "admin_auth_event", type: event }));
+}
+
 export type PublishOutcome = "success" | "failure";
 
 interface PublishResultDetail {

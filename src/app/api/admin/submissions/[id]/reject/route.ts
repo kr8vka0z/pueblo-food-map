@@ -23,8 +23,8 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { AccessDeniedError, requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
-import { logAdminAuthFailure } from "@/lib/logger";
+import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
+import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 
 async function authorizeRejectRequest(headers: HeaderSource): Promise<AdminDbAccess> {
   const access = await getAdminDb(headers);
@@ -64,11 +64,7 @@ export async function POST(
   try {
     access = await authorizeRejectRequest(req.headers);
   } catch (err) {
-    if (err instanceof AccessDeniedError) {
-      logAdminAuthFailure(err.reason);
-      return new Response("Forbidden", { status: 403 });
-    }
-    throw err;
+    return adminAuthErrorResponse(err);
   }
   const { db, identity } = access;
 

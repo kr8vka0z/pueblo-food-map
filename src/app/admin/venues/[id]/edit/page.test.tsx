@@ -162,7 +162,10 @@ describe("EditVenuePage — auth guard, not-found, and prop wiring", () => {
   });
 
   test("access denied -> fails closed: forbidden() fires and the denial is logged", async () => {
-    mockGetAdminDb.mockRejectedValue(new AccessDeniedError("invalid_token"));
+    // "not_allowlisted" stands in for any AccessDeniedError reason OTHER
+    // than "no_session" here — this test proves the generic forbidden()/403
+    // branch, not this specific reason (see adminAuthErrors.ts).
+    mockGetAdminDb.mockRejectedValue(new AccessDeniedError("not_allowlisted"));
 
     await expect(
       EditVenuePage({
@@ -171,7 +174,7 @@ describe("EditVenuePage — auth guard, not-found, and prop wiring", () => {
       }),
     ).rejects.toThrow("FORBIDDEN_CALLED");
 
-    expect(logAdminAuthFailure).toHaveBeenCalledWith("invalid_token");
+    expect(logAdminAuthFailure).toHaveBeenCalledWith("not_allowlisted");
     expect(forbidden).toHaveBeenCalledTimes(1);
     expect(notFound).not.toHaveBeenCalled();
   });

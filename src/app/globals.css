@@ -162,6 +162,7 @@ body {
   padding: 4px 8px;
   box-shadow: 0 2px 8px rgba(26, 24, 23, 0.12);
   pointer-events: none;
+  max-width: 240px;
 }
 
 .pfm-tooltip .mapboxgl-popup-tip {
@@ -179,14 +180,15 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: var(--color-ink-700);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .pfm-tooltip__category {
   font-family: var(--font-sans);
   font-size: 11px;
   color: var(--color-ink-500);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 /* ─── User-location dot pulse animation ─────────────────────────────────────

@@ -11,13 +11,13 @@
  * writes nothing, so it has nothing for CSRF to protect (same reasoning
  * as GET /api/admin/whoami).
  *
- * Provider: the free US Census Bureau geocoder, not Mapbox. The app's
- * Mapbox public token (AGENTS.md "Mapbox Token Management") is
- * URL-restricted to the public hostnames and does NOT include
- * admin.pueblofoodmap.com, so a browser-side Mapbox call would fail here,
- * and Mapbox's secret token must never reach a Worker or client bundle.
- * The Census geocoder needs no key/token/URL allowlist to provision or
- * rotate and covers US street addresses (Pueblo is US) — a clean fit.
+ * Provider: the free US Census Bureau geocoder, not Mapbox. Admin now
+ * serves at the apex `/admin` path, which the app's Mapbox public token
+ * (AGENTS.md "Mapbox Token Management") does cover — but that token's
+ * secret counterpart still must never reach a Worker or client bundle just
+ * to add a geocoding scope. The Census geocoder needs no key/token/URL
+ * allowlist to provision or rotate and covers US street addresses (Pueblo
+ * is US) — a clean fit with nothing new to rotate or leak.
  * Grounded against the live Census Geocoder API docs
  * (geocoding.geo.census.gov) before building this: `onelineaddress` takes
  * `address`/`benchmark`/`format` query params and returns
@@ -30,8 +30,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/adminDb";
-import { AccessDeniedError } from "@/lib/cfAccess";
-import { logAdminAuthFailure } from "@/lib/logger";
+import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 
 // WHY force-dynamic: same reasoning as GET /api/admin/whoami — this route
 // reads req.headers directly (not next/headers), so without this Next may
@@ -92,11 +91,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   try {
     await getAdminDb(req.headers);
   } catch (err) {
-    if (err instanceof AccessDeniedError) {
-      logAdminAuthFailure(err.reason);
-      return new Response("Forbidden", { status: 403 });
-    }
-    throw err;
+    return adminAuthErrorResponse(err);
   }
 
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";

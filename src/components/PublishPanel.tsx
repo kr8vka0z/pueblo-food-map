@@ -105,7 +105,10 @@ function friendlyErrorMessage(status: number, error?: string): string {
   if (status === 422) {
     return `Couldn't publish: something in a venue's data didn't pass validation.${error ? ` (${error})` : ""}`;
   }
-  if (status === 403) {
+  // 403 = Cloudflare Access / origin denied; 401 = no valid Better Auth session
+  // (the dual-auth gate's no_session response for /api/admin/* handlers). Both
+  // mean "sign in again," so they share this message.
+  if (status === 403 || status === 401) {
     return "Your session expired — reload and sign in again.";
   }
   return "Something went wrong publishing. Nothing was changed — try again in a moment.";

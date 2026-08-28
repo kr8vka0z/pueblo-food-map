@@ -13,7 +13,6 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
@@ -26,10 +25,8 @@ export const metadata: Metadata = buildPageMetadata({
   path: "/privacy",
 });
 
-export default async function PrivacyPage() {
-  const cookieStore = await cookies();
-  const rawLocale = cookieStore.get("pfm-locale")?.value;
-  const locale: Locale = rawLocale === "en" || rawLocale === "es" ? rawLocale : "en";
+export default function PrivacyPage() {
+  const locale: Locale = "en";
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">

@@ -418,6 +418,11 @@ const en: Record<string, string> = {
   "about.faq.a5": "Each place shows a 'last verified' date so you can judge how recent it is. Hours can still change — especially around holidays — so for anything time-sensitive, call ahead when a phone number is listed.",
   "about.faq.q6": "How do I get directions?",
   "about.faq.a6": "Open any place and choose Walk, Bus, or Drive. Walking directions show right on the map; bus and driving directions open in Google Maps.",
+
+  // 404 Not Found page (#288)
+  "notfound.title": "Page not found",
+  "notfound.body": "The page you are looking for doesn't exist or has been moved.",
+  "notfound.backToMap": "Back to map",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -834,6 +839,11 @@ const es: Record<string, string> = {
   "about.faq.a5": "Cada lugar muestra una fecha de 'última verificación' para que sepas qué tan reciente es. Los horarios pueden cambiar, sobre todo en días festivos, así que para algo urgente conviene llamar antes cuando hay un número de teléfono.",
   "about.faq.q6": "¿Cómo obtengo indicaciones para llegar?",
   "about.faq.a6": "Abre cualquier lugar y elige Caminar, Autobús o Manejar. Las indicaciones a pie se muestran en el mapa; las de autobús y automóvil se abren en Google Maps.",
+
+  // 404 Not Found page (#288)
+  "notfound.title": "Página no encontrada",
+  "notfound.body": "La página que buscas no existe o se ha movido.",
+  "notfound.backToMap": "Volver al mapa",
 };
 
 /** Substitute simple {key} placeholders. */

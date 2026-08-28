@@ -9,7 +9,6 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import FeedbackForm from "@/components/FeedbackForm";
@@ -23,11 +22,8 @@ export const metadata: Metadata = buildPageMetadata({
   path: "/feedback",
 });
 
-export default async function FeedbackPage() {
-  // Read locale cookie server-side — same pattern as suggest/page.tsx
-  const cookieStore = await cookies();
-  const rawLocale = cookieStore.get("pfm-locale")?.value;
-  const locale: Locale = rawLocale === "en" || rawLocale === "es" ? rawLocale : "en";
+export default function FeedbackPage() {
+  const locale: Locale = "en";
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">

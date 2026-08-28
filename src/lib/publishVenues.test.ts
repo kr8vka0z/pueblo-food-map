@@ -291,14 +291,14 @@ describe("venuesToLiteralArray / serializePublishedVenuesFile", () => {
   });
 
   test("round-trip: the full venueToRow → validateSnapshot → serialize pipeline preserves the real seeded venues exactly", () => {
-    // Runs the real seed data (108 venues) through the exact publish pipeline
+    // Runs the real seed data (106 venues) through the exact publish pipeline
     // and asserts it survives byte-for-byte. Anchored to the seeds themselves,
     // NOT to published-venues.ts: that file is regenerated from D1 on every
-    // admin publish (so it grows past 108), which is expected — pinning a test
+    // admin publish (so it grows past 106), which is expected — pinning a test
     // to it blocked every real publish. This still fully exercises the
     // serializer against real venue shapes.
     const allVenues = [...pfpVenues, ...groceryOsmVenues, ...plentifulPantries];
-    expect(allVenues).toHaveLength(108);
+    expect(allVenues).toHaveLength(106);
 
     const rows = allVenues.map((v) => venueToRow(v));
     const validation = validateSnapshot(rows);

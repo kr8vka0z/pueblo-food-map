@@ -32,6 +32,10 @@ function renderWithProvider(
   );
 }
 
+beforeEach(() => {
+  document.cookie = "pfm-locale=; max-age=0; path=/";
+});
+
 // ─── LanguageToggle — rendering ───────────────────────────────────────────────
 
 describe("LanguageToggle — rendering", () => {

@@ -22,9 +22,9 @@
  *   - vitest.config.mts leaflet alias
  */
 
+import { memo, type KeyboardEvent } from "react";
 import { Marker } from "react-map-gl/mapbox";
 import { MapPin } from "lucide-react";
-import type { KeyboardEvent } from "react";
 import type { Venue, VenueCategory } from "@/types/venue";
 import { formatMiles } from "@/lib/distance";
 import { t, type Locale } from "@/lib/i18n";
@@ -57,7 +57,9 @@ interface VenueMarkerProps {
   selected: boolean;
   /** Distance from user in miles, appended to aria-label when available. */
   distanceMiles?: number;
-  onClick: () => void;
+  onClick?: () => void;
+  /** Stable venue selector callback (#291). */
+  onSelect?: (id: string) => void;
   /** Called with venue.id on mouseenter/focusin — hover tooltip is managed in Map.tsx. */
   onHover?: (id: string) => void;
   /** Called on mouseleave/focusout — dismisses hover tooltip in Map.tsx. */
@@ -67,11 +69,12 @@ interface VenueMarkerProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function VenueMarker({
+function VenueMarker({
   venue,
   selected,
   distanceMiles,
   onClick,
+  onSelect,
   onHover,
   onLeave,
   locale = "en",
@@ -88,13 +91,18 @@ export default function VenueMarker({
     ? `${venue.name}, ${readableName}, ${distLabel}`
     : `${venue.name}, ${readableName}`;
 
+  function handleAction() {
+    if (onClick) onClick();
+    if (onSelect) onSelect(venue.id);
+  }
+
   // Keyboard handler: fire click on Enter or Space (native <button> behaviour
   // covers this already in most browsers, but we add it explicitly for clarity
   // and to satisfy the acceptance criteria note in the issue).
   function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      onClick();
+      handleAction();
     }
   }
 
@@ -151,7 +159,7 @@ export default function VenueMarker({
       <button
         type="button"
         aria-label={ariaLabel}
-        onClick={onClick}
+        onClick={handleAction}
         onKeyDown={handleKeyDown}
         style={{
           background: "none",
@@ -182,3 +190,5 @@ export default function VenueMarker({
     </Marker>
   );
 }
+
+export default memo(VenueMarker);

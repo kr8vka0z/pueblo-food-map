@@ -24,9 +24,17 @@
 - **HTTP/www redirect:** HTTP requests and `www.pueblofoodmap.com` both 301-redirect to `https://pueblofoodmap.com` via Cloudflare zone redirect rule + Always-Use-HTTPS.
 - **Hosting:** Cloudflare Workers, project name `pueblo-food-map` (configured in `wrangler.jsonc`)
 - **Adapter:** `@opennextjs/cloudflare` — translates Next.js App Router output into Worker format
-- **CI/CD — TRANSITIONAL (robot-deploy rollout, Phase 2):** `dev` deploys via GitHub Actions (`.github/workflows/deploy-dev.yml` — push `dev` → staging worker at dev.pueblofoodmap.com). **Prod (`main`) still deploys via Cloudflare Workers Builds** (dashboard connection) until the gated cutover: disconnect Workers Builds in the CF dashboard, then `deploy-prod.yml` takes over on push to `main`. Until that flip, the Workers-Builds details below still hold for prod — and after it, rewrite this section.
-  - Push to `main` → production deploy (automatic, Workers Builds — until the flip above)
-  - Open a PR → unique preview deploy URL (posted as a check on the PR, visible in the CF dashboard under that build)
+- **CI/CD:** both envs deploy via GitHub Actions robots — Cloudflare Workers
+  Builds is disconnected (see [`deploy-prod.yml`](.github/workflows/deploy-prod.yml)'s
+  file header for why the two must never both be connected). Push to `main` →
+  [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) builds and deploys the
+  top-level `wrangler.jsonc` config. Push to `dev` →
+  [`deploy-dev.yml`](.github/workflows/deploy-dev.yml) deploys the staging
+  worker at dev.pueblofoodmap.com. Neither workflow has a manual re-run
+  trigger — a deploy only happens as a side effect of a push landing on that
+  branch. See [ARCHITECTURE.md](ARCHITECTURE.md), "Hosting — Cloudflare
+  Workers via OpenNext", for the known gap where Dependabot's auto-merge can
+  land a commit on `main` with no deploy firing at all.
   - **Build command:** `npx opennextjs-cloudflare build`
   - **Deploy command:** `npx wrangler deploy` (CF default)
 

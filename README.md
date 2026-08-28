@@ -104,8 +104,13 @@ scripts/           One-off ingestion scripts (run locally; not imported by app)
 - **CI:** `lint → typecheck → test (with coverage) → audit → build` on every
   PR and push to `main`
   ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
-- **Deploys:** Cloudflare Workers Builds (connected via CF dashboard, no
-  Actions YAML). Push to `main` → production; open a PR → preview URL.
+- **Deploys:** GitHub Actions
+  ([`deploy-prod.yml`](.github/workflows/deploy-prod.yml) /
+  [`deploy-dev.yml`](.github/workflows/deploy-dev.yml)), not Cloudflare
+  Workers Builds. Push to `main` → production; push to `dev` → staging at
+  dev.pueblofoodmap.com. No per-PR preview deploy exists (that was a
+  Workers Builds feature; it's no longer connected) — `npm run preview`
+  (local Worker emulator) is the pre-merge check.
 - **Rollback:** CF dashboard → Workers & Pages → `pueblo-food-map` →
   Deployments → pick a previous build → "Rollback to this deployment".
 

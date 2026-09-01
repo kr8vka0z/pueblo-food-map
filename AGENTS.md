@@ -1412,7 +1412,7 @@ flood of the admin auth surface before a request ever reaches the app.
   stolen-password rule → an active auth-flood rule.
 - **To change it:** Cloudflare dashboard → Security → WAF → Rate limiting
   rules, or the rulesets API on the zone/ruleset ids above (Global API key
-  — `op://Atlas/Cloudflare Global API`, header-auth `X-Auth-Email` /
+  — `op://Atlas/Cloudflare - Global API Key`, header-auth `X-Auth-Email` /
   `X-Auth-Key`).
 
 ---

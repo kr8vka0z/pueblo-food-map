@@ -115,15 +115,35 @@ npm run deploy    # OpenNext build + wrangler deploy to production
   alongside that token's real `allowedUrls`.
 - **Preview deploy warning:** A PR's CF preview deploy is reachable at the URL Cloudflare posts as a check on the PR (do not guess a `<branch>-…workers.dev` subdomain — that pattern does not resolve and 404s). Its map throws "site not authorized" unless that exact subdomain is added to the token's URL restrictions (Mapbox dropped wildcard support), so for a quick demo it is usually easier to demo from production.
 
-### Lighthouse CI build token (`pk.*`, GitHub secret only)
+### Lighthouse CI build token — RETIRED (#304). There is exactly ONE public token now.
 
-- **Purpose:** The Lighthouse CI job builds this commit's code and serves it on a local server (`next start` at `localhost:3000`), then audits that — so a PR is graded on its own changes, not on production (see `.github/workflows/lighthouse.yml`). This token is passed to that build as `NEXT_PUBLIC_MAPBOX_TOKEN` so the map renders during the audit instead of an "unauthorized" blank.
-- **GitHub secret name:** `MAPBOX_PREVIEW_TOKEN` (legacy name — it is a build token, not a preview-URL token).
-- **Type:** Public (`pk.*`) — same scopes as the production token (`styles:read`, `fonts:read`, `tilesets:read`). Must be created in the Mapbox Studio dashboard (cannot mint `pk` tokens via API).
-- **URL restrictions:** MUST be unrestricted (or explicitly allow `localhost:3000`) so the map authorizes on the CI's local server. A prod-URL-restricted token would render "not authorized" and skew the audit.
-- **Because it is unrestricted, `MAPBOX_PREVIEW_TOKEN` may only ever reach a build whose output is thrown away.** Lighthouse serves its build on a throwaway localhost server and deletes it; nothing it produces is published. Any workflow that deploys a bundle to a public hostname must use the restricted `NEXT_PUBLIC_MAPBOX_TOKEN` instead — `deploy-dev.yml` reused this secret until #304 and shipped an any-domain key in staging's public JS for 45 days.
-- **If the secret is absent:** the build still succeeds and accessibility is still measured, but the map renders blank ("not authorized"), so the performance score is unrepresentative. There is **no** production fallback — the job always audits the local build of the commit under test.
-- **Provisioning:** Mapbox Studio → Access tokens → Create token → Public, scopes above, no URL restrictions → copy → GitHub repo Settings → Secrets and variables → Actions → `MAPBOX_PREVIEW_TOKEN`.
+`.github/workflows/lighthouse.yml` used to read its own separate
+`MAPBOX_PREVIEW_TOKEN` secret, holding a deliberately **URL-unrestricted** `pk.*`
+token. It now reads the same restricted `NEXT_PUBLIC_MAPBOX_TOKEN` secret both
+deploys use, which authorizes on the CI's local server because `localhost:3000`
+is on that token's Mapbox allowlist.
+
+**WHY the separate token is gone rather than merely documented as dangerous:** an
+unrestricted key sitting in the repo's secret store is one careless
+`${{ secrets.… }}` reference away from a publicly served bundle, and a
+`NEXT_PUBLIC_*` value is inlined into the client bundle by `next build` — the
+reference and the leak are the same act, with nothing in between to catch it.
+That is not hypothetical here: `deploy-dev.yml` made exactly that reference and
+published an any-domain Mapbox key at dev.pueblofoodmap.com for 45 days (#304).
+The file-header comment warning about it had been sitting directly above the
+offending line the whole time. Removing the token removes the footgun; keeping it
+with a better warning would not have.
+
+**Consequences to preserve:**
+
+- **Do not reintroduce an unrestricted token for CI convenience.** If a future job
+  needs the map to render on some hostname, add that hostname to the one public
+  token's URL allowlist in Mapbox Studio — and write it into the allowlist above,
+  because a stale copy of that list is precisely what kept #304 alive for 45 days.
+- **If the secret is absent,** the Lighthouse build still succeeds and
+  accessibility is still measured, but the map renders blank ("not authorized"),
+  so the performance score is unrepresentative. There is **no** production
+  fallback — the job always audits the local build of the commit under test.
 
 ### Secret token (backend / admin, `sk.*`)
 

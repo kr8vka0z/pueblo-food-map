@@ -21,11 +21,10 @@
 # allowlist (added 2026-07-03), so it authorizes here — the restriction that
 # makes it safe also makes it usable on staging, and no second token is needed.
 #
-# This deliberately does NOT reuse MAPBOX_PREVIEW_TOKEN. That secret is
-# lighthouse.yml's build token and is UNRESTRICTED by design (AGENTS.md
-# "Lighthouse CI build token" — it has to authorize on localhost, where no URL
-# restriction can help). `NEXT_PUBLIC_*` is inlined into the client bundle by
-# `next build`, and this workflow's bundle is served publicly at
+# It used to read MAPBOX_PREVIEW_TOKEN — lighthouse.yml's separate, deliberately
+# UNRESTRICTED build token, since retired along with that secret (AGENTS.md
+# "Lighthouse CI build token — RETIRED"). `NEXT_PUBLIC_*` is inlined into the
+# client bundle by `next build`, and this workflow's bundle is served publicly at
 # dev.pueblofoodmap.com, so pointing it at the unrestricted token published an
 # any-domain Mapbox key that anyone could lift and bill against Kyle's account
 # (#304 — measured live 2026-09-02: dev served token cmqo2jc6i1o7b2ton2ify1ly2

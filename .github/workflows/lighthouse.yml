@@ -5,9 +5,11 @@ name: Lighthouse CI
 # measured on its own changes (a real pre-merge gate), not on whatever is
 # already live in production.
 #
-# Map token: the build reads NEXT_PUBLIC_MAPBOX_TOKEN from the
-# MAPBOX_PREVIEW_TOKEN secret (unrestricted, so it authorizes on localhost).
-# Without it the map renders "not authorized" and skews the audit.
+# Map token: the build reads the NEXT_PUBLIC_MAPBOX_TOKEN secret — the same
+# URL-restricted public token both deploys use, which authorizes here because
+# `localhost:3000` is on its Mapbox allowlist. Without it the map renders "not
+# authorized" and skews the audit. See the build step for why the old
+# unrestricted MAPBOX_PREVIEW_TOKEN was retired (#304).
 #
 # Thresholds (mobile preset): accessibility >= 0.95 (error — the hard gate),
 # performance >= 0.65 (WARN only). Performance is warn-not-error because the map
@@ -44,10 +46,19 @@ jobs:
         run: npm run build
         env:
           # Real map token so the audited page renders the map instead of an
-          # "unauthorized" blank. The preview token is unrestricted → works on
-          # localhost. Falls back to empty (map blank, a11y still measured) if
-          # the secret is ever removed.
-          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PREVIEW_TOKEN }}
+          # "unauthorized" blank. Falls back to empty (map blank, accessibility
+          # still measured) if the secret is ever removed.
+          #
+          # This is the SAME URL-restricted public token both deploys use. It
+          # authorizes here because `localhost:3000` — the port the next step
+          # serves on — is on that token's Mapbox URL allowlist. The separate
+          # unrestricted MAPBOX_PREVIEW_TOKEN this used to read is retired: an
+          # unrestricted key is only ever one careless reference away from a
+          # publicly served bundle, which is exactly what happened in #304
+          # (deploy-dev.yml reused it and published it at
+          # dev.pueblofoodmap.com for 45 days). Keeping zero unrestricted
+          # tokens in the repo removes the footgun instead of documenting it.
+          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
 
       - name: Start the app and wait until it responds
         run: |

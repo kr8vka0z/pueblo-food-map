@@ -238,8 +238,17 @@ export function serializePublishedVenuesFile(venues: Venue[], meta: PublishFileM
 
 export interface PublishSnapshot {
   rows: VenueRow[];
-  /** Ids with status='draft' at snapshot time — the ONLY ids step 6 promotes. */
+  /** Ids with status='draft' at snapshot time — the ONLY ids step 6 promotes to 'published'. */
   draftIds: string[];
+  /**
+   * Ids with status='published' at snapshot time whose updated_at > published_at
+   * (i.e. edited since their last publish). #284: this snapshot is what a
+   * publish is ABOUT to ship, so these rows' edits are landing in this same
+   * file commit as the drafts above — they just aren't changing `status`
+   * (already 'published'). See promotePublishedDrafts below for why they
+   * still need published_at/published_by re-stamped.
+   */
+  editedPublishedIds: string[];
 }
 
 /**
@@ -253,7 +262,10 @@ export async function fetchPublishSnapshot(db: D1Database): Promise<PublishSnaps
     .all<VenueRow>();
   const rows = result.results;
   const draftIds = rows.filter((row) => row.status === "draft").map((row) => row.id);
-  return { rows, draftIds };
+  const editedPublishedIds = rows
+    .filter((row) => row.status === "published" && row.published_at !== null && row.updated_at > row.published_at)
+    .map((row) => row.id);
+  return { rows, draftIds, editedPublishedIds };
 }
 
 export interface PublishAuditMeta {
@@ -265,10 +277,22 @@ export interface PublishAuditMeta {
 
 /**
  * Step 6 (spec §5 step 5 / §8 NB1): promotes exactly the draft ids captured
- * at snapshot time to 'published' and writes ONE audit_log row for the
- * whole publish event, atomically via db.batch(). The caller (route.ts)
- * MUST NOT call this unless commitPublishedVenues() already resolved —
- * that ordering is what this function assumes, not what it enforces.
+ * at snapshot time to 'published', ALSO re-stamps every already-published
+ * row edited since its last publish (#284), and writes ONE audit_log row
+ * for the whole publish event, atomically via db.batch(). The caller
+ * (route.ts) MUST NOT call this unless commitPublishedVenues() already
+ * resolved — that ordering is what this function assumes, not what it
+ * enforces.
+ *
+ * #284 root cause: this function used to touch `draftIds` only, so a
+ * `published` row's `published_at` never advanced past its FIRST publish —
+ * summarizePublishChanges() (adminVenues.ts) then counted it "edited since
+ * publish" forever, even after the edit had already shipped in this exact
+ * commit. `editedPublishedIds` (fetchPublishSnapshot) names exactly the
+ * `published` rows this snapshot is committing an edit for; re-stamping
+ * them here, in the SAME post-commit batch as the draft promotions, keeps
+ * the NB1 ordering intact — nothing in D1 is touched unless the GitHub
+ * commit above already succeeded.
  *
  * `entity_id` on the audit row is the publish's own timestamp (same value
  * stamped onto every promoted venue's `published_at`) rather than a single
@@ -284,8 +308,10 @@ export async function promotePublishedDrafts(
   db: D1Database,
   draftIds: string[],
   meta: PublishAuditMeta,
+  editedPublishedIds: string[] = [],
 ): Promise<void> {
-  const statements = draftIds.map((id) =>
+  const stampedIds = [...draftIds, ...editedPublishedIds];
+  const statements = stampedIds.map((id) =>
     db
       .prepare(
         "UPDATE venues SET status = 'published', published_at = ?, published_by = ? WHERE id = ?",
@@ -296,6 +322,8 @@ export async function promotePublishedDrafts(
   const afterJson = JSON.stringify({
     promotedIds: draftIds,
     promotedCount: draftIds.length,
+    editedIds: editedPublishedIds,
+    editedCount: editedPublishedIds.length,
     snapshotCount: meta.snapshotCount,
     prUrl: meta.prUrl,
   });

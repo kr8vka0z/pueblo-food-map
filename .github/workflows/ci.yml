@@ -44,6 +44,19 @@ jobs:
         # AGENTS.md "Publish -> static"). Any other change on that branch
         # -- code, a workflow file, a second file alongside the data file --
         # fails this check and gets the full pipeline below (#336).
+        #
+        # Diffed from the MERGE-BASE of base/head, not a raw two-dot diff
+        # (PR review on #383): a two-dot diff only equals "this PR's change"
+        # when base.sha is exactly head's parent. If main/dev advances
+        # between the bot branch being reset and this run evaluating it --
+        # or a `synchronize` event carries a lagging base.sha -- the two-dot
+        # diff also shows base's own commits as reversed changes, more than
+        # one path appears, data_only goes false, and the publish PR is
+        # blocked by exactly the gate this carve-out exists to bypass. Fails
+        # closed (safe) either way, but merge-base is what a squash merge
+        # actually lands, so this is strictly more correct, not looser.
+        # Checkout above already uses fetch-depth: 0 (full history), which
+        # merge-base needs to resolve.
         env:
           EVENT_NAME: ${{ github.event_name }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
@@ -53,7 +66,7 @@ jobs:
         run: |
           data_only=false
           if [ "$EVENT_NAME" = "pull_request" ] && [ "$HEAD_REF" = "publish-bot" ] && [ "$IS_FORK" = "false" ]; then
-            changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+            changed="$(git diff --name-only "$(git merge-base "$BASE_SHA" "$HEAD_SHA")" "$HEAD_SHA")"
             if [ "$changed" = "src/data/published-venues.ts" ]; then
               data_only=true
             fi

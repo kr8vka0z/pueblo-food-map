@@ -77,6 +77,16 @@ jobs:
         # base...head diff touches EXACTLY the one generated file the
         # publish engine writes (src/lib/publishVenues.ts, AGENTS.md
         # "Publish -> static") (#336).
+        #
+        # Diffed from the MERGE-BASE of base/head, not a raw two-dot diff
+        # (PR review on #383) -- see ci.yml's matching step for the full WHY:
+        # a two-dot diff only equals "this PR's change" when base.sha is
+        # exactly head's parent, and a lagging base.sha on a `synchronize`
+        # event (or main/dev advancing between bot-branch reset and this run)
+        # makes it show base's own commits as reversed changes, breaking
+        # data_only exactly when the publish carve-out needs to hold. This
+        # job's checkout above already uses fetch-depth: 0, which merge-base
+        # needs to resolve.
         env:
           EVENT_NAME: ${{ github.event_name }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
@@ -86,7 +96,7 @@ jobs:
         run: |
           data_only=false
           if [ "$EVENT_NAME" = "pull_request" ] && [ "$HEAD_REF" = "publish-bot" ] && [ "$IS_FORK" = "false" ]; then
-            changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+            changed="$(git diff --name-only "$(git merge-base "$BASE_SHA" "$HEAD_SHA")" "$HEAD_SHA")"
             if [ "$changed" = "src/data/published-venues.ts" ]; then
               data_only=true
             fi

@@ -412,9 +412,18 @@ Preview environment (that's a Cloudflare Pages concept). Runtime secrets
 See [AGENTS.md](AGENTS.md) for deploy, rollback, env-var management, and
 Mapbox token management.
 
+**Superseded 2026-09-02 (#375): Dependabot no longer merges into `main` at
+all.** `dependabot.yml` now sets `target-branch: dev`, so dependency PRs open
+against `dev`, auto-merge there, and reach production only through a normal
+`dev` → `main` promotion PR — an ordinary human-token merge that always fires
+Deploy Prod. The strand-on-`main` scenario described below therefore no longer
+has a path to occur through Dependabot.
+
+**The underlying GitHub rule has not changed, so this history stays.** Any
+future workflow that pushes to `main` with `GITHUB_TOKEN` reintroduces the
+identical silent failure. Read this before adding one.
+
 **Fixed 2026-08-28: Dependabot auto-merge used to strand commits undeployed.**
-The history below is kept because the failure mode is silent and worth
-recognising if it ever returns.
 
 Previously, [`dependabot-auto-merge.yml`](.github/workflows/dependabot-auto-merge.yml)
 auto-merged patch/minor Dependabot PRs using `secrets.GITHUB_TOKEN`. GitHub
@@ -467,10 +476,24 @@ hatch. Before that, a commit which reached `main` without firing a deploy
 could only be rescued by pushing another commit; now `main` can be deployed
 as-is from the Actions tab.
 
-**Still unverified at the time of writing:** no Dependabot PR has auto-merged
-since the swap, so the end-to-end path has not yet been observed producing a
-Deploy Prod run. The detection commands above are how to confirm it on the
-first real auto-merge.
+**Verified end to end 2026-09-02** (it had sat unverified since the swap).
+Minutes after `target-branch: dev` landed on `main`, Dependabot re-ran and
+opened PRs #380 and #381 against `dev`. Both waited for the full required-check
+set (`Lint, typecheck, build` took 3m54s) and only then auto-merged, ~5 minutes
+after opening, and the merges fired Deploy Dev. So the App-token swap works and
+the auto-merge genuinely gates on CI.
+
+**What actually makes it wait is the branch ruleset, not the workflow.**
+`gh pr merge --auto` only defers when the base branch has required status
+checks; on a branch with none it merges the instant auto-merge is enabled. The
+`dev` ruleset added in #375 requires the same four checks `main` does, which is
+why the runs above were allowed to finish. Delete that ruleset and Dependabot
+auto-merge silently degrades into merge-on-open.
+
+**One consequence of the `dev` target to keep in mind:** a dependency bump —
+including a security bump — now sits on `dev` until someone opens a promotion
+PR. It gets real staging exposure first, which is the point, but it is no
+longer self-delivering to production.
 
 ---
 

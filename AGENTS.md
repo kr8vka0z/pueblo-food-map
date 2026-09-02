@@ -33,8 +33,9 @@
   worker at dev.pueblofoodmap.com. Neither workflow has a manual re-run
   trigger — a deploy only happens as a side effect of a push landing on that
   branch. See [ARCHITECTURE.md](ARCHITECTURE.md), "Hosting — Cloudflare
-  Workers via OpenNext", for the known gap where Dependabot's auto-merge can
-  land a commit on `main` with no deploy firing at all.
+  Workers via OpenNext", for the historical gap where an auto-merge could land
+  a commit on `main` with no deploy firing at all — closed for Dependabot in
+  #375, but still live for any future workflow that pushes with `GITHUB_TOKEN`.
   - **Build command:** `npx opennextjs-cloudflare build`
   - **Deploy command:** `npx wrangler deploy` (CF default)
 - **Dependency updates land on `dev` first, like everything else (#375).**

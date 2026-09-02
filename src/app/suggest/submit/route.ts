@@ -25,7 +25,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { VENUE_CATEGORIES, type VenueCategoryKey } from "@/lib/suggestTypes";
 import { verifyTurnstileToken } from "@/lib/turnstile";
-import { createRateLimiter, EMAIL_RE } from "@/lib/rateLimit";
+import { createRateLimiter, isValidEmail } from "@/lib/rateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
 import { insertPublicSubmission } from "@/lib/publicSubmissions";
@@ -160,7 +160,7 @@ function validate(body: SubmitPayload): string | null {
   if (body.submitterEmail.length > FIELD_LIMITS.EMAIL) {
     return "Email address too long";
   }
-  if (!EMAIL_RE.test(body.submitterEmail)) {
+  if (!isValidEmail(body.submitterEmail)) {
     return "Invalid email format";
   }
   return null; // valid

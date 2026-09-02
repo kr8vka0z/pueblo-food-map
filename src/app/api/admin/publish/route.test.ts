@@ -253,6 +253,15 @@ describe("POST /api/admin/publish", () => {
     expect(res.status).toBe(200);
     expect(batch).toHaveBeenCalledTimes(1);
 
+    // Regression for the #284 review defect: publishedCount used to be
+    // draftIds.length only, so a publish shipping ONLY an edited-published
+    // venue (zero new drafts) reported "0 places pushed" even though this
+    // venue's edit just went live. This fixture has zero drafts and one
+    // genuinely edited-published row (published_at set, older than
+    // updated_at, asserted above), so the correct count is exactly 1.
+    const data = (await res.json()) as { publishedCount: number };
+    expect(data.publishedCount).toBe(1);
+
     const update = boundStatements.find(
       (s) => s.sql.startsWith("UPDATE venues") && s.args[2] === "edited-venue",
     );

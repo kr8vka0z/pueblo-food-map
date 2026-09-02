@@ -112,7 +112,13 @@ export async function POST(req: NextRequest): Promise<Response> {
     prUrl: commitResult.prUrl,
     prNumber: commitResult.prNumber,
     reused: commitResult.reused,
-    publishedCount: snapshot.draftIds.length,
+    // #284 widened promotion to also re-stamp already-published rows edited
+    // since their last publish (snapshot.editedPublishedIds) — this count
+    // must include them too, or a publish that only ships such an edit (no
+    // new drafts) reports "0 places pushed" despite a real change going
+    // live. draftIds/editedPublishedIds partition by `status` at snapshot
+    // time (fetchPublishSnapshot, publishVenues.ts) and can never overlap.
+    publishedCount: snapshot.draftIds.length + snapshot.editedPublishedIds.length,
     snapshotCount: validation.venues.length,
   });
 }

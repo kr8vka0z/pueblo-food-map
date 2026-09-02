@@ -16,13 +16,23 @@
 # minted (ToastHoster's deploy-dev.yml uses a Worker/D1/zone-scoped token;
 # see PR description for the same follow-up here).
 #
-# Build-time NEXT_PUBLIC_MAPBOX_TOKEN: reuses the MAPBOX_PREVIEW_TOKEN
-# secret lighthouse.yml already provisions (AGENTS.md "Lighthouse CI build
-# token" — an UNRESTRICTED pk.* token, documented for exactly this case: a
-# CI build served on a hostname the production token's URL allowlist
-# doesn't cover). dev.pueblofoodmap.com is not on that allowlist either
-# (AGENTS.md "Mapbox Token Management" lists only the prod hostnames), so
-# the real prod token would 401 here — see PR description Surprises.
+# Build-time NEXT_PUBLIC_MAPBOX_TOKEN: the SAME URL-restricted public token
+# deploy-prod.yml uses. `dev.pueblofoodmap.com` is on that token's Mapbox URL
+# allowlist (added 2026-07-03), so it authorizes here — the restriction that
+# makes it safe also makes it usable on staging, and no second token is needed.
+#
+# This deliberately does NOT reuse MAPBOX_PREVIEW_TOKEN. That secret is
+# lighthouse.yml's build token and is UNRESTRICTED by design (AGENTS.md
+# "Lighthouse CI build token" — it has to authorize on localhost, where no URL
+# restriction can help). `NEXT_PUBLIC_*` is inlined into the client bundle by
+# `next build`, and this workflow's bundle is served publicly at
+# dev.pueblofoodmap.com, so pointing it at the unrestricted token published an
+# any-domain Mapbox key that anyone could lift and bill against Kyle's account
+# (#304 — measured live 2026-09-02: dev served token cmqo2jc6i1o7b2ton2ify1ly2
+# with allowedUrls null, while prod served the restricted one). Cloudflare
+# Access gates the dev PAGES, never the static JS assets, so gating is not a
+# substitute for restricting the token. Never point this at an unrestricted
+# token again.
 # NEXT_PUBLIC_TURNSTILE_SITE_KEY reuses the same secret as prod (Turnstile
 # widgets support multiple allowed hostnames on one sitekey, unlike Mapbox's
 # no-wildcard restriction) — Kyle should confirm dev.pueblofoodmap.com is an
@@ -50,7 +60,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       # Consumed by `next build` inside the opennextjs-cloudflare build step
       # below — see the file-header comment on secret choice/reuse.
-      NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PREVIEW_TOKEN }}
+      NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
     steps:
       # Same pinned-SHA third-party actions as deploy-prod.yml — a mutable

@@ -3,10 +3,33 @@
 
 version: 2
 
+# WHY `target-branch: dev` on every ecosystem below: without it Dependabot
+# defaults to the repository's DEFAULT branch (`main`), and
+# dependabot-auto-merge.yml then squashes each PR straight into `main`.
+# Nothing carries those commits back the other way, so `dev` only ever falls
+# further behind — a one-way valve. Measured 2026-09-01: `dev` was 20 commits
+# behind `main` with 0 ahead, 19 of them exactly these dependency/CI bumps, and
+# PRs branched off `dev` were being graded against a three-week-stale base
+# (#375). Targeting `dev` puts dependency updates on the same dev -> main
+# promotion path as every other change in this repo.
+#
+# The trade this accepts: a security bump now reaches production one promotion
+# later than it used to. That is the intended shape — this repo is dev-first,
+# and `dev` auto-deploys to dev.pueblofoodmap.com, so a bump gets real staging
+# exposure before it can reach the public site.
+#
+# Load-bearing companion, NOT in this file: the `dev` branch ruleset requires
+# the same four status checks `main` does ("Lint, typecheck, build", Semgrep,
+# TruffleHog, Dependency CVE Audit — all four already run on PRs into `dev`).
+# `gh pr merge --auto` only WAITS when the base branch has required checks; with
+# none, it merges the instant it is enabled. Removing that ruleset would silently
+# turn auto-merge into merge-on-open.
+
 updates:
   # npm packages (Next.js, React, Leaflet, ESLint, TypeScript, etc.)
   - package-ecosystem: npm
     directory: "/"
+    target-branch: dev
     schedule:
       interval: weekly
       day: monday
@@ -65,6 +88,7 @@ updates:
   # GitHub Actions used in .github/workflows/*.yml (actions/checkout, actions/setup-node, etc.)
   - package-ecosystem: github-actions
     directory: "/"
+    target-branch: dev
     schedule:
       interval: weekly
       day: monday

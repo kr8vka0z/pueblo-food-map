@@ -27,9 +27,18 @@ jobs:
     # Fork pull requests do not get OIDC tokens for this job.
     # We skip those runs to avoid false red checks and keep required CI signal clean.
     # Maintainers can still request an explicit review through @claude comments.
+    #
+    # Also skip the publish-bot PR specifically (#336): it's opened with
+    # Kyle's fine-grained personal PAT (see AGENTS.md "Publish -> static",
+    # GITHUB_PUBLISH_TOKEN), not a bot account, so `user.type != 'Bot'` above
+    # doesn't catch it -- every venue-data publish otherwise fires a paid AI
+    # review job against a generated data file with no code to review. The
+    # @claude-mention path is untouched, so a maintainer can still request a
+    # review on that PR by hand if one is ever actually wanted.
     if: >-
       (github.event_name == 'pull_request' &&
        github.event.pull_request.user.type != 'Bot' &&
+       github.event.pull_request.head.ref != 'publish-bot' &&
        github.event.pull_request.head.repo.fork == false) ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request != null &&

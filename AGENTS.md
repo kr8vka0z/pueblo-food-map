@@ -37,6 +37,33 @@
   land a commit on `main` with no deploy firing at all.
   - **Build command:** `npx opennextjs-cloudflare build`
   - **Deploy command:** `npx wrangler deploy` (CF default)
+- **Dependency updates land on `dev` first, like everything else (#375).**
+  [`dependabot.yml`](.github/dependabot.yml) sets `target-branch: dev` on both
+  ecosystems, so Dependabot opens its weekly PRs against `dev` and
+  [`dependabot-auto-merge.yml`](.github/workflows/dependabot-auto-merge.yml)
+  squashes patch/minor bumps there; they reach production only via the normal
+  `dev` → `main` promotion PR. Before this, Dependabot defaulted to the
+  repository's default branch and merged straight into `main` with nothing
+  flowing back — a one-way valve that left `dev` 20 commits behind `main` by
+  2026-09-01, so anything branched off `dev` was built and graded against a
+  three-week-stale base.
+  - **The `dev` branch ruleset is load-bearing for this, not decoration.** It
+    requires the same four status checks `main` does — `Lint, typecheck, build`,
+    `SAST Code Analysis (Semgrep)`, `Secret Leak Scan (TruffleHog)`,
+    `Dependency CVE Audit` — all of which already run on PRs into `dev`
+    ([`ci.yml`](.github/workflows/ci.yml),
+    [`weekly-security-audit.yml`](.github/workflows/weekly-security-audit.yml)).
+    `gh pr merge --auto` only waits for green CI when the base branch has
+    required checks; on a branch with none it merges the moment auto-merge is
+    enabled. Delete that ruleset and Dependabot auto-merge silently becomes
+    merge-on-open.
+  - **Do NOT verify this with `git rev-list --count origin/dev..origin/main`.**
+    The repo allows squash merges only (merge commits and rebase are both
+    disabled and `main` requires linear history), so a `dev` → `main` promotion
+    rewrites the promoted commits into one new SHA. The two branches end up
+    content-identical but permanently SHA-divergent, and a commit count will
+    read non-zero even when nothing is actually missing. Compare content
+    instead: `git diff --stat origin/dev origin/main`.
 
 ## Build and preview locally
 

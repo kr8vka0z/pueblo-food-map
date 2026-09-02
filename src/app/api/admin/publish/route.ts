@@ -92,13 +92,19 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json({ ok: false, error: "github_commit_failed" }, { status: 502 });
   }
 
-  // 6. ONLY now: promote drafts + write the audit row, atomically
-  await promotePublishedDrafts(db, snapshot.draftIds, {
-    actorEmail: identity.email,
-    publishedAt,
-    prUrl: commitResult.prUrl,
-    snapshotCount: validation.venues.length,
-  });
+  // 6. ONLY now: promote drafts + re-stamp edited-published rows (#284) +
+  // write the audit row, atomically
+  await promotePublishedDrafts(
+    db,
+    snapshot.draftIds,
+    {
+      actorEmail: identity.email,
+      publishedAt,
+      prUrl: commitResult.prUrl,
+      snapshotCount: validation.venues.length,
+    },
+    snapshot.editedPublishedIds,
+  );
 
   logPublishResult("success", { prUrl: commitResult.prUrl });
   return NextResponse.json({

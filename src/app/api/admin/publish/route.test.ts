@@ -77,20 +77,24 @@ function makeRow(overrides: Partial<VenueRow> = {}): VenueRow {
 }
 
 function makeFakeDb(seedRows: VenueRow[]) {
+  const boundStatements: { sql: string; args: unknown[] }[] = [];
   const batch = vi.fn(async (stmts: unknown[]) =>
     stmts.map(() => ({ success: true, results: [], meta: {} })),
   );
   const fakeDb = {
-    prepare: () => {
+    prepare: (sql: string) => {
       const stmt = {
-        bind: () => stmt,
+        bind: (...args: unknown[]) => {
+          boundStatements.push({ sql, args });
+          return stmt;
+        },
         all: async () => ({ success: true, results: seedRows, meta: {} }),
       };
       return stmt;
     },
     batch,
   };
-  return { db: fakeDb as unknown as D1Database, batch };
+  return { db: fakeDb as unknown as D1Database, batch, boundStatements };
 }
 
 function makeRequest(opts: { origin?: string } = {}): NextRequest {
@@ -225,6 +229,39 @@ describe("POST /api/admin/publish", () => {
     expect(data.snapshotCount).toBe(3);
 
     expect(batch).toHaveBeenCalledTimes(1);
+  });
+
+  // #284 regression, end to end through the route: editing an ALREADY-
+  // PUBLISHED venue then publishing must re-stamp its published_at/
+  // published_by in D1 — not just promote drafts. Before the fix, this
+  // route only ever forwarded snapshot.draftIds to promotePublishedDrafts,
+  // so this venue's published_at (fixed in the past) never advanced and
+  // summarizePublishChanges() kept counting it "edited" forever.
+  test("publishing an edited-published venue re-stamps its published_at/published_by in D1 (#284)", async () => {
+    const { db, batch, boundStatements } = makeFakeDb([
+      makeRow({
+        id: "edited-venue",
+        status: "published",
+        published_at: "2026-01-01T00:00:00.000Z", // its ORIGINAL publish
+        updated_at: "2026-06-01T00:00:00.000Z", // edited long after that publish
+      }),
+    ]);
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    vi.stubGlobal("fetch", makeGithubFetchMock());
+
+    const res = await POST(makeRequest({ origin: ADMIN_ORIGIN }));
+    expect(res.status).toBe(200);
+    expect(batch).toHaveBeenCalledTimes(1);
+
+    const update = boundStatements.find(
+      (s) => s.sql.startsWith("UPDATE venues") && s.args[2] === "edited-venue",
+    );
+    expect(update).toBeDefined();
+    // published_at is now THIS publish's timestamp, not the stale original —
+    // this is the exact state that makes summarizePublishChanges() (which
+    // reads updated_at > published_at) report "up to date" afterward.
+    expect(update?.args[0]).not.toBe("2026-01-01T00:00:00.000Z");
+    expect(update?.args[1]).toBe(ADMIN_EMAIL); // published_by
   });
 
   test.each(["main-ref", "file-sha", "commit", "create-pr", "auto-merge"] as const)(

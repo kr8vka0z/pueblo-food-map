@@ -91,11 +91,28 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 - **Local dev:** `.env.local` (gitignored — never commit this file)
 - **Build variable:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Settings → Build → Build variables. Workers Builds has one shared build-variable set and a single `production` environment — there is NO separate Preview environment (that's Cloudflare Pages). The same build vars apply to prod deploys and PR preview builds. `NEXT_PUBLIC_*` vars are inlined into the client bundle by `next build`; they must be present at build time, not runtime.
 - **Scopes:** `styles:read`, `fonts:read`, `tilesets:read`
-- **URL restrictions (bare hostnames, no protocol, no wildcards):**
+- **URL restrictions (bare hostnames, no protocol, no wildcards)** — read back off Mapbox 2026-09-02, not transcribed:
   - `pueblofoodmap.com`
   - `www.pueblofoodmap.com`
+  - `dev.pueblofoodmap.com`
   - `localhost:3000`
   - `pueblo-food-map.kyle-boyd.workers.dev`
+- **This one token covers BOTH deploys.** `dev.pueblofoodmap.com` was added to the
+  allowlist on 2026-07-03 but never written down here, so `deploy-dev.yml` went on
+  reusing the unrestricted Lighthouse token on the belief that the real token would
+  401 on staging (#304). It does not. Both
+  [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) and
+  [`deploy-dev.yml`](.github/workflows/deploy-dev.yml) now read the same
+  `NEXT_PUBLIC_MAPBOX_TOKEN` GitHub secret. **A `NEXT_PUBLIC_*` value is inlined
+  into the client bundle by `next build` and both bundles are served publicly, so
+  neither workflow may ever be pointed at an unrestricted token** — Cloudflare
+  Access gates dev's pages, never its static JS.
+- **Verifying which token an environment actually serves** (do this rather than
+  trusting this file — that is exactly how #304 happened): fetch the site's JS
+  chunks, grep for `pk\.`, then base64-decode the token's middle segment. The `a`
+  field is the Mapbox token id, which
+  `curl "https://api.mapbox.com/tokens/v2/kr8vka0z?access_token=$SK"` lists
+  alongside that token's real `allowedUrls`.
 - **Preview deploy warning:** A PR's CF preview deploy is reachable at the URL Cloudflare posts as a check on the PR (do not guess a `<branch>-…workers.dev` subdomain — that pattern does not resolve and 404s). Its map throws "site not authorized" unless that exact subdomain is added to the token's URL restrictions (Mapbox dropped wildcard support), so for a quick demo it is usually easier to demo from production.
 
 ### Lighthouse CI build token (`pk.*`, GitHub secret only)
@@ -104,6 +121,7 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 - **GitHub secret name:** `MAPBOX_PREVIEW_TOKEN` (legacy name — it is a build token, not a preview-URL token).
 - **Type:** Public (`pk.*`) — same scopes as the production token (`styles:read`, `fonts:read`, `tilesets:read`). Must be created in the Mapbox Studio dashboard (cannot mint `pk` tokens via API).
 - **URL restrictions:** MUST be unrestricted (or explicitly allow `localhost:3000`) so the map authorizes on the CI's local server. A prod-URL-restricted token would render "not authorized" and skew the audit.
+- **Because it is unrestricted, `MAPBOX_PREVIEW_TOKEN` may only ever reach a build whose output is thrown away.** Lighthouse serves its build on a throwaway localhost server and deletes it; nothing it produces is published. Any workflow that deploys a bundle to a public hostname must use the restricted `NEXT_PUBLIC_MAPBOX_TOKEN` instead — `deploy-dev.yml` reused this secret until #304 and shipped an any-domain key in staging's public JS for 45 days.
 - **If the secret is absent:** the build still succeeds and accessibility is still measured, but the map renders blank ("not authorized"), so the performance score is unrepresentative. There is **no** production fallback — the job always audits the local build of the commit under test.
 - **Provisioning:** Mapbox Studio → Access tokens → Create token → Public, scopes above, no URL restrictions → copy → GitHub repo Settings → Secrets and variables → Actions → `MAPBOX_PREVIEW_TOKEN`.
 

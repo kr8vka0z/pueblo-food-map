@@ -37,6 +37,24 @@ updates:
       - dependency-name: eslint
         update-types:
           - version-update:semver-major
+      # TypeScript majors are gated the same way, one layer down: typescript-eslint
+      # (pulled in transitively via eslint-config-next) reads TypeScript's internal
+      # APIs, so it hard-gates the compiler version it will run against. The 6 -> 7
+      # bump (PR #301) failed the lint step outright with
+      # `Error: typescript-eslint does not support TS 7.0.` Nothing in this repo can
+      # unblock that. Drop this entry once typescript-eslint ships TS 7 support.
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
+      # better-sqlite3 majors are capped by better-auth, which declares
+      # `peerOptional better-sqlite3@^12.0.0`. The 12 -> 13 bump (PR #363) failed
+      # `npm ci` outright with ERESOLVE against better-auth@1.7.1. It is a
+      # dev-only dependency here (prod persistence is Cloudflare D1), so there is
+      # nothing to gain from forcing it. Drop this entry once better-auth widens
+      # that peer range.
+      - dependency-name: better-sqlite3
+        update-types:
+          - version-update:semver-major
     labels:
       - dependencies
       - npm

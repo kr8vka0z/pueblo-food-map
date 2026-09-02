@@ -24,9 +24,17 @@
 - **HTTP/www redirect:** HTTP requests and `www.pueblofoodmap.com` both 301-redirect to `https://pueblofoodmap.com` via Cloudflare zone redirect rule + Always-Use-HTTPS.
 - **Hosting:** Cloudflare Workers, project name `pueblo-food-map` (configured in `wrangler.jsonc`)
 - **Adapter:** `@opennextjs/cloudflare` — translates Next.js App Router output into Worker format
-- **CI/CD — TRANSITIONAL (robot-deploy rollout, Phase 2):** `dev` deploys via GitHub Actions (`.github/workflows/deploy-dev.yml` — push `dev` → staging worker at dev.pueblofoodmap.com). **Prod (`main`) still deploys via Cloudflare Workers Builds** (dashboard connection) until the gated cutover: disconnect Workers Builds in the CF dashboard, then `deploy-prod.yml` takes over on push to `main`. Until that flip, the Workers-Builds details below still hold for prod — and after it, rewrite this section.
-  - Push to `main` → production deploy (automatic, Workers Builds — until the flip above)
-  - Open a PR → unique preview deploy URL (posted as a check on the PR, visible in the CF dashboard under that build)
+- **CI/CD:** both envs deploy via GitHub Actions robots — Cloudflare Workers
+  Builds is disconnected (see [`deploy-prod.yml`](.github/workflows/deploy-prod.yml)'s
+  file header for why the two must never both be connected). Push to `main` →
+  [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) builds and deploys the
+  top-level `wrangler.jsonc` config. Push to `dev` →
+  [`deploy-dev.yml`](.github/workflows/deploy-dev.yml) deploys the staging
+  worker at dev.pueblofoodmap.com. Neither workflow has a manual re-run
+  trigger — a deploy only happens as a side effect of a push landing on that
+  branch. See [ARCHITECTURE.md](ARCHITECTURE.md), "Hosting — Cloudflare
+  Workers via OpenNext", for the known gap where Dependabot's auto-merge can
+  land a commit on `main` with no deploy firing at all.
   - **Build command:** `npx opennextjs-cloudflare build`
   - **Deploy command:** `npx wrangler deploy` (CF default)
 
@@ -526,10 +534,13 @@ commits that file via the GitHub Contents API to a fixed bot branch
 reuses that branch's PR, and enables auto-merge via the GraphQL API (the
 REST API has no "enable future auto-merge" endpoint — only the GraphQL
 `enablePullRequestAutoMerge` mutation does), (5) **only once step 4
-succeeds**, promotes the exact draft ids captured in step 1 to `published`
-and writes one `audit_log` row, atomically via a single `db.batch()`. Once
-the PR auto-merges, the existing Workers Builds pipeline (unmodified)
-redeploys production like any other push to `main`.
+succeeds**, promotes the exact draft ids captured in step 1 to `published`,
+**also re-stamps `published_at`/`published_by` on every already-published
+row in the snapshot edited since its last publish** (#284 —
+`fetchPublishSnapshot`'s `editedPublishedIds`), and writes one `audit_log`
+row, atomically via a single `db.batch()`. Once the PR auto-merges, the
+existing Workers Builds pipeline (unmodified) redeploys production like
+any other push to `main`.
 
 **`published-venues.ts` is now the public map's data source, not the three
 source arrays.** `src/data/venues.ts` imports `publishedVenues` from
@@ -554,6 +565,20 @@ asserts D1's `batch()` is never called when any step of the GitHub call
 fails, and IS called exactly once when it succeeds. Getting this backwards
 (as the spec's own v1.0 draft did) can mark drafts "published" in D1 even
 when the file never actually shipped.
+
+**#284 fix — editing an already-published venue must also advance its
+`published_at`.** Before this fix, `promotePublishedDrafts()` only ever
+touched `draftIds` — a `published` row's `published_at` never moved past
+its FIRST publish, so `summarizePublishChanges()` (`src/lib/adminVenues.ts`,
+`updated_at > published_at`) kept counting an already-shipped edit as
+"edited since publish" forever: `PublishPanel` never returned to "up to
+date," and every further click shipped a byte-identical file. Fixed by
+having `fetchPublishSnapshot()` also compute `editedPublishedIds` (rows
+with `status='published'` whose `updated_at > published_at`) alongside
+`draftIds`, and `promotePublishedDrafts()` re-stamps `published_at`/
+`published_by` on BOTH sets, still inside the same post-commit
+`db.batch()` — the NB1 ordering above is unchanged, this just widened
+which rows step 6 touches.
 
 **Concurrent publishes — "last snapshot wins" via a fixed bot branch.**
 Every publish resets the SAME `publish-bot` branch to `main`'s current tip
@@ -894,9 +919,11 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   other brand fields. `buildPageMetadata` emits the full `openGraph`/`twitter` block (brand
   image, siteName, type, locale) so link previews on subpages retain the brand image.
 - **Known bilingual limitation** — the EN/ES language toggle is cookie-based: both locales
-  serve the same URL. Crawlers only index the English version. Proper bilingual SEO (separate
-  `/es/` URL tree or `hreflang` link tags) requires separate routes and is a deferred
-  follow-up beyond #164.
+  serve the same URL. Static utility pages (`/about`, `/venues`, `/suggest`, `/feedback`, `/privacy`)
+  keep English `<title>` and `<meta>` tags (decision recorded in #287) so they remain 100%
+  statically cacheable on Cloudflare without per-request `cookies()` reads forcing dynamic execution.
+  Crawlers index the English metadata. Proper bilingual SEO (separate `/es/` URL tree or `hreflang`
+  link tags) requires separate routes and is a deferred follow-up beyond #164.
 - **Done: explicit homepage canonical** — `src/app/page.tsx` is now a Server Component and sets
   `export const metadata = buildPageMetadata({ path: "/", ... })` directly, giving `/` the same
   explicit self-canonical every other page already had (previously implicit/inherited).
@@ -1041,6 +1068,13 @@ isn't needed.
 
 ## `@better-auth/cli` schema generation — a real gotcha
 
+**Not a standing devDependency as of 2026-08-28** — its bundled
+`better-auth@1.4.21` copy carried 14 open Dependabot alerts (including the
+repo's only CRITICAL) with no newer `@better-auth/cli` release available to
+fix them. Removed from `package.json`; run it on demand via `npx
+@better-auth/cli@latest generate ...` (see command below) instead of a
+pinned install — same capability, no standing vulnerable copy on disk.
+
 `@better-auth/cli@1.4.21` bundles its OWN pinned copy of
 `better-auth@1.4.21` in its own `node_modules` — a version released
 BEFORE D1 support existed. Its internal `getAdapter()`/`getMigrations()`
@@ -1062,7 +1096,7 @@ app code, never bundled into the Worker.
 **Regenerating the schema after a future plugin/config change:**
 
 ```bash
-npx @better-auth/cli generate --config scripts/auth-cli.config.ts --output migrations/000N_<name>.sql -y
+npx @better-auth/cli@latest generate --config scripts/auth-cli.config.ts --output migrations/000N_<name>.sql -y
 ```
 
 Review the output for `BEGIN`/`COMMIT` before committing (D1 rejects

@@ -28,10 +28,10 @@ describe("venues data-layer invariants", () => {
     expect(JSON.stringify(venues)).toBe(JSON.stringify(expected));
   });
 
-  test("seed arrays total 108 records: 10 pfp + 60 osm + 38 plentiful", () => {
+  test("seed arrays total 106 records: 10 pfp + 60 osm + 36 plentiful", () => {
     expect(pfpVenues).toHaveLength(10);
     expect(groceryOsmVenues).toHaveLength(60);
-    expect(plentifulPantries).toHaveLength(38);
+    expect(plentifulPantries).toHaveLength(36);
   });
 
   test("pfpVenues re-exported from venues.ts matches the leaf module used to build publishedVenues", async () => {

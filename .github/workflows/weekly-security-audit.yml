@@ -1,6 +1,17 @@
+# Supply-chain / secret / SAST sweep of this repo — runs on every PR into
+# main/dev (so it can gate merges) and weekly on a schedule.
+#
+# WHY both triggers: a PR run only ever sees the dependency graph and code as
+# of that diff. A CVE published against a dependency this repo already
+# shipped needs a second, independent trigger that fires on the world's
+# schedule, not just on pushes — that's the failure the cron catches that
+# PR-time scanning cannot. Required-check enforcement is a separate, later
+# decision — this PR only makes the checks exist to be required.
 name: Weekly Security Audit
 
 on:
+  pull_request:
+    branches: [main, dev]
   schedule:
     # Runs every Sunday at 06:00 UTC (12:00 AM MST)
     - cron: '0 6 * * 0'
@@ -18,7 +29,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run Semgrep SAST Scan
         uses: semgrep/semgrep-action@v1
@@ -33,12 +44,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Run TruffleHog Secret Scanner
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@20652fbbdefffcdaa493a5bf57ab2ac6b1db715b # v3.97.1
         with:
           extra_args: --only-verified
 
@@ -48,19 +59,31 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node
-        uses: actions/setup-node@v4 # v4.1.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
 
-      - name: Run NPM Dependency Audit
+      # Full-tree audit is informational only: build tooling never ships to
+      # production, so a CVE here shouldn't block a merge. It still runs and
+      # posts to the job summary — reported, not silenced — so a build-tool
+      # CVE stays visible instead of vanishing when the blocking step below is
+      # scoped down. Deliberate split, not a loosened check.
+      - name: Full dependency audit (informational, build tooling included)
         run: |
-          echo "### 📦 Dependency Security Audit" >> $GITHUB_STEP_SUMMARY
-          if npm audit --audit-level=high; then
-            echo "✅ No high/critical CVEs found in dependencies." >> $GITHUB_STEP_SUMMARY
+          echo "### Full dependency audit (informational — includes build tooling, does not block)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          npm audit >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Run NPM Dependency Audit (production only, blocking)
+        run: |
+          echo "### Production dependency audit" >> $GITHUB_STEP_SUMMARY
+          if npm audit --audit-level=high --omit=dev; then
+            echo "No high/critical CVEs found in production dependencies." >> $GITHUB_STEP_SUMMARY
           else
-            echo "⚠️ High or critical vulnerability detected in packages!" >> $GITHUB_STEP_SUMMARY
+            echo "High or critical vulnerability detected in production dependencies." >> $GITHUB_STEP_SUMMARY
             exit 1
           fi

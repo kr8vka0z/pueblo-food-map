@@ -1562,18 +1562,6 @@ export const publishedVenues: Venue[] = [
     "last_verified": "2026-05-14"
   },
   {
-    "id": "plentiful-pueblo-community-soup-kitchen-1bc98af5",
-    "name": "Pueblo Community Soup Kitchen",
-    "category": "meal_site",
-    "lat": 38.273296,
-    "lng": -104.612059,
-    "address": "422 W. 7th St., Pueblo, CO 81003",
-    "phone": "(719) 545-6540",
-    "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-soup-kitchen-1bc98af5",
-    "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
-  },
-  {
     "id": "plentiful-pueblo-community-soup-kitchen-plentiful-3195",
     "name": "Pueblo Community Soup Kitchen",
     "category": "meal_site",
@@ -1609,18 +1597,6 @@ export const publishedVenues: Venue[] = [
     "phone": "(719) 545-6540",
     "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-soup-kitchen-plentiful-3195",
     "notes": "Pueblo Community Soup Kitchen. in Pueblo, CO. Phone: (719) 545-6540.",
-    "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
-  },
-  {
-    "id": "plentiful-pueblo-cooperative-care-center-97ec4eda",
-    "name": "Pueblo Cooperative Care Center",
-    "category": "pantry",
-    "lat": 38.274237,
-    "lng": -104.610622,
-    "address": "326 West 8th Street, Pueblo, CO 81003",
-    "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-cooperative-care-center-97ec4eda",
-    "notes": "Pueblo Cooperative Care Center. in Pueblo, CO. Hours and directions available.",
     "source": "directory.plentiful.org/colorado/pueblo",
     "last_verified": "2026-05-14"
   },

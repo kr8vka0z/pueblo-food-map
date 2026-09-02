@@ -443,7 +443,7 @@ export default function Map({
           venue={venue}
           selected={venue.id === selectedVenueId}
           distanceMiles={userDistances.get(venue.id)}
-          onClick={() => onSelectVenue(venue.id)}
+          onSelect={onSelectVenue}
           onHover={handleMarkerHover}
           onLeave={handleMarkerLeave}
           locale={locale}

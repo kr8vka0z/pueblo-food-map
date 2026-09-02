@@ -6,11 +6,27 @@ name: Dependabot auto-merge
 #
 # Why this is safe: a repository ruleset on `main` requires the "Lint, typecheck,
 # build" and "Workers Builds: pueblo-food-map" status checks, so `gh pr merge
-# --auto` waits for green CI before it merges — it never merges a red build. We
-# use only the built-in GITHUB_TOKEN (no custom secrets), so Dependabot's
-# restricted token works once `permissions:` elevates it.
+# --auto` waits for green CI before it merges — it never merges a red build.
+#
+# WHY NOT GITHUB_TOKEN FOR THE MERGE: GitHub deliberately does not start new
+# workflow runs for pushes made with the built-in GITHUB_TOKEN (its recursion
+# guard). Auto-merge is attributed to whoever enabled it, so enabling it with
+# GITHUB_TOKEN meant the resulting push to `main` fired NO Deploy Prod run at
+# all — production silently kept serving the older build while `main` moved
+# ahead. Observed 2026-08-28: PR #361 merged as 6ce2737 with zero deploy-prod
+# runs for that SHA. The failure leaves no red mark anywhere, because the run
+# simply never exists. An installation token from a GitHub App is not covered by
+# the guard, so the merge it produces does trigger Deploy Prod.
+#
+# WHY pull_request_target: on plain `pull_request`, a Dependabot PR is given the
+# *Dependabot* secret store, which does not hold RELEASE_PLEASE_APP_* — the App
+# credentials would arrive empty. `pull_request_target` runs in the base-repo
+# context and can read Actions secrets. That is normally a footgun because it
+# pairs elevated secrets with untrusted PR code, but this workflow never checks
+# out the PR: it only reads Dependabot metadata and calls the `gh` CLI against
+# the PR URL. No untrusted code executes here.
 
-on: pull_request
+on: pull_request_target
 
 permissions:
   contents: write
@@ -27,12 +43,23 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Same App used by release-please, which already opens PRs and pushes
+      # commits on this repo — so it demonstrably holds contents + pull-requests
+      # write here. Minted per-run and short-lived; nothing long-lived is stored.
+      - name: Mint a GitHub App token
+        id: app-token
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+
       - name: Enable auto-merge for patch & minor bumps
         if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Hold major bumps for manual review
         if: steps.meta.outputs.update-type == 'version-update:semver-major'

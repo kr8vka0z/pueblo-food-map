@@ -379,11 +379,23 @@ a Workers-compatible bundle.
 Cloudflare Workers Builds. The reason for this migration is not in the
 current shallow git history; see open questions below.
 
-**CI/CD:** Cloudflare Workers Builds is connected to the GitHub repo via the
-CF dashboard — there is no GitHub Actions YAML for deploys. GitHub Actions
-runs `lint → typecheck → build` only (`.github/workflows/ci.yml`). A green
-CI run is necessary but not sufficient: Cloudflare Workers Builds is a
-separate system with its own build logs.
+**CI/CD:** deploys run through GitHub Actions, not Cloudflare Workers
+Builds — the dashboard connection was disconnected when
+[`.github/workflows/deploy-prod.yml`](.github/workflows/deploy-prod.yml)
+merged (its file header explains why the two must never run together).
+Push to `main` → `deploy-prod.yml` builds via `opennextjs-cloudflare` and
+deploys the top-level `wrangler.jsonc` config (prod worker
+`pueblo-food-map`, route pueblofoodmap.com). Push to `dev` →
+[`deploy-dev.yml`](.github/workflows/deploy-dev.yml) deploys the staging
+worker at dev.pueblofoodmap.com. Neither workflow has a
+`workflow_dispatch:` trigger, so there is no manual "re-run" button — a
+deploy only happens as a side effect of a push landing on that branch (see
+"Gap: Dependabot auto-merge can strand commits undeployed" below for why
+that matters). Separately, `.github/workflows/ci.yml` runs
+`lint → design:lint → design:drift → typecheck → test:coverage → npm audit
+→ build` on every PR and push to `main` — that's the correctness gate;
+`deploy-prod.yml`/`deploy-dev.yml` re-run the same `predeploy` suite before
+deploying, so a red build never reaches production.
 
 **Route handlers as Workers:** Next.js route handlers (`submit/route.ts`)
 compile to Worker fetch handlers. The in-process rate-limit `Map` is in
@@ -399,6 +411,66 @@ Preview environment (that's a Cloudflare Pages concept). Runtime secrets
 
 See [AGENTS.md](AGENTS.md) for deploy, rollback, env-var management, and
 Mapbox token management.
+
+**Fixed 2026-08-28: Dependabot auto-merge used to strand commits undeployed.**
+The history below is kept because the failure mode is silent and worth
+recognising if it ever returns.
+
+Previously, [`dependabot-auto-merge.yml`](.github/workflows/dependabot-auto-merge.yml)
+auto-merged patch/minor Dependabot PRs using `secrets.GITHUB_TOKEN`. GitHub
+deliberately does not start new workflow runs for pushes made with
+`GITHUB_TOKEN` (a recursion guard, so an auto-merge can't trigger another
+workflow that triggers another merge). But `deploy-prod.yml` fires on
+`push: branches: [main]` — so when Dependabot's PR auto-merges, the commit
+lands on `main` and **no deploy runs**. Production keeps serving the
+previous build with no red signal anywhere: the failure mode is an
+*absent* workflow run, not a failed one, so there's nothing to page on.
+
+Observed instance: PR #361 (Next 16.3.2 → 16.3.3) auto-merged at 16:23 UTC
+on 2026-08-28 as commit `6ce2737`, while the newest Deploy Prod run was
+still `12d438a` from 16:17. It cleared itself when a later PR was merged
+by hand — any human-token push carries stranded commits along on the next
+deploy — but that's incidental, not a fix.
+
+Detect a stranded commit: compare `main`'s tip against the last Deploy
+Prod run's `headSha`.
+```bash
+gh api repos/kr8vka0z/pueblo-food-map/commits/main -q .sha
+gh run list --repo kr8vka0z/pueblo-food-map --workflow "Deploy Prod" \
+  --limit 1 --json headSha,conclusion
+```
+A mismatch means commits are sitting on `main` undeployed.
+
+Why the admin Publish flow doesn't have this problem: `publishVenues.ts`
+(the commit/PR logic behind `POST /api/admin/publish`) authenticates its
+GitHub calls with the `GITHUB_PUBLISH_TOKEN` fine-grained PAT (provisioned
+under #260), not `GITHUB_TOKEN` — a PAT-authored push isn't covered by the
+recursion guard, so it deploys normally.
+
+**The fix applied.** `dependabot-auto-merge.yml` now mints a short-lived
+installation token from the same GitHub App that backs release-please
+(`actions/create-github-app-token`) and enables auto-merge with that instead
+of `GITHUB_TOKEN`. An App token is not covered by the recursion guard, so the
+resulting push to `main` starts Deploy Prod normally.
+
+That swap forced a second change: on a plain `pull_request` event a Dependabot
+PR is handed the *Dependabot* secret store, which does not contain
+`RELEASE_PLEASE_APP_*`, so the App credentials would arrive empty. The
+workflow therefore runs on `pull_request_target`, which executes in the
+base-repo context and can read Actions secrets. `pull_request_target` is
+normally avoided because it pairs elevated secrets with untrusted PR code —
+that risk does not apply here, because the workflow never checks the PR out.
+It only reads Dependabot metadata and calls the `gh` CLI against the PR URL.
+
+`deploy-prod.yml` also gained a `workflow_dispatch:` trigger as a recovery
+hatch. Before that, a commit which reached `main` without firing a deploy
+could only be rescued by pushing another commit; now `main` can be deployed
+as-is from the Actions tab.
+
+**Still unverified at the time of writing:** no Dependabot PR has auto-merged
+since the swap, so the end-to-end path has not yet been observed producing a
+Deploy Prod run. The detection commands above are how to confirm it on the
+first real auto-merge.
 
 ---
 

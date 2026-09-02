@@ -357,6 +357,34 @@ describe("fetchPublishSnapshot", () => {
     const snapshot = await fetchPublishSnapshot(db);
     expect(snapshot.draftIds).toEqual([]);
   });
+
+  // #284 regression: a published row edited after its last publish must be
+  // named in editedPublishedIds so promotePublishedDrafts can re-stamp it —
+  // this is the exact split summarizePublishChanges() (adminVenues.ts) reads
+  // to decide "edited since publish."
+  test("editedPublishedIds names published rows edited since their last publish", async () => {
+    const { db } = makeFakeDb([
+      // published, never edited since -> not "edited"
+      makeRow({
+        id: "untouched",
+        status: "published",
+        published_at: "2026-01-02T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:00.000Z",
+      }),
+      // published, edited AFTER its last publish -> "edited"
+      makeRow({
+        id: "edited",
+        status: "published",
+        published_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-01-02T00:00:00.000Z",
+      }),
+      // draft -> covered by draftIds, never editedPublishedIds
+      makeRow({ id: "d", status: "draft", published_at: null }),
+    ]);
+    const snapshot = await fetchPublishSnapshot(db);
+    expect(snapshot.editedPublishedIds).toEqual(["edited"]);
+    expect(snapshot.draftIds).toEqual(["d"]);
+  });
 });
 
 describe("promotePublishedDrafts", () => {
@@ -396,6 +424,68 @@ describe("promotePublishedDrafts", () => {
     expect(batch).toHaveBeenCalledTimes(1);
     expect(boundStatements).toHaveLength(1);
     expect(boundStatements[0].sql).toContain("INSERT INTO audit_log");
+  });
+
+  // #284 regression. The issue's own words: "the absence of such a test is
+  // exactly why the bug shipped" — this asserts the post-publish D1 STATE of
+  // an edited-published row, not just that a statement was issued. Before
+  // the fix, promotePublishedDrafts touched draftIds only, so this venue's
+  // published_at stayed stuck at its original value forever, and
+  // summarizePublishChanges() (adminVenues.ts) kept counting it "edited"
+  // even after this exact publish shipped its edit.
+  test("re-stamps published_at/published_by on an edited-published row, closing #284", async () => {
+    const { db, boundStatements, batch } = makeFakeDb([]);
+    await promotePublishedDrafts(
+      db,
+      [], // no drafts this publish — only an edit to an already-published venue
+      {
+        actorEmail: "admin@pueblofoodmap.com",
+        publishedAt: "2026-07-02T00:00:00.000Z",
+        prUrl: "https://github.com/kr8vka0z/pueblo-food-map/pull/2",
+        snapshotCount: 1,
+      },
+      ["edited-venue"],
+    );
+
+    expect(batch).toHaveBeenCalledTimes(1);
+    const updates = boundStatements.filter((s) => s.sql.startsWith("UPDATE venues"));
+    expect(updates).toHaveLength(1);
+    // Post-publish D1 state: published_at/published_by ARE updated to this
+    // publish's values (the exact fix — status stays 'published', already
+    // true, but the bind args below are what actually lands in the row).
+    expect(updates[0].args).toEqual([
+      "2026-07-02T00:00:00.000Z", // published_at
+      "admin@pueblofoodmap.com", // published_by
+      "edited-venue", // WHERE id = ?
+    ]);
+
+    const afterJson = JSON.parse(
+      boundStatements.find((s) => s.sql.startsWith("INSERT INTO audit_log"))?.args[5] as string,
+    );
+    expect(afterJson.editedIds).toEqual(["edited-venue"]);
+    expect(afterJson.editedCount).toBe(1);
+  });
+
+  test("a second publish immediately after is a no-op: zero re-stamped rows, zero UPDATEs", async () => {
+    // Simulates the AC2 scenario end to end at the promotion layer: once
+    // published_at has caught up to updated_at (the first publish's fix),
+    // fetchPublishSnapshot's editedPublishedIds is empty on the very next
+    // publish, so promotePublishedDrafts issues no UPDATE at all — only the
+    // audit row, same as the zero-drafts case above.
+    const { db, boundStatements, batch } = makeFakeDb([]);
+    await promotePublishedDrafts(
+      db,
+      [],
+      {
+        actorEmail: "admin@pueblofoodmap.com",
+        publishedAt: "2026-07-03T00:00:00.000Z",
+        prUrl: "https://github.com/kr8vka0z/pueblo-food-map/pull/3",
+        snapshotCount: 1,
+      },
+      [], // nothing edited since the previous (already-fixed) publish
+    );
+    expect(batch).toHaveBeenCalledTimes(1);
+    expect(boundStatements.filter((s) => s.sql.startsWith("UPDATE venues"))).toHaveLength(0);
   });
 });
 

@@ -92,13 +92,19 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json({ ok: false, error: "github_commit_failed" }, { status: 502 });
   }
 
-  // 6. ONLY now: promote drafts + write the audit row, atomically
-  await promotePublishedDrafts(db, snapshot.draftIds, {
-    actorEmail: identity.email,
-    publishedAt,
-    prUrl: commitResult.prUrl,
-    snapshotCount: validation.venues.length,
-  });
+  // 6. ONLY now: promote drafts + re-stamp edited-published rows (#284) +
+  // write the audit row, atomically
+  await promotePublishedDrafts(
+    db,
+    snapshot.draftIds,
+    {
+      actorEmail: identity.email,
+      publishedAt,
+      prUrl: commitResult.prUrl,
+      snapshotCount: validation.venues.length,
+    },
+    snapshot.editedPublishedIds,
+  );
 
   logPublishResult("success", { prUrl: commitResult.prUrl });
   return NextResponse.json({
@@ -106,7 +112,13 @@ export async function POST(req: NextRequest): Promise<Response> {
     prUrl: commitResult.prUrl,
     prNumber: commitResult.prNumber,
     reused: commitResult.reused,
-    publishedCount: snapshot.draftIds.length,
+    // #284 widened promotion to also re-stamp already-published rows edited
+    // since their last publish (snapshot.editedPublishedIds) — this count
+    // must include them too, or a publish that only ships such an edit (no
+    // new drafts) reports "0 places pushed" despite a real change going
+    // live. draftIds/editedPublishedIds partition by `status` at snapshot
+    // time (fetchPublishSnapshot, publishVenues.ts) and can never overlap.
+    publishedCount: snapshot.draftIds.length + snapshot.editedPublishedIds.length,
     snapshotCount: validation.venues.length,
   });
 }

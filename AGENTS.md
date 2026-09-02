@@ -534,10 +534,13 @@ commits that file via the GitHub Contents API to a fixed bot branch
 reuses that branch's PR, and enables auto-merge via the GraphQL API (the
 REST API has no "enable future auto-merge" endpoint — only the GraphQL
 `enablePullRequestAutoMerge` mutation does), (5) **only once step 4
-succeeds**, promotes the exact draft ids captured in step 1 to `published`
-and writes one `audit_log` row, atomically via a single `db.batch()`. Once
-the PR auto-merges, the existing Workers Builds pipeline (unmodified)
-redeploys production like any other push to `main`.
+succeeds**, promotes the exact draft ids captured in step 1 to `published`,
+**also re-stamps `published_at`/`published_by` on every already-published
+row in the snapshot edited since its last publish** (#284 —
+`fetchPublishSnapshot`'s `editedPublishedIds`), and writes one `audit_log`
+row, atomically via a single `db.batch()`. Once the PR auto-merges, the
+existing Workers Builds pipeline (unmodified) redeploys production like
+any other push to `main`.
 
 **`published-venues.ts` is now the public map's data source, not the three
 source arrays.** `src/data/venues.ts` imports `publishedVenues` from
@@ -562,6 +565,20 @@ asserts D1's `batch()` is never called when any step of the GitHub call
 fails, and IS called exactly once when it succeeds. Getting this backwards
 (as the spec's own v1.0 draft did) can mark drafts "published" in D1 even
 when the file never actually shipped.
+
+**#284 fix — editing an already-published venue must also advance its
+`published_at`.** Before this fix, `promotePublishedDrafts()` only ever
+touched `draftIds` — a `published` row's `published_at` never moved past
+its FIRST publish, so `summarizePublishChanges()` (`src/lib/adminVenues.ts`,
+`updated_at > published_at`) kept counting an already-shipped edit as
+"edited since publish" forever: `PublishPanel` never returned to "up to
+date," and every further click shipped a byte-identical file. Fixed by
+having `fetchPublishSnapshot()` also compute `editedPublishedIds` (rows
+with `status='published'` whose `updated_at > published_at`) alongside
+`draftIds`, and `promotePublishedDrafts()` re-stamps `published_at`/
+`published_by` on BOTH sets, still inside the same post-commit
+`db.batch()` — the NB1 ordering above is unchanged, this just widened
+which rows step 6 touches.
 
 **Concurrent publishes — "last snapshot wins" via a fixed bot branch.**
 Every publish resets the SAME `publish-bot` branch to `main`'s current tip

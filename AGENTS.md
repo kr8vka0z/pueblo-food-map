@@ -608,6 +608,35 @@ row, atomically via a single `db.batch()`. Once the PR auto-merges, the
 existing Workers Builds pipeline (unmodified) redeploys production like
 any other push to `main`.
 
+**The publish-bot PR itself skips part of the merge gate — a scoped, not
+general, bypass (`ci.yml` / `weekly-security-audit.yml`, #336).** Step 4
+above opens a real PR that has to pass the same required checks any other
+PR does, but two of those checks carve out a `data_only` fast path so a
+routine data publish isn't held to a UI-code review bar. `ci.yml`'s "Lint,
+typecheck, build" job skips `lint`, the `design:lint`/`design:drift` token
+gates, and the full `test:coverage` suite (replaced by a narrower
+published-data/venue-shape subset — row shape, benefit-flag overlay wiring,
+every venue's lat/lng inside the county bbox, hours parsing, JSON-LD).
+`weekly-security-audit.yml`'s "Dependency CVE Audit" job skips the
+blocking production `npm audit`. **`typecheck` and `build` are never
+skipped, on any publish PR, no exception** — they're what proves the
+regenerated file still type-checks against the `Venue` shape and still
+statically generates every venue page. Semgrep (`SAST Code Analysis`) and
+TruffleHog (`Secret Leak Scan`) also always run — neither job has a
+`data_only` branch at all. The whole carve-out rests on one invariant:
+`data_only` only ever goes `true` when the PR's full diff — computed from
+the merge-base of base/head, not a raw two-dot diff (a two-dot diff can
+falsely include base's own commits if base has moved, see the `detect`
+step's own WHY comment in both workflow files) — touches EXACTLY
+`src/data/published-venues.ts`. A second file changing alongside it, a
+workflow file, or any code change on that branch fails the check and gets
+the full pipeline. `src/__tests__/publishedVenues.test.ts` additionally
+proves the file's BODY is actually a JSON data literal (not just correctly
+named/pathed) by reading its raw source and `JSON.parse`-ing the slice
+after the `export const publishedVenues: Venue[] = ` declaration — a file
+that fails to parse as JSON there fails that test, which runs even in the
+scoped-down publish-PR test subset.
+
 **`published-venues.ts` is now the public map's data source, not the three
 source arrays.** `src/data/venues.ts` imports `publishedVenues` from
 `src/data/published-venues.ts` and applies the `benefit-flags.ts`

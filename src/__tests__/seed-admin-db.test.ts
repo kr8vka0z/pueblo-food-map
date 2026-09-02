@@ -8,7 +8,7 @@
  * D1/wrangler — see the script's own file header for why that's a separate,
  * manually-run step.
  *
- * The final describe block runs the checks against the REAL 108-record
+ * The final describe block runs the checks against the REAL production-size
  * dataset — this is the actual acceptance criterion ("Known pair this MUST
  * catch... If your check does NOT surface that pair, the heuristic is
  * wrong — fix it until it does."), not just a synthetic fixture.

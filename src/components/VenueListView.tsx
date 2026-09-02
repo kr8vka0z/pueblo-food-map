@@ -4,8 +4,9 @@
  * VenueListView — the admin's searchable/filterable venue table (read-only
  * list #253; per-row Edit link added #255). Receives every D1 `venues` row
  * (draft + published + archived) as a prop and owns all search/filter UI
- * state client-side — 108 rows total today, comfortably small enough that
- * no server-side pagination or search endpoint is warranted yet.
+ * state client-side — the dataset is comfortably small (low hundreds of
+ * rows), well under the point where server-side pagination or a search
+ * endpoint would be warranted.
  *
  * Presentational + interactive only: no data fetching (that's the Server
  * Component page, src/app/admin/page.tsx) and no mutation of its own — the

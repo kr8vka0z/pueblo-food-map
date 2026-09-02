@@ -110,7 +110,8 @@ function matchesWicBenefit(q: string): boolean {
  * Filter venues by a free-text query against venue name, category terms (EN + ES),
  * and benefit-program aliases (SNAP / WIC).
  *
- * - No debounce: 108 venues is fast enough for live-filter on each keystroke.
+ * - No debounce: the venue dataset is small enough that live-filter on each
+ *   keystroke stays fast without one.
  * - No fuzzy match: substring is sufficient for the demo; revisit post-demo.
  * - Empty query returns the full list unchanged.
  */

@@ -397,6 +397,16 @@ that matters). Separately, `.github/workflows/ci.yml` runs
 `deploy-prod.yml`/`deploy-dev.yml` re-run the same `predeploy` suite before
 deploying, so a red build never reaches production.
 
+**One scoped exception:** a `publish-bot` PR whose full diff (merge-base of
+base/head, not a raw two-dot diff) touches EXACTLY
+`src/data/published-venues.ts` — the file the admin Publish action
+regenerates from D1 (see AGENTS.md "Publish → static" for the full flow) —
+skips `lint`, `design:lint`, `design:drift`, `test:coverage` (replaced by a
+narrower published-data/venue-shape test subset), and `npm audit`.
+`typecheck` and `build` still run unconditionally, on every publish PR, with
+no exception — see AGENTS.md "Publish → static" for the exact skip list and
+why the carve-out can't be widened into a general gate bypass.
+
 **Route handlers as Workers:** Next.js route handlers (`submit/route.ts`)
 compile to Worker fetch handlers. The in-process rate-limit `Map` is in
 Worker memory — it resets on cold-start, which is acceptable for v1 volume.
@@ -530,8 +540,9 @@ fetches every `venues` row — draft, published, and archived — via
 `getAdminDb()` (src/lib/adminDb.ts, the single D1 choke point) and renders
 them through `VenueListView` (src/components/VenueListView.tsx), a Client
 Component that owns search (name/address, case-insensitive) and status/
-category filter state entirely client-side — 108 rows total today, well
-under where server-side filtering would earn its complexity. A row is
+category filter state entirely client-side — the dataset is comfortably
+small (low hundreds of rows), well under where server-side filtering would
+earn its complexity. A row is
 flagged "Unpublished changes" (`hasUnpublishedChanges()`,
 src/lib/adminVenues.ts) when it's a draft, or when a published row has been
 edited since its last publish (`updated_at > published_at`) — so an admin

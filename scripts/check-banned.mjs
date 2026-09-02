@@ -28,7 +28,12 @@ const PATTERNS = [
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '').replace(/^\/([A-Z]:)/, '$1');
 
-const EXCLUDE_DIRS  = new Set(['node_modules', '.next', 'out', 'build', 'docs', '.claude']);
+// .wrangler/.open-next/coverage are build/output dirs (see .gitignore) — they
+// can contain vendored/bundled copies of banned strings (old font names,
+// stale Tailwind palette utilities) that were never written by hand in this
+// repo. Scanning them produces false BANNED hits against generated code,
+// not a real violation to fix (#248).
+const EXCLUDE_DIRS  = new Set(['node_modules', '.next', 'out', 'build', 'docs', '.claude', '.wrangler', '.open-next', 'coverage']);
 const EXCLUDE_FILES = new Set([join(ROOT, 'scripts', 'check-banned.mjs').replace(/\\/g, '/')]);
 const INCLUDE_EXTS  = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css']);
 

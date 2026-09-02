@@ -8,7 +8,7 @@
  * polygon plus ~0.06° (~4 mi) of padding on every side so the county border
  * never hard-clips at the map edge.
  *
- * All 108 venues in src/data/venues.ts fall within this bbox.
+ * Every venue in src/data/venues.ts falls within this bbox.
  *
  * Format: [[lngWest, latSouth], [lngEast, latNorth]]
  */

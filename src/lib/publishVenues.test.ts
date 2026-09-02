@@ -4,7 +4,7 @@
  *
  * Covers: row validation/strip (fixture rows, including the tri-state
  * SNAP/WIC mapping and hours_weekly JSON parse), the serializer (including
- * a round-trip against the real 108-venue Part-1 baseline), the D1
+ * a round-trip against the real Part-1 baseline dataset), the D1
  * snapshot/promote queries (fake D1 — captures statements rather than
  * executing real SQL, since proving MY code's call sequence is the goal,
  * not re-implementing SQLite), and the GitHub commit/PR/auto-merge
@@ -179,6 +179,43 @@ describe("validateAndMapRow", () => {
     }
   });
 
+  // #267: valid JSON that isn't the right SHAPE used to slip through a bare
+  // `JSON.parse(...) as WeeklyHours` cast with no runtime check at all.
+  test("hours_weekly valid JSON but wrong shape (a string, not an object) is rejected", () => {
+    const result = validateAndMapRow(makeRow({ id: "bad-hours-shape", hours_weekly: '"just a string"' }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.id).toBe("bad-hours-shape");
+      expect(result.error.reason).toMatch(/hours/i);
+    }
+  });
+
+  test("hours_weekly valid JSON but an array (not an object) is rejected", () => {
+    const result = validateAndMapRow(makeRow({ id: "bad-hours-array", hours_weekly: "[1,2,3]" }));
+    expect(result.ok).toBe(false);
+  });
+
+  test("hours_weekly with an unknown day key is rejected", () => {
+    const result = validateAndMapRow(
+      makeRow({ id: "bad-hours-day", hours_weekly: JSON.stringify({ someday: ["09:00-17:00"] }) }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.reason).toMatch(/someday/i);
+  });
+
+  test("hours_weekly with a non-string slot value is rejected", () => {
+    const result = validateAndMapRow(
+      makeRow({ id: "bad-hours-slot", hours_weekly: JSON.stringify({ mon: [123] }) }),
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  test("hours_weekly as an empty object (no day keys at all) maps to undefined", () => {
+    const result = validateAndMapRow(makeRow({ hours_weekly: JSON.stringify({}) }));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.venue.hours_weekly).toBeUndefined();
+  });
+
   test("invalid category is rejected", () => {
     const result = validateAndMapRow(makeRow({ id: "bad-cat", category: "not-a-category" }));
     expect(result.ok).toBe(false);
@@ -187,6 +224,17 @@ describe("validateAndMapRow", () => {
 
   test.each(["lat", "lng"] as const)("NaN %s is rejected", (field) => {
     const result = validateAndMapRow(makeRow({ id: `bad-${field}`, [field]: NaN }));
+    expect(result.ok).toBe(false);
+  });
+
+  // #267: Number.isNaN alone lets Infinity/-Infinity through (Number.isNaN(Infinity) === false).
+  test.each(["lat", "lng"] as const)("%s === Infinity is rejected", (field) => {
+    const result = validateAndMapRow(makeRow({ id: `bad-${field}`, [field]: Infinity }));
+    expect(result.ok).toBe(false);
+  });
+
+  test.each(["lat", "lng"] as const)("%s === -Infinity is rejected", (field) => {
+    const result = validateAndMapRow(makeRow({ id: `bad-${field}`, [field]: -Infinity }));
     expect(result.ok).toBe(false);
   });
 

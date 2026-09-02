@@ -90,8 +90,14 @@ function validateTriState(value: unknown, field: string, errors: Record<string, 
  * completely-omitted field would produce, so callers reading this back
  * (e.g. publishVenues.ts's validateAndMapRow) never see a spurious empty
  * schedule.
+ *
+ * Exported (#267) so publishVenues.ts's validateAndMapRow can shape-check
+ * hours_weekly the same way this route already does, instead of a second,
+ * separately-maintained copy of the same day-key/slot-shape rules — load-
+ * bearing once a later automated data feeder writes rows that never pass
+ * through this admin form's own validation first.
  */
-function validateHoursWeekly(value: unknown, errors: Record<string, string>): string | null {
+export function validateHoursWeekly(value: unknown, errors: Record<string, string>): string | null {
   if (value === undefined || value === null) return null;
   if (typeof value !== "object" || Array.isArray(value)) {
     errors.hours_weekly = "Hours must be a weekly schedule object.";

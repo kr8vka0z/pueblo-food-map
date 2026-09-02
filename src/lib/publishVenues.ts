@@ -14,6 +14,7 @@
  * pieces. See src/app/api/admin/publish/route.ts for the sequencing.
  */
 
+import { validateHoursWeekly } from "@/lib/adminVenueValidation";
 import type { Venue, VenueCategory, WeeklyHours } from "@/types/venue";
 
 // ─── D1 row shape ───────────────────────────────────────────────────────────
@@ -91,10 +92,16 @@ export function validateAndMapRow(row: VenueRow): RowValidationResult {
   if (!VALID_CATEGORIES.has(row.category)) {
     return { ok: false, error: { id: row.id, reason: `invalid category "${row.category}"` } };
   }
-  if (typeof row.lat !== "number" || Number.isNaN(row.lat)) {
+  // Number.isFinite (not isNaN) so Infinity/-Infinity are also rejected here
+  // (#267) — isNaN alone let a non-real coordinate slip past this row
+  // validator into the public data file. Unlike adminVenueValidation.ts's
+  // own lat/lng check, this file has no real-world -90..90 / -180..180
+  // range bound today — Number.isFinite closes the reported Infinity gap
+  // without adding a range check that wasn't already here.
+  if (typeof row.lat !== "number" || !Number.isFinite(row.lat)) {
     return { ok: false, error: { id: row.id, reason: "invalid lat" } };
   }
-  if (typeof row.lng !== "number" || Number.isNaN(row.lng)) {
+  if (typeof row.lng !== "number" || !Number.isFinite(row.lng)) {
     return { ok: false, error: { id: row.id, reason: "invalid lng" } };
   }
   if (typeof row.address !== "string" || row.address.length === 0) {
@@ -115,11 +122,28 @@ export function validateAndMapRow(row: VenueRow): RowValidationResult {
 
   let hoursWeekly: WeeklyHours | undefined;
   if (row.hours_weekly !== null && row.hours_weekly !== undefined) {
+    let parsed: unknown;
     try {
-      hoursWeekly = JSON.parse(row.hours_weekly) as WeeklyHours;
+      parsed = JSON.parse(row.hours_weekly);
     } catch {
       return { ok: false, error: { id: row.id, reason: "hours_weekly is not valid JSON" } };
     }
+    // Shape check, not just "is this valid JSON" (#267) — a bare JSON.parse
+    // cast let ANY parseable JSON (a string, an array, an object with
+    // unknown day keys or non-string-array slot values) through as a
+    // WeeklyHours with no runtime backstop. Reuses adminVenueValidation.ts's
+    // own day-key/slot-shape rules rather than a second copy of them — this
+    // path only had none before because every existing row got here via
+    // that admin form's own POST validation first; a later automated data
+    // feeder writing rows directly has no such guarantee.
+    const shapeErrors: Record<string, string> = {};
+    const cleanedHoursJson = validateHoursWeekly(parsed, shapeErrors);
+    if (shapeErrors.hours_weekly) {
+      return { ok: false, error: { id: row.id, reason: shapeErrors.hours_weekly } };
+    }
+    hoursWeekly = cleanedHoursJson !== null
+      ? (JSON.parse(cleanedHoursJson) as WeeklyHours)
+      : undefined;
   }
 
   const venue: Venue = {

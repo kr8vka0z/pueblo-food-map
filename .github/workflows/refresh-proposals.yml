@@ -1,0 +1,121 @@
+# Automated venue-refresh pipeline — fixes: venue data hadn't been
+# re-verified since 2026-05 because scripts/scrape-plentiful.py and
+# scripts/ingest-osm-grocery.py wrote committed .ts files
+# (src/data/pantries-plentiful.ts, src/data/grocery-osm.ts) that nothing in
+# the app has read since the #237 D1 admin cutover — see README.md "Data
+# sources" and ARCHITECTURE.md "Data aggregator pattern" for the full
+# history. Only a human editing the admin form ever changed a live venue,
+# which is why nothing had moved in four months.
+#
+# This workflow re-runs those two scraper scripts UNMODIFIED (plus a new
+# Overpass fetcher, scripts/fetch-osm-grocery.py — ingest-osm-grocery.py has
+# never itself talked to Overpass, see that new file's own header), diffs
+# their output against the current Cloudflare D1 `venues` rows, and writes
+# ONE `change_proposals` row per detected difference — never a `venues` row.
+# scripts/refresh-ingest.ts (the orchestrator) and scripts/refresh/*.ts (the
+# pure diff/guardrail/link-health logic, unit-tested in
+# scripts/refresh/*.test.ts) are the actual implementation; this file is
+# just the schedule + credentials wrapper around them.
+#
+# A human reviewing/approving these proposals is a SEPARATE, LATER slice
+# (the admin's /admin/flags review queue, docs/admin/cloudflare-native-admin-spec.md
+# §6.6) — nothing this workflow does is visible on the public map or the
+# admin's existing venue list until that review ships and an admin acts.
+#
+# Credentials: reuses the SAME CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID
+# repo secrets deploy-prod.yml / deploy-dev.yml already use for
+# `wrangler deploy` (AGENTS.md's established secret names) — no new secret.
+# `wrangler d1 execute` (what scripts/refresh-ingest.ts shells out to) reads
+# the same two env vars any other wrangler command does.
+name: Venue Data Refresh
+
+on:
+  # THE MONTHLY CRON IS DELIBERATELY NOT ENABLED YET. Do not add it back
+  # without the two things below, both named in the 2026-09-02 review of
+  # PR #388:
+  #
+  #   1. The review UI (slice 2). Until an admin can approve or reject a
+  #      proposal from a screen, an unattended run writes into a queue
+  #      nobody reads — the worst outcome here is not a bad proposal, it is
+  #      months of confidence that data is being refreshed while the queue
+  #      silently fills. Every proposal this job writes is inert until a
+  #      human acts on it, so an unread queue is indistinguishable from no
+  #      pipeline at all.
+  #   2. A least-privilege credential. This job currently runs with the
+  #      deploy token (Workers deploy + full D1 admin) while parsing
+  #      adversarial third-party HTML. A token scoped to D1 Edit alone
+  #      bounds what a compromised scrape can reach.
+  #
+  # Until then the ONLY trigger is manual, so every run has a person
+  # watching it and reading what it wrote. When the cron returns, the
+  # intended schedule is `- cron: "0 6 1 * *"` — 06:00 UTC on the 1st,
+  # outside any US business day, so an admin never opens a queue that the
+  # same run is still writing. One combined monthly run for both sources is
+  # this slice's deliberate simplification over
+  # docs/admin/cloudflare-native-admin-spec.md §6.2's separate per-source
+  # cadences; see scripts/refresh-ingest.ts's file header.
+  #
+  # Recovery hatch / manual verification — same rationale as deploy-prod.yml's
+  # workflow_dispatch: lets this run be triggered by hand from the Actions
+  # tab without waiting for the 1st of the month, and is how this pipeline
+  # gets its first real production run after merge.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-proposals
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Scrape, diff against D1, write change_proposals
+    runs-on: ubuntu-latest
+    # Generous relative to deploy's 15 min: this job makes O(100) polite,
+    # rate-limited outbound requests in sequence (Plentiful detail pages,
+    # Nominatim geocoding, the link-health pass) — scripts/scrape-plentiful.py's
+    # own DETAIL_SLEEP/GEOCODE_SLEEP and scripts/refresh-ingest.ts's
+    # LINK_HEALTH_DELAY_MS are deliberately slow, by design (politeness to
+    # third-party services this repo doesn't control), not a performance bug.
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      # Same pinned-SHA third-party actions convention as deploy-prod.yml /
+      # deploy-dev.yml — a mutable tag could be repointed to malicious code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # 22, not 20: wrangler >=4.x refuses to run on Node <22 (deploy
+          # workflows' own established note, run 29660459443).
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      # scripts/scrape-plentiful.py's own header: "ERROR: beautifulsoup4 not
+      # installed. Run: pip install beautifulsoup4" — no requirements.txt
+      # exists in this repo (checked; not adding one for a single dep two
+      # scripts need, ponytail rung 6). Pinned to an exact version this
+      # scraper has actually been run against (fix: an unpinned `pip
+      # install` fetches whatever's newest inside a job holding the
+      # production Cloudflare deploy token).
+      - run: pip install beautifulsoup4==4.14.3
+      # --db-mode remote is REAL — this writes to PRODUCTION D1
+      # (pueblo-food-map-admin). Never pass --db-mode local here; that flag
+      # exists for scripts/refresh-ingest.ts's own local-dev/CI-test use
+      # against Miniflare's on-disk SQLite, not this workflow.
+      #
+      # `--no-install`, not `npx tsx`: `tsx` is a pinned devDependency
+      # (package.json) as of this fix — `npm ci` above already installed
+      # it into node_modules/.bin. Plain `npx tsx` would still work off
+      # that same local install, but --no-install makes it a hard error
+      # instead of a silent registry fetch if the local binary is ever
+      # missing (a stale cache, a future package.json edit that drops the
+      # pin) — this job holds the production Cloudflare deploy token, so
+      # "run whatever's newest from npm" is never an acceptable fallback
+      # here, only a loud failure is.
+      - run: npx --no-install tsx scripts/refresh-ingest.ts --db-mode remote

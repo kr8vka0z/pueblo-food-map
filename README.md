@@ -144,13 +144,36 @@ CI enforces this automatically (blocking gate).
 | Layer | Source | Refresh |
 |---|---|---|
 | Gardens + landscapes | Pueblo Food Project CGSP page | Manual |
-| Pantries + meal sites | Plentiful public directory (`directory.plentiful.org/colorado/pueblo`) | Re-run `scripts/scrape-plentiful.py` |
-| Grocery / convenience / farms | OpenStreetMap Overpass API | Re-run `scripts/ingest-osm-grocery.py` |
+| Pantries + meal sites | Plentiful public directory (`directory.plentiful.org/colorado/pueblo`) | Automated (see below) |
+| Grocery / convenience / farms | OpenStreetMap Overpass API | Automated (see below) |
 | SNAP / WIC flags | USDA FNS + CDPHE public data | Re-run `scripts/match-benefits.py` |
 
 PFP garden coordinates geocoded against Nominatim (OpenStreetMap) on
 2026-05-14 via `scripts/geocode-pfp.py` — audit trail in
 `data/raw/pfp-geocodes.json`.
+
+**Re-running the scrapers by hand does NOT update the live map.** Since the
+#237 admin cutover, the public map's data comes from Cloudflare D1 via an
+explicit admin Publish click (see ARCHITECTURE.md "Data aggregator
+pattern") — `scripts/scrape-plentiful.py` and `scripts/ingest-osm-grocery.py`
+still exist and still work exactly as before, but their output
+(`src/data/pantries-plentiful.ts`, `src/data/grocery-osm.ts`) is no longer
+read by the build. This is why venue data went unverified for four months
+(2026-05 to 2026-09): the only remaining path to correct a venue was a human
+editing it by hand in `/admin`.
+
+**The real refresh path (as of #133/#234's automated pipeline):**
+[`.github/workflows/refresh-proposals.yml`](.github/workflows/refresh-proposals.yml)
+runs monthly (and on manual dispatch), re-scrapes Plentiful and OSM, diffs
+the result against D1's current venues, and writes one `change_proposals`
+row per detected difference — including a link-health pass that flags dead
+outbound `url`s. It never writes to `venues` directly; every proposal still
+needs a human to review and approve before it reaches the public map (that
+review UI is a separate, later piece of work — see
+`docs/admin/cloudflare-native-admin-spec.md` §6). See
+`scripts/refresh-ingest.ts`'s own file header for the full mechanism, and
+AGENTS.md's "Automated venue-refresh pipeline" section for operational
+detail (guardrails, credentials, local testing).
 
 ---
 

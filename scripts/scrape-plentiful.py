@@ -546,7 +546,17 @@ def main() -> int:
         else:
             print(f"  [{i+1:2d}/{len(unique_entries)}] {entry['name'][:60]} (skip details)")
 
-        # Determine category
+        # Determine category. WHY this is weak (Fix 4 review note): the only
+        # signal is "does the directory's own NAME string contain the exact
+        # substring 'Soup Kitchen'?" — an admin's hand-corrected category
+        # for anything that doesn't literally spell that out (e.g. a combo
+        # pantry+meal site, or an org whose real name doesn't say "Soup
+        # Kitchen") gets silently proposed back to "pantry" every single
+        # run. Fix 3's diff_hash change (scripts/refresh/diffEngine.ts) at
+        # least makes an explicit rejection of that proposal STICK now —
+        # but the heuristic itself is unchanged and is the real underlying
+        # weakness; a durable fix needs a better category signal from
+        # Plentiful, not just better rejection memory.
         category = "meal_site" if MEAL_SITE_SUBSTRING in entry["name"] else "pantry"
 
         enriched.append({

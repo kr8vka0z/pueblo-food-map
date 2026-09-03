@@ -30,15 +30,31 @@
 name: Venue Data Refresh
 
 on:
-  schedule:
-    # Monthly — matches docs/admin/cloudflare-native-admin-spec.md §6.2's
-    # illustrative OSM cadence (groceries change less often than pantries;
-    # a single combined monthly run for both sources is this slice's
-    # deliberate simplification over that doc's separate per-source
-    # cadences — see scripts/refresh-ingest.ts's own file header).
-    # 06:00 UTC on the 1st — outside any US business day, keeps admins from
-    # opening a stale queue on the SAME run that's still writing it.
-    - cron: "0 6 1 * *"
+  # THE MONTHLY CRON IS DELIBERATELY NOT ENABLED YET. Do not add it back
+  # without the two things below, both named in the 2026-09-02 review of
+  # PR #388:
+  #
+  #   1. The review UI (slice 2). Until an admin can approve or reject a
+  #      proposal from a screen, an unattended run writes into a queue
+  #      nobody reads — the worst outcome here is not a bad proposal, it is
+  #      months of confidence that data is being refreshed while the queue
+  #      silently fills. Every proposal this job writes is inert until a
+  #      human acts on it, so an unread queue is indistinguishable from no
+  #      pipeline at all.
+  #   2. A least-privilege credential. This job currently runs with the
+  #      deploy token (Workers deploy + full D1 admin) while parsing
+  #      adversarial third-party HTML. A token scoped to D1 Edit alone
+  #      bounds what a compromised scrape can reach.
+  #
+  # Until then the ONLY trigger is manual, so every run has a person
+  # watching it and reading what it wrote. When the cron returns, the
+  # intended schedule is `- cron: "0 6 1 * *"` — 06:00 UTC on the 1st,
+  # outside any US business day, so an admin never opens a queue that the
+  # same run is still writing. One combined monthly run for both sources is
+  # this slice's deliberate simplification over
+  # docs/admin/cloudflare-native-admin-spec.md §6.2's separate per-source
+  # cadences; see scripts/refresh-ingest.ts's file header.
+  #
   # Recovery hatch / manual verification — same rationale as deploy-prod.yml's
   # workflow_dispatch: lets this run be triggered by hand from the Actions
   # tab without waiting for the 1st of the month, and is how this pipeline

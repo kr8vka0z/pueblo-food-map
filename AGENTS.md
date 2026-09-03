@@ -1052,6 +1052,58 @@ Requires `python3` on PATH with `beautifulsoup4` installed
 and CI runs use the same parser) and network access (Plentiful, Overpass,
 Nominatim, and every venue's stored `url` for the link-health pass — expect
 this to take 1-2 minutes; the delays are deliberate politeness, not a bug).
+
+**Plentiful changed its detail-page markup, 2026-09-02 — the hours parser
+was rewritten, not just patched.** `scrape-plentiful.py`'s
+`_infer_weekly_hours()` used to regex-match dated upcoming-service lines
+("2026-05-14 10:00 AM - 12:00 PM") off the page's flat text. Measured that
+day against all 35 live Pueblo detail pages: that form appears on ZERO of
+them. Plentiful now renders a recurring schedule as real markup instead
+(`<h2>Hours</h2>` + one or more `<p class="schedule-freq">`/
+`<table class="hours-table">` pairs — "Every week" or "Once a month" + an
+ordinal weekday like "4th Tuesday"). `_parse_hours_card()` (same file)
+replaces the old function: "Every week" rows still populate `hours_weekly`
+(the WeeklyHours Monday-Sunday grid `src/lib/hours.ts` consumes); any other
+recurrence ("Once a month", an ordinal weekday) has no slot in that grid, so
+it's rendered as an English sentence appended to `notes` instead (e.g.
+"Open the 4th Tuesday of each month, 11:00 AM – 12:00 PM.") rather than
+silently dropped — `src/lib/venueNotes.ts`'s boilerplate suppression was
+checked and does NOT swallow this text (its exact-suffix match no longer
+applies once real prose follows). Of the 35 pages measured: 27 have no
+"Hours" card at all (a real fact, not a parse failure), 4 are weekly, 3 are
+monthly/ordinal, 1 has an empty `<table class="hours-table">` with no rows.
+
+**Offline self-check — run this after touching `_parse_hours_card()` or
+anything it calls:**
+
+```bash
+python3 scripts/scrape-plentiful.py --self-check
+```
+
+No network, no D1 — asserts the parser against real HTML fixtures saved in
+`scripts/fixtures/plentiful/*.html` (captured from live Pueblo detail pages
+on 2026-09-02, one per shape found above). This is the one runnable proof
+for this parser; the repo has no Python test runner configured and
+deliberately doesn't get one for one script.
+
+**A new FATAL guard closes the exact failure mode that motivated this
+fix.** The old parser breaking silently returned `hours_weekly=None` for
+every venue — indistinguishable from "these venues just have no listed
+hours," so nobody noticed until a human spotted a new venue with no hours
+at all. `main()` now tallies, across all fetched detail pages, how many
+yielded ANY schedule data (weekly or the monthly/ordinal notes text). If at
+least 5 detail pages were fetched and NOT ONE yielded a schedule, that's
+almost certainly a markup change (not coincidence — even a fully-working
+parser only finds a schedule on ~20% of real Pueblo venues, measured
+2026-09-02), so the script prints `FATAL: 0/N fetched detail pages yielded
+any parseable Hours data` and exits 1 BEFORE writing any output — same
+"abort rather than silently ship a lie" shape as the directory-page `FATAL:
+No pantry cards parsed` guard above, and same downstream effect as any
+other scraper PROCESS failure (see "This does NOT apply to a scraper
+PROCESS failure" below: `refresh-ingest.ts`'s `execFileSync` throws on the
+non-zero exit, so neither Plentiful nor OSM writes anything that run). The
+floor of 5 exists so a small run can't trip this on sample-size noise alone.
+
 Inspect what it wrote:
 
 ```bash

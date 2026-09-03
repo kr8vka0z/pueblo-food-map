@@ -17,9 +17,13 @@
  *   4. Runs the outbound link-health pass (scripts/refresh/linkHealth.ts)
  *      over every venue with a stored url.
  *   5. If the combined total exceeds the per-run cap, aborts and writes
- *      NOTHING. Otherwise writes every surviving proposal as one D1
- *      db.batch()-equivalent (a single `wrangler d1 execute --file`), after
- *      superseding any earlier-run pending proposal for the same
+ *      NOTHING. Otherwise writes every surviving proposal as one batch of
+ *      SQL statements — `wrangler d1 execute --local --file` locally
+ *      (Miniflare's real db.batch()), or `wrangler d1 execute --remote
+ *      --command` in production (D1's REST /query endpoint, itself
+ *      documented as executing multiple `;`-joined statements "as a
+ *      batch" — see d1ApplyFile's own WHY comment for the full trace) —
+ *      after superseding any earlier-run pending proposal for the same
  *      (source, target_venue_id).
  *
  * This script NEVER writes to `venues` — only `change_proposals`. That's a
@@ -41,7 +45,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -109,9 +113,44 @@ function d1Query<T>(dbMode: DbMode, sql: string): T[] {
   return parsed[0]?.results ?? [];
 }
 
-/** Applies a SQL file via `wrangler d1 execute --file` — same apply mechanism scripts/seed-admin-db.ts documents. */
+/**
+ * Applies a batch of SQL statements. `--local` uses `--file` — same apply
+ * mechanism scripts/seed-admin-db.ts documents, and Miniflare's real
+ * `db.batch()` under the hood (verified in wrangler's own bundled source,
+ * `executeLocally`: `splitSqlQuery` + `db.batch(queries.map(db.prepare))`).
+ *
+ * `--remote` deliberately does NOT use `--file` (fix, was the original bug
+ * here): wrangler's `executeRemotely` (node_modules/wrangler/wrangler-dist/
+ * cli.js, `executeSql`/`executeRemotely`) branches on `input.file` — when
+ * set, it skips the query path ENTIRELY and instead uploads the file to R2
+ * and polls a D1 "import" job, printing "your D1 database will be
+ * unavailable to serve queries" while it runs. That's fine for a one-time
+ * schema seed (scripts/seed-admin-db.ts) but this job runs monthly against
+ * the SAME database that also holds Better Auth sessions, the auth
+ * rate-limit table, and public_submissions — a brief outage here logs the
+ * admin out and silently drops any public form submission landing in that
+ * window (best-effort insert, see AGENTS.md "Public submissions queue").
+ * `--command` instead takes the OTHER branch of that same `executeRemotely`
+ * function: no `input.file`, so it posts straight to D1's REST `/query`
+ * endpoint (`d1ApiPost(..., "query", { sql })`) — the identical live-query
+ * mechanism `d1Query()` above already uses for every read in this file,
+ * proven to not take anything offline. Cloudflare's own D1 API docs
+ * confirm a `;`-joined multi-statement `sql` string here "will be executed
+ * as a batch," and D1's batch semantics (per Cloudflare's docs) commit
+ * sequentially and roll back the whole sequence on any one failure — the
+ * same effective atomicity the file-header comment above already claimed,
+ * just reached through the query path instead of the offline import path.
+ */
 function d1ApplyFile(dbMode: DbMode, filePath: string): void {
-  execFileSync(process.execPath, [WRANGLER_BIN, "d1", "execute", DATABASE_NAME, `--${dbMode}`, "--file", filePath], {
+  if (dbMode === "remote") {
+    const sql = readFileSync(filePath, "utf-8");
+    execFileSync(process.execPath, [WRANGLER_BIN, "d1", "execute", DATABASE_NAME, "--remote", "--command", sql], {
+      cwd: REPO_ROOT,
+      stdio: "inherit",
+    });
+    return;
+  }
+  execFileSync(process.execPath, [WRANGLER_BIN, "d1", "execute", DATABASE_NAME, "--local", "--file", filePath], {
     cwd: REPO_ROOT,
     stdio: "inherit",
   });
@@ -212,7 +251,13 @@ async function main(): Promise<void> {
   }
 
   // ── 1 + 2: scrape, load current D1 state ──
-  const [plentifulIncoming, osmIncoming] = await Promise.all([scrapePlentiful(), scrapeOsm()]);
+  // Sequential, not Promise.all — each scraper shells out via execFileSync,
+  // which blocks Node's single thread until that child process exits, so
+  // the two scrapes were never actually concurrent despite the old
+  // Promise.all wrapping (a misleading-but-harmless read, fixed here to
+  // match what actually runs).
+  const plentifulIncoming = await scrapePlentiful();
+  const osmIncoming = await scrapeOsm();
   const currentByType: Record<RefreshSource, CurrentVenueRow[]> = {
     plentiful: loadCurrentRows(dbMode, "plentiful"),
     osm: loadCurrentRows(dbMode, "osm"),
@@ -329,9 +374,11 @@ async function main(): Promise<void> {
       );
     }
 
+    // mkdtempSync already creates tmpDir — a following mkdirSync(tmpDir) was
+    // a redundant no-op (recursive:true tolerates an existing dir) removed
+    // here, not a behavior change.
     const tmpDir = mkdtempSync(join(tmpdir(), "pfp-refresh-"));
     const sqlFile = join(tmpDir, "proposals.sql");
-    mkdirSync(tmpDir, { recursive: true });
     writeFileSync(sqlFile, statements.join("\n") + "\n", "utf-8");
 
     console.log(`Writing ${allProposals.length} proposal(s) + superseding ${toSupersede.length} stale pending row(s)...`);

@@ -60,6 +60,48 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history, not the default shallow clone -- the data-only
+          # detection step below diffs base...head by SHA (#336).
+          fetch-depth: 0
+
+      - name: Detect data-only publish-bot PR
+        id: detect
+        # Same diff-scope guard as ci.yml's "Lint, typecheck, build" job --
+        # duplicated rather than shared, since GitHub Actions has no
+        # cross-workflow step-output reuse. A branch-name check ALONE would
+        # be unsafe (anything pushed to a branch literally named
+        # "publish-bot" would silently skip the CVE gate); the real safety
+        # property is the DIFF -- data_only=true only when the PR is really
+        # publish-bot -> main/dev, from this repo (not a fork), AND its full
+        # base...head diff touches EXACTLY the one generated file the
+        # publish engine writes (src/lib/publishVenues.ts, AGENTS.md
+        # "Publish -> static") (#336).
+        #
+        # Diffed from the MERGE-BASE of base/head, not a raw two-dot diff
+        # (PR review on #383) -- see ci.yml's matching step for the full WHY:
+        # a two-dot diff only equals "this PR's change" when base.sha is
+        # exactly head's parent, and a lagging base.sha on a `synchronize`
+        # event (or main/dev advancing between bot-branch reset and this run)
+        # makes it show base's own commits as reversed changes, breaking
+        # data_only exactly when the publish carve-out needs to hold. This
+        # job's checkout above already uses fetch-depth: 0, which merge-base
+        # needs to resolve.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          data_only=false
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$HEAD_REF" = "publish-bot" ] && [ "$IS_FORK" = "false" ]; then
+            changed="$(git diff --name-only "$(git merge-base "$BASE_SHA" "$HEAD_SHA")" "$HEAD_SHA")"
+            if [ "$changed" = "src/data/published-venues.ts" ]; then
+              data_only=true
+            fi
+          fi
+          echo "data_only=$data_only" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -70,7 +112,10 @@ jobs:
       # production, so a CVE here shouldn't block a merge. It still runs and
       # posts to the job summary — reported, not silenced — so a build-tool
       # CVE stays visible instead of vanishing when the blocking step below is
-      # scoped down. Deliberate split, not a loosened check.
+      # scoped down. Deliberate split, not a loosened check. Also runs
+      # unconditionally for a data-only publish PR (#336) -- a build-tool CVE
+      # stays visible on every run, publish included, even on the run that
+      # skips the blocking step below.
       - name: Full dependency audit (informational, build tooling included)
         run: |
           echo "### Full dependency audit (informational — includes build tooling, does not block)" >> $GITHUB_STEP_SUMMARY
@@ -79,6 +124,18 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Run NPM Dependency Audit (production only, blocking)
+        # Skipped for a data-only publish PR (#336) -- same reasoning as
+        # ci.yml's "npm audit (production deps, high/critical only)" step: a
+        # newly-published CVE against an unrelated transitive dependency
+        # must not block real venue data from reaching the live map. The CVE
+        # is still reported (the informational step above, this same job,
+        # every run) and still enforced on every non-publish PR and by this
+        # workflow's own weekly cron regardless of whether a PR is ever
+        # opened. This job must still run and report green on a data-only
+        # PR -- it's a required check by its literal name ("Dependency CVE
+        # Audit"), so a job-level `if:` here would leave the PR blocked
+        # forever instead of passing; only this one step is conditional.
+        if: steps.detect.outputs.data_only != 'true'
         run: |
           echo "### Production dependency audit" >> $GITHUB_STEP_SUMMARY
           if npm audit --audit-level=high --omit=dev; then
@@ -87,3 +144,12 @@ jobs:
             echo "High or critical vulnerability detected in production dependencies." >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
+
+      - name: Skipped — data-only publish PR
+        # Job-summary breadcrumb explaining why the blocking step above is
+        # absent from this run's log, so a green "Dependency CVE Audit"
+        # check on a publish PR doesn't read as "nothing ran" (#336).
+        if: steps.detect.outputs.data_only == 'true'
+        run: |
+          echo "### Production dependency audit — skipped" >> $GITHUB_STEP_SUMMARY
+          echo "This PR is a data-only publish-bot PR (touches only src/data/published-venues.ts). The blocking production-CVE check is scoped out for data-only publishes — see ci.yml/weekly-security-audit.yml comments (#336). The full informational audit above still ran." >> $GITHUB_STEP_SUMMARY

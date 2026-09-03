@@ -11,9 +11,9 @@
  * Cards, not a dense table (unlike VenueListView): a submission carries far
  * more per-row detail than a venue's list columns (full address, hours,
  * contact, notes, or a closure's description) — a table would either clip
- * that detail or force horizontal scroll, where 108 rows of DENSE tabular
- * comparison genuinely suits VenueListView, a handful of pending
- * submissions read better as review cards.
+ * that detail or force horizontal scroll — where VenueListView's dense
+ * tabular comparison genuinely suits a large row count, a handful of
+ * pending submissions read better as review cards.
  *
  * Approve is a plain navigation Link for BOTH kinds (#270 made closure
  * match new_venue) — reusing existing routes rather than inventing new

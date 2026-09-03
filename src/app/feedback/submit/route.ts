@@ -19,7 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FEEDBACK_TYPES, type FeedbackTypeKey } from "@/lib/feedbackTypes";
 import { verifyTurnstileToken } from "@/lib/turnstile";
-import { createRateLimiter, EMAIL_RE } from "@/lib/rateLimit";
+import { createRateLimiter, isValidEmail } from "@/lib/rateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
 
@@ -108,7 +108,7 @@ function validate(body: SubmitPayload): string | null {
   if (body.contactEmail.length > FIELD_LIMITS.EMAIL) {
     return "Email address too long";
   }
-  if (!EMAIL_RE.test(body.contactEmail)) {
+  if (!isValidEmail(body.contactEmail)) {
     return "Invalid email format";
   }
   return null; // valid

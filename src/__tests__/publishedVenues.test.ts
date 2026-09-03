@@ -9,6 +9,8 @@
  */
 
 import { describe, test, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Venue } from "@/types/venue";
 import { venues, pfpVenues, categoryLabels, categoryColors, categoryIcon } from "@/data/venues";
 import { publishedVenues } from "@/data/published-venues";
@@ -17,6 +19,33 @@ import { plentifulPantries } from "@/data/pantries-plentiful";
 import { benefitFlags } from "@/data/benefit-flags";
 
 describe("venues data-layer invariants", () => {
+  // The data_only carve-out (ci.yml / weekly-security-audit.yml #336) skips
+  // lint/full-suite/audit for a publish-bot PR on the strength of PATH alone
+  // (the diff touches exactly src/data/published-venues.ts). Nothing else
+  // proves the file's BODY is actually data — a .ts module, anything
+  // syntactically valid after `export const publishedVenues: Venue[] =`
+  // passes typecheck/build/Semgrep/TruffleHog and rides the carve-out
+  // through auto-merge. This test is that proof: it reads the file's raw
+  // source (not the imported module — importing already executes whatever
+  // code is there), isolates the text after the declaration's `= ` exactly
+  // as serializePublishedVenuesFile() (src/lib/publishVenues.ts) emits it,
+  // and JSON.parses that slice. JSON.parse accepts only data — no function
+  // calls, no identifiers, no side effects — so a pass here is a structural
+  // guarantee the file is a JSON literal, not just a filename match.
+  test("published-venues.ts's exported literal is provably a JSON data literal, not executable code", () => {
+    const raw = readFileSync(join(process.cwd(), "src", "data", "published-venues.ts"), "utf-8");
+    const marker = "export const publishedVenues: Venue[] = ";
+    const markerIndex = raw.indexOf(marker);
+    expect(markerIndex).toBeGreaterThanOrEqual(0);
+
+    const afterDeclaration = raw.slice(markerIndex + marker.length).trimEnd();
+    expect(afterDeclaration.endsWith(";")).toBe(true);
+    const literalText = afterDeclaration.slice(0, -1);
+
+    const parsed: unknown = JSON.parse(literalText);
+    expect(parsed).toEqual(publishedVenues);
+  });
+
   test("venues applies the benefit-flag overlay on top of publishedVenues", () => {
     // venues.ts builds `venues` as publishedVenues.map(overlay); this pins that
     // wiring. Anchored to publishedVenues (not the seed spread) so it stays

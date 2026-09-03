@@ -397,6 +397,16 @@ that matters). Separately, `.github/workflows/ci.yml` runs
 `deploy-prod.yml`/`deploy-dev.yml` re-run the same `predeploy` suite before
 deploying, so a red build never reaches production.
 
+**One scoped exception:** a `publish-bot` PR whose full diff (merge-base of
+base/head, not a raw two-dot diff) touches EXACTLY
+`src/data/published-venues.ts` — the file the admin Publish action
+regenerates from D1 (see AGENTS.md "Publish → static" for the full flow) —
+skips `lint`, `design:lint`, `design:drift`, `test:coverage` (replaced by a
+narrower published-data/venue-shape test subset), and `npm audit`.
+`typecheck` and `build` still run unconditionally, on every publish PR, with
+no exception — see AGENTS.md "Publish → static" for the exact skip list and
+why the carve-out can't be widened into a general gate bypass.
+
 **Route handlers as Workers:** Next.js route handlers (`submit/route.ts`)
 compile to Worker fetch handlers. The in-process rate-limit `Map` is in
 Worker memory — it resets on cold-start, which is acceptable for v1 volume.
@@ -412,9 +422,18 @@ Preview environment (that's a Cloudflare Pages concept). Runtime secrets
 See [AGENTS.md](AGENTS.md) for deploy, rollback, env-var management, and
 Mapbox token management.
 
+**Superseded 2026-09-02 (#375): Dependabot no longer merges into `main` at
+all.** `dependabot.yml` now sets `target-branch: dev`, so dependency PRs open
+against `dev`, auto-merge there, and reach production only through a normal
+`dev` → `main` promotion PR — an ordinary human-token merge that always fires
+Deploy Prod. The strand-on-`main` scenario described below therefore no longer
+has a path to occur through Dependabot.
+
+**The underlying GitHub rule has not changed, so this history stays.** Any
+future workflow that pushes to `main` with `GITHUB_TOKEN` reintroduces the
+identical silent failure. Read this before adding one.
+
 **Fixed 2026-08-28: Dependabot auto-merge used to strand commits undeployed.**
-The history below is kept because the failure mode is silent and worth
-recognising if it ever returns.
 
 Previously, [`dependabot-auto-merge.yml`](.github/workflows/dependabot-auto-merge.yml)
 auto-merged patch/minor Dependabot PRs using `secrets.GITHUB_TOKEN`. GitHub
@@ -467,10 +486,24 @@ hatch. Before that, a commit which reached `main` without firing a deploy
 could only be rescued by pushing another commit; now `main` can be deployed
 as-is from the Actions tab.
 
-**Still unverified at the time of writing:** no Dependabot PR has auto-merged
-since the swap, so the end-to-end path has not yet been observed producing a
-Deploy Prod run. The detection commands above are how to confirm it on the
-first real auto-merge.
+**Verified end to end 2026-09-02** (it had sat unverified since the swap).
+Minutes after `target-branch: dev` landed on `main`, Dependabot re-ran and
+opened PRs #380 and #381 against `dev`. Both waited for the full required-check
+set (`Lint, typecheck, build` took 3m54s) and only then auto-merged, ~5 minutes
+after opening, and the merges fired Deploy Dev. So the App-token swap works and
+the auto-merge genuinely gates on CI.
+
+**What actually makes it wait is the branch ruleset, not the workflow.**
+`gh pr merge --auto` only defers when the base branch has required status
+checks; on a branch with none it merges the instant auto-merge is enabled. The
+`dev` ruleset added in #375 requires the same four checks `main` does, which is
+why the runs above were allowed to finish. Delete that ruleset and Dependabot
+auto-merge silently degrades into merge-on-open.
+
+**One consequence of the `dev` target to keep in mind:** a dependency bump —
+including a security bump — now sits on `dev` until someone opens a promotion
+PR. It gets real staging exposure first, which is the point, but it is no
+longer self-delivering to production.
 
 ---
 
@@ -507,8 +540,9 @@ fetches every `venues` row — draft, published, and archived — via
 `getAdminDb()` (src/lib/adminDb.ts, the single D1 choke point) and renders
 them through `VenueListView` (src/components/VenueListView.tsx), a Client
 Component that owns search (name/address, case-insensitive) and status/
-category filter state entirely client-side — 108 rows total today, well
-under where server-side filtering would earn its complexity. A row is
+category filter state entirely client-side — the dataset is comfortably
+small (low hundreds of rows), well under where server-side filtering would
+earn its complexity. A row is
 flagged "Unpublished changes" (`hasUnpublishedChanges()`,
 src/lib/adminVenues.ts) when it's a draft, or when a published row has been
 edited since its last publish (`updated_at > published_at`) — so an admin

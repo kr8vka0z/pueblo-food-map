@@ -23,7 +23,7 @@
     "@better-auth/passkey": "1.7.2",
     "better-auth": "1.7.2",
     "jose": "^6.2.10",
-    "lucide-react": "^1.35.0",
+    "lucide-react": "^1.37.0",
     "mapbox-gl": "^3.29.0",
     "next": "16.3.4",
     "react": "19.2.8",
@@ -32,7 +32,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260826.1",
+    "@cloudflare/workers-types": "^5.20260830.1",
     "@google/design.md": "0.4.0",
     "@opennextjs/cloudflare": "1.20.4",
     "@tailwindcss/postcss": "^4",

@@ -25,7 +25,7 @@
 
 import { categoryLabels } from "@/data/venues";
 import { DISPLAY_DAY_KEYS } from "@/lib/hours";
-import { EMAIL_RE } from "@/lib/rateLimit";
+import { isValidEmail } from "@/lib/rateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import type { VenueCategory, WeeklyHours } from "@/types/venue";
 
@@ -90,8 +90,14 @@ function validateTriState(value: unknown, field: string, errors: Record<string, 
  * completely-omitted field would produce, so callers reading this back
  * (e.g. publishVenues.ts's validateAndMapRow) never see a spurious empty
  * schedule.
+ *
+ * Exported (#267) so publishVenues.ts's validateAndMapRow can shape-check
+ * hours_weekly the same way this route already does, instead of a second,
+ * separately-maintained copy of the same day-key/slot-shape rules — load-
+ * bearing once a later automated data feeder writes rows that never pass
+ * through this admin form's own validation first.
  */
-function validateHoursWeekly(value: unknown, errors: Record<string, string>): string | null {
+export function validateHoursWeekly(value: unknown, errors: Record<string, string>): string | null {
   if (value === undefined || value === null) return null;
   if (typeof value !== "object" || Array.isArray(value)) {
     errors.hours_weekly = "Hours must be a weekly schedule object.";
@@ -163,20 +169,19 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
 
   const phone = optionalString(b.phone, "phone", errors);
   const email = optionalString(b.email, "email", errors);
-  // Cap length BEFORE the regex: EMAIL_RE (src/lib/rateLimit.ts) backtracks
-  // polynomially, so running it on unbounded input is a ReDoS vector even
-  // behind admin auth (a self-inflicted Worker-CPU DoS). Bounding to the RFC
-  // 5321 max first keeps the regex on <=254 chars — the same guard the public
-  // form routes already apply. Also clears the CodeQL polynomial-ReDoS alert
-  // this call site otherwise trips.
+  // Cap length BEFORE the regex: the underlying EMAIL_RE (src/lib/rateLimit.ts)
+  // backtracks polynomially, so running it on unbounded input is a ReDoS
+  // vector even behind admin auth (a self-inflicted Worker-CPU DoS). Bounding
+  // to the RFC 5321 max first keeps the regex on <=254 chars — the same guard
+  // the public form routes already apply. isValidEmail() (src/lib/rateLimit.ts)
+  // re-applies its own identical .slice(0, FIELD_LIMITS.EMAIL) bound at its
+  // call site (a no-op here, since this length guard already rejected
+  // anything longer than the cap) — reused rather than re-inlining the same
+  // regex+bound a second time in this file; one shared helper for both the
+  // public forms and this admin field, same bound either way.
   if (email && email.length > FIELD_LIMITS.EMAIL) {
     errors.email = `Email must be ${FIELD_LIMITS.EMAIL} characters or fewer.`;
-  } else if (email && !EMAIL_RE.test(email.slice(0, FIELD_LIMITS.EMAIL))) {
-    // .slice() is a no-op here (the guard above already rejected anything
-    // longer than the cap), but it makes the regex operand's length bound
-    // explicit to static analysis — CodeQL's polynomial-ReDoS taint tracking
-    // doesn't treat the length guard alone as a sanitizer, so without this the
-    // (now-harmless) alert re-attaches to this line on every scan.
+  } else if (email && !isValidEmail(email)) {
     errors.email = "Enter a valid email address.";
   }
   const url = optionalString(b.url, "url", errors);

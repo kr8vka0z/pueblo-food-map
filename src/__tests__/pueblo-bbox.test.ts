@@ -4,7 +4,7 @@
  * Verifies:
  *   - PUEBLO_COUNTY_BBOX has the correct structure and sane values.
  *   - PUEBLO_COUNTY_MIN_ZOOM is a reasonable floor.
- *   - All 108 venues in src/data/venues.ts fall within the bbox
+ *   - Every venue in src/data/venues.ts falls within the bbox
  *     (so no venue becomes unreachable after pan constraint is applied).
  */
 

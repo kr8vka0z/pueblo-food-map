@@ -14,6 +14,7 @@ import { join } from "node:path";
 import type { Venue } from "@/types/venue";
 import { venues, pfpVenues, categoryLabels, categoryColors, categoryIcon } from "@/data/venues";
 import { publishedVenues, publishedAt } from "@/data/published-venues";
+import { serializePublishedVenuesFile } from "@/lib/publishVenues";
 import { groceryOsmVenues } from "@/data/grocery-osm";
 import { plentifulPantries } from "@/data/pantries-plentiful";
 import { benefitFlags } from "@/data/benefit-flags";
@@ -25,57 +26,23 @@ describe("venues data-layer invariants", () => {
   // proves the file's BODY is actually data — a .ts module, anything
   // syntactically valid after `export const publishedVenues: Venue[] =`
   // passes typecheck/build/Semgrep/TruffleHog and rides the carve-out
-  // through auto-merge. This test is that proof: it reads the file's raw
-  // source (not the imported module — importing already executes whatever
-  // code is there), isolates the text after the declaration's `= ` exactly
-  // as serializePublishedVenuesFile() (src/lib/publishVenues.ts) emits it,
-  // and JSON.parses that slice. JSON.parse accepts only data — no function
-  // calls, no identifiers, no side effects — so a pass here is a structural
-  // guarantee the file is a JSON literal, not just a filename match.
-  test("published-venues.ts's exported literal is provably a JSON data literal, not executable code", () => {
+  // through auto-merge.
+  //
+  // Board review fix: the prior version of this proof only parsed the TEXT
+  // AFTER a marker string (`export const publishedVenues: Venue[] = ` /
+  // `export const publishedAt = `) — it never looked at anything BEFORE
+  // those markers, so executable code sitting ahead of them (e.g. in the
+  // header, or between the two declarations) would pass undetected. This
+  // byte-equality assertion is strictly stronger: it reserializes the
+  // imported data through the REAL serializer the publish route calls
+  // (serializePublishedVenuesFile, src/lib/publishVenues.ts) and asserts the
+  // committed file's raw source is IDENTICAL, byte for byte, to that output.
+  // The only way this passes is if the whole file — header, imports, BOTH
+  // exports, down to whitespace — is exactly what the serializer would have
+  // produced from this same data. There is no region left unchecked.
+  test("published-venues.ts's raw source is byte-identical to serializePublishedVenuesFile() output", () => {
     const raw = readFileSync(join(process.cwd(), "src", "data", "published-venues.ts"), "utf-8");
-    const marker = "export const publishedVenues: Venue[] = ";
-    const markerIndex = raw.indexOf(marker);
-    expect(markerIndex).toBeGreaterThanOrEqual(0);
-
-    const afterDeclaration = raw.slice(markerIndex + marker.length).trimEnd();
-    expect(afterDeclaration.endsWith(";")).toBe(true);
-    const literalText = afterDeclaration.slice(0, -1);
-
-    const parsed: unknown = JSON.parse(literalText);
-    expect(parsed).toEqual(publishedVenues);
-  });
-
-  // Board review finding #2: serializePublishedVenuesFile() now ALSO emits a
-  // `publishedAt` const (src/lib/publishVenues.ts) so the map-wide freshness
-  // line has something to read at runtime — a header comment isn't readable
-  // by component code. This extends the proof above to that new export: the
-  // same JSON.parse-only technique confirms it's inert string data (not, say,
-  // a `new Date()` call that would tick every build), which the data_only CI
-  // carve-out (ci.yml #336) depends on for every future publish, not just
-  // `publishedVenues`.
-  test("published-venues.ts's exported publishedAt is provably a JSON string literal, not executable code", () => {
-    const raw = readFileSync(join(process.cwd(), "src", "data", "published-venues.ts"), "utf-8");
-    const marker = "export const publishedAt = ";
-    const markerIndex = raw.indexOf(marker);
-    expect(markerIndex).toBeGreaterThanOrEqual(0);
-    // publishedAt must appear before publishedVenues — the existing marker
-    // slice above assumes nothing follows the venues array declaration.
-    expect(markerIndex).toBeLessThan(raw.indexOf("export const publishedVenues: Venue[] = "));
-
-    const afterDeclaration = raw.slice(markerIndex + marker.length);
-    const lineEnd = afterDeclaration.indexOf("\n");
-    const statement = afterDeclaration.slice(0, lineEnd).trimEnd();
-    expect(statement.endsWith(";")).toBe(true);
-    const literalText = statement.slice(0, -1);
-
-    const parsed: unknown = JSON.parse(literalText);
-    expect(typeof parsed).toBe("string");
-    expect(parsed).toBe(publishedAt);
-    // A real ISO timestamp, not just any string — proves it round-trips
-    // through Date parsing the way formatPublishedDate() (dataFreshness.ts)
-    // consumes it.
-    expect(Number.isNaN(new Date(parsed as string).getTime())).toBe(false);
+    expect(raw).toBe(serializePublishedVenuesFile(publishedVenues, { publishedAt }));
   });
 
   test("venues applies the benefit-flag overlay on top of publishedVenues", () => {

@@ -83,10 +83,23 @@ jobs:
       # scripts/scrape-plentiful.py's own header: "ERROR: beautifulsoup4 not
       # installed. Run: pip install beautifulsoup4" — no requirements.txt
       # exists in this repo (checked; not adding one for a single dep two
-      # scripts need, ponytail rung 6).
-      - run: pip install beautifulsoup4
+      # scripts need, ponytail rung 6). Pinned to an exact version this
+      # scraper has actually been run against (fix: an unpinned `pip
+      # install` fetches whatever's newest inside a job holding the
+      # production Cloudflare deploy token).
+      - run: pip install beautifulsoup4==4.14.3
       # --db-mode remote is REAL — this writes to PRODUCTION D1
       # (pueblo-food-map-admin). Never pass --db-mode local here; that flag
       # exists for scripts/refresh-ingest.ts's own local-dev/CI-test use
       # against Miniflare's on-disk SQLite, not this workflow.
-      - run: npx tsx scripts/refresh-ingest.ts --db-mode remote
+      #
+      # `--no-install`, not `npx tsx`: `tsx` is a pinned devDependency
+      # (package.json) as of this fix — `npm ci` above already installed
+      # it into node_modules/.bin. Plain `npx tsx` would still work off
+      # that same local install, but --no-install makes it a hard error
+      # instead of a silent registry fetch if the local binary is ever
+      # missing (a stale cache, a future package.json edit that drops the
+      # pin) — this job holds the production Cloudflare deploy token, so
+      # "run whatever's newest from npm" is never an acceptable fallback
+      # here, only a loud failure is.
+      - run: npx --no-install tsx scripts/refresh-ingest.ts --db-mode remote

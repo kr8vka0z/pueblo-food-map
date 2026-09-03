@@ -36,6 +36,13 @@
  * mapSubmissionPayloadToFormValues(). On success that path redirects back
  * to /admin/submissions instead of /admin, so the admin lands back on the
  * queue rather than the plain venue list.
+ *
+ * #390: an optional `proposalId` prop (EDIT mode only — the mirror image of
+ * `submissionId` above, which is create-mode-only) rides along in the
+ * PATCH body so the edit route can approve the originating `change_proposals`
+ * row (source='link_health') atomically with the venue update — wired by
+ * src/app/admin/venues/[id]/edit/page.tsx when opened as `?proposal=<id>`.
+ * On success that path redirects back to /admin/flags instead of /admin.
  */
 
 import { useState } from "react";
@@ -112,6 +119,16 @@ export interface AddVenueFormProps {
    * in the SAME atomic batch as the venue insert (see that route's header).
    */
   submissionId?: number;
+  /**
+   * The `change_proposals` row id this edit was reached FROM (#390): set
+   * only when /admin/venues/<id>/edit was opened via the flags queue's
+   * link_health "Review & fix link" hand-off (?proposal=<id>). Meaningful
+   * only in EDIT mode — ignored in create mode, mirror image of
+   * `submissionId` above. Threaded straight through to the PATCH body so
+   * PATCH /api/admin/venues/<id> can flip that proposal to
+   * `status='approved'` in the SAME atomic batch as the venue update.
+   */
+  proposalId?: number;
 }
 
 type FieldErrorKey =
@@ -228,7 +245,7 @@ function validateClient(values: AddVenueFormValues): FieldErrors {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function AddVenueForm({ initialValues, venueId, submissionId }: AddVenueFormProps) {
+export default function AddVenueForm({ initialValues, venueId, submissionId, proposalId }: AddVenueFormProps) {
   const router = useRouter();
   const isEditMode = venueId !== undefined;
   const [values, setValues] = useState<AddVenueFormValues>(() => defaultValues(initialValues));
@@ -333,6 +350,9 @@ export default function AddVenueForm({ initialValues, venueId, submissionId }: A
       // queue — never in edit mode (submissionId is meaningless there; see
       // this prop's own doc comment above).
       ...(!isEditMode && submissionId != null ? { submissionId } : {}),
+      // #390: mirror image — only ever sent on an edit reached from the
+      // flags queue's link_health hand-off.
+      ...(isEditMode && proposalId != null ? { proposalId } : {}),
     };
 
     // Create POSTs /api/admin/venues (201 on success); edit PATCHes
@@ -351,10 +371,14 @@ export default function AddVenueForm({ initialValues, venueId, submissionId }: A
       });
 
       if (res.status === successStatus) {
-        // #259: a create that approved a submission returns to the review
-        // queue (so the admin picks up the next pending card) rather than
-        // the plain venue list; every other path is unchanged.
-        router.push(!isEditMode && submissionId != null ? "/admin/submissions" : "/admin");
+        // #259/#390: a create that approved a submission returns to the
+        // review queue; an edit that approved a proposal returns to the
+        // flags queue — so the admin picks up the next pending card in
+        // either case, rather than the plain venue list.
+        let redirectTo = "/admin";
+        if (!isEditMode && submissionId != null) redirectTo = "/admin/submissions";
+        else if (isEditMode && proposalId != null) redirectTo = "/admin/flags";
+        router.push(redirectTo);
         router.refresh();
         return;
       }

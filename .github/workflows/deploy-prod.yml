@@ -86,6 +86,35 @@ jobs:
       # gate step above (~3 min duplicated inside the 15-min timeout).
       - run: npx opennextjs-cloudflare build
       - run: npx opennextjs-cloudflare deploy
+      # Post-deploy smoke check. AGENTS.md's "Per-venue pages" section
+      # states the lesson this codifies: "a green build / CF-check does
+      # NOT prove the page works on this stack" (learned 2026-06-20, a
+      # `redirects()` rule that built clean and passed CI 500'd the live
+      # homepage) — that lesson was never automated until now. Curls the
+      # direct Worker origin (bypasses the zone/CDN cache, per AGENTS.md
+      # "Direct Worker URL") for the homepage, the venues directory, and
+      # one real per-venue page. The 10-day 2026-08-24 to 2026-09-02
+      # outage (218/230 public URLs 404ing) is exactly the class of
+      # failure this would have caught on deploy #1 instead of deploy #19.
+      - name: Smoke test production (post-deploy)
+        run: |
+          set -e
+          ORIGIN="https://pueblo-food-map.kyle-boyd.workers.dev"
+          VENUE_ID=$(grep -m1 '"id":' src/data/published-venues.ts | sed -E 's/.*"id": *"([^"]+)".*/\1/')
+          if [ -z "$VENUE_ID" ]; then
+            echo "Smoke check failed: could not read a venue id from src/data/published-venues.ts" >&2
+            exit 1
+          fi
+          status=0
+          for path in "/" "/venues" "/venue/${VENUE_ID}"; do
+            code=$(curl -fsS -o /dev/null -w "%{http_code}" "${ORIGIN}${path}" || echo "000")
+            echo "GET ${ORIGIN}${path} -> ${code}"
+            if [ "$code" != "200" ]; then
+              echo "Smoke check failed: ${path} returned ${code}, expected 200" >&2
+              status=1
+            fi
+          done
+          exit $status
       # Belt and suspenders on top of the HC.io dead-man's-switch (wrangler.jsonc
       # `triggers`/`vars`, custom-worker.ts `scheduled()`): that switch only fires on
       # SILENCE (no ping within period+grace). A failed deploy here pushes an explicit

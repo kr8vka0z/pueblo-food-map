@@ -297,6 +297,17 @@ describe("venuesToLiteralArray / serializePublishedVenuesFile", () => {
     expect(text).toContain("Last published: 2026-07-01T00:00:00.000Z");
   });
 
+  // Board review finding #2 — the map-wide freshness line (ListView, /about)
+  // reads this export at runtime; the header comment alone isn't readable by
+  // component code.
+  test("emits a publishedAt const, before the publishedVenues export", () => {
+    const text = serializePublishedVenuesFile([], { publishedAt: "2026-07-01T00:00:00.000Z" });
+    expect(text).toContain('export const publishedAt = "2026-07-01T00:00:00.000Z";');
+    expect(text.indexOf("export const publishedAt = ")).toBeLessThan(
+      text.indexOf("export const publishedVenues: Venue[] = "),
+    );
+  });
+
   test("does NOT embed a publishing admin's email anywhere in the file text", () => {
     const text = serializePublishedVenuesFile(
       [{ id: "x", name: "X", category: "farm", lat: 1, lng: 2, address: "a", source: "s", last_verified: "2026-01-01" }],

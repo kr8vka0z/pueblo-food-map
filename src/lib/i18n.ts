@@ -91,6 +91,7 @@ const en: Record<string, string> = {
   "badge.opensAt": "Opens at {time}",
   "badge.closesAt": "Closes {time}",
   "badge.closedToday": "Closed today",
+  "badge.hoursUnknown": "Hours unknown — call ahead",
   "badge.snap": "SNAP",
   "badge.wic": "WIC",
 
@@ -402,6 +403,11 @@ const en: Record<string, string> = {
   "venues.intro": "Every pantry, grocery store, community garden, farm, and meal site on the map — grouped by type, with addresses and hours.",
   "venues.noHours": "Hours not listed",
 
+  // Map-wide data freshness (board review finding #2) — surfaced in ListView
+  // and /about so users can judge how current the whole map is, not just one
+  // venue's own last_verified date.
+  "freshness.updated": "Map data updated {date}",
+
   // About page FAQ + stats (#PR4)
   "about.stat.insecurity": "According to Feeding America's Map the Meal Gap (2023 data), about 1 in 6 Pueblo County residents — roughly 16.5% — faces food insecurity, including nearly 1 in 5 children.",
   "about.stat.count": "Pueblo Food Map currently maps {count} of the free and low-cost food resources that can help.",
@@ -516,6 +522,7 @@ const es: Record<string, string> = {
   "badge.opensAt": "Abre a las {time}",
   "badge.closesAt": "Cierra a las {time}",
   "badge.closedToday": "Cerrado hoy",
+  "badge.hoursUnknown": "Horario desconocido — llama antes",
   "badge.snap": "SNAP",
   "badge.wic": "WIC",
 
@@ -822,6 +829,9 @@ const es: Record<string, string> = {
   "venues.heading": "Todos los recursos alimentarios",
   "venues.intro": "Cada despensa, supermercado, huerto comunitario, granja y comedor del mapa — agrupados por tipo, con direcciones y horarios.",
   "venues.noHours": "Horario no disponible",
+
+  // Map-wide data freshness (board review finding #2)
+  "freshness.updated": "Datos del mapa actualizados el {date}",
 
   // About page FAQ + stats (#PR4)
   "about.stat.insecurity": "Según el estudio Map the Meal Gap de Feeding America (datos de 2023), aproximadamente 1 de cada 6 residentes del condado de Pueblo — cerca del 16.5% — vive con inseguridad alimentaria, incluyendo casi 1 de cada 5 niños.",

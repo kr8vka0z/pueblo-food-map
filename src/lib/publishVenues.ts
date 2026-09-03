@@ -214,7 +214,12 @@ export function validateSnapshot(rows: VenueRow[]): ValidateSnapshotResult {
 // ─── Serialize: Venue[] -> published-venues.ts source text ────────────────
 
 export interface PublishFileMeta {
-  /** ISO timestamp — embedded in the file's header comment only. */
+  /**
+   * ISO timestamp — embedded in the file's header comment AND, since board
+   * review finding #2, as a real `export const publishedAt` string so
+   * component code (ListView / /about's freshness line) can read it at
+   * runtime; a header comment alone isn't readable from JS.
+   */
   publishedAt: string;
 }
 
@@ -237,6 +242,15 @@ export function venuesToLiteralArray(venues: Venue[]): string {
  * identity is already recorded where an audit trail belongs (D1's private
  * audit_log/venues.published_by, written by promotePublishedDrafts below),
  * not baked into permanent public git history.
+ *
+ * Board review finding #2: the header comment's "Last published" line isn't
+ * readable at runtime — nothing on the live map ever told a user how current
+ * the data was. `publishedAt` is now ALSO emitted as a real exported const
+ * (a plain JSON.stringify'd string, same inertness guarantee as
+ * venuesToLiteralArray below) so ListView / /about can render a "Map data
+ * updated <date>" line. Emitted BEFORE the `publishedVenues` export so the
+ * `export const publishedVenues: Venue[] = ` marker
+ * src/__tests__/publishedVenues.test.ts anchors on is unaffected.
  */
 export function serializePublishedVenuesFile(venues: Venue[], meta: PublishFileMeta): string {
   const header = [
@@ -254,6 +268,7 @@ export function serializePublishedVenuesFile(venues: Venue[], meta: PublishFileM
   return (
     `${header}\n` +
     `import type { Venue } from "@/types/venue";\n\n` +
+    `export const publishedAt = ${JSON.stringify(meta.publishedAt)};\n` +
     `export const publishedVenues: Venue[] = ${venuesToLiteralArray(venues)};\n`
   );
 }

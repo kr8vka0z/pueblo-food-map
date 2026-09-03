@@ -46,14 +46,21 @@ import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
 import ProposalsReviewView from "@/components/ProposalsReviewView";
+import type { WeeklyHours } from "@/types/venue";
 
 interface VenueLookupRow {
   id: string;
   name: string;
   category: string;
+  lat: number;
+  lng: number;
   address: string;
   phone: string | null;
   url: string | null;
+  hours_weekly: string | null;
+  accepts_snap: number | null;
+  accepts_wic: number | null;
+  source: string;
   last_verified: string;
   status: string;
 }
@@ -63,16 +70,30 @@ interface VenueLookupRow {
  * tell what the change is? There's no detail."). A reviewer needs enough of
  * the CURRENT venue to recognise the place and sanity-check a proposed
  * change against it — name and status alone answer "does this id exist,"
- * not "is this the place I think it is." Deliberately NOT every AdminVenueRow
- * column (no lat/lng/hours/notes/audit fields) — this is a lookup for
- * display context, not a second venue-edit read.
+ * not "is this the place I think it is."
+ *
+ * Widened AGAIN (right-hand preview, staging review — Kyle: "it would be
+ * nice if there was a full preview... easier to catch errors that way").
+ * The preview reuses the real public VenueCard component, which needs
+ * lat/lng/hours_weekly/accepts_snap/accepts_wic/source to render a genuine
+ * card — the previous {name, category, address, phone, url, last_verified,
+ * status} shape had enough for a text summary but not enough for a real
+ * render. Still deliberately NOT every AdminVenueRow column (no notes,
+ * operator, email, audit fields) — VenueCard doesn't render any of those,
+ * so pulling them would just be an unused read.
  */
 export interface VenueLookup {
   name: string;
   category: string;
+  lat: number;
+  lng: number;
   address: string;
   phone: string | null;
   url: string | null;
+  hours_weekly: WeeklyHours | null;
+  accepts_snap?: boolean;
+  accepts_wic?: boolean;
+  source: string;
   last_verified: string;
   status: string;
 }
@@ -115,16 +136,42 @@ async function loadVenueLookup(db: D1Database, ids: string[]): Promise<Record<st
     const batch = uniqueIds.slice(i, i + D1_MAX_BOUND_PARAMS);
     const placeholders = batch.map(() => "?").join(", ");
     const result = await db
-      .prepare(`SELECT id, name, category, address, phone, url, last_verified, status FROM venues WHERE id IN (${placeholders})`)
+      .prepare(
+        `SELECT id, name, category, lat, lng, address, phone, url, hours_weekly, accepts_snap, accepts_wic, source, last_verified, status FROM venues WHERE id IN (${placeholders})`,
+      )
       .bind(...batch)
       .all<VenueLookupRow>();
     for (const row of result.results) {
+      // hours_weekly is JSON text in D1 (migrations/0001) — same shape
+      // src/lib/adminVenueForm.ts's hoursWeeklyJsonToDraft() unpacks, but
+      // parsed straight to the object VenueCard/Venue expects here rather
+      // than that file's per-day-comma-string draft shape (that's a form
+      // editing convenience, not what a read-only preview needs). A bad
+      // JSON blob degrades to null (no hours row) rather than throwing —
+      // same fail-soft posture as parseProposalRow above.
+      let hours: WeeklyHours | null = null;
+      if (row.hours_weekly) {
+        try {
+          hours = JSON.parse(row.hours_weekly) as WeeklyHours;
+        } catch {
+          hours = null;
+        }
+      }
       map[row.id] = {
         name: row.name,
         category: row.category,
+        lat: row.lat,
+        lng: row.lng,
         address: row.address,
         phone: row.phone,
         url: row.url,
+        hours_weekly: hours,
+        // Tri-state INTEGER -> optional boolean, same NULL=unknown mapping
+        // publishVenues.ts's serializer already uses for the exact same
+        // column (src/lib/publishVenues.ts, "key omitted" comment).
+        accepts_snap: row.accepts_snap === null ? undefined : row.accepts_snap === 1,
+        accepts_wic: row.accepts_wic === null ? undefined : row.accepts_wic === 1,
+        source: row.source,
         last_verified: row.last_verified,
         status: row.status,
       };

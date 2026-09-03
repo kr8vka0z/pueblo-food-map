@@ -75,6 +75,12 @@ export function useMapFilters(origin: LatLng) {
     );
   }, []);
 
+  // WHY confirmed-open only, deliberately NOT matching the filtered list below:
+  // the "Open now" filter itself lets "no_hours" venues survive (board review
+  // finding #1) so the pantry majority isn't hidden, but this badge counts only
+  // venues whose hours are actually known to be open right now. Inflating this
+  // number to match the filtered list's length would misreport how many places
+  // are provably open — this is the one honest number on the screen.
   const openNowCount = useMemo(
     () =>
       venuesWithDistance.filter(
@@ -109,14 +115,37 @@ export function useMapFilters(origin: LatLng) {
         }
         if (filterOpenNow) {
           const status = computeOpenStatus(v.hours_weekly, now);
-          if (status.state !== "open") return false;
+          // "no_hours" survives the filter deliberately (board review finding
+          // #1): 74 of 107 venues have no hours_weekly data, so treating
+          // "unknown" the same as "closed" hid 25 of 35 food pantries behind
+          // this toggle with nothing on screen explaining why. Only a venue
+          // whose hours ARE known and currently says closed gets dropped here
+          // — components render the "no_hours" case as a distinct "hours
+          // unknown, call ahead" label (see BottomSheet/DesktopVenueWindow/
+          // VenueCard) so it's never mistaken for "open."
+          if (status.state !== "open" && status.state !== "no_hours") return false;
         }
         if (filterSnap && !v.accepts_snap) return false;
         if (filterWic && !v.accepts_wic) return false;
         if (filterFavorites && favoriteSet.size > 0 && !favoriteSet.has(v.id)) return false;
         return true;
       })
-      .sort((a, b) => a.distanceMiles - b.distanceMiles);
+      .sort((a, b) => {
+        // Open now leads with confirmed-open venues, distance-sorted within
+        // each group — board review finding: since "no_hours" venues now
+        // survive the filter above, sorting by distance alone let confirmed-
+        // open venues (19 of 93 on a real sample) get buried among a majority
+        // of "hours unknown" rows, defeating the point of the toggle. Distance
+        // is always a real number here (origin falls back to PUEBLO_CENTER in
+        // MapWrapper when geolocation is unavailable — never NaN/undefined),
+        // so no special-casing is needed for a missing-distance case.
+        if (filterOpenNow) {
+          const aOpen = computeOpenStatus(a.hours_weekly, now).state === "open";
+          const bOpen = computeOpenStatus(b.hours_weekly, now).state === "open";
+          if (aOpen !== bOpen) return aOpen ? -1 : 1;
+        }
+        return a.distanceMiles - b.distanceMiles;
+      });
 
     return searchVenues(afterFilters, query);
   }, [

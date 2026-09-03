@@ -120,6 +120,7 @@ components:
     textColor: "{colors.ink400}"
   badgeYellow:
     backgroundColor: "{colors.yellow}"
+    textColor: "{colors.ink700}"
   venueMarkerPantry:
     backgroundColor: "{colors.catPantry}"
   venueMarkerGrocery:

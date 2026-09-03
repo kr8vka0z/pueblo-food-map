@@ -9,6 +9,8 @@ import { describe, test, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import ListView from "@/components/ListView";
 import type { Venue } from "@/types/venue";
+import { publishedAt } from "@/data/published-venues";
+import { formatPublishedDate } from "@/lib/dataFreshness";
 
 // ─── Fixture ─────────────────────────────────────────────────────────────────
 
@@ -85,6 +87,28 @@ describe("ListView — renders venue list", () => {
       />,
     );
     expect(screen.getByText(/sorted by distance/i)).toBeDefined();
+  });
+});
+
+// ─── Data freshness (board review finding #2) ─────────────────────────────────
+
+describe("ListView — data freshness line", () => {
+  test("renders 'Map data updated <date>' using the real publishedAt export", () => {
+    render(<ListView venues={FIXTURE_VENUES} selectedVenueId={null} onSelect={vi.fn()} />);
+    const expected = formatPublishedDate(publishedAt, "en");
+    expect(screen.getByText(new RegExp(`Map data updated ${expected}`))).toBeDefined();
+  });
+
+  test("shows the freshness line even when the filtered list is empty", () => {
+    render(<ListView venues={[]} selectedVenueId={null} onSelect={vi.fn()} />);
+    const expected = formatPublishedDate(publishedAt, "en");
+    expect(screen.getByText(new RegExp(`Map data updated ${expected}`))).toBeDefined();
+  });
+
+  test("renders the ES translation", () => {
+    render(<ListView venues={FIXTURE_VENUES} selectedVenueId={null} onSelect={vi.fn()} locale="es" />);
+    const expected = formatPublishedDate(publishedAt, "es");
+    expect(screen.getByText(new RegExp(`Datos del mapa actualizados el ${expected}`))).toBeDefined();
   });
 });
 

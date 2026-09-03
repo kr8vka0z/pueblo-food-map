@@ -9,6 +9,7 @@
  */
 import type { Venue } from "@/types/venue";
 
+export const publishedAt = "2026-07-22T04:35:18.344Z";
 export const publishedVenues: Venue[] = [
   {
     "id": "garden-bethany-lutheran",

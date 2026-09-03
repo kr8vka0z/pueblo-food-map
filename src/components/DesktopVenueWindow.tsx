@@ -34,7 +34,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { MapPin, Phone, Clock, ExternalLink } from "lucide-react";
+import { MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import { safeUrl } from "@/lib/safeUrl";
@@ -59,6 +59,7 @@ import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
+import { getDisplayNotes } from "@/lib/venueNotes";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import VenuePopupHeader from "@/components/VenuePopupHeader";
@@ -189,6 +190,7 @@ export default function DesktopVenueWindow({
   const windowH = expanded ? WINDOW_EXPANDED_H : WINDOW_QUICK_H;
 
   const status = computeOpenStatus(venue.hours_weekly);
+  const displayNotes = getDisplayNotes(venue);
 
   // ── Position computation ─────────────────────────────────────────────────
   // Recomputes position on mount and whenever the map pans/zooms.
@@ -331,12 +333,24 @@ export default function DesktopVenueWindow({
               : t("badge.closedToday", locale)}
           </span>
         )}
+        {/* Board review finding #1: a "no_hours" venue now survives the
+            "Open now" filter instead of vanishing — this label is what tells
+            the user why there's no open/closed read, using a different icon
+            (not Clock) + explicit text so it's never mistaken for "open" by
+            shape alone, not just color. */}
+        {status && status.state === "no_hours" && (
+          <span className="flex items-center gap-1 text-[var(--color-ink-700)] font-medium">
+            <CircleHelp size={12} aria-hidden className="text-[var(--color-ink-700)]" />
+            {t("badge.hoursUnknown", locale)}
+          </span>
+        )}
       </div>
 
-      {/* Notes (2 lines max) — guard: never render OSM artifact strings */}
-      {venue.notes && !/osm/i.test(venue.notes) && (
+      {/* Notes (2 lines max) — suppressed for OSM artifacts and Plentiful's
+          auto-generated boilerplate (src/lib/venueNotes.ts) */}
+      {displayNotes && (
         <p className="text-xs text-[var(--color-ink-700)] leading-relaxed line-clamp-2">
-          {venue.notes}
+          {displayNotes}
         </p>
       )}
 
@@ -450,14 +464,15 @@ export default function DesktopVenueWindow({
         </section>
       )}
 
-      {/* Notes — guard: never render OSM artifact strings */}
-      {venue.notes && !/osm/i.test(venue.notes) && (
+      {/* Notes — suppressed for OSM artifacts and Plentiful's auto-generated
+          boilerplate (src/lib/venueNotes.ts) */}
+      {displayNotes && (
         <section aria-label={t("detail.about", locale)}>
           <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
             {t("detail.about", locale)}
           </h3>
           <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
-            {venue.notes}
+            {displayNotes}
           </p>
         </section>
       )}

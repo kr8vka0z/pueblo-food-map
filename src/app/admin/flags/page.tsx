@@ -31,12 +31,13 @@
  * carry a field diff in `proposed_diff` (not necessarily the venue's
  * `name`, unless name itself is one of the changed fields), and a bare name
  * alone can't tell an admin which place a change targets or whether a
- * proposed value looks right — so this page runs ONE extra
+ * proposed value looks right — so this page runs an extra
  * `SELECT id, name, category, address, phone, url, last_verified, status
  * FROM venues WHERE id IN (...)` across every target_venue_id in the
  * current page of proposals, rather than a per-row lookup — the same "one
  * query, not N" discipline src/lib/adminVenues.ts's summarizePublishChanges
- * already follows.
+ * already follows. Batched at 100 ids per statement because that is D1's
+ * bound-parameter ceiling; see loadVenueLookup's own header.
  */
 
 import { headers } from "next/headers";
@@ -77,33 +78,59 @@ export interface VenueLookup {
 }
 
 /**
- * One `SELECT ... WHERE id IN (...)` for every target_venue_id on this
- * page — never a per-row lookup. Returns an empty map for an empty input
- * rather than issuing a query with no placeholders (invalid SQL). Carries
- * `status` alongside the rest so ProposalsReviewView can label an `add`
- * proposal targeting an already-archived id "Restore" instead of "New" —
- * spec §6.6's "Restore" labeling — without a second query.
+ * D1's hard ceiling on bound parameters in a single statement. Measured
+ * against the real API on 2026-09-02, not taken from docs: 100 placeholders
+ * succeed, 101 fail with `too many SQL variables … SQLITE_ERROR` (D1 error
+ * code 7500).
+ */
+const D1_MAX_BOUND_PARAMS = 100;
+
+/**
+ * One `SELECT ... WHERE id IN (...)` per batch of target_venue_ids — never a
+ * per-row lookup. Returns an empty map for an empty input rather than issuing
+ * a query with no placeholders (invalid SQL). Carries `status` alongside the
+ * rest so ProposalsReviewView can label an `add` proposal targeting an
+ * already-archived id "Restore" instead of "New" — spec §6.6's "Restore"
+ * labeling — without a second query.
+ *
+ * BATCHING (fix, 2026-09-02): this used to bind every unique id into ONE
+ * statement, which threw above 100 ids and 500'd the whole page. That was
+ * invisible during development — a hand-seeded queue of a handful of rows
+ * never reaches the limit — but the FIRST real pipeline run wrote 107
+ * proposals against 107 distinct venues, so the ceiling is not an edge case
+ * here, it is the normal monthly shape. The per-run proposal cap
+ * (PER_RUN_PROPOSAL_CAP = 150, scripts/refresh/diffEngine.ts) is itself well
+ * above 100, and pending rows accumulate across runs until an admin acts, so
+ * the queue has no upper bound at all.
+ *
+ * Batching rather than paginating the page deliberately: a reviewer needs to
+ * see the whole queue to filter it, and splitting one wide read into a few
+ * narrower ones keeps that true without changing what the screen shows.
  */
 async function loadVenueLookup(db: D1Database, ids: string[]): Promise<Record<string, VenueLookup>> {
   const uniqueIds = [...new Set(ids)];
-  if (uniqueIds.length === 0) return {};
-  const placeholders = uniqueIds.map(() => "?").join(", ");
-  const result = await db
-    .prepare(`SELECT id, name, category, address, phone, url, last_verified, status FROM venues WHERE id IN (${placeholders})`)
-    .bind(...uniqueIds)
-    .all<VenueLookupRow>();
   const map: Record<string, VenueLookup> = {};
-  for (const row of result.results) {
-    map[row.id] = {
-      name: row.name,
-      category: row.category,
-      address: row.address,
-      phone: row.phone,
-      url: row.url,
-      last_verified: row.last_verified,
-      status: row.status,
-    };
+
+  for (let i = 0; i < uniqueIds.length; i += D1_MAX_BOUND_PARAMS) {
+    const batch = uniqueIds.slice(i, i + D1_MAX_BOUND_PARAMS);
+    const placeholders = batch.map(() => "?").join(", ");
+    const result = await db
+      .prepare(`SELECT id, name, category, address, phone, url, last_verified, status FROM venues WHERE id IN (${placeholders})`)
+      .bind(...batch)
+      .all<VenueLookupRow>();
+    for (const row of result.results) {
+      map[row.id] = {
+        name: row.name,
+        category: row.category,
+        address: row.address,
+        phone: row.phone,
+        url: row.url,
+        last_verified: row.last_verified,
+        status: row.status,
+      };
+    }
   }
+
   return map;
 }
 

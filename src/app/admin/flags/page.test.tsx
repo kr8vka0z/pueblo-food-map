@@ -75,16 +75,22 @@ function makeProposalRow(overrides: Partial<ChangeProposalRow> = {}): ChangeProp
  */
 function makeFakeDb(proposalRows: ChangeProposalRow[], venueRows: { id: string; name: string; status: string }[]) {
   const capturedSql: string[] = [];
+  // Captured separately from the SQL so a test can assert how many
+  // parameters each statement actually binds — D1 rejects more than 100.
+  const capturedBindCounts: number[] = [];
   const db = {
     prepare: (sql: string) => {
       capturedSql.push(sql);
       return {
-        bind: () => ({ all: async () => ({ success: true, results: venueRows, meta: {} }) }),
+        bind: (...args: unknown[]) => {
+          capturedBindCounts.push(args.length);
+          return { all: async () => ({ success: true, results: venueRows, meta: {} }) };
+        },
         all: async () => ({ success: true, results: proposalRows, meta: {} }),
       };
     },
   } as unknown as object;
-  return { db, getSql: () => capturedSql };
+  return { db, getSql: () => capturedSql, getBindCounts: () => capturedBindCounts };
 }
 
 function readStub(): { proposals: ParsedProposal[]; venueLookup: Record<string, VenueLookup> } {
@@ -135,6 +141,31 @@ describe("FlagsPage — auth guard", () => {
 
     const inQueries = getSql().filter((s) => s.includes("FROM venues WHERE id IN"));
     expect(inQueries).toHaveLength(1);
+  });
+
+  /**
+   * Regression guard for a real 500 on staging, 2026-09-02. D1 rejects more
+   * than 100 bound parameters in one statement (`too many SQL variables`,
+   * error 7500 — measured directly against the API, not read off docs), and
+   * the venue lookup used to bind every unique target_venue_id into a single
+   * query. A hand-seeded queue of a few rows never hit it; the first REAL
+   * pipeline run wrote 107 proposals against 107 distinct venues and the
+   * whole page 500'd. The per-run cap is 150 and pending rows accumulate
+   * across runs, so >100 is the normal shape here, not an edge case.
+   */
+  test("splits the venue lookup into batches of at most 100 bound ids", async () => {
+    const rows = Array.from({ length: 107 }, (_, i) => makeProposalRow({ id: i + 1, target_venue_id: `osm-node-${i}` }));
+    const { db, getSql, getBindCounts } = makeFakeDb(rows, []);
+    mockGetAdminDb.mockResolvedValue({ db, identity: { email: "admin@example.com" } });
+
+    render(await FlagsPage());
+
+    const inQueries = getSql().filter((s) => s.includes("FROM venues WHERE id IN"));
+    expect(inQueries).toHaveLength(2);
+    expect(getBindCounts()).toEqual([100, 7]);
+    for (const count of getBindCounts()) {
+      expect(count).toBeLessThanOrEqual(100);
+    }
   });
 
   test("zero pending proposals -> no venue-lookup query at all (empty IN() would be invalid SQL)", async () => {

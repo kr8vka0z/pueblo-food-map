@@ -1,14 +1,13 @@
 /**
  * /about — mission, vision, origin story, and how venues are sourced.
  *
- * Static server component: reads locale from cookie (same pattern as other
- * utility pages — privacy, feedback). No form or dynamic data.
+ * Static server component, deliberately English-only — no locale cookie
+ * read (AGENTS.md "Known bilingual limitation", #287). A cookie read here
+ * would force this page dynamic on every request; staying English-only
+ * keeps it 100% statically cacheable. No form or dynamic data.
  *
  * Copy on this page is DRAFT pending final text from Kyle / Pueblo Food
  * Project (#155). See i18n keys about.* in src/lib/i18n.ts.
- *
- * WHY server component: locale cookie read at request time avoids an ES→EN
- * language flash for Spanish-language visitors (same rationale as /privacy).
  */
 
 import type { Metadata } from "next";

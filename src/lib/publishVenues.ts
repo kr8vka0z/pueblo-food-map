@@ -214,7 +214,12 @@ export function validateSnapshot(rows: VenueRow[]): ValidateSnapshotResult {
 // ─── Serialize: Venue[] -> published-venues.ts source text ────────────────
 
 export interface PublishFileMeta {
-  /** ISO timestamp — embedded in the file's header comment only. */
+  /**
+   * ISO timestamp — embedded in the file's header comment AND, since board
+   * review finding #2, as a real `export const publishedAt` string so
+   * component code (ListView / /about's freshness line) can read it at
+   * runtime; a header comment alone isn't readable from JS.
+   */
   publishedAt: string;
 }
 

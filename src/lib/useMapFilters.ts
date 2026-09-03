@@ -75,6 +75,12 @@ export function useMapFilters(origin: LatLng) {
     );
   }, []);
 
+  // WHY confirmed-open only, deliberately NOT matching the filtered list below:
+  // the "Open now" filter itself lets "no_hours" venues survive (board review
+  // finding #1) so the pantry majority isn't hidden, but this badge counts only
+  // venues whose hours are actually known to be open right now. Inflating this
+  // number to match the filtered list's length would misreport how many places
+  // are provably open — this is the one honest number on the screen.
   const openNowCount = useMemo(
     () =>
       venuesWithDistance.filter(
@@ -124,7 +130,22 @@ export function useMapFilters(origin: LatLng) {
         if (filterFavorites && favoriteSet.size > 0 && !favoriteSet.has(v.id)) return false;
         return true;
       })
-      .sort((a, b) => a.distanceMiles - b.distanceMiles);
+      .sort((a, b) => {
+        // Open now leads with confirmed-open venues, distance-sorted within
+        // each group — board review finding: since "no_hours" venues now
+        // survive the filter above, sorting by distance alone let confirmed-
+        // open venues (19 of 93 on a real sample) get buried among a majority
+        // of "hours unknown" rows, defeating the point of the toggle. Distance
+        // is always a real number here (origin falls back to PUEBLO_CENTER in
+        // MapWrapper when geolocation is unavailable — never NaN/undefined),
+        // so no special-casing is needed for a missing-distance case.
+        if (filterOpenNow) {
+          const aOpen = computeOpenStatus(a.hours_weekly, now).state === "open";
+          const bOpen = computeOpenStatus(b.hours_weekly, now).state === "open";
+          if (aOpen !== bOpen) return aOpen ? -1 : 1;
+        }
+        return a.distanceMiles - b.distanceMiles;
+      });
 
     return searchVenues(afterFilters, query);
   }, [

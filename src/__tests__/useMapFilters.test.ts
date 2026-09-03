@@ -126,6 +126,42 @@ describe("useMapFilters — open-now filter", () => {
     expect(survivingNoHours.length).toBe(noHoursCount);
   });
 
+  // Review fix: confirmed-open venues must lead the Open now list, not get
+  // buried by pure distance sort among the majority of "hours unknown" rows.
+  test("with Open now active, a farther confirmed-open venue sorts ahead of a nearer unknown-hours venue", () => {
+    const now = new Date("2026-06-21T14:00:00-06:00");
+    const openVenue = allVenues.find(
+      (v) => computeOpenStatus(v.hours_weekly, now).state === "open",
+    );
+    const unknownVenue = allVenues.find((v) => !v.hours_weekly);
+    expect(openVenue).toBeDefined();
+    expect(unknownVenue).toBeDefined();
+
+    // Origin AT the unknown-hours venue's own coordinates guarantees it is the
+    // nearest possible venue (~0mi) while the confirmed-open venue sits at
+    // whatever real distance separates the two — always farther, by
+    // construction. A pure distance sort would rank the unknown venue first;
+    // this proves the open-first grouping overrides that.
+    const origin = { lat: unknownVenue!.lat, lng: unknownVenue!.lng };
+    const { result } = renderHook(() => useMapFilters(origin));
+    act(() => result.current.setFilterOpenNow(true));
+
+    const ids = result.current.filteredVenues.map((v) => v.id);
+    expect(ids.indexOf(openVenue!.id)).toBeLessThan(ids.indexOf(unknownVenue!.id));
+  });
+
+  test("with Open now off, pure distance order is restored regardless of open status", () => {
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
+    act(() => result.current.setFilterOpenNow(true));
+    act(() => result.current.setFilterOpenNow(false));
+    const distances = result.current.filteredVenues.map(
+      (v) => (v as unknown as { distanceMiles: number }).distanceMiles,
+    );
+    for (let i = 1; i < distances.length; i++) {
+      expect(distances[i]!).toBeGreaterThanOrEqual(distances[i - 1]!);
+    }
+  });
+
   test("a venue with known hours that is currently closed is still dropped by Open now", () => {
     // 2026-06-21T14:00:00-06:00 (beforeEach fake clock) — Saturday 2pm MDT.
     // Pick a real venue whose computed status is "closed_today" (hours ARE

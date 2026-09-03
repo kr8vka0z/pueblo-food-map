@@ -1004,6 +1004,48 @@ npx wrangler d1 execute pueblo-food-map-admin --local --file=scripts/generated/s
 npx tsx scripts/refresh-ingest.ts --db-mode local
 ```
 
+**`--db-mode` has three values, and the mode picks the DATABASE, not just a
+wrangler flag:**
+
+| Mode | Database | Where |
+|---|---|---|
+| `local` | `pueblo-food-map-admin` | Miniflare's on-disk SQLite (`npm run preview`) |
+| `staging` | `pueblo-food-map-admin-staging` | the real Cloudflare database `dev.pueblofoodmap.com` binds |
+| `remote` | `pueblo-food-map-admin` | **PRODUCTION** |
+
+`staging` exists so the `/admin/flags` review queue can be exercised against
+genuine pipeline output — real scrapes, real diffs, real proposal rows — with
+zero risk to production. It is a fixed mode rather than a free-form
+`--database <name>` flag on purpose: the one thing this script must never do
+by accident is write to production, and a name flag makes production the
+default that a typo falls back to. A bad `--db-mode` value exits 1.
+
+**Seeding staging with real venues first.** Staging's own `venues` rows are
+fake seed data, so diffing a real scrape against them produces nonsense (and
+trips the abnormal-drop guard). Copy production's venue rows across first —
+this reads production and writes only staging:
+
+```bash
+npx wrangler d1 export pueblo-food-map-admin --remote --table venues --no-schema --output /tmp/prod-venues.sql -y
+# prepend: DELETE FROM change_proposals; DELETE FROM audit_log; DELETE FROM venues;
+npx wrangler d1 execute pueblo-food-map-admin-staging --remote --file /tmp/prod-venues.sql -y
+npx tsx scripts/refresh-ingest.ts --db-mode staging
+```
+
+**The remote apply is CHUNKED, and that is load-bearing.** Both `staging` and
+`remote` write via `wrangler d1 execute --command` (never `--file`, which
+routes to D1's import API and takes the database offline — see
+`d1ApplyFile`'s own header). A full run is ~45 KB of SQL, which exceeds
+Windows' 32,767-character command-line limit and dies with `ENAMETOOLONG`
+before wrangler starts; it survives on a Linux GitHub runner (ARG_MAX ~2 MB),
+so this failed on every local Windows run while the production path worked.
+`d1ApplyFile` now splits the run into ≤24,000-character batches. The tradeoff:
+a run is a SEQUENCE of atomic batches, not one — a mid-sequence failure leaves
+earlier chunks committed, and re-running that Action under the SAME run_id
+(GitHub's "Re-run jobs") would hit the idempotency guard and exit 0 without
+finishing. Recover with a fresh `workflow_dispatch` run, which gets a new
+run_id.
+
 Requires `python3` on PATH with `beautifulsoup4` installed
 (`pip install beautifulsoup4==4.14.3` — pinned to match
 `.github/workflows/refresh-proposals.yml`'s exact version, so local runs

@@ -63,9 +63,28 @@ import {
   type RefreshSource,
 } from "./refresh/diffEngine";
 import { checkUrl } from "./refresh/linkHealth";
+import { chunkSqlStatements } from "./refresh/sqlChunks";
 
 const REPO_ROOT = join(__dirname, "..");
-const DATABASE_NAME = "pueblo-food-map-admin"; // wrangler.jsonc d1_databases[0].database_name
+// wrangler.jsonc's two D1 bindings, keyed by --db-mode. `local` and `remote`
+// are the SAME database name (top-level d1_databases[0]) differing only by
+// wrangler's --local/--remote flag: Miniflare's on-disk SQLite vs. the real
+// production database. `staging` is a genuinely DIFFERENT database
+// (env.staging.d1_databases[0], id 909e74b2-…) that dev.pueblofoodmap.com
+// binds — provisioned specifically so the admin surface has real rows to
+// render without ever reading or writing production.
+//
+// WHY staging is its own mode rather than a free-form `--database <name>`
+// flag: the only thing this script must never do by accident is write to
+// production, and a name flag makes prod the default that a typo falls back
+// to. Three fixed modes make every possible invocation an explicit,
+// reviewable choice — there is no way to spell "staging" slightly wrong and
+// silently hit prod, because a bad value exits 1.
+const DATABASE_NAMES = {
+  local: "pueblo-food-map-admin",
+  remote: "pueblo-food-map-admin",
+  staging: "pueblo-food-map-admin-staging",
+} as const;
 const LINK_HEALTH_DELAY_MS = 500; // politeness — same order of magnitude as scrape-plentiful.py's DETAIL_SLEEP
 
 // Invoke wrangler's own JS entrypoint via `node`, not `npx wrangler` —
@@ -82,16 +101,25 @@ const PYTHON_CMD = process.platform === "win32" ? "python" : "python3";
 
 // ─── CLI args ───────────────────────────────────────────────────────────────
 
-type DbMode = "local" | "remote";
+type DbMode = keyof typeof DATABASE_NAMES;
 
 function parseDbMode(argv: string[]): DbMode {
   const idx = argv.indexOf("--db-mode");
   const value = idx >= 0 ? argv[idx + 1] : undefined;
-  if (value !== "local" && value !== "remote") {
-    console.error('FATAL: --db-mode <local|remote> is required (e.g. "npx tsx scripts/refresh-ingest.ts --db-mode local").');
+  if (value !== "local" && value !== "remote" && value !== "staging") {
+    console.error('FATAL: --db-mode <local|remote|staging> is required (e.g. "npx tsx scripts/refresh-ingest.ts --db-mode local").');
     process.exit(1);
   }
   return value;
+}
+
+/**
+ * Which wrangler flag a mode maps to. `staging` is remote — it's a real
+ * Cloudflare-hosted database, just not the production one; the isolation
+ * comes from the database NAME (DATABASE_NAMES above), not from this flag.
+ */
+function wranglerLocationFlag(dbMode: DbMode): "--local" | "--remote" {
+  return dbMode === "local" ? "--local" : "--remote";
 }
 
 // ─── wrangler d1 execute wrapper ────────────────────────────────────────────
@@ -103,7 +131,7 @@ interface WranglerD1Result<T> {
 
 /** Runs a read-only query via `wrangler d1 execute --json` and returns its rows. */
 function d1Query<T>(dbMode: DbMode, sql: string): T[] {
-  const args = [WRANGLER_BIN, "d1", "execute", DATABASE_NAME, `--${dbMode}`, "--json", "--command", sql];
+  const args = [WRANGLER_BIN, "d1", "execute", DATABASE_NAMES[dbMode], wranglerLocationFlag(dbMode), "--json", "--command", sql];
   const stdout = execFileSync(process.execPath, args, { cwd: REPO_ROOT, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024 });
   // wrangler prints npm-notice/update-check noise on stdout ahead of the
   // JSON in some installs — find the JSON array by its opening bracket
@@ -137,20 +165,42 @@ function d1Query<T>(dbMode: DbMode, sql: string): T[] {
  * proven to not take anything offline. Cloudflare's own D1 API docs
  * confirm a `;`-joined multi-statement `sql` string here "will be executed
  * as a batch," and D1's batch semantics (per Cloudflare's docs) commit
- * sequentially and roll back the whole sequence on any one failure — the
- * same effective atomicity the file-header comment above already claimed,
- * just reached through the query path instead of the offline import path.
+ * sequentially and roll back the whole sequence on any one failure.
+ *
+ * CHUNKING (fix, found by the first real remote run — 107 proposals against
+ * the staging database — on 2026-09-02): passing the whole run's SQL as ONE
+ * `--command` argv blows Windows' 32,767-character CreateProcess limit and
+ * dies with `spawnSync … ENAMETOOLONG` before wrangler ever starts. A full
+ * run is ~45 KB of SQL, so this is the normal case, not an edge case. See
+ * scripts/refresh/sqlChunks.ts for the split itself and its own tests.
+ *
+ * ponytail: the ceiling this introduces is that a run is no longer ONE atomic
+ * batch — it is a sequence of them, so a mid-sequence failure leaves the
+ * earlier chunks committed. That is tolerable here specifically because a
+ * `change_proposals` row is inert until a human approves it, and because the
+ * diff engine is idempotent against current D1 state: whatever a failed chunk
+ * didn't write simply gets re-proposed by the next run. The one sharp edge is
+ * main()'s run_id idempotency guard — re-running a PARTIALLY-failed Action
+ * under the SAME run_id (GitHub's "Re-run jobs", which keeps run_id stable)
+ * sees the earlier chunks' rows and exits 0 without finishing the run. Recover
+ * with a fresh `workflow_dispatch` run, which gets a new run_id. Upgrade path
+ * if that ever bites: write the SQL through D1's REST /query endpoint directly
+ * (no argv involved, no chunking needed) instead of shelling out to wrangler.
  */
 function d1ApplyFile(dbMode: DbMode, filePath: string): void {
-  if (dbMode === "remote") {
-    const sql = readFileSync(filePath, "utf-8");
-    execFileSync(process.execPath, [WRANGLER_BIN, "d1", "execute", DATABASE_NAME, "--remote", "--command", sql], {
-      cwd: REPO_ROOT,
-      stdio: "inherit",
+  if (dbMode !== "local") {
+    const chunks = chunkSqlStatements(readFileSync(filePath, "utf-8"));
+    chunks.forEach((chunk, i) => {
+      console.log(`  applying chunk ${i + 1}/${chunks.length}...`);
+      execFileSync(
+        process.execPath,
+        [WRANGLER_BIN, "d1", "execute", DATABASE_NAMES[dbMode], "--remote", "--command", chunk],
+        { cwd: REPO_ROOT, stdio: "inherit" },
+      );
     });
     return;
   }
-  execFileSync(process.execPath, [WRANGLER_BIN, "d1", "execute", DATABASE_NAME, "--local", "--file", filePath], {
+  execFileSync(process.execPath, [WRANGLER_BIN, "d1", "execute", DATABASE_NAMES[dbMode], "--local", "--file", filePath], {
     cwd: REPO_ROOT,
     stdio: "inherit",
   });
@@ -237,9 +287,12 @@ async function main(): Promise<void> {
   const runId = process.env.GITHUB_RUN_ID ?? `local-${Date.now()}`;
 
   console.log(`=== Pueblo Food Map — automated refresh run ===`);
-  console.log(`db-mode: ${dbMode}  run_id: ${runId}  today: ${today}`);
+  console.log(`db-mode: ${dbMode}  database: ${DATABASE_NAMES[dbMode]}  run_id: ${runId}  today: ${today}`);
   if (dbMode === "remote") {
     console.log("!!! REMOTE MODE — this will write to PRODUCTION D1. !!!");
+  }
+  if (dbMode === "staging") {
+    console.log("staging mode — writes to the dev.pueblofoodmap.com database, never production.");
   }
 
   // Idempotency (§6.10d): a retried Action re-POSTing under the same

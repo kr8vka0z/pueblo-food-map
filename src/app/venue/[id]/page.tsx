@@ -6,11 +6,16 @@
  * JSON-LD — enabling rich search results and accurate link previews for
  * shared venue links. Issue #164 item 6.4.
  *
- * WHY dynamically rendered (not SSG): the cookies() call to read the locale
- * preference opts this route out of static generation — Next.js treats any
- * use of dynamic server APIs as dynamic rendering. generateStaticParams +
- * dynamicParams=false still restrict the route to known venue ids (unknown ids
- * return 404), but each request is rendered at runtime, not at compile time.
+ * This route is statically generated: generateStaticParams + dynamicParams
+ * = false prerender every known venue id at build time (unknown ids 404).
+ * The prior `cookies()`-based locale read that forced dynamic rendering was
+ * removed in PR #351 (2026-08-24) — this comment previously described that
+ * removed behavior, which is what let this route regress: on Cloudflare via
+ * OpenNext, a static + dynamicParams=false route depends on the configured
+ * incremental cache actually serving the prerendered HTML (open-next.config.ts).
+ * With the default "dummy" cache, every request 404s (NoFallbackError on a
+ * cache miss) — the 2026-08-24 to 2026-09-02 production outage. Do not
+ * reintroduce cookies()/dynamic APIs here without re-checking that pairing.
  *
  * params is a Promise in Next.js 16 App Router — must be awaited.
  */

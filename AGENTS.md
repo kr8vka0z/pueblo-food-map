@@ -1173,12 +1173,20 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
 
 **PR2 (items 6.3 + 6.4) — shipped.**
 
-- **Per-venue pages** — `src/app/venue/[id]/page.tsx` (dynamically rendered, `dynamicParams = false`).
+- **Per-venue pages** — `src/app/venue/[id]/page.tsx` (statically generated, `dynamicParams = false`
+  — since PR #351, 2026-08-24; the route previously read `cookies()` for locale, which forced
+  dynamic rendering, but that call is gone and the route is fully static now).
   Each page carries a venue-specific `<title>` + `<meta description>` + OpenGraph/Twitter metadata
   via `buildPageMetadata`, and a `<script type="application/ld+json">` block with a
   `LocalBusiness` / `GroceryStore` / `FoodEstablishment` / `Place` `@type` mapped from the
   venue category. `generateStaticParams` restricts the route to known venue ids; unknown ids 404.
-  WHY dynamically rendered: the `cookies()` call to read locale opts the route out of SSG.
+  **A static + `dynamicParams = false` route on this stack depends on `open-next.config.ts`'s
+  incremental cache actually serving the prerendered HTML** — the default "dummy" cache never
+  populates, so every prerendered dynamic path 404s (`NoFallbackError` on a cache miss). This
+  caused a 10-day production outage (2026-08-24 to 2026-09-02, 218/230 public URLs down) before
+  `open-next.config.ts` was set to the `staticAssetsIncrementalCache` override. Do not revert that
+  override, and do not reintroduce `cookies()`/other dynamic APIs into this route without
+  re-verifying the pairing still holds.
 - **Legacy `?venue=` links — handled CLIENT-SIDE (no server redirect).** New shares use the
   canonical `/venue/<id>`. Old `/?venue=<id>` links still work: the homepage reads the `venue`
   query param client-side and opens that pin. There is intentionally **no** server-side redirect

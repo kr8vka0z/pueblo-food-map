@@ -9,12 +9,13 @@
  * Publish panel (PublishPanel, below) above a read-only table of every
  * venues row (draft + published + archived), plus an "Add place" link to
  * /admin/venues/new (src/app/admin/venues/new/page.tsx), the only OTHER
- * mutation entry point besides Publish, and a "Review queue" link to
- * /admin/submissions (src/app/admin/submissions/page.tsx) — a plain
- * navigation link, not a mutation entry point, styled as the same
- * secondary sage-underline link this admin shell already uses elsewhere
- * (e.g. "Back to venue list") so "Add place" stays the header's one
- * primary action. This page itself still performs no mutation and issues
+ * mutation entry point besides Publish, a "Review queue" link to
+ * /admin/submissions (src/app/admin/submissions/page.tsx), and a "Data
+ * refresh queue" link to /admin/flags (src/app/admin/flags/page.tsx, #390)
+ * — all plain navigation links, not mutation entry points, styled as the
+ * same secondary sage-underline link this admin shell already uses
+ * elsewhere (e.g. "Back to venue list") so "Add place" stays the header's
+ * one primary action. This page itself still performs no mutation and issues
  * no non-GET request, so it has no requireAdminOrigin() CSRF check here —
  * that guard exists only for non-GET /api/admin/* mutations
  * (src/lib/cfAccess.ts).
@@ -86,6 +87,12 @@ export default async function AdminPage() {
             className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
           >
             Review queue
+          </Link>
+          <Link
+            href="/admin/flags"
+            className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+          >
+            Data refresh queue
           </Link>
           <p className="text-sm text-[var(--color-ink-500)]">
             Signed in as{" "}

@@ -1005,8 +1005,9 @@ npx tsx scripts/refresh-ingest.ts --db-mode local
 ```
 
 Requires `python3` on PATH with `beautifulsoup4` installed
-(`pip install beautifulsoup4` — `scripts/scrape-plentiful.py`'s own
-dependency, unchanged by this work) and network access (Plentiful, Overpass,
+(`pip install beautifulsoup4==4.14.3` — pinned to match
+`.github/workflows/refresh-proposals.yml`'s exact version, so local runs
+and CI runs use the same parser) and network access (Plentiful, Overpass,
 Nominatim, and every venue's stored `url` for the link-health pass — expect
 this to take 1-2 minutes; the delays are deliberate politeness, not a bug).
 Inspect what it wrote:
@@ -1029,11 +1030,27 @@ npx wrangler d1 execute pueblo-food-map-admin --local --json --command "SELECT s
 - **Per-run cap** (whole run): more than 150 combined proposals aborts the
   entire run — nothing is written, for any source.
 
-A source-level abort still lets the OTHER source (and the link-health pass)
-write their own good proposals — see `scripts/refresh-ingest.ts`'s own file
-header for why independent scrape failures are treated independently. The
-job's exit code is non-zero if ANY source aborted, even if others succeeded,
-so the Actions run still goes red.
+A source-level **guardrail** abort (the zero-record or abnormal-drop guard
+above, both evaluated per source AFTER that source's scrape already
+succeeded) still lets the OTHER source (and the link-health pass) write
+their own good proposals — `main()` in `scripts/refresh-ingest.ts` loops
+`diffSource()` once per source, and one source's `result.aborted` doesn't
+stop that loop from reaching the next source.
+
+**This does NOT apply to a scraper PROCESS failure** (fix: this file
+previously conflated the two). `scrapePlentiful()`/`scrapeOsm()` run
+sequentially, each shelling out to a Python script via `execFileSync`,
+which throws on a non-zero exit — e.g. `scrape-plentiful.py`'s own `FATAL:
+No pantry cards parsed` guard, or `fetch-osm-grocery.py`'s `remark`-key
+guard (see "Automated venue-refresh pipeline" above). Either scraper
+crashing throws BEFORE either source ever reaches `diffSource()`, so
+`main()`'s top-level `.catch()` fires and NEITHER source writes anything —
+there is no "other source" left running by that point to write good
+proposals. Both failure modes leave the job's exit code non-zero (a
+rejected promise or a source's `aborted: true` both fail `main()`), so the
+Actions run goes red either way — but only the guardrail case actually
+produces good proposals for the healthy source; a scraper crash produces
+none at all.
 
 **Credentials — reuses existing secrets, nothing new to provision.**
 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` — the same repo secrets
@@ -1056,24 +1073,42 @@ secret — smaller surface area for the same result.
 production credentials held during implementation); a human runs these at
 merge time:**
 
+**⚠️ This workflow does NOTHING until it reaches `main` — merging to `dev`
+alone looks like a broken job, not a delayed one.** Both `schedule` and
+`workflow_dispatch` (`.github/workflows/refresh-proposals.yml`'s two
+triggers) are GitHub Actions features that "only trigger a workflow run if
+the workflow file exists on the default branch" (GitHub's own docs,
+verbatim) — this repo's default branch is `main` (see "Hosting" above: push
+to `dev` deploys staging via `deploy-dev.yml`; `main` is the one that's
+default AND production). That's the same trap #375's Dependabot fix closed
+for dependency PRs — the fix there was routing target branches correctly;
+here the fix is sequencing: promote BEFORE trying to trigger a run, not
+after.
+
 ```bash
-# 1. Apply the schema this pipeline depends on, if not already live —
+# 1. Promote this branch to `main` first — steps 4/5 below are no-ops
+#    (nothing to dispatch, nothing written) until this workflow file is on
+#    the default branch. Normal dev -> main promotion PR, squash-merged
+#    (this repo's branch protection allows squash only — "do NOT verify
+#    with git rev-list" note under "Hosting" above explains why).
+
+# 2. Apply the schema this pipeline depends on, if not already live —
 #    change_proposals already exists in migrations/0001_init_admin_schema.sql
 #    (shipped with the original #237 admin cutover), so this is very likely
 #    already applied; confirm before assuming either way:
 npx wrangler d1 migrations apply pueblo-food-map-admin --remote
 
-# 2. Confirm CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are already set as
+# 3. Confirm CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are already set as
 #    GitHub Actions repo secrets (deploy-prod.yml / deploy-dev.yml already
 #    require them, so this should be a no-op check, not a new provisioning
 #    step).
 
-# 3. First real run — either wait for the 1st-of-month cron, or trigger by
+# 4. First real run — either wait for the 1st-of-month cron, or trigger by
 #    hand from the Actions tab (workflow_dispatch) to verify against
-#    production without waiting:
+#    production without waiting. Only works now that step 1 has landed:
 gh workflow run "Venue Data Refresh"
 
-# 4. Read what it proposed:
+# 5. Read what it proposed:
 npx wrangler d1 execute pueblo-food-map-admin --remote --json --command "SELECT source, change_type, COUNT(*) FROM change_proposals WHERE status='pending' GROUP BY source, change_type"
 ```
 

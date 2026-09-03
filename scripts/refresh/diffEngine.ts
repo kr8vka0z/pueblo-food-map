@@ -148,9 +148,21 @@ export interface ProposalDraft {
  * order inside `after` doesn't matter (JSON.stringify's own key order does
  * — callers must build `after` with a consistent key order across runs,
  * which every builder below does by construction).
+ *
+ * WHY `last_verified` is stripped before hashing: every builder below
+ * stamps `after.last_verified = today` on EVERY add/update, including a
+ * pure freshness bump — so today's date, not the real field values, was
+ * the dominant input to the old hash. That made rejection memory (§6.10b)
+ * inert: a human-rejected proposal (e.g. a hand-corrected category upstream
+ * still lists differently) hashed differently every single day purely
+ * because `today` moved, so it silently reappeared on the very next run.
+ * `last_verified`'s STRING KEY stays in `fields_changed` (stable, never a
+ * date) — only its dated VALUE inside `after` is excluded here.
  */
 export function computeDiffHash(after: Partial<Venue> | null, fieldsChanged: string[]): string {
-  const normalized = JSON.stringify({ after, fields_changed: [...fieldsChanged].sort() });
+  const stableAfter = after ? { ...after } : null;
+  if (stableAfter) delete stableAfter.last_verified;
+  const normalized = JSON.stringify({ after: stableAfter, fields_changed: [...fieldsChanged].sort() });
   return createHash("sha256").update(normalized).digest("hex");
 }
 
@@ -208,6 +220,30 @@ function incomingFieldValue(venue: Venue, field: keyof Venue): unknown {
 function valuesEqual(a: unknown, b: unknown): boolean {
   if (typeof a === "number" && typeof b === "number") return a === b;
   return String(a ?? "") === String(b ?? "");
+}
+
+function isEmptyFieldValue(v: unknown): boolean {
+  return v === null || v === undefined || v === "";
+}
+
+/**
+ * Fields where a scraper hiccup — not a real-world change — can plausibly
+ * turn a populated value into an empty one, so a "cleared" proposal for
+ * these must never be auto-generated from a diff alone.
+ *
+ * `plentiful`: scrape-plentiful.py swallows a detail-page HTTP error and
+ * emits `hours_weekly=None`; its card-parse heuristic can emit `phone=""`
+ * when the card layout doesn't match. Either turns one transient upstream
+ * 5xx into a proposal to erase real hours a person needs to know when to
+ * show up, or a real contact number — worse than doing nothing.
+ */
+const DESTRUCTIVE_CLEAR_GUARD: Partial<Record<RefreshSource, ReadonlyArray<keyof Venue>>> = {
+  plentiful: ["hours_weekly", "phone"],
+};
+
+function isGuardedClear(source: RefreshSource, field: keyof Venue, currentValue: unknown, incomingValue: unknown): boolean {
+  if (!DESTRUCTIVE_CLEAR_GUARD[source]?.includes(field)) return false;
+  return !isEmptyFieldValue(currentValue) && isEmptyFieldValue(incomingValue);
 }
 
 // ─── Incoming-record validity (spec §6.9's schema-validation slice) ───────
@@ -300,7 +336,18 @@ export function diffSource(params: DiffSourceParams): DiffSourceResult {
       continue;
     }
 
-    const changedFields = fields.filter((f) => !valuesEqual(currentFieldValue(current, f), incomingFieldValue(inc, f)));
+    const changedFields = fields.filter((f) => {
+      const currentValue = currentFieldValue(current, f);
+      const incomingValue = incomingFieldValue(inc, f);
+      if (valuesEqual(currentValue, incomingValue)) return false;
+      // Never propose a real value clearing to empty for a guarded field —
+      // see DESTRUCTIVE_CLEAR_GUARD's own WHY comment. The record is still
+      // otherwise "confirmed present" (falls through to the last_verified-
+      // only branch below if nothing else changed), it just doesn't get an
+      // update proposal for THIS field on the strength of a diff alone.
+      if (isGuardedClear(source, f, currentValue, incomingValue)) return false;
+      return true;
+    });
 
     if (changedFields.length > 0) {
       const before: Partial<Venue> = { last_verified: current.last_verified };

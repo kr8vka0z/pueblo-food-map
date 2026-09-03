@@ -237,19 +237,25 @@ describe("guardrail: 'nothing changed' run writes zero content proposals", () =>
 });
 
 describe("rejection memory (§6.10b)", () => {
-  test("a diff matching a previously-rejected (source, target, diff_hash) is not re-proposed", () => {
+  // Fix 3: this must prove the REAL property — a rejected proposal stays
+  // rejected across different run dates, not just within one calendar day.
+  // Pinning `today` equal on both runs (the old version of this test) would
+  // pass even if diff_hash still baked in last_verified's dated value —
+  // exactly the bug this guards against.
+  test("a diff matching a previously-rejected (source, target, diff_hash) is not re-proposed, even on a later run date", () => {
     const rows = [row({ phone: "old" })];
     const incoming = [venue({ phone: "new" })];
     const firstRun = diffSource({ source: "osm", currentRows: rows, incoming, runId: RUN_ID, today: TODAY });
     const rejectedHash = firstRun.proposals[0].diffHash;
     const rejectedKeys = new Set([`osm:${rows[0].id}:${rejectedHash}`]);
 
+    const laterToday = "2026-10-01"; // a different calendar day than TODAY
     const secondRun = diffSource({
       source: "osm",
       currentRows: rows,
       incoming,
       runId: "run-2",
-      today: TODAY, // same today -> identical diff_hash
+      today: laterToday,
       rejectedKeys,
     });
     expect(secondRun.proposals).toHaveLength(0);
@@ -263,6 +269,68 @@ describe("computeDiffHash", () => {
     const c = computeDiffHash({ phone: "2" }, ["phone"]);
     expect(a).toBe(b);
     expect(a).not.toBe(c);
+  });
+
+  test("Fix 3: ignores last_verified's dated value — same substantive change on two different days hashes identically", () => {
+    const a = computeDiffHash({ phone: "1", last_verified: "2026-05-01" }, ["phone", "last_verified"]);
+    const b = computeDiffHash({ phone: "1", last_verified: "2026-09-02" }, ["phone", "last_verified"]);
+    expect(a).toBe(b);
+  });
+
+  test("still differs when the real (non-last_verified) content differs, regardless of date", () => {
+    const a = computeDiffHash({ phone: "1", last_verified: "2026-05-01" }, ["phone", "last_verified"]);
+    const b = computeDiffHash({ phone: "2", last_verified: "2026-09-02" }, ["phone", "last_verified"]);
+    expect(a).not.toBe(b);
+  });
+});
+
+describe("Fix 4: destructive-clear guard (Plentiful hours_weekly/phone)", () => {
+  test("a real hours_weekly value clearing to null on Plentiful is NOT proposed (transient scrape failure shape)", () => {
+    const result = diffSource({
+      source: "plentiful",
+      currentRows: [row({ id: "plentiful-x", hours_weekly: '{"mon":["09:00 AM - 05:00 PM"]}' })],
+      incoming: [venue({ id: "plentiful-x", hours_weekly: undefined })],
+      runId: RUN_ID,
+      today: TODAY,
+    });
+    expect(result.proposals).toHaveLength(1);
+    expect(result.proposals[0].proposedDiff.fields_changed).toEqual(["last_verified"]);
+  });
+
+  test("a real phone value clearing to empty string on Plentiful is NOT proposed (card-parse-miss shape)", () => {
+    const result = diffSource({
+      source: "plentiful",
+      currentRows: [row({ id: "plentiful-x", phone: "719-555-0100" })],
+      incoming: [venue({ id: "plentiful-x", phone: "" })],
+      runId: RUN_ID,
+      today: TODAY,
+    });
+    expect(result.proposals).toHaveLength(1);
+    expect(result.proposals[0].proposedDiff.fields_changed).toEqual(["last_verified"]);
+  });
+
+  test("a real hours_weekly value clearing on OSM (not guarded) is still proposed normally", () => {
+    const result = diffSource({
+      source: "osm",
+      currentRows: [row({ id: "osm-x", operator: "irrelevant" })],
+      incoming: [venue({ id: "osm-x" })],
+      runId: RUN_ID,
+      today: TODAY,
+    });
+    // hours_weekly isn't in OSM's allowlist at all (unrelated existing rule)
+    // — this just proves the guard is scoped to plentiful, not a blanket rule.
+    expect(result.proposals).toHaveLength(1);
+  });
+
+  test("phone going from empty to populated on Plentiful is still proposed (guard only blocks clearing, not filling in)", () => {
+    const result = diffSource({
+      source: "plentiful",
+      currentRows: [row({ id: "plentiful-x", phone: null })],
+      incoming: [venue({ id: "plentiful-x", phone: "719-555-0100" })],
+      runId: RUN_ID,
+      today: TODAY,
+    });
+    expect(result.proposals[0].proposedDiff.fields_changed).toContain("phone");
   });
 });
 

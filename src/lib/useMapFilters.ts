@@ -109,7 +109,15 @@ export function useMapFilters(origin: LatLng) {
         }
         if (filterOpenNow) {
           const status = computeOpenStatus(v.hours_weekly, now);
-          if (status.state !== "open") return false;
+          // "no_hours" survives the filter deliberately (board review finding
+          // #1): 74 of 107 venues have no hours_weekly data, so treating
+          // "unknown" the same as "closed" hid 25 of 35 food pantries behind
+          // this toggle with nothing on screen explaining why. Only a venue
+          // whose hours ARE known and currently says closed gets dropped here
+          // — components render the "no_hours" case as a distinct "hours
+          // unknown, call ahead" label (see BottomSheet/DesktopVenueWindow/
+          // VenueCard) so it's never mistaken for "open."
+          if (status.state !== "open" && status.state !== "no_hours") return false;
         }
         if (filterSnap && !v.accepts_snap) return false;
         if (filterWic && !v.accepts_wic) return false;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock } from "lucide-react";
+import { Clock, CircleHelp } from "lucide-react";
 import type { Venue } from "@/types/venue";
 import { categoryColors, categoryLabels } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
@@ -76,6 +76,17 @@ export default function VenueCard({
             {status.state === "closed_today" && (
               <Badge variant="neutral">{t("badge.closedToday", locale)}</Badge>
             )}
+            {/* Board review finding #1: hours-unknown venues now survive the
+                "Open now" filter (useMapFilters.ts) instead of vanishing —
+                this badge is what tells the user WHY there's no open/closed
+                read on this card, distinguished from "open"/"closed" by a
+                different icon + explicit text, not color alone. */}
+            {status.state === "no_hours" && (
+              <Badge variant="unknown">
+                <CircleHelp size={11} className="shrink-0" aria-hidden />
+                {t("badge.hoursUnknown", locale)}
+              </Badge>
+            )}
             {venue.accepts_snap && (
               <Badge variant="snap">{t("badge.snap", locale)}</Badge>
             )}
@@ -104,12 +115,19 @@ function Badge({
   variant,
 }: {
   children: React.ReactNode;
-  variant: "open" | "neutral" | "snap";
+  variant: "open" | "neutral" | "snap" | "unknown";
 }) {
   const styles: Record<string, string> = {
     open: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]",
     neutral: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
     snap: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]",
+    // DESIGN.md: "Yellow is for support/classification badges only" — this is
+    // the first real use of --color-brand-yellow (previously spec'd as
+    // `badgeYellow` but never actually wired to a component). ink-700 text
+    // (not ink-500/warning) clears WCAG AA (9.9:1 measured) — warning
+    // (#B45309) only reaches ~3.5:1 on this background, which fails normal-
+    // text contrast at this badge's font size.
+    unknown: "bg-[var(--color-brand-yellow)] text-[var(--color-ink-700)]",
   };
   return (
     <span

@@ -26,6 +26,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useMapFilters } from "@/lib/useMapFilters";
 import { venues as allVenues } from "@/data/venues";
 import { __resetFavoritesForTests, addFavorite } from "@/lib/favorites";
+import { computeOpenStatus } from "@/lib/hours";
 
 // Pueblo center — same default as MapWrapper
 const PUEBLO_CENTER = { lat: 38.2667, lng: -104.6167 };
@@ -109,6 +110,36 @@ describe("useMapFilters — open-now filter", () => {
     act(() => result.current.setFilterOpenNow(true));
     act(() => result.current.setFilterOpenNow(false));
     expect(result.current.filteredVenues.length).toBe(allVenues.length);
+  });
+
+  // Board review finding #1: "Open now" used to silently drop every venue
+  // with no hours_weekly data (74 of 107, incl. 25 of 35 pantries) — it read
+  // as "everything is closed" to a hungry user. A venue with genuinely
+  // unknown hours must now survive the filter; a venue whose hours ARE known
+  // and currently reads closed must still be dropped (that part was correct).
+  test("a venue with no hours_weekly survives the Open now filter", () => {
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
+    const noHoursCount = allVenues.filter((v) => !v.hours_weekly).length;
+    expect(noHoursCount).toBeGreaterThan(0); // sanity: fixture actually has some
+    act(() => result.current.setFilterOpenNow(true));
+    const survivingNoHours = result.current.filteredVenues.filter((v) => !v.hours_weekly);
+    expect(survivingNoHours.length).toBe(noHoursCount);
+  });
+
+  test("a venue with known hours that is currently closed is still dropped by Open now", () => {
+    // 2026-06-21T14:00:00-06:00 (beforeEach fake clock) — Saturday 2pm MDT.
+    // Pick a real venue whose computed status is "closed_today" (hours ARE
+    // known, just not open right now) — distinct from "no_hours" (unknown),
+    // which is the case the previous test proves survives instead.
+    const now = new Date("2026-06-21T14:00:00-06:00");
+    const knownClosed = allVenues.find(
+      (v) => computeOpenStatus(v.hours_weekly, now).state === "closed_today",
+    );
+    expect(knownClosed).toBeDefined();
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
+    act(() => result.current.setFilterOpenNow(true));
+    const stillPresent = result.current.filteredVenues.some((v) => v.id === knownClosed!.id);
+    expect(stillPresent).toBe(false);
   });
 });
 

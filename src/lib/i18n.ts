@@ -91,6 +91,7 @@ const en: Record<string, string> = {
   "badge.opensAt": "Opens at {time}",
   "badge.closesAt": "Closes {time}",
   "badge.closedToday": "Closed today",
+  "badge.hoursUnknown": "Hours unknown — call ahead",
   "badge.snap": "SNAP",
   "badge.wic": "WIC",
 
@@ -516,6 +517,7 @@ const es: Record<string, string> = {
   "badge.opensAt": "Abre a las {time}",
   "badge.closesAt": "Cierra a las {time}",
   "badge.closedToday": "Cerrado hoy",
+  "badge.hoursUnknown": "Horario desconocido — llama antes",
   "badge.snap": "SNAP",
   "badge.wic": "WIC",
 

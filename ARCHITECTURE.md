@@ -213,13 +213,16 @@ scripts/fetch-osm-grocery.py ┤→ scripts/ingest-osm-grocery.py ─┐
 - **Structural guarantee, not a runtime check:** no function anywhere in
   `scripts/refresh-ingest.ts` or `scripts/refresh/*.ts` constructs an
   INSERT/UPDATE/DELETE against `venues` — only `change_proposals`. Applying
-  an approved proposal to `venues` is the review UI's job (a separate,
-  later slice; §6.7 of the design doc).
-- **Not yet built (deferred to that later slice, not silently dropped):**
-  the `/admin/flags` review UI itself, and the stale-apply guard (§6.10c,
-  which only matters at *approval* time). Auto-supersede (§6.10a) and
-  rejection memory (§6.10b) — both concerns of *this* ingestion job, not
-  the review UI — are implemented.
+  an approved proposal to `venues` is the review UI's job (§6.7 of the
+  design doc) — now built, `/admin/flags`
+  (`src/app/admin/flags/page.tsx` + `src/components/ProposalsReviewView.tsx`
+  + `src/app/api/admin/proposals/[id]/{approve,reject}`, #390). It's the
+  ONLY code path that constructs a `venues` mutation FROM a `change_proposals`
+  row — the ingestion pipeline above still never does. See AGENTS.md's
+  "Change-proposal review queue (#390)" for how it satisfies the
+  supersede-race, stale-apply, and rejection-memory correctness
+  requirements. Auto-supersede (§6.10a) and rejection memory (§6.10b)
+  remain concerns of *this* ingestion job, unchanged by that slice.
 
 See `AGENTS.md`'s "Automated venue-refresh pipeline" section for the
 operational detail (schedule, credentials, local testing, the exact

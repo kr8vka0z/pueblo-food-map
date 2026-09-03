@@ -120,6 +120,9 @@ describe("AdminPage — auth guard", () => {
     // admin home instead of only by typing the URL.
     const reviewQueueLink = screen.getByRole("link", { name: "Review queue" });
     expect(reviewQueueLink.getAttribute("href")).toBe("/admin/submissions");
+    // #390 follow-up: nav link to the change-proposal review queue.
+    const flagsQueueLink = screen.getByRole("link", { name: "Data refresh queue" });
+    expect(flagsQueueLink.getAttribute("href")).toBe("/admin/flags");
     expect(forbidden).not.toHaveBeenCalled();
   });
 

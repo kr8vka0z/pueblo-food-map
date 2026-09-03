@@ -1,7 +1,8 @@
 /**
  * /admin/venues/[id]/edit — Cloudflare Access-gated "Edit a venue" page,
  * plus the "Remove from map" (archive) action (#255); `?submission=<id>`
- * closure-report review context added #270.
+ * closure-report review context added #270; `?proposal=<id>` link_health
+ * review context added #390.
  *
  * Same auth chain as /admin and /admin/venues/new (AGENTS.md "Admin
  * authentication"): getAdminDb() verifies the caller's Cloudflare Access
@@ -39,6 +40,18 @@
  * params and searchParams are both Promises in Next.js 16 App Router — must
  * be awaited (same convention as /venue/[id]/page.tsx and
  * /admin/venues/new/page.tsx).
+ *
+ * #390: `?proposal=<id>` is the /admin/flags queue's link_health hand-off —
+ * that queue's card intentionally has no Approve button for a link_health
+ * proposal (a dead-URL observation isn't safe to blindly apply; see
+ * src/components/ProposalsReviewView.tsx's own header), only a "Review &
+ * fix link" navigation link here. resolveLinkHealthProposalContext() below
+ * mirrors resolveClosureReportContext() exactly — same match-against-THIS-
+ * venue check, same "any failure degrades to the plain page" shape — and
+ * when accepted threads the proposal id through as AddVenueForm's new
+ * `proposalId` prop (that component's header explains the PATCH-time
+ * approval), plus renders the dead URL + last-seen HTTP status in a banner
+ * so the admin has context before editing.
  */
 
 import { headers } from "next/headers";
@@ -50,6 +63,7 @@ import AddVenueForm from "@/components/AddVenueForm";
 import ArchiveVenueButton from "@/components/ArchiveVenueButton";
 import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
+import { parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
 import type { AdminVenueRow } from "@/types/venue";
 import type { ClosurePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
 
@@ -104,25 +118,69 @@ async function resolveClosureReportContext(
   }
 }
 
+interface LinkHealthProposalContext {
+  proposalId: number;
+  /** null when the stored diff failed to parse, or carried no url/http_status — the banner falls back to generic copy, same parseError-tolerant shape as ClosureReportContext.detail above. */
+  deadUrl: string | null;
+  httpStatus: number | null;
+}
+
+/**
+ * Resolves `?proposal=<id>` to a link_health review context, or null on ANY
+ * failure mode — same shape as resolveClosureReportContext() above: param
+ * absent/non-integer, no matching pending link_health row, a
+ * `target_venue_id` that doesn't match THIS venue, or a D1 read failure
+ * (wrapped so it degrades to the plain edit page rather than 500ing it).
+ */
+async function resolveLinkHealthProposalContext(
+  db: D1Database,
+  venueId: string,
+  rawProposalParam: string | undefined,
+): Promise<LinkHealthProposalContext | null> {
+  if (!rawProposalParam) return null;
+
+  const proposalId = Number(rawProposalParam);
+  if (!Number.isInteger(proposalId) || proposalId <= 0) return null;
+
+  try {
+    const row = await db
+      .prepare("SELECT * FROM change_proposals WHERE id = ? AND source = 'link_health' AND status = 'pending'")
+      .bind(proposalId)
+      .first<ChangeProposalRow>();
+    if (!row || row.target_venue_id !== venueId) return null;
+
+    const parsed = parseProposalRow(row);
+    if (parsed.parseError) return { proposalId, deadUrl: null, httpStatus: null };
+
+    const httpStatus = typeof parsed.diff.meta?.http_status === "number" ? parsed.diff.meta.http_status : null;
+    const deadUrl = typeof parsed.diff.before?.url === "string" ? parsed.diff.before.url : null;
+    return { proposalId, deadUrl, httpStatus };
+  } catch {
+    return null; // a D1 failure here must never crash the edit page itself
+  }
+}
+
 export default async function EditVenuePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ submission?: string }>;
+  searchParams: Promise<{ submission?: string; proposal?: string }>;
 }) {
   const { id } = await params;
   let email: string;
   let venue: AdminVenueRow | null;
   let closureContext: ClosureReportContext | null = null;
+  let linkHealthContext: LinkHealthProposalContext | null = null;
 
   try {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
     venue = await db.prepare("SELECT * FROM venues WHERE id = ?").bind(id).first<AdminVenueRow>();
     if (venue) {
-      const { submission } = await searchParams;
+      const { submission, proposal } = await searchParams;
       closureContext = await resolveClosureReportContext(db, id, submission);
+      linkHealthContext = await resolveLinkHealthProposalContext(db, id, proposal);
     }
   } catch (err) {
     handlePageAuthError(err);
@@ -161,7 +219,27 @@ export default async function EditVenuePage({
             </Link>
           </div>
         )}
-        <AddVenueForm venueId={venue.id} initialValues={mapVenueRowToFormValues(venue)} />
+        {linkHealthContext && (
+          <div className="max-w-2xl rounded-[var(--radius-lg)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
+            <p className="font-semibold">Reviewing a dead link</p>
+            <p className="mt-1">
+              {linkHealthContext.deadUrl
+                ? `The automated refresh couldn't reach ${linkHealthContext.deadUrl}${
+                    linkHealthContext.httpStatus ? ` (HTTP ${linkHealthContext.httpStatus})` : ""
+                  }.`
+                : "The automated refresh flagged this venue's link as unreachable."}{" "}
+              Update or remove the URL below, then save.
+            </p>
+            <Link href="/admin/flags" className="mt-2 inline-block font-medium underline underline-offset-2">
+              Back to data refresh queue
+            </Link>
+          </div>
+        )}
+        <AddVenueForm
+          venueId={venue.id}
+          initialValues={mapVenueRowToFormValues(venue)}
+          proposalId={linkHealthContext?.proposalId}
+        />
 
         <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
           <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Danger zone</h2>

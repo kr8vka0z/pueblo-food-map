@@ -289,4 +289,51 @@ describe("PATCH /api/admin/venues/[id]", () => {
     expect(updateStmt.args).toContain(0); // accepts_wic
     expect(updateStmt.args).toContain("719-555-0100");
   });
+
+  // #390: optional proposalId body field, the link_health "route to edit"
+  // hand-off — see route.ts's header comment for why this is a looser
+  // convenience path than the flags queue's own strict approve route.
+  describe("optional proposalId (link_health hand-off, #390)", () => {
+    test("proposalId present -> batch has 3 statements, the 3rd approves that exact proposal", async () => {
+      const { db, batch } = makeFakeDb(makeExistingRow());
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ proposalId: 748 }) }));
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(3);
+      const [, , approveStmt] = stmts;
+      expect(approveStmt.sql).toContain("UPDATE change_proposals SET status = 'approved'");
+      expect(approveStmt.sql).toContain("source = 'link_health'");
+      expect(approveStmt.sql).toContain("target_venue_id = ?");
+      expect(approveStmt.args).toContain(748);
+      expect(approveStmt.args).toContain(VENUE_ID);
+      expect(approveStmt.args).toContain(ADMIN_EMAIL);
+    });
+
+    test("proposalId absent -> batch still has only 2 statements (unchanged from before #390)", async () => {
+      const { db, batch } = makeFakeDb(makeExistingRow());
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(makeRequest({ origin: ADMIN_ORIGIN }));
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(2);
+    });
+
+    test("non-integer proposalId is ignored, not bound -> still 2 statements", async () => {
+      const { db, batch } = makeFakeDb(makeExistingRow());
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(
+        makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ proposalId: "not-a-number" }) }),
+      );
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(2);
+    });
+  });
 });

@@ -990,9 +990,9 @@ why this exists (the venue data staleness gap).
 OSM, diffs the result against Cloudflare D1's current `venues` rows, runs an
 outbound link-health pass over every stored `url`, and writes ONE
 `change_proposals` row (`migrations/0001_init_admin_schema.sql`) per
-detected difference. It never writes to `venues` — that table only changes
-when a human approves a proposal, which is a separate, later slice (the
-`/admin/flags` review UI, spec §6.6, NOT built by this work).
+detected difference. It never writes to `venues` directly — that table only
+changes when a human approves a proposal, via the `/admin/flags` review
+queue (spec §6.6, #390 — see "Change-proposal review queue (#390)" below).
 
 **Running it locally** (safe — never touches production D1 unless you pass
 `--remote`):
@@ -1112,17 +1112,108 @@ gh workflow run "Venue Data Refresh"
 npx wrangler d1 execute pueblo-food-map-admin --remote --json --command "SELECT source, change_type, COUNT(*) FROM change_proposals WHERE status='pending' GROUP BY source, change_type"
 ```
 
-**What's deliberately NOT built here (deferred to the review-UI slice, not
-silently dropped):** the `/admin/flags` review queue itself (spec §6.6) —
-proposals sit in D1 with no UI to see them yet, so `npx wrangler d1 execute
---remote` (above) is the only way to inspect them until that slice ships —
-and the stale-apply guard (spec §6.10c), which only matters once something
-actually applies an approved proposal to `venues`. Auto-supersede (§6.10a:
-a fresher run's proposal for the same `(source, target_venue_id)` retires
-an earlier run's still-pending one) and rejection memory (§6.10b: a diff
-identical to one a human already explicitly rejected is not re-proposed)
-ARE implemented — both are this ingestion job's own write-time concern, not
-the review UI's.
+**Historical note — what used to be deferred here is now built (#390).**
+Prior revisions of this section said the `/admin/flags` review queue and the
+stale-apply guard were deferred to a later slice; both now exist — see
+"Change-proposal review queue (#390)" below for the full picture. This
+ingestion job's own write-time mechanisms — auto-supersede (§6.10a: a
+fresher run's proposal for the same `(source, target_venue_id)` retires an
+earlier run's still-pending one) and rejection memory (§6.10b: a diff
+identical to one a human already explicitly rejected is not re-proposed) —
+are unchanged by that slice; it only reads and acts on what this job
+already writes.
+
+## Change-proposal review queue (#390)
+
+`/admin/flags` (`src/app/admin/flags/page.tsx` + `src/components/ProposalsReviewView.tsx`)
+is the review UI the previous section's ingestion pipeline was writing into
+with nothing to read it — the same Server-Component-auth-gate /
+Client-Component-interaction split as `/admin/submissions`, and closely
+modeled on it (`getAdminDb()` → `handlePageAuthError()`, per-row defensive
+`parseProposalRow()` so one malformed `proposed_diff` degrades to that
+card's own error state rather than blanking the queue or 500ing the page,
+same as `parseSubmissionRow` there). Lists every `status='pending'` row,
+newest first, with source/change-type filter chips (only rendered once more
+than one distinct value is actually present) so a 100+ row queue stays
+workable. Each card shows the target venue's name (via one batched
+`WHERE id IN (...)` lookup against `venues`, not a per-row query) and a
+`<dl>` before/after of exactly the fields `fields_changed` names
+(`last_verified` and `id` are filtered out of that list — a freshness stamp
+and an already-shown identifier, not worth eyeballing).
+
+**Two new mutation routes, `src/app/api/admin/proposals/[id]/approve` and
+`.../reject`**, same auth pair as every other admin mutation
+(`getAdminDb()` then `requireAdminOrigin()`). Approve applies the proposal
+to `venues` via the SAME shape of atomic `db.batch()` (venue mutation +
+`audit_log` INSERT) every other admin mutation route already uses — nothing
+new to `venues.status` semantics or `audit_log.action`'s enum, per spec
+§6.7. Reject is a standalone `UPDATE change_proposals SET status =
+'rejected', ... WHERE id = ? AND status = 'pending'`, deliberately touching
+only `status`/`reviewed_by`/`reviewed_at` — `source`, `target_venue_id`, and
+`diff_hash` are left untouched so the next pipeline run's rejection-memory
+lookup (§6.10b, `scripts/refresh/diffEngine.ts`) still finds this exact row.
+
+**The three correctness requirements the issue named, all load-bearing:**
+
+1. **Supersede race** — a later pipeline run's auto-supersede (§6.10a) can
+   flip a pending row while an admin is mid-review. The approve route
+   re-`SELECT`s the proposal fresh at request time (never trusts a
+   page-load snapshot), returns `409 stale` if it's no longer `pending`,
+   AND carries `AND status = 'pending'` on its own `change_proposals`
+   UPDATE inside the batch, checking `D1Result.meta.changes === 0`
+   afterward as a second belt against a true concurrent race in the
+   few-hundred-ms window between the pre-check and the batch (documented as
+   an accepted residual, same tolerance already given to
+   `public_submissions`' own idempotency ceiling — see that section above).
+   Reject uses the same `AND status = 'pending'` + `meta.changes === 0 →
+   404` shape `POST /api/admin/submissions/[id]/reject` already established.
+2. **Stale-apply** (§6.10c) — `src/lib/adminProposals.ts`'s
+   `checkStaleApply()`, a pure function re-verifying a proposal's `before`
+   snapshot against a FRESH read of the current `venues` row, scoped to
+   exactly what that proposal type asserts (not a whole-row check — see
+   that file's own header for the "#235 reconciliation" case a coarse check
+   would misfire on: two independent proposals from different sources can
+   legitimately target the same venue at once). Reuses
+   `diffEngine.ts`'s own exported `currentFieldValue()`/`valuesEqual()`
+   rather than re-deriving field equality, so the two comparisons can never
+   silently drift apart (e.g. `hours_weekly`'s day-key-sorted JSON
+   normalization). A stale proposal is marked `superseded`, not applied,
+   and the admin sees why.
+3. **Rejection memory** (§6.10b) — proved structurally: the reject route's
+   UPDATE statement's WHERE/SET clauses never reference `source`,
+   `target_venue_id`, or `diff_hash`, so diffEngine's own
+   `SELECT source, target_venue_id, diff_hash FROM change_proposals WHERE
+   status = 'rejected'` lookup is guaranteed to find whatever this route
+   just rejected on the next run. Regression-guarded in
+   `src/app/api/admin/proposals/[id]/reject/route.test.ts`.
+
+**`link_health` proposals are never blindly applied.** A dead-URL finding
+isn't a field edit safe to auto-apply — the approve route rejects a
+`link_health` source outright (`400`), and `ProposalsReviewView`'s card
+shows no Approve button for one at all, only a real navigation `Link` to
+`/admin/venues/<id>/edit?proposal=<id>`. That page (see "Admin venue edit &
+archive" above) resolves the proposal via a new
+`resolveLinkHealthProposalContext()` — same match-against-THIS-venue
+defensive shape as `resolveClosureReportContext()` — shows the dead URL +
+last-seen HTTP status in a banner, and threads the proposal id through as
+`AddVenueForm`'s new `proposalId` prop (edit-mode-only, mirror image of
+`submissionId` above, which is create-mode-only). Saving that edit approves
+the proposal in the SAME atomic `db.batch()` as the venue update
+(`PATCH /api/admin/venues/[id]`'s new optional `proposalId` body field) —
+deliberately the loose "route to edit, let the admin fix whatever they see
+fit" convenience path, not the strict stale-apply-guarded one the flags
+queue's own approve route uses for `add`/`update`/`remove`.
+
+**Removal proposals are never single-click.** A `change_type='remove'`
+card's action button reaches `ArchiveVenueButton`'s own established
+`window.confirm()` convention (see "Admin venue edit & archive" above) and,
+like every other admin removal, only ever sets `status='archived'` — never
+`DELETE`.
+
+**Now that this UI exists, `.github/workflows/refresh-proposals.yml`'s
+`schedule` trigger can be reconsidered** — it was deliberately disabled
+(commit `f9226c7`) specifically because proposals had nowhere to be
+reviewed. Re-enabling it is a separate decision, not part of this slice.
 
 # Discoverability / SEO (#164)
 

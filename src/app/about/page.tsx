@@ -17,6 +17,8 @@ import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
 import { venues } from "@/data/venues";
+import { publishedAt } from "@/data/published-venues";
+import { formatPublishedDate } from "@/lib/dataFreshness";
 import { serializeJsonLd, buildFaqJsonLd } from "@/lib/venueSchema";
 import SiteFooter from "@/components/SiteFooter";
 
@@ -93,6 +95,10 @@ export default function AboutPage() {
           </p>
           <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
             {t("about.stat.count", locale, { count: String(venues.length) })}
+          </p>
+          {/* Board review finding #2: map-wide freshness, alongside coverage */}
+          <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+            {t("freshness.updated", locale, { date: formatPublishedDate(publishedAt, locale) })}
           </p>
         </div>
 

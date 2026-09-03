@@ -9,6 +9,11 @@
  */
 import type { Venue } from "@/types/venue";
 
+// Hand-added once (not by a live publish) to bring this committed file in
+// line with serializePublishedVenuesFile()'s new output shape — board review
+// finding #2. The next real /admin publish regenerates this whole file and
+// will emit the same line; see that function's WHY comment.
+export const publishedAt = "2026-07-22T04:35:18.344Z";
 export const publishedVenues: Venue[] = [
   {
     "id": "garden-bethany-lutheran",

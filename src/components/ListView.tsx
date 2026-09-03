@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import type { Venue } from "@/types/venue";
 import { t, type Locale } from "@/lib/i18n";
+import { publishedAt } from "@/data/published-venues";
+import { formatPublishedDate } from "@/lib/dataFreshness";
 import VenueCard from "@/components/VenueCard";
 import { useLocale } from "@/lib/LocaleContext";
 
@@ -33,6 +35,12 @@ export default function ListView({
     <div className="absolute inset-0 z-[700] flex flex-col bg-[var(--color-bone-50)] overflow-hidden">
       {/* Spacer clears the floating SearchBar + ViewToggle that sit above the list */}
       <div className="shrink-0 h-[116px]" aria-hidden />
+      {/* Board review finding #2: map-wide freshness — shown unconditionally
+          (not gated on venues.length) since it describes the whole dataset,
+          not the current filter result. */}
+      <p className="shrink-0 px-4 pb-1 text-xs text-[var(--color-ink-400)]">
+        {t("freshness.updated", locale, { date: formatPublishedDate(publishedAt, locale) })}
+      </p>
       {notice ? <div className="shrink-0">{notice}</div> : null}
       <div className="flex-1 overflow-y-auto overscroll-contain pb-6">
         {venues.length === 0 ? (

@@ -5,11 +5,11 @@
  * Source of truth is Cloudflare D1 (`pueblo-food-map-admin`.venues); this
  * file is the build-time snapshot the public map imports at request time
  * (docs/admin/cloudflare-native-admin-spec.md §3.3, §3.5 step 3).
- * Last published: 2026-07-22T04:35:18.344Z
+ * Last published: 2026-09-03T02:16:04.876Z
  */
 import type { Venue } from "@/types/venue";
 
-export const publishedAt = "2026-07-22T04:35:18.344Z";
+export const publishedAt = "2026-09-03T02:16:04.876Z";
 export const publishedVenues: Venue[] = [
   {
     "id": "garden-bethany-lutheran",
@@ -19,7 +19,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.591039,
     "address": "1802 Sheridan Rd, Pueblo, CO 81001",
     "email": "garden@pueblofoodproject.org",
-    "url": "https://pueblofoodproject.org/cgsp/",
+    "url": "https://pueblofoodproject.org/gardens/",
     "notes": "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
     "operator": "Pueblo Food Project",
     "source": "pueblofoodproject.org/cgsp",
@@ -33,7 +33,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.596439,
     "address": "814 E 5th St, Pueblo, CO 81001",
     "email": "garden@pueblofoodproject.org",
-    "url": "https://pueblofoodproject.org/cgsp/",
+    "url": "https://pueblofoodproject.org/gardens/",
     "notes": "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
     "operator": "Pueblo Food Project",
     "source": "pueblofoodproject.org/cgsp",
@@ -47,7 +47,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.621467,
     "address": "110 Midway Dr, Pueblo, CO",
     "email": "garden@pueblofoodproject.org",
-    "url": "https://pueblofoodproject.org/cgsp/",
+    "url": "https://pueblofoodproject.org/gardens/",
     "notes": "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
     "operator": "Pueblo Food Project",
     "source": "pueblofoodproject.org/cgsp",
@@ -61,7 +61,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.625036,
     "address": "Lake Ave near the Fire Station, Pueblo, CO",
     "email": "garden@pueblofoodproject.org",
-    "url": "https://pueblofoodproject.org/cgsp/",
+    "url": "https://pueblofoodproject.org/gardens/",
     "notes": "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
     "operator": "Pueblo Food Project",
     "source": "pueblofoodproject.org/cgsp",
@@ -80,7 +80,7 @@ export const publishedVenues: Venue[] = [
       ]
     },
     "email": "garden@pueblofoodproject.org",
-    "url": "https://pueblofoodproject.org/cgsp/",
+    "url": "https://pueblofoodproject.org/gardens/",
     "notes": "Weekly volunteer work days Wed 4-7pm. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
     "operator": "Pueblo Food Project",
     "source": "pueblofoodproject.org/cgsp",
@@ -94,7 +94,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.612428,
     "address": "215 Canal St, Pueblo, CO 81004",
     "email": "garden@pueblofoodproject.org",
-    "url": "https://pueblofoodproject.org/cgsp/",
+    "url": "https://pueblofoodproject.org/gardens/",
     "notes": "Open to public. Produce donated to food pantries. Partner: Pueblo County Extension Master Gardener Program.",
     "operator": "Pueblo Food Project",
     "source": "pueblofoodproject.org/cgsp",
@@ -107,7 +107,7 @@ export const publishedVenues: Venue[] = [
     "lat": 38.268172,
     "lng": -104.608897,
     "address": "1st & Main, Pueblo, CO",
-    "url": "https://pueblofoodproject.org/cgsp/",
+    "url": "https://pueblofoodproject.org/gardens/",
     "notes": "Public edible landscape installation in downtown Pueblo.",
     "operator": "Pueblo Food Project",
     "source": "pueblofoodproject.org/cgsp",
@@ -120,7 +120,7 @@ export const publishedVenues: Venue[] = [
     "lat": 38.262121,
     "lng": -104.615912,
     "address": "400 S Union Ave, Pueblo, CO 81003",
-    "url": "https://pueblofoodproject.org/cgsp/",
+    "url": "https://pueblofoodproject.org/gardens/",
     "notes": "Edible landscape at Pueblo's first food hall.",
     "operator": "Pueblo Food Project",
     "source": "pueblofoodproject.org/cgsp",
@@ -133,7 +133,7 @@ export const publishedVenues: Venue[] = [
     "lat": 38.222062,
     "lng": -104.617207,
     "address": "600 Maryland Ave, Pueblo, CO",
-    "url": "https://pueblofoodproject.org/cgsp/",
+    "url": "https://pueblofoodproject.org/gardens/",
     "notes": "Public edible landscape installation.",
     "operator": "Pueblo Food Project",
     "source": "pueblofoodproject.org/cgsp",
@@ -146,7 +146,7 @@ export const publishedVenues: Venue[] = [
     "lat": 38.283229,
     "lng": -104.607842,
     "address": "Mineral Palace Park, Pueblo, CO",
-    "url": "https://pueblofoodproject.org/cgsp/",
+    "url": "https://pueblofoodproject.org/gardens/",
     "notes": "Public edible landscape installation.",
     "operator": "Pueblo Food Project",
     "source": "pueblofoodproject.org/cgsp",
@@ -1563,6 +1563,18 @@ export const publishedVenues: Venue[] = [
     "last_verified": "2026-05-14"
   },
   {
+    "id": "plentiful-pueblo-community-soup-kitchen-1bc98af5",
+    "name": "Pueblo Community Soup Kitchen",
+    "category": "meal_site",
+    "lat": 38.273296,
+    "lng": -104.612059,
+    "address": "422 W. 7th St., Pueblo, CO 81003",
+    "phone": "(719) 545-6540",
+    "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-soup-kitchen-1bc98af5",
+    "source": "directory.plentiful.org/colorado/pueblo",
+    "last_verified": "2026-05-14"
+  },
+  {
     "id": "plentiful-pueblo-community-soup-kitchen-plentiful-3195",
     "name": "Pueblo Community Soup Kitchen",
     "category": "meal_site",
@@ -1598,6 +1610,18 @@ export const publishedVenues: Venue[] = [
     "phone": "(719) 545-6540",
     "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-soup-kitchen-plentiful-3195",
     "notes": "Pueblo Community Soup Kitchen. in Pueblo, CO. Phone: (719) 545-6540.",
+    "source": "directory.plentiful.org/colorado/pueblo",
+    "last_verified": "2026-05-14"
+  },
+  {
+    "id": "plentiful-pueblo-cooperative-care-center-97ec4eda",
+    "name": "Pueblo Cooperative Care Center",
+    "category": "pantry",
+    "lat": 38.274237,
+    "lng": -104.610622,
+    "address": "326 West 8th Street, Pueblo, CO 81003",
+    "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-cooperative-care-center-97ec4eda",
+    "notes": "Pueblo Cooperative Care Center. in Pueblo, CO. Hours and directions available.",
     "source": "directory.plentiful.org/colorado/pueblo",
     "last_verified": "2026-05-14"
   },

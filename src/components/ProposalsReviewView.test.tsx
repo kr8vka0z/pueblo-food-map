@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ParsedProposal } from "@/lib/adminProposals";
+import type { VenueLookup } from "@/app/admin/flags/page";
 
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
@@ -46,6 +47,20 @@ afterEach(() => {
 });
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
+
+/** Widened VenueLookup fixture (#390 review) — every test that needs a lookup entry builds off this rather than repeating the full shape. */
+function makeVenueLookup(overrides: Partial<VenueLookup> = {}): VenueLookup {
+  return {
+    name: "Eastside Grocery",
+    category: "grocery",
+    address: "123 Main St, Pueblo, CO",
+    phone: "719-555-0100",
+    url: "https://eastside.example.com",
+    last_verified: "2026-09-01",
+    status: "published",
+    ...overrides,
+  };
+}
 
 function makeUpdateProposal(overrides: Partial<ParsedProposal> = {}): ParsedProposal {
   return {
@@ -138,10 +153,12 @@ describe("ProposalsReviewView — update card (before/after diff)", () => {
     render(
       <ProposalsReviewView
         proposals={[makeUpdateProposal()]}
-        venueLookup={{ "osm-node-1": { name: "Eastside Grocery", status: "published" } }}
+        venueLookup={{ "osm-node-1": makeVenueLookup() }}
       />,
     );
     expect(screen.getByText("Eastside Grocery")).toBeDefined();
+    // Address renders alongside the name so an admin can recognise the place, not just match an id.
+    expect(screen.getByText("123 Main St, Pueblo, CO")).toBeDefined();
     expect(screen.getByText("Phone")).toBeDefined();
     expect(screen.getByText("719-555-0100")).toBeDefined();
     expect(screen.getByText("719-555-0199")).toBeDefined();
@@ -184,7 +201,7 @@ describe("ProposalsReviewView — remove card (never a single click)", () => {
     render(
       <ProposalsReviewView
         proposals={[makeRemoveProposal()]}
-        venueLookup={{ "plentiful-old-pantry": { name: "Old Pantry", status: "published" } }}
+        venueLookup={{ "plentiful-old-pantry": makeVenueLookup({ name: "Old Pantry", address: "45 Elm St, Pueblo, CO" }) }}
       />,
     );
 
@@ -202,7 +219,7 @@ describe("ProposalsReviewView — remove card (never a single click)", () => {
     render(
       <ProposalsReviewView
         proposals={[makeRemoveProposal()]}
-        venueLookup={{ "plentiful-old-pantry": { name: "Old Pantry", status: "published" } }}
+        venueLookup={{ "plentiful-old-pantry": makeVenueLookup({ name: "Old Pantry", address: "45 Elm St, Pueblo, CO" }) }}
       />,
     );
 
@@ -296,8 +313,8 @@ describe("ProposalsReviewView — filters", () => {
       <ProposalsReviewView
         proposals={[makeUpdateProposal(), makeRemoveProposal()]}
         venueLookup={{
-          "osm-node-1": { name: "Eastside Grocery", status: "published" },
-          "plentiful-old-pantry": { name: "Old Pantry", status: "published" },
+          "osm-node-1": makeVenueLookup(),
+          "plentiful-old-pantry": makeVenueLookup({ name: "Old Pantry", address: "45 Elm St, Pueblo, CO" }),
         }}
       />,
     );
@@ -308,5 +325,167 @@ describe("ProposalsReviewView — filters", () => {
     await user.click(screen.getByRole("button", { name: "OpenStreetMap" }));
     expect(screen.getByText("Eastside Grocery")).toBeDefined();
     expect(screen.queryByText("Old Pantry")).toBeNull();
+  });
+});
+
+// ─── #390 review — detail rendering per card type ─────────────────────────
+
+function makeAddProposal(overrides: Partial<ParsedProposal> = {}): ParsedProposal {
+  return {
+    row: {
+      id: 10,
+      source: "osm",
+      target_venue_id: "osm-node-new",
+      change_type: "add",
+      proposed_diff: "",
+      diff_hash: "h10",
+      run_id: "run-42",
+      anomaly: 0,
+      status: "pending",
+      created_at: "2026-09-01T12:00:00.000Z",
+      reviewed_by: null,
+      reviewed_at: null,
+      applied_at: null,
+    },
+    parseError: false,
+    diff: {
+      before: null,
+      after: {
+        id: "osm-node-new",
+        name: "Northside Pantry",
+        category: "pantry",
+        lat: 38.27,
+        lng: -104.6,
+        address: "900 Elm St, Pueblo, CO",
+        phone: "719-555-0200",
+        url: "https://northside.example.com",
+        hours_weekly: { mon: ["09:00-17:00"] },
+        last_verified: "2026-09-01",
+      },
+      fields_changed: ["id", "name", "category", "lat", "lng", "address", "phone", "url", "hours_weekly", "last_verified"],
+    },
+    ...overrides,
+  } as ParsedProposal;
+}
+
+describe("ProposalsReviewView — remove card detail (venue context, no freshness message)", () => {
+  test("shows the venue's current address (header) and category (body) alongside the removal explanation", () => {
+    render(
+      <ProposalsReviewView
+        proposals={[makeRemoveProposal()]}
+        venueLookup={{
+          "plentiful-old-pantry": makeVenueLookup({ name: "Old Pantry", category: "pantry", address: "45 Elm St, Pueblo, CO" }),
+        }}
+      />,
+    );
+    // Address renders once, in the card header (shared by every non-add card).
+    expect(screen.getByText("45 Elm St, Pueblo, CO")).toBeDefined();
+    expect(screen.getByText("Food Pantry")).toBeDefined();
+    expect(screen.getByText(/no longer lists/i)).toBeDefined();
+  });
+
+  test("names the source that dropped it", () => {
+    render(
+      <ProposalsReviewView
+        proposals={[makeRemoveProposal()]}
+        venueLookup={{ "plentiful-old-pantry": makeVenueLookup({ name: "Old Pantry" }) }}
+      />,
+    );
+    // makeRemoveProposal's row.source is "plentiful" -> badge label "Plentiful".
+    expect(screen.getByText(/Plentiful no longer lists/)).toBeDefined();
+  });
+
+  test("a remove card never renders the freshness-only message", () => {
+    render(
+      <ProposalsReviewView
+        proposals={[makeRemoveProposal()]}
+        venueLookup={{ "plentiful-old-pantry": makeVenueLookup({ name: "Old Pantry" }) }}
+      />,
+    );
+    expect(screen.queryByText(/Confirmed still present/i)).toBeNull();
+  });
+});
+
+describe("ProposalsReviewView — add card (no existing venue) renders the full proposed record", () => {
+  test("renders name, address, category, phone, website, and hours — marked as not on the map", () => {
+    render(<ProposalsReviewView proposals={[makeAddProposal()]} venueLookup={{}} />);
+
+    expect(screen.getByText("Northside Pantry")).toBeDefined();
+    expect(screen.getByText("900 Elm St, Pueblo, CO")).toBeDefined();
+    expect(screen.getByText("Food Pantry")).toBeDefined();
+    expect(screen.getByText("719-555-0200")).toBeDefined();
+    expect(screen.getByText("https://northside.example.com")).toBeDefined();
+    expect(screen.getByText(/not currently on the map/i)).toBeDefined();
+  });
+
+  test("hours render human-readably (formatSlot), never a raw 24h string or JSON", () => {
+    render(<ProposalsReviewView proposals={[makeAddProposal()]} venueLookup={{}} />);
+
+    expect(screen.getByText(/9am\s*–\s*5pm/)).toBeDefined();
+    expect(screen.queryByText(/09:00-17:00/)).toBeNull();
+    expect(screen.queryByText(/\{"mon"/)).toBeNull();
+  });
+
+  test("an add targeting an already-archived id is labeled Restore, not New venue", () => {
+    render(
+      <ProposalsReviewView
+        proposals={[makeAddProposal()]}
+        venueLookup={{ "osm-node-new": makeVenueLookup({ name: "Northside Pantry", status: "archived" }) }}
+      />,
+    );
+    expect(screen.getByText("Restore")).toBeDefined();
+    expect(screen.getByText(/lists this place again/i)).toBeDefined();
+  });
+});
+
+describe("ProposalsReviewView — freshness-only update names the source and date", () => {
+  test("states which source confirmed the venue and when, not a source-less sentence", () => {
+    const freshnessOnly = makeUpdateProposal({
+      diff: {
+        before: { last_verified: "2026-08-01" },
+        after: { last_verified: "2026-09-01" },
+        fields_changed: ["last_verified"],
+      },
+    });
+    render(<ProposalsReviewView proposals={[freshnessOnly]} venueLookup={{ "osm-node-1": makeVenueLookup() }} />);
+
+    // makeUpdateProposal's row.source is "osm" -> badge label "OpenStreetMap".
+    // One combined match (not two separate getByText calls) — the card
+    // header ALSO renders a "Sep 1, 2026" timestamp, so asserting the date
+    // fragment on its own would hit two elements.
+    expect(screen.getByText(/Confirmed still present by OpenStreetMap on Sep 1, 2026/)).toBeDefined();
+  });
+});
+
+describe("ProposalsReviewView — hours render human-readably in an update diff", () => {
+  test("an hours_weekly field change shows formatted slots, not raw 24h strings", () => {
+    const hoursUpdate = makeUpdateProposal({
+      diff: {
+        before: { hours_weekly: { mon: ["09:00-17:00"] }, last_verified: "2026-08-01" },
+        after: { hours_weekly: { mon: ["08:00-18:00"] }, last_verified: "2026-09-01" },
+        fields_changed: ["hours_weekly", "last_verified"],
+      },
+    });
+    render(<ProposalsReviewView proposals={[hoursUpdate]} venueLookup={{}} />);
+
+    expect(screen.getByText(/9am\s*–\s*5pm/)).toBeDefined();
+    expect(screen.getByText(/8am\s*–\s*6pm/)).toBeDefined();
+    expect(screen.queryByText(/09:00-17:00/)).toBeNull();
+  });
+});
+
+describe("ProposalsReviewView — link_health shows when it was checked", () => {
+  test("includes the checked_at timestamp alongside the dead URL and status", () => {
+    render(<ProposalsReviewView proposals={[makeLinkHealthProposal()]} venueLookup={{}} />);
+    // One combined match — the card header also renders a "Sep 1, 2026"
+    // timestamp, so asserting the date fragment alone would hit two elements.
+    expect(screen.getByText(/on the last check, Sep 1, 2026/)).toBeDefined();
+  });
+});
+
+describe("ProposalsReviewView — card header shows which run produced it", () => {
+  test("shows the run_id alongside the submitted date", () => {
+    render(<ProposalsReviewView proposals={[makeUpdateProposal()]} venueLookup={{}} />);
+    expect(screen.getByText(/run-1/)).toBeDefined();
   });
 });

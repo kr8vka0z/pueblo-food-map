@@ -51,12 +51,30 @@
  * On any successful action, router.refresh() re-runs the Server Component's
  * query — the acted-on card simply stops matching `status = 'pending'` and
  * disappears from the next render.
+ *
+ * Detail rendering (usability fix, staging review): Kyle's verdict on
+ * staging was "How am I supposed to tell what the change is? There's no
+ * detail" — a card could name a venue and a changing field but gave no way
+ * to judge the change against the real place. Fixed by widening
+ * page.tsx's venueLookup (name/status only -> + category/address/phone/
+ * url/last_verified) and adding a distinct detail renderer per
+ * change_type: `AddDetails` shows the full proposed record for a venue
+ * that isn't on the map yet (diff.after is the only source of truth —
+ * venueLookup has nothing to show), `RemoveDetails` now states which
+ * source stopped listing the place alongside its current address/category,
+ * and `FieldDiff`'s freshness-only branch now names the confirming source
+ * and date instead of a source-less "still present" sentence. Hours values
+ * everywhere route through @/lib/hours' formatSlot so an admin reads
+ * "9am – 5pm," never a raw "09:00-17:00" or a JSON blob.
  */
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { WeeklyHours } from "@/types/venue";
+import { categoryLabels } from "@/data/venues";
+import { formatLastVerified } from "@/lib/adminVenues";
+import { formatSlot } from "@/lib/hours";
+import type { Venue, VenueCategory, WeeklyHours } from "@/types/venue";
 import type { ParsedProposal, ProposalChangeType, ProposalSourceValue, ProposedDiff } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/app/admin/flags/page";
 
@@ -129,13 +147,31 @@ function fieldLabel(field: string): string {
   return FIELD_LABELS[field] ?? field;
 }
 
+function capitalizeDay(day: string): string {
+  return day.charAt(0).toUpperCase() + day.slice(1);
+}
+
+/**
+ * Per-day hours summary shared by formatFieldValue (update diffs) and
+ * AddDetails (new-venue proposals) — routes every slot through
+ * @/lib/hours' formatSlot so an admin reads "9am – 5pm," never a raw
+ * "09:00-17:00"/"9:00 AM - 5:00 PM" string or a dumped JSON object. Empty
+ * (no days with slots) returns "(empty)", same convention as
+ * formatFieldValue's other empty values.
+ */
+function formatHoursSummary(hours: WeeklyHours): string {
+  const entries = Object.entries(hours).filter(([, slots]) => (slots ?? []).length > 0);
+  if (entries.length === 0) return "(empty)";
+  return entries
+    .map(([day, slots]) => `${capitalizeDay(day)}: ${(slots ?? []).map(formatSlot).join(", ")}`)
+    .join(" · ");
+}
+
 /** Renders one Venue field's value for the diff view — hours_weekly gets a compact per-day summary, everything else stringifies plainly. Empty/null/undefined renders as an explicit "(empty)" so a real value clearing to nothing reads clearly, not as a blank cell. */
 function formatFieldValue(field: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "(empty)";
   if (field === "hours_weekly" && typeof value === "object") {
-    const entries = Object.entries(value as WeeklyHours).filter(([, slots]) => (slots ?? []).length > 0);
-    if (entries.length === 0) return "(empty)";
-    return entries.map(([day, slots]) => `${day}: ${(slots ?? []).join(", ")}`).join(" · ");
+    return formatHoursSummary(value as WeeklyHours);
   }
   if (typeof value === "boolean") return value ? "Yes" : "No";
   return String(value);
@@ -316,11 +352,20 @@ function ProposalCard({
             {isRestore ? "Restore" : CHANGE_TYPE_LABEL[changeType] ?? changeType}
           </span>
         </div>
-        <p className="text-xs text-[var(--color-ink-400)]">{formatSubmittedAt(row.created_at)}</p>
+        {/* created_at + run_id — a reviewer working a real queue needs to know
+            whether a card is from last night's run or one from weeks ago. */}
+        <p className="text-xs text-[var(--color-ink-400)]">
+          {formatSubmittedAt(row.created_at)} · run {row.run_id}
+        </p>
       </div>
 
       <div className="mt-3">
         <p className="text-base font-semibold text-[var(--color-ink-700)]">{venueName}</p>
+        {/* Address alongside the name — recognising the actual place, not just
+            matching an id, is what lets an admin judge the change at all. */}
+        {targetVenue?.address && (
+          <p className="text-xs text-[var(--color-ink-500)]">{targetVenue.address}</p>
+        )}
         <p className="text-xs text-[var(--color-ink-400)]">{row.target_venue_id}</p>
 
         {proposal.parseError ? (
@@ -331,9 +376,11 @@ function ProposalCard({
         ) : source === "link_health" ? (
           <LinkHealthDetails diff={proposal.diff} />
         ) : changeType === "remove" ? (
-          <RemoveDetails name={venueName} />
+          <RemoveDetails name={venueName} venue={targetVenue} sourceLabel={sourceBadge.label} />
+        ) : changeType === "add" ? (
+          <AddDetails diff={proposal.diff} sourceLabel={sourceBadge.label} isRestore={isRestore} />
         ) : (
-          <FieldDiff diff={proposal.diff} />
+          <FieldDiff diff={proposal.diff} sourceLabel={sourceBadge.label} />
         )}
       </div>
 
@@ -432,24 +479,52 @@ function ProposalCard({
 
 // ─── Per-change_type detail rows ────────────────────────────────────────────
 
-function RemoveDetails({ name }: { name: string }) {
+/** Plain "Label: value" row — same shape SubmissionsReviewView's own DetailRow uses, kept local since that file doesn't export it. */
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <p className="mt-2 text-sm text-[var(--color-ink-700)]">
-      &ldquo;{name}&rdquo; no longer appears in this source&apos;s data. Archiving keeps its record — it stops
-      appearing on the public map but is never deleted.
+    <p className="text-sm text-[var(--color-ink-700)]">
+      <span className={fieldLabelClass}>{label}: </span>
+      {value}
     </p>
   );
 }
 
+/**
+ * `venue` (the current D1 row, from page.tsx's widened venueLookup) is
+ * normally present — a remove proposal targets a venue that still exists
+ * (that's the point) — but stays optional so this never throws on a stray
+ * lookup miss. Address is NOT repeated here — the card header (above this
+ * component) already shows it for every non-`add` card, same source, so a
+ * second copy would just be visual noise on the one card type that most
+ * needs its message to stand out. Names `sourceLabel` explicitly
+ * ("OpenStreetMap no longer lists...") instead of the old source-less "this
+ * source" — a reviewer with several sources in the queue at once needs to
+ * know which one dropped it.
+ */
+function RemoveDetails({ name, venue, sourceLabel }: { name: string; venue: VenueLookup | undefined; sourceLabel: string }) {
+  return (
+    <div className="mt-2 space-y-1">
+      {venue && <DetailRow label="Category" value={categoryLabels[venue.category as VenueCategory] ?? venue.category} />}
+      <p className="text-sm text-[var(--color-ink-700)]">
+        {sourceLabel} no longer lists &ldquo;{name}&rdquo;. Archiving keeps its record — it stops appearing on the
+        public map but is never deleted.
+      </p>
+    </div>
+  );
+}
+
+/** No address row for the same reason RemoveDetails drops it — the card header already shows it. */
 function LinkHealthDetails({ diff }: { diff: ProposedDiff }) {
   const deadUrl = typeof diff.before?.url === "string" ? diff.before.url : null;
   const httpStatus = typeof diff.meta?.http_status === "number" ? diff.meta.http_status : null;
+  const checkedAt = typeof diff.meta?.checked_at === "string" ? diff.meta.checked_at : null;
   return (
     <p className="mt-2 text-sm text-[var(--color-ink-700)]">
       {deadUrl ? (
         <>
           This venue&apos;s website (<span className="break-all">{deadUrl}</span>) returned{" "}
-          {httpStatus ?? "an error"} on the last check.
+          {httpStatus ?? "an error"} on the last check
+          {checkedAt ? `, ${formatSubmittedAt(checkedAt)}` : ""}.
         </>
       ) : (
         "This venue's website was flagged as unreachable on the last check."
@@ -458,7 +533,38 @@ function LinkHealthDetails({ diff }: { diff: ProposedDiff }) {
   );
 }
 
-function FieldDiff({ diff }: { diff: ProposedDiff }) {
+/**
+ * `add` proposals (diffEngine.ts's buildProposal) always carry `before:
+ * null` — there is no existing D1 row to diff against, so a before/after
+ * table has nothing on the "before" side to show. The full proposed record
+ * lives entirely in `diff.after`; this renders it directly, explicitly
+ * marked as not yet on the public map, rather than routing it through
+ * FieldDiff (which would render every field as "(empty) → value," reading
+ * like a diff of a blank record instead of a new venue to review).
+ */
+function AddDetails({ diff, sourceLabel, isRestore }: { diff: ProposedDiff; sourceLabel: string; isRestore: boolean }) {
+  const after = (diff.after ?? {}) as Partial<Venue>;
+  const categoryLabel = after.category ? (categoryLabels[after.category as VenueCategory] ?? after.category) : undefined;
+  const hoursSummary =
+    after.hours_weekly && Object.keys(after.hours_weekly).length > 0 ? formatHoursSummary(after.hours_weekly) : undefined;
+
+  return (
+    <div className="mt-2 space-y-1">
+      <p className="text-sm font-medium text-[var(--color-clay-700)]">
+        {isRestore
+          ? `${sourceLabel} lists this place again — not currently shown on the map.`
+          : `Found by ${sourceLabel} — not currently on the map.`}
+      </p>
+      {after.address && <DetailRow label="Address" value={after.address} />}
+      {categoryLabel && <DetailRow label="Category" value={categoryLabel} />}
+      {after.phone && <DetailRow label="Phone" value={after.phone} />}
+      {after.url && <DetailRow label="Website" value={after.url} />}
+      {hoursSummary && <DetailRow label="Hours" value={hoursSummary} />}
+    </div>
+  );
+}
+
+function FieldDiff({ diff, sourceLabel }: { diff: ProposedDiff; sourceLabel: string }) {
   // last_verified is a pure freshness stamp, not a field an admin needs to
   // eyeball in a before/after table — every add/update proposal carries it,
   // so showing it as a full diff row would visually bury the field that
@@ -470,9 +576,16 @@ function FieldDiff({ diff }: { diff: ProposedDiff }) {
   const reviewFields = diff.fields_changed.filter((f) => f !== "last_verified" && f !== "id");
 
   if (reviewFields.length === 0) {
+    // WHY name the source and date rather than the old source-less
+    // "Confirmed still present at the source": that sentence is this
+    // card's ENTIRE information content on a freshness-only proposal (the
+    // common case in a real run) — omitting who checked and when left
+    // nothing for a reviewer to actually verify.
+    const verifiedAt = typeof diff.after?.last_verified === "string" ? diff.after.last_verified : undefined;
     return (
       <p className="mt-2 text-sm text-[var(--color-ink-500)]">
-        Confirmed still present at the source — this only refreshes the &ldquo;last verified&rdquo; date.
+        Confirmed still present by {sourceLabel}
+        {verifiedAt ? ` on ${formatLastVerified(verifiedAt)}` : ""} — no other details changed.
       </p>
     );
   }

@@ -27,13 +27,16 @@
  * blanking the whole queue or 500ing the page — identical defensive shape to
  * /admin/submissions' own parseSubmissionRow.
  *
- * Venue names for the card headers: `update`/`remove` proposals only carry
- * a field diff in `proposed_diff` (not necessarily the venue's `name`,
- * unless name itself is one of the changed fields), so this page runs ONE
- * extra `SELECT id, name FROM venues WHERE id IN (...)` across every
- * target_venue_id in the current page of proposals, rather than a per-row
- * lookup — the same "one query, not N" discipline
- * src/lib/adminVenues.ts's summarizePublishChanges already follows.
+ * Venue context for the card headers: `update`/`remove` proposals only
+ * carry a field diff in `proposed_diff` (not necessarily the venue's
+ * `name`, unless name itself is one of the changed fields), and a bare name
+ * alone can't tell an admin which place a change targets or whether a
+ * proposed value looks right — so this page runs ONE extra
+ * `SELECT id, name, category, address, phone, url, last_verified, status
+ * FROM venues WHERE id IN (...)` across every target_venue_id in the
+ * current page of proposals, rather than a per-row lookup — the same "one
+ * query, not N" discipline src/lib/adminVenues.ts's summarizePublishChanges
+ * already follows.
  */
 
 import { headers } from "next/headers";
@@ -46,11 +49,30 @@ import ProposalsReviewView from "@/components/ProposalsReviewView";
 interface VenueLookupRow {
   id: string;
   name: string;
+  category: string;
+  address: string;
+  phone: string | null;
+  url: string | null;
+  last_verified: string;
   status: string;
 }
 
+/**
+ * Widened from {name, status} (#390 review — Kyle: "How am I supposed to
+ * tell what the change is? There's no detail."). A reviewer needs enough of
+ * the CURRENT venue to recognise the place and sanity-check a proposed
+ * change against it — name and status alone answer "does this id exist,"
+ * not "is this the place I think it is." Deliberately NOT every AdminVenueRow
+ * column (no lat/lng/hours/notes/audit fields) — this is a lookup for
+ * display context, not a second venue-edit read.
+ */
 export interface VenueLookup {
   name: string;
+  category: string;
+  address: string;
+  phone: string | null;
+  url: string | null;
+  last_verified: string;
   status: string;
 }
 
@@ -58,7 +80,7 @@ export interface VenueLookup {
  * One `SELECT ... WHERE id IN (...)` for every target_venue_id on this
  * page — never a per-row lookup. Returns an empty map for an empty input
  * rather than issuing a query with no placeholders (invalid SQL). Carries
- * `status` alongside `name` so ProposalsReviewView can label an `add`
+ * `status` alongside the rest so ProposalsReviewView can label an `add`
  * proposal targeting an already-archived id "Restore" instead of "New" —
  * spec §6.6's "Restore" labeling — without a second query.
  */
@@ -67,11 +89,21 @@ async function loadVenueLookup(db: D1Database, ids: string[]): Promise<Record<st
   if (uniqueIds.length === 0) return {};
   const placeholders = uniqueIds.map(() => "?").join(", ");
   const result = await db
-    .prepare(`SELECT id, name, status FROM venues WHERE id IN (${placeholders})`)
+    .prepare(`SELECT id, name, category, address, phone, url, last_verified, status FROM venues WHERE id IN (${placeholders})`)
     .bind(...uniqueIds)
     .all<VenueLookupRow>();
   const map: Record<string, VenueLookup> = {};
-  for (const row of result.results) map[row.id] = { name: row.name, status: row.status };
+  for (const row of result.results) {
+    map[row.id] = {
+      name: row.name,
+      category: row.category,
+      address: row.address,
+      phone: row.phone,
+      url: row.url,
+      last_verified: row.last_verified,
+      status: row.status,
+    };
+  }
   return map;
 }
 

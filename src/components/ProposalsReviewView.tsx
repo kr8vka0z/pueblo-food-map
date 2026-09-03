@@ -66,6 +66,30 @@
  * and date instead of a source-less "still present" sentence. Hours values
  * everywhere route through @/lib/hours' formatSlot so an admin reads
  * "9am – 5pm," never a raw "09:00-17:00" or a JSON blob.
+ *
+ * Website/phone links (usability fix, second staging review pass): a
+ * Website value used to render as inert plain text — `renderFieldValue()`
+ * is the ONE shared place every field value routes through (DetailRow,
+ * FieldDiff's after value, LinkHealthDetails' dead-link banner) so a url/
+ * phone field reads as a real link everywhere this queue shows one, not
+ * just the one spot Kyle happened to review.
+ *
+ * Right-hand preview (`ProposalPreview`, same review pass — Kyle: "it would
+ * be nice if there was a full preview on the right hand side that showed
+ * what the new venue card was going to look like. easier to catch errors
+ * that way"): renders the REAL public VenueCard component
+ * (src/components/VenueCard.tsx, the same one src/components/ListView.tsx
+ * uses) fed `buildPreviewVenue()`'s merge of the proposal's `after` diff
+ * over the current venueLookup row — not a hand-rolled lookalike, so what
+ * an admin sees here is exactly what the public map renders once approved,
+ * not an approximation of it. `remove` previews today's card (a remove
+ * proposal carries no field diff) under a dimmed `inert` treatment plus a
+ * real (non-hidden) sentence explaining the outcome — Kyle's own
+ * instruction was explicit that a normal-looking card here would
+ * misrepresent what happens on approval. `link_health` never reaches this
+ * component (routed to the venue edit screen instead, see the card's own
+ * action row below) — a dead-link finding has no proposed field change to
+ * preview, and the edit screen IS the real, richer place to inspect it.
  */
 
 import { useMemo, useState } from "react";
@@ -74,6 +98,8 @@ import { useRouter } from "next/navigation";
 import { categoryLabels } from "@/data/venues";
 import { formatLastVerified } from "@/lib/adminVenues";
 import { formatSlot } from "@/lib/hours";
+import { safeUrl } from "@/lib/safeUrl";
+import VenueCard from "@/components/VenueCard";
 import type { Venue, VenueCategory, WeeklyHours } from "@/types/venue";
 import type { ParsedProposal, ProposalChangeType, ProposalSourceValue, ProposedDiff } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/app/admin/flags/page";
@@ -359,28 +385,44 @@ function ProposalCard({
         </p>
       </div>
 
-      <div className="mt-3">
-        <p className="text-base font-semibold text-[var(--color-ink-700)]">{venueName}</p>
-        {/* Address alongside the name — recognising the actual place, not just
-            matching an id, is what lets an admin judge the change at all. */}
-        {targetVenue?.address && (
-          <p className="text-xs text-[var(--color-ink-500)]">{targetVenue.address}</p>
-        )}
-        <p className="text-xs text-[var(--color-ink-400)]">{row.target_venue_id}</p>
+      {/* Detail column stacks under the preview on narrow screens (mobile-
+          first base rule) and sits side-by-side with it from lg: up — a
+          side-by-side layout needs real width for both to stay readable, so
+          this doesn't flip at md: (design/references/mobile.md). */}
+      <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start">
+        {/* data-testid: the preview column intentionally re-renders the
+            venue's name/address/category via the real VenueCard — tests
+            need to scope queries to one column or the other rather than
+            asserting on now-legitimately-duplicated text. */}
+        <div data-testid="proposal-detail" className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-[var(--color-ink-700)]">{venueName}</p>
+          {/* Address alongside the name — recognising the actual place, not just
+              matching an id, is what lets an admin judge the change at all. */}
+          {targetVenue?.address && (
+            <p className="text-xs text-[var(--color-ink-500)]">{targetVenue.address}</p>
+          )}
+          <p className="text-xs text-[var(--color-ink-400)]">{row.target_venue_id}</p>
 
-        {proposal.parseError ? (
-          <p className="mt-2 text-sm text-[var(--color-clay-700)]">
-            Couldn&apos;t read details for this proposal — the stored data may be malformed. You can still reject
-            it below.
-          </p>
-        ) : source === "link_health" ? (
-          <LinkHealthDetails diff={proposal.diff} />
-        ) : changeType === "remove" ? (
-          <RemoveDetails name={venueName} venue={targetVenue} sourceLabel={sourceBadge.label} />
-        ) : changeType === "add" ? (
-          <AddDetails diff={proposal.diff} sourceLabel={sourceBadge.label} isRestore={isRestore} />
-        ) : (
-          <FieldDiff diff={proposal.diff} sourceLabel={sourceBadge.label} />
+          {proposal.parseError ? (
+            <p className="mt-2 text-sm text-[var(--color-clay-700)]">
+              Couldn&apos;t read details for this proposal — the stored data may be malformed. You can still
+              reject it below.
+            </p>
+          ) : source === "link_health" ? (
+            <LinkHealthDetails diff={proposal.diff} />
+          ) : changeType === "remove" ? (
+            <RemoveDetails name={venueName} venue={targetVenue} sourceLabel={sourceBadge.label} />
+          ) : changeType === "add" ? (
+            <AddDetails diff={proposal.diff} sourceLabel={sourceBadge.label} isRestore={isRestore} />
+          ) : (
+            <FieldDiff diff={proposal.diff} sourceLabel={sourceBadge.label} />
+          )}
+        </div>
+
+        {!proposal.parseError && source !== "link_health" && (
+          <div data-testid="proposal-preview" className="min-w-0 lg:w-[320px] lg:shrink-0">
+            <ProposalPreview changeType={changeType} diff={proposal.diff} venue={targetVenue} venueId={row.target_venue_id} />
+          </div>
         )}
       </div>
 
@@ -479,12 +521,51 @@ function ProposalCard({
 
 // ─── Per-change_type detail rows ────────────────────────────────────────────
 
-/** Plain "Label: value" row — same shape SubmissionsReviewView's own DetailRow uses, kept local since that file doesn't export it. */
-function DetailRow({ label, value }: { label: string; value: string }) {
+/**
+ * Renders one already-formatted field value inline — the ONE shared place
+ * every field value in this queue routes through, so a `url`/`phone` field
+ * reads as a real link everywhere it's shown, not just the one call site
+ * Kyle happened to review (staging review: a Website value rendered as
+ * inert plain text). `url` reuses `safeUrl` (src/lib/safeUrl.ts) rather
+ * than a fresh regex check — the same http(s)-only allowlist guard
+ * BottomSheet/DesktopVenueWindow already apply to `venue.url`, since this
+ * data comes from the exact same untrusted OSM/Plentiful sources. `phone`
+ * is skipped when the value is the "(empty)" sentinel formatFieldValue
+ * produces for a null/undefined/empty field — a `tel:(empty)` link would be
+ * worse than no link. `break-all` on the url anchor lets a long link wrap
+ * instead of blowing out the card width (the same reason VenueCard's own
+ * distance readout uses a fixed-width font rather than letting layout
+ * jitter — different fix, same "don't let one value's length break the
+ * layout" concern).
+ */
+function renderFieldValue(field: string | undefined, formatted: string): React.ReactNode {
+  const linkClass = "break-all text-[var(--color-sage-700)] underline underline-offset-2";
+  if (field === "url") {
+    const href = safeUrl(formatted);
+    if (href) {
+      return (
+        <a href={href} target="_blank" rel="noopener noreferrer" className={linkClass}>
+          {formatted}
+        </a>
+      );
+    }
+  }
+  if (field === "phone" && formatted !== "(empty)") {
+    return (
+      <a href={`tel:${formatted}`} className={linkClass}>
+        {formatted}
+      </a>
+    );
+  }
+  return formatted;
+}
+
+/** Plain "Label: value" row — same shape SubmissionsReviewView's own DetailRow uses, kept local since that file doesn't export it. `field` (optional) routes the value through renderFieldValue's url/phone link treatment. */
+function DetailRow({ label, value, field }: { label: string; value: string; field?: string }) {
   return (
     <p className="text-sm text-[var(--color-ink-700)]">
       <span className={fieldLabelClass}>{label}: </span>
-      {value}
+      {renderFieldValue(field, value)}
     </p>
   );
 }
@@ -513,7 +594,14 @@ function RemoveDetails({ name, venue, sourceLabel }: { name: string; venue: Venu
   );
 }
 
-/** No address row for the same reason RemoveDetails drops it — the card header already shows it. */
+/**
+ * No address row for the same reason RemoveDetails drops it — the card
+ * header already shows it. The dead URL still renders as a real link (via
+ * renderFieldValue) rather than plain text — a 404 at the last scheduled
+ * check doesn't mean the site is down right now, and letting the reviewing
+ * admin click through to verify before fixing anything is exactly the
+ * judgment call this queue exists for.
+ */
 function LinkHealthDetails({ diff }: { diff: ProposedDiff }) {
   const deadUrl = typeof diff.before?.url === "string" ? diff.before.url : null;
   const httpStatus = typeof diff.meta?.http_status === "number" ? diff.meta.http_status : null;
@@ -522,7 +610,7 @@ function LinkHealthDetails({ diff }: { diff: ProposedDiff }) {
     <p className="mt-2 text-sm text-[var(--color-ink-700)]">
       {deadUrl ? (
         <>
-          This venue&apos;s website (<span className="break-all">{deadUrl}</span>) returned{" "}
+          This venue&apos;s website ({renderFieldValue("url", deadUrl)}) returned{" "}
           {httpStatus ?? "an error"} on the last check
           {checkedAt ? `, ${formatSubmittedAt(checkedAt)}` : ""}.
         </>
@@ -557,8 +645,8 @@ function AddDetails({ diff, sourceLabel, isRestore }: { diff: ProposedDiff; sour
       </p>
       {after.address && <DetailRow label="Address" value={after.address} />}
       {categoryLabel && <DetailRow label="Category" value={categoryLabel} />}
-      {after.phone && <DetailRow label="Phone" value={after.phone} />}
-      {after.url && <DetailRow label="Website" value={after.url} />}
+      {after.phone && <DetailRow label="Phone" value={after.phone} field="phone" />}
+      {after.url && <DetailRow label="Website" value={after.url} field="url" />}
       {hoursSummary && <DetailRow label="Hours" value={hoursSummary} />}
     </div>
   );
@@ -599,14 +687,136 @@ function FieldDiff({ diff, sourceLabel }: { diff: ProposedDiff; sourceLabel: str
         <div key={field} className="text-sm">
           <dt className={fieldLabelClass}>{fieldLabel(field)}</dt>
           <dd className="text-[var(--color-ink-700)]">
+            {/* Only the "after" (resulting) value becomes a link — the
+                struck-through "before" value is being replaced, not
+                something worth clicking through to. */}
             <span className="text-[var(--color-clay-700)] line-through decoration-1">
               {formatFieldValue(field, before[field])}
             </span>{" "}
             <span aria-hidden>→</span>{" "}
-            <span className="font-medium text-[var(--color-sage-700)]">{formatFieldValue(field, after[field])}</span>
+            <span className="font-medium text-[var(--color-sage-700)]">
+              {renderFieldValue(field, formatFieldValue(field, after[field]))}
+            </span>
           </dd>
         </div>
       ))}
     </dl>
+  );
+}
+
+// ─── Right-hand preview: the real public venue card, fed proposed data ────
+
+/**
+ * Builds the Venue object handed to the real VenueCard for the preview
+ * column — `after` merged OVER the current venueLookup row so an `update`
+ * proposal shows the RESULTING card, not today's. `add` proposals carry a
+ * full `after` record already (diffEngine.ts's buildProposal never emits a
+ * partial add); `remove` calls this with `after: null` (a remove proposal
+ * carries no field diff — diffEngine always writes `fields_changed: []` for
+ * it) to preview today's card unmodified, with the "will disappear" framing
+ * handled entirely by the caller, not here.
+ *
+ * Only `name`/`category`/`address` are required to return a real Venue —
+ * the three fields VenueCard actually renders. `lat`/`lng`/`source`/
+ * `last_verified` are required by the Venue TYPE but never read by
+ * VenueCard's own render, so a missing value there defaults rather than
+ * blocking the whole preview — an `add` proposal's diff, for instance,
+ * doesn't carry `source` (only `change_proposals.source`, a different
+ * column, does), and there's no existing venueLookup row for a brand-new
+ * venue to fall back to.
+ *
+ * Returns null when even that minimum isn't met (a stray venueLookup miss
+ * on an `update`/`remove`, or a malformed proposal) — same fail-soft
+ * posture as this file's other per-row defensive branches (parseError,
+ * RemoveDetails' optional venue) rather than crashing the card on bad data.
+ */
+function buildPreviewVenue(venue: VenueLookup | undefined, after: Partial<Venue> | null | undefined, id: string): Venue | null {
+  const base: Partial<Venue> = venue
+    ? {
+        id,
+        name: venue.name,
+        category: venue.category as VenueCategory,
+        lat: venue.lat,
+        lng: venue.lng,
+        address: venue.address,
+        hours_weekly: venue.hours_weekly ?? undefined,
+        accepts_snap: venue.accepts_snap,
+        accepts_wic: venue.accepts_wic,
+        phone: venue.phone ?? undefined,
+        url: venue.url ?? undefined,
+        source: venue.source,
+        last_verified: venue.last_verified,
+      }
+    : {};
+  const merged: Partial<Venue> = { ...base, ...(after ?? {}), id };
+
+  if (!merged.name || !merged.category || !merged.address) return null;
+
+  return {
+    ...merged,
+    name: merged.name,
+    category: merged.category,
+    address: merged.address,
+    lat: merged.lat ?? 0,
+    lng: merged.lng ?? 0,
+    source: merged.source ?? "",
+    last_verified: merged.last_verified ?? "",
+  } as Venue;
+}
+
+/**
+ * Right-hand preview panel — Kyle's staging review: "it would be nice if
+ * there was a full preview on the right hand side that showed what the new
+ * venue card was going to look like. easier to catch errors that way."
+ * Renders the SAME public VenueCard component src/components/ListView.tsx
+ * uses for the real /list row, fed buildPreviewVenue()'s merged data — not
+ * a hand-rolled lookalike, so what an admin sees here is exactly what the
+ * public map renders once approved.
+ *
+ * `inert` (not just visual dimming) on the wrapping `<ul>`: VenueCard's
+ * root is a real focusable `<button>` — leaving it focusable while visually
+ * inert would be a keyboard trap to a control that does nothing, and
+ * `aria-hidden` on a focusable descendant is the WCAG anti-pattern the
+ * native `inert` attribute exists specifically to avoid (it removes the
+ * subtree from focus AND the accessibility tree together). This preview is
+ * context, not a second set of controls — Approve/Reject below stay the
+ * card's only actions.
+ */
+function ProposalPreview({
+  changeType,
+  diff,
+  venue,
+  venueId,
+}: {
+  changeType: ProposalChangeType;
+  diff: ProposedDiff;
+  venue: VenueLookup | undefined;
+  venueId: string;
+}) {
+  const isRemove = changeType === "remove";
+  const previewVenue = buildPreviewVenue(venue, isRemove ? null : diff.after, venueId);
+
+  return (
+    <div>
+      <p className={`${fieldLabelClass} mb-2`}>Preview — public map</p>
+      {previewVenue ? (
+        <ul
+          inert
+          className={
+            "overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white " +
+            (isRemove ? "opacity-50 grayscale" : "")
+          }
+        >
+          <VenueCard venue={previewVenue} isSelected={false} onClick={() => {}} headingLevel={3} />
+        </ul>
+      ) : (
+        <p className="text-sm text-[var(--color-ink-500)]">Not enough data to preview this change.</p>
+      )}
+      {isRemove && previewVenue && (
+        <p className="mt-2 text-sm font-medium text-[var(--color-clay-700)]">
+          This venue will no longer appear on the public map.
+        </p>
+      )}
+    </div>
   );
 }

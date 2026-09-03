@@ -17,7 +17,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ParsedProposal } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/app/admin/flags/page";
@@ -48,14 +48,26 @@ afterEach(() => {
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
 
-/** Widened VenueLookup fixture (#390 review) — every test that needs a lookup entry builds off this rather than repeating the full shape. */
+/**
+ * Widened VenueLookup fixture (#390 review, widened again for the preview
+ * panel — lat/lng/hours_weekly/accepts_snap/accepts_wic/source are what
+ * buildPreviewVenue()/VenueCard need to render a real card) — every test
+ * that needs a lookup entry builds off this rather than repeating the full
+ * shape.
+ */
 function makeVenueLookup(overrides: Partial<VenueLookup> = {}): VenueLookup {
   return {
     name: "Eastside Grocery",
     category: "grocery",
+    lat: 38.27,
+    lng: -104.6,
     address: "123 Main St, Pueblo, CO",
     phone: "719-555-0100",
     url: "https://eastside.example.com",
+    hours_weekly: { mon: ["09:00-17:00"] },
+    accepts_snap: undefined,
+    accepts_wic: undefined,
+    source: "OpenStreetMap (node/4041375052)",
     last_verified: "2026-09-01",
     status: "published",
     ...overrides,
@@ -156,12 +168,16 @@ describe("ProposalsReviewView — update card (before/after diff)", () => {
         venueLookup={{ "osm-node-1": makeVenueLookup() }}
       />,
     );
-    expect(screen.getByText("Eastside Grocery")).toBeDefined();
+    // Scoped to the detail column — the right-hand preview also renders this
+    // venue's name/address via the real VenueCard (#390 preview-panel
+    // addition), so an unscoped query now legitimately matches twice.
+    const detail = within(screen.getByTestId("proposal-detail"));
+    expect(detail.getByText("Eastside Grocery")).toBeDefined();
     // Address renders alongside the name so an admin can recognise the place, not just match an id.
-    expect(screen.getByText("123 Main St, Pueblo, CO")).toBeDefined();
-    expect(screen.getByText("Phone")).toBeDefined();
-    expect(screen.getByText("719-555-0100")).toBeDefined();
-    expect(screen.getByText("719-555-0199")).toBeDefined();
+    expect(detail.getByText("123 Main St, Pueblo, CO")).toBeDefined();
+    expect(detail.getByText("Phone")).toBeDefined();
+    expect(detail.getByText("719-555-0100")).toBeDefined();
+    expect(detail.getByText("719-555-0199")).toBeDefined();
     // last_verified is excluded from the visible diff rows (freshness stamp, not a review-worthy field).
     expect(screen.queryByText("Last verified")).toBeNull();
   });
@@ -319,11 +335,14 @@ describe("ProposalsReviewView — filters", () => {
       />,
     );
 
-    expect(screen.getByText("Eastside Grocery")).toBeDefined();
-    expect(screen.getByText("Old Pantry")).toBeDefined();
+    // getAllByText, not getByText — the right-hand preview panel also
+    // renders each venue's name via the real VenueCard (#390 preview-panel
+    // addition), so both names now legitimately appear twice.
+    expect(screen.getAllByText("Eastside Grocery").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Old Pantry").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "OpenStreetMap" }));
-    expect(screen.getByText("Eastside Grocery")).toBeDefined();
+    expect(screen.getAllByText("Eastside Grocery").length).toBeGreaterThan(0);
     expect(screen.queryByText("Old Pantry")).toBeNull();
   });
 });
@@ -410,9 +429,16 @@ describe("ProposalsReviewView — add card (no existing venue) renders the full 
   test("renders name, address, category, phone, website, and hours — marked as not on the map", () => {
     render(<ProposalsReviewView proposals={[makeAddProposal()]} venueLookup={{}} />);
 
-    expect(screen.getByText("Northside Pantry")).toBeDefined();
-    expect(screen.getByText("900 Elm St, Pueblo, CO")).toBeDefined();
-    expect(screen.getByText("Food Pantry")).toBeDefined();
+    // Name/address/category scoped to the detail column — the right-hand
+    // preview also renders these three via the real VenueCard (#390
+    // preview-panel addition), so an unscoped query now matches twice.
+    // Phone/website aren't rendered by VenueCard at all, so those stay
+    // unscoped (still a single match each, now inside a link — see the
+    // clickable-link tests below for the anchor-specific assertions).
+    const detail = within(screen.getByTestId("proposal-detail"));
+    expect(detail.getByText("Northside Pantry")).toBeDefined();
+    expect(detail.getByText("900 Elm St, Pueblo, CO")).toBeDefined();
+    expect(detail.getByText("Food Pantry")).toBeDefined();
     expect(screen.getByText("719-555-0200")).toBeDefined();
     expect(screen.getByText("https://northside.example.com")).toBeDefined();
     expect(screen.getByText(/not currently on the map/i)).toBeDefined();
@@ -487,5 +513,124 @@ describe("ProposalsReviewView — card header shows which run produced it", () =
   test("shows the run_id alongside the submitted date", () => {
     render(<ProposalsReviewView proposals={[makeUpdateProposal()]} venueLookup={{}} />);
     expect(screen.getByText(/run-1/)).toBeDefined();
+  });
+});
+
+// ─── Clickable URL/phone values (staging review, second pass) ─────────────
+
+describe("ProposalsReviewView — Website/Phone values render as real links", () => {
+  test("an add proposal's Website value is a real link — correct href, opens a new tab safely", () => {
+    render(<ProposalsReviewView proposals={[makeAddProposal()]} venueLookup={{}} />);
+
+    const link = screen.getByRole("link", { name: "https://northside.example.com" });
+    expect(link.getAttribute("href")).toBe("https://northside.example.com");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  test("an add proposal's Phone value is a tel: link", () => {
+    render(<ProposalsReviewView proposals={[makeAddProposal()]} venueLookup={{}} />);
+
+    const link = screen.getByRole("link", { name: "719-555-0200" });
+    expect(link.getAttribute("href")).toBe("tel:719-555-0200");
+  });
+
+  test("an update proposal's url field diff renders the resulting (after) value as a real link", () => {
+    const urlUpdate = makeUpdateProposal({
+      diff: {
+        before: { url: "https://old.example.com" },
+        after: { url: "https://new.example.com" },
+        fields_changed: ["url"],
+      },
+    });
+    render(<ProposalsReviewView proposals={[urlUpdate]} venueLookup={{}} />);
+
+    const link = screen.getByRole("link", { name: "https://new.example.com" });
+    expect(link.getAttribute("href")).toBe("https://new.example.com");
+    // The struck-through "before" value is being replaced, not something
+    // worth clicking through to — it stays plain text.
+    expect(screen.queryByRole("link", { name: "https://old.example.com" })).toBeNull();
+    expect(screen.getByText("https://old.example.com")).toBeDefined();
+  });
+
+  test("a non-http(s) url never becomes a link (safeUrl guard)", () => {
+    const unsafeUpdate = makeUpdateProposal({
+      diff: {
+        before: { url: "https://old.example.com" },
+        after: { url: "javascript:alert(1)" },
+        fields_changed: ["url"],
+      },
+    });
+    render(<ProposalsReviewView proposals={[unsafeUpdate]} venueLookup={{}} />);
+
+    expect(screen.queryByRole("link", { name: /javascript:alert/ })).toBeNull();
+    expect(screen.getByText("javascript:alert(1)")).toBeDefined();
+  });
+
+  test("the link_health dead-link URL is itself a real, clickable link", () => {
+    render(<ProposalsReviewView proposals={[makeLinkHealthProposal()]} venueLookup={{}} />);
+
+    const link = screen.getByRole("link", { name: "https://dead.example.com" });
+    expect(link.getAttribute("href")).toBe("https://dead.example.com");
+    expect(link.getAttribute("target")).toBe("_blank");
+  });
+});
+
+// ─── Right-hand preview panel (staging review, second pass) ───────────────
+
+describe("ProposalsReviewView — preview panel shows the RESULTING venue, not today's", () => {
+  test("an update proposal's preview reflects the proposed value, not the current one", () => {
+    const categoryUpdate = makeUpdateProposal({
+      diff: {
+        before: { category: "grocery" },
+        after: { category: "pantry" },
+        fields_changed: ["category"],
+      },
+    });
+    render(
+      <ProposalsReviewView
+        proposals={[categoryUpdate]}
+        venueLookup={{ "osm-node-1": makeVenueLookup({ category: "grocery" }) }}
+      />,
+    );
+
+    const preview = within(screen.getByTestId("proposal-preview"));
+    // The preview must show the PROPOSED category (pantry -> "Food Pantry"),
+    // never the current one (grocery -> "Grocery / Supermarket") — a test
+    // that would pass against either would prove nothing about the merge.
+    expect(preview.getByText(/Food Pantry/)).toBeDefined();
+    expect(preview.queryByText(/Grocery \/ Supermarket/)).toBeNull();
+  });
+
+  test("an add proposal's preview renders the real VenueCard for the new venue", () => {
+    render(<ProposalsReviewView proposals={[makeAddProposal()]} venueLookup={{}} />);
+
+    const preview = within(screen.getByTestId("proposal-preview"));
+    expect(preview.getByText("Northside Pantry")).toBeDefined();
+    expect(preview.getByText(/Food Pantry/)).toBeDefined();
+  });
+
+  test("a remove proposal's preview never presents the venue as if it were staying — dimmed card, explicit off-map sentence, no plain normal-looking card", () => {
+    render(
+      <ProposalsReviewView
+        proposals={[makeRemoveProposal()]}
+        venueLookup={{ "plentiful-old-pantry": makeVenueLookup({ name: "Old Pantry", category: "pantry" }) }}
+      />,
+    );
+
+    const preview = within(screen.getByTestId("proposal-preview"));
+    expect(preview.getByText(/no longer appear on the public map/i)).toBeDefined();
+    // The card itself is still shown (dimmed, not hidden) so the reviewer
+    // can still recognise which place is leaving — but it's marked `inert`
+    // (removed from the accessibility tree and keyboard-unreachable), not a
+    // normal interactive card sitting there as if nothing were happening.
+    const card = preview.getByText("Old Pantry").closest("ul");
+    expect(card).not.toBeNull();
+    expect(card?.hasAttribute("inert")).toBe(true);
+  });
+
+  test("a link_health card renders no preview panel — there's no proposed field change to preview", () => {
+    render(<ProposalsReviewView proposals={[makeLinkHealthProposal()]} venueLookup={{}} />);
+    expect(screen.queryByTestId("proposal-preview")).toBeNull();
   });
 });

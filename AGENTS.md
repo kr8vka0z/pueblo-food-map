@@ -1257,6 +1257,47 @@ like every other admin removal, only ever sets `status='archived'` — never
 (commit `f9226c7`) specifically because proposals had nowhere to be
 reviewed. Re-enabling it is a separate decision, not part of this slice.
 
+## Flags queue usability fixes — clickable links + resulting-card preview
+
+Two fixes from Kyle's first real review of 104 live proposals on staging.
+Both live in `ProposalsReviewView.tsx`; see that file's own header for the
+full WHY.
+
+**Website/phone values are real links, not plain text.** Every field-value
+render in this queue (`AddDetails`' Website/Phone rows, `FieldDiff`'s
+"after" diff value, `LinkHealthDetails`' dead-link banner) routes through
+one shared `renderFieldValue()` — a `url` field becomes an `http(s)`-only
+link (reuses `safeUrl`, src/lib/safeUrl.ts — the same untrusted-OSM-data
+guard BottomSheet/DesktopVenueWindow already apply to `venue.url`), a
+`phone` field becomes a `tel:` link. Only the "after" side of a `FieldDiff`
+row links — the struck-through "before" value is being replaced, not worth
+clicking through to.
+
+**A right-hand preview shows the RESULTING public venue card** — Kyle:
+"it would be nice if there was a full preview on the right hand side that
+showed what the new venue card was going to look like. easier to catch
+errors that way." Renders the real `VenueCard` component
+(src/components/VenueCard.tsx, the same one `ListView.tsx` uses for the
+public `/list` row) fed `buildPreviewVenue()`'s merge of the proposal's
+`after` diff over the current venue row — never a hand-rolled lookalike.
+`add`/`update` preview the resulting card; `remove` previews TODAY's card
+under a dimmed, `inert` treatment (native `inert`, not `aria-hidden` — the
+card's root is a real focusable `<button>`, and `aria-hidden` on a
+focusable descendant is the exact WCAG anti-pattern `inert` exists to
+avoid) plus a real, announced "will no longer appear" sentence — a plain
+undimmed card here would misrepresent the outcome. `link_health` renders no
+preview panel at all: that source has no proposed field change (a dead-link
+finding isn't an edit), and the "Review & fix link" button already routes
+to the one place — the venue edit screen — that shows the real thing.
+
+**`page.tsx`'s `venueLookup` widened again** (id/name/status only ->
+`+category/address/phone/url/last_verified/status` for the first review
+pass -> `+lat/lng/hours_weekly/accepts_snap/accepts_wic/source` for this
+one) — the preview needs everything `VenueCard` actually renders, which the
+narrower "recognise the place" shape from the first pass didn't carry.
+Still deliberately not every `AdminVenueRow` column (no notes/operator/
+email/audit fields — `VenueCard` doesn't render any of those).
+
 # Discoverability / SEO (#164)
 
 Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**

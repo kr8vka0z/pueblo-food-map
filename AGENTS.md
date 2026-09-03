@@ -976,6 +976,119 @@ admin shell already uses elsewhere (e.g. "Back to venue list") so "Add
 place" stays the header's one primary action — shipped as a follow-up
 after this slice, not folded into #259's original scope.
 
+# Automated venue-refresh pipeline
+
+Full design: `docs/admin/cloudflare-native-admin-spec.md` §6 (auto-refresh &
+the change-approval queue). This section covers what actually shipped — a
+scoped INGESTION slice, not the full doc — plus the operational facts (run
+it, read its output, provision it in production). See ARCHITECTURE.md's own
+"Automated venue-refresh pipeline" section for the mental-model summary and
+why this exists (the venue data staleness gap).
+
+**What it is, in one sentence:** a monthly (+ manual-dispatch) GitHub Action
+(`.github/workflows/refresh-proposals.yml`) that re-scrapes Plentiful and
+OSM, diffs the result against Cloudflare D1's current `venues` rows, runs an
+outbound link-health pass over every stored `url`, and writes ONE
+`change_proposals` row (`migrations/0001_init_admin_schema.sql`) per
+detected difference. It never writes to `venues` — that table only changes
+when a human approves a proposal, which is a separate, later slice (the
+`/admin/flags` review UI, spec §6.6, NOT built by this work).
+
+**Running it locally** (safe — never touches production D1 unless you pass
+`--remote`):
+
+```bash
+npx wrangler d1 migrations apply pueblo-food-map-admin --local   # once, if not already applied
+npx tsx scripts/seed-admin-db.ts                                 # generates scripts/generated/seed-admin.sql
+npx wrangler d1 execute pueblo-food-map-admin --local --file=scripts/generated/seed-admin.sql
+npx tsx scripts/refresh-ingest.ts --db-mode local
+```
+
+Requires `python3` on PATH with `beautifulsoup4` installed
+(`pip install beautifulsoup4` — `scripts/scrape-plentiful.py`'s own
+dependency, unchanged by this work) and network access (Plentiful, Overpass,
+Nominatim, and every venue's stored `url` for the link-health pass — expect
+this to take 1-2 minutes; the delays are deliberate politeness, not a bug).
+Inspect what it wrote:
+
+```bash
+npx wrangler d1 execute pueblo-food-map-admin --local --json --command "SELECT source, change_type, COUNT(*) FROM change_proposals GROUP BY source, change_type"
+```
+
+**Guardrails — all three fail loud (non-zero exit), never a silent no-op:**
+
+- **Zero-record guard** (per source): an empty scrape aborts that source's
+  writes entirely rather than proposing to remove every active row for it.
+- **Abnormal-drop guard** (per source): `>=` max(5, ceil(20% of that
+  source's active row count)) of its rows missing from a fresh scrape
+  aborts that source's writes entirely. **Deliberately stricter than the
+  design doc's §6.4**, which still writes flagged removal proposals for a
+  human to see — this pipeline runs unattended with no review UI live yet,
+  so a scraper glitch writing nothing is safer than writing half a run for
+  nobody to catch.
+- **Per-run cap** (whole run): more than 150 combined proposals aborts the
+  entire run — nothing is written, for any source.
+
+A source-level abort still lets the OTHER source (and the link-health pass)
+write their own good proposals — see `scripts/refresh-ingest.ts`'s own file
+header for why independent scrape failures are treated independently. The
+job's exit code is non-zero if ANY source aborted, even if others succeeded,
+so the Actions run still goes red.
+
+**Credentials — reuses existing secrets, nothing new to provision.**
+`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` — the same repo secrets
+`deploy-prod.yml` / `deploy-dev.yml` already use for `wrangler deploy` — are
+what `wrangler d1 execute` (what `scripts/refresh-ingest.ts` shells out to;
+there's no Cloudflare Worker binding available from a plain GitHub Actions
+runner) reads. This is a deliberate departure from
+`docs/admin/cloudflare-native-admin-spec.md` §6.3/§6.8's design, which
+specs a NEW authenticated HTTP route (`POST /api/admin/refresh/ingest`)
+behind a Cloudflare Access Service Token + a new `REFRESH_INGEST_TOKEN`
+bearer secret — that design predates the Better Auth cutover (Cloudflare
+Access no longer gates anything on this admin surface, see "Admin
+authentication — Better Auth is the sole gate" above) and would have meant
+standing up a new authenticated API surface + a new secret for a job that
+already has a perfectly good, existing, narrowly-scoped credential path
+straight to the database it needs to write. No UI, no new route, no new
+secret — smaller surface area for the same result.
+
+**Production checklist — NOT run as part of building this pipeline (no
+production credentials held during implementation); a human runs these at
+merge time:**
+
+```bash
+# 1. Apply the schema this pipeline depends on, if not already live —
+#    change_proposals already exists in migrations/0001_init_admin_schema.sql
+#    (shipped with the original #237 admin cutover), so this is very likely
+#    already applied; confirm before assuming either way:
+npx wrangler d1 migrations apply pueblo-food-map-admin --remote
+
+# 2. Confirm CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are already set as
+#    GitHub Actions repo secrets (deploy-prod.yml / deploy-dev.yml already
+#    require them, so this should be a no-op check, not a new provisioning
+#    step).
+
+# 3. First real run — either wait for the 1st-of-month cron, or trigger by
+#    hand from the Actions tab (workflow_dispatch) to verify against
+#    production without waiting:
+gh workflow run "Venue Data Refresh"
+
+# 4. Read what it proposed:
+npx wrangler d1 execute pueblo-food-map-admin --remote --json --command "SELECT source, change_type, COUNT(*) FROM change_proposals WHERE status='pending' GROUP BY source, change_type"
+```
+
+**What's deliberately NOT built here (deferred to the review-UI slice, not
+silently dropped):** the `/admin/flags` review queue itself (spec §6.6) —
+proposals sit in D1 with no UI to see them yet, so `npx wrangler d1 execute
+--remote` (above) is the only way to inspect them until that slice ships —
+and the stale-apply guard (spec §6.10c), which only matters once something
+actually applies an approved proposal to `venues`. Auto-supersede (§6.10a:
+a fresher run's proposal for the same `(source, target_venue_id)` retires
+an earlier run's still-pending one) and rejection memory (§6.10b: a diff
+identical to one a human already explicitly rejected is not re-proposed)
+ARE implemented — both are this ingestion job's own write-time concern, not
+the review UI's.
+
 # Discoverability / SEO (#164)
 
 Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**

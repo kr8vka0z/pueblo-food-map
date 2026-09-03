@@ -64,7 +64,7 @@ def build_query() -> str:
 
 
 def fetch_overpass(query: str) -> dict:
-    data = f"data={urllib.parse.quote(query)}".encode("ascii")  # type: ignore[name-defined]
+    data = f"data={urllib.parse.quote(query)}".encode("ascii")
     req = urllib.request.Request(
         OVERPASS_URL,
         data=data,
@@ -79,11 +79,27 @@ def main() -> int:
     print("Querying Overpass API for Pueblo County grocery/convenience/farm nodes+ways...")
     try:
         payload = fetch_overpass(query)
-    except urllib.error.URLError as exc:
+    except Exception as exc:
+        # urllib.error.URLError (network/timeout) is already an Exception
+        # subclass — the two-except split this replaced logged the same
+        # FATAL text for both, so there was nothing the split branch caught
+        # that this one doesn't.
         print(f"FATAL: Overpass request failed: {exc}", file=sys.stderr)
         return 1
-    except Exception as exc:
-        print(f"FATAL: Overpass request failed: {exc}", file=sys.stderr)
+
+    # Fix 5: Overpass returns HTTP 200 with a `remark` key (not an HTTP
+    # error) when a query hits its own timeout/memory limit — the response
+    # still carries a real `elements` array, just a PARTIAL one (e.g. 55 of
+    # 62 expected). Downstream, scripts/refresh-ingest.ts's diff engine has
+    # no way to distinguish "this venue really closed" from "Overpass gave
+    # up early" — a partial result under the abnormal-drop guardrail's
+    # threshold produces plausible-looking removal proposals for venues
+    # that are still there. Treat `remark` as a hard failure and write
+    # NOTHING, same as any other fetch error — refusing to write partial
+    # data is what lets the caller's zero-record guardrail do its job
+    # instead of silently diffing against a truncated set.
+    if "remark" in payload:
+        print(f"FATAL: Overpass returned a partial result (remark: {payload['remark']!r}) — refusing to write.", file=sys.stderr)
         return 1
 
     elements = payload.get("elements", [])

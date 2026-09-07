@@ -1146,22 +1146,28 @@ Actions run goes red either way — but only the guardrail case actually
 produces good proposals for the healthy source; a scraper crash produces
 none at all.
 
-**Credentials — reuses existing secrets, nothing new to provision.**
-`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` — the same repo secrets
-`deploy-prod.yml` / `deploy-dev.yml` already use for `wrangler deploy` — are
-what `wrangler d1 execute` (what `scripts/refresh-ingest.ts` shells out to;
-there's no Cloudflare Worker binding available from a plain GitHub Actions
-runner) reads. This is a deliberate departure from
+**Credentials — its own least-privilege token, not the deploy token
+(#403).** This job's `CLOUDFLARE_API_TOKEN` env var (what `wrangler d1
+execute`, which `scripts/refresh-ingest.ts` shells out to, reads — there's
+no Cloudflare Worker binding available from a plain GitHub Actions runner)
+maps from its own `CLOUDFLARE_D1_TOKEN` repo secret — D1 Write only,
+account-scoped — never from the `CLOUDFLARE_API_TOKEN` secret
+`deploy-prod.yml` / `deploy-dev.yml` use for `wrangler deploy`. This job
+parses adversarial third-party HTML, so a least-privilege credential
+bounds what a compromised scrape can reach; it shares only
+`CLOUDFLARE_ACCOUNT_ID` with the deploy workflows. This is a deliberate
+departure from
 `docs/admin/cloudflare-native-admin-spec.md` §6.3/§6.8's design, which
 specs a NEW authenticated HTTP route (`POST /api/admin/refresh/ingest`)
 behind a Cloudflare Access Service Token + a new `REFRESH_INGEST_TOKEN`
 bearer secret — that design predates the Better Auth cutover (Cloudflare
 Access no longer gates anything on this admin surface, see "Admin
 authentication — Better Auth is the sole gate" above) and would have meant
-standing up a new authenticated API surface + a new secret for a job that
-already has a perfectly good, existing, narrowly-scoped credential path
-straight to the database it needs to write. No UI, no new route, no new
-secret — smaller surface area for the same result.
+standing up a whole new authenticated API surface for a job that can reach
+the database directly. No UI, no new route — just one narrowly-scoped
+credential (`CLOUDFLARE_D1_TOKEN`, #403) added later once the reused
+deploy token was identified as too broad — smaller surface area than the
+spec's design either way.
 
 **Production checklist — NOT run as part of building this pipeline (no
 production credentials held during implementation); a human runs these at
@@ -1192,14 +1198,13 @@ after.
 #    already applied; confirm before assuming either way:
 npx wrangler d1 migrations apply pueblo-food-map-admin --remote
 
-# 3. Confirm CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are already set as
-#    GitHub Actions repo secrets (deploy-prod.yml / deploy-dev.yml already
-#    require them, so this should be a no-op check, not a new provisioning
-#    step).
+# 3. Confirm CLOUDFLARE_D1_TOKEN (D1 Write only, #403) and the shared
+#    CLOUDFLARE_ACCOUNT_ID are set as GitHub Actions repo secrets — done
+#    as of #403; this job no longer reads the deploy workflows' token.
 
-# 4. First real run — either wait for the 1st-of-month cron, or trigger by
-#    hand from the Actions tab (workflow_dispatch) to verify against
-#    production without waiting. Only works now that step 1 has landed:
+# 4. First real run — either wait for the 1st-of-month cron (now enabled,
+#    #403), or trigger by hand from the Actions tab (workflow_dispatch) to
+#    verify without waiting. Only works now that step 1 has landed:
 gh workflow run "Venue Data Refresh"
 
 # 5. Read what it proposed:
@@ -1305,9 +1310,12 @@ like every other admin removal, only ever sets `status='archived'` — never
 `DELETE`.
 
 **Now that this UI exists, `.github/workflows/refresh-proposals.yml`'s
-`schedule` trigger can be reconsidered** — it was deliberately disabled
-(commit `f9226c7`) specifically because proposals had nowhere to be
-reviewed. Re-enabling it is a separate decision, not part of this slice.
+`schedule` trigger has been re-enabled (#403, 2026-09-07)** — it had been
+deliberately disabled (commit `f9226c7`) specifically because proposals
+had nowhere to be reviewed; that condition, plus a least-privilege
+credential replacing the reused deploy token, are both now met. See
+"Automated venue-refresh pipeline" above, "Credentials" for the token
+swap.
 
 ## Flags queue usability fixes — clickable links + resulting-card preview
 

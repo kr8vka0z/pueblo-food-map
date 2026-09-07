@@ -22,43 +22,36 @@
 # §6.6) — nothing this workflow does is visible on the public map or the
 # admin's existing venue list until that review ships and an admin acts.
 #
-# Credentials: reuses the SAME CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID
-# repo secrets deploy-prod.yml / deploy-dev.yml already use for
-# `wrangler deploy` (AGENTS.md's established secret names) — no new secret.
-# `wrangler d1 execute` (what scripts/refresh-ingest.ts shells out to) reads
-# the same two env vars any other wrangler command does.
+# Credentials: this job has its OWN CLOUDFLARE_D1_TOKEN secret (D1 Write
+# only, account-scoped, #403) mapped into the CLOUDFLARE_API_TOKEN env var
+# wrangler reads — plus the shared CLOUDFLARE_ACCOUNT_ID repo secret
+# deploy-prod.yml / deploy-dev.yml also use. It does NOT reuse the deploy
+# token: this job parses adversarial third-party HTML, so a least-privilege
+# credential bounds what a compromised scrape can reach — the full Workers
+# deploy + D1 admin token must never run here again.
 name: Venue Data Refresh
 
 on:
-  # THE MONTHLY CRON IS DELIBERATELY NOT ENABLED YET. Do not add it back
-  # without the two things below, both named in the 2026-09-02 review of
-  # PR #388:
-  #
-  #   1. The review UI (slice 2). Until an admin can approve or reject a
-  #      proposal from a screen, an unattended run writes into a queue
-  #      nobody reads — the worst outcome here is not a bad proposal, it is
-  #      months of confidence that data is being refreshed while the queue
-  #      silently fills. Every proposal this job writes is inert until a
-  #      human acts on it, so an unread queue is indistinguishable from no
-  #      pipeline at all.
-  #   2. A least-privilege credential. This job currently runs with the
-  #      deploy token (Workers deploy + full D1 admin) while parsing
-  #      adversarial third-party HTML. A token scoped to D1 Edit alone
-  #      bounds what a compromised scrape can reach.
-  #
-  # Until then the ONLY trigger is manual, so every run has a person
-  # watching it and reading what it wrote. When the cron returns, the
-  # intended schedule is `- cron: "0 6 1 * *"` — 06:00 UTC on the 1st,
-  # outside any US business day, so an admin never opens a queue that the
-  # same run is still writing. One combined monthly run for both sources is
-  # this slice's deliberate simplification over
+  # THE MONTHLY CRON IS NOW ENABLED (#403). It was held back on the two
+  # conditions the prior revision of this comment named: the /admin/flags
+  # review UI shipped to production 2026-09-07 (#401, promotion PR #404),
+  # and this job now runs on its own least-privilege CLOUDFLARE_D1_TOKEN
+  # (#403) instead of the deploy token. The first watched production run
+  # (2026-09-07, run 34107550551, 107 proposals) tripped no guardrail.
+  # 06:00 UTC on the 1st is outside any US business day, so an admin never
+  # opens a queue the same run is still writing. One combined monthly run
+  # for both sources is still this slice's deliberate simplification over
   # docs/admin/cloudflare-native-admin-spec.md §6.2's separate per-source
   # cadences; see scripts/refresh-ingest.ts's file header.
+  schedule:
+    - cron: "0 6 1 * *" # 06:00 UTC on the 1st
+  # `schedule` only fires from the default branch (main) — this file must
+  # be promoted to main for the cron to exist, same trap #375 closed for
+  # Dependabot's target-branch.
   #
   # Recovery hatch / manual verification — same rationale as deploy-prod.yml's
   # workflow_dispatch: lets this run be triggered by hand from the Actions
-  # tab without waiting for the 1st of the month, and is how this pipeline
-  # gets its first real production run after merge.
+  # tab without waiting for the 1st of the month.
   workflow_dispatch:
 
 permissions:
@@ -80,7 +73,10 @@ jobs:
     # third-party services this repo doesn't control), not a performance bug.
     timeout-minutes: 30
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # D1-Write-only token (#403), not the deploy token — bounds what a
+      # compromised scrape can reach. wrangler reads the CLOUDFLARE_API_TOKEN
+      # env var name regardless of which secret it's mapped from.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       # Same pinned-SHA third-party actions convention as deploy-prod.yml /
@@ -101,8 +97,8 @@ jobs:
       # exists in this repo (checked; not adding one for a single dep two
       # scripts need, ponytail rung 6). Pinned to an exact version this
       # scraper has actually been run against (fix: an unpinned `pip
-      # install` fetches whatever's newest inside a job holding the
-      # production Cloudflare deploy token).
+      # install` fetches whatever's newest inside a job holding a live
+      # Cloudflare D1-write credential — see the file-header WHY, #403).
       - run: pip install beautifulsoup4==4.14.3
       # --db-mode remote is REAL — this writes to PRODUCTION D1
       # (pueblo-food-map-admin). The other two modes exist for humans, not
@@ -117,7 +113,7 @@ jobs:
       # that same local install, but --no-install makes it a hard error
       # instead of a silent registry fetch if the local binary is ever
       # missing (a stale cache, a future package.json edit that drops the
-      # pin) — this job holds the production Cloudflare deploy token, so
+      # pin) — this job holds a live Cloudflare D1-write credential, so
       # "run whatever's newest from npm" is never an acceptable fallback
       # here, only a loud failure is.
       - run: npx --no-install tsx scripts/refresh-ingest.ts --db-mode remote

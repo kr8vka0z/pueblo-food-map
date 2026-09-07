@@ -14,17 +14,76 @@ Run: `python3 scripts/test_fetch_osm_grocery.py`
 from __future__ import annotations
 
 import importlib.util
+import json
 import pathlib
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+import urllib.error
+from unittest.mock import MagicMock, patch
 
 MODULE_PATH = pathlib.Path(__file__).resolve().parent / "fetch-osm-grocery.py"
 _spec = importlib.util.spec_from_file_location("fetch_osm_grocery", MODULE_PATH)
 assert _spec and _spec.loader
 fetch_osm_grocery = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(fetch_osm_grocery)
+
+
+def _make_response(payload: dict) -> MagicMock:
+    """Build a fake urlopen() context manager returning `payload` as JSON."""
+    resp = MagicMock()
+    resp.read.return_value = json.dumps(payload).encode("utf-8")
+    cm = MagicMock()
+    cm.__enter__.return_value = resp
+    cm.__exit__.return_value = False
+    return cm
+
+
+class OverpassRetryTest(unittest.TestCase):
+    """2026-09-07: the scheduled refresh workflow died twice on GitHub-hosted
+    runners with a bare HTTP 504 ~10s after the request, while the identical
+    query from a home PC returns 200 in ~5s — a transient upstream/runner-side
+    blip, not a bad query. An unattended monthly cron can't die on that."""
+
+    def test_retries_on_transient_5xx_then_succeeds(self) -> None:
+        errors = [
+            urllib.error.HTTPError("https://overpass-api.de/api/interpreter", 504, "Gateway Timeout", None, None),
+            urllib.error.HTTPError("https://overpass-api.de/api/interpreter", 502, "Bad Gateway", None, None),
+        ]
+        ok_response = _make_response({"elements": [{"id": 1}]})
+        with (
+            patch.object(fetch_osm_grocery.urllib.request, "urlopen", side_effect=[*errors, ok_response]) as mock_urlopen,
+            patch.object(fetch_osm_grocery.time, "sleep") as mock_sleep,
+        ):
+            result = fetch_osm_grocery.fetch_overpass("fake query")
+
+        self.assertEqual(result, {"elements": [{"id": 1}]})
+        self.assertEqual(mock_urlopen.call_count, 3)
+        self.assertEqual([c.args[0] for c in mock_sleep.call_args_list], [20, 40])
+
+    def test_gives_up_after_max_attempts(self) -> None:
+        error = urllib.error.HTTPError("https://overpass-api.de/api/interpreter", 504, "Gateway Timeout", None, None)
+        with (
+            patch.object(fetch_osm_grocery.urllib.request, "urlopen", side_effect=[error, error, error, error]) as mock_urlopen,
+            patch.object(fetch_osm_grocery.time, "sleep") as mock_sleep,
+        ):
+            with self.assertRaises(urllib.error.HTTPError):
+                fetch_osm_grocery.fetch_overpass("fake query")
+
+        self.assertEqual(mock_urlopen.call_count, 4)
+        self.assertEqual([c.args[0] for c in mock_sleep.call_args_list], [20, 40, 80])
+
+    def test_does_not_retry_on_bad_query_400(self) -> None:
+        error = urllib.error.HTTPError("https://overpass-api.de/api/interpreter", 400, "Bad Request", None, None)
+        with (
+            patch.object(fetch_osm_grocery.urllib.request, "urlopen", side_effect=error) as mock_urlopen,
+            patch.object(fetch_osm_grocery.time, "sleep") as mock_sleep,
+        ):
+            with self.assertRaises(urllib.error.HTTPError):
+                fetch_osm_grocery.fetch_overpass("fake query")
+
+        self.assertEqual(mock_urlopen.call_count, 1)
+        mock_sleep.assert_not_called()
 
 
 class RemarkGuardTest(unittest.TestCase):

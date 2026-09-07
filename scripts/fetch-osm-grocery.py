@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import pathlib
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -53,6 +54,18 @@ SHOP_TAGS = ["supermarket", "convenience", "farm"]
 
 USER_AGENT = "pueblo-food-map/osm-grocery-fetch (kysboyd@gmail.com)"
 
+# 2026-09-07: the scheduled refresh workflow (refresh-proposals.yml) died
+# twice on GitHub-hosted runners with a bare HTTP 504 ~10s after the
+# request, while the identical query from a home PC returns 200 in ~5s with
+# 81 elements — so the 504 is a transient upstream/runner-side blip, not a
+# bad query, and an unattended monthly cron can't die on a 10-second blip.
+# ponytail: fixed doubling, no jitter, no cap beyond 4 attempts — enough for
+# a gateway blip; if Overpass ever needs longer backoff, add jitter/a cap
+# then, not speculatively now.
+OVERPASS_MAX_ATTEMPTS = 4
+OVERPASS_RETRY_DELAYS_SEC = (20, 40, 80)
+OVERPASS_RETRYABLE_HTTP_STATUSES = {429, 502, 503, 504}
+
 
 def build_query() -> str:
     clauses = []
@@ -70,8 +83,25 @@ def fetch_overpass(query: str) -> dict:
         data=data,
         headers={"User-Agent": USER_AGENT, "Content-Type": "application/x-www-form-urlencoded"},
     )
-    with urllib.request.urlopen(req, timeout=90) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    for attempt in range(1, OVERPASS_MAX_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code not in OVERPASS_RETRYABLE_HTTP_STATUSES or attempt == OVERPASS_MAX_ATTEMPTS:
+                raise
+            reason = str(exc)
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if attempt == OVERPASS_MAX_ATTEMPTS:
+                raise
+            reason = str(exc)
+        delay = OVERPASS_RETRY_DELAYS_SEC[attempt - 1]
+        print(
+            f"Overpass attempt {attempt}/{OVERPASS_MAX_ATTEMPTS} failed ({reason}); retrying in {delay}s",
+            file=sys.stderr,
+        )
+        time.sleep(delay)
+    raise RuntimeError("unreachable")  # pragma: no cover — loop always returns or raises above
 
 
 def main() -> int:

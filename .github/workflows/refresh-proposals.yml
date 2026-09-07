@@ -105,9 +105,11 @@ jobs:
       # production Cloudflare deploy token).
       - run: pip install beautifulsoup4==4.14.3
       # --db-mode remote is REAL — this writes to PRODUCTION D1
-      # (pueblo-food-map-admin). Never pass --db-mode local here; that flag
-      # exists for scripts/refresh-ingest.ts's own local-dev/CI-test use
-      # against Miniflare's on-disk SQLite, not this workflow.
+      # (pueblo-food-map-admin). The other two modes exist for humans, not
+      # this workflow: `local` targets Miniflare's on-disk SQLite, and
+      # `staging` targets the separate pueblo-food-map-admin-staging database
+      # dev.pueblofoodmap.com binds (see AGENTS.md's "--db-mode has three
+      # values" table). Never swap either one in here.
       #
       # `--no-install`, not `npx tsx`: `tsx` is a pinned devDependency
       # (package.json) as of this fix — `npm ci` above already installed

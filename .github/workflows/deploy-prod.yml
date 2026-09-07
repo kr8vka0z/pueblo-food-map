@@ -105,9 +105,39 @@ jobs:
             echo "Smoke check failed: could not read a venue id from src/data/published-venues.ts" >&2
             exit 1
           fi
+          # RETRY, because `wrangler deploy` returning is not the same as the new
+          # version serving. Its first run (2026-09-03) went red against a
+          # deployment that was in fact correct: `/` and `/venues` answered 200
+          # while `/venue/<id>` still 404'd, and the same URL served 200 a couple
+          # of minutes later with nothing redeployed in between. Static assets —
+          # which is where the prerendered venue pages now live, see
+          # open-next.config.ts — become reachable slightly after the Worker
+          # itself does. Without a retry this step reports every good deploy as a
+          # failure, and a check that cries wolf gets deleted, taking the real
+          # signal with it.
+          #
+          # Deliberately NOT curl's own --retry: that retries a connection-level
+          # failure, not a well-formed 404, which is exactly the shape here.
+          #
+          # ponytail: fixed 10s x 6 rather than exponential backoff — one minute
+          # covers the propagation observed by a wide margin. If a deploy ever
+          # legitimately needs longer, raise the attempt count; do not weaken the
+          # assertion to a warning.
+          attempts=6
           status=0
           for path in "/" "/venues" "/venue/${VENUE_ID}"; do
-            code=$(curl -fsS -o /dev/null -w "%{http_code}" "${ORIGIN}${path}" || echo "000")
+            code=""
+            for i in $(seq 1 "$attempts"); do
+              # No -f: a 404 must be READ, not turned into a curl error. `-f`
+              # suppresses the body AND exits non-zero, which previously
+              # concatenated with the fallback and printed the nonsense "404000".
+              code=$(curl -sS -o /dev/null -w "%{http_code}" "${ORIGIN}${path}" || echo "000")
+              [ "$code" = "200" ] && break
+              if [ "$i" -lt "$attempts" ]; then
+                echo "GET ${ORIGIN}${path} -> ${code} (attempt ${i}/${attempts}, retrying in 10s)"
+                sleep 10
+              fi
+            done
             echo "GET ${ORIGIN}${path} -> ${code}"
             if [ "$code" != "200" ]; then
               echo "Smoke check failed: ${path} returned ${code}, expected 200" >&2

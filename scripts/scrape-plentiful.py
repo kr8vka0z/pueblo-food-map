@@ -18,6 +18,17 @@ Nominatim policy compliance:
   * Custom User-Agent with contact email (required).
   * 1.1s sleep between requests (hard cap: 1 req/sec).
   * viewbox + bounded=1 to bias results inside Pueblo County.
+
+Offline self-check (no network, proves the Hours-card parser against real
+saved HTML — run this after any change near _parse_hours_card()):
+  `python3 scripts/scrape-plentiful.py --self-check`
+
+Hours parsing, 2026-09-02: Plentiful's detail pages changed shape — the old
+regex matched dated upcoming-service lines ("2026-05-14 10:00 AM - 12:00
+PM") that no longer appear anywhere; the site now renders a recurring
+"Every week" / "Once a month" schedule instead. See _parse_hours_card()'s
+own docstring for the measured shape breakdown and AGENTS.md's "Automated
+venue-refresh pipeline" section for the guardrail this change added.
 """
 
 from __future__ import annotations
@@ -219,45 +230,159 @@ def dedupe(entries: list[dict]) -> tuple[list[dict], int]:
 # Detail page parsing
 # ---------------------------------------------------------------------------
 
-def _infer_weekly_hours(html: str) -> Optional[dict]:
-    """
-    Plentiful detail pages list upcoming service dates as text like:
-      "2026-05-14 10:00 AM – 12:00 PM Walk-in"
-    We infer a WeeklyHours map by collecting all {day_of_week: set(time_ranges)}.
-    Returns None if no schedule found.
-    """
-    soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text(separator="\n")
+# Full weekday name -> WeeklyHours day key, for "Every week" recurrence
+# rows (e.g. "Monday", "Monday - Friday"). Only the seven real weekday
+# names Plentiful renders — see _expand_weekday_spec()'s own note on why a
+# wraparound range ("Friday - Monday") is deliberately not guessed at.
+_WEEKDAY_NAME_TO_KEY = {
+    "Monday": "mon",
+    "Tuesday": "tue",
+    "Wednesday": "wed",
+    "Thursday": "thu",
+    "Friday": "fri",
+    "Saturday": "sat",
+    "Sunday": "sun",
+}
 
-    # Match lines like "2026-05-14 10:00 AM – 12:00 PM" or "2026-05-14 10:00 AM - 12:00 PM"
-    date_entry_re = re.compile(
-        r"(\d{4}-\d{2}-\d{2})\s+"          # date
-        r"(\d{1,2}:\d{2}\s*[AP]M)"          # start time
-        r"\s*[–\-]\s*"                       # separator
-        r"(\d{1,2}:\d{2}\s*[AP]M)"          # end time
-    )
+
+def _expand_weekday_spec(day_spec: str) -> list[str]:
+    """
+    Expands an "Every week" day-cell into WeeklyHours day keys. Plentiful's
+    own two observed shapes (measured 2026-09-02 against every live Pueblo
+    detail page): a single day name ("Monday") or a hyphen-separated range
+    ("Monday - Friday").
+
+    ponytail: only a forward Mon->Sun range is expanded. A wraparound range
+    (e.g. "Friday - Monday") has never been observed live; if Plentiful ever
+    renders one, this returns [] (the pair is silently dropped) rather than
+    guessing which days it means — a wrong guess here would ship wrong hours
+    to a person deciding when to show up. Upgrade path if it ever appears:
+    wrap the slice through _DOW_NAMES with modulo indexing.
+    """
+    parts = [p.strip() for p in day_spec.split("-")]
+    if len(parts) == 1:
+        key = _WEEKDAY_NAME_TO_KEY.get(parts[0])
+        return [key] if key else []
+    if len(parts) == 2:
+        start_key = _WEEKDAY_NAME_TO_KEY.get(parts[0])
+        end_key = _WEEKDAY_NAME_TO_KEY.get(parts[1])
+        if not start_key or not end_key:
+            return []
+        start_i = _DOW_NAMES.index(start_key)
+        end_i = _DOW_NAMES.index(end_key)
+        if start_i <= end_i:
+            return _DOW_NAMES[start_i : end_i + 1]
+        return []  # wraparound — not seen live, don't guess (see docstring)
+    return []
+
+
+def _render_recurrence_note(freq: Optional[str], day_spec: str, time_range: str) -> str:
+    """
+    Renders a NON-weekly recurrence (e.g. "Once a month" / "4th Tuesday") as
+    an English sentence for the `notes` field. hours_weekly only models a
+    Monday-Sunday weekly grid (src/lib/hours.ts's WeeklyHours shape) — a
+    monthly/ordinal recurrence has no structured home there, so it must
+    survive in prose instead of being silently dropped (task requirement,
+    2026-09-02 Plentiful format-change fix).
+
+    ponytail: a multi-day cell ("2nd Thursday, 4th Thursday") is rendered as
+    a literal comma list, not "2nd and 4th Thursday" — correct English
+    list-joining is more code than this note's one reader (a human
+    reviewing an admin change-proposal) needs.
+    """
+    # En dash between times to match this app's other hand-written notes
+    # prose (e.g. AGENTS.md's own examples) — hours_weekly's stored slot
+    # strings keep the plain hyphen Plentiful renders (src/lib/hours.ts's
+    # parseSlot() expects that exact " - " separator); this en-dash version
+    # is prose-only and never round-trips back into hours_weekly.
+    pretty_time = time_range.replace(" - ", " – ")
+    if freq == "Once a month":
+        return f"Open the {day_spec} of each month, {pretty_time}."
+    freq_label = freq or "On a recurring schedule"
+    return f"{freq_label}: {day_spec}, {pretty_time}."
+
+
+def _parse_hours_card(soup: BeautifulSoup) -> tuple[Optional[dict], list[str]]:
+    """
+    Parses the detail page's "Hours" card, current as of 2026-09-02.
+
+    Superseded design: this function used to regex-match dated upcoming-
+    service lines like "2026-05-14 10:00 AM - 12:00 PM" off the page's flat
+    text. Measured 2026-09-02 against all 35 live Pueblo detail pages: that
+    form appears on ZERO of them (see .git log for the removed regex).
+    Plentiful now renders a recurring schedule instead, as real markup:
+
+        <div class="card card--mt">
+          <h2>Hours</h2>
+          <p class="schedule-freq">Every week</p>
+          <table class="hours-table">
+            <tr><td>Monday</td><td>4:00 PM - 6:00 PM</td></tr>
+          </table>
+          <!-- a card can repeat the (freq, table) pair, e.g. a venue with
+               BOTH a monthly special AND a weekly recurrence -->
+        </div>
+
+    Of the 35 pages measured: 27 have no "Hours" card at all (a real fact,
+    not a parse failure — those venues just haven't told Plentiful their
+    hours), 4 are "Every week" (this function's `hours_weekly` return), 3
+    are "Once a month" + an ordinal weekday ("4th Tuesday") — captured as a
+    `recurrence_notes` sentence instead, since WeeklyHours has no slot for
+    "the 4th Tuesday" — and 1 has an empty `<table class="hours-table">`
+    with no rows at all (the card exists but carries nothing, same as "no
+    hours" for parsing purposes). See scripts/fixtures/plentiful/*.html for
+    real captured samples of every shape and --self-check below, which
+    proves this function against them without a live fetch.
+
+    Returns (hours_weekly, recurrence_notes) — hours_weekly is None when no
+    "Every week" row was found (matches _infer_weekly_hours's old contract);
+    recurrence_notes is a list of English sentences for every non-weekly row
+    found (empty list when there are none).
+    """
+    hours_h2 = next((h2 for h2 in soup.find_all("h2") if h2.get_text(strip=True) == "Hours"), None)
+    if hours_h2 is None:
+        return None, []
+    card = hours_h2.parent
+    if card is None:
+        return None, []
 
     dow_times: dict[str, set[str]] = defaultdict(set)
-    for m in date_entry_re.finditer(text):
-        date_str, start, end = m.group(1), m.group(2).strip(), m.group(3).strip()
-        try:
-            dt = datetime.strptime(date_str, "%Y-%m-%d")
-        except ValueError:
+    recurrence_notes: list[str] = []
+    current_freq: Optional[str] = None
+
+    for child in card.find_all(["p", "table"], recursive=False):
+        classes = child.get("class") or []
+        if child.name == "p" and "schedule-freq" in classes:
+            current_freq = child.get_text(strip=True)
             continue
-        dow = _PY_DOW_TO_NAME[dt.weekday()]
-        # Normalise to 24h? Keep as-is for now — schema says string[]
-        time_range = f"{start} - {end}"
-        dow_times[dow].add(time_range)
+        if child.name == "table" and "hours-table" in classes:
+            for tr in child.find_all("tr"):
+                cells = tr.find_all("td")
+                if len(cells) < 2:
+                    continue
+                day_spec = cells[0].get_text(strip=True)
+                time_range = cells[1].get_text(strip=True)
+                if not day_spec or not time_range:
+                    continue
+                if current_freq == "Every week":
+                    for day_key in _expand_weekday_spec(day_spec):
+                        dow_times[day_key].add(time_range)
+                else:
+                    recurrence_notes.append(_render_recurrence_note(current_freq, day_spec, time_range))
 
-    if not dow_times:
-        return None
+    hours_weekly: Optional[dict] = None
+    if dow_times:
+        hours_weekly = {day: sorted(dow_times[day]) for day in _DOW_NAMES if day in dow_times}
 
-    # Build ordered dict (mon→sun), convert sets to sorted lists
-    result: dict = {}
-    for day in _DOW_NAMES:
-        if day in dow_times:
-            result[day] = sorted(dow_times[day])
-    return result if result else None
+    return hours_weekly, recurrence_notes
+
+
+def _infer_weekly_hours(html: str) -> Optional[dict]:
+    """Thin wrapper over _parse_hours_card() for callers that only need the
+    WeeklyHours half — kept as its own function so the name stays stable for
+    anything reasoning about this module's history."""
+    soup = BeautifulSoup(html, "html.parser")
+    hours_weekly, _ = _parse_hours_card(soup)
+    return hours_weekly
 
 
 def parse_detail(html: str) -> dict:
@@ -265,7 +390,15 @@ def parse_detail(html: str) -> dict:
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(separator=" ").lower()
 
-    hours_weekly = _infer_weekly_hours(html)
+    hours_weekly, recurrence_notes = _parse_hours_card(soup)
+    # Whether THIS page's Hours card actually yielded any schedule data —
+    # weekly or non-weekly. Distinct from hours_weekly being None: most
+    # Pueblo venues (27/35, measured 2026-09-02) legitimately have no Hours
+    # card at all, which is real data, not a parse failure. main()'s FATAL
+    # guard below tallies this signal, not hours_weekly alone, so it can
+    # tell "this venue hasn't told Plentiful its hours" apart from "the
+    # parser stopped understanding Plentiful's markup."
+    schedule_found = hours_weekly is not None or len(recurrence_notes) > 0
 
     # SNAP / WIC: look for mentions in page text
     accepts_snap: Optional[bool] = None
@@ -294,11 +427,21 @@ def parse_detail(html: str) -> dict:
                     notes = (notes or "") + s.strip() + "."
                     break
 
+    # A non-weekly recurrence (e.g. "Once a month") has no home in
+    # hours_weekly's Monday-Sunday grid — fold it into notes instead of
+    # dropping it, so a human reviewing this venue's admin change-proposal
+    # still sees when it's actually open. Appended, never replacing the
+    # meta-description text above, so both survive.
+    if recurrence_notes:
+        extra = " ".join(recurrence_notes)
+        notes = f"{notes} {extra}".strip() if notes else extra
+
     return {
         "hours_weekly": hours_weekly,
         "accepts_snap": accepts_snap,
         "accepts_wic": accepts_wic,
         "notes": notes,
+        "schedule_found": schedule_found,
     }
 
 
@@ -483,6 +626,81 @@ def generate_ts(kept: list[dict], dropped_count: int, geocode_null_count: int) -
 
 
 # ---------------------------------------------------------------------------
+# Self-check
+# ---------------------------------------------------------------------------
+
+FIXTURES_DIR = REPO / "scripts" / "fixtures" / "plentiful"
+
+
+def _load_fixture(name: str) -> BeautifulSoup:
+    html = (FIXTURES_DIR / name).read_text(encoding="utf-8")
+    return BeautifulSoup(html, "html.parser")
+
+
+def _self_check() -> int:
+    """
+    Offline, assert-based proof that the Hours-card parser above still
+    matches Plentiful's real markup. Run via:
+
+        python scripts/scrape-plentiful.py --self-check
+
+    This repo has no Python test runner configured and deliberately doesn't
+    get one for one script (ponytail: no new framework/dependency for a
+    single file) — this is the ONE runnable command that fails the moment
+    Plentiful's Hours-card markup changes again, without needing a live
+    fetch or touching D1. Fixtures in scripts/fixtures/plentiful/*.html are
+    real HTML captured from live Pueblo detail pages on 2026-09-02 (trimmed
+    to <div class="detail-grid">, otherwise byte-for-byte), one per shape
+    found when every live page was measured that day — see
+    _parse_hours_card()'s own docstring for the full shape breakdown.
+    """
+    checked = 0
+
+    def check(label: str, fixture: str, expect_hours: Optional[dict], expect_notes: list[str]) -> None:
+        nonlocal checked
+        soup = _load_fixture(fixture)
+        hours, notes = _parse_hours_card(soup)
+        assert hours == expect_hours, f"{label}: expected hours_weekly={expect_hours!r}, got {hours!r}"
+        assert notes == expect_notes, f"{label}: expected recurrence_notes={expect_notes!r}, got {notes!r}"
+        checked += 1
+        print(f"  OK  {label}")
+
+    check("weekly (single day)", "weekly.html", {"mon": ["4:00 PM - 6:00 PM"]}, [])
+    check(
+        "weekday range (Monday - Friday)",
+        "weekday_range.html",
+        {d: ["8:00 AM - 4:30 PM"] for d in ("mon", "tue", "wed", "thu", "fri")},
+        [],
+    )
+    check(
+        "monthly (ordinal weekday, no weekly row)",
+        "monthly.html",
+        None,
+        ["Open the 4th Tuesday of each month, 11:00 AM – 12:00 PM."],
+    )
+    check(
+        "monthly special + weekly recurrence together",
+        "weekly_and_monthly.html",
+        {"thu": ["11:00 AM - 12:45 PM"]},
+        ["Open the 2nd Thursday, 4th Thursday of each month, 11:00 AM – 12:45 PM."],
+    )
+    check("no Hours card at all", "no_hours_section.html", None, [])
+    check("Hours card present but empty (no schedule-freq/table rows)", "empty_hours_heading.html", None, [])
+
+    # _infer_weekly_hours() is a thin wrapper kept for any future caller
+    # that only needs the WeeklyHours half — prove it isn't dead code by
+    # exercising it against the same fixture bytes _parse_hours_card() uses.
+    weekly_html = (FIXTURES_DIR / "weekly.html").read_text(encoding="utf-8")
+    wrapper_result = _infer_weekly_hours(weekly_html)
+    assert wrapper_result == {"mon": ["4:00 PM - 6:00 PM"]}, f"_infer_weekly_hours wrapper: got {wrapper_result!r}"
+    checked += 1
+    print("  OK  _infer_weekly_hours() wrapper")
+
+    print(f"\nOK: {checked}/{checked} self-checks passed.")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -498,7 +716,15 @@ def main() -> int:
         action="store_true",
         help="Skip Nominatim geocoding (uses cached values only)",
     )
+    parser.add_argument(
+        "--self-check",
+        action="store_true",
+        help="Run the offline parser self-check against scripts/fixtures/plentiful/*.html and exit (no network).",
+    )
     args = parser.parse_args()
+
+    if args.self_check:
+        return _self_check()
 
     # ---- Step 1: fetch directory listing ----
     print(f"Fetching directory: {DIRECTORY_URL}")
@@ -522,6 +748,13 @@ def main() -> int:
     # ---- Step 3: fetch detail pages ----
     scrape_timestamp = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     enriched: list[dict] = []
+    # Guard tally (see the FATAL check right after this loop): how many
+    # detail pages we actually fetched vs. how many yielded ANY schedule
+    # data (weekly or non-weekly). A page with no Hours card at all is real
+    # data, not a failure (27/35 Pueblo venues, measured 2026-09-02) — this
+    # counts only pages whose Hours card, if present, was actually parsed.
+    detail_pages_fetched = 0
+    detail_pages_with_schedule = 0
 
     for i, entry in enumerate(unique_entries):
         detail_data: dict = {"hours_weekly": None, "accepts_snap": None, "accepts_wic": None, "notes": None}
@@ -531,7 +764,10 @@ def main() -> int:
                 time.sleep(DETAIL_SLEEP)
             try:
                 detail_html = fetch_html(entry["url"])
+                detail_pages_fetched += 1
                 detail_data = parse_detail(detail_html)
+                if detail_data.get("schedule_found"):
+                    detail_pages_with_schedule += 1
                 hw = detail_data.get("hours_weekly")
                 snap = detail_data.get("accepts_snap")
                 wic = detail_data.get("accepts_wic")
@@ -569,6 +805,39 @@ def main() -> int:
             "notes": detail_data.get("notes"),
             "scrape_timestamp": scrape_timestamp,
         })
+
+    # Guardrail — same "abort before writing anything, exit non-zero" shape
+    # as the directory-page "FATAL: No pantry cards parsed" guard above
+    # (AGENTS.md "Automated venue-refresh pipeline" documents this as a
+    # scraper PROCESS failure, distinct from the diff-engine's own
+    # zero-record/abnormal-drop guardrails — a non-zero exit here throws
+    # BEFORE either source reaches the diff engine).
+    #
+    # WHY this is a proportion (0 successes / N attempts, N >= a floor),
+    # not "hours_weekly is ever None" or a raw removal-style percentage:
+    # most Pueblo venues legitimately have NO Hours card (27/35 measured
+    # 2026-09-02) — a working parser is EXPECTED to return no schedule for
+    # most pages, so "some Nones" can never be the signal. The only thing
+    # that means "the site's markup changed under us again" is a fetched
+    # detail page NEVER ONCE yielding schedule data, across enough pages
+    # that coincidence is implausible. The floor exists so a deliberately
+    # small run (`--skip-details`, or a future filtered run touching only a
+    # couple of venues) can't trip this on sample-size noise alone — with
+    # only 7/35 (20%) of real venues carrying any schedule at all, a run of
+    # a handful of venues can easily see zero by chance even when parsing
+    # works fine.
+    HOURS_GUARDRAIL_FLOOR = 5
+    if detail_pages_fetched >= HOURS_GUARDRAIL_FLOOR and detail_pages_with_schedule == 0:
+        print(
+            f"FATAL: 0/{detail_pages_fetched} fetched detail pages yielded any parseable "
+            f"Hours data — Plentiful's page format has likely changed again. Refusing to "
+            f"write output (would silently ship every venue with hours_weekly=None). Run "
+            f"`python {pathlib.Path(__file__).name} --self-check` to confirm the parser "
+            f"itself still matches scripts/fixtures/plentiful/*.html; if that still passes, "
+            f"capture a fresh detail-page HTML sample and update this parser and its fixtures.",
+            file=sys.stderr,
+        )
+        return 1
 
     # ---- Step 4: geocode ----
     print(f"\nGeocoding {len(enriched)} addresses via Nominatim...")

@@ -207,7 +207,12 @@ function normalizeHours(value: string | WeeklyHours | undefined | null): string 
   return JSON.stringify(stable);
 }
 
-function currentFieldValue(row: CurrentVenueRow, field: keyof Venue): unknown {
+// Exported (WHY, #390): src/lib/adminProposals.ts's stale-apply guard (§6.10c)
+// needs to re-compare a fresh D1 row against a proposal's `before` snapshot
+// using EXACTLY this same equality semantics (same hours_weekly
+// normalization, same null-coalescing) — reimplementing it in the admin
+// route would let the two comparisons silently drift apart over time.
+export function currentFieldValue(row: CurrentVenueRow, field: keyof Venue): unknown {
   if (field === "hours_weekly") return normalizeHours(row.hours_weekly);
   return (row as unknown as Record<string, unknown>)[field] ?? null;
 }
@@ -217,7 +222,8 @@ function incomingFieldValue(venue: Venue, field: keyof Venue): unknown {
   return (venue as unknown as Record<string, unknown>)[field] ?? null;
 }
 
-function valuesEqual(a: unknown, b: unknown): boolean {
+/** Exported for the same reuse reason as currentFieldValue() above. */
+export function valuesEqual(a: unknown, b: unknown): boolean {
   if (typeof a === "number" && typeof b === "number") return a === b;
   return String(a ?? "") === String(b ?? "");
 }

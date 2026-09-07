@@ -33,6 +33,26 @@
  * — SQLite only applies a column DEFAULT on INSERT — so `updated_at` is
  * computed once here in JS and used identically for the SQL bind, the
  * audit row's timestamp, and after_json, guaranteeing all three agree.
+ *
+ * Optional `proposalId` body field (#390, /admin/flags's link_health
+ * hand-off): mirrors the `submissionId` convention POST /api/admin/venues
+ * (create) and POST /api/admin/venues/[id]/archive already established for
+ * public_submissions — an OPTIONAL 3rd statement riding this same
+ * db.batch() flips the originating change_proposals row to 'approved' when
+ * the edit that resolves it saves. This is deliberately the loose,
+ * "route to edit, let the admin fix whatever they see fit" convenience
+ * path for link_health proposals specifically (the /admin/flags queue's
+ * own POST /api/admin/proposals/[id]/approve route is the strict one, with
+ * the full stale-apply guard — see that route's header). A link_health
+ * proposal's `before`/`after` diff is only ever a candidate dead-URL
+ * observation, not a field this route could safely auto-apply — the admin
+ * is expected to actually look at the page and decide what changed, so
+ * there is no equivalent stale-apply check here. The extra WHERE guards
+ * (source='link_health', target_venue_id=id) keep a stray/crafted
+ * proposalId from marking an unrelated proposal approved even though the
+ * edit itself still always succeeds — same accepted idempotency-ceiling
+ * shape as public_submissions' own `AND status = 'pending'` clause
+ * (ponytail: below).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -64,6 +84,24 @@ const VENUE_UPDATE_SQL = `UPDATE venues SET
 
 const AUDIT_INSERT_SQL =
   "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+// ponytail: AND status = 'pending' is a deliberate idempotency ceiling, not
+// an oversight — same shape as public_submissions' own approve statements
+// (see this file's header + AGENTS.md "Public submissions queue"). A
+// double-approve affects 0 rows here and is silently a no-op on the
+// proposal side, while the venue edit itself still always succeeds. If
+// that ever needs to be surfaced instead of swallowed, the upgrade path is
+// reading D1Result.meta.changes back to the client, same as
+// POST /api/admin/proposals/[id]/approve already does for its own strict
+// check.
+const APPROVE_PROPOSAL_SQL =
+  "UPDATE change_proposals SET status = 'approved', reviewed_by = ?, reviewed_at = ?, applied_at = ? WHERE id = ? AND status = 'pending' AND source = 'link_health' AND target_venue_id = ?";
+
+/** Mirrors readOptionalSubmissionId's convention in the sibling create/archive routes. */
+function readOptionalProposalId(body: unknown): number | null {
+  const raw = (body as { proposalId?: unknown })?.proposalId;
+  return typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : null;
+}
 
 function buildVenueUpdateValues(
   id: string,
@@ -156,6 +194,7 @@ export async function PATCH(
     return NextResponse.json({ ok: false, errors: validation.errors }, { status: 422 });
   }
   const { fields } = validation;
+  const proposalId = readOptionalProposalId(body);
 
   const existing = await db.prepare("SELECT * FROM venues WHERE id = ?").bind(id).first<AdminVenueRow>();
   if (!existing) {
@@ -171,9 +210,14 @@ export async function PATCH(
   const insertAudit = db
     .prepare(AUDIT_INSERT_SQL)
     .bind(identity.email, "venue", id, "update", JSON.stringify(existing), JSON.stringify(afterRow), updatedAt);
+  const approveProposal =
+    proposalId !== null
+      ? db.prepare(APPROVE_PROPOSAL_SQL).bind(identity.email, updatedAt, updatedAt, proposalId, id)
+      : null;
 
-  // Atomic: the update and its own audit trail either both land or neither does.
-  await db.batch([updateVenue, insertAudit]);
+  // Atomic: the update, its own audit trail, and (when present) the
+  // originating link_health proposal's approval either all land or none do.
+  await db.batch([updateVenue, insertAudit, ...(approveProposal !== null ? [approveProposal] : [])]);
 
   return NextResponse.json({ ok: true, id });
 }

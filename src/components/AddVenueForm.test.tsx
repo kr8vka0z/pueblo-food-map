@@ -294,6 +294,61 @@ describe("AddVenueForm — submissionId threading (#259)", () => {
   });
 });
 
+describe("AddVenueForm — proposalId threading (/admin/flags, #390)", () => {
+  test("edit mode + proposalId -> PATCH body includes proposalId", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm venueId="manual-abc" proposalId={748} />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Save changes/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.proposalId).toBe(748);
+  });
+
+  test("edit mode WITHOUT proposalId -> PATCH body omits proposalId entirely", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm venueId="manual-abc" />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Save changes/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.proposalId).toBeUndefined();
+  });
+
+  test("create mode ignores proposalId entirely: POST body omits it", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ ok: true, id: "manual-new" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm proposalId={748} />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Add venue/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.proposalId).toBeUndefined();
+  });
+
+  test("a successful edit WITH proposalId redirects to /admin/flags, not /admin", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm venueId="manual-abc" proposalId={748} />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Save changes/i }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/flags"));
+  });
+});
+
 describe("AddVenueForm — geocode (Find location from address)", () => {
   test("the button is disabled while the address field is blank", () => {
     render(<AddVenueForm />);

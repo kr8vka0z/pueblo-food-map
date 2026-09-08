@@ -123,6 +123,34 @@ function makeRemoveProposal(): ParsedProposal {
   } as ParsedProposal;
 }
 
+/** The one shape POST /api/admin/proposals/approve-date-only ever bulk-approves — change_type 'update', an osm/plentiful source, fields_changed exactly ["last_verified"] (src/lib/adminProposals.ts's isDateOnlyUpdateProposal). */
+function makeDateOnlyProposal(overrides: Partial<ParsedProposal> = {}): ParsedProposal {
+  return {
+    row: {
+      id: 20,
+      source: "plentiful",
+      target_venue_id: "plentiful-pantry-1",
+      change_type: "update",
+      proposed_diff: "",
+      diff_hash: "h20",
+      run_id: "run-1",
+      anomaly: 0,
+      status: "pending",
+      created_at: "2026-09-01T12:00:00.000Z",
+      reviewed_by: null,
+      reviewed_at: null,
+      applied_at: null,
+    },
+    parseError: false,
+    diff: {
+      before: { last_verified: "2026-08-01" },
+      after: { last_verified: "2026-09-01" },
+      fields_changed: ["last_verified"],
+    },
+    ...overrides,
+  } as ParsedProposal;
+}
+
 function makeLinkHealthProposal(): ParsedProposal {
   return {
     row: {
@@ -632,5 +660,111 @@ describe("ProposalsReviewView — preview panel shows the RESULTING venue, not t
   test("a link_health card renders no preview panel — there's no proposed field change to preview", () => {
     render(<ProposalsReviewView proposals={[makeLinkHealthProposal()]} venueLookup={{}} />);
     expect(screen.queryByTestId("proposal-preview")).toBeNull();
+  });
+});
+
+// ─── Bulk "Approve all date-only updates" (issue: 89 of 107 real proposals
+// were freshness-only) ──────────────────────────────────────────────────────
+
+describe("ProposalsReviewView — bulk approve date-only updates", () => {
+  test("no button when nothing in the queue is date-only", () => {
+    render(<ProposalsReviewView proposals={[makeUpdateProposal(), makeRemoveProposal()]} venueLookup={{}} />);
+    expect(screen.queryByRole("button", { name: /Approve all/i })).toBeNull();
+  });
+
+  test("shows the button with the correct count when date-only proposals are present", () => {
+    render(
+      <ProposalsReviewView
+        proposals={[makeDateOnlyProposal({ row: { ...makeDateOnlyProposal().row, id: 20 } }), makeDateOnlyProposal({ row: { ...makeDateOnlyProposal().row, id: 21 } }), makeUpdateProposal()]}
+        venueLookup={{}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Approve all 2 date-only updates" })).toBeDefined();
+  });
+
+  test("declining the confirm dialog never calls fetch", async () => {
+    confirmSpy.mockReturnValue(false);
+    const user = userEvent.setup();
+    render(<ProposalsReviewView proposals={[makeDateOnlyProposal()]} venueLookup={{}} />);
+
+    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(confirmSpy.mock.calls[0][0]).toMatch(/Real changes are not included/);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  test("confirming POSTs the exact visible date-only ids and refreshes on success", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ approved: 1, skipped: [] }) });
+    const user = userEvent.setup();
+    render(<ProposalsReviewView proposals={[makeDateOnlyProposal({ row: { ...makeDateOnlyProposal().row, id: 42 } })]} venueLookup={{}} />);
+
+    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/admin/proposals/approve-date-only",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ ids: [42] }) }),
+      ),
+    );
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("Approved 1. Skipped 0.")).toBeDefined();
+  });
+
+  test("a mixed server result shows both counts", async () => {
+    mockFetch.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ({ approved: 2, skipped: [{ id: 1, reason: "not pending" }] }),
+    });
+    const user = userEvent.setup();
+    render(
+      <ProposalsReviewView
+        proposals={[makeDateOnlyProposal({ row: { ...makeDateOnlyProposal().row, id: 1 } }), makeDateOnlyProposal({ row: { ...makeDateOnlyProposal().row, id: 2 } })]}
+        venueLookup={{}}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+    await waitFor(() => expect(screen.getByText("Approved 2. Skipped 1.")).toBeDefined());
+  });
+
+  test("a failed request shows an inline error and never refreshes", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 500, json: async () => ({ ok: false }) });
+    const user = userEvent.setup();
+    render(<ProposalsReviewView proposals={[makeDateOnlyProposal()]} venueLookup={{}} />);
+
+    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+
+    await waitFor(() => expect(screen.getByText(/Something went wrong/i)).toBeDefined());
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  test("the result line is aria-live=\"polite\"", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ approved: 1, skipped: [] }) });
+    const user = userEvent.setup();
+    render(<ProposalsReviewView proposals={[makeDateOnlyProposal()]} venueLookup={{}} />);
+
+    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+    await waitFor(() => {
+      const resultLine = screen.getByText("Approved 1. Skipped 0.");
+      expect(resultLine.getAttribute("aria-live")).toBe("polite");
+    });
+  });
+
+  test("the count reflects the currently FILTERED list, not the whole queue", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProposalsReviewView
+        proposals={[
+          makeDateOnlyProposal({ row: { ...makeDateOnlyProposal().row, id: 1, source: "osm" } }),
+          makeDateOnlyProposal({ row: { ...makeDateOnlyProposal().row, id: 2, source: "plentiful" } }),
+        ]}
+        venueLookup={{}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Approve all 2 date-only updates" })).toBeDefined();
+
+    await user.click(screen.getByRole("button", { name: "OpenStreetMap" }));
+    expect(screen.getByRole("button", { name: "Approve all 1 date-only updates" })).toBeDefined();
   });
 });

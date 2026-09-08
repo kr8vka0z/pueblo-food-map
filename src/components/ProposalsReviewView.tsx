@@ -90,6 +90,25 @@
  * component (routed to the venue edit screen instead, see the card's own
  * action row below) — a dead-link finding has no proposed field change to
  * preview, and the edit screen IS the real, richer place to inspect it.
+ *
+ * Bulk "Approve all date-only updates" (issue: the first production run
+ * wrote 107 proposals, 89 of them a bare freshness confirmation — "no admin
+ * clicks 89 times a month"): computed from `filtered` (the currently
+ * DISPLAYED subset, after the source/change-type chips above), not the full
+ * `proposals` prop — approving what the reviewer can currently see matches
+ * how the single Approve button already behaves per-card. Uses the SAME
+ * src/lib/adminProposals.ts `isDateOnlyUpdateProposal` predicate the server
+ * route re-validates against, so the button's own count can never overstate
+ * what the server will actually apply. A `window.confirm()` gate (same
+ * convention as the single Approve button's own remove-confirmation) states
+ * the count and that real changes are excluded, then POSTs
+ * /api/admin/proposals/approve-date-only with exactly those ids.
+ * `router.refresh()` on success re-runs the same Server Component query the
+ * single-approve flow already relies on to drop acted-on cards — this
+ * component's own local `bulkState` (not the props) is what shows the
+ * "Approved N. Skipped K." summary, so it survives that refresh instead of
+ * disappearing the instant approved cards stop matching `status =
+ * 'pending'`.
  */
 
 import { useMemo, useState } from "react";
@@ -101,6 +120,7 @@ import { formatSlot } from "@/lib/hours";
 import { safeUrl } from "@/lib/safeUrl";
 import VenueCard from "@/components/VenueCard";
 import type { Venue, VenueCategory, WeeklyHours } from "@/types/venue";
+import { isDateOnlyUpdateProposal } from "@/lib/adminProposals";
 import type { ParsedProposal, ProposalChangeType, ProposalSourceValue, ProposedDiff } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/app/admin/flags/page";
 
@@ -214,9 +234,18 @@ function formatSubmittedAt(iso: string): string {
 type SourceFilter = "all" | ProposalSourceValue;
 type ChangeTypeFilter = "all" | ProposalChangeType;
 
+/** Bulk-approve's own local result state — kept separate from each card's per-row ActionState (defined below) since this action targets a whole set of cards, not one. */
+type BulkApproveState =
+  | { status: "idle" }
+  | { status: "submitting" }
+  | { status: "done"; approved: number; skipped: number }
+  | { status: "error"; message: string };
+
 export default function ProposalsReviewView({ proposals, venueLookup }: ProposalsReviewViewProps) {
+  const router = useRouter();
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [changeTypeFilter, setChangeTypeFilter] = useState<ChangeTypeFilter>("all");
+  const [bulkState, setBulkState] = useState<BulkApproveState>({ status: "idle" });
 
   const presentSources = useMemo(
     () => [...new Set(proposals.map((p) => p.row.source))] as ProposalSourceValue[],
@@ -232,6 +261,37 @@ export default function ProposalsReviewView({ proposals, venueLookup }: Proposal
     if (changeTypeFilter !== "all" && p.row.change_type !== changeTypeFilter) return false;
     return true;
   });
+
+  // Same predicate the server re-validates against (src/lib/adminProposals.ts)
+  // — scoped to `filtered`, the currently VISIBLE subset, not the whole queue.
+  const dateOnlyIds = useMemo(
+    () => filtered.filter((p) => !p.parseError && isDateOnlyUpdateProposal(p.row, p.diff)).map((p) => p.row.id),
+    [filtered],
+  );
+
+  async function handleBulkApprove(ids: number[]) {
+    const confirmed = window.confirm(
+      `Approve all ${ids.length} proposals that only update the last-verified date? Real changes are not included.`,
+    );
+    if (!confirmed) return;
+    setBulkState({ status: "submitting" });
+    try {
+      const res = await fetch("/api/admin/proposals/approve-date-only", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = (await res.json().catch(() => null)) as { approved?: number; skipped?: { id: number }[] } | null;
+      if (res.status === 200 && data) {
+        setBulkState({ status: "done", approved: data.approved ?? 0, skipped: data.skipped?.length ?? 0 });
+        router.refresh();
+        return;
+      }
+      setBulkState({ status: "error", message: "Something went wrong. Nothing was applied. Try again." });
+    } catch {
+      setBulkState({ status: "error", message: "Something went wrong. Nothing was applied. Try again." });
+    }
+  }
 
   if (proposals.length === 0) {
     return (
@@ -272,9 +332,27 @@ export default function ProposalsReviewView({ proposals, venueLookup }: Proposal
         </div>
       )}
 
-      <p className="text-sm text-[var(--color-ink-500)]">
-        {filtered.length} of {proposals.length} pending {proposals.length === 1 ? "proposal" : "proposals"}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-[var(--color-ink-500)]">
+          {filtered.length} of {proposals.length} pending {proposals.length === 1 ? "proposal" : "proposals"}
+        </p>
+        {dateOnlyIds.length > 0 && (
+          <button
+            type="button"
+            onClick={() => handleBulkApprove(dateOnlyIds)}
+            disabled={bulkState.status === "submitting"}
+            className={primaryButtonClass}
+          >
+            {bulkState.status === "submitting" ? "Approving…" : `Approve all ${dateOnlyIds.length} date-only updates`}
+          </button>
+        )}
+      </div>
+
+      {(bulkState.status === "done" || bulkState.status === "error") && (
+        <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">
+          {bulkState.status === "done" ? `Approved ${bulkState.approved}. Skipped ${bulkState.skipped}.` : bulkState.message}
+        </p>
+      )}
 
       {filtered.length === 0 ? (
         <div className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-10 text-center">

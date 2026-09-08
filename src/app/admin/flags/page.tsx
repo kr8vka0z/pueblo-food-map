@@ -45,6 +45,7 @@ import Link from "next/link";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
+import { D1_MAX_BOUND_PARAMS, chunkArray } from "@/lib/d1";
 import ProposalsReviewView from "@/components/ProposalsReviewView";
 import type { WeeklyHours } from "@/types/venue";
 
@@ -99,14 +100,6 @@ export interface VenueLookup {
 }
 
 /**
- * D1's hard ceiling on bound parameters in a single statement. Measured
- * against the real API on 2026-09-02, not taken from docs: 100 placeholders
- * succeed, 101 fail with `too many SQL variables … SQLITE_ERROR` (D1 error
- * code 7500).
- */
-const D1_MAX_BOUND_PARAMS = 100;
-
-/**
  * One `SELECT ... WHERE id IN (...)` per batch of target_venue_ids — never a
  * per-row lookup. Returns an empty map for an empty input rather than issuing
  * a query with no placeholders (invalid SQL). Carries `status` alongside the
@@ -132,8 +125,7 @@ async function loadVenueLookup(db: D1Database, ids: string[]): Promise<Record<st
   const uniqueIds = [...new Set(ids)];
   const map: Record<string, VenueLookup> = {};
 
-  for (let i = 0; i < uniqueIds.length; i += D1_MAX_BOUND_PARAMS) {
-    const batch = uniqueIds.slice(i, i + D1_MAX_BOUND_PARAMS);
+  for (const batch of chunkArray(uniqueIds, D1_MAX_BOUND_PARAMS)) {
     const placeholders = batch.map(() => "?").join(", ");
     const result = await db
       .prepare(

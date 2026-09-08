@@ -107,7 +107,12 @@ function makeVenueFor(id: number, overrides: Partial<AdminVenueRow> = {}): Admin
  * 409 path (that's this route's shared-engine dependency, already covered
  * by adminProposals.test.ts and the single-approve route's own tests).
  */
-function makeFakeDb(opts: { proposals: ChangeProposalRow[]; venuesById?: Record<string, AdminVenueRow | undefined> }) {
+function makeFakeDb(opts: {
+  proposals: ChangeProposalRow[];
+  venuesById?: Record<string, AdminVenueRow | undefined>;
+  /** Simulates an unexpected D1 throw for one target venue's lookup inside applyApprovedProposal() — the reviewer's per-id try/catch regression case. */
+  throwForVenueId?: string;
+}) {
   const proposalsById = new Map(opts.proposals.map((p) => [p.id, p]));
   const venuesById = opts.venuesById ?? {};
   const inQueryBindCounts: number[] = [];
@@ -121,7 +126,11 @@ function makeFakeDb(opts: { proposals: ChangeProposalRow[]; venuesById?: Record<
       args,
       first: async <T,>(): Promise<T | null> => {
         if (sql.includes("FROM venues")) {
-          return (venuesById[args[0] as string] ?? null) as unknown as T | null;
+          const venueId = args[0] as string;
+          if (opts.throwForVenueId && venueId === opts.throwForVenueId) {
+            throw new Error("simulated D1 failure");
+          }
+          return (venuesById[venueId] ?? null) as unknown as T | null;
         }
         return null;
       },
@@ -296,6 +305,23 @@ describe("POST /api/admin/proposals/approve-date-only", () => {
     for (const count of getInQueryBindCounts()) {
       expect(count).toBeLessThanOrEqual(100);
     }
+  });
+
+  // ── Reviewer finding (PR #417): a mid-loop D1 throw must not lose earlier
+  // successes or claim nothing was applied ─────────────────────────────────
+  test("second of three ids throws inside applyApprovedProposal -> 200, approved 2, skipped 1 reason 'internal error', batch still called for ids 1 and 3", async () => {
+    const proposals = [1, 2, 3].map((id) => makeDateOnlyProposal(id));
+    const venuesById = Object.fromEntries([1, 2, 3].map((id) => [`venue-${id}`, makeVenueFor(id)]));
+    const { db, batch } = makeFakeDb({ proposals, venuesById, throwForVenueId: "venue-2" });
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+    const res = await POST(makeRequest({ origin: ADMIN_ORIGIN, body: { ids: [1, 2, 3] } }));
+    expect(res.status).toBe(200);
+    const data = (await res.json()) as { approved: number; skipped: { id: number; reason: string }[] };
+    expect(data.approved).toBe(2);
+    expect(data.skipped).toEqual([{ id: 2, reason: "internal error" }]);
+    // Only ids 1 and 3 ever reach a db.batch() call — id 2 threw before its own batch.
+    expect(batch).toHaveBeenCalledTimes(2);
   });
 
   test("duplicate ids in the request are deduped — approved once, not twice", async () => {

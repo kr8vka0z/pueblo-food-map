@@ -738,6 +738,42 @@ describe("ProposalsReviewView — bulk approve date-only updates", () => {
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 
+  // ── Reviewer finding (PR #417): distinct too_many_ids message, and never
+  // claim "Nothing was applied" for a status that could be partial ─────────
+  test("a too_many_ids response shows the specific 'narrow the filter' message, not the generic one", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 400, json: async () => ({ ok: false, error: "too_many_ids" }) });
+    const user = userEvent.setup();
+    render(<ProposalsReviewView proposals={[makeDateOnlyProposal()]} venueLookup={{}} />);
+
+    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/More than 200 date-only proposals selected — narrow the filter and retry/i)).toBeDefined(),
+    );
+    expect(screen.queryByText(/Nothing was applied/i)).toBeNull();
+  });
+
+  test("a 500 response never claims 'Nothing was applied' — some ids may have already applied", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 500, json: async () => ({ ok: false }) });
+    const user = userEvent.setup();
+    render(<ProposalsReviewView proposals={[makeDateOnlyProposal()]} venueLookup={{}} />);
+
+    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+
+    await waitFor(() => expect(screen.getByText(/Something went wrong/i)).toBeDefined());
+    expect(screen.queryByText(/Nothing was applied/i)).toBeNull();
+  });
+
+  test("a 403 response DOES claim 'Nothing was applied' — the server never started the loop", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 403, json: async () => ({ ok: false }) });
+    const user = userEvent.setup();
+    render(<ProposalsReviewView proposals={[makeDateOnlyProposal()]} venueLookup={{}} />);
+
+    await user.click(screen.getByRole("button", { name: /Approve all/i }));
+
+    await waitFor(() => expect(screen.getByText(/Nothing was applied/i)).toBeDefined());
+  });
+
   test("the result line is aria-live=\"polite\"", async () => {
     mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ approved: 1, skipped: [] }) });
     const user = userEvent.setup();

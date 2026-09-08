@@ -281,14 +281,38 @@ export default function ProposalsReviewView({ proposals, venueLookup }: Proposal
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
       });
-      const data = (await res.json().catch(() => null)) as { approved?: number; skipped?: { id: number }[] } | null;
+      const data = (await res.json().catch(() => null)) as
+        | { approved?: number; skipped?: { id: number }[]; error?: string }
+        | null;
       if (res.status === 200 && data) {
         setBulkState({ status: "done", approved: data.approved ?? 0, skipped: data.skipped?.length ?? 0 });
         router.refresh();
         return;
       }
-      setBulkState({ status: "error", message: "Something went wrong. Nothing was applied. Try again." });
+      // Reviewer finding (PR #417): a "Nothing was applied" claim is only
+      // true for a request the server never started processing (400/401/403
+      // — bad body/id-cap/auth, rejected before the per-id loop runs). A 500
+      // means the loop was already partway through when something broke, so
+      // some ids may have applied already — claiming "nothing" there would
+      // be a lie the way it was for the server's own per-id loop before this
+      // same review round (route.ts's try/catch fix).
+      if (data?.error === "too_many_ids") {
+        setBulkState({
+          status: "error",
+          message: "More than 200 date-only proposals selected — narrow the filter and retry.",
+        });
+        return;
+      }
+      const requestNeverStarted = res.status === 400 || res.status === 401 || res.status === 403;
+      setBulkState({
+        status: "error",
+        message: requestNeverStarted
+          ? "Something went wrong. Nothing was applied. Try again."
+          : "Something went wrong. Some proposals may already be approved — refresh before retrying.",
+      });
     } catch {
+      // fetch() itself threw (network failure) — the request never reached
+      // the server, so "nothing was applied" is genuinely true here.
       setBulkState({ status: "error", message: "Something went wrong. Nothing was applied. Try again." });
     }
   }

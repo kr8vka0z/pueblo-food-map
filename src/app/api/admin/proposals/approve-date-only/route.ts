@@ -24,7 +24,11 @@
  * to apply. There is no scenario where one malformed id in a batch of 50
  * blocks the other 49 — that would make the "select-all" convenience worse
  * than clicking Approve 50 times individually, the exact problem this route
- * exists to remove.
+ * exists to remove. This includes an unexpected D1 throw mid-loop: the
+ * per-id `applyApprovedProposal()` call is wrapped in its own try/catch, so
+ * ids already applied before a later id's throw stay applied and are
+ * correctly counted in the response's `approved` total — a 500 here would
+ * otherwise tell the client "nothing was applied" while some ids already had.
  *
  * **Validation re-runs the FULL predicate against a fresh DB row, not the
  * client's claim.** status must be 'pending', change_type must be 'update',
@@ -151,12 +155,22 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
 
     // Same engine a single Approve click uses, own stale-apply re-check
-    // included (applyApprovedProposal's own header).
-    const outcome = await applyApprovedProposal(db, row, identity);
-    if (outcome.ok) {
-      approved += 1;
-    } else {
-      skipped.push({ id, reason: outcome.message ?? outcome.error });
+    // included (applyApprovedProposal's own header). Wrapped in its own
+    // try/catch (Reviewer finding, PR #417) — an uncaught D1 throw on id N
+    // would otherwise 500 the whole request AFTER ids before N already
+    // committed their own db.batch(), so the client's "nothing was applied"
+    // fallback message would be a lie. Recording it as a skip instead keeps
+    // the response's `approved` count always truthful, whatever happens to
+    // any single id.
+    try {
+      const outcome = await applyApprovedProposal(db, row, identity);
+      if (outcome.ok) {
+        approved += 1;
+      } else {
+        skipped.push({ id, reason: outcome.message ?? outcome.error });
+      }
+    } catch {
+      skipped.push({ id, reason: "internal error" });
     }
   }
 

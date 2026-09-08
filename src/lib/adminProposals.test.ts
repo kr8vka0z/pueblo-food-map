@@ -8,6 +8,7 @@
 import { describe, expect, test } from "vitest";
 import {
   checkStaleApply,
+  isDateOnlyUpdateProposal,
   parseProposalRow,
   toColumnValue,
   toTriState,
@@ -171,6 +172,52 @@ describe("checkStaleApply — change_type 'update' (the scoped, per-field check)
       diff,
     );
     expect(result).toEqual({ stale: false });
+  });
+});
+
+describe("isDateOnlyUpdateProposal — shared by the client filter and the bulk-approve route", () => {
+  const dateOnlyDiff: ProposedDiff = {
+    before: { last_verified: "2026-08-01" },
+    after: { last_verified: "2026-09-05" },
+    fields_changed: ["last_verified"],
+  };
+
+  test("update + osm, fields_changed exactly ['last_verified'] -> true", () => {
+    expect(isDateOnlyUpdateProposal({ change_type: "update", source: "osm" }, dateOnlyDiff)).toBe(true);
+  });
+
+  test("update + plentiful, fields_changed exactly ['last_verified'] -> true", () => {
+    expect(isDateOnlyUpdateProposal({ change_type: "update", source: "plentiful" }, dateOnlyDiff)).toBe(true);
+  });
+
+  test("link_health source -> false, even though diffEngine always shapes it as change_type 'update'", () => {
+    expect(isDateOnlyUpdateProposal({ change_type: "update", source: "link_health" }, dateOnlyDiff)).toBe(false);
+  });
+
+  test("gtfs source -> false (not on the bulk-approvable allowlist)", () => {
+    expect(isDateOnlyUpdateProposal({ change_type: "update", source: "gtfs" }, dateOnlyDiff)).toBe(false);
+  });
+
+  test("change_type 'add' -> false regardless of source/diff shape", () => {
+    expect(isDateOnlyUpdateProposal({ change_type: "add", source: "osm" }, dateOnlyDiff)).toBe(false);
+  });
+
+  test("change_type 'remove' -> false regardless of source/diff shape", () => {
+    expect(isDateOnlyUpdateProposal({ change_type: "remove", source: "osm" }, dateOnlyDiff)).toBe(false);
+  });
+
+  test("fields_changed carries a real field alongside last_verified -> false, not bulk-approvable", () => {
+    const diff: ProposedDiff = {
+      before: { last_verified: "2026-08-01", phone: "719-555-0100" },
+      after: { last_verified: "2026-09-05", phone: "719-555-0199" },
+      fields_changed: ["last_verified", "phone"],
+    };
+    expect(isDateOnlyUpdateProposal({ change_type: "update", source: "osm" }, diff)).toBe(false);
+  });
+
+  test("fields_changed empty -> false", () => {
+    const diff: ProposedDiff = { before: {}, after: {}, fields_changed: [] };
+    expect(isDateOnlyUpdateProposal({ change_type: "update", source: "osm" }, diff)).toBe(false);
   });
 });
 

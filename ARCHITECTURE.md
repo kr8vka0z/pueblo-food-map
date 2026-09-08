@@ -216,7 +216,9 @@ scripts/fetch-osm-grocery.py ┤→ scripts/ingest-osm-grocery.py ─┐
   an approved proposal to `venues` is the review UI's job (§6.7 of the
   design doc) — now built, `/admin/flags`
   (`src/app/admin/flags/page.tsx` + `src/components/ProposalsReviewView.tsx`
-  + `src/app/api/admin/proposals/[id]/{approve,reject}`, #390). It's the
+  + `src/app/api/admin/proposals/[id]/{approve,reject}`, #390, plus the
+  bulk `src/app/api/admin/proposals/approve-date-only` added on top of the
+  same engine — see AGENTS.md's "Bulk-approve date-only updates"). It's the
   ONLY code path that constructs a `venues` mutation FROM a `change_proposals`
   row — the ingestion pipeline above still never does. See AGENTS.md's
   "Change-proposal review queue (#390)" for how it satisfies the

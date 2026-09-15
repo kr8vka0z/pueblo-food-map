@@ -5,11 +5,11 @@
  * Source of truth is Cloudflare D1 (`pueblo-food-map-admin`.venues); this
  * file is the build-time snapshot the public map imports at request time
  * (docs/admin/cloudflare-native-admin-spec.md §3.3, §3.5 step 3).
- * Last published: 2026-09-15T17:57:12.957Z
+ * Last published: 2026-09-15T18:31:42.457Z
  */
 import type { Venue } from "@/types/venue";
 
-export const publishedAt = "2026-09-15T17:57:12.957Z";
+export const publishedAt = "2026-09-15T18:31:42.457Z";
 export const publishedVenues: Venue[] = [
   {
     "id": "garden-bethany-lutheran",
@@ -179,7 +179,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.496445,
     "address": "Baxter Road, Baxter, CO 81006",
     "source": "OpenStreetMap (node/10239124452)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-11550915644",
@@ -189,7 +189,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.621343,
     "address": "Club Manor Drive, Pueblo, CO 81008",
     "source": "OpenStreetMap (node/11550915644)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12079476149",
@@ -199,7 +199,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.57943,
     "address": "South Aspen Road, Blende, CO 81003",
     "source": "OpenStreetMap (node/12079476149)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12184485110",
@@ -209,7 +209,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.349524,
     "address": "US 50 Business, Avondale, CO 81022",
     "source": "OpenStreetMap (node/12184485110)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12199987090",
@@ -219,7 +219,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.621195,
     "address": "West Northern Avenue, Pueblo, CO 81004",
     "source": "OpenStreetMap (node/12199987090)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12259768973",
@@ -229,7 +229,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.614027,
     "address": "East Abriendo Avenue, Pueblo, CO 81004",
     "source": "OpenStreetMap (node/12259768973)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12478967185",
@@ -239,7 +239,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.611215,
     "address": "West 8th Street, Pueblo, CO 81003",
     "source": "OpenStreetMap (node/12478967185)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12496998446",
@@ -249,7 +249,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.624074,
     "address": "Francisco Street, Pueblo, CO 81002",
     "source": "OpenStreetMap (node/12496998446)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12528946501",
@@ -259,7 +259,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.565459,
     "address": "20th Lane, Blende, CO 81006",
     "source": "OpenStreetMap (node/12528946501)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12599529644",
@@ -296,7 +296,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://maurofarms.com/",
     "notes": "Identifies as Women owned",
     "source": "OpenStreetMap (node/12599529644)",
-    "last_verified": "2026-09-07"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12599529663",
@@ -331,7 +331,7 @@ export const publishedVenues: Venue[] = [
     "phone": "+1 719-948-3200",
     "url": "https://www.facebook.com/ditomasofarms1/",
     "source": "OpenStreetMap (node/12599529663)",
-    "last_verified": "2026-09-07"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12706112997",
@@ -341,7 +341,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.662294,
     "address": "Lucille Street, Pueblo, CO 81005",
     "source": "OpenStreetMap (node/12706112997)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12839229515",
@@ -351,7 +351,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.458933,
     "address": "36th Lane, Vineland, CO",
     "source": "OpenStreetMap (node/12839229515)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-12849787149",
@@ -361,7 +361,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.599331,
     "address": "Montebello Road, Pueblo, CO 81008",
     "source": "OpenStreetMap (node/12849787149)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-13398740836",
@@ -371,7 +371,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.663068,
     "address": "Glenroyal Drive, Pueblo, CO 81005",
     "source": "OpenStreetMap (node/13398740836)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-4041145706",
@@ -381,7 +381,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.586859,
     "address": "North Monument Avenue, Pueblo, CO 81001",
     "source": "OpenStreetMap (node/4041145706)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-4041297300",
@@ -391,7 +391,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.631284,
     "address": "Kachina Drive, Pueblo, CO 81008",
     "source": "OpenStreetMap (node/4041297300)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-4041363143",
@@ -401,7 +401,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.625627,
     "address": "Iowa Avenue, Pueblo, CO 81004",
     "source": "OpenStreetMap (node/4041363143)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-4041363156",
@@ -435,7 +435,7 @@ export const publishedVenues: Venue[] = [
     },
     "operator": "Western Convenience Store",
     "source": "OpenStreetMap (node/4041363156)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-4041363163",
@@ -445,7 +445,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.628526,
     "address": "West 4th Street, Pueblo, CO 81002",
     "source": "OpenStreetMap (node/4041363163)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-4041374999",
@@ -479,7 +479,7 @@ export const publishedVenues: Venue[] = [
     },
     "operator": "Loaf 'N Jug",
     "source": "OpenStreetMap (node/4041374999)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-4041375005",
@@ -489,7 +489,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.638885,
     "address": "Acero Avenue, Pueblo, CO 81004",
     "source": "OpenStreetMap (node/4041375005)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-4041375052",
@@ -501,7 +501,7 @@ export const publishedVenues: Venue[] = [
     "phone": "+1 719-564-0447",
     "url": "https://www.7-eleven.com/locations/co/pueblo/2727-south-prairie-13111",
     "source": "OpenStreetMap (node/4041375052)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-4041375053",
@@ -511,7 +511,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.643326,
     "address": "South Prairie Avenue, Pueblo, CO 81005",
     "source": "OpenStreetMap (node/4041375053)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-4043068526",
@@ -521,7 +521,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.745238,
     "address": "West Spaulding Avenue, Pueblo West, CO 81007",
     "source": "OpenStreetMap (node/4043068526)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-4043068646",
@@ -531,7 +531,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.745053,
     "address": "West Spaulding Avenue, Pueblo West, CO 81007",
     "source": "OpenStreetMap (node/4043068646)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-5409829684",
@@ -564,7 +564,7 @@ export const publishedVenues: Venue[] = [
       ]
     },
     "source": "OpenStreetMap (node/5409829684)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-node-9330967204",
@@ -574,7 +574,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.612008,
     "address": "West 7th Street, Pueblo, CO 81003",
     "source": "OpenStreetMap (node/9330967204)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-1079237907",
@@ -584,7 +584,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.702067,
     "address": "136 South Purcell Boulevard, Pueblo West, CO",
     "source": "OpenStreetMap (way/1079237907)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-1135823373",
@@ -594,7 +594,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.643387,
     "address": "1242 South Prairie Avenue, Pueblo 81004",
     "source": "OpenStreetMap (way/1135823373)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-1266766543",
@@ -604,7 +604,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.817532,
     "address": "West Carrizo Springs Avenue, CO",
     "source": "OpenStreetMap (way/1266766543)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-224603771",
@@ -614,7 +614,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.622958,
     "address": "6470 North Elizabeth Street, Pueblo, CO 81008",
     "source": "OpenStreetMap (way/224603771)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-264728293",
@@ -626,7 +626,7 @@ export const publishedVenues: Venue[] = [
     "phone": "+1 719-547-2108",
     "url": "https://local.safeway.com/safeway/co/pueblo/1017-n-market-plaza.html",
     "source": "OpenStreetMap (way/264728293)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-439892311",
@@ -661,7 +661,7 @@ export const publishedVenues: Venue[] = [
     "phone": "+1 719 542 2411",
     "url": "https://www.naturalgrocers.com/store/pueblo",
     "source": "OpenStreetMap (way/439892311)",
-    "last_verified": "2026-09-07"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-439892313",
@@ -696,7 +696,7 @@ export const publishedVenues: Venue[] = [
     "phone": "+1-719-544-0390",
     "url": "https://www.kingsoopers.com/stores/details/620/00043",
     "source": "OpenStreetMap (way/439892313)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-466464064",
@@ -732,7 +732,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://www.walmart.com/store/3382-pueblo-west-co",
     "operator": "Walmart",
     "source": "OpenStreetMap (way/466464064)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-499816944",
@@ -742,7 +742,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.79703,
     "address": "6654 State Highway 165, Colorado City, CO 81004",
     "source": "OpenStreetMap (way/499816944)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-499816958",
@@ -776,7 +776,7 @@ export const publishedVenues: Venue[] = [
     },
     "notes": "Convenience Store;Gas Station",
     "source": "OpenStreetMap (way/499816958)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-505568940",
@@ -811,7 +811,7 @@ export const publishedVenues: Venue[] = [
     "phone": "+1 719-543-7265",
     "url": "https://www.7-eleven.com/locations/co/pueblo/804-e-4th-st-20638",
     "source": "OpenStreetMap (way/505568940)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-535378000",
@@ -822,7 +822,7 @@ export const publishedVenues: Venue[] = [
     "address": "Dillon Drive, Pueblo, CO 81008",
     "notes": "Operated by Loaf 'N Jug",
     "source": "OpenStreetMap (way/535378000)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-535378006",
@@ -856,7 +856,7 @@ export const publishedVenues: Venue[] = [
     },
     "operator": "J R's Country Store",
     "source": "OpenStreetMap (way/535378006)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-535379543",
@@ -866,7 +866,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.620024,
     "address": "905 West US Highway 50, Pueblo, CO 81008",
     "source": "OpenStreetMap (way/535379543)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-535379550",
@@ -900,7 +900,7 @@ export const publishedVenues: Venue[] = [
     },
     "operator": "Corner Store",
     "source": "OpenStreetMap (way/535379550)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-535650928",
@@ -911,7 +911,7 @@ export const publishedVenues: Venue[] = [
     "address": "3522 North Elizabeth Street, Pueblo, CO 81008",
     "notes": "Operated by 7-Eleven",
     "source": "OpenStreetMap (way/535650928)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-535656814",
@@ -922,7 +922,7 @@ export const publishedVenues: Venue[] = [
     "address": "2801 North Elizabeth Street, Pueblo, CO 81008",
     "notes": "Operated by Alta",
     "source": "OpenStreetMap (way/535656814)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-535686236",
@@ -932,7 +932,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.49248,
     "address": "32nd Lane, Baxter, CO 81006",
     "source": "OpenStreetMap (way/535686236)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-536454112",
@@ -968,7 +968,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://www.walmart.com/store/842-pueblo-co",
     "operator": "Walmart",
     "source": "OpenStreetMap (way/536454112)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-544400971",
@@ -980,7 +980,7 @@ export const publishedVenues: Venue[] = [
     "phone": "+1 719-543-5671",
     "url": "https://local.albertsons.com/co/pueblo/1601-hwy-50-w.html",
     "source": "OpenStreetMap (way/544400971)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-547529779",
@@ -990,7 +990,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.644771,
     "address": "Lambert Avenue, Pueblo, CO 81002",
     "source": "OpenStreetMap (way/547529779)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-549826775",
@@ -1000,7 +1000,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.834381,
     "address": "Address not in OpenStreetMap",
     "source": "OpenStreetMap (way/549826775)",
-    "last_verified": "2026-09-07"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-549826793",
@@ -1010,7 +1010,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.837199,
     "address": "Address not in OpenStreetMap",
     "source": "OpenStreetMap (way/549826793)",
-    "last_verified": "2026-09-07"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-591851971",
@@ -1043,7 +1043,7 @@ export const publishedVenues: Venue[] = [
       ]
     },
     "source": "OpenStreetMap (way/591851971)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-659620782",
@@ -1053,7 +1053,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.606481,
     "address": "Hector Garcia Place, Pueblo, CO 81003",
     "source": "OpenStreetMap (way/659620782)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-682492454",
@@ -1089,7 +1089,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://www.walmart.com/store/1001-pueblo-co",
     "operator": "Walmart",
     "source": "OpenStreetMap (way/682492454)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-682492473",
@@ -1125,7 +1125,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://www.walmart.com/store/5828/pueblo-co",
     "operator": "Walmart",
     "source": "OpenStreetMap (way/682492473)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-946612229",
@@ -1160,7 +1160,7 @@ export const publishedVenues: Venue[] = [
     "phone": "+1-719-561-1234",
     "url": "https://local.safeway.com/safeway/co/pueblo/1231-s-prairie-ave.html",
     "source": "OpenStreetMap (way/946612229)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-946612238",
@@ -1195,7 +1195,7 @@ export const publishedVenues: Venue[] = [
     "phone": "+1-719-564-0590",
     "url": "https://www.kingsoopers.com/stores/details/620/00012",
     "source": "OpenStreetMap (way/946612238)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-946614791",
@@ -1205,7 +1205,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.59641,
     "address": "1002 Bonforte Boulevard, Pueblo, CO 81001",
     "source": "OpenStreetMap (way/946614791)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-946614803",
@@ -1240,7 +1240,7 @@ export const publishedVenues: Venue[] = [
     "phone": "+1-719-544-6057",
     "url": "https://savealot.com/grocery-stores/pueblo-81001-23844/",
     "source": "OpenStreetMap (way/946614803)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-947245256",
@@ -1250,7 +1250,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.666376,
     "address": "4125 Thames Drive, Pueblo, CO 81005",
     "source": "OpenStreetMap (way/947245256)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-971896407",
@@ -1284,7 +1284,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://www.mussofarmschileroom.com/",
     "notes": "surcharge for using cards",
     "source": "OpenStreetMap (way/971896407)",
-    "last_verified": "2026-09-07"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "osm-way-974172860",
@@ -1294,7 +1294,7 @@ export const publishedVenues: Venue[] = [
     "lng": -104.572577,
     "address": "2120 Oakshire Lane, Pueblo, CO 81001",
     "source": "OpenStreetMap (way/974172860)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-agape-fellowship-church-925bb133",
@@ -1306,7 +1306,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/agape-fellowship-church-925bb133",
     "notes": "Agape Fellowship Church. in Pueblo, CO. Hours and directions available.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-assistance-league-pueblo-services-7754e3e3",
@@ -1319,7 +1319,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/assistance-league-pueblo-services-7754e3e3",
     "notes": "Assistance League-Pueblo Services. in Pueblo, CO. Phone: (719) 544-1528.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-bessemer-mobile-food-pantry-58874d63",
@@ -1332,7 +1332,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/bessemer-mobile-food-pantry-58874d63",
     "notes": "Bessemer Mobile Food Pantry. in Pueblo, CO.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-09-07"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-bgcc-pueblo-pantry-plentiful-4069",
@@ -1350,7 +1350,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/bgcc-pueblo-pantry-plentiful-4069",
     "notes": "BGCC Pueblo Pantry. in Pueblo, CO. Phone: (719) 470-1004.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-blessing-box-216-w-routt-plentiful-1454",
@@ -1368,7 +1368,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/blessing-box-216-w-routt-plentiful-1454",
     "notes": "Blessing Box - 216 W Routt. in Pueblo, CO. Phone: (800) 748-2074.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-care-and-share-food-bank-for-southern-colorado-main-location-4a362e63",
@@ -1397,7 +1397,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/care-and-share-food-bank-for-southern-colorado-main-location-4a362e63",
     "notes": "Care and Share Food Bank for Southern Colorado - Main Location. in Pueblo, CO. Hours and directions available.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-09-07"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-center-toward-self-reliance-1c29edf8",
@@ -1427,7 +1427,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/center-toward-self-reliance-1c29edf8",
     "notes": "Center Toward Self-Reliance. in Pueblo, CO. Phone: (719) 546-1271.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-09-07"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-colorado-division-of-housing-food-distribution-center-5448eb74",
@@ -1439,7 +1439,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/colorado-division-of-housing-food-distribution-center-5448eb74",
     "notes": "Colorado Division Of Housing - Food Distribution Center. in Pueblo, CO.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-compassion-care-pueblo-caba5d25",
@@ -1452,7 +1452,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/compassion-care-pueblo-caba5d25",
     "notes": "Compassion Care- Pueblo. in Pueblo, CO. Phone: (719) 423-9138.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-cornerstone-assembly-of-god-pueblo-e68b65ea",
@@ -1465,7 +1465,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/cornerstone-assembly-of-god-pueblo-e68b65ea",
     "notes": "Cornerstone Assembly of God Pueblo. in Pueblo, CO. Phone: (719) 542-4133.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-edible-planet-food-distribution-center-71b7a0fe",
@@ -1477,7 +1477,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/edible-planet-food-distribution-center-71b7a0fe",
     "notes": "Edible Planet - Food Distribution Center. in Pueblo, CO.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-eva-r-baca-elementary-school-52dc3901",
@@ -1489,7 +1489,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/eva-r-baca-elementary-school-52dc3901",
     "notes": "Eva R Baca Elementary School. in Pueblo, CO.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-first-congregational-united-church-of-christ-pueblo-plentiful-4247",
@@ -1507,7 +1507,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/first-congregational-united-church-of-christ-pueblo-plentiful-4247",
     "notes": "First Congregational United Church of Christ- Pueblo. in Pueblo, CO. Phone: (719) 544-1892.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-foodbank-of-eastside-neighbor-s-council-fde35382",
@@ -1519,7 +1519,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/foodbank-of-eastside-neighbor-s-council-fde35382",
     "notes": "Foodbank of Eastside Neighbor's Council. in Pueblo, CO.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-full-force-ministries-food-pantry-cf58c38d",
@@ -1531,7 +1531,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/full-force-ministries-food-pantry-cf58c38d",
     "notes": "Full Force Ministries Food Pantry. in Pueblo, CO.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-lynn-gardens-baptist-church-21831a26",
@@ -1548,7 +1548,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/lynn-gardens-baptist-church-21831a26",
     "notes": "Lynn Gardens Baptist Church. in Pueblo, CO. Hours and directions available. Open the 2nd Thursday, 4th Thursday of each month, 11:00 AM – 12:45 PM.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-09-07"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-minnequa-vfw-post-3641-f69cfb98",
@@ -1566,7 +1566,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/minnequa-vfw-post-3641-f69cfb98",
     "notes": "Minnequa VFW Post 3641. in Pueblo, CO. Phone: (719) 406-5247. Hours and directions available.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-09-07"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-mt-carmel-veteran-center-of-pueblo-76b970d4",
@@ -1579,7 +1579,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/mt-carmel-veteran-center-of-pueblo-76b970d4",
     "notes": "Mt Carmel Veteran Center of Pueblo. in Pueblo, CO. Phone: (719) 309-4719.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-new-heights-baptist-church-35755919",
@@ -1591,7 +1591,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/new-heights-baptist-church-35755919",
     "notes": "New Heights Baptist Church. in Pueblo, CO. Hours and directions available.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-praise-assembly-of-god-food-pantry-2118f856",
@@ -1603,7 +1603,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/praise-assembly-of-god-food-pantry-2118f856",
     "notes": "Praise Assembly of God - Food Pantry. in Pueblo, CO.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-pueblo-community-college-mobile-pantry-stop-e0de86e7",
@@ -1615,7 +1615,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-college-mobile-pantry-stop-e0de86e7",
     "notes": "Pueblo Community College - Mobile Pantry Stop. in Pueblo, CO. Hours and directions available.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-pueblo-community-college-school-pantry-cdc32119",
@@ -1627,7 +1627,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-college-school-pantry-cdc32119",
     "notes": "Pueblo Community College - School Pantry. in Pueblo, CO. Hours and directions available.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-pueblo-community-soup-kitchen-plentiful-3195",
@@ -1666,7 +1666,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-soup-kitchen-plentiful-3195",
     "notes": "Pueblo Community Soup Kitchen. in Pueblo, CO. Phone: (719) 545-6540.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-pueblo-cooperative-care-center-plentiful-3140",
@@ -1693,7 +1693,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-cooperative-care-center-plentiful-3140",
     "notes": "Pueblo Cooperative Care Center. in Pueblo, CO. Phone: (719) 543-7484.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-pueblo-county-usda-food-distribution-plentiful-3149",
@@ -1723,7 +1723,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-county-usda-food-distribution-plentiful-3149",
     "notes": "Pueblo County USDA Food Distribution. in Pueblo, CO. Phone: (719) 583-6199.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-pueblo-united-3d8ce244",
@@ -1736,7 +1736,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-united-3d8ce244",
     "notes": "Pueblo United. in Pueblo, CO. Phone: (719) 696-8586.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-rmser-empowerment-center-plentiful-3072",
@@ -1757,7 +1757,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/rmser-empowerment-center-plentiful-3072",
     "notes": "RMSER Empowerment Center. in Pueblo, CO. Phone: (800) 748-2074.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-salvation-army-pueblo-plentiful-3190",
@@ -1781,7 +1781,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/salvation-army-pueblo-plentiful-3190",
     "notes": "Salvation Army- Pueblo. in Pueblo, CO. Phone: (719) 543-3656.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-senior-resource-development-agency-pueblo-inc-plentiful-3197",
@@ -1811,7 +1811,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/senior-resource-development-agency-pueblo-inc-plentiful-3197",
     "notes": "Senior Resource Development Agency, Pueblo Inc.. in Pueblo, CO. Phone: (719) 543-0100.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-senior-towers-mobile-market-19a75a56",
@@ -1824,7 +1824,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/senior-towers-mobile-market-19a75a56",
     "notes": "Senior Towers - Mobile Market. in Pueblo, CO. Phone: (719) 296-6995.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-st-anne-s-catholic-church-37512aae",
@@ -1836,7 +1836,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/st-anne-s-catholic-church-37512aae",
     "notes": "St. Anne's Catholic Church. in Pueblo, CO.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-steel-city-fellowship-2d4c6ff3",
@@ -1849,7 +1849,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/steel-city-fellowship-2d4c6ff3",
     "notes": "Steel City Fellowship. in Pueblo, CO. Phone: (719) 350-5001.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-the-avenue-church-plentiful-3200",
@@ -1867,7 +1867,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/the-avenue-church-plentiful-3200",
     "notes": "The Avenue Church. in Pueblo, CO. Phone: (719) 561-1512.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-the-pueblo-shelter-safeside-recovery-plentiful-4265",
@@ -1904,7 +1904,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/the-pueblo-shelter-safeside-recovery-plentiful-4265",
     "notes": "The Pueblo Shelter/SafeSide Recovery. in Pueblo, CO. Phone: (719) 924-8413.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   },
   {
     "id": "plentiful-victory-life-ministries-a24917c0",
@@ -1916,6 +1916,6 @@ export const publishedVenues: Venue[] = [
     "url": "https://directory.plentiful.org/colorado/pueblo/victory-life-ministries-a24917c0",
     "notes": "Victory Life Ministries. in Pueblo, CO.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-15"
   }
 ];

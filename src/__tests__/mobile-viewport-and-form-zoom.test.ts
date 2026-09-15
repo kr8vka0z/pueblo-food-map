@@ -49,4 +49,22 @@ describe("mobile viewport + form field zoom", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  test("overlays anchored below the search bar track its safe-area-shifted top", () => {
+    // These sit at a fixed offset below SearchBar, which now shifts down on
+    // a notched phone — each must reference the same inset, or it rides up
+    // under the bar again.
+    const files = [
+      "CategoryDropdown.tsx",
+      "EmptySearchPopover.tsx",
+      "SearchResultsPopover.tsx",
+      "LocationDeniedBanner.tsx",
+    ];
+    for (const file of files) {
+      const source = readFileSync(join(process.cwd(), "src", "components", file), "utf-8");
+      expect(source, `${file} should reference env(safe-area-inset-top)`).toMatch(
+        /env\(safe-area-inset-top\)/,
+      );
+    }
+  });
 });

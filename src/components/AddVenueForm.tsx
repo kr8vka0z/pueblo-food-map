@@ -396,8 +396,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
     }
   }
 
-  // text-base on mobile / text-sm from md up: iOS Safari auto-zooms the page
-  // on focusing any field under 16px — text-sm alone is 14px (mobile review #3).
+  // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
   const inputBase =
     "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
     "bg-white placeholder:text-[var(--color-ink-300)] " +
@@ -792,9 +791,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           id="venue-source"
           value={values.source}
           onChange={(e) => setField("source", e.target.value)}
-          // Last single-line field before the submit button — "Outside
-          // Pueblo County" below it is a checkbox, not a text field
-          // (mobile review #4).
+          // Last single-line field — "Outside Pueblo County" below is a checkbox.
           enterKeyHint="done"
           aria-required="true"
           aria-invalid={errors.source ? "true" : undefined}

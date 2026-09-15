@@ -42,12 +42,8 @@ export const metadata: Metadata = {
   },
 };
 
-// WHY viewportFit: "cover": without it, iOS Safari letterboxes the page
-// inside the notch/Dynamic Island safe area instead of drawing edge-to-edge,
-// and env(safe-area-inset-*) resolves to 0 everywhere — silently disabling
-// every safe-area padding rule in the app. Must ship together with those
-// insets (mobile review item #2): "cover" alone, without the insets, makes
-// overlays slide under the notch/home indicator instead of clearing it.
+// viewportFit "cover" draws edge-to-edge and enables env(safe-area-inset-*)
+// everywhere; without it those insets all resolve to 0.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,

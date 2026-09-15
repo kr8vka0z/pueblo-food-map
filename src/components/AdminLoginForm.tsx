@@ -58,8 +58,7 @@ type PasskeyRegisterStatus = "idle" | "registering" | "error";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// text-base on mobile / text-sm from md up: iOS Safari auto-zooms the page
-// on focusing any field under 16px — text-sm alone is 14px (mobile review #3).
+// text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
 const inputBase =
   "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
   "bg-white placeholder:text-[var(--color-ink-300)] " +
@@ -248,8 +247,7 @@ export default function AdminLoginForm() {
             inputMode="email"
             autoCapitalize="off"
             autoCorrect="off"
-            // Only field on the form, so it's also the last one before submit
-            // (mobile review #4).
+            // Only field, so also the last one before submit.
             enterKeyHint="go"
             value={email}
             onChange={(e) => setEmail(e.target.value)}

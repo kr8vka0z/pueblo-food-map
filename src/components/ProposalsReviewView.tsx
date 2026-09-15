@@ -581,9 +581,7 @@ function ProposalCard({
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            // text-base on mobile / text-sm from md up: iOS Safari auto-zooms
-            // on focus under 16px (mobile review #3) — grep found this admin
-            // reason field wasn't in the review's explicit list.
+            // text-base on mobile: iOS Safari auto-zooms on focus under 16px.
             className={
               "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
               "text-[var(--color-ink-900)] bg-white placeholder:text-[var(--color-ink-400)] " +

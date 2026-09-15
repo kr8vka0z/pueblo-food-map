@@ -106,18 +106,13 @@ export default function SearchBar({
 
   return (
     <div
-      // top: max(1rem, inset) so the bar clears the notch/Dynamic Island in
-      // portrait (mobile review #2 top overlay). left-0/right-0 unchanged —
-      // the actual side gutter lives on the inner div below, where it can
-      // pick up the landscape left/right insets without disturbing desktop
-      // centering.
+      // top clears the notch/Dynamic Island; side gutter lives on the inner div below.
       className="absolute top-[max(1rem,env(safe-area-inset-top))] left-0 right-0 flex justify-center"
       style={{ zIndex: 1000, pointerEvents: "none" }}
       aria-hidden={false}
     >
       <div
-        // mx-4 gutter becomes safe-area-aware on mobile (landscape notch);
-        // md:mx-0 unchanged — desktop has no side insets to account for.
+        // mx-4 gutter, safe-area-aware for the landscape notch.
         className="relative w-full ml-[max(1rem,env(safe-area-inset-left))] mr-[max(1rem,env(safe-area-inset-right))] md:ml-0 md:mr-0 md:w-[520px]"
         style={{ pointerEvents: "auto" }}
       >

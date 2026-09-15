@@ -5,11 +5,11 @@
  * Source of truth is Cloudflare D1 (`pueblo-food-map-admin`.venues); this
  * file is the build-time snapshot the public map imports at request time
  * (docs/admin/cloudflare-native-admin-spec.md §3.3, §3.5 step 3).
- * Last published: 2026-09-15T17:41:07.252Z
+ * Last published: 2026-09-15T17:57:12.957Z
  */
 import type { Venue } from "@/types/venue";
 
-export const publishedAt = "2026-09-15T17:41:07.252Z";
+export const publishedAt = "2026-09-15T17:57:12.957Z";
 export const publishedVenues: Venue[] = [
   {
     "id": "garden-bethany-lutheran",
@@ -658,10 +658,10 @@ export const publishedVenues: Venue[] = [
         "09:00-19:35"
       ]
     },
-    "phone": "+1-719-542-2411",
+    "phone": "+1 719 542 2411",
     "url": "https://www.naturalgrocers.com/store/pueblo",
     "source": "OpenStreetMap (way/439892311)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-07"
   },
   {
     "id": "osm-way-439892313",
@@ -993,6 +993,26 @@ export const publishedVenues: Venue[] = [
     "last_verified": "2026-05-20"
   },
   {
+    "id": "osm-way-549826775",
+    "name": "Loaf 'N Jug",
+    "category": "convenience",
+    "lat": 37.945588,
+    "lng": -104.834381,
+    "address": "Address not in OpenStreetMap",
+    "source": "OpenStreetMap (way/549826775)",
+    "last_verified": "2026-09-07"
+  },
+  {
+    "id": "osm-way-549826793",
+    "name": "Valley Market",
+    "category": "grocery",
+    "lat": 37.944544,
+    "lng": -104.837199,
+    "address": "Address not in OpenStreetMap",
+    "source": "OpenStreetMap (way/549826793)",
+    "last_verified": "2026-09-07"
+  },
+  {
     "id": "osm-way-591851971",
     "name": "Loaf 'N Jug",
     "category": "convenience",
@@ -1308,10 +1328,11 @@ export const publishedVenues: Venue[] = [
     "lat": 38.237869,
     "lng": -104.612428,
     "address": "215 Canal St, Pueblo, CO 81004",
+    "phone": "(719) 528-1247",
     "url": "https://directory.plentiful.org/colorado/pueblo/bessemer-mobile-food-pantry-58874d63",
     "notes": "Bessemer Mobile Food Pantry. in Pueblo, CO.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-07"
   },
   {
     "id": "plentiful-bgcc-pueblo-pantry-plentiful-4069",
@@ -1356,10 +1377,27 @@ export const publishedVenues: Venue[] = [
     "lat": 38.209461,
     "lng": -104.627381,
     "address": "100 Greenhorn Dr #100, Pueblo, CO 81004",
+    "hours_weekly": {
+      "fri": [
+        "8:00 AM - 4:30 PM"
+      ],
+      "mon": [
+        "8:00 AM - 4:30 PM"
+      ],
+      "thu": [
+        "8:00 AM - 4:30 PM"
+      ],
+      "tue": [
+        "8:00 AM - 4:30 PM"
+      ],
+      "wed": [
+        "8:00 AM - 4:30 PM"
+      ]
+    },
     "url": "https://directory.plentiful.org/colorado/pueblo/care-and-share-food-bank-for-southern-colorado-main-location-4a362e63",
     "notes": "Care and Share Food Bank for Southern Colorado - Main Location. in Pueblo, CO. Hours and directions available.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-07"
   },
   {
     "id": "plentiful-center-toward-self-reliance-1c29edf8",
@@ -1368,11 +1406,28 @@ export const publishedVenues: Venue[] = [
     "lat": 38.274091,
     "lng": -104.6197,
     "address": "901 W. 8th St., Pueblo, CO 81003",
+    "hours_weekly": {
+      "fri": [
+        "8:00 AM - 4:30 PM"
+      ],
+      "mon": [
+        "8:00 AM - 4:30 PM"
+      ],
+      "thu": [
+        "8:00 AM - 4:30 PM"
+      ],
+      "tue": [
+        "8:00 AM - 4:30 PM"
+      ],
+      "wed": [
+        "8:00 AM - 4:30 PM"
+      ]
+    },
     "phone": "(719) 546-1271",
     "url": "https://directory.plentiful.org/colorado/pueblo/center-toward-self-reliance-1c29edf8",
     "notes": "Center Toward Self-Reliance. in Pueblo, CO. Phone: (719) 546-1271.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-07"
   },
   {
     "id": "plentiful-colorado-division-of-housing-food-distribution-center-5448eb74",
@@ -1479,27 +1534,39 @@ export const publishedVenues: Venue[] = [
     "last_verified": "2026-05-14"
   },
   {
-    "id": "plentiful-lynn-gardens-baptist-church-d9ee705e",
+    "id": "plentiful-lynn-gardens-baptist-church-21831a26",
     "name": "Lynn Gardens Baptist Church",
     "category": "pantry",
     "lat": 38.223992,
     "lng": -104.656767,
-    "address": "3804 W. Pueblo Blvd., Pueblo, CO 81005",
-    "url": "https://directory.plentiful.org/colorado/pueblo/lynn-gardens-baptist-church-d9ee705e",
+    "address": "3804 W. Pueblo Blvd, Pueblo, CO 81005",
+    "hours_weekly": {
+      "thu": [
+        "11:00 AM - 12:45 PM"
+      ]
+    },
+    "url": "https://directory.plentiful.org/colorado/pueblo/lynn-gardens-baptist-church-21831a26",
+    "notes": "Lynn Gardens Baptist Church. in Pueblo, CO. Hours and directions available. Open the 2nd Thursday, 4th Thursday of each month, 11:00 AM – 12:45 PM.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-07"
   },
   {
-    "id": "plentiful-minnequa-vfw-post-3641-9faa99be",
+    "id": "plentiful-minnequa-vfw-post-3641-f69cfb98",
     "name": "Minnequa VFW Post 3641",
     "category": "pantry",
-    "lat": 38.270809,
-    "lng": -104.597789,
-    "address": "724 E. 4th St., Pueblo, CO 81001",
+    "lat": 38.263995,
+    "lng": -104.614187,
+    "address": "724 E 4th St., Pueblo, CO 81001",
+    "hours_weekly": {
+      "mon": [
+        "4:00 PM - 6:00 PM"
+      ]
+    },
     "phone": "(719) 406-5247",
-    "url": "https://directory.plentiful.org/colorado/pueblo/minnequa-vfw-post-3641-9faa99be",
+    "url": "https://directory.plentiful.org/colorado/pueblo/minnequa-vfw-post-3641-f69cfb98",
+    "notes": "Minnequa VFW Post 3641. in Pueblo, CO. Phone: (719) 406-5247. Hours and directions available.",
     "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
+    "last_verified": "2026-09-07"
   },
   {
     "id": "plentiful-mt-carmel-veteran-center-of-pueblo-76b970d4",
@@ -1563,18 +1630,6 @@ export const publishedVenues: Venue[] = [
     "last_verified": "2026-05-14"
   },
   {
-    "id": "plentiful-pueblo-community-soup-kitchen-1bc98af5",
-    "name": "Pueblo Community Soup Kitchen",
-    "category": "meal_site",
-    "lat": 38.273296,
-    "lng": -104.612059,
-    "address": "422 W. 7th St., Pueblo, CO 81003",
-    "phone": "(719) 545-6540",
-    "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-community-soup-kitchen-1bc98af5",
-    "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
-  },
-  {
     "id": "plentiful-pueblo-community-soup-kitchen-plentiful-3195",
     "name": "Pueblo Community Soup Kitchen",
     "category": "meal_site",
@@ -1614,18 +1669,6 @@ export const publishedVenues: Venue[] = [
     "last_verified": "2026-05-14"
   },
   {
-    "id": "plentiful-pueblo-cooperative-care-center-97ec4eda",
-    "name": "Pueblo Cooperative Care Center",
-    "category": "pantry",
-    "lat": 38.274237,
-    "lng": -104.610622,
-    "address": "326 West 8th Street, Pueblo, CO 81003",
-    "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-cooperative-care-center-97ec4eda",
-    "notes": "Pueblo Cooperative Care Center. in Pueblo, CO. Hours and directions available.",
-    "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
-  },
-  {
     "id": "plentiful-pueblo-cooperative-care-center-plentiful-3140",
     "name": "Pueblo Cooperative Care Center",
     "category": "pantry",
@@ -1649,19 +1692,6 @@ export const publishedVenues: Venue[] = [
     "phone": "(719) 543-7484",
     "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-cooperative-care-center-plentiful-3140",
     "notes": "Pueblo Cooperative Care Center. in Pueblo, CO. Phone: (719) 543-7484.",
-    "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-05-14"
-  },
-  {
-    "id": "plentiful-pueblo-county-hhs-c01bc9c1",
-    "name": "Pueblo County HHS",
-    "category": "pantry",
-    "lat": 38.272001,
-    "lng": -104.563807,
-    "address": "2631 East 4th Street, Pueblo, CO 81001",
-    "phone": "(719) 583-6199",
-    "url": "https://directory.plentiful.org/colorado/pueblo/pueblo-county-hhs-c01bc9c1",
-    "notes": "Pueblo County HHS. in Pueblo, CO. Phone: (719) 583-6199.",
     "source": "directory.plentiful.org/colorado/pueblo",
     "last_verified": "2026-05-14"
   },

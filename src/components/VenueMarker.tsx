@@ -22,7 +22,7 @@
  *   - vitest.config.mts leaflet alias
  */
 
-import { memo, type KeyboardEvent } from "react";
+import { memo, useRef, type KeyboardEvent } from "react";
 import { Marker } from "react-map-gl/mapbox";
 import { MapPin } from "lucide-react";
 import type { Venue, VenueCategory } from "@/types/venue";
@@ -49,6 +49,10 @@ const SIZE_DEFAULT = 28;
 const SIZE_SELECTED = 36;
 // Extra padding around the pin to accommodate the outer ring.
 const RING_PAD = 5;
+// Invisible tap-target floor (mobile review #13) — the default 28px pin sits
+// well under 44px. Selected pins are already 36+2*RING_PAD=46px, over the
+// floor, so this only ever grows the default state.
+const MIN_HIT_SIZE = 44;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -84,6 +88,11 @@ function VenueMarker({
   const readableName = t(`marker.category.${venue.category}`, locale);
   const pinSize = selected ? SIZE_SELECTED : SIZE_DEFAULT;
   const totalSize = selected ? pinSize + RING_PAD * 2 : pinSize;
+  // The pin itself always renders at totalSize, in the same spot. hitSize only
+  // grows the transparent button around it (bottom-anchored, see below) — the
+  // visible pin never changes size or position.
+  const hitSize = Math.max(totalSize, MIN_HIT_SIZE);
+  const pinWrapperRef = useRef<HTMLSpanElement>(null);
 
   // Build aria-label: "<name>, <category>[, <distance>]"
   const distLabel = distanceMiles !== undefined ? formatMiles(distanceMiles) : "";
@@ -166,26 +175,46 @@ function VenueMarker({
           border: "none",
           padding: 0,
           cursor: "pointer",
-          display: "block",
-          filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))",
-          transform: "scale(1)",
-          transition: "transform 0.1s ease",
-          width: `${totalSize}px`,
-          height: `${totalSize}px`,
+          // flex + align-items:flex-end keeps the visible pin flush to the
+          // BOTTOM of this (possibly larger) box — Mapbox's anchor="bottom"
+          // pins that same bottom edge to the venue's coordinate, so growing
+          // the box only ever adds invisible space above/beside the pin; the
+          // pin's rendered tip never moves off the coordinate (mobile review #13).
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "center",
+          width: `${hitSize}px`,
+          height: `${hitSize}px`,
           lineHeight: 0,
         }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.15)";
+        onMouseEnter={() => {
+          if (pinWrapperRef.current) pinWrapperRef.current.style.transform = "scale(1.15)";
           onHover?.(venue.id);
         }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+        onMouseLeave={() => {
+          if (pinWrapperRef.current) pinWrapperRef.current.style.transform = "scale(1)";
           onLeave?.();
         }}
         onFocus={() => onHover?.(venue.id)}
         onBlur={() => onLeave?.()}
       >
-        {pinElement}
+        {/* This wrapper is exactly totalSize — the pin's real visual box.
+            Hover-scale now targets it directly (not the enlarged button)
+            so the zoom still happens around the pin itself. */}
+        <span
+          ref={pinWrapperRef}
+          style={{
+            display: "block",
+            filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))",
+            transform: "scale(1)",
+            transition: "transform 0.1s ease",
+            width: `${totalSize}px`,
+            height: `${totalSize}px`,
+            lineHeight: 0,
+          }}
+        >
+          {pinElement}
+        </span>
       </button>
     </Marker>
   );

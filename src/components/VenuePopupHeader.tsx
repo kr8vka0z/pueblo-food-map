@@ -21,6 +21,7 @@
 
 import { X } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 interface VenuePopupHeaderProps {
   venueId: string;
@@ -57,8 +58,14 @@ export default function VenuePopupHeader({
         onClick={onClose}
         aria-label={t("detail.close", locale)}
         className={
-          "order-3 flex items-center justify-center w-8 h-8 -mr-1 rounded-md shrink-0 " +
+          // 32px -> 44px hit area (this row is already 44px tall, so the new
+          // box fills it exactly). Negative margin folds in the pre-existing
+          // -mr-1 and cancels the growth so the panel's tight header layout
+          // and the icon's position don't move (mobile review #11).
+          "order-3 flex items-center justify-center w-11 h-11 " +
+          "-mt-1.5 -mb-1.5 -ml-1.5 -mr-[10px] rounded-md shrink-0 " +
           "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
+          PRESS_FEEDBACK + " " +
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
         }
       >
@@ -78,6 +85,7 @@ export default function VenuePopupHeader({
           "order-1 flex items-center h-8 px-3 -ml-1 rounded-md " +
           "text-xs font-medium text-[var(--color-sage-600)] " +
           "hover:text-[var(--color-sage-700)] hover:bg-[var(--color-bone-100)] transition-colors " +
+          PRESS_FEEDBACK + " " +
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
         }
       >

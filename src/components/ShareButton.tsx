@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Share2, Check } from "lucide-react";
 import { shareVenue } from "@/lib/share";
 import { t, type Locale } from "@/lib/i18n";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 interface ShareButtonProps {
   venueId: string;
@@ -58,9 +59,12 @@ export default function ShareButton({
       title={label}
       onClick={handleClick}
       className={
-        "shrink-0 flex items-center justify-center w-9 h-9 rounded-md transition-colors " +
+        // 36px -> 44px hit area; same negative-margin technique as FavoriteButton
+        // (mobile review #12).
+        "shrink-0 flex items-center justify-center w-11 h-11 -m-1 rounded-md transition-colors " +
         "hover:bg-[var(--color-bone-100)] " +
         "text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)] " +
+        PRESS_FEEDBACK + " " +
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
       }
     >

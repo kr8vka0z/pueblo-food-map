@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 // Fonts are self-hosted via @font-face in globals.css — no next/font/google import.
 import "./globals.css";
 import { preload } from "react-dom";
@@ -40,6 +40,18 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
   },
+};
+
+// WHY viewportFit: "cover": without it, iOS Safari letterboxes the page
+// inside the notch/Dynamic Island safe area instead of drawing edge-to-edge,
+// and env(safe-area-inset-*) resolves to 0 everywhere — silently disabling
+// every safe-area padding rule in the app. Must ship together with those
+// insets (mobile review item #2): "cover" alone, without the insets, makes
+// overlays slide under the notch/home indicator instead of clearing it.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

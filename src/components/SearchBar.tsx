@@ -106,12 +106,19 @@ export default function SearchBar({
 
   return (
     <div
-      className="absolute top-4 left-0 right-0 flex justify-center"
+      // top: max(1rem, inset) so the bar clears the notch/Dynamic Island in
+      // portrait (mobile review #2 top overlay). left-0/right-0 unchanged —
+      // the actual side gutter lives on the inner div below, where it can
+      // pick up the landscape left/right insets without disturbing desktop
+      // centering.
+      className="absolute top-[max(1rem,env(safe-area-inset-top))] left-0 right-0 flex justify-center"
       style={{ zIndex: 1000, pointerEvents: "none" }}
       aria-hidden={false}
     >
       <div
-        className="relative w-full mx-4 md:mx-0 md:w-[520px]"
+        // mx-4 gutter becomes safe-area-aware on mobile (landscape notch);
+        // md:mx-0 unchanged — desktop has no side insets to account for.
+        className="relative w-full ml-[max(1rem,env(safe-area-inset-left))] mr-[max(1rem,env(safe-area-inset-right))] md:ml-0 md:mr-0 md:w-[520px]"
         style={{ pointerEvents: "auto" }}
       >
         {/* Search icon — 16×16 mobile, 18×18 desktop. Hidden when chip is active. */}
@@ -182,6 +189,7 @@ export default function SearchBar({
           onBlur={onBlur}
           placeholder={placeholder}
           aria-label={ariaLabel}
+          enterKeyHint="search"
           {...comboboxAttrs}
           className={
             "w-full h-11 md:h-[52px] " +

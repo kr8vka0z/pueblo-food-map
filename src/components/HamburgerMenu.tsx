@@ -176,7 +176,11 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
   const externalAriaLabel = (labelKey: string) =>
     `${t(labelKey, locale)} ${t("menu.opensInNewTab", locale)}`;
 
-  // Panel positioning style: fixed side-sheet on mobile, absolute dropdown on desktop
+  // Panel positioning style: fixed side-sheet on mobile, absolute dropdown on desktop.
+  // Mobile panel stays edge-to-edge (top:0/height:100%) so the backdrop still
+  // covers the full screen; safe-area padding keeps its CONTENT clear of the
+  // notch/Dynamic Island, the home-indicator strip, and (landscape) the
+  // rounded corner on the edge it slides in from (mobile review #2).
   const panelStyle: React.CSSProperties = isMobile
     ? {
         position: "fixed",
@@ -189,6 +193,9 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
         backgroundColor: "white",
         boxShadow: "0 4px 32px rgba(0,0,0,0.22)",
         overflowY: "auto",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingRight: "env(safe-area-inset-right)",
       }
     : {
         position: "absolute",
@@ -206,8 +213,11 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
     <div
       style={{
         position: "absolute",
-        top: "16px",
-        right: "16px",
+        // max(16px, inset) so the trigger clears the notch/Dynamic Island
+        // (top) and the rounded corner it hugs in landscape (right) — mobile
+        // review #2 top-overlay fix.
+        top: "max(16px, env(safe-area-inset-top))",
+        right: "max(16px, env(safe-area-inset-right))",
         zIndex: 1002,
       }}
     >

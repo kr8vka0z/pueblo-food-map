@@ -1105,9 +1105,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
       {/* Top-left cluster: Wordmark (#97; EN/ES toggle moved to hamburger menu #109)
            - Positioned absolute top-4 left-4, z-index 1000.
-           - Wordmark uses selfPositioned=false so it doesn't add its own absolute styles. */}
+           - Wordmark uses selfPositioned=false so it doesn't add its own absolute styles.
+           - top/left: max(1rem, inset) so it clears the notch/Dynamic Island
+             (portrait) and the rounded corner it hugs in landscape (mobile
+             review #2 top overlay). */}
       <div
-        className="absolute top-4 left-4 flex items-center gap-2"
+        className="absolute top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] flex items-center gap-2"
         style={{ zIndex: 1000 }}
       >
         <Wordmark onClick={handleWordmarkReset} size="sm" selfPositioned={false} />

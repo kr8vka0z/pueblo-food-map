@@ -120,7 +120,10 @@ export default function BottomSheet({
               follow-up). vaul still allows swipe-down-to-dismiss on the content. */}
           {venue && (
             <div className="flex-1 overflow-y-auto">
-              <div className="flex flex-col px-5 pt-5 pb-4 gap-3">
+              {/* pb: max(1rem, safe-area-inset-bottom) so content clears the
+                  iPhone home-indicator strip instead of sitting under it
+                  (mobile review #2). */}
+              <div className="flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3">
                 {/* Header row: title + close */}
                 <div className="flex items-start gap-2">
                   <h2

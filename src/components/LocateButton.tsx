@@ -86,9 +86,26 @@ export default function LocateButton({
 
   // Placement: on mobile (sheetVisible) anchor just below the search bar so the
   // button never overlaps the venue bottom-sheet; on desktop, bottom-center.
+  // Desktop/bottom-center state adds safe-area-inset-bottom on top of the
+  // usual 24px so it clears the iPhone home-indicator strip (mobile review
+  // #2) — the mobile top-anchored state doesn't need it, it's already offset
+  // well clear of the notch by TOP_OFFSET_MOBILE_PX.
+  //
+  // WHY calc(24px + inset) here instead of the review's literal
+  // max(24px, inset), the pattern used everywhere else in this PR: this is
+  // the one safe-area fix applied via a React inline style (`style={{
+  // bottom: ... }}`), which goes through the DOM's live CSSOM value parser —
+  // unlike a Tailwind arbitrary-value class (compiled to a stylesheet, never
+  // validated by that parser). jsdom's CSSOM implementation doesn't
+  // recognize `max()` and silently drops the assignment, which broke this
+  // component's own placement test (LocateButton108.test.tsx). calc() IS
+  // supported and every real target browser supports it too. On a
+  // non-notched device (inset 0) the two are identical (24px); on a notched
+  // one this floor sits a bit above the pure inset rather than sitting
+  // exactly on it — strictly more clearance, never less.
   const placement = sheetVisible
     ? { top: TOP_OFFSET_MOBILE_PX }
-    : { bottom: BOTTOM_OFFSET_DEFAULT_PX };
+    : { bottom: `calc(${BOTTOM_OFFSET_DEFAULT_PX}px + env(safe-area-inset-bottom))` };
 
   const label =
     variant === "locating"

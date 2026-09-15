@@ -990,9 +990,15 @@ why this exists (the venue data staleness gap).
 OSM, diffs the result against Cloudflare D1's current `venues` rows, runs an
 outbound link-health pass over every stored `url`, and writes ONE
 `change_proposals` row (`migrations/0001_init_admin_schema.sql`) per
-detected difference. It never writes to `venues` directly — that table only
-changes when a human approves a proposal, via the `/admin/flags` review
-queue (spec §6.6, #390 — see "Change-proposal review queue (#390)" below).
+detected difference. It writes to `venues` in exactly ONE bounded case — a
+"date-only" freshness-only proposal auto-applies (Kyle, 2026-09-15: "If the
+only proposed change is just the 'last checked date' that doesn't need a
+manual approval" — see "Bulk-approve date-only updates" below and
+scripts/refresh-ingest.ts's file header for the exact scope). Every other
+proposal (a real field change, an add, a remove, any link_health finding)
+only changes `venues` when a human approves it, via the `/admin/flags`
+review queue (spec §6.6, #390 — see "Change-proposal review queue (#390)"
+below).
 
 **Running it locally** (safe — never touches production D1 unless you pass
 `--remote`):
@@ -1416,6 +1422,15 @@ survives the `router.refresh()` triggered on success — the same
 Server-Component re-fetch the single-approve flow already relies on to
 drop acted-on cards, which re-renders this client component's props
 without unmounting it.
+
+**Superseded for future runs, still needed for leftovers (Kyle, 2026-09-15).**
+`scripts/refresh-ingest.ts` now auto-applies a date-only proposal at
+INGESTION time (same `isDateOnlyUpdateProposal()` predicate, see
+scripts/refresh/proposalSql.ts) — so a run after this change writes zero
+date-only rows into `/admin/flags` for this button to act on. The button
+itself is NOT removed: any date-only row a PRIOR run already left pending
+still needs it (or a single Approve click) to clear, and it's the correct
+fallback if the ingestion-time auto-apply is ever disabled.
 
 # Discoverability / SEO (#164)
 

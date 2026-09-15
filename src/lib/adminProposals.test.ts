@@ -226,6 +226,11 @@ describe("toColumnValue", () => {
     expect(toColumnValue("hours_weekly", { mon: ["9:00-17:00"] })).toBe(JSON.stringify({ mon: ["9:00-17:00"] }));
   });
 
+  test("hours_weekly already-JSON text (pipeline proposal shape) is stored as-is, not double-encoded", () => {
+    const text = JSON.stringify({ mon: ["9:00-17:00"] });
+    expect(toColumnValue("hours_weekly", text)).toBe(text);
+  });
+
   test("hours_weekly null/undefined -> null", () => {
     expect(toColumnValue("hours_weekly", null)).toBeNull();
     expect(toColumnValue("hours_weekly", undefined)).toBeNull();

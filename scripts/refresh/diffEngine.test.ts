@@ -13,6 +13,7 @@ import {
   computeDiffHash,
   buildLinkHealthProposal,
   isValidIncomingRecord,
+  currentFieldValue,
   type CurrentVenueRow,
 } from "./diffEngine";
 
@@ -352,5 +353,14 @@ describe("buildLinkHealthProposal", () => {
     expect(p.proposedDiff.before).toEqual({ url: "https://dead.example/x" });
     expect(p.proposedDiff.after).toEqual({ url: null });
     expect(p.proposedDiff.meta).toEqual({ http_status: 404, checked_at: "2026-09-02T00:00:00Z" });
+  });
+});
+
+describe("currentFieldValue — hours_weekly stored as empty string", () => {
+  // A proposal's `before` snapshot records "no hours" as "" — the stale-apply
+  // guard feeds that back through here, and JSON.parse("") used to throw.
+  test('"" normalizes to "" instead of throwing', () => {
+    const before = { hours_weekly: "" } as unknown as CurrentVenueRow;
+    expect(currentFieldValue(before, "hours_weekly")).toBe("");
   });
 });

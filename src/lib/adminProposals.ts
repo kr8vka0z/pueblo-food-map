@@ -199,6 +199,10 @@ export function checkStaleApply(
 export function toColumnValue(field: keyof Venue, value: unknown): unknown {
   if (field === "hours_weekly") {
     if (value === null || value === undefined) return null;
+    // The refresh pipeline's proposed_diff already carries hours_weekly as D1's JSON
+    // text (diffEngine's CurrentVenueRow shape) — stringifying that again stored a
+    // JSON-string-of-JSON that publish validation rejects (found approving #402).
+    if (typeof value === "string") return value;
     return JSON.stringify(value);
   }
   return value === undefined ? null : value;

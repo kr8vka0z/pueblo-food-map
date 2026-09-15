@@ -5,11 +5,11 @@
  * Source of truth is Cloudflare D1 (`pueblo-food-map-admin`.venues); this
  * file is the build-time snapshot the public map imports at request time
  * (docs/admin/cloudflare-native-admin-spec.md §3.3, §3.5 step 3).
- * Last published: 2026-09-03T02:16:04.876Z
+ * Last published: 2026-09-15T17:41:07.252Z
  */
 import type { Venue } from "@/types/venue";
 
-export const publishedAt = "2026-09-03T02:16:04.876Z";
+export const publishedAt = "2026-09-15T17:41:07.252Z";
 export const publishedVenues: Venue[] = [
   {
     "id": "garden-bethany-lutheran",
@@ -296,7 +296,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://maurofarms.com/",
     "notes": "Identifies as Women owned",
     "source": "OpenStreetMap (node/12599529644)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-07"
   },
   {
     "id": "osm-node-12599529663",
@@ -331,7 +331,7 @@ export const publishedVenues: Venue[] = [
     "phone": "+1 719-948-3200",
     "url": "https://www.facebook.com/ditomasofarms1/",
     "source": "OpenStreetMap (node/12599529663)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-07"
   },
   {
     "id": "osm-node-12706112997",
@@ -1264,7 +1264,7 @@ export const publishedVenues: Venue[] = [
     "url": "https://www.mussofarmschileroom.com/",
     "notes": "surcharge for using cards",
     "source": "OpenStreetMap (way/971896407)",
-    "last_verified": "2026-05-20"
+    "last_verified": "2026-09-07"
   },
   {
     "id": "osm-way-974172860",

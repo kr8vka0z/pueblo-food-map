@@ -176,7 +176,9 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
   const externalAriaLabel = (labelKey: string) =>
     `${t(labelKey, locale)} ${t("menu.opensInNewTab", locale)}`;
 
-  // Panel positioning style: fixed side-sheet on mobile, absolute dropdown on desktop
+  // Panel positioning style: fixed side-sheet on mobile, absolute dropdown on desktop.
+  // Mobile stays edge-to-edge (top:0/height:100%) for the backdrop; safe-area
+  // padding keeps its content clear of the notch, home indicator, and edge.
   const panelStyle: React.CSSProperties = isMobile
     ? {
         position: "fixed",
@@ -189,6 +191,9 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
         backgroundColor: "white",
         boxShadow: "0 4px 32px rgba(0,0,0,0.22)",
         overflowY: "auto",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingRight: "env(safe-area-inset-right)",
       }
     : {
         position: "absolute",
@@ -206,8 +211,9 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
     <div
       style={{
         position: "absolute",
-        top: "16px",
-        right: "16px",
+        // Clears the notch/Dynamic Island (top) and the landscape edge (right).
+        top: "max(16px, env(safe-area-inset-top))",
+        right: "max(16px, env(safe-area-inset-right))",
         zIndex: 1002,
       }}
     >

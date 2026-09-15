@@ -253,8 +253,9 @@ function SubmissionCard({ submission }: { submission: ReviewSubmission }) {
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            // text-base on mobile: iOS Safari auto-zooms on focus under 16px.
             className={
-              "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-sm " +
+              "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
               "text-[var(--color-ink-900)] bg-white placeholder:text-[var(--color-ink-400)] " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
               "focus-visible:border-[var(--color-sage-500)]"

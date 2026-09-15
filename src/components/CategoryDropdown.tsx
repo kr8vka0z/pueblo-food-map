@@ -110,8 +110,10 @@ export default function CategoryDropdown({
       className={
         // Same anchor as SearchResultsPopover — positioned relative to MapWrapper root
         "absolute left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[520px] " +
-        // Position below search bar (matches SearchResultsPopover)
-        "top-[72px] md:top-[84px] " +
+        // Position below search bar (matches SearchResultsPopover). Mobile
+        // offset tracks the search bar's own safe-area-shifted top so this
+        // never rides up under it on a notched phone.
+        "top-[calc(56px+max(1rem,env(safe-area-inset-top)))] md:top-[84px] " +
         "z-[999] " +
         "bg-[var(--color-bone-50)] " +
         "border border-[var(--color-bone-200)] " +

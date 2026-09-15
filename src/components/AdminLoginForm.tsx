@@ -58,8 +58,9 @@ type PasskeyRegisterStatus = "idle" | "registering" | "error";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
 const inputBase =
-  "w-full rounded-[var(--radius-md)] border px-3 py-2 text-sm text-[var(--color-ink-900)] " +
+  "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
   "bg-white placeholder:text-[var(--color-ink-300)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:border-[var(--color-sage-500)]";
@@ -244,6 +245,10 @@ export default function AdminLoginForm() {
             type="email"
             autoComplete="email webauthn"
             inputMode="email"
+            autoCapitalize="off"
+            autoCorrect="off"
+            // Only field, so also the last one before submit.
+            enterKeyHint="go"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             aria-invalid={fieldError ? "true" : undefined}

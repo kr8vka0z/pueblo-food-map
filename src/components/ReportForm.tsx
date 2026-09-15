@@ -225,8 +225,9 @@ export default function ReportForm({
 
   // ── Form (idle | submitting | error) ─────────────────────────────────────
 
+  // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
   const inputBase =
-    "w-full rounded-[var(--radius-md)] border px-3 py-2 text-sm text-[var(--color-ink-900)] " +
+    "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
     "bg-white placeholder:text-[var(--color-ink-300)] " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
     "focus-visible:border-[var(--color-sage-500)]";
@@ -333,6 +334,10 @@ export default function ReportForm({
           onChange={(e) => setContactEmail(e.target.value)}
           placeholder={t("report.email.placeholder", locale)}
           autoComplete="email"
+          autoCapitalize="off"
+          autoCorrect="off"
+          // Last field before submit — Enter implicitly submits, so "send".
+          enterKeyHint="send"
           maxLength={EMAIL}
           aria-describedby={
             errors.contactEmail

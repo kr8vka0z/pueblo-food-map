@@ -85,15 +85,10 @@ export default function LocateButton({
   if (variant === "hidden") return null;
 
   // Placement: on mobile (sheetVisible) anchor just below the search bar so
-  // the button never overlaps the venue bottom-sheet; on desktop,
-  // bottom-center. Both add the relevant safe-area inset so they clear the
-  // notch/home-indicator and track the search bar's own shifted top.
-  //
-  // calc() not max(): this is a React inline style, and jsdom's CSSOM
-  // silently drops max() there (broke LocateButton108.test.tsx). calc() is
-  // supported everywhere and equals max() when the inset is 0.
+  // the button never overlaps the venue bottom-sheet; on desktop, bottom-center.
+  // Both add the safe-area inset (calc, not max: jsdom drops max() in inline styles).
   const placement = sheetVisible
-    ? { top: `calc(${TOP_OFFSET_MOBILE_PX - 16}px + env(safe-area-inset-top))` }
+    ? { top: `calc(${TOP_OFFSET_MOBILE_PX}px + env(safe-area-inset-top))` }
     : { bottom: `calc(${BOTTOM_OFFSET_DEFAULT_PX}px + env(safe-area-inset-bottom))` };
 
   const label =

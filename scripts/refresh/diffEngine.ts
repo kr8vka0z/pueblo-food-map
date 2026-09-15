@@ -199,7 +199,10 @@ export function pendingKey(source: ProposalSource, targetVenueId: string): strin
 
 /** Normalizes a WeeklyHours-shaped value (object OR its JSON-string D1 form) for equality comparison. */
 function normalizeHours(value: string | WeeklyHours | undefined | null): string {
-  if (value === null || value === undefined) return "";
+  // "" too: a proposal's stored `before` snapshot records an absent hours value as ""
+  // (this function's own output), and the stale-apply guard feeds it back in here —
+  // JSON.parse("") threw, so approving any "venue had no hours" proposal crashed.
+  if (value === null || value === undefined || value === "") return "";
   const parsed = typeof value === "string" ? (JSON.parse(value) as WeeklyHours) : value;
   const sortedDays = Object.keys(parsed).sort();
   const stable: Record<string, string[]> = {};

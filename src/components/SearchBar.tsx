@@ -19,6 +19,7 @@
 
 import { useCallback } from "react";
 import { Search, X } from "lucide-react";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 interface SearchBarProps {
   /** Controlled value — owned by MapWrapper. */
@@ -163,9 +164,14 @@ export default function SearchBar({
               }}
               className={
                 "flex-shrink-0 flex items-center justify-center " +
-                "rounded-full w-3.5 h-3.5 " +
+                // Visible icon (X size=10) is unchanged — the button's own box grows
+                // from 14px to 26px and a matching negative margin cancels the growth
+                // for layout purposes, so the icon renders at the exact same spot
+                // (mobile review #7: 14x14 was under the 24px WCAG floor).
+                "rounded-full w-[26px] h-[26px] -m-[6px] " +
                 "hover:bg-[var(--color-sage-200,#d0e4da)] " +
                 "transition-colors duration-100 " +
+                PRESS_FEEDBACK + " " +
                 "focus-visible:outline-none focus-visible:ring-1 " +
                 "focus-visible:ring-[var(--color-sage-500)]"
               }

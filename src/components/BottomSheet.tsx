@@ -28,6 +28,7 @@ import { getDisplayNotes } from "@/lib/venueNotes";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { safeUrl } from "@/lib/safeUrl";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
@@ -137,8 +138,15 @@ export default function BottomSheet({
                     onClick={onClose}
                     aria-label={t("detail.close", locale)}
                     className={
-                      "flex items-center justify-center w-8 h-8 -mr-1 rounded-md " +
+                      // 32px -> 44px hit area: box grows via width/height, negative
+                      // margin on every side cancels the growth for flex-flow
+                      // purposes (the -mr-1 that existed before is folded into the
+                      // new -mr value), so the row's layout and the icon's visible
+                      // position are unchanged (mobile review #11).
+                      "flex items-center justify-center w-11 h-11 " +
+                      "-mt-1.5 -mb-1.5 -ml-1.5 -mr-[10px] rounded-md " +
                       "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
+                      PRESS_FEEDBACK + " " +
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
                     }
                   >
@@ -248,8 +256,11 @@ export default function BottomSheet({
                     });
                   }}
                   className={
-                    "flex items-center gap-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
+                    // ~20px tall -> real padding growth (mobile review #8: this is
+                    // the ONLY way to expand the sheet). Type size/color untouched.
+                    "flex items-center gap-1.5 py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
                     "hover:text-[var(--color-sage-700)] " +
+                    PRESS_FEEDBACK + " " +
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
                     "rounded text-left"
                   }

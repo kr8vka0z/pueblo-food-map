@@ -38,6 +38,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { Venue } from "@/types/venue";
 import { t, type Locale } from "@/lib/i18n";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -139,6 +140,7 @@ function formatStepDistance(meters: number, locale: Locale): string {
 const baseClass =
   "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--radius-md)] " +
   "text-sm font-semibold transition-colors duration-150 " +
+  PRESS_FEEDBACK + " " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-1";
 
 const walkActiveClass =
@@ -312,8 +314,11 @@ export default function DirectionButtons({
             aria-controls={stepsListId}
             onClick={() => setStepsExpanded((v) => !v)}
             className={
-              "text-sm font-medium text-[var(--color-sage-600)] " +
+              // ~20px tall -> real padding growth, same treatment as BottomSheet's
+              // Show/Hide details toggle (mobile review #9).
+              "py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
               "hover:text-[var(--color-sage-700)] underline-offset-2 hover:underline " +
+              PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
             }
           >
@@ -378,8 +383,13 @@ export default function DirectionButtons({
             rel="noopener noreferrer"
             aria-label={t("directions.openInGoogleMapsAria", locale, { name: venue.name })}
             className={
-              "text-xs text-[var(--color-ink-500)] underline underline-offset-2 " +
+              // ~16px tall -> inline-block so the padding growth actually
+              // expands this link's own box (a plain inline element's padding
+              // doesn't reliably grow its hit rect across browsers). Same type
+              // size/color as before (mobile review #10).
+              "inline-block py-1.5 text-xs text-[var(--color-ink-500)] underline underline-offset-2 " +
               "hover:text-[var(--color-ink-700)] " +
+              PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
             }
           >

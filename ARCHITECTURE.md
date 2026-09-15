@@ -186,10 +186,13 @@ scripts/fetch-osm-grocery.py ┤→ scripts/ingest-osm-grocery.py ─┐
 - **Every source-owned field genuinely unchanged still produces one
   `last_verified`-refresh proposal** (unless it's already stamped today) —
   this is the mechanism that actually fixes the staleness problem: a human
-  approving these proposals (a separate slice) is what moves
-  `last_verified` forward across the whole map. It's a proposal like any
-  other, never a direct `venues` write — the guardrail below has no carve-out
-  for a field this trivial.
+  approving these proposals used to be what moves `last_verified` forward
+  across the whole map. **Amended, Kyle, 2026-09-15:** a proposal that is
+  EXACTLY this shape (nothing else changed) now auto-applies straight to
+  `venues.last_verified` instead of waiting for that click — see
+  `scripts/refresh/proposalSql.ts` and AGENTS.md's "Automated venue-refresh
+  pipeline" section. Any other proposal is unaffected — still never a
+  direct `venues` write.
 - **`scripts/refresh/linkHealth.ts`** checks every venue's stored `url`
   (HEAD, falling back to GET) and proposes clearing only a 404/410 — not
   403 (often a bot-block on the checker's own request), 429, any 5xx, or a
@@ -210,19 +213,29 @@ scripts/fetch-osm-grocery.py ┤→ scripts/ingest-osm-grocery.py ─┐
   catch. A combined 150-proposal per-run cap aborts the ENTIRE run (writes
   nothing at all) if tripped. Any abort exits non-zero — a red Actions run,
   never a silent no-op.
-- **Structural guarantee, not a runtime check:** no function anywhere in
-  `scripts/refresh-ingest.ts` or `scripts/refresh/*.ts` constructs an
-  INSERT/UPDATE/DELETE against `venues` — only `change_proposals`. Applying
-  an approved proposal to `venues` is the review UI's job (§6.7 of the
+- **One bounded exception to the "ingestion never writes `venues`"
+  guarantee (Kyle, 2026-09-15):** `scripts/refresh/proposalSql.ts`'s
+  `buildProposalWriteStatements()` writes a `venues.last_verified` UPDATE +
+  an `audit_log` row + an already-`'approved'` `change_proposals` row for
+  exactly one shape — a date-only freshness confirmation (`change_type`
+  `'update'`, source `osm`/`plentiful`, `fields_changed` EXACTLY
+  `["last_verified"]`) — reusing the SAME `isDateOnlyUpdateProposal()`
+  predicate the `/admin/flags` bulk-approve button uses (`src/lib/adminProposals.ts`),
+  so the two can't silently diverge on what counts. Every OTHER shape (a
+  real field change, an add, a remove, any link_health finding) still only
+  ever writes a plain pending `change_proposals` row — applying THAT kind
+  of approved proposal to `venues` is the review UI's job (§6.7 of the
   design doc) — now built, `/admin/flags`
   (`src/app/admin/flags/page.tsx` + `src/components/ProposalsReviewView.tsx`
-  + `src/app/api/admin/proposals/[id]/{approve,reject}`, #390). It's the
-  ONLY code path that constructs a `venues` mutation FROM a `change_proposals`
-  row — the ingestion pipeline above still never does. See AGENTS.md's
-  "Change-proposal review queue (#390)" for how it satisfies the
-  supersede-race, stale-apply, and rejection-memory correctness
-  requirements. Auto-supersede (§6.10a) and rejection memory (§6.10b)
-  remain concerns of *this* ingestion job, unchanged by that slice.
+  + `src/app/api/admin/proposals/[id]/{approve,reject}`, #390, plus the
+  bulk `src/app/api/admin/proposals/approve-date-only` added on top of the
+  same engine — see AGENTS.md's "Bulk-approve date-only updates"). It's the
+  ONLY code path that constructs a `venues` mutation FROM a REAL-CHANGE
+  `change_proposals` row. See AGENTS.md's "Change-proposal review queue
+  (#390)" for how it satisfies the supersede-race, stale-apply, and
+  rejection-memory correctness requirements. Auto-supersede (§6.10a) and
+  rejection memory (§6.10b) remain concerns of *this* ingestion job,
+  unchanged by that slice.
 
 See `AGENTS.md`'s "Automated venue-refresh pipeline" section for the
 operational detail (schedule, credentials, local testing, the exact

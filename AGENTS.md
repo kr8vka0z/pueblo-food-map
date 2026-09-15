@@ -990,9 +990,15 @@ why this exists (the venue data staleness gap).
 OSM, diffs the result against Cloudflare D1's current `venues` rows, runs an
 outbound link-health pass over every stored `url`, and writes ONE
 `change_proposals` row (`migrations/0001_init_admin_schema.sql`) per
-detected difference. It never writes to `venues` directly — that table only
-changes when a human approves a proposal, via the `/admin/flags` review
-queue (spec §6.6, #390 — see "Change-proposal review queue (#390)" below).
+detected difference. It writes to `venues` in exactly ONE bounded case — a
+"date-only" freshness-only proposal auto-applies (Kyle, 2026-09-15: "If the
+only proposed change is just the 'last checked date' that doesn't need a
+manual approval" — see "Bulk-approve date-only updates" below and
+scripts/refresh-ingest.ts's file header for the exact scope). Every other
+proposal (a real field change, an add, a remove, any link_health finding)
+only changes `venues` when a human approves it, via the `/admin/flags`
+review queue (spec §6.6, #390 — see "Change-proposal review queue (#390)"
+below).
 
 **Running it locally** (safe — never touches production D1 unless you pass
 `--remote`):
@@ -1357,6 +1363,74 @@ one) — the preview needs everything `VenueCard` actually renders, which the
 narrower "recognise the place" shape from the first pass didn't carry.
 Still deliberately not every `AdminVenueRow` column (no notes/operator/
 email/audit fields — `VenueCard` doesn't render any of those).
+
+## Bulk-approve date-only updates (issue: 89 of 107 real proposals)
+
+The first real venue-refresh pipeline run wrote 107 pending proposals; 89
+were pure freshness confirmations — `change_type: 'update'`,
+`fields_changed` exactly `["last_verified"]` — one Approve click each was
+never going to happen monthly. `ProposalsReviewView` now shows one
+`Approve all N date-only updates` button in the queue header (near "N of M
+pending proposals") whenever the currently FILTERED list contains at least
+one qualifying proposal; a native `window.confirm()` states the count and
+that real changes are excluded, then POSTs the exact visible ids to
+`POST /api/admin/proposals/approve-date-only`.
+
+**One predicate, shared by client and server** —
+`isDateOnlyUpdateProposal()` (`src/lib/adminProposals.ts`): `change_type`
+must be `'update'`, `source` must be `osm` or `plentiful` (never
+`link_health` — that source is always shaped as an `update` by
+`diffEngine.ts` but is source-gated out here too, same carve-out as the
+single-approve route; never `gtfs`, which the pipeline doesn't emit this
+way today but is excluded by an explicit allowlist rather than "everything
+but link_health" so a future new source doesn't silently qualify), and
+`fields_changed` must be EXACTLY `["last_verified"]` — a proposal that
+moves `last_verified` alongside a real field never qualifies. The client
+uses this to compute the button's count; the bulk route re-runs the exact
+same check against a FRESH D1 read of each requested id, so the two can
+never quietly diverge on what "date-only" means.
+
+**The single-proposal apply engine was extracted, not re-copied.**
+`applyApprovedProposal()` (`src/lib/adminProposals.ts`) is the entire
+add/update/remove branching + stale-apply guard (§6.10c) + atomic
+`db.batch()` body that used to live inline in
+`POST /api/admin/proposals/[id]/approve`; that route now just does its own
+id-parsing and supersede-race pre-check, then delegates. The bulk route
+calls the same function once per validated id — same audit-trail identity,
+same 409-on-double-approve belt, same everything — so a date-only proposal
+approved in bulk is indistinguishable in `audit_log` from one approved by
+hand.
+
+**Never partial-fails.** Every id in the request is independent: an id
+that's gone stale, not date-only, not found, or already reviewed is
+recorded in the response's `skipped: {id, reason}[]` array and every other
+valid id still applies. Response shape: `{ approved: number, skipped:
+{id, reason}[] }`. Capped at 200 ids per request (400 above that, or on a
+malformed body) — comfortably above any real queue's date-only subset
+while still bounding one request's worth of sequential `db.batch()` calls.
+
+**D1's 100-bound-parameter ceiling (#397) is reused, not re-hit.** The
+bulk route's own `SELECT * FROM change_proposals WHERE id IN (...)`
+pre-fetch chunks at 100 ids via `src/lib/d1.ts`'s `chunkArray()` /
+`D1_MAX_BOUND_PARAMS` — extracted from this same page's `loadVenueLookup()`
+(which now imports from there too, no behavior change) so the constant and
+the chunking loop live in exactly one place for both call sites.
+
+**Client:** `ProposalsReviewView`'s own local `bulkState` (not a prop)
+holds the "Approved N. Skipped K." result line (`aria-live="polite"`) so it
+survives the `router.refresh()` triggered on success — the same
+Server-Component re-fetch the single-approve flow already relies on to
+drop acted-on cards, which re-renders this client component's props
+without unmounting it.
+
+**Superseded for future runs, still needed for leftovers (Kyle, 2026-09-15).**
+`scripts/refresh-ingest.ts` now auto-applies a date-only proposal at
+INGESTION time (same `isDateOnlyUpdateProposal()` predicate, see
+scripts/refresh/proposalSql.ts) — so a run after this change writes zero
+date-only rows into `/admin/flags` for this button to act on. The button
+itself is NOT removed: any date-only row a PRIOR run already left pending
+still needs it (or a single Approve click) to clear, and it's the correct
+fallback if the ingestion-time auto-apply is ever disabled.
 
 # Discoverability / SEO (#164)
 

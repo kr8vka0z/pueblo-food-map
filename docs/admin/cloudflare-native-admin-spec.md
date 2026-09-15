@@ -190,7 +190,12 @@ document can do on its own.
   queue (§6) for every automated source refresh (OSM, Plentiful, and — once
   built — GTFS).** An automated refresh run never writes to `venues`
   directly; it proposes add/update/remove changes, and a human approves or
-  rejects each one. This is a new core feature of this revision, not a
+  rejects each one. **Amended, Kyle, 2026-09-15:** the one exception is a
+  pure "date-only" freshness confirmation (nothing changed but the
+  last-checked date), which now auto-applies without a human click — see
+  AGENTS.md's "Automated venue-refresh pipeline" and "Bulk-approve
+  date-only updates" sections for the shipped shape of this exception.
+  This is a new core feature of this revision, not a
   preserved decision from Ray's issues — it exists because bringing OSM and
   Plentiful into D1 (above) would otherwise mean the next scrape run could
   silently clobber a hand-correction an admin just made. **One automated
@@ -649,7 +654,8 @@ A separate Worker was considered and rejected for v1 for exactly that reason
 
 ┌──────────────────────────────────────────────────────────────────────┐
 │ REFRESH FEEDER PATH — automated, proposes only, never writes venues   │
-│ directly (§6)                                                         │
+│ directly (§6) — EXCEPT a date-only freshness bump, which auto-applies │
+│ (amended, Kyle, 2026-09-15 — see AGENTS.md)                           │
 │                                                                        │
 │  Scheduled GitHub Action (monthly OSM / weekly Plentiful — §6.2)      │
 │    │  runs the scrapers PLUS the enrichment steps folded into the     │
@@ -1138,6 +1144,9 @@ clobber a correction an admin just made — the old model (a script overwrites
 a committed `.ts` file, full stop) is incompatible with that. The fix: an
 automated refresh run never writes to `venues` directly. It computes what it
 *thinks* should change, writes those as proposals, and a human decides.
+**Amended, Kyle, 2026-09-15:** a pure date-only freshness confirmation is
+the one proposal shape that skips the human decision and auto-applies —
+see AGENTS.md's "Automated venue-refresh pipeline" section.
 
 ### 6.1 Why this unifies `#133`, `#234`, and the admin CRUD work
 

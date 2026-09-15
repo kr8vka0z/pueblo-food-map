@@ -11,16 +11,23 @@
 # Overpass fetcher, scripts/fetch-osm-grocery.py — ingest-osm-grocery.py has
 # never itself talked to Overpass, see that new file's own header), diffs
 # their output against the current Cloudflare D1 `venues` rows, and writes
-# ONE `change_proposals` row per detected difference — never a `venues` row.
-# scripts/refresh-ingest.ts (the orchestrator) and scripts/refresh/*.ts (the
-# pure diff/guardrail/link-health logic, unit-tested in
-# scripts/refresh/*.test.ts) are the actual implementation; this file is
-# just the schedule + credentials wrapper around them.
+# ONE `change_proposals` row per detected difference — with exactly ONE
+# bounded exception (Kyle, 2026-09-15): a "date-only" proposal (a pure
+# last_verified freshness confirmation, no other field changed) auto-applies
+# straight to `venues.last_verified` instead of waiting on a human click —
+# see scripts/refresh-ingest.ts's file header and scripts/refresh/proposalSql.ts
+# for the exact scope. Every other proposal shape still only ever writes a
+# `change_proposals` row. scripts/refresh-ingest.ts (the orchestrator) and
+# scripts/refresh/*.ts (the pure diff/guardrail/link-health logic,
+# unit-tested in scripts/refresh/*.test.ts) are the actual implementation;
+# this file is just the schedule + credentials wrapper around them.
 #
-# A human reviewing/approving these proposals is a SEPARATE, LATER slice
-# (the admin's /admin/flags review queue, docs/admin/cloudflare-native-admin-spec.md
-# §6.6) — nothing this workflow does is visible on the public map or the
-# admin's existing venue list until that review ships and an admin acts.
+# A human reviewing/approving a REAL change proposal is a SEPARATE, LATER
+# slice (the admin's /admin/flags review queue,
+# docs/admin/cloudflare-native-admin-spec.md §6.6) — a date-only bump is the
+# one exception (it lands in the admin's venue list immediately, and on the
+# public map on the next Publish click); every other proposal this workflow
+# writes stays invisible until that review ships and an admin acts.
 #
 # Credentials: this job has its OWN CLOUDFLARE_D1_TOKEN secret (D1 Write
 # only, account-scoped, #403) mapped into the CLOUDFLARE_API_TOKEN env var

@@ -240,8 +240,10 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
 
   // ── Form (idle | submitting | error) ─────────────────────────────────────
 
+  // text-base on mobile / text-sm from md up: iOS Safari auto-zooms the page
+  // on focusing any field under 16px — text-sm alone is 14px (mobile review #3).
   const inputBase =
-    "w-full rounded-[var(--radius-md)] border px-3 py-2 text-sm text-[var(--color-ink-900)] " +
+    "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
     "bg-white placeholder:text-[var(--color-ink-300)] " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
     "focus-visible:border-[var(--color-sage-500)]";
@@ -465,6 +467,12 @@ export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
           onChange={(e) => setSubmitterEmail(e.target.value)}
           placeholder={t("suggest.submitterEmail.placeholder", locale)}
           autoComplete="email"
+          autoCapitalize="off"
+          autoCorrect="off"
+          // Last single-line field before the submit button — Enter here
+          // implicitly submits the form, so "send" is the honest label
+          // (mobile review #4; never "next", which would lie about that).
+          enterKeyHint="send"
           required
           maxLength={EMAIL}
           aria-required="true"

@@ -47,8 +47,9 @@ const STATUS_BADGE_STYLES: Record<AdminVenueStatus, string> = {
 
 const controlLabelClass =
   "text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]";
+// text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
 const controlInputClass =
-  "rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-3 py-2 text-sm " +
+  "rounded-[var(--radius-md)] border border-[var(--color-bone-300)] bg-white px-3 py-2 text-base md:text-sm " +
   "text-[var(--color-ink-900)] placeholder:text-[var(--color-ink-400)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:border-[var(--color-sage-500)]";

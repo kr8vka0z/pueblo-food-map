@@ -60,13 +60,13 @@ export default function LocationDeniedBanner({
   return (
     /*
      * Outer positioner: absolute, horizontally centered below the search bar.
-     * top-[80px] clears the 64px SearchBar + 16px gap.
+     * top offset clears it (64px gap) and tracks its safe-area-shifted top.
      * Mobile: full width minus 16px margins on each side (left-4 right-4).
      * Desktop (md+): fixed 420px centered.
      */
     <div
       className={
-        "absolute top-[80px] left-4 right-4 " +
+        "absolute top-[calc(64px+max(1rem,env(safe-area-inset-top)))] left-4 right-4 " +
         "md:left-1/2 md:right-auto md:w-[420px] md:-translate-x-1/2 " +
         "z-[1100]"
       }

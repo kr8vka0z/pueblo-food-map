@@ -396,8 +396,9 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
     }
   }
 
+  // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
   const inputBase =
-    "w-full rounded-[var(--radius-md)] border px-3 py-2 text-sm text-[var(--color-ink-900)] " +
+    "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
     "bg-white placeholder:text-[var(--color-ink-300)] " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
     "focus-visible:border-[var(--color-sage-500)]";
@@ -724,6 +725,9 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           id="venue-email"
           value={values.email}
           onChange={(e) => setField("email", e.target.value)}
+          autoComplete="email"
+          autoCapitalize="off"
+          autoCorrect="off"
           aria-invalid={errors.email ? "true" : undefined}
           aria-describedby={errors.email ? "venue-email-error" : undefined}
           className={`${inputBase} ${inputBorder(!!errors.email)}`}
@@ -787,6 +791,8 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           id="venue-source"
           value={values.source}
           onChange={(e) => setField("source", e.target.value)}
+          // Last single-line field — "Outside Pueblo County" below is a checkbox.
+          enterKeyHint="done"
           aria-required="true"
           aria-invalid={errors.source ? "true" : undefined}
           aria-describedby={errors.source ? "venue-source-error" : undefined}

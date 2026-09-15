@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 // Fonts are self-hosted via @font-face in globals.css — no next/font/google import.
 import "./globals.css";
 import { preload } from "react-dom";
@@ -40,6 +40,14 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
   },
+};
+
+// viewportFit "cover" draws edge-to-edge and enables env(safe-area-inset-*)
+// everywhere; without it those insets all resolve to 0.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

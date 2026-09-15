@@ -100,8 +100,9 @@ export default function SearchResultsPopover({
       className={
         // Identical anchor to EmptySearchPopover
         "absolute left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[520px] " +
-        // Position below search bar: 44px bar height + 16px gap mobile; 52px + 16px desktop
-        "top-[72px] md:top-[84px] " +
+        // Position below search bar. Mobile offset tracks the bar's own
+        // safe-area-shifted top so it doesn't ride up under it (notch).
+        "top-[calc(56px+max(1rem,env(safe-area-inset-top)))] md:top-[84px] " +
         "z-[999] " +
         // Visual — identical to EmptySearchPopover
         "bg-[var(--color-bone-50)] " +

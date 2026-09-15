@@ -26,11 +26,23 @@
  *      after superseding any earlier-run pending proposal for the same
  *      (source, target_venue_id).
  *
- * This script NEVER writes to `venues` — only `change_proposals`. That's a
- * structural guarantee, not a runtime check: no function in this file or
- * scripts/refresh/*.ts constructs an UPDATE/INSERT/DELETE against `venues`
- * anywhere. A human approving a proposal (a separate, later slice) is the
- * only path that ever mutates `venues` from this pipeline's output.
+ * This script writes to `venues` in exactly ONE bounded case — everything
+ * else still only ever proposes. A "date-only" proposal (change_type
+ * 'update', source osm/plentiful, fields_changed EXACTLY ["last_verified"]
+ * — a pure freshness confirmation, ~86 of ~104 proposals in a real run) is
+ * auto-applied to `venues.last_verified` right here in step 6 (Kyle,
+ * 2026-09-15: "If the only proposed change is just the 'last checked date'
+ * that doesn't need a manual approval") — see scripts/refresh/proposalSql.ts
+ * for the exact predicate and statements. This stays bounded: ONE column,
+ * a value the job itself computed (today's date, not upstream-sourced
+ * data), under the SAME least-privilege D1 token every other write in this
+ * file already uses, and every auto-apply still lands a full audit_log +
+ * an already-'approved' change_proposals row — no different, auditwise,
+ * from a human clicking Approve. Every OTHER proposal shape (a real field
+ * change, an add, a remove, any link_health finding) still only ever
+ * writes a pending `change_proposals` row; a human approving one of THOSE
+ * (a separate, later slice, /admin/flags) is the only other path that
+ * mutates `venues` from this pipeline's output.
  *
  * WHY shell out to `wrangler d1 execute` instead of a D1Database binding:
  * this runs as a plain Node process (GitHub Actions runner or a local
@@ -63,6 +75,7 @@ import {
   type RefreshSource,
 } from "./refresh/diffEngine";
 import { checkUrl } from "./refresh/linkHealth";
+import { buildProposalWriteStatements } from "./refresh/proposalSql";
 import { chunkSqlStatements } from "./refresh/sqlChunks";
 
 const REPO_ROOT = join(__dirname, "..");
@@ -412,19 +425,19 @@ async function main(): Promise<void> {
         `UPDATE change_proposals SET status = 'superseded', reviewed_at = ${sqlText(now)} WHERE id = ${row.id} AND status = 'pending';`,
       );
     }
+    // Per-proposal write: a date-only osm/plentiful freshness confirmation
+    // auto-applies (venues UPDATE + audit_log + an already-'approved' row,
+    // Kyle 2026-09-15 — see this file's own header and
+    // scripts/refresh/proposalSql.ts); every other proposal still only
+    // ever writes a plain pending row. buildProposalWriteStatements() is
+    // the single place that decides which, so this loop can't drift from
+    // the /admin/flags bulk-approve button's own isDateOnlyUpdateProposal
+    // check.
+    let autoAppliedCount = 0;
     for (const p of allProposals) {
-      statements.push(
-        "INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id) VALUES (" +
-          [
-            sqlText(p.source),
-            sqlText(p.targetVenueId),
-            sqlText(p.changeType),
-            sqlText(JSON.stringify(p.proposedDiff)),
-            sqlText(p.diffHash),
-            sqlText(p.runId),
-          ].join(", ") +
-          ");",
-      );
+      const built = buildProposalWriteStatements(p, now, sqlText);
+      if (built.autoApplied) autoAppliedCount++;
+      statements.push(...built.statements);
     }
 
     // mkdtempSync already creates tmpDir — a following mkdirSync(tmpDir) was
@@ -434,7 +447,11 @@ async function main(): Promise<void> {
     const sqlFile = join(tmpDir, "proposals.sql");
     writeFileSync(sqlFile, statements.join("\n") + "\n", "utf-8");
 
-    console.log(`Writing ${allProposals.length} proposal(s) + superseding ${toSupersede.length} stale pending row(s)...`);
+    console.log(
+      `Writing ${allProposals.length - autoAppliedCount} proposal(s) for review + ` +
+        `auto-applying ${autoAppliedCount} date-only freshness bump(s) + ` +
+        `superseding ${toSupersede.length} stale pending row(s)...`,
+    );
     d1ApplyFile(dbMode, sqlFile);
     console.log("Done.");
   }

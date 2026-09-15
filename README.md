@@ -167,9 +167,11 @@ editing it by hand in `/admin`.
 runs monthly (and on manual dispatch), re-scrapes Plentiful and OSM, diffs
 the result against D1's current venues, and writes one `change_proposals`
 row per detected difference — including a link-health pass that flags dead
-outbound `url`s. It never writes to `venues` directly; every proposal still
-needs a human to review and approve before it reaches the public map (that
-review UI is a separate, later piece of work — see
+outbound `url`s. It writes to `venues` in exactly one bounded case: a
+"date-only" proposal (nothing changed but the last-checked date) auto-
+applies rather than waiting on a click (Kyle, 2026-09-15). Every other
+proposal still needs a human to review and approve before it reaches the
+public map (that review UI is a separate, later piece of work — see
 `docs/admin/cloudflare-native-admin-spec.md` §6). See
 `scripts/refresh-ingest.ts`'s own file header for the full mechanism, and
 AGENTS.md's "Automated venue-refresh pipeline" section for operational

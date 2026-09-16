@@ -119,7 +119,7 @@ Rationale: cool grays (the Tailwind default) feel sterile and clinical. Pueblo i
   --color-bone-300: #D4CDB8;  /* Disabled border */
 
   /* Ink — warm foreground neutrals */
-  --color-ink-400:  #8A847A;  /* Secondary text */
+  --color-ink-400:  #6A645A;  /* Secondary text */
   --color-ink-500:  #5F5A52;  /* Body text on bone */
   --color-ink-700:  #2D2A26;  /* Headings, primary text */
   --color-ink-900:  #1A1817;  /* Near-black (display titles, max emphasis) */

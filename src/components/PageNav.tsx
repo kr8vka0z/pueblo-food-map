@@ -31,7 +31,7 @@ import { useFavorites } from "@/lib/favorites";
 import { venues } from "@/data/venues";
 
 /** Bottom padding for a page's <main>: the bar below 2xl, the floating pill at 2xl. */
-export const PAGE_NAV_CLEARANCE = "pb-[calc(78px+env(safe-area-inset-bottom))] 2xl:pb-24";
+export const PAGE_NAV_CLEARANCE = "pb-[calc(76px+env(safe-area-inset-bottom))] 2xl:pb-24";
 
 const NO_GEO = { permission: "prompt", position: null } as const;
 

@@ -11,7 +11,6 @@
  *     <Map />            — fills viewport
  *     <SearchBar />      — absolute top-center, z-index 1000 (Map/List switch inside)
  *     {isMobile && <BottomSheet />}
- *     <fade band />      — below 2xl, map mode, no venue sheet (docs/bottom-nav-spec.md §8)
  *     <BottomNav />      — bar below 2xl, pill floating bottom-centre at 2xl+ (§3, §5); last in DOM
  *   </div>
  *
@@ -1036,8 +1035,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     handleLocateRequest();
   }, [handleViewModeChange, handleLocateRequest]);
 
-  // §10: the venue sheet (phone only) covers the bottom edge; the bar and the
-  // fade band both step aside while it is open at any detent.
+  // §10: the venue sheet (phone only) covers the bottom edge; the nav steps
+  // aside while it is open at any detent.
   const venueSheetOpen = isMobile && viewMode === "map" && selectedVenue !== null;
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -1319,15 +1318,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
           }
         />
-      )}
-
-      {/* Fade band (spec §8) — softens the map behind the lifted credits.
-          Gated on the same condition as <MapCanvas>, not just viewMode: while
-          the deferred load hasn't fired, ListView stands in under "map" mode
-          and blurring a list of cards is pure per-frame cost. Styles and the
-          strength presets live in globals.css (.nav-fade-band). */}
-      {!mapUnavailable && mapLoadTriggered && viewMode === "map" && !venueSheetOpen && (
-        <div aria-hidden="true" data-testid="nav-fade-band" className="nav-fade-band 2xl:hidden" />
       )}
 
       {/* BottomNav — LAST in DOM order so keyboard users reach the map and the

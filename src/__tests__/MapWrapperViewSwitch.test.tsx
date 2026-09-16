@@ -7,7 +7,7 @@
  * clicking it actually switches the view, aria-pressed tracks the active
  * view, and a query/category filter survives a view switch. The bottom
  * nav (docs/bottom-nav-spec.md) is covered at this level too: one switch
- * only, aria-current on the open panel's item, the fade band, Near me.
+ * only, aria-current on the open panel's item, Near me.
  *
  * Mocking recipe (WebGL/next-dynamic/Map/DesktopVenueWindow) copied
  * verbatim from MapWrapperDeferredLoad.test.tsx — see that file's header
@@ -217,20 +217,6 @@ describe("MapWrapper — bottom nav (docs/bottom-nav-spec.md)", () => {
     expect(nav.querySelectorAll("[aria-current]")).toHaveLength(0);
   });
 
-  test("the fade band is decorative and non-interactive, map mode only (§8, §13 test 5)", async () => {
-    await renderAndLoadMap();
-    const band = screen.getByTestId("nav-fade-band");
-    expect(band.getAttribute("aria-hidden")).toBe("true");
-    // pointer-events: none lives on .nav-fade-band in globals.css (jsdom loads
-    // no stylesheet), so assert the element carries that class.
-    expect(band.className).toContain("nav-fade-band");
-
-    fireEvent.click(screen.getByRole("button", { name: /^List$/i }));
-    expect(screen.queryByTestId("nav-fade-band")).toBeNull();
-    // The bar itself persists in list mode.
-    expect(screen.getByRole("navigation")).toBeDefined();
-  });
-
   test("Near me from list view returns to the map (§6)", async () => {
     await renderAndLoadMap();
     fireEvent.click(screen.getByRole("button", { name: /^List$/i }));
@@ -241,7 +227,7 @@ describe("MapWrapper — bottom nav (docs/bottom-nav-spec.md)", () => {
 });
 
 describe("MapWrapper — phone venue sheet hides the bottom chrome (§10)", () => {
-  test("bar and fade band step aside while a venue sheet is open (§10)", async () => {
+  test("the nav steps aside while a venue sheet is open (§10)", async () => {
     // Every media query matches → phone layout (isMobile, below 2xl).
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -259,7 +245,6 @@ describe("MapWrapper — phone venue sheet hides the bottom chrome (§10)", () =
     expect(screen.getByTestId("map-canvas").getAttribute("data-selected-venue-id")).toBe(venues[0].id);
     // DOM queries, not role queries: vaul's modal sheet aria-hides its siblings.
     expect(document.querySelector("[data-bottom-nav]")).toBeNull();
-    expect(screen.queryByTestId("nav-fade-band")).toBeNull();
   });
 });
 

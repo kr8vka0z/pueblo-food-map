@@ -204,52 +204,12 @@ body {
 }
 
 /* ─── Credits above the bottom nav bar — docs/bottom-nav-spec.md §9 ──────────
-   Below 2xl the bottom bar (78px + home-indicator inset) would cover this
-   corner, so the control group lifts above it. 2xl and up the nav is a pill
+   Below 2xl the floating nav pill (64px + 12px gap + home-indicator inset)
+   would cover this corner, so the control group lifts 8px above it. 2xl and up the nav is a pill
    in the bottom centre, clear of the corner. */
 @media (width < 96rem) {
   .mapboxgl-map .mapboxgl-ctrl-bottom-right {
-    bottom: calc(78px + 12px + env(safe-area-inset-bottom));
-  }
-}
-
-/* ─── Fade band above the bottom nav bar — docs/bottom-nav-spec.md §8 ────────
-   Softens the map behind the lifted credits. Same bone-450 frosted treatment
-   as SplashScreen's scrim, at lower strength. Kyle picked strength 1; the
-   three knobs are custom properties so moving to a stronger preset is three
-   number changes on :root, not a rebuild:
-     strength 1 (shipping)  --nav-fade-height: 92px;  --nav-fade-alpha: 0.20; --nav-fade-blur: 3px
-     strength 2             --nav-fade-height: 104px; --nav-fade-alpha: 0.30; --nav-fade-blur: 5px
-     strength 3             --nav-fade-height: 116px; --nav-fade-alpha: 0.40; --nav-fade-blur: 8px
-   pointer-events: none is NOT optional — the band sits over 92px of map right
-   above the thumb zone; without it every pan starting there is swallowed.
-   The mask holds the blur for the bottom 30% and fades it out over the rest,
-   so backdrop-filter never draws a hard seam at the band's top edge.
-   If dragging stutters on a real low-end Android, ship the fallback below to
-   everyone (drop backdrop-filter, alpha 0.30) — never toggle blur on frame timing. */
-.nav-fade-band {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(78px + env(safe-area-inset-bottom));
-  height: var(--nav-fade-height, 92px);
-  background: linear-gradient(
-    to top,
-    rgba(182, 172, 139, var(--nav-fade-alpha, 0.20)),
-    rgba(182, 172, 139, 0)
-  );
-  backdrop-filter: blur(var(--nav-fade-blur, 3px));
-  -webkit-backdrop-filter: blur(var(--nav-fade-blur, 3px));
-  mask-image: linear-gradient(to top, #000 0%, #000 30%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 30%, transparent 100%);
-  pointer-events: none;
-  z-index: 999;
-}
-
-/* Without backdrop-filter the band is a bare tint and reads weaker; raise the alpha. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .nav-fade-band {
-    --nav-fade-alpha: 0.30;
+    bottom: calc(76px + 8px + env(safe-area-inset-bottom));
   }
 }
 

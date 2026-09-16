@@ -154,3 +154,12 @@ describe("ViewToggle — labels at size=md (docs/bottom-nav-spec.md §4.1, §4.3
     expect(screen.getByRole("button", { name: /^List$/i })).toBeDefined();
   });
 });
+
+describe('size="flush" (Kyle, 2026-09-16) — part of the search pill', () => {
+  test("fills its container's height and drops its own border", () => {
+    render(<ViewToggle mode="map" onChange={vi.fn()} size="flush" />);
+    const group = screen.getByRole("group");
+    expect(group.style.height).toBe("100%");
+    expect(group.className).not.toContain("border");
+  });
+});

@@ -267,17 +267,19 @@ export default function SearchBar({
             inside the 44px mobile / 52px desktop pill. Width reserved on the
             <input> above is measured off the rendered control, not computed.
 
-            right-1.5 at every width: the old mobile-only right-12 existed to
-            clear the navy menu button, which the bottom nav replaced
-            (docs/bottom-nav-spec.md §4.2). */}
+            Flush since 2026-09-16 (Kyle: "no gap… it just needs to look like a
+            part of the search bar"): the switch fills the pill's right end,
+            1px in so the pill's border wraps it, with no border or inset of
+            its own (size="flush"). This supersedes the 38px/~3px-inset note
+            above; the buttons are now 42px / 50px tall. */}
         {viewSwitch && (
-          <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+          <div className="absolute top-px bottom-px right-px">
             <ViewToggle
               mode={viewSwitch.mode}
               onChange={viewSwitch.onChange}
               locale={viewSwitch.locale}
               mapDisabled={viewSwitch.mapDisabled}
-              size="md"
+              size="flush"
               collapseLabelsNarrow={Boolean(filterChip)}
             />
           </div>

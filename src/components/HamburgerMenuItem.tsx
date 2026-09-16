@@ -5,13 +5,14 @@
  *
  * Renders as a <li role="menuitem"> with a full-width anchor or button.
  * Accepts an href for link items (rendered via next/link) or an onClick for
- * action items (rendered as a button).
+ * action items (rendered as a button). A link item may ALSO take onClick —
+ * HamburgerMenu passes its close() there so navigating to the current page
+ * (e.g. tapping "About this map" while already on /about) still closes the
+ * drawer instead of leaving it open with body scroll locked (#PR-review item 2).
  *
- * External link support (#96):
- *   Pass isExternal={true} together with href to open in a new tab with
- *   rel="noopener noreferrer". Supply an icon (e.g. Lucide ExternalLink)
- *   to show it to the right of the label. Provide an ariaLabel to add
- *   "opens in new tab" context for screen readers.
+ * isExternal/ariaLabel (#96, external-link support) were removed 2026-09-16:
+ * every item here is an internal Link now — the one external row (the sponsor
+ * card) is a plain <a>, not this component, so nothing called them.
  */
 
 import Link from "next/link";
@@ -20,34 +21,26 @@ import type { ReactNode } from "react";
 interface HamburgerMenuItemProps {
   /** Display label for the item. */
   label: string;
-  /** If provided, renders as a Next.js Link (or plain <a> for external links). */
+  /** If provided, renders as a Next.js Link. */
   href?: string;
-  /** If provided (and no href), renders as a button with this handler. */
-  onClick?: () => void;
   /**
-   * When true, renders an <a> with target="_blank" and rel="noopener noreferrer"
-   * instead of a Next.js Link. Requires href.
+   * Click handler. Action items (no href) use this as their sole behavior.
+   * Link items may also pass this — e.g. to close the drawer — since a
+   * next/link navigation to the current route doesn't otherwise fire anything.
    */
-  isExternal?: boolean;
+  onClick?: () => void;
   /**
    * Optional icon element to show to the right of the label.
    * Typically a small Lucide icon (size 14-16).
    */
   icon?: ReactNode;
-  /**
-   * Override the accessible label. Used to add "opens in new tab" suffix
-   * for external links without showing it visually.
-   */
-  ariaLabel?: string;
 }
 
 export default function HamburgerMenuItem({
   label,
   href,
   onClick,
-  isExternal = false,
   icon,
-  ariaLabel,
 }: HamburgerMenuItemProps) {
   const itemClass =
     "flex items-center gap-2 w-full text-left px-5 py-3 text-sm font-medium " +
@@ -78,22 +71,12 @@ export default function HamburgerMenuItem({
   // for a future a11y pass.
   return (
     <li role="menuitem">
-      {href && isExternal ? (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={ariaLabel}
-          className={itemClass}
-        >
-          {children}
-        </a>
-      ) : href ? (
-        <Link href={href} aria-label={ariaLabel} className={itemClass}>
+      {href ? (
+        <Link href={href} onClick={onClick} className={itemClass}>
           {children}
         </Link>
       ) : (
-        <button type="button" onClick={onClick} aria-label={ariaLabel} className={itemClass}>
+        <button type="button" onClick={onClick} className={itemClass}>
           {children}
         </button>
       )}

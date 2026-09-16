@@ -187,6 +187,20 @@ describe("HamburgerMenu — close behaviors", () => {
     });
   });
 
+  test("clicking a link item closes the drawer (review item 2 — dead tap on the current page)", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => expect(screen.getByRole("menu")).toBeDefined());
+    expect(document.body.style.overflow).toBe("hidden");
+
+    await user.click(screen.getByRole("link", { name: /About this map/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(document.body.style.overflow).toBe("");
+    });
+  });
+
   test("focus returns to hamburger button after X-button close", async () => {
     const user = userEvent.setup();
     renderMenu();
@@ -514,5 +528,49 @@ describe("#109 — Language toggle as last menu item", () => {
     const langIdx = panelText.indexOf("Language / Idioma");
     expect(lastLinkIdx).toBeGreaterThan(-1);
     expect(langIdx).toBeGreaterThan(lastLinkIdx);
+  });
+});
+
+// ─── Focus trap re-targeting (review item 3) ─────────────────────────────────
+// The focus effect keys on [open] only, so switching `view` while already
+// open (Saved -> Menu via the bottom nav) doesn't re-run it — focus can be
+// left on the nav button that opened it, outside the panel. handleTab must
+// pull focus back in rather than only wrapping at first/last.
+
+describe("HamburgerMenu — focus trap re-targeting after leaving the panel", () => {
+  test("Tab from outside the panel moves focus to the first focusable element", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    const openerBtn = screen.getByRole("button", { name: /Open menu/i });
+    await user.click(openerBtn);
+    await waitFor(() => expect(screen.getByRole("menu")).toBeDefined());
+
+    // Simulate focus having ended up outside the panel (e.g. left on the nav
+    // button after a view re-target) rather than driving the exact re-target
+    // sequence, which needs BottomNav wiring this unit doesn't own.
+    openerBtn.focus();
+    expect(document.activeElement).toBe(openerBtn);
+
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Tab" });
+
+    const panel = document.getElementById("hamburger-panel");
+    expect(panel?.contains(document.activeElement)).toBe(true);
+  });
+
+  test("Shift+Tab from outside the panel moves focus to the last focusable element", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    const openerBtn = screen.getByRole("button", { name: /Open menu/i });
+    await user.click(openerBtn);
+    await waitFor(() => expect(screen.getByRole("menu")).toBeDefined());
+
+    openerBtn.focus();
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Tab", shiftKey: true });
+
+    const panel = document.getElementById("hamburger-panel")!;
+    const focusable = panel.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    expect(document.activeElement).toBe(focusable[focusable.length - 1]);
   });
 });

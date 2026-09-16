@@ -34,18 +34,18 @@ function renderNav(overrides: Partial<Props> = {}) {
 
 describe("BottomNav", () => {
   test("renders four items, each with a visible text label (§13.1)", () => {
-    renderNav();
-    const buttons = screen.getAllByRole("button");
-    expect(buttons.map((b) => b.textContent)).toEqual(["Near me", "Saved", "Resources", "Menu"]);
-    for (const b of buttons) {
+    const { container } = renderNav();
+    const items = Array.from(container.querySelectorAll("li > button, li > a"));
+    expect(items.map((b) => b.textContent)).toEqual(["Near me", "Saved", "Resources", "Menu"]);
+    for (const b of items) {
       const label = b.querySelector("span");
       expect(label?.className ?? "").not.toContain("sr-only");
     }
   });
 
   test("Spanish labels (§11)", () => {
-    renderNav({ locale: "es" });
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+    const { container } = renderNav({ locale: "es" });
+    expect(Array.from(container.querySelectorAll("li > button, li > a")).map((b) => b.textContent)).toEqual([
       "Cerca de mí",
       "Guardados",
       "Recursos",
@@ -66,13 +66,21 @@ describe("BottomNav", () => {
     expect(current[0].textContent).toBe("Saved");
   });
 
-  test("Resources opens the help section, Menu the top, Saved the saved section (§7)", () => {
+  test("Menu opens the drawer top, Saved the saved section (§7)", () => {
     const onSectionTap = vi.fn();
     renderNav({ onSectionTap });
     fireEvent.click(screen.getByRole("button", { name: "Saved" }));
-    fireEvent.click(screen.getByRole("button", { name: "Resources" }));
     fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-    expect(onSectionTap.mock.calls).toEqual([["saved"], ["help"], ["top"]]);
+    expect(onSectionTap.mock.calls).toEqual([["saved"], ["top"]]);
+  });
+
+  test("Resources is a link to the /resources page, not a drawer section (Kyle, 2026-09-16)", () => {
+    const onSectionTap = vi.fn();
+    renderNav({ onSectionTap });
+    const link = screen.getByRole("link", { name: "Resources" });
+    expect(link.getAttribute("href")).toBe("/resources");
+    fireEvent.click(link);
+    expect(onSectionTap).not.toHaveBeenCalled();
   });
 
   test("Near me is disabled and shows the spinner while locating; label unchanged (§13.4, §6)", () => {

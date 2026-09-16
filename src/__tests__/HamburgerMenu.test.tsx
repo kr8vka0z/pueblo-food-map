@@ -112,29 +112,14 @@ describe("HamburgerMenu — open state", () => {
     });
   });
 
-  test("Get help section renders the five assistance links (#131)", async () => {
+  test("the assistance links moved to /resources — the drawer links there once", async () => {
     const user = userEvent.setup();
     renderMenu();
     await user.click(screen.getByRole("button", { name: /Open menu/i }));
     await waitFor(() => {
-      const co211 = screen.getByRole("link", { name: /2-1-1 Colorado/i }) as HTMLAnchorElement;
-      const snap = screen.getByRole("link", { name: /Apply for SNAP/i }) as HTMLAnchorElement;
-      const wic = screen.getByRole("link", { name: /Apply for WIC/i }) as HTMLAnchorElement;
-      const doubleup = screen.getByRole("link", { name: /Double Up Food Bucks/i }) as HTMLAnchorElement;
-      const hotline = screen.getByRole("link", { name: /Food hotline/i }) as HTMLAnchorElement;
-
-      expect(co211.href).toContain("211colorado.org");
-      expect(snap.href).toContain("cdhs.colorado.gov/snap");
-      expect(wic.href).toContain("coloradowic.gov");
-      expect(doubleup.href).toContain("doubleupcolorado.org");
-      expect(hotline.href).toContain("tel:");
-      expect(hotline.href).toContain("8558554626");
-
-      // Web resources open in a new tab; the hotline is a tap-to-call link.
-      expect(co211.target).toBe("_blank");
-      expect(snap.target).toBe("_blank");
-      expect(wic.target).toBe("_blank");
-      expect(doubleup.target).toBe("_blank");
+      const link = screen.getByRole("link", { name: /Food help programs/i }) as HTMLAnchorElement;
+      expect(link.getAttribute("href")).toBe("/resources");
+      expect(screen.queryByRole("link", { name: /Apply for SNAP/i })).toBeNull();
     });
   });
 
@@ -452,16 +437,6 @@ describe("HamburgerMenu — bottom nav entry points", () => {
     expect(screen.queryByText("View")).toBeNull();
     expect(screen.queryByRole("button", { name: /^Map$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^List$/i })).toBeNull();
-  });
-
-  test("initialSection='help' scrolls the Get help heading into view", () => {
-    const scrollIntoView = vi.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;
-    render(<HamburgerMenu locale="en" open onClose={vi.fn()} initialSection="help" />);
-    const heading = screen.getByText("Get help");
-    expect(heading.id).toBe("menu-section-help");
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(scrollIntoView.mock.contexts[0]).toBe(heading);
   });
 
   test("a tap inside ignoreOutsideRef does not close the drawer", () => {

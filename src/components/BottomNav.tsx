@@ -20,6 +20,7 @@
  */
 
 import type { RefObject } from "react";
+import Link from "next/link";
 import { Locate, LocateFixed, Loader2, Heart, HandHelping, Menu } from "lucide-react";
 import type { GeoState } from "@/lib/useGeolocation";
 import { t, type Locale } from "@/lib/i18n";
@@ -28,8 +29,8 @@ import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 /** Bar content height in px, excluding the safe-area inset (§3.1). */
 export const BOTTOM_NAV_HEIGHT_PX = 78;
 
-/** Which drawer section a nav item opens (§7). */
-export type MenuSection = "top" | "saved" | "help";
+/** Which drawer section a nav item opens (§7). Resources is a page, not a section. */
+export type MenuSection = "top" | "saved";
 
 interface BottomNavProps {
   locale: Locale;
@@ -85,12 +86,23 @@ export default function BottomNav({
     <Locate aria-hidden className={ICON_CLASS} />
   );
 
-  const sectionItems: Array<{ section: MenuSection; label: string; icon: React.ReactNode }> = [
-    { section: "saved", label: t("nav.saved", locale), icon: <Heart aria-hidden className={ICON_CLASS} /> },
-    // hand-helping, not hand-heart: the heart collapses into the fingers at 24px (§3.2).
-    { section: "help", label: t("nav.resources", locale), icon: <HandHelping aria-hidden className={ICON_CLASS} /> },
-    { section: "top", label: t("nav.menu", locale), icon: <Menu aria-hidden className={ICON_CLASS} /> },
-  ];
+  const sectionItem = (section: MenuSection, label: string, icon: React.ReactNode) => {
+    const active = openSection === section;
+    return (
+      <li className="flex flex-1 2xl:flex-none 2xl:h-11">
+        <button
+          type="button"
+          onClick={() => onSectionTap(section)}
+          aria-current={active ? "true" : undefined}
+          data-testid={`nav-${section}`}
+          className={ITEM_CLASS + " " + colorFor(active)}
+        >
+          {icon}
+          <span>{label}</span>
+        </button>
+      </li>
+    );
+  };
 
   return (
     <nav
@@ -131,23 +143,17 @@ export default function BottomNav({
             {isLocating ? t("locate.locating", locale) : ""}
           </span>
         </li>
-        {sectionItems.map(({ section, label, icon }) => {
-          const active = openSection === section;
-          return (
-            <li key={section} className="flex flex-1 2xl:flex-none 2xl:h-11">
-              <button
-                type="button"
-                onClick={() => onSectionTap(section)}
-                aria-current={active ? "true" : undefined}
-                data-testid={`nav-${section}`}
-                className={ITEM_CLASS + " " + colorFor(active)}
-              >
-                {icon}
-                <span>{label}</span>
-              </button>
-            </li>
-          );
-        })}
+        {sectionItem("saved", t("nav.saved", locale), <Heart aria-hidden className={ICON_CLASS} />)}
+        {/* Resources opens its own page (/resources) — Kyle, 2026-09-16: as a
+            drawer section it looked like it did the same thing as Menu. */}
+        <li className="flex flex-1 2xl:flex-none 2xl:h-11">
+          <Link href="/resources" data-testid="nav-resources" className={ITEM_CLASS + " " + colorFor(false)}>
+            {/* hand-helping, not hand-heart: the heart collapses into the fingers at 24px (§3.2). */}
+            <HandHelping aria-hidden className={ICON_CLASS} />
+            <span>{t("nav.resources", locale)}</span>
+          </Link>
+        </li>
+        {sectionItem("top", t("nav.menu", locale), <Menu aria-hidden className={ICON_CLASS} />)}
       </ul>
     </nav>
   );

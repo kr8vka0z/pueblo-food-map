@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * HamburgerMenu — the app drawer: saved places, assistance resources, links,
- * language. Controlled; it has no trigger of its own.
+ * HamburgerMenu — the app drawer: saved places, links (including the
+ * /resources page), language. Controlled; it has no trigger of its own.
  *
- * Opened by BottomNav's Saved / Resources / Menu items (docs/bottom-nav-spec.md
- * §7), each passing `initialSection` so the drawer scrolls that section into
- * view. The navy trigger button this used to own was deleted with the bottom
+ * Opened by BottomNav's Saved / Menu items (docs/bottom-nav-spec.md §7), each
+ * passing `initialSection` so the drawer scrolls that section into view.
+ * Resources is a page now, not a drawer section. The navy trigger button this used to own was deleted with the bottom
  * nav, as was its Map/List row — that switch lives in the search box (§4.4).
  *
  * Desktop (≥768px): ~280px dropdown top-right, below the search row.
@@ -27,7 +27,7 @@
  */
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Phone, Info, List } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, HandHelping } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
@@ -63,7 +63,6 @@ interface HamburgerMenuProps {
 /** DOM ids of the sections BottomNav can open the drawer at. */
 const SECTION_IDS: Record<Exclude<MenuSection, "top">, string> = {
   saved: "menu-section-saved",
-  help: "menu-section-help",
 };
 
 // All focusable elements inside the panel for tab-trap.
@@ -181,11 +180,11 @@ export default function HamburgerMenu({
   // ── Scroll the requested section into view (§7) ─────────────────────────────
   // Declared after the focus-trap effect so it runs after focus lands on the
   // close button at the top. Re-runs when the section changes while open
-  // (Saved → Resources).
+  // (Saved → Menu).
   //
-  // ponytail: scroll-into-view is the whole mechanism. Ceiling: if either
-  // section ever grows past a screenful of its own, it wants a real page.
-  // Upgrade path is a route per section, with the drawer delegating.
+  // ponytail: scroll-into-view is the whole mechanism. Ceiling: if Saved
+  // ever grows past a screenful of its own, it wants a real page — as
+  // Resources already got (/resources).
   useEffect(() => {
     if (!open || !panelRef.current) return;
     const target =
@@ -394,49 +393,13 @@ export default function HamburgerMenu({
               icon={<List size={14} />}
             />
 
-            {/* Get help — curated external assistance resources (#131) */}
-            <li
-              role="presentation"
-              className="mt-1 border-t border-[var(--color-bone-200)] pt-2"
-            >
-              <p id={SECTION_IDS.help} className="scroll-mt-2 px-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
-                {t("menu.help.heading", locale)}
-              </p>
-            </li>
+            {/* Food help programs — the five external links that lived here
+                (#131) moved to the /resources page, which explains each one;
+                the bottom nav's Resources item goes there too. */}
             <HamburgerMenuItem
-              label={t("menu.help.211", locale)}
-              href="https://www.211colorado.org/food-assistance/"
-              isExternal={true}
-              icon={<ExternalLink size={14} />}
-              ariaLabel={externalAriaLabel("menu.help.211")}
-            />
-            <HamburgerMenuItem
-              label={t("menu.help.snap", locale)}
-              href="https://cdhs.colorado.gov/snap"
-              isExternal={true}
-              icon={<ExternalLink size={14} />}
-              ariaLabel={externalAriaLabel("menu.help.snap")}
-            />
-            <HamburgerMenuItem
-              label={t("menu.help.wic", locale)}
-              href="https://www.coloradowic.gov/eligibility/apply"
-              isExternal={true}
-              icon={<ExternalLink size={14} />}
-              ariaLabel={externalAriaLabel("menu.help.wic")}
-            />
-            <HamburgerMenuItem
-              label={t("menu.help.doubleup", locale)}
-              href="https://doubleupcolorado.org/"
-              isExternal={true}
-              icon={<ExternalLink size={14} />}
-              ariaLabel={externalAriaLabel("menu.help.doubleup")}
-            />
-            <HamburgerMenuItem
-              label={t("menu.help.hotline", locale)}
-              href="tel:+18558554626"
-              isExternal={true}
-              icon={<Phone size={14} />}
-              ariaLabel={t("menu.help.hotline", locale)}
+              label={t("nav.resourcesPage", locale)}
+              href="/resources"
+              icon={<HandHelping size={14} />}
             />
 
             {/* About Pueblo Food Project (#96) — moved to the bottom of the nav

@@ -190,12 +190,6 @@ export default function HamburgerMenu({
 
   const menuLabel = t("menu.open", locale);
   const closeLabel = t("menu.close", locale);
-  /**
-   * External menu links open a new tab; screen readers need that called out in the active locale.
-   * Compose label and suffix once so each item stays aligned with i18n keys.
-   */
-  const externalAriaLabel = (labelKey: string) =>
-    `${t(labelKey, locale)} ${t("menu.opensInNewTab", locale)}`;
 
   // Panel positioning style: fixed side-sheet on mobile, absolute dropdown on desktop.
   // Mobile stays edge-to-edge (top:0/height:100%) for the backdrop; safe-area
@@ -345,7 +339,36 @@ export default function HamburgerMenu({
             )
           ) : (
             <>
-              {/* Menu item list — About is the last item (#124) */}
+              {/* Sponsor card — first thing in the Menu, deliberately loud (Kyle,
+                  2026-09-16): the map's corner "Sponsored by" line moved here.
+                  Outside role="menu" for the same reason as the language row:
+                  a card link isn't a menuitem. It replaces the old "About Pueblo
+                  Food Project" item, which went to the same site. */}
+              <a
+                href="https://pueblofoodproject.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="menu-sponsor"
+                aria-label={`${t("menu.sponsoredBy", locale)} Pueblo Food Project ${t("menu.opensInNewTab", locale)}`}
+                className={
+                  "flex items-center gap-3 mx-4 mt-3 mb-1 px-3.5 py-3 rounded-[var(--radius-lg)] " +
+                  "border border-[var(--color-sage-500)] bg-[var(--color-sage-100)] " +
+                  "hover:border-[var(--color-sage-700)] transition-colors duration-100 " +
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
+                  PRESS_FEEDBACK
+                }
+              >
+                <span className="flex flex-col flex-1 min-w-0">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-500)]">
+                    {t("menu.sponsoredBy", locale)}
+                  </span>
+                  <span className="text-base font-semibold text-[var(--color-sage-700)]">
+                    Pueblo Food Project
+                  </span>
+                </span>
+                <ExternalLink size={18} aria-hidden className="shrink-0 text-[var(--color-sage-700)]" />
+              </a>
+              {/* Menu item list */}
               <ul role="menu" aria-label={menuLabel} className="py-2">
                 {/* Show welcome screen (#99) — re-shows splash without clearing localStorage */}
                 {onShowWelcome && (
@@ -390,16 +413,6 @@ export default function HamburgerMenu({
                   label={t("nav.resourcesPage", locale)}
                   href="/resources"
                   icon={<HandHelping size={14} />}
-                />
-
-                {/* About Pueblo Food Project (#96) — moved to the bottom of the nav
-                    links per #124; sits above the language control (kept last per #109). */}
-                <HamburgerMenuItem
-                  label={t("menu.about", locale)}
-                  href="https://pueblofoodproject.org/about/"
-                  isExternal={true}
-                  icon={<ExternalLink size={14} />}
-                  ariaLabel={externalAriaLabel("menu.about")}
                 />
               </ul>
               {/* Language toggle (#109) — placed OUTSIDE role="menu" because LanguageToggle

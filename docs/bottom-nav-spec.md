@@ -227,6 +227,12 @@ Cost accepted by Kyle: 1280–1535px laptops get the bottom bar.
 A single cutover also means there is exactly one place in the codebase where this
 decision lives, and it is an existing Tailwind breakpoint rather than a bespoke one.
 
+> **Amended 2026-09-16 by Kyle (pill placement):** at `2xl`+ the pill no longer sits beside
+> the search box — it floats in the bottom centre of the screen, 24px up
+> (`2xl:bottom-6 2xl:left-1/2 2xl:-translate-x-1/2`). The 1536px cutover stays. Category
+> auto-zoom pads the map's bottom by the pill (24 + 52px) at `2xl`+, and the outside-county
+> alert sits 12px above it.
+
 ---
 
 ## 6. "Near me" replaces the orange banner
@@ -420,6 +426,15 @@ inventing a second convention.
 > **Amended 2026-09-16 by Kyle (credits row):** the Mapbox logo, its compact "i" credit
 > button and the sponsor line now share one line — logo, then "i", sponsor on the right
 > (globals.css). Opening the "i" hides the sponsor line until it closes.
+
+> **Amended again 2026-09-16 by Kyle (supersedes the credits row above):** the sponsor
+> line is gone from the map — "Sponsored by Pueblo Food Project" is now a card at the top of
+> the Menu drawer, linking to pueblofoodproject.org in a new tab, replacing the old "About
+> Pueblo Food Project" item. The map's corner holds only the Mapbox credits, moved to the
+> **bottom-right**: compact "i" then the logo on one row, the logo at 65×20 (the size Mapbox's
+> attribution guide lists; the smallest allowed) and the "i" at 20×20. Opening the "i"
+> spreads the credit text leftward. `.mapboxgl-ctrl-bottom-right` carries the below-`2xl`
+> lift; at `2xl`+ it sits in the corner, clear of the bottom-centre pill.
 
 ---
 

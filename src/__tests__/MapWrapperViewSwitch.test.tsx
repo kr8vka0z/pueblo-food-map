@@ -241,7 +241,7 @@ describe("MapWrapper — bottom nav (docs/bottom-nav-spec.md)", () => {
 });
 
 describe("MapWrapper — phone venue sheet hides the bottom chrome (§10)", () => {
-  test("sponsor credit, bar and fade band all step aside while a venue sheet is open (Kyle, 2026-09-16)", async () => {
+  test("bar and fade band step aside while a venue sheet is open (§10)", async () => {
     // Every media query matches → phone layout (isMobile, below 2xl).
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -257,11 +257,19 @@ describe("MapWrapper — phone venue sheet hides the bottom chrome (§10)", () =
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
     });
     expect(screen.getByTestId("map-canvas").getAttribute("data-selected-venue-id")).toBe(venues[0].id);
-    // DOM queries, not role queries: vaul's modal sheet aria-hides its
-    // siblings, so a role query would miss a credit that is still painted.
-    const credit = document.querySelector<HTMLElement>('a[href="https://pueblofoodproject.org/"]');
-    expect(credit?.parentElement?.style.display).toBe("none");
+    // DOM queries, not role queries: vaul's modal sheet aria-hides its siblings.
     expect(document.querySelector("[data-bottom-nav]")).toBeNull();
     expect(screen.queryByTestId("nav-fade-band")).toBeNull();
+  });
+});
+
+describe("MapWrapper — sponsor credit lives in the Menu, not on the map (Kyle, 2026-09-16)", () => {
+  test("the map shows no sponsor link; Menu opens with one to pueblofoodproject.org", async () => {
+    await renderAndLoadMap();
+    expect(document.querySelector('a[href="https://pueblofoodproject.org/"]')).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Menu$/i }));
+    const card = screen.getByTestId("menu-sponsor");
+    expect(card.getAttribute("href")).toBe("https://pueblofoodproject.org/");
+    expect(card.getAttribute("target")).toBe("_blank");
   });
 });

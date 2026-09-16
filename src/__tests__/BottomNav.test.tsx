@@ -117,3 +117,13 @@ describe("BottomNav", () => {
     expect(screen.getByRole("navigation", { name: "Main" })).toBeDefined();
   });
 });
+
+describe("BottomNav — 2xl pill floats bottom-centre (Kyle, 2026-09-16)", () => {
+  test("carries the bottom-centre classes, not the old beside-the-search-box ones", () => {
+    renderNav();
+    const nav = screen.getByRole("navigation");
+    for (const c of ["2xl:bottom-6", "2xl:left-1/2", "2xl:-translate-x-1/2"]) expect(nav.className).toContain(c);
+    expect(nav.className).not.toContain("272px");
+    expect(nav.className).not.toContain("2xl:top-");
+  });
+});

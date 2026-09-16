@@ -239,3 +239,29 @@ describe("MapWrapper — bottom nav (docs/bottom-nav-spec.md)", () => {
     expect(screen.getByRole("button", { name: /^Map$/i }).getAttribute("aria-pressed")).toBe("true");
   });
 });
+
+describe("MapWrapper — phone venue sheet hides the bottom chrome (§10)", () => {
+  test("sponsor credit, bar and fade band all step aside while a venue sheet is open (Kyle, 2026-09-16)", async () => {
+    // Every media query matches → phone layout (isMobile, below 2xl).
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }),
+    });
+    const { venues } = await import("@/data/venues");
+    await act(async () => {
+      render(
+        <LocaleProvider>
+          <MapWrapper initialVenueId={venues[0].id} />
+        </LocaleProvider>,
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+    expect(screen.getByTestId("map-canvas").getAttribute("data-selected-venue-id")).toBe(venues[0].id);
+    // DOM queries, not role queries: vaul's modal sheet aria-hides its
+    // siblings, so a role query would miss a credit that is still painted.
+    const credit = document.querySelector<HTMLElement>('a[href="https://pueblofoodproject.org/"]');
+    expect(credit?.parentElement?.style.display).toBe("none");
+    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
+    expect(screen.queryByTestId("nav-fade-band")).toBeNull();
+  });
+});

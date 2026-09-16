@@ -21,7 +21,7 @@
 
 import type { RefObject } from "react";
 import Link from "next/link";
-import { Locate, LocateFixed, Loader2, Heart, HandHelping, Menu } from "lucide-react";
+import { Locate, LocateFixed, Loader2, Star, HandHelping, Menu } from "lucide-react";
 import type { GeoState } from "@/lib/useGeolocation";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
@@ -143,7 +143,8 @@ export default function BottomNav({
             {isLocating ? t("locate.locating", locale) : ""}
           </span>
         </li>
-        {sectionItem("saved", t("nav.saved", locale), <Heart aria-hidden className={ICON_CLASS} />)}
+        {/* Star, not heart: matches the save button on every venue card (Kyle, 2026-09-16). */}
+        {sectionItem("saved", t("nav.saved", locale), <Star aria-hidden className={ICON_CLASS} />)}
         {/* Resources opens its own page (/resources) — Kyle, 2026-09-16: as a
             drawer section it looked like it did the same thing as Menu. */}
         <li className="flex flex-1 2xl:flex-none 2xl:h-11">

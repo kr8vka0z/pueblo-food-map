@@ -84,6 +84,14 @@ or any data path.
 
 ## 3. The bottom bar
 
+> **Amended 2026-09-16 by Kyle (floating pill):** below `2xl` the bar is now a 64px floating
+> pill — `left/right: 12px`, `bottom: 12px + safe-area inset`, `bone-50`, `bone-300` border,
+> full radius, matching the search bar and the `2xl` pill. Icon still sits above the word
+> (the one-line laptop layout measured ~407px wide, wider than a 393px phone). Cells stay
+> ~90px wide. `BOTTOM_NAV_HEIGHT_PX` is now 76 (pill + gap) and every clearance uses it; the
+> §8 fade band is deleted (nothing spans the bottom edge to fade behind); credits sit 8px
+> above the pill. §3.1's geometry below is the original full-width bar.
+
 ### 3.1 Geometry and appearance
 
 **The decision:**

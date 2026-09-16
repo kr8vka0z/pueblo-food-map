@@ -53,12 +53,6 @@ export function useMapUI() {
   // ── Desktop window expanded state (PR 5) ───────────────────────────────────
   const [windowExpanded, setWindowExpanded] = useState(false);
 
-  // ── BottomSheet snap state — (the map sponsor credit it once hid is gone, #459)
-  const [sheetFullyExpanded, setSheetFullyExpanded] = useState(false);
-
-  // Reset expanded state when a new venue is selected (issue #122).
-  useEffect(() => { queueMicrotask(() => setSheetFullyExpanded(false)); }, [selectedVenueId]);
-
   // ── Map instance — passed up from Map via onMapReady ───────────────────────
   // Typed as mapboxgl.Map; MapWrapper uses it for flyTo/fitBounds calls.
   const [mapboxMap, setMapboxMap] = useState<mapboxgl.Map | null>(null);
@@ -74,8 +68,6 @@ export function useMapUI() {
     showVenueOnMap,
     windowExpanded,
     setWindowExpanded,
-    sheetFullyExpanded,
-    setSheetFullyExpanded,
     mapboxMap,
     setMapboxMap,
   };

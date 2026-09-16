@@ -300,7 +300,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     showVenueOnMap,
     windowExpanded,
     setWindowExpanded,
-    setSheetFullyExpanded,
     mapboxMap,
     setMapboxMap,
   } = useMapUI();
@@ -1294,11 +1293,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         <BottomSheet
           key={selectedVenueId ?? "empty"}
           venue={selectedVenue}
-          onClose={() => {
-            setSelectedVenueId(null);
-            setSheetFullyExpanded(false);
-          }}
-          onExpandedChange={setSheetFullyExpanded}
+          onClose={() => setSelectedVenueId(null)}
           onWalkRoute={handleWalkRoute}
           isWalkRouteActive={
             selectedVenueId !== null && walkingRouteVenueId === selectedVenueId

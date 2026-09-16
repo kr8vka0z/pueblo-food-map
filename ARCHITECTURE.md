@@ -270,7 +270,6 @@ Key state atoms and their roles:
 | `bannerVisible` | `boolean` | Location-denied banner after an active re-tap |
 | `outsideCountyVisible` | `boolean` | Toast when resolved position is outside Pueblo County |
 | `isPopoverOpen / activeIndex` | `boolean / number` | Typeahead popover ARIA state |
-| `sheetFullyExpanded` | `boolean` | Bottom sheet snap; hides SponsorCredit when true |
 | `windowExpanded` | `boolean` | Desktop venue window expanded state |
 | `mapboxMap` | `mapboxgl.Map \| null` | Map instance; received via `onMapReady` callback from Map.tsx |
 | `walkingRoute` | `WalkingRouteGeoJSON \| null` | Active walking route GeoJSON (Mapbox Directions API) — passed to Map.tsx as a prop |

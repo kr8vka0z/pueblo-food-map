@@ -29,10 +29,11 @@ Browser
         ├── DesktopVenueWindow.tsx  (desktop: marker-anchored detail panel)
         ├── SearchBar / SearchResultsPopover / CategoryDropdown
         │     (SearchBar also hosts the Map/List view toggle, #191)
-        ├── LocateButton     (geolocate + drift / re-center)
-        ├── HamburgerMenu    (saved places, help links, language, view toggle
-        │     — same toggle, kept here too as the low-frequency fallback)
-        └── ListView         (full-screen nearest-first list, map mode off)
+        ├── HamburgerMenu    (the drawer: saved places, help links, language;
+        │     controlled — opened by BottomNav at a section)
+        ├── ListView         (full-screen nearest-first list, map mode off)
+        └── BottomNav        (Near me · Saved · Resources · Menu — bar below xl,
+              pill beside the search box at xl+; docs/bottom-nav-spec.md)
 
 Shared utility components
   └── src/components/SiteFooter.tsx  (slim nav footer on utility pages: /about, /privacy, /suggest, /feedback)
@@ -263,7 +264,7 @@ Key state atoms and their roles:
 | `activeCategoryFilter` | `VenueCategory \| null` | Single-select from category dropdown; syncs into `selectedCategories` and triggers autozoom |
 | `filterOpenNow / filterSnap / filterWic / filterFavorites` | `boolean` | Boolean filter toggles |
 | `isDrifted` | `boolean` | True when user-location dot has left the visible viewport — shows "Re-center" button |
-| `isLocating` | `boolean` | True while a geo request is in-flight — shows spinner in LocateButton |
+| `isLocating` | `boolean` | True while a geo request is in-flight — shows spinner on BottomNav's "Near me" |
 | `bannerVisible` | `boolean` | Location-denied banner after an active re-tap |
 | `outsideCountyVisible` | `boolean` | Toast when resolved position is outside Pueblo County |
 | `isPopoverOpen / activeIndex` | `boolean / number` | Typeahead popover ARIA state |
@@ -287,7 +288,7 @@ Key state atoms and their roles:
 ```
 Walk tapped, userLocation === null
   → handleWalkRoute stashes venue.id in walkAwaitingVenueIdRef
-  → calls handleLocateRequest()   (same geo.request() flow the locate button uses)
+  → calls handleLocateRequest()   (same geo.request() flow "Near me" uses)
   → resume effect watches geo.state, applies decideWalkResume(awaitingVenueId, selectedVenueId, geo.state):
       granted + position     → fetchWalkingRoute(venue, position)   — draws the real route
       denied / unavailable   → setWalkLocationHintVenueId(venue.id) — "share your location" hint, no route
@@ -308,7 +309,8 @@ Walk tapped, userLocation === null
 **Geolocation flow:**
 
 ```
-User taps LocateButton
+User taps "Near me" (BottomNav)
+  → handleNearMe() switches to map view if in list view, then
   → handleLocateRequest()
     → stamps userRequestedAtRef
     → increments recenterRequestId  (Map.tsx flyTo fires even if position unchanged)
@@ -869,7 +871,7 @@ stale non-zero summary right after a publish that already succeeded.
 
 **Why sage, not orange, for the Publish button.** DESIGN.md scopes
 brand-orange to exactly two elements, both on the *public* map (the splash
-CTA, the LocateButton pill), with an explicit Don't against reuse
+CTA, and formerly the LocateButton pill), with an explicit Don't against reuse
 elsewhere — extending it to a third, admin-only context would break that
 rule. Filled sage-500/sage-600-hover is already this admin surface's
 established primary-action treatment (`AddVenueForm`'s submit button,

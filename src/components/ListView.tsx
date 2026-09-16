@@ -42,7 +42,10 @@ export default function ListView({
         {t("freshness.updated", locale, { date: formatPublishedDate(publishedAt, locale) })}
       </p>
       {notice ? <div className="shrink-0">{notice}</div> : null}
-      <div className="flex-1 overflow-y-auto overscroll-contain pb-6">
+      {/* Below xl the bottom nav bar sits over the list's last row; the extra
+          bottom padding lets the final card scroll fully clear of it
+          (docs/bottom-nav-spec.md §10 — fails only on the last row, easy to miss). */}
+      <div className="flex-1 overflow-y-auto overscroll-contain pb-[calc(78px+env(safe-area-inset-bottom)+24px)] xl:pb-6">
         {venues.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 px-6 pt-16 text-center">
             <p className="text-base text-[var(--color-ink-500)]">{t("empty.title", locale)}</p>

@@ -1,7 +1,8 @@
 # Pueblo Food Access Map — Bottom Navigation & View Switch Specification
 
-**Status:** v1.0 — design approved by Kyle 2026-09-16; **specification proposed,
-awaiting sign-off**. Not implemented.
+**Status:** v1.0 — design approved by Kyle 2026-09-16. **Implemented on branch
+`feat/bottom-nav`** (PR to `dev`) — see that PR for measured values and the one
+open question on §5 at exactly 1280px.
 **Author:** Atlas (Claude Opus 5), 2026-09-16.
 **Scope:** Replaces the floating navy hamburger button, the orange "Find food near me"
 map banner, and the desktop "Pueblo Food Map" wordmark with a single persistent

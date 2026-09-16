@@ -12,7 +12,6 @@
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { SITE_URL, buildPageMetadata } from "@/lib/site";
 import sitemap from "@/app/sitemap";
 import { groupVenuesByCategory } from "@/app/venues/page";
@@ -184,9 +183,7 @@ describe("groupVenuesByCategory", () => {
 
 describe("HamburgerMenu — venues directory link", () => {
   test("panel contains a link to /venues (EN)", async () => {
-    const user = userEvent.setup();
-    render(<HamburgerMenu locale="en" />);
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} />);
     await waitFor(() => {
       const link = screen.getByRole("link", {
         name: new RegExp(t("nav.venuesList", "en"), "i"),

@@ -4,7 +4,7 @@
  * Covers the primary entry surfaces:
  *   1. SplashScreen — first-visit gate (PR 3)
  *   2. SearchBar — floating search bar above map (PR 6)
- *   3. LocateButton — geolocation trigger (idle / granted / denied states)
+ *   3. BottomNav — Near me / Saved / Resources / Menu (idle / locating / open states)
  *   4. LocationDeniedBanner — permission-denied overlay (PR 7)
  *   5. VenueMarker — Mapbox marker button (PR 45, Mapbox migration)
  *
@@ -28,7 +28,6 @@
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import type AxeCore from "axe-core";
 import type { Venue } from "@/types/venue";
@@ -104,9 +103,9 @@ describe("SearchBar a11y", () => {
   });
 });
 
-// ─── LocateButton ─────────────────────────────────────────────────────────────
+// ─── BottomNav (replaced LocateButton — docs/bottom-nav-spec.md §6, §12) ───────
 
-import LocateButton from "@/components/LocateButton";
+import BottomNav from "@/components/BottomNav";
 import type { GeoState } from "@/lib/useGeolocation";
 
 const GEO_IDLE: GeoState = { permission: "prompt", position: null };
@@ -114,46 +113,15 @@ const GEO_GRANTED: GeoState = {
   permission: "granted",
   position: { lat: 38.2544, lng: -104.6091 },
 };
-const GEO_DENIED: GeoState = { permission: "denied", position: null };
 
-describe("LocateButton a11y", () => {
-  test("findFood state has no axe violations", async () => {
-    const { container } = render(
-      <LocateButton geoState={GEO_IDLE} isLocating={false} isDrifted={false} onRequest={vi.fn()} />,
-    );
-    const results = await runAxe(container);
-    expect(
-      results.violations.length,
-      `Violations found:\n${describeViolations(results)}`,
-    ).toBe(0);
-  });
-
-  test("locating state has no axe violations", async () => {
-    const { container } = render(
-      <LocateButton geoState={GEO_IDLE} isLocating={true} isDrifted={false} onRequest={vi.fn()} />,
-    );
-    const results = await runAxe(container);
-    expect(
-      results.violations.length,
-      `Violations found:\n${describeViolations(results)}`,
-    ).toBe(0);
-  });
-
-  test("reCenter state has no axe violations", async () => {
-    const { container } = render(
-      <LocateButton geoState={GEO_GRANTED} isLocating={false} isDrifted={true} onRequest={vi.fn()} />,
-    );
-    const results = await runAxe(container);
-    expect(
-      results.violations.length,
-      `Violations found:\n${describeViolations(results)}`,
-    ).toBe(0);
-  });
-
-  test("denied state (findFood) has no axe violations", async () => {
-    const { container } = render(
-      <LocateButton geoState={GEO_DENIED} isLocating={false} isDrifted={false} onRequest={vi.fn()} />,
-    );
+describe("BottomNav a11y", () => {
+  const cases: Array<[string, React.ComponentProps<typeof BottomNav>]> = [
+    ["idle, nothing open", { locale: "en", openSection: null, onSectionTap: vi.fn(), geoState: GEO_IDLE, isLocating: false, isDrifted: false, onNearMe: vi.fn() }],
+    ["locating", { locale: "en", openSection: null, onSectionTap: vi.fn(), geoState: GEO_IDLE, isLocating: true, isDrifted: false, onNearMe: vi.fn() }],
+    ["located + drifted, Saved open", { locale: "es", openSection: "saved", onSectionTap: vi.fn(), geoState: GEO_GRANTED, isLocating: false, isDrifted: true, onNearMe: vi.fn() }],
+  ];
+  test.each(cases)("%s has no axe violations", async (_label, props) => {
+    const { container } = render(<BottomNav {...props} />);
     const results = await runAxe(container);
     expect(
       results.violations.length,
@@ -255,19 +223,8 @@ describe("HamburgerMenu a11y", () => {
     });
   });
 
-  test("closed state (trigger only) has no axe violations", async () => {
-    const { container } = render(<HamburgerMenu />);
-    const results = await runAxe(container);
-    expect(
-      results.violations.length,
-      `Violations found:\n${describeViolations(results)}`,
-    ).toBe(0);
-  });
-
   test("open state has no axe violations", async () => {
-    const user = userEvent.setup();
-    const { container } = render(<HamburgerMenu />);
-    await user.click(container.querySelector("button")!);
+    const { container } = render(<HamburgerMenu open onClose={vi.fn()} />);
     const results = await runAxe(container);
     expect(
       results.violations.length,

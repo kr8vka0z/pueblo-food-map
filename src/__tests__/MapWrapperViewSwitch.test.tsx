@@ -5,10 +5,9 @@
  * Covers, at the real-MapWrapper level (the acceptance criteria this issue
  * named): the switch renders inside the search bar in both view states,
  * clicking it actually switches the view, aria-pressed tracks the active
- * view, and a query/category filter survives a view switch. The
- * HamburgerMenu's own View row (unremoved by this issue — "menu stays for
- * less frequent actions") is exercised too, proving the two share one
- * viewMode source and can't drift out of sync.
+ * view, and a query/category filter survives a view switch. The bottom
+ * nav (docs/bottom-nav-spec.md) is covered at this level too: one switch
+ * only, aria-current on the open panel's item, the fade band, Near me.
  *
  * Mocking recipe (WebGL/next-dynamic/Map/DesktopVenueWindow) copied
  * verbatim from MapWrapperDeferredLoad.test.tsx — see that file's header
@@ -194,24 +193,49 @@ describe("MapWrapper — category filter survives a view switch (#191)", () => {
   });
 });
 
-describe("MapWrapper — inline switch and HamburgerMenu's View row stay in sync (#191)", () => {
-  test("switching via the inline control updates the menu's own ViewToggle too", async () => {
+describe("MapWrapper — bottom nav (docs/bottom-nav-spec.md)", () => {
+  test("the Map/List switch exists exactly once — the drawer no longer carries its own (§4.4)", async () => {
     await renderAndLoadMap();
+    fireEvent.click(screen.getByRole("button", { name: /^Menu$/i }));
+    expect(screen.getByRole("menu")).toBeDefined();
+    expect(screen.getAllByRole("group", { name: /choose map or list view/i })).toHaveLength(1);
+  });
 
-    // Switch to list via the inline (SearchBar) control.
+  test("no nav item is current until its panel opens; then only that one is (§3.3)", async () => {
+    await renderAndLoadMap();
+    const nav = screen.getByRole("navigation");
+    expect(nav.querySelectorAll("[aria-current]")).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Saved$/i }));
+    const current = nav.querySelectorAll("[aria-current]");
+    expect(current).toHaveLength(1);
+    expect(current[0].textContent).toBe("Saved");
+
+    // Tapping the open item again closes the drawer and clears the state.
+    fireEvent.click(screen.getByRole("button", { name: /^Saved$/i }));
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(nav.querySelectorAll("[aria-current]")).toHaveLength(0);
+  });
+
+  test("the fade band is decorative and non-interactive, map mode only (§8, §13 test 5)", async () => {
+    await renderAndLoadMap();
+    const band = screen.getByTestId("nav-fade-band");
+    expect(band.getAttribute("aria-hidden")).toBe("true");
+    // pointer-events: none lives on .nav-fade-band in globals.css (jsdom loads
+    // no stylesheet), so assert the element carries that class.
+    expect(band.className).toContain("nav-fade-band");
+
     fireEvent.click(screen.getByRole("button", { name: /^List$/i }));
+    expect(screen.queryByTestId("nav-fade-band")).toBeNull();
+    // The bar itself persists in list mode.
+    expect(screen.getByRole("navigation")).toBeDefined();
+  });
 
-    // Open the hamburger menu — it renders its own ViewToggle (unremoved by
-    // this issue, per "menu stays for less frequent actions").
-    fireEvent.click(screen.getByRole("button", { name: /open menu/i }));
-
-    const groups = screen.getAllByRole("group", { name: /choose map or list view/i });
-    expect(groups).toHaveLength(2); // inline (SearchBar) + menu row, both mounted now
-
-    const listButtons = screen.getAllByRole("button", { name: /^List$/i });
-    // Both instances must already read "pressed" — same viewMode state, no drift.
-    listButtons.forEach((btn) => {
-      expect(btn.getAttribute("aria-pressed")).toBe("true");
-    });
+  test("Near me from list view returns to the map (§6)", async () => {
+    await renderAndLoadMap();
+    fireEvent.click(screen.getByRole("button", { name: /^List$/i }));
+    expect(screen.getByRole("button", { name: /^List$/i }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: /^Near me$/i }));
+    expect(screen.getByRole("button", { name: /^Map$/i }).getAttribute("aria-pressed")).toBe("true");
   });
 });

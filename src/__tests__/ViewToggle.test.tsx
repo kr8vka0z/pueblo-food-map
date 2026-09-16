@@ -124,33 +124,33 @@ describe("ViewToggle — mapDisabled (#191 follow-up)", () => {
   });
 });
 
-describe("ViewToggle — inactive label is sr-only on phones at size=md (#191 follow-up)", () => {
-  // WHY these assert on class names rather than computed styles: jsdom does
-  // not evaluate Tailwind's generated CSS or media queries, so the responsive
-  // behaviour itself is not observable here. What IS worth locking down is
-  // that the label text stays in the DOM (and therefore in the accessibility
-  // tree) rather than being removed — that is the property that keeps the
-  // icon-only button reachable by a screen reader.
-  test("inactive label text remains queryable by accessible name at size=md", () => {
-    render(<ViewToggle mode="map" onChange={vi.fn()} size="md" />);
-    expect(screen.getByRole("button", { name: /^List$/i })).toBeDefined();
-    expect(screen.getByRole("button", { name: /^Map$/i })).toBeDefined();
-  });
-
-  test("only the inactive label carries the sr-only visual-hiding classes", () => {
+describe("ViewToggle — labels at size=md (docs/bottom-nav-spec.md §4.1, §4.3)", () => {
+  // WHY class names rather than computed styles: jsdom does not evaluate
+  // Tailwind's generated CSS or media queries. The contract worth locking down
+  // is which spans carry visual-hiding classes, and that label text always
+  // stays in the accessibility tree.
+  test("both labels render as visible text by default (§13 test 6 — the §4 regression guard)", () => {
     const { container } = render(<ViewToggle mode="map" onChange={vi.fn()} size="md" />);
     const spans = Array.from(container.querySelectorAll("span"));
     const mapSpan = spans.find((s) => s.textContent === "Map");
     const listSpan = spans.find((s) => s.textContent === "List");
-    expect(mapSpan?.className ?? "").not.toContain("sr-only");
-    expect(listSpan?.className ?? "").toContain("sr-only");
-    expect(listSpan?.className ?? "").toContain("md:not-sr-only");
+    expect(mapSpan).toBeDefined();
+    expect(listSpan).toBeDefined();
+    for (const span of [mapSpan, listSpan]) {
+      expect(span?.className ?? "").not.toContain("sr-only");
+    }
   });
 
-  test('size="sm" never hides a label — the menu row has room for both', () => {
-    const { container } = render(<ViewToggle mode="map" onChange={vi.fn()} size="sm" />);
-    for (const span of Array.from(container.querySelectorAll("span"))) {
-      expect(span.className ?? "").not.toContain("sr-only");
+  test("collapseLabelsNarrow hides BOTH labels under 400px only, keeping accessible names", () => {
+    const { container } = render(
+      <ViewToggle mode="map" onChange={vi.fn()} size="md" collapseLabelsNarrow />,
+    );
+    const spans = Array.from(container.querySelectorAll("span"));
+    expect(spans).toHaveLength(2);
+    for (const span of spans) {
+      expect(span.className).toBe("max-[400px]:sr-only");
     }
+    expect(screen.getByRole("button", { name: /^Map$/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /^List$/i })).toBeDefined();
   });
 });

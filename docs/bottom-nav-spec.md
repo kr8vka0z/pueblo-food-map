@@ -269,8 +269,14 @@ first-time visitor sees first.
 > WIC, Double Up Food Bucks, the Food Resource Hotline, Everyday Eats — saying what it
 > is, what it's good for and how to get it, with call / text / website buttons. The
 > drawer's five "Get help" links were replaced by a single "Food help programs" link to
-> the same page, and `initialSection` lost `"help"`. Saved still uses the drawer as
-> described below. The original decision is kept for the record.
+> the same page, and `initialSection` lost `"help"`.
+>
+> **Amended 2026-09-16 by Kyle — Saved is its own view.** With nothing saved, the Saved
+> section didn't render, so Saved opened the plain menu — again the same as Menu. The
+> prop is now `view?: "top" | "saved"`. `"saved"` shows only the saved places (tap one to
+> open it on the map), or an empty state — "No saved places yet / Tap the star on any
+> place to save it" — when there are none; its header reads "Saved places". `"top"` is
+> the menu, and no longer lists saved places. The original decision is kept for the record.
 
 **The original decision:** `HamburgerMenu.tsx` keeps its drawer and its contents unchanged. It
 gains one prop:

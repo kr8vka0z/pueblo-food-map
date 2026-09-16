@@ -1,12 +1,15 @@
 "use client";
 
 /**
- * HamburgerMenu — the app drawer: saved places, links (including the
- * /resources page), language. Controlled; it has no trigger of its own.
+ * HamburgerMenu — the app drawer. Controlled; it has no trigger of its own.
  *
- * Opened by BottomNav's Saved / Menu items (docs/bottom-nav-spec.md §7), each
- * passing `initialSection` so the drawer scrolls that section into view.
- * Resources is a page now, not a drawer section. The navy trigger button this used to own was deleted with the bottom
+ * Opened by BottomNav (docs/bottom-nav-spec.md §7) in one of two views:
+ *   - "top"   (Menu)  — links (including /resources) and language.
+ *   - "saved" (Saved) — ONLY the saved places, or an empty state when there
+ *     are none. WHY two views, not one drawer scrolled to a section: with
+ *     nothing saved the Saved section didn't render, so Saved opened the
+ *     plain menu and looked like the same button as Menu (Kyle, 2026-09-16).
+ * The navy trigger button this used to own was deleted with the bottom
  * nav, as was its Map/List row — that switch lives in the search box (§4.4).
  *
  * Desktop (≥768px): ~280px dropdown top-right, below the search row.
@@ -27,7 +30,7 @@
  */
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, HandHelping } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, HandHelping, Star } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
@@ -46,7 +49,7 @@ interface HamburgerMenuProps {
    * Re-shows the splash WITHOUT clearing localStorage.
    */
   onShowWelcome?: () => void;
-  /** Favorited venues (nearest-first), shown in the "Saved places" section (#132). */
+  /** Favorited venues (nearest-first), shown in the "saved" view (#132). */
   savedVenues?: Array<Venue & { distanceMiles?: number }>;
   /** Called when a saved venue row is tapped — selects it on the map. */
   onSelectVenue?: (id: string) => void;
@@ -54,16 +57,11 @@ interface HamburgerMenuProps {
   open: boolean;
   /** Called when the drawer asks to close (X, Escape, outside tap, item picked). */
   onClose: () => void;
-  /** Section scrolled into view on open, and again whenever it changes while open (§7). */
-  initialSection?: MenuSection;
+  /** Which view the drawer shows: the menu ("top") or the saved places ("saved"). */
+  view?: MenuSection;
   /** The nav bar — pointerdowns inside it are not "outside" (it toggles the drawer itself). */
   ignoreOutsideRef?: RefObject<HTMLElement | null>;
 }
-
-/** DOM ids of the sections BottomNav can open the drawer at. */
-const SECTION_IDS: Record<Exclude<MenuSection, "top">, string> = {
-  saved: "menu-section-saved",
-};
 
 // All focusable elements inside the panel for tab-trap.
 const FOCUSABLE =
@@ -76,7 +74,7 @@ export default function HamburgerMenu({
   onSelectVenue,
   open,
   onClose,
-  initialSection = "top",
+  view = "top",
   ignoreOutsideRef,
 }: HamburgerMenuProps) {
   const { locale: ctxLocale } = useLocale();
@@ -177,22 +175,10 @@ export default function HamburgerMenu({
     };
   }, [open]);
 
-  // ── Scroll the requested section into view (§7) ─────────────────────────────
-  // Declared after the focus-trap effect so it runs after focus lands on the
-  // close button at the top. Re-runs when the section changes while open
-  // (Saved → Menu).
-  //
-  // ponytail: scroll-into-view is the whole mechanism. Ceiling: if Saved
-  // ever grows past a screenful of its own, it wants a real page — as
-  // Resources already got (/resources).
+  // Switching views while open (Saved → Menu) starts the new view at the top.
   useEffect(() => {
-    if (!open || !panelRef.current) return;
-    const target =
-      initialSection === "top" ? null : document.getElementById(SECTION_IDS[initialSection]);
-    // No saved places yet → the Saved section isn't rendered; stay at the top.
-    if (target) target.scrollIntoView?.({ block: "start" });
-    else panelRef.current.scrollTop = 0;
-  }, [open, initialSection]);
+    if (open && panelRef.current) panelRef.current.scrollTop = 0;
+  }, [open, view]);
 
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const isBelow2xl = useMediaQuery(BELOW_2XL_QUERY);
@@ -237,7 +223,7 @@ export default function HamburgerMenu({
         top: "calc(52px + 8px)",
         right: 0,
         width: "280px",
-        // Bounded so it scrolls (initialSection needs that) and clears the bar below 2xl.
+        // Bounded so a long saved list scrolls and the drawer clears the bar below 2xl.
         maxHeight: `calc(100dvh - 92px - ${barClearance})`,
         zIndex: 1002,
         backgroundColor: "white",
@@ -288,7 +274,7 @@ export default function HamburgerMenu({
               className="text-base font-semibold text-[var(--color-ink-800)]"
               aria-hidden="true"
             >
-              {t("menu.title", locale)}
+              {t(view === "saved" ? "menu.saved.heading" : "menu.title", locale)}
             </span>
             <button
               type="button"
@@ -311,18 +297,13 @@ export default function HamburgerMenu({
             </button>
           </div>
 
-          {/* Menu item list — About is the last item (#124) */}
-          <ul role="menu" aria-label={menuLabel} className="py-2">
-            {/* Saved places (#132) — favorited venues; tap to open on the map */}
-            {savedVenues.length > 0 && (
-              <>
-                <li role="presentation" className="pt-1">
-                  <p id={SECTION_IDS.saved} className="scroll-mt-2 px-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
-                    {t("menu.saved.heading", locale)}
-                  </p>
-                </li>
+          {view === "saved" ? (
+            // Plain list, not role="menu": these are buttons in a dialog-like
+            // panel, and the empty state is prose, not a menu item.
+            savedVenues.length > 0 ? (
+              <ul aria-label={t("menu.saved.heading", locale)} className="py-2">
                 {savedVenues.map((v) => (
-                  <li role="menuitem" key={v.id}>
+                  <li key={v.id}>
                     <button
                       type="button"
                       onClick={() => {
@@ -350,82 +331,93 @@ export default function HamburgerMenu({
                     </button>
                   </li>
                 ))}
-                <li
-                  role="presentation"
-                  aria-hidden="true"
-                  className="mt-1 mb-1 border-t border-[var(--color-bone-200)]"
+              </ul>
+            ) : (
+              <div className="flex flex-col items-center text-center gap-2 px-6 py-10">
+                <Star size={28} aria-hidden className="text-[var(--color-ink-400)]" />
+                <p className="text-base font-semibold text-[var(--color-ink-800)]">
+                  {t("menu.saved.emptyTitle", locale)}
+                </p>
+                <p className="text-sm text-[var(--color-ink-600)] leading-relaxed">
+                  {t("menu.saved.emptyBody", locale)}
+                </p>
+              </div>
+            )
+          ) : (
+            <>
+              {/* Menu item list — About is the last item (#124) */}
+              <ul role="menu" aria-label={menuLabel} className="py-2">
+                {/* Show welcome screen (#99) — re-shows splash without clearing localStorage */}
+                {onShowWelcome && (
+                  <HamburgerMenuItem
+                    label={t("menu.showWelcome", locale)}
+                    onClick={() => {
+                      close();
+                      onShowWelcome();
+                    }}
+                    icon={<RotateCcw size={14} />}
+                  />
+                )}
+                {/* Suggest a venue (#71) */}
+                <HamburgerMenuItem
+                  label={t("menu.suggest", locale)}
+                  href="/suggest"
+                  icon={<MapPinPlus size={14} />}
                 />
-              </>
-            )}
-            {/* Show welcome screen (#99) — re-shows splash without clearing localStorage */}
-            {onShowWelcome && (
-              <HamburgerMenuItem
-                label={t("menu.showWelcome", locale)}
-                onClick={() => {
-                  close();
-                  onShowWelcome();
-                }}
-                icon={<RotateCcw size={14} />}
-              />
-            )}
-            {/* Suggest a venue (#71) */}
-            <HamburgerMenuItem
-              label={t("menu.suggest", locale)}
-              href="/suggest"
-              icon={<MapPinPlus size={14} />}
-            />
-            {/* Send us feedback (#116) */}
-            <HamburgerMenuItem
-              label={t("menu.feedback", locale)}
-              href="/feedback"
-              icon={<MessageSquare size={14} />}
-            />
-            {/* About this map (#155) — internal link, no external icon */}
-            <HamburgerMenuItem
-              label={t("nav.about", locale)}
-              href="/about"
-              icon={<Info size={14} />}
-            />
-            {/* Browse all venues (#PR4) — internal link to the full directory */}
-            <HamburgerMenuItem
-              label={t("nav.venuesList", locale)}
-              href="/venues"
-              icon={<List size={14} />}
-            />
+                {/* Send us feedback (#116) */}
+                <HamburgerMenuItem
+                  label={t("menu.feedback", locale)}
+                  href="/feedback"
+                  icon={<MessageSquare size={14} />}
+                />
+                {/* About this map (#155) — internal link, no external icon */}
+                <HamburgerMenuItem
+                  label={t("nav.about", locale)}
+                  href="/about"
+                  icon={<Info size={14} />}
+                />
+                {/* Browse all venues (#PR4) — internal link to the full directory */}
+                <HamburgerMenuItem
+                  label={t("nav.venuesList", locale)}
+                  href="/venues"
+                  icon={<List size={14} />}
+                />
 
-            {/* Food help programs — the five external links that lived here
-                (#131) moved to the /resources page, which explains each one;
-                the bottom nav's Resources item goes there too. */}
-            <HamburgerMenuItem
-              label={t("nav.resourcesPage", locale)}
-              href="/resources"
-              icon={<HandHelping size={14} />}
-            />
+                {/* Food help programs — the five external links that lived here
+                    (#131) moved to the /resources page, which explains each one;
+                    the bottom nav's Resources item goes there too. */}
+                <HamburgerMenuItem
+                  label={t("nav.resourcesPage", locale)}
+                  href="/resources"
+                  icon={<HandHelping size={14} />}
+                />
 
-            {/* About Pueblo Food Project (#96) — moved to the bottom of the nav
-                links per #124; sits above the language control (kept last per #109). */}
-            <HamburgerMenuItem
-              label={t("menu.about", locale)}
-              href="https://pueblofoodproject.org/about/"
-              isExternal={true}
-              icon={<ExternalLink size={14} />}
-              ariaLabel={externalAriaLabel("menu.about")}
-            />
-          </ul>
-          {/* Language toggle (#109) — placed OUTSIDE role="menu" because LanguageToggle
-              is a composite widget (role="group" with aria-pressed buttons), not a
-              menuitem. WAI-ARIA aria-required-children requires menu children to be
-              menuitem, group > menuitem, or separator — a group without menuitem
-              children is non-conformant. Moving the toggle below the <ul> keeps the
-              visual position while satisfying the ARIA constraint. */}
-          <div
-            className="flex items-center justify-between px-5 py-3 border-t border-[var(--color-bone-200)]"
-          >
-            <span className="text-sm font-medium text-[var(--color-ink-800)]">
-              {t("menu.language", locale)}
-            </span>
-            <LanguageToggle />
-          </div>
+                {/* About Pueblo Food Project (#96) — moved to the bottom of the nav
+                    links per #124; sits above the language control (kept last per #109). */}
+                <HamburgerMenuItem
+                  label={t("menu.about", locale)}
+                  href="https://pueblofoodproject.org/about/"
+                  isExternal={true}
+                  icon={<ExternalLink size={14} />}
+                  ariaLabel={externalAriaLabel("menu.about")}
+                />
+              </ul>
+              {/* Language toggle (#109) — placed OUTSIDE role="menu" because LanguageToggle
+                  is a composite widget (role="group" with aria-pressed buttons), not a
+                  menuitem. WAI-ARIA aria-required-children requires menu children to be
+                  menuitem, group > menuitem, or separator — a group without menuitem
+                  children is non-conformant. Moving the toggle below the <ul> keeps the
+                  visual position while satisfying the ARIA constraint. */}
+              <div
+                className="flex items-center justify-between px-5 py-3 border-t border-[var(--color-bone-200)]"
+              >
+                <span className="text-sm font-medium text-[var(--color-ink-800)]">
+                  {t("menu.language", locale)}
+                </span>
+                <LanguageToggle />
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

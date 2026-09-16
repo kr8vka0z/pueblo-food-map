@@ -22,6 +22,7 @@ import { useEffect, useRef } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 interface LocationDeniedBannerProps {
   /** Re-request geolocation. If denied again, the parent's useEffect re-triggers. */
@@ -90,13 +91,19 @@ export default function LocationDeniedBanner({
           onClick={onDismiss}
           aria-label={t("detail.close", locale)}
           className={
-            "absolute top-2 right-2 " +
-            "w-8 h-8 " +
+            // 32px -> 44px hit area. This box is absolutely positioned via
+            // top/right, so growth is compensated by moving the anchor inward
+            // by half the size delta (6px) instead of a margin — that keeps
+            // the box's center, and therefore the icon, pinned to the same
+            // spot (mobile review #11).
+            "absolute top-[2px] right-[2px] " +
+            "w-11 h-11 " +
             "flex items-center justify-center " +
             "rounded-full " +
             "text-[var(--color-ink-500)] " +
             "hover:bg-[var(--color-bone-200)] " +
             "transition-colors duration-150 " +
+            PRESS_FEEDBACK + " " +
             "focus-visible:outline-none focus-visible:ring-2 " +
             "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-1"
           }
@@ -157,6 +164,7 @@ export default function LocationDeniedBanner({
               "underline underline-offset-2 " +
               "hover:text-[var(--color-ink-700)] " +
               "transition-colors duration-150 " +
+              PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 " +
               "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
               "rounded-sm"

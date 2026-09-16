@@ -2,6 +2,7 @@
 
 import { Map as MapIcon, List as ListIcon } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 export type ViewMode = "map" | "list";
 
@@ -30,6 +31,7 @@ export default function ViewToggle({ mode, onChange, locale = "en" }: ViewToggle
             onClick={() => onChange(m)}
             className={
               "flex items-center gap-1 px-2.5 text-xs font-semibold transition-colors duration-150 h-full " +
+              PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
               (active
                 ? "bg-[var(--color-ink-700)] text-[var(--color-bone-50)]"

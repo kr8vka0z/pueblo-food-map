@@ -28,6 +28,7 @@ import LanguageToggle from "./LanguageToggle";
 import ViewToggle, { type ViewMode } from "./ViewToggle";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
@@ -293,9 +294,13 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
               aria-label={closeLabel}
               onClick={close}
               className={
-                "flex items-center justify-center w-8 h-8 rounded-full " +
+                // 32px -> 44px hit area, negative margin cancels the growth so
+                // the header row's layout and the icon's position don't move
+                // (mobile review #11).
+                "flex items-center justify-center w-11 h-11 -m-1.5 rounded-full " +
                 "text-[var(--color-ink-500)] " +
                 "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-800)] " +
+                PRESS_FEEDBACK + " " +
                 "focus-visible:outline-none focus-visible:ring-2 " +
                 "focus-visible:ring-[var(--color-sage-500)] " +
                 "transition-colors duration-100"

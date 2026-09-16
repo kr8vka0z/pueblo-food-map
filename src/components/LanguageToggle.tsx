@@ -14,6 +14,7 @@
 
 import { useLocale } from "@/lib/LocaleContext";
 import { t, type Locale } from "@/lib/i18n";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 const LABELS: Record<Locale, string> = {
   en: "EN",
@@ -46,6 +47,7 @@ export default function LanguageToggle() {
             aria-label={`Language: ${SR_LABELS[l]}`}
             className={
               "px-3 text-xs font-semibold transition-colors duration-150 h-full " +
+              PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset " +
               "focus-visible:ring-[var(--color-sage-500)] " +
               (active

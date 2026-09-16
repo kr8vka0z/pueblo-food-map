@@ -4,6 +4,7 @@ import type { VenueCategory } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 const ALL_CATEGORIES: VenueCategory[] = [
   "pantry",
@@ -40,21 +41,33 @@ export default function CategoryChips({
         role="group"
         aria-label={t("chips.filterByCategory", locale)}
       >
-        {/* "All" chip */}
+        {/* "All" chip — the pill (span) is 36px tall, unchanged at rest; the
+            button wrapping it is 44px tall via padding, with a matching
+            negative margin so the row's own height doesn't grow (mobile
+            review #12). Filter-based press feedback on the button still
+            visually dims the pill span since CSS filter composites the
+            whole subtree. */}
         <button
           type="button"
           onClick={() => onToggle(null)}
           aria-pressed={isAll}
           className={
-            "shrink-0 flex items-center gap-1.5 px-3 h-9 rounded-full " +
-            "text-sm font-medium transition-colors duration-150 " +
-            (isAll
-              ? "bg-[var(--color-ink-700)] text-[var(--color-bone-50)]"
-              : "bg-[var(--color-bone-100)] text-[var(--color-ink-700)] hover:bg-[var(--color-bone-200)]") +
-            " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+            "shrink-0 flex items-center justify-center py-[4px] -my-[4px] rounded-full " +
+            PRESS_FEEDBACK + " " +
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
           }
         >
-          {t("category.all", locale)} · {totalCount}
+          <span
+            className={
+              "flex items-center gap-1.5 px-3 h-9 rounded-full " +
+              "text-sm font-medium transition-colors duration-150 " +
+              (isAll
+                ? "bg-[var(--color-ink-700)] text-[var(--color-bone-50)]"
+                : "bg-[var(--color-bone-100)] text-[var(--color-ink-700)] hover:bg-[var(--color-bone-200)]")
+            }
+          >
+            {t("category.all", locale)} · {totalCount}
+          </span>
         </button>
 
         {ALL_CATEGORIES.map((cat) => {
@@ -70,31 +83,35 @@ export default function CategoryChips({
               onClick={() => onToggle(cat)}
               aria-pressed={isSelected}
               className={
-                "shrink-0 flex items-center gap-1.5 px-3 h-9 rounded-full " +
-                "text-sm font-medium transition-colors duration-150 " +
+                "shrink-0 flex items-center justify-center py-[4px] -my-[4px] rounded-full " +
+                PRESS_FEEDBACK + " " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
               }
-              style={
-                isSelected
-                  ? {
-                      backgroundColor: color,
-                      color: "#FBFAF6",
-                    }
-                  : {
-                      backgroundColor: "var(--color-bone-100)",
-                      color: "var(--color-ink-700)",
-                    }
-              }
             >
-              {/* Color dot when not selected */}
-              {!isSelected && (
-                <span
-                  className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: color }}
-                  aria-hidden
-                />
-              )}
-              {t(`category.${cat}`, locale)} · {count}
+              <span
+                className="flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium transition-colors duration-150"
+                style={
+                  isSelected
+                    ? {
+                        backgroundColor: color,
+                        color: "#FBFAF6",
+                      }
+                    : {
+                        backgroundColor: "var(--color-bone-100)",
+                        color: "var(--color-ink-700)",
+                      }
+                }
+              >
+                {/* Color dot when not selected */}
+                {!isSelected && (
+                  <span
+                    className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: color }}
+                    aria-hidden
+                  />
+                )}
+                {t(`category.${cat}`, locale)} · {count}
+              </span>
             </button>
           );
         })}

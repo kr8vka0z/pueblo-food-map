@@ -237,7 +237,10 @@ export default function SearchBar({
             // roughly half of a 375px phone's ~343px pill and left the input
             // unusable next to an active category chip. 190px at md: is the
             // both-labels width, which the 520px desktop bar absorbs easily.
-            (viewSwitch ? "pr-[136px] md:pr-[190px] " : "pr-4 ") +
+            // Mobile is 168px: the switch's own 110px worst case plus the
+            // 48px it is pushed in by below (see the right-12 note), so the
+            // typed query never runs under the switch or the menu button.
+            (viewSwitch ? "pr-[168px] md:pr-[190px] " : "pr-4 ") +
             "text-base md:text-sm text-[var(--color-ink-700)] " +
             "bg-[var(--color-bone-50)] " +
             "border border-[var(--color-bone-300)] " +
@@ -263,14 +266,25 @@ export default function SearchBar({
             control's own worst-case rendered width — two buttons at px-3
             padding + 14px icon + gap-1 + the longest label pair
             ("Mapa"/"Lista", ES) — plus a small gap before the switch and the
-            pill's edge; not pixel-measured in a browser as of this commit. */}
+            pill's edge.
+
+            right-12 below MOBILE ONLY, and it is load-bearing, not spacing
+            taste: under md: the menu button (MapWrapper renders it in its own
+            absolutely-positioned layer at z-index 1002) sits flush to the
+            pill's right edge, 44px wide. At right-1 the whole List button
+            landed underneath it — measured on dev at 375px, List occupied
+            x 316-354 and the menu button x 315-359, and
+            document.elementFromPoint at the List button's own centre returned
+            the menu button, so tapping List opened the menu instead. At md:
+            and up the menu moves out to the viewport's right edge, far clear
+            of the 520px centred bar, so right-1.5 stays. */}
         {viewSwitch && (
-          <div className="absolute right-1 md:right-1.5 top-1/2 -translate-y-1/2">
+          <div className="absolute right-12 md:right-1.5 top-1/2 -translate-y-1/2">
             <ViewToggle
               mode={viewSwitch.mode}
               onChange={viewSwitch.onChange}
               locale={viewSwitch.locale}
-            mapDisabled={viewSwitch.mapDisabled}
+              mapDisabled={viewSwitch.mapDisabled}
               size="md"
             />
           </div>

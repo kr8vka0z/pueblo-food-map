@@ -15,11 +15,18 @@
  * - role="combobox" on the input; aria-expanded/aria-controls/aria-activedescendant
  *   are controlled by parent (MapWrapper) and passed as comboboxProps.
  * - onFocus / onBlur / onKeyDown for popover lifecycle are also passed by parent.
+ *
+ * Inline Map/List view switch (#191) — optional `viewSwitch` prop renders a
+ * ViewToggle at the pill's right end, mirroring `filterChip`'s left anchor.
+ * See that prop's own comment for why it lives here instead of a new
+ * floating control.
  */
 
 import { useCallback } from "react";
 import { Search, X } from "lucide-react";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import ViewToggle, { type ViewMode } from "./ViewToggle";
+import type { Locale } from "@/lib/i18n";
 
 interface SearchBarProps {
   /** Controlled value — owned by MapWrapper. */
@@ -61,6 +68,24 @@ interface SearchBarProps {
     clearAriaLabel?: string;
     onClear: () => void;
   };
+
+  // ── Inline Map/List view switch (#191) ───────────────────────────────────
+  /**
+   * When set, renders the Map/List ViewToggle inside the search pill's right
+   * end, mirroring how filterChip anchors to the left. WHY here and not a
+   * new floating control: the issue owner's explicit instruction was "build
+   * it into the search bar" so the switch doesn't add a new element to an
+   * already-busy mobile screen — SearchBar is the one control already
+   * visible in BOTH map and list view (unlike LocateButton or the map-only
+   * banners), so it's reachable from wherever the user actually is.
+   */
+  viewSwitch?: {
+    mode: ViewMode;
+    onChange: (mode: ViewMode) => void;
+    locale?: Locale;
+    /** Renders the "map" side disabled when the map cannot mount (#165). */
+    mapDisabled?: boolean;
+  };
 }
 
 export default function SearchBar({
@@ -77,6 +102,7 @@ export default function SearchBar({
   onBlur,
   onKeyDownExtra,
   filterChip,
+  viewSwitch,
 }: SearchBarProps) {
   const handleKey = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -141,7 +167,11 @@ export default function SearchBar({
           </>
         )}
 
-        {/* Active category filter chip — rendered inside the search bar (#95) */}
+        {/* Active category filter chip — rendered inside the search bar (#95).
+            max-w shrinks from 40% to 26% when the view switch (#191) also
+            occupies the right end — on a 375px phone that's the difference
+            between a category chip that can crowd out the view switch and
+            one that still leaves the input a usable typing field. */}
         {filterChip && (
           <div
             className={
@@ -151,7 +181,7 @@ export default function SearchBar({
               "text-[var(--color-sage-700,#2d6e52)] " +
               "text-xs font-semibold " +
               "rounded-full px-2 py-0.5 " +
-              "max-w-[40%]"
+              (viewSwitch ? "max-w-[26%]" : "max-w-[40%]")
             }
           >
             <span className="truncate">{filterChip.label}</span>
@@ -194,8 +224,20 @@ export default function SearchBar({
           {...comboboxAttrs}
           className={
             "w-full h-11 md:h-[52px] " +
-            (filterChip ? "pl-[calc(40%+8px)] " : "pl-9 md:pl-10 ") +
-            "pr-4 " +
+            (filterChip
+              ? viewSwitch
+                ? "pl-[calc(26%+8px)] "
+                : "pl-[calc(40%+8px)] "
+              : "pl-9 md:pl-10 ") +
+            // pr reserves room for the inline view switch (#191).
+            // 136px mobile = the control's widest real state (active button
+            // with its label + icon-only inactive button + borders + inset),
+            // measured against the longest label pair, Spanish "Mapa"/"Lista".
+            // It was 168px while BOTH labels showed on mobile, which ate
+            // roughly half of a 375px phone's ~343px pill and left the input
+            // unusable next to an active category chip. 190px at md: is the
+            // both-labels width, which the 520px desktop bar absorbs easily.
+            (viewSwitch ? "pr-[136px] md:pr-[190px] " : "pr-4 ") +
             "text-base md:text-sm text-[var(--color-ink-700)] " +
             "bg-[var(--color-bone-50)] " +
             "border border-[var(--color-bone-300)] " +
@@ -208,6 +250,31 @@ export default function SearchBar({
             "elevation-1"
           }
         />
+
+        {/* Inline Map/List view switch (#191) — right end of the pill,
+            mirroring filterChip's left anchor. size="md" renders a real 36px
+            button height (see ViewToggle.tsx's own WHY on the 38px outer
+            constant) rather than ViewToggle's default 28px: a prior mobile
+            review set a 36×36 CSS px tap-target floor for controls on this
+            bar (see the filterChip × button above), and 28px undershoots
+            that here too. The 38px outer control sits with a ~3px inset
+            inside the 44px mobile / 52px desktop pill. Width reserved on the
+            <input> above (168px mobile / 190px desktop) was sized from this
+            control's own worst-case rendered width — two buttons at px-3
+            padding + 14px icon + gap-1 + the longest label pair
+            ("Mapa"/"Lista", ES) — plus a small gap before the switch and the
+            pill's edge; not pixel-measured in a browser as of this commit. */}
+        {viewSwitch && (
+          <div className="absolute right-1 md:right-1.5 top-1/2 -translate-y-1/2">
+            <ViewToggle
+              mode={viewSwitch.mode}
+              onChange={viewSwitch.onChange}
+              locale={viewSwitch.locale}
+            mapDisabled={viewSwitch.mapDisabled}
+              size="md"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

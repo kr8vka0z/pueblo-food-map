@@ -51,6 +51,7 @@ import { t } from "@/lib/i18n";
 import { venues as allVenues } from "@/data/venues";
 import type { Venue, VenueCategory } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
+import type { ViewMode } from "./ViewToggle";
 import ListView from "./ListView";
 import {
   PUEBLO_COUNTY_BBOX,
@@ -1043,6 +1044,19 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
   }, []);
 
+  // WHY one shared handler: the view switch is now reachable from two places
+  // (the inline SearchBar control, #191, and the pre-existing HamburgerMenu
+  // row) — both must honor the same mapUnavailable guard (selecting "map"
+  // while the map can't mount would show a blank screen, #165). A single
+  // callback keeps that guard in one place instead of copy-pasted per caller.
+  const handleViewModeChange = useCallback(
+    (mode: ViewMode) => {
+      if (mapUnavailable && mode === "map") return;
+      setViewMode(mode);
+    },
+    [mapUnavailable, setViewMode],
+  );
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -1146,6 +1160,15 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
               }
             : undefined
         }
+        viewSwitch={{
+          mode: viewMode,
+          onChange: handleViewModeChange,
+          locale,
+          // Surface the guard instead of hiding it: handleViewModeChange
+          // silently ignores "map" while the map can't mount, which read as a
+          // dead button once #191 moved this control onto the main screen.
+          mapDisabled: mapUnavailable,
+        }}
       />
 
       {/* SearchResultsPopover — shown when query is non-empty AND has matches (#67).
@@ -1207,12 +1230,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         savedVenues={savedVenues}
         onSelectVenue={handleSelectSavedVenue}
         viewMode={viewMode}
-        onViewModeChange={(mode) => {
-          // WHY: ignore "map" selection while unavailable — map mount is
-          // suppressed, so switching to map view would show a blank screen.
-          if (mapUnavailable && mode === "map") return;
-          setViewMode(mode);
-        }}
+        onViewModeChange={handleViewModeChange}
       />
 
       {/* LocateButton — bottom-center, morphing control (#108). Map mode only (#129). */}

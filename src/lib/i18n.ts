@@ -349,7 +349,7 @@ const en: Record<string, string> = {
   "privacy.pageTitle": "Privacy — Pueblo Food Map",
   "privacy.heading": "Privacy",
   "privacy.body": "Pueblo Food Map collects the information you type into our forms (venue reports, suggestions, and feedback). That information is used to review your submission and, if you provide an email address, to follow up with you. We do not sell, share, or store your contact information beyond what is needed to respond. Your IP address is checked to block spam when you submit a form, and is never saved with your submission.",
-  "privacy.analytics": "We use Cloudflare Web Analytics to count visits and measure how quickly pages load. It sets no cookies and stores nothing on your device, it does not identify you by your IP address or your browser, and it does not follow you to other websites. It records only which page was viewed, the site you arrived from, your browser and device type, your country, and page load timings. We use no advertising pixels and no other analytics service.",
+  "privacy.analytics": "We use Cloudflare Web Analytics to count visits and measure how quickly pages load. It sets no cookies and stores nothing on your device, it does not identify you by your IP address or your browser, and it does not follow you to other websites. It records things like which page was viewed, the site you arrived from, your browser and device type, your country, and how long the page took to load. We use no advertising pixels and no other analytics service.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
   "directions.walk": "Walk",
@@ -779,7 +779,7 @@ const es: Record<string, string> = {
   "privacy.pageTitle": "Privacidad — Pueblo Food Map",
   "privacy.heading": "Privacidad",
   "privacy.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). Esa información se usa para revisar tu envío y, si proporcionas un correo, para darte seguimiento. No vendemos, compartimos ni guardamos tu información de contacto más allá de lo necesario para responder. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con tu envío.",
-  "privacy.analytics": "Usamos Cloudflare Web Analytics para contar visitas y medir qué tan rápido cargan las páginas. No usa cookies ni guarda nada en tu dispositivo, no te identifica por tu dirección IP ni por tu navegador, y no te sigue a otros sitios web. Solo registra qué página se vio, el sitio desde el que llegaste, tu tipo de navegador y dispositivo, tu país y los tiempos de carga de la página. No usamos píxeles de publicidad ni ningún otro servicio de análisis.",
+  "privacy.analytics": "Usamos Cloudflare Web Analytics para contar visitas y medir qué tan rápido cargan las páginas. No usa cookies ni guarda nada en tu dispositivo, no te identifica por tu dirección IP ni por tu navegador, y no te sigue a otros sitios web. Registra datos como qué página se vio, el sitio desde el que llegaste, tu tipo de navegador y dispositivo, tu país y cuánto tardó en cargar la página. No usamos píxeles de publicidad ni ningún otro servicio de análisis.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
   "directions.walk": "Caminar",

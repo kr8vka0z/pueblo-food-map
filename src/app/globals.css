@@ -163,15 +163,17 @@ body {
    - "i" 20×20 to match the logo's height; opening it spreads the credit text
      to the LEFT, so the logo never moves.
    - Mapbox inserts the attribution control before the logo, so plain `row`
-     order is "i", logo. line-height 0 on the controls stops the logo's
-     wrapper growing past 20px, which pushed it below the "i".
+     order is "i", logo. Both wrappers are made exactly 20px tall and centred:
+     mapbox-gl.css gives the logo a -4px bottom margin and the compact credit
+     2px vertical padding, which left the logo 8px lower than the "i"
+     (measured on dev at 393×852).
    The `.mapboxgl-map` ancestor is load-bearing: mapbox-gl.css ships its own
    `.mapboxgl-ctrl-bottom-right` rules in a chunk that loads AFTER this file
    (the map is lazy), so a bare single-class selector loses on source order. */
 .mapboxgl-map .mapboxgl-ctrl-bottom-right {
   display: flex;
   flex-direction: row;
-  align-items: flex-end;
+  align-items: center;
 }
 .mapboxgl-map .mapboxgl-ctrl-bottom-right .mapboxgl-ctrl {
   margin: 0 6px 6px 0;
@@ -183,7 +185,12 @@ body {
 .mapboxgl-map .mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-attrib.mapboxgl-compact {
   min-height: 20px;
 }
+.mapboxgl-map .mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-attrib.mapboxgl-compact:not(.mapboxgl-compact-show) {
+  padding-top: 0;
+  padding-bottom: 0;
+}
 .mapboxgl-map a.mapboxgl-ctrl-logo {
+  margin: 0;
   width: 65px;
   height: 20px;
   background-size: 65px 20px;

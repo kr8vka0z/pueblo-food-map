@@ -56,7 +56,7 @@ interface MapboxMap {
   off: (event: string, fn: () => void) => MapboxMap;
 }
 import type { Venue } from "@/types/venue";
-import { categoryColors, categoryLabels } from "@/data/venues";
+import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
@@ -301,7 +301,7 @@ export default function DesktopVenueWindow({
           style={{ backgroundColor: categoryColors[venue.category] }}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" aria-hidden />
-          {categoryLabels[venue.category]}
+          {t(`category.full.${venue.category}`, locale)}
         </span>
         {venue.accepts_snap && (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
@@ -382,7 +382,7 @@ export default function DesktopVenueWindow({
         style={{ backgroundColor: categoryColors[venue.category] }}
       >
         <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" aria-hidden />
-        {categoryLabels[venue.category]}
+        {t(`category.full.${venue.category}`, locale)}
       </span>
 
       {/* Address — guard: never render "Address not in OpenStreetMap" placeholder */}

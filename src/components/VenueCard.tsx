@@ -2,7 +2,7 @@
 
 import { Clock, CircleHelp } from "lucide-react";
 import type { Venue } from "@/types/venue";
-import { categoryColors, categoryLabels } from "@/data/venues";
+import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
 import { t } from "@/lib/i18n";
@@ -56,7 +56,7 @@ export default function VenueCard({
             {venue.name}
           </Heading>
           <span className="block text-sm text-[var(--color-ink-400)] truncate mb-1.5">
-            {categoryLabels[venue.category]} · {venue.address}
+            {t(`category.full.${venue.category}`, locale)} · {venue.address}
           </span>
 
           {/* Badge row */}

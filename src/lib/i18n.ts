@@ -67,6 +67,9 @@ const en: Record<string, string> = {
   "detail.back": "Back",
   "detail.close": "Close",
   "detail.getDirections": "Get directions",
+  // "View on the map" CTA on /venue/[id] — was a hardcoded English string
+  // (pueblo-food-map#bilingual-static-pages) since that page never read locale.
+  "detail.viewOnMap": "View on the map",
   "detail.hours": "HOURS",
   "detail.contact": "CONTACT",
   "detail.about": "ABOUT",
@@ -499,6 +502,7 @@ const es: Record<string, string> = {
   "detail.back": "Atrás",
   "detail.close": "Cerrar",
   "detail.getDirections": "Cómo llegar",
+  "detail.viewOnMap": "Ver en el mapa",
   "detail.hours": "HORARIO",
   "detail.contact": "CONTACTO",
   "detail.about": "ACERCA DE",

@@ -14,12 +14,17 @@
  *   - Error state with "Try again" preserving form data
  *   - Mobile-friendly: no horizontal scroll at 375px
  *   - Keyboard accessible: all controls labeled, errors linked via aria-describedby
+ *
+ * Reads locale from useLocale() (#289) instead of a prop passed down from
+ * /feedback's page.tsx — matches the rest of the codebase's client-side
+ * locale pattern (SiteFooter, ListView, HamburgerMenu).
  */
 
 import { useState, useEffect, useRef } from "react";
 import Script from "next/script";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 import { FEEDBACK_TYPES, type FeedbackTypeKey } from "@/lib/feedbackTypes";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 
@@ -57,15 +62,10 @@ function validate(
   return errors;
 }
 
-// ─── Props ────────────────────────────────────────────────────────────────────
-
-interface FeedbackFormProps {
-  locale?: Locale;
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function FeedbackForm({ locale = "en" }: FeedbackFormProps) {
+export default function FeedbackForm() {
+  const { locale } = useLocale();
   const [feedbackType, setFeedbackType] = useState<string>("");
   const [message, setMessage] = useState<string>("");
   const [contactEmail, setContactEmail] = useState<string>("");

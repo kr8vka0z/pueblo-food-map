@@ -23,6 +23,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import FeedbackForm from "@/components/FeedbackForm";
+import { LocaleProvider } from "@/lib/LocaleContext";
 import {
   expectTurnstileError,
   getSubmitButtonName,
@@ -63,8 +64,14 @@ afterEach(() => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// FeedbackForm reads locale via useLocale() (#289), not a prop — wrap it in
+// a LocaleProvider to exercise the same EN/ES cases the old `locale` prop did.
 function renderForm(locale: "en" | "es" = "en") {
-  return render(<FeedbackForm locale={locale} />);
+  return render(
+    <LocaleProvider initialLocale={locale}>
+      <FeedbackForm />
+    </LocaleProvider>,
+  );
 }
 
 function mockSuccess() {

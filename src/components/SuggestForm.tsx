@@ -19,12 +19,17 @@
  *   - Error state with "Try again" preserving form data
  *   - Mobile-friendly: no horizontal scroll at 375px
  *   - Keyboard accessible: all controls labeled, errors linked via aria-describedby
+ *
+ * Reads locale from useLocale() (#289) instead of a prop passed down from
+ * /suggest's page.tsx — matches the rest of the codebase's client-side
+ * locale pattern (SiteFooter, ListView, HamburgerMenu).
  */
 
 import { useState, useEffect, useRef } from "react";
 import Script from "next/script";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 import { VENUE_CATEGORIES, type VenueCategoryKey } from "@/lib/suggestTypes";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 
@@ -74,15 +79,10 @@ function validate(
   return errors;
 }
 
-// ─── Props ────────────────────────────────────────────────────────────────────
-
-interface SuggestFormProps {
-  locale?: Locale;
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function SuggestForm({ locale = "en" }: SuggestFormProps) {
+export default function SuggestForm() {
+  const { locale } = useLocale();
   const [venueName, setVenueName] = useState<string>("");
   const [address, setAddress] = useState<string>("");
   const [category, setCategory] = useState<string>("");

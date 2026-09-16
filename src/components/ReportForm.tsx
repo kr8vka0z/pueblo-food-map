@@ -14,12 +14,17 @@
  *   - Error state with "Try again" preserving form data
  *   - Mobile-friendly: no horizontal scroll at 375px
  *   - Keyboard accessible: all controls labeled, errors linked via aria-describedby
+ *
+ * Reads locale from useLocale() (#289) instead of a prop passed down from
+ * /report/[venueId]'s page.tsx — matches the rest of the codebase's
+ * client-side locale pattern (SiteFooter, ListView, HamburgerMenu).
  */
 
 import { useState, useEffect, useRef } from "react";
 import Script from "next/script";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 
@@ -62,7 +67,6 @@ interface ReportFormProps {
   venueId: string;
   venueName: string;
   venueAddress: string;
-  locale?: Locale;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -72,8 +76,8 @@ export default function ReportForm({
   // venueName and venueAddress are passed by the page (it reads them from the
   // static venue list) but the form no longer sends them to the server.
   // The server now re-looks them up from venueId (#160 1.3).
-  locale = "en",
 }: ReportFormProps) {
+  const { locale } = useLocale();
   const [issueType, setIssueType] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [contactEmail, setContactEmail] = useState<string>("");

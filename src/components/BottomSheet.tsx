@@ -21,7 +21,7 @@ import { useState } from "react";
 import { Drawer } from "vaul";
 import { X, ChevronUp, ChevronDown, MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import type { Venue } from "@/types/venue";
-import { categoryColors, categoryLabels } from "@/data/venues";
+import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
@@ -176,7 +176,7 @@ export default function BottomSheet({
                     style={{ backgroundColor: categoryColors[venue.category] }}
                   >
                     <span className="w-2 h-2 rounded-full bg-white/40 shrink-0" aria-hidden />
-                    {categoryLabels[venue.category]}
+                    {t(`category.full.${venue.category}`, locale)}
                   </span>
                   {venue.accepts_snap && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">

@@ -25,6 +25,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SuggestForm from "@/components/SuggestForm";
+import { LocaleProvider } from "@/lib/LocaleContext";
 import {
   expectTurnstileError,
   getSubmitButtonName,
@@ -62,8 +63,14 @@ afterEach(() => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// SuggestForm reads locale via useLocale() (#289), not a prop — wrap it in a
+// LocaleProvider to exercise the same EN/ES cases the old `locale` prop did.
 function renderForm(locale: "en" | "es" = "en") {
-  return render(<SuggestForm locale={locale} />);
+  return render(
+    <LocaleProvider initialLocale={locale}>
+      <SuggestForm />
+    </LocaleProvider>,
+  );
 }
 
 function mockSuccess() {

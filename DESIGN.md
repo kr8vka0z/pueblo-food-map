@@ -202,8 +202,8 @@ The spacing scale is a 4px base grid: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 px. Mo
 
 The Mapbox canvas fills the entire viewport — there is no persistent sidebar. Persistent chrome at default state:
 - Search bar: floating pill, full-width minus 16px margins mobile / 520px centered desktop, 44px tall mobile / 52px desktop, Map/List switch inside its right end
-- BottomNav (docs/bottom-nav-spec.md): Near me · Saved · Resources · Menu. Below `xl` (1280px) a 78px `bone-50` bar across the bottom (icon above a 12px/700 label, `ink-500` / `brand-navy` when its panel is open), with a non-interactive fade band above it; at `xl`+ a white pill beside the search box
-- Mapbox attribution + sponsor credit: bottom corners, lifted above the bar below `xl`
+- BottomNav (docs/bottom-nav-spec.md): Near me · Saved · Resources · Menu. Below `2xl` (1536px) a 78px `bone-50` bar across the bottom (icon above a 12px/700 label, `ink-500` / `brand-navy` when its panel is open), with a non-interactive fade band above it; at `2xl`+ a white pill beside the search box
+- Mapbox attribution + sponsor credit: bottom corners, lifted above the bar below `2xl`
 
 Together these occupy less than 10% of the 1440×900 desktop viewport at default state. When a venue is selected, the BottomSheet (mobile) or DesktopVenueWindow (desktop) appears — still leaving the bulk of the map exposed.
 

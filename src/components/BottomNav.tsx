@@ -6,8 +6,8 @@
  * Spec: docs/bottom-nav-spec.md (§3 bar, §5 breakpoints, §6 Near me, §12 a11y).
  *
  * One component, two layouts, one set of buttons:
- *   below xl  — fixed bar across the bottom, icon above its word.
- *   xl and up — white pill to the right of the centred 520px search box,
+ *   below 2xl  — fixed bar across the bottom, icon above its word.
+ *   2xl and up — white pill to the right of the centred 520px search box,
  *               icon and word on one line.
  * WHY one DOM tree with responsive classes rather than two renders: there is
  * never a moment both layouts should exist, so there is never a second
@@ -46,18 +46,18 @@ interface BottomNavProps {
 }
 
 const ITEM_CLASS =
-  // Below xl: equal-width cell, 24px icon above a 12px/700 label, 5px gap (§3.1).
+  // Below 2xl: equal-width cell, 24px icon above a 12px/700 label, 5px gap (§3.1).
   "flex flex-1 flex-col items-center justify-center gap-[5px] h-full min-w-0 " +
   "text-[12px] leading-[14px] font-bold " +
-  // xl: icon and word on one line inside the pill (§5).
-  "xl:flex-none xl:flex-row xl:gap-1.5 xl:px-3 xl:rounded-full " +
+  // 2xl: icon and word on one line inside the pill (§5).
+  "2xl:flex-none 2xl:flex-row 2xl:gap-1.5 2xl:px-3 2xl:rounded-full " +
   "transition-colors duration-150 " +
   "hover:bg-[var(--color-bone-100)] " +
   "disabled:cursor-default " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
   PRESS_FEEDBACK;
 
-const ICON_CLASS = "shrink-0 size-6 xl:size-5";
+const ICON_CLASS = "shrink-0 size-6 2xl:size-5";
 
 function colorFor(active: boolean) {
   return active
@@ -98,23 +98,23 @@ export default function BottomNav({
       aria-label={t("nav.aria", locale)}
       data-bottom-nav=""
       className={
-        // Below xl: the bar (§3.1). Height carries the safe-area inset as
+        // Below 2xl: the bar (§3.1). Height carries the safe-area inset as
         // bottom padding so the 78px content row sits above the home indicator.
         "fixed left-0 right-0 bottom-0 z-[1003] " +
         "h-[calc(78px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] " +
         "bg-[var(--color-bone-50)] border-t border-[var(--color-bone-200)] " +
         "shadow-[0_-2px_12px_rgba(26,24,23,0.08)] " +
-        // xl: pill beside the search box — same height, radius, shadow and
+        // 2xl: pill beside the search box — same height, radius, shadow and
         // background as SearchBar's input (h-[52px], rounded-full, bone-50,
         // bone-300 border, elevation-1). 520/2 = 260px from centre, +12px gap.
-        "xl:absolute xl:right-auto xl:bottom-auto xl:z-[1000] " +
-        "xl:top-[max(1rem,env(safe-area-inset-top))] xl:left-[calc(50%+272px)] " +
-        "xl:h-[52px] xl:pb-0 xl:px-1 xl:border xl:border-[var(--color-bone-300)] " +
-        "xl:rounded-[var(--radius-full)] xl:elevation-1"
+        "2xl:absolute 2xl:right-auto 2xl:bottom-auto 2xl:z-[1000] " +
+        "2xl:top-[max(1rem,env(safe-area-inset-top))] 2xl:left-[calc(50%+272px)] " +
+        "2xl:h-[52px] 2xl:pb-0 2xl:px-1 2xl:border 2xl:border-[var(--color-bone-300)] " +
+        "2xl:rounded-[var(--radius-full)] 2xl:elevation-1"
       }
     >
-      <ul className="flex h-full items-stretch xl:items-center xl:gap-0.5">
-        <li className="flex flex-1 xl:flex-none xl:h-11">
+      <ul className="flex h-full items-stretch 2xl:items-center 2xl:gap-0.5">
+        <li className="flex flex-1 2xl:flex-none 2xl:h-11">
           <button
             type="button"
             onClick={onNearMe}
@@ -134,7 +134,7 @@ export default function BottomNav({
         {sectionItems.map(({ section, label, icon }) => {
           const active = openSection === section;
           return (
-            <li key={section} className="flex flex-1 xl:flex-none xl:h-11">
+            <li key={section} className="flex flex-1 2xl:flex-none 2xl:h-11">
               <button
                 type="button"
                 onClick={() => onSectionTap(section)}

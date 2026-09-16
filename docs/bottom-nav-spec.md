@@ -1,8 +1,8 @@
 # Pueblo Food Access Map — Bottom Navigation & View Switch Specification
 
-**Status:** v1.0 — design approved by Kyle 2026-09-16. **Implemented on branch
-`feat/bottom-nav`** (PR to `dev`) — see that PR for measured values and the one
-open question on §5 at exactly 1280px.
+**Status:** v1.0 — design approved by Kyle 2026-09-16. **Implemented** in #449 (PR to `dev`).
+**§5 amended 2026-09-16 by Kyle:** cutover moved from `2xl` (1280px) to `2xl` (1536px) —
+at 1280 the pill measured wider than the space beside the search box.
 **Author:** Atlas (Claude Opus 5), 2026-09-16.
 **Scope:** Replaces the floating navy hamburger button, the orange "Find food near me"
 map banner, and the desktop "Pueblo Food Map" wordmark with a single persistent
@@ -33,7 +33,7 @@ both vanish while a venue card is open). Those are the four to read first.
 | Map/List switch | Inside search box, "List" label hidden below `md` | Inside search box, **both labels visible at every width** |
 | Orange "Find food near me" pill | Floating on the map at `top: 72px` | **Retired** — becomes "Near me" in the bar |
 | Navigation | Hidden behind the hamburger menu | **Near me · Saved · Resources · Menu** |
-| Navigation placement | — | Bottom bar below `xl`; inline pill right of the search box at `xl`+ |
+| Navigation placement | — | Bottom bar below `2xl`; inline pill right of the search box at `2xl`+ |
 | Mapbox mark + sponsor line | Bottom corners of the map | Lifted above the bar, with a soft fade band behind them |
 
 Four changes are load-bearing and must ship together: deleting the hamburger is what
@@ -208,20 +208,23 @@ controls for one piece of state that can disagree visually is a bug waiting to b
 
 ## 5. Breakpoints
 
-**The decision:** the cutover is Tailwind `xl` (1280px).
+**The decision:** the cutover is Tailwind `2xl` (1536px). *(Amended 2026-09-16 — was `2xl`, 1280px.)*
 
-- Below `xl`: bottom bar (`xl:hidden`), fade band, credits lifted.
-- `xl` and above: no bar, no band, credits untouched in their existing corners. The four
+- Below `2xl`: bottom bar (`2xl:hidden`), fade band, credits lifted.
+- `2xl` and above: no bar, no band, credits untouched in their existing corners. The four
   items render as a single white pill to the **right** of the centred search box
-  (`hidden xl:flex`), matching the search box's height, radius, shadow and background,
+  (`hidden 2xl:flex`), matching the search box's height, radius, shadow and background,
   with the icon and label on one line rather than stacked.
 
-**The rationale:** measured on the live site — the search pill is a fixed 520px wide and
-centred. At 1280px it spans x380–900, leaving a 312px gap on the right: enough for the
-four-item pill. At 820px (tablet) it spans x150–670, leaving only ~134px. So the inline
-row cannot survive at tablet width, and the tablet keeps the bar.
+**The rationale:** the search pill is a fixed 520px wide and centred, and the nav pill
+starts 12px to its right (x = 50% + 272px). Measured on dev.pueblofoodmap.com after #449,
+the pill is 387px wide in English and 414px in Spanish. At 1280px only 352px is free
+(1280 − 912 − 16), so the original `2xl` cutover overflowed the screen — "Menu" cut off in
+English, "Menú" gone in Spanish. At 1536px the pill starts at x1040 and 480px is free, so
+both languages fit. At 820px (tablet) the gap is ~134px, so the tablet keeps the bar.
+Cost accepted by Kyle: 1280–1535px laptops get the bottom bar.
 
-A single 1280px cutover also means there is exactly one place in the codebase where this
+A single cutover also means there is exactly one place in the codebase where this
 decision lives, and it is an existing Tailwind breakpoint rather than a bespoke one.
 
 ---
@@ -311,7 +314,7 @@ pointer-events: none;
 z-index: 999;
 ```
 
-`aria-hidden="true"`. Rendered only below `xl`, **and only in map mode** — in list mode
+`aria-hidden="true"`. Rendered only below `2xl`, **and only in map mode** — in list mode
 the band would be blurring a list of cards for no benefit at a per-frame cost.
 `SponsorCredit` is already map-mode-only for the same reason (#129).
 
@@ -371,8 +374,8 @@ machinery than the problem is worth.
 
 **The decision:**
 
-- `SponsorCredit.tsx`: `bottom: 8` → `bottom: calc(78px + 12px + env(safe-area-inset-bottom))` below `xl`; unchanged at `xl`+.
-- Mapbox attribution: `.mapboxgl-ctrl-bottom-left` gets the same offset in `globals.css`, scoped below `xl`.
+- `SponsorCredit.tsx`: `bottom: 8` → `bottom: calc(78px + 12px + env(safe-area-inset-bottom))` below `2xl`; unchanged at `2xl`+.
+- Mapbox attribution: `.mapboxgl-ctrl-bottom-left` gets the same offset in `globals.css`, scoped below `2xl`.
 - Both keep `zIndex: 1000`, above the band (999) and below the bar (1003).
 
 **The rationale:** **the Mapbox attribution is a licence condition.** Mapbox's terms
@@ -385,7 +388,7 @@ thing for the bottom-sheet peek bar, and the outside-county alert computes
 `bottom: isMobile ? 88 + 12 + 52 : 24 + 52`. This follows that precedent rather than
 inventing a second convention.
 
-### Stacking order (below `xl`)
+### Stacking order (below `2xl`)
 
 | Layer | z-index |
 |---|---|
@@ -413,10 +416,10 @@ fully expanded for the same reason; this extends the existing rule rather than a
 new one.
 
 **Map padding:** `MapWrapper`'s map `padding.bottom` increases by the bar's height below
-`xl`, so `fitBounds` and marker-fly animations stop centring results underneath the bar.
+`2xl`, so `fitBounds` and marker-fly animations stop centring results underneath the bar.
 
 **List padding:** the bar persists in list mode, so `ListView` needs bottom padding of
-`calc(78px + env(safe-area-inset-bottom))` below `xl`. Without it the last venue card in
+`calc(78px + env(safe-area-inset-bottom))` below `2xl`. Without it the last venue card in
 the list is unreachable — it scrolls to the bottom and stops under the bar. This is a
 separate fix from the map padding above and is easy to miss, because the list only fails
 on its final row.
@@ -470,7 +473,7 @@ geometry above.
 5. The band carries `aria-hidden="true"` and `pointer-events: none`.
 6. `ViewToggle` at `size="md"` renders both labels as visible text (not `sr-only`) in the default case.
 7. `HamburgerMenu` no longer renders a Map/List row.
-8. `SponsorCredit`'s computed bottom offset includes the bar height below `xl`.
+8. `SponsorCredit`'s computed bottom offset includes the bar height below `2xl`.
 
 Test 6 is the regression guard for the whole §4 premise — if a future change reinstates
 `sr-only` on the inactive segment, that test fails.
@@ -496,7 +499,7 @@ Manual, on dev.pueblofoodmap.com, because none of the following can be caught in
 3. **375 × 812** — a pan gesture starting inside the band's 92px pans the map.
 4. **375 × 812, list mode** — scroll to the very bottom; the last venue card is fully visible and tappable, and there is no fade band over the list.
 5. **820 × 1180** — the bar is present, not the inline row.
-6. **1280 × 800** — the inline row is present, no bar, no band, credits in their original corners.
+6. **1536 × 864** — the inline row is present, no bar, no band, credits in their original corners.
 7. **Open a venue** — bar and band both disappear; closing restores them.
 8. **Real low-end Android, if one is available** — drag the map with the band present and judge smoothness against §8.3.
 

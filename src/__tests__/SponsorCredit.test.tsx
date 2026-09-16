@@ -33,11 +33,11 @@ describe("SponsorCredit", () => {
 
   // docs/bottom-nav-spec.md §13 test 8. jsdom evaluates no Tailwind, so the
   // class contract is what's assertable; the pixel check is §14 on dev.
-  test("clearBottomNav lifts the credit above the bar below xl, back to the corner at xl", () => {
+  test("clearBottomNav lifts the credit above the bar below 2xl, back to the corner at 2xl", () => {
     const { container } = render(<SponsorCredit clearBottomNav />);
     const root = container.firstChild as HTMLElement;
     expect(root.className).toContain("bottom-[calc(78px+12px+env(safe-area-inset-bottom))]");
-    expect(root.className).toContain("xl:bottom-2");
+    expect(root.className).toContain("2xl:bottom-2");
     expect(root.style.bottom).toBe("");
   });
 

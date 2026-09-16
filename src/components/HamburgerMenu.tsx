@@ -31,7 +31,7 @@ import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Phone, Info, Lis
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
-import { useMediaQuery, MOBILE_QUERY, BELOW_XL_QUERY } from "@/lib/useMediaQuery";
+import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
@@ -196,10 +196,10 @@ export default function HamburgerMenu({
   }, [open, initialSection]);
 
   const isMobile = useMediaQuery(MOBILE_QUERY);
-  const isBelowXl = useMediaQuery(BELOW_XL_QUERY);
-  // The bottom bar (z 1003) draws over the drawer below xl; keep the drawer's
+  const isBelow2xl = useMediaQuery(BELOW_2XL_QUERY);
+  // The bottom bar (z 1003) draws over the drawer below 2xl; keep the drawer's
   // last item (the language toggle) scrollable clear of it.
-  const barClearance = isBelowXl
+  const barClearance = isBelow2xl
     ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + env(safe-area-inset-bottom))`
     : "0px";
 
@@ -228,7 +228,7 @@ export default function HamburgerMenu({
         boxShadow: "0 4px 32px rgba(0,0,0,0.22)",
         overflowY: "auto",
         paddingTop: "env(safe-area-inset-top)",
-        paddingBottom: isBelowXl ? barClearance : "env(safe-area-inset-bottom)",
+        paddingBottom: isBelow2xl ? barClearance : "env(safe-area-inset-bottom)",
         paddingRight: "env(safe-area-inset-right)",
       }
     : {
@@ -238,7 +238,7 @@ export default function HamburgerMenu({
         top: "calc(52px + 8px)",
         right: 0,
         width: "280px",
-        // Bounded so it scrolls (initialSection needs that) and clears the bar below xl.
+        // Bounded so it scrolls (initialSection needs that) and clears the bar below 2xl.
         maxHeight: `calc(100dvh - 92px - ${barClearance})`,
         zIndex: 1002,
         backgroundColor: "white",

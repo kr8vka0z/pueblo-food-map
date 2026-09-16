@@ -60,7 +60,10 @@ export default function PageNav({ locale }: { locale: Locale }) {
 
   return (
     <>
-      <nav className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0">
+      <nav
+        aria-label={t("nav.pageAria", locale)}
+        className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0"
+      >
         <Link
           href="/"
           className={

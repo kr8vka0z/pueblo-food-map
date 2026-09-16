@@ -168,6 +168,9 @@ const en: Record<string, string> = {
   "nav.resources": "Resources",
   "nav.menu": "Menu",
   "nav.aria": "Main",
+  // PageNav's top "Back to map" bar (review item 7c) — distinct from BottomNav's
+  // "Main" landmark so a screen reader doesn't announce two navs both named "Main".
+  "nav.pageAria": "Page",
 
   // Saved places (#132)
   "menu.saved.heading": "Saved places",
@@ -639,6 +642,7 @@ const es: Record<string, string> = {
   "nav.resources": "Recursos",
   "nav.menu": "Menú",
   "nav.aria": "Principal",
+  "nav.pageAria": "Página",
 
   // Saved places (#132)
   "menu.saved.heading": "Lugares guardados",

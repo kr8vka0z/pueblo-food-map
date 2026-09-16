@@ -17,6 +17,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import SiteFooter from "@/components/SiteFooter";
 import { DISPLAY_DAY_KEYS, formatSlot } from "@/lib/hours";
 import type { Venue, VenueCategory } from "@/types/venue";
+import PageTopNav from "./PageTopNav";
 
 interface VenuesDirectoryContentProps {
   groups: { category: VenueCategory; items: Venue[] }[];
@@ -27,20 +28,7 @@ export default function VenuesDirectoryContent({ groups }: VenuesDirectoryConten
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
-      {/* Top nav bar — matches about.tsx / venue/[id]/page.tsx pattern */}
-      <nav className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0">
-        <Link
-          href="/"
-          className={
-            "text-sm font-medium text-[var(--color-sage-600)] " +
-            "hover:text-[var(--color-sage-700)] transition-colors " +
-            "focus-visible:outline-none focus-visible:ring-2 " +
-            "focus-visible:ring-[var(--color-sage-500)] rounded"
-          }
-        >
-          ← {t("footer.backToMap", locale)}
-        </Link>
-      </nav>
+      <PageTopNav locale={locale} />
 
       {/* Page content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-8">

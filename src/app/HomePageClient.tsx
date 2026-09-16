@@ -74,6 +74,9 @@ export default function HomePageClient() {
   const [viewport, setViewport] = useState<'located' | 'pueblo-center'>('pueblo-center');
   // Deep link (#132): a ?venue=<id> URL opens straight to that pin.
   const [initialVenueId, setInitialVenueId] = useState<string | null>(null);
+  // "Back to menu" on a Menu page (PageTopNav) links to /?menu=1: land on the
+  // map with the Menu already open (Kyle, 2026-09-16).
+  const [initialMenuOpen, setInitialMenuOpen] = useState(false);
 
   // Ref to the map container element — focus moves here on splash dismiss.
   const mapContainerRef = useRef<HTMLElement | null>(null);
@@ -88,7 +91,16 @@ export default function HomePageClient() {
     // which flags synchronous setState in effect bodies. The queueMicrotask
     // ensures we're in the microtask queue, not the synchronous effect body.
     queueMicrotask(() => {
-      const venueParam = new URLSearchParams(window.location.search).get('venue');
+      const params = new URLSearchParams(window.location.search);
+      const venueParam = params.get('venue');
+      const menuParam = params.get('menu') === '1';
+      if (menuParam) {
+        setInitialMenuOpen(true);
+        // Strip it so a refresh lands on the plain map, not the Menu again.
+        params.delete('menu');
+        const qs = params.toString();
+        window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+      }
       // Also read #venue=<id> fragment: used by /venue/[id] "View on the map" CTA
       // so the fragment bypasses the /?venue= → /venue/<id> middleware redirect.
       const hashParam = window.location.hash.startsWith('#venue=')
@@ -97,7 +109,8 @@ export default function HomePageClient() {
       const resolvedId = venueParam ?? hashParam;
       setInitialVenueId(resolvedId);
       // A shared venue link (either form) goes straight to the pin — skip the splash.
-      setSplashShown(resolvedId ? false : !readGate());
+      // "Back to menu" comes from inside the app, so the splash was already seen.
+      setSplashShown(resolvedId || menuParam ? false : !readGate());
     });
   }, []);
 
@@ -138,7 +151,7 @@ export default function HomePageClient() {
         inert={splashShown || undefined}
         aria-hidden={splashShown || undefined}
       >
-        <MapWrapper viewport={viewport} onShowWelcome={showSplashAgain} initialVenueId={initialVenueId} />
+        <MapWrapper viewport={viewport} onShowWelcome={showSplashAgain} initialVenueId={initialVenueId} initialMenuOpen={initialMenuOpen} />
       </main>
 
       {/* Splash overlay — full-viewport frosted scrim on top of the map */}

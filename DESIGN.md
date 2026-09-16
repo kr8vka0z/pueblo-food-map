@@ -204,7 +204,8 @@ The Mapbox canvas fills the entire viewport — there is no persistent sidebar. 
 - Search bar: floating pill, full-width minus 16px margins mobile / 520px centered desktop, 44px tall mobile / 52px desktop, Map/List switch inside its right end
 - BottomNav (docs/bottom-nav-spec.md): Near me · Saved · Resources · Menu (Resources links to the `/resources` page; Saved opens the drawer showing only saved places — or a "No saved places yet" empty state — and Menu opens it showing the menu). Below `2xl` (1536px) a 78px `bone-50` bar across the bottom (icon above a 12px/700 label, `ink-500` / `brand-navy` when its panel is open), with a non-interactive fade band above it; at `2xl`+ a white pill floating bottom-centre, 24px up
 - Mapbox credits: bottom-right, one row — compact "i" then the logo at 65×20 (the smallest size Mapbox's attribution guide lists) — lifted above the bar below `2xl`
-- Sponsor credit: not on the map. "Sponsored by Pueblo Food Project" is a sage card at the top of the Menu drawer, linking to pueblofoodproject.org in a new tab (the splash keeps its own corner credit)
+- Sponsor credit: not on the map. "Sponsored by Pueblo Food Project" is a sage card at the top of the Menu drawer, linking to pueblofoodproject.org in a new tab (no splash credit since 2026-09-16)
+- PageTopNav (pages the Menu opens — About, Suggest, Feedback, Browse all venues, Food help programs): "← Back to map" text link left, sage "Back to menu" pill right; the pill returns to the map with the Menu open (`/?menu=1`)
 
 Together these occupy less than 10% of the 1440×900 desktop viewport at default state. When a venue is selected, the BottomSheet (mobile) or DesktopVenueWindow (desktop) appears — still leaving the bulk of the map exposed.
 

@@ -9,31 +9,18 @@
  * cookies() read — AGENTS.md "Known bilingual limitation", #287).
  */
 
-import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import FeedbackForm from "@/components/FeedbackForm";
 import SiteFooter from "@/components/SiteFooter";
+import PageTopNav from "./PageTopNav";
 
 export default function FeedbackPageContent() {
   const { locale } = useLocale();
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
-      {/* Top nav bar */}
-      <nav className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0">
-        <Link
-          href="/"
-          className={
-            "text-sm font-medium text-[var(--color-sage-600)] " +
-            "hover:text-[var(--color-sage-700)] transition-colors " +
-            "focus-visible:outline-none focus-visible:ring-2 " +
-            "focus-visible:ring-[var(--color-sage-500)] rounded"
-          }
-        >
-          ← {t("feedback.backToMap", locale)}
-        </Link>
-      </nav>
+      <PageTopNav locale={locale} />
 
       {/* Content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8">

@@ -12,7 +12,7 @@
  *     <SearchBar />      — absolute top-center, z-index 1000 (Map/List switch inside)
  *     {isMobile && <BottomSheet />}
  *     <fade band />      — below 2xl, map mode, no venue sheet (docs/bottom-nav-spec.md §8)
- *     <BottomNav />      — bar below 2xl, pill beside the search box at 2xl+ (§3, §5); last in DOM
+ *     <BottomNav />      — bar below 2xl, pill floating bottom-centre at 2xl+ (§3, §5); last in DOM
  *   </div>
  *
  * No sidebar. No category rail. No desktop split-pane.
@@ -36,7 +36,6 @@ import BottomNav, { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
 import CategoryDropdown from "./CategoryDropdown";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
-import SponsorCredit from "./SponsorCredit";
 import EmptySearchPopover from "./EmptySearchPopover";
 import SearchResultsPopover, {
   MAX_VISIBLE,
@@ -801,12 +800,14 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    // Below 2xl the bottom nav bar covers the map's bottom edge — pad by its
-    // height so fitted pins don't land underneath it (docs/bottom-nav-spec.md §10).
+    // The bottom nav covers the map's bottom edge — the bar below 2xl, the
+    // floating pill (24px up + 52px tall) at 2xl — so pad by it and fitted pins
+    // don't land underneath (docs/bottom-nav-spec.md §5, §10).
     const basePadding = isMobile ? CATEGORY_FIT_PADDING_MOBILE : CATEGORY_FIT_PADDING_DESKTOP;
-    const fitPadding = isBelow2xl
-      ? { ...basePadding, bottom: basePadding.bottom + BOTTOM_NAV_HEIGHT_PX }
-      : basePadding;
+    const fitPadding = {
+      ...basePadding,
+      bottom: basePadding.bottom + (isBelow2xl ? BOTTOM_NAV_HEIGHT_PX : 24 + 52),
+    };
 
     if (activeCategoryFilter === null) {
       // Skip unless a real category was active on the previous ready run —
@@ -1213,10 +1214,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           style={{
             position: "absolute",
             // Below 2xl: lifted clear of the bottom nav bar and the credits line
-            // above it (spec §9 offset + 52). 2xl: the original desktop spot.
+            // above it (spec §9 offset + 52). 2xl: above the floating nav pill
+            // (24px up + 52px tall + 12px gap).
             bottom: isBelow2xl
               ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 12px + 52px + env(safe-area-inset-bottom))`
-              : 24 + 52,
+              : 24 + 52 + 12,
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 1001,
@@ -1252,14 +1254,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           }}
           onDismiss={() => setBannerVisible(false)}
         />
-      )}
-
-      {/* SponsorCredit — bottom-right (#69). Map mode only (#129). Hidden while
-          the venue sheet is open at ANY detent, like the bar and fade band (§10):
-          the credit sits above the sheet's z-index, so at the peek detent it
-          printed across the Walk/Bus/Drive buttons (Kyle, 2026-09-16). */}
-      {viewMode === "map" && (
-        <SponsorCredit hidden={venueSheetOpen} clearBottomNav />
       )}
 
       {/* BottomSheet — mobile only (vaul v2, venue-centric API). Map mode only (#129). */}

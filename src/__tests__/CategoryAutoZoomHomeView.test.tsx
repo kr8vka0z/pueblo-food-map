@@ -232,6 +232,13 @@ const ALL_BOUNDS = computeCategoryBounds(allRealVenues);
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
+// matchMedia is stubbed to never match, i.e. the 2xl layout, where the nav is a
+// pill floating 24px above the bottom edge (52px tall) — fits pad past it.
+const DESKTOP_PADDING_WITH_PILL = {
+  ...CATEGORY_FIT_PADDING_DESKTOP,
+  bottom: CATEGORY_FIT_PADDING_DESKTOP.bottom + 24 + 52,
+};
+
 describe("#247 — category autozoom vs. #231 fixed home view", () => {
   test("map-ready with no filter ever selected does NOT fitBounds (home view stands)", async () => {
     await renderMapWrapper();
@@ -251,7 +258,7 @@ describe("#247 — category autozoom vs. #231 fixed home view", () => {
       PANTRY_BOUNDS,
       expect.objectContaining({
         maxZoom: CATEGORY_FIT_MAX_ZOOM,
-        padding: CATEGORY_FIT_PADDING_DESKTOP,
+        padding: DESKTOP_PADDING_WITH_PILL,
       }),
     );
   });
@@ -269,7 +276,7 @@ describe("#247 — category autozoom vs. #231 fixed home view", () => {
       ALL_BOUNDS,
       expect.objectContaining({
         maxZoom: CATEGORY_FIT_MAX_ZOOM,
-        padding: CATEGORY_FIT_PADDING_DESKTOP,
+        padding: DESKTOP_PADDING_WITH_PILL,
       }),
     );
   });

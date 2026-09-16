@@ -7,8 +7,9 @@
  *
  * One component, two layouts, one set of buttons:
  *   below 2xl  — fixed bar across the bottom, icon above its word.
- *   2xl and up — white pill to the right of the centred 520px search box,
- *               icon and word on one line.
+ *   2xl and up — pill floating in the bottom centre of the screen, icon and
+ *               word on one line (Kyle, 2026-09-16; it used to sit beside
+ *               the search box).
  * WHY one DOM tree with responsive classes rather than two renders: there is
  * never a moment both layouts should exist, so there is never a second
  * landmark, a second focus stop, or a second copy of the Near-me state.
@@ -116,11 +117,11 @@ export default function BottomNav({
         "h-[calc(78px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] " +
         "bg-[var(--color-bone-50)] border-t border-[var(--color-bone-200)] " +
         "shadow-[0_-2px_12px_rgba(26,24,23,0.08)] " +
-        // 2xl: pill beside the search box — same height, radius, shadow and
+        // 2xl: pill floating bottom-centre — same height, radius, shadow and
         // background as SearchBar's input (h-[52px], rounded-full, bone-50,
-        // bone-300 border, elevation-1). 520/2 = 260px from centre, +12px gap.
-        "2xl:absolute 2xl:right-auto 2xl:bottom-auto 2xl:z-[1000] " +
-        "2xl:top-[max(1rem,env(safe-area-inset-top))] 2xl:left-[calc(50%+272px)] " +
+        // bone-300 border, elevation-1). 24px up, clear of the Mapbox corner.
+        "2xl:absolute 2xl:right-auto 2xl:z-[1000] " +
+        "2xl:bottom-6 2xl:left-1/2 2xl:-translate-x-1/2 " +
         "2xl:h-[52px] 2xl:pb-0 2xl:px-1 2xl:border 2xl:border-[var(--color-bone-300)] " +
         "2xl:rounded-[var(--radius-full)] 2xl:elevation-1"
       }

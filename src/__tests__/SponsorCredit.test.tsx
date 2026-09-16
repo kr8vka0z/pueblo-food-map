@@ -31,24 +31,11 @@ describe("SponsorCredit", () => {
     expect(screen.getByText("Patrocinado por Pueblo Food Project")).toBeDefined();
   });
 
-  // docs/bottom-nav-spec.md §13 test 8. jsdom evaluates no Tailwind, so the
-  // class contract is what's assertable; the pixel check is §14 on dev.
-  test("clearBottomNav lifts the credit above the bar below 2xl, back to the corner at 2xl", () => {
-    const { container } = render(<SponsorCredit clearBottomNav />);
-    const root = container.firstChild as HTMLElement;
-    expect(root.className).toContain("bottom-[calc(78px+12px+6px+env(safe-area-inset-bottom))]");
-    expect(root.className).toContain("2xl:bottom-[6px]");
-    // Same 23px box as the Mapbox logo, text centred — keeps the two on one line.
-    expect(root.className).toContain("h-[23px]");
-    expect(root.className).toContain("items-center");
-    expect(root.style.bottom).toBe("");
-  });
-
-  test("without clearBottomNav (the splash) it keeps bottom: 8", () => {
+  test("sits in the splash's bottom-right corner", () => {
     const { container } = render(<SponsorCredit />);
     const root = container.firstChild as HTMLElement;
     expect(root.style.bottom).toBe("8px");
-    expect(root.className).toBe("");
+    expect(root.style.right).toBe("8px");
   });
 
   test("hidden prop hides the element", () => {

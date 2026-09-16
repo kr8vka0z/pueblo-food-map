@@ -180,7 +180,7 @@ const en: Record<string, string> = {
   "menu.close": "Close menu",
   "menu.title": "Pueblo Food Map",
   "menu.suggest": "Suggest a venue",
-  "menu.about": "About Pueblo Food Project",
+  "menu.sponsoredBy": "Sponsored by",
   "menu.showWelcome": "Show welcome screen",
   "menu.language": "Language / Idioma",
 
@@ -652,7 +652,7 @@ const es: Record<string, string> = {
   "menu.close": "Cerrar menú",
   "menu.title": "Pueblo Food Map",
   "menu.suggest": "Sugerir un lugar",
-  "menu.about": "Acerca de Pueblo Food Project",
+  "menu.sponsoredBy": "Patrocinado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.language": "Language / Idioma",
 

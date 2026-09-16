@@ -368,6 +368,7 @@ export default function Map({
       mapStyle="mapbox://styles/mapbox/streets-v12"
       style={{ width: "100%", height: "100%" }}
       attributionControl={false}
+      logoPosition="bottom-right"
       onLoad={handleLoad}
       onMoveEnd={handleMoveEnd}
       maxBounds={PUEBLO_COUNTY_BBOX}
@@ -386,8 +387,9 @@ export default function Map({
         console.warn("[Map] Mapbox error:", e.error);
       }}
     >
-      {/* Attribution — bottom-left per spec §10.3; styled in globals.css */}
-      <AttributionControl position="bottom-left" compact={true} />
+      {/* Attribution + logo — bottom-right, one row, "i" left of the logo
+          (Kyle, 2026-09-16; spec §9). Styled in globals.css. */}
+      <AttributionControl position="bottom-right" compact={true} />
 
       {/* County mask — inverted fill + border line (#62).
           Rendered only after the boundary GeoJSON has loaded.

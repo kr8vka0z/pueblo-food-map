@@ -222,57 +222,34 @@ describe("HamburgerMenu — locale", () => {
   });
 });
 
-// ─── #96: About Pueblo Food Project ──────────────────────────────────────────
+// ─── Sponsor card (replaces #96's "About Pueblo Food Project" item) ───────────
 
-describe("#96 — About Pueblo Food Project menu item", () => {
-  test("'About' item renders in the open panel (EN)", async () => {
-    const user = userEvent.setup();
-    renderMenu();
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      expect(screen.getByText("About Pueblo Food Project")).toBeDefined();
-    });
+describe("HamburgerMenu — sponsor card (Kyle, 2026-09-16)", () => {
+  test("is the first thing in the Menu and links to pueblofoodproject.org in a new tab", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} />);
+    const card = screen.getByRole("link", { name: /Sponsored by Pueblo Food Project/i });
+    expect(card.getAttribute("href")).toBe("https://pueblofoodproject.org/");
+    expect(card.getAttribute("target")).toBe("_blank");
+    expect(card.getAttribute("rel")).toContain("noopener");
+    expect(card.getAttribute("aria-label")).toContain("(opens in new tab)");
+    // Before every menu item.
+    const firstItem = screen.getAllByRole("menuitem")[0];
+    expect(card.compareDocumentPosition(firstItem) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  test("'About' link href is correct", async () => {
-    const user = userEvent.setup();
-    renderMenu();
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
-      expect((link as HTMLAnchorElement).href).toContain("pueblofoodproject.org/about/");
-    });
+  test("the old 'About Pueblo Food Project' item is gone (same site as the card)", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} />);
+    expect(screen.queryByText("About Pueblo Food Project")).toBeNull();
   });
 
-  test("'About' link has target='_blank'", async () => {
-    const user = userEvent.setup();
-    renderMenu();
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
-      expect((link as HTMLAnchorElement).target).toBe("_blank");
-    });
+  test("ES label", () => {
+    render(<HamburgerMenu locale="es" open onClose={vi.fn()} />);
+    expect(screen.getByText("Patrocinado por")).toBeDefined();
   });
 
-  test("'About' link has rel containing noopener and noreferrer", async () => {
-    const user = userEvent.setup();
-    renderMenu();
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
-      const rel = (link as HTMLAnchorElement).rel;
-      expect(rel).toContain("noopener");
-      expect(rel).toContain("noreferrer");
-    });
-  });
-
-  test("'About' item renders in ES locale with Spanish label", async () => {
-    const user = userEvent.setup();
-    renderMenu("es");
-    await user.click(screen.getByRole("button", { name: /Abrir menú/i }));
-    await waitFor(() => {
-      expect(screen.getByText("Acerca de Pueblo Food Project")).toBeDefined();
-    });
+  test("not shown in the Saved view", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} view="saved" savedVenues={[]} />);
+    expect(screen.queryByTestId("menu-sponsor")).toBeNull();
   });
 });
 
@@ -522,8 +499,8 @@ describe("#109 — Language toggle as last menu item", () => {
     void container; // suppress unused warning
   });
 
-  test("language row appears after the About link in the panel", async () => {
-    // WHY: language toggle moved outside role="menu" ul — verify it still renders
+  test("language row is the last row in the panel, after the menu links", async () => {
+    // WHY: language toggle sits outside role="menu" ul — verify it still renders
     // after all menuitem links (last visually in the panel).
     const user = userEvent.setup();
     renderMenuWithLocaleProvider();
@@ -531,12 +508,11 @@ describe("#109 — Language toggle as last menu item", () => {
     await waitFor(() => {
       expect(screen.getByText("Language / Idioma")).toBeDefined();
     });
-    // The "About" link text appears before "Language / Idioma" in the DOM
     const panel = screen.getByText("Language / Idioma").closest('[id="hamburger-panel"]');
     const panelText = panel?.textContent ?? "";
-    const aboutIdx = panelText.indexOf("About Pueblo Food Project");
+    const lastLinkIdx = panelText.indexOf("Food help programs");
     const langIdx = panelText.indexOf("Language / Idioma");
-    expect(aboutIdx).toBeGreaterThan(-1);
-    expect(langIdx).toBeGreaterThan(aboutIdx);
+    expect(lastLinkIdx).toBeGreaterThan(-1);
+    expect(langIdx).toBeGreaterThan(lastLinkIdx);
   });
 });

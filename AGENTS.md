@@ -13,7 +13,7 @@
 - **Libraries:** `mapbox-gl` v3 + `react-map-gl` v8 (react-map-gl/mapbox import path).
 - **Basemap style:** `mapbox://styles/mapbox/streets-v12` (demo). Custom Studio brand basemap is a post-demo polish pass.
 - **Map components:** `src/components/Map.tsx` (the main map canvas, markers, popups, user-location dot) and `src/components/VenueMarker.tsx` (the interactive Lucide MapPin button rendered inside each Mapbox Marker).
-- **Wrapper:** `src/components/MapWrapper.tsx` wires the map to SearchBar, LocateButton, geolocation state, and venue selection.
+- **Wrapper:** `src/components/MapWrapper.tsx` wires the map to SearchBar, BottomNav (its Near me button replaced LocateButton), geolocation state, and venue selection.
 - **Token management:** see "Mapbox Token Management" section below.
 - **Testing:** react-map-gl/mapbox requires a WebGL canvas unavailable in jsdom. Mock the module in tests — see `src/__tests__/Map.test.tsx` and `src/__tests__/VenueMarker.test.tsx` for the pattern.
 
@@ -750,8 +750,8 @@ generic friendly retry message. No branch ever claims success unless the
 response is exactly `200` with `{ ok: true, ... }`.
 
 **Button color: sage, not orange.** Publish is this screen's primary
-action, but DESIGN.md reserves brand-orange ("ButtonPrimary") for exactly
-two elements on the PUBLIC map (the splash CTA and the LocateButton pill),
+action, but DESIGN.md reserves brand-orange ("ButtonPrimary") for the splash CTA alone (the
+LocateButton pill that also used it was replaced by BottomNav's Near me),
 with an explicit Don't against using it anywhere else. Sage is documented
 as this design system's general primary-interactive color, and filled
 sage-500/sage-600-hover is already the admin surface's established

@@ -157,9 +157,13 @@ body {
    The Mapbox logo + attribution are a LICENCE CONDITION: Mapbox's terms allow
    moving them, not hiding them. Below xl the bottom bar (78px + home-indicator
    inset) would cover this corner, so the whole bottom-left control group lifts
-   by the same offset SponsorCredit uses. xl and up: no bar, untouched. */
+   by the same offset SponsorCredit uses. xl and up: no bar, untouched.
+   The `.mapboxgl-map` ancestor is load-bearing: mapbox-gl.css ships its own
+   `.mapboxgl-ctrl-bottom-left { bottom: 0 }` in a chunk that loads AFTER this
+   file (the map is lazy), so a bare single-class selector loses on source
+   order — seen on dev.pueblofoodmap.com, credits sat under the bar. */
 @media (width < 80rem) {
-  .mapboxgl-ctrl-bottom-left {
+  .mapboxgl-map .mapboxgl-ctrl-bottom-left {
     bottom: calc(78px + 12px + env(safe-area-inset-bottom));
   }
 }

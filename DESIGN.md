@@ -16,7 +16,7 @@ colors:
   bone100: "#F4F1EA"
   bone200: "#E8E3D6"
   bone300: "#D4CDB8"
-  ink400: "#8A847A"
+  ink400: "#6A645A"
   ink500: "#5F5A52"
   ink700: "#2D2A26"
   ink900: "#1A1817"
@@ -165,7 +165,7 @@ A pre-existing design sidecar (`docs/pueblo-food-map-v2-handoff.md`) documents p
 
 **Bone is the paper.** The entire app sits on `bone-50` (#FBFAF6), a warm cream with a faint yellow tint. The bone scale steps up through `bone-100` (chip resting state, hover fills), `bone-200` (card borders, subtle dividers), and `bone-300` (search bar border at rest). These are not grays — they are warm. Never introduce a neutral or cool gray.
 
-**Ink is the ink.** Text runs warm charcoal: `ink-700` (#2D2A26) for all body text and headings — this combination on `bone-50` achieves WCAG AAA (7:1). `ink-500` (#5F5A52) for secondary metadata (distance, hours). `ink-400` (#8A847A) for placeholder text, icon fills, and section headers (rendered 10–11px uppercase, tracked wider). `ink-900` (#1A1817) for venue name headings in detail cards.
+**Ink is the ink.** Text runs warm charcoal: `ink-700` (#2D2A26) for all body text and headings — this combination on `bone-50` achieves WCAG AAA (7:1). `ink-500` (#5F5A52) for secondary metadata (distance, hours). `ink-400` (#6A645A) for placeholder text, icon fills, and section headers (rendered 10–11px uppercase, tracked wider). `ink-900` (#1A1817) for venue name headings in detail cards. `ink-400` carries real text — placeholders, 10–11px section headers, footer links — so its value must clear WCAG AA 4.5:1 against `bone-50`, `bone-100`, and `bone-200`. #6A645A does (5.61 / 5.20 / 4.57); the previous #8A847A did not (3.55 / 3.29 / 2.89).
 
 **Sage is the primary interactive color.** Every link, focus ring, active filter chip, selected marker ring, and interactive affordance uses sage — NOT blue. `sage-600` (#2C5F4F) is the primary color, used for the "Show details" toggle text, operator links on hover, and the Plentiful CTA hover state. `sage-500` (#4A8466) is the focus ring and selected marker ring color. `sage-100` + `sage-700` form the SNAP/WIC benefit badge pairing (calm, not urgent).
 

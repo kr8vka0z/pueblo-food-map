@@ -18,7 +18,7 @@
  */
 
 import Link from "next/link";
-import { Phone, MessageSquareText, ExternalLink } from "lucide-react";
+import { Phone, MessageSquareText, ExternalLink, ChevronDown } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
@@ -105,7 +105,7 @@ export default function ResourcesContent() {
         </Link>
       </nav>
 
-      <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-6">
+      <div className="flex-1 w-full max-w-lg mx-auto px-4 py-6 space-y-3">
         <h1
           className="text-3xl font-normal text-[var(--color-ink-900)]"
           style={{ fontFamily: "var(--font-display)" }}
@@ -121,52 +121,74 @@ export default function ResourcesContent() {
             key={key}
             id={key}
             aria-labelledby={`resource-${key}`}
-            className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-5 space-y-3 scroll-mt-4"
+            className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white scroll-mt-4"
           >
-            <h2 id={`resource-${key}`} className="text-lg font-semibold text-[var(--color-ink-800)]">
-              {t(`resources.${key}.name`, locale)}
-            </h2>
-            <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
-              {t(`resources.${key}.what`, locale)}
-            </p>
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-500)] mb-1">
-                {t("resources.goodFor", locale)}
-              </h3>
-              <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
-                {t(`resources.${key}.goodFor`, locale)}
-              </p>
-            </div>
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-500)] mb-1">
-                {t("resources.how", locale)}
-              </h3>
-              <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
-                {t(`resources.${key}.how`, locale)}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 pt-1">
-              {actions.map((a) =>
-                a.kind === "web" ? (
-                  <a key={a.href} href={a.href} target="_blank" rel="noopener noreferrer" className={ACTION_CLASS}>
-                    <ExternalLink size={14} aria-hidden />
-                    {t(a.labelKey ?? "resources.action.website", locale)}
-                    <span className="sr-only"> {t("menu.opensInNewTab", locale)}</span>
-                  </a>
-                ) : (
-                  <a key={a.href} href={a.href} className={ACTION_CLASS}>
-                    {a.kind === "call" ? (
-                      <Phone size={14} aria-hidden />
+            {/* Starts closed so all six programs fit on a phone screen without
+                scrolling (Kyle, 2026-09-16). Native <details>: keyboard, screen
+                reader expanded state and find-in-page all work with no JS.
+                Name only when closed — measured at 375×812, adding the one-line
+                "what" pushed the last card ~190px (EN) / ~280px (ES) below the fold. */}
+            <details className="group">
+              <summary
+                className={
+                  "flex items-start gap-3 p-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden " +
+                  "rounded-[var(--radius-lg)] hover:bg-[var(--color-bone-100)] " +
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                }
+              >
+                <h2 id={`resource-${key}`} className="flex-1 min-w-0 text-base font-semibold text-[var(--color-ink-800)]">
+                  {t(`resources.${key}.name`, locale)}
+                </h2>
+                <ChevronDown
+                  size={20}
+                  aria-hidden
+                  className="shrink-0 mt-0.5 text-[var(--color-sage-600)] transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none"
+                />
+              </summary>
+              <div className="px-4 pb-4 space-y-3">
+                <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+                  {t(`resources.${key}.what`, locale)}
+                </p>
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-500)] mb-1">
+                    {t("resources.goodFor", locale)}
+                  </h3>
+                  <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+                    {t(`resources.${key}.goodFor`, locale)}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-500)] mb-1">
+                    {t("resources.how", locale)}
+                  </h3>
+                  <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+                    {t(`resources.${key}.how`, locale)}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {actions.map((a) =>
+                    a.kind === "web" ? (
+                      <a key={a.href} href={a.href} target="_blank" rel="noopener noreferrer" className={ACTION_CLASS}>
+                        <ExternalLink size={14} aria-hidden />
+                        {t(a.labelKey ?? "resources.action.website", locale)}
+                        <span className="sr-only"> {t("menu.opensInNewTab", locale)}</span>
+                      </a>
                     ) : (
-                      <MessageSquareText size={14} aria-hidden />
-                    )}
-                    {t(a.kind === "call" ? "resources.action.call" : "resources.action.text", locale, {
-                      number: a.number,
-                    })}
-                  </a>
-                ),
-              )}
-            </div>
+                      <a key={a.href} href={a.href} className={ACTION_CLASS}>
+                        {a.kind === "call" ? (
+                          <Phone size={14} aria-hidden />
+                        ) : (
+                          <MessageSquareText size={14} aria-hidden />
+                        )}
+                        {t(a.kind === "call" ? "resources.action.call" : "resources.action.text", locale, {
+                          number: a.number,
+                        })}
+                      </a>
+                    ),
+                  )}
+                </div>
+              </div>
+            </details>
           </section>
         ))}
 

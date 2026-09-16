@@ -7,6 +7,7 @@
  *      with no raw i18n keys leaking through (a missing key renders the key).
  *   3. Call / text / website buttons point where the copy says they do.
  *   4. Website buttons open a new tab and say so to screen readers.
+ *   5. Cards start collapsed; only the name is in the <summary>.
  */
 
 import { describe, test, expect, vi } from "vitest";
@@ -47,6 +48,19 @@ describe("/resources", () => {
       within(card).getByText(t(`resources.${key}.how`, locale));
     }
     expect(container.textContent).not.toMatch(/resources\.[a-z0-9]+\./);
+  });
+
+  test("every card starts collapsed, showing only its name (Kyle, 2026-09-16)", () => {
+    renderPage("en");
+    for (const { key } of PROGRAMS) {
+      const card = screen.getByRole("region", { name: t(`resources.${key}.name`, "en") });
+      const details = card.querySelector("details")!;
+      expect(details.open).toBe(false);
+      const summary = details.querySelector("summary")!;
+      expect(summary.textContent).toContain(t(`resources.${key}.name`, "en"));
+      expect(summary.textContent).not.toContain(t(`resources.${key}.what`, "en"));
+      expect(summary.textContent).not.toContain(t(`resources.${key}.how`, "en"));
+    }
   });
 
   test("phone, text and website buttons carry the right targets", () => {

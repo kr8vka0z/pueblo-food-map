@@ -45,6 +45,8 @@ interface BottomNavProps {
   onNearMe: () => void;
   /** Used by HamburgerMenu's outside-click check so tapping the nav doesn't count as "outside". */
   navRef?: RefObject<HTMLElement | null>;
+  /** On /resources itself (PageNav): Resources shows as the current item. */
+  onResourcesPage?: boolean;
 }
 
 const ITEM_CLASS =
@@ -76,6 +78,7 @@ export default function BottomNav({
   isDrifted,
   onNearMe,
   navRef,
+  onResourcesPage = false,
 }: BottomNavProps) {
   // §6: the label never changes, only the icon does — so the bar never reflows.
   const located = geoState.permission === "granted" && geoState.position !== null;
@@ -120,7 +123,8 @@ export default function BottomNav({
         // 2xl: pill floating bottom-centre — same height, radius, shadow and
         // background as SearchBar's input (h-[52px], rounded-full, bone-50,
         // bone-300 border, elevation-1). 24px up, clear of the Mapbox corner.
-        "2xl:absolute 2xl:right-auto 2xl:z-[1000] " +
+        // fixed, not absolute: on the Menu pages (PageNav) the document scrolls.
+        "2xl:right-auto 2xl:z-[1000] " +
         "2xl:bottom-6 2xl:left-1/2 2xl:-translate-x-1/2 " +
         "2xl:h-[52px] 2xl:pb-0 2xl:px-1 2xl:border 2xl:border-[var(--color-bone-300)] " +
         "2xl:rounded-[var(--radius-full)] 2xl:elevation-1"
@@ -149,7 +153,12 @@ export default function BottomNav({
         {/* Resources opens its own page (/resources) — Kyle, 2026-09-16: as a
             drawer section it looked like it did the same thing as Menu. */}
         <li className="flex flex-1 2xl:flex-none 2xl:h-11">
-          <Link href="/resources" data-testid="nav-resources" className={ITEM_CLASS + " " + colorFor(false)}>
+          <Link
+            href="/resources"
+            data-testid="nav-resources"
+            aria-current={onResourcesPage ? "page" : undefined}
+            className={ITEM_CLASS + " " + colorFor(onResourcesPage)}
+          >
             {/* hand-helping, not hand-heart: the heart collapses into the fingers at 24px (§3.2). */}
             <HandHelping aria-hidden className={ICON_CLASS} />
             <span>{t("nav.resources", locale)}</span>

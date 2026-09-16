@@ -21,7 +21,7 @@ import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { formatPublishedDate } from "@/lib/dataFreshness";
 import SiteFooter from "@/components/SiteFooter";
-import PageTopNav from "./PageTopNav";
+import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
 const FAQ_NUMS = [1, 2, 3, 4, 5, 6] as const;
 
@@ -38,7 +38,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
   const { locale } = useLocale();
 
   return (
-    <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
+    <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
       {/* FAQPage structured data — English always (#386); mirrors the visible
           FAQ section below only when locale === "en" */}
       <script
@@ -48,7 +48,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
 
       {/* DRAFT COPY — pending final text from Kyle / Pueblo Food Project (#155) */}
 
-      <PageTopNav locale={locale} />
+      <PageNav locale={locale} />
 
       {/* Page content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-8">

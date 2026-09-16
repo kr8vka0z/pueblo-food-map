@@ -13,6 +13,10 @@ import { LocaleProvider } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import FeedbackPageContent from "@/components/FeedbackPageContent";
 
+// PageNav (bottom nav + drawer) has its own test; stub it so this page test
+// doesn't need next/navigation or matchMedia.
+vi.mock("@/components/PageNav", () => ({ default: () => null, PAGE_NAV_CLEARANCE: "" }));
+
 const mockTurnstile = {
   render: vi.fn((_container: HTMLElement, opts: { callback?: (t: string) => void }) => {
     if (opts.callback) opts.callback("test-token");

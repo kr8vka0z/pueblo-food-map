@@ -17,7 +17,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import SiteFooter from "@/components/SiteFooter";
 import { DISPLAY_DAY_KEYS, formatSlot } from "@/lib/hours";
 import type { Venue, VenueCategory } from "@/types/venue";
-import PageTopNav from "./PageTopNav";
+import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
 interface VenuesDirectoryContentProps {
   groups: { category: VenueCategory; items: Venue[] }[];
@@ -27,8 +27,8 @@ export default function VenuesDirectoryContent({ groups }: VenuesDirectoryConten
   const { locale } = useLocale();
 
   return (
-    <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
-      <PageTopNav locale={locale} />
+    <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
+      <PageNav locale={locale} />
 
       {/* Page content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-8">

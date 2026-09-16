@@ -16,8 +16,8 @@
  *   - Removed secondary CTA ("Show the Pueblo map") — primary CTA is now the
  *     only entry point. Fallback to pueblo-center still applies when geo is
  *     denied or dismissed (existing onPrimary('pueblo-center') path unchanged).
- *   - Sponsor credit moved to bottom-right corner (mirrors SponsorCredit on map).
- *     Uses SponsorCredit component directly; splash.sponsor.* i18n keys removed.
+ *   - Sponsor credit moved to bottom-right corner. Removed entirely 2026-09-16
+ *     (Kyle): the sponsor credit lives only at the top of the Menu drawer now.
  *   - Removed hairline divider (no longer needed without in-column credit).
  *   - onSecondary prop removed.
  *
@@ -26,7 +26,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Wordmark from './Wordmark';
-import SponsorCredit from './SponsorCredit';
 import { useGeolocation } from '@/lib/useGeolocation';
 import { useLocale } from '@/lib/LocaleContext';
 import { t } from '@/lib/i18n';
@@ -97,8 +96,7 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
     //   --splash-scrim-opacity  (default 0.25) — higher = more opaque, less peek-through
     //   --splash-scrim-blur     (default 4px)  — higher = more frosted
     //
-    // SponsorCredit is positioned on this outer fixed container so it pins to the
-    // viewport corner and does NOT scroll with the content. There is no EN/ES toggle
+    // There is no EN/ES toggle
     // on the splash — the two CTAs below set the language; the toggle lives on the map.
     <div
       className="fixed inset-0 z-[9000] overflow-y-auto"
@@ -193,9 +191,6 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
           </p>
         </div>
       </div>
-
-      {/* ── Sponsor credit — bottom-right corner (viewport-pinned, mirrors map) ── */}
-      <SponsorCredit locale={locale} />
     </div>
   );
 }

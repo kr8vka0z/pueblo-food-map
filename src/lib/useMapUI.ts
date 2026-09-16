@@ -53,7 +53,7 @@ export function useMapUI() {
   // ── Desktop window expanded state (PR 5) ───────────────────────────────────
   const [windowExpanded, setWindowExpanded] = useState(false);
 
-  // ── BottomSheet snap state — used to hide SponsorCredit when sheet is full (#69)
+  // ── BottomSheet snap state — (the map sponsor credit it once hid is gone, #459)
   const [sheetFullyExpanded, setSheetFullyExpanded] = useState(false);
 
   // Reset expanded state when a new venue is selected (issue #122).

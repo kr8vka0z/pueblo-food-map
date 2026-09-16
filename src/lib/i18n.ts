@@ -17,7 +17,7 @@ const en: Record<string, string> = {
   "topbar.locale.es": "ES",
 
   // Search
-  "search.placeholder": "Search venues or address…",
+  "search.placeholder": "Search",
   "search.aria": "Search venues",
   "search.shortcut": "⌘K",
 
@@ -122,7 +122,6 @@ const en: Record<string, string> = {
   "empty.showCategoryAria": "Show {label} venues",
 
   // Sponsor credit (#69)
-  "sponsor.text": "Sponsored by Pueblo Food Project",
 
   // Legend (#72)
   "legend.button_label": "Map legend",
@@ -491,7 +490,7 @@ const es: Record<string, string> = {
   "topbar.locale.es": "ES",
 
   // Search
-  "search.placeholder": "Buscar lugares o dirección…",
+  "search.placeholder": "Buscar",
   "search.aria": "Buscar lugares",
   "search.shortcut": "⌘K",
 
@@ -594,7 +593,6 @@ const es: Record<string, string> = {
   "empty.showCategoryAria": "Mostrar lugares de {label}",
 
   // Sponsor credit (#69)
-  "sponsor.text": "Patrocinado por Pueblo Food Project",
 
   // Legend (#72)
   "legend.button_label": "Leyenda del mapa",

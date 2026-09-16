@@ -340,7 +340,7 @@ The mobile layout is the primary design — this product is mobile-first because
 │ [≡] Pueblo Food Map        [EN|ES] [⊙]  │  ← 56px sticky top bar
 ├──────────────────────────────────────────┤
 │  ╭───────────────────────────────────╮   │  ← 12px gutter
-│  │  🔍  Search venues or address…    │   │  ← 44px search input (floating)
+│  │  🔍  Search                        │   │  ← 44px search input (floating)
 │  ╰───────────────────────────────────╯   │
 │                                          │
 │       (Custom-styled map fills           │
@@ -377,7 +377,7 @@ The mobile layout is the primary design — this product is mobile-first because
 
 #### 5.2.2 Search input — 44px height, floating
 
-**Spec:** floats 8px below the top bar (technically still in the header region, with `bg-bone-50` and `elevation-1`). 12px horizontal page gutter on both sides. Magnifying-glass icon (16px) left-aligned with 12px right padding. Placeholder in `ink-400`: "Search venues or address…".
+**Spec:** floats 8px below the top bar (technically still in the header region, with `bg-bone-50` and `elevation-1`). 12px horizontal page gutter on both sides. Magnifying-glass icon (16px) left-aligned with 12px right padding. Placeholder in `ink-400`: "Search" (shortened 2026-09-16 so it fits beside the Map/List switch).
 
 When focused: 2px sage ring (focus indicator), placeholder slides up. Typing filters both the list and the map markers in real time (250ms debounce).
 

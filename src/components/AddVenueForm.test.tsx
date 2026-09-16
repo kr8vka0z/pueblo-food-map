@@ -437,3 +437,26 @@ describe("AddVenueForm — geocode (Find location from address)", () => {
     expect(await screen.findByText(/Location lookup is unavailable right now/i)).toBeDefined();
   });
 });
+
+describe("AddVenueForm — lat/lng wheel guard", () => {
+  test("a wheel scroll over a focused Latitude/Longitude field blurs it instead of silently changing the value", () => {
+    // These two number inputs set the coordinates a venue pin is drawn at on
+    // the public map, so a mouse-wheel scroll silently incrementing or
+    // decrementing a focused value here is a data-integrity hazard, not a
+    // cosmetic quirk — the field must lose focus before the wheel event can
+    // reach its value.
+    render(<AddVenueForm />);
+    const lat = screen.getByLabelText(/^Latitude/i);
+    const lng = screen.getByLabelText(/^Longitude/i);
+
+    lat.focus();
+    expect(document.activeElement).toBe(lat);
+    fireEvent.wheel(lat);
+    expect(document.activeElement).not.toBe(lat);
+
+    lng.focus();
+    expect(document.activeElement).toBe(lng);
+    fireEvent.wheel(lng);
+    expect(document.activeElement).not.toBe(lng);
+  });
+});

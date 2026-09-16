@@ -590,6 +590,17 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           the next upgrade if geocoding ever proves too imprecise (e.g. a
           venue set back from its mailing address); no ceiling here beyond
           that remaining UX gap. */}
+      {/* WHY these stay type="number" rather than the usual mobile-friendly
+          type="text" + inputMode="decimal" swap: every longitude in Pueblo
+          County is NEGATIVE (~-104.6), and inputMode="decimal" renders a
+          keypad of digits and a decimal separator with no minus key, which
+          would make longitude unenterable on a phone — the opposite of the
+          intended fix. type="number" keeps a numeric keyboard that still
+          offers a sign. The one genuine hazard of type="number" is that a
+          wheel scroll over a FOCUSED field silently edits its value, and
+          these two write straight to the public map's coordinates, so the
+          onWheel handlers below blur the field instead. If this is ever
+          revisited, verify the minus key on a real iPhone first. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="venue-lat" className={labelClass}>
@@ -601,6 +612,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
             step="any"
             value={values.lat}
             onChange={(e) => setField("lat", e.target.value)}
+            onWheel={(e) => e.currentTarget.blur()}
             aria-required="true"
             aria-invalid={errors.lat ? "true" : undefined}
             aria-describedby={errors.lat ? "venue-lat-error" : undefined}
@@ -622,6 +634,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
             step="any"
             value={values.lng}
             onChange={(e) => setField("lng", e.target.value)}
+            onWheel={(e) => e.currentTarget.blur()}
             aria-required="true"
             aria-invalid={errors.lng ? "true" : undefined}
             aria-describedby={errors.lng ? "venue-lng-error" : undefined}

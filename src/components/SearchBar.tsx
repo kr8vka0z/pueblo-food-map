@@ -231,18 +231,20 @@ export default function SearchBar({
               : "pl-9 md:pl-10 ") +
             // pr reserves room for the inline view switch (#191). ONE value at
             // every width (docs/bottom-nav-spec.md §4.2) — the switch is the
-            // same control at the same 6px inset everywhere now.
-            // MEASURED, not computed (the last two bugs here were arithmetic
-            // that rendered wrong): on dev at 1280 the toggle's bounding box
-            // is 131.8px EN "Map/List", 145.1px ES "Mapa/Lista". 145 + 6px
-            // inset + 8px slack = 160px.
+            // same control everywhere now.
+            // MEASURED 2026-09-16 on the flush switch (`size="flush"`,
+            // `right-px` — 1px inset, no border of its own), not computed:
+            // at 1280 the toggle's bounding box is 137.8px EN "Map/List",
+            // 151.1px ES "Mapa/Lista". 152 (rounded up) + 1px inset + 8px
+            // slack = 161px. Re-measure rather than adjusting these numbers
+            // by eye if the switch's own padding ever changes.
             // With a chip showing under 400px the toggle goes icon-only
             // (§4.3); measured the same way at 375 (EN and ES alike, no
-            // words): 78px + 6 + 8 = 92px, leaving 154px to type in.
+            // words): 84px + 1 + 8 = 93px, leaving 158px to type in.
             (viewSwitch
               ? filterChip
-                ? "pr-[160px] max-[400px]:pr-[92px] "
-                : "pr-[160px] "
+                ? "pr-[161px] max-[400px]:pr-[93px] "
+                : "pr-[161px] "
               : "pr-4 ") +
             "text-base md:text-sm text-[var(--color-ink-700)] " +
             "bg-[var(--color-bone-50)] " +
@@ -258,20 +260,13 @@ export default function SearchBar({
         />
 
         {/* Inline Map/List view switch (#191) — right end of the pill,
-            mirroring filterChip's left anchor. size="md" renders a real 36px
-            button height (see ViewToggle.tsx's own WHY on the 38px outer
-            constant) rather than ViewToggle's default 28px: a prior mobile
-            review set a 36×36 CSS px tap-target floor for controls on this
-            bar (see the filterChip × button above), and 28px undershoots
-            that here too. The 38px outer control sits with a ~3px inset
-            inside the 44px mobile / 52px desktop pill. Width reserved on the
-            <input> above is measured off the rendered control, not computed.
-
-            Flush since 2026-09-16 (Kyle: "no gap… it just needs to look like a
-            part of the search bar"): the switch fills the pill's right end,
-            1px in so the pill's border wraps it, with no border or inset of
-            its own (size="flush"). This supersedes the 38px/~3px-inset note
-            above; the buttons are now 42px / 50px tall. */}
+            mirroring filterChip's left anchor. Flush (Kyle, 2026-09-16: "no
+            gap… it just needs to look like a part of the search bar"): the
+            switch fills the pill's right end, 1px in so the pill's own
+            border wraps it, with no border or inset of its own
+            (size="flush") — its buttons are 42px tall on mobile, 50px on
+            desktop. Width reserved on the <input> above (`pr-*`) is measured
+            off the rendered control, not computed — see that comment. */}
         {viewSwitch && (
           <div className="absolute top-px bottom-px right-px">
             <ViewToggle

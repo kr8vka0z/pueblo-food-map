@@ -417,6 +417,10 @@ inventing a second convention.
 | Venue bottom sheet + scrim | vaul default, above all of the above |
 | Splash screen | 9000 |
 
+> **Amended 2026-09-16 by Kyle (credits row):** the Mapbox logo, its compact "i" credit
+> button and the sponsor line now share one line — logo, then "i", sponsor on the right
+> (globals.css). Opening the "i" hides the sponsor line until it closes.
+
 ---
 
 ## 10. Interaction with the venue sheet

@@ -153,6 +153,28 @@ body {
   color: var(--color-ink-400);
 }
 
+/* ─── Credits on one line (Kyle, 2026-09-16) ─────────────────────────────────
+   Mapbox stacks its bottom-left controls, so the compact "i" (the required
+   text credit, folded) sat ABOVE the logo. Lay the group out as a row instead:
+   logo, then the "i", both on the same line as SponsorCredit across the map.
+   row-reverse because Mapbox inserts the attribution control before the logo.
+   The "i" is 24px against the logo's 23px box sitting 6px up, so a 6px bottom
+   margin puts its centre on the logo's (measured on dev at 393×852).
+   `.mapboxgl-map` prefix: mapbox-gl.css loads after this file (see §9 below). */
+.mapboxgl-map .mapboxgl-ctrl-bottom-left {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-end;
+}
+.mapboxgl-map .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-attrib.mapboxgl-compact {
+  margin: 0 0 6px 4px;
+}
+/* Opened, the credit text runs across the map into the sponsor line; hide the
+   sponsor line until the "i" is closed again. */
+body:has(.mapboxgl-compact-show) [data-sponsor-credit] {
+  visibility: hidden;
+}
+
 /* ─── Credits above the bottom nav bar — docs/bottom-nav-spec.md §9 ──────────
    The Mapbox logo + attribution are a LICENCE CONDITION: Mapbox's terms allow
    moving them, not hiding them. Below 2xl the bottom bar (78px + home-indicator

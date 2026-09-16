@@ -32,6 +32,8 @@ export default function SponsorCredit({
   const locale = localeProp ?? ctxLocale;
   return (
     <div
+      // Hidden by globals.css while the Mapbox credit text is open beside it.
+      data-sponsor-credit=""
       // clearBottomNav (the map): below 2xl the bottom nav bar covers the map's
       // bottom edge, so the credit lifts above it — bar height (78) + 12px +
       // the home-indicator inset (docs/bottom-nav-spec.md §9); 2xl and up it

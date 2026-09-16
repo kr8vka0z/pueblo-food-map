@@ -24,8 +24,13 @@ interface ViewToggleProps {
    * 34px content box (36 − 2×1px border) for the `h-full` buttons inside
    * it — 2px short of the 36px floor. Setting 38 here nets a real 36px
    * button height once the border is subtracted.
+   *
+   * "flush" (Kyle, 2026-09-16) is the SearchBar instance now: no border of
+   * its own and the full height of its container, so it reads as the pill's
+   * right end rather than a button sitting inside it. The pill's own border
+   * wraps it; buttons are 42px (phone) / 50px (desktop) tall.
    */
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "flush";
   /**
    * When true the "map" button is rendered disabled rather than silently
    * ignoring taps. WHY this exists: MapWrapper suppresses the map mount when
@@ -49,9 +54,10 @@ interface ViewToggleProps {
   collapseLabelsNarrow?: boolean;
 }
 
-const SIZE_STYLES: Record<"sm" | "md", { height: number; iconSize: number; paddingX: string }> = {
+const SIZE_STYLES: Record<"sm" | "md" | "flush", { height: number | string; iconSize: number; paddingX: string }> = {
   sm: { height: 28, iconSize: 13, paddingX: "px-2.5" },
   md: { height: 38, iconSize: 14, paddingX: "px-3" },
+  flush: { height: "100%", iconSize: 14, paddingX: "px-3.5" },
 };
 
 export default function ViewToggle({
@@ -67,7 +73,10 @@ export default function ViewToggle({
     <div
       role="group"
       aria-label={t("view.toggleAria", locale)}
-      className="flex items-center rounded-full border border-[var(--color-bone-300)] bg-[var(--color-bone-100)] overflow-hidden"
+      className={
+        "flex items-center rounded-full bg-[var(--color-bone-100)] overflow-hidden" +
+        (size === "flush" ? "" : " border border-[var(--color-bone-300)]")
+      }
       style={{ height }}
     >
       {(["map", "list"] as const).map((m) => {

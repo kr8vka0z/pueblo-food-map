@@ -129,12 +129,13 @@ describe("SearchBar — viewSwitch + filterChip collision (#191)", () => {
   // reserves one measured width at every breakpoint. jsdom has no layout, so
   // the class contract is what's assertable — the pixel proof is the browser
   // measurement recorded in SearchBar.tsx's own comment.
-  test("the view switch sits at one inset and one reserved width at every width", () => {
+  test("the view switch sits flush in the pill with one reserved width at every width", () => {
     const { container } = render(
       <SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "map", onChange: vi.fn() }} />,
     );
     expect(container.querySelector(".right-12")).toBeNull();
-    expect(container.querySelector(".right-1\\.5")).not.toBeNull();
+    // Flush with the pill (Kyle, 2026-09-16): 1px in, full height, no inset.
+    expect(container.querySelector(".right-px.top-px.bottom-px")).not.toBeNull();
     const inputClass = container.querySelector("input[type='search']")?.className ?? "";
     expect(inputClass).toContain("pr-[160px]");
     expect(inputClass).not.toMatch(/md:pr-/);

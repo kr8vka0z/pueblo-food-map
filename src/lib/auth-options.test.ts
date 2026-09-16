@@ -32,15 +32,27 @@ import { betterAuth } from "better-auth";
 import { getCookies } from "better-auth/cookies";
 import { buildAuthOptions } from "@/lib/auth-options";
 
-// Full migrated schema (user/session/verification/passkey tables) — needed
-// only by the rpID-isolation describe block below, which drives a real
-// magic-link -> session -> passkey-registration-options ceremony. Every
-// other test in this file only introspects buildAuthOptions()'s returned
-// config object and needs no real tables.
-const MIGRATION_SQL = readFileSync(
-  join(process.cwd(), "migrations", "0003_better_auth_schema.sql"),
-  "utf-8",
-);
+// Full migrated schema (user/session/verification/passkey/rateLimit tables)
+// — needed only by the rpID-isolation describe block below, which drives a
+// real magic-link -> session -> passkey-registration-options ceremony, and
+// therefore actually dispatches requests through Better Auth's rate-limit
+// middleware. Every other test in this file only introspects
+// buildAuthOptions()'s returned config object, never invokes a real
+// endpoint, and needs no real tables. 0004 (the `rateLimit` table) is
+// required alongside 0003 as of better-auth 1.7.4: that release added a
+// startup schema-validation check that inspects the database the first
+// time a real request actually touches it (config introspection alone
+// never trips it — see the WHY note below).
+const MIGRATION_SQL = [
+  readFileSync(
+    join(process.cwd(), "migrations", "0003_better_auth_schema.sql"),
+    "utf-8",
+  ),
+  readFileSync(
+    join(process.cwd(), "migrations", "0004_rate_limit_table.sql"),
+    "utf-8",
+  ),
+].join("\n");
 const ALLOWLISTED_EMAIL = "kysboyd@gmail.com"; // matches adminAllowlist.ts's default
 
 describe("buildAuthOptions", () => {
@@ -78,11 +90,15 @@ describe("buildAuthOptions", () => {
 });
 
 describe("rate limit — D1-backed, magic-link custom rule (#318 Phase 4 item 1)", () => {
-  // Config introspection only — this doesn't need the `rateLimit` table to
-  // exist (migrations/0004_rate_limit_table.sql), since `auth.options` is
-  // read directly rather than exercised through a live request. See
-  // auth-options.ts's own `rateLimit` WHY comment for the full source
-  // trace behind every value asserted here.
+  // Config introspection only, on an UNMIGRATED in-memory database — no
+  // real endpoint is ever dispatched here, `auth.options` is read directly.
+  // Under better-auth >= 1.7.4 a boot-time schema-validation check requires
+  // the `rateLimit` table (migrations/0004_rate_limit_table.sql) to exist
+  // in any database a real betterAuth() instance is actually exercised
+  // against — but that check runs lazily, the first time a request is
+  // dispatched, not at construction, so config-only tests like these never
+  // trip it. See auth-options.ts's own `rateLimit` WHY comment for the full
+  // source trace behind every value asserted here.
   test("rateLimit is enabled in production, D1-backed, with the magic-link custom rule", () => {
     // WHY force NODE_ENV to "production" for this one assertion:
     // auth-options.ts's `enabled` mirrors better-auth's own

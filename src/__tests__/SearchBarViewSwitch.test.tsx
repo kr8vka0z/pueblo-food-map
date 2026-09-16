@@ -124,20 +124,47 @@ describe("SearchBar — viewSwitch + filterChip collision (#191)", () => {
     expect(screen.getByRole("group", { name: /choose map or list view/i })).toBeDefined();
   });
 
-  // Regression guard for the menu-button collision measured on dev at 375px:
-  // at right-1 the whole List button rendered underneath the hamburger menu
-  // button (which is flush to the pill's right edge under md: and sits in a
-  // higher stacking layer), so tapping List opened the menu. jsdom has no
-  // layout, so the class contract is the only thing assertable here — the
-  // pixel proof lives in the browser measurement recorded in SearchBar.tsx's
-  // own comment.
-  test("the view switch is inset past the mobile menu button, not flush to the pill edge", () => {
+  // docs/bottom-nav-spec.md §4.2: the menu button that forced the mobile-only
+  // right-12 inset is gone, so the switch sits at one inset and the input
+  // reserves one measured width at every breakpoint. jsdom has no layout, so
+  // the class contract is what's assertable — the pixel proof is the browser
+  // measurement recorded in SearchBar.tsx's own comment.
+  test("the view switch sits at one inset and one reserved width at every width", () => {
     const { container } = render(
       <SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "map", onChange: vi.fn() }} />,
     );
-    const wrapper = container.querySelector(".right-12");
-    expect(wrapper).not.toBeNull();
-    expect(wrapper?.className).toContain("md:right-1.5");
-    expect(container.querySelector("input[type='search']")?.className).toContain("pr-[168px]");
+    expect(container.querySelector(".right-12")).toBeNull();
+    expect(container.querySelector(".right-1\\.5")).not.toBeNull();
+    const inputClass = container.querySelector("input[type='search']")?.className ?? "";
+    expect(inputClass).toContain("pr-[160px]");
+    expect(inputClass).not.toMatch(/md:pr-/);
+  });
+
+  // §4.3: with a chip showing, under 400px the switch goes icon-only and the
+  // input's reservation drops to match; without a chip neither happens.
+  test("chip present: labels collapse under 400px and the reservation shrinks with them", () => {
+    const { container } = render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filterChip={{ label: "Food Pantry", onClear: vi.fn() }}
+        viewSwitch={{ mode: "map", onChange: vi.fn() }}
+      />,
+    );
+    const inputClass = container.querySelector("input[type='search']")?.className ?? "";
+    expect(inputClass).toContain("max-[400px]:pr-[92px]");
+    const labels = Array.from(container.querySelectorAll("[role=group] span"));
+    expect(labels).toHaveLength(2);
+    labels.forEach((span) => expect(span.className).toContain("max-[400px]:sr-only"));
+  });
+
+  test("no chip: labels never collapse", () => {
+    const { container } = render(
+      <SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "map", onChange: vi.fn() }} />,
+    );
+    expect(container.querySelector("input[type='search']")?.className).not.toContain("max-[400px]");
+    container
+      .querySelectorAll("[role=group] span")
+      .forEach((span) => expect(span.className).not.toContain("sr-only"));
   });
 });

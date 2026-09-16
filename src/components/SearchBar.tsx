@@ -229,18 +229,21 @@ export default function SearchBar({
                 ? "pl-[calc(26%+8px)] "
                 : "pl-[calc(40%+8px)] "
               : "pl-9 md:pl-10 ") +
-            // pr reserves room for the inline view switch (#191).
-            // 136px mobile = the control's widest real state (active button
-            // with its label + icon-only inactive button + borders + inset),
-            // measured against the longest label pair, Spanish "Mapa"/"Lista".
-            // It was 168px while BOTH labels showed on mobile, which ate
-            // roughly half of a 375px phone's ~343px pill and left the input
-            // unusable next to an active category chip. 190px at md: is the
-            // both-labels width, which the 520px desktop bar absorbs easily.
-            // Mobile is 168px: the switch's own 110px worst case plus the
-            // 48px it is pushed in by below (see the right-12 note), so the
-            // typed query never runs under the switch or the menu button.
-            (viewSwitch ? "pr-[168px] md:pr-[190px] " : "pr-4 ") +
+            // pr reserves room for the inline view switch (#191). ONE value at
+            // every width (docs/bottom-nav-spec.md §4.2) — the switch is the
+            // same control at the same 6px inset everywhere now.
+            // MEASURED, not computed (the last two bugs here were arithmetic
+            // that rendered wrong): on dev at 1280 the toggle's bounding box
+            // is 131.8px EN "Map/List", 145.1px ES "Mapa/Lista". 145 + 6px
+            // inset + 8px slack = 160px.
+            // With a chip showing under 400px the toggle goes icon-only
+            // (§4.3); measured the same way at 375 (EN and ES alike, no
+            // words): 78px + 6 + 8 = 92px, leaving 154px to type in.
+            (viewSwitch
+              ? filterChip
+                ? "pr-[160px] max-[400px]:pr-[92px] "
+                : "pr-[160px] "
+              : "pr-4 ") +
             "text-base md:text-sm text-[var(--color-ink-700)] " +
             "bg-[var(--color-bone-50)] " +
             "border border-[var(--color-bone-300)] " +
@@ -262,30 +265,20 @@ export default function SearchBar({
             bar (see the filterChip × button above), and 28px undershoots
             that here too. The 38px outer control sits with a ~3px inset
             inside the 44px mobile / 52px desktop pill. Width reserved on the
-            <input> above (168px mobile / 190px desktop) was sized from this
-            control's own worst-case rendered width — two buttons at px-3
-            padding + 14px icon + gap-1 + the longest label pair
-            ("Mapa"/"Lista", ES) — plus a small gap before the switch and the
-            pill's edge.
+            <input> above is measured off the rendered control, not computed.
 
-            right-12 below MOBILE ONLY, and it is load-bearing, not spacing
-            taste: under md: the menu button (MapWrapper renders it in its own
-            absolutely-positioned layer at z-index 1002) sits flush to the
-            pill's right edge, 44px wide. At right-1 the whole List button
-            landed underneath it — measured on dev at 375px, List occupied
-            x 316-354 and the menu button x 315-359, and
-            document.elementFromPoint at the List button's own centre returned
-            the menu button, so tapping List opened the menu instead. At md:
-            and up the menu moves out to the viewport's right edge, far clear
-            of the 520px centred bar, so right-1.5 stays. */}
+            right-1.5 at every width: the old mobile-only right-12 existed to
+            clear the navy menu button, which the bottom nav replaced
+            (docs/bottom-nav-spec.md §4.2). */}
         {viewSwitch && (
-          <div className="absolute right-12 md:right-1.5 top-1/2 -translate-y-1/2">
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
             <ViewToggle
               mode={viewSwitch.mode}
               onChange={viewSwitch.onChange}
               locale={viewSwitch.locale}
               mapDisabled={viewSwitch.mapDisabled}
               size="md"
+              collapseLabelsNarrow={Boolean(filterChip)}
             />
           </div>
         )}

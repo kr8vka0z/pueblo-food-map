@@ -161,8 +161,14 @@ const en: Record<string, string> = {
 
   // Location control (#108)
   "locate.locating": "Locating…",
-  "locate.recenter": "Re-center",
   "locate.outsideCounty": "Your location is outside Pueblo County",
+
+  // Bottom navigation bar (docs/bottom-nav-spec.md §11)
+  "nav.nearMe": "Near me",
+  "nav.saved": "Saved",
+  "nav.resources": "Resources",
+  "nav.menu": "Menu",
+  "nav.aria": "Main",
 
   // Saved places (#132)
   "menu.saved.heading": "Saved places",
@@ -181,7 +187,6 @@ const en: Record<string, string> = {
   "menu.about": "About Pueblo Food Project",
   "menu.showWelcome": "Show welcome screen",
   "menu.language": "Language / Idioma",
-  "menu.view": "View",
 
   // Category browse dropdown (#95)
   "categoryBrowse.clearFilter": "Clear category filter",
@@ -594,8 +599,14 @@ const es: Record<string, string> = {
 
   // Location control (#108)
   "locate.locating": "Localizando…",
-  "locate.recenter": "Recentrar",
   "locate.outsideCounty": "Tu ubicación está fuera del condado de Pueblo",
+
+  // Bottom navigation bar (docs/bottom-nav-spec.md §11)
+  "nav.nearMe": "Cerca de mí",
+  "nav.saved": "Guardados",
+  "nav.resources": "Recursos",
+  "nav.menu": "Menú",
+  "nav.aria": "Principal",
 
   // Saved places (#132)
   "menu.saved.heading": "Lugares guardados",
@@ -614,7 +625,6 @@ const es: Record<string, string> = {
   "menu.about": "Acerca de Pueblo Food Project",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.language": "Language / Idioma",
-  "menu.view": "Vista",
 
   // Category browse dropdown (#95)
   "categoryBrowse.clearFilter": "Borrar filtro de categoría",

@@ -36,6 +36,17 @@ interface ViewToggleProps {
    * feedback. Disabled state says "not available" instead of saying nothing.
    */
   mapDisabled?: boolean;
+  /**
+   * When true, BOTH labels go visually hidden under 400px wide (icon-only),
+   * keeping their accessible names via sr-only. SearchBar sets this only
+   * while a category chip is showing — docs/bottom-nav-spec.md §4.3: at 375px
+   * chip + labelled toggle left ~48px of typing room.
+   *
+   * ponytail: one conditional, not a layout system. The 400px threshold is a
+   * measured floor, not a breakpoint — if the chip's max-width ever changes,
+   * re-measure rather than adjusting this number by eye.
+   */
+  collapseLabelsNarrow?: boolean;
 }
 
 const SIZE_STYLES: Record<"sm" | "md", { height: number; iconSize: number; paddingX: string }> = {
@@ -49,6 +60,7 @@ export default function ViewToggle({
   locale = "en",
   size = "sm",
   mapDisabled = false,
+  collapseLabelsNarrow = false,
 }: ViewToggleProps) {
   const { height, iconSize, paddingX } = SIZE_STYLES[size];
   return (
@@ -85,21 +97,13 @@ export default function ViewToggle({
           >
             <Icon size={iconSize} aria-hidden />
             {/*
-              At "md" (the in-search-bar instance, #191) the INACTIVE label is
-              visually hidden below the md: breakpoint and shown from md: up.
-              WHY: with both labels always visible the control reserved 168px
-              of a 375px phone's ~343px-wide search pill — roughly half the
-              bar — which is exactly the mobile crowding this placement was
-              chosen to avoid. Hiding only the inactive word keeps the bar
-              readable AND makes the active view more obvious, since the
-              selected side is the one carrying a word.
-
-              sr-only (not `hidden`) is deliberate: the text stays in the
-              accessibility tree, so the icon-only button keeps a real
-              accessible name for screen readers. The icon is aria-hidden and
-              could not supply one.
+              Both labels show at every width (docs/bottom-nav-spec.md §4.1):
+              deleting the navy menu button returned the room, and a bare list
+              glyph beside a map glyph made the resident guess. The one
+              exception is collapseLabelsNarrow (§4.3). sr-only (not `hidden`)
+              there keeps the accessible name — the icon is aria-hidden.
             */}
-            <span className={size === "md" && !active ? "sr-only md:not-sr-only" : undefined}>
+            <span className={collapseLabelsNarrow ? "max-[400px]:sr-only" : undefined}>
               {t(m === "map" ? "view.map" : "view.list", locale)}
             </span>
           </button>

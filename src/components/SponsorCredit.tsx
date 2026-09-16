@@ -19,19 +19,31 @@ interface SponsorCreditProps {
   locale?: Locale;
   /** Hide the credit (e.g. when BottomSheet is fully expanded on mobile). */
   hidden?: boolean;
+  /** Lift above the bottom nav bar below xl (the map view, not the splash). */
+  clearBottomNav?: boolean;
 }
 
 export default function SponsorCredit({
   locale: localeProp,
   hidden = false,
+  clearBottomNav = false,
 }: SponsorCreditProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
   return (
     <div
+      // clearBottomNav (the map): below xl the bottom nav bar covers the map's
+      // bottom edge, so the credit lifts above it — bar height (78) + 12px +
+      // the home-indicator inset (docs/bottom-nav-spec.md §9); xl and up it
+      // sits back in its corner. The splash has no bar and keeps bottom: 8.
+      className={
+        clearBottomNav
+          ? "bottom-[calc(78px+12px+env(safe-area-inset-bottom))] xl:bottom-2"
+          : undefined
+      }
       style={{
         position: "absolute",
-        bottom: 8,
+        bottom: clearBottomNav ? undefined : 8,
         right: 8,
         zIndex: 1000,
         display: hidden ? "none" : undefined,

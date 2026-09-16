@@ -35,8 +35,8 @@
  * getContainer, on/off) on whatever `mapboxMap` it's given — our fake map
  * object from the mocked Map's onMapReady isn't a real mapboxgl.Map instance,
  * so DesktopVenueWindow would throw if it rendered for real once a venue is
- * selected. Everything else (SearchBar, LocateButton, HamburgerMenu,
- * SponsorCredit, Wordmark, CategoryDropdown) renders for real — none of them
+ * selected. Everything else (SearchBar, BottomNav, HamburgerMenu,
+ * SponsorCredit, CategoryDropdown) renders for real — none of them
  * touch mapboxMap or WebGL, matching the precedent in
  * MapWrapperChrome.test.tsx of exercising simple chrome components directly.
  *

@@ -13,7 +13,6 @@
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { SITE_URL } from "@/lib/site";
 import { buildPageMetadata } from "@/lib/site";
 import sitemap from "@/app/sitemap";
@@ -216,9 +215,7 @@ describe("SiteFooter", () => {
 
 describe("HamburgerMenu — About link", () => {
   test("panel contains an About link pointing to /about", async () => {
-    const user = userEvent.setup();
-    render(<HamburgerMenu locale="en" />);
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} />);
     await waitFor(() => {
       const link = screen.getByRole("link", {
         name: new RegExp(t("nav.about", "en"), "i"),
@@ -229,9 +226,7 @@ describe("HamburgerMenu — About link", () => {
   });
 
   test("About link is present in ES locale", async () => {
-    const user = userEvent.setup();
-    render(<HamburgerMenu locale="es" />);
-    await user.click(screen.getByRole("button", { name: /Abrir/i }));
+    render(<HamburgerMenu locale="es" open onClose={vi.fn()} />);
     await waitFor(() => {
       // Look for a link to /about regardless of text
       const links = document.querySelectorAll("a[href='/about']");

@@ -1,19 +1,24 @@
 "use client";
 
 /**
- * HamburgerMenu — top-right overlay menu for map-level actions.
+ * HamburgerMenu — the app drawer: saved places, assistance resources, links,
+ * language. Controlled; it has no trigger of its own.
  *
- * Desktop (≥768px): ~280px dropdown anchored below the trigger button.
+ * Opened by BottomNav's Saved / Resources / Menu items (docs/bottom-nav-spec.md
+ * §7), each passing `initialSection` so the drawer scrolls that section into
+ * view. The navy trigger button this used to own was deleted with the bottom
+ * nav, as was its Map/List row — that switch lives in the search box (§4.4).
+ *
+ * Desktop (≥768px): ~280px dropdown top-right, below the search row.
  * Mobile (<768px): full-height slide-in side sheet from the right, ~80% viewport width.
  *
  * Behavior:
- *   - Toggle open/closed via the hamburger button.
- *   - Close on: X-button click, outside-click/tap, Escape key.
+ *   - Close on: X-button click, outside-click/tap (taps on the nav don't
+ *     count — the nav toggles the drawer itself), Escape key.
  *   - Focus trap inside the panel while open.
- *   - Focus returns to the hamburger button on close.
+ *   - Focus returns to whatever opened it (the nav item) on close.
  *
  * A11y:
- *   - Button: aria-expanded, aria-haspopup="menu", aria-controls panel id.
  *   - Panel: role="menu", aria-label from i18n "menu.open".
  *   - Menu items: role="menuitem" (delegated to HamburgerMenuItem).
  *   - Mobile backdrop: aria-hidden="true" (decorative overlay).
@@ -21,11 +26,12 @@
  * v1 items: "Suggest a venue" → /suggest
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Menu, X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Phone, Info, List } from "lucide-react";
+import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Phone, Info, List } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
-import ViewToggle, { type ViewMode } from "./ViewToggle";
+import { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
+import { useMediaQuery, MOBILE_QUERY, BELOW_XL_QUERY } from "@/lib/useMediaQuery";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
@@ -44,35 +50,49 @@ interface HamburgerMenuProps {
   savedVenues?: Array<Venue & { distanceMiles?: number }>;
   /** Called when a saved venue row is tapped — selects it on the map. */
   onSelectVenue?: (id: string) => void;
-  /** Current map/list view mode (#view-toggle-in-menu). */
-  viewMode?: ViewMode;
-  /** Called when the user picks a view mode from the menu. */
-  onViewModeChange?: (mode: ViewMode) => void;
+  /** Whether the drawer is open (controlled by MapWrapper). */
+  open: boolean;
+  /** Called when the drawer asks to close (X, Escape, outside tap, item picked). */
+  onClose: () => void;
+  /** Section scrolled into view on open, and again whenever it changes while open (§7). */
+  initialSection?: MenuSection;
+  /** The nav bar — pointerdowns inside it are not "outside" (it toggles the drawer itself). */
+  ignoreOutsideRef?: RefObject<HTMLElement | null>;
 }
+
+/** DOM ids of the sections BottomNav can open the drawer at. */
+const SECTION_IDS: Record<Exclude<MenuSection, "top">, string> = {
+  saved: "menu-section-saved",
+  help: "menu-section-help",
+};
 
 // All focusable elements inside the panel for tab-trap.
 const FOCUSABLE =
   'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export default function HamburgerMenu({ locale: localeProp, onShowWelcome, savedVenues = [], onSelectVenue, viewMode, onViewModeChange }: HamburgerMenuProps) {
+export default function HamburgerMenu({
+  locale: localeProp,
+  onShowWelcome,
+  savedVenues = [],
+  onSelectVenue,
+  open,
+  onClose,
+  initialSection = "top",
+  ignoreOutsideRef,
+}: HamburgerMenuProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
-  const [open, setOpen] = useState(false);
 
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Element focused when the drawer opened (the nav item) — focus returns there on close.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
-  // ── Open / close helpers ────────────────────────────────────────────────────
+  // ── Close helper ────────────────────────────────────────────────────────────
 
   const close = useCallback(() => {
-    setOpen(false);
-    // Return focus to the hamburger button
-    triggerRef.current?.focus();
-  }, []);
-
-  const toggle = useCallback(() => {
-    setOpen((prev) => !prev);
-  }, []);
+    onClose();
+    returnFocusRef.current?.focus();
+  }, [onClose]);
 
   // ── Keyboard: Escape closes ──────────────────────────────────────────────────
 
@@ -96,20 +116,23 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
       if (
         panelRef.current &&
         !panelRef.current.contains(e.target as Node) &&
-        triggerRef.current &&
-        !triggerRef.current.contains(e.target as Node)
+        !ignoreOutsideRef?.current?.contains(e.target as Node)
       ) {
         close();
       }
     }
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [open, close]);
+  }, [open, close, ignoreOutsideRef]);
 
   // ── Focus trap inside the panel ─────────────────────────────────────────────
 
   useEffect(() => {
     if (!open || !panelRef.current) return;
+
+    if (document.activeElement instanceof HTMLElement) {
+      returnFocusRef.current = document.activeElement;
+    }
 
     // Move focus into the panel on open
     const firstFocusable = panelRef.current.querySelector<HTMLElement>(FOCUSABLE);
@@ -155,18 +178,30 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
     };
   }, [open]);
 
-  // isMobile: detect <768px breakpoint client-side (SSR-safe initial false)
-  const [isMobile, setIsMobile] = useState(false);
+  // ── Scroll the requested section into view (§7) ─────────────────────────────
+  // Declared after the focus-trap effect so it runs after focus lands on the
+  // close button at the top. Re-runs when the section changes while open
+  // (Saved → Resources).
+  //
+  // ponytail: scroll-into-view is the whole mechanism. Ceiling: if either
+  // section ever grows past a screenful of its own, it wants a real page.
+  // Upgrade path is a route per section, with the drawer delegating.
   useEffect(() => {
-    const mql = window.matchMedia("(max-width: 767px)");
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mql.addEventListener("change", handler);
-    const syncId = setTimeout(() => setIsMobile(mql.matches), 0);
-    return () => {
-      clearTimeout(syncId);
-      mql.removeEventListener("change", handler);
-    };
-  }, []);
+    if (!open || !panelRef.current) return;
+    const target =
+      initialSection === "top" ? null : document.getElementById(SECTION_IDS[initialSection]);
+    // No saved places yet → the Saved section isn't rendered; stay at the top.
+    if (target) target.scrollIntoView?.({ block: "start" });
+    else panelRef.current.scrollTop = 0;
+  }, [open, initialSection]);
+
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const isBelowXl = useMediaQuery(BELOW_XL_QUERY);
+  // The bottom bar (z 1003) draws over the drawer below xl; keep the drawer's
+  // last item (the language toggle) scrollable clear of it.
+  const barClearance = isBelowXl
+    ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + env(safe-area-inset-bottom))`
+    : "0px";
 
   const menuLabel = t("menu.open", locale);
   const closeLabel = t("menu.close", locale);
@@ -193,14 +228,18 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
         boxShadow: "0 4px 32px rgba(0,0,0,0.22)",
         overflowY: "auto",
         paddingTop: "env(safe-area-inset-top)",
-        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingBottom: isBelowXl ? barClearance : "env(safe-area-inset-bottom)",
         paddingRight: "env(safe-area-inset-right)",
       }
     : {
         position: "absolute",
-        top: "calc(100% + 8px)",
+        // 52px = the search row height at md+, where the deleted trigger
+        // button sat — the dropdown keeps clearing the search box.
+        top: "calc(52px + 8px)",
         right: 0,
         width: "280px",
+        // Bounded so it scrolls (initialSection needs that) and clears the bar below xl.
+        maxHeight: `calc(100dvh - 92px - ${barClearance})`,
         zIndex: 1002,
         backgroundColor: "white",
         borderRadius: "8px",
@@ -218,41 +257,6 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
         zIndex: 1002,
       }}
     >
-      {/* Hamburger trigger button */}
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-label={menuLabel}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-controls="hamburger-panel"
-        onClick={toggle}
-        className={
-          "flex items-center justify-center " +
-          "w-11 h-11 md:w-[52px] md:h-[52px] " +
-          "rounded-full " +
-          "bg-[var(--color-brand-navy)] " +
-          "transition-[background-color,opacity] duration-150 " +
-          "hover:opacity-90 active:scale-95 " +
-          "focus-visible:outline-none focus-visible:ring-2 " +
-          "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
-          "elevation-2"
-        }
-      >
-        <Menu
-          size={18}
-          className="md:hidden"
-          style={{ color: "#ffffff" }}
-          aria-hidden
-        />
-        <Menu
-          size={22}
-          className="hidden md:block"
-          style={{ color: "#ffffff" }}
-          aria-hidden
-        />
-      </button>
-
       {/* ── Mobile backdrop ─────────────────────────────────────────────────── */}
       {open && isMobile && (
         <div
@@ -272,9 +276,7 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
           children to be menuitem elements. The outer panel also contains the
           close button header which is not a menuitem — putting role="menu" on
           the outer div triggers aria-required-children violations. The <ul>
-          contains only menuitem-role elements, so role="menu" belongs there.
-          aria-controls on the trigger still points to the outer panel id so
-          focus management and AT can locate the panel. */}
+          contains only menuitem-role elements, so role="menu" belongs there. */}
       {open && (
         <div
           id="hamburger-panel"
@@ -312,33 +314,11 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
 
           {/* Menu item list — About is the last item (#124) */}
           <ul role="menu" aria-label={menuLabel} className="py-2">
-            {/* View mode (Map | List) — moved here from a floating control */}
-            {/* WHY role="none": this row contains a composite widget (ViewToggle),
-                not a simple menuitem. role="menuitem" must be on the interactive
-                element, not a container. Using role="none" avoids aria-required-children. */}
-            {viewMode && onViewModeChange && (
-              <li
-                role="none"
-                className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-bone-200)]"
-              >
-                <span className="text-sm font-medium text-[var(--color-ink-800)]">
-                  {t("menu.view", locale)}
-                </span>
-                <ViewToggle
-                  mode={viewMode}
-                  locale={locale}
-                  onChange={(m) => {
-                    onViewModeChange(m);
-                    close();
-                  }}
-                />
-              </li>
-            )}
             {/* Saved places (#132) — favorited venues; tap to open on the map */}
             {savedVenues.length > 0 && (
               <>
                 <li role="presentation" className="pt-1">
-                  <p className="px-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
+                  <p id={SECTION_IDS.saved} className="scroll-mt-2 px-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
                     {t("menu.saved.heading", locale)}
                   </p>
                 </li>
@@ -419,7 +399,7 @@ export default function HamburgerMenu({ locale: localeProp, onShowWelcome, saved
               role="presentation"
               className="mt-1 border-t border-[var(--color-bone-200)] pt-2"
             >
-              <p className="px-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
+              <p id={SECTION_IDS.help} className="scroll-mt-2 px-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
                 {t("menu.help.heading", locale)}
               </p>
             </li>

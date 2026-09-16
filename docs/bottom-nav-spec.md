@@ -1,6 +1,7 @@
 # Pueblo Food Access Map — Bottom Navigation & View Switch Specification
 
-**Status:** v1.0 — approved by Kyle 2026-09-16, not yet implemented.
+**Status:** v1.0 — design approved by Kyle 2026-09-16; **specification proposed,
+awaiting sign-off**. Not implemented.
 **Author:** Atlas (Claude Opus 5), 2026-09-16.
 **Scope:** Replaces the floating navy hamburger button, the orange "Find food near me"
 map banner, and the desktop "Pueblo Food Map" wordmark with a single persistent
@@ -13,6 +14,12 @@ further design decisions. Supersedes the mobile chrome described in
 
 This document is the source of truth for this change. Each section states **the
 decision** first, then **the rationale**.
+
+Four decisions in here were never drawn in a mockup and so were never approved:
+§4.3 (the switch drops its labels when a category chip is showing on a narrow phone),
+§6 (`LocateButton` is deleted outright, not moved), §7 (Saved and Resources scroll the
+existing drawer rather than becoming their own pages), and §10 (the bar and the band
+both vanish while a venue card is open). Those are the four to read first.
 
 ---
 
@@ -64,6 +71,7 @@ thumb-reachable region was unused.
 | `src/components/ViewToggle.tsx` | Remove the `sr-only md:not-sr-only` label treatment; add the chip-present icon-only rule. |
 | `src/components/HamburgerMenu.tsx` | Keep the drawer, delete its trigger button and its duplicate Map/List row; add an `initialSection` prop. |
 | `src/components/LocateButton.tsx` | **Deleted.** Its state machine moves into `BottomNav`'s "Near me" item. |
+| `src/components/ListView.tsx` | Bottom padding so the last card clears the bar. |
 | `src/components/SponsorCredit.tsx` | Bottom offset clears the bar. |
 | `src/app/globals.css` | Mapbox attribution control offset; fade-band custom properties. |
 | `src/lib/i18n.ts` | Four new keys, EN + ES. |
@@ -155,19 +163,20 @@ phone screen: a bare list glyph beside a map glyph asks the resident to guess.
 **The decision:**
 
 - `SearchBar.tsx` line ~282: `absolute right-12 md:right-1.5` → `absolute right-1.5`.
-- `SearchBar.tsx` line ~243: `pr-[168px] md:pr-[190px]` → `pr-[164px] md:pr-[190px]`.
+- `SearchBar.tsx` line ~243: `pr-[168px] md:pr-[190px]` → **one value at every width.**
 
-The desktop value is unchanged.
+**The rationale:** after the first change, the toggle is the same control at the same
+6px inset at every width — so it must reserve one number, not two. Today's desktop
+already renders exactly that configuration (both labels, `md:right-1.5`) and reserves
+190px, so **190 is a value proven in production for this exact control**, and is the
+value to write unless measurement says otherwise.
 
-**The rationale:** with both labels present and the toggle sitting at a 6px inset, the
-control measures roughly 140px in English. Spanish is the wider case — "Mapa" and
-"Lista" add about 15px — so 164px of reserved padding covers the worst case with a few
-pixels of slack.
-
-**Required verification before merge:** these are computed, not measured. Load
-dev.pueblofoodmap.com at 375×812 in both English and Spanish, read the toggle's bounding
-box, and confirm the input's text never runs under it. The last two layout bugs in this
-area (#446, fixed by #448) were both arithmetic that looked right and rendered wrong.
+**Required verification before the number is committed:** load dev.pueblofoodmap.com at
+1280 wide, read the toggle's real bounding box in both English and Spanish, and set the
+padding to that width plus the 6px inset plus ~8px of slack. Then confirm at 375×812, in
+both languages, that typed text never runs under the control. The last two layout bugs
+in this area (#446, fixed by #448) were both arithmetic that looked right and rendered
+wrong — do not ship a computed number here.
 
 ### 4.3 The category-chip case
 
@@ -176,9 +185,10 @@ area (#446, fixed by #448) were both arithmetic that looked right and rendered w
 names via `sr-only`. Above 400px, or with no chip, both labels show.
 
 **The rationale:** at 375px the pill is 343px wide. A chip takes `max-w-[26%]` ≈ 97px
-plus 8px, and the toggle takes 164px, leaving 74px for typed text — about eight
-characters. That is a genuinely unusable field, so the labels yield in the one case
-where the space is contested.
+plus 8px of gap, and the toggle reserves ~190px (§4.2), leaving **about 48px** for typed
+text — five or six characters. That is an unusable field, so the labels yield in the one
+case where the space is genuinely contested. Icon-only drops the toggle to roughly 84px
+reserved, which returns the field to ~154px.
 
 ```
 ponytail: one conditional, not a layout system. The 400px threshold is a measured
@@ -275,30 +285,45 @@ section, with the drawer delegating.
 
 ## 8. The fade band
 
-### 8.1 Values — strength 1
+### 8.1 Values — strength 1, behind three custom properties
 
-**The decision:** a non-interactive band sits directly above the bar:
+**The decision:** a non-interactive band sits directly above the bar. Its three
+adjustable values are custom properties with strength-1 defaults, exactly as
+`SplashScreen.tsx` does with `--splash-scrim-opacity` and `--splash-scrim-blur`:
 
 ```css
 position: fixed;
 left: 0;
 right: 0;
 bottom: calc(78px + env(safe-area-inset-bottom));   /* the bar's full height */
-height: 92px;
+height: var(--nav-fade-height, 92px);
 background: linear-gradient(
   to top,
-  rgba(182, 172, 139, 0.20),
+  rgba(182, 172, 139, var(--nav-fade-alpha, 0.20)),
   rgba(182, 172, 139, 0)
 );
-backdrop-filter: blur(3px);
--webkit-backdrop-filter: blur(3px);
+backdrop-filter: blur(var(--nav-fade-blur, 3px));
+-webkit-backdrop-filter: blur(var(--nav-fade-blur, 3px));
 mask-image: linear-gradient(to top, #000 0%, #000 30%, transparent 100%);
 -webkit-mask-image: linear-gradient(to top, #000 0%, #000 30%, transparent 100%);
 pointer-events: none;
 z-index: 999;
 ```
 
-`aria-hidden="true"`. Rendered only below `xl`.
+`aria-hidden="true"`. Rendered only below `xl`, **and only in map mode** — in list mode
+the band would be blurring a list of cards for no benefit at a per-frame cost.
+`SponsorCredit` is already map-mode-only for the same reason (#129).
+
+**The three presets that were rendered and compared:**
+
+| Strength | `--nav-fade-height` | `--nav-fade-alpha` | `--nav-fade-blur` |
+|---|---|---|---|
+| **1 — lightest (shipping default)** | `92px` | `0.20` | `3px` |
+| 2 — middle | `104px` | `0.30` | `5px` |
+| 3 — strongest | `116px` | `0.40` | `8px` |
+
+Kyle's instruction was "let's start with strength 1", so 1 is the default and moving to
+2 or 3 is three number changes in one place, not a rebuild.
 
 **The rationale:** `rgba(182, 172, 139, …)` is `bone-450`, taken directly from
 `SplashScreen.tsx`'s frosted scrim rather than invented — the app already has a "soften
@@ -318,8 +343,8 @@ thumb zone, and without it every pan gesture that starts there would be swallowe
 **The decision:**
 
 ```css
-@supports not ((backdrop-filter: blur(3px)) or (-webkit-backdrop-filter: blur(3px))) {
-  /* raise the gradient to 0.30 alpha; no blur */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  /* --nav-fade-alpha: 0.30; no blur */
 }
 ```
 
@@ -334,7 +359,7 @@ or low-end Android this can cost measurable smoothness. The band is 92px tall an
 blur radius is 3px, so the cost is small, but it is not zero.
 
 **If dragging measurably degrades on a real low-end device:** drop the
-`backdrop-filter` line and raise the gradient alpha to 0.30 — that is, ship the §8.2
+`backdrop-filter` line and set `--nav-fade-alpha: 0.30` — that is, ship the §8.2
 fallback path to everyone. The gradient alone is a plain paint with no per-frame cost.
 Do not attempt to toggle the blur dynamically based on frame timing; that is more
 machinery than the problem is worth.
@@ -388,6 +413,12 @@ new one.
 
 **Map padding:** `MapWrapper`'s map `padding.bottom` increases by the bar's height below
 `xl`, so `fitBounds` and marker-fly animations stop centring results underneath the bar.
+
+**List padding:** the bar persists in list mode, so `ListView` needs bottom padding of
+`calc(78px + env(safe-area-inset-bottom))` below `xl`. Without it the last venue card in
+the list is unreachable — it scrolls to the bottom and stops under the bar. This is a
+separate fix from the map padding above and is easy to miss, because the list only fails
+on its final row.
 
 ---
 
@@ -462,10 +493,11 @@ Manual, on dev.pueblofoodmap.com, because none of the following can be caught in
 1. **375 × 812, English and Spanish** — the view switch does not overlap the typed text, with and without a category chip active.
 2. **375 × 812** — the Mapbox mark and the sponsor line are fully visible above the bar and legible over downtown at zoom 14 (the busiest map area).
 3. **375 × 812** — a pan gesture starting inside the band's 92px pans the map.
-4. **820 × 1180** — the bar is present, not the inline row.
-5. **1280 × 800** — the inline row is present, no bar, no band, credits in their original corners.
-6. **Open a venue** — bar and band both disappear; closing restores them.
-7. **Real low-end Android, if one is available** — drag the map with the band present and judge smoothness against §8.3.
+4. **375 × 812, list mode** — scroll to the very bottom; the last venue card is fully visible and tappable, and there is no fade band over the list.
+5. **820 × 1180** — the bar is present, not the inline row.
+6. **1280 × 800** — the inline row is present, no bar, no band, credits in their original corners.
+7. **Open a venue** — bar and band both disappear; closing restores them.
+8. **Real low-end Android, if one is available** — drag the map with the band present and judge smoothness against §8.3.
 
 Kyle sees it on dev before anything is promoted to production.
 

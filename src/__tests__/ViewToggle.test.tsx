@@ -71,3 +71,28 @@ describe("ViewToggle — ES locale", () => {
     expect(screen.getByRole("button", { name: /^Lista$/i })).toBeDefined();
   });
 });
+
+describe("ViewToggle — size variants (#191)", () => {
+  test('default (no size prop) renders the 28px "sm" group height', () => {
+    render(<ViewToggle mode="map" onChange={vi.fn()} />);
+    const group = screen.getByRole("group");
+    expect(group.style.height).toBe("28px");
+  });
+
+  test('size="sm" is explicitly 28px (unchanged HamburgerMenu treatment)', () => {
+    render(<ViewToggle mode="map" onChange={vi.fn()} size="sm" />);
+    const group = screen.getByRole("group");
+    expect(group.style.height).toBe("28px");
+  });
+
+  test(
+    'size="md" group height is 38px, not 36px — Preflight\'s border-box ' +
+      "sizing plus the group's 1px top+bottom border would otherwise shrink " +
+      "the h-full buttons inside to 34px, 2px under the 36px tap-target floor",
+    () => {
+      render(<ViewToggle mode="map" onChange={vi.fn()} size="md" />);
+      const group = screen.getByRole("group");
+      expect(group.style.height).toBe("38px");
+    },
+  );
+});

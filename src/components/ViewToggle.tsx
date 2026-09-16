@@ -12,18 +12,25 @@ interface ViewToggleProps {
   locale?: Locale;
   /**
    * Visual size. "sm" (28px) is the original HamburgerMenu row treatment.
-   * "md" (36px) is the #191 inline-in-SearchBar instance — a 28px control
-   * on that surface undershot the 36×36 CSS px tap-target floor a prior
-   * mobile review fixed everywhere else on this bar (see SearchBar.tsx's
+   * "md" is the #191 inline-in-SearchBar instance — a 28px control on that
+   * surface undershot the 36×36 CSS px tap-target floor a prior mobile
+   * review fixed everywhere else on this bar (see SearchBar.tsx's
    * viewSwitch WHY comment), so a taller variant was added rather than
    * reusing 28px verbatim.
+   *
+   * WHY the "md" height constant is 38, not 36: Tailwind Preflight sets
+   * box-sizing: border-box globally, and the group `<div>` below has a 1px
+   * border on top and bottom. A `height: 36` style would render only a
+   * 34px content box (36 − 2×1px border) for the `h-full` buttons inside
+   * it — 2px short of the 36px floor. Setting 38 here nets a real 36px
+   * button height once the border is subtracted.
    */
   size?: "sm" | "md";
 }
 
 const SIZE_STYLES: Record<"sm" | "md", { height: number; iconSize: number; paddingX: string }> = {
   sm: { height: 28, iconSize: 13, paddingX: "px-2.5" },
-  md: { height: 36, iconSize: 14, paddingX: "px-3" },
+  md: { height: 38, iconSize: 14, paddingX: "px-3" },
 };
 
 export default function ViewToggle({ mode, onChange, locale = "en", size = "sm" }: ViewToggleProps) {

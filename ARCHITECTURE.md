@@ -28,8 +28,10 @@ Browser
         ├── BottomSheet.tsx  (mobile: vaul v2 bottom sheet)
         ├── DesktopVenueWindow.tsx  (desktop: marker-anchored detail panel)
         ├── SearchBar / SearchResultsPopover / CategoryDropdown
+        │     (SearchBar also hosts the Map/List view toggle, #191)
         ├── LocateButton     (geolocate + drift / re-center)
-        ├── HamburgerMenu    (saved places, help links, language, view toggle)
+        ├── HamburgerMenu    (saved places, help links, language, view toggle
+        │     — same toggle, kept here too as the low-frequency fallback)
         └── ListView         (full-screen nearest-first list, map mode off)
 
 Shared utility components

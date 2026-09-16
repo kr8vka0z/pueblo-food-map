@@ -244,17 +244,18 @@ export default function SearchBar({
         />
 
         {/* Inline Map/List view switch (#191) — right end of the pill,
-            mirroring filterChip's left anchor. size="md" (36px) rather than
-            ViewToggle's default 28px: a prior mobile review set a 36×36 CSS
-            px tap-target floor for controls on this bar (see SearchBar.tsx's
-            filterChip × button above), and 28px undershoots that here too.
-            36px sits with a ~4px inset inside the 44px mobile / 52px desktop
-            pill. Width reserved on the <input> above (168px mobile / 190px
-            desktop) was sized from this control's own worst-case rendered
-            width — two buttons at px-3 padding + 14px icon + gap-1 + the
-            longest label pair ("Mapa"/"Lista", ES) — plus a small gap before
-            the switch and the pill's edge; not pixel-measured in a browser,
-            see this issue's own report for that caveat. */}
+            mirroring filterChip's left anchor. size="md" renders a real 36px
+            button height (see ViewToggle.tsx's own WHY on the 38px outer
+            constant) rather than ViewToggle's default 28px: a prior mobile
+            review set a 36×36 CSS px tap-target floor for controls on this
+            bar (see the filterChip × button above), and 28px undershoots
+            that here too. The 38px outer control sits with a ~3px inset
+            inside the 44px mobile / 52px desktop pill. Width reserved on the
+            <input> above (168px mobile / 190px desktop) was sized from this
+            control's own worst-case rendered width — two buttons at px-3
+            padding + 14px icon + gap-1 + the longest label pair
+            ("Mapa"/"Lista", ES) — plus a small gap before the switch and the
+            pill's edge; not pixel-measured in a browser as of this commit. */}
         {viewSwitch && (
           <div className="absolute right-1 md:right-1.5 top-1/2 -translate-y-1/2">
             <ViewToggle

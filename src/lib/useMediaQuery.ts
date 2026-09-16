@@ -15,8 +15,8 @@ import { useEffect, useState } from "react";
 
 /** Phone: below Tailwind `md` — BottomSheet instead of the desktop venue window. */
 export const MOBILE_QUERY = "(max-width: 767px)";
-/** Below Tailwind `xl` — bottom nav bar instead of the inline nav pill (spec §5). */
-export const BELOW_XL_QUERY = "(max-width: 1279px)";
+/** Below Tailwind `2xl` (1536px) — bottom nav bar instead of the inline nav pill (spec §5). */
+export const BELOW_2XL_QUERY = "(max-width: 1535px)";
 
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(false);

@@ -32,8 +32,8 @@ Browser
         ├── HamburgerMenu    (the drawer: saved places, help links, language;
         │     controlled — opened by BottomNav at a section)
         ├── ListView         (full-screen nearest-first list, map mode off)
-        └── BottomNav        (Near me · Saved · Resources · Menu — bar below xl,
-              pill beside the search box at xl+; docs/bottom-nav-spec.md)
+        └── BottomNav        (Near me · Saved · Resources · Menu — bar below 2xl (1536px),
+              pill beside the search box at 2xl+; docs/bottom-nav-spec.md)
 
 Shared utility components
   └── src/components/SiteFooter.tsx  (slim nav footer on utility pages: /about, /privacy, /suggest, /feedback)

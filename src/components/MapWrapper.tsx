@@ -11,8 +11,8 @@
  *     <Map />            — fills viewport
  *     <SearchBar />      — absolute top-center, z-index 1000 (Map/List switch inside)
  *     {isMobile && <BottomSheet />}
- *     <fade band />      — below xl, map mode, no venue sheet (docs/bottom-nav-spec.md §8)
- *     <BottomNav />      — bar below xl, pill beside the search box at xl+ (§3, §5); last in DOM
+ *     <fade band />      — below 2xl, map mode, no venue sheet (docs/bottom-nav-spec.md §8)
+ *     <BottomNav />      — bar below 2xl, pill beside the search box at 2xl+ (§3, §5); last in DOM
  *   </div>
  *
  * No sidebar. No category rail. No desktop split-pane.
@@ -60,7 +60,7 @@ import {
 import { useMapFilters } from "@/lib/useMapFilters";
 import { useMapUI } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
-import { useMediaQuery, MOBILE_QUERY, BELOW_XL_QUERY } from "@/lib/useMediaQuery";
+import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
 // dynamic import here in a Client Component as required by Next.js 16
@@ -697,9 +697,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   // ── Breakpoints ──────────────────────────────────────────────────────────────
   // isMobile (<768): BottomSheet instead of DesktopVenueWindow.
-  // isBelowXl (<1280): the bottom nav is a bar covering the map's bottom edge.
+  // isBelow2xl (<1536): the bottom nav is a bar covering the map's bottom edge.
   const isMobile = useMediaQuery(MOBILE_QUERY);
-  const isBelowXl = useMediaQuery(BELOW_XL_QUERY);
+  const isBelow2xl = useMediaQuery(BELOW_2XL_QUERY);
 
   // ── Drawer (HamburgerMenu) — opened from BottomNav at a section (spec §7) ────
   const [menuSection, setMenuSection] = useState<MenuSection | null>(null);
@@ -802,10 +802,10 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    // Below xl the bottom nav bar covers the map's bottom edge — pad by its
+    // Below 2xl the bottom nav bar covers the map's bottom edge — pad by its
     // height so fitted pins don't land underneath it (docs/bottom-nav-spec.md §10).
     const basePadding = isMobile ? CATEGORY_FIT_PADDING_MOBILE : CATEGORY_FIT_PADDING_DESKTOP;
-    const fitPadding = isBelowXl
+    const fitPadding = isBelow2xl
       ? { ...basePadding, bottom: basePadding.bottom + BOTTOM_NAV_HEIGHT_PX }
       : basePadding;
 
@@ -843,7 +843,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategoryFilter, mapboxMap]);
-  // Note: `isMobile` / `isBelowXl` intentionally excluded from deps — we want the padding that
+  // Note: `isMobile` / `isBelow2xl` intentionally excluded from deps — we want the padding that
   // was current at the time the category was selected, not re-zoom on resize.
   // `allVenues` is a module-level constant (stable ref); no dep needed.
 
@@ -1213,9 +1213,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           aria-live="polite"
           style={{
             position: "absolute",
-            // Below xl: lifted clear of the bottom nav bar and the credits line
-            // above it (spec §9 offset + 52). xl: the original desktop spot.
-            bottom: isBelowXl
+            // Below 2xl: lifted clear of the bottom nav bar and the credits line
+            // above it (spec §9 offset + 52). 2xl: the original desktop spot.
+            bottom: isBelow2xl
               ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 12px + 52px + env(safe-area-inset-bottom))`
               : 24 + 52,
             left: "50%",
@@ -1331,7 +1331,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           and blurring a list of cards is pure per-frame cost. Styles and the
           strength presets live in globals.css (.nav-fade-band). */}
       {!mapUnavailable && mapLoadTriggered && viewMode === "map" && !venueSheetOpen && (
-        <div aria-hidden="true" data-testid="nav-fade-band" className="nav-fade-band xl:hidden" />
+        <div aria-hidden="true" data-testid="nav-fade-band" className="nav-fade-band 2xl:hidden" />
       )}
 
       {/* BottomNav — LAST in DOM order so keyboard users reach the map and the

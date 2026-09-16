@@ -83,6 +83,8 @@ interface SearchBarProps {
     mode: ViewMode;
     onChange: (mode: ViewMode) => void;
     locale?: Locale;
+    /** Renders the "map" side disabled when the map cannot mount (#165). */
+    mapDisabled?: boolean;
   };
 }
 
@@ -227,9 +229,15 @@ export default function SearchBar({
                 ? "pl-[calc(26%+8px)] "
                 : "pl-[calc(40%+8px)] "
               : "pl-9 md:pl-10 ") +
-            // pr reserves room for the inline view switch (#191) — see that
-            // block's own WHY comment below for how 168px/190px were derived.
-            (viewSwitch ? "pr-[168px] md:pr-[190px] " : "pr-4 ") +
+            // pr reserves room for the inline view switch (#191).
+            // 136px mobile = the control's widest real state (active button
+            // with its label + icon-only inactive button + borders + inset),
+            // measured against the longest label pair, Spanish "Mapa"/"Lista".
+            // It was 168px while BOTH labels showed on mobile, which ate
+            // roughly half of a 375px phone's ~343px pill and left the input
+            // unusable next to an active category chip. 190px at md: is the
+            // both-labels width, which the 520px desktop bar absorbs easily.
+            (viewSwitch ? "pr-[136px] md:pr-[190px] " : "pr-4 ") +
             "text-base md:text-sm text-[var(--color-ink-700)] " +
             "bg-[var(--color-bone-50)] " +
             "border border-[var(--color-bone-300)] " +
@@ -262,6 +270,7 @@ export default function SearchBar({
               mode={viewSwitch.mode}
               onChange={viewSwitch.onChange}
               locale={viewSwitch.locale}
+            mapDisabled={viewSwitch.mapDisabled}
               size="md"
             />
           </div>

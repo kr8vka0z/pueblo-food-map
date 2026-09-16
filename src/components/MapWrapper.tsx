@@ -1164,6 +1164,10 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           mode: viewMode,
           onChange: handleViewModeChange,
           locale,
+          // Surface the guard instead of hiding it: handleViewModeChange
+          // silently ignores "map" while the map can't mount, which read as a
+          // dead button once #191 moved this control onto the main screen.
+          mapDisabled: mapUnavailable,
         }}
       />
 

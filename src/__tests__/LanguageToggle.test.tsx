@@ -123,21 +123,9 @@ describe("LanguageToggle — initialLocale", () => {
 
 // ─── Locale string propagation — sample component ────────────────────────────
 // Verifies that a component consuming useLocale() re-renders with ES strings
-// when the locale flips to "es". Uses SponsorCredit as the sample component.
+// when the locale flips to "es".
 
-import SponsorCredit from "@/components/SponsorCredit";
-
-describe("Locale string propagation — SponsorCredit re-renders on locale flip", () => {
-  test("shows EN sponsor text by default", () => {
-    renderWithProvider(<SponsorCredit locale="en" />);
-    expect(screen.getByText(t("sponsor.text", "en"))).toBeDefined();
-  });
-
-  test("shows ES sponsor text when locale='es'", () => {
-    renderWithProvider(<SponsorCredit locale="es" />);
-    expect(screen.getByText(t("sponsor.text", "es"))).toBeDefined();
-  });
-
+describe("Locale string propagation — a consumer re-renders on locale flip", () => {
   test("toggle flip causes re-render with ES strings in a consumer", async () => {
     // Renders the toggle + a locale-aware consumer in the same provider tree.
     // When toggle flips to ES, the consumer should show ES text.
@@ -146,7 +134,7 @@ describe("Locale string propagation — SponsorCredit re-renders on locale flip"
       return (
         <div>
           <LanguageToggle />
-          <span data-testid="sponsor">{t("sponsor.text", locale)}</span>
+          <span data-testid="sponsor">{t("menu.sponsoredBy", locale)}</span>
         </div>
       );
     }
@@ -155,17 +143,17 @@ describe("Locale string propagation — SponsorCredit re-renders on locale flip"
     renderWithProvider(<TestConsumer />);
 
     // Initially EN
-    expect(screen.getByTestId("sponsor").textContent).toBe(t("sponsor.text", "en"));
+    expect(screen.getByTestId("sponsor").textContent).toBe(t("menu.sponsoredBy", "en"));
 
     // Flip to ES via toggle
     await user.click(screen.getByRole("button", { name: /spanish/i }));
 
     // Should now show ES text
-    expect(screen.getByTestId("sponsor").textContent).toBe(t("sponsor.text", "es"));
+    expect(screen.getByTestId("sponsor").textContent).toBe(t("menu.sponsoredBy", "es"));
 
     // Flip back to EN
     await user.click(screen.getByRole("button", { name: /english/i }));
-    expect(screen.getByTestId("sponsor").textContent).toBe(t("sponsor.text", "en"));
+    expect(screen.getByTestId("sponsor").textContent).toBe(t("menu.sponsoredBy", "en"));
   });
 });
 

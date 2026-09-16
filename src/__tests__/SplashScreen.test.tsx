@@ -10,7 +10,7 @@
  *   - Primary CTA still present
  *   - Tagline, microcopy still present
  *   - Sponsor credit renders in bottom-right corner (absolute/fixed position)
- *   - Sponsor link accessible label (sponsor.text contains org name)
+ *   - No sponsor link (moved to the Menu)
  */
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
@@ -79,46 +79,13 @@ describe("purpose line", () => {
   });
 });
 
-// ── Sponsor credit ────────────────────────────────────────────────────────────
+// ── Sponsor credit — removed (Kyle, 2026-09-16; it lives in the Menu) ──────────
 
-describe("sponsor credit link", () => {
-  test("link points to pueblofoodproject.org", () => {
+describe("sponsor credit", () => {
+  test("the splash shows no sponsor link", () => {
     renderSplash("en");
-    const link = screen.getByRole("link", { name: /pueblo food project/i });
-    expect(link).toBeTruthy();
-    expect((link as HTMLAnchorElement).href).toContain("pueblofoodproject.org");
-  });
-
-  test("link opens in new tab (target=_blank)", () => {
-    renderSplash("en");
-    const link = screen.getByRole("link", { name: /pueblo food project/i });
-    expect((link as HTMLAnchorElement).target).toBe("_blank");
-  });
-
-  test("link has rel=noopener noreferrer", () => {
-    renderSplash("en");
-    const link = screen.getByRole("link", { name: /pueblo food project/i });
-    expect((link as HTMLAnchorElement).rel).toContain("noopener");
-    expect((link as HTMLAnchorElement).rel).toContain("noreferrer");
-  });
-
-  test("renders EN sponsor text", () => {
-    renderSplash("en");
-    expect(screen.getByText(/sponsored by pueblo food project/i)).toBeTruthy();
-  });
-
-  test("renders ES sponsor text", () => {
-    renderSplash("es");
-    expect(screen.getByText(/patrocinado por pueblo food project/i)).toBeTruthy();
-  });
-
-  test("sponsor credit container is absolutely positioned (bottom-right corner)", () => {
-    const { container } = renderSplash("en");
-    // SponsorCredit renders a div with position:absolute, bottom:8, right:8
-    const creditWrapper = container.querySelector<HTMLElement>(
-      'div[style*="position: absolute"][style*="bottom: 8"][style*="right: 8"]',
-    );
-    expect(creditWrapper).toBeTruthy();
+    expect(screen.queryByText(/sponsored by/i)).toBeNull();
+    expect(document.querySelector('a[href*="pueblofoodproject.org"]')).toBeNull();
   });
 });
 

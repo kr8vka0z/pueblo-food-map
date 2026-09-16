@@ -22,7 +22,7 @@ import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import SiteFooter from "@/components/SiteFooter";
-import PageTopNav from "./PageTopNav";
+import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
 type Action =
   | { kind: "call"; href: string; number: string }
@@ -90,8 +90,8 @@ export default function ResourcesContent() {
   const { locale } = useLocale();
 
   return (
-    <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
-      <PageTopNav locale={locale} />
+    <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
+      <PageNav locale={locale} />
 
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-6 space-y-3">
         <h1

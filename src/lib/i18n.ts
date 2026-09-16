@@ -397,7 +397,6 @@ const en: Record<string, string> = {
   // Nav and footer shared strings (#155)
   "nav.about": "About this map",
   "footer.backToMap": "Back to map",
-  "nav.backToMenu": "Back to menu",
   "footer.about": "About",
   "footer.privacy": "Privacy",
   "footer.suggest": "Suggest a venue",
@@ -865,7 +864,6 @@ const es: Record<string, string> = {
   // Nav and footer shared strings (#155)
   "nav.about": "Acerca de este mapa",
   "footer.backToMap": "Volver al mapa",
-  "nav.backToMenu": "Volver al menú",
   "footer.about": "Acerca de",
   "footer.privacy": "Privacidad",
   "footer.suggest": "Sugerir un lugar",

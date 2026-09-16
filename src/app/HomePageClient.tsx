@@ -74,9 +74,6 @@ export default function HomePageClient() {
   const [viewport, setViewport] = useState<'located' | 'pueblo-center'>('pueblo-center');
   // Deep link (#132): a ?venue=<id> URL opens straight to that pin.
   const [initialVenueId, setInitialVenueId] = useState<string | null>(null);
-  // "Back to menu" on a Menu page (PageTopNav) links to /?menu=1: land on the
-  // map with the Menu already open (Kyle, 2026-09-16).
-  const [initialMenuOpen, setInitialMenuOpen] = useState(false);
 
   // Ref to the map container element — focus moves here on splash dismiss.
   const mapContainerRef = useRef<HTMLElement | null>(null);
@@ -93,11 +90,13 @@ export default function HomePageClient() {
     queueMicrotask(() => {
       const params = new URLSearchParams(window.location.search);
       const venueParam = params.get('venue');
-      const menuParam = params.get('menu') === '1';
-      if (menuParam) {
-        setInitialMenuOpen(true);
-        // Strip it so a refresh lands on the plain map, not the Menu again.
-        params.delete('menu');
+      // "Near me" in the bottom nav on a Menu page (PageNav) links to /?near=1:
+      // open the map and locate, as the splash's "Find food near me" does.
+      const nearParam = params.get('near') === '1';
+      if (nearParam) {
+        setViewport('located');
+        // Strip it so a refresh doesn't locate again.
+        params.delete('near');
         const qs = params.toString();
         window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
       }
@@ -109,8 +108,8 @@ export default function HomePageClient() {
       const resolvedId = venueParam ?? hashParam;
       setInitialVenueId(resolvedId);
       // A shared venue link (either form) goes straight to the pin — skip the splash.
-      // "Back to menu" comes from inside the app, so the splash was already seen.
-      setSplashShown(resolvedId || menuParam ? false : !readGate());
+      // Near me comes from inside the app, so the splash was already seen.
+      setSplashShown(resolvedId || nearParam ? false : !readGate());
     });
   }, []);
 
@@ -151,7 +150,7 @@ export default function HomePageClient() {
         inert={splashShown || undefined}
         aria-hidden={splashShown || undefined}
       >
-        <MapWrapper viewport={viewport} onShowWelcome={showSplashAgain} initialVenueId={initialVenueId} initialMenuOpen={initialMenuOpen} />
+        <MapWrapper viewport={viewport} onShowWelcome={showSplashAgain} initialVenueId={initialVenueId} />
       </main>
 
       {/* Splash overlay — full-viewport frosted scrim on top of the map */}

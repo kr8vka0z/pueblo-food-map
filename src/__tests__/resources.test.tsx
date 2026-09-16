@@ -18,6 +18,10 @@ import ResourcesContent, { PROGRAMS } from "@/components/ResourcesContent";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { t, type Locale } from "@/lib/i18n";
 
+// PageNav (bottom nav + drawer) has its own test; stub it so this page test
+// doesn't need next/navigation or matchMedia.
+vi.mock("@/components/PageNav", () => ({ default: () => null, PAGE_NAV_CLEARANCE: "" }));
+
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode; [k: string]: unknown }) => (
     <a href={href} {...(rest as React.AnchorHTMLAttributes<HTMLAnchorElement>)}>

@@ -233,6 +233,12 @@ decision lives, and it is an existing Tailwind breakpoint rather than a bespoke 
 > auto-zoom pads the map's bottom by the pill (24 + 52px) at `2xl`+, and the outside-county
 > alert sits 12px above it.
 
+> **Amended 2026-09-16 by Kyle (nav on the Menu pages):** About, Suggest, Feedback, Browse
+> all venues and Food help programs carry the same bar/pill via `PageNav`, so Menu and Saved
+> open the drawer over the page instead of sending you back to the map. Near me returns to
+> the map locating (`/?near=1`); a saved place opens the map on its pin (`/?venue=<id>`).
+> Both the bar and the drawer are `position: fixed` at every width because those pages scroll.
+
 ---
 
 ## 6. "Near me" replaces the orange banner

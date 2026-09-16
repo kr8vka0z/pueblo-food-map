@@ -211,7 +211,7 @@ export default function HamburgerMenu({
         paddingRight: "env(safe-area-inset-right)",
       }
     : {
-        position: "absolute",
+        position: "absolute", // inside the fixed wrapper below
         // 52px = the search row height at md+, where the deleted trigger
         // button sat — the dropdown keeps clearing the search box.
         top: "calc(52px + 8px)",
@@ -229,7 +229,8 @@ export default function HamburgerMenu({
   return (
     <div
       style={{
-        position: "absolute",
+        // fixed, not absolute: PageNav mounts this drawer on scrolling pages too.
+        position: "fixed",
         // Clears the notch/Dynamic Island (top) and the landscape edge (right).
         top: "max(16px, env(safe-area-inset-top))",
         right: "max(16px, env(safe-area-inset-right))",

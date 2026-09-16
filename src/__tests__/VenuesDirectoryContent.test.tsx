@@ -8,12 +8,16 @@
  * rendering, not grouping.
  */
 
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import VenuesDirectoryContent from "@/components/VenuesDirectoryContent";
 import type { Venue } from "@/types/venue";
+
+// PageNav (bottom nav + drawer) has its own test; stub it so this page test
+// doesn't need next/navigation or matchMedia.
+vi.mock("@/components/PageNav", () => ({ default: () => null, PAGE_NAV_CLEARANCE: "" }));
 
 const FIXTURE_GROUPS = [
   {

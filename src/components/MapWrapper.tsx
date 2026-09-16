@@ -276,11 +276,9 @@ interface MapWrapperProps {
   onShowWelcome?: () => void;
   /** Deep link (#132): venue id from a ?venue=<id> URL to open on load. */
   initialVenueId?: string | null;
-  /** Open the Menu on mount — "Back to menu" from a Menu page (/?menu=1). */
-  initialMenuOpen?: boolean;
 }
 
-export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, initialVenueId, initialMenuOpen = false }: MapWrapperProps) {
+export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, initialVenueId }: MapWrapperProps) {
   const router = useRouter();
 
   // ── Locale — from context ─────────────────────────────────────────────────────
@@ -702,7 +700,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const isBelow2xl = useMediaQuery(BELOW_2XL_QUERY);
 
   // ── Drawer (HamburgerMenu) — opened from BottomNav at a section (spec §7) ────
-  const [menuSection, setMenuSection] = useState<MenuSection | null>(initialMenuOpen ? "top" : null);
+  const [menuSection, setMenuSection] = useState<MenuSection | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
   const handleNavSectionTap = useCallback((section: MenuSection) => {
     // Tapping the open section's own item closes it; any other item re-targets.

@@ -30,8 +30,14 @@ import { t, type Locale } from "@/lib/i18n";
 import { useFavorites } from "@/lib/favorites";
 import { venues } from "@/data/venues";
 
-/** Bottom padding for a page's <main>: the bar below 2xl, the floating pill at 2xl. */
-export const PAGE_NAV_CLEARANCE = "pb-[calc(76px+env(safe-area-inset-bottom))] 2xl:pb-24";
+/**
+ * Classes for a page's <main> so its end clears the fixed nav: bottom padding
+ * for the pill (below 2xl) / the floating 2xl pill. shrink-0 is load-bearing:
+ * <body> is a full-height flex column, so without it <main> shrinks to the
+ * viewport, its content overflows, and the padding lands mid-page — the
+ * footer ended up under the nav (measured on dev /about at 393×852).
+ */
+export const PAGE_NAV_CLEARANCE = "shrink-0 pb-[calc(76px+env(safe-area-inset-bottom))] 2xl:pb-24";
 
 const NO_GEO = { permission: "prompt", position: null } as const;
 

@@ -56,6 +56,15 @@ export default function PrivacyPage() {
         <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
           {t("privacy.body", locale)}
         </p>
+        {/*
+          Analytics is its own paragraph rather than more sentences appended to
+          privacy.body: it describes a different actor (Cloudflare, not this
+          site's forms), and the two were already long enough that one <p>
+          buried the point a reader comes to this page for.
+        */}
+        <p className="text-sm text-[var(--color-ink-700)] leading-relaxed mt-4">
+          {t("privacy.analytics", locale)}
+        </p>
       </div>
 
       <SiteFooter />

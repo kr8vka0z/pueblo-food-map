@@ -137,7 +137,7 @@ describe("SearchBar — viewSwitch + filterChip collision (#191)", () => {
     // Flush with the pill (Kyle, 2026-09-16): 1px in, full height, no inset.
     expect(container.querySelector(".right-px.top-px.bottom-px")).not.toBeNull();
     const inputClass = container.querySelector("input[type='search']")?.className ?? "";
-    expect(inputClass).toContain("pr-[160px]");
+    expect(inputClass).toContain("pr-[161px]");
     expect(inputClass).not.toMatch(/md:pr-/);
   });
 
@@ -153,7 +153,7 @@ describe("SearchBar — viewSwitch + filterChip collision (#191)", () => {
       />,
     );
     const inputClass = container.querySelector("input[type='search']")?.className ?? "";
-    expect(inputClass).toContain("max-[400px]:pr-[92px]");
+    expect(inputClass).toContain("max-[400px]:pr-[93px]");
     const labels = Array.from(container.querySelectorAll("[role=group] span"));
     expect(labels).toHaveLength(2);
     labels.forEach((span) => expect(span.className).toContain("max-[400px]:sr-only"));

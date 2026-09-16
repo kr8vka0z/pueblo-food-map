@@ -36,9 +36,14 @@ export default function SponsorCredit({
       // bottom edge, so the credit lifts above it — bar height (78) + 12px +
       // the home-indicator inset (docs/bottom-nav-spec.md §9); 2xl and up it
       // sits back in its corner. The splash has no bar and keeps bottom: 8.
+      //
+      // On the map the credit shares a row with the Mapbox logo across the
+      // screen, so it copies the logo's box: 23px tall, 6px above the control
+      // corner (measured on dev at 393×852), text centred in it. Without this
+      // the text sat ~6px lower than the logo (Kyle, 2026-09-16).
       className={
         clearBottomNav
-          ? "bottom-[calc(78px+12px+env(safe-area-inset-bottom))] 2xl:bottom-2"
+          ? "flex items-center h-[23px] bottom-[calc(78px+12px+6px+env(safe-area-inset-bottom))] 2xl:bottom-[6px]"
           : undefined
       }
       style={{

@@ -36,8 +36,11 @@ describe("SponsorCredit", () => {
   test("clearBottomNav lifts the credit above the bar below 2xl, back to the corner at 2xl", () => {
     const { container } = render(<SponsorCredit clearBottomNav />);
     const root = container.firstChild as HTMLElement;
-    expect(root.className).toContain("bottom-[calc(78px+12px+env(safe-area-inset-bottom))]");
-    expect(root.className).toContain("2xl:bottom-2");
+    expect(root.className).toContain("bottom-[calc(78px+12px+6px+env(safe-area-inset-bottom))]");
+    expect(root.className).toContain("2xl:bottom-[6px]");
+    // Same 23px box as the Mapbox logo, text centred — keeps the two on one line.
+    expect(root.className).toContain("h-[23px]");
+    expect(root.className).toContain("items-center");
     expect(root.style.bottom).toBe("");
   });
 

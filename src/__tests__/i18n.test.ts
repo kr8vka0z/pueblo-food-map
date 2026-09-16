@@ -34,6 +34,7 @@ const IDENTICAL_ALLOWLIST = new Set([
 /** Keys that must differ between EN and ES. */
 const MUST_DIFFER = [
   "menu.sponsoredBy",
+  "nav.backToMenu",
   "form.turnstile.verifying",
   "form.turnstile.error",
   "splash.dialogLabel",

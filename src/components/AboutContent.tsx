@@ -21,6 +21,7 @@ import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { formatPublishedDate } from "@/lib/dataFreshness";
 import SiteFooter from "@/components/SiteFooter";
+import PageTopNav from "./PageTopNav";
 
 const FAQ_NUMS = [1, 2, 3, 4, 5, 6] as const;
 
@@ -47,20 +48,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
 
       {/* DRAFT COPY — pending final text from Kyle / Pueblo Food Project (#155) */}
 
-      {/* Top nav bar */}
-      <nav className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0">
-        <Link
-          href="/"
-          className={
-            "text-sm font-medium text-[var(--color-sage-600)] " +
-            "hover:text-[var(--color-sage-700)] transition-colors " +
-            "focus-visible:outline-none focus-visible:ring-2 " +
-            "focus-visible:ring-[var(--color-sage-500)] rounded"
-          }
-        >
-          ← {t("about.backToMap", locale)}
-        </Link>
-      </nav>
+      <PageTopNav locale={locale} />
 
       {/* Page content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-8">

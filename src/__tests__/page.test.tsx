@@ -60,8 +60,8 @@ vi.mock("next/dynamic", () => ({
 
 // ─── Mock MapWrapper — renders a testid sentinel; no WebGL needed ─────────────
 vi.mock("@/components/MapWrapper", () => ({
-  default: vi.fn(({ onShowWelcome }: { onShowWelcome?: () => void }) => (
-    <div data-testid="map-wrapper" tabIndex={-1}>
+  default: vi.fn(({ onShowWelcome, initialMenuOpen }: { onShowWelcome?: () => void; initialMenuOpen?: boolean }) => (
+    <div data-testid="map-wrapper" data-menu-open={initialMenuOpen ? "1" : "0"} tabIndex={-1}>
       <button type="button" onClick={onShowWelcome} data-testid="show-welcome-btn">
         Show welcome
       </button>
@@ -293,5 +293,23 @@ describe("#99 showSplashAgain", () => {
 
     // Gate should still be set (future page loads skip the splash)
     expect(localStorage.getItem(GATE_KEY)).toBe("1");
+  });
+});
+
+describe("Back to menu (/?menu=1, Kyle 2026-09-16)", () => {
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  test("opens the map with the Menu open, skips the splash, and strips the param", async () => {
+    window.history.replaceState(null, "", "/?menu=1");
+    await renderPage();
+    expect(screen.getByTestId("map-wrapper").getAttribute("data-menu-open")).toBe("1");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(window.location.search).toBe("");
+  });
+
+  test("a plain visit leaves the Menu closed", async () => {
+    localStorage.setItem(GATE_KEY, "1");
+    await renderPage();
+    expect(screen.getByTestId("map-wrapper").getAttribute("data-menu-open")).toBe("0");
   });
 });

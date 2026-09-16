@@ -17,12 +17,12 @@
  * Pueblo County DHS). Re-check them when editing — phone hours drift.
  */
 
-import Link from "next/link";
 import { Phone, MessageSquareText, ExternalLink, ChevronDown } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import SiteFooter from "@/components/SiteFooter";
+import PageTopNav from "./PageTopNav";
 
 type Action =
   | { kind: "call"; href: string; number: string }
@@ -91,19 +91,7 @@ export default function ResourcesContent() {
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
-      <nav className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0">
-        <Link
-          href="/"
-          className={
-            "text-sm font-medium text-[var(--color-sage-600)] " +
-            "hover:text-[var(--color-sage-700)] transition-colors " +
-            "focus-visible:outline-none focus-visible:ring-2 " +
-            "focus-visible:ring-[var(--color-sage-500)] rounded"
-          }
-        >
-          ← {t("about.backToMap", locale)}
-        </Link>
-      </nav>
+      <PageTopNav locale={locale} />
 
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-6 space-y-3">
         <h1

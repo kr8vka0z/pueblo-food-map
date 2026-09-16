@@ -118,7 +118,7 @@ indicator, which is what iOS expects.
 | Order | Label (EN) | Label (ES) | lucide icon | Behaviour |
 |---|---|---|---|---|
 | 1 | Near me | Cerca de mí | `locate` | Requests location, flies to it, re-centres if already located |
-| 2 | Saved | Guardados | `heart` | Opens the drawer at the saved-places section |
+| 2 | Saved | Guardados | `star` (was `heart`; changed 2026-09-16 by Kyle to match the venue cards' save star) | Opens the drawer's saved-places view |
 | 3 | Resources | Recursos | `hand-helping` | Opens the `/resources` page *(amended 2026-09-16, see §7)* |
 | 4 | Menu | Menú | `menu` | Opens the drawer at the top |
 
@@ -429,6 +429,10 @@ top of a scrim is either unreachable (behind it) or an escape hatch that bypasse
 modal (in front of it). Neither is right. The sheet already hides `SponsorCredit` when
 fully expanded for the same reason; this extends the existing rule rather than adding a
 new one.
+
+> **Amended 2026-09-16 by Kyle:** `SponsorCredit` now hides at every detent too, not just
+> fully expanded. It sits above the sheet's z-index, so at the peek detent "Sponsored by
+> Pueblo Food Project" printed across the Walk / Bus / Drive buttons (seen on an iPhone).
 
 **Map padding:** `MapWrapper`'s map `padding.bottom` increases by the bar's height below
 `2xl`, so `fitBounds` and marker-fly animations stop centring results underneath the bar.

@@ -302,7 +302,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     showVenueOnMap,
     windowExpanded,
     setWindowExpanded,
-    sheetFullyExpanded,
     setSheetFullyExpanded,
     mapboxMap,
     setMapboxMap,
@@ -1255,9 +1254,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* SponsorCredit — bottom-right, hidden when BottomSheet is fully expanded (#69). Map mode only (#129). */}
+      {/* SponsorCredit — bottom-right (#69). Map mode only (#129). Hidden while
+          the venue sheet is open at ANY detent, like the bar and fade band (§10):
+          the credit sits above the sheet's z-index, so at the peek detent it
+          printed across the Walk/Bus/Drive buttons (Kyle, 2026-09-16). */}
       {viewMode === "map" && (
-        <SponsorCredit hidden={isMobile && sheetFullyExpanded} clearBottomNav />
+        <SponsorCredit hidden={venueSheetOpen} clearBottomNav />
       )}
 
       {/* BottomSheet — mobile only (vaul v2, venue-centric API). Map mode only (#129). */}

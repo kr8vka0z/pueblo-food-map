@@ -12,7 +12,8 @@
  *   3. Closes on X button click / outside click / Escape; panel unmounts.
  *   4. Focus returns to the opener after Escape / X-button close.
  *   5. ES locale: labels show Spanish strings.
- *   6. No Map/List row (spec §4.4) and initialSection scrolling (spec §7).
+ *   6. No Map/List row (spec §4.4).
+ *   7. Saved view: saved places only, or an empty state (spec §7 amendment).
  */
 
 import { useRef, useState, type ComponentProps } from "react";
@@ -351,9 +352,9 @@ describe("#99 — Show welcome screen menu item", () => {
   });
 });
 
-// ─── #132 9c: Saved places section ───────────────────────────────────────────
+// ─── #132 9c + Kyle 2026-09-16: Saved view ──────────────────────────────────
 
-describe("HamburgerMenu — Saved places (#132)", () => {
+describe("HamburgerMenu — Saved view", () => {
   const savedVenueFixtures = [
     {
       id: "saved-v1",
@@ -379,52 +380,45 @@ describe("HamburgerMenu — Saved places (#132)", () => {
     },
   ];
 
-  test("saved places heading does NOT appear when savedVenues is omitted", async () => {
-    const user = userEvent.setup();
-    renderMenu();
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      // menu is open — confirm by checking a known item
-      expect(screen.getByRole("link", { name: /Suggest a venue/i })).toBeDefined();
-      // heading must not be present
-      expect(screen.queryByText(/saved places/i)).toBeNull();
-    });
+  test("with nothing saved, Saved opens an empty state — not the menu", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} view="saved" savedVenues={[]} />);
+    expect(screen.getByText("No saved places yet")).toBeDefined();
+    expect(screen.getByText(/Tap the star on any place/)).toBeDefined();
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.queryByRole("link", { name: /Suggest a venue/i })).toBeNull();
   });
 
-  test("saved places heading does NOT appear when savedVenues is empty", async () => {
-    const user = userEvent.setup();
-    render(<Harness locale="en" savedVenues={[]} />);
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      expect(screen.getByRole("link", { name: /Suggest a venue/i })).toBeDefined();
-      expect(screen.queryByText(/saved places/i)).toBeNull();
-    });
+  test("with saved places, Saved lists them and nothing else", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} view="saved" savedVenues={savedVenueFixtures} />);
+    expect(screen.getByText("Saved places")).toBeDefined();
+    expect(screen.getByText("Eastside Food Pantry")).toBeDefined();
+    expect(screen.getByText("Community Garden")).toBeDefined();
+    expect(screen.queryByText("No saved places yet")).toBeNull();
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  test("saved places heading and venue names visible when savedVenues has entries", async () => {
-    const user = userEvent.setup();
-    render(<Harness locale="en" savedVenues={savedVenueFixtures} onSelectVenue={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      expect(screen.getByText(/saved places/i)).toBeDefined();
-      expect(screen.getByText("Eastside Food Pantry")).toBeDefined();
-      expect(screen.getByText("Community Garden")).toBeDefined();
-    });
-  });
-
-  test("clicking a saved venue row calls onSelectVenue with that venue id exactly once", async () => {
-    const user = userEvent.setup();
+  test("clicking a saved place closes the drawer and selects it once", () => {
     const onSelectVenue = vi.fn();
-    render(<Harness locale="en" savedVenues={savedVenueFixtures} onSelectVenue={onSelectVenue} />);
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      expect(screen.getByText("Eastside Food Pantry")).toBeDefined();
-    });
-    await user.click(screen.getByText("Eastside Food Pantry"));
-    await waitFor(() => {
-      expect(onSelectVenue).toHaveBeenCalledTimes(1);
-      expect(onSelectVenue).toHaveBeenCalledWith("saved-v1");
-    });
+    const onClose = vi.fn();
+    render(
+      <HamburgerMenu locale="en" open onClose={onClose} view="saved" savedVenues={savedVenueFixtures} onSelectVenue={onSelectVenue} />,
+    );
+    fireEvent.click(screen.getByText("Eastside Food Pantry"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSelectVenue).toHaveBeenCalledTimes(1);
+    expect(onSelectVenue).toHaveBeenCalledWith("saved-v1");
+  });
+
+  test("ES: empty state is in Spanish", () => {
+    render(<HamburgerMenu locale="es" open onClose={vi.fn()} view="saved" savedVenues={[]} />);
+    expect(screen.getByText("Lugares guardados")).toBeDefined();
+    expect(screen.getByText("Todavía no tienes lugares guardados")).toBeDefined();
+  });
+
+  test("the Menu view no longer lists saved places", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} savedVenues={savedVenueFixtures} />);
+    expect(screen.getByRole("link", { name: /Suggest a venue/i })).toBeDefined();
+    expect(screen.queryByText("Eastside Food Pantry")).toBeNull();
   });
 });
 

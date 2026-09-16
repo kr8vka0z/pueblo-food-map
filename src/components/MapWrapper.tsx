@@ -1202,7 +1202,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         onSelectVenue={handleSelectSavedVenue}
         open={menuSection !== null}
         onClose={handleMenuClose}
-        initialSection={menuSection ?? "top"}
+        view={menuSection ?? "top"}
         ignoreOutsideRef={navRef}
       />
 

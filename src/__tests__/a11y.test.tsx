@@ -231,6 +231,19 @@ describe("HamburgerMenu a11y", () => {
       `Violations found:\n${describeViolations(results)}`,
     ).toBe(0);
   });
+
+  test("saved view (empty and with places) has no axe violations", async () => {
+    const place = {
+      id: "v1", name: "Eastside Food Pantry", category: "pantry" as const, lat: 38.26, lng: -104.6,
+      address: "100 Main St", source: "test", last_verified: "2025-01-01",
+    };
+    for (const savedVenues of [[], [place]]) {
+      const { container, unmount } = render(<HamburgerMenu open onClose={vi.fn()} view="saved" savedVenues={savedVenues} />);
+      const results = await runAxe(container);
+      expect(results.violations.length, `Violations found:\n${describeViolations(results)}`).toBe(0);
+      unmount();
+    }
+  });
 });
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────

@@ -9,13 +9,19 @@
  * not a mock of it. See adminAllowlist.test.ts for the plain-logic unit
  * tests of the underlying isAllowlistedEmail() comparison.
  *
- * WHY apply migrations/0003_better_auth_schema.sql directly: that file is
- * the actual schema this app ships (see its own header for how it's
+ * WHY apply migrations/0003_better_auth_schema.sql AND
+ * migrations/0004_rate_limit_table.sql directly: both files are the actual
+ * schema this app ships (see each file's own header for how it's
  * generated/reviewed) — plain CREATE TABLE/INDEX statements, D1-compatible
  * and equally valid SQLite DDL for better-sqlite3. Running the real
- * migration (rather than hand-rolling a test schema) means a schema drift
- * between the migration and what Better Auth actually needs would fail
- * these tests, not just auth-options.test.ts's construction-only check.
+ * migrations (rather than hand-rolling a test schema) means a schema drift
+ * between the migrations and what Better Auth actually needs would fail
+ * these tests, not just auth-options.test.ts's construction-only check —
+ * exactly the mechanism that caught this file's own tests when better-auth
+ * 1.7.4 added a boot-time schema-validation check and every test here that
+ * dispatches a real request (signInMagicLink, magicLinkVerify,
+ * generatePasskeyRegistrationOptions) started failing on a missing
+ * `rateLimit` table until 0004 was added below.
  *
  * WHY a `host` header on every direct auth.api call: auth-options.ts's
  * `baseURL` is dynamic (`{ allowedHosts, protocol }`, not a static string —
@@ -33,10 +39,16 @@ import { betterAuth } from "better-auth";
 import { buildAuthOptions } from "@/lib/auth-options";
 import { adminAuthAllowlistPlugin } from "@/lib/adminAuthAllowlistPlugin";
 
-const MIGRATION_SQL = readFileSync(
-  join(process.cwd(), "migrations", "0003_better_auth_schema.sql"),
-  "utf-8",
-);
+const MIGRATION_SQL = [
+  readFileSync(
+    join(process.cwd(), "migrations", "0003_better_auth_schema.sql"),
+    "utf-8",
+  ),
+  readFileSync(
+    join(process.cwd(), "migrations", "0004_rate_limit_table.sql"),
+    "utf-8",
+  ),
+].join("\n");
 
 const ALLOWLISTED_EMAIL = "kysboyd@gmail.com"; // matches adminAllowlist.ts's default
 

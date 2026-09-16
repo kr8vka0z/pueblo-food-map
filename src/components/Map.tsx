@@ -28,7 +28,6 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import type { Venue } from "@/types/venue";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
-import { categoryLabels } from "@/data/venues";
 import VenueMarker from "@/components/VenueMarker";
 import type mapboxgl from "mapbox-gl";
 import {
@@ -464,7 +463,7 @@ export default function Map({
           <div className="pfm-tooltip__content">
             <span className="pfm-tooltip__name">{hoveredVenue.name}</span>
             <span className="pfm-tooltip__category">
-              {categoryLabels[hoveredVenue.category]}
+              {t(`category.full.${hoveredVenue.category}`, locale)}
             </span>
           </div>
         </Popup>

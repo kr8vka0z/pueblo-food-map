@@ -354,3 +354,20 @@ describe("VenueMarker a11y", () => {
     ).toBe(0);
   });
 });
+
+// ─── ResourcesContent (/resources) ────────────────────────────────────────────
+// next/link is already mocked to a plain <a> above.
+
+import ResourcesContent from "@/components/ResourcesContent";
+
+describe("ResourcesContent a11y", () => {
+  test("has no axe violations", async () => {
+    const { container } = render(<ResourcesContent />);
+    const results = await runAxe(container);
+    expect(
+      results.violations.length,
+      `Violations found:
+${describeViolations(results)}`,
+    ).toBe(0);
+  });
+});

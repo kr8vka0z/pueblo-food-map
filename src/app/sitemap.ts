@@ -26,6 +26,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
+      // WHY 0.8: same tier as /about — a discovery page people search for
+      // ("how to get SNAP in Pueblo"), not a utility form.
+      url: `${SITE_URL}/resources`,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
       // WHY 0.7: a browse/discovery page (the crawlable counterpart to the
       // JS-only homepage map) — below /about's 0.8, above the utility forms.
       url: `${SITE_URL}/venues`,

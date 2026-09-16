@@ -29,7 +29,7 @@ Browser
         ├── DesktopVenueWindow.tsx  (desktop: marker-anchored detail panel)
         ├── SearchBar / SearchResultsPopover / CategoryDropdown
         │     (SearchBar also hosts the Map/List view toggle, #191)
-        ├── HamburgerMenu    (the drawer: saved places, help links, language;
+        ├── HamburgerMenu    (the drawer: saved places, links, language;
         │     controlled — opened by BottomNav at a section)
         ├── ListView         (full-screen nearest-first list, map mode off)
         └── BottomNav        (Near me · Saved · Resources · Menu — bar below 2xl (1536px),
@@ -42,6 +42,8 @@ Next.js App Router (Cloudflare Worker, SSR)
   └── src/app/layout.tsx      (reads pfm-locale cookie; wraps with LocaleProvider)
   └── src/app/page.tsx        (splash gate; mounts MapWrapper)
   └── src/app/about/page.tsx  (mission, vision, origin story, venue sourcing — #155)
+  └── src/app/resources/page.tsx  (food help programs: 2-1-1, SNAP, WIC, Double Up,
+        hotline, Everyday Eats — what each is and how to get it; BottomNav's Resources item)
   └── src/app/report/[venueId]/page.tsx + submit/route.ts
   └── src/app/suggest/page.tsx + submit/route.ts
   └── src/app/feedback/page.tsx + submit/route.ts

@@ -119,7 +119,7 @@ indicator, which is what iOS expects.
 |---|---|---|---|---|
 | 1 | Near me | Cerca de mí | `locate` | Requests location, flies to it, re-centres if already located |
 | 2 | Saved | Guardados | `heart` | Opens the drawer at the saved-places section |
-| 3 | Resources | Recursos | `hand-helping` | Opens the drawer at the assistance section |
+| 3 | Resources | Recursos | `hand-helping` | Opens the `/resources` page *(amended 2026-09-16, see §7)* |
 | 4 | Menu | Menú | `menu` | Opens the drawer at the top |
 
 **On "Resources":** the label was "Get help" with a phone-handset icon in an earlier
@@ -263,7 +263,16 @@ first-time visitor sees first.
 
 ## 7. Saved and Resources reuse the drawer
 
-**The decision:** `HamburgerMenu.tsx` keeps its drawer and its contents unchanged. It
+> **Amended 2026-09-16 by Kyle — Resources is now its own page.** Seen on dev, Resources
+> and Menu opened the same drawer and looked like the same button. Resources now links to
+> `/resources` (`ResourcesContent.tsx`): one card per program — 2-1-1 Colorado, SNAP,
+> WIC, Double Up Food Bucks, the Food Resource Hotline, Everyday Eats — saying what it
+> is, what it's good for and how to get it, with call / text / website buttons. The
+> drawer's five "Get help" links were replaced by a single "Food help programs" link to
+> the same page, and `initialSection` lost `"help"`. Saved still uses the drawer as
+> described below. The original decision is kept for the record.
+
+**The original decision:** `HamburgerMenu.tsx` keeps its drawer and its contents unchanged. It
 gains one prop:
 
 ```ts

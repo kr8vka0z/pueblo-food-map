@@ -123,4 +123,21 @@ describe("SearchBar — viewSwitch + filterChip collision (#191)", () => {
     expect(screen.getByText("Food Pantry")).toBeDefined();
     expect(screen.getByRole("group", { name: /choose map or list view/i })).toBeDefined();
   });
+
+  // Regression guard for the menu-button collision measured on dev at 375px:
+  // at right-1 the whole List button rendered underneath the hamburger menu
+  // button (which is flush to the pill's right edge under md: and sits in a
+  // higher stacking layer), so tapping List opened the menu. jsdom has no
+  // layout, so the class contract is the only thing assertable here — the
+  // pixel proof lives in the browser measurement recorded in SearchBar.tsx's
+  // own comment.
+  test("the view switch is inset past the mobile menu button, not flush to the pill edge", () => {
+    const { container } = render(
+      <SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "map", onChange: vi.fn() }} />,
+    );
+    const wrapper = container.querySelector(".right-12");
+    expect(wrapper).not.toBeNull();
+    expect(wrapper?.className).toContain("md:right-1.5");
+    expect(container.querySelector("input[type='search']")?.className).toContain("pr-[168px]");
+  });
 });

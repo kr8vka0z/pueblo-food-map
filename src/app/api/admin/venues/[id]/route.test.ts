@@ -336,4 +336,92 @@ describe("PATCH /api/admin/venues/[id]", () => {
       expect(stmts).toHaveLength(2);
     });
   });
+
+  // Blessing Boxes slice 1 (migrations/0005) — the blessing_boxes row only
+  // gets touched when this edit is actually relevant to it (see route.ts's
+  // needsBoxTouch); an ordinary pantry/garden/etc. edit (above) stays at
+  // exactly 2 statements.
+  describe("blessing_boxes row lifecycle", () => {
+    test("editing an existing blessing_box (still a box) -> batch has 4 statements: UPDATE, DELETE box, INSERT box, audit", async () => {
+      const existing = makeExistingRow({ category: "blessing_box" });
+      const { db, batch } = makeFakeDb(existing);
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(
+        makeRequest({
+          origin: ADMIN_ORIGIN,
+          body: validPayload({
+            category: "blessing_box",
+            host_name: "New Host",
+            host_contact: "new@example.org",
+          }),
+        }),
+      );
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(4);
+      const [updateStmt, deleteStmt, insertStmt, auditStmt] = stmts;
+      expect(updateStmt.sql).toContain("UPDATE venues SET");
+      expect(deleteStmt.sql).toBe("DELETE FROM blessing_boxes WHERE venue_id = ?");
+      expect(deleteStmt.args).toEqual([VENUE_ID]);
+      expect(insertStmt.sql).toContain("INSERT INTO blessing_boxes");
+      expect(insertStmt.args).toContain("New Host");
+      expect(insertStmt.args).toContain("new@example.org");
+      expect(auditStmt.sql).toContain("INSERT INTO audit_log");
+      const afterJson = JSON.parse(auditStmt.args[5] as string);
+      expect(afterJson.box.hostContact).toBe("new@example.org");
+    });
+
+    test("category changed FROM blessing_box to a plain kind -> batch DELETEs the stale box row, no INSERT", async () => {
+      const existing = makeExistingRow({ category: "blessing_box" });
+      const { db, batch } = makeFakeDb(existing);
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(
+        makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ category: "pantry" }) }),
+      );
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(3);
+      const [, deleteStmt, auditStmt] = stmts;
+      expect(deleteStmt.sql).toBe("DELETE FROM blessing_boxes WHERE venue_id = ?");
+      expect(auditStmt.sql).toContain("INSERT INTO audit_log");
+    });
+
+    test("category changed TO blessing_box from a plain kind -> batch DELETEs (no-op) then INSERTs the new box row", async () => {
+      const existing = makeExistingRow({ category: "pantry" });
+      const { db, batch } = makeFakeDb(existing);
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(
+        makeRequest({
+          origin: ADMIN_ORIGIN,
+          body: validPayload({ category: "blessing_box", host_name: "First Host" }),
+        }),
+      );
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(4);
+      const [, deleteStmt, insertStmt] = stmts;
+      expect(deleteStmt.sql).toBe("DELETE FROM blessing_boxes WHERE venue_id = ?");
+      expect(insertStmt.sql).toContain("INSERT INTO blessing_boxes");
+      expect(insertStmt.args).toContain("First Host");
+    });
+
+    test("an ordinary pantry-to-pantry edit never touches blessing_boxes at all", async () => {
+      const existing = makeExistingRow({ category: "pantry" });
+      const { db, batch } = makeFakeDb(existing);
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ category: "pantry" }) }));
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(2);
+      expect(stmts.some((s) => s.sql.includes("blessing_boxes"))).toBe(false);
+    });
+  });
 });

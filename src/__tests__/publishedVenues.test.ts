@@ -72,7 +72,10 @@ describe("venues data-layer invariants", () => {
     expect(JSON.stringify(pfpVenues)).toBe(JSON.stringify(leafPfpVenues));
   });
 
-  test("categoryLabels / categoryColors / categoryIcon are untouched by the refactor", () => {
+  // Blessing Boxes slice 1 added an 8th category — categoryLabels below now
+  // includes it, updated at the same time BROWSE_CATEGORIES/ALL_CATEGORIES
+  // (CategoryDropdown.tsx/CategoryChips.tsx) did.
+  test("categoryLabels / categoryColors / categoryIcon are untouched by the publish refactor (blessing_box added by a later slice)", () => {
     expect(categoryLabels).toEqual({
       pantry: "Food Pantry",
       grocery: "Grocery / Supermarket",
@@ -81,6 +84,7 @@ describe("venues data-layer invariants", () => {
       garden: "Community Garden",
       edible_landscape: "Edible Landscape",
       meal_site: "Meal Site",
+      blessing_box: "Blessing Box",
     });
     expect(categoryColors.pantry).toBe("#BE2D45");
     expect(categoryIcon.pantry).toBe("ShoppingBasket");

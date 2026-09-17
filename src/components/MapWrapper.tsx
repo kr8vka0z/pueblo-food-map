@@ -56,6 +56,7 @@ import {
   PUEBLO_CENTER,
 } from "@/data/pueblo-bbox";
 import { useMapFilters } from "@/lib/useMapFilters";
+import { useBoxVenues } from "@/lib/useBoxVenues";
 import { useMapUI } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
 import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
@@ -709,6 +710,16 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // ── Origin — user position or Pueblo center fallback ─────────────────────────
   const origin = userLocation ?? PUEBLO_CENTER;
 
+  // ── Blessing boxes (slice 1) — live layer, fetched client-side and merged
+  // into the same filter/count/marker pipeline every other venue flows
+  // through (useBoxVenues/useMapFilters headers explain why). boxIdSet lets
+  // every selection handler below tell "this id is a box" apart from an
+  // ordinary venue with one Set lookup, so a box click routes straight to
+  // its own /box/<id> page instead of opening the generic detail card
+  // (which has no host/most-needed/status fields to show).
+  const boxVenues = useBoxVenues();
+  const boxIdSet = useMemo(() => new Set(boxVenues.map((v) => v.id)), [boxVenues]);
+
   // ── Filter pipeline — extracted hook (testable independently of map render) ──
   const {
     query,
@@ -736,7 +747,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     wicCount,
     handleCategoryBrowseSelect,
     handleClearAllFilters,
-  } = useMapFilters(origin);
+  } = useMapFilters(origin, boxVenues);
 
   // ── Typeahead popover state (issue #67) ──────────────────────────────────────
   // isPopoverOpen: true when input is focused + query is non-empty + matches exist.
@@ -755,7 +766,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     if (deepLinkDoneRef.current) return;
     if (!mapboxMap) return; // wait until the map can fly
     deepLinkDoneRef.current = true;
-    if (initialVenueId && allVenues.some((v) => v.id === initialVenueId)) {
+    if (initialVenueId && boxIdSet.has(initialVenueId)) {
+      router.push(`/box/${initialVenueId}`);
+    } else if (initialVenueId && allVenues.some((v) => v.id === initialVenueId)) {
       queueMicrotask(() => setSelectedVenueId(initialVenueId));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -934,6 +947,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         if (popoverVisible && activeIndex >= 0 && activeIndex < filteredVenues.length) {
           e.preventDefault();
           const venue = filteredVenues[activeIndex];
+          if (boxIdSet.has(venue.id)) {
+            router.push(`/box/${venue.id}`);
+            setIsPopoverOpen(false);
+            setActiveIndex(-1);
+            return;
+          }
           setSelectedVenueId(venue.id);
           showVenueOnMap();
           if (!isMobile) setWindowExpanded(false);
@@ -943,7 +962,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       }
     },
     // filteredVenues reference is stable between renders with same query/filters.
-    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap],
+    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap, boxIdSet, router],
   );
 
   // Select a venue from the Saved list (#132 9c). Clears active filters + search
@@ -952,6 +971,10 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // opens its detail card.
   const handleSelectSavedVenue = useCallback(
     (venueId: string) => {
+      if (boxIdSet.has(venueId)) {
+        router.push(`/box/${venueId}`);
+        return;
+      }
       handleClearAllFilters();
       setSelectedVenueId(venueId);
       if (mapUnavailable) {
@@ -961,12 +984,18 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [handleClearAllFilters, isMobile, mapUnavailable, router, showVenueOnMap],
+    [boxIdSet, handleClearAllFilters, isMobile, mapUnavailable, router, showVenueOnMap],
   );
 
   /** Called when user clicks/taps a result row inside the popover. */
   const handleSelectVenueFromPopover = useCallback(
     (venueId: string) => {
+      if (boxIdSet.has(venueId)) {
+        router.push(`/box/${venueId}`);
+        setIsPopoverOpen(false);
+        setActiveIndex(-1);
+        return;
+      }
       setSelectedVenueId(venueId);
       if (mapUnavailable) {
         router.push(`/venue/${venueId}`);
@@ -977,7 +1006,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     },
-    [isMobile, mapUnavailable, router, showVenueOnMap],
+    [boxIdSet, isMobile, mapUnavailable, router, showVenueOnMap],
   );
 
   // Select a venue from the list (#129) — switch back to the map, centered on it.
@@ -985,6 +1014,10 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // including hours, phone, SNAP/WIC details, notes, and directions.
   const handleSelectFromList = useCallback(
     (venueId: string) => {
+      if (boxIdSet.has(venueId)) {
+        router.push(`/box/${venueId}`);
+        return;
+      }
       setSelectedVenueId(venueId);
       if (mapUnavailable) {
         router.push(`/venue/${venueId}`);
@@ -993,17 +1026,23 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [isMobile, mapUnavailable, router, showVenueOnMap],
+    [boxIdSet, isMobile, mapUnavailable, router, showVenueOnMap],
   );
 
+  // Box pins skip the generic detail card entirely (no host/most-needed/
+  // status fields to show there) and go straight to their own page.
   const handleSelectVenueFromMap = useCallback(
     (id: string) => {
+      if (boxIdSet.has(id)) {
+        router.push(`/box/${id}`);
+        return;
+      }
       setSelectedVenueId(id);
       if (!isMobile) {
         setWindowExpanded(false);
       }
     },
-    [isMobile, setSelectedVenueId, setWindowExpanded],
+    [boxIdSet, isMobile, router, setSelectedVenueId, setWindowExpanded],
   );
 
   const handleMapReady = useCallback(

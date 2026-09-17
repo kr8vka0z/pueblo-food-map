@@ -264,4 +264,62 @@ describe("POST /api/admin/venues", () => {
     expect(venueStmt.args).toContain(0); // accepts_wic
     expect(venueStmt.args).toContain("719-555-0100");
   });
+
+  // Blessing Boxes slice 1 (migrations/0005) — the create route inserts a
+  // blessing_boxes row as a third batch statement, atomically with the venue.
+  test("blessing_box create -> db.batch() called once with venue INSERT + box INSERT + audit INSERT, box.host_contact never omitted from the batch but never public (see the read-endpoint tests)", async () => {
+    const { db, batch } = makeFakeDb();
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+    const res = await POST(
+      makeRequest({
+        origin: ADMIN_ORIGIN,
+        body: validPayload({
+          category: "blessing_box",
+          host_name: "Jane Doe",
+          host_note: "Stocked weekly",
+          host_contact: "jane@example.org",
+          most_needed: "Canned soup",
+          installed_on: "2026-01-15",
+        }),
+      }),
+    );
+    expect(res.status).toBe(201);
+    const data = (await res.json()) as { id: string };
+
+    expect(batch).toHaveBeenCalledTimes(1);
+    const stmts = batch.mock.calls[0][0] as BoundStatement[];
+    expect(stmts).toHaveLength(3);
+
+    const [venueStmt, boxStmt, auditStmt] = stmts;
+    expect(venueStmt.sql).toContain("INSERT INTO venues");
+    expect(venueStmt.args).toContain("blessing_box");
+
+    expect(boxStmt.sql).toContain("INSERT INTO blessing_boxes");
+    expect(boxStmt.args).toEqual([
+      data.id,
+      "Jane Doe",
+      "Stocked weekly",
+      "jane@example.org",
+      "Canned soup",
+      "2026-01-15",
+      null,
+    ]);
+
+    expect(auditStmt.sql).toContain("INSERT INTO audit_log");
+    const afterJson = JSON.parse(auditStmt.args[5] as string);
+    expect(afterJson.box.hostContact).toBe("jane@example.org");
+  });
+
+  test("non-blessing_box create -> db.batch() never includes a blessing_boxes INSERT", async () => {
+    const { db, batch } = makeFakeDb();
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+    const res = await POST(makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ category: "garden" }) }));
+    expect(res.status).toBe(201);
+
+    const stmts = batch.mock.calls[0][0] as BoundStatement[];
+    expect(stmts).toHaveLength(2);
+    expect(stmts.some((s) => s.sql.includes("blessing_boxes"))).toBe(false);
+  });
 });

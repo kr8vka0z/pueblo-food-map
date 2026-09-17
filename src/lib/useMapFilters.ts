@@ -19,7 +19,7 @@ import { haversineMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
 import { searchVenues } from "@/lib/searchVenues";
 import { useFavorites } from "@/lib/favorites";
-import type { VenueCategory } from "@/types/venue";
+import type { Venue, VenueCategory } from "@/types/venue";
 
 /** Lat/lng origin — user position or Pueblo center fallback. */
 export interface LatLng {
@@ -27,7 +27,22 @@ export interface LatLng {
   lng: number;
 }
 
-export function useMapFilters(origin: LatLng) {
+/**
+ * `extraVenues` (Blessing Boxes slice 1): blessing_box venues, fetched
+ * client-side at request time from the live endpoint — they're excluded
+ * from `venues.ts`'s build-time snapshot on purpose (boxes are live, not
+ * published), so this hook can't just import them the way it imports
+ * `allVenues`. Merging them in HERE, rather than duplicating a second
+ * filter/count/distance pipeline in MapWrapper, is what makes every existing
+ * category-chip/count/search/sort rule apply to boxes automatically — every
+ * field this pipeline reads (hours_weekly, accepts_snap/wic) is already
+ * optional on Venue, and a box simply doesn't have them (same as many
+ * existing garden/edible_landscape rows today), so no category-specific
+ * branch was needed anywhere in this file. Defaults to [] so every existing
+ * caller/test keeps working unchanged.
+ */
+export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
+  const combinedVenues = useMemo(() => [...allVenues, ...extraVenues], [extraVenues]);
   // ── Filter state ────────────────────────────────────────────────────────────
   const [query, setQuery] = useState("");
   const [selectedCategories, setSelectedCategories] =
@@ -47,11 +62,11 @@ export function useMapFilters(origin: LatLng) {
 
   // ── Derived: venues with Haversine distances ─────────────────────────────────
   const venuesWithDistance = useMemo(() => {
-    return allVenues.map((v) => ({
+    return combinedVenues.map((v) => ({
       ...v,
       distanceMiles: haversineMiles(origin, { lat: v.lat, lng: v.lng }),
     }));
-  }, [origin]);
+  }, [combinedVenues, origin]);
 
   // ── Derived: saved venues (favorites, nearest-first) ─────────────────────────
   const savedVenues = useMemo(() => {
@@ -66,14 +81,14 @@ export function useMapFilters(origin: LatLng) {
 
   // ── Derived: filter badge counts (computed from all venues, not filtered) ────
   const allVenueCounts = useMemo(() => {
-    return allVenues.reduce<Partial<Record<VenueCategory, number>>>(
+    return combinedVenues.reduce<Partial<Record<VenueCategory, number>>>(
       (acc, v) => {
         acc[v.category] = (acc[v.category] ?? 0) + 1;
         return acc;
       },
       {},
     );
-  }, []);
+  }, [combinedVenues]);
 
   // WHY confirmed-open only, deliberately NOT matching the filtered list below:
   // the "Open now" filter itself lets "no_hours" venues survive (board review

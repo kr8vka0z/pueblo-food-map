@@ -50,6 +50,13 @@ export interface VenueRow {
   published_by: string | null;
 }
 
+// Deliberately does NOT include "blessing_box": fetchPublishSnapshot's own
+// SQL already excludes every blessing_box row from the rows this validator
+// ever sees (boxes are live, not published — Build Plan architecture call
+// #1), so a box row reaching here at all would mean that exclusion broke.
+// Leaving it out of the enum turns that regression into a loud, named
+// validation error ("invalid category") instead of a box silently
+// publishing to the static map.
 const VALID_CATEGORIES: ReadonlySet<string> = new Set<VenueCategory>([
   "pantry",
   "grocery",
@@ -296,8 +303,13 @@ export interface PublishSnapshot {
  * status='published' only, silently dropping every pending draft).
  */
 export async function fetchPublishSnapshot(db: D1Database): Promise<PublishSnapshot> {
+  // AND category != 'blessing_box': boxes are live, not published (Build
+  // Plan architecture call #1) — they read straight from D1 through their
+  // own endpoint/page, and must never ride a Publish into the static
+  // snapshot. Left out here rather than filtered after the query so a box
+  // row can never even become a draftId/editedPublishedId candidate below.
   const result = await db
-    .prepare("SELECT * FROM venues WHERE status IN ('draft','published') ORDER BY id")
+    .prepare("SELECT * FROM venues WHERE status IN ('draft','published') AND category != 'blessing_box' ORDER BY id")
     .all<VenueRow>();
   const rows = result.results;
   const draftIds = rows.filter((row) => row.status === "draft").map((row) => row.id);

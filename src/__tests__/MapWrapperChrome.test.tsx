@@ -120,16 +120,19 @@ describe("#95 — CategoryDropdown rendering", () => {
     expect(screen.getByRole("listbox")).toBeDefined();
   });
 
-  test("renders 10 option rows (Open now + Accepts SNAP + Accepts WIC + 7 categories)", () => {
+  // Blessing Boxes slice 1 added an 8th browsable category (blessing_box) —
+  // see CategoryDropdown.tsx's own BROWSE_CATEGORIES list.
+  test("renders 11 option rows (Open now + Accepts SNAP + Accepts WIC + 8 categories)", () => {
     renderCategoryDropdown();
     const options = screen.getAllByRole("option");
-    expect(options).toHaveLength(10);
+    expect(options).toHaveLength(11);
   });
 
-  test("BROWSE_CATEGORIES exports all 7 categories in legend order", () => {
-    expect(BROWSE_CATEGORIES).toHaveLength(7);
+  test("BROWSE_CATEGORIES exports all 8 categories in legend order, blessing_box last", () => {
+    expect(BROWSE_CATEGORIES).toHaveLength(8);
     expect(BROWSE_CATEGORIES[0]).toBe("pantry");
     expect(BROWSE_CATEGORIES[6]).toBe("meal_site");
+    expect(BROWSE_CATEGORIES[7]).toBe("blessing_box");
   });
 
   test("shows EN category labels", () => {

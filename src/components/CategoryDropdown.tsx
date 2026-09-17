@@ -4,7 +4,7 @@
  * CategoryDropdown — empty-query category browse list (#95).
  *
  * Renders when the search bar is focused and the query is empty.
- * Shows all 7 venue categories with:
+ * Shows all 8 venue categories (7 places + blessing boxes, slice 1) with:
  *   - Color swatch
  *   - Localized category label
  *   - Total venue count (over all venues, not filtered)
@@ -34,6 +34,7 @@ export const BROWSE_CATEGORIES: VenueCategory[] = [
   "garden",
   "edible_landscape",
   "meal_site",
+  "blessing_box",
 ];
 
 interface CategoryDropdownProps {

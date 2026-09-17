@@ -39,8 +39,10 @@ function renderPage(locale: Locale) {
 }
 
 describe("/resources", () => {
-  test("is in the sitemap", () => {
-    expect(sitemap().map((e) => e.url)).toContain(`${SITE_URL}/resources`);
+  // sitemap() is async as of Blessing Boxes slice 1 — see seo.test.ts's note.
+  test("is in the sitemap", async () => {
+    const entries = await sitemap();
+    expect(entries.map((e) => e.url)).toContain(`${SITE_URL}/resources`);
   });
 
   test.each(["en", "es"] as const)("renders every program card in %s with no missing keys", (locale) => {

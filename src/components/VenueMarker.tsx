@@ -39,6 +39,7 @@ const CATEGORY_COLORS: Record<VenueCategory, string> = {
   garden: "#2C5F4F",
   edible_landscape: "#58772B",
   meal_site: "#6B3FA0",
+  blessing_box: "#C2447B",
 };
 
 // ─── Sage selected ring color (--color-sage-500) ──────────────────────────────

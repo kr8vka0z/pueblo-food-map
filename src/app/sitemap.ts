@@ -5,13 +5,46 @@
  * Static routes are listed first, then per-venue pages (74+ entries) are
  * appended dynamically from the venues array. Venue pages use monthly
  * changeFrequency and 0.7 priority — meaningful but below the homepage.
+ *
+ * Blessing box pages (slice 1) are appended after venues, read live from D1
+ * — boxes are excluded from the venues array on purpose (live, not
+ * published), so this is the one place sitemap.ts reaches outside its
+ * usual build-time-only data source. `force-dynamic` + a try/catch around
+ * the D1 read (never the sitemap-wide function) matches AGENTS.md's
+ * invariant that a `next build` must never itself touch D1 — this file
+ * still builds fine with zero box entries; the read only ever runs at
+ * request time. A D1 failure degrades to "no box entries this request"
+ * rather than 500ing the whole sitemap.
  */
 
 import type { MetadataRoute } from "next";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { SITE_URL } from "@/lib/site";
 import { venues } from "@/data/venues";
+import { loadLiveBoxes } from "@/lib/blessingBoxes";
+import { logBlessingBoxesReadFailure } from "@/lib/logger";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export const dynamic = "force-dynamic";
+
+async function loadBoxRoutes(): Promise<MetadataRoute.Sitemap> {
+  try {
+    const { env } = getCloudflareContext();
+    const boxes = await loadLiveBoxes(env.ADMIN_DB);
+    return boxes.map((b) => ({
+      url: `${SITE_URL}/box/${b.id}`,
+      lastModified: b.last_verified,
+      // "daily": a box's live status/host details can change any time,
+      // unlike an ordinary venue's monthly-refresh cadence.
+      changeFrequency: "daily",
+      priority: 0.6,
+    }));
+  } catch (err) {
+    logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error");
+    return [];
+  }
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: SITE_URL,
@@ -66,5 +99,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }));
 
-  return [...staticRoutes, ...venueRoutes];
+  const boxRoutes = await loadBoxRoutes();
+
+  return [...staticRoutes, ...venueRoutes, ...boxRoutes];
 }

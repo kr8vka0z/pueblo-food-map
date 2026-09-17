@@ -38,6 +38,22 @@ const VALID_DAY_KEYS: ReadonlySet<string> = new Set(DISPLAY_DAY_KEYS);
 
 export type TriState = 0 | 1 | null;
 
+/**
+ * Blessing-box-only fields (blessing_boxes table, migrations/0005). Present
+ * (non-null) only when `category === "blessing_box"` — validateCreateVenuePayload
+ * returns `box: null` for every other category, so callers (the venues
+ * create/edit routes) can branch on that single field rather than
+ * re-checking category themselves.
+ */
+export interface ValidatedBoxFields {
+  hostName: string | null;
+  hostNote: string | null;
+  hostContact: string | null;
+  mostNeeded: string | null;
+  installedOn: string | null;
+  removedOn: string | null;
+}
+
 /** Fields ready to bind into the INSERT statement — already the exact type/shape each D1 column expects. */
 export interface ValidatedVenueFields {
   name: string;
@@ -57,6 +73,7 @@ export interface ValidatedVenueFields {
   source: string;
   lastVerified: string;
   outsideCounty: 0 | 1;
+  box: ValidatedBoxFields | null;
 }
 
 export type ValidateCreateVenueResult =
@@ -118,6 +135,37 @@ export function validateHoursWeekly(value: unknown, errors: Record<string, strin
   }
 
   return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
+}
+
+/** Optional ISO date string: undefined/null/blank -> null; unparseable -> a field error. */
+function optionalDate(value: unknown, field: string, errors: Record<string, string>): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  if (Number.isNaN(Date.parse(value.trim()))) {
+    errors[field] = "Enter a valid date.";
+    return null;
+  }
+  return value.trim();
+}
+
+/**
+ * Validates the blessing_boxes-only fields (migrations/0005). Every field is
+ * optional free text/date — none of them block a create/edit, matching the
+ * build plan's admin story ("expose the box-only fields") with no stated
+ * required-ness. Only called (and only returns non-null) when the venue's
+ * own `category` field is "blessing_box" — validateCreateVenuePayload wires
+ * that gate so an ordinary pantry/garden/etc. edit never even looks at these
+ * body fields.
+ */
+export function validateBoxFields(body: Record<string, unknown>, errors: Record<string, string>): ValidatedBoxFields {
+  return {
+    hostName: optionalString(body.host_name, "host_name", errors),
+    hostNote: optionalString(body.host_note, "host_note", errors),
+    hostContact: optionalString(body.host_contact, "host_contact", errors),
+    mostNeeded: optionalString(body.most_needed, "most_needed", errors),
+    installedOn: optionalDate(body.installed_on, "installed_on", errors),
+    removedOn: optionalDate(body.removed_on, "removed_on", errors),
+  };
 }
 
 /**
@@ -195,6 +243,11 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
     errors.outside_county = "Must be true or false.";
   }
 
+  // Only a blessing_box submits the box-only fields; every other category's
+  // request body is never even inspected for them, so a stray host_name on
+  // a pantry create is silently ignored rather than validated or stored.
+  const box = category === "blessing_box" ? validateBoxFields(b, errors) : null;
+
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors };
   }
@@ -218,6 +271,7 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
       source,
       lastVerified,
       outsideCounty,
+      box,
     },
   };
 }

@@ -33,6 +33,11 @@ const CATEGORY_SEARCH_TERMS: Record<VenueCategory, readonly string[]> = {
     "paisaje comestible",
   ],
   meal_site: ["meal site", "meal", "comedor", "comedor comunitario"],
+  blessing_box: [
+    "blessing box",
+    "little free pantry",
+    "caja de bendiciones",
+  ],
 };
 
 /**
@@ -58,6 +63,7 @@ const CATEGORY_LABELS: Record<VenueCategory, string> = {
   garden: "Community garden",
   edible_landscape: "Edible landscape",
   meal_site: "Meal site",
+  blessing_box: "Blessing box",
 };
 
 function normalizeQuery(query: string): string {

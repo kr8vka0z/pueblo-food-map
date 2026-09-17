@@ -30,6 +30,7 @@ const en: Record<string, string> = {
   "category.garden": "Garden",
   "category.edible_landscape": "Edible Landscape",
   "category.meal_site": "Meal Site",
+  "category.blessing_box": "Blessing Box",
 
   // Category labels (full)
   "category.full.pantry": "Food Pantry",
@@ -39,6 +40,7 @@ const en: Record<string, string> = {
   "category.full.garden": "Community Garden",
   "category.full.edible_landscape": "Edible Landscape",
   "category.full.meal_site": "Meal Site",
+  "category.full.blessing_box": "Blessing Box",
 
   // Category rail section headers
   "rail.categories": "Categories",
@@ -143,6 +145,7 @@ const en: Record<string, string> = {
   "splash.cat.garden": "Community garden",
   "splash.cat.edible_landscape": "Edible landscape",
   "splash.cat.meal_site": "Meal site",
+  "splash.cat.blessing_box": "Blessing box",
 
   // Location denied banner (#68)
   "banner.title": "Location turned off",
@@ -205,6 +208,7 @@ const en: Record<string, string> = {
   "suggest.category.garden": "Community Garden",
   "suggest.category.edible_landscape": "Edible Landscape",
   "suggest.category.meal_site": "Meal Site",
+  "suggest.category.blessing_box": "Blessing Box",
   "suggest.hours.label": "Hours (optional)",
   "suggest.hours.placeholder": "e.g. Mon–Fri 9am–5pm",
   "suggest.contact.label": "Contact info (optional)",
@@ -328,6 +332,7 @@ const en: Record<string, string> = {
   "marker.category.garden": "Community garden",
   "marker.category.edible_landscape": "Edible landscape",
   "marker.category.meal_site": "Meal site",
+  "marker.category.blessing_box": "Blessing box",
 
   // External links (#162)
   "menu.opensInNewTab": "(opens in new tab)",
@@ -473,6 +478,15 @@ const en: Record<string, string> = {
   "resources.everydayeats.what": "A free box of 22–25 basic foods every month from Pueblo County — things like milk, cheese, cereal, rice or pasta, and canned fruits, vegetables and protein.",
   "resources.everydayeats.goodFor": "Adults 60 and older with limited income. Households of any age on SNAP, Medicaid, SSI and some other programs can also get emergency food (called TEFAP) the same way.",
   "resources.everydayeats.how": "Text FOOD to 1-877-644-3663. You'll get a link to a short sign-up form. You'll renew every 6 months, and if you miss your box 3 months in a row you lose your spot.",
+
+  // Blessing box detail page (/box/[id], slice 1)
+  "box.host": "Host",
+  "box.hostNotePrefix": "From the host",
+  "box.mostNeeded": "Most needed",
+  "box.installedSince": "Installed",
+  "box.status": "Status",
+  "box.status.unknown": "Unknown — check-ins are coming soon.",
+  "box.notFound": "We couldn't find that blessing box.",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -505,6 +519,7 @@ const es: Record<string, string> = {
   "category.garden": "Huerto",
   "category.edible_landscape": "Paisaje comestible", // [CHECK]
   "category.meal_site": "Comedor",
+  "category.blessing_box": "Caja de bendiciones", // [CHECK]
 
   // Category labels (full)
   "category.full.pantry": "Despensa de alimentos",
@@ -514,6 +529,7 @@ const es: Record<string, string> = {
   "category.full.garden": "Huerto comunitario",
   "category.full.edible_landscape": "Paisaje comestible", // [CHECK]
   "category.full.meal_site": "Comedor comunitario",
+  "category.full.blessing_box": "Caja de bendiciones", // [CHECK]
 
   // Category rail section headers
   "rail.categories": "Categorías",
@@ -616,6 +632,7 @@ const es: Record<string, string> = {
   "splash.cat.garden": "Huerto comunitario",
   "splash.cat.edible_landscape": "Paisaje comestible", // [CHECK]
   "splash.cat.meal_site": "Comedor comunitario",
+  "splash.cat.blessing_box": "Caja de bendiciones", // [CHECK]
 
   // Location denied banner (#68)
   "banner.title": "Ubicación desactivada",
@@ -676,6 +693,7 @@ const es: Record<string, string> = {
   "suggest.category.garden": "Huerto comunitario",
   "suggest.category.edible_landscape": "Paisaje comestible",
   "suggest.category.meal_site": "Comedor comunitario",
+  "suggest.category.blessing_box": "Caja de bendiciones", // [CHECK]
   "suggest.hours.label": "Horario (opcional)",
   "suggest.hours.placeholder": "p. ej. Lun–Vie 9am–5pm",
   "suggest.contact.label": "Información de contacto (opcional)",
@@ -798,6 +816,7 @@ const es: Record<string, string> = {
   "marker.category.garden": "Huerto",
   "marker.category.edible_landscape": "Paisaje comestible",
   "marker.category.meal_site": "Comedor",
+  "marker.category.blessing_box": "Caja de bendiciones", // [CHECK]
 
   // External links (#162)
   "menu.opensInNewTab": "(se abre en una pestaña nueva)",
@@ -938,6 +957,15 @@ const es: Record<string, string> = {
   "resources.everydayeats.what": "Una caja gratuita con 22 a 25 alimentos básicos cada mes del Condado de Pueblo, como leche, queso, cereal, arroz o pasta, y frutas, verduras y proteína enlatadas.",
   "resources.everydayeats.goodFor": "Adultos de 60 años o más con ingresos limitados. Los hogares de cualquier edad que reciben SNAP, Medicaid, SSI y algunos otros programas también pueden obtener comida de emergencia (llamada TEFAP) de la misma manera.",
   "resources.everydayeats.how": "Envía FOOD por mensaje de texto al 1-877-644-3663. Recibirás un enlace a un formulario corto de inscripción. Hay que renovar cada 6 meses, y si no recoges tu caja 3 meses seguidos pierdes tu lugar.",
+
+  // Blessing box detail page (/box/[id], slice 1)
+  "box.host": "Anfitrión", // [CHECK]
+  "box.hostNotePrefix": "Del anfitrión", // [CHECK]
+  "box.mostNeeded": "Lo que más se necesita",
+  "box.installedSince": "Instalada desde", // [CHECK]
+  "box.status": "Estado",
+  "box.status.unknown": "Desconocido — pronto podrás marcar visitas.", // [CHECK]
+  "box.notFound": "No pudimos encontrar esa caja de bendiciones.", // [CHECK]
 };
 
 /** Substitute simple {key} placeholders. */

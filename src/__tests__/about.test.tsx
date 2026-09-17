@@ -57,14 +57,16 @@ beforeEach(() => {
 // ─── 1. Sitemap ───────────────────────────────────────────────────────────────
 
 describe("sitemap — /about", () => {
-  test("/about is present in the sitemap", () => {
-    const entries = sitemap();
+  // sitemap() is async as of Blessing Boxes slice 1 (reads live box routes
+  // from D1) — see src/__tests__/seo.test.ts's own note on this.
+  test("/about is present in the sitemap", async () => {
+    const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${SITE_URL}/about`);
   });
 
-  test("/about entry has a positive priority", () => {
-    const entries = sitemap();
+  test("/about entry has a positive priority", async () => {
+    const entries = await sitemap();
     const aboutEntry = entries.find((e) => e.url === `${SITE_URL}/about`);
     expect(aboutEntry).toBeDefined();
     expect((aboutEntry?.priority ?? 0) > 0).toBe(true);

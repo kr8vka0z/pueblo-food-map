@@ -60,6 +60,12 @@ export function summarizePublishChanges(rows: AdminVenueRow[]): PublishChangeSum
   let archived = 0;
 
   for (const row of rows) {
+    // Boxes never publish (Build Plan architecture call #1 — live, not
+    // published) and their create route always inserts status='draft', so
+    // without this skip every blessing_box row would count as "1 new
+    // place" on the Publish panel forever, with no publish action able to
+    // ever clear it.
+    if (row.category === "blessing_box") continue;
     switch (row.status) {
       case "draft":
         newDrafts += 1;

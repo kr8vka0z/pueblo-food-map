@@ -253,9 +253,9 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **SnapWicPill** (benefit indicator): `sage-100` bg, `sage-700` text, `rounded` (sm radius), `px-2 py-0.5 text-xs font-medium`. Calm, not urgent — sage reads "civic info," not "alert."
 
-**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. Lucide `Search` icon at `ink-400` (16px mobile / 18px desktop), left-inset. When a category filter is active, a `filterChip` (sage-100/sage-700/full radius) appears inside the bar left of the placeholder. The Map/List **ViewToggle** (see below) sits inside the bar's right end (#191) — a 36px `size="md"` instance, right-inset (`right-1.5`) at every width; the input reserves one measured 160px for it (92px when a category chip shows under 400px).
+**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. Lucide `Search` icon at `ink-400` (16px mobile / 18px desktop), left-inset. When a category filter is active, a `filterChip` (sage-100/sage-700/full radius) appears inside the bar left of the placeholder. The Map/List **ViewToggle** (see below) sits flush inside the bar's right end (#191) — full height, no border of its own, 1px in so the pill's own border wraps it (`right-px`); the input reserves one measured 161px for it (93px when a category chip shows under 400px).
 
-**ViewToggle** (Map/List switch): `bone-100` bg, 1px `bone-300` border, `rounded-full`, segmented two-button group. Active side: `ink-700` fill, `bone-50` text. Inactive: `ink-500` text. Two sizes — `sm` (28px) and `md` (36px, inline in SearchBar, #191). Both words show at every width (docs/bottom-nav-spec.md §4.1). One exception: while a category chip shows on a screen under 400px wide, both words go visually hidden (`sr-only`, so accessible names survive) and the switch is icon-only (§4.3). When the map cannot mount, the Map side renders `disabled` at `ink-400`/60% opacity rather than accepting a tap that does nothing.
+**ViewToggle** (Map/List switch): `bone-100` bg, `rounded-full`, segmented two-button group — no border of its own; it reads as the search pill's own right end. Active side: `ink-700` fill, `bone-50` text. Inactive: `ink-500` text. One size now (SearchBar's flush instance, #191 — the bordered `sm`/`md` variants had no callers left once HamburgerMenu's own Map/List row was deleted with the bottom nav, and were removed). Both words show at every width (docs/bottom-nav-spec.md §4.1). One exception: while a category chip shows on a screen under 400px wide, both words go visually hidden (`sr-only`, so accessible names survive) and the switch is icon-only (§4.3). When the map cannot mount, the Map side renders `disabled` at `ink-400`/60% opacity rather than accepting a tap that does nothing.
 
 **CategoryChip** (filter chip row): `bone-100` bg / `ink-700` text when unselected, with a 10px colored dot at left. Category accent bg / `bone-50` text when selected (dot hidden). `rounded-full`, `h-9 px-3 text-sm`. Scrollable row with `no-scrollbar` utility and a right-edge bone-50 fade mask.
 
@@ -265,7 +265,7 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **VenueMarker**: Lucide `MapPin` SVG filled with category accent color, `stroke: #FFFFFF`, `strokeWidth: 1.5`, `filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25))`. Default 28px / selected 36px. Selected state: an outer SVG `circle` with `sage-500` stroke (4px, no fill) wrapping the pin. Hover: `scale(1.15)` inline transform.
 
-**BottomNav**: see docs/bottom-nav-spec.md for geometry, stacking order and the fade-band presets (strength 1 ships; the three knobs are `--nav-fade-height` / `--nav-fade-alpha` / `--nav-fade-blur` on `.nav-fade-band` in globals.css).
+**BottomNav**: see docs/bottom-nav-spec.md for geometry and stacking order (the fade band that spec once described was deleted with the bottom-nav rework — `.nav-fade-band` no longer exists in globals.css).
 
 ## Do's and Don'ts
 

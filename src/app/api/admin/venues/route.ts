@@ -28,6 +28,7 @@ import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
 import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
+import { boxEventsForCreate, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";
 
 /**
  * getAdminDb() FIRST (identity/JWT), THEN the CSRF/Origin check — same
@@ -185,6 +186,13 @@ export async function POST(req: NextRequest): Promise<Response> {
           .prepare(BOX_INSERT_SQL)
           .bind(id, fields.box.hostName, fields.box.hostNote, fields.box.hostContact, fields.box.mostNeeded, fields.box.installedOn, fields.box.removedOn)
       : null;
+  // Blessing Boxes slice 3: a fresh blessing_box create always gets exactly
+  // one 'added' box_events row (boxEventsForCreate returns [] for every
+  // other category) — see src/lib/boxEvents.ts's own header for why this
+  // rides the SAME batch as the venue/audit writes below.
+  const insertBoxEvents = boxEventsForCreate(fields).map((e) =>
+    db.prepare(BOX_EVENT_INSERT_SQL).bind(id, e.kind, e.detail, timestamp),
+  );
   const insertAudit = db
     .prepare(AUDIT_INSERT_SQL)
     .bind(
@@ -212,12 +220,13 @@ export async function POST(req: NextRequest): Promise<Response> {
       ? db.prepare(APPROVE_SUBMISSION_SQL).bind(identity.email, timestamp, submissionId)
       : null;
 
-  // Atomic: the venue row, its blessing_boxes row (if any), its audit
-  // trail, and (#259) the originating submission's approval either all
-  // land together or none does.
+  // Atomic: the venue row, its blessing_boxes row (if any), its box_events
+  // lifecycle row(s) (if any), its audit trail, and (#259) the originating
+  // submission's approval either all land together or none does.
   await db.batch([
     insertVenue,
     ...(insertBox !== null ? [insertBox] : []),
+    ...insertBoxEvents,
     insertAudit,
     ...(approveSubmission !== null ? [approveSubmission] : []),
   ]);

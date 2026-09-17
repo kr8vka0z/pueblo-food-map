@@ -266,8 +266,12 @@ describe("POST /api/admin/venues", () => {
   });
 
   // Blessing Boxes slice 1 (migrations/0005) — the create route inserts a
-  // blessing_boxes row as a third batch statement, atomically with the venue.
-  test("blessing_box create -> db.batch() called once with venue INSERT + box INSERT + audit INSERT, box.host_contact never omitted from the batch but never public (see the read-endpoint tests)", async () => {
+  // blessing_boxes row as a third batch statement, atomically with the
+  // venue. Slice 3 (migrations/0008) adds a fourth: one 'added' box_events
+  // row, in the SAME batch — Build Plan slice 3 scope: "These writes ride
+  // the same batch as the existing venue write ... so a failure can't leave
+  // one without the other."
+  test("blessing_box create -> db.batch() called once with venue INSERT + box INSERT + box_events 'added' INSERT + audit INSERT, box.host_contact never omitted from the batch but never public (see the read-endpoint tests)", async () => {
     const { db, batch } = makeFakeDb();
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
 
@@ -289,9 +293,9 @@ describe("POST /api/admin/venues", () => {
 
     expect(batch).toHaveBeenCalledTimes(1);
     const stmts = batch.mock.calls[0][0] as BoundStatement[];
-    expect(stmts).toHaveLength(3);
+    expect(stmts).toHaveLength(4);
 
-    const [venueStmt, boxStmt, auditStmt] = stmts;
+    const [venueStmt, boxStmt, eventStmt, auditStmt] = stmts;
     expect(venueStmt.sql).toContain("INSERT INTO venues");
     expect(venueStmt.args).toContain("blessing_box");
 
@@ -305,6 +309,11 @@ describe("POST /api/admin/venues", () => {
       "2026-01-15",
       null,
     ]);
+
+    expect(eventStmt.sql).toBe("INSERT INTO box_events (venue_id, kind, detail, created_at) VALUES (?, ?, ?, ?)");
+    expect(eventStmt.args[0]).toBe(data.id);
+    expect(eventStmt.args[1]).toBe("added");
+    expect(eventStmt.args[2]).toBeNull();
 
     expect(auditStmt.sql).toContain("INSERT INTO audit_log");
     const afterJson = JSON.parse(auditStmt.args[5] as string);

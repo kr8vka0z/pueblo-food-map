@@ -73,6 +73,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
+      // WHY 0.5/"hourly": live content (Blessing Boxes slice 3), but a
+      // secondary/watcher-audience page — below the browse/discovery pages
+      // above, same priority tier as /feedback.
+      url: `${SITE_URL}/boxes/activity`,
+      changeFrequency: "hourly",
+      priority: 0.5,
+    },
+    {
       url: `${SITE_URL}/suggest`,
       changeFrequency: "monthly",
       priority: 0.6,

@@ -60,6 +60,7 @@ import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
 import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
+import { computeBoxEventWrites, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";
 import type { AdminVenueRow } from "@/types/venue";
 
 /**
@@ -215,6 +216,15 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
+  // Blessing Boxes slice 3: computeBoxEventWrites needs the box's pre-edit
+  // removed_on to detect a null->set transition (the "removed" event) —
+  // only fetched when this venue is CURRENTLY a box, since a plain venue
+  // has no blessing_boxes row to read at all.
+  const existingBoxRow =
+    existing.category === "blessing_box"
+      ? await db.prepare("SELECT removed_on FROM blessing_boxes WHERE venue_id = ?").bind(id).first<{ removed_on: string | null }>()
+      : null;
+
   const updatedAt = new Date().toISOString();
   const afterRow = buildAfterRow(existing, fields, identity.email, updatedAt);
 
@@ -235,6 +245,17 @@ export async function PATCH(
           .prepare(BOX_INSERT_SQL)
           .bind(id, fields.box.hostName, fields.box.hostNote, fields.box.hostContact, fields.box.mostNeeded, fields.box.installedOn, fields.box.removedOn)
       : null;
+  // Blessing Boxes slice 3: zero, one, or several box_events rows, computed
+  // by diffing the pre-edit row against this save (renamed/moved/removed —
+  // see src/lib/boxEvents.ts's own header for why "becoming a box" and
+  // "leaving box-hood" are handled specially, and why archiving writes
+  // nothing at all). An ordinary non-box edit returns [] here, same
+  // "zero statements added" invariant needsBoxTouch already guarantees for
+  // the box INSERT/DELETE pair above.
+  const insertBoxEvents = computeBoxEventWrites(
+    { category: existing.category, name: existing.name, address: existing.address, removedOn: existingBoxRow?.removed_on ?? null },
+    { name: fields.name, address: fields.address, box: fields.box },
+  ).map((e) => db.prepare(BOX_EVENT_INSERT_SQL).bind(id, e.kind, e.detail, updatedAt));
   const insertAudit = db
     .prepare(AUDIT_INSERT_SQL)
     .bind(
@@ -255,12 +276,14 @@ export async function PATCH(
       : null;
 
   // Atomic: the update, the box row delete+reinsert (only when relevant —
-  // see needsBoxTouch above), its own audit trail, and (when present) the
-  // originating link_health proposal's approval either all land or none do.
+  // see needsBoxTouch above), its box_events lifecycle row(s) (if any), its
+  // own audit trail, and (when present) the originating link_health
+  // proposal's approval either all land or none do.
   await db.batch([
     updateVenue,
     ...(deleteBox !== null ? [deleteBox] : []),
     ...(insertBox !== null ? [insertBox] : []),
+    ...insertBoxEvents,
     insertAudit,
     ...(approveProposal !== null ? [approveProposal] : []),
   ]);

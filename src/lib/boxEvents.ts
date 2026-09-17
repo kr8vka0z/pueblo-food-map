@@ -102,11 +102,22 @@ export function computeBoxEventWrites(
   if (!wasBox && isBox) return [{ kind: "added", detail: null }];
   if (!wasBox || !isBox) return []; // never a box, or leaving box-hood — see header above
 
+  // ponytail: this is a raw string-difference check, not a real "did the
+  // location/name meaningfully change" check — correcting a typo in an
+  // address (e.g. a missing comma) reads as a public "moved" event, and
+  // likewise for a name spelling fix. Case-insensitive equality (below) is
+  // the one free guard available here (both sides are already trimmed by
+  // adminVenueValidation.ts before this function ever sees them, so a pure
+  // case fix — "Main St" -> "main st" — is caught for free); a genuine
+  // typo fix in the same case still fires. Ceiling: no diff-distance/
+  // normalization here, and none should be added casually — the upgrade
+  // path, if this ever matters enough, is asking the admin to confirm
+  // "is this a real move?" on save rather than inferring it from the diff.
   const events: BoxEventWrite[] = [];
-  if (existing.name !== fields.name) {
+  if (existing.name.toLowerCase() !== fields.name.toLowerCase()) {
     events.push({ kind: "renamed", detail: `${existing.name} → ${fields.name}` });
   }
-  if (existing.address !== fields.address) {
+  if (existing.address.toLowerCase() !== fields.address.toLowerCase()) {
     events.push({ kind: "moved", detail: `${existing.address} → ${fields.address}` });
   }
   const wasRemoved = isSet(existing.removedOn);

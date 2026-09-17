@@ -106,6 +106,24 @@ describe("computeBoxEventWrites", () => {
     expect(events).toEqual([]);
   });
 
+  test("a pure case-only change (name AND address) -> no events — the one free guard PR #472 review asked for", () => {
+    const events = computeBoxEventWrites(baseExisting, {
+      name: "same name",
+      address: "same address",
+      box: { removedOn: null },
+    });
+    expect(events).toEqual([]);
+  });
+
+  test("a real change that ALSO differs only in case elsewhere still fires — case-insensitivity doesn't mask a genuine move", () => {
+    const events = computeBoxEventWrites(baseExisting, {
+      name: "Same Name",
+      address: "New Address",
+      box: { removedOn: null },
+    });
+    expect(events).toEqual([{ kind: "moved", detail: "Same Address → New Address" }]);
+  });
+
   test("becoming a box for the first time (wasBox=false, isBox=true) -> exactly one 'added' event, no rename/move noise even though name/address differ from the pre-edit plain-venue row", () => {
     const existing: ExistingBoxEventContext = { category: "pantry", name: "Old Pantry Name", address: "Old Pantry Address", removedOn: null };
     const events = computeBoxEventWrites(existing, {

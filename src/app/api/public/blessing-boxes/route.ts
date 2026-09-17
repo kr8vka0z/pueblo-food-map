@@ -13,65 +13,38 @@
  *
  * Caching: held at the Cloudflare edge for 60s via the Workers Cache API
  * (caches.default) — a bare Cache-Control response header does nothing on a
- * Worker response (it's advisory to the BROWSER, not Cloudflare's edge); the
- * cache.put()/cache.match() pair below is what actually holds the response
- * at the edge, matching the build plan's "held at the edge ~60 seconds" line.
- * This repo had no prior Cache API example to follow — built directly from
- * Cloudflare's documented caches.default pattern.
+ * Worker response (it's advisory to the BROWSER, not Cloudflare's edge).
+ * The actual cache.put()/cache.match() pair lives in the shared
+ * respondWithEdgeCache() helper (src/lib/edgeCache.ts) — see that file's
+ * header for why it's shared with the activity route rather than
+ * duplicated: a degraded (D1-failure) load must never be cached, and that
+ * rule needs to live in exactly one place.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { loadLiveBoxes, type PublicBlessingBox } from "@/lib/blessingBoxes";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
+import { respondWithEdgeCache, type BestEffortResult } from "@/lib/edgeCache";
 
 export const dynamic = "force-dynamic";
 
-const CACHE_TTL_SECONDS = 60;
-
-async function loadBoxesBestEffort(): Promise<PublicBlessingBox[]> {
+async function loadBoxesBestEffort(): Promise<BestEffortResult<{ boxes: PublicBlessingBox[] }>> {
   try {
     const { env } = getCloudflareContext();
-    return await loadLiveBoxes(env.ADMIN_DB);
+    const boxes = await loadLiveBoxes(env.ADMIN_DB);
+    return { data: { boxes }, degraded: false };
   } catch (err) {
     // Best-effort, never blocking (same convention as public_submissions'
     // insert path, src/lib/publicSubmissions.ts): a D1 blip degrades the
-    // live layer to "no boxes this request" rather than 500ing the map.
+    // live layer to "no boxes this request" rather than 500ing the map —
+    // but `degraded: true` tells respondWithEdgeCache() to never cache
+    // this fallback (see edgeCache.ts's own header).
     logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error");
-    return [];
+    return { data: { boxes: [] }, degraded: true };
   }
 }
 
 export async function GET(req: NextRequest): Promise<Response> {
-  // caches.default is a Workers-runtime extension to the standard
-  // CacheStorage interface (lib.dom's own CacheStorage type has no `default`
-  // member, hence the narrower local cast below) — absent in vitest/jsdom,
-  // so route.test.ts stubs it. Not present at all (e.g. an unexpected local
-  // runtime) degrades to "always compute fresh" rather than throwing.
-  const cache: Cache | undefined = (globalThis as { caches?: { default?: Cache } }).caches?.default;
-  const cacheKey = new Request(req.url, req);
-
-  if (cache) {
-    const cached = await cache.match(cacheKey);
-    if (cached) return cached;
-  }
-
-  const boxes = await loadBoxesBestEffort();
-  const response = NextResponse.json(
-    { boxes },
-    { headers: { "Cache-Control": `public, max-age=${CACHE_TTL_SECONDS}` } },
-  );
-
-  if (cache) {
-    try {
-      const { ctx } = getCloudflareContext();
-      ctx.waitUntil(cache.put(cacheKey, response.clone()));
-    } catch {
-      // No live ExecutionContext (e.g. running outside a real Worker
-      // request) — caching is a performance nicety, never required for
-      // this response to be correct.
-    }
-  }
-
-  return response;
+  return respondWithEdgeCache(req, loadBoxesBestEffort);
 }

@@ -16,23 +16,25 @@
  * boxes (getCloudflareContext().env.ADMIN_DB read directly).
  *
  * Caching: same Workers Cache API (caches.default) pattern as the box list
- * endpoint, held at the edge for 60s. Cache matching is on the full request
- * URL (Cache API default), which already includes every filter's
- * querystring — so `?box=x` and `?box=y` naturally cache as separate
- * entries with no extra key-building code needed.
+ * endpoint, held at the edge for 60s, via the shared respondWithEdgeCache()
+ * helper (src/lib/edgeCache.ts) — see that file's header for why the
+ * cache.put()/cache.match() logic is shared rather than duplicated: a
+ * degraded (D1-failure) load must never be cached, in either route. Cache
+ * matching is on the full request URL (Cache API default), which already
+ * includes every filter's querystring — so `?box=x` and `?box=y` naturally
+ * cache as separate entries with no extra key-building code needed.
  *
  * Best-effort: a D1 failure degrades to an EMPTY page (never a 500) — same
  * resilience posture as every other public blessing-box read.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { loadBoxActivity, type ActivityFilters, type ActivityPage } from "@/lib/boxActivity";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
+import { respondWithEdgeCache, type BestEffortResult } from "@/lib/edgeCache";
 
 export const dynamic = "force-dynamic";
-
-const CACHE_TTL_SECONDS = 60;
 
 function parseFilters(url: URL): ActivityFilters {
   const num = (v: string | null): number | undefined => {
@@ -50,42 +52,20 @@ function parseFilters(url: URL): ActivityFilters {
   };
 }
 
-async function loadActivityBestEffort(filters: ActivityFilters): Promise<ActivityPage> {
+async function loadActivityBestEffort(filters: ActivityFilters): Promise<BestEffortResult<ActivityPage>> {
   try {
     const { env } = getCloudflareContext();
-    return await loadBoxActivity(env.ADMIN_DB, filters);
+    const page = await loadBoxActivity(env.ADMIN_DB, filters);
+    return { data: page, degraded: false };
   } catch (err) {
     logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error");
-    return { items: [], hasMore: false, page: 1 };
+    // `degraded: true` tells respondWithEdgeCache() to never cache this
+    // fallback — see edgeCache.ts's own header.
+    return { data: { items: [], hasMore: false, page: 1 }, degraded: true };
   }
 }
 
 export async function GET(req: NextRequest): Promise<Response> {
-  // Same Workers-runtime caches.default pattern as
-  // GET /api/public/blessing-boxes/route.ts — see that file's own header.
-  const cache: Cache | undefined = (globalThis as { caches?: { default?: Cache } }).caches?.default;
-  const cacheKey = new Request(req.url, req);
-
-  if (cache) {
-    const cached = await cache.match(cacheKey);
-    if (cached) return cached;
-  }
-
   const filters = parseFilters(new URL(req.url));
-  const page = await loadActivityBestEffort(filters);
-  const response = NextResponse.json(page, {
-    headers: { "Cache-Control": `public, max-age=${CACHE_TTL_SECONDS}` },
-  });
-
-  if (cache) {
-    try {
-      const { ctx } = getCloudflareContext();
-      ctx.waitUntil(cache.put(cacheKey, response.clone()));
-    } catch {
-      // No live ExecutionContext — caching is a performance nicety, never
-      // required for this response to be correct.
-    }
-  }
-
-  return response;
+  return respondWithEdgeCache(req, () => loadActivityBestEffort(filters));
 }

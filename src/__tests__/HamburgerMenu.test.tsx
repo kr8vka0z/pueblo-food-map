@@ -1,19 +1,22 @@
 /**
  * HamburgerMenu tests — #71
  *
+ * The drawer is controlled and has no trigger of its own since the bottom nav
+ * (docs/bottom-nav-spec.md §7) — BottomNav opens it. `Harness` below stands in
+ * for that opener: a plain button toggling `open`, passed as ignoreOutsideRef
+ * exactly as MapWrapper passes the nav.
+ *
  * Covers:
- *   1. Renders the hamburger button with correct aria attributes (collapsed state).
- *   2. Opens panel on button click; aria-expanded becomes true.
- *   3. Panel has role="menu" and contains "Suggest a venue" link.
- *   4. Closes on X button click; panel unmounts.
- *   5. Closes on outside click; panel unmounts.
- *   6. Closes on Escape key; panel unmounts.
- *   7. Focus returns to hamburger button after Escape close.
- *   8. Focus returns to hamburger button after X-button close.
- *   9. "Suggest a venue" link points to /suggest.
- *  10. ES locale: aria-labels show Spanish strings.
+ *   1. Panel is absent while closed.
+ *   2. Panel has role="menu" and contains "Suggest a venue" link.
+ *   3. Closes on X button click / outside click / Escape; panel unmounts.
+ *   4. Focus returns to the opener after Escape / X-button close.
+ *   5. ES locale: labels show Spanish strings.
+ *   6. No Map/List row (spec §4.4).
+ *   7. Saved view: saved places only, or an empty state (spec §7 amendment).
  */
 
+import { useRef, useState, type ComponentProps } from "react";
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -43,39 +46,44 @@ beforeEach(() => {
   });
 });
 
+type HarnessProps = Omit<ComponentProps<typeof HamburgerMenu>, "open" | "onClose" | "ignoreOutsideRef">;
+
+function Harness(props: HarnessProps) {
+  const [open, setOpen] = useState(false);
+  const openerRef = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <button
+        ref={openerRef}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label={props.locale === "es" ? "Abrir menú" : "Open menu"}
+      />
+      <HamburgerMenu {...props} open={open} onClose={() => setOpen(false)} ignoreOutsideRef={openerRef} />
+    </>
+  );
+}
+
 function renderMenu(locale: "en" | "es" = "en") {
-  return render(<HamburgerMenu locale={locale} />);
+  return render(<Harness locale={locale} />);
 }
 
 function renderMenuWithWelcome(onShowWelcome = vi.fn(), locale: "en" | "es" = "en") {
-  return { onShowWelcome, ...render(<HamburgerMenu locale={locale} onShowWelcome={onShowWelcome} />) };
+  return { onShowWelcome, ...render(<Harness locale={locale} onShowWelcome={onShowWelcome} />) };
 }
 
 function renderMenuWithLocaleProvider(locale: "en" | "es" = "en", initialLocale: "en" | "es" = "en") {
   return render(
     <LocaleProvider initialLocale={initialLocale}>
-      <HamburgerMenu locale={locale} />
+      <Harness locale={locale} />
     </LocaleProvider>,
   );
 }
 
 describe("HamburgerMenu — collapsed state", () => {
-  test("renders hamburger trigger button", () => {
-    renderMenu();
-    const btn = screen.getByRole("button", { name: /Open menu/i });
-    expect(btn).toBeDefined();
-  });
-
-  test("aria-expanded is false when closed", () => {
-    renderMenu();
-    const btn = screen.getByRole("button", { name: /Open menu/i }) as HTMLButtonElement;
-    expect(btn.getAttribute("aria-expanded")).toBe("false");
-  });
-
-  test("aria-haspopup is 'menu'", () => {
-    renderMenu();
-    const btn = screen.getByRole("button", { name: /Open menu/i }) as HTMLButtonElement;
-    expect(btn.getAttribute("aria-haspopup")).toBe("menu");
+  test("renders no trigger button of its own (the bottom nav opens it)", () => {
+    render(<HamburgerMenu locale="en" open={false} onClose={vi.fn()} />);
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   test("panel is not in DOM when closed", () => {
@@ -85,22 +93,12 @@ describe("HamburgerMenu — collapsed state", () => {
 });
 
 describe("HamburgerMenu — open state", () => {
-  test("panel appears after button click", async () => {
+  test("panel appears after the opener is clicked", async () => {
     const user = userEvent.setup();
     renderMenu();
     await user.click(screen.getByRole("button", { name: /Open menu/i }));
     await waitFor(() => {
       expect(screen.getByRole("menu")).toBeDefined();
-    });
-  });
-
-  test("aria-expanded becomes true after opening", async () => {
-    const user = userEvent.setup();
-    renderMenu();
-    const btn = screen.getByRole("button", { name: /Open menu/i }) as HTMLButtonElement;
-    await user.click(btn);
-    await waitFor(() => {
-      expect(btn.getAttribute("aria-expanded")).toBe("true");
     });
   });
 
@@ -115,29 +113,14 @@ describe("HamburgerMenu — open state", () => {
     });
   });
 
-  test("Get help section renders the five assistance links (#131)", async () => {
+  test("the assistance links moved to /resources — the drawer links there once", async () => {
     const user = userEvent.setup();
     renderMenu();
     await user.click(screen.getByRole("button", { name: /Open menu/i }));
     await waitFor(() => {
-      const co211 = screen.getByRole("link", { name: /2-1-1 Colorado/i }) as HTMLAnchorElement;
-      const snap = screen.getByRole("link", { name: /Apply for SNAP/i }) as HTMLAnchorElement;
-      const wic = screen.getByRole("link", { name: /Apply for WIC/i }) as HTMLAnchorElement;
-      const doubleup = screen.getByRole("link", { name: /Double Up Food Bucks/i }) as HTMLAnchorElement;
-      const hotline = screen.getByRole("link", { name: /Food hotline/i }) as HTMLAnchorElement;
-
-      expect(co211.href).toContain("211colorado.org");
-      expect(snap.href).toContain("cdhs.colorado.gov/snap");
-      expect(wic.href).toContain("coloradowic.gov");
-      expect(doubleup.href).toContain("doubleupcolorado.org");
-      expect(hotline.href).toContain("tel:");
-      expect(hotline.href).toContain("8558554626");
-
-      // Web resources open in a new tab; the hotline is a tap-to-call link.
-      expect(co211.target).toBe("_blank");
-      expect(snap.target).toBe("_blank");
-      expect(wic.target).toBe("_blank");
-      expect(doubleup.target).toBe("_blank");
+      const link = screen.getByRole("link", { name: /Food help programs/i }) as HTMLAnchorElement;
+      expect(link.getAttribute("href")).toBe("/resources");
+      expect(screen.queryByRole("link", { name: /Apply for SNAP/i })).toBeNull();
     });
   });
 
@@ -204,6 +187,20 @@ describe("HamburgerMenu — close behaviors", () => {
     });
   });
 
+  test("clicking a link item closes the drawer (review item 2 — dead tap on the current page)", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: /Open menu/i }));
+    await waitFor(() => expect(screen.getByRole("menu")).toBeDefined());
+    expect(document.body.style.overflow).toBe("hidden");
+
+    await user.click(screen.getByRole("link", { name: /About this map/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(document.body.style.overflow).toBe("");
+    });
+  });
+
   test("focus returns to hamburger button after X-button close", async () => {
     const user = userEvent.setup();
     renderMenu();
@@ -220,11 +217,6 @@ describe("HamburgerMenu — close behaviors", () => {
 });
 
 describe("HamburgerMenu — locale", () => {
-  test("ES locale: trigger button shows Spanish aria-label", () => {
-    renderMenu("es");
-    expect(screen.getByRole("button", { name: /Abrir menú/i })).toBeDefined();
-  });
-
   test("ES locale: X button shows Spanish close label", async () => {
     const user = userEvent.setup();
     renderMenu("es");
@@ -244,57 +236,34 @@ describe("HamburgerMenu — locale", () => {
   });
 });
 
-// ─── #96: About Pueblo Food Project ──────────────────────────────────────────
+// ─── Sponsor card (replaces #96's "About Pueblo Food Project" item) ───────────
 
-describe("#96 — About Pueblo Food Project menu item", () => {
-  test("'About' item renders in the open panel (EN)", async () => {
-    const user = userEvent.setup();
-    renderMenu();
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      expect(screen.getByText("About Pueblo Food Project")).toBeDefined();
-    });
+describe("HamburgerMenu — sponsor card (Kyle, 2026-09-16)", () => {
+  test("is the first thing in the Menu and links to pueblofoodproject.org in a new tab", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} />);
+    const card = screen.getByRole("link", { name: /Sponsored by Pueblo Food Project/i });
+    expect(card.getAttribute("href")).toBe("https://pueblofoodproject.org/");
+    expect(card.getAttribute("target")).toBe("_blank");
+    expect(card.getAttribute("rel")).toContain("noopener");
+    expect(card.getAttribute("aria-label")).toContain("(opens in new tab)");
+    // Before every menu item.
+    const firstItem = screen.getAllByRole("menuitem")[0];
+    expect(card.compareDocumentPosition(firstItem) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  test("'About' link href is correct", async () => {
-    const user = userEvent.setup();
-    renderMenu();
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
-      expect((link as HTMLAnchorElement).href).toContain("pueblofoodproject.org/about/");
-    });
+  test("the old 'About Pueblo Food Project' item is gone (same site as the card)", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} />);
+    expect(screen.queryByText("About Pueblo Food Project")).toBeNull();
   });
 
-  test("'About' link has target='_blank'", async () => {
-    const user = userEvent.setup();
-    renderMenu();
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
-      expect((link as HTMLAnchorElement).target).toBe("_blank");
-    });
+  test("ES label", () => {
+    render(<HamburgerMenu locale="es" open onClose={vi.fn()} />);
+    expect(screen.getByText("Patrocinado por")).toBeDefined();
   });
 
-  test("'About' link has rel containing noopener and noreferrer", async () => {
-    const user = userEvent.setup();
-    renderMenu();
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      const link = screen.getByRole("link", { name: /About Pueblo Food Project/i });
-      const rel = (link as HTMLAnchorElement).rel;
-      expect(rel).toContain("noopener");
-      expect(rel).toContain("noreferrer");
-    });
-  });
-
-  test("'About' item renders in ES locale with Spanish label", async () => {
-    const user = userEvent.setup();
-    renderMenu("es");
-    await user.click(screen.getByRole("button", { name: /Abrir menú/i }));
-    await waitFor(() => {
-      expect(screen.getByText("Acerca de Pueblo Food Project")).toBeDefined();
-    });
+  test("not shown in the Saved view", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} view="saved" savedVenues={[]} />);
+    expect(screen.queryByTestId("menu-sponsor")).toBeNull();
   });
 });
 
@@ -374,9 +343,9 @@ describe("#99 — Show welcome screen menu item", () => {
   });
 });
 
-// ─── #132 9c: Saved places section ───────────────────────────────────────────
+// ─── #132 9c + Kyle 2026-09-16: Saved view ──────────────────────────────────
 
-describe("HamburgerMenu — Saved places (#132)", () => {
+describe("HamburgerMenu — Saved view", () => {
   const savedVenueFixtures = [
     {
       id: "saved-v1",
@@ -402,140 +371,69 @@ describe("HamburgerMenu — Saved places (#132)", () => {
     },
   ];
 
-  test("saved places heading does NOT appear when savedVenues is omitted", async () => {
-    const user = userEvent.setup();
-    renderMenu();
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      // menu is open — confirm by checking a known item
-      expect(screen.getByRole("link", { name: /Suggest a venue/i })).toBeDefined();
-      // heading must not be present
-      expect(screen.queryByText(/saved places/i)).toBeNull();
-    });
+  test("with nothing saved, Saved opens an empty state — not the menu", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} view="saved" savedVenues={[]} />);
+    expect(screen.getByText("No saved places yet")).toBeDefined();
+    expect(screen.getByText(/Tap the star on any place/)).toBeDefined();
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.queryByRole("link", { name: /Suggest a venue/i })).toBeNull();
   });
 
-  test("saved places heading does NOT appear when savedVenues is empty", async () => {
-    const user = userEvent.setup();
-    render(<HamburgerMenu locale="en" savedVenues={[]} />);
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      expect(screen.getByRole("link", { name: /Suggest a venue/i })).toBeDefined();
-      expect(screen.queryByText(/saved places/i)).toBeNull();
-    });
+  test("with saved places, Saved lists them and nothing else", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} view="saved" savedVenues={savedVenueFixtures} />);
+    expect(screen.getByText("Saved places")).toBeDefined();
+    expect(screen.getByText("Eastside Food Pantry")).toBeDefined();
+    expect(screen.getByText("Community Garden")).toBeDefined();
+    expect(screen.queryByText("No saved places yet")).toBeNull();
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  test("saved places heading and venue names visible when savedVenues has entries", async () => {
-    const user = userEvent.setup();
-    render(<HamburgerMenu locale="en" savedVenues={savedVenueFixtures} onSelectVenue={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      expect(screen.getByText(/saved places/i)).toBeDefined();
-      expect(screen.getByText("Eastside Food Pantry")).toBeDefined();
-      expect(screen.getByText("Community Garden")).toBeDefined();
-    });
-  });
-
-  test("clicking a saved venue row calls onSelectVenue with that venue id exactly once", async () => {
-    const user = userEvent.setup();
+  test("clicking a saved place closes the drawer and selects it once", () => {
     const onSelectVenue = vi.fn();
-    render(<HamburgerMenu locale="en" savedVenues={savedVenueFixtures} onSelectVenue={onSelectVenue} />);
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      expect(screen.getByText("Eastside Food Pantry")).toBeDefined();
-    });
-    await user.click(screen.getByText("Eastside Food Pantry"));
-    await waitFor(() => {
-      expect(onSelectVenue).toHaveBeenCalledTimes(1);
-      expect(onSelectVenue).toHaveBeenCalledWith("saved-v1");
-    });
+    const onClose = vi.fn();
+    render(
+      <HamburgerMenu locale="en" open onClose={onClose} view="saved" savedVenues={savedVenueFixtures} onSelectVenue={onSelectVenue} />,
+    );
+    fireEvent.click(screen.getByText("Eastside Food Pantry"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSelectVenue).toHaveBeenCalledTimes(1);
+    expect(onSelectVenue).toHaveBeenCalledWith("saved-v1");
+  });
+
+  test("ES: empty state is in Spanish", () => {
+    render(<HamburgerMenu locale="es" open onClose={vi.fn()} view="saved" savedVenues={[]} />);
+    expect(screen.getByText("Lugares guardados")).toBeDefined();
+    expect(screen.getByText("Todavía no tienes lugares guardados")).toBeDefined();
+  });
+
+  test("the Menu view no longer lists saved places", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} savedVenues={savedVenueFixtures} />);
+    expect(screen.getByRole("link", { name: /Suggest a venue/i })).toBeDefined();
+    expect(screen.queryByText("Eastside Food Pantry")).toBeNull();
   });
 });
 
-// ─── #view-toggle-in-menu: Map | List view toggle moved into hamburger menu ───
+// ─── docs/bottom-nav-spec.md §4.4 + §7 ───────────────────────────────────────
 
-describe("HamburgerMenu — view toggle (#view-toggle-in-menu)", () => {
-  test("View label and both Map/List buttons are visible when viewMode is passed and menu is open", async () => {
-    const user = userEvent.setup();
-    render(
-      <HamburgerMenu
-        locale="en"
-        viewMode="map"
-        onViewModeChange={vi.fn()}
-      />
-    );
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      expect(screen.getByText("View")).toBeDefined();
-      expect(screen.getByRole("button", { name: /^Map$/i })).toBeDefined();
-      expect(screen.getByRole("button", { name: /^List$/i })).toBeDefined();
-    });
+describe("HamburgerMenu — bottom nav entry points", () => {
+  test("renders no Map/List row (the switch lives in the search box, §4.4)", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} />);
+    expect(screen.getByRole("menu")).toBeDefined();
+    expect(screen.queryByText("View")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Map$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^List$/i })).toBeNull();
   });
 
-  test("Map button is aria-pressed=true when viewMode=map", async () => {
-    const user = userEvent.setup();
-    render(
-      <HamburgerMenu
-        locale="en"
-        viewMode="map"
-        onViewModeChange={vi.fn()}
-      />
-    );
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      const mapBtn = screen.getByRole("button", { name: /^Map$/i });
-      expect(mapBtn.getAttribute("aria-pressed")).toBe("true");
-    });
-  });
-
-  test("clicking List button calls onViewModeChange once with 'list'", async () => {
-    const user = userEvent.setup();
-    const onViewModeChange = vi.fn();
-    render(
-      <HamburgerMenu
-        locale="en"
-        viewMode="map"
-        onViewModeChange={onViewModeChange}
-      />
-    );
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /^List$/i })).toBeDefined();
-    });
-    await user.click(screen.getByRole("button", { name: /^List$/i }));
-    await waitFor(() => {
-      expect(onViewModeChange).toHaveBeenCalledTimes(1);
-      expect(onViewModeChange).toHaveBeenCalledWith("list");
-    });
-  });
-
-  test("clicking List button closes the menu", async () => {
-    const user = userEvent.setup();
-    render(
-      <HamburgerMenu
-        locale="en"
-        viewMode="map"
-        onViewModeChange={vi.fn()}
-      />
-    );
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      expect(screen.getByRole("menu")).toBeDefined();
-    });
-    await user.click(screen.getByRole("button", { name: /^List$/i }));
-    await waitFor(() => {
-      expect(screen.queryByRole("menu")).toBeNull();
-    });
-  });
-
-  test("View row does NOT render when viewMode is not passed", async () => {
-    const user = userEvent.setup();
-    render(<HamburgerMenu locale="en" />);
-    await user.click(screen.getByRole("button", { name: /Open menu/i }));
-    await waitFor(() => {
-      // menu open — confirm by checking a known item
-      expect(screen.getByRole("link", { name: /Suggest a venue/i })).toBeDefined();
-      expect(screen.queryByText("View")).toBeNull();
-    });
+  test("a tap inside ignoreOutsideRef does not close the drawer", () => {
+    const onClose = vi.fn();
+    const nav = document.createElement("nav");
+    document.body.appendChild(nav);
+    render(<HamburgerMenu locale="en" open onClose={onClose} ignoreOutsideRef={{ current: nav }} />);
+    fireEvent.pointerDown(nav);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.pointerDown(document.body);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    nav.remove();
   });
 });
 
@@ -615,8 +513,8 @@ describe("#109 — Language toggle as last menu item", () => {
     void container; // suppress unused warning
   });
 
-  test("language row appears after the About link in the panel", async () => {
-    // WHY: language toggle moved outside role="menu" ul — verify it still renders
+  test("language row is the last row in the panel, after the menu links", async () => {
+    // WHY: language toggle sits outside role="menu" ul — verify it still renders
     // after all menuitem links (last visually in the panel).
     const user = userEvent.setup();
     renderMenuWithLocaleProvider();
@@ -624,12 +522,55 @@ describe("#109 — Language toggle as last menu item", () => {
     await waitFor(() => {
       expect(screen.getByText("Language / Idioma")).toBeDefined();
     });
-    // The "About" link text appears before "Language / Idioma" in the DOM
     const panel = screen.getByText("Language / Idioma").closest('[id="hamburger-panel"]');
     const panelText = panel?.textContent ?? "";
-    const aboutIdx = panelText.indexOf("About Pueblo Food Project");
+    const lastLinkIdx = panelText.indexOf("Food help programs");
     const langIdx = panelText.indexOf("Language / Idioma");
-    expect(aboutIdx).toBeGreaterThan(-1);
-    expect(langIdx).toBeGreaterThan(aboutIdx);
+    expect(lastLinkIdx).toBeGreaterThan(-1);
+    expect(langIdx).toBeGreaterThan(lastLinkIdx);
+  });
+});
+
+// ─── Focus trap re-targeting (review item 3) ─────────────────────────────────
+// The focus effect keys on [open] only, so switching `view` while already
+// open (Saved -> Menu via the bottom nav) doesn't re-run it — focus can be
+// left on the nav button that opened it, outside the panel. handleTab must
+// pull focus back in rather than only wrapping at first/last.
+
+describe("HamburgerMenu — focus trap re-targeting after leaving the panel", () => {
+  test("Tab from outside the panel moves focus to the first focusable element", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    const openerBtn = screen.getByRole("button", { name: /Open menu/i });
+    await user.click(openerBtn);
+    await waitFor(() => expect(screen.getByRole("menu")).toBeDefined());
+
+    // Simulate focus having ended up outside the panel (e.g. left on the nav
+    // button after a view re-target) rather than driving the exact re-target
+    // sequence, which needs BottomNav wiring this unit doesn't own.
+    openerBtn.focus();
+    expect(document.activeElement).toBe(openerBtn);
+
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Tab" });
+
+    const panel = document.getElementById("hamburger-panel");
+    expect(panel?.contains(document.activeElement)).toBe(true);
+  });
+
+  test("Shift+Tab from outside the panel moves focus to the last focusable element", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    const openerBtn = screen.getByRole("button", { name: /Open menu/i });
+    await user.click(openerBtn);
+    await waitFor(() => expect(screen.getByRole("menu")).toBeDefined());
+
+    openerBtn.focus();
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Tab", shiftKey: true });
+
+    const panel = document.getElementById("hamburger-panel")!;
+    const focusable = panel.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    expect(document.activeElement).toBe(focusable[focusable.length - 1]);
   });
 });

@@ -147,15 +147,25 @@ vi.stubGlobal("turnstile", mockTurnstile);
 vi.stubGlobal("fetch", vi.fn());
 
 describe("SuggestForm SNAP/WIC fieldset legend", () => {
+  // SuggestForm reads locale via useLocale() (#289), not a prop — wrap it in
+  // a LocaleProvider to exercise the same EN/ES cases the old `locale` prop did.
   test("EN: fieldset legend has non-empty text content", () => {
-    const { container } = render(<SuggestForm locale="en" />);
+    const { container } = render(
+      <LocaleProvider initialLocale="en">
+        <SuggestForm />
+      </LocaleProvider>,
+    );
     const legend = container.querySelector("fieldset legend");
     expect(legend).not.toBeNull();
     expect((legend!.textContent ?? "").trim().length).toBeGreaterThan(0);
   });
 
   test("ES: fieldset legend has non-empty text content in Spanish", () => {
-    const { container } = render(<SuggestForm locale="es" />);
+    const { container } = render(
+      <LocaleProvider initialLocale="es">
+        <SuggestForm />
+      </LocaleProvider>,
+    );
     const legend = container.querySelector("fieldset legend");
     expect(legend).not.toBeNull();
     const text = (legend!.textContent ?? "").trim();
@@ -165,7 +175,11 @@ describe("SuggestForm SNAP/WIC fieldset legend", () => {
   });
 
   test("EN: fieldset legend uses i18n key 'suggest.benefits.legend'", () => {
-    const { container } = render(<SuggestForm locale="en" />);
+    const { container } = render(
+      <LocaleProvider initialLocale="en">
+        <SuggestForm />
+      </LocaleProvider>,
+    );
     const legend = container.querySelector("fieldset legend");
     expect((legend!.textContent ?? "").trim()).toBe(t("suggest.benefits.legend", "en"));
   });

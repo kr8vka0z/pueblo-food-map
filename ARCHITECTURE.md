@@ -28,9 +28,12 @@ Browser
         ├── BottomSheet.tsx  (mobile: vaul v2 bottom sheet)
         ├── DesktopVenueWindow.tsx  (desktop: marker-anchored detail panel)
         ├── SearchBar / SearchResultsPopover / CategoryDropdown
-        ├── LocateButton     (geolocate + drift / re-center)
-        ├── HamburgerMenu    (saved places, help links, language, view toggle)
-        └── ListView         (full-screen nearest-first list, map mode off)
+        │     (SearchBar also hosts the Map/List view toggle, #191)
+        ├── HamburgerMenu    (the drawer: saved places, links, language;
+        │     controlled — opened by BottomNav at a section)
+        ├── ListView         (full-screen nearest-first list, map mode off)
+        └── BottomNav        (Near me · Saved · Resources · Menu — bar below 2xl (1536px),
+              pill floating bottom-centre at 2xl+; docs/bottom-nav-spec.md)
 
 Shared utility components
   └── src/components/SiteFooter.tsx  (slim nav footer on utility pages: /about, /privacy, /suggest, /feedback)
@@ -39,6 +42,8 @@ Next.js App Router (Cloudflare Worker, SSR)
   └── src/app/layout.tsx      (reads pfm-locale cookie; wraps with LocaleProvider)
   └── src/app/page.tsx        (splash gate; mounts MapWrapper)
   └── src/app/about/page.tsx  (mission, vision, origin story, venue sourcing — #155)
+  └── src/app/resources/page.tsx  (food help programs: 2-1-1, SNAP, WIC, Double Up,
+        hotline, Everyday Eats — what each is and how to get it; BottomNav's Resources item)
   └── src/app/report/[venueId]/page.tsx + submit/route.ts
   └── src/app/suggest/page.tsx + submit/route.ts
   └── src/app/feedback/page.tsx + submit/route.ts
@@ -261,11 +266,10 @@ Key state atoms and their roles:
 | `activeCategoryFilter` | `VenueCategory \| null` | Single-select from category dropdown; syncs into `selectedCategories` and triggers autozoom |
 | `filterOpenNow / filterSnap / filterWic / filterFavorites` | `boolean` | Boolean filter toggles |
 | `isDrifted` | `boolean` | True when user-location dot has left the visible viewport — shows "Re-center" button |
-| `isLocating` | `boolean` | True while a geo request is in-flight — shows spinner in LocateButton |
+| `isLocating` | `boolean` | True while a geo request is in-flight — shows spinner on BottomNav's "Near me" |
 | `bannerVisible` | `boolean` | Location-denied banner after an active re-tap |
 | `outsideCountyVisible` | `boolean` | Toast when resolved position is outside Pueblo County |
 | `isPopoverOpen / activeIndex` | `boolean / number` | Typeahead popover ARIA state |
-| `sheetFullyExpanded` | `boolean` | Bottom sheet snap; hides SponsorCredit when true |
 | `windowExpanded` | `boolean` | Desktop venue window expanded state |
 | `mapboxMap` | `mapboxgl.Map \| null` | Map instance; received via `onMapReady` callback from Map.tsx |
 | `walkingRoute` | `WalkingRouteGeoJSON \| null` | Active walking route GeoJSON (Mapbox Directions API) — passed to Map.tsx as a prop |
@@ -285,7 +289,7 @@ Key state atoms and their roles:
 ```
 Walk tapped, userLocation === null
   → handleWalkRoute stashes venue.id in walkAwaitingVenueIdRef
-  → calls handleLocateRequest()   (same geo.request() flow the locate button uses)
+  → calls handleLocateRequest()   (same geo.request() flow "Near me" uses)
   → resume effect watches geo.state, applies decideWalkResume(awaitingVenueId, selectedVenueId, geo.state):
       granted + position     → fetchWalkingRoute(venue, position)   — draws the real route
       denied / unavailable   → setWalkLocationHintVenueId(venue.id) — "share your location" hint, no route
@@ -306,7 +310,8 @@ Walk tapped, userLocation === null
 **Geolocation flow:**
 
 ```
-User taps LocateButton
+User taps "Near me" (BottomNav)
+  → handleNearMe() switches to map view if in list view, then
   → handleLocateRequest()
     → stamps userRequestedAtRef
     → increments recenterRequestId  (Map.tsx flyTo fires even if position unchanged)
@@ -867,7 +872,7 @@ stale non-zero summary right after a publish that already succeeded.
 
 **Why sage, not orange, for the Publish button.** DESIGN.md scopes
 brand-orange to exactly two elements, both on the *public* map (the splash
-CTA, the LocateButton pill), with an explicit Don't against reuse
+CTA, and formerly the LocateButton pill), with an explicit Don't against reuse
 elsewhere — extending it to a third, admin-only context would break that
 rule. Filled sage-500/sage-600-hover is already this admin surface's
 established primary-action treatment (`AddVenueForm`'s submit button,

@@ -13,7 +13,9 @@ const IDENTICAL_ALLOWLIST = new Set([
   "search.shortcut",
   "menu.title",
   "menu.language",
-  "menu.help.doubleup",
+  "resources.211.name",
+  "resources.wic.name",
+  "resources.doubleup.name",
   "suggest.fallback",
   "feedback.fallback",
   "report.fallback",
@@ -31,7 +33,7 @@ const IDENTICAL_ALLOWLIST = new Set([
 
 /** Keys that must differ between EN and ES. */
 const MUST_DIFFER = [
-  "menu.about",
+  "menu.sponsoredBy",
   "form.turnstile.verifying",
   "form.turnstile.error",
   "splash.dialogLabel",

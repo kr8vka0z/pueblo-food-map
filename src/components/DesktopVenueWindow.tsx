@@ -38,6 +38,7 @@ import { MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import { safeUrl } from "@/lib/safeUrl";
+import { BOTTOM_NAV_HEIGHT_PX } from "@/components/BottomNav";
 import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 
 /**
@@ -56,7 +57,7 @@ interface MapboxMap {
   off: (event: string, fn: () => void) => MapboxMap;
 }
 import type { Venue } from "@/types/venue";
-import { categoryColors, categoryLabels } from "@/data/venues";
+import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
@@ -209,11 +210,20 @@ export default function DesktopVenueWindow({
       // Use the card's actual rendered size so anchoring tracks the
       // content-hugged height (#121); fall back to design constants pre-layout.
       const el = windowRef.current;
+      // Subtract the bottom nav's footprint so the window's bottom-edge clip
+      // check (review item 7a) treats that space as already occupied — the
+      // nav sits ABOVE the map's own bottom edge at every breakpoint this
+      // component renders at (desktop, >=768px), and BOTTOM_NAV_HEIGHT_PX
+      // (76) happens to equal both shapes it takes there: below 2xl it's the
+      // bar itself; at 2xl+ it's the floating pill's 24px offset + 52px
+      // height. Without this, a window anchored near the bottom of a short
+      // viewport could render partly behind the nav.
+      const clippedContainerH = container.offsetHeight - BOTTOM_NAV_HEIGHT_PX;
       const pos = computeWindowPosition(
         pt.x,
         pt.y,
         container.offsetWidth,
-        container.offsetHeight,
+        clippedContainerH,
         el?.offsetWidth || windowW,
         el?.offsetHeight || windowH,
       );
@@ -301,7 +311,7 @@ export default function DesktopVenueWindow({
           style={{ backgroundColor: categoryColors[venue.category] }}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" aria-hidden />
-          {categoryLabels[venue.category]}
+          {t(`category.full.${venue.category}`, locale)}
         </span>
         {venue.accepts_snap && (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
@@ -382,7 +392,7 @@ export default function DesktopVenueWindow({
         style={{ backgroundColor: categoryColors[venue.category] }}
       >
         <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" aria-hidden />
-        {categoryLabels[venue.category]}
+        {t(`category.full.${venue.category}`, locale)}
       </span>
 
       {/* Address — guard: never render "Address not in OpenStreetMap" placeholder */}

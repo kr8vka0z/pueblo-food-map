@@ -23,6 +23,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ReportForm from "@/components/ReportForm";
+import { LocaleProvider } from "@/lib/LocaleContext";
 import {
   expectTurnstileError,
   getSubmitButtonName,
@@ -71,14 +72,17 @@ afterEach(() => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// ReportForm reads locale via useLocale() (#289), not a prop — wrap it in a
+// LocaleProvider to exercise the same EN/ES cases the old `locale` prop did.
 function renderForm(locale: "en" | "es" = "en") {
   return render(
-    <ReportForm
-      venueId="garden-rmser"
-      venueName="RMSER Community Garden"
-      venueAddress="330 Lake Ave, Pueblo, CO 81004"
-      locale={locale}
-    />,
+    <LocaleProvider initialLocale={locale}>
+      <ReportForm
+        venueId="garden-rmser"
+        venueName="RMSER Community Garden"
+        venueAddress="330 Lake Ave, Pueblo, CO 81004"
+      />
+    </LocaleProvider>,
   );
 }
 

@@ -88,16 +88,31 @@ export default function HomePageClient() {
     // which flags synchronous setState in effect bodies. The queueMicrotask
     // ensures we're in the microtask queue, not the synchronous effect body.
     queueMicrotask(() => {
-      const venueParam = new URLSearchParams(window.location.search).get('venue');
-      // Also read #venue=<id> fragment: used by /venue/[id] "View on the map" CTA
-      // so the fragment bypasses the /?venue= → /venue/<id> middleware redirect.
+      const params = new URLSearchParams(window.location.search);
+      const venueParam = params.get('venue');
+      // "Near me" in the bottom nav on a Menu page (PageNav) links to /?near=1:
+      // open the map and locate, as the splash's "Find food near me" does.
+      const nearParam = params.get('near') === '1';
+      if (nearParam) {
+        setViewport('located');
+        // Strip it so a refresh doesn't locate again.
+        params.delete('near');
+        const qs = params.toString();
+        window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+      }
+      // Also read #venue=<id> fragment: used by /venue/[id]'s "View on the map"
+      // CTA. There's no /?venue= → /venue/<id> redirect to bypass (next.config.ts
+      // removed it — a `has`-query redirect on "/" 500'd on OpenNext/Cloudflare,
+      // see that file's 2026-06-20 hotfix note); PageNav's saved-venue links use
+      // the plain query form instead, and both land here and are read client-side.
       const hashParam = window.location.hash.startsWith('#venue=')
         ? window.location.hash.slice('#venue='.length)
         : null;
       const resolvedId = venueParam ?? hashParam;
       setInitialVenueId(resolvedId);
       // A shared venue link (either form) goes straight to the pin — skip the splash.
-      setSplashShown(resolvedId ? false : !readGate());
+      // Near me comes from inside the app, so the splash was already seen.
+      setSplashShown(resolvedId || nearParam ? false : !readGate());
     });
   }, []);
 

@@ -169,7 +169,7 @@ A pre-existing design sidecar (`docs/pueblo-food-map-v2-handoff.md`) documents p
 
 **Sage is the primary interactive color.** Every link, focus ring, active filter chip, selected marker ring, and interactive affordance uses sage — NOT blue. `sage-600` (#2C5F4F) is the primary color, used for the "Show details" toggle text, operator links on hover, and the Plentiful CTA hover state. `sage-500` (#4A8466) is the focus ring and selected marker ring color. `sage-100` + `sage-700` form the SNAP/WIC benefit badge pairing (calm, not urgent).
 
-**Orange and navy are the brand colors** from Pueblo Food Project (`pueblofoodproject.org`). Orange (#F7943C) appears on exactly two things: the splash CTA buttons and the LocateButton pill. Navy (#190F3F) is the wordmark color and the text rendered on orange-background controls. These are the loudest, most declarative elements. Do not apply them to secondary actions, metadata, or hover states.
+**Orange and navy are the brand colors** from Pueblo Food Project (`pueblofoodproject.org`). Orange (#F7943C) appears on exactly one thing: the splash CTA buttons. (The orange LocateButton pill on the map was retired for the bottom nav's "Near me" item, docs/bottom-nav-spec.md §6.) Navy (#190F3F) is the wordmark color and the text rendered on orange-background controls. These are the loudest, most declarative elements. Do not apply them to secondary actions, metadata, or hover states.
 
 **Yellow (#FFD166)** is for support/classification badges only. It does not appear as a button, interactive state, or background fill.
 
@@ -200,11 +200,12 @@ Section headers in detail cards (hours, contact, about) are 10–11px uppercase 
 
 The spacing scale is a 4px base grid: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 px. Most inter-element gaps and component padding land on 16px or 24px.
 
-The Mapbox canvas fills the entire viewport — there is no persistent sidebar or navigation rail. Persistent chrome at default state:
-- Search bar: floating pill, full-width minus 16px margins mobile / 520px centered desktop, 44px tall mobile / 52px desktop
-- LocateButton: context-sensitive pill, center-bottom desktop / center-top mobile, hidden when user dot is on-screen
-- Wordmark: frosted pill, top-left, 44px minimum tap target
-- Category chips: scrollable single row below the search bar
+The Mapbox canvas fills the entire viewport — there is no persistent sidebar. Persistent chrome at default state:
+- Search bar: floating pill, full-width minus 16px margins mobile / 520px centered desktop, 44px tall mobile / 52px desktop, Map/List switch inside its right end
+- BottomNav (docs/bottom-nav-spec.md): Near me · Saved · Resources · Menu (Resources links to the `/resources` page; Saved opens the drawer showing only saved places — or a "No saved places yet" empty state — and Menu opens it showing the menu). Below `2xl` (1536px) a 64px floating `bone-50` pill, 12px in from the sides and 12px above the bottom, `bone-300` border, full radius — matching the search bar (icon above a 12px/700 label, `ink-500` / `brand-navy` when its panel is open); at `2xl`+ a white pill floating bottom-centre, 24px up
+- Mapbox credits: bottom-right, one row — compact "i" then the logo at 65×20 (the smallest size Mapbox's attribution guide lists) — lifted 8px above the pill below `2xl`
+- Sponsor credit: not on the map. "Sponsored by Pueblo Food Project" is a sage card at the top of the Menu drawer, linking to pueblofoodproject.org in a new tab (no splash credit since 2026-09-16)
+- PageNav (pages the Menu opens — About, Suggest, Feedback, Browse all venues, Food help programs): "← Back to map" at the top plus the same BottomNav as the map; Menu and Saved open the drawer over the page, Near me returns to the map locating (`/?near=1`), Resources is highlighted on its own page
 
 Together these occupy less than 10% of the 1440×900 desktop viewport at default state. When a venue is selected, the BottomSheet (mobile) or DesktopVenueWindow (desktop) appears — still leaving the bulk of the map exposed.
 
@@ -215,7 +216,7 @@ Body: `background: bone-50`, `color: ink-700`, `font: Public Sans`. No max-width
 Two shadow levels, both using warm ink-tinted rgba (not black):
 
 - `elevation-1` — subtle inner-border glow: `0 1px 2px rgba(26,24,23,0.04), 0 0 0 1px rgba(26,24,23,0.05)`. Used on the SearchBar. The 1px ring gives the floating pill definition against the bone background without a hard border.
-- `elevation-2` — raised card: `0 4px 12px rgba(26,24,23,0.06), 0 0 0 1px rgba(26,24,23,0.06)`. Used on the BottomSheet and LocateButton pill.
+- `elevation-2` — raised card: `0 4px 12px rgba(26,24,23,0.06), 0 0 0 1px rgba(26,24,23,0.06)`. Used on the BottomSheet.
 
 Map markers use CSS `filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25))` — not `box-shadow`. A filter drop-shadow follows the alpha shape of the Lucide MapPin SVG, not its bounding box, so the shadow traces the pin silhouette correctly.
 
@@ -225,13 +226,12 @@ The DesktopVenueWindow uses a heavier hand-written shadow `0 8px 32px rgba(0,0,0
 
 Easing: `--ease-out-circ` (`cubic-bezier(0.32, 0.72, 0, 1)`) is registered in `@theme` for spec compliance. Most transitions use standard `ease` at `duration-150ms` (color / filter changes on button hover/active).
 
-Three deliberate animations in the product:
+Two deliberate animations in the product:
 
 1. **`pfm-pulse`** (2s, ease-in-out, infinite) — the user-location dot breathes gently: scale 1 → 1.2, opacity 1 → 0.7. Communicates "live GPS" without demanding attention.
-2. **`locateButtonIn`** (200ms, ease-out) — the LocateButton slides up 8px from below on entry. A subtle arrival cue; not decorative.
-3. **Vaul drawer drag** — the BottomSheet uses vaul's native momentum physics for drag-to-dismiss. No custom easing needed.
+2. **Vaul drawer drag** — the BottomSheet uses vaul's native momentum physics for drag-to-dismiss. No custom easing needed.
 
-All animations collapse to `0.01ms !important` via the global `prefers-reduced-motion: reduce` block. No per-component reduced-motion guards are needed — the cascade handles it. `motion-safe:animate-[locateButtonIn_200ms_ease-out]` is the one explicit usage in code.
+All animations collapse to `0.01ms !important` via the global `prefers-reduced-motion: reduce` block. No per-component reduced-motion guards are needed — the cascade handles it.
 
 ## Map Chrome
 
@@ -245,7 +245,7 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 ## Components
 
-**ButtonPrimary** (splash CTA + LocateButton pill): `orange` bg, `navy` text, `radius-md`, `px-6 py-4` mobile / `px-6 py-5` desktop. Hover: `brightness-105`. Active: `brightness-95`. Focus: 2px orange offset outline. Use for exactly one primary action per screen context.
+**ButtonPrimary** (splash CTA): `orange` bg, `navy` text, `radius-md`, `px-6 py-4` mobile / `px-6 py-5` desktop. Hover: `brightness-105`. Active: `brightness-95`. Focus: 2px orange offset outline. Use for exactly one primary action per screen context.
 
 **TooltipChip** (marker hover popup): `bone-50` bg, 1px `sage-500` border, `radius-sm`, `px-2 py-1`, `pointer-events: none`, no popup arrow.
 
@@ -253,7 +253,9 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **SnapWicPill** (benefit indicator): `sage-100` bg, `sage-700` text, `rounded` (sm radius), `px-2 py-0.5 text-xs font-medium`. Calm, not urgent — sage reads "civic info," not "alert."
 
-**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. Lucide `Search` icon at `ink-400` (16px mobile / 18px desktop), left-inset. When a category filter is active, a `filterChip` (sage-100/sage-700/full radius) appears inside the bar left of the placeholder.
+**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. Lucide `Search` icon at `ink-400` (16px mobile / 18px desktop), left-inset. When a category filter is active, a `filterChip` (sage-100/sage-700/full radius) appears inside the bar left of the placeholder. The Map/List **ViewToggle** (see below) sits flush inside the bar's right end (#191) — full height, no border of its own, 1px in so the pill's own border wraps it (`right-px`); the input reserves a measured 93px for it on phones (icons only) and 161px from `md` up (words).
+
+**ViewToggle** (Map/List switch): `bone-100` bg, `rounded-full`, segmented two-button group — no border of its own; it reads as the search pill's own right end. Active side: `ink-700` fill, `bone-50` text. Inactive: `ink-500` text. One size now (SearchBar's flush instance, #191 — the bordered `sm`/`md` variants had no callers left once HamburgerMenu's own Map/List row was deleted with the bottom nav, and were removed). Icons only on phones (under `md`, 768px) and "Map / List" words from `md` up (Kyle, 2026-09-16) — the words go visually hidden (`sr-only`), so accessible names survive. This replaces the earlier words-at-every-width rule (docs/bottom-nav-spec.md §4 amendment). When the map cannot mount, the Map side renders `disabled` at `ink-400`/60% opacity rather than accepting a tap that does nothing.
 
 **CategoryChip** (filter chip row): `bone-100` bg / `ink-700` text when unselected, with a 10px colored dot at left. Category accent bg / `bone-50` text when selected (dot hidden). `rounded-full`, `h-9 px-3 text-sm`. Scrollable row with `no-scrollbar` utility and a right-edge bone-50 fade mask.
 
@@ -263,7 +265,7 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **VenueMarker**: Lucide `MapPin` SVG filled with category accent color, `stroke: #FFFFFF`, `strokeWidth: 1.5`, `filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25))`. Default 28px / selected 36px. Selected state: an outer SVG `circle` with `sage-500` stroke (4px, no fill) wrapping the pin. Hover: `scale(1.15)` inline transform.
 
-**Wordmark (map-reset button mode)**: `bg-white/90 backdrop-blur-sm`, `radius-xl`, `px-3 py-2`, `min-h-[44px] min-w-[44px]`, `text-sm md:text-base`, absolute top-left of the map canvas at `z-index: 1000`. Focus ring: `sage-500`, 2px offset. Text: Fraunces + 0.04em tracking via `.wordmark` utility.
+**BottomNav**: see docs/bottom-nav-spec.md for geometry and stacking order (the fade band that spec once described was deleted with the bottom-nav rework — `.nav-fade-band` no longer exists in globals.css).
 
 ## Do's and Don'ts
 
@@ -281,7 +283,7 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 **Don't:**
 - Don't introduce cool or neutral grays anywhere. Bone and ink are warm-tinted; a neutral gray creates a visible temperature mismatch.
 - Don't use `catGrocery` (`#1F4E8C`) for links, buttons, or any interactive state. It is a data color reserved for the grocery category pin only — the only blue in the system.
-- Don't use orange for secondary actions, badges, hover states, or metadata. Orange is reserved for the splash CTAs and the LocateButton pill.
+- Don't use orange for secondary actions, badges, hover states, or metadata. Orange is reserved for the splash CTAs.
 - Don't use yellow (`#FFD166`) for anything other than support/classification badges.
 - Don't use Fraunces for body text, button labels, form inputs, or any running text at 16px or smaller. Its variable weight range is seductive, but it is a display serif built for headlines.
 - Don't add a sidebar. The v1 360px categories rail + 280px detail panel were removed in v2. A sidebar competes with the map for viewport space and violates the chrome budget.

@@ -17,7 +17,7 @@ const en: Record<string, string> = {
   "topbar.locale.es": "ES",
 
   // Search
-  "search.placeholder": "Search venues or address…",
+  "search.placeholder": "Search",
   "search.aria": "Search venues",
   "search.shortcut": "⌘K",
 
@@ -67,6 +67,9 @@ const en: Record<string, string> = {
   "detail.back": "Back",
   "detail.close": "Close",
   "detail.getDirections": "Get directions",
+  // "View on the map" CTA on /venue/[id] — was a hardcoded English string
+  // (pueblo-food-map#bilingual-static-pages) since that page never read locale.
+  "detail.viewOnMap": "View on the map",
   "detail.hours": "HOURS",
   "detail.contact": "CONTACT",
   "detail.about": "ABOUT",
@@ -119,7 +122,6 @@ const en: Record<string, string> = {
   "empty.showCategoryAria": "Show {label} venues",
 
   // Sponsor credit (#69)
-  "sponsor.text": "Sponsored by Pueblo Food Project",
 
   // Legend (#72)
   "legend.button_label": "Map legend",
@@ -158,27 +160,31 @@ const en: Record<string, string> = {
 
   // Location control (#108)
   "locate.locating": "Locating…",
-  "locate.recenter": "Re-center",
   "locate.outsideCounty": "Your location is outside Pueblo County",
+
+  // Bottom navigation bar (docs/bottom-nav-spec.md §11)
+  "nav.nearMe": "Near me",
+  "nav.saved": "Saved",
+  "nav.resources": "Resources",
+  "nav.menu": "Menu",
+  "nav.aria": "Main",
+  // PageNav's top "Back to map" bar (review item 7c) — distinct from BottomNav's
+  // "Main" landmark so a screen reader doesn't announce two navs both named "Main".
+  "nav.pageAria": "Page",
 
   // Saved places (#132)
   "menu.saved.heading": "Saved places",
+  "menu.saved.emptyTitle": "No saved places yet",
+  "menu.saved.emptyBody": "Tap the star on any place to save it. It will show up here.",
 
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Open menu",
   "menu.close": "Close menu",
   "menu.title": "Pueblo Food Map",
-  "menu.help.heading": "Get help",
-  "menu.help.211": "2-1-1 Colorado — find help",
-  "menu.help.snap": "Apply for SNAP",
-  "menu.help.wic": "Apply for WIC",
-  "menu.help.doubleup": "Double Up Food Bucks",
-  "menu.help.hotline": "Food hotline: 855-855-4626",
   "menu.suggest": "Suggest a venue",
-  "menu.about": "About Pueblo Food Project",
+  "menu.sponsoredBy": "Sponsored by",
   "menu.showWelcome": "Show welcome screen",
   "menu.language": "Language / Idioma",
-  "menu.view": "View",
 
   // Category browse dropdown (#95)
   "categoryBrowse.clearFilter": "Clear category filter",
@@ -378,7 +384,6 @@ const en: Record<string, string> = {
 
   // About page (#155) — DRAFT copy pending final text from Kyle / Pueblo Food Project
   "about.heading": "About Pueblo Food Map",
-  "about.backToMap": "Back to map",
   "about.mission.heading": "Our mission",
   "about.mission.body": "Pueblo Food Map puts every free and low-cost food resource in Pueblo County on one mobile-friendly map — so anyone, in any neighborhood, can find what they need in minutes.",
   "about.vision.heading": "Our vision",
@@ -430,6 +435,44 @@ const en: Record<string, string> = {
   "notfound.title": "Page not found",
   "notfound.body": "The page you are looking for doesn't exist or has been moved.",
   "notfound.backToMap": "Back to map",
+
+  // Resources page (/resources) — Kyle, 2026-09-16
+  "nav.resourcesPage": "Food help programs",
+  "resources.heading": "Food help programs",
+  "resources.intro": "These programs can help you pay for groceries or get free food. Asking costs nothing. Not sure where to start? Call the Food Resource Hotline — they can tell you what you may qualify for.",
+  "resources.goodFor": "What it's good for",
+  "resources.how": "How to get it",
+  "resources.checked": "Details checked with each program in September 2026. Hours and rules can change — call ahead if you can.",
+  "resources.action.website": "Website",
+  "resources.action.call": "Call {number}",
+  "resources.action.text": "Text {number}",
+  "resources.211.name": "2-1-1 Colorado",
+  "resources.211.what": "A free helpline that connects you with local health and human services, including food.",
+  "resources.211.goodFor": "Finding food pantries, community meals, home-delivered meals, and baby formula or baby food near you.",
+  "resources.211.how": "Dial 2-1-1 or (866) 760-6489, or text your ZIP code to 898-211. You can also search or chat on their website.",
+  "resources.snap.name": "SNAP (food stamps)",
+  "resources.snap.what": "Money for groceries every month, loaded onto an EBT card that works like a debit card.",
+  "resources.snap.goodFor": "Buying food at most grocery stores and some online stores. With Double Up Food Bucks, SNAP dollars go further on fruits and vegetables.",
+  "resources.snap.how": "Apply online with Colorado PEAK, or at a Pueblo County Human Services office: 405 W. 9th St., 320 W. 10th St., or 2641 E. 4th St. (7:30 a.m.–5 p.m.). Whether you qualify depends on your household size and income. You may need a short interview by phone or in person. The Food Resource Hotline can help you apply by phone.",
+  "resources.snap.apply": "Apply on PEAK",
+  "resources.wic.name": "WIC",
+  "resources.wic.what": "Healthy food, nutrition advice, and breastfeeding support (including pumps) for pregnant women, new moms, babies, and children under 5.",
+  "resources.wic.goodFor": "Families with young children. Dads, grandparents, foster parents and other caregivers can get WIC for a child under 5. You don't need to be a U.S. citizen.",
+  "resources.wic.how": "If you get Medicaid, SNAP or TANF, you already meet the income rule. Call the Pueblo WIC clinic (101 W. 9th St.; Monday–Thursday 8 a.m.–5 p.m., Friday 8 a.m.–4:30 p.m.), or fill out the online sign-up form and they'll contact you within 10 days.",
+  "resources.wic.signup": "Sign up online",
+  "resources.doubleup.name": "Double Up Food Bucks",
+  "resources.doubleup.what": "A match on fresh fruits and vegetables for people who use SNAP.",
+  "resources.doubleup.goodFor": "Getting twice the produce. When you use your EBT card at a participating store or farmers market, Double Up matches what you spend, dollar for dollar, up to $20 a day.",
+  "resources.doubleup.how": "If you have a Colorado EBT card, you're already in — there's nothing to apply for. Just use your card at a participating location.",
+  "resources.doubleup.find": "Find a location",
+  "resources.hotline.name": "Food Resource Hotline",
+  "resources.hotline.what": "A free, confidential phone line run by Hunger Free Colorado.",
+  "resources.hotline.goodFor": "Getting pointed in the right direction. They check which programs you may qualify for, help you apply for SNAP over the phone, and connect you with food pantries, free meals and WIC. They help everyone, no matter their immigration status.",
+  "resources.hotline.how": "Call 855-855-4626, Monday–Thursday 8:30 a.m.–4:30 p.m. or Friday 8 a.m.–noon. Help is available in more than 150 languages, including Spanish.",
+  "resources.everydayeats.name": "Everyday Eats (60 and older)",
+  "resources.everydayeats.what": "A free box of 22–25 basic foods every month from Pueblo County — things like milk, cheese, cereal, rice or pasta, and canned fruits, vegetables and protein.",
+  "resources.everydayeats.goodFor": "Adults 60 and older with limited income. Households of any age on SNAP, Medicaid, SSI and some other programs can also get emergency food (called TEFAP) the same way.",
+  "resources.everydayeats.how": "Text FOOD to 1-877-644-3663. You'll get a link to a short sign-up form. You'll renew every 6 months, and if you miss your box 3 months in a row you lose your spot.",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -449,7 +492,7 @@ const es: Record<string, string> = {
   "topbar.locale.es": "ES",
 
   // Search
-  "search.placeholder": "Buscar lugares o dirección…",
+  "search.placeholder": "Buscar",
   "search.aria": "Buscar lugares",
   "search.shortcut": "⌘K",
 
@@ -499,6 +542,7 @@ const es: Record<string, string> = {
   "detail.back": "Atrás",
   "detail.close": "Cerrar",
   "detail.getDirections": "Cómo llegar",
+  "detail.viewOnMap": "Ver en el mapa",
   "detail.hours": "HORARIO",
   "detail.contact": "CONTACTO",
   "detail.about": "ACERCA DE",
@@ -551,7 +595,6 @@ const es: Record<string, string> = {
   "empty.showCategoryAria": "Mostrar lugares de {label}",
 
   // Sponsor credit (#69)
-  "sponsor.text": "Patrocinado por Pueblo Food Project",
 
   // Legend (#72)
   "legend.button_label": "Leyenda del mapa",
@@ -590,27 +633,29 @@ const es: Record<string, string> = {
 
   // Location control (#108)
   "locate.locating": "Localizando…",
-  "locate.recenter": "Recentrar",
   "locate.outsideCounty": "Tu ubicación está fuera del condado de Pueblo",
+
+  // Bottom navigation bar (docs/bottom-nav-spec.md §11)
+  "nav.nearMe": "Cerca de mí",
+  "nav.saved": "Guardados",
+  "nav.resources": "Recursos",
+  "nav.menu": "Menú",
+  "nav.aria": "Principal",
+  "nav.pageAria": "Página",
 
   // Saved places (#132)
   "menu.saved.heading": "Lugares guardados",
+  "menu.saved.emptyTitle": "Todavía no tienes lugares guardados",
+  "menu.saved.emptyBody": "Toca la estrella en cualquier lugar para guardarlo. Aparecerá aquí.",
 
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Abrir menú",
   "menu.close": "Cerrar menú",
   "menu.title": "Pueblo Food Map",
-  "menu.help.heading": "Obtener ayuda",
-  "menu.help.211": "2-1-1 Colorado — buscar ayuda",
-  "menu.help.snap": "Solicitar SNAP",
-  "menu.help.wic": "Solicitar WIC",
-  "menu.help.doubleup": "Double Up Food Bucks",
-  "menu.help.hotline": "Línea de ayuda: 855-855-4626",
   "menu.suggest": "Sugerir un lugar",
-  "menu.about": "Acerca de Pueblo Food Project",
+  "menu.sponsoredBy": "Patrocinado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.language": "Language / Idioma",
-  "menu.view": "Vista",
 
   // Category browse dropdown (#95)
   "categoryBrowse.clearFilter": "Borrar filtro de categoría",
@@ -806,7 +851,6 @@ const es: Record<string, string> = {
 
   // About page (#155) — BORRADOR de texto pendiente aprobación de Kyle / Pueblo Food Project
   "about.heading": "Acerca de Pueblo Food Map",
-  "about.backToMap": "Volver al mapa",
   "about.mission.heading": "Nuestra misión",
   "about.mission.body": "Pueblo Food Map pone todos los recursos de alimentos gratuitos y de bajo costo del condado de Pueblo en un mapa fácil de usar en el celular, para que cualquier persona, en cualquier colonia, pueda encontrar lo que necesita en minutos.",
   "about.vision.heading": "Nuestra visión",
@@ -856,6 +900,44 @@ const es: Record<string, string> = {
   "notfound.title": "Página no encontrada",
   "notfound.body": "La página que buscas no existe o se ha movido.",
   "notfound.backToMap": "Volver al mapa",
+
+  // Resources page (/resources) — Kyle, 2026-09-16
+  "nav.resourcesPage": "Programas de ayuda alimentaria",
+  "resources.heading": "Programas de ayuda alimentaria",
+  "resources.intro": "Estos programas pueden ayudarte a pagar el mercado o conseguir comida gratis. Preguntar no cuesta nada. ¿No sabes por dónde empezar? Llama a la Línea de Recursos Alimentarios: te dirán para qué programas podrías calificar.",
+  "resources.goodFor": "Para qué sirve",
+  "resources.how": "Cómo obtenerlo",
+  "resources.checked": "Datos verificados con cada programa en septiembre de 2026. Los horarios y requisitos pueden cambiar; si puedes, llama antes de ir.",
+  "resources.action.website": "Sitio web",
+  "resources.action.call": "Llamar al {number}",
+  "resources.action.text": "Enviar mensaje al {number}",
+  "resources.211.name": "2-1-1 Colorado",
+  "resources.211.what": "Una línea de ayuda gratuita que te conecta con servicios locales de salud y servicios humanos, incluida la comida.",
+  "resources.211.goodFor": "Encontrar despensas de alimentos, comidas comunitarias, comidas a domicilio y fórmula o comida para bebé cerca de ti.",
+  "resources.211.how": "Marca 2-1-1 o (866) 760-6489, o envía tu código postal por mensaje de texto al 898-211. También puedes buscar o chatear en su sitio web.",
+  "resources.snap.name": "SNAP (cupones de alimentos)",
+  "resources.snap.what": "Dinero para comprar comida cada mes, cargado en una tarjeta EBT que funciona como una tarjeta de débito.",
+  "resources.snap.goodFor": "Comprar comida en la mayoría de los supermercados y en algunas tiendas en línea. Con Double Up Food Bucks, tus dólares de SNAP rinden más en frutas y verduras.",
+  "resources.snap.how": "Solicítalo en línea con Colorado PEAK o en una oficina de Servicios Humanos del Condado de Pueblo: 405 W. 9th St., 320 W. 10th St. o 2641 E. 4th St. (7:30 a. m.–5 p. m.). Calificar depende del tamaño de tu hogar y de tus ingresos. Es posible que necesites una entrevista corta por teléfono o en persona. La Línea de Recursos Alimentarios puede ayudarte a solicitarlo por teléfono.",
+  "resources.snap.apply": "Solicitar en PEAK",
+  "resources.wic.name": "WIC",
+  "resources.wic.what": "Comida saludable, consejos de nutrición y apoyo para la lactancia (incluidos extractores de leche) para mujeres embarazadas, mamás recientes, bebés y niños menores de 5 años.",
+  "resources.wic.goodFor": "Familias con niños pequeños. Papás, abuelos, padres de crianza y otras personas a cargo pueden obtener WIC para un niño menor de 5 años. No necesitas ser ciudadano de EE. UU.",
+  "resources.wic.how": "Si recibes Medicaid, SNAP o TANF, ya cumples con el requisito de ingresos. Llama a la clínica de WIC de Pueblo (101 W. 9th St.; lunes a jueves de 8 a. m. a 5 p. m., viernes de 8 a. m. a 4:30 p. m.) o llena el formulario de inscripción en línea y te contactarán en un plazo de 10 días.",
+  "resources.wic.signup": "Inscribirse en línea",
+  "resources.doubleup.name": "Double Up Food Bucks",
+  "resources.doubleup.what": "Una compensación en frutas y verduras frescas para quienes usan SNAP.",
+  "resources.doubleup.goodFor": "Llevarte el doble de frutas y verduras. Cuando usas tu tarjeta EBT en una tienda o mercado de agricultores participante, Double Up iguala lo que gastas, dólar por dólar, hasta $20 al día.",
+  "resources.doubleup.how": "Si tienes una tarjeta EBT de Colorado, ya estás inscrito: no hay que solicitar nada. Solo usa tu tarjeta en un lugar participante.",
+  "resources.doubleup.find": "Buscar un lugar",
+  "resources.hotline.name": "Línea de Recursos Alimentarios",
+  "resources.hotline.what": "Una línea telefónica gratuita y confidencial de Hunger Free Colorado.",
+  "resources.hotline.goodFor": "Orientarte. Revisan para qué programas podrías calificar, te ayudan a solicitar SNAP por teléfono y te conectan con despensas de alimentos, comidas gratuitas y WIC. Ayudan a todas las personas, sin importar su situación migratoria.",
+  "resources.hotline.how": "Llama al 855-855-4626, de lunes a jueves de 8:30 a. m. a 4:30 p. m. o los viernes de 8 a. m. a mediodía. Hay ayuda en más de 150 idiomas, incluido el español.",
+  "resources.everydayeats.name": "Everyday Eats (60 años o más)",
+  "resources.everydayeats.what": "Una caja gratuita con 22 a 25 alimentos básicos cada mes del Condado de Pueblo, como leche, queso, cereal, arroz o pasta, y frutas, verduras y proteína enlatadas.",
+  "resources.everydayeats.goodFor": "Adultos de 60 años o más con ingresos limitados. Los hogares de cualquier edad que reciben SNAP, Medicaid, SSI y algunos otros programas también pueden obtener comida de emergencia (llamada TEFAP) de la misma manera.",
+  "resources.everydayeats.how": "Envía FOOD por mensaje de texto al 1-877-644-3663. Recibirás un enlace a un formulario corto de inscripción. Hay que renovar cada 6 meses, y si no recoges tu caja 3 meses seguidos pierdes tu lugar.",
 };
 
 /** Substitute simple {key} placeholders. */

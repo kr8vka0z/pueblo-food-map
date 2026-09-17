@@ -7,8 +7,9 @@ import { LocaleProvider } from "@/lib/LocaleContext";
 import { venues } from "@/data/venues";
 
 const mockPush = vi.fn();
+const mockReplace = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
 }));
 
 // Mock WebGL as unavailable to simulate older / unsupported device
@@ -30,6 +31,7 @@ vi.mock("@/components/DesktopVenueWindow", () => ({
 
 beforeEach(() => {
   mockPush.mockClear();
+  mockReplace.mockClear();
   Object.defineProperty(navigator, "permissions", {
     value: { query: vi.fn().mockResolvedValue({ state: "prompt", onchange: null }) },
     configurable: true,
@@ -70,5 +72,22 @@ describe("MapWrapper WebGL fallback navigation (#285)", () => {
     await user.click(venueButton);
 
     expect(mockPush).toHaveBeenCalledWith(`/venue/${targetVenue.id}`);
+  });
+});
+
+describe("MapWrapper WebGL fallback deep link (review item 4 — #165 x #132)", () => {
+  test("?venue=<id> with the map unavailable replaces to /venue/[id] instead of selecting nothing", async () => {
+    const targetVenue = venues[0];
+    await act(async () => {
+      render(
+        <LocaleProvider>
+          <MapWrapper initialVenueId={targetVenue.id} />
+        </LocaleProvider>,
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.getByText(/map unavailable/i)).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith(`/venue/${encodeURIComponent(targetVenue.id)}`);
   });
 });

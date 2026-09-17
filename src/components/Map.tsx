@@ -28,7 +28,6 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import type { Venue } from "@/types/venue";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
-import { categoryLabels } from "@/data/venues";
 import VenueMarker from "@/components/VenueMarker";
 import type mapboxgl from "mapbox-gl";
 import {
@@ -369,6 +368,7 @@ export default function Map({
       mapStyle="mapbox://styles/mapbox/streets-v12"
       style={{ width: "100%", height: "100%" }}
       attributionControl={false}
+      logoPosition="bottom-right"
       onLoad={handleLoad}
       onMoveEnd={handleMoveEnd}
       maxBounds={PUEBLO_COUNTY_BBOX}
@@ -387,8 +387,9 @@ export default function Map({
         console.warn("[Map] Mapbox error:", e.error);
       }}
     >
-      {/* Attribution — bottom-left per spec §10.3; styled in globals.css */}
-      <AttributionControl position="bottom-left" compact={true} />
+      {/* Attribution + logo — bottom-right, one row, "i" left of the logo
+          (Kyle, 2026-09-16; spec §9). Styled in globals.css. */}
+      <AttributionControl position="bottom-right" compact={true} />
 
       {/* County mask — inverted fill + border line (#62).
           Rendered only after the boundary GeoJSON has loaded.
@@ -464,7 +465,7 @@ export default function Map({
           <div className="pfm-tooltip__content">
             <span className="pfm-tooltip__name">{hoveredVenue.name}</span>
             <span className="pfm-tooltip__category">
-              {categoryLabels[hoveredVenue.category]}
+              {t(`category.full.${hoveredVenue.category}`, locale)}
             </span>
           </div>
         </Popup>

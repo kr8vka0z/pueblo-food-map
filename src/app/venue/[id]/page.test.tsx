@@ -8,10 +8,14 @@
  * that each venue's description includes its own name + address, so no two
  * venues (even in the same category) ever produce the same string.
  *
- * Only `generateMetadata` is exercised here, not the default page export —
- * the default export calls `cookies()` (next/headers), which needs a real
- * request context this test environment doesn't provide. generateMetadata
- * itself never touches cookies, so it's safely testable in isolation.
+ * Only `generateMetadata` is exercised here, not the default page export.
+ * This comment previously (falsely) claimed the default export called
+ * cookies() — that read was removed in PR #351 (2026-08-24, see AGENTS.md
+ * "Discoverability / SEO"), and the current default export reads no dynamic
+ * API at all. Its visible rendering is covered separately by
+ * src/__tests__/VenueContent.test.tsx, which exercises the extracted client
+ * component directly (#289 bilingual-static-pages) — that's a cleaner seam
+ * than rendering this async Server Component's notFound()/JSX here.
  */
 
 import { describe, test, expect } from "vitest";

@@ -9,9 +9,9 @@
  * Layout (all viewports):
  *   <div relative h-full w-full>
  *     <Map />            — fills viewport
- *     <SearchBar />      — absolute top-center, z-index 1000
- *     <LocateButton />   — absolute top-right, z-index 1000
- *     {isMobile && <BottomSheet />}   — PR 5 will replace with vaul v2
+ *     <SearchBar />      — absolute top-center, z-index 1000 (Map/List switch inside)
+ *     {isMobile && <BottomSheet />}
+ *     <BottomNav />      — bar below 2xl, pill floating bottom-centre at 2xl+ (§3, §5); last in DOM
  *   </div>
  *
  * No sidebar. No category rail. No desktop split-pane.
@@ -31,12 +31,10 @@ import type { WalkingRouteGeoJSON, WalkingRouteInfo, WalkStep } from "@/componen
 import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
-import Wordmark from "./Wordmark";
-import LocateButton from "./LocateButton";
+import BottomNav, { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
 import CategoryDropdown from "./CategoryDropdown";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
-import SponsorCredit from "./SponsorCredit";
 import EmptySearchPopover from "./EmptySearchPopover";
 import SearchResultsPopover, {
   MAX_VISIBLE,
@@ -51,15 +49,16 @@ import { t } from "@/lib/i18n";
 import { venues as allVenues } from "@/data/venues";
 import type { Venue, VenueCategory } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
+import type { ViewMode } from "./ViewToggle";
 import ListView from "./ListView";
 import {
   PUEBLO_COUNTY_BBOX,
   PUEBLO_CENTER,
-  PUEBLO_DEFAULT_ZOOM,
 } from "@/data/pueblo-bbox";
 import { useMapFilters } from "@/lib/useMapFilters";
 import { useMapUI } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
+import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
 // dynamic import here in a Client Component as required by Next.js 16
@@ -160,30 +159,6 @@ const CATEGORY_LISTBOX_ID = "category-browse-listbox";
 // 'pueblo-center' → hardcoded Pueblo center (default).
 // PR 3 sets this when dismissing the splash. No other behaviour changes here.
 export type SplashViewport = 'located' | 'pueblo-center';
-
-// isMobile: true if viewport < 768px. Detected client-side only.
-// Initial state is false (SSR-safe); sync happens inside the effect via
-// the MediaQueryList.onchange path only, avoiding the cascading-render
-// lint rule. The initial `matches` sync runs via a one-shot "change"
-// dispatch substitute: we compare in the effect and only set when different.
-function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia("(max-width: 767px)");
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mql.addEventListener("change", handler);
-    // Sync the initial value without triggering cascading-render lint rule:
-    // we schedule it as a microtask so it runs after the effect commit phase.
-    const syncId = setTimeout(() => setIsMobile(mql.matches), 0);
-    return () => {
-      clearTimeout(syncId);
-      mql.removeEventListener("change", handler);
-    };
-  }, []);
-
-  return isMobile;
-}
 
 // ─── Walking route URL builder (pure, exported for unit tests) ───────────────
 
@@ -325,8 +300,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     showVenueOnMap,
     windowExpanded,
     setWindowExpanded,
-    sheetFullyExpanded,
-    setSheetFullyExpanded,
     mapboxMap,
     setMapboxMap,
   } = useMapUI();
@@ -373,11 +346,11 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   // ── Explicit recenter counter — incremented on each user-initiated locate tap ──
   // Map.tsx's flyTo effect depends on this value so the map re-centers every
-  // time the user taps LocateButton, not just on the first geolocation event. (#60)
+  // time the user taps "Near me", not just on the first geolocation event. (#60)
   const [recenterRequestId, setRecenterRequestId] = useState(0);
 
   // ── Locating state — true while a geo request is in flight (#108) ────────────
-  // Rendered by LocateButton as the "Locating…" spinner state.
+  // Rendered by BottomNav's "Near me" item as its spinner state.
   const [isLocating, setIsLocating] = useState(false);
   // geoRequestedAtRef: epoch ms of last in-flight locate request (ref, not state,
   // so the useEffect below doesn't depend on isLocating itself).
@@ -718,8 +691,20 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewport]);
 
-  // ── Mobile detection ─────────────────────────────────────────────────────────
-  const isMobile = useIsMobile();
+  // ── Breakpoints ──────────────────────────────────────────────────────────────
+  // isMobile (<768): BottomSheet instead of DesktopVenueWindow.
+  // isBelow2xl (<1536): the bottom nav is a bar covering the map's bottom edge.
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const isBelow2xl = useMediaQuery(BELOW_2XL_QUERY);
+
+  // ── Drawer (HamburgerMenu) — opened from BottomNav at a section (spec §7) ────
+  const [menuSection, setMenuSection] = useState<MenuSection | null>(null);
+  const navRef = useRef<HTMLElement | null>(null);
+  const handleNavSectionTap = useCallback((section: MenuSection) => {
+    // Tapping the open section's own item closes it; any other item re-targets.
+    setMenuSection((current) => (current === section ? null : section));
+  }, []);
+  const handleMenuClose = useCallback(() => setMenuSection(null), []);
 
   // ── Origin — user position or Pueblo center fallback ─────────────────────────
   const origin = userLocation ?? PUEBLO_CENTER;
@@ -776,28 +761,23 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapboxMap]);
 
-  // ── Wordmark reset handler (#61) ─────────────────────────────────────────────
-  // Recenters the map on Pueblo, clears selected venue, filters, and search.
-  // Does NOT re-show the splash screen (splash is a one-time onboarding gate).
-  // WHY PUEBLO_DEFAULT_ZOOM (not a literal): this is the SAME target Map.tsx's
-  // initialViewState uses for the fixed initial view (#231) — sharing the
-  // constant keeps a fresh load and a logo-click reset from ever drifting apart.
-  const handleWordmarkReset = useCallback(() => {
-    setSelectedVenueId(null);
-    handleClearAllFilters();
-
-    if (!mapboxMap) return;
-
-    const reducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (reducedMotion) {
-      mapboxMap.jumpTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: PUEBLO_DEFAULT_ZOOM });
-    } else {
-      mapboxMap.flyTo({ center: [PUEBLO_CENTER.lng, PUEBLO_CENTER.lat], zoom: PUEBLO_DEFAULT_ZOOM });
+  // mapUnavailable variant of the deep link above (review item 4): when the
+  // map can't mount, Map.tsx never renders, so mapboxMap stays null forever
+  // and the effect above never fires — a shared `/?venue=<id>` link silently
+  // selected nothing (PageNav's saved-venue links reuse this same query
+  // param). Route straight to the venue detail page instead, mirroring the
+  // mapUnavailable branches in handleSelect*/handleSelectSavedVenue below.
+  // Shares deepLinkDoneRef so whichever branch resolves first (map ready vs.
+  // map unavailable — mutually exclusive in practice) wins, never both.
+  useEffect(() => {
+    if (deepLinkDoneRef.current) return;
+    if (!mapUnavailable) return; // starts false; flips in a client effect (#165)
+    deepLinkDoneRef.current = true;
+    if (initialVenueId && allVenues.some((v) => v.id === initialVenueId)) {
+      router.replace(`/venue/${encodeURIComponent(initialVenueId)}`);
     }
-  }, [handleClearAllFilters, mapboxMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapUnavailable]);
 
   // ── Category autozoom (#111) ─────────────────────────────────────────────────
   // When a single category is activated from the dropdown, fit the map to all
@@ -836,6 +816,15 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    // The bottom nav covers the map's bottom edge — the bar below 2xl, the
+    // floating pill (24px up + 52px tall) at 2xl — so pad by it and fitted pins
+    // don't land underneath (docs/bottom-nav-spec.md §5, §10).
+    const basePadding = isMobile ? CATEGORY_FIT_PADDING_MOBILE : CATEGORY_FIT_PADDING_DESKTOP;
+    const fitPadding = {
+      ...basePadding,
+      bottom: basePadding.bottom + (isBelow2xl ? BOTTOM_NAV_HEIGHT_PX : 24 + 52),
+    };
+
     if (activeCategoryFilter === null) {
       // Skip unless a real category was active on the previous ready run —
       // `== null` catches both "map's first ready run" (undefined) and
@@ -850,7 +839,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       const allBounds = computeCategoryBounds(allVenues);
       if (!allBounds) return;
       mapboxMap.fitBounds(allBounds, {
-        padding: isMobile ? CATEGORY_FIT_PADDING_MOBILE : CATEGORY_FIT_PADDING_DESKTOP,
+        padding: fitPadding,
         maxZoom: CATEGORY_FIT_MAX_ZOOM,
         duration: reducedMotion ? 0 : 600,
       });
@@ -864,13 +853,13 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     if (!bounds) return;
 
     mapboxMap.fitBounds(bounds, {
-      padding: isMobile ? CATEGORY_FIT_PADDING_MOBILE : CATEGORY_FIT_PADDING_DESKTOP,
+      padding: fitPadding,
       maxZoom: CATEGORY_FIT_MAX_ZOOM,
       duration: reducedMotion ? 0 : 600,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategoryFilter, mapboxMap]);
-  // Note: `isMobile` intentionally excluded from deps — we want the padding that
+  // Note: `isMobile` / `isBelow2xl` intentionally excluded from deps — we want the padding that
   // was current at the time the category was selected, not re-zoom on resize.
   // `allVenues` is a module-level constant (stable ref); no dep needed.
 
@@ -1043,6 +1032,30 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
   }, []);
 
+  // WHY one shared handler: every path that switches views (the inline
+  // SearchBar control, #191, and "Near me" below) must honor the same
+  // mapUnavailable guard (selecting "map" while the map can't mount would show
+  // a blank screen, #165).
+  const handleViewModeChange = useCallback(
+    (mode: ViewMode) => {
+      if (mapUnavailable && mode === "map") return;
+      setViewMode(mode);
+    },
+    [mapUnavailable, setViewMode],
+  );
+
+  // "Near me" (docs/bottom-nav-spec.md §6). The bar persists in list view, but
+  // a fly-to-your-location is invisible there — so it returns to the map first
+  // (a no-op when the map can't mount; the location still re-sorts the list).
+  const handleNearMe = useCallback(() => {
+    handleViewModeChange("map");
+    handleLocateRequest();
+  }, [handleViewModeChange, handleLocateRequest]);
+
+  // §10: the venue sheet (phone only) covers the bottom edge; the nav steps
+  // aside while it is open at any detent.
+  const venueSheetOpen = isMobile && viewMode === "map" && selectedVenue !== null;
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -1103,16 +1116,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* Top-left cluster: Wordmark (#97; EN/ES toggle moved to hamburger menu #109).
-           z-index 1000; selfPositioned=false since this div owns placement.
-           top/left clear the notch/Dynamic Island and the landscape edge. */}
-      <div
-        className="absolute top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] flex items-center gap-2"
-        style={{ zIndex: 1000 }}
-      >
-        <Wordmark onClick={handleWordmarkReset} size="sm" selfPositioned={false} />
-      </div>
-
       {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67)
           filterChip shows the active category filter (#95). */}
       <SearchBar
@@ -1146,6 +1149,15 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
               }
             : undefined
         }
+        viewSwitch={{
+          mode: viewMode,
+          onChange: handleViewModeChange,
+          locale,
+          // Surface the guard instead of hiding it: handleViewModeChange
+          // silently ignores "map" while the map can't mount, which read as a
+          // dead button once #191 moved this control onto the main screen.
+          mapDisabled: mapUnavailable,
+        }}
       />
 
       {/* SearchResultsPopover — shown when query is non-empty AND has matches (#67).
@@ -1199,33 +1211,16 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* HamburgerMenu — top-right, above the control stack (#71).
-          When mapUnavailable, intercept onViewModeChange so selecting "map"
-          is a no-op — prevents the user from landing on a blank screen. */}
+      {/* HamburgerMenu — the drawer, opened by BottomNav at a section (#71, spec §7). */}
       <HamburgerMenu
         onShowWelcome={onShowWelcome}
         savedVenues={savedVenues}
         onSelectVenue={handleSelectSavedVenue}
-        viewMode={viewMode}
-        onViewModeChange={(mode) => {
-          // WHY: ignore "map" selection while unavailable — map mount is
-          // suppressed, so switching to map view would show a blank screen.
-          if (mapUnavailable && mode === "map") return;
-          setViewMode(mode);
-        }}
+        open={menuSection !== null}
+        onClose={handleMenuClose}
+        view={menuSection ?? "top"}
+        ignoreOutsideRef={navRef}
       />
-
-      {/* LocateButton — bottom-center, morphing control (#108). Map mode only (#129). */}
-      {viewMode === "map" && (
-        <LocateButton
-          geoState={geo.state}
-          isLocating={isLocating}
-          isDrifted={isDrifted}
-          onRequest={handleLocateRequest}
-          sheetVisible={isMobile}
-          sheetFullyExpanded={isMobile && sheetFullyExpanded}
-        />
-      )}
 
       {/* Outside-county message — appears when resolved position is beyond maxBounds (#108). Map mode only (#129). */}
       {viewMode === "map" && outsideCountyVisible && (
@@ -1234,7 +1229,28 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           aria-live="polite"
           style={{
             position: "absolute",
-            bottom: isMobile ? 88 + 12 + 52 : 24 + 52, // above locate button
+            // Below 2xl: lifted clear of the bottom nav bar AND the Mapbox
+            // credits row above it (globals.css's `@media (width < 96rem)`
+            // rule lifts that row the same way). Recomputed 2026-09-16 — the
+            // old "+ 52" dated from a taller credits control that no longer
+            // exists:
+            //   BOTTOM_NAV_HEIGHT_PX (76) — the nav bar itself
+            //   + 8                       — nav-to-credits gap (globals.css)
+            //   + 26                      — credits row height: the 20px
+            //                               logo/attrib control (globals.css
+            //                               `.mapboxgl-ctrl-logo`) plus its
+            //                               own 6px bottom margin
+            //                               (`.mapboxgl-ctrl-bottom-right
+            //                               .mapboxgl-ctrl`) — margins don't
+            //                               collapse in a flex row, so both
+            //                               count toward the row's height
+            //   + 12                      — clearance above the credits row
+            // 2xl: above the floating nav pill (24px up + 52px tall + 12px
+            // gap) — credits aren't lifted at 2xl (the pill sits centred,
+            // clear of the bottom-right corner), so this branch is unchanged.
+            bottom: isBelow2xl
+              ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 8px + 26px + 12px + env(safe-area-inset-bottom))`
+              : 24 + 52 + 12,
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 1001,
@@ -1272,21 +1288,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* SponsorCredit — bottom-right, hidden when BottomSheet is fully expanded (#69). Map mode only (#129). */}
-      {viewMode === "map" && (
-        <SponsorCredit hidden={isMobile && sheetFullyExpanded} />
-      )}
-
       {/* BottomSheet — mobile only (vaul v2, venue-centric API). Map mode only (#129). */}
       {isMobile && viewMode === "map" && (
         <BottomSheet
           key={selectedVenueId ?? "empty"}
           venue={selectedVenue}
-          onClose={() => {
-            setSelectedVenueId(null);
-            setSheetFullyExpanded(false);
-          }}
-          onExpandedChange={setSheetFullyExpanded}
+          onClose={() => setSelectedVenueId(null)}
           onWalkRoute={handleWalkRoute}
           isWalkRouteActive={
             selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
@@ -1339,6 +1346,21 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           showWalkLocationHint={
             selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
           }
+        />
+      )}
+
+      {/* BottomNav — LAST in DOM order so keyboard users reach the map and the
+          search first (spec §12). */}
+      {!venueSheetOpen && (
+        <BottomNav
+          locale={locale}
+          openSection={menuSection}
+          onSectionTap={handleNavSectionTap}
+          geoState={geo.state}
+          isLocating={isLocating}
+          isDrifted={isDrifted}
+          onNearMe={handleNearMe}
+          navRef={navRef}
         />
       )}
     </div>

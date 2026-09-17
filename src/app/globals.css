@@ -92,6 +92,13 @@
 
 :root {
   color-scheme: light;
+  /* Mirrors BottomNav.tsx's BOTTOM_NAV_HEIGHT_PX (76 = the 64px pill + 12px
+     gap below 2xl) for the plain-CSS rules that can't import a TS constant
+     (mobileTapTargets-style source tests keep the two in sync). Lives here,
+     not in the `@theme` block above — @theme tokens are mirrored to/gated
+     by DESIGN.md via `npm run design:drift`, and this is an internal layout
+     constant, not a design token. */
+  --bottom-nav-clearance: 76px;
 }
 
 body {
@@ -209,7 +216,7 @@ body {
    in the bottom centre, clear of the corner. */
 @media (width < 96rem) {
   .mapboxgl-map .mapboxgl-ctrl-bottom-right {
-    bottom: calc(76px + 8px + env(safe-area-inset-bottom));
+    bottom: calc(var(--bottom-nav-clearance) + 8px + env(safe-area-inset-bottom));
   }
 }
 

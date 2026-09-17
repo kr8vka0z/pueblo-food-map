@@ -37,7 +37,8 @@ import { venues } from "@/data/venues";
  * viewport, its content overflows, and the padding lands mid-page — the
  * footer ended up under the nav (measured on dev /about at 393×852).
  */
-export const PAGE_NAV_CLEARANCE = "shrink-0 pb-[calc(76px+env(safe-area-inset-bottom))] 2xl:pb-24";
+export const PAGE_NAV_CLEARANCE =
+  "shrink-0 pb-[calc(var(--bottom-nav-clearance)+env(safe-area-inset-bottom))] 2xl:pb-24";
 
 const NO_GEO = { permission: "prompt", position: null } as const;
 

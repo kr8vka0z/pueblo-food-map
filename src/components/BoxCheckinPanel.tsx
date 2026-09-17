@@ -43,7 +43,17 @@ interface BoxCheckinPanelProps {
   onCheckinSuccess: (result: { status: BoxStatus; lastFilledAt: string | null }) => void;
 }
 
-type SubmitState = "idle" | "submitting" | "success" | "error" | "rate_limited";
+type SubmitState =
+  | "idle"
+  | "submitting"
+  | "success"
+  | "error"
+  // Split 2026-09-17 (review correction) from one shared "rate_limited" —
+  // the route now returns two distinct error codes (rate_limit_visitor vs.
+  // rate_limit_box) so the copy can say WHOSE cap tripped instead of one
+  // message that misdirected blame either way.
+  | "rate_limited_visitor"
+  | "rate_limited_box";
 
 export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinPanelProps) {
   const { locale } = useLocale();
@@ -126,8 +136,10 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
         if (data.status) {
           onCheckinSuccess({ status: data.status, lastFilledAt: data.lastFilledAt ?? null });
         }
-      } else if (data.error === "rate_limit") {
-        setSubmitState("rate_limited");
+      } else if (data.error === "rate_limit_visitor") {
+        setSubmitState("rate_limited_visitor");
+      } else if (data.error === "rate_limit_box") {
+        setSubmitState("rate_limited_box");
       } else {
         setSubmitState("error");
       }
@@ -187,9 +199,14 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
           {t("box.checkin.error", locale)}
         </p>
       )}
-      {submitState === "rate_limited" && (
+      {submitState === "rate_limited_visitor" && (
         <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
-          {t("box.checkin.error.rateLimit", locale)}
+          {t("box.checkin.error.rateLimitVisitor", locale)}
+        </p>
+      )}
+      {submitState === "rate_limited_box" && (
+        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
+          {t("box.checkin.error.rateLimitBox", locale)}
         </p>
       )}
       {turnstileError && (

@@ -207,8 +207,8 @@ describe("BoxCheckinPanel — note kinds (filled/problem)", () => {
 });
 
 describe("BoxCheckinPanel — error states", () => {
-  test("rate_limit error shows an inline message, not the generic error", async () => {
-    mockError("rate_limit");
+  test("rate_limit_visitor error shows the device-scoped inline message, not the generic error", async () => {
+    mockError("rate_limit_visitor");
     const user = userEvent.setup();
     renderPanel();
     await waitFor(() => expect(screen.getByRole("button", { name: "I took something" })).not.toBeDisabled());
@@ -219,6 +219,20 @@ describe("BoxCheckinPanel — error states", () => {
       expect(screen.getByText(/Too many check-ins/i)).toBeDefined();
     });
     expect(screen.queryByText("That didn't go through. Please try again.")).toBeNull();
+  });
+
+  test("rate_limit_box error shows the box-scoped inline message, not the visitor one", async () => {
+    mockError("rate_limit_box");
+    const user = userEvent.setup();
+    renderPanel();
+    await waitFor(() => expect(screen.getByRole("button", { name: "I took something" })).not.toBeDisabled());
+
+    await user.click(screen.getByRole("button", { name: "I took something" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/unusual number of check-ins/i)).toBeDefined();
+    });
+    expect(screen.queryByText(/Too many check-ins from this device/i)).toBeNull();
   });
 
   test("a generic server error shows the fallback message", async () => {

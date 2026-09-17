@@ -48,8 +48,17 @@
 -- this slice — production is a later, explicit, Kyle-gated step, same
 -- convention as every migration since 0001 (see AGENTS.md "Blessing Boxes
 -- — promotion checklist").
+--
+-- IDEMPOTENCY — 2026-09-17 review correction: every CREATE below uses
+-- IF NOT EXISTS, so this file is genuinely safe to re-run against a
+-- database that already has these objects (unlike the earlier claim in
+-- this header, which asserted idempotency without it — wrangler's own
+-- migrations ledger already prevents this specific file from re-applying
+-- through the normal `d1 migrations apply` path, but IF NOT EXISTS makes
+-- the SQL itself true independent of that ledger, e.g. if ever run by hand
+-- via `d1 execute`).
 
-CREATE TABLE box_checkins (
+CREATE TABLE IF NOT EXISTS box_checkins (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   venue_id      TEXT NOT NULL,
   kind          TEXT NOT NULL CHECK (kind IN ('filled','took','low','empty','problem')),
@@ -64,12 +73,12 @@ CREATE TABLE box_checkins (
 -- one box, newest first" (both public reads and the admin panel) and "is
 -- this box's latest status-relevant signal still within 7 days" (same
 -- query, computed in application code from the same index).
-CREATE INDEX idx_box_checkins_venue_created ON box_checkins(venue_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_box_checkins_venue_created ON box_checkins(venue_id, created_at);
 
-CREATE TABLE box_checkin_rate_limit (
-  key     TEXT PRIMARY KEY,  -- HMAC(TURNSTILE_SECRET_KEY, "scope:id:hour-bucket") — see checkinRateLimit.ts
+CREATE TABLE IF NOT EXISTS box_checkin_rate_limit (
+  key     TEXT PRIMARY KEY,  -- HMAC(CHECKIN_RATE_LIMIT_SECRET, "scope:id:hour-bucket") — see checkinRateLimit.ts. A DEDICATED secret, not TURNSTILE_SECRET_KEY (2026-09-17 review) — rotating Turnstile for an unrelated reason must not reset every open rate-limit bucket.
   bucket  INTEGER NOT NULL,  -- the hour bucket this row belongs to, for the opportunistic sweep below
   count   INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE INDEX idx_box_checkin_rate_limit_bucket ON box_checkin_rate_limit(bucket);
+CREATE INDEX IF NOT EXISTS idx_box_checkin_rate_limit_bucket ON box_checkin_rate_limit(bucket);

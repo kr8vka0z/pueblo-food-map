@@ -228,6 +228,14 @@ op run --env-file=.env.local -- npm run dev
 > **Note:** `TURNSTILE_SECRET_KEY` is also required for local form testing — the submit routes throw
 > if it is missing (hardened in #160). Store it in 1Password and reference it the same way in
 > `.env.local`.
+>
+> **`CHECKIN_RATE_LIMIT_SECRET` (2026-09-17, Blessing Boxes slice 2) is required for the
+> check-in write path** — `POST /api/public/blessing-boxes/[id]/checkins` throws if it's missing.
+> A DEDICATED secret, not `TURNSTILE_SECRET_KEY`: rotating Turnstile for an unrelated reason must
+> not silently reset every open rate-limit bucket. Set the same way (`wrangler secret put
+> CHECKIN_RATE_LIMIT_SECRET`, 1Password reference in `.env.local`) — see
+> `src/lib/checkinRateLimit.ts`'s own header and the "Blessing boxes — promotion checklist" below
+> for the production requirement.
 
 ### Rotation procedure
 
@@ -2243,10 +2251,33 @@ latest visible `filled` → `stocked`; latest visible `low` → `low`; latest
 visible `empty` → `empty`; no visible status-setting check-in within the
 last **7 days** → `unknown`; `removed_on` set on the box's `blessing_boxes`
 row → `out_of_service` (wins over any check-in, including a fresh
-`filled`) — same admin-pause signal slice 1's Danger-zone archive already
-writes, reused rather than adding a second flag. `took` and `problem` never
-set status by themselves — they're excluded from the status-setting kind
-map entirely, not merely deprioritized. `computeLastFilledAt()` is a
+`filled`).
+
+**`out_of_service` is currently unreachable from the admin UI — 2026-09-17
+review correction to a false claim this section previously made.** It used
+to say `out_of_service` "reuses the same admin-pause signal slice 1's
+Danger-zone archive already writes." That was never true: the admin archive
+route (`Danger zone` on a venue's edit page) only ever sets
+`venues.status = 'archived'` — it never touches `blessing_boxes.removed_on`.
+And archiving doesn't degrade a box to a status at all: every live box query
+(`SELECT_LIVE_BOXES_SQL`/`SELECT_LIVE_BOX_BY_ID_SQL` in
+`src/lib/blessingBoxes.ts`) filters `v.status != 'archived'`, so an archived
+box's row is excluded before it ever reaches `computeBoxStatus()` — the pin
+disappears from the map and its `/box/<id>` page 404s, the same way any
+other archived venue does. **The only way a box currently reads
+`out_of_service` is `blessing_boxes.removed_on` being set directly**
+(hand-edited via `AddVenueForm`'s box fieldset, or by hand in D1) — **there
+is no admin "pause this box without archiving it" button yet.** That's a
+real gap, not a bug in what's built; a future slice would need to wire an
+admin control to `removed_on` if "paused but still visible on the map" is
+ever wanted. `took` and `problem` never set status by themselves — they're
+excluded from the status-setting kind map entirely, not merely
+deprioritized. **This is a deliberately chosen reading of the Build Plan's
+looser "no check-ins for 7 days" wording, not the only valid one** — see
+`computeBoxStatus()`'s own header comment in `src/lib/blessingBoxes.ts` for
+the full reasoning; flagged here so it's visible without opening that file,
+since it's a real deviation being reported to Kyle as shipped, not a bug.
+`computeLastFilledAt()` is a
 second, separate pure function (latest visible `filled`, **no 7-day
 window** — "last filled 3 weeks ago" should still say so, unlike the status
 badge which fades to Unknown). Both are exhaustively unit-tested in
@@ -2270,8 +2301,10 @@ for those three kinds.
 in-process limiter and not Better Auth's `rateLimit` table.**
 `src/lib/checkinRateLimit.ts`'s `checkAndIncrement()` is the whole
 mechanism: bucket the current time to the hour, HMAC-SHA256 (Web Crypto
-`crypto.subtle`, `SESSION_SECRET`/`TURNSTILE_SECRET_KEY`-style server
-secret) `${scope}:${id}:${bucket}` into a 64-hex-char key, then
+`crypto.subtle`, keyed off the dedicated `CHECKIN_RATE_LIMIT_SECRET` runtime
+secret — see "Secrets" below; **not** `TURNSTILE_SECRET_KEY`, 2026-09-17
+review correction, see that bullet) `${scope}:${id}:${bucket}` into a
+64-hex-char key, then
 `INSERT ... ON CONFLICT(key) DO UPDATE SET count = count + 1 RETURNING
 count` — one atomic upsert, no read-then-write race window. A stale-bucket
 sweep (`DELETE WHERE bucket < currentBucket - 2`) runs best-effort on every
@@ -2295,15 +2328,31 @@ load is not a rate limiter.
     later, and it's designed for one endpoint's auth flow, not per-box
     variable caps. A same-shaped-but-independent table costs one migration
     and keeps the two rate limiters from ever silently coupling.
-- **Two caps, both checked, both atomic:** per-box
-  (`scope: "box"`, `MAX_PER_BOX_PER_HOUR = 60`, catches an automated flood
-  against one box regardless of who) and per-visitor-per-box
-  (`scope: "visitor-box"`, `MAX_PER_VISITOR_PER_BOX_PER_HOUR = 6`, "a
-  handful of check-ins per box per hour from one visitor" per the task).
-  The per-visitor check only runs when a `clientToken` is present in the
-  request body — its absence (an old cached page, a blocked script) still
-  leaves the per-box cap standing, so no submission goes entirely
-  unlimited.
+- **Two caps, both checked, both atomic — visitor checked FIRST, then box
+  (2026-09-17 review correction; this used to run box-then-visitor):**
+  per-visitor-per-box (`scope: "visitor-box"`,
+  `MAX_PER_VISITOR_PER_BOX_PER_HOUR = 6`, "a handful of check-ins per box
+  per hour from one visitor" per the task) is checked and can reject a
+  request BEFORE the per-box counter (`scope: "box"`,
+  `MAX_PER_BOX_PER_HOUR = 300`, catches an automated flood against one box
+  regardless of who) is ever touched. Checking box-first used to mean a
+  single over-tapping visitor burned the SHARED box-wide quota on every one
+  of their own rejected attempts, which could lock out every other visitor
+  at that box — including the host trying to log "filled" — even though the
+  box itself never saw genuine high traffic. The per-visitor check only runs
+  when a `clientToken` is present in the request body — its absence (an old
+  cached page, a blocked script) still leaves the per-box cap standing, so
+  no submission goes entirely unlimited. **`MAX_PER_BOX_PER_HOUR` was raised
+  60 → 300 the same review pass**, because 60 shared across every visitor at
+  a box meant a real crowd at a distribution event — or even one
+  Turnstile-passing person tapping repeatedly — could lock out the whole
+  box for the rest of the hour; 300 still catches a scripted flood (which
+  blows past it in well under a minute) while comfortably covering up to 50
+  distinct visitors each maxing out their own per-visitor cap in one hour.
+  The two failure modes also now return distinct error codes
+  (`rate_limit_visitor` vs. `rate_limit_box`) so `BoxCheckinPanel.tsx` can
+  show copy that names which scope tripped, instead of one generic message
+  that misdirected blame either way.
 - **No IP ever persisted — a client token instead.**
   `src/lib/checkinClientToken.ts`'s `getCheckinClientToken()` mints a
   `crypto.randomUUID()` on first use and persists it in `localStorage`
@@ -2404,15 +2453,35 @@ contains — a promotion that lands before the production data catches up
 means the redirect target (`/box/<id>`) 404s (no row to read) and the box
 pin silently vanishes from the live map (its `venues` row still reads
 `category='pantry'` with no `blessing_boxes` row, so it's neither a public
-box nor findable at its old URL). A promotion landing before `0007` is
-applied means the check-in panel's POST 500s (no `box_checkins` table to
-insert into) and every box's status/last-filled reads are silently absent
-(`loadVisibleCheckins()`'s own D1-failure-degrades-to-empty convention
-masks this as "no check-ins yet" rather than a loud error, so don't assume
-a quiet box page means the migration ran). `0006` and `0007` are both
-idempotent and safe to run on any database in any order after `0005` —
-including production, where neither has ever been applied — so there is no
-reason to defer either once `dev` is ready to promote.
+box nor findable at its old URL). **A promotion landing after `0006` but before `0007` is applied is worse
+than "status absent" — 2026-09-17 review correction to a previous
+understatement here.** `loadVisibleCheckins()`/`loadVisibleCheckinsForVenues`
+have no try/catch of their own; the missing-table D1 error they throw
+propagates straight up through `loadLiveBoxes()`/`loadLiveBoxById()` to
+`loadBoxesBestEffort()` (`src/app/api/public/blessing-boxes/route.ts`) and
+`loadBox()` (`src/app/box/[id]/page.tsx`) — both of which catch it and
+degrade, but at the "give up on the whole box" level, not a per-box
+"status absent" level, because the exception fires before any individual
+box's row is ever mapped to a response. The observable result:
+**EVERY blessing-box pin disappears from the live map** (the list endpoint
+returns `[]`, not a partial list with missing statuses) **and every
+`/box/<id>` page 404s** (`loadBox()` returns `null` → `notFound()`) — not
+merely "quiet" or "no check-ins yet," but the whole feature going dark
+site-wide until `0007` lands. Whoever runs the promotion should treat a
+missing `0007` as a full outage of the feature, not a cosmetic gap.
+`0006` and `0007` are both idempotent (`0007` genuinely so as of this
+review pass — see its own migration-file header) and safe to run on any
+database in any order after `0005` — including production, where neither
+has ever been applied — so there is no reason to defer either once `dev` is
+ready to promote.
+
+**Also required before promoting: the `CHECKIN_RATE_LIMIT_SECRET` runtime
+secret must be set on the production Worker** (`wrangler secret put
+CHECKIN_RATE_LIMIT_SECRET`, same convention as `RESEND_API_KEY`/
+`TURNSTILE_SECRET_KEY` — see "Secrets" above and `.env.example`) —
+`src/app/api/public/blessing-boxes/[id]/checkins/route.ts` throws on every
+request if it's unset, so a promotion without it means every check-in
+(not just the rate-limit path) fails immediately in production.
 
 ---
 

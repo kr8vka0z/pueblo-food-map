@@ -129,9 +129,15 @@ const STATUS_SETTING_KIND: Readonly<Record<string, BoxStatus>> = {
  * ("does not change status by itself... feeds the stats" — Discovery §4),
  * and the diagram's own transition labels (FILLED / RUNNING LOW / EMPTY)
  * never mention 'took' or 'problem' at all — so a 'took' happening today
- * does not "renew" a status it never set. This is the more defensible of
- * two readings of the Build Plan's looser "no check-ins" phrasing; stated
- * here so a later slice doesn't silently pick the other one.
+ * does not "renew" a status it never set. **This is a DELIBERATELY CHOSEN
+ * reading, not the only valid one** — the Build Plan's own wording ("no
+ * check-ins for 7 days") is looser and could be read as ANY check-in of
+ * any kind resetting the clock, including 'took'/'problem'. Picked the
+ * stricter reading (only a status-setting kind renews the window) because
+ * it's the more defensible of the two against the diagram's own transition
+ * labels; stated here explicitly so a later slice doesn't silently assume
+ * the other reading, and so this stays visible as a known, reported
+ * deviation rather than an unexamined implementation detail.
  */
 export function computeBoxStatus(
   checkins: CheckinStatusInput[],
@@ -255,6 +261,20 @@ export const SELECT_LIVE_BOX_BY_ID_SQL = `
  * fieldset, so it's the one real signal available today that matches the
  * diagram's Out-of-service state. See computeBoxStatus()'s own header for
  * the full deferral note.
+ *
+ * ⚠ This is NOT wired to the "Remove from map" archive action, and never
+ * should be conflated with it — verified 2026-09-17 review: `POST
+ * /api/admin/venues/[id]/archive` only ever sets `venues.status='archived'`;
+ * it never touches `blessing_boxes.removed_on`. The two are separate,
+ * non-overlapping mechanisms: archiving a box removes it from
+ * SELECT_LIVE_BOXES_SQL/SELECT_LIVE_BOX_BY_ID_SQL entirely (both filter
+ * `v.status != 'archived'`), so an archived box disappears from the map and
+ * /box/<id> 404s — it never reaches this function or reads as
+ * "out_of_service" at all. The ONLY way a box reads "out_of_service" today
+ * is an admin hand-editing `removed_on` on the box's own edit fieldset
+ * while leaving the venue itself published/draft (not archived). There is
+ * still no admin "pause" button that flips this in one click — an admin
+ * edits the field directly, same as any other box detail.
  */
 export function mapRowToPublicBox(
   row: BoxJoinRow,
@@ -299,11 +319,20 @@ export function isBlessingBox(category: VenueCategory): category is "blessing_bo
 // migrations/0005 already applies to host_contact: a public read site
 // should never even fetch the private row, not just remember to drop it.
 
+// Every check-in query orders by `created_at DESC, id DESC` — id is the
+// autoincrement insert order, so this is a deterministic tiebreaker for two
+// rows sharing a millisecond timestamp (real on D1: created_at's precision
+// is ms, and a busy box can get two check-ins in the same ms). Without it,
+// which of the two "wins" computeBoxStatus()/computeLastFilledAt() (both of
+// which only compare `created_at` strings, never `id`) is left to SQLite's
+// unspecified tie order — id DESC pins it to "the one inserted last wins,"
+// matching what a human would expect "most recent" to mean.
+
 const SELECT_VISIBLE_CHECKINS_SQL = `
   SELECT venue_id, kind, visibility, created_at
   FROM box_checkins
   WHERE venue_id = ? AND visibility = 'visible' AND kind != 'problem'
-  ORDER BY created_at DESC
+  ORDER BY created_at DESC, id DESC
 `;
 
 /** One D1 IN(...) query for every box on the list endpoint, not N+1 — see loadLiveBoxes' own call site. */
@@ -313,7 +342,7 @@ function selectVisibleCheckinsForVenuesSql(count: number): string {
     SELECT venue_id, kind, visibility, created_at
     FROM box_checkins
     WHERE visibility = 'visible' AND kind != 'problem' AND venue_id IN (${placeholders})
-    ORDER BY created_at DESC
+    ORDER BY created_at DESC, id DESC
   `;
 }
 
@@ -373,7 +402,7 @@ const SELECT_ALL_CHECKINS_FOR_VENUE_SQL = `
   SELECT id, venue_id, kind, note, visibility, hidden_by, hidden_at, created_at
   FROM box_checkins
   WHERE venue_id = ?
-  ORDER BY created_at DESC
+  ORDER BY created_at DESC, id DESC
 `;
 
 /** Every check-in for ONE box — visible + hidden, including 'problem' — newest first. Feeds BoxCheckinsAdminPanel via the venue edit page's resolveBoxCheckins(). */

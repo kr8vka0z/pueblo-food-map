@@ -513,7 +513,12 @@ const en: Record<string, string> = {
   "box.checkin.success.empty": "Thanks for letting us know.",
   "box.checkin.success.problem": "Thanks — we've let the admin know.",
   "box.checkin.error": "That didn't go through. Please try again.",
-  "box.checkin.error.rateLimit": "Too many check-ins from this device right now. Please try again later.",
+  // Split 2026-09-17 (review correction) from one shared "rateLimit" key —
+  // a single message misdirected blame between "this device is over its
+  // own cap" and "this box is busy right now." See the checkins route's
+  // own header for the two distinct error codes these key off.
+  "box.checkin.error.rateLimitVisitor": "Too many check-ins from this device right now. Please try again later.",
+  "box.checkin.error.rateLimitBox": "This box is getting an unusual number of check-ins right now. Please try again later.",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -1019,7 +1024,8 @@ const es: Record<string, string> = {
   "box.checkin.success.empty": "Gracias por avisarnos.", // [CHECK]
   "box.checkin.success.problem": "Gracias — ya avisamos al administrador.", // [CHECK]
   "box.checkin.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
-  "box.checkin.error.rateLimit": "Demasiadas visitas desde este dispositivo por ahora. Por favor intenta más tarde.", // [CHECK]
+  "box.checkin.error.rateLimitVisitor": "Demasiadas visitas desde este dispositivo por ahora. Por favor intenta más tarde.", // [CHECK]
+  "box.checkin.error.rateLimitBox": "Esta caja está recibiendo un número inusual de visitas en este momento. Por favor intenta más tarde.", // [CHECK]
 };
 
 /** Substitute simple {key} placeholders. */

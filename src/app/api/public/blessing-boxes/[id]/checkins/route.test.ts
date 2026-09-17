@@ -94,6 +94,7 @@ describe("POST /api/public/blessing-boxes/[id]/checkins", () => {
     delete (globalThis as { caches?: unknown }).caches;
 
     process.env.TURNSTILE_SECRET_KEY = "test-secret";
+    process.env.CHECKIN_RATE_LIMIT_SECRET = "test-rate-limit-secret";
     process.env.RESEND_API_KEY = "test-resend-key";
 
     mockVerifyTurnstileToken.mockResolvedValue(true);
@@ -132,18 +133,38 @@ describe("POST /api/public/blessing-boxes/[id]/checkins", () => {
     expect(mockGetCloudflareContext).not.toHaveBeenCalled();
   });
 
-  test("box rate limit exceeded -> 429", async () => {
+  test("box rate limit exceeded (no clientToken, so only the box cap runs) -> 429 rate_limit_box", async () => {
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
-    mockCheckAndIncrement.mockResolvedValueOnce(false); // box cap fails first
+    mockCheckAndIncrement.mockResolvedValueOnce(false); // box cap fails (only check that runs)
     const res = await callPost({ kind: "took", turnstileToken: "t" });
     expect(res.status).toBe(429);
+    const data = await res.json();
+    expect(data.error).toBe("rate_limit_box");
   });
 
-  test("per-visitor-per-box rate limit exceeded -> 429 (box cap passes, visitor cap fails)", async () => {
+  test("per-visitor-per-box rate limit exceeded -> 429 rate_limit_visitor, box counter never touched", async () => {
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
-    mockCheckAndIncrement.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    mockCheckAndIncrement.mockResolvedValueOnce(false); // visitor cap fails FIRST
     const res = await callPost({ kind: "took", turnstileToken: "t", clientToken: "abc-123" });
     expect(res.status).toBe(429);
+    const data = await res.json();
+    expect(data.error).toBe("rate_limit_visitor");
+    // 2026-09-17 review correction (item 1): the visitor check must run and
+    // reject BEFORE the box counter is ever touched, so an over-tapping
+    // visitor never burns the shared box-wide budget on their own rejected
+    // attempts.
+    expect(mockCheckAndIncrement).toHaveBeenCalledTimes(1);
+    expect(mockCheckAndIncrement.mock.calls[0][2]).toEqual({ scope: "visitor-box", id: "abc-123:" + BOX_ID });
+  });
+
+  test("clientToken present and under cap -> visitor check runs first, then box check", async () => {
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
+    mockCheckAndIncrement.mockResolvedValueOnce(true).mockResolvedValueOnce(true);
+    const res = await callPost({ kind: "took", turnstileToken: "t", clientToken: "abc-123" });
+    expect(res.status).toBe(200);
+    expect(mockCheckAndIncrement).toHaveBeenCalledTimes(2);
+    expect(mockCheckAndIncrement.mock.calls[0][2]).toEqual({ scope: "visitor-box", id: "abc-123:" + BOX_ID });
+    expect(mockCheckAndIncrement.mock.calls[1][2]).toEqual({ scope: "box", id: BOX_ID });
   });
 
   test("no clientToken -> only the box cap is checked, never a visitor cap", async () => {
@@ -151,6 +172,20 @@ describe("POST /api/public/blessing-boxes/[id]/checkins", () => {
     await callPost({ kind: "took", turnstileToken: "t" });
     expect(mockCheckAndIncrement).toHaveBeenCalledTimes(1);
     expect(mockCheckAndIncrement.mock.calls[0][2]).toEqual({ scope: "box", id: BOX_ID });
+  });
+
+  test("rate-limit checks use CHECKIN_RATE_LIMIT_SECRET, not TURNSTILE_SECRET_KEY", async () => {
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
+    await callPost({ kind: "took", turnstileToken: "t" });
+    expect(mockCheckAndIncrement.mock.calls[0][1]).toBe("test-rate-limit-secret");
+  });
+
+  test("CHECKIN_RATE_LIMIT_SECRET missing -> throws, never reaches D1", async () => {
+    delete process.env.CHECKIN_RATE_LIMIT_SECRET;
+    await expect(callPost({ kind: "took", turnstileToken: "t" })).rejects.toThrow(
+      "CHECKIN_RATE_LIMIT_SECRET not configured",
+    );
+    expect(mockGetCloudflareContext).not.toHaveBeenCalled();
   });
 
   test("invalid kind -> 422", async () => {

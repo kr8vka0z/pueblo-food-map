@@ -36,12 +36,23 @@
  * nothing here an attacker or a data export could ever tie to a person.
  *
  * WHY the key is HMAC'd rather than storing the box id / client token
- * directly: composing the row's key from TURNSTILE_SECRET_KEY means a
- * leaked D1 export shows only opaque hashes, never a raw client token or
- * box id an attacker could correlate across rows. Reuses the Turnstile
- * secret (already a runtime-only Worker secret this route requires anyway
- * for its own Turnstile check) rather than provisioning a brand-new secret
- * for one small hash.
+ * directly: composing the row's key from a server secret means a leaked D1
+ * export shows only opaque hashes, never a raw client token or box id an
+ * attacker could correlate across rows.
+ *
+ * WHY a DEDICATED `CHECKIN_RATE_LIMIT_SECRET` rather than reusing
+ * `TURNSTILE_SECRET_KEY` (2026-09-17 review correction — the original
+ * version of this file reused the Turnstile secret): rotating Turnstile
+ * for an unrelated reason (e.g. a routine credential rotation, or a
+ * Turnstile-specific incident) would silently reset every open rate-limit
+ * bucket the instant the new secret took effect — every HMAC key this
+ * table has ever written would stop matching, so every visitor's counter
+ * effectively zeroes out, defeating the cap for up to an hour with no
+ * error, no log line, nothing to notice. The two are independent security
+ * concerns (bot verification vs. write-frequency capping) with no reason
+ * to share a rotation lifecycle. Set as its own runtime secret the same
+ * way as RESEND_API_KEY/TURNSTILE_SECRET_KEY (see .env.example and
+ * AGENTS.md's Blessing Boxes slice 2 section).
  *
  * Atomicity: one `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` statement
  * per check — this is the load-bearing part. A read-then-write ("SELECT the

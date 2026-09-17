@@ -14,19 +14,40 @@
  * src/lib/checkinRateLimit.ts's own header for the full D1-shared-counter
  * reasoning. Two independent caps, both keyed off non-identifying values
  * (never an IP — see that file's header): MAX_PER_BOX_PER_HOUR guards the
- * whole box against a flood from anywhere, MAX_PER_VISITOR_PER_BOX_PER_HOUR
- * is the Build Plan's "a handful of check-ins per box per hour from one
- * visitor," keyed off a random client-generated token
- * (src/lib/checkinClientToken.ts) rather than an IP.
+ * whole box against an automated flood from anywhere, deliberately set well
+ * above any plausible honest-use ceiling (see that constant's own comment);
+ * MAX_PER_VISITOR_PER_BOX_PER_HOUR is the Build Plan's "a handful of
+ * check-ins per box per hour from one visitor," keyed off a random
+ * client-generated token (src/lib/checkinClientToken.ts) rather than an IP.
+ *
+ * WHY the visitor cap is checked BEFORE the box cap (2026-09-17 review
+ * correction — this used to run box-then-visitor): checking and
+ * incrementing the box counter FIRST meant a single over-tapping visitor —
+ * hammering the button past their own per-visitor limit — burned the
+ * SHARED box-wide budget on every one of their own rejected attempts, which
+ * could starve every OTHER visitor at that box (including the host trying
+ * to log "filled") even though the box itself never saw genuine high
+ * traffic. Checking the visitor cap first means a visitor who's over their
+ * own limit is rejected before touching the box's shared counter at all —
+ * the box counter only ever advances on an attempt that was going to be
+ * genuinely counted against the box either way.
+ *
+ * WHY two distinct rate-limit error codes ("rate_limit_visitor" vs.
+ * "rate_limit_box"), not one shared "rate_limit" (2026-09-17 review
+ * correction): a single generic message misdirected blame — a visitor over
+ * THEIR OWN cap was being told the box was busy (wrong scope, sounds like a
+ * problem with the box, not them), and vice versa. BoxCheckinPanel.tsx maps
+ * each to its own copy: "too many check-ins from this device" vs. "this box
+ * is getting an unusual number of check-ins right now."
  *
  * WHY 'problem' reports never touch the public read path: the INSERT below
  * is identical for every kind, but every public SELECT elsewhere in this
  * app (src/lib/blessingBoxes.ts) filters `kind != 'problem'` at the query —
  * this route's only 'problem'-specific behavior is emailing the admin
  * (mirrors report/submit's sendReportEmail shape) and never recomputing the
- * response's status/lastFilled/recentCheckins from a 'problem' row (it
- * cannot, structurally — computeBoxStatus/toPublicCheckinEvents both
- * exclude that kind by construction).
+ * response's status/lastFilled from a 'problem' row (it cannot,
+ * structurally — computeBoxStatus/computeLastFilledAt both exclude that
+ * kind by construction).
  *
  * Cache freshness: GET /api/public/blessing-boxes holds its response at the
  * Cloudflare edge for 60s via the Workers Cache API (that route's own
@@ -36,9 +57,11 @@
  * Account-scoped token this app doesn't use elsewhere, see AGENTS.md's
  * Cloudflare notes) — so the visitor who just checked in sees the change on
  * their own next fetch, and every colo is bounded at 60s regardless. The
- * response body ALSO carries the box's fresh status/lastFilledAt/
- * recentCheckins directly, so BoxContent's panel can update immediately
- * without waiting on any fetch at all — see BoxContent.tsx's own header.
+ * response body ALSO carries the box's fresh status/lastFilledAt directly
+ * (2026-09-17 review correction — this comment previously claimed a
+ * `recentCheckins` field that the response never actually returns), so
+ * BoxContent's panel can update immediately without waiting on any fetch at
+ * all — see BoxContent.tsx's own header.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -61,7 +84,21 @@ const CHECKIN_KINDS: readonly CheckinKind[] = ["filled", "took", "low", "empty",
 /** Only these two kinds may carry a note — matches the panel's own UI (BoxContent.tsx: "optional short note on filled and problem"). A note sent alongside any other kind is silently dropped, not rejected — harmless either way, and rejecting it would punish a client that sent extra data by mistake. */
 const KINDS_ALLOWING_NOTE: ReadonlySet<CheckinKind> = new Set(["filled", "problem"]);
 
-export const MAX_PER_BOX_PER_HOUR = 60;
+/**
+ * WHY 300, not 60 (2026-09-17 review correction — this was 60): 60/hour
+ * shared across every visitor at a box meant one Turnstile-passing person
+ * tapping repeatedly, or a real crowd at a distribution event, could lock
+ * out everyone else at that box for the rest of the hour — including the
+ * host trying to log "filled." This cap exists to catch an automated flood
+ * (an actual bot script fires dozens of requests in seconds, not spread
+ * over an hour), not to throttle a busy but honest day. At
+ * MAX_PER_VISITOR_PER_BOX_PER_HOUR below, 300/hour still only allows 50
+ * distinct visitors each going full-tilt on their own per-visitor cap, or
+ * 300 distinct single taps — comfortably past what a real neighborhood box
+ * plausibly sees from honest use in an hour, while a scripted flood still
+ * blows past 300 in well under a minute and gets caught.
+ */
+export const MAX_PER_BOX_PER_HOUR = 300;
 export const MAX_PER_VISITOR_PER_BOX_PER_HOUR = 6;
 
 interface CheckinPayload {
@@ -144,6 +181,14 @@ export async function POST(
   if (!turnstileSecret) {
     throw new Error("TURNSTILE_SECRET_KEY not configured");
   }
+  // Dedicated secret for rate-limit key derivation — deliberately NOT
+  // turnstileSecret (2026-09-17 review correction; see checkinRateLimit.ts's
+  // header for why sharing the two would let a Turnstile-only rotation
+  // silently reset every open rate-limit bucket).
+  const checkinRateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
+  if (!checkinRateLimitSecret) {
+    throw new Error("CHECKIN_RATE_LIMIT_SECRET not configured");
+  }
   const turnstileValid = await verifyTurnstileToken(body.turnstileToken, turnstileSecret, ip);
   if (!turnstileValid) {
     logFormFailure("checkin", "turnstile_failed");
@@ -161,25 +206,36 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
   }
 
-  const boxCap = await checkAndIncrement(db, turnstileSecret, { scope: "box", id: boxId }, MAX_PER_BOX_PER_HOUR);
-  if (!boxCap) {
-    return NextResponse.json({ ok: false, error: "rate_limit" }, { status: 429 });
-  }
-  // A missing/blocked clientToken (see checkinClientToken.ts) means no
-  // per-visitor cap can apply this request — the per-box cap above still
-  // bounds total abuse. This is a deliberate, stated trade, not an
-  // oversight (see checkinRateLimit.ts's header and this slice's PR body).
+  // Visitor cap FIRST, box cap second (2026-09-17 review correction — this
+  // used to run box-then-visitor). See this file's header "WHY the visitor
+  // cap is checked BEFORE the box cap" for the full reasoning: checking the
+  // box first let one over-tapping visitor burn the shared box-wide budget
+  // on their own rejected attempts. A missing/blocked clientToken (see
+  // checkinClientToken.ts) means no per-visitor cap can apply to this
+  // request — the box cap below still bounds total abuse either way. This
+  // is a deliberate, stated trade, not an oversight (see
+  // checkinRateLimit.ts's header and this slice's PR body).
   const clientToken = typeof body.clientToken === "string" ? body.clientToken.slice(0, 200) : null;
   if (clientToken) {
     const visitorCap = await checkAndIncrement(
       db,
-      turnstileSecret,
+      checkinRateLimitSecret,
       { scope: "visitor-box", id: `${clientToken}:${boxId}` },
       MAX_PER_VISITOR_PER_BOX_PER_HOUR,
     );
     if (!visitorCap) {
-      return NextResponse.json({ ok: false, error: "rate_limit" }, { status: 429 });
+      return NextResponse.json({ ok: false, error: "rate_limit_visitor" }, { status: 429 });
     }
+  }
+
+  const boxCap = await checkAndIncrement(
+    db,
+    checkinRateLimitSecret,
+    { scope: "box", id: boxId },
+    MAX_PER_BOX_PER_HOUR,
+  );
+  if (!boxCap) {
+    return NextResponse.json({ ok: false, error: "rate_limit_box" }, { status: 429 });
   }
 
   const kind = body.kind;

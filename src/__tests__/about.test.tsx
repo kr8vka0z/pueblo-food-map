@@ -106,7 +106,6 @@ const { en, es } = I18N_DICTIONARIES;
 describe("i18n — about.* keys", () => {
   const ABOUT_KEYS = [
     "about.heading",
-    "about.backToMap",
     "about.mission.heading",
     "about.mission.body",
     "about.howWeSource.heading",

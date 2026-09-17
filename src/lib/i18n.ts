@@ -384,7 +384,6 @@ const en: Record<string, string> = {
 
   // About page (#155) — DRAFT copy pending final text from Kyle / Pueblo Food Project
   "about.heading": "About Pueblo Food Map",
-  "about.backToMap": "Back to map",
   "about.mission.heading": "Our mission",
   "about.mission.body": "Pueblo Food Map puts every free and low-cost food resource in Pueblo County on one mobile-friendly map — so anyone, in any neighborhood, can find what they need in minutes.",
   "about.vision.heading": "Our vision",
@@ -852,7 +851,6 @@ const es: Record<string, string> = {
 
   // About page (#155) — BORRADOR de texto pendiente aprobación de Kyle / Pueblo Food Project
   "about.heading": "Acerca de Pueblo Food Map",
-  "about.backToMap": "Volver al mapa",
   "about.mission.heading": "Nuestra misión",
   "about.mission.body": "Pueblo Food Map pone todos los recursos de alimentos gratuitos y de bajo costo del condado de Pueblo en un mapa fácil de usar en el celular, para que cualquier persona, en cualquier colonia, pueda encontrar lo que necesita en minutos.",
   "about.vision.heading": "Nuestra visión",

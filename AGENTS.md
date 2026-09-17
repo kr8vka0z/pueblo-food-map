@@ -229,6 +229,16 @@ op run --env-file=.env.local -- npm run dev
 > if it is missing (hardened in #160). Store it in 1Password and reference it the same way in
 > `.env.local`.
 >
+> **The staging/dev Worker was missing `TURNSTILE_SECRET_KEY` entirely — fixed 2026-09-17.**
+> Every dev form (suggest a place, report closure, feedback, box check-ins) was silently failing
+> Turnstile verification on dev.pueblofoodmap.com because no secret had ever been set on that
+> Worker (production was never affected — it had its own key all along). Set via `wrangler secret
+> put TURNSTILE_SECRET_KEY` from `op://Atlas/Turnstile - Pueblo Food Map/credential`. **Dev
+> deliberately shares production's Turnstile SITE key** (the client-side `NEXT_PUBLIC_*` widget
+> key — Turnstile site keys are not URL-restricted the way the Mapbox public token is, so one site
+> key already covers both hostnames), which means the real SECRET key is required on dev too, not
+> a test/always-pass key — there is no dev-only Turnstile keypair in use here.
+>
 > **`CHECKIN_RATE_LIMIT_SECRET` (2026-09-17, Blessing Boxes slice 2) is required for the
 > check-in write path** — `POST /api/public/blessing-boxes/[id]/checkins` throws if it's missing.
 > A DEDICATED secret, not `TURNSTILE_SECRET_KEY`: rotating Turnstile for an unrelated reason must
@@ -2440,10 +2450,12 @@ an activity-log page, and closest-box — per the task's own explicit
 exclusion list. No photo column was added to `box_checkins`, left for
 slice 5.
 
-**Blessing boxes — promotion checklist.** Run ALL THREE migrations —
+**Blessing boxes — promotion checklist.** Run ALL FOUR migrations —
 `0005_blessing_boxes.sql` (schema), `0006_convert_routt_blessing_box.sql`
-(the Routt data conversion), AND `0007_box_checkins.sql` (check-ins +
-rate-limit tables) — against the **production** D1
+(the Routt data conversion), `0007_box_checkins.sql` (check-ins +
+rate-limit tables), AND `0008_box_events.sql` (the activity-log lifecycle
+table, slice 3 — see "Blessing Boxes — activity log (slice 3)" below) —
+against the **production** D1
 (`pueblo-food-map-admin`) **BEFORE** promoting `dev` → `main`, not after.
 This is NOT optional cleanup: `next.config.ts`'s `/venue/<Routt-id>` →
 `/box/<Routt-id>` redirect and `publishVenues.ts`'s
@@ -2482,6 +2494,149 @@ CHECKIN_RATE_LIMIT_SECRET`, same convention as `RESEND_API_KEY`/
 `src/app/api/public/blessing-boxes/[id]/checkins/route.ts` throws on every
 request if it's unset, so a promotion without it means every check-in
 (not just the rate-limit path) fails immediately in production.
+
+---
+
+# Blessing Boxes — activity log (slice 3)
+
+Full design: `atlas-kb/projects/Pueblo Food Map/Blessing Boxes Build Plan.md`
+and `...Blessing Boxes Epic - Discovery.md` (stories D1-D3). This section
+covers what slice 3 (the activity log) actually shipped, on top of slice
+1's box identity and slice 2's check-ins/status work above.
+
+**`migrations/0008_box_events.sql`** adds one table, `box_events` — `id`
+(autoincrement PK), `venue_id`, `kind` (CHECK IN
+`'added'|'moved'|'renamed'|'paused'|'removed'`), `detail` (nullable free
+text, e.g. `"Old Name → New Name"`), `created_at`. Two indexes:
+`(venue_id, created_at)` for the per-box embed (below) and `(created_at)`
+alone for the global feed's cross-venue ordering. Applied to **staging and
+local dev only, 2026-09-17** — same "production is a later, explicit,
+Kyle-gated step" convention as 0005-0007 (see the updated promotion
+checklist above, now covering four migrations through 0008).
+
+**Unlike a missing `0007`, a missing `0008` degrades gracefully, not a full
+outage.** `box_events` is read only by `boxActivity.ts`'s UNION ALL query
+(below), and that read path is already wrapped in the SAME best-effort
+try/catch `blessing-boxes/route.ts` established for the box list
+(`loadActivityBestEffort()`) — a missing table degrades the activity page
+and the per-box embed to their empty states, not a 404 or a blank map. The
+box list/detail endpoints slice 2's checklist warns about are untouched by
+this slice.
+
+**Events are written from the existing admin mutation routes, riding the
+SAME atomic `db.batch()` as the venue write + its `audit_log` row — never a
+separate write.** `src/lib/boxEvents.ts` is pure decision logic, no D1
+calls of its own:
+
+- `boxEventsForCreate()` — `POST /api/admin/venues`
+  (`src/app/api/admin/venues/route.ts`): a NEW blessing-box venue writes one
+  `added` event. A non-box create writes none.
+- `computeBoxEventWrites()` — `PATCH /api/admin/venues/[id]`
+  (`src/app/api/admin/venues/[id]/route.ts`): compares the row as it was
+  fetched pre-edit against the submitted fields and can emit
+  `renamed` (name changed), `moved` (address changed — both can fire on the
+  same edit), and `removed` (the box's `removed_on` field transitions from
+  unset to set). Becoming a box for the first time on an edit (was a plain
+  pantry, now `category='blessing_box'`) writes `added`, short-circuiting
+  the rename/move/removed comparisons entirely — there's no "old box state"
+  to diff against. **Leaving box-hood** (was a box, edited to a different
+  category) writes NOTHING — seeded here, see the paused/archive note
+  below.
+- **`paused` is defined in the CHECK constraint but never written by
+  anything in this slice** — reserved for a future "pause without
+  archiving" admin control (see slice 2's own note above: no such control
+  exists yet, `removed_on` is the only way a box currently reads
+  `out_of_service`). Listed in `ACTIVITY_KINDS`/the kind filter dropdown
+  now so that control can start writing it later with zero read-path
+  changes.
+- **Archiving a box (`POST /api/admin/venues/[id]/archive`) writes NO
+  event, and this is deliberate, not an oversight.** `boxActivity.ts`'s
+  read-side JOIN filters `v.status != 'archived'` on every row (a
+  self-defeat problem — visibility logic that says "hide anything on an
+  archived venue," the same JOIN condition slice 2's own live-box queries
+  already use). Writing a `removed`-shaped event at archive time would
+  therefore immediately become invisible to every reader the moment it's
+  written — the exact rows a "this box is gone" event exists to surface
+  would be the ones structurally excluded from ever showing it. The
+  `removed_on` field (slice 1/2, distinct from archiving) is the correct
+  and reachable "this box is out of service but still visible on the map"
+  signal, and IS covered by the `removed` event above. Symmetric case,
+  same reasoning: leaving box-hood via a category-changing edit also skips
+  the venue-JOIN filter the same way, so it also writes nothing.
+
+**Read path — `src/lib/boxActivity.ts`, a `UNION ALL` merge of
+`box_checkins` (slice 2) and `box_events` (this slice), not two separate
+queries and not a new dedicated table duplicating either.** Each half is
+independently filtered (checkins: `visibility='visible' AND kind !=
+'problem'` — a problem report is never public, same structural guarantee
+slice 2 already gives it — via the SQL, not just app code; events: no
+extra filter beyond the venue JOIN) and both are JOINed against `venues ON
+v.category = 'blessing_box' AND v.status != 'archived'`, so archived boxes
+and non-box venues can never surface here regardless of table. Ordered
+`ORDER BY created_at DESC, source DESC, row_id DESC` — the `source`/
+`row_id` tiebreakers make ordering fully deterministic even when two rows
+share the same timestamp (checkins and events are independent autoincrement
+sequences, so `id` alone can't interleave them). Filters: `venueId`, `kind`
+(any value from `ACTIVITY_KINDS`, spanning both checkin and event kinds —
+an unrecognized kind matches nothing rather than silently matching
+everything), `from`/`to` (UTC calendar-day boundaries — a
+`ponytail:` comment on the date-boundary helpers names the known Mountain
+Time skew this introduces near midnight as the accepted ceiling, with "read
+the filter's date range in the visitor's own timezone" as the upgrade
+path), and pagination (`page`/`pageSize`, default 25, fetches `pageSize+1`
+rows to compute `hasMore` without a second COUNT query).
+
+**Public route — `GET /api/public/blessing-boxes/activity`**
+(`src/app/api/public/blessing-boxes/activity/route.ts`) mirrors slice 1's
+list endpoint exactly: `getCloudflareContext()` direct D1 read (never
+`getAdminDb()` — this is a public route), 60s Cloudflare edge cache via the
+Workers Cache API, and a best-effort try/catch degrading to `{items: [],
+hasMore: false, page: 1}` on any D1 failure (missing table, outage, or
+otherwise) rather than a 500.
+
+**`/boxes/activity`** (`src/app/boxes/activity/page.tsx` +
+`BoxesActivityContent.tsx`) — the public global feed (Discovery D1/D2).
+Static English-metadata server shell wrapping a client component (same
+`buildPageMetadata` split every other page in "Discoverability / SEO"
+above uses) inside a `<Suspense>` boundary — required because the content
+component reads the initial `?box=<id>` query param via
+`useSearchParams()`. Filter controls (box, kind, from, to — real
+`<label htmlFor>` on every one, not placeholder-only) are plain local React
+state, **not synced back to the URL as they change** — a deliberate slice-3
+scope cut (see "Open questions for Kyle" below). Pagination is Prev/Next
+(not "Load more" — avoids needing an accumulated-items state) via
+`useBoxActivity.ts`, a client fetch hook mirroring `useBoxVenues.ts`'s
+established `useEffect`+`fetch`+`cancelled`-flag+empty-state-fallback
+shape.
+
+**Per-box embed (Discovery D3)** — `BoxContent.tsx` (slice 1/2) gained a
+"Recent activity" section below the check-in panel, reusing the exact same
+`BoxActivityList` rendering component the global feed uses
+(`showVenueName={false}` — the box's own name is already the page's `<h1>`,
+so the shared component substitutes "This box" instead of repeating it),
+filtered to `{ venueId: box.id, pageSize: 5 }`, with a "See full activity"
+link to `/boxes/activity?box=<id>` — the one URL param the global feed DOES
+read (once, on initial load only, per the scope cut above).
+
+**Nav entry.** `HamburgerMenu.tsx` gained one more top-menu item ("Box
+activity" / `nav.boxActivity`), linking to `/boxes/activity`, inserted
+between the existing "Browse all venues" and "Food help programs" items,
+same `HamburgerMenuItem` pattern as every other internal link in that list
+— judged mechanical (an ordinary list insertion, not a new layout or visual
+decision) rather than a design question needing Kyle's sign-off.
+
+**Deliberately NOT built in this slice** (out of the acceptance criteria,
+so a later slice doesn't assume otherwise): photos, adopt-a-box, alerts,
+stats/numbers, QR, closest-box, and D4's weekly summary digest — per the
+task's own explicit exclusion list.
+
+**Open questions for Kyle** (flagged in the PR body, not guessed at):
+whether the global feed's filters should round-trip into the URL (so a
+filtered view is shareable/bookmarkable) — this slice deliberately cut that
+to plain local state for a simpler build; and whether an admin "pause
+without archiving" control (writing `paused`, wiring `removed_on` outside
+an edit) is worth building now that the kind exists in the schema and the
+filter UI.
 
 ---
 

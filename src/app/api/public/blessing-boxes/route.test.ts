@@ -45,6 +45,8 @@ function makeBox(overrides: Partial<PublicBlessingBox> = {}): PublicBlessingBox 
       installedOn: "2026-01-15",
       removedOn: null,
       status: "unknown",
+      lastFilledAt: null,
+      recentCheckins: [],
     },
     ...overrides,
   };

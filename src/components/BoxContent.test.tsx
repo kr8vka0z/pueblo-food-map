@@ -31,6 +31,8 @@ function makeBox(overrides: Partial<PublicBlessingBox> = {}): PublicBlessingBox 
       installedOn: "2026-01-15",
       removedOn: null,
       status: "unknown",
+      lastFilledAt: null,
+      recentCheckins: [],
     },
     ...overrides,
   };
@@ -58,10 +60,34 @@ describe("BoxContent — locale", () => {
   });
 });
 
-describe("BoxContent — status placeholder", () => {
-  test("always shows the 'Unknown' status placeholder text, never a computed value", () => {
+describe("BoxContent — status + last filled (slice 2)", () => {
+  test("shows 'Unknown' when the box prop carries no signal", () => {
     render(<BoxContent box={makeBox()} />);
     expect(screen.getByText(t("box.status.unknown", "en"), { exact: false })).toBeDefined();
+  });
+
+  test("renders the real computed status the box prop carries", () => {
+    const box = makeBox({ box: { ...makeBox().box, status: "empty" } });
+    render(<BoxContent box={box} />);
+    expect(screen.getByTestId("box-status-badge").textContent).toContain(t("box.status.empty", "en"));
+  });
+
+  test("shows 'not marked filled yet' when lastFilledAt is null", () => {
+    render(<BoxContent box={makeBox()} />);
+    expect(screen.getByText(t("box.lastFilled.never", "en"))).toBeDefined();
+  });
+
+  test("shows a relative 'last filled' time when lastFilledAt is set", () => {
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    const box = makeBox({ box: { ...makeBox().box, lastFilledAt: threeHoursAgo } });
+    render(<BoxContent box={box} />);
+    expect(screen.getByText(/Last filled 3 hours ago/)).toBeDefined();
+  });
+
+  test("renders the check-in panel with all five buttons", () => {
+    render(<BoxContent box={makeBox()} />);
+    expect(screen.getByText(t("box.checkin.heading", "en"))).toBeDefined();
+    expect(screen.getByRole("button", { name: "I took something" })).toBeDefined();
   });
 });
 

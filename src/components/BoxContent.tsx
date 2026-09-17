@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * BoxContent — visible body of /box/[id] (Blessing Boxes slice 1).
+ * BoxContent — visible body of /box/[id] (Blessing Boxes slice 1, extended
+ * in slice 2 with real computed status + the check-in panel).
  *
  * Mirrors VenueContent.tsx's shape (nav bar, header, action links) for
  * visual consistency with the rest of the site, but reads the
@@ -11,19 +12,39 @@
  * itself was extracted from page.tsx: the page stays free of useLocale()
  * (#289's pattern) so generateMetadata/the server page never reads a
  * dynamic API by way of this component.
+ *
+ * SLICE 2 — status/lastFilledAt are lifted into local state, seeded from
+ * the server-rendered `box` prop, so BoxCheckinPanel's onCheckinSuccess can
+ * update the badge and "last filled" line the instant a check-in succeeds —
+ * no refetch, no page reload, no dependency on the list endpoint's 60s edge
+ * cache (see BoxCheckinPanel.tsx / the checkins route's own headers).
  */
 
+import { useState } from "react";
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
-import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+import { formatRelativeTime } from "@/lib/relativeTime";
+import BoxCheckinPanel from "@/components/BoxCheckinPanel";
+import type { BoxStatus, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 interface BoxContentProps {
   box: PublicBlessingBox;
 }
 
+/** Semantic-token color pairing per status — success/warning/danger are DESIGN.md's general status tokens, not admin-only (see AGENTS.md's own note on --color-danger, which is about ONE admin button's rationale, not a restriction on this token's normal error/status use elsewhere). Unknown/out_of_service intentionally reuse the same muted neutral treatment slice 1 already used for the placeholder — neither is an alarming state. */
+const STATUS_BADGE_CLASS: Record<BoxStatus, string> = {
+  stocked: "bg-[var(--color-success)]/10 text-[var(--color-success)]",
+  low: "bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
+  empty: "bg-[var(--color-danger)]/10 text-[var(--color-danger)]",
+  unknown: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
+  out_of_service: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
+};
+
 export default function BoxContent({ box }: BoxContentProps) {
   const { locale } = useLocale();
+  const [status, setStatus] = useState<BoxStatus>(box.box.status);
+  const [lastFilledAt, setLastFilledAt] = useState<string | null>(box.box.lastFilledAt);
 
   const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${box.lat},${box.lng}`;
 
@@ -59,10 +80,18 @@ export default function BoxContent({ box }: BoxContentProps) {
           <p className="mt-1 text-sm text-[var(--color-ink-500)]">{box.address}</p>
         </header>
 
-        {/* Status — always the slice-1 placeholder, never computed */}
-        <div>
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-bone-100)] text-[var(--color-ink-500)]">
-            {t("box.status", locale)}: {t(`box.status.${box.box.status}`, locale)}
+        {/* Status — computed from check-ins (slice 2); lifted into local state so a successful check-in updates this instantly. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            data-testid="box-status-badge"
+            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE_CLASS[status]}`}
+          >
+            {t("box.status", locale)}: {t(`box.status.${status}`, locale)}
+          </span>
+          <span className="text-xs text-[var(--color-ink-400)]">
+            {lastFilledAt
+              ? t("box.lastFilled", locale, { time: formatRelativeTime(lastFilledAt, locale) })
+              : t("box.lastFilled.never", locale)}
           </span>
         </div>
 
@@ -114,6 +143,15 @@ export default function BoxContent({ box }: BoxContentProps) {
             {t("detail.getDirections", locale)}
           </a>
         </div>
+
+        {/* Check-in panel (slice 2) */}
+        <BoxCheckinPanel
+          boxId={box.id}
+          onCheckinSuccess={({ status: newStatus, lastFilledAt: newLastFilledAt }) => {
+            setStatus(newStatus);
+            setLastFilledAt(newLastFilledAt);
+          }}
+        />
       </div>
     </main>
   );

@@ -1552,6 +1552,12 @@ Site-level SEO ships in two PRs. **This section covers PR1 (items 6.1 + 6.2).**
   entry also carries `lastModified: v.last_verified` — issue #164 quick win (S6) — a real,
   deterministic per-venue signal (unlike the static routes above, which have no equivalent
   per-page source and so still omit the field).
+- **`sitemap()` is `async` as of Blessing Boxes slice 1** — it also appends every live
+  `/box/<id>` route (`changeFrequency: "daily"`, `priority: 0.6`), read straight off D1 via
+  `loadLiveBoxes()` (src/lib/blessingBoxes.ts) since boxes skip the published-venues.ts
+  build-time snapshot entirely (see "Blessing Boxes — live box layer" below). The D1 read is
+  wrapped in its own try/catch (never the whole function) so `next build` still succeeds with
+  zero box entries — this file still never touches D1 at build time, only at request time.
 - **Venue description uniqueness** — `generateMetadata` in `src/app/venue/[id]/page.tsx` builds
   each venue's `<meta description>` from that venue's own name + address (not just its category),
   e.g. `"${name} — ${category} in Pueblo, CO. ${address}."` — issue #164 quick win (S4). Before
@@ -2087,6 +2093,127 @@ real string only on staging).
 pre-cutover Cloudflare Access era — they're dead (`cfAccess.ts` is
 CSRF-only now, reads neither), so leaving them set is harmless; deleting
 them is also safe.
+
+---
+
+# Blessing Boxes — live box layer (slice 1)
+
+Full design: `atlas-kb/projects/Pueblo Food Map/Blessing Boxes Build Plan.md`
+(8 phased slices) and `...Blessing Boxes Epic - Discovery.md`. This section
+covers what slice 1 (box identity) actually shipped.
+
+**Architecture call: boxes are live, not published.** Every other place on
+this map flows through the draft → publish → static-snapshot pipeline
+(`src/data/published-venues.ts`, "Publish → static" above) — a box
+deliberately skips it. An admin's box create/edit is visible on the public
+map and at `/box/<id>` immediately, with no Publish click, because
+`src/lib/blessingBoxes.ts`'s `loadLiveBoxes()`/`loadLiveBoxById()` read D1
+directly at request time. This exists so Kyle's dev-only practice boxes
+(below) can never leak onto the live map via an ordinary publish — there is
+no code path connecting the two.
+
+**`category: 'blessing_box'`** is a real 8th `VenueCategory` (was 7),
+fanned out the same way every other category is: `categoryLabels`/
+`categoryColors`/`categoryIcon` (src/data/venues.ts), `VenueMarker.tsx`'s
+own duplicate color map (see DESIGN.md's "Category colors" section, now an
+8-color palette, for why this is a 3-place duplication, not 1), `CategoryChips.tsx`
+/`CategoryDropdown.tsx`'s category lists, `searchVenues.ts`'s two
+category-keyed Records, `src/lib/i18n.ts` (EN+ES `category.*`/
+`category.full.*`/`splash.cat.*`/`suggest.category.*`/`marker.category.*`),
+and `adminVenueValidation.ts`'s enum. Pin color: `catBlessing` /
+`#C2447B` (raspberry) — DESIGN.md's frontmatter + `--color-cat-blessing` in
+`globals.css`, checked by `bun run design:drift`.
+
+**`migrations/0005_blessing_boxes.sql`** — a full `venues` table rebuild
+(SQLite has no `ALTER TABLE ... ALTER CONSTRAINT`; see the migration's own
+header for the verified-safe rebuild recipe) to widen the `category` CHECK,
+plus a new `blessing_boxes` table: `venue_id` TEXT PRIMARY KEY matching
+`venues.id` by convention (no declared FK, same as `change_proposals`),
+`host_name`/`host_note`/`most_needed`/`installed_on`/`removed_on` (all
+public), `host_contact` (**PRIVATE — never SELECTed by the public read
+endpoint or `/box/<id>`**, enforced by naming columns explicitly at every
+public read site, never `SELECT *`), and `qr_code_id` (reserved, unused
+until slice 8). **Applied to STAGING (`pueblo-food-map-admin-staging`) and
+local dev only, 2026-09-17 — production is a later, explicit, Kyle-gated
+step**, same convention as every other migration in this file.
+
+**Public read surface, both request-time, both best-effort (a D1 failure
+degrades to "no boxes" rather than a 500):**
+- `GET /api/public/blessing-boxes` — every non-archived box, `host_contact`
+  stripped, held at the Cloudflare edge ~60s via the Workers Cache API
+  (`caches.default` — a bare `Cache-Control` response header does nothing
+  on a Worker response; this repo had no prior Cache API example, built
+  fresh from Cloudflare's documented pattern). `useBoxVenues()`
+  (src/lib/useBoxVenues.ts) is the client hook that fetches this and feeds
+  the result into `useMapFilters`'s new optional `extraVenues` param
+  (`MapWrapper.tsx`) — boxes merge into the same count/filter/search/sort/
+  marker pipeline every other venue already flows through, with zero
+  category-specific branching needed there (see `useMapFilters.ts`'s own
+  WHY comment).
+- `/box/[id]` — a `force-dynamic` page (no `generateStaticParams` — there is
+  no fixed build-time id list, unlike `/venue/[id]`), rendering
+  `BoxContent.tsx`: name/address/host/most-needed/installed-since/
+  directions link, and an always-shown status line reading the slice-1
+  placeholder (`BOX_STATUS_PLACEHOLDER = "unknown"`, `src/lib/blessingBoxes.ts`
+  — check-ins/real status land in slice 2, never computed here). Box clicks
+  on the map route straight to this page (`router.push`) rather than
+  opening the ordinary `BottomSheet`/`DesktopVenueWindow` card — a
+  deliberate slice-1 scope call (those cards have no host/most-needed/
+  status fields to show meaningfully); 6 selection entry points in
+  `MapWrapper.tsx` each carry a one-line guard for this.
+
+**The one real box converted:** the Routt St venue
+(`plentiful-blessing-box-216-w-routt-plentiful-1454`, née a plain `pantry`
+sourced from Plentiful) is now `category='blessing_box'` on staging D1 —
+lat/lng/address/phone/url/notes untouched, still the real Plentiful data;
+its `blessing_boxes` row starts empty (no real host info known yet — an
+admin fills it in later). Its old `/venue/<id>` URL keeps working via a
+**plain path** `redirects()` entry in `next.config.ts` (NOT the `has`-query
+kind that 500'd production on 2026-06-20 — see that file's own header) to
+`/box/<id>`; `dynamicParams = false` means `/venue/[id]/page.tsx` itself
+can never run this redirect (a static route 404s an unknown id before any
+page code executes), so it has to live in `next.config.ts`. It was also
+removed by hand from `src/data/published-venues.ts` (that file is normally
+auto-generated by `POST /api/admin/publish` and never hand-edited — see
+"Publish → static" above — but a live publish is an outward,
+production-affecting action outside a dev-only slice's scope; the next real
+publish naturally re-excludes it forever via `fetchPublishSnapshot()`'s new
+`AND category != 'blessing_box'` filter).
+
+**The refresh pipeline never touches a box.** `excludeBlessingBoxes()`
+(scripts/refresh/diffEngine.ts) strips box rows from BOTH sides of every
+diff — existing D1 rows already `category='blessing_box'`, and any freshly
+scraped record sharing a box's id regardless of what category the SCRAPE
+itself assigns it (Plentiful's own site still lists Routt as a plain
+pantry; it has no idea we recategorized it) — called from
+`scripts/refresh-ingest.ts` right before `diffSource()`, once per source.
+
+**Admin:** `AddVenueForm.tsx`'s existing create/edit screens gained a
+conditional `<fieldset>` (rendered only when `category === 'blessing_box'`)
+for the 6 box-only fields, validated server-side by
+`adminVenueValidation.ts`'s `validateBoxFields()`. No new permission tier —
+every admin write, box or not, continues through the existing atomic
+`db.batch()` + `audit_log` path (`POST /api/admin/venues`,
+`PATCH /api/admin/venues/[id]`) — an edit's blessing_boxes row is
+delete-then-reinsert, but ONLY when the edit actually touches a box (still
+a box, or changing to/from one); an ordinary pantry/garden/etc. edit adds
+zero box statements to the batch.
+
+**Dev-only practice data — `scripts/seed-blessing-boxes.ts`.** Generates
+(never applies) two throwaway SQL files under the gitignored
+`scripts/generated/`: 4 obviously-fake boxes (`fake-blessing-box-practice-*`
+ids, "(TEST DATA)" in every name) for `seed-blessing-boxes.sql`, and the
+matching `DELETE`s for `remove-blessing-boxes.sql`. Apply either with
+`wrangler d1 execute pueblo-food-map-admin-staging --remote --file=...`
+(never against `pueblo-food-map-admin`, i.e. production) — see the script's
+own header for the exact commands. Both are currently seeded on staging
+alongside the real Routt box.
+
+**Deferred, not built in this slice** (out of the acceptance criteria,
+listed so a later slice doesn't assume otherwise): check-ins, a real
+computed status, photos, adopt-a-box, alerts, stats, QR stickers, an
+activity-log page, and a "Plentiful lists a box we don't have" detection —
+none of these fell out cheaply from `excludeBlessingBoxes()` alone.
 
 ---
 

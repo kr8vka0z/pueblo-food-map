@@ -1353,24 +1353,6 @@ export const publishedVenues: Venue[] = [
     "last_verified": "2026-09-15"
   },
   {
-    "id": "plentiful-blessing-box-216-w-routt-plentiful-1454",
-    "name": "Blessing Box - 216 W Routt",
-    "category": "pantry",
-    "lat": 38.25902,
-    "lng": -104.625612,
-    "address": "216 W Routt Ave, Pueblo, CO 81004",
-    "hours_weekly": {
-      "tue": [
-        "8:00 AM - 2:00 PM"
-      ]
-    },
-    "phone": "(800) 748-2074",
-    "url": "https://directory.plentiful.org/colorado/pueblo/blessing-box-216-w-routt-plentiful-1454",
-    "notes": "Blessing Box - 216 W Routt. in Pueblo, CO. Phone: (800) 748-2074.",
-    "source": "directory.plentiful.org/colorado/pueblo",
-    "last_verified": "2026-09-15"
-  },
-  {
     "id": "plentiful-care-and-share-food-bank-for-southern-colorado-main-location-4a362e63",
     "name": "Care and Share Food Bank for Southern Colorado - Main Location",
     "category": "pantry",

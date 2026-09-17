@@ -14,6 +14,7 @@ import {
   buildLinkHealthProposal,
   isValidIncomingRecord,
   currentFieldValue,
+  excludeBlessingBoxes,
   type CurrentVenueRow,
 } from "./diffEngine";
 
@@ -362,5 +363,45 @@ describe("currentFieldValue — hours_weekly stored as empty string", () => {
   test('"" normalizes to "" instead of throwing', () => {
     const before = { hours_weekly: "" } as unknown as CurrentVenueRow;
     expect(currentFieldValue(before, "hours_weekly")).toBe("");
+  });
+});
+
+// Blessing Boxes slice 1: a box must never generate a refresh-pipeline
+// proposal of any kind, on either side of the diff.
+describe("excludeBlessingBoxes", () => {
+  test("strips a blessing_box row from currentRows, and its incoming counterpart by id", () => {
+    const boxCurrent = row({ id: "the-box", category: "blessing_box", name: "216 W Routt" });
+    const otherCurrent = row({ id: "osm-node-1" });
+    // Plentiful's own site still lists this box under its OLD category —
+    // stripped anyway, purely by id, regardless of what category the scrape assigns.
+    const boxIncoming = venue({ id: "the-box", category: "pantry", name: "216 W Routt (Plentiful)" });
+    const otherIncoming = venue({ id: "osm-node-1" });
+
+    const result = excludeBlessingBoxes(
+      [boxCurrent, otherCurrent],
+      [boxIncoming, otherIncoming],
+    );
+
+    expect(result.currentRows).toEqual([otherCurrent]);
+    expect(result.incoming).toEqual([otherIncoming]);
+  });
+
+  test("no blessing_box rows present -> both sides pass through unchanged", () => {
+    const current = [row({ id: "a" }), row({ id: "b" })];
+    const incoming = [venue({ id: "a" }), venue({ id: "b" })];
+    const result = excludeBlessingBoxes(current, incoming);
+    expect(result.currentRows).toEqual(current);
+    expect(result.incoming).toEqual(incoming);
+  });
+
+  test("an incoming record with no matching current box row is left alone (not a box we know about)", () => {
+    const current = [row({ id: "the-box", category: "blessing_box" })];
+    const incoming = [venue({ id: "the-box" }), venue({ id: "unrelated" })];
+    const result = excludeBlessingBoxes(current, incoming);
+    expect(result.incoming.map((v) => v.id)).toEqual(["unrelated"]);
+  });
+
+  test("empty inputs -> empty outputs", () => {
+    expect(excludeBlessingBoxes([], [])).toEqual({ currentRows: [], incoming: [] });
   });
 });

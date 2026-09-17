@@ -62,6 +62,26 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Blessing Boxes slice 1: the one real box (216 W Routt) is being
+  // converted from a plain pantry to category='blessing_box' and dropped
+  // from published-venues.ts, so /venue/<its-id> would otherwise 404
+  // (that page is dynamicParams=false — see its own header on why a
+  // redirect inside the page component runs too late to help: the static
+  // layer 404s before any page code executes). A PLAIN path redirect (no
+  // `has` query-string matcher) — unlike the /?venue=<id> redirect removed
+  // 2026-06-20 above, which broke because of a `has` rule on `source: "/"`
+  // — is the ordinary, well-supported Next.js/OpenNext case, so this one is
+  // safe to add. permanent: true -> 308, matching "its old address must
+  // keep working" (a real, indefinite redirect, not a temporary one).
+  async redirects() {
+    return [
+      {
+        source: "/venue/plentiful-blessing-box-216-w-routt-plentiful-1454",
+        destination: "/box/plentiful-blessing-box-216-w-routt-plentiful-1454",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

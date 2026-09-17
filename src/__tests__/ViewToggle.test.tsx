@@ -2,6 +2,9 @@
  * ViewToggle tests (#129)
  *
  * Segmented Map|List control — aria-pressed state and onChange callback.
+ * sm/md size variants (#191) were removed 2026-09-16: SearchBar (the only
+ * caller left, since HamburgerMenu's own row was deleted with the bottom
+ * nav) always rendered the flush treatment, so the prop was collapsed away.
  */
 
 import { describe, test, expect, vi } from "vitest";
@@ -19,6 +22,13 @@ describe("ViewToggle — rendering", () => {
     render(<ViewToggle mode="map" onChange={vi.fn()} />);
     const group = screen.getByRole("group");
     expect(group.getAttribute("aria-label")).toBeTruthy();
+  });
+
+  test("fills its container's height and has no border of its own", () => {
+    render(<ViewToggle mode="map" onChange={vi.fn()} />);
+    const group = screen.getByRole("group");
+    expect(group.style.height).toBe("100%");
+    expect(group.className).not.toContain("border");
   });
 });
 
@@ -72,35 +82,10 @@ describe("ViewToggle — ES locale", () => {
   });
 });
 
-describe("ViewToggle — size variants (#191)", () => {
-  test('default (no size prop) renders the 28px "sm" group height', () => {
-    render(<ViewToggle mode="map" onChange={vi.fn()} />);
-    const group = screen.getByRole("group");
-    expect(group.style.height).toBe("28px");
-  });
-
-  test('size="sm" is explicitly 28px (unchanged HamburgerMenu treatment)', () => {
-    render(<ViewToggle mode="map" onChange={vi.fn()} size="sm" />);
-    const group = screen.getByRole("group");
-    expect(group.style.height).toBe("28px");
-  });
-
-  test(
-    'size="md" group height is 38px, not 36px — Preflight\'s border-box ' +
-      "sizing plus the group's 1px top+bottom border would otherwise shrink " +
-      "the h-full buttons inside to 34px, 2px under the 36px tap-target floor",
-    () => {
-      render(<ViewToggle mode="map" onChange={vi.fn()} size="md" />);
-      const group = screen.getByRole("group");
-      expect(group.style.height).toBe("38px");
-    },
-  );
-});
-
 describe("ViewToggle — mapDisabled (#191 follow-up)", () => {
   test("map button is disabled and does not fire onChange when mapDisabled", () => {
     const onChange = vi.fn();
-    render(<ViewToggle mode="list" onChange={onChange} size="md" mapDisabled />);
+    render(<ViewToggle mode="list" onChange={onChange} mapDisabled />);
     const mapBtn = screen.getByRole("button", { name: /^Map$/i });
     expect((mapBtn as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(mapBtn);
@@ -109,7 +94,7 @@ describe("ViewToggle — mapDisabled (#191 follow-up)", () => {
 
   test("list button stays usable while the map side is disabled", () => {
     const onChange = vi.fn();
-    render(<ViewToggle mode="list" onChange={onChange} size="md" mapDisabled />);
+    render(<ViewToggle mode="list" onChange={onChange} mapDisabled />);
     const listBtn = screen.getByRole("button", { name: /^List$/i });
     expect((listBtn as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(listBtn);
@@ -117,20 +102,20 @@ describe("ViewToggle — mapDisabled (#191 follow-up)", () => {
   });
 
   test("neither button is disabled by default", () => {
-    render(<ViewToggle mode="map" onChange={vi.fn()} size="md" />);
+    render(<ViewToggle mode="map" onChange={vi.fn()} />);
     for (const name of [/^Map$/i, /^List$/i]) {
       expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(false);
     }
   });
 });
 
-describe("ViewToggle — labels at size=md (docs/bottom-nav-spec.md §4.1, §4.3)", () => {
+describe("ViewToggle — labels (docs/bottom-nav-spec.md §4.1, §4.3)", () => {
   // WHY class names rather than computed styles: jsdom does not evaluate
   // Tailwind's generated CSS or media queries. The contract worth locking down
   // is which spans carry visual-hiding classes, and that label text always
   // stays in the accessibility tree.
   test("both labels render as visible text by default (§13 test 6 — the §4 regression guard)", () => {
-    const { container } = render(<ViewToggle mode="map" onChange={vi.fn()} size="md" />);
+    const { container } = render(<ViewToggle mode="map" onChange={vi.fn()} />);
     const spans = Array.from(container.querySelectorAll("span"));
     const mapSpan = spans.find((s) => s.textContent === "Map");
     const listSpan = spans.find((s) => s.textContent === "List");
@@ -143,7 +128,7 @@ describe("ViewToggle — labels at size=md (docs/bottom-nav-spec.md §4.1, §4.3
 
   test("collapseLabelsNarrow hides BOTH labels under 400px only, keeping accessible names", () => {
     const { container } = render(
-      <ViewToggle mode="map" onChange={vi.fn()} size="md" collapseLabelsNarrow />,
+      <ViewToggle mode="map" onChange={vi.fn()} collapseLabelsNarrow />,
     );
     const spans = Array.from(container.querySelectorAll("span"));
     expect(spans).toHaveLength(2);
@@ -152,14 +137,5 @@ describe("ViewToggle — labels at size=md (docs/bottom-nav-spec.md §4.1, §4.3
     }
     expect(screen.getByRole("button", { name: /^Map$/i })).toBeDefined();
     expect(screen.getByRole("button", { name: /^List$/i })).toBeDefined();
-  });
-});
-
-describe('size="flush" (Kyle, 2026-09-16) — part of the search pill', () => {
-  test("fills its container's height and drops its own border", () => {
-    render(<ViewToggle mode="map" onChange={vi.fn()} size="flush" />);
-    const group = screen.getByRole("group");
-    expect(group.style.height).toBe("100%");
-    expect(group.className).not.toContain("border");
   });
 });

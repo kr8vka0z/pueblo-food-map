@@ -263,10 +263,11 @@ export default function SearchBar({
             mirroring filterChip's left anchor. Flush (Kyle, 2026-09-16: "no
             gap… it just needs to look like a part of the search bar"): the
             switch fills the pill's right end, 1px in so the pill's own
-            border wraps it, with no border or inset of its own
-            (size="flush") — its buttons are 42px tall on mobile, 50px on
-            desktop. Width reserved on the <input> above (`pr-*`) is measured
-            off the rendered control, not computed — see that comment. */}
+            border wraps it — ViewToggle itself always renders this way now
+            (it has no other caller). Its buttons are 42px tall on mobile,
+            50px on desktop. Width reserved on the <input> above (`pr-*`) is
+            measured off the rendered control, not computed — see that
+            comment. */}
         {viewSwitch && (
           <div className="absolute top-px bottom-px right-px">
             <ViewToggle
@@ -274,7 +275,6 @@ export default function SearchBar({
               onChange={viewSwitch.onChange}
               locale={viewSwitch.locale}
               mapDisabled={viewSwitch.mapDisabled}
-              size="flush"
               collapseLabelsNarrow={Boolean(filterChip)}
             />
           </div>

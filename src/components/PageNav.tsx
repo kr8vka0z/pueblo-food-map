@@ -48,6 +48,10 @@ export default function PageNav({ locale }: { locale: Locale }) {
   const [section, setSection] = useState<MenuSection | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
 
+  // Duplicates useMapFilters.ts's savedVenues derivation (distance sort) on
+  // purpose, not by oversight — these pages have no map, so there's no user
+  // location to sort by. Name order is the next-best stable ordering off the
+  // map, so this stays its own small useMemo rather than sharing the hook.
   const favoriteIds = useFavorites();
   const savedVenues = useMemo(() => {
     const ids = new Set(favoriteIds);

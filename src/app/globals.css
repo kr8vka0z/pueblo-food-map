@@ -147,7 +147,7 @@ body {
   }
 }
 
-/* ─── Mapbox attribution — spec §10.3: bottom-left, 11px, transparent ────────── */
+/* ─── Mapbox attribution — spec §10.3: bottom-right, 11px, transparent ───────── */
 .mapboxgl-ctrl-attrib {
   font-size: 11px !important;
   background: transparent !important;

@@ -218,7 +218,10 @@ export default function HamburgerMenu({
         boxShadow: "0 4px 32px rgba(0,0,0,0.22)",
         overflowY: "auto",
         paddingTop: "env(safe-area-inset-top)",
-        paddingBottom: isBelow2xl ? barClearance : "env(safe-area-inset-bottom)",
+        // isMobile (this branch) implies isBelow2xl — MOBILE_QUERY (767px) is
+        // narrower than BELOW_2XL_QUERY (1535px) — so barClearance always
+        // applies here; the env(...)-only alternative was unreachable.
+        paddingBottom: barClearance,
         paddingRight: "env(safe-area-inset-right)",
       }
     : {

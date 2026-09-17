@@ -100,8 +100,11 @@ export default function HomePageClient() {
         const qs = params.toString();
         window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
       }
-      // Also read #venue=<id> fragment: used by /venue/[id] "View on the map" CTA
-      // so the fragment bypasses the /?venue= → /venue/<id> middleware redirect.
+      // Also read #venue=<id> fragment: used by /venue/[id]'s "View on the map"
+      // CTA. There's no /?venue= → /venue/<id> redirect to bypass (next.config.ts
+      // removed it — a `has`-query redirect on "/" 500'd on OpenNext/Cloudflare,
+      // see that file's 2026-06-20 hotfix note); PageNav's saved-venue links use
+      // the plain query form instead, and both land here and are read client-side.
       const hashParam = window.location.hash.startsWith('#venue=')
         ? window.location.hash.slice('#venue='.length)
         : null;

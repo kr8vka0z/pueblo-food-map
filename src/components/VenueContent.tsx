@@ -31,7 +31,9 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
   const { locale } = useLocale();
 
   const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}`;
-  // Fragment form — bypasses the /?venue= middleware redirect loop.
+  // Fragment form, matching HomePageClient's #venue= handling — there is no
+  // /?venue= redirect to bypass (next.config.ts removed it; see that file's
+  // 2026-06-20 note), this is just the CTA's original link form.
   const viewOnMapHref = `/#venue=${v.id}`;
 
   return (

@@ -167,13 +167,20 @@ export default function BoxesActivityContent() {
           </button>
         )}
 
-        <div aria-live="polite">
-          {loading && activityPage.items.length === 0 ? (
-            <p className="text-sm text-[var(--color-ink-500)]">{t("activity.loading", locale)}</p>
-          ) : (
-            <BoxActivityList items={activityPage.items} showVenueName />
-          )}
-        </div>
+        {/* aria-live is scoped to this one short status line, not the list
+            below it (PR #472 review, nit 2) — a live region around the
+            whole 25-item list re-announces every item to a screen reader
+            on each filter change; a "12 results" count is the meaningful
+            update, and the list itself is read normally, once, like any
+            other static content. */}
+        <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">
+          {loading && activityPage.items.length === 0
+            ? t("activity.loading", locale)
+            : t("activity.resultCount", locale, { count: String(activityPage.items.length) })}
+        </p>
+        {!(loading && activityPage.items.length === 0) && (
+          <BoxActivityList items={activityPage.items} showVenueName />
+        )}
 
         {activityPage.items.length > 0 && (
           <div className="flex items-center justify-between gap-3 pt-2">

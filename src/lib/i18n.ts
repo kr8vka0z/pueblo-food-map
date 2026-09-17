@@ -528,6 +528,7 @@ const en: Record<string, string> = {
   "activity.prevPage": "Previous",
   "activity.nextPage": "Next",
   "activity.loading": "Loading…",
+  "activity.resultCount": "{count} results",
   "activity.filters.box": "Box",
   "activity.filters.boxAll": "All boxes",
   "activity.filters.kind": "Kind",
@@ -1079,6 +1080,7 @@ const es: Record<string, string> = {
   "activity.prevPage": "Anterior", // [CHECK]
   "activity.nextPage": "Siguiente", // [CHECK]
   "activity.loading": "Cargando…", // [CHECK]
+  "activity.resultCount": "{count} resultados", // [CHECK]
   "activity.filters.box": "Caja", // [CHECK]
   "activity.filters.boxAll": "Todas las cajas", // [CHECK]
   "activity.filters.kind": "Tipo", // [CHECK]

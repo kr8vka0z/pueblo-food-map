@@ -157,6 +157,38 @@ describe("BoxesActivityContent", () => {
     expect(await screen.findByText(t("activity.empty", "en"))).toBeDefined();
   });
 
+  test("aria-live is scoped to the short status line, not the whole item list (PR #472 review, nit 2)", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/blessing-boxes/activity")) {
+        return Promise.resolve(
+          jsonResponse({
+            items: [
+              {
+                source: "checkin",
+                kind: "filled",
+                detail: null,
+                createdAt: new Date().toISOString(),
+                venueId: "box-1",
+                venueName: "Box",
+                venueAddress: "1 Main St",
+              },
+            ],
+            hasMore: false,
+            page: 1,
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse({ boxes: [] }));
+    });
+    render(<BoxesActivityContent />);
+    const status = await screen.findByText("1 results");
+    expect(status.getAttribute("aria-live")).toBe("polite");
+    // The list itself sits OUTSIDE any aria-live ancestor — re-rendering it
+    // on a filter change must not re-announce every item to a screen reader.
+    const list = await screen.findByText(/was filled/);
+    expect(list.closest("[aria-live]")).toBeNull();
+  });
+
   test("Next page button is disabled when hasMore is false", async () => {
     mockFetch.mockImplementation((url: string) => {
       if (url.includes("/activity")) {

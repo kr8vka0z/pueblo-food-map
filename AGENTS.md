@@ -2514,14 +2514,25 @@ local dev only, 2026-09-17** — same "production is a later, explicit,
 Kyle-gated step" convention as 0005-0007 (see the updated promotion
 checklist above, now covering four migrations through 0008).
 
-**Unlike a missing `0007`, a missing `0008` degrades gracefully, not a full
-outage.** `box_events` is read only by `boxActivity.ts`'s UNION ALL query
-(below), and that read path is already wrapped in the SAME best-effort
+**A missing `0008` is a split picture, not uniformly graceful — 2026-09-17
+review correction to an overclaim this section previously made.** It used
+to say a missing `box_events` table "degrades gracefully, not a full
+outage." That is true for the READ path only: `box_events` is read only by
+`boxActivity.ts`'s UNION ALL query (below), wrapped in the SAME best-effort
 try/catch `blessing-boxes/route.ts` established for the box list
-(`loadActivityBestEffort()`) — a missing table degrades the activity page
-and the per-box embed to their empty states, not a 404 or a blank map. The
+(`loadActivityBestEffort()`), so a missing table degrades the activity page
+and the per-box embed to their empty states, not a 404 or a blank map — the
 box list/detail endpoints slice 2's checklist warns about are untouched by
-this slice.
+this slice. **It is FALSE for the WRITE path.** `INSERT INTO box_events`
+rides the SAME atomic `db.batch()` as the venue write + its `audit_log` row
+(next paragraph) — D1's `batch()` is all-or-nothing, so on an environment
+without migration `0008`, that INSERT throws a missing-table error and the
+ENTIRE batch rolls back: every admin create or edit of a blessing-box venue
+fails outright, not just its activity-log row. `0008` is therefore
+**mandatory before promotion, same as `0005`-`0007`**, not an optional
+nicety just because its read side degrades gracefully — see the updated
+promotion checklist above, which already lists it as required for exactly
+this reason.
 
 **Events are written from the existing admin mutation routes, riding the
 SAME atomic `db.batch()` as the venue write + its `audit_log` row — never a

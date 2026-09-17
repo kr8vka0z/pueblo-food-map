@@ -55,14 +55,15 @@ beforeEach(() => {
 // ─── 1. Sitemap ───────────────────────────────────────────────────────────────
 
 describe("sitemap — /venues", () => {
-  test("/venues is present in the sitemap", () => {
-    const entries = sitemap();
+  // sitemap() is async as of Blessing Boxes slice 1 — see seo.test.ts's note.
+  test("/venues is present in the sitemap", async () => {
+    const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${SITE_URL}/venues`);
   });
 
-  test("/venues entry has a positive priority", () => {
-    const entries = sitemap();
+  test("/venues entry has a positive priority", async () => {
+    const entries = await sitemap();
     const entry = entries.find((e) => e.url === `${SITE_URL}/venues`);
     expect(entry).toBeDefined();
     expect((entry?.priority ?? 0) > 0).toBe(true);

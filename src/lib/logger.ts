@@ -97,6 +97,18 @@ export function logAdminAuthEvent(event: AdminAuthEvent): void {
   console.log(JSON.stringify({ event: "admin_auth_event", type: event }));
 }
 
+/**
+ * Emit a single-line JSON structured log entry when the public live
+ * blessing-boxes read (GET /api/public/blessing-boxes, /box/<id>,
+ * sitemap.ts) fails to reach D1. Error-level: unlike a form's db_write_failed
+ * (where the email still went out), this is the ONLY data path for a box —
+ * a failure here means the box layer degrades to empty/absent for that
+ * request, so it's worth the same alert-level visibility as a Resend outage.
+ */
+export function logBlessingBoxesReadFailure(message: string): void {
+  console.error(JSON.stringify({ event: "blessing_boxes_read_failure", message }));
+}
+
 export type PublishOutcome = "success" | "failure";
 
 interface PublishResultDetail {

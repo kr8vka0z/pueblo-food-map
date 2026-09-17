@@ -207,6 +207,14 @@ function buildEventHalf(filters: ActivityFilters): HalfQuery {
  * `row_id` — it's about determinism, not meaning). Fetches `pageSize + 1`
  * rows so loadBoxActivity can compute `hasMore` without a second COUNT(*)
  * query.
+ *
+ * ponytail: pagination is plain OFFSET, on a table that receives new rows
+ * constantly — a row inserted between two page loads can shift every row
+ * after it by one, so a visitor paging forward can see a row repeat or
+ * silently skip one at the page boundary. Fine at this feature's real
+ * volume (a handful of check-ins/events per box per day); the upgrade path
+ * is a cursor on `created_at` (keyset pagination) instead of OFFSET, if
+ * this table's write rate ever makes the boundary drift noticeable.
  */
 export function buildActivityQuery(filters: ActivityFilters): { sql: string; params: unknown[] } {
   const page = clampPage(filters.page);

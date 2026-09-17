@@ -70,10 +70,12 @@ export const PROGRAMS: Array<{ key: string; actions: Action[] }> = [
   {
     key: "everydayeats",
     actions: [
-      // ponytail: `?body=` pre-fills FOOD on iOS and Android; a client that
-      // ignores it still opens a message to the right number, and the card
-      // text says what to send.
-      { kind: "text", href: "sms:+18776443663?body=FOOD", number: "1-877-644-3663" },
+      // ponytail: `?&body=` (leading `&` before the only param) pre-fills FOOD
+      // on BOTH iOS and Android — a bare `?body=` is Android-only, iOS's
+      // Messages app drops the body silently unless the query starts with
+      // `&` (review item 7b). A client that ignores it still opens a message
+      // to the right number, and the card text says what to send.
+      { kind: "text", href: "sms:+18776443663?&body=FOOD", number: "1-877-644-3663" },
       { kind: "web", href: "https://county.pueblo.org/human-services-department/everyday-eats" },
     ],
   },

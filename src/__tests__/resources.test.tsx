@@ -77,7 +77,7 @@ describe("/resources", () => {
 
     const eats = screen.getByRole("region", { name: /Everyday Eats/ });
     expect(within(eats).getByRole("link", { name: /Text 1-877-644-3663/ }).getAttribute("href")).toBe(
-      "sms:+18776443663?body=FOOD",
+      "sms:+18776443663?&body=FOOD",
     );
 
     const peak = screen.getByRole("link", { name: /Apply on PEAK/ }) as HTMLAnchorElement;

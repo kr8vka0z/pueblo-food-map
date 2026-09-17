@@ -31,8 +31,12 @@ import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 /**
  * Space the nav takes off the bottom of the screen below 2xl, excluding the
- * safe-area inset: the 64px pill + the 12px gap under it. Everything that must
- * clear the nav (map padding, list padding, drawer, credits) uses this.
+ * safe-area inset: the 64px pill + the 12px gap under it. JS/TSX that must
+ * clear the nav (MapWrapper's alert offset, HamburgerMenu's drawer padding,
+ * DesktopVenueWindow's clip math) imports this constant directly. Plain CSS
+ * can't import a TS export, so globals.css mirrors the same number as
+ * `--bottom-nav-clearance` (kept in sync by a source-level test, not by a
+ * shared import) for PageNav/ListView padding and the Mapbox credits offset.
  */
 export const BOTTOM_NAV_HEIGHT_PX = 76;
 

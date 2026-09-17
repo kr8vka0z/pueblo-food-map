@@ -300,7 +300,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     showVenueOnMap,
     windowExpanded,
     setWindowExpanded,
-    setSheetFullyExpanded,
     mapboxMap,
     setMapboxMap,
   } = useMapUI();
@@ -762,6 +761,24 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapboxMap]);
 
+  // mapUnavailable variant of the deep link above (review item 4): when the
+  // map can't mount, Map.tsx never renders, so mapboxMap stays null forever
+  // and the effect above never fires — a shared `/?venue=<id>` link silently
+  // selected nothing (PageNav's saved-venue links reuse this same query
+  // param). Route straight to the venue detail page instead, mirroring the
+  // mapUnavailable branches in handleSelect*/handleSelectSavedVenue below.
+  // Shares deepLinkDoneRef so whichever branch resolves first (map ready vs.
+  // map unavailable — mutually exclusive in practice) wins, never both.
+  useEffect(() => {
+    if (deepLinkDoneRef.current) return;
+    if (!mapUnavailable) return; // starts false; flips in a client effect (#165)
+    deepLinkDoneRef.current = true;
+    if (initialVenueId && allVenues.some((v) => v.id === initialVenueId)) {
+      router.replace(`/venue/${encodeURIComponent(initialVenueId)}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapUnavailable]);
+
   // ── Category autozoom (#111) ─────────────────────────────────────────────────
   // When a single category is activated from the dropdown, fit the map to all
   // venues in that category. When the user CLEARS an active category, return
@@ -1212,11 +1229,27 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           aria-live="polite"
           style={{
             position: "absolute",
-            // Below 2xl: lifted clear of the bottom nav bar and the credits line
-            // above it (spec §9 offset + 52). 2xl: above the floating nav pill
-            // (24px up + 52px tall + 12px gap).
+            // Below 2xl: lifted clear of the bottom nav bar AND the Mapbox
+            // credits row above it (globals.css's `@media (width < 96rem)`
+            // rule lifts that row the same way). Recomputed 2026-09-16 — the
+            // old "+ 52" dated from a taller credits control that no longer
+            // exists:
+            //   BOTTOM_NAV_HEIGHT_PX (76) — the nav bar itself
+            //   + 8                       — nav-to-credits gap (globals.css)
+            //   + 26                      — credits row height: the 20px
+            //                               logo/attrib control (globals.css
+            //                               `.mapboxgl-ctrl-logo`) plus its
+            //                               own 6px bottom margin
+            //                               (`.mapboxgl-ctrl-bottom-right
+            //                               .mapboxgl-ctrl`) — margins don't
+            //                               collapse in a flex row, so both
+            //                               count toward the row's height
+            //   + 12                      — clearance above the credits row
+            // 2xl: above the floating nav pill (24px up + 52px tall + 12px
+            // gap) — credits aren't lifted at 2xl (the pill sits centred,
+            // clear of the bottom-right corner), so this branch is unchanged.
             bottom: isBelow2xl
-              ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 12px + 52px + env(safe-area-inset-bottom))`
+              ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 8px + 26px + 12px + env(safe-area-inset-bottom))`
               : 24 + 52 + 12,
             left: "50%",
             transform: "translateX(-50%)",
@@ -1260,11 +1293,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         <BottomSheet
           key={selectedVenueId ?? "empty"}
           venue={selectedVenue}
-          onClose={() => {
-            setSelectedVenueId(null);
-            setSheetFullyExpanded(false);
-          }}
-          onExpandedChange={setSheetFullyExpanded}
+          onClose={() => setSelectedVenueId(null)}
           onWalkRoute={handleWalkRoute}
           isWalkRouteActive={
             selectedVenueId !== null && walkingRouteVenueId === selectedVenueId

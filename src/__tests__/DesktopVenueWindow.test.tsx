@@ -23,9 +23,10 @@
  */
 
 import { describe, test, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
+import { BOTTOM_NAV_HEIGHT_PX } from "@/components/BottomNav";
 import type { Venue } from "@/types/venue";
 
 // ─── Minimal mapboxgl.Map stub ────────────────────────────────────────────────
@@ -292,5 +293,48 @@ describe("DesktopVenueWindow — ES locale strings", () => {
   test("ES: X-close has aria-label 'Cerrar'", () => {
     renderWindow({ expanded: false, locale: "es" });
     expect(screen.getByRole("button", { name: "Cerrar" })).toBeDefined();
+  });
+});
+
+// ─── Bottom nav clearance (review item 7a) ────────────────────────────────────
+// BOTTOM_NAV_HEIGHT_PX (76) covers the bottom of the map container at every
+// breakpoint this component renders at (desktop, >=768px) — the bar itself
+// below 2xl, the floating pill's 24px offset + 52px height at 2xl+ — so the
+// position math must treat that band as already occupied, not part of the
+// space a collapsed/expanded window can clip against.
+
+describe("DesktopVenueWindow — bottom nav clearance", () => {
+  test("a window whose default placement would land in the nav band is shifted clear of it", async () => {
+    // Container is 800 tall; the marker sits 4px inside the nav's 76px band
+    // (nav covers y in [724, 800]). The default "top-right of marker" anchor
+    // (window bottom == marker y, collapsed height 220) would render the
+    // window's bottom at 728 — 4px into the nav — if containerH weren't
+    // corrected for the nav's footprint first.
+    const markerY = 800 - BOTTOM_NAV_HEIGHT_PX + 4;
+    const customMap = {
+      project: vi.fn().mockReturnValue({ x: 0, y: markerY }),
+      getContainer: vi.fn().mockReturnValue({ offsetWidth: 1000, offsetHeight: 800 }),
+      on: vi.fn().mockReturnThis(),
+      off: vi.fn().mockReturnThis(),
+    };
+    const venue = makeVenue();
+    render(
+      <DesktopVenueWindow
+        venue={venue}
+        expanded={false}
+        mapboxMap={customMap}
+        onExpand={vi.fn()}
+        onCollapse={vi.fn()}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog");
+    await waitFor(() => expect(dialog.style.top).not.toBe(""));
+
+    const top = Number(dialog.style.top.replace("px", ""));
+    const collapsedHeight = 220; // WINDOW_QUICK_H — jsdom renders offsetHeight 0, so the fallback constant applies
+    expect(top + collapsedHeight).toBeLessThanOrEqual(800 - BOTTOM_NAV_HEIGHT_PX);
   });
 });

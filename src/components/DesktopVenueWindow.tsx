@@ -38,6 +38,7 @@ import { MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import { safeUrl } from "@/lib/safeUrl";
+import { BOTTOM_NAV_HEIGHT_PX } from "@/components/BottomNav";
 import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 
 /**
@@ -209,11 +210,20 @@ export default function DesktopVenueWindow({
       // Use the card's actual rendered size so anchoring tracks the
       // content-hugged height (#121); fall back to design constants pre-layout.
       const el = windowRef.current;
+      // Subtract the bottom nav's footprint so the window's bottom-edge clip
+      // check (review item 7a) treats that space as already occupied — the
+      // nav sits ABOVE the map's own bottom edge at every breakpoint this
+      // component renders at (desktop, >=768px), and BOTTOM_NAV_HEIGHT_PX
+      // (76) happens to equal both shapes it takes there: below 2xl it's the
+      // bar itself; at 2xl+ it's the floating pill's 24px offset + 52px
+      // height. Without this, a window anchored near the bottom of a short
+      // viewport could render partly behind the nav.
+      const clippedContainerH = container.offsetHeight - BOTTOM_NAV_HEIGHT_PX;
       const pos = computeWindowPosition(
         pt.x,
         pt.y,
         container.offsetWidth,
-        container.offsetHeight,
+        clippedContainerH,
         el?.offsetWidth || windowW,
         el?.offsetHeight || windowH,
       );

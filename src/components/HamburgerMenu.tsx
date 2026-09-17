@@ -149,6 +149,17 @@ export default function HamburgerMenu({
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
 
+      // Re-targeting the open drawer (e.g. Saved -> Menu via the bottom nav,
+      // which this effect doesn't re-run for — it only keys on [open]) can
+      // leave focus on a bottom-nav button OUTSIDE the panel. The old check
+      // only wrapped at first/last, so from outside, Tab escaped into page
+      // content instead of re-entering the trap. Pull focus back in first.
+      if (!panelRef.current.contains(document.activeElement)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+        return;
+      }
+
       if (e.shiftKey) {
         if (document.activeElement === first) {
           e.preventDefault();
@@ -207,7 +218,10 @@ export default function HamburgerMenu({
         boxShadow: "0 4px 32px rgba(0,0,0,0.22)",
         overflowY: "auto",
         paddingTop: "env(safe-area-inset-top)",
-        paddingBottom: isBelow2xl ? barClearance : "env(safe-area-inset-bottom)",
+        // isMobile (this branch) implies isBelow2xl — MOBILE_QUERY (767px) is
+        // narrower than BELOW_2XL_QUERY (1535px) — so barClearance always
+        // applies here; the env(...)-only alternative was unreachable.
+        paddingBottom: barClearance,
         paddingRight: "env(safe-area-inset-right)",
       }
     : {
@@ -382,28 +396,35 @@ export default function HamburgerMenu({
                     icon={<RotateCcw size={14} />}
                   />
                 )}
-                {/* Suggest a venue (#71) */}
+                {/* Suggest a venue (#71). onClick={close}: a next/link to the
+                    page you're already on doesn't navigate, so without this
+                    tapping a link item while on that same route left the
+                    drawer open with body scroll locked (review item 2). */}
                 <HamburgerMenuItem
                   label={t("menu.suggest", locale)}
                   href="/suggest"
+                  onClick={close}
                   icon={<MapPinPlus size={14} />}
                 />
                 {/* Send us feedback (#116) */}
                 <HamburgerMenuItem
                   label={t("menu.feedback", locale)}
                   href="/feedback"
+                  onClick={close}
                   icon={<MessageSquare size={14} />}
                 />
                 {/* About this map (#155) — internal link, no external icon */}
                 <HamburgerMenuItem
                   label={t("nav.about", locale)}
                   href="/about"
+                  onClick={close}
                   icon={<Info size={14} />}
                 />
                 {/* Browse all venues (#PR4) — internal link to the full directory */}
                 <HamburgerMenuItem
                   label={t("nav.venuesList", locale)}
                   href="/venues"
+                  onClick={close}
                   icon={<List size={14} />}
                 />
 
@@ -413,6 +434,7 @@ export default function HamburgerMenu({
                 <HamburgerMenuItem
                   label={t("nav.resourcesPage", locale)}
                   href="/resources"
+                  onClick={close}
                   icon={<HandHelping size={14} />}
                 />
               </ul>

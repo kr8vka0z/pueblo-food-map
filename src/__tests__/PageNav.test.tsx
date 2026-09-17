@@ -5,6 +5,8 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import PageNav from "@/components/PageNav";
+import { addFavorite, removeFavorite } from "@/lib/favorites";
+import { venues } from "@/data/venues";
 
 const push = vi.fn();
 let pathname = "/about";
@@ -30,6 +32,12 @@ describe("PageNav", () => {
     expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
   });
 
+  test("the top 'Back to map' nav has its own aria-label, distinct from BottomNav's 'Main' (review item 7c)", () => {
+    render(<PageNav locale="en" />);
+    expect(screen.getByRole("navigation", { name: "Page" })).toBeDefined();
+    expect(screen.getByRole("navigation", { name: "Main" })).toBeDefined();
+  });
+
   test("Menu opens the drawer over the page, and tapping Menu again closes it", () => {
     render(<PageNav locale="en" />);
     expect(document.getElementById("hamburger-panel")).toBeNull();
@@ -44,6 +52,21 @@ describe("PageNav", () => {
     render(<PageNav locale="en" />);
     fireEvent.click(screen.getByTestId("nav-saved"));
     expect(screen.getByText(/No saved places yet/i)).toBeDefined();
+  });
+
+  test("selecting a saved place pushes /?venue=<encoded id>", () => {
+    const venue = venues[0];
+    addFavorite(venue.id);
+    try {
+      render(<PageNav locale="en" />);
+      fireEvent.click(screen.getByTestId("nav-saved"));
+      fireEvent.click(screen.getByText(venue.name));
+      expect(push).toHaveBeenCalledWith(`/?venue=${encodeURIComponent(venue.id)}`);
+    } finally {
+      // favorites.ts caches its snapshot at module scope — undo so later
+      // tests in this file see the empty list beforeEach expects.
+      removeFavorite(venue.id);
+    }
   });
 
   test("Near me goes to the map, locating", () => {

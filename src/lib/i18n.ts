@@ -519,6 +519,50 @@ const en: Record<string, string> = {
   // own header for the two distinct error codes these key off.
   "box.checkin.error.rateLimitVisitor": "Too many check-ins from this device right now. Please try again later.",
   "box.checkin.error.rateLimitBox": "This box is getting an unusual number of check-ins right now. Please try again later.",
+
+  // Activity log (/boxes/activity, slice 3) and nav entry
+  "nav.boxActivity": "Blessing box activity",
+  "activity.heading": "Blessing box activity",
+  "activity.intro": "Every fill, low report, empty report, and box change across the network, newest first.",
+  "activity.empty": "No activity to show yet.",
+  "activity.prevPage": "Previous",
+  "activity.nextPage": "Next",
+  "activity.loading": "Loading…",
+  "activity.filters.box": "Box",
+  "activity.filters.boxAll": "All boxes",
+  "activity.filters.kind": "Kind",
+  "activity.filters.kindAll": "All kinds",
+  "activity.filters.from": "From",
+  "activity.filters.to": "To",
+  "activity.filters.clear": "Clear filters",
+  "activity.recentHeading": "Recent activity at this box",
+  "activity.recentEmpty": "No activity at this box yet.",
+  "activity.viewFull": "See full activity",
+  "activity.thisBox": "This box",
+  // Line templates — {name} is the box's own name (already reads
+  // "Blessing Box - 216 W Routt" etc., so these deliberately don't repeat
+  // "Box at" ahead of it, per the Discovery doc's own example lines).
+  "activity.line.filled": "{name} was filled",
+  "activity.line.took": "Someone took something from {name}",
+  "activity.line.low": "{name} is running low",
+  "activity.line.empty": "{name} is empty",
+  "activity.line.added": "{name} was added as a new blessing box",
+  "activity.line.moved": "{name} moved",
+  "activity.line.renamed": "{name} was renamed",
+  "activity.line.paused": "{name} was paused",
+  "activity.line.removed": "{name} was removed",
+  // Short noun labels for the kind filter's <option> text — distinct from
+  // box.checkin.* above, which is first-person button copy ("I filled it")
+  // that reads oddly as a filter option.
+  "activity.kind.filled": "Filled",
+  "activity.kind.took": "Took something",
+  "activity.kind.low": "Running low",
+  "activity.kind.empty": "Empty",
+  "activity.kind.added": "Box added",
+  "activity.kind.moved": "Box moved",
+  "activity.kind.renamed": "Box renamed",
+  "activity.kind.paused": "Box paused",
+  "activity.kind.removed": "Box removed",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -1026,6 +1070,44 @@ const es: Record<string, string> = {
   "box.checkin.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
   "box.checkin.error.rateLimitVisitor": "Demasiadas visitas desde este dispositivo por ahora. Por favor intenta más tarde.", // [CHECK]
   "box.checkin.error.rateLimitBox": "Esta caja está recibiendo un número inusual de visitas en este momento. Por favor intenta más tarde.", // [CHECK]
+
+  // Activity log (/boxes/activity, slice 3) and nav entry
+  "nav.boxActivity": "Actividad de las cajas de bendiciones", // [CHECK]
+  "activity.heading": "Actividad de las cajas de bendiciones", // [CHECK]
+  "activity.intro": "Cada surtido, aviso de poco, aviso de vacío y cambio de caja en toda la red, del más reciente al más antiguo.", // [CHECK]
+  "activity.empty": "Todavía no hay actividad que mostrar.", // [CHECK]
+  "activity.prevPage": "Anterior", // [CHECK]
+  "activity.nextPage": "Siguiente", // [CHECK]
+  "activity.loading": "Cargando…", // [CHECK]
+  "activity.filters.box": "Caja", // [CHECK]
+  "activity.filters.boxAll": "Todas las cajas", // [CHECK]
+  "activity.filters.kind": "Tipo", // [CHECK]
+  "activity.filters.kindAll": "Todos los tipos", // [CHECK]
+  "activity.filters.from": "Desde", // [CHECK]
+  "activity.filters.to": "Hasta", // [CHECK]
+  "activity.filters.clear": "Quitar filtros", // [CHECK]
+  "activity.recentHeading": "Actividad reciente en esta caja", // [CHECK]
+  "activity.recentEmpty": "Todavía no hay actividad en esta caja.", // [CHECK]
+  "activity.viewFull": "Ver toda la actividad", // [CHECK]
+  "activity.thisBox": "Esta caja", // [CHECK]
+  "activity.line.filled": "{name} fue surtida", // [CHECK]
+  "activity.line.took": "Alguien tomó algo de {name}", // [CHECK]
+  "activity.line.low": "{name} tiene poco", // [CHECK]
+  "activity.line.empty": "{name} está vacía", // [CHECK]
+  "activity.line.added": "{name} se agregó como una nueva caja de bendiciones", // [CHECK]
+  "activity.line.moved": "{name} se cambió de lugar", // [CHECK]
+  "activity.line.renamed": "{name} cambió de nombre", // [CHECK]
+  "activity.line.paused": "{name} se pausó", // [CHECK]
+  "activity.line.removed": "{name} se eliminó", // [CHECK]
+  "activity.kind.filled": "Surtida", // [CHECK]
+  "activity.kind.took": "Se tomó algo", // [CHECK]
+  "activity.kind.low": "Con poco", // [CHECK]
+  "activity.kind.empty": "Vacía", // [CHECK]
+  "activity.kind.added": "Caja agregada", // [CHECK]
+  "activity.kind.moved": "Caja cambiada de lugar", // [CHECK]
+  "activity.kind.renamed": "Caja con nombre cambiado", // [CHECK]
+  "activity.kind.paused": "Caja pausada", // [CHECK]
+  "activity.kind.removed": "Caja eliminada", // [CHECK]
 };
 
 /** Substitute simple {key} placeholders. */

@@ -229,23 +229,16 @@ export default function SearchBar({
                 ? "pl-[calc(26%+8px)] "
                 : "pl-[calc(40%+8px)] "
               : "pl-9 md:pl-10 ") +
-            // pr reserves room for the inline view switch (#191). ONE value at
-            // every width (docs/bottom-nav-spec.md §4.2) — the switch is the
-            // same control everywhere now.
-            // MEASURED 2026-09-16 on the flush switch (`size="flush"`,
-            // `right-px` — 1px inset, no border of its own), not computed:
-            // at 1280 the toggle's bounding box is 137.8px EN "Map/List",
-            // 151.1px ES "Mapa/Lista". 152 (rounded up) + 1px inset + 8px
-            // slack = 161px. Re-measure rather than adjusting these numbers
-            // by eye if the switch's own padding ever changes.
-            // With a chip showing under 400px the toggle goes icon-only
-            // (§4.3); measured the same way at 375 (EN and ES alike, no
-            // words): 84px + 1 + 8 = 93px, leaving 158px to type in.
-            (viewSwitch
-              ? filterChip
-                ? "pr-[161px] max-[400px]:pr-[93px] "
-                : "pr-[161px] "
-              : "pr-4 ") +
+            // pr reserves room for the inline view switch (#191), which is
+            // icons only under md and "Map/List" words from md up (see
+            // ViewToggle). MEASURED 2026-09-16 on the flush switch (`right-px`
+            // — 1px inset, no border of its own), not computed:
+            // - under md, icon-only (EN and ES alike): 84px + 1 + 8px slack = 93px.
+            // - md and up: 137.8px EN "Map/List", 151.1px ES "Mapa/Lista";
+            //   152 (rounded up) + 1 + 8 = 161px.
+            // Re-measure rather than adjusting these numbers by eye if the
+            // switch's own padding ever changes.
+            (viewSwitch ? "pr-[93px] md:pr-[161px] " : "pr-4 ") +
             "text-base md:text-sm text-[var(--color-ink-700)] " +
             "bg-[var(--color-bone-50)] " +
             "border border-[var(--color-bone-300)] " +
@@ -275,7 +268,6 @@ export default function SearchBar({
               onChange={viewSwitch.onChange}
               locale={viewSwitch.locale}
               mapDisabled={viewSwitch.mapDisabled}
-              collapseLabelsNarrow={Boolean(filterChip)}
             />
           </div>
         )}

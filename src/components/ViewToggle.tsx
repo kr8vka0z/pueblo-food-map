@@ -20,17 +20,6 @@ interface ViewToggleProps {
    * feedback. Disabled state says "not available" instead of saying nothing.
    */
   mapDisabled?: boolean;
-  /**
-   * When true, BOTH labels go visually hidden under 400px wide (icon-only),
-   * keeping their accessible names via sr-only. SearchBar sets this only
-   * while a category chip is showing — docs/bottom-nav-spec.md §4.3: at 375px
-   * chip + labelled toggle left ~48px of typing room.
-   *
-   * ponytail: one conditional, not a layout system. The 400px threshold is a
-   * measured floor, not a breakpoint — if the chip's max-width ever changes,
-   * re-measure rather than adjusting this number by eye.
-   */
-  collapseLabelsNarrow?: boolean;
 }
 
 export default function ViewToggle({
@@ -38,7 +27,6 @@ export default function ViewToggle({
   onChange,
   locale = "en",
   mapDisabled = false,
-  collapseLabelsNarrow = false,
 }: ViewToggleProps) {
   return (
     <div
@@ -80,13 +68,15 @@ export default function ViewToggle({
           >
             <Icon size={14} aria-hidden />
             {/*
-              Both labels show at every width (docs/bottom-nav-spec.md §4.1):
-              deleting the navy menu button returned the room, and a bare list
-              glyph beside a map glyph made the resident guess. The one
-              exception is collapseLabelsNarrow (§4.3). sr-only (not `hidden`)
-              there keeps the accessible name — the icon is aria-hidden.
+              Icons only on phones (under md, 768px), words from md up (Kyle,
+              2026-09-16): on a phone the words cost the search box typing
+              room — ~65px in Spanish — and the map/list glyphs read on their
+              own there; laptops have the room, so the words stay. sr-only
+              (not `hidden`) keeps the accessible name — the icon is
+              aria-hidden. This replaces the earlier "labels at every width,
+              icon-only only with a chip under 400px" rule (spec §4.1/§4.3).
             */}
-            <span className={collapseLabelsNarrow ? "max-[400px]:sr-only" : undefined}>
+            <span className="max-md:sr-only">
               {t(m === "map" ? "view.map" : "view.list", locale)}
             </span>
           </button>

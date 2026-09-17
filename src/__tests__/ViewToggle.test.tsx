@@ -114,26 +114,13 @@ describe("ViewToggle — labels (docs/bottom-nav-spec.md §4.1, §4.3)", () => {
   // Tailwind's generated CSS or media queries. The contract worth locking down
   // is which spans carry visual-hiding classes, and that label text always
   // stays in the accessibility tree.
-  test("both labels render as visible text by default (§13 test 6 — the §4 regression guard)", () => {
+  // Icons only on phones, words from md up (Kyle, 2026-09-16).
+  test("labels are hidden under md only, keeping accessible names", () => {
     const { container } = render(<ViewToggle mode="map" onChange={vi.fn()} />);
     const spans = Array.from(container.querySelectorAll("span"));
-    const mapSpan = spans.find((s) => s.textContent === "Map");
-    const listSpan = spans.find((s) => s.textContent === "List");
-    expect(mapSpan).toBeDefined();
-    expect(listSpan).toBeDefined();
-    for (const span of [mapSpan, listSpan]) {
-      expect(span?.className ?? "").not.toContain("sr-only");
-    }
-  });
-
-  test("collapseLabelsNarrow hides BOTH labels under 400px only, keeping accessible names", () => {
-    const { container } = render(
-      <ViewToggle mode="map" onChange={vi.fn()} collapseLabelsNarrow />,
-    );
-    const spans = Array.from(container.querySelectorAll("span"));
-    expect(spans).toHaveLength(2);
+    expect(spans.map((s) => s.textContent)).toEqual(["Map", "List"]);
     for (const span of spans) {
-      expect(span.className).toBe("max-[400px]:sr-only");
+      expect(span.className).toBe("max-md:sr-only");
     }
     expect(screen.getByRole("button", { name: /^Map$/i })).toBeDefined();
     expect(screen.getByRole("button", { name: /^List$/i })).toBeDefined();

@@ -137,35 +137,30 @@ describe("SearchBar — viewSwitch + filterChip collision (#191)", () => {
     // Flush with the pill (Kyle, 2026-09-16): 1px in, full height, no inset.
     expect(container.querySelector(".right-px.top-px.bottom-px")).not.toBeNull();
     const inputClass = container.querySelector("input[type='search']")?.className ?? "";
-    expect(inputClass).toContain("pr-[161px]");
-    expect(inputClass).not.toMatch(/md:pr-/);
+    // Icon-only switch under md, worded from md up (Kyle, 2026-09-16).
+    expect(inputClass).toContain("pr-[93px]");
+    expect(inputClass).toContain("md:pr-[161px]");
   });
 
-  // §4.3: with a chip showing, under 400px the switch goes icon-only and the
-  // input's reservation drops to match; without a chip neither happens.
-  test("chip present: labels collapse under 400px and the reservation shrinks with them", () => {
+  // Chip or no chip, the switch is icons only under md and the reservation
+  // matches it — the chip no longer changes the right side at all.
+  test.each([
+    ["no chip", undefined],
+    ["chip", { label: "Food Pantry", onClear: vi.fn() }],
+  ])("%s: labels hidden under md only, reservation matches", (_name, chip) => {
     const { container } = render(
       <SearchBar
         value=""
         onChange={vi.fn()}
-        filterChip={{ label: "Food Pantry", onClear: vi.fn() }}
+        filterChip={chip}
         viewSwitch={{ mode: "map", onChange: vi.fn() }}
       />,
     );
     const inputClass = container.querySelector("input[type='search']")?.className ?? "";
-    expect(inputClass).toContain("max-[400px]:pr-[93px]");
+    expect(inputClass).toContain("pr-[93px] md:pr-[161px]");
+    expect(inputClass).not.toContain("max-[400px]");
     const labels = Array.from(container.querySelectorAll("[role=group] span"));
     expect(labels).toHaveLength(2);
-    labels.forEach((span) => expect(span.className).toContain("max-[400px]:sr-only"));
-  });
-
-  test("no chip: labels never collapse", () => {
-    const { container } = render(
-      <SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "map", onChange: vi.fn() }} />,
-    );
-    expect(container.querySelector("input[type='search']")?.className).not.toContain("max-[400px]");
-    container
-      .querySelectorAll("[role=group] span")
-      .forEach((span) => expect(span.className).not.toContain("sr-only"));
+    labels.forEach((span) => expect(span.className).toBe("max-md:sr-only"));
   });
 });

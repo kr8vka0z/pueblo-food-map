@@ -155,6 +155,13 @@ section, "Saved" is active and that statement is accurate.
 
 ## 4. The search-box view switch
 
+> **Amendment (Kyle, 2026-09-16):** §4.1 and §4.3 are superseded. The switch is now
+> icons only under `md` (768px) and shows "Map / List" words from `md` up, chip or no
+> chip. On a phone the words cost the search box typing room (~65px in Spanish), and the
+> map/list glyphs read on their own there. Input padding is measured per mode: 93px
+> under `md`, 161px from `md` up (see `SearchBar.tsx`). The switch is also flush with
+> the pill's right end now (1px inset), not the 6px inset §4.2 describes.
+
 ### 4.1 Both labels, every width
 
 **The decision:** `ViewToggle` at `size="md"` renders the text label on **both**

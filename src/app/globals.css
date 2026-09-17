@@ -60,6 +60,7 @@
   --color-cat-garden:      #2C5F4F;
   --color-cat-landscape:   #58772B;
   --color-cat-meal:        #6B3FA0;
+  --color-cat-blessing:    #C2447B;
 
   /* Type families — sourced from self-hosted @font-face above */
   --font-sans:    'Public Sans', system-ui, -apple-system, sans-serif;

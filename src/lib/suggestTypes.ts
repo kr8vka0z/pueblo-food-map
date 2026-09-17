@@ -15,6 +15,7 @@ export const VENUE_CATEGORIES = {
   garden: "Community Garden",
   edible_landscape: "Edible Landscape",
   meal_site: "Meal Site",
+  blessing_box: "Blessing Box",
 } as const;
 
 export type VenueCategoryKey = keyof typeof VENUE_CATEGORIES;

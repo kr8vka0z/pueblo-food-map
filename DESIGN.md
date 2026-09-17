@@ -38,6 +38,7 @@ colors:
   catGarden: "#2C5F4F"
   catLandscape: "#58772B"
   catMeal: "#6B3FA0"
+  catBlessing: "#C2447B"
 
 typography:
   fontDisplay: "'Fraunces', Georgia, serif"
@@ -135,6 +136,8 @@ components:
     backgroundColor: "{colors.catLandscape}"
   venueMarkerMeal:
     backgroundColor: "{colors.catMeal}"
+  venueMarkerBlessingBox:
+    backgroundColor: "{colors.catBlessing}"
   focusRing:
     backgroundColor: "{colors.sage500}"
   hoverSurface:
@@ -173,7 +176,7 @@ A pre-existing design sidecar (`docs/pueblo-food-map-v2-handoff.md`) documents p
 
 **Yellow (#FFD166)** is for support/classification badges only. It does not appear as a button, interactive state, or background fill.
 
-**Category colors** are a 7-color data palette for map pins. Each maintains drop-shadow contrast against the Mapbox Streets basemap at day rendering:
+**Category colors** are an 8-color data palette for map pins. Each maintains drop-shadow contrast against the Mapbox Streets basemap at day rendering:
 - Pantry: deep crimson `#BE2D45`
 - Grocery: dark cobalt `#1F4E8C` — the only blue in the entire palette
 - Convenience: teal `#0F6573`
@@ -181,6 +184,7 @@ A pre-existing design sidecar (`docs/pueblo-food-map-v2-handoff.md`) documents p
 - Garden: `#2C5F4F` — same hex as `sage-600` and `primary` (intentional: the garden category maps to the brand's calming green)
 - Edible landscape: olive `#58772B`
 - Meal site: plum `#6B3FA0`
+- Blessing box: raspberry `#C2447B` (Blessing Boxes slice 1, 2026-09-17) — the one hue bucket (magenta/berry) not already claimed by the other 7
 
 ## Typography
 

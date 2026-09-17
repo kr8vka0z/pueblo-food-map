@@ -49,6 +49,7 @@ describe("validateCreateVenuePayload — happy path", () => {
       source: "Manual entry",
       lastVerified: "2026-07-03",
       outsideCounty: 0,
+      box: null,
     });
   });
 
@@ -261,5 +262,73 @@ describe("validateCreateVenuePayload — optional email format", () => {
   test("omitted email is valid (optional field)", () => {
     const result = validateCreateVenuePayload(validPayload());
     expect(result.ok).toBe(true);
+  });
+});
+
+// Blessing Boxes slice 1 (migrations/0005) — box-only field validation.
+describe("validateCreateVenuePayload — blessing_box category", () => {
+  test("non-blessing_box categories never populate box, even if box-shaped fields are sent", () => {
+    const result = validateCreateVenuePayload(
+      validPayload({ category: "pantry", host_name: "Should be ignored" }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.fields.box).toBeNull();
+  });
+
+  test("a blessing_box with no box fields validates, box fields default to null", () => {
+    const result = validateCreateVenuePayload(validPayload({ category: "blessing_box" }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.fields.box).toEqual({
+      hostName: null,
+      hostNote: null,
+      hostContact: null,
+      mostNeeded: null,
+      installedOn: null,
+      removedOn: null,
+    });
+  });
+
+  test("a blessing_box's box fields are captured and trimmed", () => {
+    const result = validateCreateVenuePayload(
+      validPayload({
+        category: "blessing_box",
+        host_name: "  Jane Doe  ",
+        host_note: "Stocked every Saturday.",
+        host_contact: "jane@example.org",
+        most_needed: "Canned soup, pasta",
+        installed_on: "2026-01-15",
+        removed_on: "",
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.fields.box).toEqual({
+      hostName: "Jane Doe",
+      hostNote: "Stocked every Saturday.",
+      hostContact: "jane@example.org",
+      mostNeeded: "Canned soup, pasta",
+      installedOn: "2026-01-15",
+      removedOn: null,
+    });
+  });
+
+  test("rejects an unparseable installed_on date", () => {
+    const result = validateCreateVenuePayload(
+      validPayload({ category: "blessing_box", installed_on: "not-a-date" }),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.installed_on).toBeTruthy();
+  });
+
+  test("rejects a non-string host_note", () => {
+    const result = validateCreateVenuePayload(
+      validPayload({ category: "blessing_box", host_note: 12345 }),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.host_note).toBeTruthy();
   });
 });

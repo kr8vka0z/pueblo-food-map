@@ -2215,9 +2215,186 @@ computed status, photos, adopt-a-box, alerts, stats, QR stickers, an
 activity-log page, and a "Plentiful lists a box we don't have" detection —
 none of these fell out cheaply from `excludeBlessingBoxes()` alone.
 
-**Blessing boxes — promotion checklist.** Run BOTH migrations —
-`0005_blessing_boxes.sql` (schema) AND `0006_convert_routt_blessing_box.sql`
-(the Routt data conversion) — against the **production** D1
+---
+
+# Blessing Boxes — check-ins and live status (slice 2)
+
+Full design: `atlas-kb/projects/Pueblo Food Map/Blessing Boxes Build Plan.md`
+and `...Blessing Boxes Epic - Discovery.md`. This section covers what slice
+2 (check-ins and live status) actually shipped, on top of slice 1's box
+identity work above.
+
+**`migrations/0007_box_checkins.sql`** adds two tables. `box_checkins` —
+`id` (autoincrement PK), `venue_id`, `kind` (CHECK IN
+`'filled'|'took'|'low'|'empty'|'problem'`), `note` (nullable, capped at
+`FIELD_LIMITS.BOX_CHECKIN_NOTE = 280` chars via `src/lib/fieldLimits.ts`),
+`visibility` (CHECK `'visible'|'hidden'`, default `'visible'`), `hidden_by`/
+`hidden_at` (nullable), `created_at`. **Stores no name, no email, no IP
+address — ever.** `box_checkin_rate_limit` — `key` (an HMAC-SHA256 hash,
+never the raw box id or client token — see below), `bucket` (an
+hour-number, not a timestamp), `count`. Applied to **staging and local dev
+only, 2026-09-17** — same "production is a later, explicit, Kyle-gated
+step" convention as 0005/0006 above (see the updated promotion checklist
+below, which now includes this migration).
+
+**Status is computed, never typed in — one function, `computeBoxStatus()`**
+(`src/lib/blessingBoxes.ts`), implementing the state diagram exactly:
+latest visible `filled` → `stocked`; latest visible `low` → `low`; latest
+visible `empty` → `empty`; no visible status-setting check-in within the
+last **7 days** → `unknown`; `removed_on` set on the box's `blessing_boxes`
+row → `out_of_service` (wins over any check-in, including a fresh
+`filled`) — same admin-pause signal slice 1's Danger-zone archive already
+writes, reused rather than adding a second flag. `took` and `problem` never
+set status by themselves — they're excluded from the status-setting kind
+map entirely, not merely deprioritized. `computeLastFilledAt()` is a
+second, separate pure function (latest visible `filled`, **no 7-day
+window** — "last filled 3 weeks ago" should still say so, unlike the status
+badge which fades to Unknown). Both are exhaustively unit-tested in
+`src/lib/blessingBoxes.test.ts` (hidden check-ins never count, exactly-7-
+days-old still counts, 8-days-old fades, `took`/`problem` never move the
+needle, `out_of_service` beats a same-day `filled`).
+
+**Public write path — `POST /api/public/blessing-boxes/[id]/checkins`**
+(`src/app/api/public/blessing-boxes/[id]/checkins/route.ts`). Guard order,
+same convention as `/suggest/submit`/`/report/submit`: Content-Type check →
+Turnstile (`src/lib/turnstile.ts`, reused, not reimplemented) → honeypot →
+rate limit → field validation. Reaches D1 directly via
+`getCloudflareContext()` (a public route, not `getAdminDb()` — same
+"public routes reach the binding directly" convention "Public submissions
+queue" documents above). `note` is only accepted (and only capped) for
+`filled`/`problem` — `took`/`low`/`empty` silently drop any submitted note,
+matching the panel's own one-tap UI (below), which never shows a note field
+for those three kinds.
+
+**Rate limiting — a NEW D1 table, a shared atomic counter, not the
+in-process limiter and not Better Auth's `rateLimit` table.**
+`src/lib/checkinRateLimit.ts`'s `checkAndIncrement()` is the whole
+mechanism: bucket the current time to the hour, HMAC-SHA256 (Web Crypto
+`crypto.subtle`, `SESSION_SECRET`/`TURNSTILE_SECRET_KEY`-style server
+secret) `${scope}:${id}:${bucket}` into a 64-hex-char key, then
+`INSERT ... ON CONFLICT(key) DO UPDATE SET count = count + 1 RETURNING
+count` — one atomic upsert, no read-then-write race window. A stale-bucket
+sweep (`DELETE WHERE bucket < currentBucket - 2`) runs best-effort on every
+call so the table doesn't grow unbounded; a failed sweep never fails the
+rate-limit check itself. **Fails CLOSED** — any D1 error returns "blocked,"
+never "allowed," on the theory that a rate limiter that fails open under
+load is not a rate limiter.
+- **Why a new table, not `src/lib/rateLimit.ts`:** that module's counter
+  lives in a plain in-process `Map` — correct for the three public forms'
+  volume, but Cloudflare Workers run one isolate per edge colo (and
+  sometimes more than one per colo under load), so each isolate keeps its
+  own independent `Map`. An abuser hitting different isolates sails past
+  the "5 per hour" limit multiple times over; this is exactly the weakness
+  the slice's task named as needing fixed.
+  - **Why a new table, not Better Auth's existing `migrations/0004
+    rateLimit` table:** that table's schema and query shape are Better
+    Auth's own internal implementation detail (its `storage: "database"`
+    rate-limit engine, "Admin authentication — Better Auth Phase 4" above)
+    — reusing it for an unrelated public write path means matching its
+    exact column contract with no guarantee Better Auth won't change it
+    later, and it's designed for one endpoint's auth flow, not per-box
+    variable caps. A same-shaped-but-independent table costs one migration
+    and keeps the two rate limiters from ever silently coupling.
+- **Two caps, both checked, both atomic:** per-box
+  (`scope: "box"`, `MAX_PER_BOX_PER_HOUR = 60`, catches an automated flood
+  against one box regardless of who) and per-visitor-per-box
+  (`scope: "visitor-box"`, `MAX_PER_VISITOR_PER_BOX_PER_HOUR = 6`, "a
+  handful of check-ins per box per hour from one visitor" per the task).
+  The per-visitor check only runs when a `clientToken` is present in the
+  request body — its absence (an old cached page, a blocked script) still
+  leaves the per-box cap standing, so no submission goes entirely
+  unlimited.
+- **No IP ever persisted — a client token instead.**
+  `src/lib/checkinClientToken.ts`'s `getCheckinClientToken()` mints a
+  `crypto.randomUUID()` on first use and persists it in `localStorage`
+  (key `pfm-checkin-client-token`) — this is the "visitor" identity the
+  per-visitor cap keys on, not an IP address. It identifies a BROWSER, not
+  a PERSON — clearing storage or switching devices resets it — a
+  deliberate ceiling given v1's "fully anonymous" rule (no accounts, no
+  server-side visitor identity at all); HMAC-hashing it before it ever
+  touches D1 means even the rate-limit table itself never stores the raw
+  token.
+
+**`problem` reports are admin-only — enforced structurally, not just by
+convention.** `SELECT_VISIBLE_CHECKINS_SQL`/`selectVisibleCheckinsForVenuesSql`
+(`src/lib/blessingBoxes.ts`) filter `kind != 'problem'` at the SQL level —
+belt-and-suspenders alongside `toPublicCheckinEvents()`'s own filter, same
+"never even fetch the private data" guarantee migrations/0005 already gives
+`host_contact`. A `problem` submission best-effort emails
+issues@pueblofoodmap.com via Resend (same sending-key convention as the
+three public forms — see "Resend Email Key Management" above); the email
+send is wrapped in its own try/catch so a Resend outage degrades to "the
+check-in still saved, the admin just isn't emailed about it" rather than
+failing the whole request — the admin check-ins panel (below) is the
+durable record either way.
+
+**~1-minute freshness without waiting out the list endpoint's 60s edge
+cache.** Slice 1's `GET /api/public/blessing-boxes` is cached at the
+Cloudflare edge via the Workers Cache API (`caches.default`) for ~60s. A
+fresh check-in achieves visible freshness two ways, not one: (1) the POST
+handler's response body already carries the box's newly recomputed
+`status`/`lastFilledAt` (`loadVisibleCheckins()` + `computeBoxStatus()`/
+`computeLastFilledAt()`, re-run synchronously after the INSERT) — so
+`BoxCheckinPanel`'s `onCheckinSuccess` updates `BoxContent`'s badge
+instantly, with zero dependency on the cache at all, for the person who
+just checked in; (2) for every OTHER visitor reading the list endpoint,
+`bustListCache()` best-effort `caches.default.delete()`s that GET's cache
+entry for the current colo right after the write, so the very next list
+read past this point re-executes the D1 query instead of serving a stale
+60s-old snapshot. The Cache API is per-colo, not zone-wide, so a visitor on
+a different edge colo can still see the old cached response for up to the
+remaining ~60s — accepted, since "about a minute" was the task's own
+freshness bar, not "instant everywhere."
+
+**Admin hide/unhide — `POST /api/admin/box-checkins/[id]/visibility`**
+(`src/app/api/admin/box-checkins/[id]/visibility/route.ts`). Same auth pair
+as every other admin mutation (`getAdminDb()` then `requireAdminOrigin()`).
+Flips `visibility` and, atomically in the same `db.batch()`, writes an
+`audit_log` row — reusing `action='update'` (widening that column's CHECK
+constraint for one more enum value is a full table rebuild, disproportionate
+here; see the route's own header) with a new `entity='box_checkin'` (a
+plain TEXT column, no schema change needed). No permission levels (Kyle's
+decision, same as every other admin surface in this app) — any admin can
+hide/unhide any check-in; the audit_log row is the accountability
+mechanism, not a role check. `BoxCheckinsAdminPanel.tsx`, rendered on
+`/admin/venues/[id]/edit` only when `venue.category === 'blessing_box'`,
+lists EVERY check-in for that box — hidden rows and `problem` reports
+included, unlike the public feed — via `loadAllCheckinsForBox()`
+(`src/lib/blessingBoxes.ts`, a separate query from the public
+visible/non-problem one, not a flag on it, so the public path can never
+accidentally start returning hidden/problem rows through a future
+refactor).
+
+**Public UI:** `BoxCheckinPanel.tsx` — five buttons
+(`took`/`filled`/`low`/`empty`/`problem`), `took`/`low`/`empty` submit
+immediately with no note field ever shown; `filled`/`problem` expand a
+small optional-note form first. Turnstile mount/reset mirrors
+`ReportForm.tsx`'s own widget lifecycle with one deliberate difference:
+this panel resets the widget after EVERY submit (success or failure), not
+only a failed one — a visitor can tap more than once in the same page view
+(e.g. "took" now, "empty" later), and a Turnstile token is single-use, so a
+second tap would otherwise silently fail verification on a stale, already-
+consumed token. `BoxContent.tsx` lifts `status`/`lastFilledAt` into local
+state seeded from the server-rendered box prop, so `onCheckinSuccess`
+updates the badge and "last filled" line instantly with no refetch (see the
+freshness point above). "Last filled" renders via
+`src/lib/relativeTime.ts`'s `formatRelativeTime()` — a thin wrapper over
+`Intl.RelativeTimeFormat`, no new date library.
+
+**i18n:** all new `box.status.*`/`box.lastFilled*`/`box.checkin.*` keys
+carry both EN and ES strings (`src/lib/i18n.ts`), the new Spanish marked
+`// [CHECK]` per this repo's established unreviewed-translation convention.
+
+**Out of scope for this slice, deliberately not built** (so a later slice
+doesn't assume otherwise): photos, adopt-a-box, alerts, stats, QR stickers,
+an activity-log page, and closest-box — per the task's own explicit
+exclusion list. No photo column was added to `box_checkins`, left for
+slice 5.
+
+**Blessing boxes — promotion checklist.** Run ALL THREE migrations —
+`0005_blessing_boxes.sql` (schema), `0006_convert_routt_blessing_box.sql`
+(the Routt data conversion), AND `0007_box_checkins.sql` (check-ins +
+rate-limit tables) — against the **production** D1
 (`pueblo-food-map-admin`) **BEFORE** promoting `dev` → `main`, not after.
 This is NOT optional cleanup: `next.config.ts`'s `/venue/<Routt-id>` →
 `/box/<Routt-id>` redirect and `publishVenues.ts`'s
@@ -2227,10 +2404,15 @@ contains — a promotion that lands before the production data catches up
 means the redirect target (`/box/<id>`) 404s (no row to read) and the box
 pin silently vanishes from the live map (its `venues` row still reads
 `category='pantry'` with no `blessing_boxes` row, so it's neither a public
-box nor findable at its old URL). `0006` is idempotent and safe to run on
-any database in any order after `0005` — including production, where it
-has never been applied — so there is no reason to defer it once `dev` is
-ready to promote.
+box nor findable at its old URL). A promotion landing before `0007` is
+applied means the check-in panel's POST 500s (no `box_checkins` table to
+insert into) and every box's status/last-filled reads are silently absent
+(`loadVisibleCheckins()`'s own D1-failure-degrades-to-empty convention
+masks this as "no check-ins yet" rather than a loud error, so don't assume
+a quiet box page means the migration ran). `0006` and `0007` are both
+idempotent and safe to run on any database in any order after `0005` —
+including production, where neither has ever been applied — so there is no
+reason to defer either once `dev` is ready to promote.
 
 ---
 

@@ -24,6 +24,12 @@ export const FIELD_LIMITS = {
   // Feedback form
   FEEDBACK_MESSAGE: 3000,
 
+  // Blessing box check-in note (Blessing Boxes slice 2) — "a short note",
+  // per the Build Plan; deliberately far shorter than the report/suggest
+  // description fields above since a check-in note is a one-line aside
+  // ("shelf was full, added extra diapers"), not a description.
+  BOX_CHECKIN_NOTE: 280,
+
   // Shared
   EMAIL: 254, // RFC 5321 maximum
 } as const;

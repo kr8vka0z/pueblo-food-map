@@ -485,8 +485,35 @@ const en: Record<string, string> = {
   "box.mostNeeded": "Most needed",
   "box.installedSince": "Installed",
   "box.status": "Status",
-  "box.status.unknown": "Unknown — check-ins are coming soon.",
+  "box.status.unknown": "Unknown — no recent check-ins",
   "box.notFound": "We couldn't find that blessing box.",
+
+  // Check-ins and live status (slice 2)
+  "box.status.stocked": "Stocked",
+  "box.status.low": "Running low",
+  "box.status.empty": "Empty",
+  "box.status.out_of_service": "Out of service",
+  "box.lastFilled": "Last filled {time}",
+  "box.lastFilled.never": "Not marked filled yet",
+  "box.checkin.heading": "Check in at this box",
+  "box.checkin.filled": "I filled it",
+  "box.checkin.took": "I took something",
+  "box.checkin.low": "Running low",
+  "box.checkin.empty": "It's empty",
+  "box.checkin.problem": "Report a problem",
+  "box.checkin.noteLabel": "Add a short note (optional)",
+  "box.checkin.notePlaceholder.filled": "e.g. Topped it off with canned soup",
+  "box.checkin.notePlaceholder.problem": "e.g. Door is broken",
+  "box.checkin.submit": "Send",
+  "box.checkin.submitting": "Sending…",
+  "box.checkin.cancel": "Cancel",
+  "box.checkin.success.filled": "Thanks for filling it!",
+  "box.checkin.success.took": "Thanks — enjoy!",
+  "box.checkin.success.low": "Thanks for the heads up.",
+  "box.checkin.success.empty": "Thanks for letting us know.",
+  "box.checkin.success.problem": "Thanks — we've let the admin know.",
+  "box.checkin.error": "That didn't go through. Please try again.",
+  "box.checkin.error.rateLimit": "Too many check-ins from this device right now. Please try again later.",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -964,8 +991,35 @@ const es: Record<string, string> = {
   "box.mostNeeded": "Lo que más se necesita",
   "box.installedSince": "Instalada desde", // [CHECK]
   "box.status": "Estado",
-  "box.status.unknown": "Desconocido — pronto podrás marcar visitas.", // [CHECK]
+  "box.status.unknown": "Desconocido — sin visitas recientes", // [CHECK]
   "box.notFound": "No pudimos encontrar esa caja de bendiciones.", // [CHECK]
+
+  // Check-ins and live status (slice 2)
+  "box.status.stocked": "Surtida", // [CHECK]
+  "box.status.low": "Quedan pocas cosas", // [CHECK]
+  "box.status.empty": "Vacía", // [CHECK]
+  "box.status.out_of_service": "Fuera de servicio", // [CHECK]
+  "box.lastFilled": "Surtida por última vez {time}", // [CHECK]
+  "box.lastFilled.never": "Aún no se ha marcado como surtida", // [CHECK]
+  "box.checkin.heading": "Marca tu visita a esta caja", // [CHECK]
+  "box.checkin.filled": "La surtí", // [CHECK]
+  "box.checkin.took": "Tomé algo", // [CHECK]
+  "box.checkin.low": "Quedan pocas cosas", // [CHECK]
+  "box.checkin.empty": "Está vacía", // [CHECK]
+  "box.checkin.problem": "Reportar un problema", // [CHECK]
+  "box.checkin.noteLabel": "Agrega una nota breve (opcional)", // [CHECK]
+  "box.checkin.notePlaceholder.filled": "ej. La llené con sopa enlatada", // [CHECK]
+  "box.checkin.notePlaceholder.problem": "ej. La puerta está rota", // [CHECK]
+  "box.checkin.submit": "Enviar", // [CHECK]
+  "box.checkin.submitting": "Enviando…", // [CHECK]
+  "box.checkin.cancel": "Cancelar", // [CHECK]
+  "box.checkin.success.filled": "¡Gracias por surtirla!", // [CHECK]
+  "box.checkin.success.took": "Gracias — ¡disfrútalo!", // [CHECK]
+  "box.checkin.success.low": "Gracias por avisarnos.", // [CHECK]
+  "box.checkin.success.empty": "Gracias por avisarnos.", // [CHECK]
+  "box.checkin.success.problem": "Gracias — ya avisamos al administrador.", // [CHECK]
+  "box.checkin.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "box.checkin.error.rateLimit": "Demasiadas visitas desde este dispositivo por ahora. Por favor intenta más tarde.", // [CHECK]
 };
 
 /** Substitute simple {key} placeholders. */

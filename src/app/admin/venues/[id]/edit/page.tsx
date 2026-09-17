@@ -52,6 +52,15 @@
  * `proposalId` prop (that component's header explains the PATCH-time
  * approval), plus renders the dead URL + last-seen HTTP status in a banner
  * so the admin has context before editing.
+ *
+ * Blessing Boxes slice 2: when `venue.category === 'blessing_box'`,
+ * resolveBoxCheckins() loads every check-in for this box (visible, hidden,
+ * and 'problem' reports alike — see loadAllCheckinsForBox's own header) and
+ * renders BoxCheckinsAdminPanel below the form, so hide/unhide and
+ * 'problem' report review live on the same screen as the rest of a box's
+ * admin data. Wrapped in the same try/catch-degrades-to-empty shape as
+ * resolveClosureReportContext()/resolveLinkHealthProposalContext() above —
+ * a D1 read failure here must never take down the whole edit page.
  */
 
 import { headers } from "next/headers";
@@ -61,9 +70,11 @@ import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import AddVenueForm from "@/components/AddVenueForm";
 import ArchiveVenueButton from "@/components/ArchiveVenueButton";
+import BoxCheckinsAdminPanel from "@/components/BoxCheckinsAdminPanel";
 import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import { parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
+import { loadAllCheckinsForBox, type AdminCheckinRow } from "@/lib/blessingBoxes";
 import type { AdminVenueRow } from "@/types/venue";
 import type { ClosurePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
 
@@ -160,6 +171,21 @@ async function resolveLinkHealthProposalContext(
   }
 }
 
+/**
+ * Loads every check-in for this box (all visibilities, all kinds) for
+ * BoxCheckinsAdminPanel — see that function's own header in
+ * src/lib/blessingBoxes.ts. Only called for a blessing_box venue; degrades
+ * to [] on any D1 failure so this optional admin panel can never take down
+ * the rest of the edit page.
+ */
+async function resolveBoxCheckins(db: D1Database, venueId: string): Promise<AdminCheckinRow[]> {
+  try {
+    return await loadAllCheckinsForBox(db, venueId);
+  } catch {
+    return [];
+  }
+}
+
 export default async function EditVenuePage({
   params,
   searchParams,
@@ -172,6 +198,7 @@ export default async function EditVenuePage({
   let venue: AdminVenueRow | null;
   let closureContext: ClosureReportContext | null = null;
   let linkHealthContext: LinkHealthProposalContext | null = null;
+  let boxCheckins: AdminCheckinRow[] = [];
 
   try {
     const { db, identity } = await getAdminDb(await headers());
@@ -181,6 +208,9 @@ export default async function EditVenuePage({
       const { submission, proposal } = await searchParams;
       closureContext = await resolveClosureReportContext(db, id, submission);
       linkHealthContext = await resolveLinkHealthProposalContext(db, id, proposal);
+      if (venue.category === "blessing_box") {
+        boxCheckins = await resolveBoxCheckins(db, id);
+      }
     }
   } catch (err) {
     handlePageAuthError(err);
@@ -240,6 +270,13 @@ export default async function EditVenuePage({
           initialValues={mapVenueRowToFormValues(venue)}
           proposalId={linkHealthContext?.proposalId}
         />
+
+        {venue.category === "blessing_box" && (
+          <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
+            <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Check-ins</h2>
+            <BoxCheckinsAdminPanel checkins={boxCheckins} />
+          </div>
+        )}
 
         <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
           <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Danger zone</h2>

@@ -5,14 +5,35 @@
  * one behavior unique to a box: the status line always shows the slice-1
  * placeholder ("Unknown"), never a computed value, and host/most-needed
  * sections only render when the underlying field is present.
+ *
+ * SLICE 3 addition: BoxContent now renders a "recent activity" panel that
+ * fetches GET /api/public/blessing-boxes/activity on mount (useBoxActivity)
+ * — global fetch is stubbed for every test in this file (same
+ * vi.stubGlobal("fetch", ...) convention as BoxCheckinsAdminPanel.test.tsx)
+ * so no test makes a real network call.
  */
 
-import { describe, test, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, test, expect, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import BoxContent from "@/components/BoxContent";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+
+const mockFetch = vi.fn();
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ items: [], hasMore: false, page: 1 }),
+  });
+  vi.stubGlobal("fetch", mockFetch);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function makeBox(overrides: Partial<PublicBlessingBox> = {}): PublicBlessingBox {
   return {
@@ -120,5 +141,55 @@ describe("BoxContent — conditional sections", () => {
     // Not present in the type at all — this asserts the page never renders
     // the word "private" or an email-shaped host_contact value in the DOM.
     expect(screen.queryByText(/private@/)).toBeNull();
+  });
+});
+
+describe("BoxContent — recent activity panel (slice 3, Discovery D3)", () => {
+  test("fetches the activity endpoint scoped to this box, with a small page size", async () => {
+    const box = makeBox();
+    render(<BoxContent box={box} />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain("/api/public/blessing-boxes/activity");
+    expect(url).toContain(`box=${encodeURIComponent(box.id)}`);
+    expect(url).toContain("limit=5");
+  });
+
+  test("renders each returned activity line, scoped to this box (no venue name repeated)", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        items: [
+          {
+            source: "checkin",
+            kind: "filled",
+            detail: null,
+            createdAt: new Date().toISOString(),
+            venueId: "plentiful-blessing-box-216-w-routt-plentiful-1454",
+            venueName: "216 W Routt Blessing Box",
+            venueAddress: "216 W Routt Ave, Pueblo, CO 81004",
+          },
+        ],
+        hasMore: false,
+        page: 1,
+      }),
+    });
+    render(<BoxContent box={makeBox()} />);
+    // The activity LINE itself never repeats the venue name (only the
+    // page's own <h1> does) — showVenueName=false on this embed.
+    expect(await screen.findByText(/This box was filled/)).toBeDefined();
+  });
+
+  test("shows the per-box empty state when there is no activity yet", async () => {
+    render(<BoxContent box={makeBox()} />);
+    expect(await screen.findByText(t("activity.recentEmpty", "en"))).toBeDefined();
+  });
+
+  test("links to the full activity page, pre-filtered to this box", () => {
+    const box = makeBox();
+    render(<BoxContent box={box} />);
+    const link = screen.getByText(t("activity.viewFull", "en")).closest("a");
+    expect(link).not.toBeNull();
+    expect(link?.getAttribute("href")).toBe(`/boxes/activity?box=${encodeURIComponent(box.id)}`);
   });
 });

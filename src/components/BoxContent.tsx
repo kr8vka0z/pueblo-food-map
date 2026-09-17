@@ -18,14 +18,24 @@
  * update the badge and "last filled" line the instant a check-in succeeds —
  * no refetch, no page reload, no dependency on the list endpoint's 60s edge
  * cache (see BoxCheckinPanel.tsx / the checkins route's own headers).
+ *
+ * SLICE 3 — a "recent activity at this box" panel (Discovery story D3),
+ * fetched client-side via useBoxActivity({venueId: box.id, pageSize: 5})
+ * and rendered through the SAME BoxActivityList component /boxes/activity
+ * uses, with showVenueName=false (the venue name is already this page's own
+ * heading). A fresh check-in doesn't appear here instantly — this panel
+ * still rides the activity endpoint's own 60s edge cache, unlike the status
+ * badge above, which updates from the check-in POST's own response body.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { formatRelativeTime } from "@/lib/relativeTime";
+import { useBoxActivity } from "@/lib/useBoxActivity";
 import BoxCheckinPanel from "@/components/BoxCheckinPanel";
+import BoxActivityList from "@/components/BoxActivityList";
 import type { BoxStatus, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 interface BoxContentProps {
@@ -47,6 +57,10 @@ export default function BoxContent({ box }: BoxContentProps) {
   const [lastFilledAt, setLastFilledAt] = useState<string | null>(box.box.lastFilledAt);
 
   const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${box.lat},${box.lng}`;
+
+  // Discovery D3 — "each box card should show its own recent log."
+  const activityFilters = useMemo(() => ({ venueId: box.id, pageSize: 5 }), [box.id]);
+  const { page: recentActivity } = useBoxActivity(activityFilters);
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
@@ -152,6 +166,23 @@ export default function BoxContent({ box }: BoxContentProps) {
             setLastFilledAt(newLastFilledAt);
           }}
         />
+
+        {/* Recent activity at this box (slice 3, Discovery D3) */}
+        <section aria-labelledby="box-activity-heading" className="space-y-2 pt-2 border-t border-[var(--color-bone-200)]">
+          <h2
+            id="box-activity-heading"
+            className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)]"
+          >
+            {t("activity.recentHeading", locale)}
+          </h2>
+          <BoxActivityList items={recentActivity.items} showVenueName={false} emptyMessageKey="activity.recentEmpty" />
+          <Link
+            href={`/boxes/activity?box=${encodeURIComponent(box.id)}`}
+            className="inline-block text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline"
+          >
+            {t("activity.viewFull", locale)}
+          </Link>
+        </section>
       </div>
     </main>
   );

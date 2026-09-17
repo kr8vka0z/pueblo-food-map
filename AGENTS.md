@@ -2215,6 +2215,23 @@ computed status, photos, adopt-a-box, alerts, stats, QR stickers, an
 activity-log page, and a "Plentiful lists a box we don't have" detection —
 none of these fell out cheaply from `excludeBlessingBoxes()` alone.
 
+**Blessing boxes — promotion checklist.** Run BOTH migrations —
+`0005_blessing_boxes.sql` (schema) AND `0006_convert_routt_blessing_box.sql`
+(the Routt data conversion) — against the **production** D1
+(`pueblo-food-map-admin`) **BEFORE** promoting `dev` → `main`, not after.
+This is NOT optional cleanup: `next.config.ts`'s `/venue/<Routt-id>` →
+`/box/<Routt-id>` redirect and `publishVenues.ts`'s
+`category != 'blessing_box'` snapshot filter both ship on the Worker deploy
+itself, unconditionally, regardless of what production D1 currently
+contains — a promotion that lands before the production data catches up
+means the redirect target (`/box/<id>`) 404s (no row to read) and the box
+pin silently vanishes from the live map (its `venues` row still reads
+`category='pantry'` with no `blessing_boxes` row, so it's neither a public
+box nor findable at its old URL). `0006` is idempotent and safe to run on
+any database in any order after `0005` — including production, where it
+has never been applied — so there is no reason to defer it once `dev` is
+ready to promote.
+
 ---
 
 # Design system — DESIGN.md

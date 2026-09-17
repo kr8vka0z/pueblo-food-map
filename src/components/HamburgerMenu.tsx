@@ -30,7 +30,7 @@
  */
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, HandHelping, Star } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, HandHelping, Star, History } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
@@ -426,6 +426,15 @@ export default function HamburgerMenu({
                   href="/venues"
                   onClick={close}
                   icon={<List size={14} />}
+                />
+
+                {/* Blessing box activity log (Blessing Boxes slice 3) — internal
+                    link to the public feed of box fills/moves/etc. */}
+                <HamburgerMenuItem
+                  label={t("nav.boxActivity", locale)}
+                  href="/boxes/activity"
+                  onClick={close}
+                  icon={<History size={14} />}
                 />
 
                 {/* Food help programs — the five external links that lived here

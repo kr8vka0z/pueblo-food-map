@@ -3119,6 +3119,30 @@ needed there). The tapped button shows the same "Sending…" label a real
 in-flight submit uses while it waits — no separate "Verifying…" line, which
 is deleted along with the `!turnstileToken` render branch that produced it.
 
+**Fallback to a visible checkbox when the invisible check doubts a visitor
+(2026-09-18, later same day).** The invisible box widget's own
+`error-callback` used to leave a visitor with no way through at all — a red
+"please retry" error that just re-ran the same check and failed the same
+way again. `BoxCheckinPanel.tsx` now swaps in a SECOND widget, rendered
+into the same container, using the ordinary managed
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` every other public form already uses
+(default visible "Verify you are human" checkbox) — the swap also triggers
+if the invisible widget never calls back at all within
+`PENDING_SUBMIT_TIMEOUT_MS`. It flips at most once per page view and never
+flips back. A tap queued when the invisible check fails is NOT failed — it
+stays queued and fires the moment the fallback widget produces a token; the
+POST body now carries `turnstileKey: "box" | "fallback"` so the server
+knows which secret to verify against. **No new production secret is
+needed for this** — the fallback attempt verifies against
+`TURNSTILE_SECRET_KEY`, which already exists on both Workers (see
+"Resend Email Key Management" → local dev note, and the "Blessing boxes —
+promotion checklist" above, whose `TURNSTILE_BOX_SECRET_KEY` line is
+unaffected and still required for the invisible-mode default path). Only
+if the FALLBACK widget's own `error-callback` fires does the panel fall
+through to the pre-existing `failQueuedSubmit` path (red error, note
+restored) — see `BoxCheckinPanel.tsx`'s own header, "Fallback to a visible
+checkbox," for the full state-machine reasoning.
+
 **`/box/<id>/history` had two "Back to map" links** — `PageNav`'s own
 chrome-level link (pointed at the bare `/`) plus `BoxHistoryContent`'s own
 inline link (pointed at `/?venue=<id>`, so it reopened the exact box card).

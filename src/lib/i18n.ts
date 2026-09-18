@@ -523,6 +523,10 @@ const en: Record<string, string> = {
   // own header for the two distinct error codes these key off.
   "box.checkin.error.rateLimitVisitor": "Too many check-ins from this device right now. Please try again later.",
   "box.checkin.error.rateLimitBox": "This box is getting an unusual number of check-ins right now. Please try again later.",
+  // Shown while the fallback (visible) Turnstile widget is on screen,
+  // waiting for the visitor to tap it — replaces the old red error text for
+  // this case (BoxCheckinPanel.tsx, "Fallback to a visible checkbox").
+  "box.checkin.turnstileFallbackPrompt": "Tap the box below to confirm you're a person.",
 
   // Most-recent-check-in snapshot on the in-map card (map-first rework,
   // 2026-09-18) — the card shows ONE line, not a list; the full timeline
@@ -1094,6 +1098,7 @@ const es: Record<string, string> = {
   "box.checkin.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
   "box.checkin.error.rateLimitVisitor": "Demasiadas visitas desde este dispositivo por ahora. Por favor intenta más tarde.", // [CHECK]
   "box.checkin.error.rateLimitBox": "Esta caja está recibiendo un número inusual de visitas en este momento. Por favor intenta más tarde.", // [CHECK]
+  "box.checkin.turnstileFallbackPrompt": "Toca el recuadro de abajo para confirmar que eres una persona.", // [CHECK]
 
   "box.recentCheckin.heading": "Visita más reciente", // [CHECK]
   "box.recentCheckin.none": "Aún no hay visitas registradas", // [CHECK]

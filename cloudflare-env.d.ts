@@ -28,10 +28,18 @@
 // --include-runtime=false`) after any wrangler.jsonc binding change — this
 // file itself only needs to change if a *new* binding introduces another
 // runtime type (e.g. KVNamespace) alongside D1Database.
-import type { D1Database as CFD1Database } from "@cloudflare/workers-types/experimental";
+import type {
+  D1Database as CFD1Database,
+  R2Bucket as CFR2Bucket,
+} from "@cloudflare/workers-types/experimental";
 
 declare global {
   type D1Database = CFD1Database;
+  // Blessing Boxes slice 5 (photos) — BOX_PHOTOS binding. Same narrow-import
+  // reasoning as D1Database above: a bare `wrangler types` full-runtime
+  // include would reintroduce the HTMLRewriter `Element`/lib.dom `Element`
+  // collision this file's own header warns about.
+  type R2Bucket = CFR2Bucket;
   // This MUST stay an `interface` (not eslint's suggested `type` alias) so
   // it declaration-merges with @opennextjs/cloudflare's own
   // `declare global { interface CloudflareEnv {...} }` — a `type` alias

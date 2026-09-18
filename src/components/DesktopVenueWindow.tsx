@@ -532,16 +532,26 @@ export default function DesktopVenueWindow({
     </div>
   );
 
-  // ── Blessing-box bodies ───────────────────────────────────────────────────
+  // ── Blessing-box body ─────────────────────────────────────────────────────
   // A box's card content is entirely BoxCardBody (status, latest check-in,
   // most-needed, host note, check-in panel, History link) — none of the
   // ordinary-venue address/hours/SNAP-WIC/phone/Plentiful-link sections
-  // apply to a box, so these two are built fresh rather than branching
-  // inside collapsedBody/expandedBody above. `showExpandedDetails` mirrors
-  // this window's own collapsed/expanded split (see BoxCardBody's header).
-
-  const boxCollapsedBody = (
-    <div className="flex flex-col p-4 gap-3">
+  // apply to a box. `showExpandedDetails` mirrors this window's own
+  // collapsed/expanded split (see BoxCardBody's header).
+  //
+  // ONE tree, not two (fix, PR review 2026-09-18): collapsedBody/expandedBody
+  // above stay a genuine ternary-swapped pair because ordinary venues really
+  // do show different sections per state. A box doesn't — only the outer
+  // scroll wrapper's class and BoxCardBody's showExpandedDetails prop vary —
+  // so this renders as a single element at a stable tree position across the
+  // expanded/collapsed toggle, keyed only by `expanded` for the outer class.
+  // Two separate JSX consts previously swapped by the `isBox ? boxExpandedBody
+  // : boxCollapsedBody` ternary in the render below meant BoxCardBody (and
+  // its child BoxCheckinPanel, which holds in-progress note-form state) fully
+  // remounted on every toggle, silently discarding a note the visitor was
+  // mid-typing.
+  const boxBody = (
+    <div className={expanded ? "flex-1 overflow-y-auto px-4 py-4 space-y-4" : "flex flex-col p-4 gap-3"}>
       {venueNameBlock}
       <span
         className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--color-bone-50)] w-fit"
@@ -561,35 +571,7 @@ export default function DesktopVenueWindow({
         showLocationHint={showWalkLocationHint}
       />
       {box ? (
-        <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} showExpandedDetails={false} />
-      ) : (
-        <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
-      )}
-    </div>
-  );
-
-  const boxExpandedBody = (
-    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-      {venueNameBlock}
-      <span
-        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--color-bone-50)] w-fit"
-        style={{ backgroundColor: categoryColors[venue.category] }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" aria-hidden />
-        {t(`category.full.${venue.category}`, locale)}
-      </span>
-      <DirectionButtons
-        venue={venue}
-        onWalk={onWalkRoute ?? (() => {})}
-        locale={locale}
-        isRouteActive={isWalkRouteActive}
-        onClearRoute={onClearWalkRoute}
-        routeInfo={isWalkRouteActive ? walkRouteInfo : null}
-        walkSteps={isWalkRouteActive ? walkRouteSteps : null}
-        showLocationHint={showWalkLocationHint}
-      />
-      {box ? (
-        <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} showExpandedDetails />
+        <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} showExpandedDetails={expanded} />
       ) : (
         <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
       )}
@@ -632,16 +614,28 @@ export default function DesktopVenueWindow({
         locale={locale}
       />
 
-      {/* Body — collapsed or expanded. id wired to toggle's aria-controls. */}
-      {expanded ? (
+      {/* Body — collapsed or expanded. id wired to toggle's aria-controls.
+          Box branch stays at a stable top-level position regardless of
+          `expanded` (see boxBody's own header — only its inner className and
+          BoxCardBody's showExpandedDetails prop vary) so BoxCardBody never
+          remounts on toggle; ordinary venues keep the real ternary swap
+          since their collapsed/expanded content genuinely differs. */}
+      {isBox ? (
+        <div
+          id={`venue-popup-body-${venue.id}`}
+          className={expanded ? "flex flex-col flex-1 overflow-hidden" : undefined}
+        >
+          {boxBody}
+        </div>
+      ) : expanded ? (
         <div
           id={`venue-popup-body-${venue.id}`}
           className="flex flex-col flex-1 overflow-hidden"
         >
-          {isBox ? boxExpandedBody : expandedBody}
+          {expandedBody}
         </div>
       ) : (
-        <div id={`venue-popup-body-${venue.id}`}>{isBox ? boxCollapsedBody : collapsedBody}</div>
+        <div id={`venue-popup-body-${venue.id}`}>{collapsedBody}</div>
       )}
     </div>
   );

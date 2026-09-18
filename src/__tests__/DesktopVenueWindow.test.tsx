@@ -391,7 +391,6 @@ function makeBox(overrides: Partial<PublicBlessingBox["box"]> = {}): PublicBless
       removedOn: null,
       status: "stocked",
       lastFilledAt: "2026-09-17T09:00:00.000Z",
-      statusSince: "2026-09-17T09:00:00.000Z",
       recentCheckins: [],
       ...overrides,
     },
@@ -512,5 +511,39 @@ describe("DesktopVenueWindow — blessing box card (map-first rework)", () => {
     textarea.focus();
     await user.keyboard("{Escape}");
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test("an in-progress check-in note survives toggling expanded (fix, PR review 2026-09-18 — collapsed/expanded used to be two separate BoxCardBody subtrees that remounted on toggle)", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <DesktopVenueWindow
+        venue={makeBoxVenue()}
+        box={makeBox()}
+        expanded={false}
+        mapboxMap={mockMapboxMap}
+        onExpand={vi.fn()}
+        onCollapse={vi.fn()}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "I filled it" }));
+    const textarea = await screen.findByRole("textbox");
+    await user.type(textarea, "Left extra cans");
+
+    rerender(
+      <DesktopVenueWindow
+        venue={makeBoxVenue()}
+        box={makeBox()}
+        expanded={true}
+        mapboxMap={mockMapboxMap}
+        onExpand={vi.fn()}
+        onCollapse={vi.fn()}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+
+    expect(screen.getByRole("textbox")).toHaveValue("Left extra cans");
   });
 });

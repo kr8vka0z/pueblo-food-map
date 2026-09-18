@@ -13,6 +13,12 @@
  * BoxHistoryContent.tsx (client), which reuses useBoxActivity/
  * BoxActivityList — the same activity read path slice 3 built, filtered to
  * this one box, not a second query.
+ *
+ * Passes the FULL loaded `box` (fix, PR review 2026-09-18), not just its id
+ * and name — BoxHistoryContent now also renders BoxCardBody (status,
+ * check-in panel) above the list, since a mapUnavailable visitor is routed
+ * straight here with no other way to check in. Same D1 read already done
+ * for `generateMetadata`, not a second query.
  */
 
 import { notFound } from "next/navigation";
@@ -59,5 +65,5 @@ export default async function BoxHistoryPage({
   const box = await loadBox(id);
   if (!box) notFound();
 
-  return <BoxHistoryContent boxId={box.id} boxName={box.name} />;
+  return <BoxHistoryContent box={box} />;
 }

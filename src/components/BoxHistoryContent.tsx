@@ -8,6 +8,21 @@
  * we could show all the historical information, check-ins, and all that
  * fun stuff").
  *
+ * Also the ONLY check-in surface for a visitor whose device can't show the
+ * map (fix, PR review 2026-09-18): MapWrapper.tsx routes a mapUnavailable
+ * box selection straight to this page (no in-map card exists to open there),
+ * so BoxCardBody — the SAME snapshot-plus-check-in-panel component the map
+ * card renders — is rendered here too, above the history list. Without this,
+ * a no-WebGL visitor could see a box's status but had no way to check in at
+ * all, a real regression from the pre-rework standalone /box/<id> page.
+ * `liveBox` is local state seeded from the server-loaded `box` prop (same
+ * pattern the old deleted BoxContent.tsx used) so a successful check-in
+ * updates the badge/last-filled/recent-check-in line here instantly, with no
+ * refetch — mirrors MapWrapper.tsx's own handleBoxCheckinSuccess patch
+ * (including skipping 'problem' reports, which set no status) since this
+ * page needs the identical optimistic update, just for one box instead of a
+ * whole map's worth.
+ *
  * Reuses the SAME activity read path slice 3 built (useBoxActivity ->
  * GET /api/public/blessing-boxes/activity), filtered to this one box via
  * its existing `venueId` filter — not a second query, and the same
@@ -29,23 +44,41 @@ import { useLocale } from "@/lib/LocaleContext";
 import { useBoxActivity } from "@/lib/useBoxActivity";
 import { ACTIVITY_PAGE_SIZE_DEFAULT } from "@/lib/boxActivity";
 import BoxActivityList from "@/components/BoxActivityList";
+import BoxCardBody from "@/components/BoxCardBody";
 import SiteFooter from "@/components/SiteFooter";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
+import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 interface BoxHistoryContentProps {
-  boxId: string;
-  boxName: string;
+  box: PublicBlessingBox;
 }
 
-export default function BoxHistoryContent({ boxId, boxName }: BoxHistoryContentProps) {
+export default function BoxHistoryContent({ box }: BoxHistoryContentProps) {
   const { locale } = useLocale();
   const [page, setPage] = useState(1);
+  const [liveBox, setLiveBox] = useState(box);
 
   const { page: activityPage, loading } = useBoxActivity({
-    venueId: boxId,
+    venueId: liveBox.id,
     page,
     pageSize: ACTIVITY_PAGE_SIZE_DEFAULT,
   });
+
+  const handleCheckinSuccess = (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => {
+    setLiveBox((current) => ({
+      ...current,
+      box: {
+        ...current.box,
+        status: result.status,
+        lastFilledAt: result.lastFilledAt,
+        // Same "problem" skip + cap-at-5 as MapWrapper's handleBoxCheckinSuccess.
+        recentCheckins:
+          result.kind === "problem"
+            ? current.box.recentCheckins
+            : [{ kind: result.kind, createdAt: new Date().toISOString() }, ...current.box.recentCheckins].slice(0, 5),
+      },
+    }));
+  };
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
@@ -56,7 +89,7 @@ export default function BoxHistoryContent({ boxId, boxName }: BoxHistoryContentP
           {/* Back to the exact box's card, not just the bare map — the
               in-map ?venue=<id> deep link MapWrapper already reads. */}
           <Link
-            href={`/?venue=${encodeURIComponent(boxId)}`}
+            href={`/?venue=${encodeURIComponent(liveBox.id)}`}
             className="text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline"
           >
             {t("box.history.back", locale)}
@@ -65,10 +98,20 @@ export default function BoxHistoryContent({ boxId, boxName }: BoxHistoryContentP
             className="mt-2 text-3xl font-normal text-[var(--color-ink-900)]"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            {boxName}
+            {liveBox.name}
           </h1>
           <p className="mt-2 text-sm text-[var(--color-ink-700)]">{t("box.history.subheading", locale)}</p>
         </div>
+
+        {/* Full current-snapshot card, incl. check-in panel and host note —
+            see this file's own header. `showExpandedDetails` left at its
+            default (true): a no-WebGL visitor's only box page is THIS one,
+            so it needs the full snapshot, not the map card's collapsed
+            subset. Costs one redundant "History" link pointing at the page
+            already on screen — accepted rather than threading a new prop
+            through BoxCardBody to suppress just that link for a one-page
+            cosmetic wrinkle. */}
+        <BoxCardBody box={liveBox} onCheckinSuccess={handleCheckinSuccess} />
 
         <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">
           {loading && activityPage.items.length === 0

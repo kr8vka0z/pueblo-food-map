@@ -27,6 +27,28 @@ vi.mock("next/navigation", () => ({
 
 import BoxHistoryContent from "@/components/BoxHistoryContent";
 import { t } from "@/lib/i18n";
+import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+
+const testBox: PublicBlessingBox = {
+  id: "box-1",
+  name: "Test Blessing Box",
+  category: "blessing_box",
+  lat: 38.27,
+  lng: -104.61,
+  address: "123 Test St, Pueblo, CO",
+  source: "manual",
+  last_verified: "2026-09-01T00:00:00.000Z",
+  box: {
+    hostName: null,
+    hostNote: null,
+    mostNeeded: null,
+    installedOn: "2026-01-01",
+    removedOn: null,
+    status: "stocked",
+    lastFilledAt: "2026-09-17T09:00:00.000Z",
+    recentCheckins: [],
+  },
+};
 
 const mockFetch = vi.fn();
 
@@ -48,9 +70,23 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("BoxHistoryContent — check-in panel (fix, PR review 2026-09-18)", () => {
+  test("renders the box's check-in panel — the only way a no-WebGL visitor (routed straight here by MapWrapper's mapUnavailable branch) can check in at all", () => {
+    render(<BoxHistoryContent box={testBox} />);
+    expect(screen.getByRole("button", { name: "I filled it" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Running low" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "It's empty" })).toBeDefined();
+  });
+
+  test("renders the box's current status badge above the history list", () => {
+    render(<BoxHistoryContent box={testBox} />);
+    expect(screen.getByTestId("box-status-badge")).toBeDefined();
+  });
+});
+
 describe("BoxHistoryContent — reuses the filtered activity read path", () => {
   test("fetches the activity endpoint scoped to this box's id, not a separate/unfiltered query", async () => {
-    render(<BoxHistoryContent boxId="box-1" boxName="Test Blessing Box" />);
+    render(<BoxHistoryContent box={testBox} />);
     await waitFor(() => expect(mockFetch).toHaveBeenCalled());
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain("/api/public/blessing-boxes/activity");
@@ -58,7 +94,7 @@ describe("BoxHistoryContent — reuses the filtered activity read path", () => {
   });
 
   test("renders the box name as the page heading and a 'Back to the map' link to ?venue=<id>", () => {
-    render(<BoxHistoryContent boxId="box-1" boxName="Test Blessing Box" />);
+    render(<BoxHistoryContent box={testBox} />);
     expect(screen.getByRole("heading", { name: "Test Blessing Box" })).toBeDefined();
     const back = screen.getByRole("link", { name: t("box.history.back", "en") });
     expect(back.getAttribute("href")).toBe("/?venue=box-1");
@@ -82,7 +118,7 @@ describe("BoxHistoryContent — reuses the filtered activity read path", () => {
         page: 1,
       }),
     );
-    render(<BoxHistoryContent boxId="box-1" boxName="Test Blessing Box" />);
+    render(<BoxHistoryContent box={testBox} />);
     // showVenueName={false} — the box's own name is already the page's <h1>,
     // so the item text should NOT repeat "Test Blessing Box was filled" —
     // BoxActivityList substitutes "This box" instead (AGENTS.md's own note).
@@ -91,7 +127,7 @@ describe("BoxHistoryContent — reuses the filtered activity read path", () => {
   });
 
   test("shows the empty state when this box has no activity yet", async () => {
-    render(<BoxHistoryContent boxId="box-1" boxName="Test Blessing Box" />);
+    render(<BoxHistoryContent box={testBox} />);
     expect(await screen.findByText(t("activity.recentEmpty", "en"))).toBeDefined();
   });
 
@@ -113,7 +149,7 @@ describe("BoxHistoryContent — reuses the filtered activity read path", () => {
         page: 1,
       }),
     );
-    render(<BoxHistoryContent boxId="box-1" boxName="Test Blessing Box" />);
+    render(<BoxHistoryContent box={testBox} />);
     const prev = await screen.findByText(t("activity.prevPage", "en"));
     const next = await screen.findByText(t("activity.nextPage", "en"));
     expect(prev.closest("button")).toBeDisabled();
@@ -139,7 +175,7 @@ describe("BoxHistoryContent — reuses the filtered activity read path", () => {
       }),
     );
     const user = userEvent.setup();
-    render(<BoxHistoryContent boxId="box-1" boxName="Test Blessing Box" />);
+    render(<BoxHistoryContent box={testBox} />);
     const next = await screen.findByText(t("activity.nextPage", "en"));
     await user.click(next);
     await waitFor(() => {

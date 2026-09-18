@@ -3233,12 +3233,14 @@ the check-in POST.
 **Serving — `GET /api/public/box-photos/[id]`.** APPROVED ONLY, enforced at
 the SQL level (`loadApprovedBoxPhotoById`, `src/lib/boxPhotos.ts`) — a
 pending/rejected/flagged photo's row, and therefore its R2 bytes, is never
-even read. Workers Cache API, `Cache-Control: public, max-age=3600` (1 hour,
-not `immutable` — a photo can be flagged/rejected later and must stop
-serving promptly; the approve/reject/flag routes all `bustEdgeCache()` this
-exact path, but that purge is per-colo, so the 1-hour TTL is the real
-cross-colo bound). A 404 (bad id, no approved row, missing R2 object) is
-never itself cached.
+even read. Workers Cache API, `Cache-Control: public, max-age=300` (5
+minutes, tightened from 1 hour 2026-09-18 per PR #490 review — not
+`immutable` — a photo can be flagged/rejected later and must stop serving
+promptly; the approve/reject/flag routes all `bustEdgeCache()` this exact
+path, but that purge is per-colo, so the 5-minute TTL is the real cross-colo
+bound: a hidden photo can linger up to 5 minutes on another data centre or in
+a visitor's own browser cache). A 404 (bad id, no approved row, missing R2
+object) is never itself cached.
 
 **Admin preview — `GET /api/admin/box-photos/[id]/preview`.** Same shape as
 the public serve route but `getAdminDb()`-gated, ANY status (an admin must

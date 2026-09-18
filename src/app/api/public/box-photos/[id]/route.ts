@@ -16,11 +16,13 @@
  * FLAGGED or REJECTED later and must stop serving promptly — the approve/
  * reject/flag routes all bustEdgeCache() this exact path on any status
  * change, but that purge is per-colo (see respondWithEdgeCache's own
- * header), so the Cache-Control TTL is the real cross-colo bound. 1 hour is
- * the deliberate choice: long enough to be a real caching win for a photo
- * that gets viewed repeatedly, short enough that a flagged photo can only
- * ever linger on an un-purged colo for up to an hour — a moderation
- * trade-off, not a technical ceiling.
+ * header), so the Cache-Control TTL is the real cross-colo bound. 5 minutes
+ * (fix, 2026-09-18, PR #490 review; was 1 hour) is the deliberate choice: a
+ * flagged/rejected photo can now only ever linger on an un-purged colo (or
+ * in a visitor's own browser cache — same header governs both) for up to 5
+ * minutes, not up to an hour — a moderation trade-off, not a technical
+ * ceiling. `cache.put()` below has no TTL of its own; the Cache API reads it
+ * straight off this same Cache-Control header, so one constant governs both.
  *
  * A 404 (bad id, no approved row, or the R2 object itself missing) is NEVER
  * cached — same "never cache a degraded/negative result" rule
@@ -35,7 +37,7 @@ import { logBlessingBoxesReadFailure } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-const CACHE_TTL_SECONDS = 60 * 60; // see this file's own header for why 1 hour, not immutable/1-year
+const CACHE_TTL_SECONDS = 5 * 60; // see this file's own header for why 5 minutes, not immutable/1-year
 
 function notFound(): Response {
   return new Response(null, { status: 404 });

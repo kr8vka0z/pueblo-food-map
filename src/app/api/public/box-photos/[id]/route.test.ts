@@ -65,7 +65,11 @@ describe("GET /api/public/box-photos/[id]", () => {
     expect(res.status).toBe(404);
   });
 
-  test("success: streams the JPEG bytes with a 1-hour Cache-Control, not immutable/1-year", async () => {
+  // Cache TTL shortened 1 hour -> 5 minutes (fix, 2026-09-18, PR #490
+  // review): "Set the serve response to Cache-Control: public,
+  // max-age=300" — a flagged/rejected photo must not linger cross-colo for
+  // up to an hour.
+  test("success: streams the JPEG bytes with a 5-minute Cache-Control, not immutable/1-year", async () => {
     const bytes = new Uint8Array([1, 2, 3, 4]);
     const { bucket, get } = makeBucket(bytes);
     mockGetCloudflareContext.mockReturnValue({
@@ -74,7 +78,7 @@ describe("GET /api/public/box-photos/[id]", () => {
     const res = await callGet();
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/jpeg");
-    expect(res.headers.get("Cache-Control")).toBe("public, max-age=3600");
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
     expect(get).toHaveBeenCalledWith("box-photos/a/x.jpg");
   });

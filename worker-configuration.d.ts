@@ -8,6 +8,7 @@ interface __BaseEnv_Env {
 	NEXT_PUBLIC_MAPBOX_TOKEN: string;
 	RESEND_API_KEY: string;
 	WORKER_SELF_REFERENCE: Fetcher /* pueblo-food-map-staging */ | Service<typeof import("./custom-worker").default>;
+	HC_PING_URL?: "https://hc-ping.com/3d8c7693-8506-49d3-a4a4-d34426f3ea9a";
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -29,5 +30,5 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "BETTER_AUTH_RP_ID" | "NEXT_PUBLIC_MAPBOX_TOKEN" | "RESEND_API_KEY">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "BETTER_AUTH_RP_ID" | "NEXT_PUBLIC_MAPBOX_TOKEN" | "RESEND_API_KEY" | "HC_PING_URL">> {}
 }

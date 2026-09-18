@@ -126,6 +126,18 @@ describe("mapRowToPublicBox", () => {
     expect(box.box.mostNeeded).toBeNull();
     expect(box.box.installedOn).toBeNull();
   });
+
+  // ─── Slice 5 (photos) ─────────────────────────────────────────────────────
+
+  test("latestPhoto defaults to null when no photo is passed", () => {
+    const box = mapRowToPublicBox(makeRow());
+    expect(box.box.latestPhoto).toBeNull();
+  });
+
+  test("latestPhoto is passed straight through when provided", () => {
+    const box = mapRowToPublicBox(makeRow(), [], new Date(), { id: 42, createdAt: "2026-09-18T10:00:00.000Z" });
+    expect(box.box.latestPhoto).toEqual({ id: 42, createdAt: "2026-09-18T10:00:00.000Z" });
+  });
 });
 
 describe("mapRowsToPublicBoxes", () => {
@@ -334,6 +346,44 @@ describe("loadLiveBoxes / loadLiveBoxById", () => {
     const db = makeFakeDb([], { known: row }, { known: [ci({ kind: "low" })] });
     const box = await loadLiveBoxById(db, "known", NOW);
     expect(box?.box.status).toBe("low");
+  });
+
+  // ─── Slice 5 (photos) — a real D1Database that discriminates the query
+  // shape by SQL text, unlike makeFakeDb above (which only distinguishes
+  // "FROM venues" from a shared checkins-shaped fallback). ──────────────────
+
+  function makeFakeDbWithPhotos(row: BoxJoinRow, photoRows: { id: number; venue_id: string; created_at: string }[]) {
+    const prepare = (sql: string) => {
+      if (sql.includes("FROM venues")) {
+        return { bind: () => ({ first: async () => row }) };
+      }
+      if (sql.includes("FROM box_photos")) {
+        return { bind: (...ids: unknown[]) => ({ all: async () => ({ results: photoRows.filter((p) => (ids as string[]).includes(p.venue_id)) }) }) };
+      }
+      return { bind: () => ({ all: async () => ({ results: [] }) }) };
+    };
+    return { prepare } as unknown as D1Database;
+  }
+
+  test("loadLiveBoxById attaches the most recent approved photo", async () => {
+    const row = makeRow({ id: "known" });
+    const db = makeFakeDbWithPhotos(row, [{ id: 7, venue_id: "known", created_at: "2026-09-18T10:00:00.000Z" }]);
+    const box = await loadLiveBoxById(db, "known");
+    expect(box?.box.latestPhoto).toEqual({ id: 7, createdAt: "2026-09-18T10:00:00.000Z" });
+  });
+
+  test("loadLiveBoxById degrades latestPhoto to null (never throws) when the photos query fails — a photos-table outage must not take the box down", async () => {
+    const row = makeRow({ id: "known" });
+    const db = {
+      prepare: (sql: string) => {
+        if (sql.includes("FROM venues")) return { bind: () => ({ first: async () => row }) };
+        if (sql.includes("FROM box_photos")) throw new Error("no such table: box_photos");
+        return { bind: () => ({ all: async () => ({ results: [] }) }) };
+      },
+    } as unknown as D1Database;
+    const box = await loadLiveBoxById(db, "known");
+    expect(box?.id).toBe("known"); // the box itself still loads
+    expect(box?.box.latestPhoto).toBeNull();
   });
 });
 

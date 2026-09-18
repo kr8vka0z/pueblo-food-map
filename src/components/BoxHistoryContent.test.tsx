@@ -47,6 +47,7 @@ const testBox: PublicBlessingBox = {
     status: "stocked",
     lastFilledAt: "2026-09-17T09:00:00.000Z",
     recentCheckins: [],
+    latestPhoto: null,
   },
 };
 

@@ -13,9 +13,11 @@
  *
  * Persistent header bar (issue #64):
  *   - Always visible, same height (~44px), same background in both states.
- *   - Left: "Show details" / "Hide details" toggle (replaces chevron + text-link).
+ *   - Left: "Show details" / "Hide details" toggle (replaces chevron + text-link) —
+ *     for a blessing box (no collapsed state, see the box-body section below)
+ *     this slot is a "History" link to /box/<id>/history instead (2026-09-18).
  *   - Right: X-close (clears selectedVenueId).
- *   - Tab order: X-close → Show/Hide details → body content.
+ *   - Tab order: X-close → Show/Hide details (or History) → body content.
  *   - Venue title lives in the body, same layout container in both states
  *     (no title jump between states).
  *
@@ -202,8 +204,12 @@ export default function DesktopVenueWindow({
   const [position, setPosition] = useState<WindowPosition>({ left: 0, top: 0 });
 
   const isBox = venue.category === "blessing_box";
-  const windowW = expanded ? WINDOW_EXPANDED_W : WINDOW_QUICK_W;
-  const windowH = expanded ? WINDOW_EXPANDED_H : WINDOW_QUICK_H;
+  // A box has no expand/collapse state (2026-09-18 — see boxBody's own
+  // comment below) and always shows its full content, so it always sizes
+  // like an ordinary venue's expanded window regardless of the `expanded`
+  // prop (still meaningful for ordinary venues, which genuinely toggle).
+  const windowW = expanded || isBox ? WINDOW_EXPANDED_W : WINDOW_QUICK_W;
+  const windowH = expanded || isBox ? WINDOW_EXPANDED_H : WINDOW_QUICK_H;
 
   const status = computeOpenStatus(venue.hours_weekly);
   const displayNotes = getDisplayNotes(venue);
@@ -534,24 +540,20 @@ export default function DesktopVenueWindow({
 
   // ── Blessing-box body ─────────────────────────────────────────────────────
   // A box's card content is entirely BoxCardBody (status, latest check-in,
-  // most-needed, host note, check-in panel, History link) — none of the
-  // ordinary-venue address/hours/SNAP-WIC/phone/Plentiful-link sections
-  // apply to a box. `showExpandedDetails` mirrors this window's own
-  // collapsed/expanded split (see BoxCardBody's header).
+  // most-needed, host note, check-in panel) — none of the ordinary-venue
+  // address/hours/SNAP-WIC/phone/Plentiful-link sections apply to a box. No
+  // History link here: the header renders it instead (see VenuePopupHeader's
+  // own header for why), so `showHistoryLink={false}`.
   //
-  // ONE tree, not two (fix, PR review 2026-09-18): collapsedBody/expandedBody
-  // above stay a genuine ternary-swapped pair because ordinary venues really
-  // do show different sections per state. A box doesn't — only the outer
-  // scroll wrapper's class and BoxCardBody's showExpandedDetails prop vary —
-  // so this renders as a single element at a stable tree position across the
-  // expanded/collapsed toggle, keyed only by `expanded` for the outer class.
-  // Two separate JSX consts previously swapped by the `isBox ? boxExpandedBody
-  // : boxCollapsedBody` ternary in the render below meant BoxCardBody (and
-  // its child BoxCheckinPanel, which holds in-progress note-form state) fully
-  // remounted on every toggle, silently discarding a note the visitor was
-  // mid-typing.
+  // ONE tree, always the scrollable/expanded-style wrapper (fix, 2026-09-18 —
+  // Kyle: "When I click show details, nothing shows up"): a box has no
+  // collapsed state anymore, so unlike collapsedBody/expandedBody above
+  // (a genuine ternary-swapped pair for ordinary venues, whose content really
+  // does differ per state) this is one element at a stable tree position,
+  // independent of `expanded` — BoxCardBody (and its child BoxCheckinPanel,
+  // which holds in-progress note-form state) never remounts.
   const boxBody = (
-    <div className={expanded ? "flex-1 overflow-y-auto px-4 py-4 space-y-4" : "flex flex-col p-4 gap-3"}>
+    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
       {venueNameBlock}
       <span
         className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--color-bone-50)] w-fit"
@@ -571,7 +573,7 @@ export default function DesktopVenueWindow({
         showLocationHint={showWalkLocationHint}
       />
       {box ? (
-        <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} showExpandedDetails={expanded} />
+        <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} showHistoryLink={false} />
       ) : (
         <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
       )}
@@ -605,26 +607,27 @@ export default function DesktopVenueWindow({
         maxHeight: "calc(100% - 24px)",
       }}
     >
-      {/* Persistent header bar — always visible in both states */}
+      {/* Persistent header bar — always visible in both states. A box has no
+          Show/Hide toggle (historyHref swaps that slot for a History link —
+          see VenuePopupHeader's own header); expanded/onToggle are unused
+          in that branch but still passed since the prop is shared with the
+          ordinary-venue case. */}
       <VenuePopupHeader
         venueId={venue.id}
         expanded={expanded}
         onToggle={expanded ? onCollapse : onExpand}
         onClose={onClose}
         locale={locale}
+        historyHref={isBox ? `/box/${encodeURIComponent(venue.id)}/history` : undefined}
       />
 
       {/* Body — collapsed or expanded. id wired to toggle's aria-controls.
-          Box branch stays at a stable top-level position regardless of
-          `expanded` (see boxBody's own header — only its inner className and
-          BoxCardBody's showExpandedDetails prop vary) so BoxCardBody never
-          remounts on toggle; ordinary venues keep the real ternary swap
-          since their collapsed/expanded content genuinely differs. */}
+          Box branch stays at a stable top-level position, always the
+          scrollable-content wrapper (see boxBody's own header) so
+          BoxCardBody never remounts; ordinary venues keep the real ternary
+          swap since their collapsed/expanded content genuinely differs. */}
       {isBox ? (
-        <div
-          id={`venue-popup-body-${venue.id}`}
-          className={expanded ? "flex flex-col flex-1 overflow-hidden" : undefined}
-        >
+        <div id={`venue-popup-body-${venue.id}`} className="flex flex-col flex-1 overflow-hidden">
           {boxBody}
         </div>
       ) : expanded ? (

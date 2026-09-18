@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import BoxCheckinPanel from "@/components/BoxCheckinPanel";
@@ -34,6 +34,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers(); // safety net for the fake-timer test below — a no-op when already real
 });
 
 const onCheckinSuccess = vi.fn();
@@ -77,6 +78,177 @@ describe("BoxCheckinPanel — rendering", () => {
     const honeypot = document.getElementById("box-checkin-website");
     expect(honeypot).not.toBeNull();
     expect(honeypot!.closest("[aria-hidden]")?.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+// ─── Widget visibility (card-polish follow-up, 2026-09-18) ────────────────
+// Kyle: "Do we need to show the Cloudflare check?" — the widget now renders
+// with appearance: "interaction-only" so it stays invisible unless
+// Cloudflare actually needs a person to interact, and the old "Verifying…"
+// line is gone since buttons are usable immediately regardless of token state.
+
+describe("BoxCheckinPanel — Turnstile widget stays invisible by default", () => {
+  test("render() is called with appearance: 'interaction-only'", () => {
+    renderPanel();
+    expect(mockTurnstile.render).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ appearance: "interaction-only" }),
+    );
+  });
+
+  test("no 'Verifying…' text anywhere, even before a token exists", async () => {
+    // Turnstile that never calls back — token stays null for the whole test.
+    vi.stubGlobal("turnstile", { render: vi.fn(() => "widget-id-1"), reset: vi.fn(), remove: vi.fn() });
+    renderPanel();
+    await waitFor(() => expect(screen.getByRole("button", { name: "I took something" })).toBeDefined());
+    expect(screen.queryByText(/Verifying/i)).toBeNull();
+  });
+
+  test("buttons are tappable immediately, before any token exists", async () => {
+    vi.stubGlobal("turnstile", { render: vi.fn(() => "widget-id-1"), reset: vi.fn(), remove: vi.fn() });
+    renderPanel();
+    const button = await screen.findByRole("button", { name: "I took something" });
+    expect(button).not.toBeDisabled();
+  });
+});
+
+describe("BoxCheckinPanel — a tap before the token exists is queued, not dropped", () => {
+  function renderPanelWithDelayedToken() {
+    let deliverToken: ((token: string) => void) | null = null;
+    vi.stubGlobal("turnstile", {
+      render: vi.fn((_container: HTMLElement, opts: { callback?: (t: string) => void }) => {
+        deliverToken = opts.callback ?? null; // token withheld until the test delivers it
+        return "widget-id-1";
+      }),
+      reset: vi.fn(),
+      remove: vi.fn(),
+    });
+    renderPanel();
+    return {
+      deliver: (token: string) => {
+        if (!deliverToken) throw new Error("Turnstile callback never captured");
+        deliverToken(token);
+      },
+    };
+  }
+
+  test("a one-tap kind ('took') submits exactly once, the moment the token arrives", async () => {
+    mockSuccess();
+    const user = userEvent.setup();
+    const { deliver } = renderPanelWithDelayedToken();
+    const button = await screen.findByRole("button", { name: "I took something" });
+
+    await user.click(button);
+    // Queued, not submitted yet — no token, and no dropped tap either.
+    expect(mockFetch).not.toHaveBeenCalled();
+    // A clear pending state on the tapped button, not a page-wide "Verifying…" line.
+    expect(await screen.findByRole("button", { name: "Sending…" })).toBeDefined();
+
+    deliver("test-turnstile-token");
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
+    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.kind).toBe("took");
+    expect(body.turnstileToken).toBe("test-turnstile-token");
+  });
+
+  test("a note-kind ('filled') submit is queued and fires once, with the typed note intact", async () => {
+    mockSuccess();
+    const user = userEvent.setup();
+    const { deliver } = renderPanelWithDelayedToken();
+
+    await user.click(await screen.findByRole("button", { name: "I filled it" }));
+    await user.type(screen.getByLabelText(/Add a short note/i), "Topped it off");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    deliver("test-turnstile-token");
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
+    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.kind).toBe("filled");
+    expect(body.note).toBe("Topped it off");
+  });
+});
+
+// ─── Queued-tap recovery (bug fix follow-up, 2026-09-18) ──────────────────
+// A tap queued while waiting on a token must not be stuck forever if the
+// token never comes — Turnstile's error-callback, or nothing calling back
+// at all within PENDING_SUBMIT_TIMEOUT_MS.
+describe("BoxCheckinPanel — a queued tap that never resolves is not stuck forever", () => {
+  function renderPanelCapturingCallbacks() {
+    let fireError: (() => void) | null = null;
+    vi.stubGlobal("turnstile", {
+      render: vi.fn(
+        (_container: HTMLElement, opts: { "error-callback"?: () => void }) => {
+          // The token callback is never delivered in this describe block — every
+          // test here is about a tap that's still queued when it fails.
+          fireError = opts["error-callback"] ?? null;
+          return "widget-id-1";
+        },
+      ),
+      reset: vi.fn(),
+      remove: vi.fn(),
+    });
+    renderPanel();
+    return {
+      fireError: () => {
+        if (!fireError) throw new Error("Turnstile error-callback never captured");
+        fireError();
+      },
+    };
+  }
+
+  test("Turnstile error-callback while a tap is queued clears it — buttons re-enabled, error shown", async () => {
+    const user = userEvent.setup();
+    const { fireError } = renderPanelCapturingCallbacks();
+
+    await user.click(await screen.findByRole("button", { name: "I took something" }));
+    expect(await screen.findByRole("button", { name: "Sending…" })).toBeDefined();
+
+    fireError();
+
+    await waitFor(() => expect(screen.getByText("That didn't go through. Please try again.")).toBeDefined());
+    expect(screen.getByRole("button", { name: "I took something" })).not.toBeDisabled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  test("no token within the time limit clears the queued tap the same way", () => {
+    // Real userEvent/waitFor polling relies on real setTimeout ticks, which
+    // freeze under fake timers — fireEvent + a synchronous act() advance
+    // avoids that trap entirely (both are already act-aware).
+    vi.useFakeTimers();
+    renderPanelCapturingCallbacks();
+
+    fireEvent.click(screen.getByRole("button", { name: "I took something" }));
+    expect(screen.getByRole("button", { name: "Sending…" })).toBeDefined();
+
+    act(() => {
+      vi.advanceTimersByTime(15_000);
+    });
+
+    expect(screen.getByText("That didn't go through. Please try again.")).toBeDefined();
+    expect(screen.getByRole("button", { name: "I took something" })).not.toBeDisabled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  test("note text survives a failed queued submit — the note form reopens with it intact", async () => {
+    const user = userEvent.setup();
+    const { fireError } = renderPanelCapturingCallbacks();
+
+    await user.click(await screen.findByRole("button", { name: "I filled it" }));
+    await user.type(screen.getByLabelText(/Add a short note/i), "Topped it off");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    // Queued (no token yet) — the form closes at queue time, same as the
+    // happy path in "a tap before the token exists is queued" above.
+    expect(screen.queryByLabelText(/Add a short note/i)).toBeNull();
+
+    fireError();
+
+    await waitFor(() => expect(screen.getByLabelText(/Add a short note/i)).toBeDefined());
+    expect(screen.getByLabelText(/Add a short note/i)).toHaveValue("Topped it off");
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 

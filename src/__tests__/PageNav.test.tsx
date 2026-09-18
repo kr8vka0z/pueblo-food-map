@@ -32,6 +32,11 @@ describe("PageNav", () => {
     expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
   });
 
+  test("backHref overrides the default '/' destination (BoxHistoryContent points it at ?venue=<id>)", () => {
+    render(<PageNav locale="en" backHref="/?venue=box-1" />);
+    expect(screen.getByRole("link", { name: /Back to map/ }).getAttribute("href")).toBe("/?venue=box-1");
+  });
+
   test("the top 'Back to map' nav has its own aria-label, distinct from BottomNav's 'Main' (review item 7c)", () => {
     render(<PageNav locale="en" />);
     expect(screen.getByRole("navigation", { name: "Page" })).toBeDefined();

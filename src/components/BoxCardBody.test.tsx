@@ -1,11 +1,17 @@
 /**
- * BoxCardBody tests (Blessing Boxes map-first rework, 2026-09-18).
+ * BoxCardBody tests (Blessing Boxes map-first rework, 2026-09-18; card-polish
+ * follow-up same day). Covers the scope-addition requirement: the card
+ * renders ONLY the single most recent check-in, never a list — plus the
+ * History link's href/visibility and the conditional host/most-needed
+ * sections. Reuses BoxCheckinPanel.test.tsx's own Turnstile-stub convention
+ * since BoxCardBody renders that panel directly (not mocked).
  *
- * Covers the scope-addition requirement (Kyle, same day): the card renders
- * ONLY the single most recent check-in, never a list — plus the History
- * link's href and the conditional host/most-needed sections. Reuses
- * BoxCheckinPanel.test.tsx's own Turnstile-stub convention since
- * BoxCardBody renders that panel directly (not mocked).
+ * Card-polish follow-up (Kyle: "When I click show details, nothing shows
+ * up"): `showExpandedDetails` is GONE — the host section and the History
+ * link no longer gate on an expanded state that doesn't exist for a box
+ * anymore (BoxCardBody's own header). `showHistoryLink` replaces it, but
+ * only to suppress the link where a caller renders an equivalent one
+ * elsewhere (DesktopVenueWindow's header, the history page itself).
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
@@ -55,11 +61,11 @@ const BASE_BOX: PublicBlessingBox = {
   },
 };
 
-function renderCard(box: Partial<PublicBlessingBox["box"]> = {}, showExpandedDetails = true) {
+function renderCard(box: Partial<PublicBlessingBox["box"]> = {}, showHistoryLink?: boolean) {
   const fullBox: PublicBlessingBox = { ...BASE_BOX, box: { ...BASE_BOX.box, ...box } };
   return render(
     <LocaleProvider initialLocale="en">
-      <BoxCardBody box={fullBox} showExpandedDetails={showExpandedDetails} />
+      <BoxCardBody box={fullBox} showHistoryLink={showHistoryLink} />
     </LocaleProvider>,
   );
 }
@@ -121,31 +127,24 @@ describe("BoxCardBody — conditional sections", () => {
     expect(screen.getByText("Canned goods")).toBeDefined();
   });
 
-  test("host section only renders when hostName or hostNote is set, and only when expanded", () => {
-    const noHost = renderCard({ hostName: null, hostNote: null }, true);
+  test("host section only renders when hostName or hostNote is set — no expanded state to gate it (fix, 2026-09-18: Kyle's 'nothing shows up' report)", () => {
+    const noHost = renderCard({ hostName: null, hostNote: null });
     expect(screen.queryByText("Host")).toBeNull();
     noHost.unmount();
 
-    const withHost = renderCard({ hostName: "Jane Doe", hostNote: null }, true);
+    renderCard({ hostName: "Jane Doe", hostNote: null });
     expect(screen.getByText("Jane Doe")).toBeDefined();
-    withHost.unmount();
-
-    // Collapsed (showExpandedDetails=false): host section never renders even
-    // when hostName is set — matches DesktopVenueWindow's collapsed/expanded
-    // split for an ordinary venue.
-    renderCard({ hostName: "Jane Doe", hostNote: null }, false);
-    expect(screen.queryByText("Host", { selector: "h3" })).toBeNull();
   });
 });
 
 describe("BoxCardBody — History link", () => {
-  test("links to /box/<id>/history when expanded", () => {
-    renderCard({}, true);
+  test("links to /box/<id>/history by default", () => {
+    renderCard({});
     const link = screen.getByRole("link", { name: "History" });
     expect(link.getAttribute("href")).toBe("/box/test-box-1/history");
   });
 
-  test("no History link when collapsed", () => {
+  test("showHistoryLink={false} hides it (used where a caller already renders an equivalent link)", () => {
     renderCard({}, false);
     expect(screen.queryByRole("link", { name: "History" })).toBeNull();
   });

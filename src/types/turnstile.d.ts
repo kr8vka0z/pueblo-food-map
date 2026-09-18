@@ -16,6 +16,14 @@ declare global {
           callback?: (token: string) => void;
           "error-callback"?: () => void;
           "expired-callback"?: () => void;
+          /**
+           * Controls when the widget becomes visible. "interaction-only"
+           * (BoxCheckinPanel, 2026-09-18) keeps it invisible unless Cloudflare
+           * decides an interactive challenge is actually needed — the default
+           * "always" (ReportForm/SuggestForm/FeedbackForm) shows the widget's
+           * chrome immediately even for a pass-through check.
+           */
+          appearance?: "always" | "execute" | "interaction-only";
         },
       ) => string;
       reset: (widgetId: string) => void;

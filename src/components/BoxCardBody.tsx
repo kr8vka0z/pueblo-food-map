@@ -29,12 +29,24 @@
  *   - a current-SPONSOR ("Cared for by …") slot — arrives in slice 6
  *     (box_adopters)
  *
- * `showExpandedDetails` mirrors DesktopVenueWindow's own collapsed/expanded
- * split for an ordinary venue: collapsed = status/last-filled/most-recent-
- * check-in/most-needed/check-in buttons (the glanceable + actionable core);
- * expanded adds the host's note and the History link. BottomSheet (mobile)
- * has no such toggle — everything here is short enough now that the
- * activity list is gone, so it always passes true.
+ * No expand/collapse state (fix, 2026-09-18 — Kyle: "When I click show
+ * details, nothing shows up," because the old `showExpandedDetails` gate
+ * hid the host note behind a toggle whose only OTHER effect was revealing a
+ * host note most boxes don't have). Everything here — including the host's
+ * note, when set — renders unconditionally now, same as DesktopVenueWindow's
+ * header replacing its Show/Hide details toggle with a History link for a
+ * box (see that component's own header).
+ *
+ * `showHistoryLink` (default true) exists ONLY to suppress the in-body
+ * History link where something else already provides that link: the
+ * DesktopVenueWindow header (a box has no toggle to replace, so the link
+ * lives there instead — same visual weight/position the toggle had) and the
+ * history page itself (BoxHistoryContent — linking a page to itself is
+ * dead weight). BottomSheet (mobile, no header link slot) leaves it at the
+ * default; positioned near the TOP of this component (right under status)
+ * rather than after the check-in panel so it stays reachable without
+ * scrolling past five buttons and a note form first (Kyle, 2026-09-18: "the
+ * History link is... not buried at the bottom").
  */
 
 import Link from "next/link";
@@ -47,11 +59,11 @@ import { STATUS_BADGE_CLASS, type BoxStatus, type CheckinKind, type PublicBlessi
 interface BoxCardBodyProps {
   box: PublicBlessingBox;
   onCheckinSuccess?: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
-  /** See this file's own header. Default true — BottomSheet always shows everything. */
-  showExpandedDetails?: boolean;
+  /** See this file's own header. Default true — hidden only where a caller already provides an equivalent link elsewhere. */
+  showHistoryLink?: boolean;
 }
 
-export default function BoxCardBody({ box, onCheckinSuccess, showExpandedDetails = true }: BoxCardBodyProps) {
+export default function BoxCardBody({ box, onCheckinSuccess, showHistoryLink = true }: BoxCardBodyProps) {
   const { locale } = useLocale();
   const mostRecentCheckin = box.box.recentCheckins[0] ?? null;
 
@@ -72,8 +84,21 @@ export default function BoxCardBody({ box, onCheckinSuccess, showExpandedDetails
         </span>
       </div>
 
+      {/* History link — kept near the top so it's reachable without
+          scrolling past the check-in panel first (see this file's own
+          header). Suppressed where the caller already renders an equivalent
+          link (DesktopVenueWindow's header, the history page itself). */}
+      {showHistoryLink && (
+        <Link
+          href={`/box/${encodeURIComponent(box.id)}/history`}
+          className="text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline w-fit"
+        >
+          {t("box.history.link", locale)}
+        </Link>
+      )}
+
       {/* Most recent check-in — ONE line, not a list (Kyle, 2026-09-18): the
-          full timeline lives at /box/<id>/history via the History link below. */}
+          full timeline lives at /box/<id>/history via the History link above. */}
       <div>
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-1">
           {t("box.recentCheckin.heading", locale)}
@@ -105,7 +130,7 @@ export default function BoxCardBody({ box, onCheckinSuccess, showExpandedDetails
       {/* Slice 6 extension point: current-sponsor ("Cared for by …") slot.
           Renders nothing until box_adopters exists (same rule as above). */}
 
-      {showExpandedDetails && (box.box.hostName || box.box.hostNote) && (
+      {(box.box.hostName || box.box.hostNote) && (
         <div>
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-1">
             {t("box.host", locale)}
@@ -124,15 +149,6 @@ export default function BoxCardBody({ box, onCheckinSuccess, showExpandedDetails
         boxId={box.id}
         onCheckinSuccess={(result) => onCheckinSuccess?.(result)}
       />
-
-      {showExpandedDetails && (
-        <Link
-          href={`/box/${encodeURIComponent(box.id)}/history`}
-          className="text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline"
-        >
-          {t("box.history.link", locale)}
-        </Link>
-      )}
     </div>
   );
 }

@@ -16,7 +16,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("next/navigation", () => ({
@@ -93,11 +93,24 @@ describe("BoxHistoryContent — reuses the filtered activity read path", () => {
     expect(url).toContain("box=box-1");
   });
 
-  test("renders the box name as the page heading and a 'Back to the map' link to ?venue=<id>", () => {
+  test("renders the box name as the page heading and exactly one 'Back to map' link in the page's top nav, pointed at ?venue=<id> (card-polish follow-up, 2026-09-18: this page used to render a SECOND back-to-map link of its own alongside PageNav's chrome link)", () => {
     render(<BoxHistoryContent box={testBox} />);
     expect(screen.getByRole("heading", { name: "Test Blessing Box" })).toBeDefined();
-    const back = screen.getByRole("link", { name: t("box.history.back", "en") });
+    // Scoped to the "Page" nav landmark (PageNav's chrome bar) — SiteFooter
+    // (every utility page's shared footer, unrelated to this fix) also
+    // renders its own site-wide "Back to map" link further down the page;
+    // that one is pre-existing chrome, not the page-chrome/content
+    // duplicate this test guards against.
+    const pageNav = screen.getByRole("navigation", { name: "Page" });
+    // getByRole throws if more than one link matches within pageNav —
+    // proves there's exactly one there.
+    const back = within(pageNav).getByRole("link", { name: /Back to map/ });
     expect(back.getAttribute("href")).toBe("/?venue=box-1");
+  });
+
+  test("the box card's own History link is hidden on its own history page (self-link would be dead weight)", () => {
+    render(<BoxHistoryContent box={testBox} />);
+    expect(screen.queryByRole("link", { name: "History" })).toBeNull();
   });
 
   test("renders fetched activity items via the same BoxActivityList renderer the global feed uses", async () => {

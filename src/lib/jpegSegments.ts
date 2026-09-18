@@ -15,14 +15,25 @@
  * of code, far less than pulling in an image-metadata dependency for one
  * narrow operation this app will only ever do server-side.
  *
- * WHAT IS NOT PARSED: the entropy-coded scan data itself (after SOS). JPEG
- * scan data stuffs literal 0xFF bytes as 0xFF 0x00 and can contain RSTn
- * marker bytes (0xD0-0xD7) at restart-interval boundaries — walking THAT
- * byte-for-byte to find "the next real marker" is a much bigger, genuinely
- * risky parser to get exactly right, and this module has no reason to: once
- * SOS is reached, everything from there to the end of the file is image
- * data, not metadata, so it is copied through verbatim rather than
- * re-parsed. This is the one deliberate scope boundary in this file.
+ * WHAT IS NOT re-parsed as marker segments: the entropy-coded scan data
+ * itself (after SOS). JPEG scan data stuffs literal 0xFF bytes as
+ * 0xFF 0x00 and can contain RSTn marker bytes (0xD0-0xD7) at
+ * restart-interval boundaries — walking THAT byte-for-byte to find "the
+ * next real marker segment" is a much bigger, genuinely risky parser to get
+ * exactly right, and this module has no reason to.
+ *
+ * IT IS, however, scanned for the End-Of-Image marker (0xFF 0xD9) — see
+ * `findEoiIndex()` — and everything from there to the end of the buffer is
+ * dropped, never copied through. WHY (2026-09-18 fix, review finding): a
+ * naive "copy scanStart..EOF verbatim" used to trust that a JPEG's own EOI
+ * was also the end of the FILE, but real phone photos routinely are not —
+ * Google/Samsung "Motion Photo" files append a whole second MP4 after the
+ * still JPEG's EOI, and multi-picture-format (MPF) files append a second,
+ * SEPARATE JPEG (with its OWN EXIF/GPS segment) after the first. Copying
+ * everything through unconditionally would have carried that appended
+ * blob's metadata straight past the strip this file exists to do. Cutting
+ * at the first genuine EOI, and REJECTING a file where none is found,
+ * closes that gap.
  */
 
 // APPn range that can carry EXIF/XMP/ICC/etc. — APP0 (0xE0, JFIF) is the one
@@ -127,13 +138,49 @@ function parseJpeg(bytes: Uint8Array): ParsedJpeg {
 }
 
 /**
+ * Finds the real End-Of-Image marker (0xFF 0xD9) inside entropy-coded scan
+ * data, honoring JPEG byte-stuffing so a 0xFF byte that is NOT actually a
+ * marker is never mistaken for one: 0xFF 0x00 is a literal stuffed 0xFF
+ * data byte, and 0xFF followed by 0xD0-0xD7 is a restart marker — both are
+ * skipped over as a pair, never inspected as a candidate EOI. Any other
+ * 0xFF-led byte pair (a marker this module doesn't otherwise recognize
+ * inside scan data, e.g. a progressive JPEG's next scan header) is treated
+ * as ordinary data and scanning continues — this function's only job is to
+ * find the genuine end, not to fully re-parse the scan. Returns the index
+ * of the EOI's leading 0xFF, or null if none is found before the end of
+ * `bytes` (see this file's header for why a missing EOI is rejected rather
+ * than defaulting to "copy everything").
+ */
+function findEoiIndex(bytes: Uint8Array, from: number): number | null {
+  let i = from;
+  while (i < bytes.length - 1) {
+    if (bytes[i] === 0xff) {
+      const next = bytes[i + 1];
+      if (next === 0x00 || (next >= 0xd0 && next <= 0xd7)) {
+        i += 2; // stuffed data byte or restart marker — part of the scan, not a boundary
+        continue;
+      }
+      if (next === EOI_MARKER) {
+        return i;
+      }
+    }
+    i++;
+  }
+  return null;
+}
+
+/**
  * Returns a new ArrayBuffer with every APP1-APP15 segment (EXIF, XMP, ICC
  * profiles, manufacturer notes — anything capable of carrying GPS
  * coordinates or other identifying metadata) removed. APP0 (JFIF — pixel
  * density/thumbnail only) and every other segment (DQT, SOF, DHT, SOS, the
  * scan data itself) pass through byte-for-byte unchanged, so the resulting
  * file decodes identically to the original, just without the metadata.
- * Throws InvalidJpegError on a file that doesn't parse as JPEG at all.
+ * The output is truncated at the scan data's own End-Of-Image marker (see
+ * `findEoiIndex`'s header) — any bytes a phone appended AFTER that marker
+ * (a Motion Photo's video, a second MPF picture with its own EXIF) are
+ * dropped, never copied through. Throws InvalidJpegError on a file that
+ * doesn't parse as JPEG at all, or whose scan data never reaches an EOI.
  */
 export function stripMetadataSegments(input: ArrayBuffer): ArrayBuffer {
   const bytes = new Uint8Array(input);
@@ -144,10 +191,13 @@ export function stripMetadataSegments(input: ArrayBuffer): ArrayBuffer {
     if (seg.marker >= APPN_FIRST && seg.marker <= APPN_LAST) continue; // drop — this is the whole point
     chunks.push(bytes.subarray(seg.start, seg.end));
   }
-  // Everything from scanStart to EOF is entropy-coded image data (plus a
-  // trailing EOI marker) — copied verbatim, never re-parsed (see file header).
   if (scanStart !== null) {
-    chunks.push(bytes.subarray(scanStart));
+    const eoiIndex = findEoiIndex(bytes, scanStart);
+    if (eoiIndex === null) {
+      throw new InvalidJpegError("No End-Of-Image marker found in scan data");
+    }
+    // Include the EOI marker itself (2 bytes); anything past it is dropped.
+    chunks.push(bytes.subarray(scanStart, eoiIndex + 2));
   }
 
   const total = chunks.reduce((sum, c) => sum + c.length, 0);

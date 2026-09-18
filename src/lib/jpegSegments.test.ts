@@ -106,6 +106,48 @@ describe("stripMetadataSegments", () => {
     );
   });
 
+  test("bytes appended after the real EOI are dropped — a fake secondary JPEG (with its own EXIF/GPS segment) tacked on after the first is never carried through (fix, 2026-09-18: Motion Photo / MPF files)", () => {
+    const primary = buildFakeJpeg();
+    // A second, fake "appended" JPEG — its own SOI, an APP1 carrying a
+    // second secret GPS marker, and its own EOI — mimicking how a real
+    // phone appends a Motion Photo video or an MPF secondary picture after
+    // the primary JPEG's own End-Of-Image.
+    const appendedSecretMarker = "SECOND_IMAGE_GPS_SECRET";
+    const trailer = new Uint8Array([
+      0xff,
+      0xd8, // SOI
+      ...segment(0xe1, textBytes(`Exif\0\0${appendedSecretMarker}`)), // APP1 in the appended blob
+      0xff,
+      0xd9, // its own EOI
+    ]);
+    const combined = new Uint8Array(primary.length + trailer.length);
+    combined.set(primary, 0);
+    combined.set(trailer, primary.length);
+
+    const stripped = new Uint8Array(stripMetadataSegments(combined.buffer as ArrayBuffer));
+    const text = new TextDecoder("latin1").decode(stripped);
+
+    // The appended blob's own EXIF/GPS text never survives at all...
+    expect(text).not.toContain(appendedSecretMarker);
+    // ...because the output is cut exactly at the PRIMARY image's own EOI —
+    // identical byte-for-byte to stripping the primary image alone.
+    const strippedPrimaryAlone = new Uint8Array(stripMetadataSegments(primary.buffer as ArrayBuffer));
+    expect(Array.from(stripped)).toEqual(Array.from(strippedPrimaryAlone));
+  });
+
+  test("a file whose scan data never reaches an End-Of-Image marker is rejected, not silently truncated or passed through", () => {
+    const noEoi = new Uint8Array([
+      0xff,
+      0xd8,
+      ...segment(0xc0, [8, 0, 10, 0, 10, 1, 1, 0x11, 0]),
+      ...segment(0xda, [1, 1, 0, 0, 63, 0]),
+      0x01,
+      0x02,
+      0x03, // scan data with no trailing FF D9 anywhere
+    ]);
+    expect(() => stripMetadataSegments(noEoi.buffer as ArrayBuffer)).toThrow(InvalidJpegError);
+  });
+
   test("a JPEG with no APP1 at all round-trips unchanged in content", () => {
     const noExif = new Uint8Array([
       0xff,

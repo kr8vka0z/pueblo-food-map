@@ -558,6 +558,7 @@ const en: Record<string, string> = {
   "box.photo.reportError": "That didn't go through. Please try again.",
   "box.photo.morePhotos": "Show more photos",
   "box.photo.none": "No photos yet",
+  "box.photo.galleryHeading": "Photos",
 
   // Most-recent-check-in snapshot on the in-map card (map-first rework,
   // 2026-09-18) — the card shows ONE line, not a list; the full timeline
@@ -1155,6 +1156,7 @@ const es: Record<string, string> = {
   "box.photo.reportError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
   "box.photo.morePhotos": "Mostrar más fotos", // [CHECK]
   "box.photo.none": "Aún no hay fotos", // [CHECK]
+  "box.photo.galleryHeading": "Fotos", // [CHECK]
 
   "box.recentCheckin.heading": "Visita más reciente", // [CHECK]
   "box.recentCheckin.none": "Aún no hay visitas registradas", // [CHECK]

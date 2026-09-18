@@ -66,6 +66,8 @@ import { useLocale } from "@/lib/LocaleContext";
 import VenuePopupHeader from "@/components/VenuePopupHeader";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import HoursList from "@/components/HoursList";
+import BoxCardBody from "@/components/BoxCardBody";
+import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -139,6 +141,16 @@ function computeWindowPosition(
 
 interface DesktopVenueWindowProps {
   venue: Venue & { distanceMiles?: number };
+  /**
+   * Full blessing-box record when `venue.category === "blessing_box"` — see
+   * BottomSheet's identical prop for the full rationale (`venue` only ever
+   * carries plain-Venue fields). `null`/`undefined` while MapWrapper's box
+   * fetch hasn't resolved yet — the box collapsed/expanded bodies show a
+   * loading line until it has.
+   */
+  box?: PublicBlessingBox | null;
+  /** Forwarded to BoxCardBody's check-in panel — see BottomSheet's identical prop. */
+  onCheckinSuccess?: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
   expanded: boolean;
   /** mapboxgl.Map instance delivered by Map.tsx onLoad → onMapReady. */
   mapboxMap: MapboxMap | null;
@@ -169,6 +181,8 @@ interface DesktopVenueWindowProps {
 
 export default function DesktopVenueWindow({
   venue,
+  box,
+  onCheckinSuccess,
   expanded,
   mapboxMap,
   onExpand,
@@ -187,6 +201,7 @@ export default function DesktopVenueWindow({
   const windowRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<WindowPosition>({ left: 0, top: 0 });
 
+  const isBox = venue.category === "blessing_box";
   const windowW = expanded ? WINDOW_EXPANDED_W : WINDOW_QUICK_W;
   const windowH = expanded ? WINDOW_EXPANDED_H : WINDOW_QUICK_H;
 
@@ -246,9 +261,17 @@ export default function DesktopVenueWindow({
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        onClose();
-      }
+      if (e.key !== "Escape") return;
+      // A box's check-in panel (BoxCardBody -> BoxCheckinPanel) has a note
+      // textarea living inside this window. Without this guard, Escape while
+      // typing a note both loses focus AND closes the whole card — the
+      // browser's own "Escape clears an input" behavior competing with this
+      // window's own Escape-to-dismiss. Only global-dismiss when focus is on
+      // the window shell itself, not on a form control inside it.
+      const active = document.activeElement;
+      const typing = active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+      if (typing && windowRef.current?.contains(active)) return;
+      onClose();
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -292,7 +315,7 @@ export default function DesktopVenueWindow({
         )}
       </div>
       <div className="flex items-center gap-0.5 shrink-0">
-        <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} />
+        <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} isBox={isBox} />
         <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} />
       </div>
     </div>
@@ -509,6 +532,70 @@ export default function DesktopVenueWindow({
     </div>
   );
 
+  // ── Blessing-box bodies ───────────────────────────────────────────────────
+  // A box's card content is entirely BoxCardBody (status, latest check-in,
+  // most-needed, host note, check-in panel, History link) — none of the
+  // ordinary-venue address/hours/SNAP-WIC/phone/Plentiful-link sections
+  // apply to a box, so these two are built fresh rather than branching
+  // inside collapsedBody/expandedBody above. `showExpandedDetails` mirrors
+  // this window's own collapsed/expanded split (see BoxCardBody's header).
+
+  const boxCollapsedBody = (
+    <div className="flex flex-col p-4 gap-3">
+      {venueNameBlock}
+      <span
+        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--color-bone-50)] w-fit"
+        style={{ backgroundColor: categoryColors[venue.category] }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" aria-hidden />
+        {t(`category.full.${venue.category}`, locale)}
+      </span>
+      <DirectionButtons
+        venue={venue}
+        onWalk={onWalkRoute ?? (() => {})}
+        locale={locale}
+        isRouteActive={isWalkRouteActive}
+        onClearRoute={onClearWalkRoute}
+        routeInfo={isWalkRouteActive ? walkRouteInfo : null}
+        walkSteps={isWalkRouteActive ? walkRouteSteps : null}
+        showLocationHint={showWalkLocationHint}
+      />
+      {box ? (
+        <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} showExpandedDetails={false} />
+      ) : (
+        <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
+      )}
+    </div>
+  );
+
+  const boxExpandedBody = (
+    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      {venueNameBlock}
+      <span
+        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--color-bone-50)] w-fit"
+        style={{ backgroundColor: categoryColors[venue.category] }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" aria-hidden />
+        {t(`category.full.${venue.category}`, locale)}
+      </span>
+      <DirectionButtons
+        venue={venue}
+        onWalk={onWalkRoute ?? (() => {})}
+        locale={locale}
+        isRouteActive={isWalkRouteActive}
+        onClearRoute={onClearWalkRoute}
+        routeInfo={isWalkRouteActive ? walkRouteInfo : null}
+        walkSteps={isWalkRouteActive ? walkRouteSteps : null}
+        showLocationHint={showWalkLocationHint}
+      />
+      {box ? (
+        <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} showExpandedDetails />
+      ) : (
+        <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
+      )}
+    </div>
+  );
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -551,10 +638,10 @@ export default function DesktopVenueWindow({
           id={`venue-popup-body-${venue.id}`}
           className="flex flex-col flex-1 overflow-hidden"
         >
-          {expandedBody}
+          {isBox ? boxExpandedBody : expandedBody}
         </div>
       ) : (
-        <div id={`venue-popup-body-${venue.id}`}>{collapsedBody}</div>
+        <div id={`venue-popup-body-${venue.id}`}>{isBox ? boxCollapsedBody : collapsedBody}</div>
       )}
     </div>
   );

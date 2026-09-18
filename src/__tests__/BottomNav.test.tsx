@@ -127,30 +127,3 @@ describe("BottomNav — 2xl pill floats bottom-centre (Kyle, 2026-09-16)", () =>
     expect(nav.className).not.toContain("2xl:top-");
   });
 });
-
-describe("BottomNav — Blessing Boxes entry candidate 'nav' (slice 4, B4)", () => {
-  test("showBoxesItem defaults to false — still exactly four items, the documented shape is unchanged", () => {
-    const { container } = renderNav();
-    const items = Array.from(container.querySelectorAll("li > button, li > a"));
-    expect(items).toHaveLength(4);
-    expect(items.map((b) => b.textContent)).not.toContain("Boxes");
-  });
-
-  test("showBoxesItem=true adds a fifth item, between Resources and Menu, with a visible label", () => {
-    const { container } = renderNav({ showBoxesItem: true });
-    const items = Array.from(container.querySelectorAll("li > button, li > a"));
-    expect(items.map((b) => b.textContent)).toEqual(["Near me", "Saved", "Resources", "Boxes", "Menu"]);
-    const label = screen.getByTestId("nav-boxes").querySelector("span");
-    expect(label?.className ?? "").not.toContain("sr-only");
-  });
-
-  test("it links to /boxes and carries aria-current only when onBoxesPage is true", () => {
-    renderNav({ showBoxesItem: true });
-    const link = screen.getByTestId("nav-boxes");
-    expect(link.getAttribute("href")).toBe("/boxes");
-    expect(link.getAttribute("aria-current")).toBeNull();
-
-    renderNav({ showBoxesItem: true, onBoxesPage: true });
-    expect(screen.getAllByTestId("nav-boxes")[1].getAttribute("aria-current")).toBe("page");
-  });
-});

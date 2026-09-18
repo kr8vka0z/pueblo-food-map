@@ -345,7 +345,15 @@ export function mapRowsToPublicBoxes(rows: BoxJoinRow[]): PublicBlessingBox[] {
   return rows.map((row) => mapRowToPublicBox(row));
 }
 
-/** Type guard used by MapWrapper's merged venue list to route a click to /box/<id> instead of opening the normal detail card. */
+/**
+ * Type guard for the merged venue list. Map-first rework (2026-09-18): a
+ * box click now opens the SAME in-map card every other venue uses
+ * (BottomSheet/DesktopVenueWindow), just with box-specific content
+ * (BoxCardBody) instead of routing to a separate page — this guard is what
+ * those components use (`venue.category === "blessing_box"` inline, or via
+ * this function) to pick which body to render, and what MapWrapper uses to
+ * look up the matching PublicBlessingBox record for the card.
+ */
 export function isBlessingBox(category: VenueCategory): category is "blessing_box" {
   return category === "blessing_box";
 }

@@ -16,11 +16,35 @@
  *   next/link renders as <a> natively in the test environment (no mock needed).
  */
 
-import { describe, test, expect, vi } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import BottomSheet from "@/components/BottomSheet";
 import type { Venue } from "@/types/venue";
+import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+import * as shareMod from "@/lib/share";
+
+// BoxCardBody (rendered for a box venue) renders BoxCheckinPanel directly,
+// which mounts a Turnstile widget — stub it the same way
+// BoxCheckinPanel.test.tsx/BoxCardBody.test.tsx already do.
+const mockTurnstile = {
+  render: vi.fn((_container: HTMLElement, opts: { callback?: (t: string) => void }) => {
+    if (opts.callback) opts.callback("test-turnstile-token");
+    return "widget-id-1";
+  }),
+  reset: vi.fn(),
+  remove: vi.fn(),
+};
+
+beforeEach(() => {
+  vi.stubGlobal("fetch", vi.fn());
+  mockTurnstile.render.mockClear();
+  vi.stubGlobal("turnstile", mockTurnstile);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 // ─── Mock vaul ───────────────────────────────────────────────────────────────
 // Render children as plain divs; no portal / animation.
@@ -164,5 +188,82 @@ describe("BottomSheet — Plentiful link (#128)", () => {
     render(<BottomSheet venue={venue} onClose={() => {}} />);
     await user.click(screen.getByRole("button", { name: /show details/i }));
     expect(screen.queryByRole("link", { name: /on Plentiful/i })).toBeNull();
+  });
+});
+
+// ─── Blessing box (map-first rework, 2026-09-18) ───────────────────────────
+
+function makeBoxVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: number } {
+  return makeVenue({
+    id: "test-box-1",
+    name: "Test Blessing Box",
+    category: "blessing_box",
+    phone: undefined,
+    hours_weekly: undefined,
+    ...overrides,
+  });
+}
+
+function makeBox(overrides: Partial<PublicBlessingBox["box"]> = {}): PublicBlessingBox {
+  return {
+    id: "test-box-1",
+    name: "Test Blessing Box",
+    category: "blessing_box",
+    lat: 38.27,
+    lng: -104.61,
+    address: "123 Test St, Pueblo, CO",
+    source: "manual",
+    last_verified: "2026-09-01T00:00:00.000Z",
+    box: {
+      hostName: null,
+      hostNote: null,
+      mostNeeded: null,
+      installedOn: "2026-01-01",
+      removedOn: null,
+      status: "stocked",
+      lastFilledAt: "2026-09-17T09:00:00.000Z",
+      statusSince: "2026-09-17T09:00:00.000Z",
+      recentCheckins: [],
+      ...overrides,
+    },
+  };
+}
+
+describe("BottomSheet — blessing box card (map-first rework)", () => {
+  test("renders BoxCardBody content, not the ordinary venue detail toggle", () => {
+    render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
+    // BoxCardBody's status badge is present — proves the box branch rendered.
+    expect(screen.getByTestId("box-status-badge")).toBeDefined();
+    // The ordinary venue's Show/Hide details toggle never renders for a box.
+    expect(screen.queryByRole("button", { name: /show details/i })).toBeNull();
+  });
+
+  test("hours-today badge and notes paragraph are skipped for a box", () => {
+    render(
+      <BottomSheet
+        venue={makeBoxVenue({ notes: "Some note text that would otherwise show" })}
+        box={makeBox()}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.queryByText("Some note text that would otherwise show")).toBeNull();
+    expect(screen.queryByText(/Open now|Closed|hours unknown/i)).toBeNull();
+  });
+
+  test("shows a loading fallback when box data hasn't arrived yet", () => {
+    render(<BottomSheet venue={makeBoxVenue()} box={null} onClose={() => {}} />);
+    expect(screen.queryByTestId("box-status-badge")).toBeNull();
+  });
+
+  test("share button calls shareVenue with isBox: true for a box venue", async () => {
+    // Same vi.spyOn(shareMod, "shareVenue") strategy ShareButton.test.tsx
+    // uses for its clipboard-fallback case — avoids the userEvent-vs-
+    // navigator.clipboard mock conflict documented in that file's own header.
+    const shareSpy = vi.spyOn(shareMod, "shareVenue").mockResolvedValue("copied");
+    const user = userEvent.setup();
+    render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
+    await user.click(screen.getByRole("button", { name: /share/i }));
+    expect(shareSpy).toHaveBeenCalledWith(expect.objectContaining({ venueId: "test-box-1", isBox: true }));
+    shareSpy.mockRestore();
   });
 });

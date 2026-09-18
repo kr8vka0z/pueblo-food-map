@@ -22,12 +22,35 @@
  *   on/off are no-ops) so position is deterministic and the component renders without errors.
  */
 
-import { describe, test, expect, vi } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
 import { BOTTOM_NAV_HEIGHT_PX } from "@/components/BottomNav";
 import type { Venue } from "@/types/venue";
+import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+
+// BoxCardBody (rendered for a box venue) renders BoxCheckinPanel directly,
+// which mounts a Turnstile widget — same stub convention as
+// BoxCheckinPanel.test.tsx/BoxCardBody.test.tsx.
+const mockTurnstile = {
+  render: vi.fn((_container: HTMLElement, opts: { callback?: (t: string) => void }) => {
+    if (opts.callback) opts.callback("test-turnstile-token");
+    return "widget-id-1";
+  }),
+  reset: vi.fn(),
+  remove: vi.fn(),
+};
+
+beforeEach(() => {
+  vi.stubGlobal("fetch", vi.fn());
+  mockTurnstile.render.mockClear();
+  vi.stubGlobal("turnstile", mockTurnstile);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 // ─── Minimal mapboxgl.Map stub ────────────────────────────────────────────────
 
@@ -336,5 +359,158 @@ describe("DesktopVenueWindow — bottom nav clearance", () => {
     const top = Number(dialog.style.top.replace("px", ""));
     const collapsedHeight = 220; // WINDOW_QUICK_H — jsdom renders offsetHeight 0, so the fallback constant applies
     expect(top + collapsedHeight).toBeLessThanOrEqual(800 - BOTTOM_NAV_HEIGHT_PX);
+  });
+});
+
+// ─── Blessing box (map-first rework, 2026-09-18) ───────────────────────────
+
+function makeBoxVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: number } {
+  return makeVenue({
+    id: "test-box-1",
+    name: "Test Blessing Box",
+    category: "blessing_box",
+    ...overrides,
+  });
+}
+
+function makeBox(overrides: Partial<PublicBlessingBox["box"]> = {}): PublicBlessingBox {
+  return {
+    id: "test-box-1",
+    name: "Test Blessing Box",
+    category: "blessing_box",
+    lat: 38.27,
+    lng: -104.61,
+    address: "123 Test St, Pueblo, CO",
+    source: "manual",
+    last_verified: "2026-09-01T00:00:00.000Z",
+    box: {
+      hostName: null,
+      hostNote: "Please knock if the gate is closed.",
+      mostNeeded: null,
+      installedOn: "2026-01-01",
+      removedOn: null,
+      status: "stocked",
+      lastFilledAt: "2026-09-17T09:00:00.000Z",
+      statusSince: "2026-09-17T09:00:00.000Z",
+      recentCheckins: [],
+      ...overrides,
+    },
+  };
+}
+
+describe("DesktopVenueWindow — blessing box card (map-first rework)", () => {
+  test("collapsed: renders BoxCardBody content, no History link, no host note", () => {
+    render(
+      <DesktopVenueWindow
+        venue={makeBoxVenue()}
+        box={makeBox()}
+        expanded={false}
+        mapboxMap={mockMapboxMap}
+        onExpand={vi.fn()}
+        onCollapse={vi.fn()}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+    expect(screen.getByTestId("box-status-badge")).toBeDefined();
+    // showExpandedDetails=false in the collapsed box body — History link and
+    // the host-note section are both expanded-only (BoxCardBody's own gate).
+    expect(screen.queryByRole("link", { name: "History" })).toBeNull();
+    expect(screen.queryByText("Please knock if the gate is closed.")).toBeNull();
+  });
+
+  test("expanded: renders BoxCardBody content including the History link and host note", () => {
+    render(
+      <DesktopVenueWindow
+        venue={makeBoxVenue()}
+        box={makeBox()}
+        expanded={true}
+        mapboxMap={mockMapboxMap}
+        onExpand={vi.fn()}
+        onCollapse={vi.fn()}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+    expect(screen.getByTestId("box-status-badge")).toBeDefined();
+    const link = screen.getByRole("link", { name: "History" });
+    expect(link.getAttribute("href")).toBe("/box/test-box-1/history");
+    expect(screen.getByText("Please knock if the gate is closed.")).toBeDefined();
+  });
+
+  test("ordinary-venue-only sections (address, hours table, phone, Plentiful link, report) never render for a box", () => {
+    render(
+      <DesktopVenueWindow
+        venue={makeBoxVenue({ phone: "(719) 555-0199", address: "999 Should Not Show St" })}
+        box={makeBox()}
+        expanded={true}
+        mapboxMap={mockMapboxMap}
+        onExpand={vi.fn()}
+        onCollapse={vi.fn()}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+    expect(screen.queryByText("999 Should Not Show St")).toBeNull();
+    expect(screen.queryByText("(719) 555-0199")).toBeNull();
+    expect(screen.queryByRole("link", { name: /report/i })).toBeNull();
+  });
+
+  test("shows a loading fallback when box data hasn't arrived yet", () => {
+    render(
+      <DesktopVenueWindow
+        venue={makeBoxVenue()}
+        box={null}
+        expanded={false}
+        mapboxMap={mockMapboxMap}
+        onExpand={vi.fn()}
+        onCollapse={vi.fn()}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+    expect(screen.queryByTestId("box-status-badge")).toBeNull();
+  });
+
+  test("Show/Hide details header toggle still works for a box (unaffected by the isBox branch)", async () => {
+    const onExpand = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <DesktopVenueWindow
+        venue={makeBoxVenue()}
+        box={makeBox()}
+        expanded={false}
+        mapboxMap={mockMapboxMap}
+        onExpand={onExpand}
+        onCollapse={vi.fn()}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /show details/i }));
+    expect(onExpand).toHaveBeenCalledTimes(1);
+  });
+
+  test("Escape does not close the window while focus is inside the check-in note textarea", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <DesktopVenueWindow
+        venue={makeBoxVenue()}
+        box={makeBox()}
+        expanded={true}
+        mapboxMap={mockMapboxMap}
+        onExpand={vi.fn()}
+        onCollapse={vi.fn()}
+        onClose={onClose}
+        locale="en"
+      />,
+    );
+    // "I filled it" expands an optional-note form with a textarea (BoxCheckinPanel).
+    await user.click(screen.getByRole("button", { name: "I filled it" }));
+    const textarea = await screen.findByRole("textbox");
+    textarea.focus();
+    await user.keyboard("{Escape}");
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,11 @@
 /**
- * /box/[id] — a single blessing box's public page (Blessing Boxes slice 1).
+ * /box/[id] — no longer a standalone box page (map-first rework,
+ * 2026-09-18: Kyle wanted box interaction "to just happen on the map...
+ * not take you to a different page"). This route now exists ONLY to (a)
+ * keep old links (shares, the Routt redirect, future QR stickers) working
+ * and (b) still emit box-specific `<head>` metadata for link previews —
+ * see BoxRedirectClient.tsx's own header for why the redirect itself is
+ * client-side rather than a server `redirect()`.
  *
  * WHY this is NOT in the pre-built venue set (unlike /venue/[id]'s
  * generateStaticParams + dynamicParams=false): boxes are live, not
@@ -11,10 +17,6 @@
  * GET /api/public/blessing-boxes route does (src/lib/blessingBoxes.ts's
  * loadLiveBoxById) — best-effort: a D1 failure here 404s rather than
  * throwing a 500, same resilience posture as that route's own fallback.
- *
- * A box with no check-ins yet (slice 2 territory) always shows the
- * BOX_STATUS_PLACEHOLDER ("Unknown") — this page never computes a real
- * status.
  */
 
 import { notFound } from "next/navigation";
@@ -23,7 +25,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { buildPageMetadata } from "@/lib/site";
 import { loadLiveBoxById } from "@/lib/blessingBoxes";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
-import BoxContent from "@/components/BoxContent";
+import BoxRedirectClient from "@/components/BoxRedirectClient";
 
 export const dynamic = "force-dynamic";
 
@@ -61,5 +63,5 @@ export default async function BoxPage({
   const box = await loadBox(id);
   if (!box) notFound();
 
-  return <BoxContent box={box} />;
+  return <BoxRedirectClient id={box.id} name={box.name} />;
 }

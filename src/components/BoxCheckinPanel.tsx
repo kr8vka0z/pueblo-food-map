@@ -39,6 +39,29 @@
  * tap (or an already-queued one) waits for the callback's next token exactly
  * like the first one did.
  *
+ * Fallback to a visible checkbox (2026-09-18, follow-up): the invisible
+ * widget's own `error-callback` fires whenever Cloudflare doubts a visitor —
+ * with no widget on screen, that visitor had no way through at all (the old
+ * behavior: a red "please retry" error, forever, since retrying just re-runs
+ * the same invisible check that will fail the same way). Instead, a box
+ * error-callback swaps the invisible widget for a SECOND widget rendered
+ * into the same container, using the ordinary MANAGED key every other public
+ * form already uses (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`, default visible
+ * "Verify you are human" checkbox — no `appearance` override). `turnstileMode`
+ * ("box" | "fallback", mirrored into `turnstileModeRef` so the widget
+ * callbacks registered once at mount always read the current value, same
+ * reason `submitCheckin`'s own closure trick exists below) tracks which key
+ * is live; it flips at most once and never flips back — once a visitor has
+ * been asked for the visible checkbox, there's no reason to re-attempt the
+ * invisible one. A tap queued when the box widget fails is NOT failed — it
+ * stays in `pendingSubmit` and the existing token-arrival effect fires it
+ * the moment the FALLBACK widget produces a token, now carrying
+ * `turnstileKey: "fallback"` in the POST body instead of `"box"` (the server
+ * route picks its verification secret off this field). While waiting on the
+ * human, a calm one-line prompt (`box.checkin.turnstileFallbackPrompt`)
+ * replaces the old red error text — the fallback widget is expected to need
+ * an actual tap, not a transient failure.
+ *
  * A queued tap isn't guaranteed a token ever arrives — Turnstile's own
  * `error-callback` can fire instead, or the widget script can fail to load
  * or call back at all (content blocker, offline, slow network). Either way
@@ -48,9 +71,17 @@
  * existing plain error message, and — for a note-kind tap (filled/problem)
  * — reopens the note form with the visitor's typed text restored, since
  * `handleNoteSubmit` already cleared the live `note`/`openKind` state at
- * queue time. `PENDING_SUBMIT_TIMEOUT_MS` bounds the "never calls back at
- * all" case; `error-callback` firing bounds the "calls back with a failure"
- * case.
+ * queue time. In BOX mode, neither trigger reaches `failQueuedSubmit`
+ * directly anymore: `error-callback` calls `switchToFallback()` instead (see
+ * above), and `PENDING_SUBMIT_TIMEOUT_MS` — which still only runs in box
+ * mode; it's suspended entirely once `turnstileMode` is `"fallback"`, since
+ * a visible checkbox waiting on a real human tap has no natural time bound —
+ * also calls `switchToFallback()` first and only falls through to
+ * `failQueuedSubmit` if that swap itself couldn't happen (`window.turnstile`
+ * never loaded at all — the one case a fallback widget can't be mounted
+ * either). Only once the FALLBACK widget's own `error-callback` fires does
+ * `failQueuedSubmit` run for real, restoring the plain red error exactly as
+ * before this change.
  *
  * onCheckinSuccess lifts the POST response's fresh status/lastFilledAt
  * straight into BoxContent's own state — no refetch, no dependency on the
@@ -116,6 +147,19 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetId = useRef<string | null>(null);
 
+  // Which Turnstile key produced (or is expected to produce) the current
+  // token — see this file's own header, "Fallback to a visible checkbox".
+  // Mirrored into a ref because the box widget's error-callback is
+  // registered once at mount and must read the CURRENT mode synchronously
+  // (a second error-callback firing before a re-render would otherwise see
+  // a stale "box" and try to switch again).
+  const [turnstileMode, setTurnstileModeState] = useState<"box" | "fallback">("box");
+  const turnstileModeRef = useRef<"box" | "fallback">("box");
+  function setTurnstileMode(mode: "box" | "fallback") {
+    turnstileModeRef.current = mode;
+    setTurnstileModeState(mode);
+  }
+
   // A tap that lands before Turnstile's invisible check resolves queues here
   // instead of being dropped or blocking the panel — see this file's own
   // header. Cleared the instant the queued submit actually fires.
@@ -127,10 +171,53 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
 
     turnstileWidgetId.current = window.turnstile.render(turnstileContainerRef.current, {
       // Dedicated invisible-mode key, check-ins only — never the managed
-      // NEXT_PUBLIC_TURNSTILE_SITE_KEY the other three forms use. See this
-      // file's own header for why (Kyle, 2026-09-18: the managed checkbox
-      // still appeared on his phone even under "interaction-only").
+      // NEXT_PUBLIC_TURNSTILE_SITE_KEY the other three forms use (that key
+      // is reserved for the FALLBACK widget below). See this file's own
+      // header for why (Kyle, 2026-09-18: the managed checkbox still
+      // appeared on his phone even under "interaction-only").
       sitekey: process.env.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY ?? "",
+      callback: (token) => {
+        setTurnstileToken(token);
+        setTurnstileError(false);
+      },
+      "error-callback": () => {
+        // The invisible check doubts this visitor and there's no widget on
+        // screen for them to satisfy — swap in a visible checkbox instead
+        // of a dead-end error. Any queued tap stays queued; see this file's
+        // own header, "Fallback to a visible checkbox".
+        switchToFallback();
+      },
+      "expired-callback": () => {
+        setTurnstileToken(null);
+      },
+    });
+  }
+
+  /**
+   * Removes the (invisible) box widget and mounts the managed-key fallback
+   * widget into the same container — a visible "Verify you are human"
+   * checkbox, default appearance. Idempotent (a second call while already
+   * in fallback mode is a no-op) and never flips back to box mode: once a
+   * visitor's been asked for the visible checkbox, the invisible one has
+   * nothing left to prove. Returns false only when the swap genuinely
+   * couldn't happen (`window.turnstile` never loaded) — the one case the
+   * caller (the pending-submit timeout) still needs to fail the queued tap
+   * outright rather than wait on a widget that will never render.
+   */
+  function switchToFallback(): boolean {
+    if (turnstileModeRef.current === "fallback") return true;
+    if (!turnstileContainerRef.current || !window.turnstile) return false;
+
+    setTurnstileMode("fallback");
+    setTurnstileToken(null);
+    setTurnstileError(false);
+
+    if (turnstileWidgetId.current) {
+      window.turnstile.remove(turnstileWidgetId.current);
+      turnstileWidgetId.current = null;
+    }
+    turnstileWidgetId.current = window.turnstile.render(turnstileContainerRef.current, {
+      sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "",
       callback: (token) => {
         setTurnstileToken(token);
         setTurnstileError(false);
@@ -143,6 +230,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
         setTurnstileToken(null);
       },
     });
+    return true;
   }
 
   useEffect(() => {
@@ -195,16 +283,25 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
     queueMicrotask(() => failQueuedSubmit(queued));
   }, [turnstileError, pendingSubmit]);
 
-  // Failure mode 2: the Turnstile script never loads or never calls back at
-  // all (content blocker, offline, slow network) — nothing above ever fires
-  // without this. Each queued tap gets its own timer, cleared the moment it
-  // resolves (success, error-callback, or a fresh tap replacing it).
+  // Failure mode 2: the box widget never loads or never calls back at all
+  // (content blocker, offline, slow network) — nothing above ever fires
+  // without this. Only runs in BOX mode; suspended entirely once
+  // turnstileMode is "fallback" (dep below), since a visible checkbox
+  // waiting on a real human tap has no natural time bound — see this
+  // file's own header. On firing, tries switchToFallback() FIRST (the
+  // "no callback at all" case is exactly the case a real visitor most needs
+  // the visible widget for) and only falls through to failQueuedSubmit if
+  // that swap itself couldn't happen (window.turnstile never loaded — the
+  // one case a fallback widget can't be mounted either).
   useEffect(() => {
-    if (!pendingSubmit) return;
+    if (!pendingSubmit || turnstileMode === "fallback") return;
     const queued = pendingSubmit;
-    const timer = setTimeout(() => failQueuedSubmit(queued), PENDING_SUBMIT_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      if (!switchToFallback()) failQueuedSubmit(queued);
+    }, PENDING_SUBMIT_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [pendingSubmit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- switchToFallback/failQueuedSubmit only touch refs and stable setState setters (see switchToFallback's own header), so a fresh closure per render behaves identically; re-running this effect per pendingSubmit/turnstileMode change (not per render) is what it wants.
+  }, [pendingSubmit, turnstileMode]);
 
   async function submitCheckin(kind: CheckinKind, noteValue: string) {
     setSubmitState("submitting");
@@ -219,6 +316,14 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
           note: noteValue || undefined,
           website: honeypot, // honeypot field
           turnstileToken: turnstileToken ?? "",
+          // Which key produced this token — the route picks its
+          // verification secret off this field (TURNSTILE_SECRET_KEY for
+          // "fallback", TURNSTILE_BOX_SECRET_KEY otherwise). Read off the
+          // ref, not the `turnstileMode` state closed over by this render,
+          // so a mode flip that happens between queueing and firing (the
+          // exact case this whole fallback feature exists for) is never
+          // sent stale.
+          turnstileKey: turnstileModeRef.current,
           clientToken: getCheckinClientToken() ?? undefined,
         }),
       });
@@ -342,6 +447,9 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
         <p role="alert" className="text-xs text-[var(--color-danger)]">
           {t("form.turnstile.error", locale)}
         </p>
+      )}
+      {turnstileMode === "fallback" && !turnstileToken && !turnstileError && (
+        <p className="text-xs text-[var(--color-ink-700)]">{t("box.checkin.turnstileFallbackPrompt", locale)}</p>
       )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

@@ -108,6 +108,17 @@ interface CheckinPayload {
   website?: string;
   /** Cloudflare Turnstile response token from the client widget. */
   turnstileToken?: string;
+  /**
+   * Which Turnstile key produced turnstileToken above — "box" (the
+   * dedicated invisible-mode key) or "fallback" (the shared managed key,
+   * BoxCheckinPanel.tsx's visible-checkbox fallback for a visitor the
+   * invisible check doubted). Picks which secret this route verifies
+   * against, below. Strictly validated: only these two literal values are
+   * ever trusted — anything else (missing, mistyped, tampered) is treated
+   * as "box", the ORIGINAL/default flow, never silently upgraded to the
+   * shared managed secret.
+   */
+  turnstileKey?: string;
   /** Opaque, non-identifying per-browser token from src/lib/checkinClientToken.ts — used ONLY as a rate-limit key, never persisted to box_checkins (see migrations/0007's own header). */
   clientToken?: string;
 }
@@ -177,16 +188,23 @@ export async function POST(
   const ip =
     req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 
-  // Dedicated invisible-mode Turnstile secret, check-ins only — never
-  // TURNSTILE_SECRET_KEY, the managed-mode key the other three public forms
-  // verify against (2026-09-18: a managed-mode widget still popped its
-  // checkbox on a real phone even under `appearance: "interaction-only"`,
-  // so check-ins moved to a second site key provisioned in Cloudflare's
-  // invisible widget mode — see BoxCheckinPanel.tsx's own header and
-  // AGENTS.md's "Blessing boxes — card polish" section).
-  const turnstileSecret = process.env.TURNSTILE_BOX_SECRET_KEY;
+  // Which secret to verify against depends on which widget produced the
+  // token (2026-09-18 follow-up — the client can now fall back to the
+  // shared managed-mode widget when its own invisible check doubts a
+  // visitor; see BoxCheckinPanel.tsx's own header, "Fallback to a visible
+  // checkbox"). "fallback" -> the ordinary managed-mode secret every other
+  // public form already verifies against (TURNSTILE_SECRET_KEY — already
+  // set on both the dev and prod Workers, no new secret needed for this).
+  // Anything else, including missing/mistyped -> the dedicated invisible-mode
+  // secret this route has always used (TURNSTILE_BOX_SECRET_KEY) — the
+  // ORIGINAL flow stays the strict default, never silently upgraded.
+  const turnstileKey = body.turnstileKey === "fallback" ? "fallback" : "box";
+  const turnstileSecret =
+    turnstileKey === "fallback" ? process.env.TURNSTILE_SECRET_KEY : process.env.TURNSTILE_BOX_SECRET_KEY;
   if (!turnstileSecret) {
-    throw new Error("TURNSTILE_BOX_SECRET_KEY not configured");
+    throw new Error(
+      turnstileKey === "fallback" ? "TURNSTILE_SECRET_KEY not configured" : "TURNSTILE_BOX_SECRET_KEY not configured",
+    );
   }
   // Dedicated secret for rate-limit key derivation — deliberately NOT
   // turnstileSecret (2026-09-17 review correction; see checkinRateLimit.ts's

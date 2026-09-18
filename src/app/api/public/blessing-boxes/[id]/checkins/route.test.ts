@@ -204,6 +204,43 @@ describe("POST /api/public/blessing-boxes/[id]/checkins", () => {
     expect(mockVerifyTurnstileToken).toHaveBeenCalledWith("t", "test-secret", expect.any(String));
   });
 
+  // ─── Fallback to a visible checkbox (BoxCheckinPanel.tsx follow-up,
+  // 2026-09-18) — turnstileKey: "fallback" picks TURNSTILE_SECRET_KEY, the
+  // ordinary managed-mode secret every other public form already verifies
+  // against, instead of the dedicated TURNSTILE_BOX_SECRET_KEY. ───────────
+  describe("turnstileKey — which secret gets verified against", () => {
+    test("turnstileKey: 'fallback' verifies against TURNSTILE_SECRET_KEY, not TURNSTILE_BOX_SECRET_KEY", async () => {
+      process.env.TURNSTILE_SECRET_KEY = "test-managed-secret";
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
+      const res = await callPost({ kind: "took", turnstileToken: "t", turnstileKey: "fallback" });
+      expect(res.status).toBe(200);
+      expect(mockVerifyTurnstileToken).toHaveBeenCalledWith("t", "test-managed-secret", expect.any(String));
+    });
+
+    test("turnstileKey: 'fallback' with TURNSTILE_SECRET_KEY missing -> throws, never verifies", async () => {
+      delete process.env.TURNSTILE_SECRET_KEY;
+      await expect(
+        callPost({ kind: "took", turnstileToken: "t", turnstileKey: "fallback" }),
+      ).rejects.toThrow("TURNSTILE_SECRET_KEY not configured");
+      expect(mockVerifyTurnstileToken).not.toHaveBeenCalled();
+    });
+
+    test("turnstileKey missing -> verifies against TURNSTILE_BOX_SECRET_KEY (the original default)", async () => {
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
+      const res = await callPost({ kind: "took", turnstileToken: "t" });
+      expect(res.status).toBe(200);
+      expect(mockVerifyTurnstileToken).toHaveBeenCalledWith("t", "test-secret", expect.any(String));
+    });
+
+    test("an unrecognized turnstileKey value is treated as 'box', never as 'fallback'", async () => {
+      process.env.TURNSTILE_SECRET_KEY = "test-managed-secret";
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
+      const res = await callPost({ kind: "took", turnstileToken: "t", turnstileKey: "tampered-value" });
+      expect(res.status).toBe(200);
+      expect(mockVerifyTurnstileToken).toHaveBeenCalledWith("t", "test-secret", expect.any(String));
+    });
+  });
+
   test("invalid kind -> 422", async () => {
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
     const res = await callPost({ kind: "not-a-real-kind", turnstileToken: "t" });

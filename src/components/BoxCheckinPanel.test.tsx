@@ -188,52 +188,122 @@ describe("BoxCheckinPanel — a tap before the token exists is queued, not dropp
 
 // ─── Queued-tap recovery (bug fix follow-up, 2026-09-18) ──────────────────
 // A tap queued while waiting on a token must not be stuck forever if the
-// token never comes — Turnstile's error-callback, or nothing calling back
-// at all within PENDING_SUBMIT_TIMEOUT_MS.
+// token never comes — the box widget's error-callback, or nothing calling
+// back at all within PENDING_SUBMIT_TIMEOUT_MS. Since the fallback-widget
+// follow-up (below), NEITHER of those failure modes fails the queued tap
+// directly anymore — both now switch to the fallback widget first, and the
+// tap only actually fails if the FALLBACK widget also errors. Captures
+// every render() call's callbacks by index (0 = box widget, 1 = the
+// fallback widget mounted on top of it) so a test can drive either stage.
 describe("BoxCheckinPanel — a queued tap that never resolves is not stuck forever", () => {
   function renderPanelCapturingCallbacks() {
-    let fireError: (() => void) | null = null;
-    vi.stubGlobal("turnstile", {
-      render: vi.fn(
-        (_container: HTMLElement, opts: { "error-callback"?: () => void }) => {
-          // The token callback is never delivered in this describe block — every
-          // test here is about a tap that's still queued when it fails.
-          fireError = opts["error-callback"] ?? null;
-          return "widget-id-1";
-        },
-      ),
-      reset: vi.fn(),
-      remove: vi.fn(),
-    });
+    const errorCallbacks: (() => void)[] = [];
+    const tokenCallbacks: ((t: string) => void)[] = [];
+    let widgetCount = 0;
+    const renderMock = vi.fn(
+      (_container: HTMLElement, opts: { "error-callback"?: () => void; callback?: (t: string) => void }) => {
+        widgetCount += 1;
+        if (opts["error-callback"]) errorCallbacks.push(opts["error-callback"]);
+        if (opts.callback) tokenCallbacks.push(opts.callback);
+        return `widget-id-${widgetCount}`;
+      },
+    );
+    const removeMock = vi.fn();
+    vi.stubGlobal("turnstile", { render: renderMock, reset: vi.fn(), remove: removeMock });
     renderPanel();
     return {
-      fireError: () => {
-        if (!fireError) throw new Error("Turnstile error-callback never captured");
-        fireError();
+      renderMock,
+      removeMock,
+      fireBoxError: () => {
+        if (!errorCallbacks[0]) throw new Error("box widget error-callback never captured");
+        errorCallbacks[0]();
+      },
+      fireFallbackError: () => {
+        if (!errorCallbacks[1]) throw new Error("fallback widget error-callback never captured — did it mount?");
+        errorCallbacks[1]();
+      },
+      deliverFallbackToken: (token: string) => {
+        if (!tokenCallbacks[1]) throw new Error("fallback widget callback never captured — did it mount?");
+        tokenCallbacks[1](token);
       },
     };
   }
 
-  test("Turnstile error-callback while a tap is queued clears it — buttons re-enabled, error shown", async () => {
-    const user = userEvent.setup();
-    const { fireError } = renderPanelCapturingCallbacks();
+  test("box widget error-callback while a tap is queued switches to the fallback widget instead of failing it", async () => {
+    const originalManagedKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "managed-fallback-key";
+    try {
+      const user = userEvent.setup();
+      const { renderMock, removeMock, fireBoxError } = renderPanelCapturingCallbacks();
 
-    await user.click(await screen.findByRole("button", { name: "I took something" }));
-    expect(await screen.findByRole("button", { name: "Sending…" })).toBeDefined();
+      await user.click(await screen.findByRole("button", { name: "I took something" }));
+      expect(await screen.findByRole("button", { name: "Sending…" })).toBeDefined();
 
-    fireError();
+      fireBoxError();
 
-    await waitFor(() => expect(screen.getByText("That didn't go through. Please try again.")).toBeDefined());
-    expect(screen.getByRole("button", { name: "I took something" })).not.toBeDisabled();
-    expect(mockFetch).not.toHaveBeenCalled();
+      // Box widget removed, fallback widget mounted in its place with the
+      // shared managed key, default (visible) appearance — no `appearance`
+      // override, same as ReportForm/SuggestForm/FeedbackForm's own render.
+      await waitFor(() => expect(renderMock).toHaveBeenCalledTimes(2));
+      expect(removeMock).toHaveBeenCalledWith("widget-id-1");
+      expect(renderMock.mock.calls[1][1]).toEqual(
+        expect.objectContaining({ sitekey: "managed-fallback-key" }),
+      );
+      expect(renderMock.mock.calls[1][1]).toEqual(expect.not.objectContaining({ appearance: expect.anything() }));
+      // The tap is still queued (not failed) and the calm prompt replaces
+      // the old dead-end error text.
+      expect(screen.getByRole("button", { name: "Sending…" })).toBeDefined();
+      expect(screen.queryByText("That didn't go through. Please try again.")).toBeNull();
+      expect(screen.getByText(/tap the box below/i)).toBeDefined();
+      expect(mockFetch).not.toHaveBeenCalled();
+    } finally {
+      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = originalManagedKey;
+    }
   });
 
-  test("no token within the time limit clears the queued tap the same way", () => {
+  test("a queued tap fires once the fallback widget delivers a token, sending turnstileKey: 'fallback'", async () => {
+    mockSuccess();
+    const user = userEvent.setup();
+    const { fireBoxError, deliverFallbackToken } = renderPanelCapturingCallbacks();
+
+    await user.click(await screen.findByRole("button", { name: "I took something" }));
+    fireBoxError();
+    await waitFor(() => expect(screen.getByText(/tap the box below/i)).toBeDefined());
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    deliverFallbackToken("fallback-token");
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
+    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.kind).toBe("took");
+    expect(body.turnstileToken).toBe("fallback-token");
+    expect(body.turnstileKey).toBe("fallback");
+  });
+
+  test("no token within the time limit also switches to the fallback widget, not a failure", () => {
     // Real userEvent/waitFor polling relies on real setTimeout ticks, which
     // freeze under fake timers — fireEvent + a synchronous act() advance
     // avoids that trap entirely (both are already act-aware).
     vi.useFakeTimers();
-    renderPanelCapturingCallbacks();
+    const { renderMock } = renderPanelCapturingCallbacks();
+
+    fireEvent.click(screen.getByRole("button", { name: "I took something" }));
+    expect(screen.getByRole("button", { name: "Sending…" })).toBeDefined();
+
+    act(() => {
+      vi.advanceTimersByTime(15_000);
+    });
+
+    expect(renderMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: "Sending…" })).toBeDefined();
+    expect(screen.queryByText("That didn't go through. Please try again.")).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  test("window.turnstile never having loaded at all — the 15s timeout fails the queued tap (no widget to fall back to)", () => {
+    vi.stubGlobal("turnstile", undefined);
+    vi.useFakeTimers();
+    renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "I took something" }));
     expect(screen.getByRole("button", { name: "Sending…" })).toBeDefined();
@@ -247,9 +317,9 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  test("note text survives a failed queued submit — the note form reopens with it intact", async () => {
+  test("note text survives a failed queued submit once the FALLBACK widget also errors — the note form reopens with it intact", async () => {
     const user = userEvent.setup();
-    const { fireError } = renderPanelCapturingCallbacks();
+    const { fireBoxError, fireFallbackError } = renderPanelCapturingCallbacks();
 
     await user.click(await screen.findByRole("button", { name: "I filled it" }));
     await user.type(screen.getByLabelText(/Add a short note/i), "Topped it off");
@@ -259,7 +329,12 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
     // happy path in "a tap before the token exists is queued" above.
     expect(screen.queryByLabelText(/Add a short note/i)).toBeNull();
 
-    fireError();
+    fireBoxError(); // switches to fallback — tap stays queued, note stays lost-for-now
+    await waitFor(() => expect(screen.getByText(/tap the box below/i)).toBeDefined());
+    expect(screen.queryByLabelText(/Add a short note/i)).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    fireFallbackError(); // NOW it actually fails
 
     await waitFor(() => expect(screen.getByLabelText(/Add a short note/i)).toBeDefined());
     expect(screen.getByLabelText(/Add a short note/i)).toHaveValue("Topped it off");
@@ -285,6 +360,7 @@ describe("BoxCheckinPanel — one-tap kinds (took/low/empty)", () => {
     expect(body.kind).toBe("took");
     expect(body.note).toBeUndefined();
     expect(body.turnstileToken).toBe("test-turnstile-token");
+    expect(body.turnstileKey).toBe("box");
   });
 
   // `kind` was added to onCheckinSuccess's payload for the map-first card

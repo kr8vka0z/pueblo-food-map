@@ -2,7 +2,7 @@
  * ReportPhotoButton tests (Blessing Boxes slice 5).
  */
 
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ReportPhotoButton from "@/components/ReportPhotoButton";

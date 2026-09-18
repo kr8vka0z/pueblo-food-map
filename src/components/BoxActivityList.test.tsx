@@ -90,6 +90,6 @@ describe("BoxActivityList", () => {
     const items = [makeItem({ kind: "filled" }), makeItem({ kind: "took", createdAt: "2026-09-17T09:00:00.000Z" })];
     render(<BoxActivityList items={items} showVenueName now={NOW} />);
     expect(screen.getByText(/was filled/)).toBeInTheDocument();
-    expect(screen.getByText(/Someone took something/)).toBeInTheDocument();
+    expect(screen.getByText(/Someone used/)).toBeInTheDocument();
   });
 });

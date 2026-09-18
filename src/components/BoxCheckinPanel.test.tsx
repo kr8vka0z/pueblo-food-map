@@ -60,7 +60,7 @@ describe("BoxCheckinPanel — rendering", () => {
   test("renders all five check-in buttons", async () => {
     renderPanel();
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "I took something" })).toBeDefined();
+      expect(screen.getByRole("button", { name: "I used this box" })).toBeDefined();
     });
     expect(screen.getByRole("button", { name: "I filled it" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Running low" })).toBeDefined();
@@ -115,14 +115,14 @@ describe("BoxCheckinPanel — Turnstile widget stays invisible by default", () =
     // Turnstile that never calls back — token stays null for the whole test.
     vi.stubGlobal("turnstile", { render: vi.fn(() => "widget-id-1"), reset: vi.fn(), remove: vi.fn() });
     renderPanel();
-    await waitFor(() => expect(screen.getByRole("button", { name: "I took something" })).toBeDefined());
+    await waitFor(() => expect(screen.getByRole("button", { name: "I used this box" })).toBeDefined());
     expect(screen.queryByText(/Verifying/i)).toBeNull();
   });
 
   test("buttons are tappable immediately, before any token exists", async () => {
     vi.stubGlobal("turnstile", { render: vi.fn(() => "widget-id-1"), reset: vi.fn(), remove: vi.fn() });
     renderPanel();
-    const button = await screen.findByRole("button", { name: "I took something" });
+    const button = await screen.findByRole("button", { name: "I used this box" });
     expect(button).not.toBeDisabled();
   });
 });
@@ -151,7 +151,7 @@ describe("BoxCheckinPanel — a tap before the token exists is queued, not dropp
     mockSuccess();
     const user = userEvent.setup();
     const { deliver } = renderPanelWithDelayedToken();
-    const button = await screen.findByRole("button", { name: "I took something" });
+    const button = await screen.findByRole("button", { name: "I used this box" });
 
     await user.click(button);
     // Queued, not submitted yet — no token, and no dropped tap either.
@@ -236,7 +236,7 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
       const user = userEvent.setup();
       const { renderMock, removeMock, fireBoxError } = renderPanelCapturingCallbacks();
 
-      await user.click(await screen.findByRole("button", { name: "I took something" }));
+      await user.click(await screen.findByRole("button", { name: "I used this box" }));
       expect(await screen.findByRole("button", { name: "Sending…" })).toBeDefined();
 
       fireBoxError();
@@ -266,7 +266,7 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
     const user = userEvent.setup();
     const { fireBoxError, deliverFallbackToken } = renderPanelCapturingCallbacks();
 
-    await user.click(await screen.findByRole("button", { name: "I took something" }));
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
     fireBoxError();
     await waitFor(() => expect(screen.getByText(/tap the box below/i)).toBeDefined());
     expect(mockFetch).not.toHaveBeenCalled();
@@ -287,7 +287,7 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
     vi.useFakeTimers();
     const { renderMock } = renderPanelCapturingCallbacks();
 
-    fireEvent.click(screen.getByRole("button", { name: "I took something" }));
+    fireEvent.click(screen.getByRole("button", { name: "I used this box" }));
     expect(screen.getByRole("button", { name: "Sending…" })).toBeDefined();
 
     act(() => {
@@ -305,7 +305,7 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
     vi.useFakeTimers();
     renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "I took something" }));
+    fireEvent.click(screen.getByRole("button", { name: "I used this box" }));
     expect(screen.getByRole("button", { name: "Sending…" })).toBeDefined();
 
     act(() => {
@@ -313,7 +313,7 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
     });
 
     expect(screen.getByText("That didn't go through. Please try again.")).toBeDefined();
-    expect(screen.getByRole("button", { name: "I took something" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "I used this box" })).not.toBeDisabled();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -343,13 +343,13 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
 });
 
 describe("BoxCheckinPanel — one-tap kinds (took/low/empty)", () => {
-  test("tapping 'I took something' submits immediately, no note field ever shown", async () => {
+  test("tapping 'I used this box' submits immediately, no note field ever shown", async () => {
     mockSuccess();
     const user = userEvent.setup();
     renderPanel();
-    await waitFor(() => expect(screen.getByRole("button", { name: "I took something" })).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "I used this box" })).not.toBeDisabled());
 
-    await user.click(screen.getByRole("button", { name: "I took something" }));
+    await user.click(screen.getByRole("button", { name: "I used this box" }));
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
     expect(screen.queryByLabelText(/Add a short note/i)).toBeNull();
@@ -396,9 +396,9 @@ describe("BoxCheckinPanel — one-tap kinds (took/low/empty)", () => {
     mockSuccess();
     const user = userEvent.setup();
     renderPanel();
-    await waitFor(() => expect(screen.getByRole("button", { name: "I took something" })).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "I used this box" })).not.toBeDisabled());
 
-    await user.click(screen.getByRole("button", { name: "I took something" }));
+    await user.click(screen.getByRole("button", { name: "I used this box" }));
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
     const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
@@ -481,9 +481,9 @@ describe("BoxCheckinPanel — error states", () => {
     mockError("rate_limit_visitor");
     const user = userEvent.setup();
     renderPanel();
-    await waitFor(() => expect(screen.getByRole("button", { name: "I took something" })).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "I used this box" })).not.toBeDisabled());
 
-    await user.click(screen.getByRole("button", { name: "I took something" }));
+    await user.click(screen.getByRole("button", { name: "I used this box" }));
 
     await waitFor(() => {
       expect(screen.getByText(/Too many check-ins/i)).toBeDefined();
@@ -495,9 +495,9 @@ describe("BoxCheckinPanel — error states", () => {
     mockError("rate_limit_box");
     const user = userEvent.setup();
     renderPanel();
-    await waitFor(() => expect(screen.getByRole("button", { name: "I took something" })).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "I used this box" })).not.toBeDisabled());
 
-    await user.click(screen.getByRole("button", { name: "I took something" }));
+    await user.click(screen.getByRole("button", { name: "I used this box" }));
 
     await waitFor(() => {
       expect(screen.getByText(/unusual number of check-ins/i)).toBeDefined();
@@ -509,9 +509,9 @@ describe("BoxCheckinPanel — error states", () => {
     mockError("Not found");
     const user = userEvent.setup();
     renderPanel();
-    await waitFor(() => expect(screen.getByRole("button", { name: "I took something" })).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "I used this box" })).not.toBeDisabled());
 
-    await user.click(screen.getByRole("button", { name: "I took something" }));
+    await user.click(screen.getByRole("button", { name: "I used this box" }));
 
     await waitFor(() => {
       expect(screen.getByText("That didn't go through. Please try again.")).toBeDefined();
@@ -521,7 +521,7 @@ describe("BoxCheckinPanel — error states", () => {
   test("ES locale renders Spanish button labels", async () => {
     renderPanel("es");
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Tomé algo" })).toBeDefined();
+      expect(screen.getByRole("button", { name: "Usé esta caja" })).toBeDefined();
     });
   });
 });

@@ -40,6 +40,12 @@
  * each to its own copy: "too many check-ins from this device" vs. "this box
  * is getting an unusual number of check-ins right now."
  *
+ * Slice 5 (photos): the response now also carries `checkinId` (the new
+ * row's `meta.last_row_id`, null if D1 didn't hand one back) — a photo
+ * attached to a check-in (BoxCheckinPanel's "filled" note form, or the
+ * dedicated "Add a photo" choice) uploads in a SEPARATE request, after this
+ * one returns, and needs the id to link box_photos.checkin_id to it.
+ *
  * WHY 'problem' reports never touch the public read path: the INSERT below
  * is identical for every kind, but every public SELECT elsewhere in this
  * app (src/lib/blessingBoxes.ts) filters `kind != 'problem'` at the query —
@@ -289,11 +295,20 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
+  let newCheckinId: number | null = null;
   try {
-    await db
+    const insertResult = await db
       .prepare("INSERT INTO box_checkins (venue_id, kind, note) VALUES (?, ?, ?)")
       .bind(boxId, checkinKind, note)
       .run();
+    // Slice 5 (photos): a photo attached to this check-in is uploaded in a
+    // SEPARATE request, after this one returns — the client needs the new
+    // row's id to link it (box_photos.checkin_id). typeof-guarded rather
+    // than asserted: a D1 insert that succeeds without a usable
+    // last_row_id should degrade to "no id to attach a photo to," never
+    // crash an otherwise-successful check-in.
+    const rawId = insertResult.meta?.last_row_id;
+    if (typeof rawId === "number") newCheckinId = rawId;
   } catch (err) {
     logFormFailure("checkin", "db_write_failed", {
       message: err instanceof Error ? err.message : "unknown error",
@@ -336,5 +351,6 @@ export async function POST(
     ok: true,
     status: computeBoxStatus(checkins, now, outOfService),
     lastFilledAt: computeLastFilledAt(checkins),
+    checkinId: newCheckinId,
   });
 }

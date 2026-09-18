@@ -51,7 +51,7 @@ function makeFakeDb(opts: FakeDbOptions = {}) {
           run: async () => {
             if (insertShouldThrow) throw new Error("insert failed");
             insertCalls.push(args);
-            return { success: true };
+            return { success: true, meta: { last_row_id: 42 } };
           },
         }),
       };
@@ -332,6 +332,33 @@ describe("POST /api/public/blessing-boxes/[id]/checkins", () => {
     expect(data.ok).toBe(true);
     expect(data.status).toBe("stocked");
     expect(data.lastFilledAt).toBe(now.toISOString());
+  });
+
+  // ─── Slice 5 (photos): the response returns the new check-in's id so a
+  // photo can be attached to it in a follow-up request. ───────────────────
+  test("success response carries the new check-in's id (from D1's meta.last_row_id)", async () => {
+    const { db } = makeFakeDb();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    const res = await callPost({ kind: "took", turnstileToken: "t" });
+    const data = await res.json();
+    expect(data.checkinId).toBe(42);
+  });
+
+  test("checkinId is null when D1 doesn't hand back a usable last_row_id (defensive, never a crash)", async () => {
+    const prepare = (sql: string) => {
+      if (sql.includes("JOIN blessing_boxes")) {
+        return { bind: () => ({ first: async () => ({ id: BOX_ID, removed_on: null }) }) };
+      }
+      if (sql.includes("INSERT INTO box_checkins")) {
+        return { bind: () => ({ run: async () => ({ success: true }) }) }; // no meta at all
+      }
+      return { bind: () => ({ all: async () => ({ results: [] }) }) };
+    };
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: { prepare } as unknown as D1Database } });
+    const res = await callPost({ kind: "took", turnstileToken: "t" });
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.checkinId).toBeNull();
   });
 
   test("a box with a non-null removed_on -> response status is out_of_service", async () => {

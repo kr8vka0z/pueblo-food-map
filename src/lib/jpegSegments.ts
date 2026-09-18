@@ -25,8 +25,10 @@
  * re-parsed. This is the one deliberate scope boundary in this file.
  */
 
-/** APPn range that can carry EXIF/XMP/ICC/etc. — APP0 (JFIF) is the one exception kept (it's just density/thumbnail info, never personal). */
-const APP0_MARKER = 0xe0;
+// APPn range that can carry EXIF/XMP/ICC/etc. — APP0 (0xE0, JFIF) is the one
+// exception kept (it's just density/thumbnail info, never personal); the
+// range below starts at APP1 so APP0 is implicitly excluded, with no
+// separate constant needed for a marker this file never has to name.
 const APPN_FIRST = 0xe1; // APP1 — where EXIF (and often XMP) lives
 const APPN_LAST = 0xef; // APP15
 const SOS_MARKER = 0xda; // Start Of Scan — everything after this is image data, not metadata

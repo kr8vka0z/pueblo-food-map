@@ -31,9 +31,13 @@ performance).
    build on every PR and must pass before merge — `main` is a protected
    branch and requires the CI status check.
 
-CodeRabbit automatically reviews human-authored, non-draft pull requests.
-Address actionable findings before merge, or explain why a suggested change
-does not apply. New pushes receive incremental follow-up reviews automatically.
+CodeRabbit reviews pull requests into `main` and `dev` (see
+`.coderabbit.yaml`; drafts, Dependabot, the release bot, and
+"Publish venues update" PRs are skipped). While the repository has fewer
+than 10 stars, CodeRabbit does not start a review on its own — comment
+`@coderabbitai review` on the pull request to request one, and again after
+pushing fixes. Address actionable findings before merge, or explain why a
+suggested change does not apply.
 
 ## Development setup
 

@@ -76,6 +76,7 @@ npm run deploy    # OpenNext build + wrangler deploy to production
 
 ## Operational notes
 
+- **CodeRabbit review:** after opening a PR, comment `@coderabbitai review` — the repo has fewer than 10 stars, so CodeRabbit never starts a review by itself. Read its findings (inline comments plus the "Other comments" block in its review body) and address or answer them before merging. See CONTRIBUTING.md.
 - **Build logs:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab
 - **Rollback:** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments tab → find a previous successful deployment → "Rollback to this deployment". Production traffic switches in ~30 seconds.
 - **Environment variables — two kinds, two places.** (1) Build-time `NEXT_PUBLIC_*` are inlined by `next build` → set under **Settings → Build → Build variables**. (2) Runtime server secrets (`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`) are read at request time → set under **Settings → Variables and Secrets**. **Workers Builds has ONE shared build-variable set and a single `production` environment — there is NO separate Preview environment** (that's Cloudflare Pages). The same build vars apply to production deploys and PR preview builds.

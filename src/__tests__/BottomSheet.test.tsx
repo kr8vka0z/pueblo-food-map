@@ -222,7 +222,6 @@ function makeBox(overrides: Partial<PublicBlessingBox["box"]> = {}): PublicBless
       removedOn: null,
       status: "stocked",
       lastFilledAt: "2026-09-17T09:00:00.000Z",
-      statusSince: "2026-09-17T09:00:00.000Z",
       recentCheckins: [],
       ...overrides,
     },

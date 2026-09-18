@@ -481,14 +481,16 @@ const en: Record<string, string> = {
 
   // Blessing box card (rendered in-map, BottomSheet/DesktopVenueWindow, slice 1)
   "box.host": "Host",
-  "box.hostNotePrefix": "From the host",
   "box.mostNeeded": "Most needed",
   "box.status": "Status",
   "box.status.unknown": "Unknown — no recent check-ins",
-  "box.notFound": "We couldn't find that blessing box.",
   // Card is opening on the map (client redirect from /box/<id>) or the
   // full box record hasn't loaded into the card yet — both share this line.
   "box.cardLoading": "Loading…",
+  // No-JS fallback (fix, PR review 2026-09-18): the redirect above needs a
+  // client effect to run, so a JS-disabled visitor is never sent anywhere —
+  // this is the plain link that gets them there by hand.
+  "box.redirectLink": "View this box on the map",
 
   // Check-ins and live status (slice 2)
   "box.status.stocked": "Stocked",
@@ -1057,12 +1059,11 @@ const es: Record<string, string> = {
 
   // Blessing box card (rendered in-map, BottomSheet/DesktopVenueWindow, slice 1)
   "box.host": "Anfitrión", // [CHECK]
-  "box.hostNotePrefix": "Del anfitrión", // [CHECK]
   "box.mostNeeded": "Lo que más se necesita",
   "box.status": "Estado",
   "box.status.unknown": "Desconocido — sin visitas recientes", // [CHECK]
-  "box.notFound": "No pudimos encontrar esa caja de bendiciones.", // [CHECK]
   "box.cardLoading": "Cargando…", // [CHECK]
+  "box.redirectLink": "Ver esta caja en el mapa", // [CHECK]
 
   // Check-ins and live status (slice 2)
   "box.status.stocked": "Surtida", // [CHECK]

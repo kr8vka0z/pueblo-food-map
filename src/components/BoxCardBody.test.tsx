@@ -51,7 +51,6 @@ const BASE_BOX: PublicBlessingBox = {
     removedOn: null,
     status: "stocked",
     lastFilledAt: "2026-09-17T09:00:00.000Z",
-    statusSince: "2026-09-17T09:00:00.000Z",
     recentCheckins: [],
   },
 };

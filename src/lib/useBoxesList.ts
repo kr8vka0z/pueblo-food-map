@@ -2,19 +2,21 @@
 
 /**
  * useBoxesList — client-side fetch of the FULL live blessing-box layer
- * (GET /api/public/blessing-boxes) for the /boxes directory page (Blessing
- * Boxes slice 4, Discovery story B5).
+ * (GET /api/public/blessing-boxes). Originally built for the now-deleted
+ * /boxes directory page (Blessing Boxes slice 4); its one consumer today is
+ * MapWrapper.tsx, which needs the FULL PublicBlessingBox (status,
+ * lastFilledAt, mostNeeded, recentCheckins, host note) to render the open
+ * box card, not just the plain Venue shape.
  *
  * WHY a separate hook from useBoxVenues.ts, not a shared one with an
  * options flag: useBoxVenues deliberately strips every box down to a plain
  * Venue (see its own header) so it slots into useMapFilters' pipeline with
  * zero adapter code — the right shape for the MAP's marker/filter pipeline.
- * /boxes needs the FULL PublicBlessingBox (status, statusSince,
- * lastFilledAt, mostNeeded) to sort and render its rows, so this hook
- * fetches the SAME endpoint and keeps the full shape instead. Same fetch,
- * same best-effort-on-failure convention; not worth a shared options param
- * for what's really two different return types serving two different
- * consumers.
+ * This hook fetches the SAME endpoint and keeps the full shape instead for
+ * the card. Same fetch, same best-effort-on-failure convention; not worth a
+ * shared options param for what's really two different return types serving
+ * two different consumers (MapWrapper.tsx's card vs. BoxesActivityContent.tsx's
+ * filter dropdown, via useBoxVenues).
  */
 
 import { useEffect, useState } from "react";

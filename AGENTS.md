@@ -2651,6 +2651,171 @@ filter UI.
 
 ---
 
+# Blessing Boxes — directory page, closest-to-me, map entry point (slice 4)
+
+Full design: `atlas-kb/projects/Pueblo Food Map/Blessing Boxes Build Plan.md`
+and `...Blessing Boxes Epic - Discovery.md` (stories B2-B6). This section
+covers what slice 4 shipped, on top of slices 1-3 above. **No new
+migration** — this slice is read-side UI only, built entirely on the
+`statusSince` field (below) and the public box shape slices 1-3 already
+expose.
+
+**`statusSince` — a new field on `PublicBlessingBox.box`, computed by
+`computeStatusSince()` (`src/lib/blessingBoxes.ts`), mirroring
+`computeBoxStatus()`'s own status-setting-check-in search but returning the
+TIMESTAMP instead of the mapped status string.** Exists because "needs
+filling most" (next paragraph) has to rank *within* the empty/low group by
+how long a box has sat in that state, which `lastFilledAt` can't answer —
+a box last filled three months ago and one last filled yesterday can both
+currently read `empty`, and only `statusSince` distinguishes "just went
+empty" from "been empty a while." `null` for `out_of_service` or a box with
+no status-setting signal at all, same "no signal" convention
+`lastFilledAt`/`computeBoxStatus()` already use.
+
+**Two pure comparators, also in `blessingBoxes.ts`, fully unit-tested
+(ties, nulls, determinism) in `blessingBoxes.test.ts`:**
+
+- `compareBoxesByNeedsFillingMost()` — the default `/boxes` sort. Ranks by
+  status group first (`empty` → `low` → `unknown` → `stocked` →
+  `out_of_service`, `NEEDS_FILLING_RANK`), then within `empty`/`low` breaks
+  ties on `statusSince` ascending (older = more urgent; a missing
+  `statusSince` sorts as MOST urgent, `""` treated as earliest), then
+  within `unknown`/`stocked` breaks ties on `lastFilledAt` ascending (same
+  null-sorts-first-as-most-urgent treatment), then falls back to
+  `name.localeCompare` then `id.localeCompare` for full determinism (a
+  stable sort still needs a real tiebreak once two boxes share every other
+  field — two `Array.prototype.sort` calls on the same input can otherwise
+  reorder ties differently across engines).
+- `compareBoxesByRecentlyFilled()` — `lastFilledAt` descending, but a null
+  sorts LAST here (the opposite end from the same field's treatment in the
+  needs-filling comparator above — "recently filled" and "needs filling"
+  are asking opposite questions about the same missing data: never-filled
+  is the LEAST recent, not the most urgent, in this ordering). Same
+  name/id tiebreak.
+
+**`STATUS_BADGE_CLASS`** (the Tailwind class map behind each status badge)
+moved from a private const in `BoxContent.tsx` into `blessingBoxes.ts` and
+is now exported — both `BoxContent.tsx` (the per-box page) and
+`BoxesDirectoryContent.tsx` (this slice's directory page) render the same
+badge styling from one place instead of a second copy drifting from the
+first.
+
+**`/boxes`** (`src/app/boxes/page.tsx` + `BoxesDirectoryContent.tsx`, the
+server-shell/client-content split every other directory page in this repo
+uses — see `/venues` and `/boxes/activity` above) — lists every live box
+(`useBoxesList()`, the full-`PublicBlessingBox`-shape sibling of
+`useBoxVenues.ts`; that existing hook only returns the map's lighter marker
+shape, so a second hook was added rather than widening the first and
+forcing every map render to carry fields it never uses) fetched from the
+SAME `GET /api/public/blessing-boxes` slice 1 already ships (no new route,
+no new cache).
+
+- **Sort control** (`<select>`, real `<label htmlFor>`, not icon-only) —
+  three options: `needsFilling` (default, B6), `closest` (B2), and
+  `recentlyFilled`.
+- **B3 "prefer boxes not reported empty"** — one labeled checkbox
+  ("Hide boxes reported empty"), not a filter panel, per the task's own
+  instruction. Filters the empty-status boxes out of the list entirely
+  when checked; combines with any sort.
+- **B2 "closest to me," one tap, no location required to use the page** —
+  picking `closest` in the sort `<select>` IS the one tap: it calls
+  `useGeolocation()`'s `request()` right there (no separate button).
+  Distance is `haversineMiles()` (straight-line, `src/lib/distance.ts`,
+  already documented in that file as NOT a walking route) computed
+  entirely client-side against the already-fetched box array — **the fetch
+  to `/api/public/blessing-boxes` carries no query string, body, or header
+  derived from the visitor's coordinates, ever; the position is read only
+  to sort the array already in memory.** Regression-guarded in
+  `BoxesDirectoryContent.test.tsx` ("the visitor's coordinates never
+  appear in the outbound fetch"): asserts the fetch is called exactly
+  once, with no `init` argument and no lat/lng/latitude/longitude
+  substring in the URL. Without location (denied, not yet granted, or
+  unavailable), the page falls straight back to the default needs-filling
+  order with an honest inline message — never a blank or broken page; the
+  task's own "must work without location too... or just the full list"
+  requirement is met by the simpler of two valid readings (full-list
+  fallback) rather than building address/neighborhood-entry geocoding
+  infrastructure this repo has no existing public-facing capability for
+  (flagged as a scope decision in the PR, not assumed).
+- **B6 most-needed** — surfaced on every row that has one (`box.mostNeeded`,
+  already public since slice 1), same field `BoxContent.tsx`'s own page
+  already shows.
+- **A11y** — the sort control and the checkbox both carry real
+  `<label>`/accessible-name text; the ONE `aria-live="polite"` region is a
+  single result-count status line (`"N boxes"`), never the list itself —
+  same "narrow the live region" convention `BoxesActivityContent.tsx`
+  (slice 3) already established, so a filter/sort change announces a count
+  instead of re-reading 30+ rows to a screen-reader user.
+- **Registered in `src/app/sitemap.ts`** at priority 0.7 / hourly — shares
+  `/venues`' priority tier as a real browse/discovery page, not
+  `/boxes/activity`'s lower watcher-tier 0.5.
+
+**B4 — the map entry point is a REAL, undecided design choice, so both
+candidates are built and live behind one query-param switch rather than
+either being picked unilaterally:**
+
+- **No `?boxEntry=` param is a NEUTRAL, third state — not an alias for
+  either candidate.** `resolveBoxEntryVariant()` (`src/lib/boxEntryVariant.ts`,
+  a small pure module with no map-related imports, extracted specifically
+  so it's unit-testable — see the next bullet) maps the query string to
+  `"nav" | "map" | null`; an absent or unrecognized `boxEntry` value
+  resolves to `null`, which renders NEITHER candidate — today's exact
+  4-item `BottomNav` and no floating button. **This corrects a real bug
+  found in review on PR #473:** the first version of this switch defaulted
+  the no-param case to `"nav"`, so every ordinary visitor with no
+  `?boxEntry=` at all silently got the 5-item bar — the opposite of
+  opt-in, and a silent override of the finalized 4-item design below.
+  `MapWrapper.tsx` reads this ONCE via a lazy `useState` initializer over
+  `window.location.search` — safe only because `MapWrapper` is always
+  dynamically imported with `ssr: false` (confirmed via
+  `HomePageClient.tsx`) and therefore never renders server-side, so there
+  is no server/client markup mismatch to worry about from reading
+  `window` directly.
+- **Candidate "nav"** (`?boxEntry=nav`, explicit opt-in only) —
+  `BottomNav.tsx` gained a 5th, OPT-IN item (`showBoxesItem` prop, default
+  `false`) linking to `/boxes`. Default `false` is load-bearing: `BottomNav`
+  is documented elsewhere in this file as a finalized 4-item design (Near
+  me/Saved/Resources/Menu, Kyle 2026-09-16) — this slice does not silently
+  grow it; the item only appears when `MapWrapper` explicitly resolves to
+  `"nav"`. Regression-guarded in `BottomNav.test.tsx`: the default renders
+  exactly 4 items with no "Boxes" text; `showBoxesItem: true` renders 5, in
+  order, with a visible (non-sr-only) label.
+- **Candidate "map"** (`?boxEntry=map`, explicit opt-in only) —
+  `BlessingBoxesMapButton.tsx`, a new floating pill button (bottom-right,
+  above `BottomNav`'s own height via the shared `BOTTOM_NAV_HEIGHT_PX`
+  constant, `--color-cat-blessing` raspberry fill per DESIGN.md's existing
+  category-color token, `--radius-full`, the shared `PRESS_FEEDBACK`
+  interaction class) linking to `/boxes`. No new dependency — reuses
+  existing tokens/classes exactly as DESIGN.md prescribes.
+- **Preview URLs for Kyle to compare** (dev, once merged and deployed):
+  `https://dev.pueblofoodmap.com/?boxEntry=nav` (bottom-nav candidate) and
+  `https://dev.pueblofoodmap.com/?boxEntry=map` (floating map-button
+  candidate). `https://dev.pueblofoodmap.com/` with NO param shows neither
+  — today's unmodified 4-item bar.
+- **`boxEntryVariant.test.ts` is the MapWrapper-level regression coverage**
+  the fix above needs: no param -> `null`, `?boxEntry=nav` -> `"nav"`,
+  `?boxEntry=map` -> `"map"`, an unrecognized value -> `null`. This repo has
+  no `MapWrapper.test.tsx` harness anywhere (Mapbox's WebGL canvas
+  requirement makes it untestable in jsdom, same limitation this file's own
+  "Map library" section at the top documents), so the resolver was
+  extracted into its own map-import-free module precisely so the
+  param-to-variant mapping — the actual bug's location — has a real,
+  headless test rather than only each CANDIDATE component being tested in
+  isolation (`BottomNav.test.tsx`'s own describe block,
+  `BlessingBoxesMapButton.test.tsx`).
+- **All of this — `boxEntryVariant.ts`, `BlessingBoxesMapButton.tsx`,
+  `MapWrapper.tsx`'s `boxEntryVariant` state, and `BottomNav.tsx`'s
+  `showBoxesItem` prop — is TEMPORARY scaffolding for Kyle's B4 choice, not
+  a permanent feature flag.** It MUST be deleted and collapsed to whichever
+  single placement he picks BEFORE this feature is ever promoted to `main`.
+
+**Deliberately NOT built in this slice** (out of the acceptance criteria,
+per the task's own explicit exclusion list, so a later slice doesn't
+assume otherwise): photos, adopt-a-box, alerts, stats/numbers, QR
+stickers, accounts.
+
+---
+
 # Design system — DESIGN.md
 
 [DESIGN.md](DESIGN.md) is the agent-facing visual-identity reference. Read it before

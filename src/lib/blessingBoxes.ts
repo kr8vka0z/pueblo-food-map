@@ -176,6 +176,40 @@ export function computeLastFilledAt(checkins: CheckinStatusInput[]): string | nu
   return latest;
 }
 
+/**
+ * SLICE 4 — the timestamp of whichever check-in set the box's CURRENT
+ * status ("since when has this box been reading empty/low/stocked").
+ * Deliberately separate from computeLastFilledAt: for an EMPTY box,
+ * computeLastFilledAt answers "when was it last filled" (which could be
+ * months ago), not "how long has it been sitting empty" — and the /boxes
+ * "needs filling most" sort (compareBoxesByNeedsFillingMost, below) needs
+ * exactly the latter to rank a box that's been empty for three weeks ahead
+ * of one that went empty an hour ago.
+ *
+ * Uses the SAME latest-visible-status-setting-check-in search
+ * computeBoxStatus() runs, so the two can never disagree about which
+ * check-in is "current" — this is not a second independent read of the
+ * check-ins list with its own bug surface, it's the same search restated
+ * to return the timestamp instead of the mapped status. `outOfService`
+ * mirrors computeBoxStatus()'s own parameter for the same reason: an
+ * out-of-service box's state isn't driven by a check-in at all, so there
+ * is no "since when" to report — null, same as "no signal."
+ */
+export function computeStatusSince(
+  checkins: CheckinStatusInput[],
+  outOfService: boolean,
+): string | null {
+  if (outOfService) return null;
+
+  let latest: CheckinStatusInput | null = null;
+  for (const c of checkins) {
+    if (c.visibility !== "visible") continue;
+    if (!(c.kind in STATUS_SETTING_KIND)) continue;
+    if (!latest || c.created_at > latest.created_at) latest = c;
+  }
+  return latest?.created_at ?? null;
+}
+
 /** How many recent public check-in events a box's public shape carries — a feed, not a full history (the full history is slice 3's /boxes/activity page). */
 const RECENT_CHECKINS_LIMIT = 5;
 
@@ -214,6 +248,8 @@ export interface PublicBlessingBox extends Venue {
     removedOn: string | null;
     status: BoxStatus;
     lastFilledAt: string | null;
+    /** SLICE 4 — see computeStatusSince()'s own header. Feeds compareBoxesByNeedsFillingMost's empty/low tie-break; not otherwise rendered. */
+    statusSince: string | null;
     recentCheckins: PublicCheckinEvent[];
   };
 }
@@ -299,6 +335,7 @@ export function mapRowToPublicBox(
       removedOn: row.removed_on,
       status: computeBoxStatus(checkins, now, outOfService),
       lastFilledAt: computeLastFilledAt(checkins),
+      statusSince: computeStatusSince(checkins, outOfService),
       recentCheckins: toPublicCheckinEvents(checkins),
     },
   };
@@ -311,6 +348,108 @@ export function mapRowsToPublicBoxes(rows: BoxJoinRow[]): PublicBlessingBox[] {
 /** Type guard used by MapWrapper's merged venue list to route a click to /box/<id> instead of opening the normal detail card. */
 export function isBlessingBox(category: VenueCategory): category is "blessing_box" {
   return category === "blessing_box";
+}
+
+// ─── Shared UI constant (slice 2, relocated here slice 4) ──────────────────
+// Moved out of BoxContent.tsx so /boxes' row list (slice 4) can share it
+// instead of a second copy drifting out of sync with the detail page's
+// badge. Plain Tailwind class strings, no JSX/framework import — still
+// fits this file's own "pure" convention (see header), same as i18n.ts
+// living in lib/ with no React import either.
+/** Semantic-token color pairing per status — success/warning/danger are DESIGN.md's general status tokens, not admin-only (see AGENTS.md's own note on --color-danger, which is about ONE admin button's rationale, not a restriction on this token's normal error/status use elsewhere). Unknown/out_of_service intentionally reuse the same muted neutral treatment slice 1 already used for the placeholder — neither is an alarming state. */
+export const STATUS_BADGE_CLASS: Record<BoxStatus, string> = {
+  stocked: "bg-[var(--color-success)]/10 text-[var(--color-success)]",
+  low: "bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
+  empty: "bg-[var(--color-danger)]/10 text-[var(--color-danger)]",
+  unknown: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
+  out_of_service: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
+};
+
+// ─── /boxes sort logic (slice 4, Discovery B5/B2) ──────────────────────────
+
+/**
+ * Status-group urgency order for compareBoxesByNeedsFillingMost — lower
+ * sorts first (more urgent). An out-of-service box sorts LAST: it doesn't
+ * need filling, it needs a host or an admin, so surfacing it ahead of
+ * boxes that genuinely need a giver's trip would be actively misleading.
+ */
+const NEEDS_FILLING_RANK: Record<BoxStatus, number> = {
+  empty: 0,
+  low: 1,
+  unknown: 2,
+  stocked: 3,
+  out_of_service: 4,
+};
+
+/**
+ * The /boxes page's DEFAULT sort (Blessing Boxes slice 4, acceptance
+ * criterion 1: "define it from the status rule ... document the ordering
+ * in a comment"). Rule, in priority order:
+ *
+ *   1. Status group, in the urgency order NEEDS_FILLING_RANK encodes:
+ *      empty, then running low, then unknown, then stocked, then
+ *      out-of-service last (see that constant's own comment).
+ *   2. Within empty/low: `statusSince` ascending — the box that has held
+ *      that status the LONGEST sorts first (an older "went empty" signal
+ *      is more urgent than a fresh one). A missing statusSince (shouldn't
+ *      happen for a real empty/low box — that status can only be SET by a
+ *      check-in, which is exactly what statusSince reads) is treated as
+ *      "" so it sorts first defensively, never silently buried.
+ *   3. Within unknown/stocked: `lastFilledAt` ascending, treating "never
+ *      filled" (null) as the earliest possible value — a box that's never
+ *      been filled needs it more than one filled last week, even though
+ *      neither currently reads empty or low.
+ *   4. Within out-of-service: no urgency signal applies — falls straight
+ *      through to the tie-break below.
+ *   5. Final tie-break, every group: name (locale-aware `localeCompare`),
+ *      then id — makes the order fully deterministic, so two boxes with
+ *      identical timestamps never visibly swap position between renders
+ *      or between two runs of the same test.
+ */
+export function compareBoxesByNeedsFillingMost(
+  a: PublicBlessingBox,
+  b: PublicBlessingBox,
+): number {
+  const rankDiff = NEEDS_FILLING_RANK[a.box.status] - NEEDS_FILLING_RANK[b.box.status];
+  if (rankDiff !== 0) return rankDiff;
+
+  if (a.box.status === "empty" || a.box.status === "low") {
+    const aKey = a.box.statusSince ?? "";
+    const bKey = b.box.statusSince ?? "";
+    if (aKey !== bKey) return aKey < bKey ? -1 : 1;
+  } else if (a.box.status === "unknown" || a.box.status === "stocked") {
+    const aKey = a.box.lastFilledAt ?? "";
+    const bKey = b.box.lastFilledAt ?? "";
+    if (aKey !== bKey) return aKey < bKey ? -1 : 1;
+  }
+
+  const nameDiff = a.name.localeCompare(b.name);
+  if (nameDiff !== 0) return nameDiff;
+  return a.id.localeCompare(b.id);
+}
+
+/**
+ * The /boxes page's "Recently filled" sort option (slice 4, acceptance
+ * criterion 1's third offered sort) — `lastFilledAt` descending (most
+ * recently filled first). A box that's never been filled (null) sorts
+ * LAST, the opposite end from compareBoxesByNeedsFillingMost's treatment
+ * of the same null (there, "never filled" reads as most urgent; here, it
+ * reads as least recent — same fact, two different questions). Same
+ * name/id tie-break as compareBoxesByNeedsFillingMost, for the same
+ * determinism reason.
+ */
+export function compareBoxesByRecentlyFilled(a: PublicBlessingBox, b: PublicBlessingBox): number {
+  const aFilled = a.box.lastFilledAt;
+  const bFilled = b.box.lastFilledAt;
+  if (aFilled === null && bFilled !== null) return 1;
+  if (aFilled !== null && bFilled === null) return -1;
+  if (aFilled !== null && bFilled !== null && aFilled !== bFilled) {
+    return aFilled > bFilled ? -1 : 1;
+  }
+
+  const nameDiff = a.name.localeCompare(b.name);
+  if (nameDiff !== 0) return nameDiff;
+  return a.id.localeCompare(b.id);
 }
 
 // ─── Check-in SQL (slice 2) ─────────────────────────────────────────────────

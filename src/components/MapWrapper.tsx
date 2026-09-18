@@ -32,6 +32,8 @@ import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
 import BottomNav, { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
+import BlessingBoxesMapButton from "./BlessingBoxesMapButton";
+import { resolveBoxEntryVariant, type BoxEntryVariant } from "@/lib/boxEntryVariant";
 import CategoryDropdown from "./CategoryDropdown";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
@@ -283,6 +285,30 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   // ── Locale — from context ─────────────────────────────────────────────────────
   const { locale } = useLocale();
+
+  // ── Blessing Boxes entry point — B4 preview switch (slice 4) ────────────────
+  // Kyle has to see BOTH candidates on dev before either ships (task's own
+  // instruction — this is a real visual decision, not ours to pick
+  // silently). NEITHER candidate renders by default: ?boxEntry=nav opts
+  // into BottomNav's 5th item, ?boxEntry=map opts into the floating
+  // BlessingBoxesMapButton, and no param (or any other value) resolves to
+  // neutral — today's exact 4-item BottomNav, no floating button — so
+  // Kyle's finalized 4-item design (2026-09-16) is never silently
+  // overridden for a visitor who never opted into a preview. Resolution
+  // logic lives in resolveBoxEntryVariant() (src/lib/boxEntryVariant.ts),
+  // extracted specifically so it's unit-testable — MapWrapper itself has
+  // no test harness (see that file's own header). Read once via a lazy
+  // useState initializer, same convention as SplashScreen/HomePageClient's
+  // other `window.location.search` reads — safe here because MapWrapper is
+  // mounted via next/dynamic(ssr:false) (see its own file header), so it
+  // never renders on the server at all; there is no hydration mismatch to
+  // guard against. TEMPORARY: delete this whole switch (this state,
+  // BlessingBoxesMapButton.tsx, boxEntryVariant.ts, and BottomNav's
+  // `showBoxesItem` prop), collapsing to whichever single placement Kyle
+  // picks, BEFORE any promotion of this feature to `main`.
+  const [boxEntryVariant] = useState<BoxEntryVariant>(() =>
+    typeof window === "undefined" ? null : resolveBoxEntryVariant(window.location.search),
+  );
 
   // ── Geolocation — v2 hook ────────────────────────────────────────────────────
   const geo = useGeolocation();
@@ -1388,6 +1414,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
+      {/* Blessing Boxes entry point candidate "map" (B4) — see the
+          boxEntryVariant switch above. */}
+      {!venueSheetOpen && boxEntryVariant === "map" && (
+        <BlessingBoxesMapButton locale={locale} />
+      )}
+
       {/* BottomNav — LAST in DOM order so keyboard users reach the map and the
           search first (spec §12). */}
       {!venueSheetOpen && (
@@ -1400,6 +1432,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           isDrifted={isDrifted}
           onNearMe={handleNearMe}
           navRef={navRef}
+          showBoxesItem={boxEntryVariant === "nav"}
         />
       )}
     </div>

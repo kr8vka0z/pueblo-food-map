@@ -36,20 +36,11 @@ import { formatRelativeTime } from "@/lib/relativeTime";
 import { useBoxActivity } from "@/lib/useBoxActivity";
 import BoxCheckinPanel from "@/components/BoxCheckinPanel";
 import BoxActivityList from "@/components/BoxActivityList";
-import type { BoxStatus, PublicBlessingBox } from "@/lib/blessingBoxes";
+import { STATUS_BADGE_CLASS, type BoxStatus, type PublicBlessingBox } from "@/lib/blessingBoxes";
 
 interface BoxContentProps {
   box: PublicBlessingBox;
 }
-
-/** Semantic-token color pairing per status — success/warning/danger are DESIGN.md's general status tokens, not admin-only (see AGENTS.md's own note on --color-danger, which is about ONE admin button's rationale, not a restriction on this token's normal error/status use elsewhere). Unknown/out_of_service intentionally reuse the same muted neutral treatment slice 1 already used for the placeholder — neither is an alarming state. */
-const STATUS_BADGE_CLASS: Record<BoxStatus, string> = {
-  stocked: "bg-[var(--color-success)]/10 text-[var(--color-success)]",
-  low: "bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
-  empty: "bg-[var(--color-danger)]/10 text-[var(--color-danger)]",
-  unknown: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
-  out_of_service: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
-};
 
 export default function BoxContent({ box }: BoxContentProps) {
   const { locale } = useLocale();

@@ -18,6 +18,7 @@
  */
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
@@ -30,17 +31,27 @@ interface BoxRedirectClientProps {
 export default function BoxRedirectClient({ id, name }: BoxRedirectClientProps) {
   const router = useRouter();
   const { locale } = useLocale();
+  const destination = `/?venue=${encodeURIComponent(id)}`;
 
   useEffect(() => {
-    router.replace(`/?venue=${encodeURIComponent(id)}`);
-  }, [id, router]);
+    router.replace(destination);
+  }, [destination, router]);
 
-  // Visible only for the brief flash before the replace takes effect (and
-  // for a JS-disabled visitor, who won't be redirected at all — the name
-  // plus a plain reason is more useful to them than a spinner).
+  // Visible only for the brief flash before the replace takes effect for a
+  // JS visitor. A JS-disabled visitor never runs the effect above at all and
+  // would otherwise be stuck on "Loading…" forever (fix, PR review
+  // 2026-09-18) — the plain <a> link below is a real navigation, not a
+  // router.push, so it works with JS off too.
   return (
     <p className="p-6 text-sm text-[var(--color-ink-500)]">
       {name} — {t("box.cardLoading", locale)}
+      <br />
+      <Link
+        href={destination}
+        className="text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline"
+      >
+        {t("box.redirectLink", locale)}
+      </Link>
     </p>
   );
 }

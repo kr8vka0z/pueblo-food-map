@@ -564,6 +564,25 @@ const en: Record<string, string> = {
   "activity.kind.renamed": "Box renamed",
   "activity.kind.paused": "Box paused",
   "activity.kind.removed": "Box removed",
+
+  // /boxes directory page (slice 4, Discovery B2/B3/B5/B6) + the B4 entry
+  // point (bottom nav item / floating map button — both share "nav.boxes")
+  "nav.boxes": "Boxes",
+  "boxes.heading": "Blessing Boxes",
+  "boxes.intro": "Every blessing box in the network, sorted so the ones that need filling most come first.",
+  "boxes.sort.label": "Sort by",
+  "boxes.sort.needsFilling": "Needs filling most",
+  "boxes.sort.closest": "Closest to me",
+  "boxes.sort.recentlyFilled": "Recently filled",
+  "boxes.sort.needsLocation": "Turn on location to sort by distance. Showing the boxes that need filling most instead.",
+  "boxes.sort.locationDenied": "Location isn't available on this device. Showing the boxes that need filling most instead.",
+  "boxes.locating": "Finding your location…",
+  "boxes.hideEmpty": "Hide boxes reported empty",
+  "boxes.distanceNote": "Distance shown is a straight line, not a walking route.",
+  "boxes.resultCount": "{count} boxes",
+  "boxes.loading": "Loading…",
+  "boxes.empty": "No blessing boxes to show right now.",
+  "boxes.mostNeeded": "Most needed: {list}",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -1110,6 +1129,24 @@ const es: Record<string, string> = {
   "activity.kind.renamed": "Caja con nombre cambiado", // [CHECK]
   "activity.kind.paused": "Caja pausada", // [CHECK]
   "activity.kind.removed": "Caja eliminada", // [CHECK]
+
+  // /boxes directory page (slice 4) + the B4 entry point
+  "nav.boxes": "Cajas", // [CHECK]
+  "boxes.heading": "Cajas de bendición", // [CHECK]
+  "boxes.intro": "Todas las cajas de bendición de la red, ordenadas para que las que más necesitan surtido aparezcan primero.", // [CHECK]
+  "boxes.sort.label": "Ordenar por", // [CHECK]
+  "boxes.sort.needsFilling": "Las que más necesitan surtido", // [CHECK]
+  "boxes.sort.closest": "Las más cercanas a mí", // [CHECK]
+  "boxes.sort.recentlyFilled": "Surtidas recientemente", // [CHECK]
+  "boxes.sort.needsLocation": "Activa tu ubicación para ordenar por distancia. Mostrando en su lugar las que más necesitan surtido.", // [CHECK]
+  "boxes.sort.locationDenied": "La ubicación no está disponible en este dispositivo. Mostrando en su lugar las que más necesitan surtido.", // [CHECK]
+  "boxes.locating": "Buscando tu ubicación…", // [CHECK]
+  "boxes.hideEmpty": "Ocultar cajas reportadas como vacías", // [CHECK]
+  "boxes.distanceNote": "La distancia mostrada es una línea recta, no una ruta a pie.", // [CHECK]
+  "boxes.resultCount": "{count} cajas", // [CHECK]
+  "boxes.loading": "Cargando…", // [CHECK]
+  "boxes.empty": "No hay cajas de bendición que mostrar por ahora.", // [CHECK]
+  "boxes.mostNeeded": "Lo más necesitado: {list}", // [CHECK]
 };
 
 /** Substitute simple {key} placeholders. */

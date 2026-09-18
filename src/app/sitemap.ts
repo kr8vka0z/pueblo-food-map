@@ -73,6 +73,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
+      // WHY 0.7/"hourly": the boxes counterpart to /venues above — a real
+      // browse/discovery page (find a box, sorted by need), not a watcher
+      // page, so it shares /venues' priority tier; "hourly" because a
+      // box's status changes far faster than an ordinary venue's details.
+      url: `${SITE_URL}/boxes`,
+      changeFrequency: "hourly",
+      priority: 0.7,
+    },
+    {
       // WHY 0.5/"hourly": live content (Blessing Boxes slice 3), but a
       // secondary/watcher-audience page — below the browse/discovery pages
       // above, same priority tier as /feedback.

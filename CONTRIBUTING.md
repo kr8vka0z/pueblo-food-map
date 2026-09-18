@@ -31,6 +31,10 @@ performance).
    build on every PR and must pass before merge — `main` is a protected
    branch and requires the CI status check.
 
+CodeRabbit automatically reviews human-authored, non-draft pull requests.
+Address actionable findings before merge, or explain why a suggested change
+does not apply. New pushes receive incremental follow-up reviews automatically.
+
 ## Development setup
 
 Requirements: Node.js 20 (LTS) or later and npm.

@@ -2928,11 +2928,17 @@ destination since there's no card to open there: a box id now routes to
 `/box/<id>/history` (the one still-standalone page a box has), a plain
 venue id to `/venue/<id>` as before. The same box-vs-venue split was
 applied to `handleSelectSavedVenue`/`handleSelectVenueFromPopover`/
-`handleSelectFromList`'s own `mapUnavailable` branches; `handleSearchKeyDown`'s
-Enter branch and `handleSelectVenueFromMap` (the plain map-pin tap) dropped
-their box special-case entirely — a box selection there just opens the
-in-map card like anything else, with no `mapUnavailable` branch on either
-path to redirect through.
+`handleSelectFromList`'s own `mapUnavailable` branches. `handleSelectVenueFromMap`
+(the plain map-pin tap) correctly has no such branch — Map.tsx never renders
+while `mapUnavailable`, so there are no pins to tap in the first place, a
+genuinely unreachable path. `handleSearchKeyDown`'s Enter branch is
+different and was fixed (2026-09-18, PR review) to match the other three:
+SearchBar itself renders unconditionally regardless of `mapUnavailable` (see
+its render call in MapWrapper.tsx), so Enter on a box result stayed
+reachable — and without the branch it silently did nothing, since
+`showVenueOnMap()` no-ops while `mapUnavailable` (useMapUI.ts) and both card
+components only render when `viewMode === "map"`. It now carries the same
+box-vs-venue `router.push` the other three use.
 
 **MapWrapper's box data — one fetch, not two.** `useBoxesList()` (the FULL
 `PublicBlessingBox[]` shape, slice 4's own hook) replaces `useBoxVenues()`

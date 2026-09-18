@@ -639,9 +639,18 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const boxesById = useMemo(() => new Map(liveBoxes.map((b) => [b.id, b])), [liveBoxes]);
   // Check-in success patches (kind/status/lastFilledAt) so the open card
   // reflects the just-submitted check-in immediately — see
-  // handleBoxCheckinSuccess below. Cleared implicitly whenever liveBoxes
-  // itself refetches with newer data (a fresh fetch always wins — this map
-  // is a layer ON TOP of boxesById, read second in getBoxById).
+  // handleBoxCheckinSuccess below. getBoxById checks this map FIRST, so an
+  // override always wins over boxesById while it exists.
+  //
+  // Nothing clears an override today: useBoxesList() fetches exactly once on
+  // mount (empty effect deps — see its own header) and never refetches, so
+  // there is no later "fresh fetch" that could supersede a stale override.
+  // ponytail: an override can drift from reality if the box changes by some
+  // OTHER path in the same session (another tab's check-in, an admin edit).
+  // Ceiling: acceptable today because nothing refetches to reconcile against.
+  // If a periodic/background refetch of liveBoxes is ever added, this map
+  // must be explicitly cleared or merged against the fresh data at that
+  // point, or the override will permanently shadow it.
   const [boxOverrides, setBoxOverrides] = useState<Map<string, PublicBlessingBox>>(new Map());
   const getBoxById = useCallback(
     (id: string | null): PublicBlessingBox | null => {
@@ -1057,10 +1066,25 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         if (popoverVisible && activeIndex >= 0 && activeIndex < filteredVenues.length) {
           e.preventDefault();
           const venue = filteredVenues[activeIndex];
-          // No box special-case (map-first rework, 2026-09-18) — a box
-          // result opens the SAME in-map card every other result does; there
-          // is no mapUnavailable branch on this path (the search popover
-          // only exists over the map view) to redirect through instead.
+          // mapUnavailable branch added (fix, 2026-09-18): unlike a map pin
+          // tap (handleSelectVenueFromMap, correctly branch-free — no pins
+          // exist to tap when Map.tsx never renders), SearchBar itself is
+          // rendered unconditionally, mapUnavailable or not (see its render
+          // call below) — so this Enter path stays reachable even when the
+          // map can't mount. Without this branch, setSelectedVenueId alone
+          // did nothing visible: showVenueOnMap() no-ops while mapUnavailable
+          // (useMapUI.ts), and both card components (BottomSheet/
+          // DesktopVenueWindow) only render when viewMode === "map" — so a
+          // keyboard Enter on a box result silently went nowhere. Same
+          // box-vs-venue redirect the other three selection handlers already
+          // use (handleSelectSavedVenue/handleSelectVenueFromPopover/
+          // handleSelectFromList).
+          if (mapUnavailable) {
+            router.push(boxIdSet.has(venue.id) ? `/box/${venue.id}/history` : `/venue/${venue.id}`);
+            setIsPopoverOpen(false);
+            setActiveIndex(-1);
+            return;
+          }
           setSelectedVenueId(venue.id);
           showVenueOnMap();
           if (!isMobile) setWindowExpanded(false);
@@ -1070,7 +1094,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       }
     },
     // filteredVenues reference is stable between renders with same query/filters.
-    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap],
+    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap, mapUnavailable, boxIdSet, router],
   );
 
   // Select a venue from the Saved list (#132 9c). Clears active filters + search

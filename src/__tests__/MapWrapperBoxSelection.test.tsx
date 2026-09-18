@@ -54,7 +54,6 @@ const TEST_BOX = {
     removedOn: null,
     status: "stocked" as const,
     lastFilledAt: "2026-09-17T09:00:00.000Z",
-    statusSince: "2026-09-17T09:00:00.000Z",
     recentCheckins: [],
   },
 };
@@ -108,6 +107,25 @@ describe("MapWrapper box selection (map-first rework)", () => {
     expect(mockPush).toHaveBeenCalledWith(`/box/${TEST_BOX.id}/history`);
     expect(mockPush).not.toHaveBeenCalledWith(`/venue/${TEST_BOX.id}`);
     expect(mockPush).not.toHaveBeenCalledWith(`/box/${TEST_BOX.id}`);
+  });
+
+  test("pressing Enter on a box search result while the map is unavailable routes to /box/<id>/history (review fix, 2026-09-18: this path used to silently do nothing)", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(
+        <LocaleProvider>
+          <MapWrapper />
+        </LocaleProvider>,
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    const searchInput = await screen.findByRole("combobox", { name: /search/i });
+    await user.type(searchInput, "Test Blessing");
+    await user.keyboard("{ArrowDown}{Enter}");
+
+    expect(mockPush).toHaveBeenCalledWith(`/box/${TEST_BOX.id}/history`);
+    expect(mockPush).not.toHaveBeenCalledWith(`/venue/${TEST_BOX.id}`);
   });
 
   test("?venue=<boxId> deep link with the map unavailable replaces to /box/<id>/history", async () => {

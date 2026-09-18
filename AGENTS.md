@@ -2754,42 +2754,60 @@ no new cache).
 candidates are built and live behind one query-param switch rather than
 either being picked unilaterally:**
 
-- **`MapWrapper.tsx`** reads `?boxEntry=map` vs. anything else (default
-  `nav`) ONCE via a lazy `useState` initializer reading
+- **No `?boxEntry=` param is a NEUTRAL, third state — not an alias for
+  either candidate.** `resolveBoxEntryVariant()` (`src/lib/boxEntryVariant.ts`,
+  a small pure module with no map-related imports, extracted specifically
+  so it's unit-testable — see the next bullet) maps the query string to
+  `"nav" | "map" | null`; an absent or unrecognized `boxEntry` value
+  resolves to `null`, which renders NEITHER candidate — today's exact
+  4-item `BottomNav` and no floating button. **This corrects a real bug
+  found in review on PR #473:** the first version of this switch defaulted
+  the no-param case to `"nav"`, so every ordinary visitor with no
+  `?boxEntry=` at all silently got the 5-item bar — the opposite of
+  opt-in, and a silent override of the finalized 4-item design below.
+  `MapWrapper.tsx` reads this ONCE via a lazy `useState` initializer over
   `window.location.search` — safe only because `MapWrapper` is always
   dynamically imported with `ssr: false` (confirmed via
   `HomePageClient.tsx`) and therefore never renders server-side, so there
   is no server/client markup mismatch to worry about from reading
   `window` directly.
-- **Candidate "nav"** (default) — `BottomNav.tsx` gained a 5th, OPT-IN
-  item (`showBoxesItem` prop, default `false`) linking to `/boxes`. Default
-  `false` is load-bearing: `BottomNav` is documented elsewhere in this file
-  as a finalized 4-item design (Near me/Saved/Resources/Menu, Kyle
-  2026-09-16) — this slice does not silently grow it; the item only
-  appears when `MapWrapper` explicitly opts in via the query param.
-  Regression-guarded in `BottomNav.test.tsx`: the default renders exactly 4
-  items with no "Boxes" text; `showBoxesItem: true` renders 5, in order,
-  with a visible (non-sr-only) label.
-- **Candidate "map"** — `BlessingBoxesMapButton.tsx`, a new floating pill
-  button (bottom-right, above `BottomNav`'s own height via the shared
-  `BOTTOM_NAV_HEIGHT_PX` constant, `--color-cat-blessing` raspberry fill
-  per DESIGN.md's existing category-color token, `--radius-full`, the
-  shared `PRESS_FEEDBACK` interaction class) linking to `/boxes`. No new
-  dependency — reuses existing tokens/classes exactly as DESIGN.md
-  prescribes.
+- **Candidate "nav"** (`?boxEntry=nav`, explicit opt-in only) —
+  `BottomNav.tsx` gained a 5th, OPT-IN item (`showBoxesItem` prop, default
+  `false`) linking to `/boxes`. Default `false` is load-bearing: `BottomNav`
+  is documented elsewhere in this file as a finalized 4-item design (Near
+  me/Saved/Resources/Menu, Kyle 2026-09-16) — this slice does not silently
+  grow it; the item only appears when `MapWrapper` explicitly resolves to
+  `"nav"`. Regression-guarded in `BottomNav.test.tsx`: the default renders
+  exactly 4 items with no "Boxes" text; `showBoxesItem: true` renders 5, in
+  order, with a visible (non-sr-only) label.
+- **Candidate "map"** (`?boxEntry=map`, explicit opt-in only) —
+  `BlessingBoxesMapButton.tsx`, a new floating pill button (bottom-right,
+  above `BottomNav`'s own height via the shared `BOTTOM_NAV_HEIGHT_PX`
+  constant, `--color-cat-blessing` raspberry fill per DESIGN.md's existing
+  category-color token, `--radius-full`, the shared `PRESS_FEEDBACK`
+  interaction class) linking to `/boxes`. No new dependency — reuses
+  existing tokens/classes exactly as DESIGN.md prescribes.
 - **Preview URLs for Kyle to compare** (dev, once merged and deployed):
-  `https://dev.pueblofoodmap.com/?boxEntry=nav` (bottom-nav candidate, also
-  the default with no param at all) and
+  `https://dev.pueblofoodmap.com/?boxEntry=nav` (bottom-nav candidate) and
   `https://dev.pueblofoodmap.com/?boxEntry=map` (floating map-button
-  candidate).
-- **Both components should be deleted, and the switch collapsed to
-  whichever Kyle picks, once he decides** — this is a temporary A/B
-  scaffold, not a permanent feature flag. No `MapWrapper`-level test exists
-  for the query-param switch itself (this repo has no `MapWrapper.test.tsx`
-  harness anywhere — Mapbox's WebGL canvas requirement makes it untestable
-  in jsdom, same limitation this file's own "Map library" section at the
-  top documents); each CANDIDATE component is unit-tested on its own
-  (`BottomNav.test.tsx`'s new describe block, `BlessingBoxesMapButton.test.tsx`).
+  candidate). `https://dev.pueblofoodmap.com/` with NO param shows neither
+  — today's unmodified 4-item bar.
+- **`boxEntryVariant.test.ts` is the MapWrapper-level regression coverage**
+  the fix above needs: no param -> `null`, `?boxEntry=nav` -> `"nav"`,
+  `?boxEntry=map` -> `"map"`, an unrecognized value -> `null`. This repo has
+  no `MapWrapper.test.tsx` harness anywhere (Mapbox's WebGL canvas
+  requirement makes it untestable in jsdom, same limitation this file's own
+  "Map library" section at the top documents), so the resolver was
+  extracted into its own map-import-free module precisely so the
+  param-to-variant mapping — the actual bug's location — has a real,
+  headless test rather than only each CANDIDATE component being tested in
+  isolation (`BottomNav.test.tsx`'s own describe block,
+  `BlessingBoxesMapButton.test.tsx`).
+- **All of this — `boxEntryVariant.ts`, `BlessingBoxesMapButton.tsx`,
+  `MapWrapper.tsx`'s `boxEntryVariant` state, and `BottomNav.tsx`'s
+  `showBoxesItem` prop — is TEMPORARY scaffolding for Kyle's B4 choice, not
+  a permanent feature flag.** It MUST be deleted and collapsed to whichever
+  single placement he picks BEFORE this feature is ever promoted to `main`.
 
 **Deliberately NOT built in this slice** (out of the acceptance criteria,
 per the task's own explicit exclusion list, so a later slice doesn't

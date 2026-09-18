@@ -273,7 +273,7 @@ export default function BottomSheet({
                     away (Kyle, 2026-09-18: "just happen on the map"). */}
                 {isBox ? (
                   box ? (
-                    <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} showExpandedDetails />
+                    <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} />
                   ) : (
                     <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
                   )

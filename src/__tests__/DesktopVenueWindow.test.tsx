@@ -397,8 +397,27 @@ function makeBox(overrides: Partial<PublicBlessingBox["box"]> = {}): PublicBless
   };
 }
 
-describe("DesktopVenueWindow — blessing box card (map-first rework)", () => {
-  test("collapsed: renders BoxCardBody content, no History link, no host note", () => {
+describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-09-18)", () => {
+  test("no expand/collapse toggle for a box — the header renders a History link instead, regardless of the (now-unused-for-boxes) expanded prop", () => {
+    render(
+      <DesktopVenueWindow
+        venue={makeBoxVenue()}
+        box={makeBox()}
+        expanded={false}
+        mapboxMap={mockMapboxMap}
+        onExpand={vi.fn()}
+        onCollapse={vi.fn()}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /show details/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /hide details/i })).toBeNull();
+    const link = screen.getByRole("link", { name: "History" });
+    expect(link.getAttribute("href")).toBe("/box/test-box-1/history");
+  });
+
+  test("host note and status render unconditionally — no 'nothing shows up' gap (Kyle, 2026-09-18)", () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue()}
@@ -412,28 +431,6 @@ describe("DesktopVenueWindow — blessing box card (map-first rework)", () => {
       />,
     );
     expect(screen.getByTestId("box-status-badge")).toBeDefined();
-    // showExpandedDetails=false in the collapsed box body — History link and
-    // the host-note section are both expanded-only (BoxCardBody's own gate).
-    expect(screen.queryByRole("link", { name: "History" })).toBeNull();
-    expect(screen.queryByText("Please knock if the gate is closed.")).toBeNull();
-  });
-
-  test("expanded: renders BoxCardBody content including the History link and host note", () => {
-    render(
-      <DesktopVenueWindow
-        venue={makeBoxVenue()}
-        box={makeBox()}
-        expanded={true}
-        mapboxMap={mockMapboxMap}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
-        onClose={vi.fn()}
-        locale="en"
-      />,
-    );
-    expect(screen.getByTestId("box-status-badge")).toBeDefined();
-    const link = screen.getByRole("link", { name: "History" });
-    expect(link.getAttribute("href")).toBe("/box/test-box-1/history");
     expect(screen.getByText("Please knock if the gate is closed.")).toBeDefined();
   });
 
@@ -471,23 +468,23 @@ describe("DesktopVenueWindow — blessing box card (map-first rework)", () => {
     expect(screen.queryByTestId("box-status-badge")).toBeNull();
   });
 
-  test("Show/Hide details header toggle still works for a box (unaffected by the isBox branch)", async () => {
-    const onExpand = vi.fn();
-    const user = userEvent.setup();
+  test("the header's History link navigates to /box/<id>/history for a box (replaces the Show/Hide toggle, same position/classes — VenuePopupHeader's own header)", () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={makeBox()}
         expanded={false}
         mapboxMap={mockMapboxMap}
-        onExpand={onExpand}
+        onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
     );
-    await user.click(screen.getByRole("button", { name: /show details/i }));
-    expect(onExpand).toHaveBeenCalledTimes(1);
+    const link = screen.getByRole("link", { name: "History" });
+    expect(link.getAttribute("href")).toBe("/box/test-box-1/history");
+    // Same order-1 (visually leftmost) slot the ordinary-venue toggle uses.
+    expect(link.className).toContain("order-1");
   });
 
   test("Escape does not close the window while focus is inside the check-in note textarea", async () => {

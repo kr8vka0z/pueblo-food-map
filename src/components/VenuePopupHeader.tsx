@@ -17,8 +17,17 @@
  * region (id="venue-popup-body-{venueId}"), which is applied by DesktopVenueWindow.
  *
  * Keyboard: Enter/Space activate buttons (browser default for <button>).
+ *
+ * Blessing box variant (`historyHref`, 2026-09-18 — Kyle: "When I click show
+ * details, nothing shows up"): a box card has no expand/collapse state
+ * (BoxCardBody always renders everything now), so there is nothing for a
+ * Show/Hide toggle to do. When `historyHref` is set, this slot renders a
+ * "History" link to that URL instead — same classes, same order-1 position
+ * the toggle used, so the row keeps its visual weight. `expanded`/`onToggle`
+ * are unused in that branch (still required for the ordinary-venue case).
  */
 
+import Link from "next/link";
 import { X } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
@@ -29,6 +38,8 @@ interface VenuePopupHeaderProps {
   onToggle: () => void;
   onClose: () => void;
   locale?: Locale;
+  /** See this file's own header — renders a History link in place of the Show/Hide toggle for a blessing box. */
+  historyHref?: string;
 }
 
 export default function VenuePopupHeader({
@@ -37,12 +48,20 @@ export default function VenuePopupHeader({
   onToggle,
   onClose,
   locale = "en",
+  historyHref,
 }: VenuePopupHeaderProps) {
   const toggleLabel = expanded
     ? t("detail.hideDetails", locale)
     : t("detail.showDetails", locale);
 
   const bodyId = `venue-popup-body-${venueId}`;
+
+  const toggleSlotClassName =
+    "order-1 flex items-center h-8 px-3 -ml-1 rounded-md " +
+    "text-xs font-medium text-[var(--color-sage-600)] " +
+    "hover:text-[var(--color-sage-700)] hover:bg-[var(--color-bone-100)] transition-colors " +
+    PRESS_FEEDBACK + " " +
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 
   return (
     <div
@@ -75,22 +94,24 @@ export default function VenuePopupHeader({
       {/* Spacer — order-2 = sits between toggle (order-1) and X-close (order-3) */}
       <div className="order-2 flex-1" />
 
-      {/* Show / Hide details toggle — second in DOM = second in tab order; order-1 = visually leftmost */}
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        aria-controls={bodyId}
-        className={
-          "order-1 flex items-center h-8 px-3 -ml-1 rounded-md " +
-          "text-xs font-medium text-[var(--color-sage-600)] " +
-          "hover:text-[var(--color-sage-700)] hover:bg-[var(--color-bone-100)] transition-colors " +
-          PRESS_FEEDBACK + " " +
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-        }
-      >
-        {toggleLabel}
-      </button>
+      {/* Show/Hide details toggle (ordinary venue) OR History link (blessing
+          box, no toggle state) — second in DOM = second in tab order;
+          order-1 = visually leftmost, same slot either way. */}
+      {historyHref ? (
+        <Link href={historyHref} className={toggleSlotClassName}>
+          {t("box.history.link", locale)}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-controls={bodyId}
+          className={toggleSlotClassName}
+        >
+          {toggleLabel}
+        </button>
+      )}
     </div>
   );
 }

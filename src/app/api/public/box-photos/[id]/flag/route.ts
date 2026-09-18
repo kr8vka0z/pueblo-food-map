@@ -11,9 +11,19 @@
  * isn't worth it for that risk; the per-visitor rate limit below is the
  * actual anti-abuse control, same posture the task's own spec calls for.
  *
- * Guard order: rate limit (only when a clientToken is present — same
- * optional-visitor-cap posture the photo upload route already established,
- * see that route's own header) -> load the photo AS APPROVED ONLY -> flip.
+ * Guard order (fix, 2026-09-18, PR #490 review): a missing/malformed
+ * `clientToken` is now a hard 400 — earlier this field was OPTIONAL (same
+ * posture the photo upload route still has), but that let a script POST a
+ * bodyless request per photo id and hide every photo in the review queue
+ * with no rate limit ever touched (checkAndIncrement was skipped entirely
+ * when clientTokenStr was falsy) while also emailing issues@ once per
+ * photo. A real client always has one (getCheckinClientToken() mints it on
+ * first localStorage read), so requiring it here costs nothing for a real
+ * visitor and closes the free-for-all. Order: id -> clientToken presence
+ * (400) -> live D1 context (503) -> per-visitor cap (429) -> a NEW
+ * site-wide cap across ALL photos (429, ~30/hour — closes the "rotate
+ * clientToken to bypass the per-visitor cap" gap the per-visitor check
+ * alone can't) -> load the photo AS APPROVED ONLY -> flip.
  *
  * Only an APPROVED photo can be flagged — loadApprovedBoxPhotoById(), the
  * exact same "never even fetch the private thing" query the public serve
@@ -37,6 +47,10 @@ import { logFormFailure } from "@/lib/logger";
 
 /** A handful per visitor per hour — the task's own suggested figure; this is a low-stakes one-tap action, not worth a tighter cap. */
 const MAX_FLAGS_PER_VISITOR_PER_HOUR = 5;
+
+/** Site-wide, across every photo and every clientToken (fix, 2026-09-18, PR #490 review) — the per-visitor cap alone does nothing against a script that mints a fresh clientToken per request, so this is a second, coarser ceiling keyed to one fixed id instead of the caller's token. ~30/hour per the review finding — enough for a real flood of reports on a genuinely bad photo, far below what it'd take to empty the review queue. */
+const MAX_FLAGS_SITE_WIDE_PER_HOUR = 30;
+const GLOBAL_FLAG_RATE_LIMIT_ID = "all-photos";
 
 async function sendFlagEmail(photoId: number, boxName: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
@@ -79,10 +93,13 @@ export async function POST(
   try {
     body = await req.json();
   } catch {
-    // a bodyless POST is fine — clientToken is optional, see this file's header
+    // fall through to the clientToken check below — a bodyless POST fails it the same as a body missing the field
   }
   const clientToken = (body as { clientToken?: unknown })?.clientToken;
-  const clientTokenStr = typeof clientToken === "string" ? clientToken.slice(0, 200) : null;
+  const clientTokenStr = typeof clientToken === "string" && clientToken.length > 0 ? clientToken.slice(0, 200) : null;
+  if (!clientTokenStr) {
+    return NextResponse.json({ ok: false, error: "missing_client_token" }, { status: 400 });
+  }
 
   let db: D1Database;
   try {
@@ -91,20 +108,27 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
   }
 
-  if (clientTokenStr) {
-    const checkinRateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
-    if (!checkinRateLimitSecret) {
-      throw new Error("CHECKIN_RATE_LIMIT_SECRET not configured");
-    }
-    const underCap = await checkAndIncrement(
-      db,
-      checkinRateLimitSecret,
-      { scope: "photo-flag-visitor", id: clientTokenStr },
-      MAX_FLAGS_PER_VISITOR_PER_HOUR,
-    );
-    if (!underCap) {
-      return NextResponse.json({ ok: false, error: "rate_limit_visitor" }, { status: 429 });
-    }
+  const checkinRateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
+  if (!checkinRateLimitSecret) {
+    throw new Error("CHECKIN_RATE_LIMIT_SECRET not configured");
+  }
+  const underVisitorCap = await checkAndIncrement(
+    db,
+    checkinRateLimitSecret,
+    { scope: "photo-flag-visitor", id: clientTokenStr },
+    MAX_FLAGS_PER_VISITOR_PER_HOUR,
+  );
+  if (!underVisitorCap) {
+    return NextResponse.json({ ok: false, error: "rate_limit_visitor" }, { status: 429 });
+  }
+  const underGlobalCap = await checkAndIncrement(
+    db,
+    checkinRateLimitSecret,
+    { scope: "photo-flag-global", id: GLOBAL_FLAG_RATE_LIMIT_ID },
+    MAX_FLAGS_SITE_WIDE_PER_HOUR,
+  );
+  if (!underGlobalCap) {
+    return NextResponse.json({ ok: false, error: "rate_limit_global" }, { status: 429 });
   }
 
   const existing = await loadApprovedBoxPhotoById(db, photoId);

@@ -105,7 +105,7 @@ describe("POST /api/public/box-photos/[id]/flag", () => {
   test("no matching APPROVED row -> 404 (also covers a non-existent id, structurally identical)", async () => {
     const { db } = makeFakeDb({ photoRow: null });
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
-    const res = await callPost();
+    const res = await callPost({ clientToken: "visitor-abc" });
     expect(res.status).toBe(404);
   });
 
@@ -119,13 +119,50 @@ describe("POST /api/public/box-photos/[id]/flag", () => {
     expect(data.error).toBe("rate_limit_visitor");
   });
 
-  test("no clientToken -> rate limiter is never called, request still succeeds", async () => {
+  test("over the site-wide cap -> 429, even though the per-visitor cap alone would allow it (fix, 2026-09-18: closes the rotate-clientToken bypass)", async () => {
+    mockCheckAndIncrement.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const { db, updateCalls } = makeFakeDb();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    const res = await callPost({ clientToken: "visitor-abc" });
+    expect(res.status).toBe(429);
+    const data = (await res.json()) as { error: string };
+    expect(data.error).toBe("rate_limit_global");
+    expect(updateCalls).toHaveLength(0);
+    expect(mockCheckAndIncrement).toHaveBeenCalledTimes(2);
+    expect(mockCheckAndIncrement.mock.calls[1][2]).toEqual({ scope: "photo-flag-global", id: "all-photos" });
+  });
+
+  // Review finding (PR #490): a missing clientToken used to skip the rate
+  // limiter entirely and still succeed — "Return 400 when clientToken is
+  // missing or malformed" replaces that with a hard 400, before any D1 work.
+  test("missing clientToken -> 400, never touches D1 or the rate limiter", async () => {
     const { db, updateCalls } = makeFakeDb();
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
     const res = await callPost({});
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    const data = (await res.json()) as { error: string };
+    expect(data.error).toBe("missing_client_token");
     expect(mockCheckAndIncrement).not.toHaveBeenCalled();
-    expect(updateCalls).toHaveLength(1);
+    expect(mockGetCloudflareContext).not.toHaveBeenCalled();
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  test("malformed clientToken (non-string, empty string) -> 400", async () => {
+    const { db } = makeFakeDb();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+
+    const resNumber = await callPost({ clientToken: 12345 });
+    expect(resNumber.status).toBe(400);
+
+    const resEmpty = await callPost({ clientToken: "" });
+    expect(resEmpty.status).toBe(400);
+  });
+
+  test("no body at all -> 400, same as an explicit missing clientToken", async () => {
+    const { db } = makeFakeDb();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    const res = await callPost(undefined);
+    expect(res.status).toBe(400);
   });
 
   test("success: flags the photo, sends the admin alert email", async () => {
@@ -151,7 +188,7 @@ describe("POST /api/public/box-photos/[id]/flag", () => {
     mockFetch.mockResolvedValueOnce(new Response("boom", { status: 502 }));
     const { db } = makeFakeDb();
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
-    const res = await callPost({});
+    const res = await callPost({ clientToken: "visitor-abc" });
     expect(res.status).toBe(200);
   });
 
@@ -159,7 +196,7 @@ describe("POST /api/public/box-photos/[id]/flag", () => {
     mockGetCloudflareContext.mockImplementation(() => {
       throw new Error("no cloudflare context");
     });
-    const res = await callPost({});
+    const res = await callPost({ clientToken: "visitor-abc" });
     expect(res.status).toBe(503);
   });
 });

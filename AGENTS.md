@@ -2991,6 +2991,47 @@ have no direct replacement; the box-vs-venue selection logic itself no
 longer needs one, since it no longer branches to a different destination
 on an ordinary map tap.
 
+**Review fixes (2026-09-18, same PR).** A ship-it review of the above found
+four real gaps, all fixed on top of it:
+
+- **No-WebGL check-in gap (real regression).** `BoxHistoryContent.tsx` now
+  also renders `BoxCardBody` (status, check-in panel, host note) above the
+  history list, seeded from the full `PublicBlessingBox` the route's
+  `page.tsx` already loads for `generateMetadata` — not just `{boxId,
+  boxName}` as before. A `mapUnavailable` visitor is routed straight to this
+  page with no other way to open a card, so without this the check-in panel
+  (and the map card's whole snapshot) was simply unreachable on that device
+  — a real loss versus the pre-rework standalone `/box/<id>` page. Local
+  `liveBox` state mirrors `MapWrapper.tsx`'s own `handleBoxCheckinSuccess`
+  patch (same 'problem'-skip, same 5-item cap) so a check-in here updates
+  the badge/last-filled/recent-check-in line instantly, no refetch.
+- **Desktop check-in note used to be lost on toggle.** `DesktopVenueWindow.tsx`'s
+  box body was two separate JSX trees (`boxCollapsedBody`/`boxExpandedBody`),
+  each with its own `<BoxCardBody>`, swapped by the `expanded` ternary — so
+  `BoxCheckinPanel`'s in-progress note textarea remounted (and its typed text
+  vanished) every time the header's Show/Hide details toggle fired. Replaced
+  with one `boxBody` at a stable tree position (only its wrapper class and
+  `BoxCardBody`'s `showExpandedDetails` prop vary with `expanded`); the
+  ordinary-venue `collapsedBody`/`expandedBody` pair is untouched — those
+  genuinely render different sections per state, so unifying them would be a
+  much larger change than this box-only fix.
+- **Search-Enter on a box while mapUnavailable used to do nothing.** Unlike
+  a map-pin tap (no pins exist to tap when `Map.tsx` never renders —
+  correctly branch-free), `SearchBar` itself renders unconditionally, so
+  pressing Enter on a box result stayed reachable when the map can't mount —
+  but `showVenueOnMap()` no-ops in that state and neither card component
+  renders outside `viewMode === "map"`, so the keystroke silently did
+  nothing. `handleSearchKeyDown`'s Enter branch now carries the same
+  box-vs-venue `router.push` the other three selection handlers already use.
+- **No-JS visitor stuck on "Loading…" forever.** `/box/[id]`'s redirect
+  (`BoxRedirectClient.tsx`) depends on a `useEffect` that never runs without
+  JS. It now also renders a plain `<Link>` (a real `<a href>`, works with JS
+  off) to the same `/?venue=<id>` destination.
+- Also corrected: the `boxOverrides` comment in `MapWrapper.tsx` had the
+  override-precedence and refetch claims backwards (`getBoxById` checks the
+  override FIRST, and `useBoxesList()` never refetches at all — it fetches
+  once on mount, so nothing today ever clears a stale override).
+
 ---
 
 # Design system — DESIGN.md

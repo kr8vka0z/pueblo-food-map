@@ -18,6 +18,21 @@
  * now, "empty" later), and the second tap would otherwise silently fail
  * Turnstile verification with a stale, already-consumed token.
  *
+ * Widget visibility (2026-09-18, Kyle: "Do we need to show the Cloudflare
+ * check?"): rendered with `appearance: "interaction-only"` — the widget
+ * stays invisible and check-in buttons are tappable right away; Cloudflare
+ * only shows its chrome in the rare case it needs a real interactive
+ * challenge. That means a tap CAN land before a token exists yet. Rather
+ * than block the whole panel on it (the old "Verifying…" line + disabled
+ * buttons) or silently drop the tap, the tapped kind is queued
+ * (`pendingSubmit`) and an effect fires it the moment `turnstileToken`
+ * resolves — the tapped button shows the same "Sending…" label a real
+ * in-flight submit uses, everything else disables for the moment so a
+ * second tap can't race it. Token expiry is already handled the same way:
+ * Turnstile's own `expired-callback` clears `turnstileToken`, and the next
+ * tap (or an already-queued one) waits for the callback's next token exactly
+ * like the first one did.
+ *
  * onCheckinSuccess lifts the POST response's fresh status/lastFilledAt
  * straight into BoxContent's own state — no refetch, no dependency on the
  * list endpoint's 60s cache (see the route handler's own header for the
@@ -76,12 +91,20 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetId = useRef<string | null>(null);
 
+  // A tap that lands before Turnstile's invisible check resolves queues here
+  // instead of being dropped or blocking the panel — see this file's own
+  // header. Cleared the instant the queued submit actually fires.
+  const [pendingSubmit, setPendingSubmit] = useState<{ kind: CheckinKind; note: string } | null>(null);
+
   function mountTurnstile() {
     if (!turnstileContainerRef.current || !window.turnstile) return;
     if (turnstileWidgetId.current) return; // already mounted
 
     turnstileWidgetId.current = window.turnstile.render(turnstileContainerRef.current, {
       sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "",
+      // Invisible unless Cloudflare decides it actually needs a person to
+      // interact (Kyle, 2026-09-18) — see this file's own header.
+      appearance: "interaction-only",
       callback: (token) => {
         setTurnstileToken(token);
         setTurnstileError(false);
@@ -105,6 +128,21 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
       }
     };
   }, []);
+
+  // Fires a queued tap the moment a token becomes available (first mount,
+  // or after `expired-callback` clears a stale one and Turnstile hands back
+  // a fresh one). setPendingSubmit is deferred to a microtask — same
+  // react-hooks/set-state-in-effect workaround DesktopVenueWindow's own
+  // position effect uses (see its own header) — calling it synchronously in
+  // the effect body is a lint error (cascading-render risk), even though
+  // it's cleared before the async submitCheckin call starts, not after.
+  useEffect(() => {
+    if (!turnstileToken || !pendingSubmit) return;
+    const { kind, note: noteValue } = pendingSubmit;
+    queueMicrotask(() => setPendingSubmit(null));
+    void submitCheckin(kind, noteValue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- submitCheckin closes over this render's turnstileToken/honeypot/boxId already; re-running per pendingSubmit/turnstileToken change (not per render) is what this effect wants.
+  }, [turnstileToken, pendingSubmit]);
 
   async function submitCheckin(kind: CheckinKind, noteValue: string) {
     setSubmitState("submitting");
@@ -156,20 +194,35 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
   }
 
   function handleTap(kind: CheckinKind) {
-    if (submitState === "submitting") return;
+    if (submitState === "submitting" || pendingSubmit) return;
     if (KINDS_WITH_NOTE.has(kind)) {
       setOpenKind(kind);
       setNote("");
       setSubmitState("idle");
       return;
     }
-    void submitCheckin(kind, "");
+    if (turnstileToken) {
+      void submitCheckin(kind, "");
+    } else {
+      // No token yet (interaction-only Turnstile hasn't resolved) — queue
+      // instead of submitting with an empty token or dropping the tap. The
+      // effect above fires it the moment turnstileToken arrives.
+      setPendingSubmit({ kind, note: "" });
+    }
   }
 
   function handleNoteSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!openKind) return;
-    void submitCheckin(openKind, note.trim());
+    const kind = openKind;
+    const noteValue = note.trim();
+    setOpenKind(null);
+    setNote("");
+    if (turnstileToken) {
+      void submitCheckin(kind, noteValue);
+    } else {
+      setPendingSubmit({ kind, note: noteValue });
+    }
   }
 
   const buttonBase =
@@ -178,7 +231,14 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
     "hover:bg-[var(--color-bone-100)] focus-visible:outline-none focus-visible:ring-2 " +
     "focus-visible:ring-[var(--color-sage-500)] disabled:opacity-60 disabled:cursor-not-allowed";
 
-  const canSubmit = submitState !== "submitting" && !!turnstileToken;
+  // One action at a time: busy while an actual submit is in flight OR one is
+  // queued waiting on a token (see handleTap/handleNoteSubmit above) — never
+  // gated on turnstileToken alone, since that would be the old "disabled
+  // until Verifying… resolves" behavior this rework removes.
+  const busy = submitState === "submitting" || pendingSubmit !== null;
+  // Which single button (if any) shows the "Sending…" label — either the
+  // tap actually in flight, or the one queued waiting on a token.
+  const busyKind = pendingSubmit?.kind ?? (submitState === "submitting" ? lastKind : null);
 
   return (
     <section aria-labelledby="box-checkin-heading" className="space-y-3">
@@ -228,18 +288,14 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
             key={kind}
             type="button"
             className={buttonBase}
-            disabled={!canSubmit}
-            aria-disabled={!canSubmit}
+            disabled={busy}
+            aria-disabled={busy}
             onClick={() => handleTap(kind)}
           >
-            {t(`box.checkin.${kind}`, locale)}
+            {kind === busyKind ? t("box.checkin.submitting", locale) : t(`box.checkin.${kind}`, locale)}
           </button>
         ))}
       </div>
-
-      {!turnstileToken && submitState !== "submitting" && (
-        <p className="text-xs text-[var(--color-ink-400)]">{t("form.turnstile.verifying", locale)}</p>
-      )}
 
       {openKind && (
         <form onSubmit={handleNoteSubmit} className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-bone-200)] p-3">
@@ -262,8 +318,8 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={!canSubmit}
-              aria-disabled={!canSubmit}
+              disabled={busy}
+              aria-disabled={busy}
               className={
                 "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
                 "text-sm font-semibold hover:bg-[var(--color-sage-600)] disabled:opacity-60 disabled:cursor-not-allowed " +

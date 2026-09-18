@@ -80,6 +80,96 @@ describe("BoxCheckinPanel — rendering", () => {
   });
 });
 
+// ─── Widget visibility (card-polish follow-up, 2026-09-18) ────────────────
+// Kyle: "Do we need to show the Cloudflare check?" — the widget now renders
+// with appearance: "interaction-only" so it stays invisible unless
+// Cloudflare actually needs a person to interact, and the old "Verifying…"
+// line is gone since buttons are usable immediately regardless of token state.
+
+describe("BoxCheckinPanel — Turnstile widget stays invisible by default", () => {
+  test("render() is called with appearance: 'interaction-only'", () => {
+    renderPanel();
+    expect(mockTurnstile.render).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ appearance: "interaction-only" }),
+    );
+  });
+
+  test("no 'Verifying…' text anywhere, even before a token exists", async () => {
+    // Turnstile that never calls back — token stays null for the whole test.
+    vi.stubGlobal("turnstile", { render: vi.fn(() => "widget-id-1"), reset: vi.fn(), remove: vi.fn() });
+    renderPanel();
+    await waitFor(() => expect(screen.getByRole("button", { name: "I took something" })).toBeDefined());
+    expect(screen.queryByText(/Verifying/i)).toBeNull();
+  });
+
+  test("buttons are tappable immediately, before any token exists", async () => {
+    vi.stubGlobal("turnstile", { render: vi.fn(() => "widget-id-1"), reset: vi.fn(), remove: vi.fn() });
+    renderPanel();
+    const button = await screen.findByRole("button", { name: "I took something" });
+    expect(button).not.toBeDisabled();
+  });
+});
+
+describe("BoxCheckinPanel — a tap before the token exists is queued, not dropped", () => {
+  function renderPanelWithDelayedToken() {
+    let deliverToken: ((token: string) => void) | null = null;
+    vi.stubGlobal("turnstile", {
+      render: vi.fn((_container: HTMLElement, opts: { callback?: (t: string) => void }) => {
+        deliverToken = opts.callback ?? null; // token withheld until the test delivers it
+        return "widget-id-1";
+      }),
+      reset: vi.fn(),
+      remove: vi.fn(),
+    });
+    renderPanel();
+    return {
+      deliver: (token: string) => {
+        if (!deliverToken) throw new Error("Turnstile callback never captured");
+        deliverToken(token);
+      },
+    };
+  }
+
+  test("a one-tap kind ('took') submits exactly once, the moment the token arrives", async () => {
+    mockSuccess();
+    const user = userEvent.setup();
+    const { deliver } = renderPanelWithDelayedToken();
+    const button = await screen.findByRole("button", { name: "I took something" });
+
+    await user.click(button);
+    // Queued, not submitted yet — no token, and no dropped tap either.
+    expect(mockFetch).not.toHaveBeenCalled();
+    // A clear pending state on the tapped button, not a page-wide "Verifying…" line.
+    expect(await screen.findByRole("button", { name: "Sending…" })).toBeDefined();
+
+    deliver("test-turnstile-token");
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
+    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.kind).toBe("took");
+    expect(body.turnstileToken).toBe("test-turnstile-token");
+  });
+
+  test("a note-kind ('filled') submit is queued and fires once, with the typed note intact", async () => {
+    mockSuccess();
+    const user = userEvent.setup();
+    const { deliver } = renderPanelWithDelayedToken();
+
+    await user.click(await screen.findByRole("button", { name: "I filled it" }));
+    await user.type(screen.getByLabelText(/Add a short note/i), "Topped it off");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    deliver("test-turnstile-token");
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledOnce());
+    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.kind).toBe("filled");
+    expect(body.note).toBe("Topped it off");
+  });
+});
+
 describe("BoxCheckinPanel — one-tap kinds (took/low/empty)", () => {
   test("tapping 'I took something' submits immediately, no note field ever shown", async () => {
     mockSuccess();

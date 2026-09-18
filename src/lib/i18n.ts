@@ -534,8 +534,10 @@ const en: Record<string, string> = {
   "box.history.subheading": "Full history for this box",
   // /box/<id>/history page (map-first rework scope addition, 2026-09-18) —
   // reuses BoxActivityList/useBoxActivity filtered to one box, so it needs
-  // no new heading/empty-state keys of its own beyond this back link.
-  "box.history.back": "Back to the map",
+  // no new heading/empty-state keys of its own. "box.history.back" (its own
+  // "Back to the map" link) was deleted 2026-09-18: PageNav's chrome-level
+  // link already covers it (backHref, see PageNav.tsx's own header) — two
+  // "back to map" links on one page was the bug being fixed.
 
   // Activity log (/boxes/activity, slice 3) and nav entry
   "nav.boxActivity": "Blessing box activity",
@@ -1097,7 +1099,6 @@ const es: Record<string, string> = {
   "box.recentCheckin.none": "Aún no hay visitas registradas", // [CHECK]
   "box.history.link": "Historial", // [CHECK]
   "box.history.subheading": "Historial completo de esta caja", // [CHECK]
-  "box.history.back": "Volver al mapa", // [CHECK]
 
   // Activity log (/boxes/activity, slice 3) and nav entry
   "nav.boxActivity": "Actividad de las cajas de bendiciones", // [CHECK]

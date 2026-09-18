@@ -38,7 +38,6 @@
  */
 
 import { useState } from "react";
-import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { useBoxActivity } from "@/lib/useBoxActivity";
@@ -82,18 +81,16 @@ export default function BoxHistoryContent({ box }: BoxHistoryContentProps) {
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
-      <PageNav locale={locale} />
+      {/* backHref points PageNav's own "Back to map" chrome link at the
+          exact box's card (?venue=<id>), not just the bare map — the in-map
+          deep link MapWrapper already reads. Fix, 2026-09-18: this page used
+          to ALSO render its own "Back to the map" link below, so a visitor
+          saw two of them; deleted in favor of pointing the one chrome link
+          everywhere else already has. */}
+      <PageNav locale={locale} backHref={`/?venue=${encodeURIComponent(liveBox.id)}`} />
 
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-6">
         <div>
-          {/* Back to the exact box's card, not just the bare map — the
-              in-map ?venue=<id> deep link MapWrapper already reads. */}
-          <Link
-            href={`/?venue=${encodeURIComponent(liveBox.id)}`}
-            className="text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline"
-          >
-            {t("box.history.back", locale)}
-          </Link>
           <h1
             className="mt-2 text-3xl font-normal text-[var(--color-ink-900)]"
             style={{ fontFamily: "var(--font-display)" }}
@@ -104,14 +101,12 @@ export default function BoxHistoryContent({ box }: BoxHistoryContentProps) {
         </div>
 
         {/* Full current-snapshot card, incl. check-in panel and host note —
-            see this file's own header. `showExpandedDetails` left at its
-            default (true): a no-WebGL visitor's only box page is THIS one,
-            so it needs the full snapshot, not the map card's collapsed
-            subset. Costs one redundant "History" link pointing at the page
-            already on screen — accepted rather than threading a new prop
-            through BoxCardBody to suppress just that link for a one-page
-            cosmetic wrinkle. */}
-        <BoxCardBody box={liveBox} onCheckinSuccess={handleCheckinSuccess} />
+            see this file's own header. `showHistoryLink={false}` (2026-09-18):
+            a History link pointing at the page it's already on is dead
+            weight — everything else about BoxCardBody's default rendering
+            still applies, since a no-WebGL visitor's only box page is THIS
+            one and needs the full snapshot. */}
+        <BoxCardBody box={liveBox} onCheckinSuccess={handleCheckinSuccess} showHistoryLink={false} />
 
         <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">
           {loading && activityPage.items.length === 0

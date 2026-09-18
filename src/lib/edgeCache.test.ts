@@ -9,7 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { respondWithEdgeCache } from "@/lib/edgeCache";
+import { bustEdgeCache, respondWithEdgeCache } from "@/lib/edgeCache";
 
 const mockGetCloudflareContext = vi.fn();
 vi.mock("@opennextjs/cloudflare", () => ({
@@ -98,5 +98,46 @@ describe("respondWithEdgeCache", () => {
     delete (globalThis as { caches?: unknown }).caches;
     const res = await respondWithEdgeCache(makeRequest(), async () => ({ data: {}, degraded: true }));
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
+  });
+});
+
+describe("bustEdgeCache", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    delete (globalThis as { caches?: unknown }).caches;
+  });
+
+  test("deletes every listed path, resolved against the request's own origin", async () => {
+    const del = vi.fn().mockResolvedValue(true);
+    (globalThis as { caches?: CacheStorage }).caches = { default: { delete: del } as unknown as Cache } as unknown as CacheStorage;
+
+    await bustEdgeCache(makeRequest(), ["/api/public/blessing-boxes", "/api/public/box-photos/1"]);
+
+    expect(del).toHaveBeenCalledTimes(2);
+    const urls = del.mock.calls.map((call) => (call[0] as Request).url);
+    expect(urls).toEqual([
+      "https://pueblofoodmap.com/api/public/blessing-boxes",
+      "https://pueblofoodmap.com/api/public/box-photos/1",
+    ]);
+  });
+
+  test("one path's delete failure doesn't stop the others — best-effort per path", async () => {
+    const del = vi.fn().mockRejectedValueOnce(new Error("boom")).mockResolvedValueOnce(true);
+    (globalThis as { caches?: CacheStorage }).caches = { default: { delete: del } as unknown as Cache } as unknown as CacheStorage;
+
+    await expect(bustEdgeCache(makeRequest(), ["/a", "/b"])).resolves.toBeUndefined();
+    expect(del).toHaveBeenCalledTimes(2);
+  });
+
+  test("no caches global -> resolves without throwing", async () => {
+    delete (globalThis as { caches?: unknown }).caches;
+    await expect(bustEdgeCache(makeRequest(), ["/a"])).resolves.toBeUndefined();
+  });
+
+  test("empty path list -> no-op, never touches caches", async () => {
+    const del = vi.fn();
+    (globalThis as { caches?: CacheStorage }).caches = { default: { delete: del } as unknown as Cache } as unknown as CacheStorage;
+    await bustEdgeCache(makeRequest(), []);
+    expect(del).not.toHaveBeenCalled();
   });
 });

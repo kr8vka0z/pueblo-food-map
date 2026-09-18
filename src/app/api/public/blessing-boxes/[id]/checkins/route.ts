@@ -76,6 +76,7 @@ import { verifyTurnstileToken } from "@/lib/turnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
+import { bustEdgeCache } from "@/lib/edgeCache";
 import {
   computeBoxStatus,
   computeLastFilledAt,
@@ -159,16 +160,9 @@ async function sendProblemReportEmail(boxId: string, boxName: string, note: stri
   }
 }
 
-/** Deletes GET /api/public/blessing-boxes' cache entry for the CURRENT colo — see this file's header for why this is a partial, not zone-wide, purge, and why that's still enough. Best-effort: a cache-delete failure must never fail the check-in itself. */
+/** Deletes GET /api/public/blessing-boxes' cache entry for the CURRENT colo — see this file's header for why this is a partial, not zone-wide, purge, and why that's still enough. Thin wrapper over the shared bustEdgeCache() (src/lib/edgeCache.ts) — slice 5's photo moderation routes reuse that same helper for their own, wider set of cache keys. */
 async function bustListCache(req: NextRequest): Promise<void> {
-  const cache: Cache | undefined = (globalThis as { caches?: { default?: Cache } }).caches?.default;
-  if (!cache) return;
-  try {
-    const listUrl = new URL("/api/public/blessing-boxes", req.url);
-    await cache.delete(new Request(listUrl));
-  } catch {
-    // best-effort only — the 60s TTL is the real freshness bound either way
-  }
+  await bustEdgeCache(req, ["/api/public/blessing-boxes"]);
 }
 
 export async function POST(

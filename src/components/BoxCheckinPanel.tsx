@@ -19,10 +19,16 @@
  * Turnstile verification with a stale, already-consumed token.
  *
  * Widget visibility (2026-09-18, Kyle: "Do we need to show the Cloudflare
- * check?"): rendered with `appearance: "interaction-only"` — the widget
- * stays invisible and check-in buttons are tappable right away; Cloudflare
- * only shows its chrome in the rare case it needs a real interactive
- * challenge. That means a tap CAN land before a token exists yet. Rather
+ * check?" — then, same day, from his phone: the managed-mode widget still
+ * popped the checkbox on a real device even with `appearance:
+ * "interaction-only"", so a SECOND, dedicated Turnstile site key was
+ * provisioned in Cloudflare's own "invisible" widget mode
+ * (`NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY` — check-ins only; every other
+ * public form keeps the original managed-mode key,
+ * `NEXT_PUBLIC_TURNSTILE_SITE_KEY`). An invisible-mode key never renders a
+ * checkbox at all — `appearance` is irrelevant to it and is left off the
+ * render call. That means a tap CAN still land before a token exists yet
+ * (the invisible challenge is still asynchronous). Rather
  * than block the whole panel on it (the old "Verifying…" line + disabled
  * buttons) or silently drop the tap, the tapped kind is queued
  * (`pendingSubmit`) and an effect fires it the moment `turnstileToken`
@@ -120,10 +126,11 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
     if (turnstileWidgetId.current) return; // already mounted
 
     turnstileWidgetId.current = window.turnstile.render(turnstileContainerRef.current, {
-      sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "",
-      // Invisible unless Cloudflare decides it actually needs a person to
-      // interact (Kyle, 2026-09-18) — see this file's own header.
-      appearance: "interaction-only",
+      // Dedicated invisible-mode key, check-ins only — never the managed
+      // NEXT_PUBLIC_TURNSTILE_SITE_KEY the other three forms use. See this
+      // file's own header for why (Kyle, 2026-09-18: the managed checkbox
+      // still appeared on his phone even under "interaction-only").
+      sitekey: process.env.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY ?? "",
       callback: (token) => {
         setTurnstileToken(token);
         setTurnstileError(false);

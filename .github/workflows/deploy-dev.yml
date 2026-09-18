@@ -36,6 +36,10 @@
 # widgets support multiple allowed hostnames on one sitekey, unlike Mapbox's
 # no-wildcard restriction) — Kyle should confirm dev.pueblofoodmap.com is an
 # allowed hostname on that widget.
+#
+# NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY (2026-09-18): the second, invisible-mode
+# key blessing-box check-ins use instead of the managed-mode key above — see
+# AGENTS.md's "Blessing boxes — card polish" section. Same reuse convention.
 name: Deploy Dev
 
 on:
@@ -61,6 +65,7 @@ jobs:
       # below — see the file-header comment on secret choice/reuse.
       NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY }}
     steps:
       # Same pinned-SHA third-party actions as deploy-prod.yml — a mutable
       # tag could be repointed to malicious code; a SHA cannot.

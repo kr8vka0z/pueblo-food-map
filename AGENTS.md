@@ -2493,6 +2493,15 @@ CHECKIN_RATE_LIMIT_SECRET`, same convention as `RESEND_API_KEY`/
 request if it's unset, so a promotion without it means every check-in
 (not just the rate-limit path) fails immediately in production.
 
+**Also required before promoting: set the prod worker secret
+`TURNSTILE_BOX_SECRET_KEY`** from `op://Atlas/Turnstile - Pueblo Food Map
+box check-ins/credential` (`wrangler secret put TURNSTILE_BOX_SECRET_KEY`)
+— the dedicated invisible-mode Turnstile keypair for check-ins only (see
+"Blessing Boxes — card polish" below for why a second key exists). The
+route reads this instead of `TURNSTILE_SECRET_KEY` and throws on every
+check-in request if it's unset, same failure shape as a missing
+`CHECKIN_RATE_LIMIT_SECRET` above.
+
 ---
 
 # Blessing Boxes — activity log (slice 3)
@@ -3080,6 +3089,24 @@ forms that still use the default `always` appearance (ReportForm,
 SuggestForm, FeedbackForm), are untouched. `src/types/turnstile.d.ts` (the
 one shared `window.turnstile` declaration all four forms import) gained the
 `appearance` option to type it.
+
+**SUPERSEDED (2026-09-18, same day, real-phone regression): a managed-mode
+key still shows its checkbox on a real device even under
+`appearance: "interaction-only"`.** `interaction-only` only suppresses the
+widget's OWN chrome — it doesn't change which Cloudflare **widget mode**
+the site key was provisioned in, and the check-in key had stayed a managed
+(checkbox-capable) key throughout the paragraph above. Fixed by
+provisioning a SECOND, dedicated Turnstile site key
+(`NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY`) in Cloudflare's own **invisible**
+widget mode — a mode that structurally never renders a checkbox, so
+`appearance` no longer matters and is dropped from the render call.
+Check-ins only; every other public form (ReportForm, SuggestForm,
+FeedbackForm) keeps the original managed-mode `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+unchanged. The matching server-side secret is also now its own dedicated
+`TURNSTILE_BOX_SECRET_KEY` (not `TURNSTILE_SECRET_KEY`) — same "a rotation
+of one must never silently affect the other" reasoning already applied to
+`CHECKIN_RATE_LIMIT_SECRET` above. See the "Blessing boxes — promotion
+checklist" above for the required production secret.
 
 Check-in buttons are no longer gated on `turnstileToken` existing — they're
 tappable immediately, disabled only while an actual submit is in flight or

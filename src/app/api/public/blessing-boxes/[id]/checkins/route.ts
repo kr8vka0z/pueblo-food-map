@@ -177,9 +177,16 @@ export async function POST(
   const ip =
     req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 
-  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
+  // Dedicated invisible-mode Turnstile secret, check-ins only — never
+  // TURNSTILE_SECRET_KEY, the managed-mode key the other three public forms
+  // verify against (2026-09-18: a managed-mode widget still popped its
+  // checkbox on a real phone even under `appearance: "interaction-only"`,
+  // so check-ins moved to a second site key provisioned in Cloudflare's
+  // invisible widget mode — see BoxCheckinPanel.tsx's own header and
+  // AGENTS.md's "Blessing boxes — card polish" section).
+  const turnstileSecret = process.env.TURNSTILE_BOX_SECRET_KEY;
   if (!turnstileSecret) {
-    throw new Error("TURNSTILE_SECRET_KEY not configured");
+    throw new Error("TURNSTILE_BOX_SECRET_KEY not configured");
   }
   // Dedicated secret for rate-limit key derivation — deliberately NOT
   // turnstileSecret (2026-09-17 review correction; see checkinRateLimit.ts's

@@ -479,14 +479,18 @@ const en: Record<string, string> = {
   "resources.everydayeats.goodFor": "Adults 60 and older with limited income. Households of any age on SNAP, Medicaid, SSI and some other programs can also get emergency food (called TEFAP) the same way.",
   "resources.everydayeats.how": "Text FOOD to 1-877-644-3663. You'll get a link to a short sign-up form. You'll renew every 6 months, and if you miss your box 3 months in a row you lose your spot.",
 
-  // Blessing box detail page (/box/[id], slice 1)
+  // Blessing box card (rendered in-map, BottomSheet/DesktopVenueWindow, slice 1)
   "box.host": "Host",
-  "box.hostNotePrefix": "From the host",
   "box.mostNeeded": "Most needed",
-  "box.installedSince": "Installed",
   "box.status": "Status",
   "box.status.unknown": "Unknown — no recent check-ins",
-  "box.notFound": "We couldn't find that blessing box.",
+  // Card is opening on the map (client redirect from /box/<id>) or the
+  // full box record hasn't loaded into the card yet — both share this line.
+  "box.cardLoading": "Loading…",
+  // No-JS fallback (fix, PR review 2026-09-18): the redirect above needs a
+  // client effect to run, so a JS-disabled visitor is never sent anywhere —
+  // this is the plain link that gets them there by hand.
+  "box.redirectLink": "View this box on the map",
 
   // Check-ins and live status (slice 2)
   "box.status.stocked": "Stocked",
@@ -520,6 +524,19 @@ const en: Record<string, string> = {
   "box.checkin.error.rateLimitVisitor": "Too many check-ins from this device right now. Please try again later.",
   "box.checkin.error.rateLimitBox": "This box is getting an unusual number of check-ins right now. Please try again later.",
 
+  // Most-recent-check-in snapshot on the in-map card (map-first rework,
+  // 2026-09-18) — the card shows ONE line, not a list; the full timeline
+  // moved to /box/<id>/history.
+  "box.recentCheckin.heading": "Most recent check-in",
+  "box.recentCheckin.none": "No check-ins yet",
+  // "History" link on the card -> /box/<id>/history (map-first rework)
+  "box.history.link": "History",
+  "box.history.subheading": "Full history for this box",
+  // /box/<id>/history page (map-first rework scope addition, 2026-09-18) —
+  // reuses BoxActivityList/useBoxActivity filtered to one box, so it needs
+  // no new heading/empty-state keys of its own beyond this back link.
+  "box.history.back": "Back to the map",
+
   // Activity log (/boxes/activity, slice 3) and nav entry
   "nav.boxActivity": "Blessing box activity",
   "activity.heading": "Blessing box activity",
@@ -536,9 +553,13 @@ const en: Record<string, string> = {
   "activity.filters.from": "From",
   "activity.filters.to": "To",
   "activity.filters.clear": "Clear filters",
-  "activity.recentHeading": "Recent activity at this box",
+  // activity.recentEmpty: BoxHistoryContent's per-box empty state
+  // (/box/<id>/history). activity.recentHeading and activity.viewFull
+  // (the old BoxContent per-box "Recent activity" section header + "See
+  // full activity" link) were removed with it (map-first rework scope
+  // addition, 2026-09-18) — the card shows one line, not a list, and
+  // "History" (box.history.link, above) replaces "See full activity".
   "activity.recentEmpty": "No activity at this box yet.",
-  "activity.viewFull": "See full activity",
   "activity.thisBox": "This box",
   // Line templates — {name} is the box's own name (already reads
   // "Blessing Box - 216 W Routt" etc., so these deliberately don't repeat
@@ -565,24 +586,6 @@ const en: Record<string, string> = {
   "activity.kind.paused": "Box paused",
   "activity.kind.removed": "Box removed",
 
-  // /boxes directory page (slice 4, Discovery B2/B3/B5/B6) + the B4 entry
-  // point (bottom nav item / floating map button — both share "nav.boxes")
-  "nav.boxes": "Boxes",
-  "boxes.heading": "Blessing Boxes",
-  "boxes.intro": "Every blessing box in the network, sorted so the ones that need filling most come first.",
-  "boxes.sort.label": "Sort by",
-  "boxes.sort.needsFilling": "Needs filling most",
-  "boxes.sort.closest": "Closest to me",
-  "boxes.sort.recentlyFilled": "Recently filled",
-  "boxes.sort.needsLocation": "Turn on location to sort by distance. Showing the boxes that need filling most instead.",
-  "boxes.sort.locationDenied": "Location isn't available on this device. Showing the boxes that need filling most instead.",
-  "boxes.locating": "Finding your location…",
-  "boxes.hideEmpty": "Hide boxes reported empty",
-  "boxes.distanceNote": "Distance shown is a straight line, not a walking route.",
-  "boxes.resultCount": "{count} boxes",
-  "boxes.loading": "Loading…",
-  "boxes.empty": "No blessing boxes to show right now.",
-  "boxes.mostNeeded": "Most needed: {list}",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -1054,14 +1057,13 @@ const es: Record<string, string> = {
   "resources.everydayeats.goodFor": "Adultos de 60 años o más con ingresos limitados. Los hogares de cualquier edad que reciben SNAP, Medicaid, SSI y algunos otros programas también pueden obtener comida de emergencia (llamada TEFAP) de la misma manera.",
   "resources.everydayeats.how": "Envía FOOD por mensaje de texto al 1-877-644-3663. Recibirás un enlace a un formulario corto de inscripción. Hay que renovar cada 6 meses, y si no recoges tu caja 3 meses seguidos pierdes tu lugar.",
 
-  // Blessing box detail page (/box/[id], slice 1)
+  // Blessing box card (rendered in-map, BottomSheet/DesktopVenueWindow, slice 1)
   "box.host": "Anfitrión", // [CHECK]
-  "box.hostNotePrefix": "Del anfitrión", // [CHECK]
   "box.mostNeeded": "Lo que más se necesita",
-  "box.installedSince": "Instalada desde", // [CHECK]
   "box.status": "Estado",
   "box.status.unknown": "Desconocido — sin visitas recientes", // [CHECK]
-  "box.notFound": "No pudimos encontrar esa caja de bendiciones.", // [CHECK]
+  "box.cardLoading": "Cargando…", // [CHECK]
+  "box.redirectLink": "Ver esta caja en el mapa", // [CHECK]
 
   // Check-ins and live status (slice 2)
   "box.status.stocked": "Surtida", // [CHECK]
@@ -1091,6 +1093,12 @@ const es: Record<string, string> = {
   "box.checkin.error.rateLimitVisitor": "Demasiadas visitas desde este dispositivo por ahora. Por favor intenta más tarde.", // [CHECK]
   "box.checkin.error.rateLimitBox": "Esta caja está recibiendo un número inusual de visitas en este momento. Por favor intenta más tarde.", // [CHECK]
 
+  "box.recentCheckin.heading": "Visita más reciente", // [CHECK]
+  "box.recentCheckin.none": "Aún no hay visitas registradas", // [CHECK]
+  "box.history.link": "Historial", // [CHECK]
+  "box.history.subheading": "Historial completo de esta caja", // [CHECK]
+  "box.history.back": "Volver al mapa", // [CHECK]
+
   // Activity log (/boxes/activity, slice 3) and nav entry
   "nav.boxActivity": "Actividad de las cajas de bendiciones", // [CHECK]
   "activity.heading": "Actividad de las cajas de bendiciones", // [CHECK]
@@ -1107,9 +1115,7 @@ const es: Record<string, string> = {
   "activity.filters.from": "Desde", // [CHECK]
   "activity.filters.to": "Hasta", // [CHECK]
   "activity.filters.clear": "Quitar filtros", // [CHECK]
-  "activity.recentHeading": "Actividad reciente en esta caja", // [CHECK]
   "activity.recentEmpty": "Todavía no hay actividad en esta caja.", // [CHECK]
-  "activity.viewFull": "Ver toda la actividad", // [CHECK]
   "activity.thisBox": "Esta caja", // [CHECK]
   "activity.line.filled": "{name} fue surtida", // [CHECK]
   "activity.line.took": "Alguien tomó algo de {name}", // [CHECK]
@@ -1129,24 +1135,6 @@ const es: Record<string, string> = {
   "activity.kind.renamed": "Caja con nombre cambiado", // [CHECK]
   "activity.kind.paused": "Caja pausada", // [CHECK]
   "activity.kind.removed": "Caja eliminada", // [CHECK]
-
-  // /boxes directory page (slice 4) + the B4 entry point
-  "nav.boxes": "Cajas", // [CHECK]
-  "boxes.heading": "Cajas de bendición", // [CHECK]
-  "boxes.intro": "Todas las cajas de bendición de la red, ordenadas para que las que más necesitan surtido aparezcan primero.", // [CHECK]
-  "boxes.sort.label": "Ordenar por", // [CHECK]
-  "boxes.sort.needsFilling": "Las que más necesitan surtido", // [CHECK]
-  "boxes.sort.closest": "Las más cercanas a mí", // [CHECK]
-  "boxes.sort.recentlyFilled": "Surtidas recientemente", // [CHECK]
-  "boxes.sort.needsLocation": "Activa tu ubicación para ordenar por distancia. Mostrando en su lugar las que más necesitan surtido.", // [CHECK]
-  "boxes.sort.locationDenied": "La ubicación no está disponible en este dispositivo. Mostrando en su lugar las que más necesitan surtido.", // [CHECK]
-  "boxes.locating": "Buscando tu ubicación…", // [CHECK]
-  "boxes.hideEmpty": "Ocultar cajas reportadas como vacías", // [CHECK]
-  "boxes.distanceNote": "La distancia mostrada es una línea recta, no una ruta a pie.", // [CHECK]
-  "boxes.resultCount": "{count} cajas", // [CHECK]
-  "boxes.loading": "Cargando…", // [CHECK]
-  "boxes.empty": "No hay cajas de bendición que mostrar por ahora.", // [CHECK]
-  "boxes.mostNeeded": "Lo más necesitado: {list}", // [CHECK]
 };
 
 /** Substitute simple {key} placeholders. */

@@ -40,7 +40,14 @@ const KINDS_WITH_NOTE: ReadonlySet<CheckinKind> = new Set(["filled", "problem"])
 
 interface BoxCheckinPanelProps {
   boxId: string;
-  onCheckinSuccess: (result: { status: BoxStatus; lastFilledAt: string | null }) => void;
+  /**
+   * `kind` was added for the map-first card rework (2026-09-18): the card
+   * shows the single most recent check-in inline, and the POST response
+   * body never echoes back which kind was just submitted — the caller
+   * already knows it (it's what it just sent), so it's threaded through
+   * here rather than re-fetched.
+   */
+  onCheckinSuccess: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
 }
 
 type SubmitState =
@@ -134,7 +141,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
         setOpenKind(null);
         setNote("");
         if (data.status) {
-          onCheckinSuccess({ status: data.status, lastFilledAt: data.lastFilledAt ?? null });
+          onCheckinSuccess({ status: data.status, lastFilledAt: data.lastFilledAt ?? null, kind });
         }
       } else if (data.error === "rate_limit_visitor") {
         setSubmitState("rate_limited_visitor");

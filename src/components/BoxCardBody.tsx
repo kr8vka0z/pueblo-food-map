@@ -1,0 +1,138 @@
+"use client";
+
+/**
+ * BoxCardBody — the blessing-box body content rendered INSIDE the map's own
+ * card family (BottomSheet on mobile, DesktopVenueWindow on desktop), not a
+ * standalone page. Replaces the old full-page BoxContent.tsx (deleted) —
+ * Kyle, 2026-09-18: "I want ... check in, submit a picture, all that stuff
+ * ... to just happen on the map ... like a venue card, not take you to a
+ * different page."
+ *
+ * Shows ONLY the box's current snapshot, never a list (Kyle, 2026-09-18
+ * scope addition to the same rework): status + last filled, the single
+ * MOST RECENT check-in (not the activity list BoxContent used to embed —
+ * that moved to its own page), most-needed, the host's public note, and the
+ * check-in panel. A "History" link goes to /box/<id>/history for the full
+ * timeline — BoxActivityList (the list renderer) is reused THERE, not here.
+ *
+ * Name/address/directions/category badge stay owned by the CALLER
+ * (BottomSheet/DesktopVenueWindow already render those identically for
+ * every other venue) — this component starts at the box-specific content
+ * below that shared header, so a box card is a native member of the venue
+ * card family rather than a second, differently-shaped UI bolted on.
+ *
+ * Two extension points, deliberately rendering NOTHING today (no
+ * placeholder image, no "coming soon" text) until their data exists —
+ * marked at the exact spot their JSX will go so a later slice doesn't have
+ * to restructure this component to add them:
+ *   - a most-recent-PHOTO slot — arrives in slice 5 (box_photos)
+ *   - a current-SPONSOR ("Cared for by …") slot — arrives in slice 6
+ *     (box_adopters)
+ *
+ * `showExpandedDetails` mirrors DesktopVenueWindow's own collapsed/expanded
+ * split for an ordinary venue: collapsed = status/last-filled/most-recent-
+ * check-in/most-needed/check-in buttons (the glanceable + actionable core);
+ * expanded adds the host's note and the History link. BottomSheet (mobile)
+ * has no such toggle — everything here is short enough now that the
+ * activity list is gone, so it always passes true.
+ */
+
+import Link from "next/link";
+import { t } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
+import { formatRelativeTime } from "@/lib/relativeTime";
+import BoxCheckinPanel from "@/components/BoxCheckinPanel";
+import { STATUS_BADGE_CLASS, type BoxStatus, type CheckinKind, type PublicBlessingBox } from "@/lib/blessingBoxes";
+
+interface BoxCardBodyProps {
+  box: PublicBlessingBox;
+  onCheckinSuccess?: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
+  /** See this file's own header. Default true — BottomSheet always shows everything. */
+  showExpandedDetails?: boolean;
+}
+
+export default function BoxCardBody({ box, onCheckinSuccess, showExpandedDetails = true }: BoxCardBodyProps) {
+  const { locale } = useLocale();
+  const mostRecentCheckin = box.box.recentCheckins[0] ?? null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Status + last filled */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          data-testid="box-status-badge"
+          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE_CLASS[box.box.status]}`}
+        >
+          {t("box.status", locale)}: {t(`box.status.${box.box.status}`, locale)}
+        </span>
+        <span className="text-xs text-[var(--color-ink-400)]">
+          {box.box.lastFilledAt
+            ? t("box.lastFilled", locale, { time: formatRelativeTime(box.box.lastFilledAt, locale) })
+            : t("box.lastFilled.never", locale)}
+        </span>
+      </div>
+
+      {/* Most recent check-in — ONE line, not a list (Kyle, 2026-09-18): the
+          full timeline lives at /box/<id>/history via the History link below. */}
+      <div>
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-1">
+          {t("box.recentCheckin.heading", locale)}
+        </h3>
+        {mostRecentCheckin ? (
+          <p data-testid="box-recent-checkin" className="text-sm text-[var(--color-ink-700)]">
+            {t(`activity.kind.${mostRecentCheckin.kind}`, locale)} ·{" "}
+            {formatRelativeTime(mostRecentCheckin.createdAt, locale)}
+          </p>
+        ) : (
+          <p className="text-sm text-[var(--color-ink-500)]">{t("box.recentCheckin.none", locale)}</p>
+        )}
+      </div>
+
+      {/* Most needed */}
+      {box.box.mostNeeded && (
+        <div>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-1">
+            {t("box.mostNeeded", locale)}
+          </h3>
+          <p className="text-sm text-[var(--color-ink-700)]">{box.box.mostNeeded}</p>
+        </div>
+      )}
+
+      {/* Slice 5 extension point: most-recent-photo slot. Renders nothing
+          until box_photos exists — no placeholder image, no "coming soon"
+          text (Kyle, 2026-09-18). */}
+
+      {/* Slice 6 extension point: current-sponsor ("Cared for by …") slot.
+          Renders nothing until box_adopters exists (same rule as above). */}
+
+      {showExpandedDetails && (box.box.hostName || box.box.hostNote) && (
+        <div>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-1">
+            {t("box.host", locale)}
+          </h3>
+          {box.box.hostName && (
+            <p className="text-sm font-medium text-[var(--color-ink-700)]">{box.box.hostName}</p>
+          )}
+          {box.box.hostNote && (
+            <p className="text-sm text-[var(--color-ink-700)] leading-relaxed mt-0.5">{box.box.hostNote}</p>
+          )}
+        </div>
+      )}
+
+      {/* Check-in panel — all five choices, one tap for "took something" */}
+      <BoxCheckinPanel
+        boxId={box.id}
+        onCheckinSuccess={(result) => onCheckinSuccess?.(result)}
+      />
+
+      {showExpandedDetails && (
+        <Link
+          href={`/box/${encodeURIComponent(box.id)}/history`}
+          className="text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline"
+        >
+          {t("box.history.link", locale)}
+        </Link>
+      )}
+    </div>
+  );
+}

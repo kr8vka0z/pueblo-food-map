@@ -7,24 +7,36 @@
 export type ShareResult = "shared" | "copied" | "cancelled" | "unsupported";
 
 /**
- * Build the canonical share URL for a venue: /venue/<id>.
+ * Build the canonical share URL for a venue: /venue/<id>, or /box/<id> for a
+ * blessing box.
  *
  * WHY: Changed from /?venue=<id> to /venue/<id> in PR2 (#164 6.4). The new
  * form is the rich per-venue page — better crawlability, better link previews,
  * and a permanent redirect from the old form covers legacy shares.
+ *
+ * WHY /box/<id> instead of /venue/<id> for a box (map-first rework,
+ * 2026-09-18): /venue/[id]/page.tsx is a STATIC route restricted to known
+ * venue ids (generateStaticParams + dynamicParams=false) — a box's id was
+ * never in that build-time set (boxes are live, not published), so it would
+ * 404. /box/<id> still exists as its own route (BoxRedirectClient.tsx) with
+ * box-specific generateMetadata, which client-redirects to /?venue=<id> —
+ * the extra hop is the price of keeping a real per-box link preview.
  */
-export function venueShareUrl(venueId: string): string {
+export function venueShareUrl(venueId: string, isBox = false): string {
   const origin =
     typeof window !== "undefined" && window.location?.origin
       ? window.location.origin
       : "https://pueblofoodmap.com";
-  return `${origin}/venue/${encodeURIComponent(venueId)}`;
+  const path = isBox ? "box" : "venue";
+  return `${origin}/${path}/${encodeURIComponent(venueId)}`;
 }
 
 interface ShareVenueOptions {
   venueId: string;
   title: string;
   text?: string;
+  /** See venueShareUrl's own header — a blessing box shares /box/<id>, not /venue/<id>. */
+  isBox?: boolean;
 }
 
 /**
@@ -36,8 +48,9 @@ export async function shareVenue({
   venueId,
   title,
   text,
+  isBox = false,
 }: ShareVenueOptions): Promise<ShareResult> {
-  const url = venueShareUrl(venueId);
+  const url = venueShareUrl(venueId, isBox);
   const nav = typeof navigator !== "undefined" ? navigator : undefined;
 
   // Preferred: native share sheet (mobile + some desktop browsers).

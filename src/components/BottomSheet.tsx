@@ -34,11 +34,24 @@ import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import HoursList from "@/components/HoursList";
 import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
+import BoxCardBody from "@/components/BoxCardBody";
+import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface BottomSheetProps {
   venue: (Venue & { distanceMiles?: number }) | null;
+  /**
+   * Full blessing-box record when `venue.category === "blessing_box"` —
+   * `venue` itself only carries the plain-Venue fields every marker uses
+   * (see useBoxVenues.ts's own header), so the box-specific card body
+   * (status, host note, most-needed, check-ins) needs this separately.
+   * `null`/`undefined` while MapWrapper's box fetch hasn't resolved yet —
+   * BoxCardBody isn't rendered until it has (see the render below).
+   */
+  box?: PublicBlessingBox | null;
+  /** Forwarded to BoxCardBody's check-in panel — MapWrapper patches its cached box record so the card stays current after close/reopen. */
+  onCheckinSuccess?: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
   onClose: () => void;
   /** Called when expanded state changes — e.g. to hide overlapping UI when expanded. */
   onExpandedChange?: (expanded: boolean) => void;
@@ -66,6 +79,8 @@ interface BottomSheetProps {
 
 export default function BottomSheet({
   venue,
+  box,
+  onCheckinSuccess,
   onClose,
   onExpandedChange,
   locale: localeProp,
@@ -81,6 +96,7 @@ export default function BottomSheet({
   const [expanded, setExpanded] = useState(false);
 
   const open = venue !== null;
+  const isBox = venue?.category === "blessing_box";
   const status = venue ? computeOpenStatus(venue.hours_weekly) : null;
   const displayNotes = venue ? getDisplayNotes(venue) : undefined;
 
@@ -131,7 +147,7 @@ export default function BottomSheet({
                   >
                     {venue.name}
                   </h2>
-                  <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} />
+                  <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} isBox={isBox} />
                   <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} />
                   <button
                     type="button"
@@ -198,7 +214,10 @@ export default function BottomSheet({
                       {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
                     </span>
                   )}
-                  {status && status.state !== "no_hours" && (
+                  {/* Hours badges don't apply to a blessing box (it has no
+                      hours_weekly) — BoxCardBody's own status badge covers
+                      the equivalent "is it usable right now" read. */}
+                  {!isBox && status && status.state !== "no_hours" && (
                     <span className="flex items-center gap-1.5">
                       <Clock size={14} aria-hidden className="text-[var(--color-ink-400)]" />
                       {status.state === "open"
@@ -213,7 +232,7 @@ export default function BottomSheet({
                       tells the user why there's no open/closed read, using a
                       different icon (not Clock) + explicit text so it's never
                       mistaken for "open" by shape alone, not just color. */}
-                  {status && status.state === "no_hours" && (
+                  {!isBox && status && status.state === "no_hours" && (
                     <span className="flex items-center gap-1.5 text-[var(--color-ink-700)] font-medium">
                       <CircleHelp size={14} aria-hidden className="text-[var(--color-ink-700)]" />
                       {t("badge.hoursUnknown", locale)}
@@ -222,8 +241,11 @@ export default function BottomSheet({
                 </div>
 
                 {/* Notes (2 lines max) — suppressed for OSM artifacts and
-                    Plentiful's auto-generated boilerplate (src/lib/venueNotes.ts) */}
-                {displayNotes && (
+                    Plentiful's auto-generated boilerplate (src/lib/venueNotes.ts).
+                    Also suppressed for a box — its host note renders inside
+                    BoxCardBody instead, alongside the rest of the box-specific
+                    content. */}
+                {!isBox && displayNotes && (
                   <p className="text-sm text-[var(--color-ink-700)] leading-relaxed line-clamp-2">
                     {displayNotes}
                   </p>
@@ -231,7 +253,8 @@ export default function BottomSheet({
 
                 {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
                     routeInfo threads distance+duration down for the in-card readout.
-                    walkSteps provides the collapsible turn-by-turn list. */}
+                    walkSteps provides the collapsible turn-by-turn list.
+                    Shared by boxes and ordinary venues alike. */}
                 <DirectionButtons
                   venue={venue}
                   onWalk={onWalkRoute ?? (() => {})}
@@ -243,6 +266,19 @@ export default function BottomSheet({
                   showLocationHint={showWalkLocationHint}
                 />
 
+                {/* Blessing box: BoxCardBody replaces the show/hide-details
+                    toggle entirely — mobile has no expand/collapse for a box,
+                    everything (status, latest check-in, most-needed, host
+                    note, check-in panel, History link) renders inline right
+                    away (Kyle, 2026-09-18: "just happen on the map"). */}
+                {isBox ? (
+                  box ? (
+                    <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} showExpandedDetails />
+                  ) : (
+                    <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
+                  )
+                ) : (
+                  <>
                 {/* Show/Hide details toggle */}
                 <button
                   type="button"
@@ -369,6 +405,8 @@ export default function BottomSheet({
                     </div>
                   )}
                 </div>
+                </>
+                )}
               </div>
             </div>
           )}

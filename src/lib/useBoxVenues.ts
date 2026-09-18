@@ -21,8 +21,14 @@ import { useEffect, useState } from "react";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 
-/** Drops the `box` sub-object — the filter/marker pipeline only ever reads plain Venue fields. */
-function toVenue(b: PublicBlessingBox): Venue {
+/**
+ * Drops the `box` sub-object — the filter/marker pipeline only ever reads
+ * plain Venue fields. Exported so MapWrapper (map-first rework) can derive
+ * the same shape from useBoxesList()'s full PublicBlessingBox[] instead of
+ * fetching this hook's own copy of the same endpoint a second time — one
+ * fetch feeds both the pin/filter pipeline and the in-map card's full data.
+ */
+export function toVenue(b: PublicBlessingBox): Venue {
   return {
     id: b.id,
     name: b.name,

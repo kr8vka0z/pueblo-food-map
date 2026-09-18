@@ -2169,17 +2169,14 @@ degrades to "no boxes" rather than a 500):**
   marker pipeline every other venue already flows through, with zero
   category-specific branching needed there (see `useMapFilters.ts`'s own
   WHY comment).
-- `/box/[id]` — a `force-dynamic` page (no `generateStaticParams` — there is
-  no fixed build-time id list, unlike `/venue/[id]`), rendering
-  `BoxContent.tsx`: name/address/host/most-needed/installed-since/
-  directions link, and an always-shown status line reading the slice-1
-  placeholder (`BOX_STATUS_PLACEHOLDER = "unknown"`, `src/lib/blessingBoxes.ts`
-  — check-ins/real status land in slice 2, never computed here). Box clicks
-  on the map route straight to this page (`router.push`) rather than
-  opening the ordinary `BottomSheet`/`DesktopVenueWindow` card — a
-  deliberate slice-1 scope call (those cards have no host/most-needed/
-  status fields to show meaningfully); 6 selection entry points in
-  `MapWrapper.tsx` each carry a one-line guard for this.
+- `/box/[id]` — **SUPERSEDED by the map-first rework (2026-09-18) — see
+  that section, far below, for what this route and box click-handling
+  actually do now.** At slice-1 ship time this was a `force-dynamic` page
+  (no `generateStaticParams` — there is no fixed build-time id list, unlike
+  `/venue/[id]`) rendering a now-deleted `BoxContent.tsx`, and box clicks on
+  the map routed straight to it (`router.push`) instead of opening the
+  ordinary `BottomSheet`/`DesktopVenueWindow` card. Kept here only as the
+  historical record of slice 1's original scope call.
 
 **The one real box converted:** the Routt St venue
 (`plentiful-blessing-box-216-w-routt-plentiful-1454`, née a plain `pantry`
@@ -2654,6 +2651,19 @@ filter UI.
 
 # Blessing Boxes — directory page, closest-to-me, map entry point (slice 4)
 
+**SUPERSEDED by the map-first rework (2026-09-18) — see that section, far
+below, for what actually ships today.** The `/boxes` directory page this
+section describes was REMOVED entirely (map + category filter + List view
+replaces it — "closest to me" now lives in `useMapFilters`' existing
+distance sort, applied to boxes the same as every other venue). The B4
+map-entry-point A/B scaffolding below (`boxEntryVariant.ts`,
+`BlessingBoxesMapButton.tsx`, `showBoxesItem`) was deleted outright — Kyle's
+answer to "which entry point" turned out to be neither candidate: the
+existing category filter chip is the entry point, no new nav item or
+floating button. Kept below as the historical record of what slice 4
+originally shipped and why; none of the file paths or components it names
+still exist.
+
 Full design: `atlas-kb/projects/Pueblo Food Map/Blessing Boxes Build Plan.md`
 and `...Blessing Boxes Epic - Discovery.md` (stories B2-B6). This section
 covers what slice 4 shipped, on top of slices 1-3 above. **No new
@@ -2809,11 +2819,219 @@ either being picked unilaterally:**
   `showBoxesItem` prop — is TEMPORARY scaffolding for Kyle's B4 choice, not
   a permanent feature flag.** It MUST be deleted and collapsed to whichever
   single placement he picks BEFORE this feature is ever promoted to `main`.
+  **Done, 2026-09-18 — all of it deleted, see the map-first rework section
+  below for what replaced it.**
 
 **Deliberately NOT built in this slice** (out of the acceptance criteria,
 per the task's own explicit exclusion list, so a later slice doesn't
 assume otherwise): photos, adopt-a-box, alerts, stats/numbers, QR
 stickers, accounts.
+
+---
+
+# Blessing Boxes — map-first card rework (2026-09-18)
+
+Kyle, 2026-09-18: "I really wanted all of the interaction to still happen
+on the map... when you click on a blessing box icon, I don't want it to
+take you to a page. I want it to just happen on the map: check in, submit
+a picture, all that stuff... like a venue card, not take you to a
+different page." Same day, a scope addition: the card shows only the
+CURRENT snapshot (latest check-in, not a list), with a "History" link to a
+separate full-timeline page. Supersedes slice 1's box-click routing and
+all of slice 4's `/boxes` directory + B4 entry-point scaffolding above —
+both sections are kept only as historical record; this section is the
+current, accurate description.
+
+**Entry point — the existing category filter chip, nothing new.** No 5th
+`BottomNav` item, no floating map button. Toggle the blessing-box category
+(search-focus dropdown or the filter chip) the same way as any other
+category; `useMapFilters`' existing distance sort (already nearest-first by
+default) covers "closest box to me" for free once boxes are in the merged
+venue list — no new sort logic was needed. `BottomNav.tsx`'s `showBoxesItem`/
+`onBoxesPage` props, `src/lib/boxEntryVariant.ts`, and
+`BlessingBoxesMapButton.tsx` are all DELETED, along with their tests —
+`BottomNav` is back to exactly 4 items (Near me/Saved/Resources/Menu),
+unconditionally.
+
+**Tapping a box pin (or picking one from search results / List view) opens
+the SAME card every other venue uses** — `BottomSheet` (mobile) /
+`DesktopVenueWindow` (desktop) — never a separate page. Both components
+gained an `isBox = venue?.category === "blessing_box"` branch: the
+hours-today badge, the venue notes paragraph, and (desktop/expanded-only)
+the address/hours-table/phone/SNAP-WIC/Plentiful-link/report-venue section
+are all skipped for a box (none apply); `ShareButton`'s share link becomes
+`/box/<id>` instead of `/venue/<id>` (a box id was never in `/venue/[id]`'s
+static `generateStaticParams` set — see `share.ts`'s own header). In their
+place, `BoxCardBody.tsx` (new) renders the box-specific content: status +
+last filled, the single most recent check-in, most-needed, the check-in
+panel (all five choices), the host's note (expanded/mobile only), and the
+History link (expanded/mobile only) — see the scope-addition paragraph
+below for why it's one check-in, not a list. `DesktopVenueWindow` mirrors
+its own existing collapsed/expanded split for a box
+(`boxCollapsedBody`/`boxExpandedBody`, `BoxCardBody`'s
+`showExpandedDetails` prop) exactly like it does for an ordinary venue.
+Name/address-row/category-badge/directions stay owned by the caller (the
+same header every other venue card renders) — `BoxCardBody` starts below
+that. `DesktopVenueWindow`'s Escape-key handler also gained a guard: Escape
+no longer closes the whole window while focus is inside an `<input>`/
+`<textarea>` in it (the check-in panel's note field), matching normal
+browser expectations instead of losing an in-progress note.
+
+**Scope addition (Kyle, same day, sent mid-build): the card shows ONLY the
+current snapshot, never a list.** `BoxCardBody` renders
+`box.box.recentCheckins[0]` — one line ("Filled · 2 hours ago"), not
+`BoxActivityList`. `BoxCheckinPanel`'s `onCheckinSuccess` payload gained a
+`kind` field (the POST response never echoed back which kind was just
+submitted, and the card needs it to update that one line without a
+refetch). Two bounded extension points sit in `BoxCardBody`, deliberately
+rendering NOTHING today (no placeholder image, no "coming soon" text) until
+their data exists: a most-recent-**photo** slot (slice 5, `box_photos`) and
+a current-**sponsor** ("Cared for by…") slot (slice 6, `box_adopters`).
+
+**"History" link → `/box/<id>/history` (new page, `BoxHistoryContent.tsx`).**
+Full chronological check-in + lifecycle log for ONE box, newest first,
+paginated — reuses `useBoxActivity`/`BoxActivityList` filtered to
+`venueId`, the exact same slice-3 read path `/boxes/activity` uses (not a
+second query), so it inherits the same structural privacy guarantee
+(`problem` reports and hidden check-ins excluded at the SQL level — see
+"Blessing Boxes — activity log (slice 3)" above). A "Back to the map" link
+returns to `/?venue=<id>` directly (not `/box/<id>`, to skip that route's
+own redirect hop). `/boxes/activity` (the town-wide log) is unchanged.
+
+**`/box/[id]` is no longer a destination page — it redirects to the map.**
+`BoxRedirectClient.tsx` (new): the page's `generateMetadata` is UNCHANGED
+(still reads the box from D1 server-side, still emits box-specific
+title/description/OG tags — a shared link's preview still works), but the
+page body is now a small Client Component that calls
+`router.replace('/?venue=<id>')` on mount, showing "<box name> — Loading…"
+during the brief flash (and as the permanent state for a JS-disabled
+visitor, who is never redirected). Rendering server-side metadata then
+client-redirecting — rather than a server `redirect()` — is deliberate: a
+server redirect would skip rendering the page (and its `<head>`) entirely
+for a non-JS crawler, defeating the point of keeping `generateMetadata`.
+The Routt St box's `next.config.ts` legacy redirect
+(`/venue/<Routt-id>` → …) now points straight at `/?venue=<Routt-id>`
+instead of `/box/<Routt-id>`, skipping the extra hop for that one link — a
+plain query string on a redirect DESTINATION is fine (only a `has` query
+MATCHER on the SOURCE ever broke on this stack, see that file's own
+header).
+
+**Deep links (`MapWrapper.tsx`'s two `?venue=<id>`-reading effects).** The
+map-ready effect no longer existence-checks `initialVenueId` against
+`allVenues` before selecting it — a box's data arrives async from
+`useBoxesList`, so a check at that exact instant could reject a valid box
+id before its own fetch resolves; `selectedVenue`/`getBoxById` both already
+return null/undefined gracefully for an unresolved id, and `Map.tsx`'s
+flyTo effect re-fires once `venues`/the live box list populate (a new array
+reference), so there was nothing for the check to protect against. The
+`mapUnavailable` variant (map can't mount at all) still needs an explicit
+destination since there's no card to open there: a box id now routes to
+`/box/<id>/history` (the one still-standalone page a box has), a plain
+venue id to `/venue/<id>` as before. The same box-vs-venue split was
+applied to `handleSelectSavedVenue`/`handleSelectVenueFromPopover`/
+`handleSelectFromList`'s own `mapUnavailable` branches. `handleSelectVenueFromMap`
+(the plain map-pin tap) correctly has no such branch — Map.tsx never renders
+while `mapUnavailable`, so there are no pins to tap in the first place, a
+genuinely unreachable path. `handleSearchKeyDown`'s Enter branch is
+different and was fixed (2026-09-18, PR review) to match the other three:
+SearchBar itself renders unconditionally regardless of `mapUnavailable` (see
+its render call in MapWrapper.tsx), so Enter on a box result stayed
+reachable — and without the branch it silently did nothing, since
+`showVenueOnMap()` no-ops while `mapUnavailable` (useMapUI.ts) and both card
+components only render when `viewMode === "map"`. It now carries the same
+box-vs-venue `router.push` the other three use.
+
+**MapWrapper's box data — one fetch, not two.** `useBoxesList()` (the FULL
+`PublicBlessingBox[]` shape, slice 4's own hook) replaces `useBoxVenues()`
+in `MapWrapper.tsx`; `boxVenues` (the plain-`Venue[]` shape the
+filter/marker pipeline needs) is now derived locally via
+`useBoxVenues.ts`'s now-exported `toVenue()` mapper, so the SAME
+`GET /api/public/blessing-boxes` response feeds both the pin/filter
+pipeline AND the open card's full record — `useBoxVenues()` itself is
+unchanged and still used elsewhere (`BoxesActivityContent.tsx`'s box
+filter dropdown). `boxesById` (a `Map<string, PublicBlessingBox>`) plus a
+`boxOverrides` state layer (patched by `handleBoxCheckinSuccess` on a
+successful check-in — status/lastFilledAt/a prepended, 5-capped
+`recentCheckins` entry) are what `getBoxById(selectedVenueId)` reads,
+passed to both `BottomSheet`/`DesktopVenueWindow` as their new `box` prop
+— this is what lets the open card update instantly on check-in without a
+refetch, the same freshness story slice 2's `BoxContent` used to provide
+for the old standalone page.
+
+**Category autozoom now includes boxes.** The blessing-box category chip
+used to compute `fitBounds` over `allVenues` alone — since boxes never
+live in that static, build-time snapshot (they're a live D1 layer, see
+"Blessing Boxes — live box layer" above), selecting that chip fit an empty
+array and never zoomed at all. Both the "clear filter" and "single category
+selected" branches of that effect now compute bounds over
+`[...allVenues, ...boxVenues]`, and `boxVenues` was added to the effect's
+own dependency array so a chip activated before the async box fetch
+resolves still zooms once it does. The Walk-resume effect (`#207`,
+resuming a walking-direction request after a geolocation prompt resolves)
+picks the target venue from `allVenues` OR `boxVenues` for the same
+reason — a box card now shares `DirectionButtons`/Walk with every other
+venue.
+
+**Sitemap / metadata — unchanged, and still accurate.** `sitemap.ts` still
+lists every live `/box/<id>` URL (daily, priority 0.6) — that route still
+resolves (to the redirect-with-metadata page above), so the entry stays
+correct. `/box/<id>/history` is NOT added to the sitemap — it's a
+secondary, deep page (analogous to `/boxes/activity`, which is also
+unlisted) rather than a primary discovery surface.
+
+**Tests.** `BoxCardBody.test.tsx` (new) covers the one-recent-check-in
+render (not a list), the History link's href, and conditional sections.
+`BottomSheet.test.tsx`/`DesktopVenueWindow.test.tsx` cover the `isBox`
+branch rendering `BoxCardBody` and skipping the venue-only sections.
+`BoxHistoryContent`/the history route's tests confirm `problem`/hidden
+check-ins never surface (inherited structurally from `useBoxActivity`'s
+existing SQL-level guarantee — no new filtering to test). `MapWrapper` has
+no test harness at all (WebGL/jsdom — see "Map library" at the top of this
+file), so the deleted `boxEntryVariant.test.ts`/`BlessingBoxesMapButton.test.tsx`
+have no direct replacement; the box-vs-venue selection logic itself no
+longer needs one, since it no longer branches to a different destination
+on an ordinary map tap.
+
+**Review fixes (2026-09-18, same PR).** A ship-it review of the above found
+four real gaps, all fixed on top of it:
+
+- **No-WebGL check-in gap (real regression).** `BoxHistoryContent.tsx` now
+  also renders `BoxCardBody` (status, check-in panel, host note) above the
+  history list, seeded from the full `PublicBlessingBox` the route's
+  `page.tsx` already loads for `generateMetadata` — not just `{boxId,
+  boxName}` as before. A `mapUnavailable` visitor is routed straight to this
+  page with no other way to open a card, so without this the check-in panel
+  (and the map card's whole snapshot) was simply unreachable on that device
+  — a real loss versus the pre-rework standalone `/box/<id>` page. Local
+  `liveBox` state mirrors `MapWrapper.tsx`'s own `handleBoxCheckinSuccess`
+  patch (same 'problem'-skip, same 5-item cap) so a check-in here updates
+  the badge/last-filled/recent-check-in line instantly, no refetch.
+- **Desktop check-in note used to be lost on toggle.** `DesktopVenueWindow.tsx`'s
+  box body was two separate JSX trees (`boxCollapsedBody`/`boxExpandedBody`),
+  each with its own `<BoxCardBody>`, swapped by the `expanded` ternary — so
+  `BoxCheckinPanel`'s in-progress note textarea remounted (and its typed text
+  vanished) every time the header's Show/Hide details toggle fired. Replaced
+  with one `boxBody` at a stable tree position (only its wrapper class and
+  `BoxCardBody`'s `showExpandedDetails` prop vary with `expanded`); the
+  ordinary-venue `collapsedBody`/`expandedBody` pair is untouched — those
+  genuinely render different sections per state, so unifying them would be a
+  much larger change than this box-only fix.
+- **Search-Enter on a box while mapUnavailable used to do nothing.** Unlike
+  a map-pin tap (no pins exist to tap when `Map.tsx` never renders —
+  correctly branch-free), `SearchBar` itself renders unconditionally, so
+  pressing Enter on a box result stayed reachable when the map can't mount —
+  but `showVenueOnMap()` no-ops in that state and neither card component
+  renders outside `viewMode === "map"`, so the keystroke silently did
+  nothing. `handleSearchKeyDown`'s Enter branch now carries the same
+  box-vs-venue `router.push` the other three selection handlers already use.
+- **No-JS visitor stuck on "Loading…" forever.** `/box/[id]`'s redirect
+  (`BoxRedirectClient.tsx`) depends on a `useEffect` that never runs without
+  JS. It now also renders a plain `<Link>` (a real `<a href>`, works with JS
+  off) to the same `/?venue=<id>` destination.
+- Also corrected: the `boxOverrides` comment in `MapWrapper.tsx` had the
+  override-precedence and refetch claims backwards (`getBoxById` checks the
+  override FIRST, and `useBoxesList()` never refetches at all — it fetches
+  once on mount, so nothing today ever clears a stale override).
 
 ---
 

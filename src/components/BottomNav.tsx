@@ -24,7 +24,7 @@
 
 import type { RefObject } from "react";
 import Link from "next/link";
-import { Locate, LocateFixed, Loader2, Star, HandHelping, Menu, Gift } from "lucide-react";
+import { Locate, LocateFixed, Loader2, Star, HandHelping, Menu } from "lucide-react";
 import type { GeoState } from "@/lib/useGeolocation";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
@@ -57,17 +57,6 @@ interface BottomNavProps {
   navRef?: RefObject<HTMLElement | null>;
   /** On /resources itself (PageNav): Resources shows as the current item. */
   onResourcesPage?: boolean;
-  /**
-   * Blessing Boxes slice 4, story B4 — one of the two entry-point
-   * candidates being previewed side by side (see MapWrapper's own
-   * `?boxEntry=` switch). Defaults to false so every existing caller
-   * (PageNav, and MapWrapper when the other candidate is active) keeps
-   * exactly the documented four-item bar — this is additive and opt-in,
-   * never a change to the established default shape.
-   */
-  showBoxesItem?: boolean;
-  /** On /boxes itself: Boxes shows as the current item (mirrors onResourcesPage). */
-  onBoxesPage?: boolean;
 }
 
 const ITEM_CLASS =
@@ -100,8 +89,6 @@ export default function BottomNav({
   onNearMe,
   navRef,
   onResourcesPage = false,
-  showBoxesItem = false,
-  onBoxesPage = false,
 }: BottomNavProps) {
   // §6: the label never changes, only the icon does — so the bar never reflows.
   const located = geoState.permission === "granted" && geoState.position !== null;
@@ -189,23 +176,6 @@ export default function BottomNav({
             <span>{t("nav.resources", locale)}</span>
           </Link>
         </li>
-        {/* Blessing Boxes entry point candidate "nav" (Blessing Boxes slice
-            4, story B4) — only rendered when the ?boxEntry= preview switch
-            selects it; see MapWrapper's own header for the two candidate
-            URLs and the default. */}
-        {showBoxesItem && (
-          <li className="flex flex-1 2xl:flex-none 2xl:h-11">
-            <Link
-              href="/boxes"
-              data-testid="nav-boxes"
-              aria-current={onBoxesPage ? "page" : undefined}
-              className={ITEM_CLASS + " " + colorFor(onBoxesPage)}
-            >
-              <Gift aria-hidden className={ICON_CLASS} />
-              <span>{t("nav.boxes", locale)}</span>
-            </Link>
-          </li>
-        )}
         {sectionItem("top", t("nav.menu", locale), <Menu aria-hidden className={ICON_CLASS} />)}
       </ul>
     </nav>

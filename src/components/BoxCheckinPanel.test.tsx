@@ -100,7 +100,12 @@ describe("BoxCheckinPanel — one-tap kinds (took/low/empty)", () => {
     expect(body.turnstileToken).toBe("test-turnstile-token");
   });
 
-  test("success calls onCheckinSuccess with the response's status/lastFilledAt", async () => {
+  // `kind` was added to onCheckinSuccess's payload for the map-first card
+  // rework (2026-09-18 scope addition) — the in-map card shows the single
+  // most recent check-in inline, and needs to know WHICH kind just
+  // succeeded (the POST response never echoes it back) to update that line
+  // without a refetch.
+  test("success calls onCheckinSuccess with the response's status/lastFilledAt and the submitted kind", async () => {
     mockSuccess("empty", null);
     const user = userEvent.setup();
     renderPanel();
@@ -108,7 +113,9 @@ describe("BoxCheckinPanel — one-tap kinds (took/low/empty)", () => {
 
     await user.click(screen.getByRole("button", { name: "It's empty" }));
 
-    await waitFor(() => expect(onCheckinSuccess).toHaveBeenCalledWith({ status: "empty", lastFilledAt: null }));
+    await waitFor(() =>
+      expect(onCheckinSuccess).toHaveBeenCalledWith({ status: "empty", lastFilledAt: null, kind: "empty" }),
+    );
   });
 
   test("resets the Turnstile widget after a successful submit (token is single-use)", async () => {

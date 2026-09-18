@@ -27,6 +27,7 @@ import { useMapFilters } from "@/lib/useMapFilters";
 import { venues as allVenues } from "@/data/venues";
 import { __resetFavoritesForTests, addFavorite } from "@/lib/favorites";
 import { computeOpenStatus } from "@/lib/hours";
+import type { Venue } from "@/types/venue";
 
 // Pueblo center — same default as MapWrapper
 const PUEBLO_CENTER = { lat: 38.2667, lng: -104.6167 };
@@ -379,5 +380,63 @@ describe("useMapFilters — nearest-first sort", () => {
     const avgPueblo = r1.current.filteredVenues.reduce((s, v) => s + (v as unknown as { distanceMiles: number }).distanceMiles, 0) / r1.current.filteredVenues.length;
     const avgBoulder = r2.current.filteredVenues.reduce((s, v) => s + (v as unknown as { distanceMiles: number }).distanceMiles, 0) / r2.current.filteredVenues.length;
     expect(avgBoulder).toBeGreaterThan(avgPueblo);
+  });
+});
+
+// ── 13. Blessing boxes (extraVenues) — map-first rework, 2026-09-18 ─────────
+// Confirms boxes merged in via `extraVenues` flow through the SAME
+// category-filter/count/sort pipeline every other venue uses (build
+// requirement #4: "closest box to me" via the existing nearest-first sort),
+// with no box-specific branch needed anywhere in this file.
+
+function makeBoxVenue(id: string, lat: number, lng: number): Venue {
+  return {
+    id,
+    name: `Box ${id}`,
+    category: "blessing_box",
+    lat,
+    lng,
+    address: "Test address",
+    source: "manual",
+    last_verified: "2026-09-01",
+  };
+}
+
+describe("useMapFilters — blessing boxes via extraVenues", () => {
+  test("boxes are included in filteredVenues alongside the static venue set", () => {
+    const boxes = [makeBoxVenue("box-1", 38.27, -104.61)];
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER, boxes));
+    expect(result.current.filteredVenues.length).toBe(allVenues.length + 1);
+    expect(result.current.filteredVenues.some((v) => v.id === "box-1")).toBe(true);
+  });
+
+  test("the blessing_box category filter returns only boxes, and the count matches", () => {
+    const boxes = [makeBoxVenue("box-1", 38.27, -104.61), makeBoxVenue("box-2", 38.3, -104.65)];
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER, boxes));
+    act(() => {
+      result.current.setSelectedCategories(new Set(["blessing_box"]));
+    });
+    expect(result.current.filteredVenues.length).toBe(2);
+    expect(result.current.filteredVenues.every((v) => v.category === "blessing_box")).toBe(true);
+    expect(result.current.allVenueCounts.blessing_box).toBe(2);
+  });
+
+  test("boxes sort into the nearest-first order with ordinary venues, not appended separately", () => {
+    // A box placed essentially AT the origin should rank first, ahead of
+    // every real venue (all of which sit some real distance away).
+    const boxes = [makeBoxVenue("box-at-origin", PUEBLO_CENTER.lat, PUEBLO_CENTER.lng)];
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER, boxes));
+    expect(result.current.filteredVenues[0]?.id).toBe("box-at-origin");
+    const distances = result.current.filteredVenues.map(
+      (v) => (v as unknown as { distanceMiles: number }).distanceMiles,
+    );
+    for (let i = 1; i < distances.length; i++) {
+      expect(distances[i]!).toBeGreaterThanOrEqual(distances[i - 1]!);
+    }
+  });
+
+  test("an empty extraVenues array (default) behaves exactly like no boxes fetched yet", () => {
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER, []));
+    expect(result.current.filteredVenues.length).toBe(allVenues.length);
   });
 });

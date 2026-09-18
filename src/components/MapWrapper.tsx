@@ -32,8 +32,6 @@ import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
 import BottomNav, { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
-import BlessingBoxesMapButton from "./BlessingBoxesMapButton";
-import { resolveBoxEntryVariant, type BoxEntryVariant } from "@/lib/boxEntryVariant";
 import CategoryDropdown from "./CategoryDropdown";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
@@ -58,7 +56,9 @@ import {
   PUEBLO_CENTER,
 } from "@/data/pueblo-bbox";
 import { useMapFilters } from "@/lib/useMapFilters";
-import { useBoxVenues } from "@/lib/useBoxVenues";
+import { useBoxesList } from "@/lib/useBoxesList";
+import { toVenue } from "@/lib/useBoxVenues";
+import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 import { useMapUI } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
 import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
@@ -285,30 +285,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
   // ── Locale — from context ─────────────────────────────────────────────────────
   const { locale } = useLocale();
-
-  // ── Blessing Boxes entry point — B4 preview switch (slice 4) ────────────────
-  // Kyle has to see BOTH candidates on dev before either ships (task's own
-  // instruction — this is a real visual decision, not ours to pick
-  // silently). NEITHER candidate renders by default: ?boxEntry=nav opts
-  // into BottomNav's 5th item, ?boxEntry=map opts into the floating
-  // BlessingBoxesMapButton, and no param (or any other value) resolves to
-  // neutral — today's exact 4-item BottomNav, no floating button — so
-  // Kyle's finalized 4-item design (2026-09-16) is never silently
-  // overridden for a visitor who never opted into a preview. Resolution
-  // logic lives in resolveBoxEntryVariant() (src/lib/boxEntryVariant.ts),
-  // extracted specifically so it's unit-testable — MapWrapper itself has
-  // no test harness (see that file's own header). Read once via a lazy
-  // useState initializer, same convention as SplashScreen/HomePageClient's
-  // other `window.location.search` reads — safe here because MapWrapper is
-  // mounted via next/dynamic(ssr:false) (see its own file header), so it
-  // never renders on the server at all; there is no hydration mismatch to
-  // guard against. TEMPORARY: delete this whole switch (this state,
-  // BlessingBoxesMapButton.tsx, boxEntryVariant.ts, and BottomNav's
-  // `showBoxesItem` prop), collapsing to whichever single placement Kyle
-  // picks, BEFORE any promotion of this feature to `main`.
-  const [boxEntryVariant] = useState<BoxEntryVariant>(() =>
-    typeof window === "undefined" ? null : resolveBoxEntryVariant(window.location.search),
-  );
 
   // ── Geolocation — v2 hook ────────────────────────────────────────────────────
   const geo = useGeolocation();
@@ -637,6 +613,92 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     setWalkingRouteVenueId(null);
   }, []);
 
+  // ── Blessing boxes (slice 1, map-first rework 2026-09-18) — live layer,
+  // fetched ONCE client-side (useBoxesList's full PublicBlessingBox shape,
+  // not useBoxVenues' second fetch of the same endpoint — see toVenue's own
+  // header in useBoxVenues.ts) and merged into the same filter/count/marker
+  // pipeline every other venue flows through (useMapFilters' own header
+  // explains why). boxIdSet lets every selection handler below tell "this
+  // id is a box" apart from an ordinary venue with one Set lookup — a box
+  // click now opens the SAME in-map card every other venue uses (just with
+  // BoxCardBody content), not a separate page, so boxIdSet is only needed
+  // where mapUnavailable still routes to a standalone page (below).
+  // boxesById/boxOverrides let the open card show the box's full record
+  // (status, host note, most-needed, check-ins) that the plain Venue shape
+  // doesn't carry, and stay current after a check-in without a refetch.
+  // WHY declared THIS early (2026-09-18 fix): the Walk-resume effect below
+  // reads boxVenues in its own body and dependency array — a dependency
+  // array is evaluated during THIS render pass, not deferred like an effect
+  // body, so boxVenues must already be a assigned `const` by the time
+  // JS execution reaches that array literal, or it's a ReferenceError
+  // (temporal dead zone), not merely stale data. Caught by
+  // MapWrapperBoxSelection.test.tsx failing with exactly that error.
+  const { boxes: liveBoxes, loading: liveBoxesLoading } = useBoxesList();
+  const boxVenues = useMemo(() => liveBoxes.map(toVenue), [liveBoxes]);
+  const boxIdSet = useMemo(() => new Set(liveBoxes.map((b) => b.id)), [liveBoxes]);
+  const boxesById = useMemo(() => new Map(liveBoxes.map((b) => [b.id, b])), [liveBoxes]);
+  // Check-in success patches (kind/status/lastFilledAt) so the open card
+  // reflects the just-submitted check-in immediately — see
+  // handleBoxCheckinSuccess below. getBoxById checks this map FIRST, so an
+  // override always wins over boxesById while it exists.
+  //
+  // Nothing clears an override today: useBoxesList() fetches exactly once on
+  // mount (empty effect deps — see its own header) and never refetches, so
+  // there is no later "fresh fetch" that could supersede a stale override.
+  // ponytail: an override can drift from reality if the box changes by some
+  // OTHER path in the same session (another tab's check-in, an admin edit).
+  // Ceiling: acceptable today because nothing refetches to reconcile against.
+  // If a periodic/background refetch of liveBoxes is ever added, this map
+  // must be explicitly cleared or merged against the fresh data at that
+  // point, or the override will permanently shadow it.
+  const [boxOverrides, setBoxOverrides] = useState<Map<string, PublicBlessingBox>>(new Map());
+  const getBoxById = useCallback(
+    (id: string | null): PublicBlessingBox | null => {
+      if (!id) return null;
+      return boxOverrides.get(id) ?? boxesById.get(id) ?? null;
+    },
+    [boxOverrides, boxesById],
+  );
+  const handleBoxCheckinSuccess = useCallback(
+    (boxId: string | null, result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => {
+      if (!boxId) return;
+      setBoxOverrides((prev) => {
+        const current = prev.get(boxId) ?? boxesById.get(boxId);
+        if (!current) return prev;
+        const next = new Map(prev);
+        next.set(boxId, {
+          ...current,
+          box: {
+            ...current.box,
+            status: result.status,
+            lastFilledAt: result.lastFilledAt,
+            // Cap at 5 — the card only ever shows recentCheckins[0], and
+            // BoxActivityList/history reads its own separate query, not
+            // this in-memory list; keeping a handful avoids unbounded growth
+            // across many check-ins in one page view.
+            //
+            // "problem" is skipped here, not just narrowly typed away: a
+            // problem report is admin-only (PublicCheckinEvent's own kind
+            // union excludes it — see blessingBoxes.ts's toPublicCheckinEvents,
+            // the same structural privacy rule this in-memory patch must not
+            // undermine) and never sets status (computeBoxStatus excludes it
+            // too), so there is nothing for a problem submission to update on
+            // the open card besides this optimistic list — correctly, nothing.
+            recentCheckins:
+              result.kind === "problem"
+                ? current.box.recentCheckins
+                : [
+                    { kind: result.kind, createdAt: new Date().toISOString() },
+                    ...current.box.recentCheckins,
+                  ].slice(0, 5),
+          },
+        });
+        return next;
+      });
+    },
+    [boxesById],
+  );
+
   // Watch geo.state for resolution of an in-flight locate request.
   // Mirrors the existing bannerVisible effect: use refs (not isLocating state)
   // as the gate so this effect never depends on the state it sets.
@@ -677,7 +739,10 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
     const action = decideWalkResume(awaitingId, selectedVenueId, geo.state);
     if (action.kind === "fetch") {
-      const venue = allVenues.find((v) => v.id === awaitingId);
+      // Includes boxVenues (map-first rework, 2026-09-18) — a box card
+      // shares DirectionButtons/Walk with every other venue now, so a Walk
+      // tap awaiting location can target a box id, not just allVenues.
+      const venue = allVenues.find((v) => v.id === awaitingId) ?? boxVenues.find((v) => v.id === awaitingId);
       if (venue) void fetchWalkingRoute(venue, action.origin);
     } else if (action.kind === "show-hint") {
       setWalkLocationHintVenueId(awaitingId);
@@ -685,7 +750,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     // action.kind === "noop": the venue that asked is no longer selected —
     // nothing to attach the result to (see decideWalkResume's WHY comment).
   // Only re-run when geo.state (object ref) changes — same pattern as bannerVisible.
-  }, [geo.state, selectedVenueId, fetchWalkingRoute]);
+  }, [geo.state, selectedVenueId, fetchWalkingRoute, boxVenues]);
 
   // Handle map moveend: update drift state (called from Map's onMoveEnd prop).
   // Runs from a DOM event callback, not from a React effect.
@@ -736,16 +801,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // ── Origin — user position or Pueblo center fallback ─────────────────────────
   const origin = userLocation ?? PUEBLO_CENTER;
 
-  // ── Blessing boxes (slice 1) — live layer, fetched client-side and merged
-  // into the same filter/count/marker pipeline every other venue flows
-  // through (useBoxVenues/useMapFilters headers explain why). boxIdSet lets
-  // every selection handler below tell "this id is a box" apart from an
-  // ordinary venue with one Set lookup, so a box click routes straight to
-  // its own /box/<id> page instead of opening the generic detail card
-  // (which has no host/most-needed/status fields to show).
-  const boxVenues = useBoxVenues();
-  const boxIdSet = useMemo(() => new Set(boxVenues.map((v) => v.id)), [boxVenues]);
-
   // ── Filter pipeline — extracted hook (testable independently of map render) ──
   const {
     query,
@@ -792,9 +847,14 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     if (deepLinkDoneRef.current) return;
     if (!mapboxMap) return; // wait until the map can fly
     deepLinkDoneRef.current = true;
-    if (initialVenueId && boxIdSet.has(initialVenueId)) {
-      router.push(`/box/${initialVenueId}`);
-    } else if (initialVenueId && allVenues.some((v) => v.id === initialVenueId)) {
+    // No existence check against allVenues/boxVenues here (map-first rework,
+    // 2026-09-18) — a box's data arrives async from useBoxesList, so an
+    // existence check at this exact instant could reject a valid box id
+    // before its fetch resolves. selectedVenue's own lookup (below) and
+    // getBoxById both gracefully return null/undefined for an unknown id,
+    // and Map.tsx's flyTo effect re-fires once `venues`/liveBoxes populate
+    // (new array reference) — so there's nothing here to guard against.
+    if (initialVenueId) {
       queueMicrotask(() => setSelectedVenueId(initialVenueId));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -804,19 +864,41 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // map can't mount, Map.tsx never renders, so mapboxMap stays null forever
   // and the effect above never fires — a shared `/?venue=<id>` link silently
   // selected nothing (PageNav's saved-venue links reuse this same query
-  // param). Route straight to the venue detail page instead, mirroring the
-  // mapUnavailable branches in handleSelect*/handleSelectSavedVenue below.
-  // Shares deepLinkDoneRef so whichever branch resolves first (map ready vs.
-  // map unavailable — mutually exclusive in practice) wins, never both.
+  // param). Route straight to the venue/box detail page instead, mirroring
+  // the mapUnavailable branches in handleSelect*/handleSelectSavedVenue
+  // below. Shares deepLinkDoneRef so whichever branch resolves first (map
+  // ready vs. map unavailable — mutually exclusive in practice) wins, never
+  // both.
+  //
+  // WHY this waits on liveBoxesLoading (2026-09-18 fix, found by
+  // MapWrapperBoxSelection.test.tsx): mapUnavailable can flip true in the
+  // SAME tick useBoxesList's fetch is still in flight, so boxIdSet can still
+  // be empty the first (and, before this fix, only — deepLinkDoneRef made it
+  // one-shot) time this effect runs. allVenues is a static, always-ready
+  // array, so a plain-venue id still resolves instantly on the first pass;
+  // only the box case needs to wait for the fetch to settle before this
+  // effect is allowed to give up and mark itself done.
   useEffect(() => {
     if (deepLinkDoneRef.current) return;
     if (!mapUnavailable) return; // starts false; flips in a client effect (#165)
-    deepLinkDoneRef.current = true;
-    if (initialVenueId && allVenues.some((v) => v.id === initialVenueId)) {
-      router.replace(`/venue/${encodeURIComponent(initialVenueId)}`);
+    if (!initialVenueId) {
+      deepLinkDoneRef.current = true;
+      return;
     }
+    if (allVenues.some((v) => v.id === initialVenueId)) {
+      deepLinkDoneRef.current = true;
+      router.replace(`/venue/${encodeURIComponent(initialVenueId)}`);
+      return;
+    }
+    if (boxIdSet.has(initialVenueId)) {
+      deepLinkDoneRef.current = true;
+      router.replace(`/box/${encodeURIComponent(initialVenueId)}/history`);
+      return;
+    }
+    if (liveBoxesLoading) return; // could still resolve to a box — wait
+    deepLinkDoneRef.current = true; // genuinely unknown id — no redirect
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapUnavailable]);
+  }, [mapUnavailable, boxIdSet, liveBoxesLoading]);
 
   // ── Category autozoom (#111) ─────────────────────────────────────────────────
   // When a single category is activated from the dropdown, fit the map to all
@@ -875,7 +957,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       // Real clear — fit the all-venues bounds, capped at CATEGORY_FIT_MAX_ZOOM.
       // NOT the wordmark/home zoom: this is a computed bounds-fit over the
       // whole venue set, a different view than PUEBLO_CENTER/PUEBLO_DEFAULT_ZOOM.
-      const allBounds = computeCategoryBounds(allVenues);
+      // Includes boxVenues (map-first rework, 2026-09-18) — without this, the
+      // blessing-box category chip never actually zoomed to box pins.
+      const allBounds = computeCategoryBounds([...allVenues, ...boxVenues]);
       if (!allBounds) return;
       mapboxMap.fitBounds(allBounds, {
         padding: fitPadding,
@@ -887,7 +971,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
     // Single category selected — compute bounds from all (unfiltered) venues in
     // this category so the view doesn't depend on other active filters.
-    const categoryVenues = allVenues.filter((v) => v.category === activeCategoryFilter);
+    // [...allVenues, ...boxVenues]: boxVenues is the only place `blessing_box`
+    // category venues live (allVenues is the static published-venues.ts
+    // snapshot, which never includes boxes — see "Blessing Boxes — live box
+    // layer" in AGENTS.md) — without it, selecting the blessing-box chip
+    // computed bounds over an empty array and never zoomed at all.
+    const categoryVenues = [...allVenues, ...boxVenues].filter((v) => v.category === activeCategoryFilter);
     const bounds = computeCategoryBounds(categoryVenues);
     if (!bounds) return;
 
@@ -897,9 +986,13 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       duration: reducedMotion ? 0 : 600,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategoryFilter, mapboxMap]);
+  }, [activeCategoryFilter, mapboxMap, boxVenues]);
   // Note: `isMobile` / `isBelow2xl` intentionally excluded from deps — we want the padding that
   // was current at the time the category was selected, not re-zoom on resize.
+  // `boxVenues` IS included (map-first rework, 2026-09-18) — unlike allVenues
+  // (a stable module-level constant), it arrives async from useBoxesList, so
+  // the blessing-box chip's zoom must re-run once that fetch resolves if the
+  // filter was already active when the effect first ran with an empty array.
   // `allVenues` is a module-level constant (stable ref); no dep needed.
 
   // Pre-compute distance map for Map.tsx (aria-labels on markers)
@@ -973,8 +1066,21 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         if (popoverVisible && activeIndex >= 0 && activeIndex < filteredVenues.length) {
           e.preventDefault();
           const venue = filteredVenues[activeIndex];
-          if (boxIdSet.has(venue.id)) {
-            router.push(`/box/${venue.id}`);
+          // mapUnavailable branch added (fix, 2026-09-18): unlike a map pin
+          // tap (handleSelectVenueFromMap, correctly branch-free — no pins
+          // exist to tap when Map.tsx never renders), SearchBar itself is
+          // rendered unconditionally, mapUnavailable or not (see its render
+          // call below) — so this Enter path stays reachable even when the
+          // map can't mount. Without this branch, setSelectedVenueId alone
+          // did nothing visible: showVenueOnMap() no-ops while mapUnavailable
+          // (useMapUI.ts), and both card components (BottomSheet/
+          // DesktopVenueWindow) only render when viewMode === "map" — so a
+          // keyboard Enter on a box result silently went nowhere. Same
+          // box-vs-venue redirect the other three selection handlers already
+          // use (handleSelectSavedVenue/handleSelectVenueFromPopover/
+          // handleSelectFromList).
+          if (mapUnavailable) {
+            router.push(boxIdSet.has(venue.id) ? `/box/${venue.id}/history` : `/venue/${venue.id}`);
             setIsPopoverOpen(false);
             setActiveIndex(-1);
             return;
@@ -988,7 +1094,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       }
     },
     // filteredVenues reference is stable between renders with same query/filters.
-    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap, boxIdSet, router],
+    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap, mapUnavailable, boxIdSet, router],
   );
 
   // Select a venue from the Saved list (#132 9c). Clears active filters + search
@@ -997,14 +1103,13 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // opens its detail card.
   const handleSelectSavedVenue = useCallback(
     (venueId: string) => {
-      if (boxIdSet.has(venueId)) {
-        router.push(`/box/${venueId}`);
-        return;
-      }
       handleClearAllFilters();
       setSelectedVenueId(venueId);
       if (mapUnavailable) {
-        router.push(`/venue/${venueId}`);
+        // A box has no /venue/<id> page (that route is static, restricted
+        // to allVenues' build-time id set) — send it to its own history
+        // page instead, the one standalone page a box still has.
+        router.push(boxIdSet.has(venueId) ? `/box/${venueId}/history` : `/venue/${venueId}`);
         return;
       }
       showVenueOnMap();
@@ -1016,15 +1121,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   /** Called when user clicks/taps a result row inside the popover. */
   const handleSelectVenueFromPopover = useCallback(
     (venueId: string) => {
-      if (boxIdSet.has(venueId)) {
-        router.push(`/box/${venueId}`);
-        setIsPopoverOpen(false);
-        setActiveIndex(-1);
-        return;
-      }
       setSelectedVenueId(venueId);
       if (mapUnavailable) {
-        router.push(`/venue/${venueId}`);
+        router.push(boxIdSet.has(venueId) ? `/box/${venueId}/history` : `/venue/${venueId}`);
         return;
       }
       showVenueOnMap();
@@ -1036,17 +1135,14 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   );
 
   // Select a venue from the list (#129) — switch back to the map, centered on it.
-  // When mapUnavailable (#165 / #285), navigating to /venue/[id] reaches full venue details
-  // including hours, phone, SNAP/WIC details, notes, and directions.
+  // When mapUnavailable (#165 / #285), navigating to /venue/[id] (or a box's
+  // /box/<id>/history — the one standalone page a box still has) reaches
+  // full details.
   const handleSelectFromList = useCallback(
     (venueId: string) => {
-      if (boxIdSet.has(venueId)) {
-        router.push(`/box/${venueId}`);
-        return;
-      }
       setSelectedVenueId(venueId);
       if (mapUnavailable) {
-        router.push(`/venue/${venueId}`);
+        router.push(boxIdSet.has(venueId) ? `/box/${venueId}/history` : `/venue/${venueId}`);
         return;
       }
       showVenueOnMap();
@@ -1055,20 +1151,18 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     [boxIdSet, isMobile, mapUnavailable, router, showVenueOnMap],
   );
 
-  // Box pins skip the generic detail card entirely (no host/most-needed/
-  // status fields to show there) and go straight to their own page.
+  // A box pin now opens the SAME in-map card every other venue uses
+  // (map-first rework, 2026-09-18) — no special-case here at all; the map
+  // view is never rendered when mapUnavailable, so there's no redirect
+  // branch to thread through on this path either.
   const handleSelectVenueFromMap = useCallback(
     (id: string) => {
-      if (boxIdSet.has(id)) {
-        router.push(`/box/${id}`);
-        return;
-      }
       setSelectedVenueId(id);
       if (!isMobile) {
         setWindowExpanded(false);
       }
     },
-    [boxIdSet, isMobile, router, setSelectedVenueId, setWindowExpanded],
+    [isMobile, setSelectedVenueId, setWindowExpanded],
   );
 
   const handleMapReady = useCallback(
@@ -1358,6 +1452,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         <BottomSheet
           key={selectedVenueId ?? "empty"}
           venue={selectedVenue}
+          box={getBoxById(selectedVenueId)}
+          onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
           onClose={() => setSelectedVenueId(null)}
           onWalkRoute={handleWalkRoute}
           isWalkRouteActive={
@@ -1385,6 +1481,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         <DesktopVenueWindow
           key={selectedVenueId}
           venue={selectedVenue}
+          box={getBoxById(selectedVenueId)}
+          onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
           expanded={windowExpanded}
           mapboxMap={mapboxMap}
           onExpand={() => setWindowExpanded(true)}
@@ -1414,12 +1512,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* Blessing Boxes entry point candidate "map" (B4) — see the
-          boxEntryVariant switch above. */}
-      {!venueSheetOpen && boxEntryVariant === "map" && (
-        <BlessingBoxesMapButton locale={locale} />
-      )}
-
       {/* BottomNav — LAST in DOM order so keyboard users reach the map and the
           search first (spec §12). */}
       {!venueSheetOpen && (
@@ -1432,7 +1524,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           isDrifted={isDrifted}
           onNearMe={handleNearMe}
           navRef={navRef}
-          showBoxesItem={boxEntryVariant === "nav"}
         />
       )}
     </div>

@@ -73,11 +73,20 @@ const nextConfig: NextConfig = {
   // — is the ordinary, well-supported Next.js/OpenNext case, so this one is
   // safe to add. permanent: true -> 308, matching "its old address must
   // keep working" (a real, indefinite redirect, not a temporary one).
+  //
+  // Destination updated for the map-first rework (2026-09-18): /box/<id>
+  // itself now just client-redirects to /?venue=<id> (BoxRedirectClient.tsx)
+  // to keep its own generateMetadata for link previews — pointing THIS
+  // redirect straight at /?venue=<id> skips that extra hop for a visitor
+  // following the old /venue/<id> link. A plain query string on the
+  // DESTINATION is fine here — only a `has` MATCHER on the SOURCE broke on
+  // OpenNext/Cloudflare (the 2026-06-20 incident this comment already
+  // documents), and this redirect's source is still a plain path.
   async redirects() {
     return [
       {
         source: "/venue/plentiful-blessing-box-216-w-routt-plentiful-1454",
-        destination: "/box/plentiful-blessing-box-216-w-routt-plentiful-1454",
+        destination: "/?venue=plentiful-blessing-box-216-w-routt-plentiful-1454",
         permanent: true,
       },
     ];

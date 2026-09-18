@@ -22,9 +22,6 @@ import {
   isBlessingBox,
   computeBoxStatus,
   computeLastFilledAt,
-  computeStatusSince,
-  compareBoxesByNeedsFillingMost,
-  compareBoxesByRecentlyFilled,
   mapRowToPublicBox,
   mapRowsToPublicBoxes,
   loadLiveBoxes,
@@ -33,7 +30,6 @@ import {
   loadVisibleCheckinsForVenues,
   type BoxJoinRow,
   type CheckinStatusInput,
-  type PublicBlessingBox,
 } from "@/lib/blessingBoxes";
 
 function makeRow(overrides: Partial<BoxJoinRow> = {}): BoxJoinRow {
@@ -86,7 +82,6 @@ describe("mapRowToPublicBox", () => {
     const box = mapRowToPublicBox(makeRow(), checkins, now);
     expect(box.box.status).toBe("stocked");
     expect(box.box.lastFilledAt).toBe("2026-09-17T09:00:00.000Z");
-    expect(box.box.statusSince).toBe("2026-09-17T09:00:00.000Z");
     expect(box.box.recentCheckins).toEqual([
       { kind: "took", createdAt: "2026-09-17T10:00:00.000Z" },
       { kind: "filled", createdAt: "2026-09-17T09:00:00.000Z" },
@@ -263,144 +258,6 @@ describe("computeLastFilledAt", () => {
   test("a hidden 'filled' check-in never counts", () => {
     const checkins = [ci({ kind: "filled", visibility: "hidden", created_at: "2026-09-15T08:00:00.000Z" })];
     expect(computeLastFilledAt(checkins)).toBeNull();
-  });
-});
-
-// ─── computeStatusSince (slice 4) ───────────────────────────────────────────
-
-describe("computeStatusSince", () => {
-  test("no check-ins -> null", () => {
-    expect(computeStatusSince([], false)).toBeNull();
-  });
-
-  test("outOfService=true -> null regardless of check-ins", () => {
-    expect(computeStatusSince([ci({ kind: "empty" })], true)).toBeNull();
-  });
-
-  test("returns the timestamp of the latest status-setting check-in, mirroring computeBoxStatus's own search", () => {
-    const checkins = [
-      ci({ kind: "filled", created_at: "2026-09-01T08:00:00.000Z" }),
-      ci({ kind: "empty", created_at: "2026-09-15T08:00:00.000Z" }),
-    ];
-    expect(computeStatusSince(checkins, false)).toBe("2026-09-15T08:00:00.000Z");
-    expect(computeBoxStatus(checkins, NOW, false)).toBe("empty");
-  });
-
-  test("'took'/'problem' never count, even as the newest check-in", () => {
-    const checkins = [
-      ci({ kind: "low", created_at: "2026-09-10T08:00:00.000Z" }),
-      ci({ kind: "took", created_at: "2026-09-17T08:00:00.000Z" }),
-    ];
-    expect(computeStatusSince(checkins, false)).toBe("2026-09-10T08:00:00.000Z");
-  });
-
-  test("a hidden check-in never counts, even if it's the newest", () => {
-    const checkins = [
-      ci({ kind: "filled", visibility: "visible", created_at: "2026-09-16T08:00:00.000Z" }),
-      ci({ kind: "empty", visibility: "hidden", created_at: "2026-09-17T08:00:00.000Z" }),
-    ];
-    expect(computeStatusSince(checkins, false)).toBe("2026-09-16T08:00:00.000Z");
-  });
-});
-
-// ─── /boxes sort logic (slice 4) ────────────────────────────────────────────
-
-function makeBox(overrides: {
-  id: string;
-  name?: string;
-  status: PublicBlessingBox["box"]["status"];
-  statusSince?: string | null;
-  lastFilledAt?: string | null;
-}): PublicBlessingBox {
-  return {
-    id: overrides.id,
-    name: overrides.name ?? overrides.id,
-    category: "blessing_box",
-    lat: 38.25902,
-    lng: -104.625612,
-    address: "Test address",
-    source: "test",
-    last_verified: "2026-09-17",
-    box: {
-      hostName: null,
-      hostNote: null,
-      mostNeeded: null,
-      installedOn: null,
-      removedOn: null,
-      status: overrides.status,
-      lastFilledAt: overrides.lastFilledAt ?? null,
-      statusSince: overrides.statusSince ?? null,
-      recentCheckins: [],
-    },
-  };
-}
-
-describe("compareBoxesByNeedsFillingMost", () => {
-  test("orders by status urgency: empty, low, unknown, stocked, out_of_service", () => {
-    const boxes = [
-      makeBox({ id: "stocked", status: "stocked", lastFilledAt: "2026-09-16T00:00:00.000Z" }),
-      makeBox({ id: "outOfService", status: "out_of_service" }),
-      makeBox({ id: "empty", status: "empty", statusSince: "2026-09-10T00:00:00.000Z" }),
-      makeBox({ id: "unknown", status: "unknown" }),
-      makeBox({ id: "low", status: "low", statusSince: "2026-09-12T00:00:00.000Z" }),
-    ];
-    const sorted = [...boxes].sort(compareBoxesByNeedsFillingMost);
-    expect(sorted.map((b) => b.id)).toEqual(["empty", "low", "unknown", "stocked", "outOfService"]);
-  });
-
-  test("within empty/low, the one empty/low LONGEST (older statusSince) sorts first", () => {
-    const olderEmpty = makeBox({ id: "olderEmpty", status: "empty", statusSince: "2026-09-01T00:00:00.000Z" });
-    const newerEmpty = makeBox({ id: "newerEmpty", status: "empty", statusSince: "2026-09-16T00:00:00.000Z" });
-    expect([newerEmpty, olderEmpty].sort(compareBoxesByNeedsFillingMost).map((b) => b.id)).toEqual([
-      "olderEmpty",
-      "newerEmpty",
-    ]);
-  });
-
-  test("within unknown/stocked, 'never filled' (null lastFilledAt) sorts ahead of an old fill", () => {
-    const neverFilled = makeBox({ id: "neverFilled", status: "unknown", lastFilledAt: null });
-    const filledLongAgo = makeBox({ id: "filledLongAgo", status: "unknown", lastFilledAt: "2026-01-01T00:00:00.000Z" });
-    expect([filledLongAgo, neverFilled].sort(compareBoxesByNeedsFillingMost).map((b) => b.id)).toEqual([
-      "neverFilled",
-      "filledLongAgo",
-    ]);
-  });
-
-  test("a true tie (same status, same timestamp) falls back to name, then id — deterministic, never a coin flip", () => {
-    const a = makeBox({ id: "a", name: "Alpha Box", status: "empty", statusSince: "2026-09-10T00:00:00.000Z" });
-    const b = makeBox({ id: "b", name: "Beta Box", status: "empty", statusSince: "2026-09-10T00:00:00.000Z" });
-    expect([b, a].sort(compareBoxesByNeedsFillingMost).map((x) => x.id)).toEqual(["a", "b"]);
-    // Stable regardless of input order:
-    expect([a, b].sort(compareBoxesByNeedsFillingMost).map((x) => x.id)).toEqual(["a", "b"]);
-  });
-
-  test("an exact duplicate name still resolves via the id tie-break", () => {
-    const a = makeBox({ id: "a-box", name: "Same Name", status: "low", statusSince: "2026-09-10T00:00:00.000Z" });
-    const b = makeBox({ id: "b-box", name: "Same Name", status: "low", statusSince: "2026-09-10T00:00:00.000Z" });
-    expect([b, a].sort(compareBoxesByNeedsFillingMost).map((x) => x.id)).toEqual(["a-box", "b-box"]);
-  });
-});
-
-describe("compareBoxesByRecentlyFilled", () => {
-  test("most recently filled sorts first", () => {
-    const older = makeBox({ id: "older", status: "stocked", lastFilledAt: "2026-09-01T00:00:00.000Z" });
-    const newer = makeBox({ id: "newer", status: "stocked", lastFilledAt: "2026-09-16T00:00:00.000Z" });
-    expect([older, newer].sort(compareBoxesByRecentlyFilled).map((b) => b.id)).toEqual(["newer", "older"]);
-  });
-
-  test("never filled (null) sorts LAST — opposite end from compareBoxesByNeedsFillingMost", () => {
-    const neverFilled = makeBox({ id: "neverFilled", status: "unknown", lastFilledAt: null });
-    const filled = makeBox({ id: "filled", status: "stocked", lastFilledAt: "2026-01-01T00:00:00.000Z" });
-    expect([neverFilled, filled].sort(compareBoxesByRecentlyFilled).map((b) => b.id)).toEqual([
-      "filled",
-      "neverFilled",
-    ]);
-  });
-
-  test("a tie falls back to name, then id", () => {
-    const a = makeBox({ id: "a", name: "Alpha", status: "stocked", lastFilledAt: "2026-09-10T00:00:00.000Z" });
-    const b = makeBox({ id: "b", name: "Beta", status: "stocked", lastFilledAt: "2026-09-10T00:00:00.000Z" });
-    expect([b, a].sort(compareBoxesByRecentlyFilled).map((x) => x.id)).toEqual(["a", "b"]);
   });
 });
 

@@ -110,16 +110,34 @@ function makeR2() {
   return { put, r2: { put } as unknown as R2Bucket };
 }
 
-function makeFormRequest(fields: Record<string, string | Blob>): NextRequest {
+/**
+ * Builds a real multipart POST request with a genuine, correct
+ * `Content-Length` header. A real browser upload always sends one; handing
+ * `NextRequest` a live `FormData` object directly (instead of going through
+ * an actual `fetch()`) leaves Content-Length unset (confirmed empirically —
+ * see the fix-2026-09-18 commit), which would trip the route's new
+ * pre-parse size gate on every one of these otherwise-legitimate test
+ * uploads. Serializing through `Response` first computes the real byte
+ * length and boundary the same way a browser would, then that exact body +
+ * headers are handed to `NextRequest`.
+ */
+async function makeFormRequest(fields: Record<string, string | Blob>): Promise<NextRequest> {
   const form = new FormData();
   for (const [key, value] of Object.entries(fields)) {
     form.set(key, value as string | Blob);
   }
-  return new NextRequest(URL_BASE, { method: "POST", body: form });
+  const serialized = new Response(form);
+  const bodyBytes = await serialized.arrayBuffer();
+  const contentType = serialized.headers.get("content-type")!;
+  return new NextRequest(URL_BASE, {
+    method: "POST",
+    headers: { "Content-Type": contentType, "Content-Length": String(bodyBytes.byteLength) },
+    body: bodyBytes,
+  });
 }
 
-function callPost(fields: Record<string, string | Blob>, id: string = BOX_ID) {
-  return POST(makeFormRequest(fields), { params: Promise.resolve({ id }) });
+async function callPost(fields: Record<string, string | Blob>, id: string = BOX_ID) {
+  return POST(await makeFormRequest(fields), { params: Promise.resolve({ id }) });
 }
 
 function baseFields(overrides: Record<string, string | Blob> = {}) {
@@ -175,6 +193,47 @@ describe("POST /api/public/blessing-boxes/[id]/photos", () => {
     });
     const res = await POST(req, { params: Promise.resolve({ id: BOX_ID }) });
     expect(res.status).toBe(413);
+    expect(mockGetCloudflareContext).not.toHaveBeenCalled();
+  });
+
+  // Review finding (PR #490): a missing header silently became 0 and a junk
+  // header silently became NaN, both sailing past the old `> MAX_REQUEST_BYTES`
+  // check and letting formData() buffer an unbounded body before any size
+  // check ever fired. All three (missing/junk/zero) are now a hard 411,
+  // before formData() is ever called.
+  test("missing Content-Length header -> 411, formData() never called", async () => {
+    const req = new NextRequest(URL_BASE, {
+      method: "POST",
+      headers: { "Content-Type": "multipart/form-data; boundary=x" },
+      body: "small",
+    });
+    const res = await POST(req, { params: Promise.resolve({ id: BOX_ID }) });
+    expect(res.status).toBe(411);
+    expect((await res.json()).error).toBe("content_length_required");
+    expect(mockGetCloudflareContext).not.toHaveBeenCalled();
+  });
+
+  test("junk (non-numeric) Content-Length header -> 411, formData() never called", async () => {
+    const req = new NextRequest(URL_BASE, {
+      method: "POST",
+      headers: { "Content-Type": "multipart/form-data; boundary=x", "Content-Length": "not-a-number" },
+      body: "small",
+    });
+    const res = await POST(req, { params: Promise.resolve({ id: BOX_ID }) });
+    expect(res.status).toBe(411);
+    expect((await res.json()).error).toBe("content_length_required");
+    expect(mockGetCloudflareContext).not.toHaveBeenCalled();
+  });
+
+  test("zero Content-Length header -> 411, formData() never called", async () => {
+    const req = new NextRequest(URL_BASE, {
+      method: "POST",
+      headers: { "Content-Type": "multipart/form-data; boundary=x", "Content-Length": "0" },
+      body: "",
+    });
+    const res = await POST(req, { params: Promise.resolve({ id: BOX_ID }) });
+    expect(res.status).toBe(411);
+    expect((await res.json()).error).toBe("content_length_required");
     expect(mockGetCloudflareContext).not.toHaveBeenCalled();
   });
 

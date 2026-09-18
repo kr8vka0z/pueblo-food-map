@@ -6,8 +6,12 @@
  * usual anti-abuse fields — see CHECKIN_KINDS-style guard order below).
  * Same guard ORDER as every other public write in this app (report/submit,
  * suggest/submit, and this box's own checkins route): Content-Type check ->
- * pre-parse size gate -> parse body -> honeypot -> Turnstile -> rate limit
- * -> field validation -> box lookup -> write. Turnstile verification and
+ * pre-parse size gate (411 on a missing/non-finite/zero Content-Length, 413
+ * once it parses but is over MAX_REQUEST_BYTES — see
+ * parsePositiveContentLength()'s own header for why all three of those had
+ * to become a hard rejection rather than silently coercing to 0/NaN) ->
+ * parse body -> honeypot -> Turnstile -> rate limit -> field validation ->
+ * box lookup -> write. Turnstile verification and
  * key selection is shared with the checkins route via src/lib/
  * boxTurnstile.ts (reuse, not a copy, per the task's own instruction) —
  * same dedicated invisible-mode key with a managed-mode fallback.
@@ -72,6 +76,23 @@ const MAX_PHOTO_UPLOADS_PER_BOX_PER_HOUR = 30;
 /** Reject an oversized body before ever calling req.formData() — a bot sending a huge multipart body shouldn't get this route to buffer it just to be rate-limited (or size-rejected) afterward. Padded above MAX_PHOTO_BYTES for ordinary multipart framing overhead (boundary strings, field headers). */
 const MAX_REQUEST_BYTES = MAX_PHOTO_BYTES + 64 * 1024;
 
+/**
+ * Parses the `Content-Length` header for the pre-parse size gate below.
+ * Returns null for anything that isn't a genuine positive byte count — a
+ * MISSING header (`Number(null ?? "0")` used to silently become 0), a junk
+ * header (`Number("abc")` used to silently become NaN), or an explicit "0" —
+ * every one of those used to sail past the old `> MAX_REQUEST_BYTES` check
+ * (0 and NaN are never `>` anything) and let `req.formData()` buffer an
+ * unbounded body before any size check ever fired (fix, 2026-09-18, PR #490
+ * review). A real browser multipart upload always sends a genuine positive
+ * Content-Length, so refusing anything else costs no honest caller.
+ */
+function parsePositiveContentLength(header: string | null): number | null {
+  if (header === null) return null;
+  const n = Number(header);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 interface BoxLookupRow {
   id: string;
 }
@@ -120,7 +141,10 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
 
-  const contentLength = Number(req.headers.get("content-length") ?? "0");
+  const contentLength = parsePositiveContentLength(req.headers.get("content-length"));
+  if (contentLength === null) {
+    return NextResponse.json({ ok: false, error: "content_length_required" }, { status: 411 });
+  }
   if (contentLength > MAX_REQUEST_BYTES) {
     return NextResponse.json({ ok: false, error: "photo_too_large" }, { status: 413 });
   }

@@ -27,7 +27,7 @@
 
 import type { AccessDeniedReason } from "./cfAccess";
 
-export type FormName = "suggest" | "report" | "feedback" | "checkin";
+export type FormName = "suggest" | "report" | "feedback" | "checkin" | "checkin_photo";
 export type FormFailureReason = "turnstile_failed" | "send_failed" | "db_write_failed";
 
 interface FailureDetail {

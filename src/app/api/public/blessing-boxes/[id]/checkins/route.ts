@@ -72,7 +72,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { verifyTurnstileToken } from "@/lib/turnstile";
+import { resolveBoxTurnstileKey, verifyBoxTurnstile } from "@/lib/boxTurnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
@@ -198,23 +198,17 @@ export async function POST(
   // Anything else, including missing/mistyped -> the dedicated invisible-mode
   // secret this route has always used (TURNSTILE_BOX_SECRET_KEY) — the
   // ORIGINAL flow stays the strict default, never silently upgraded.
-  const turnstileKey = body.turnstileKey === "fallback" ? "fallback" : "box";
-  const turnstileSecret =
-    turnstileKey === "fallback" ? process.env.TURNSTILE_SECRET_KEY : process.env.TURNSTILE_BOX_SECRET_KEY;
-  if (!turnstileSecret) {
-    throw new Error(
-      turnstileKey === "fallback" ? "TURNSTILE_SECRET_KEY not configured" : "TURNSTILE_BOX_SECRET_KEY not configured",
-    );
-  }
+  const turnstileKey = resolveBoxTurnstileKey(body.turnstileKey);
   // Dedicated secret for rate-limit key derivation — deliberately NOT
-  // turnstileSecret (2026-09-17 review correction; see checkinRateLimit.ts's
-  // header for why sharing the two would let a Turnstile-only rotation
-  // silently reset every open rate-limit bucket).
+  // whichever Turnstile secret verifyBoxTurnstile() picks (2026-09-17
+  // review correction; see checkinRateLimit.ts's header for why sharing the
+  // two would let a Turnstile-only rotation silently reset every open
+  // rate-limit bucket).
   const checkinRateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
   if (!checkinRateLimitSecret) {
     throw new Error("CHECKIN_RATE_LIMIT_SECRET not configured");
   }
-  const turnstileValid = await verifyTurnstileToken(body.turnstileToken, turnstileSecret, ip);
+  const turnstileValid = await verifyBoxTurnstile(body.turnstileToken, turnstileKey, ip);
   if (!turnstileValid) {
     logFormFailure("checkin", "turnstile_failed");
     return NextResponse.json({ ok: false, error: "turnstile_failed" }, { status: 400 });

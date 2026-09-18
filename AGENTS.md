@@ -2864,13 +2864,15 @@ are all skipped for a box (none apply); `ShareButton`'s share link becomes
 static `generateStaticParams` set — see `share.ts`'s own header). In their
 place, `BoxCardBody.tsx` (new) renders the box-specific content: status +
 last filled, the single most recent check-in, most-needed, the check-in
-panel (all five choices), the host's note (expanded/mobile only), and the
-History link (expanded/mobile only) — see the scope-addition paragraph
-below for why it's one check-in, not a list. `DesktopVenueWindow` mirrors
-its own existing collapsed/expanded split for a box
-(`boxCollapsedBody`/`boxExpandedBody`, `BoxCardBody`'s
-`showExpandedDetails` prop) exactly like it does for an ordinary venue.
-Name/address-row/category-badge/directions stay owned by the caller (the
+panel (all five choices), the host's note, and the History link — see the
+scope-addition paragraph below for why it's one check-in, not a list.
+**SUPERSEDED by the card-polish follow-up (2026-09-18b, below): `BoxCardBody`
+no longer has an expanded/collapsed split at all** — the "expanded/mobile
+only" gating on the host note and History link described here, and the
+`boxCollapsedBody`/`boxExpandedBody`/`showExpandedDetails` mechanics in the
+next sentence, are historical record only. See that section for the current,
+accurate description. Name/address-row/category-badge/directions stay owned
+by the caller (the
 same header every other venue card renders) — `BoxCardBody` starts below
 that. `DesktopVenueWindow`'s Escape-key handler also gained a guard: Escape
 no longer closes the whole window while focus is inside an `<input>`/
@@ -3032,6 +3034,75 @@ four real gaps, all fixed on top of it:
   override-precedence and refetch claims backwards (`getBoxById` checks the
   override FIRST, and `useBoxesList()` never refetches at all — it fetches
   once on mount, so nothing today ever clears a stale override).
+
+# Blessing Boxes — card polish (2026-09-18b)
+
+Dev-tested by Kyle same day: "When I click show details, nothing shows up"
+(the box collapsed/expanded split gated the host note and History link
+behind a toggle whose only visible effect on most boxes — no host note set
+— was nothing) and "Do we need to show the Cloudflare check?" (Turnstile's
+default `appearance: "always"` showed its widget and a "Verifying…" line
+under the check-in buttons even on the common pass-through case). Both
+fixed; supersedes the "expanded/mobile only" / `showExpandedDetails`
+mechanics described in the map-first rework section above.
+
+**`BoxCardBody` has no expand/collapse state at all now.** The
+`showExpandedDetails` prop is gone. Status, the most-recent check-in,
+most-needed, the host's note (when set), and the check-in panel all render
+unconditionally — a box card was already short enough post-rework (no
+activity list) that there was nothing left to hide behind a toggle. A new
+`showHistoryLink` prop (default `true`) replaces it, but only to suppress
+the in-body History link where a caller already renders an equivalent one
+elsewhere — DesktopVenueWindow's header (below) and the history page itself
+(BoxHistoryContent, self-linking a page to itself is dead weight). The
+History link itself moved near the TOP of the card (right under the status
+row), not after the check-in panel, so it's reachable without scrolling
+past five buttons and a note form — mobile's version of "not buried at the
+bottom."
+
+**DesktopVenueWindow: no Show/Hide details toggle for a box either.**
+`VenuePopupHeader` gained an optional `historyHref` prop — when set, it
+renders a "History" link in the toggle's own order-1 slot (same classes,
+same visual weight/position) instead of the Show/Hide button;
+`expanded`/`onToggle` are simply unused in that branch. A box's window also
+always sizes like an ordinary venue's *expanded* state
+(`WINDOW_EXPANDED_W`/`_H`) regardless of the `expanded` prop, since there's
+no more collapsed box body to size for — `boxBody` is one scrollable tree at
+a stable position, same "no remount, note survives" guarantee the map-first
+rework already built, just without the `expanded`-conditioned class swap.
+
+**Turnstile now renders `appearance: "interaction-only"`** in
+`BoxCheckinPanel.tsx` (confirmed against Cloudflare's Turnstile
+render-options docs: valid values are `always` / `execute` /
+`interaction-only`) — the widget stays invisible unless Cloudflare decides a
+real interactive challenge is needed; the site key, and the other three
+forms that still use the default `always` appearance (ReportForm,
+SuggestForm, FeedbackForm), are untouched. `src/types/turnstile.d.ts` (the
+one shared `window.turnstile` declaration all four forms import) gained the
+`appearance` option to type it.
+
+Check-in buttons are no longer gated on `turnstileToken` existing — they're
+tappable immediately, disabled only while an actual submit is in flight or
+one is queued. A tap before the invisible check resolves is queued
+(`pendingSubmit` state) rather than dropped or submitted with an empty
+token; an effect fires the queued submit the instant `turnstileToken`
+arrives (first mount, or after `expired-callback` clears a stale token and
+hands back a fresh one — token expiry was already wired, nothing new
+needed there). The tapped button shows the same "Sending…" label a real
+in-flight submit uses while it waits — no separate "Verifying…" line, which
+is deleted along with the `!turnstileToken` render branch that produced it.
+
+**`/box/<id>/history` had two "Back to map" links** — `PageNav`'s own
+chrome-level link (pointed at the bare `/`) plus `BoxHistoryContent`'s own
+inline link (pointed at `/?venue=<id>`, so it reopened the exact box card).
+`PageNav` gained an optional `backHref` prop (default `"/"`) so a caller can
+point the ONE chrome link at a richer destination instead of duplicating
+it — `BoxHistoryContent` now passes `backHref={`/?venue=${liveBox.id}`}` and
+its own inline link is deleted. (`SiteFooter`'s separate, site-wide "Back to
+map" link — present on every utility page's footer, not specific to this
+one — is untouched; it's pre-existing shared chrome, not the page-chrome/
+content duplicate this fixes.) The now-unused `box.history.back` i18n key
+(EN + ES) was deleted.
 
 ---
 

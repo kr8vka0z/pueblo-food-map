@@ -8,7 +8,22 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LocaleProvider } from "@/lib/LocaleContext";
+
+// Slice 5 photo tests mock the shrink step — jsdom has no real
+// canvas/createImageBitmap, and this component's own responsibility is the
+// UI wiring around it, not re-proving imageResize.ts's own tested behavior
+// (see that file's own test for the real shrink/HEIC-rejection coverage).
+const mockShrinkImageToJpeg = vi.fn();
+vi.mock("@/lib/imageResize", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/imageResize")>("@/lib/imageResize");
+  return {
+    ...actual,
+    shrinkImageToJpeg: (...args: unknown[]) => mockShrinkImageToJpeg(...args),
+  };
+});
+
 import BoxCheckinPanel from "@/components/BoxCheckinPanel";
+import { UnsupportedImageError } from "@/lib/imageResize";
 
 const mockTurnstile = {
   render: vi.fn((_container: HTMLElement, opts: { callback?: (t: string) => void }) => {
@@ -29,6 +44,11 @@ beforeEach(() => {
   mockTurnstile.remove.mockClear();
   vi.stubGlobal("turnstile", mockTurnstile);
   window.localStorage.clear();
+
+  mockShrinkImageToJpeg.mockReset();
+  mockShrinkImageToJpeg.mockResolvedValue(new Blob(["shrunk-jpeg-bytes"], { type: "image/jpeg" }));
+  // jsdom implements neither — usePhotoAttach() calls both on every select/clear.
+  vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn(() => "blob:fake-url"), revokeObjectURL: vi.fn() }));
 });
 
 afterEach(() => {
@@ -523,5 +543,151 @@ describe("BoxCheckinPanel — error states", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Usé esta caja" })).toBeDefined();
     });
+  });
+});
+
+// ─── Slice 5 — "Add a photo" (standalone) ──────────────────────────────────
+
+describe("BoxCheckinPanel — Add a photo (standalone)", () => {
+  test("renders a 6th 'Add a photo' button alongside the five check-in kinds", async () => {
+    renderPanel();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add a photo" })).toBeDefined());
+  });
+
+  test("tapping it opens the picker with the disclosure line, closed by default", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add a photo" })).toBeDefined());
+    expect(screen.queryByText(/Photos are reviewed/i)).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Add a photo" }));
+    expect(screen.getByText(/Photos are reviewed before they're shown publicly/i)).toBeDefined();
+  });
+
+  test("selecting a file shrinks it, shows a preview, and enables Send", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "Add a photo" }));
+
+    const input = document.getElementById("box-photo-standalone-input") as HTMLInputElement;
+    const file = new File(["fake-bytes"], "photo.jpg", { type: "image/jpeg" });
+    await user.upload(input, file);
+
+    await waitFor(() => expect(mockShrinkImageToJpeg).toHaveBeenCalledWith(file));
+    await waitFor(() => expect(screen.getByAltText("Preview of the photo you selected")).toBeDefined());
+    expect(screen.getByRole("button", { name: "Send" })).not.toBeDisabled();
+  });
+
+  test("an unsupported format shows a friendly error, never a raw exception, and no preview", async () => {
+    mockShrinkImageToJpeg.mockRejectedValueOnce(new UnsupportedImageError());
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "Add a photo" }));
+
+    const input = document.getElementById("box-photo-standalone-input") as HTMLInputElement;
+    const file = new File(["heic-bytes"], "photo.heic", { type: "image/heic" });
+    await user.upload(input, file);
+
+    await waitFor(() => expect(screen.getByText(/isn't supported/i)).toBeDefined());
+    expect(screen.queryByAltText("Preview of the photo you selected")).toBeNull();
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  });
+
+  test("Remove clears the selection and disables Send again", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "Add a photo" }));
+    const input = document.getElementById("box-photo-standalone-input") as HTMLInputElement;
+    await user.upload(input, new File(["fake-bytes"], "photo.jpg", { type: "image/jpeg" }));
+    await waitFor(() => expect(screen.getByAltText("Preview of the photo you selected")).toBeDefined());
+
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+
+    expect(screen.queryByAltText("Preview of the photo you selected")).toBeNull();
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  });
+
+  test("Send POSTs multipart form data with no checkinId, shows success, and resets the form", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "Add a photo" }));
+    const input = document.getElementById("box-photo-standalone-input") as HTMLInputElement;
+    await user.upload(input, new File(["fake-bytes"], "photo.jpg", { type: "image/jpeg" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).not.toBeDisabled());
+
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(screen.getByText(/submitted for review/i)).toBeDefined());
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/public/blessing-boxes/box-1/photos");
+    const body = init.body as FormData;
+    expect(body.get("checkinId")).toBeNull();
+    expect(body.get("photo")).toBeInstanceOf(Blob);
+    // Form closes after a successful send — the "Add a photo" toggle is available again, the disclosure text is gone.
+    await waitFor(() => expect(screen.queryByText(/Photos are reviewed/i)).toBeNull());
+  });
+});
+
+// ─── Slice 5 — photo attach on the "filled" note form ──────────────────────
+
+describe("BoxCheckinPanel — photo attach on the 'filled' note form", () => {
+  test("the 'filled' note form shows a photo-attach field; 'problem' does not", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I filled it" }));
+    expect(screen.getByText("Add a photo (optional)")).toBeDefined();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Report a problem" }));
+    expect(screen.queryByText("Add a photo (optional)")).toBeNull();
+  });
+
+  test("submitting 'filled' with an attached photo sends the checkin first, then chains the photo upload onto the NEXT Turnstile token", async () => {
+    // Simulate Turnstile's real re-execution-on-reset behavior: render()
+    // hands back token-1 immediately (matches every other test's default
+    // mock); reset() — called right after the checkin POST resolves —
+    // stands in for Turnstile's own automatic re-challenge and hands back
+    // token-2, which is what the queued photo upload is waiting on.
+    let savedCallback: ((t: string) => void) | undefined;
+    vi.stubGlobal("turnstile", {
+      render: vi.fn((_c: HTMLElement, opts: { callback?: (t: string) => void }) => {
+        savedCallback = opts.callback;
+        opts.callback?.("token-1");
+        return "widget-id-1";
+      }),
+      // Fired asynchronously — the real widget's callback is never
+      // synchronous (it follows a network round trip). A synchronous fire
+      // here would race the component's own `setTurnstileToken(null)` call
+      // that immediately follows `reset()` in submitCheckin, since both
+      // would land in the same render batch and the null would win.
+      reset: vi.fn(() => {
+        setTimeout(() => savedCallback?.("token-2"), 0);
+      }),
+      remove: vi.fn(),
+    });
+
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, status: "stocked", lastFilledAt: null, checkinId: 42 }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I filled it" }));
+
+    const fileInput = document.getElementById("box-checkin-note-photo-input") as HTMLInputElement;
+    await user.upload(fileInput, new File(["fake-bytes"], "photo.jpg", { type: "image/jpeg" }));
+    await waitFor(() => expect(mockShrinkImageToJpeg).toHaveBeenCalled());
+
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+    const [checkinUrl] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(checkinUrl).toBe("/api/public/blessing-boxes/box-1/checkins");
+    const [photoUrl, photoInit] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(photoUrl).toBe("/api/public/blessing-boxes/box-1/photos");
+    const body = photoInit.body as FormData;
+    expect(body.get("checkinId")).toBe("42");
+    expect(body.get("photo")).toBeInstanceOf(Blob);
   });
 });

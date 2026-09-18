@@ -41,9 +41,11 @@ import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { useBoxActivity } from "@/lib/useBoxActivity";
+import { useBoxPhotos } from "@/lib/useBoxPhotos";
 import { ACTIVITY_PAGE_SIZE_DEFAULT } from "@/lib/boxActivity";
 import BoxActivityList from "@/components/BoxActivityList";
 import BoxCardBody from "@/components/BoxCardBody";
+import BoxPhotoGrid from "@/components/BoxPhotoGrid";
 import SiteFooter from "@/components/SiteFooter";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
@@ -62,6 +64,7 @@ export default function BoxHistoryContent({ box }: BoxHistoryContentProps) {
     page,
     pageSize: ACTIVITY_PAGE_SIZE_DEFAULT,
   });
+  const { photos } = useBoxPhotos(liveBox.id);
 
   const handleCheckinSuccess = (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => {
     setLiveBox((current) => ({
@@ -107,6 +110,19 @@ export default function BoxHistoryContent({ box }: BoxHistoryContentProps) {
             still applies, since a no-WebGL visitor's only box page is THIS
             one and needs the full snapshot. */}
         <BoxCardBody box={liveBox} onCheckinSuccess={handleCheckinSuccess} showHistoryLink={false} />
+
+        {/* Approved-photo grid (slice 5) — reuses the same public serve
+            route the card's own single-photo slot uses; this is the "see
+            every photo" counterpart to that most-recent-only slot. */}
+        <div>
+          <h2
+            className="text-xl font-normal text-[var(--color-ink-900)] mb-2"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {t("box.photo.galleryHeading", locale)}
+          </h2>
+          <BoxPhotoGrid photos={photos} boxName={liveBox.name} locale={locale} />
+        </div>
 
         <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">
           {loading && activityPage.items.length === 0

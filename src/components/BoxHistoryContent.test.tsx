@@ -47,6 +47,7 @@ const testBox: PublicBlessingBox = {
     status: "stocked",
     lastFilledAt: "2026-09-17T09:00:00.000Z",
     recentCheckins: [],
+    latestPhoto: null,
   },
 };
 
@@ -196,5 +197,31 @@ describe("BoxHistoryContent — reuses the filtered activity read path", () => {
       expect(lastUrl).toContain("box=box-1");
       expect(lastUrl).toContain("page=2");
     });
+  });
+});
+
+describe("BoxHistoryContent — photo gallery (slice 5)", () => {
+  test("fetches this box's photo list and renders the grid", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/photos")) {
+        return Promise.resolve(
+          jsonResponse({ photos: [{ id: 7, createdAt: new Date().toISOString() }] }),
+        );
+      }
+      return Promise.resolve(jsonResponse({ items: [], hasMore: false, page: 1 }));
+    });
+
+    render(<BoxHistoryContent box={testBox} />);
+
+    await waitFor(() =>
+      expect(mockFetch.mock.calls.some((c) => (c[0] as string).includes("/blessing-boxes/box-1/photos"))).toBe(true),
+    );
+    const img = await screen.findByRole("img");
+    expect(img.getAttribute("src")).toBe("/api/public/box-photos/7");
+  });
+
+  test("shows the empty-photos state when the box has no approved photos", async () => {
+    render(<BoxHistoryContent box={testBox} />);
+    expect(await screen.findByText(t("box.photo.none", "en"))).toBeDefined();
   });
 });

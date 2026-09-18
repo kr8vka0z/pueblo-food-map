@@ -58,6 +58,7 @@ const BASE_BOX: PublicBlessingBox = {
     status: "stocked",
     lastFilledAt: "2026-09-17T09:00:00.000Z",
     recentCheckins: [],
+    latestPhoto: null,
   },
 };
 
@@ -151,10 +152,27 @@ describe("BoxCardBody — History link", () => {
 });
 
 describe("BoxCardBody — extension points render nothing today", () => {
-  test("no photo or sponsor placeholder content appears", () => {
+  test("no photo or sponsor placeholder content appears when latestPhoto is null", () => {
     renderCard();
     expect(screen.queryByText(/coming soon/i)).toBeNull();
     expect(screen.queryByAltText(/photo/i)).toBeNull();
     expect(screen.queryByText(/cared for by/i)).toBeNull();
+  });
+});
+
+describe("BoxCardBody — most-recent photo slot (slice 5)", () => {
+  test("renders the approved photo, its caption, and a Report link when latestPhoto is set", () => {
+    renderCard({
+      latestPhoto: { id: 42, createdAt: "2026-09-17T09:00:00.000Z" },
+    });
+
+    const img = screen.getByRole("img", { name: /photo of test blessing box/i });
+    expect(img.getAttribute("src")).toBe("/api/public/box-photos/42");
+
+    // Caption — "Shared <relative time>"
+    expect(screen.getByText(/shared/i)).toBeDefined();
+
+    // Shared report control (ReportPhotoButton), not rendered when there's no photo
+    expect(screen.getByRole("button", { name: "Report this photo" })).toBeDefined();
   });
 });

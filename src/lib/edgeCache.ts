@@ -35,6 +35,37 @@ export interface BestEffortResult<T> {
  * for the wider Cache API rationale); this file is just the ONE place that
  * pattern now lives, so a future fix to it only has to happen once.
  */
+/**
+ * Deletes one or more Cloudflare Workers-edge cache entries for the CURRENT
+ * colo only (`caches.default` is per-colo, not zone-wide — see
+ * respondWithEdgeCache's own header) — best-effort, a delete failure must
+ * never fail the write that triggered it.
+ *
+ * Slice 5 (photos) generalizes the checkins route's own single-path
+ * `bustListCache` into this shared helper, because a photo's moderation
+ * decision (approve/reject/flag) now needs to bust THREE cache entries, not
+ * one: the box list (`/api/public/blessing-boxes`, whose response embeds
+ * `latestPhoto`), that box's photo history list
+ * (`/api/public/blessing-boxes/<id>/photos`), and the photo's own serve
+ * route (`/api/public/box-photos/<id>`) — a flagged photo must actually
+ * stop being servable, not just drop off the two list views. One shared
+ * function means that "bust every affected cache key" rule lives in exactly
+ * one place rather than being re-derived per caller.
+ */
+export async function bustEdgeCache(req: Request, paths: readonly string[]): Promise<void> {
+  const cache: Cache | undefined = (globalThis as { caches?: { default?: Cache } }).caches?.default;
+  if (!cache) return;
+  await Promise.all(
+    paths.map(async (path) => {
+      try {
+        await cache.delete(new Request(new URL(path, req.url)));
+      } catch {
+        // best-effort only — the 60s TTL is the real freshness bound either way
+      }
+    }),
+  );
+}
+
 export async function respondWithEdgeCache<T>(
   req: Request,
   load: () => Promise<BestEffortResult<T>>,

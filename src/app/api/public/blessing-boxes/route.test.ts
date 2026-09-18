@@ -47,6 +47,7 @@ function makeBox(overrides: Partial<PublicBlessingBox> = {}): PublicBlessingBox 
       status: "unknown",
       lastFilledAt: null,
       recentCheckins: [],
+      latestPhoto: null,
     },
     ...overrides,
   };

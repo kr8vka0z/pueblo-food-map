@@ -528,6 +528,38 @@ const en: Record<string, string> = {
   // this case (BoxCheckinPanel.tsx, "Fallback to a visible checkbox").
   "box.checkin.turnstileFallbackPrompt": "Tap the box below to confirm you're a person.",
 
+  // Slice 5 photo-upload UI (BoxCheckinPanel.tsx / imageResize.ts). The
+  // disclosure line is shown under every picker, standalone and
+  // note-attached alike — moderation + "no faces or plates" in one short
+  // sentence, per the task's own spec.
+  "box.photo.addButton": "Add a photo",
+  "box.photo.attachLabel": "Add a photo (optional)",
+  "box.photo.chooseLabel": "Choose a photo",
+  "box.photo.disclosure": "Photos are reviewed before they're shown publicly. Please don't include faces or license plates.",
+  "box.photo.processing": "Preparing photo…",
+  "box.photo.processError": "Couldn't process that photo. Please try a different one.",
+  "box.photo.unsupportedFormat": "That photo format isn't supported. Please try a JPEG or PNG.",
+  "box.photo.previewAlt": "Preview of the photo you selected",
+  "box.photo.remove": "Remove",
+  "box.photo.send": "Send",
+  "box.photo.sending": "Sending…",
+  "box.photo.success": "Thanks! Your photo has been submitted for review.",
+  "box.photo.error": "That didn't go through. Please try again.",
+
+  // Photo DISPLAY (card slot + history grid) and "Report this photo"
+  // (ReportPhotoButton.tsx) — separate from the upload-picker keys above.
+  "box.photo.heading": "Photo",
+  "box.photo.caption": "Shared {time}",
+  "box.photo.altText": "Photo of {name}, shared {time}",
+  "box.photo.report": "Report this photo",
+  "box.photo.reporting": "Reporting…",
+  "box.photo.reportConfirm": "Hide this photo and send it for review?",
+  "box.photo.reportThanks": "Thanks — this photo has been hidden pending review.",
+  "box.photo.reportError": "That didn't go through. Please try again.",
+  "box.photo.morePhotos": "Show more photos",
+  "box.photo.none": "No photos yet",
+  "box.photo.galleryHeading": "Photos",
+
   // Most-recent-check-in snapshot on the in-map card (map-first rework,
   // 2026-09-18) — the card shows ONE line, not a list; the full timeline
   // moved to /box/<id>/history.
@@ -1099,6 +1131,32 @@ const es: Record<string, string> = {
   "box.checkin.error.rateLimitVisitor": "Demasiadas visitas desde este dispositivo por ahora. Por favor intenta más tarde.", // [CHECK]
   "box.checkin.error.rateLimitBox": "Esta caja está recibiendo un número inusual de visitas en este momento. Por favor intenta más tarde.", // [CHECK]
   "box.checkin.turnstileFallbackPrompt": "Toca el recuadro de abajo para confirmar que eres una persona.", // [CHECK]
+
+  "box.photo.addButton": "Agregar una foto", // [CHECK]
+  "box.photo.attachLabel": "Agregar una foto (opcional)", // [CHECK]
+  "box.photo.chooseLabel": "Elige una foto", // [CHECK]
+  "box.photo.disclosure": "Las fotos se revisan antes de mostrarse públicamente. Por favor no incluyas rostros ni placas.", // [CHECK]
+  "box.photo.processing": "Preparando la foto…", // [CHECK]
+  "box.photo.processError": "No se pudo procesar esa foto. Por favor intenta con otra.", // [CHECK]
+  "box.photo.unsupportedFormat": "Ese formato de foto no es compatible. Por favor intenta con un JPEG o PNG.", // [CHECK]
+  "box.photo.previewAlt": "Vista previa de la foto seleccionada", // [CHECK]
+  "box.photo.remove": "Quitar", // [CHECK]
+  "box.photo.send": "Enviar", // [CHECK]
+  "box.photo.sending": "Enviando…", // [CHECK]
+  "box.photo.success": "¡Gracias! Tu foto fue enviada para revisión.", // [CHECK]
+  "box.photo.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+
+  "box.photo.heading": "Foto", // [CHECK]
+  "box.photo.caption": "Compartida {time}", // [CHECK]
+  "box.photo.altText": "Foto de {name}, compartida {time}", // [CHECK]
+  "box.photo.report": "Reportar esta foto", // [CHECK]
+  "box.photo.reporting": "Reportando…", // [CHECK]
+  "box.photo.reportConfirm": "¿Ocultar esta foto y enviarla para revisión?", // [CHECK]
+  "box.photo.reportThanks": "Gracias — esta foto se ha ocultado en espera de revisión.", // [CHECK]
+  "box.photo.reportError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "box.photo.morePhotos": "Mostrar más fotos", // [CHECK]
+  "box.photo.none": "Aún no hay fotos", // [CHECK]
+  "box.photo.galleryHeading": "Fotos", // [CHECK]
 
   "box.recentCheckin.heading": "Visita más reciente", // [CHECK]
   "box.recentCheckin.none": "Aún no hay visitas registradas", // [CHECK]

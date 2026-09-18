@@ -29,6 +29,18 @@
       "preview_database_id": "95160a48-bb42-43a2-bfc7-c016af11d3dc"
     }
   ],
+  // Blessing Boxes slice 5 (photos) — box_photos.r2_key objects live here,
+  // never inlined into D1. Like d1_databases above, r2_buckets is NOT
+  // inheritable into named environments (see "Named environments do not
+  // inherit bindings" comment below) — env.staging redeclares its own
+  // bucket further down so dev.pueblofoodmap.com never writes into the
+  // production bucket.
+  "r2_buckets": [
+    {
+      "binding": "BOX_PHOTOS",
+      "bucket_name": "pfm-box-photos"
+    }
+  ],
   // Uptime dead-man's-switch (Phase 2 slice 2, mirrors ToastHoster's design).
   // custom-worker.ts's scheduled() pings a Healthchecks.io check (env.HC_PING_URL)
   // every 5 min; HC.io itself alerts (Telegram via n8n webhook, same channel
@@ -102,6 +114,14 @@
           // d6ea5afd-...) is never read from or written to by this env.
           "database_name": "pueblo-food-map-admin-staging",
           "database_id": "909e74b2-29c0-4edc-b53e-f0f876b59e1d"
+        }
+      ],
+      // Dedicated staging bucket — never the production pfm-box-photos
+      // bucket, same isolation reasoning as the staging D1 above.
+      "r2_buckets": [
+        {
+          "binding": "BOX_PHOTOS",
+          "bucket_name": "pfm-box-photos-staging"
         }
       ],
       // Explicit no-op override — NOT redundant. `triggers` IS inheritable (unlike the

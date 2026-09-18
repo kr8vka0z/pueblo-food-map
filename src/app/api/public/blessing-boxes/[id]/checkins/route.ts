@@ -40,6 +40,12 @@
  * each to its own copy: "too many check-ins from this device" vs. "this box
  * is getting an unusual number of check-ins right now."
  *
+ * Slice 5 (photos): the response now also carries `checkinId` (the new
+ * row's `meta.last_row_id`, null if D1 didn't hand one back) — a photo
+ * attached to a check-in (BoxCheckinPanel's "filled" note form, or the
+ * dedicated "Add a photo" choice) uploads in a SEPARATE request, after this
+ * one returns, and needs the id to link box_photos.checkin_id to it.
+ *
  * WHY 'problem' reports never touch the public read path: the INSERT below
  * is identical for every kind, but every public SELECT elsewhere in this
  * app (src/lib/blessingBoxes.ts) filters `kind != 'problem'` at the query —
@@ -66,10 +72,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { verifyTurnstileToken } from "@/lib/turnstile";
+import { resolveBoxTurnstileKey, verifyBoxTurnstile } from "@/lib/boxTurnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
+import { bustEdgeCache } from "@/lib/edgeCache";
 import {
   computeBoxStatus,
   computeLastFilledAt,
@@ -153,16 +160,9 @@ async function sendProblemReportEmail(boxId: string, boxName: string, note: stri
   }
 }
 
-/** Deletes GET /api/public/blessing-boxes' cache entry for the CURRENT colo — see this file's header for why this is a partial, not zone-wide, purge, and why that's still enough. Best-effort: a cache-delete failure must never fail the check-in itself. */
+/** Deletes GET /api/public/blessing-boxes' cache entry for the CURRENT colo — see this file's header for why this is a partial, not zone-wide, purge, and why that's still enough. Thin wrapper over the shared bustEdgeCache() (src/lib/edgeCache.ts) — slice 5's photo moderation routes reuse that same helper for their own, wider set of cache keys. */
 async function bustListCache(req: NextRequest): Promise<void> {
-  const cache: Cache | undefined = (globalThis as { caches?: { default?: Cache } }).caches?.default;
-  if (!cache) return;
-  try {
-    const listUrl = new URL("/api/public/blessing-boxes", req.url);
-    await cache.delete(new Request(listUrl));
-  } catch {
-    // best-effort only — the 60s TTL is the real freshness bound either way
-  }
+  await bustEdgeCache(req, ["/api/public/blessing-boxes"]);
 }
 
 export async function POST(
@@ -198,23 +198,17 @@ export async function POST(
   // Anything else, including missing/mistyped -> the dedicated invisible-mode
   // secret this route has always used (TURNSTILE_BOX_SECRET_KEY) — the
   // ORIGINAL flow stays the strict default, never silently upgraded.
-  const turnstileKey = body.turnstileKey === "fallback" ? "fallback" : "box";
-  const turnstileSecret =
-    turnstileKey === "fallback" ? process.env.TURNSTILE_SECRET_KEY : process.env.TURNSTILE_BOX_SECRET_KEY;
-  if (!turnstileSecret) {
-    throw new Error(
-      turnstileKey === "fallback" ? "TURNSTILE_SECRET_KEY not configured" : "TURNSTILE_BOX_SECRET_KEY not configured",
-    );
-  }
+  const turnstileKey = resolveBoxTurnstileKey(body.turnstileKey);
   // Dedicated secret for rate-limit key derivation — deliberately NOT
-  // turnstileSecret (2026-09-17 review correction; see checkinRateLimit.ts's
-  // header for why sharing the two would let a Turnstile-only rotation
-  // silently reset every open rate-limit bucket).
+  // whichever Turnstile secret verifyBoxTurnstile() picks (2026-09-17
+  // review correction; see checkinRateLimit.ts's header for why sharing the
+  // two would let a Turnstile-only rotation silently reset every open
+  // rate-limit bucket).
   const checkinRateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
   if (!checkinRateLimitSecret) {
     throw new Error("CHECKIN_RATE_LIMIT_SECRET not configured");
   }
-  const turnstileValid = await verifyTurnstileToken(body.turnstileToken, turnstileSecret, ip);
+  const turnstileValid = await verifyBoxTurnstile(body.turnstileToken, turnstileKey, ip);
   if (!turnstileValid) {
     logFormFailure("checkin", "turnstile_failed");
     return NextResponse.json({ ok: false, error: "turnstile_failed" }, { status: 400 });
@@ -289,11 +283,20 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
+  let newCheckinId: number | null = null;
   try {
-    await db
+    const insertResult = await db
       .prepare("INSERT INTO box_checkins (venue_id, kind, note) VALUES (?, ?, ?)")
       .bind(boxId, checkinKind, note)
       .run();
+    // Slice 5 (photos): a photo attached to this check-in is uploaded in a
+    // SEPARATE request, after this one returns — the client needs the new
+    // row's id to link it (box_photos.checkin_id). typeof-guarded rather
+    // than asserted: a D1 insert that succeeds without a usable
+    // last_row_id should degrade to "no id to attach a photo to," never
+    // crash an otherwise-successful check-in.
+    const rawId = insertResult.meta?.last_row_id;
+    if (typeof rawId === "number") newCheckinId = rawId;
   } catch (err) {
     logFormFailure("checkin", "db_write_failed", {
       message: err instanceof Error ? err.message : "unknown error",
@@ -336,5 +339,6 @@ export async function POST(
     ok: true,
     status: computeBoxStatus(checkins, now, outOfService),
     lastFilledAt: computeLastFilledAt(checkins),
+    checkinId: newCheckinId,
   });
 }

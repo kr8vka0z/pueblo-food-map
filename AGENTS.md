@@ -2455,6 +2455,10 @@ rate-limit tables), AND `0008_box_events.sql` (the activity-log lifecycle
 table, slice 3 — see "Blessing Boxes — activity log (slice 3)" below) —
 against the **production** D1
 (`pueblo-food-map-admin`) **BEFORE** promoting `dev` → `main`, not after.
+**Slice 5 (photos, below) adds a FIFTH required migration,
+`0009_box_photos.sql`, plus an R2 binding check — see "Blessing Boxes —
+photos (slice 5)"'s own updated checklist further down for the full,
+current list.**
 This is NOT optional cleanup: `next.config.ts`'s `/venue/<Routt-id>` →
 `/box/<Routt-id>` redirect and `publishVenues.ts`'s
 `category != 'blessing_box'` snapshot filter both ship on the Worker deploy
@@ -3154,6 +3158,196 @@ map" link — present on every utility page's footer, not specific to this
 one — is untouched; it's pre-existing shared chrome, not the page-chrome/
 content duplicate this fixes.) The now-unused `box.history.back` i18n key
 (EN + ES) was deleted.
+
+---
+
+# Blessing Boxes — photos (slice 5)
+
+Full design: `atlas-kb/projects/Pueblo Food Map/Blessing Boxes Build Plan.md`,
+"Slice 5 — Photos." First use of Cloudflare R2 in this repo — every other
+binary-ish asset (venue photos never existed; the public form email bodies
+are plain text) had no precedent to follow.
+
+**Storage.** Two R2 buckets, bound as `BOX_PHOTOS` in `wrangler.jsonc`:
+`pfm-box-photos` (production, top-level binding) and `pfm-box-photos-staging`
+(`env.staging`, never the production bucket — same "dedicated, never shared"
+convention as every other per-env resource in this repo). Object key shape:
+`box-photos/<venueId>/<uuid>.jpg`. D1 holds metadata only, never the bytes —
+`migrations/0009_box_photos.sql` (see its own header for the full column
+rationale) adds `box_photos` (`status` CHECK `pending|approved|rejected|
+flagged`, `flag_count`, `width`/`height`/`bytes` read from the JPEG itself
+server-side, `checkin_id` nullable — set only when a photo rides a "filled"
+check-in). **Applied to staging and local dev only, 2026-09-18 — production
+is the usual later, explicit, Kyle-gated step; see the updated promotion
+checklist below, now covering FIVE migrations.**
+
+**Upload — `POST /api/public/blessing-boxes/[id]/photos`** (same file also
+serves the approved-photo list, `GET`, below). Same guard order as every
+other public write in this app: Content-Type/size pre-gate → honeypot →
+Turnstile (reused from `src/lib/boxTurnstile.ts` — the SAME dedicated
+invisible-mode box key + managed-mode fallback check-ins already use, not a
+third key) → two D1-shared-counter rate-limit scopes
+(`photo-visitor-box`: 3/visitor/box/hour; `photo-box`: 30/box/hour — both via
+`checkinRateLimit.ts`, entirely separate budgets from a check-in's own caps
+so a burst of one never eats the other's) → JPEG-magic-byte check (never
+trusts `Content-Type` alone) → `MAX_PHOTO_BYTES` (2 MB) size gate → EXIF/APPn
+strip (`src/lib/jpegSegments.ts`, server-side and authoritative — the client
+shrink below already drops EXIF as a side effect of re-encoding, but this
+route never assumes that happened) → R2 `put` → `box_photos` INSERT
+(`status='pending'`, the column default — nothing in this route can set any
+other status). A `checkinId` in the form body is looked up and checked
+`venue_id = boxId` before being trusted, so a photo can never attach to
+another box's check-in via a tampered id. Best-effort admin alert email
+(Resend, same sending-key convention as every other form) on a new upload;
+a Resend outage never fails an otherwise-successful upload.
+
+**Client-side shrink — `src/lib/imageResize.ts`.** `shrinkImageToJpeg(file)`
+decodes via `createImageBitmap(file, { imageOrientation: "from-image" })`
+(EXIF-aware — the orientation is baked into the pixels, not left for a
+consumer to reapply), redraws onto a `<canvas>` capped at 1600px on the
+longest side, and re-encodes to JPEG at quality ~0.8 via `toBlob()` — the
+canvas round-trip drops EXIF as a side effect, but the server strips again
+regardless (previous paragraph). `fitWithin(width, height, maxSide)` is a
+pure helper extracted specifically so the sizing math is unit-testable
+without a real canvas (jsdom has none).
+
+**Upload UI — `BoxCheckinPanel.tsx`.** A 6th grid choice, "Add a photo,"
+opens a standalone photo picker (`PhotoPickerField`, shared presentational
+component: file input, preview, Remove, disclosure text). A photo can ALSO
+ride the existing "filled" note form — `KIND_WITH_PHOTO_ATTACH = "filled"`
+only, per the task. Both paths reuse one `usePhotoAttach()` hook (select →
+shrink → preview, or a localized error for an unsupported format/processing
+failure). **Attaching a photo to a "filled" check-in reuses the SAME,
+already-consumed single-use Turnstile token slot via a generalized
+`pendingSubmit` queue** — `type: "checkin" | "photo"`, a discriminated union
+—  rather than mounting a second widget: Turnstile's default
+`execution: "render"` mode means `turnstile.reset()` after the check-in
+submit auto-re-executes and eventually calls back with a FRESH token, and
+the existing queue/timeout/fallback machinery (`PENDING_SUBMIT_TIMEOUT_MS`,
+`switchToFallback()`, `failQueuedSubmit()`) already exists to wait on
+exactly that. The standalone "Add a photo" flow posts its own multipart
+`FormData` (`photo`, `turnstileToken`, `turnstileKey`, `clientToken`,
+optional `checkinId`) via a separate `submitPhoto()` call, independent of
+the check-in POST.
+
+**Serving — `GET /api/public/box-photos/[id]`.** APPROVED ONLY, enforced at
+the SQL level (`loadApprovedBoxPhotoById`, `src/lib/boxPhotos.ts`) — a
+pending/rejected/flagged photo's row, and therefore its R2 bytes, is never
+even read. Workers Cache API, `Cache-Control: public, max-age=300` (5
+minutes, tightened from 1 hour 2026-09-18 per PR #490 review — not
+`immutable` — a photo can be flagged/rejected later and must stop serving
+promptly; the approve/reject/flag routes all `bustEdgeCache()` this exact
+path, but that purge is per-colo, so the 5-minute TTL is the real cross-colo
+bound: a hidden photo can linger up to 5 minutes on another data centre or in
+a visitor's own browser cache). A 404 (bad id, no approved row, missing R2
+object) is never itself cached.
+
+**Admin preview — `GET /api/admin/box-photos/[id]/preview`.** Same shape as
+the public serve route but `getAdminDb()`-gated, ANY status (an admin must
+be able to see a still-pending photo to review it) — never cached.
+
+**Admin moderation — `POST /api/admin/box-photos/[id]/approve|reject`.**
+Same auth pair as every other admin mutation (`getAdminDb()` then
+`requireAdminOrigin()`). Each is one atomic `db.batch()`: `UPDATE box_photos
+SET status = ..., reviewed_by, reviewed_at [, review_reason]` +
+`audit_log` INSERT (`action='update'`, `entity='box_photo'` — a plain TEXT
+column, no schema change needed, same convention slice 2's check-in
+visibility route established), then `bustEdgeCache()` on the serve route,
+the box's photo-list route, and the box list route (3 paths — a photo's
+status can affect the public serve response, the history-page list, AND
+the card's `latestPhoto` field). Approving works from EITHER `pending` OR
+`flagged` (re-publishing a flagged photo keeps its `flag_count` as history,
+never resets it). **Reject writes to D1 first, THEN best-effort deletes the
+R2 object — this order is load-bearing and regression-tested**
+(`route.test.ts` asserts the call order): if R2 delete ran first and then
+the D1 write failed, the row would still read `pending`/`flagged` while its
+bytes were already gone, an unrecoverable inconsistency; the reverse order
+just leaves an orphaned R2 object on a rare R2 failure, harmless since the
+serve route requires an approved D1 row to exist at all.
+
+**Public "report this photo" — `POST /api/public/box-photos/[id]/flag`.**
+No Turnstile (a flag has no free-text field for a bot to abuse — the
+per-visitor rate limit, 5/hour via the same `checkinRateLimit.ts` module,
+`scope: "photo-flag-visitor"`, only checked when a `clientToken` is
+present, is the real anti-abuse control here). Looks the photo up via
+`loadApprovedBoxPhotoById` (same structural privacy guarantee as the serve
+route — a flag request can't be used to probe a non-approved photo's
+existence), sets `status='flagged'` and `flag_count = flag_count + 1`
+immediately (no admin action needed to hide it), `bustEdgeCache()`s the same
+3 paths as approve/reject, and sends a best-effort admin alert email. No
+`audit_log` row — a public action, not an admin one; the row's own
+`flag_count`/`status` are the record. `ReportPhotoButton.tsx` (shared by the
+card slot and the history grid, below) gates the call behind a native
+`window.confirm()`.
+
+**Admin review queue — `/admin/box-photos`.** Lists every `pending` +
+`flagged` row (`loadReviewQueue`, `src/lib/boxPhotos.ts`), newest first,
+mirroring `/admin/submissions`'s Server-Component-auth-gate /
+Client-Component-interaction split exactly (`BoxPhotosReviewView.tsx`).
+Each card shows the image (via the admin preview route), a "New upload"
+(sage) or "Reported (N×)" (clay) badge, Approve, and Reject-with-optional-
+reason. `/admin` (`src/app/admin/page.tsx`) gained a "Photo review (N)" nav
+link, `N` from `countPendingReview()` — best-effort, degrades to omitting
+the count rather than failing the page on a D1 hiccup.
+
+**Public display — the card's most-recent-photo slot.** `BoxCardBody.tsx`'s
+photo extension point (previously deliberately empty, see the map-first
+rework section above) now renders `box.box.latestPhoto` when set: the image
+via the public serve route, a "Shared {relative time}" caption, and
+`ReportPhotoButton`. `latestPhoto` is a new field on `PublicBlessingBox.box`
+(`src/lib/blessingBoxes.ts`), populated from `loadLatestApprovedPhotosForVenues`
+(`src/lib/boxPhotos.ts`) inside the box list/detail loaders — same
+best-effort-if-D1-fails posture every other box field already has. Renders
+nothing when null (never uploaded, or nothing approved yet) — no
+placeholder image, no "coming soon" text, unchanged from the
+extension-point convention this slot replaces.
+
+**Public display — the history page's photo grid.** `/box/<id>/history`
+(`BoxHistoryContent.tsx`) gained a "Photos" section below the current-
+snapshot card: `useBoxPhotos.ts` (new client hook, mirrors `useBoxVenues.ts`'s
+fetch-on-mount/best-effort/cancel-flag shape) fetches
+`GET /api/public/blessing-boxes/[id]/photos` (already capped server-side at
+`MAX_HISTORY_PHOTOS = 24`) and renders it via `BoxPhotoGrid.tsx` — an
+8-photo initial view with a "Show more photos" button that reveals the rest
+of the already-fetched array (no second fetch, no page param — the route has
+none). Each tile carries its own `ReportPhotoButton`. Reuses the exact same
+public serve route the card slot uses, never a direct R2 URL.
+
+**`ReportPhotoButton.tsx` — one shared component, not two copies.** Owns
+the confirm-then-POST flow for both the card slot and the history grid;
+`t("box.photo.reportConfirm"/"reportThanks"/"reportError")` and the
+`clientToken` read (`getCheckinClientToken()`, the same opaque
+localStorage token the check-in rate limiter already uses — never an IP)
+live in exactly one place.
+
+**i18n.** All new `box.photo.*` keys (upload-picker: `addButton`,
+`attachLabel`, `chooseLabel`, `disclosure`, `processing`, `processError`,
+`unsupportedFormat`, `previewAlt`, `remove`, `send`, `sending`, `success`,
+`error`; display: `heading`, `caption`, `altText`, `report`, `reporting`,
+`reportConfirm`, `reportThanks`, `reportError`, `morePhotos`, `none`,
+`galleryHeading`) carry both EN and ES strings, Spanish marked `// [CHECK]`
+per this repo's established unreviewed-translation convention.
+
+**Deliberately NOT built in this slice** (explicitly optional in the task,
+"skip if it bloats" — so a later slice doesn't assume otherwise): an inline
+photo panel on a box's admin EDIT page (`/admin/venues/[id]/edit`) showing
+that box's photos without navigating to the review queue. The review queue
+(`/admin/box-photos`) already covers moderation end to end; this would only
+have been a convenience shortcut.
+
+**Blessing boxes — promotion checklist, updated.** Run ALL FIVE migrations
+now — `0005` through `0008` (see the original checklist above, unchanged)
+PLUS **`0009_box_photos.sql`** — against production D1
+(`pueblo-food-map-admin`) before promoting `dev` → `main`. Also confirm the
+production Worker's `BOX_PHOTOS` R2 binding points at the **production**
+`pfm-box-photos` bucket (already declared at the top level of
+`wrangler.jsonc`, not `env.staging` — nothing further to wire, but verify
+against the live deploy rather than assuming). **No new Turnstile or
+rate-limit secret is required** — photo upload/flag reuse
+`TURNSTILE_BOX_SECRET_KEY`/`TURNSTILE_SECRET_KEY` (the existing box +
+fallback keypair) and `CHECKIN_RATE_LIMIT_SECRET` (the existing shared
+rate-limit HMAC key), the same three secrets check-ins already require in
+production per the checklist above.
 
 ---
 

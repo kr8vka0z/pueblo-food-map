@@ -28,6 +28,8 @@
  */
 
 import type { Venue, VenueCategory } from "@/types/venue";
+import { loadLatestApprovedPhotosForVenues, type PublicBoxPhoto } from "@/lib/boxPhotos";
+import { logBlessingBoxesReadFailure } from "@/lib/logger";
 
 // ─── D1 row shapes ──────────────────────────────────────────────────────────
 
@@ -215,6 +217,8 @@ export interface PublicBlessingBox extends Venue {
     status: BoxStatus;
     lastFilledAt: string | null;
     recentCheckins: PublicCheckinEvent[];
+    /** Slice 5 — the most recent APPROVED photo, or null (never uploaded, or nothing approved yet). Null is also what a degraded (D1-failure) photo read returns — see loadLiveBoxes'/loadLiveBoxById's own comment for why a photos-table failure must never take the whole box down the way a checkins-table failure does. */
+    latestPhoto: PublicBoxPhoto | null;
   };
 }
 
@@ -280,6 +284,7 @@ export function mapRowToPublicBox(
   row: BoxJoinRow,
   checkins: CheckinStatusInput[] = [],
   now: Date = new Date(),
+  latestPhoto: PublicBoxPhoto | null = null,
 ): PublicBlessingBox {
   const outOfService = row.removed_on !== null && row.removed_on !== "";
   return {
@@ -300,6 +305,7 @@ export function mapRowToPublicBox(
       status: computeBoxStatus(checkins, now, outOfService),
       lastFilledAt: computeLastFilledAt(checkins),
       recentCheckins: toPublicCheckinEvents(checkins),
+      latestPhoto,
     },
   };
 }
@@ -444,11 +450,36 @@ export async function loadAllCheckinsForBox(db: D1Database, venueId: string): Pr
 // `now` is an optional injectable clock (defaults to `new Date()`) purely so
 // tests can pin the 7-day fade window without faking global time.
 
+/**
+ * Best-effort latest-photo lookup for one or many venues — unlike
+ * loadVisibleCheckins(Forvenues) above, this is wrapped HERE rather than
+ * left to the caller: a missing/broken box_photos table (e.g. a promotion
+ * landing before migration 0009, mirroring the exact 0007 outage this
+ * file's own history documents) must degrade to "no photo shown," not take
+ * down the whole box list/detail the way a checkins failure structurally
+ * does (loadVisibleCheckins has no try/catch of its own and is allowed to
+ * propagate). Photos are a purely additive display feature layered on top
+ * of an already-working box — there's no reason a photos-table outage
+ * should re-create slice 2's "every pin disappears" failure mode.
+ */
+async function loadLatestPhotosBestEffort(db: D1Database, venueIds: string[]): Promise<Map<string, PublicBoxPhoto>> {
+  try {
+    return await loadLatestApprovedPhotosForVenues(db, venueIds);
+  } catch (err) {
+    logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error (box_photos read)");
+    return new Map();
+  }
+}
+
 export async function loadLiveBoxes(db: D1Database, now: Date = new Date()): Promise<PublicBlessingBox[]> {
   const result = await db.prepare(SELECT_LIVE_BOXES_SQL).all<BoxJoinRow>();
   const rows = result.results ?? [];
-  const checkinsByVenue = await loadVisibleCheckinsForVenues(db, rows.map((r) => r.id));
-  return rows.map((row) => mapRowToPublicBox(row, checkinsByVenue.get(row.id) ?? [], now));
+  const venueIds = rows.map((r) => r.id);
+  const checkinsByVenue = await loadVisibleCheckinsForVenues(db, venueIds);
+  const photosByVenue = await loadLatestPhotosBestEffort(db, venueIds);
+  return rows.map((row) =>
+    mapRowToPublicBox(row, checkinsByVenue.get(row.id) ?? [], now, photosByVenue.get(row.id) ?? null),
+  );
 }
 
 export async function loadLiveBoxById(
@@ -459,5 +490,6 @@ export async function loadLiveBoxById(
   const row = await db.prepare(SELECT_LIVE_BOX_BY_ID_SQL).bind(id).first<BoxJoinRow>();
   if (!row) return null;
   const checkins = await loadVisibleCheckins(db, id);
-  return mapRowToPublicBox(row, checkins, now);
+  const photosByVenue = await loadLatestPhotosBestEffort(db, [id]);
+  return mapRowToPublicBox(row, checkins, now, photosByVenue.get(id) ?? null);
 }

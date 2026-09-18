@@ -93,7 +93,7 @@ describe("POST /api/public/blessing-boxes/[id]/checkins", () => {
     globalThis.fetch = mockFetch as unknown as typeof fetch;
     delete (globalThis as { caches?: unknown }).caches;
 
-    process.env.TURNSTILE_SECRET_KEY = "test-secret";
+    process.env.TURNSTILE_BOX_SECRET_KEY = "test-secret";
     process.env.CHECKIN_RATE_LIMIT_SECRET = "test-rate-limit-secret";
     process.env.RESEND_API_KEY = "test-resend-key";
 
@@ -186,6 +186,22 @@ describe("POST /api/public/blessing-boxes/[id]/checkins", () => {
       "CHECKIN_RATE_LIMIT_SECRET not configured",
     );
     expect(mockGetCloudflareContext).not.toHaveBeenCalled();
+  });
+
+  test("TURNSTILE_BOX_SECRET_KEY missing -> throws, never verifies Turnstile", async () => {
+    delete process.env.TURNSTILE_BOX_SECRET_KEY;
+    await expect(callPost({ kind: "took", turnstileToken: "t" })).rejects.toThrow(
+      "TURNSTILE_BOX_SECRET_KEY not configured",
+    );
+    expect(mockVerifyTurnstileToken).not.toHaveBeenCalled();
+  });
+
+  test("Turnstile verification is checked against TURNSTILE_BOX_SECRET_KEY, not TURNSTILE_SECRET_KEY", async () => {
+    delete process.env.TURNSTILE_SECRET_KEY; // the managed-mode secret the other 3 forms use — must be irrelevant here
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
+    const res = await callPost({ kind: "took", turnstileToken: "t" });
+    expect(res.status).toBe(200);
+    expect(mockVerifyTurnstileToken).toHaveBeenCalledWith("t", "test-secret", expect.any(String));
   });
 
   test("invalid kind -> 422", async () => {

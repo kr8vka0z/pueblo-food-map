@@ -81,19 +81,34 @@ describe("BoxCheckinPanel — rendering", () => {
   });
 });
 
-// ─── Widget visibility (card-polish follow-up, 2026-09-18) ────────────────
-// Kyle: "Do we need to show the Cloudflare check?" — the widget now renders
-// with appearance: "interaction-only" so it stays invisible unless
-// Cloudflare actually needs a person to interact, and the old "Verifying…"
-// line is gone since buttons are usable immediately regardless of token state.
+// ─── Widget visibility (card-polish follow-up, 2026-09-18, then a same-day
+// fix once Kyle tested on a real phone) ────────────────────────────────────
+// Kyle: "Do we need to show the Cloudflare check?" — first fixed with
+// appearance: "interaction-only", then Kyle found the managed-mode widget
+// still popped its checkbox on his phone even under that setting, so the
+// panel now mounts a SEPARATE, dedicated invisible-mode Turnstile site key
+// (NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY) instead — invisible mode never
+// renders a checkbox at all, so `appearance` no longer matters and is
+// dropped from the render call. The old "Verifying…" line is still gone
+// since buttons are usable immediately regardless of token state.
 
 describe("BoxCheckinPanel — Turnstile widget stays invisible by default", () => {
-  test("render() is called with appearance: 'interaction-only'", () => {
-    renderPanel();
-    expect(mockTurnstile.render).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ appearance: "interaction-only" }),
-    );
+  test("render() uses the dedicated invisible-mode box site key, not the managed one", () => {
+    const originalBoxKey = process.env.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY;
+    process.env.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY = "invisible-box-key";
+    try {
+      renderPanel();
+      expect(mockTurnstile.render).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ sitekey: "invisible-box-key" }),
+      );
+      expect(mockTurnstile.render).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.not.objectContaining({ appearance: expect.anything() }),
+      );
+    } finally {
+      process.env.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY = originalBoxKey;
+    }
   });
 
   test("no 'Verifying…' text anywhere, even before a token exists", async () => {

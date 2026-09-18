@@ -34,6 +34,12 @@
 # first prod run: NEXT_PUBLIC_MAPBOX_TOKEN (the real production-scoped
 # public token — see AGENTS.md "Mapbox Token Management") and
 # NEXT_PUBLIC_TURNSTILE_SITE_KEY (see .env.example).
+#
+# NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY (2026-09-18): a THIRD build secret, the
+# invisible-mode key blessing-box check-ins verify against instead of the
+# managed-mode key above (AGENTS.md "Blessing boxes — card polish"). Missing
+# it degrades the same way a missing NEXT_PUBLIC_TURNSTILE_SITE_KEY does —
+# the check-in widget fails to render — never a build failure.
 name: Deploy Prod
 
 on:
@@ -64,6 +70,7 @@ jobs:
       # file-header comment on why these must be GH secrets now.
       NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY }}
     steps:
       # Same pinned-SHA third-party actions as deploy-dev.yml — a mutable
       # tag could be repointed to malicious code; a SHA cannot.

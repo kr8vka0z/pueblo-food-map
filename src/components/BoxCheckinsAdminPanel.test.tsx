@@ -66,7 +66,7 @@ describe("BoxCheckinsAdminPanel — rendering", () => {
     expect(screen.getByText("Stocked it")).toBeDefined();
     expect(screen.getByText("Problem report")).toBeDefined();
     expect(screen.getByText("Door broken")).toBeDefined();
-    expect(screen.getByText("Took something")).toBeDefined();
+    expect(screen.getByText("Used the box")).toBeDefined();
     expect(screen.getByText(/hidden by admin@pueblofoodmap.com/)).toBeDefined();
   });
 

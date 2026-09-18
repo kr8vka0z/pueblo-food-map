@@ -34,7 +34,7 @@ interface BoxCheckinsAdminPanelProps {
 
 const KIND_LABEL: Record<AdminCheckinRow["kind"], string> = {
   filled: "Filled",
-  took: "Took something",
+  took: "Used the box",
   low: "Running low",
   empty: "Empty",
   problem: "Problem report",

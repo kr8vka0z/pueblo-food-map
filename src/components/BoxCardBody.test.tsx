@@ -82,10 +82,10 @@ describe("BoxCardBody — most recent check-in only, never a list", () => {
     const line = screen.getByTestId("box-recent-checkin");
     expect(line.textContent).toContain("Filled");
     // Not a list: only ONE check-in line rendered, the older two never appear
-    // (scoped to the line itself — "Running low"/"Took something" are ALSO
+    // (scoped to the line itself — "Running low"/"Used the box" are ALSO
     // BoxCheckinPanel's own button labels, which legitimately render below).
     expect(screen.queryAllByTestId("box-recent-checkin")).toHaveLength(1);
-    expect(line.textContent).not.toContain("Took something");
+    expect(line.textContent).not.toContain("Used the box");
     expect(line.textContent).not.toContain("Running low");
   });
 

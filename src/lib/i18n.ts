@@ -501,7 +501,7 @@ const en: Record<string, string> = {
   "box.lastFilled.never": "Not marked filled yet",
   "box.checkin.heading": "Check in at this box",
   "box.checkin.filled": "I filled it",
-  "box.checkin.took": "I took something",
+  "box.checkin.took": "I used this box",
   "box.checkin.low": "Running low",
   "box.checkin.empty": "It's empty",
   "box.checkin.problem": "Report a problem",
@@ -571,7 +571,7 @@ const en: Record<string, string> = {
   // "Blessing Box - 216 W Routt" etc., so these deliberately don't repeat
   // "Box at" ahead of it, per the Discovery doc's own example lines).
   "activity.line.filled": "{name} was filled",
-  "activity.line.took": "Someone took something from {name}",
+  "activity.line.took": "Someone used {name}",
   "activity.line.low": "{name} is running low",
   "activity.line.empty": "{name} is empty",
   "activity.line.added": "{name} was added as a new blessing box",
@@ -583,7 +583,7 @@ const en: Record<string, string> = {
   // box.checkin.* above, which is first-person button copy ("I filled it")
   // that reads oddly as a filter option.
   "activity.kind.filled": "Filled",
-  "activity.kind.took": "Took something",
+  "activity.kind.took": "Used the box",
   "activity.kind.low": "Running low",
   "activity.kind.empty": "Empty",
   "activity.kind.added": "Box added",
@@ -1080,7 +1080,7 @@ const es: Record<string, string> = {
   "box.lastFilled.never": "Aún no se ha marcado como surtida", // [CHECK]
   "box.checkin.heading": "Marca tu visita a esta caja", // [CHECK]
   "box.checkin.filled": "La surtí", // [CHECK]
-  "box.checkin.took": "Tomé algo", // [CHECK]
+  "box.checkin.took": "Usé esta caja", // [CHECK]
   "box.checkin.low": "Quedan pocas cosas", // [CHECK]
   "box.checkin.empty": "Está vacía", // [CHECK]
   "box.checkin.problem": "Reportar un problema", // [CHECK]
@@ -1124,7 +1124,7 @@ const es: Record<string, string> = {
   "activity.recentEmpty": "Todavía no hay actividad en esta caja.", // [CHECK]
   "activity.thisBox": "Esta caja", // [CHECK]
   "activity.line.filled": "{name} fue surtida", // [CHECK]
-  "activity.line.took": "Alguien tomó algo de {name}", // [CHECK]
+  "activity.line.took": "Alguien usó {name}", // [CHECK]
   "activity.line.low": "{name} tiene poco", // [CHECK]
   "activity.line.empty": "{name} está vacía", // [CHECK]
   "activity.line.added": "{name} se agregó como una nueva caja de bendiciones", // [CHECK]
@@ -1133,7 +1133,7 @@ const es: Record<string, string> = {
   "activity.line.paused": "{name} se pausó", // [CHECK]
   "activity.line.removed": "{name} se eliminó", // [CHECK]
   "activity.kind.filled": "Surtida", // [CHECK]
-  "activity.kind.took": "Se tomó algo", // [CHECK]
+  "activity.kind.took": "Se usó la caja", // [CHECK]
   "activity.kind.low": "Con poco", // [CHECK]
   "activity.kind.empty": "Vacía", // [CHECK]
   "activity.kind.added": "Caja agregada", // [CHECK]

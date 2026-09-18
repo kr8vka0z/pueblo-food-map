@@ -258,9 +258,9 @@ describe("BottomSheet — blessing box card (map-first rework)", () => {
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
     const link = screen.getByRole("link", { name: "History" });
     expect(link.getAttribute("href")).toBe("/box/test-box-1/history");
-    // "I took something" is BoxCheckinPanel's first button — the History
+    // "I used this box" is BoxCheckinPanel's first button — the History
     // link must come before it in DOM order, not after the whole panel.
-    const takeButton = screen.getByRole("button", { name: "I took something" });
+    const takeButton = screen.getByRole("button", { name: "I used this box" });
     expect(link.compareDocumentPosition(takeButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

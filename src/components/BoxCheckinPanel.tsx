@@ -33,6 +33,19 @@
  * tap (or an already-queued one) waits for the callback's next token exactly
  * like the first one did.
  *
+ * A queued tap isn't guaranteed a token ever arrives — Turnstile's own
+ * `error-callback` can fire instead, or the widget script can fail to load
+ * or call back at all (content blocker, offline, slow network). Either way
+ * the tapped button would otherwise read "Sending…" forever with every
+ * button disabled and no way out. `failQueuedSubmit` is the one recovery
+ * path both cases route through: it clears `pendingSubmit`, shows the
+ * existing plain error message, and — for a note-kind tap (filled/problem)
+ * — reopens the note form with the visitor's typed text restored, since
+ * `handleNoteSubmit` already cleared the live `note`/`openKind` state at
+ * queue time. `PENDING_SUBMIT_TIMEOUT_MS` bounds the "never calls back at
+ * all" case; `error-callback` firing bounds the "calls back with a failure"
+ * case.
+ *
  * onCheckinSuccess lifts the POST response's fresh status/lastFilledAt
  * straight into BoxContent's own state — no refetch, no dependency on the
  * list endpoint's 60s cache (see the route handler's own header for the
@@ -52,6 +65,12 @@ const { BOX_CHECKIN_NOTE } = FIELD_LIMITS;
 /** Display order — 'took' first, since it's the single most common action (Discovery C2) and needs to be reachable with zero extra taps. */
 const CHECKIN_KINDS: readonly CheckinKind[] = ["took", "filled", "low", "empty", "problem"];
 const KINDS_WITH_NOTE: ReadonlySet<CheckinKind> = new Set(["filled", "problem"]);
+
+// A queued tap (see this file's own header) must not wait forever for a
+// token that may never come — 15s is comfortably longer than Turnstile's own
+// typical challenge-resolution time, short enough that a real visitor isn't
+// left staring at "Sending…" wondering if their tap registered.
+const PENDING_SUBMIT_TIMEOUT_MS = 15_000;
 
 interface BoxCheckinPanelProps {
   boxId: string;
@@ -143,6 +162,42 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
     void submitCheckin(kind, noteValue);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- submitCheckin closes over this render's turnstileToken/honeypot/boxId already; re-running per pendingSubmit/turnstileToken change (not per render) is what this effect wants.
   }, [turnstileToken, pendingSubmit]);
+
+  // The one recovery path both queued-tap failure modes route through — see
+  // this file's own header. Restores the note form for a note-kind tap
+  // (filled/problem) since handleNoteSubmit already cleared the live
+  // note/openKind state at queue time; there's nothing to restore for a
+  // one-tap kind (took/low/empty).
+  function failQueuedSubmit(pending: { kind: CheckinKind; note: string }) {
+    setPendingSubmit(null);
+    setSubmitState("error");
+    if (KINDS_WITH_NOTE.has(pending.kind)) {
+      setOpenKind(pending.kind);
+      setNote(pending.note);
+    }
+  }
+
+  // Failure mode 1: Turnstile's error-callback fires while a tap is queued.
+  // mountTurnstile's callbacks are registered once at mount, so reading
+  // pendingSubmit directly inside error-callback would close over a stale
+  // (always-null) value — same reason the token-arrival effect above exists
+  // instead of firing submitCheckin straight from Turnstile's own callback.
+  useEffect(() => {
+    if (!turnstileError || !pendingSubmit) return;
+    const queued = pendingSubmit;
+    queueMicrotask(() => failQueuedSubmit(queued));
+  }, [turnstileError, pendingSubmit]);
+
+  // Failure mode 2: the Turnstile script never loads or never calls back at
+  // all (content blocker, offline, slow network) — nothing above ever fires
+  // without this. Each queued tap gets its own timer, cleared the moment it
+  // resolves (success, error-callback, or a fresh tap replacing it).
+  useEffect(() => {
+    if (!pendingSubmit) return;
+    const queued = pendingSubmit;
+    const timer = setTimeout(() => failQueuedSubmit(queued), PENDING_SUBMIT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [pendingSubmit]);
 
   async function submitCheckin(kind: CheckinKind, noteValue: string) {
     setSubmitState("submitting");

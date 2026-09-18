@@ -546,6 +546,19 @@ const en: Record<string, string> = {
   "box.photo.success": "Thanks! Your photo has been submitted for review.",
   "box.photo.error": "That didn't go through. Please try again.",
 
+  // Photo DISPLAY (card slot + history grid) and "Report this photo"
+  // (ReportPhotoButton.tsx) — separate from the upload-picker keys above.
+  "box.photo.heading": "Photo",
+  "box.photo.caption": "Shared {time}",
+  "box.photo.altText": "Photo of {name}, shared {time}",
+  "box.photo.report": "Report this photo",
+  "box.photo.reporting": "Reporting…",
+  "box.photo.reportConfirm": "Hide this photo and send it for review?",
+  "box.photo.reportThanks": "Thanks — this photo has been hidden pending review.",
+  "box.photo.reportError": "That didn't go through. Please try again.",
+  "box.photo.morePhotos": "Show more photos",
+  "box.photo.none": "No photos yet",
+
   // Most-recent-check-in snapshot on the in-map card (map-first rework,
   // 2026-09-18) — the card shows ONE line, not a list; the full timeline
   // moved to /box/<id>/history.
@@ -1131,6 +1144,17 @@ const es: Record<string, string> = {
   "box.photo.sending": "Enviando…", // [CHECK]
   "box.photo.success": "¡Gracias! Tu foto fue enviada para revisión.", // [CHECK]
   "box.photo.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+
+  "box.photo.heading": "Foto", // [CHECK]
+  "box.photo.caption": "Compartida {time}", // [CHECK]
+  "box.photo.altText": "Foto de {name}, compartida {time}", // [CHECK]
+  "box.photo.report": "Reportar esta foto", // [CHECK]
+  "box.photo.reporting": "Reportando…", // [CHECK]
+  "box.photo.reportConfirm": "¿Ocultar esta foto y enviarla para revisión?", // [CHECK]
+  "box.photo.reportThanks": "Gracias — esta foto se ha ocultado en espera de revisión.", // [CHECK]
+  "box.photo.reportError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "box.photo.morePhotos": "Mostrar más fotos", // [CHECK]
+  "box.photo.none": "Aún no hay fotos", // [CHECK]
 
   "box.recentCheckin.heading": "Visita más reciente", // [CHECK]
   "box.recentCheckin.none": "Aún no hay visitas registradas", // [CHECK]

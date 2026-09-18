@@ -21,13 +21,13 @@
  * below that shared header, so a box card is a native member of the venue
  * card family rather than a second, differently-shaped UI bolted on.
  *
- * Two extension points, deliberately rendering NOTHING today (no
- * placeholder image, no "coming soon" text) until their data exists —
- * marked at the exact spot their JSX will go so a later slice doesn't have
- * to restructure this component to add them:
- *   - a most-recent-PHOTO slot — arrives in slice 5 (box_photos)
- *   - a current-SPONSOR ("Cared for by …") slot — arrives in slice 6
- *     (box_adopters)
+ * Two extension points were marked at ship time, each rendering NOTHING
+ * until its own data existed (no placeholder image, no "coming soon" text):
+ *   - the most-recent-PHOTO slot — BUILT, slice 5 (2026-09-18, box_photos):
+ *     renders box.box.latestPhoto when set, via the public approved-only
+ *     serve route, with a "Report this photo" link (ReportPhotoButton.tsx).
+ *   - a current-SPONSOR ("Cared for by …") slot — still unbuilt, arrives in
+ *     slice 6 (box_adopters); still renders nothing today.
  *
  * No expand/collapse state (fix, 2026-09-18 — Kyle: "When I click show
  * details, nothing shows up," because the old `showExpandedDetails` gate
@@ -54,6 +54,7 @@ import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { formatRelativeTime } from "@/lib/relativeTime";
 import BoxCheckinPanel from "@/components/BoxCheckinPanel";
+import ReportPhotoButton from "@/components/ReportPhotoButton";
 import { STATUS_BADGE_CLASS, type BoxStatus, type CheckinKind, type PublicBlessingBox } from "@/lib/blessingBoxes";
 
 interface BoxCardBodyProps {
@@ -123,9 +124,34 @@ export default function BoxCardBody({ box, onCheckinSuccess, showHistoryLink = t
         </div>
       )}
 
-      {/* Slice 5 extension point: most-recent-photo slot. Renders nothing
-          until box_photos exists — no placeholder image, no "coming soon"
-          text (Kyle, 2026-09-18). */}
+      {/* Slice 5 (2026-09-18): most-recent APPROVED photo. Bytes stream from
+          the public serve route (approved-only, enforced server-side — see
+          that route's own header), never a direct R2 URL. Renders nothing
+          when null (never uploaded, or nothing approved yet) — no
+          placeholder image, no "coming soon" text, unchanged from the
+          extension-point rule this slot replaces. */}
+      {box.box.latestPhoto && (
+        <div>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-1">
+            {t("box.photo.heading", locale)}
+          </h3>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a runtime, R2-backed image via our own serve route, not a build-time/static asset next/image can optimize */}
+          <img
+            src={`/api/public/box-photos/${box.box.latestPhoto.id}`}
+            alt={t("box.photo.altText", locale, {
+              name: box.name,
+              time: formatRelativeTime(box.box.latestPhoto.createdAt, locale),
+            })}
+            className="max-h-48 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-200)] object-cover"
+          />
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <p className="text-xs text-[var(--color-ink-400)]">
+              {t("box.photo.caption", locale, { time: formatRelativeTime(box.box.latestPhoto.createdAt, locale) })}
+            </p>
+            <ReportPhotoButton photoId={box.box.latestPhoto.id} locale={locale} />
+          </div>
+        </div>
+      )}
 
       {/* Slice 6 extension point: current-sponsor ("Cared for by …") slot.
           Renders nothing until box_adopters exists (same rule as above). */}

@@ -3393,9 +3393,17 @@ end-to-end in try/catch — a Resend outage or a missing `alert_subscriptions`
 table degrades to a console warning, never a failed or slowed check-in.
 
 **Public write paths, same guard order convention as every other public
-route in this app** (Content-Type → Turnstile → honeypot → rate limit →
-field validation), reaching D1 directly via `getCloudflareContext()` (never
-`getAdminDb()` — these are public, unauthenticated routes):
+route in this app** (Content-Type → Turnstile → honeypot → per-visitor/
+per-box rate limit → field validation → box lookup → email-flood rate
+limit → write), reaching D1 directly via `getCloudflareContext()` (never
+`getAdminDb()` — these are public, unauthenticated routes). **2026-09-18
+security review, item 5:** the email-flood scopes (`alert-email-target`/
+`alert-email-global`) used to run alongside the per-visitor/per-box caps,
+BEFORE field validation and the box lookup — an invalid submission or an
+unknown box id still drew against the shared email budget even though no
+email was ever going to send. Both scopes now run last, immediately before
+the write/send, so only a request that already found a real box with valid
+fields can ever draw against them:
 
 - **`POST /api/public/blessing-boxes/[id]/adopt`** — the adoption
   application. Two D1-shared-counter rate-limit scopes via
@@ -3403,47 +3411,108 @@ field validation), reaching D1 directly via `getCloudflareContext()` (never
   photos already use, entirely separate budgets so a burst of one path
   never eats another's): `adopt-visitor` (3/visitor/box/hour),
   `adopt-box` (10/box/hour) — plus two shared `alert-email-target`
-  (3/email/hour) and `alert-email-global` (60/hour) scopes reused by both
-  this route and the giver-alert route below, since both ultimately send a
-  confirm email to an arbitrary address and both need the same
-  email-flood ceiling. Reuses `boxTurnstile.ts`'s dedicated invisible box
-  key + managed fallback (the same keypair check-ins/photos use, not a new
-  one).
+  (3/email/hour) and `alert-email-global` (**300**/hour, raised from 60 in
+  the 2026-09-18 review — 60 shared across this route AND the giver-alert
+  route below was tight enough to plausibly false-positive on ordinary
+  sitewide traffic) scopes reused by both this route and the giver-alert
+  route, since both ultimately send a confirm email to an arbitrary
+  address and both need the same email-flood ceiling. Reuses
+  `boxTurnstile.ts`'s dedicated invisible box key + managed fallback (the
+  same keypair check-ins/photos use, not a new one). Email is normalized
+  (trim + lowercase, `rateLimit.ts`'s `normalizeEmail`) ONCE at this
+  route's boundary before validation, the rate-limit key, and storage —
+  `displayName` runs through `src/lib/displayNameHygiene.ts`'s
+  `sanitizeDisplayName` first (rejects a raw CR/LF, strips control/bidi/
+  zero-width characters, refuses an in-name URL — this value is published
+  publicly once approved, unlike email/note).
 - **`POST /api/public/blessing-boxes/[id]/alerts`** — giver alert signup
-  (email only). `alert-visitor` (5/visitor/box/hour) plus the same shared
-  `alert-email-target`/`alert-email-global` scopes above.
+  (email only, also normalized the same way). `alert-visitor`
+  (5/visitor/box/hour) plus the same shared `alert-email-target`/
+  `alert-email-global` scopes above. **2026-09-18 security review, item
+  4:** the confirm-email send is dispatched via `ctx.waitUntil()` (same
+  pattern `boxAlerts.ts`'s `notifyBoxAlerts` uses from the checkins
+  route), never awaited — it used to be awaited inline, which made the
+  "noop" branch (address already confirmed+active, nothing sent) answer
+  faster than every other branch despite an identical response body, a
+  timing side-channel an anonymous caller could use to learn whether an
+  address was already subscribed. The adopt route above deliberately KEEPS
+  its synchronous, fatal send — a single, non-enumerable applicant email,
+  not a repeatable probe surface.
 
 Both routes send a double-opt-in confirm email on success and always
 return the identical generic "check your email" response regardless of
 whether the address is new, already subscribed, or previously
 unsubscribed — never revealing which case occurred (anti-enumeration,
-same posture the stop/resubscribe routes take below).
+same posture the stop/resubscribe routes take below). **2026-09-18
+security review, item 9:** every D1 read/write these routes and
+`POST /api/public/alerts/confirm` make is now guarded — an unhandled
+exception (a transient D1 outage, or "no such table" if migration 0010
+hasn't landed on an environment yet) returns a clean `502 db_unavailable`
+rather than an unhandled 500. `upsertGiverSubscription` (`boxAlerts.ts`)
+is also race-safe: two concurrent signups for the same venue+email can
+both pass the "no existing row" SELECT before either INSERTs — the
+UNIQUE(role, venue_id, email) index rejects the loser, which is now caught
+and re-read rather than surfaced as a failure.
 
-**Confirm/stop/resubscribe — one deliberate GET/POST asymmetry.**
-`GET /alerts/confirm?t=<token>` renders a page requiring a button click
-that POSTs to `POST /api/public/alerts/confirm` — **a bare GET must never
-mutate here**, because a mail client's link-prefetch scanner would
-silently auto-confirm every sent email before a human ever saw it.
-`GET /alerts/stop?t=<token>` is the opposite by design: it **mutates on
-its own GET**, because the safe failure direction for a prefetched
-unsubscribe link is an unwanted unsubscribe, not a wrongly-confirmed
-signup — see `stopSubscriptionByToken`'s own header in `src/lib/boxAlerts.ts`
-for the full reasoning. `POST /api/public/alerts/resubscribe` (the stop
-page's "undo" button) reactivates the same token.
+**Confirm/stop — one deliberate GET/POST asymmetry, NOT the symmetric
+mutate-on-GET the two used to share.** `GET /alerts/confirm?t=<token>`
+renders a page requiring a button click that POSTs to
+`POST /api/public/alerts/confirm` — **a bare GET must never mutate here**,
+because a mail client's link-prefetch scanner would silently auto-confirm
+every sent email before a human ever saw it.
 
-**Rate-limit response folding — the JSON API and the page disagree on
-purpose.** `stopSubscriptionByToken`/`resubscribeByToken` document that a
-rate-limited token lookup must fold into the SAME neutral "not found"
-outcome as a genuinely unknown token, so a brute-force attempt against the
-token space learns nothing either way. `/api/public/alerts/stop` and
-`/api/public/alerts/resubscribe` (the JSON routes, used by both the
-one-click mail-client path and the page's own fetch calls) follow this
-exactly — both `"not_found"` and `"rate_limited"` return the identical
-`200 {ok:false, error:"invalid_token"}`. The **`/alerts/stop` Server
-Component page**, which calls `stopSubscriptionByToken` directly rather
-than through the JSON API, shows a distinct "rate limited" message instead
-— a legitimate visitor landing on that URL isn't the enumeration threat
-model the API's neutral response protects against.
+`GET /alerts/stop?t=<token>` **used to be the deliberate opposite** — it
+mutated on its own GET, reasoned as "the safe failure direction for a
+prefetched unsubscribe link is an unwanted unsubscribe." **2026-09-18
+security review, item 6: that reasoning didn't survive contact with what a
+GET actually is.** A mail scanner's prefetch is *also* a bare GET, and a
+GET-mutates page can't distinguish "a human clicked this" from "a scanner
+fetched this HTML" — the scanner case would silently unsubscribe someone
+who never asked to be. Fixed the same way `/alerts/confirm` already
+worked: `src/app/alerts/stop/page.tsx` (a Server Component) never mutates
+and never touches D1 at all now; `AlertsStopContent.tsx` (a Client
+Component) auto-POSTs to `POST /api/public/alerts/stop` **once, on
+mount** — real JS in a real browser fires it immediately (so a human still
+gets a true one-click stop, no button to press), while a prefetch/scanner
+that only fetches static HTML never executes any JS and triggers nothing.
+A `<noscript>` fallback (a plain HTML form whose `action` already carries
+the token in the query string — the same shape the API route accepts for
+RFC 8058 one-click unsubscribes, below) covers a human with JS disabled;
+a passive HTML-fetching scanner can't submit a form. `startedRef` (a local
+ref, not part of any returned/shared state object) guards the auto-POST
+against firing twice under React StrictMode's dev-mode double effect
+invoke. `POST /api/public/alerts/resubscribe` (the stop page's "undo"
+button) still reactivates the same token, unchanged.
+
+Because the page no longer talks to `boxAlerts.ts` directly, the OLD "the
+JSON API and the page disagree on rate-limit-folding purpose" split is
+gone too — both now go through the same `POST /api/public/alerts/stop`
+route, so `"not_found"` and `"rate_limited"` always fold into the same
+neutral `200 {ok:false, error:"invalid_token"}` everywhere, with no
+separate page-level "rate limited" message left to show (the
+`alerts.stop.rateLimited` i18n key was removed with it).
+
+**`POST /api/public/alerts/stop` accepts the token from the query string
+FIRST, then a JSON or form body, and any Content-Type (2026-09-18
+security review, item 1, BLOCKER).** It used to 400 on anything but
+`application/json`, which broke the real RFC 8058 one-click unsubscribe a
+mail client sends: `Content-Type: application/x-www-form-urlencoded`,
+body `List-Unsubscribe=One-Click`, token ONLY in the URL query string
+(`?t=<token>`) — a request shape this route had never actually been able
+to serve. A caller sending `Accept: text/html` (the `<noscript>` form's
+top-level browser navigation) gets a tiny static HTML page back instead of
+JSON, since that request has no JS to read a JSON body with.
+
+**2026-09-18 security review, item 2, BLOCKER: removing a host, or
+rejecting/removing a previously-approved adopter, now ALSO rotates
+`unsubscribe_token`** in the SAME statement that sets `unsubscribed_at`
+(`removeHostSubscriptionStatement`/`unsubscribeAdopterSubscriptionStatement`,
+`src/lib/boxAlerts.ts`). It didn't before — the old token stayed live, and
+since that exact value goes out in every alert email the row ever
+received, anyone still holding a copy of one could resubscribe a
+removed/rejected recipient right back via the stop page's own "undo"
+button. Rotating in the same statement makes the old link permanently dead
+the instant the removal runs.
 
 **Admin review — two new surfaces, same auth pair as every other admin
 mutation (`getAdminDb()` then `requireAdminOrigin()`):**
@@ -3457,11 +3526,20 @@ mutation (`getAdminDb()` then `requireAdminOrigin()`):**
   an approved adopter starts receiving empty/problem alerts immediately,
   without a second signup.
 - **Host alert recipients** — `HostAlertsAdminPanel.tsx`, on a box's own
-  edit page, plus `POST /api/admin/blessing-boxes/[id]/host-alerts`.
+  edit page, plus `POST`/`DELETE /api/admin/blessing-boxes/[id]/host-alerts`.
   **Host rows are admin-vouched, not self-signed-up and not double-opt-in**
   — an admin adds a host's email directly (this is the one recipient role
   with no public signup path and no confirm-email step), since the host is
   already a known, trusted party the admin is coordinating with directly.
+  **2026-09-18 security review, item 8:** both POST and DELETE now batch
+  their write with an `audit_log` INSERT in the SAME `db.batch()`
+  (`entity='box_host_alert'`, same convention the box-adopters
+  approve/reject routes already use) — this route previously wrote with no
+  audit trail at all, the only admin mutation in this slice that didn't.
+  `findHostSubscription`/`insertHostSubscriptionStatement`/
+  `removeHostSubscriptionStatement` (`boxAlerts.ts`) replace the old
+  `addHostSubscription`/`removeHostSubscription`, which ran their own
+  write directly and so couldn't be batched with a second statement.
 
 **Card UI (`BoxCardBody.tsx`).** The "Cared for by …" line renders when
 `box.box.adopters` (every approved adopter's `display_name`, already public

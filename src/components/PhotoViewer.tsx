@@ -22,6 +22,26 @@
  * `WalkRouteStatus` already uses for a shared display component: the caller
  * always has a locale in scope, so threading it in avoids this component
  * needing its own `useLocale()` import.
+ *
+ * Escape closing ONLY this dialog (fix pass, 2026-09-19, review blocker):
+ * nothing in THIS file handles Escape — that's still correct and
+ * deliberate, the native dialog closes itself. The bug it looked like at
+ * first was the opposite direction: BottomSheet.tsx (vaul/Radix) and
+ * DesktopVenueWindow.tsx each own a document-level Escape-to-dismiss-the-
+ * whole-card listener that fired IN ADDITION to this dialog's own close,
+ * so opening a photo and pressing Escape closed the card underneath it
+ * too. Fixed in those two files (see `dialogGuard.ts`'s own header for the
+ * full trace through vaul/Radix's source and why the fix has to live
+ * there, not here).
+ *
+ * Focus restore on close (same fix pass, review item 2): explicit, not
+ * relied-on-native — `document.activeElement` at the moment `open` flips
+ * true is stored and refocused on close. A real browser's `showModal()`/
+ * `close()` already does this automatically, but this repo's jsdom test
+ * environment has no native `<dialog>` implementation at all (see
+ * vitest.setup.ts's polyfill note) and the polyfill doesn't model focus
+ * management — so relying on "native behavior" here would be untested by
+ * construction, not just untested in this repo's suite.
  */
 
 import { useEffect, useRef } from "react";
@@ -41,6 +61,31 @@ export interface PhotoViewerProps {
 
 export default function PhotoViewer({ src, alt, caption, open, onClose, locale }: PhotoViewerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // Whatever had focus right before this opened (the card's "View photo
+  // full size" button, in practice) — captured explicitly rather than
+  // relied on native restore-focus behavior; see this file's own header.
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  // "Latest ref" for onClose — read inside the close listener below instead
+  // of putting `onClose` in that effect's own dependency array. Found via
+  // this fix pass's own focus-restore test (nested harness re-rendering
+  // PhotoViewer with a fresh inline `onClose` each time, exactly like
+  // BoxCardBody does in production): React runs ALL changed effects'
+  // CLEANUPS before ANY of their bodies, in declaration order. On the
+  // render where `open` flips false, `onClose`'s identity ALSO changes (a
+  // new inline arrow every render) — so the old `close` listener was torn
+  // down, then this effect's own `dialog.close()` fired the native `close`
+  // event, and only THEN did the new listener get attached — one commit
+  // too late, silently dropping the event this component depends on for
+  // both state sync and focus restore. The ref is updated from an effect
+  // (not during render — the repo's `react-hooks/refs` lint rule forbids
+  // that, and it's also just wrong: refs aren't render inputs) so it is
+  // always current by the time the native `close` event can fire; the
+  // listener itself is attached exactly once, on mount, and never
+  // re-subscribes on `onClose` identity churn.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   // Drive the dialog's open/closed state imperatively — <dialog> has no
   // declarative `open`-via-attribute path that also gets the modal
@@ -48,20 +93,30 @@ export default function PhotoViewer({ src, alt, caption, open, onClose, locale }
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    else if (!open && dialog.open) dialog.close();
+    if (open && !dialog.open) {
+      previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      dialog.showModal();
+    } else if (!open && dialog.open) {
+      dialog.close();
+    }
   }, [open]);
 
   // The dialog's native `close` event fires however it closed — our own
   // close button, the overlay tap, Escape, or the back gesture — so this is
-  // the single place that syncs the parent's `open` state back to false,
-  // rather than duplicating that call at every close path above.
+  // the single place that syncs the parent's `open` state back to false
+  // AND restores focus, rather than duplicating both at every close path
+  // above. Mount-once (`dialogRef.current` is stable across this
+  // component's lifetime) — see the onCloseRef comment above for why.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    dialog.addEventListener("close", onClose);
-    return () => dialog.removeEventListener("close", onClose);
-  }, [onClose]);
+    function handleClose() {
+      onCloseRef.current();
+      previouslyFocusedRef.current?.focus();
+    }
+    dialog.addEventListener("close", handleClose);
+    return () => dialog.removeEventListener("close", handleClose);
+  }, []);
 
   return (
     <dialog

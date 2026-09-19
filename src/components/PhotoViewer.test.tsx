@@ -7,8 +7,9 @@
  * close it.
  */
 
+import { useState } from "react";
 import { describe, test, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import PhotoViewer from "@/components/PhotoViewer";
 
@@ -66,16 +67,43 @@ describe("PhotoViewer", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  test("Escape/cancel closes it (native <dialog> cancel event)", () => {
+  test("Escape closes it (jsdom's Escape-closes-<dialog> polyfill, see vitest.setup.ts)", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(<PhotoViewer {...PROPS} open={true} onClose={onClose} />);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  test("close() firing the native `close` event still calls onClose (e.g. programmatic close)", () => {
     const onClose = vi.fn();
     render(<PhotoViewer {...PROPS} open={true} onClose={onClose} />);
     const dialog = screen.getByRole("dialog") as HTMLDialogElement;
-    // jsdom doesn't synthesize a real Escape-triggers-cancel keyboard path
-    // for showModal() dialogs, so this fires the same `close` event the
-    // component listens on — proving OUR event wiring, which is the part
-    // under test; the browser's native Escape->cancel->close chain itself
-    // is platform behavior, not this component's code.
     fireEvent(dialog, new Event("close"));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // Review fix pass item 2: focus explicitly returns to whatever opened the
+  // viewer — not relied on native restore-focus (this file's own header).
+  test("focus returns to the element that had focus when it opened", async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            trigger
+          </button>
+          <PhotoViewer {...PROPS} open={open} onClose={() => setOpen(false)} />
+        </>
+      );
+    }
+    render(<Harness />);
+    const trigger = screen.getByRole("button", { name: "trigger" });
+    await user.click(trigger);
+    expect(screen.getByRole("dialog").querySelector("img")).not.toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(document.activeElement).toBe(trigger);
   });
 });

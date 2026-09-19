@@ -69,6 +69,7 @@ import VenuePopupHeader from "@/components/VenuePopupHeader";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import HoursList from "@/components/HoursList";
 import BoxCardBody from "@/components/BoxCardBody";
+import { isNativeDialogOpen } from "@/lib/dialogGuard";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -268,6 +269,13 @@ export default function DesktopVenueWindow({
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
+      // #508 fix pass: Escape while a box's PhotoViewer is open must close
+      // ONLY the photo, not this whole window — see dialogGuard.ts's own
+      // header. This handler is a plain bubble-phase document listener
+      // (registered below, no `{capture: true}`), so unlike the vaul/Radix
+      // case (see BottomSheet.tsx's own comment) checking the guard
+      // directly here is enough; there is no ordering race to work around.
+      if (isNativeDialogOpen()) return;
       // A box's check-in panel (BoxCardBody -> BoxCheckinPanel) has a note
       // textarea living inside this window. Without this guard, Escape while
       // typing a note both loses focus AND closes the whole card — the

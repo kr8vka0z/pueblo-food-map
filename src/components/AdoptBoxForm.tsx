@@ -139,6 +139,10 @@ export default function AdoptBoxForm({ boxId }: AdoptBoxFormProps) {
     } else {
       setState("submitting");
       setPending(values);
+      // No token in hand (expired after ~5 minutes on the page, or the widget
+      // died) — ask for a fresh one NOW rather than hoping one turns up; the
+      // token-arrival effect above sends the queued values when it lands.
+      turnstile.reset();
     }
   }
 

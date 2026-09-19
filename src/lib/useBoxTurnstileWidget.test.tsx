@@ -84,7 +84,10 @@ describe("useBoxTurnstileWidget", () => {
 
   test("reset() clears the token and calls window.turnstile.reset on the current widget", () => {
     const resetMock = vi.fn();
-    const renderMock = vi.fn((_el: HTMLElement, opts: { callback?: (t: string) => void }) => {
+    const renderMock = vi.fn((el: HTMLElement, opts: { callback?: (t: string) => void }) => {
+      // The real widget puts its iframe inside the container — reset() reads
+      // that as "the widget is still alive".
+      el.appendChild(document.createElement("iframe"));
       opts.callback?.("real-token");
       return "widget-1";
     });
@@ -97,5 +100,29 @@ describe("useBoxTurnstileWidget", () => {
 
     expect(resetMock).toHaveBeenCalledWith("widget-1");
     expect(screen.getByTestId("token").textContent).toBe("none");
+  });
+
+  // Regression — Kyle's phone, 2026-09-19: a widget whose iframe had left the
+  // container never called back again, so a queued submit waited forever.
+  test("reset() REBUILDS the widget when the container is empty or reset throws", () => {
+    const removeMock = vi.fn();
+    const renderMock = vi
+      .fn()
+      .mockImplementationOnce(() => "widget-dead") // renders nothing into the container
+      .mockImplementationOnce((el: HTMLElement, opts: { callback?: (t: string) => void }) => {
+        el.appendChild(document.createElement("iframe"));
+        opts.callback?.("fresh-token");
+        return "widget-fresh";
+      });
+    vi.stubGlobal("turnstile", { render: renderMock, reset: vi.fn(), remove: removeMock });
+
+    render(<Harness />);
+    expect(screen.getByTestId("token").textContent).toBe("none");
+
+    fireEvent.click(screen.getByRole("button", { name: "reset" }));
+
+    expect(removeMock).toHaveBeenCalledWith("widget-dead");
+    expect(renderMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("token").textContent).toBe("fresh-token");
   });
 });

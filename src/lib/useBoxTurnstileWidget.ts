@@ -125,14 +125,42 @@ export function useBoxTurnstileWidget(containerRef: RefObject<HTMLDivElement | n
   // though the server had saved the application (Kyle's phone, 2026-09-19).
   // A reset that fails must never break the caller; drop the dead widget id
   // and mount a fresh one if the container is still around.
+  //
+  // WHY it also RE-RENDERS when the container is empty: a widget whose iframe
+  // is no longer inside our container can sit there "valid" and never call
+  // back again — reset() on it neither throws nor produces a token, so a
+  // queued submit waits forever (Kyle's phone again, same night: the alert
+  // sign-up sat on "Sending…" and no request ever reached the server). An
+  // empty container is the reliable sign; rebuild in whichever mode we're in.
   function reset() {
     setToken(null);
-    if (!window.turnstile || !widgetId.current) return;
-    try {
-      window.turnstile.reset(widgetId.current);
-    } catch {
+    if (!window.turnstile) return;
+    const container = containerRef.current;
+    const widgetAlive = widgetId.current !== null && container !== null && container.childElementCount > 0;
+    if (widgetAlive) {
+      try {
+        window.turnstile.reset(widgetId.current as string);
+        return;
+      } catch {
+        // fall through to a rebuild
+      }
+    }
+    if (widgetId.current) {
+      try {
+        window.turnstile.remove(widgetId.current);
+      } catch {
+        // already gone — nothing to remove
+      }
       widgetId.current = null;
-      if (modeRef.current === "box") mount();
+    }
+    if (!container) return;
+    if (modeRef.current === "box") {
+      mount();
+    } else {
+      // Re-enter the fallback render path: it only short-circuits when the
+      // mode is ALREADY fallback, so step back to "box" for the one call.
+      modeRef.current = "box";
+      switchToFallback();
     }
   }
 

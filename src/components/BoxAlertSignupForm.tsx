@@ -113,6 +113,8 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
     } else {
       setState("submitting");
       setPendingEmail(value);
+      // Ask for a fresh token now — see AdoptBoxForm.tsx's handleSubmit.
+      turnstile.reset();
     }
   }
 

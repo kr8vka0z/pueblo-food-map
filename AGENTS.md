@@ -3713,6 +3713,113 @@ moment.
 
 ---
 
+# Blessing Boxes — numbers (slice 7)
+
+Full design: `atlas-kb/projects/Pueblo Food Map/Blessing Boxes Build Plan.md`,
+"Slice 7 — Numbers." **No migration, no new table, no new dependency, no
+new secret** — every number is computed from `box_checkins`/`box_events`/
+`box_photos`/`venues`, tables slices 1-5 already created.
+
+**`src/lib/boxStats.ts`** is the one place every number this slice shows is
+computed — pure functions over plain arrays (never a D1Database), same
+"testable against fixtures" split `blessingBoxes.ts`/`boxActivity.ts` already
+use. It also carries the ONE new D1 read this slice adds:
+`loadNetworkStatsData()`, three queries (every blessing-box venue + its
+archived flag, every non-`problem` check-in, every approved photo) — see the
+next paragraph for why this query is DELIBERATELY broader than every
+existing box query in this file.
+
+**Every existing live-box/activity query filters `v.status != 'archived'`
+(SELECT_LIVE_BOXES_SQL, boxActivity.ts's VENUE_JOIN) — `loadNetworkStatsData()`
+does NOT.** Network-wide totals must keep counting an archived box's history
+forever (task's own rule); only the "boxes that need love" ranking drops
+archived boxes, and it does that in application code
+(`rankLongestSinceLastFill`/`rankMostEmptyReports`/`rankSlowestRefill`, all
+three filter `!b.archived`), not in SQL. Dev-only practice boxes
+(`fake-blessing-box-practice-*`) get no special-case treatment anywhere in
+this slice — they're ordinary `blessing_box` venues and follow whatever the
+live layer already does with them (Kyle's own instruction for this slice).
+
+**Public counts (fills/uses/empty reports/low reports/total check-ins) are
+scoped to the picked period (7d/30d/90d/all); pair averages and the
+"needs love"/milestone numbers are ALWAYS all-time, regardless of the
+period picker.** A short window rarely contains two of the right kind of
+check-in to pair up, so period-scoping the averages would mostly render
+"—" — see `boxStats.ts`'s own header for the full reasoning. `total
+check-ins` never includes a `problem` report (admin-only from the moment
+it's written, migrations/0007's own rule) — "uses" is the `took` check-in
+kind, and the shared honesty note (`box.stats.honestyNote`) says outright
+that these are check-ins, not visits, so "uses" reads low on purpose.
+
+**Pair-average definition — exactly what's paired, not a general "gap
+between two events":** for every check-in of kind A, `collectPairDeltasMs`
+finds the FIRST later check-in of kind B (chronologically; other kinds in
+between don't matter) and records the gap. Three pairs are shown: empty ->
+next fill, fill -> next fill, fill -> next empty. A check-in with no later
+match of the paired kind contributes NOTHING (never a 0) — a box with one
+`empty` and no later `filled` shows "—", not an instant refill. The
+network average pools EVERY pair across every box and takes ONE mean —
+explicitly NOT the mean of each box's own mean, so a box with many short
+cycles correctly outweighs a box with one long one, the same way a plain
+average of every individual observation would (`computeNetworkPairAverages`'s
+own header spells out the arithmetic with a worked example).
+
+**Exclusions, applied consistently everywhere a count/average is computed:**
+a hidden check-in (`box_checkins.visibility = 'hidden'`) never counts, and
+neither does a `kind = 'problem'` report — the same two guarantees this
+whole feature already enforces at every other public read site, applied a
+second time here (belt-and-suspenders, matching `computeBoxStatus`'s own
+posture). Archived boxes (`venues.status = 'archived'`) are excluded from
+the "needs love" ranking only, never from network totals — see above.
+
+**Per-box Numbers section (`/box/<id>/history`) reuses existing D1 reads,
+adding NONE of its own:** `page.tsx` calls the already-exported
+`loadVisibleCheckins()` (blessingBoxes.ts) and `loadApprovedPhotosForVenue()`
+(boxPhotos.ts, with `boxStats.ts`'s `ALL_TIME_PHOTO_LIMIT` in place of that
+function's own 24-photo gallery cap) and passes the full arrays to
+`BoxHistoryContent` as props. The period picker then recomputes counts
+client-side with zero extra fetch.
+
+**Network-wide Numbers section (`/boxes/activity`) is a client fetch, not a
+server read** — that page is a deliberately static server shell (English
+`metadata`, no D1 read — see its own header), so this slice extends the
+existing public blessing-box API pattern instead: `GET
+/api/public/blessing-boxes/network-stats` (new route, same
+`respondWithEdgeCache()` 60s-at-the-edge helper every other public
+blessing-box GET already uses) ships the RAW data (every box's archived
+flag, every check-in, every approved-photo timestamp) rather than
+pre-aggregated numbers, and `useBoxNetworkStats.ts` fetches it once;
+`boxStats.ts`'s pure functions do the actual counting/averaging in the
+browser on every period change, so the exact logic `boxStats.test.ts`
+already proves against fixtures is what runs in production.
+
+**UI:** `BoxNumbersPanel.tsx` (shared by both sections — period `<select>`,
+two `<dl>`s of labelled rows for counts and averages, the honesty note) —
+labelled rows, not number tiles, matching this repo's general accessibility
+instinct for data lists. `BoxNeedLoveList.tsx` (network only) renders the
+three "needs love" rankings as three separate `<ol>`s rather than one
+blended score (`ponytail:` comment on the component's own header — the task
+named three distinct criteria, not a weighting to invent). `BoxMilestones.tsx`
+(network only) renders 0-2 lines from `computeMilestones()` — the single
+highest threshold each of `fills`/`uses` has reached, or nothing at all when
+neither has reached its first threshold.
+
+**i18n:** all `box.stats.*` keys carry both EN and ES strings
+(`src/lib/i18n.ts`), Spanish marked `// [CHECK]` per this repo's established
+unreviewed-translation convention; `box.stats.noData` (a bare "—") is
+the one key deliberately allowed to be identical in both locales
+(`src/__tests__/i18n.test.ts`'s `IDENTICAL_ALLOWLIST`).
+
+**Blessing boxes — promotion checklist, slice 7 addendum: NOTHING NEW
+REQUIRED.** No migration to run (still the seven from the slice 6 checklist
+above), no new runtime secret, no new R2 binding, no new Turnstile key — this
+slice only reads tables that already exist in production once slices 1-6's
+own checklists have been followed. The one thing to verify post-promotion:
+`GET /api/public/blessing-boxes/network-stats` returns real data (not the
+empty-array degrade) once production D1 has real check-in history.
+
+---
+
 # Design system — DESIGN.md
 
 [DESIGN.md](DESIGN.md) is the agent-facing visual-identity reference. Read it before

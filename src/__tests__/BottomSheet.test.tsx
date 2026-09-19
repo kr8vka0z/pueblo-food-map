@@ -256,14 +256,20 @@ describe("BottomSheet — blessing box card (map-first rework)", () => {
     expect(screen.queryByTestId("box-status-badge")).toBeNull();
   });
 
-  test("shows a prominent History link near the top, not after the check-in panel (Kyle, 2026-09-18: 'not buried at the bottom')", () => {
+  // Card redesign (2026-09-19), spec item 7: "Bottom, after a hairline
+  // rule: ONLY two links — 'History' and 'Email me when it needs
+  // filling'." Supersedes the 2026-09-18b "near the top" placement this
+  // test used to assert — the History link now lives in the card's
+  // footer, after the check-in panel, alongside the alert-signup link.
+  test("shows the History link in the footer, after the check-in panel, alongside 'Email me when it needs filling'", () => {
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
     const link = screen.getByRole("link", { name: "History" });
     expect(link.getAttribute("href")).toBe("/box/test-box-1/history");
     // "I used this box" is BoxCheckinPanel's first button — the History
-    // link must come before it in DOM order, not after the whole panel.
+    // link must come AFTER it in DOM order now (footer, not near the top).
     const takeButton = screen.getByRole("button", { name: "I used this box" });
-    expect(link.compareDocumentPosition(takeButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(link.compareDocumentPosition(takeButton) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Email me when it needs filling" })).toBeDefined();
   });
 
   test("share button calls shareVenue with isBox: true for a box venue", async () => {

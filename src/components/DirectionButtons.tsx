@@ -96,7 +96,11 @@ interface DirectionButtonsProps {
 
 // ─── Google Maps deeplink builder ────────────────────────────────────────────
 
-function googleMapsUrl(
+// Exported (2026-09-19, Blessing Box card redesign) so BoxCardBody's plain
+// address-as-directions-link can build the identical "driving" deeplink this
+// component's own Drive button already uses — one URL builder, not a second
+// copy of the query-string logic.
+export function googleMapsUrl(
   lat: number,
   lng: number,
   travelmode: "transit" | "driving" | "walking",

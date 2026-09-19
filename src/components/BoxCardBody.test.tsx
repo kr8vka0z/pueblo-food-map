@@ -1,23 +1,28 @@
 /**
- * BoxCardBody tests (Blessing Boxes map-first rework, 2026-09-18; card-polish
- * follow-up same day). Covers the scope-addition requirement: the card
- * renders ONLY the single most recent check-in, never a list — plus the
- * History link's href/visibility and the conditional host/most-needed
- * sections. Reuses BoxCheckinPanel.test.tsx's own Turnstile-stub convention
- * since BoxCardBody renders that panel directly (not mocked).
+ * BoxCardBody tests (card redesign, 2026-09-19 — see this component's own
+ * header, and AGENTS.md's "Blessing Boxes — card redesign" section, for the
+ * full as-built record). Covers: the status pill's "· filled {time}"/"·
+ * Not marked filled yet" detail segment, the always-present sponsor band in
+ * all three adopter-count states, the address-as-directions-link (and the
+ * explicit absence of any DirectionButtons/Walk-Bus-Drive row on a box),
+ * the removal of the public host NAME + "Host" heading (the note alone
+ * survives), the History link/footer, the photo slot's full-bleed layout
+ * with its overlaid caption chip, and the no-photo fallback (inline pill,
+ * no <img>). Reuses BoxCheckinPanel.test.tsx's own Turnstile-stub
+ * convention since BoxCardBody renders that panel directly (not mocked).
  *
- * Card-polish follow-up (Kyle: "When I click show details, nothing shows
- * up"): `showExpandedDetails` is GONE — the host section and the History
- * link no longer gate on an expanded state that doesn't exist for a box
- * anymore (BoxCardBody's own header). `showHistoryLink` replaces it, but
- * only to suppress the link where a caller renders an equivalent one
- * elsewhere (DesktopVenueWindow's header, the history page itself).
+ * The old "most recent check-in" describe block is GONE — the redesign
+ * removed that block from the card entirely (spec item 5: "Remove the
+ * 'Most recent check-in' block from the card"); box.box.recentCheckins is
+ * no longer read by this component at all.
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import BoxCardBody from "@/components/BoxCardBody";
+import { googleMapsUrl } from "@/components/DirectionButtons";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 
 const mockTurnstile = {
@@ -72,42 +77,16 @@ function renderCard(box: Partial<PublicBlessingBox["box"]> = {}, showHistoryLink
   );
 }
 
-describe("BoxCardBody — most recent check-in only, never a list", () => {
-  test("renders the single most recent check-in as one line", () => {
-    renderCard({
-      recentCheckins: [
-        { kind: "filled", createdAt: "2026-09-17T09:00:00.000Z" },
-        { kind: "took", createdAt: "2026-09-16T09:00:00.000Z" },
-        { kind: "low", createdAt: "2026-09-15T09:00:00.000Z" },
-      ],
-    });
-    const line = screen.getByTestId("box-recent-checkin");
-    expect(line.textContent).toContain("Filled");
-    // Not a list: only ONE check-in line rendered, the older two never appear
-    // (scoped to the line itself — "Running low"/"Used the box" are ALSO
-    // BoxCheckinPanel's own button labels, which legitimately render below).
-    expect(screen.queryAllByTestId("box-recent-checkin")).toHaveLength(1);
-    expect(line.textContent).not.toContain("Used the box");
-    expect(line.textContent).not.toContain("Running low");
-  });
-
-  test("shows an empty-state line when there are no check-ins yet", () => {
-    renderCard({ recentCheckins: [] });
-    expect(screen.queryByTestId("box-recent-checkin")).toBeNull();
-    expect(screen.getByText("No check-ins yet")).toBeDefined();
-  });
-});
-
-describe("BoxCardBody — status badge", () => {
+describe("BoxCardBody — status pill", () => {
   test("renders the box's current status", () => {
     renderCard({ status: "empty" });
     const badge = screen.getByTestId("box-status-badge");
     expect(badge.textContent).toContain("Empty");
   });
 
-  test("renders 'not marked filled yet' when lastFilledAt is null", () => {
+  test("shows 'Not marked filled yet' as the pill's detail segment when lastFilledAt is null", () => {
     renderCard({ lastFilledAt: null });
-    expect(screen.getByText("Not marked filled yet")).toBeDefined();
+    expect(screen.getByText(/not marked filled yet/i)).toBeDefined();
   });
 });
 
@@ -129,17 +108,22 @@ describe("BoxCardBody — conditional sections", () => {
     expect(screen.getByText("Canned goods")).toBeDefined();
   });
 
-  test("host section only renders when hostName or hostNote is set — no expanded state to gate it (fix, 2026-09-18: Kyle's 'nothing shows up' report)", () => {
+  // Redesign spec item 4: "Remove the public host NAME and the 'Host'
+  // heading entirely." Only the host's own note (when set) survives, as a
+  // plain quiet line with no heading above it.
+  test("never renders the host name, even when set — only the host note (no heading)", () => {
     const noHost = renderCard({ hostName: null, hostNote: null });
     expect(screen.queryByText("Host")).toBeNull();
     noHost.unmount();
 
-    renderCard({ hostName: "Jane Doe", hostNote: null });
-    expect(screen.getByText("Jane Doe")).toBeDefined();
+    renderCard({ hostName: "Jane Doe", hostNote: "Ring the bell" });
+    expect(screen.queryByText("Jane Doe")).toBeNull();
+    expect(screen.queryByText("Host")).toBeNull();
+    expect(screen.getByText("Ring the bell")).toBeDefined();
   });
 });
 
-describe("BoxCardBody — History link", () => {
+describe("BoxCardBody — History link (footer)", () => {
   test("links to /box/<id>/history by default", () => {
     renderCard({});
     const link = screen.getByRole("link", { name: "History" });
@@ -152,37 +136,71 @@ describe("BoxCardBody — History link", () => {
   });
 });
 
-describe("BoxCardBody — extension points render nothing today", () => {
-  test("no photo or sponsor placeholder content appears when latestPhoto is null", () => {
+describe("BoxCardBody — address is the directions link, no orange button", () => {
+  test("the address text itself opens driving directions — same URL DirectionButtons' Drive button builds", () => {
     renderCard();
-    expect(screen.queryByText(/coming soon/i)).toBeNull();
-    expect(screen.queryByAltText(/photo/i)).toBeNull();
-    expect(screen.queryByText(/cared for by/i)).toBeNull();
+    // aria-label ("Drive directions to <name>…") is the accessible name here,
+    // not the visible address text — assert on the visible text plus the href.
+    const addressText = screen.getByText("123 Test St, Pueblo, CO");
+    expect(addressText.tagName).toBe("A");
+    expect(addressText.getAttribute("href")).toBe(googleMapsUrl(BASE_BOX.lat, BASE_BOX.lng, "driving"));
+    expect(addressText.getAttribute("target")).toBe("_blank");
+  });
+
+  test("no Walk/Bus/Drive DirectionButtons row renders on a box card", () => {
+    renderCard();
+    expect(screen.queryByRole("button", { name: "Walk" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Bus" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Drive" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Drive" })).toBeNull();
   });
 });
 
-describe("BoxCardBody — cared-for-by sponsor slot (slice 6)", () => {
-  test("renders nothing when there are no approved adopters", () => {
+describe("BoxCardBody — sponsor band (always present, 3 adopter-count states)", () => {
+  test("shows 'needs a sponsor' + adopt link when there are no approved adopters", () => {
     renderCard({ adopters: [] });
-    expect(screen.queryByText(/cared for by/i)).toBeNull();
+    expect(screen.getByText("This box needs a sponsor.")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Apply to adopt this box" })).toBeDefined();
   });
 
-  test("renders the joined display names when adopters is non-empty", () => {
+  test("shows the single sponsor's name", () => {
+    renderCard({ adopters: ["The Martinez Family"] });
+    expect(screen.getByText(/sponsored by/i)).toBeDefined();
+    expect(screen.getByText("The Martinez Family")).toBeDefined();
+  });
+
+  test("shows 'A and B' for exactly two sponsors", () => {
     renderCard({ adopters: ["The Martinez Family", "Jane Doe"] });
-    expect(screen.getByText("Cared for by The Martinez Family, Jane Doe")).toBeDefined();
+    const band = screen.getByText(/sponsored by/i).closest("p");
+    expect(band?.textContent).toBe("Sponsored by The Martinez Family and Jane Doe");
+  });
+
+  test("shows 'A, B +N more' for three or more sponsors", () => {
+    renderCard({ adopters: ["The Martinez Family", "Jane Doe", "Sam Lee", "Eastside Youth Group"] });
+    const band = screen.getByText(/sponsored by/i).closest("p");
+    expect(band?.textContent).toBe("Sponsored by The Martinez Family, Jane Doe +2 more");
+  });
+
+  test("the adopt link expands AdoptBoxForm in place", async () => {
+    const user = userEvent.setup();
+    renderCard();
+    const trigger = screen.getByRole("button", { name: "Apply to adopt this box" });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    await user.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("textbox", { name: /your name/i })).toBeDefined();
   });
 });
 
-describe("BoxCardBody — adopt/alert inline-expand forms (slice 6)", () => {
-  test("renders both forms collapsed to a plain link", () => {
+describe("BoxCardBody — email-me-when-it-needs-filling (footer)", () => {
+  test("renders collapsed to a plain link", () => {
     renderCard();
-    expect(screen.getByRole("button", { name: "Apply to adopt this box" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Email me when it needs filling" })).toBeDefined();
   });
 });
 
-describe("BoxCardBody — most-recent photo slot (slice 5)", () => {
-  test("renders the approved photo, its caption, and a Report link when latestPhoto is set", () => {
+describe("BoxCardBody — photo slot (slice 5) and no-photo fallback", () => {
+  test("renders the approved photo full-bleed with an overlaid status pill and caption chip", () => {
     renderCard({
       latestPhoto: { id: 42, createdAt: "2026-09-17T09:00:00.000Z" },
     });
@@ -190,10 +208,19 @@ describe("BoxCardBody — most-recent photo slot (slice 5)", () => {
     const img = screen.getByRole("img", { name: /photo of test blessing box/i });
     expect(img.getAttribute("src")).toBe("/api/public/box-photos/42");
 
-    // Caption — "Shared <relative time>"
-    expect(screen.getByText(/shared/i)).toBeDefined();
+    // Caption chip — "Photo · <relative time>"
+    expect(screen.getByText(/photo ·/i)).toBeDefined();
 
-    // Shared report control (ReportPhotoButton), not rendered when there's no photo
+    // Report control now lives in the check-in panel's quiet-links row, not
+    // the photo slot itself — still rendered somewhere on the card.
     expect(screen.getByRole("button", { name: "Report this photo" })).toBeDefined();
+  });
+
+  test("no-photo layout: no <img>, the status pill renders inline instead of overlaid", () => {
+    renderCard({ latestPhoto: null });
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Report this photo" })).toBeNull();
+    // The pill still renders (status badge testid), just not layered over a photo.
+    expect(screen.getByTestId("box-status-badge")).toBeDefined();
   });
 });

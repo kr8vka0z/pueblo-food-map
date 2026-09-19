@@ -128,12 +128,24 @@ import { useLocale } from "@/lib/LocaleContext";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
 import { shrinkImageToJpeg, UnsupportedImageError } from "@/lib/imageResize";
+import ReportPhotoButton from "@/components/ReportPhotoButton";
 import type { BoxStatus, CheckinKind } from "@/lib/blessingBoxes";
 
 const { BOX_CHECKIN_NOTE } = FIELD_LIMITS;
 
-/** Display order — 'took' first, since it's the single most common action (Discovery C2) and needs to be reachable with zero extra taps. */
+// Card redesign (2026-09-19) — the five kinds now render in three groups
+// instead of one flat grid: a colored-dot status trio (filled/low/empty), a
+// two-up row (took, add a photo), and 'problem' as a quiet text link beside
+// "Report photo". CHECKIN_KINDS keeps every kind handleTap/busyKind key off
+// of; STATUS_KINDS is just the trio's display order.
 const CHECKIN_KINDS: readonly CheckinKind[] = ["took", "filled", "low", "empty", "problem"];
+const STATUS_KINDS: readonly CheckinKind[] = ["filled", "low", "empty"];
+/** Dot color per status-trio kind — same success/warning/danger tokens STATUS_DOT_CLASS (blessingBoxes.ts) uses, keyed by CheckinKind instead of BoxStatus (different domain: what someone just reported vs. the box's current computed status), so kept local rather than shared. */
+const KIND_DOT_CLASS: Partial<Record<CheckinKind, string>> = {
+  filled: "bg-[var(--color-success)]",
+  low: "bg-[var(--color-warning)]",
+  empty: "bg-[var(--color-danger)]",
+};
 const KINDS_WITH_NOTE: ReadonlySet<CheckinKind> = new Set(["filled", "problem"]);
 /** Only the "filled" note form gets a photo-attach option — the task's own spec names "filled" specifically, not "problem" (a problem report's photo, if ever needed, is a separate future scope). */
 const KIND_WITH_PHOTO_ATTACH: CheckinKind = "filled";
@@ -154,6 +166,8 @@ interface BoxCheckinPanelProps {
    * here rather than re-fetched.
    */
   onCheckinSuccess: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
+  /** Card redesign (2026-09-19): the box's current photo id, if any — renders "Report photo" beside "Report a problem" (moved down from the card's top photo slot, which now shows only the caption chip). Omit/null when there's no photo yet. */
+  latestPhotoId?: number | null;
 }
 
 type SubmitState =
@@ -231,7 +245,7 @@ function usePhotoAttach() {
   return { blob, previewUrl, error, processing, select, clear, restore };
 }
 
-export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinPanelProps) {
+export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId }: BoxCheckinPanelProps) {
   const { locale } = useLocale();
 
   const [openKind, setOpenKind] = useState<CheckinKind | null>(null);
@@ -589,9 +603,11 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
         strategy="afterInteractive"
         onLoad={mountTurnstile}
       />
+      {/* Card redesign (2026-09-19): display-font question heading, matching the mockup — was a small uppercase label. */}
       <h2
         id="box-checkin-heading"
-        className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)]"
+        className="text-lg font-semibold text-[var(--color-ink-900)]"
+        style={{ fontFamily: "var(--font-display)" }}
       >
         {t("box.checkin.heading", locale)}
       </h2>
@@ -643,8 +659,9 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {CHECKIN_KINDS.map((kind) => (
+      {/* Status trio — colored dot above the label (mockup's ".tri"). */}
+      <div className="grid grid-cols-3 gap-2">
+        {STATUS_KINDS.map((kind) => (
           <button
             key={kind}
             type="button"
@@ -653,10 +670,24 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
             aria-disabled={busy}
             onClick={() => handleTap(kind)}
           >
+            <i aria-hidden className={`block w-2 h-2 rounded-full mx-auto mb-1 ${KIND_DOT_CLASS[kind]}`} />
             {kind === busyKind ? t("box.checkin.submitting", locale) : t(`box.checkin.${kind}`, locale)}
           </button>
         ))}
-        {/* 6th choice, slice 5 — opens the standalone photo form below rather than submitting anything itself. */}
+      </div>
+
+      {/* Second row — "took" (most common action) + "Add a photo". */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          className={buttonBase}
+          disabled={busy}
+          aria-disabled={busy}
+          onClick={() => handleTap("took")}
+        >
+          {busyKind === "took" ? t("box.checkin.submitting", locale) : t("box.checkin.took", locale)}
+        </button>
+        {/* Slice 5 — opens the standalone photo form below rather than submitting anything itself. */}
         <button
           type="button"
           className={buttonBase}
@@ -670,6 +701,22 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess }: BoxCheckinP
         >
           {t("box.photo.addButton", locale)}
         </button>
+      </div>
+
+      {/* Quiet text links — "Report a problem" (was a grid button; same
+          behavior, tap opens the same note form via handleTap below) beside
+          "Report photo" when the box has a current photo. */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        <button
+          type="button"
+          disabled={busy}
+          aria-disabled={busy}
+          onClick={() => handleTap("problem")}
+          className="text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
+        >
+          {busyKind === "problem" ? t("box.checkin.submitting", locale) : t("box.checkin.problem", locale)}
+        </button>
+        {latestPhotoId != null && <ReportPhotoButton photoId={latestPhotoId} locale={locale} />}
       </div>
 
       {openKind && (

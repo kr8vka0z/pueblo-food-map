@@ -135,9 +135,56 @@ export default function BottomSheet({
               No drag handle: the "Show details" button is the one expand
               affordance — a grabber bar wrongly implied swipe-to-expand (#122
               follow-up). vaul still allows swipe-down-to-dismiss on the content. */}
+          {/* Card-redesign box actions slot (Share/Fav/Close) — one JSX
+              constant so it's built once and handed to BoxCardBody's
+              `actions` prop below, rather than duplicating this markup
+              between the box and non-box branches. Same visual weight/
+              position as the ordinary header row's own trio. */}
           {venue && (
             <div className="flex-1 overflow-y-auto">
-              {/* pb clears the iPhone home-indicator strip instead of sitting under it. */}
+              {isBox ? (
+                box ? (
+                  // Card-redesign (2026-09-19): BoxCardBody now owns the
+                  // WHOLE box card — photo, sponsor band, badge, name,
+                  // address-as-directions-link, most-needed, host note,
+                  // check-in panel, footer — not just the content below a
+                  // caller-rendered header (see that component's own
+                  // header). No px-5/pt-5 padding wrapper here: the photo
+                  // needs to sit flush against the sheet's own
+                  // rounded-t-xl top edge, so BoxCardBody pads its own body
+                  // internally and only the photo itself stays full-bleed.
+                  <BoxCardBody
+                    box={box}
+                    onCheckinSuccess={onCheckinSuccess}
+                    className="pb-[max(1rem,env(safe-area-inset-bottom))]"
+                    photoRadiusClassName="rounded-t-[var(--radius-xl)]"
+                    actions={
+                      <>
+                        <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} isBox />
+                        <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} />
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          aria-label={t("detail.close", locale)}
+                          className={
+                            "flex items-center justify-center w-11 h-11 " +
+                            "-mt-1.5 -mb-1.5 -ml-1.5 -mr-[10px] rounded-md " +
+                            "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
+                            PRESS_FEEDBACK + " " +
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                          }
+                        >
+                          <X size={18} aria-hidden />
+                        </button>
+                      </>
+                    }
+                  />
+                ) : (
+                  <div className="px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                    <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
+                  </div>
+                )
+              ) : (
               <div className="flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3">
                 {/* Header row: title + close */}
                 <div className="flex items-start gap-2">
@@ -254,7 +301,10 @@ export default function BottomSheet({
                 {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
                     routeInfo threads distance+duration down for the in-card readout.
                     walkSteps provides the collapsible turn-by-turn list.
-                    Shared by boxes and ordinary venues alike. */}
+                    Ordinary venues only as of the card redesign (2026-09-19)
+                    — a box's directions are the address-as-link BoxCardBody
+                    itself renders now (see that component's own header for
+                    why), so this branch is guaranteed non-box already. */}
                 <DirectionButtons
                   venue={venue}
                   onWalk={onWalkRoute ?? (() => {})}
@@ -266,19 +316,6 @@ export default function BottomSheet({
                   showLocationHint={showWalkLocationHint}
                 />
 
-                {/* Blessing box: BoxCardBody replaces the show/hide-details
-                    toggle entirely — mobile has no expand/collapse for a box,
-                    everything (status, latest check-in, most-needed, host
-                    note, check-in panel, History link) renders inline right
-                    away (Kyle, 2026-09-18: "just happen on the map"). */}
-                {isBox ? (
-                  box ? (
-                    <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} />
-                  ) : (
-                    <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
-                  )
-                ) : (
-                  <>
                 {/* Show/Hide details toggle */}
                 <button
                   type="button"
@@ -405,9 +442,8 @@ export default function BottomSheet({
                     </div>
                   )}
                 </div>
-                </>
-                )}
               </div>
+              )}
             </div>
           )}
         </Drawer.Content>

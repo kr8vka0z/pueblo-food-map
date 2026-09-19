@@ -494,10 +494,16 @@ const en: Record<string, string> = {
   "resources.everydayeats.how": "Text FOOD to 1-877-644-3663. You'll get a link to a short sign-up form. You'll renew every 6 months, and if you miss your box 3 months in a row you lose your spot.",
 
   // Blessing box card (rendered in-map, BottomSheet/DesktopVenueWindow, slice 1)
-  "box.host": "Host",
+  // "box.host" deleted (card redesign, 2026-09-19) — the public host NAME
+  // and "Host" heading are gone from the card entirely (display only; the
+  // admin surface and host email alerts are untouched).
   "box.mostNeeded": "Most needed",
   "box.status": "Status",
-  "box.status.unknown": "Unknown — no recent check-ins",
+  // Card redesign (2026-09-19): shortened for the status pill — the pill's
+  // own second segment now carries "no recent check-ins" separately (see
+  // box.status.unknown.detail below) rather than one long combined sentence.
+  "box.status.unknown": "Unknown",
+  "box.status.unknown.detail": "no recent check-ins",
   // Card is opening on the map (client redirect from /box/<id>) or the
   // full box record hasn't loaded into the card yet — both share this line.
   "box.cardLoading": "Loading…",
@@ -511,9 +517,13 @@ const en: Record<string, string> = {
   "box.status.low": "Running low",
   "box.status.empty": "Empty",
   "box.status.out_of_service": "Out of service",
-  "box.lastFilled": "Last filled {time}",
+  // Card redesign (2026-09-19): repurposed as the status pill's second
+  // segment ("· filled {time}") — the pill itself supplies the "· " and the
+  // leading "Last " no longer reads naturally there. Not used anywhere else
+  // (grepped before changing — see this file's own header for the rule).
+  "box.lastFilled": "filled {time}",
   "box.lastFilled.never": "Not marked filled yet",
-  "box.checkin.heading": "Check in at this box",
+  "box.checkin.heading": "How does the box look right now?",
   "box.checkin.filled": "I filled it",
   "box.checkin.took": "I used this box",
   "box.checkin.low": "Running low",
@@ -563,7 +573,11 @@ const en: Record<string, string> = {
   // Photo DISPLAY (card slot + history grid) and "Report this photo"
   // (ReportPhotoButton.tsx) — separate from the upload-picker keys above.
   "box.photo.heading": "Photo",
-  "box.photo.caption": "Shared {time}",
+  // Card redesign (2026-09-19): repurposed as the small caption chip on the
+  // photo's bottom-right corner ("Photo · {time}") — was "Shared {time}" as
+  // a caption line below the image, a layout this key's only caller no
+  // longer has.
+  "box.photo.caption": "Photo · {time}",
   "box.photo.altText": "Photo of {name}, shared {time}",
   "box.photo.report": "Report this photo",
   "box.photo.reporting": "Reporting…",
@@ -574,11 +588,10 @@ const en: Record<string, string> = {
   "box.photo.none": "No photos yet",
   "box.photo.galleryHeading": "Photos",
 
-  // Most-recent-check-in snapshot on the in-map card (map-first rework,
-  // 2026-09-18) — the card shows ONE line, not a list; the full timeline
-  // moved to /box/<id>/history.
-  "box.recentCheckin.heading": "Most recent check-in",
-  "box.recentCheckin.none": "No check-ins yet",
+  // "box.recentCheckin.heading"/"box.recentCheckin.none" deleted (card
+  // redesign, 2026-09-19) — the standalone "Most recent check-in" line is
+  // gone; the status pill now carries recency (box.lastFilled above), and
+  // the full timeline still lives at /box/<id>/history via the link below.
   // "History" link on the card -> /box/<id>/history (map-first rework)
   "box.history.link": "History",
   "box.history.subheading": "Full history for this box",
@@ -661,8 +674,16 @@ const en: Record<string, string> = {
   "box.form.error.generic": "That didn't go through. Please try again.",
   "box.form.error.rateLimit": "Too many attempts right now. Please try again later.",
 
-  // Cared-for-by sponsor slot (BoxCardBody's approved-adopters list)
-  "box.adopters.caredForBy": "Cared for by {names}",
+  // Sponsor band (card redesign, 2026-09-19) — replaces the old flat
+  // "Cared for by {names}" line AND the collapsed "Apply to adopt this box"
+  // link that used to sit lower on the card; both now live in one band
+  // right under the photo. Names render as bold JSX <b> per adopter (not
+  // interpolated into one string), so "Sponsored by" is a plain prefix key.
+  "box.sponsor.needsSponsor": "This box needs a sponsor.",
+  "box.sponsor.sponsoredByPrefix": "Sponsored by ",
+  "box.sponsor.and": "and",
+  "box.sponsor.moreCount": "+{count} more",
+  "box.sponsor.wantToHelp": "Want to help too? ",
 
   // /alerts/confirm and /alerts/stop — the shared double-opt-in confirm and
   // one-click-unsubscribe pages (slice 6). Both carry `robots: noindex` and
@@ -1254,10 +1275,10 @@ const es: Record<string, string> = {
   "resources.everydayeats.how": "Envía FOOD por mensaje de texto al 1-877-644-3663. Recibirás un enlace a un formulario corto de inscripción. Hay que renovar cada 6 meses, y si no recoges tu caja 3 meses seguidos pierdes tu lugar.",
 
   // Blessing box card (rendered in-map, BottomSheet/DesktopVenueWindow, slice 1)
-  "box.host": "Anfitrión", // [CHECK]
   "box.mostNeeded": "Lo que más se necesita",
   "box.status": "Estado",
-  "box.status.unknown": "Desconocido — sin visitas recientes", // [CHECK]
+  "box.status.unknown": "Desconocido", // [CHECK]
+  "box.status.unknown.detail": "sin visitas recientes", // [CHECK]
   "box.cardLoading": "Cargando…", // [CHECK]
   "box.redirectLink": "Ver esta caja en el mapa", // [CHECK]
 
@@ -1266,9 +1287,9 @@ const es: Record<string, string> = {
   "box.status.low": "Quedan pocas cosas", // [CHECK]
   "box.status.empty": "Vacía", // [CHECK]
   "box.status.out_of_service": "Fuera de servicio", // [CHECK]
-  "box.lastFilled": "Surtida por última vez {time}", // [CHECK]
+  "box.lastFilled": "surtida {time}", // [CHECK]
   "box.lastFilled.never": "Aún no se ha marcado como surtida", // [CHECK]
-  "box.checkin.heading": "Marca tu visita a esta caja", // [CHECK]
+  "box.checkin.heading": "¿Cómo se ve la caja ahora mismo?", // [CHECK]
   "box.checkin.filled": "La surtí", // [CHECK]
   "box.checkin.took": "Usé esta caja", // [CHECK]
   "box.checkin.low": "Quedan pocas cosas", // [CHECK]
@@ -1305,7 +1326,7 @@ const es: Record<string, string> = {
   "box.photo.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
 
   "box.photo.heading": "Foto", // [CHECK]
-  "box.photo.caption": "Compartida {time}", // [CHECK]
+  "box.photo.caption": "Foto · {time}", // [CHECK]
   "box.photo.altText": "Foto de {name}, compartida {time}", // [CHECK]
   "box.photo.report": "Reportar esta foto", // [CHECK]
   "box.photo.reporting": "Reportando…", // [CHECK]
@@ -1316,8 +1337,6 @@ const es: Record<string, string> = {
   "box.photo.none": "Aún no hay fotos", // [CHECK]
   "box.photo.galleryHeading": "Fotos", // [CHECK]
 
-  "box.recentCheckin.heading": "Visita más reciente", // [CHECK]
-  "box.recentCheckin.none": "Aún no hay visitas registradas", // [CHECK]
   "box.history.link": "Historial", // [CHECK]
   "box.history.subheading": "Historial completo de esta caja", // [CHECK]
 
@@ -1372,7 +1391,11 @@ const es: Record<string, string> = {
   "box.form.error.generic": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
   "box.form.error.rateLimit": "Demasiados intentos por ahora. Por favor intenta más tarde.", // [CHECK]
 
-  "box.adopters.caredForBy": "A cargo de {names}", // [CHECK]
+  "box.sponsor.needsSponsor": "Esta caja necesita un patrocinador.", // [CHECK]
+  "box.sponsor.sponsoredByPrefix": "Patrocinada por ", // [CHECK]
+  "box.sponsor.and": "y", // [CHECK]
+  "box.sponsor.moreCount": "+{count} más", // [CHECK]
+  "box.sponsor.wantToHelp": "¿Quieres ayudar también? ", // [CHECK]
 
   "alerts.confirm.heading": "Confirma tu correo", // [CHECK]
   "alerts.confirm.body": "Toca el botón de abajo para confirmar que quieres recibir estos correos.", // [CHECK]

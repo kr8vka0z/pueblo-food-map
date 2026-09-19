@@ -190,6 +190,11 @@ export default function BoxCardBody({
         .map((s) => s.trim())
         .filter(Boolean)
     : [];
+  // Needs ask (migration 0012) — the admin-typed line above always wins
+  // when set; the self-filling visitor-sourced list only ever shows when
+  // there's no admin text at all (task spec: "if the box's admin-typed
+  // most_needed is set — show it exactly as today (admin wins)").
+  const neededFromVisitors = mostNeededChips.length === 0 ? (box.box.neededFromVisitors ?? []) : [];
   const NameTag = headingLevel;
 
   return (
@@ -300,7 +305,9 @@ export default function BoxCardBody({
           {box.address}
         </a>
 
-        {/* Most needed */}
+        {/* Most needed — admin-typed text wins when set; the self-filling
+            visitor-sourced list (migration 0012) only renders when it
+            isn't (see neededFromVisitors' own computation above). */}
         {mostNeededChips.length > 0 && (
           <div>
             <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
@@ -313,6 +320,23 @@ export default function BoxCardBody({
                   className="rounded-full bg-[var(--color-bone-100)] px-2.5 py-1 text-sm text-[var(--color-ink-700)]"
                 >
                   {item}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {neededFromVisitors.length > 0 && (
+          <div>
+            <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
+              {t("box.mostNeeded.fromVisitors", locale)}
+            </h3>
+            <div className="flex flex-wrap gap-1.5">
+              {neededFromVisitors.map(({ key, count }) => (
+                <span
+                  key={key}
+                  className="rounded-full bg-[var(--color-bone-100)] px-2.5 py-1 text-sm text-[var(--color-ink-700)]"
+                >
+                  {t(`box.needs.${key}`, locale)} <span className="text-[var(--color-ink-400)]">· {count}</span>
                 </span>
               ))}
             </div>

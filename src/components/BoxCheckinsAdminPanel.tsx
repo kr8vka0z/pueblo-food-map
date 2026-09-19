@@ -26,7 +26,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { AdminCheckinRow } from "@/lib/blessingBoxes";
+import { parseAdminNeeds, type AdminCheckinRow, type NeedKey } from "@/lib/blessingBoxes";
 
 interface BoxCheckinsAdminPanelProps {
   checkins: AdminCheckinRow[];
@@ -38,6 +38,19 @@ const KIND_LABEL: Record<AdminCheckinRow["kind"], string> = {
   low: "Running low",
   empty: "Empty",
   problem: "Problem report",
+};
+
+/** Plain English labels, same convention as KIND_LABEL above — this admin panel isn't locale-aware anywhere else (see its own dateFormatter, hardcoded en-US), so needs labels don't route through i18n.ts either (migration 0012). */
+const NEED_LABEL: Record<NeedKey, string> = {
+  canned_food: "Canned food",
+  fresh_food: "Fresh food",
+  bread: "Bread",
+  baby_items: "Baby items",
+  diapers: "Diapers",
+  hygiene: "Hygiene items",
+  pet_food: "Pet food",
+  drinks: "Water / drinks",
+  warm_clothing: "Warm clothing",
 };
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
@@ -96,6 +109,11 @@ export default function BoxCheckinsAdminPanel({ checkins }: BoxCheckinsAdminPane
               {row.hidden_by && ` · hidden by ${row.hidden_by}`}
             </p>
             {row.note && <p className="mt-1 text-sm text-[var(--color-ink-700)]">{row.note}</p>}
+            {parseAdminNeeds(row.needs).length > 0 && (
+              <p className="mt-1 text-xs text-[var(--color-ink-500)]">
+                Needs: {parseAdminNeeds(row.needs).map((k) => NEED_LABEL[k]).join(", ")}
+              </p>
+            )}
             {errorId === row.id && (
               <p role="alert" className="mt-1 text-xs text-[var(--color-danger)]">
                 Something went wrong. Try again.

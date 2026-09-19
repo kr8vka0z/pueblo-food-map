@@ -71,10 +71,12 @@ import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import AddVenueForm from "@/components/AddVenueForm";
 import ArchiveVenueButton from "@/components/ArchiveVenueButton";
 import BoxCheckinsAdminPanel from "@/components/BoxCheckinsAdminPanel";
+import HostAlertsAdminPanel from "@/components/HostAlertsAdminPanel";
 import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import { parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
 import { loadAllCheckinsForBox, type AdminCheckinRow } from "@/lib/blessingBoxes";
+import { loadHostSubscriptions } from "@/lib/boxAlerts";
 import type { AdminVenueRow } from "@/types/venue";
 import type { ClosurePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
 
@@ -186,6 +188,15 @@ async function resolveBoxCheckins(db: D1Database, venueId: string): Promise<Admi
   }
 }
 
+/** Same degrade-to-empty shape as resolveBoxCheckins() above — a missing alert_subscriptions table (migration 0010 not yet applied) must never take down the edit page. */
+async function resolveHostAlerts(db: D1Database, venueId: string): Promise<{ id: number; email: string }[]> {
+  try {
+    return await loadHostSubscriptions(db, venueId);
+  } catch {
+    return [];
+  }
+}
+
 export default async function EditVenuePage({
   params,
   searchParams,
@@ -199,6 +210,7 @@ export default async function EditVenuePage({
   let closureContext: ClosureReportContext | null = null;
   let linkHealthContext: LinkHealthProposalContext | null = null;
   let boxCheckins: AdminCheckinRow[] = [];
+  let hostAlerts: { id: number; email: string }[] = [];
 
   try {
     const { db, identity } = await getAdminDb(await headers());
@@ -210,6 +222,7 @@ export default async function EditVenuePage({
       linkHealthContext = await resolveLinkHealthProposalContext(db, id, proposal);
       if (venue.category === "blessing_box") {
         boxCheckins = await resolveBoxCheckins(db, id);
+        hostAlerts = await resolveHostAlerts(db, id);
       }
     }
   } catch (err) {
@@ -275,6 +288,13 @@ export default async function EditVenuePage({
           <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
             <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Check-ins</h2>
             <BoxCheckinsAdminPanel checkins={boxCheckins} />
+          </div>
+        )}
+
+        {venue.category === "blessing_box" && (
+          <div className="max-w-2xl border-t border-[var(--color-bone-200)] pt-5">
+            <h2 className="text-sm font-semibold text-[var(--color-ink-700)] mb-2">Host alert emails</h2>
+            <HostAlertsAdminPanel venueId={venue.id} initialHosts={hostAlerts} />
           </div>
         )}
 

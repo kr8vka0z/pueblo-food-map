@@ -527,7 +527,11 @@ const en: Record<string, string> = {
   // (grepped before changing — see this file's own header for the rule).
   "box.lastFilled": "filled {time}",
   "box.lastFilled.never": "Not marked filled yet",
-  "box.checkin.heading": "How does the box look right now?",
+  // #510: shortened to fit one line on a phone (was "How does the box look
+  // right now?" — wrapped to two lines at 375px). "Update" covers every
+  // button under the heading (filled/low/empty/took/photo); "check in" was
+  // internal wording never meant for the visitor-facing card.
+  "box.checkin.heading": "Please update this box",
   "box.checkin.filled": "I filled it",
   "box.checkin.took": "I used this box",
   "box.checkin.low": "Running low",
@@ -609,6 +613,8 @@ const en: Record<string, string> = {
   // longer has.
   "box.photo.caption": "Photo · {time}",
   "box.photo.altText": "Photo of {name}, shared {time}",
+  // #508: the card photo becomes a button that opens PhotoViewer full-screen.
+  "box.photo.viewFullSize": "View photo full size",
   "box.photo.report": "Report this photo",
   "box.photo.reporting": "Reporting…",
   "box.photo.reportConfirm": "Hide this photo and send it for review?",
@@ -1320,7 +1326,7 @@ const es: Record<string, string> = {
   "box.status.out_of_service": "Fuera de servicio", // [CHECK]
   "box.lastFilled": "surtida {time}", // [CHECK]
   "box.lastFilled.never": "Aún no se ha marcado como surtida", // [CHECK]
-  "box.checkin.heading": "¿Cómo se ve la caja ahora mismo?", // [CHECK]
+  "box.checkin.heading": "Por favor, actualiza esta caja", // [CHECK]
   "box.checkin.filled": "La surtí", // [CHECK]
   "box.checkin.took": "Usé esta caja", // [CHECK]
   "box.checkin.low": "Quedan pocas cosas", // [CHECK]
@@ -1376,6 +1382,7 @@ const es: Record<string, string> = {
   "box.photo.heading": "Foto", // [CHECK]
   "box.photo.caption": "Foto · {time}", // [CHECK]
   "box.photo.altText": "Foto de {name}, compartida {time}", // [CHECK]
+  "box.photo.viewFullSize": "Ver foto en tamaño completo", // [CHECK]
   "box.photo.report": "Reportar esta foto", // [CHECK]
   "box.photo.reporting": "Reportando…", // [CHECK]
   "box.photo.reportConfirm": "¿Ocultar esta foto y enviarla para revisión?", // [CHECK]

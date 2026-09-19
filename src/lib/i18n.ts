@@ -370,9 +370,9 @@ const en: Record<string, string> = {
   "privacy.checkins.heading": "Blessing box check-ins",
   "privacy.checkins.body": "Checking in at a blessing box is anonymous. We do not ask for your name or email, and we do not save your IP address. A photo you add is reviewed before it shows, and location details hidden inside the photo file are removed.",
   "privacy.alerts.heading": "Email alerts and adopting a box",
-  "privacy.alerts.body1": "We keep your email address only if you ask for it: when you sign up for emails about a blessing box, or when you apply to adopt one. We use it only to send those emails. We never sell it, share it, or show it on the site.",
+  "privacy.alerts.body1": "We keep your email address only if you ask for it: when you sign up for emails about a blessing box, or when you apply to adopt one. If you host a box, Pueblo Food Map staff may add your email, with your OK, so you hear when your box is empty or has a problem. We use these addresses only to send those emails. We never sell them, share them, or show them on the site.",
   "privacy.alerts.body2": "If you adopt a box, the name you give us (for example, a group or family name) is shown on that box's card. Your email is not.",
-  "privacy.alerts.body3": "Every email we send has a stop link. One click stops the emails, with no login. To have your email address deleted completely, write to issues@pueblofoodmap.com.",
+  "privacy.alerts.body3": "Every alert email has a stop link. One click stops the emails, with no login. To have your email address deleted completely, write to issues@pueblofoodmap.com.",
   "privacy.alerts.body4": "Our emails are delivered by a mail service called Resend, which handles your address only to deliver them.",
   "privacy.analytics": "We use Cloudflare Web Analytics to count visits and measure how quickly pages load. It sets no cookies and stores nothing on your device, it does not identify you by your IP address or your browser, and it does not follow you to other websites. It records things like which page was viewed, the site you arrived from, your browser and device type, your country, and how long the page took to load. We use no advertising pixels and no other analytics service.",
 
@@ -630,9 +630,10 @@ const en: Record<string, string> = {
   "alerts.confirm.invalid": "This confirmation link is no longer valid.",
   "alerts.confirm.error": "Something went wrong. Please try again.",
   "alerts.stop.heading": "Emails stopped",
+  "alerts.stop.stopping": "Stopping…",
   "alerts.stop.body": "You won't get any more emails about this.",
   "alerts.stop.invalid": "This link is no longer valid.",
-  "alerts.stop.rateLimited": "Too many attempts. Please try again later.",
+  "alerts.stop.noscriptButton": "Stop these emails",
   "alerts.stop.undoButton": "That was a mistake — turn emails back on",
   "alerts.stop.undoing": "Turning back on…",
   "alerts.stop.undone": "You're back on the list.",
@@ -654,6 +655,11 @@ const en: Record<string, string> = {
   "email.adoptConfirm.line1": "Thanks for applying to adopt {box}. Please confirm your email to finish your application.",
   "email.adoptConfirm.line2": "An admin will review your application once you've confirmed.",
   "email.adoptConfirm.cta": "Confirm your email: {url}",
+  // 2026-09-18 security review, item 7: an "if you didn't ask for this"
+  // line on every confirm email — someone else could have typed this
+  // address in by mistake (or on purpose), and this line tells them
+  // exactly what happens if they do nothing (nothing).
+  "email.adoptConfirm.disclaimer": "If you didn't ask for this, you can ignore this email. We won't write again unless someone confirms.",
   "email.adoptApproved.subject": "You're approved to adopt {box}",
   "email.adoptApproved.line1": "Good news — your application to adopt {box} as \"{displayName}\" has been approved.",
   "email.adoptApproved.line2": "Your name will now show on the box's card, and you'll get an email if it's reported empty or has a problem.",
@@ -661,6 +667,7 @@ const en: Record<string, string> = {
   "email.alertConfirm.line1": "Please confirm you'd like email alerts for {box}.",
   "email.alertConfirm.line2": "We'll email you if it's reported empty or running low.",
   "email.alertConfirm.cta": "Confirm your email: {url}",
+  "email.alertConfirm.disclaimer": "If you didn't ask for this, you can ignore this email. We won't write again unless someone confirms.",
   "email.hostWelcome.subject": "You're now getting alerts for {box}",
   "email.hostWelcome.line1": "You've been added as a host contact for {box}.",
   "email.hostWelcome.line2": "You'll get an email if it's reported empty or has a problem.",
@@ -1074,9 +1081,9 @@ const es: Record<string, string> = {
   "privacy.checkins.heading": "Registros en cajas de bendición", // [CHECK]
   "privacy.checkins.body": "Registrar tu visita a una caja de bendición es anónimo. No pedimos tu nombre ni tu correo, y no guardamos tu dirección IP. Una foto que agregues se revisa antes de publicarse, y los detalles de ubicación ocultos en el archivo de la foto se eliminan.", // [CHECK]
   "privacy.alerts.heading": "Alertas por correo y adopción de una caja", // [CHECK]
-  "privacy.alerts.body1": "Guardamos tu correo electrónico solo si tú lo pides: cuando te suscribes a alertas de una caja de bendición, o cuando solicitas adoptar una. Lo usamos solo para enviar esos correos. Nunca lo vendemos, lo compartimos, ni lo mostramos en el sitio.", // [CHECK]
+  "privacy.alerts.body1": "Guardamos tu correo electrónico solo si tú lo pides: cuando te suscribes a alertas de una caja de bendición, o cuando solicitas adoptar una. Si eres anfitrión de una caja, el personal de Pueblo Food Map puede agregar tu correo, con tu autorización, para avisarte cuando tu caja esté vacía o tenga un problema. Usamos estas direcciones solo para enviar esos correos. Nunca las vendemos, las compartimos, ni las mostramos en el sitio.", // [CHECK]
   "privacy.alerts.body2": "Si adoptas una caja, el nombre que nos das (por ejemplo, el de un grupo o una familia) se muestra en la tarjeta de esa caja. Tu correo no.", // [CHECK]
-  "privacy.alerts.body3": "Cada correo que enviamos tiene un enlace para detenerlo. Un clic detiene los correos, sin necesidad de iniciar sesión. Para que eliminemos tu correo por completo, escribe a issues@pueblofoodmap.com.", // [CHECK]
+  "privacy.alerts.body3": "Cada correo de alerta tiene un enlace para detenerlo. Un clic detiene los correos, sin necesidad de iniciar sesión. Para que eliminemos tu correo por completo, escribe a issues@pueblofoodmap.com.", // [CHECK]
   "privacy.alerts.body4": "Nuestros correos se envían a través de un servicio de correo llamado Resend, que solo maneja tu dirección para entregarlos.", // [CHECK]
   "privacy.analytics": "Usamos Cloudflare Web Analytics para contar visitas y medir qué tan rápido cargan las páginas. No usa cookies ni guarda nada en tu dispositivo, no te identifica por tu dirección IP ni por tu navegador, y no te sigue a otros sitios web. Registra datos como qué página se vio, el sitio desde el que llegaste, tu tipo de navegador y dispositivo, tu país y cuánto tardó en cargar la página. No usamos píxeles de publicidad ni ningún otro servicio de análisis.",
 
@@ -1289,9 +1296,10 @@ const es: Record<string, string> = {
   "alerts.confirm.invalid": "Este enlace de confirmación ya no es válido.", // [CHECK]
   "alerts.confirm.error": "Algo salió mal. Por favor intenta de nuevo.", // [CHECK]
   "alerts.stop.heading": "Correos detenidos", // [CHECK]
+  "alerts.stop.stopping": "Deteniendo…", // [CHECK]
   "alerts.stop.body": "Ya no recibirás más correos sobre esto.", // [CHECK]
   "alerts.stop.invalid": "Este enlace ya no es válido.", // [CHECK]
-  "alerts.stop.rateLimited": "Demasiados intentos. Por favor intenta más tarde.", // [CHECK]
+  "alerts.stop.noscriptButton": "Detener estos correos", // [CHECK]
   "alerts.stop.undoButton": "Fue un error — vuelve a activar los correos", // [CHECK]
   "alerts.stop.undoing": "Reactivando…", // [CHECK]
   "alerts.stop.undone": "Vuelves a estar en la lista.", // [CHECK]
@@ -1309,6 +1317,7 @@ const es: Record<string, string> = {
   "email.adoptConfirm.line1": "Gracias por solicitar adoptar {box}. Confirma tu correo para terminar tu solicitud.", // [CHECK]
   "email.adoptConfirm.line2": "Un administrador revisará tu solicitud una vez que confirmes.", // [CHECK]
   "email.adoptConfirm.cta": "Confirma tu correo: {url}", // [CHECK]
+  "email.adoptConfirm.disclaimer": "Si tú no pediste esto, puedes ignorar este correo. No te escribiremos de nuevo a menos que alguien confirme.", // [CHECK]
   "email.adoptApproved.subject": "Fuiste aprobado para adoptar {box}", // [CHECK]
   "email.adoptApproved.line1": "Buenas noticias — tu solicitud para adoptar {box} como \"{displayName}\" fue aprobada.", // [CHECK]
   "email.adoptApproved.line2": "Tu nombre ahora aparecerá en la tarjeta de la caja, y recibirás un correo si se reporta vacía o con un problema.", // [CHECK]
@@ -1316,6 +1325,7 @@ const es: Record<string, string> = {
   "email.alertConfirm.line1": "Confirma que quieres recibir alertas por correo de {box}.", // [CHECK]
   "email.alertConfirm.line2": "Te avisaremos por correo si se reporta vacía o con poco surtido.", // [CHECK]
   "email.alertConfirm.cta": "Confirma tu correo: {url}", // [CHECK]
+  "email.alertConfirm.disclaimer": "Si tú no pediste esto, puedes ignorar este correo. No te escribiremos de nuevo a menos que alguien confirme.", // [CHECK]
   "email.hostWelcome.subject": "Ahora recibirás alertas de {box}", // [CHECK]
   "email.hostWelcome.line1": "Se te agregó como contacto anfitrión de {box}.", // [CHECK]
   "email.hostWelcome.line2": "Recibirás un correo si se reporta vacía o con un problema.", // [CHECK]

@@ -7,11 +7,12 @@
 > vars, and runtime gotchas for AI coders.
 >
 > **Reviewing a pull request?** Read [REVIEW.md](REVIEW.md) first and report
-> Blocker / Important / Nit the way it defines them. The CI reviewer learns the rules
-> from this line, not from its workflow file: `claude-code-action` refuses to run unless
+> Blocker / Important / Nit the way it defines them. Repo rules go in `REVIEW.md`, never
+> in the CI reviewer's workflow file: `claude-code-action` refuses to run unless
 > `.github/workflows/claude-code-review.yml` is byte-identical to the copy on `main`, so
-> any edit to that file on `dev` silently switches reviews off until the next promotion
-> (happened 2026-09-19, #501). Change it only right before a promotion.
+> any edit to it on `dev` silently switches reviews off until the next promotion. Until
+> 2026-09-19 that workflow also lacked permission to post, so its reviews were discarded
+> unseen (#502 fixes it; live after the next promotion).
 
 ---
 

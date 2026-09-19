@@ -29,6 +29,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { safeUrl } from "@/lib/safeUrl";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { isNativeDialogOpen } from "@/lib/dialogGuard";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
@@ -125,6 +126,16 @@ export default function BottomSheet({
           }
           style={{ maxHeight: "calc(100dvh - 100px)" }}
           aria-label={t("detail.venueDetailsPanel", locale)}
+          // #508 fix pass: Escape while a box's PhotoViewer is open must
+          // close ONLY the photo, not this whole sheet. vaul forwards this
+          // prop straight through to Radix's DismissableLayer, which only
+          // dismisses `if (!event.defaultPrevented)` — see dialogGuard.ts's
+          // own header for why this is the one race-free interception
+          // point (Radix's Escape listener is a document-level CAPTURE
+          // listener; nothing inside the photo dialog can out-race it).
+          onEscapeKeyDown={(event) => {
+            if (isNativeDialogOpen()) event.preventDefault();
+          }}
         >
           {/* Drawer.Title — required by Radix to fix a11y missing-title violation */}
           <Drawer.Title className="sr-only">

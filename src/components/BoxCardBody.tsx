@@ -91,6 +91,7 @@ import { formatRelativeTime } from "@/lib/relativeTime";
 import BoxCheckinPanel from "@/components/BoxCheckinPanel";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 import BoxAlertSignupForm from "@/components/BoxAlertSignupForm";
+import PhotoViewer from "@/components/PhotoViewer";
 import { googleMapsUrl, WalkRouteStatus, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 import { categoryColors } from "@/data/venues";
 import {
@@ -176,7 +177,11 @@ function StatusPill({ box, locale, overlay }: { box: PublicBlessingBox; locale: 
       data-testid="box-status-badge"
       className={
         overlay
-          ? "absolute left-3 bottom-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 text-sm font-semibold shadow-sm"
+          // pointer-events-none (#508): this badge is non-interactive text
+          // sitting on top of the photo's own "view full size" button —
+          // without it, a tap landing on the pill's bounding box would hit
+          // this div instead of the button underneath.
+          ? "pointer-events-none absolute left-3 bottom-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 text-sm font-semibold shadow-sm"
           : "inline-flex w-fit items-center gap-2 rounded-full bg-[var(--color-bone-100)] px-3 py-1.5 text-sm font-semibold"
       }
     >
@@ -224,6 +229,8 @@ export default function BoxCardBody({
 }: BoxCardBodyProps) {
   const { locale } = useLocale();
   const [adoptOpen, setAdoptOpen] = useState(false);
+  // #508: full-size photo lightbox, opened from the card photo button below.
+  const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
   // Per-instance id for the "share your location" hint (#207) — shared with
   // WalkRouteStatus's own <p id>, same reasoning as DirectionButtons' own
   // identical field. Always called (Rules of Hooks) even in link mode
@@ -251,24 +258,49 @@ export default function BoxCardBody({
           never a placeholder image. */}
       {hasPhoto ? (
         <div className="relative">
-          {/* eslint-disable-next-line @next/next/no-img-element -- a runtime, R2-backed image via our own serve route, not a build-time/static asset next/image can optimize */}
-          <img
+          {/* #508: the photo is a button that opens PhotoViewer full-screen
+              — the alt text (name + relative time) IS the photo's
+              accessible description; the button's own label just states
+              the action ("View photo full size"), same separation of
+              concerns as any other icon-only trigger on this card. */}
+          <button
+            type="button"
+            onClick={() => setPhotoViewerOpen(true)}
+            aria-label={t("box.photo.viewFullSize", locale)}
+            className="block w-full"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- a runtime, R2-backed image via our own serve route, not a build-time/static asset next/image can optimize */}
+            <img
+              src={`/api/public/box-photos/${box.box.latestPhoto!.id}`}
+              alt={t("box.photo.altText", locale, {
+                name: box.name,
+                time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale),
+              })}
+              className={`block h-[170px] w-full object-cover bg-[var(--color-bone-200)] ${photoRadiusClassName}`}
+            />
+          </button>
+          <StatusPill box={box} locale={locale} overlay />
+          {/* Caption chip moved to top-right (fix pass, item 2) — see
+              StatusPill's own header for why it used to collide with the
+              status pill sharing the bottom edge. pointer-events-none: the
+              chip overlays the photo BUTTON above, and per #508's own risk
+              note this chip must not block the tap that opens the viewer. */}
+          <div className="pointer-events-none absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 shadow-sm">
+            <span className="block truncate text-xs font-medium text-[var(--color-ink-500)]">
+              {t("box.photo.caption", locale, { time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale) })}
+            </span>
+          </div>
+          <PhotoViewer
             src={`/api/public/box-photos/${box.box.latestPhoto!.id}`}
             alt={t("box.photo.altText", locale, {
               name: box.name,
               time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale),
             })}
-            className={`block h-[170px] w-full object-cover bg-[var(--color-bone-200)] ${photoRadiusClassName}`}
+            caption={t("box.photo.caption", locale, { time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale) })}
+            open={photoViewerOpen}
+            onClose={() => setPhotoViewerOpen(false)}
+            locale={locale}
           />
-          <StatusPill box={box} locale={locale} overlay />
-          {/* Caption chip moved to top-right (fix pass, item 2) — see
-              StatusPill's own header for why it used to collide with the
-              status pill sharing the bottom edge. */}
-          <div className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 shadow-sm">
-            <span className="block truncate text-xs font-medium text-[var(--color-ink-500)]">
-              {t("box.photo.caption", locale, { time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale) })}
-            </span>
-          </div>
         </div>
       ) : (
         <div className="px-4 pt-3">
@@ -310,24 +342,32 @@ export default function BoxCardBody({
         </div>
         <AdoptBoxForm boxId={box.id} open={adoptOpen} onOpenChange={setAdoptOpen} />
 
-        {/* Badge, name, actions (Share/Fav/Close — owned by the caller) */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+        {/* Badge + actions, then name (#515 fix pass, 2026-09-19): the name
+            used to share ONE flex row with the actions (badge+name stacked
+            in a `min-w-0` column, actions `shrink-0` beside it), which
+            capped the name's wrap width at that column's flex-computed
+            width — roughly two-thirds of the card — even though the space
+            under the actions sat empty. Splitting into two rows lets the
+            name run the card's full width; the badge stays visually
+            anchored to the same line as the actions (`items-center`) since
+            that pairing was never the problem. */}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-2">
             <span
               className="inline-block rounded-full px-2.5 py-1 text-[11px] font-semibold text-[var(--color-bone-50)]"
               style={{ backgroundColor: categoryColors[box.category] }}
             >
               {t("category.full.blessing_box", locale)}
             </span>
-            <NameTag
-              id={nameId}
-              className="mt-1 text-xl font-normal leading-tight text-[var(--color-ink-900)]"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              {box.name}
-            </NameTag>
+            {actions && <div className="flex shrink-0 items-center gap-0.5">{actions}</div>}
           </div>
-          {actions && <div className="flex shrink-0 items-center gap-0.5">{actions}</div>}
+          <NameTag
+            id={nameId}
+            className="text-xl font-normal leading-tight text-[var(--color-ink-900)]"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {box.name}
+          </NameTag>
         </div>
 
         {/* Address — the text itself is the directions link/trigger (mockup

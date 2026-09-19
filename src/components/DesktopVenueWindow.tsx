@@ -540,14 +540,23 @@ export default function DesktopVenueWindow({
 
   // ── Blessing-box body ─────────────────────────────────────────────────────
   // Card redesign (2026-09-19): BoxCardBody now owns the WHOLE box card —
-  // photo, sponsor band, badge, name, address-as-directions-link,
+  // photo, sponsor band, badge, name, address-as-directions-link/trigger,
   // most-needed, host note, check-in panel, footer — so this branch no
-  // longer renders venueNameBlock, the category badge, or DirectionButtons
-  // itself (all now inside BoxCardBody); Share/Favorite are handed in via
-  // its `actions` slot instead, same visual weight/position the shared
-  // venueNameBlock used to give them. No History link here: the header
-  // renders it instead (see VenuePopupHeader's own header for why), so
-  // `showHistoryLink={false}`. `photoRadiusClassName` is left at its
+  // longer renders venueNameBlock, the category badge, or the three-button
+  // DirectionButtons row itself (all now inside BoxCardBody, and the walk
+  // restore pass the same day gives the box its own in-app Walk trigger —
+  // the address — without bringing that row back; see BoxCardBody's own
+  // header). Share/Favorite are handed in via its `actions` slot instead,
+  // same visual weight/position the shared venueNameBlock used to give
+  // them. Walk props (onWalkRoute etc.) are forwarded straight through from
+  // this component's own identically-named props — MapWrapper already
+  // passes them here unconditionally (same handleWalkRoute every ordinary
+  // venue's DirectionButtons uses below), so wiring is a pure pass-through:
+  // `onWalkRoute ? () => onWalkRoute(box) : undefined` binds the box (a
+  // PublicBlessingBox, itself a Venue) as the callback's target. No History
+  // link here: the header renders it instead (see VenuePopupHeader's own
+  // header for why), so `showHistoryLink={false}`. `photoRadiusClassName` is
+  // left at its
   // default "" — the box's photo sits below the persistent header bar, not
   // flush against the window's own top corners, so there's no radius to
   // put on it; the outer window's existing `overflow-hidden` still clips
@@ -574,6 +583,12 @@ export default function DesktopVenueWindow({
           onCheckinSuccess={onCheckinSuccess}
           showHistoryLink={false}
           nameId={`venue-window-title-${venue.id}`}
+          onWalkRoute={onWalkRoute ? () => onWalkRoute(box) : undefined}
+          isWalkRouteActive={isWalkRouteActive}
+          onClearWalkRoute={onClearWalkRoute}
+          walkRouteInfo={isWalkRouteActive ? walkRouteInfo : null}
+          walkRouteSteps={isWalkRouteActive ? walkRouteSteps : null}
+          showWalkLocationHint={showWalkLocationHint}
           actions={
             <>
               <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} isBox />

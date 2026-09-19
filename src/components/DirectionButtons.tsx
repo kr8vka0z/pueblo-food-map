@@ -138,56 +138,65 @@ function formatStepDistance(meters: number, locale: Locale): string {
   return t("directions.stepMi", locale, { distance: mi });
 }
 
-// ─── Button styles ────────────────────────────────────────────────────────────
+// ─── Active-route status (readout) ───────────────────────────────────────────
 //
-// Three equal-width buttons in a row, using the bone/ink/sage palette.
-// Walk: sage fill (primary action — in-app route).
-// Bus / Drive: bone outline (secondary — opens external app).
+// Distance/duration, the collapsible turn-by-turn steps, and the "Open in
+// Google Maps" walk handoff — everything this component shows below its Walk
+// button once a route is active, plus the "share your location" hint (#207)
+// for the sibling case where no route exists yet. Extracted (2026-09-19,
+// Blessing Box walk restore — see BoxCardBody's own header) so BoxCardBody's
+// address-as-directions-link can render the identical readout for a box's
+// in-app walking route without duplicating this JSX; DirectionButtons itself
+// keeps calling it below, byte-identical output for ordinary venues.
+//
+// WHY `locationHintId` is a prop, not generated here: the trigger element's
+// own `aria-describedby` must point at the same id this component puts on
+// the hint `<p>`, and a trigger rendered by the CALLER (this component's own
+// Walk button, or BoxCardBody's address button) can't reach an id minted
+// inside a child it hasn't rendered yet. `stepsListId` has no such
+// cross-component wiring need — nothing outside this component ever
+// references it — so it stays internal via useId(), same as before extraction.
+export interface WalkRouteStatusProps {
+  /** Only id/name/lat/lng are read — a box (PublicBlessingBox extends Venue) or an ordinary Venue both satisfy this with no conversion. */
+  venue: Pick<Venue, "id" | "name" | "lat" | "lng">;
+  locale: Locale;
+  isRouteActive: boolean;
+  routeInfo?: RouteInfo | null;
+  walkSteps?: Array<{ instruction: string; distance: number }> | null;
+  showLocationHint?: boolean;
+  locationHintId: string;
+  /**
+   * Renders a standalone "Clear route" text control between the steps block
+   * and the "Open in Google Maps" link, when the route is active. Optional —
+   * DirectionButtons itself never passes this (its own Walk button IS the
+   * clear affordance, re-labeling to "Clear walking route" on tap, so a
+   * second control here would be redundant for ordinary venues; leaving it
+   * undefined keeps their output byte-identical). BoxCardBody's own trigger
+   * (the address) stays labeled as the address at all times instead of
+   * relabeling (the address text is the box's one visible location cue on
+   * the card — losing it while a route is drawn would be a regression), so
+   * it needs this explicit control to clear a route (2026-09-19, walk
+   * restore pass, advisor()-reviewed).
+   */
+  onClearRoute?: () => void;
+}
 
-const baseClass =
-  "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--radius-md)] " +
-  "text-sm font-semibold transition-colors duration-150 " +
-  PRESS_FEEDBACK + " " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-1";
-
-const walkActiveClass =
-  baseClass +
-  " bg-[var(--color-sage-100)] text-[var(--color-sage-700)] border border-[var(--color-sage-400)]";
-
-const walkInactiveClass =
-  baseClass +
-  " bg-[var(--color-sage-500)] text-[var(--color-bone-50)] hover:bg-[var(--color-sage-600)]";
-
-const externalClass =
-  baseClass +
-  " bg-[var(--color-bone-50)] text-[var(--color-ink-700)] border border-[var(--color-bone-300)] " +
-  "hover:bg-[var(--color-bone-100)] hover:border-[var(--color-bone-400)]";
-
-// ─── DirectionButtons ─────────────────────────────────────────────────────────
-
-export default function DirectionButtons({
+export function WalkRouteStatus({
   venue,
-  onWalk,
   locale,
-  isRouteActive = false,
-  onClearRoute,
+  isRouteActive,
   routeInfo = null,
   walkSteps = null,
   showLocationHint = false,
-}: DirectionButtonsProps) {
+  locationHintId,
+  onClearRoute,
+}: WalkRouteStatusProps) {
   // Toggle state for the step list — collapsed by default.
   const [stepsExpanded, setStepsExpanded] = useState(false);
 
-  // FIX 2: Reset stepsExpanded to collapsed when the venue changes.
-  // WHY useRef to track the previous id: we want to reset only on a real change,
-  // not on every render. A direct dep on venue.id in the effect captures the right
-  // moment — a new venue always means the old route's steps are gone and the new
-  // one should start collapsed. Using a ref avoids reading stale closure state.
-  //
-  // NOTE: this effect also fires when walkSteps changes identity (new route same
-  // venue) if we depended on walkSteps, but venue.id is sufficient — it covers
-  // the cross-venue case (the primary bug) without over-firing on re-fetches for
-  // the same venue (e.g. locale change triggering a re-fetch, FIX 5 path).
+  // FIX 2 (unchanged from pre-extraction DirectionButtons): reset
+  // stepsExpanded to collapsed when the venue changes, via a ref so the
+  // effect only fires on a real id change, not every render.
   const prevVenueIdRef = useRef<string>(venue.id);
   useEffect(() => {
     if (prevVenueIdRef.current !== venue.id) {
@@ -196,86 +205,23 @@ export default function DirectionButtons({
     }
   }, [venue.id]);
 
-  // FIX 6: Per-instance id for the step list <ol>.
-  // WHY useId (not a module constant): React's useId() generates a unique id per
-  // component instance, which is robust if two DirectionButtons ever mount
-  // simultaneously (e.g. future side-by-side compare view). The module constant
-  // "walk-steps-list" was shared across all instances — fragile.
-  // data-testid="walk-steps-list" is unchanged — tests query by testid, not id.
+  // Per-instance id for the step list <ol> — see stepsListId's own reasoning
+  // in this file's pre-extraction history; useId() over a module constant
+  // stays robust if two instances of this readout ever mount simultaneously.
   const stepsListId = useId();
 
-  // Per-instance id for the "share your location" hint (#207) — aria-describedby
-  // target on the Walk button below, same useId reasoning as stepsListId.
-  const locationHintId = useId();
-
-  const busUrl = googleMapsUrl(venue.lat, venue.lng, "transit");
-  const driveUrl = googleMapsUrl(venue.lat, venue.lng, "driving");
   const walkGoogleUrl = googleMapsUrl(venue.lat, venue.lng, "walking");
-
-  function handleWalkClick() {
-    if (isRouteActive && onClearRoute) {
-      onClearRoute();
-    } else {
-      onWalk(venue);
-    }
-  }
-
-  // Accessible label for Walk includes venue name so screen readers identify the route target.
-  const walkLabel = isRouteActive
-    ? t("directions.clearRoute", locale)
-    : t("directions.walkAriaLabel", locale, { name: venue.name });
-  // Visible label (shorter) vs accessible label (full context).
-  const walkVisibleLabel = isRouteActive
-    ? t("directions.clearRoute", locale)
-    : t("directions.walk", locale);
-
   const hasSteps = isRouteActive && Array.isArray(walkSteps) && walkSteps.length > 0;
 
   return (
-    <div>
-      <div className="flex gap-2">
-        {/* Walk — in-app route */}
-        <button
-          type="button"
-          aria-label={walkLabel}
-          aria-describedby={showLocationHint ? locationHintId : undefined}
-          onClick={handleWalkClick}
-          className={isRouteActive ? walkActiveClass : walkInactiveClass}
-        >
-          {walkVisibleLabel}
-        </button>
-
-        {/* Bus — Google Maps transit deeplink */}
-        <a
-          href={busUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t("directions.busAriaLabel", locale, { name: venue.name })}
-          className={externalClass}
-        >
-          {t("directions.bus", locale)}
-        </a>
-
-        {/* Drive — Google Maps driving deeplink */}
-        <a
-          href={driveUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t("directions.driveAriaLabel", locale, { name: venue.name })}
-          className={externalClass}
-        >
-          {t("directions.drive", locale)}
-        </a>
-      </div>
-
+    <>
       {/* Location-needed hint (#207) — shown when Walk requested geolocation
           (because userLocation was null) and the browser denied it or it's
           unavailable. role="status" + aria-live announces it immediately for
-          screen reader users; aria-describedby on the Walk button above links
+          screen reader users; aria-describedby on the trigger element links
           it for users who tab back later. !isRouteActive is defensive — the
-          two states shouldn't ever coexist (MapWrapper clears this the instant
-          a new Walk tap starts, and a successful fetch never sets it), but the
-          guard makes that invariant explicit here too. */}
+          two states shouldn't ever coexist, but the guard makes that
+          invariant explicit here too. */}
       {!isRouteActive && showLocationHint && (
         <p
           id={locationHintId}
@@ -288,9 +234,9 @@ export default function DirectionButtons({
         </p>
       )}
 
-      {/* In-card walking route readout — distance + duration below the buttons.
-          Shown only when a route is active for this venue. Uses i18n keys so
-          Spanish users see localized unit strings (e.g. "{distance} caminando"). */}
+      {/* In-card walking route readout — distance + duration. Shown only
+          when a route is active. Uses i18n keys so Spanish users see
+          localized unit strings (e.g. "{distance} caminando"). */}
       {isRouteActive && routeInfo && (
         <div
           data-testid="walking-route-info"
@@ -337,18 +283,12 @@ export default function DirectionButtons({
           {/* WHY hidden attribute over CSS display:none: screen readers skip hidden elements.
               The list must not be announced when collapsed.
               FIX 4: max-h-48 + overflow-y-auto so a long step list scrolls internally and
-              keeps the Walk button + route readout visible on mobile without pushing them
-              below the viewport fold. The BottomSheet body already scrolls (overflow-y-auto),
-              so this inner scroll is intentionally nested — it caps the list specifically.
+              keeps the trigger + route readout visible on mobile without pushing them
+              below the viewport fold.
               KNOWN LIMITATION (FIX 5 deferred): Mapbox-sourced turn instructions do not
               refresh when the user toggles EN/ES while a route is active. The t()-localized
               toggle label and distance readout update immediately, but instruction text stays
-              in the language active at fetch time until the user re-taps Walk. Fixing this
-              requires a locale-change effect in MapWrapper that re-fetches the active route
-              with the new language= param. Deferred because: (a) it adds an async fetch
-              effect triggered by locale change — a new async path that needs race-guarding
-              itself; (b) the most common user path is to set language once before tapping
-              Walk. The current behavior is a minor UX limitation, not a breakage. */}
+              in the language active at fetch time until the user re-taps Walk. */}
           <ol
             id={stepsListId}
             data-testid="walk-steps-list"
@@ -373,6 +313,27 @@ export default function DirectionButtons({
               );
             })}
           </ol>
+        </div>
+      )}
+
+      {/* Clear route — only rendered when the trigger itself doesn't already
+          double as the clear affordance (see onClearRoute's own doc above).
+          Same visual weight as the steps toggle above it. */}
+      {isRouteActive && onClearRoute && (
+        <div className="mt-2">
+          <button
+            type="button"
+            data-testid="walk-clear-route"
+            onClick={onClearRoute}
+            className={
+              "py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
+              "hover:text-[var(--color-sage-700)] underline-offset-2 hover:underline " +
+              PRESS_FEEDBACK + " " +
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+            }
+          >
+            {t("directions.clearRoute", locale)}
+          </button>
         </div>
       )}
 
@@ -404,6 +365,119 @@ export default function DirectionButtons({
           </a>
         </div>
       )}
+    </>
+  );
+}
+
+// ─── Button styles ────────────────────────────────────────────────────────────
+//
+// Three equal-width buttons in a row, using the bone/ink/sage palette.
+// Walk: sage fill (primary action — in-app route).
+// Bus / Drive: bone outline (secondary — opens external app).
+
+const baseClass =
+  "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--radius-md)] " +
+  "text-sm font-semibold transition-colors duration-150 " +
+  PRESS_FEEDBACK + " " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-1";
+
+const walkActiveClass =
+  baseClass +
+  " bg-[var(--color-sage-100)] text-[var(--color-sage-700)] border border-[var(--color-sage-400)]";
+
+const walkInactiveClass =
+  baseClass +
+  " bg-[var(--color-sage-500)] text-[var(--color-bone-50)] hover:bg-[var(--color-sage-600)]";
+
+const externalClass =
+  baseClass +
+  " bg-[var(--color-bone-50)] text-[var(--color-ink-700)] border border-[var(--color-bone-300)] " +
+  "hover:bg-[var(--color-bone-100)] hover:border-[var(--color-bone-400)]";
+
+// ─── DirectionButtons ─────────────────────────────────────────────────────────
+
+export default function DirectionButtons({
+  venue,
+  onWalk,
+  locale,
+  isRouteActive = false,
+  onClearRoute,
+  routeInfo = null,
+  walkSteps = null,
+  showLocationHint = false,
+}: DirectionButtonsProps) {
+  // Per-instance id for the "share your location" hint (#207) — aria-describedby
+  // target on the Walk button below, shared with WalkRouteStatus's own <p id>
+  // (see that component's own header for why this one stays a prop instead of
+  // being generated internally like stepsListId).
+  const locationHintId = useId();
+
+  const busUrl = googleMapsUrl(venue.lat, venue.lng, "transit");
+  const driveUrl = googleMapsUrl(venue.lat, venue.lng, "driving");
+
+  function handleWalkClick() {
+    if (isRouteActive && onClearRoute) {
+      onClearRoute();
+    } else {
+      onWalk(venue);
+    }
+  }
+
+  // Accessible label for Walk includes venue name so screen readers identify the route target.
+  const walkLabel = isRouteActive
+    ? t("directions.clearRoute", locale)
+    : t("directions.walkAriaLabel", locale, { name: venue.name });
+  // Visible label (shorter) vs accessible label (full context).
+  const walkVisibleLabel = isRouteActive
+    ? t("directions.clearRoute", locale)
+    : t("directions.walk", locale);
+
+  return (
+    <div>
+      <div className="flex gap-2">
+        {/* Walk — in-app route */}
+        <button
+          type="button"
+          aria-label={walkLabel}
+          aria-describedby={showLocationHint ? locationHintId : undefined}
+          onClick={handleWalkClick}
+          className={isRouteActive ? walkActiveClass : walkInactiveClass}
+        >
+          {walkVisibleLabel}
+        </button>
+
+        {/* Bus — Google Maps transit deeplink */}
+        <a
+          href={busUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t("directions.busAriaLabel", locale, { name: venue.name })}
+          className={externalClass}
+        >
+          {t("directions.bus", locale)}
+        </a>
+
+        {/* Drive — Google Maps driving deeplink */}
+        <a
+          href={driveUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t("directions.driveAriaLabel", locale, { name: venue.name })}
+          className={externalClass}
+        >
+          {t("directions.drive", locale)}
+        </a>
+      </div>
+
+      <WalkRouteStatus
+        venue={venue}
+        locale={locale}
+        isRouteActive={isRouteActive}
+        routeInfo={routeInfo}
+        walkSteps={walkSteps}
+        showLocationHint={showLocationHint}
+        locationHintId={locationHintId}
+      />
     </div>
   );
 }

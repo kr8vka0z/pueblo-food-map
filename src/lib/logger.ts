@@ -33,6 +33,9 @@ export type FormName =
   | "feedback"
   | "checkin"
   | "checkin_photo"
+  // Migration 0012 — the "what would help you next time?" needs-ask
+  // follow-up route, same split reasoning as "checkin"/"checkin_photo".
+  | "checkin_needs"
   // Blessing Boxes slice 6: "adopt" covers the adopt-a-box application route;
   // "alerts" covers every other alert-subscription route (giver sign-up,
   // confirm, stop, resubscribe, admin host-alerts) — split the same way

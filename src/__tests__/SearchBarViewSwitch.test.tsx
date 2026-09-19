@@ -3,8 +3,10 @@
  *
  * Unit-level coverage for the `viewSwitch` prop SearchBar.tsx added: renders
  * (or doesn't) the ViewToggle at the pill's right end, tracks aria-pressed,
- * fires onChange, and shrinks the filterChip's max-w when both the chip and
- * the switch are present at once (the collision the issue called out).
+ * fires onChange. Also covers `filtersButton` (#513), which replaced the
+ * magnifier icon AND the old `filterChip` — the button and the view switch
+ * sit at opposite ends of the bar and never collide the way filterChip once
+ * did with the view switch's reserved right-side padding.
  * MapWrapperViewSwitch.test.tsx covers the same feature wired through the
  * real MapWrapper (both view states, query/filter preservation, sync with
  * the HamburgerMenu instance).
@@ -85,82 +87,93 @@ describe("SearchBar — viewSwitch present", () => {
   });
 });
 
-describe("SearchBar — viewSwitch + filterChip collision (#191)", () => {
-  test("filterChip max-w shrinks to 26% when viewSwitch is also present", () => {
-    const { container } = render(
-      <SearchBar
-        value=""
-        onChange={vi.fn()}
-        filterChip={{ label: "Food Pantry", onClear: vi.fn() }}
-        viewSwitch={{ mode: "map", onChange: vi.fn() }}
-      />,
-    );
-    const chip = container.querySelector(".max-w-\\[26\\%\\]");
-    expect(chip).not.toBeNull();
-    expect(container.querySelector(".max-w-\\[40\\%\\]")).toBeNull();
+// filterChip was removed (#513): the chosen-category tag left the search bar
+// entirely (also resolves #507's chip/placeholder overlap — there's no chip
+// left to overlap anything). Its right-side viewSwitch reservation is
+// unaffected, since filtersButton lives on the left and never shares space
+// with the right-anchored ViewToggle.
+describe("SearchBar — filtersButton (#513, replaces the magnifier + filterChip)", () => {
+  test("no filters button renders when filtersButton is not passed (plain search icon default)", () => {
+    render(<SearchBar value="" onChange={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /filters/i })).toBeNull();
   });
 
-  test("filterChip max-w stays 40% when viewSwitch is absent", () => {
-    const { container } = render(
-      <SearchBar
-        value=""
-        onChange={vi.fn()}
-        filterChip={{ label: "Food Pantry", onClear: vi.fn() }}
-      />,
-    );
-    expect(container.querySelector(".max-w-\\[40\\%\\]")).not.toBeNull();
-  });
-
-  test("both the chip and the view switch render at once, without one replacing the other", () => {
+  test("renders a Filters button in the magnifier's spot when filtersButton is passed", () => {
     render(
       <SearchBar
         value=""
         onChange={vi.fn()}
-        filterChip={{ label: "Food Pantry", onClear: vi.fn() }}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Filters" })).toBeDefined();
+  });
+
+  test("clicking the Filters button fires onClick", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick, ariaLabel: "Filters" }}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  test("no count badge when count is 0", () => {
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
+    );
+    expect(screen.queryByText("0")).toBeNull();
+  });
+
+  test("shows the count badge when count > 0, and the caller-built aria-label carries the spoken count", () => {
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 2, onClick: vi.fn(), ariaLabel: "Filters, 2 on" }}
+      />,
+    );
+    expect(screen.getByText("2")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Filters, 2 on" })).toBeDefined();
+  });
+
+  test("both the Filters button and the view switch render at once (opposite ends of the bar)", () => {
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 1, onClick: vi.fn(), ariaLabel: "Filters, 1 on" }}
         viewSwitch={{ mode: "map", onChange: vi.fn() }}
       />,
     );
-    expect(screen.getByText("Food Pantry")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Filters, 1 on" })).toBeDefined();
     expect(screen.getByRole("group", { name: /choose map or list view/i })).toBeDefined();
   });
 
-  // docs/bottom-nav-spec.md §4.2: the menu button that forced the mobile-only
-  // right-12 inset is gone, so the switch sits at one inset and the input
-  // reserves one measured width at every breakpoint. jsdom has no layout, so
-  // the class contract is what's assertable — the pixel proof is the browser
-  // measurement recorded in SearchBar.tsx's own comment.
-  test("the view switch sits flush in the pill with one reserved width at every width", () => {
-    const { container } = render(
-      <SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "map", onChange: vi.fn() }} />,
-    );
-    expect(container.querySelector(".right-12")).toBeNull();
-    // Flush with the pill (Kyle, 2026-09-16): 1px in, full height, no inset.
-    expect(container.querySelector(".right-px.top-px.bottom-px")).not.toBeNull();
-    const inputClass = container.querySelector("input[type='search']")?.className ?? "";
-    // Icon-only switch under md, worded from md up (Kyle, 2026-09-16).
-    expect(inputClass).toContain("pr-[93px]");
-    expect(inputClass).toContain("md:pr-[161px]");
-  });
-
-  // Chip or no chip, the switch is icons only under md and the reservation
-  // matches it — the chip no longer changes the right side at all.
-  test.each([
-    ["no chip", undefined],
-    ["chip", { label: "Food Pantry", onClear: vi.fn() }],
-  ])("%s: labels hidden under md only, reservation matches", (_name, chip) => {
+  // docs/bottom-nav-spec.md §4.2: the view switch's own reservation is
+  // unrelated to the left-side filters button — unlike the old filterChip,
+  // filtersButton never changes the right-side pr-* reservation.
+  test("the view switch sits flush in the pill with one reserved width, filtersButton or not", () => {
     const { container } = render(
       <SearchBar
         value=""
         onChange={vi.fn()}
-        filterChip={chip}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
         viewSwitch={{ mode: "map", onChange: vi.fn() }}
       />,
     );
+    expect(container.querySelector(".right-px.top-px.bottom-px")).not.toBeNull();
     const inputClass = container.querySelector("input[type='search']")?.className ?? "";
-    expect(inputClass).toContain("pr-[93px] md:pr-[161px]");
-    expect(inputClass).not.toContain("max-[400px]");
-    const labels = Array.from(container.querySelectorAll("[role=group] span"));
-    expect(labels).toHaveLength(2);
-    labels.forEach((span) => expect(span.className).toBe("max-md:sr-only"));
+    expect(inputClass).toContain("pr-[93px]");
+    expect(inputClass).toContain("md:pr-[161px]");
   });
 });

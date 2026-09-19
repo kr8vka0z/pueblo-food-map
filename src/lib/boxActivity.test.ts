@@ -107,6 +107,17 @@ describe("buildActivityQuery", () => {
   // `venueId`: the global /boxes/activity feed also lets a visitor filter to
   // one box via its own dropdown, and these two kinds must appear on the
   // dedicated per-box history page ONLY (issue #511's own risk note).
+  //
+  // Reviewer fix (PR #521): `includeBoxExtras` alone is NOT enough —
+  // `venueId` must ALSO be set, or the two halves are silently dropped.
+  // Without this, any caller could pass `includeExtras=1` with no `box=`
+  // filter and pull the network's ENTIRE photo/sponsor history in one
+  // request — a scope leak the approved-only filters don't protect
+  // against, since they gate WHICH rows are visible, not HOW MANY boxes'
+  // worth of rows a single request can pull. `includeBoxExtras` is
+  // therefore only "effective" when paired with a specific box, matching
+  // this feature's only real caller (BoxHistoryContent, always scoped to
+  // one box).
   describe("includeBoxExtras (photo + sponsor entries, #511)", () => {
     test("false/undefined — neither box_photos nor box_adopters is queried at all", () => {
       const { sql } = buildActivityQuery({ venueId: "box-1" });
@@ -114,8 +125,14 @@ describe("buildActivityQuery", () => {
       expect(sql).not.toContain("box_adopters");
     });
 
-    test("true — both halves join in, approved-only, with the deterministic 9-column shape", () => {
+    test("true WITHOUT venueId — ignored, neither table is queried (structural gate against a network-wide pull)", () => {
       const { sql } = buildActivityQuery({ includeBoxExtras: true });
+      expect(sql).not.toContain("box_photos");
+      expect(sql).not.toContain("box_adopters");
+    });
+
+    test("true + venueId — both halves join in, approved-only, with the deterministic 9-column shape", () => {
+      const { sql } = buildActivityQuery({ includeBoxExtras: true, venueId: "box-1" });
       expect(sql).toContain("FROM box_photos t");
       expect(sql).toContain("FROM box_adopters t");
       expect(sql).toContain("'photo' AS source");
@@ -137,7 +154,12 @@ describe("buildActivityQuery", () => {
     });
 
     test("still respects date-range filters on the new halves", () => {
-      const { sql, params } = buildActivityQuery({ includeBoxExtras: true, from: "2026-09-01", to: "2026-09-05" });
+      const { sql, params } = buildActivityQuery({
+        includeBoxExtras: true,
+        venueId: "box-1",
+        from: "2026-09-01",
+        to: "2026-09-05",
+      });
       expect(sql).toContain("t.created_at >= ?");
       expect(sql).toContain("t.reviewed_at >= ?");
       // Bound into all 4 halves now: checkin + event (created_at), photo (created_at), sponsor (reviewed_at).

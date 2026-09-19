@@ -641,6 +641,11 @@ const en: Record<string, string> = {
   "box.photo.altText": "Photo of {name}, shared {time}",
   // #508: the card photo becomes a button that opens PhotoViewer full-screen.
   "box.photo.viewFullSize": "View photo full size",
+  // #511 review nit: BoxActivityList's per-entry thumbnail button needs a
+  // label that varies per row (the generic viewFullSize text above is
+  // identical for every photo entry in the log, so multiple photos are
+  // indistinguishable to a screen reader) — {time} makes each one unique.
+  "box.photo.viewFullSizeAt": "View photo full size · {time}",
   "box.photo.report": "Report this photo",
   "box.photo.reporting": "Reporting…",
   "box.photo.reportConfirm": "Hide this photo and send it for review?",
@@ -1439,6 +1444,7 @@ const es: Record<string, string> = {
   "box.photo.caption": "Foto · {time}", // [CHECK]
   "box.photo.altText": "Foto de {name}, compartida {time}", // [CHECK]
   "box.photo.viewFullSize": "Ver foto en tamaño completo", // [CHECK]
+  "box.photo.viewFullSizeAt": "Ver foto en tamaño completo · {time}", // [CHECK]
   "box.photo.report": "Reportar esta foto", // [CHECK]
   "box.photo.reporting": "Reportando…", // [CHECK]
   "box.photo.reportConfirm": "¿Ocultar esta foto y enviarla para revisión?", // [CHECK]

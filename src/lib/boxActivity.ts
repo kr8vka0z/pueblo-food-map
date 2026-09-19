@@ -42,19 +42,28 @@
  * to this same UNION: an approved photo ("Photo added") and an approved
  * sponsor ("<name> became a sponsor", dated by box_adopters.reviewed_at —
  * when the sponsorship was APPROVED, not when the application was filed).
- * Both are gated behind `filters.includeBoxExtras`, a boolean that is
- * DELIBERATELY NOT derived from `filters.venueId` — the global
- * /boxes/activity feed also lets a visitor filter down to one box via its
- * own dropdown (BoxesActivityContent.tsx), and issue #511's own risk note
- * requires these two kinds to appear on the dedicated per-box history page
- * ONLY. Only BoxHistoryContent.tsx ever sets this flag. Neither half joins
- * the pending/rejected/flagged rows of its table (box_photos.status,
- * box_adopters.status) — same "approved-only, never even queried
- * otherwise" posture every other public read of these two tables already
- * uses (boxPhotos.ts's loadApprovedPhotosForVenue, boxAdopters.ts's
- * loadApprovedAdopterNamesForVenues) — and the sponsor half selects only
- * `display_name`, never `email`, mirroring that same file's PRIVATE-column
- * rule.
+ * Both require TWO things to be true at once — `filters.includeBoxExtras`
+ * AND `filters.venueId` (buildActivityQuery's own gate) — neither flag
+ * alone is enough:
+ *   - `includeBoxExtras` is DELIBERATELY NOT derived from `venueId`: the
+ *     global /boxes/activity feed also lets a visitor filter down to one
+ *     box via its own dropdown (BoxesActivityContent.tsx), and issue
+ *     #511's own risk note requires these two kinds to appear on the
+ *     dedicated per-box history page ONLY. Only BoxHistoryContent.tsx ever
+ *     sets this flag.
+ *   - `venueId` is REQUIRED alongside it (reviewer fix, PR #521) — without
+ *     this, `includeBoxExtras=true` with no box filter would let any
+ *     caller pull the network's ENTIRE photo/sponsor history in a single
+ *     request. The approved-only status checks below gate WHICH rows are
+ *     visible; this second gate is what stops HOW MANY boxes' worth of
+ *     rows one request can return.
+ * Neither half joins the pending/rejected/flagged rows of its table
+ * (box_photos.status, box_adopters.status) — same "approved-only, never
+ * even queried otherwise" posture every other public read of these two
+ * tables already uses (boxPhotos.ts's loadApprovedPhotosForVenue,
+ * boxAdopters.ts's loadApprovedAdopterNamesForVenues) — and the sponsor
+ * half selects only `display_name`, never `email`, mirroring that same
+ * file's PRIVATE-column rule.
  *
  * ponytail: neither new half applies `filters.kind` — no caller ever
  * combines `includeBoxExtras` with a kind filter today (BoxHistoryContent
@@ -111,7 +120,7 @@ export interface ActivityFilters {
   page?: number;
   /** Items per page, clamped by clampPageSize() — lets the D3 per-box embed request a smaller page (e.g. 5) than the global feed's default. */
   pageSize?: number;
-  /** #511 — adds the approved-photo and approved-sponsor halves to the UNION. Set ONLY by BoxHistoryContent.tsx's per-box history page; see this file's own header for why this is a dedicated flag rather than inferred from `venueId`. */
+  /** #511 — adds the approved-photo and approved-sponsor halves to the UNION, but ONLY when `venueId` is also set (buildActivityQuery's own gate — reviewer fix, PR #521: without a box filter, this alone would pull the network's entire photo/sponsor history). Set ONLY by BoxHistoryContent.tsx's per-box history page; see this file's own header for why it's a dedicated flag rather than inferred from `venueId`. */
   includeBoxExtras?: boolean;
 }
 
@@ -330,10 +339,16 @@ export function buildActivityQuery(filters: ActivityFilters): { sql: string; par
   const offset = (page - 1) * pageSize;
 
   // #511 — the photo/sponsor halves only join in when explicitly asked for
-  // (see ActivityFilters.includeBoxExtras's own header) — the global feed
-  // never sets this, so it never sees either table.
+  // (see ActivityFilters.includeBoxExtras's own header) AND scoped to one
+  // box (`venueId`) — reviewer fix (PR #521): `includeBoxExtras` alone,
+  // with no `venueId`, would let any caller pull the network's ENTIRE
+  // photo/sponsor history in one request. The approved-only filters inside
+  // buildPhotoHalf/buildSponsorHalf gate WHICH rows are visible, not HOW
+  // MANY boxes' worth a single request can return — that second gate lives
+  // here. This feature's only real caller (BoxHistoryContent) always sets
+  // both together, so this costs it nothing.
   const halves: HalfQuery[] = [buildCheckinHalf(filters), buildEventHalf(filters)];
-  if (filters.includeBoxExtras) {
+  if (filters.includeBoxExtras && filters.venueId) {
     halves.push(buildPhotoHalf(filters), buildSponsorHalf(filters));
   }
 

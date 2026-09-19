@@ -121,6 +121,21 @@ describe("BoxActivityList", () => {
       const { container } = render(<BoxActivityList items={[makePhotoItem()]} showVenueName={false} now={NOW} />);
       expect(container.querySelectorAll("li p")).toHaveLength(1);
     });
+
+    // Review nit: the generic "View photo full size" text alone is
+    // identical for every photo entry — a screen reader user with two+
+    // photos in the log can't tell the buttons apart. The label must vary
+    // per entry (here: by timestamp).
+    test("two photo entries at different times get distinguishable accessible names", () => {
+      const items = [
+        makePhotoItem({ photoId: 1, createdAt: "2026-09-17T10:00:00.000Z" }), // 2h before NOW
+        makePhotoItem({ photoId: 2, createdAt: "2026-08-01T12:00:00.000Z" }), // older, calendar date
+      ];
+      render(<BoxActivityList items={items} showVenueName={false} now={NOW} />);
+      const buttons = screen.getAllByRole("button", { name: /view photo full size/i });
+      expect(buttons).toHaveLength(2);
+      expect(buttons[0].getAttribute("aria-label")).not.toBe(buttons[1].getAttribute("aria-label"));
+    });
   });
 
   describe("sponsor entries (#511)", () => {

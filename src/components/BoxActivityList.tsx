@@ -109,7 +109,7 @@ export default function BoxActivityList({
                 <button
                   type="button"
                   onClick={() => setOpenPhotoIndex(i)}
-                  aria-label={t("box.photo.viewFullSize", locale)}
+                  aria-label={t("box.photo.viewFullSizeAt", locale, { time: when })}
                   className="mt-1.5 block"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- a runtime, R2-backed image via our own serve route, not a build-time/static asset next/image can optimize */}

@@ -37,6 +37,16 @@ interface ViewSuggestionProps {
   count: number;
   /** Called when the row is tapped; parent switches view and closes the popover. */
   onSelect: () => void;
+  /**
+   * Keyboard-a11y fix (reviewer, PR #522): this button is a real Tab stop —
+   * onFocus mirrors the search input's own focus handler (clears the
+   * parent's pending close timer) so landing here via Tab doesn't get
+   * unmounted out from under the just-arrived focus; onBlur tells the parent
+   * whether Tab-ing further should close the popover (relatedTarget/
+   * containment check lives in the parent, not here).
+   */
+  onFocus?: () => void;
+  onBlur?: (e: React.FocusEvent<HTMLButtonElement>) => void;
   /** #165 — true while the map can't mount. See file header. */
   mapDisabled?: boolean;
   locale?: Locale;
@@ -46,6 +56,8 @@ export default function ViewSuggestion({
   mode,
   count,
   onSelect,
+  onFocus,
+  onBlur,
   mapDisabled = false,
   locale = "en",
 }: ViewSuggestionProps) {
@@ -83,6 +95,8 @@ export default function ViewSuggestion({
         // onSelect fires.
         onMouseDown={(e) => e.preventDefault()}
         onClick={onSelect}
+        onFocus={onFocus}
+        onBlur={onBlur}
         className={
           "flex items-center gap-3 w-full px-4 h-[52px] text-left " +
           "text-sm font-semibold text-[var(--color-sage-700)] " +

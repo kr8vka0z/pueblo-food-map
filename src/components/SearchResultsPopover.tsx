@@ -72,6 +72,17 @@ export interface SearchResultsPopoverProps {
    * render (MapWrapper omits it while already on the list — see file header).
    */
   onSeeAllAsList?: () => void;
+  /**
+   * Keyboard-a11y fix (reviewer, PR #522) — the "see all" row is a real Tab
+   * stop (the option <li>s above it carry no tabIndex, so they were never
+   * reachable and need no equivalent wiring). onSeeAllAsListFocus mirrors the
+   * search input's own focus handler (clears the parent's pending close
+   * timer); onSeeAllAsListBlur tells the parent whether Tab-ing further
+   * should close the popover (relatedTarget/containment check lives in the
+   * parent, not here).
+   */
+  onSeeAllAsListFocus?: () => void;
+  onSeeAllAsListBlur?: (e: React.FocusEvent<HTMLButtonElement>) => void;
   locale?: Locale;
 }
 
@@ -84,6 +95,8 @@ export default function SearchResultsPopover({
   onSelect,
   onClose,
   onSeeAllAsList,
+  onSeeAllAsListFocus,
+  onSeeAllAsListBlur,
   locale: localeProp,
 }: SearchResultsPopoverProps) {
   const { locale: ctxLocale } = useLocale();
@@ -221,6 +234,8 @@ export default function SearchResultsPopover({
           // Same grace-period trick as the option rows above.
           onMouseDown={(e) => e.preventDefault()}
           onClick={onSeeAllAsList}
+          onFocus={onSeeAllAsListFocus}
+          onBlur={onSeeAllAsListBlur}
           className={
             "flex items-center gap-2.5 w-full px-4 h-[46px] text-left text-xs " +
             "text-[var(--color-sage-700)] font-semibold " +

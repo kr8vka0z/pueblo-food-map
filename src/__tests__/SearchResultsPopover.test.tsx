@@ -21,8 +21,9 @@
  *   window.scrollIntoView is mocked per-test to capture calls.
  */
 
+import type { FocusEvent } from "react";
 import { describe, test, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SearchResultsPopover, {
   MAX_VISIBLE,
@@ -61,6 +62,8 @@ function renderPopover(
     onSelect?: (id: string) => void;
     onClose?: () => void;
     onSeeAllAsList?: () => void;
+    onSeeAllAsListFocus?: () => void;
+    onSeeAllAsListBlur?: (e: FocusEvent<HTMLButtonElement>) => void;
     locale?: "en" | "es";
   } = {},
 ) {
@@ -71,6 +74,8 @@ function renderPopover(
     onSelect: overrides.onSelect ?? vi.fn(),
     onClose: overrides.onClose ?? vi.fn(),
     onSeeAllAsList: overrides.onSeeAllAsList,
+    onSeeAllAsListFocus: overrides.onSeeAllAsListFocus,
+    onSeeAllAsListBlur: overrides.onSeeAllAsListBlur,
     locale: overrides.locale ?? ("en" as const),
   };
   return render(<SearchResultsPopover {...props} />);
@@ -337,6 +342,31 @@ describe('SearchResultsPopover — "See all N matches as a list" row (#514)', ()
       locale: "es",
     });
     expect(screen.getByText(/Ver los 2 resultados en una lista/i)).toBeDefined();
+  });
+});
+
+// ─── onSeeAllAsListFocus/onSeeAllAsListBlur (keyboard-a11y fix, reviewer, PR #522) ──
+
+describe("SearchResultsPopover — 'See all N matches' row onFocus/onBlur", () => {
+  test("the row forwards focus/blur to the parent's handlers", () => {
+    const onSeeAllAsListFocus = vi.fn();
+    const onSeeAllAsListBlur = vi.fn();
+    renderPopover([makePantry("v0")], {
+      onSeeAllAsList: vi.fn(),
+      onSeeAllAsListFocus,
+      onSeeAllAsListBlur,
+    });
+    const row = screen.getByRole("button", { name: /See all 1 matches as a list/i });
+
+    // fireEvent.focus/blur (not raw dispatchEvent) — React's delegated
+    // synthetic focus/blur listens for the bubbling focusin/focusout events,
+    // which is what fireEvent's FocusEvent map produces; a bare "focus"/
+    // "blur" dispatch (non-bubbling natively) never reaches it.
+    fireEvent.focus(row);
+    expect(onSeeAllAsListFocus).toHaveBeenCalledTimes(1);
+
+    fireEvent.blur(row);
+    expect(onSeeAllAsListBlur).toHaveBeenCalledTimes(1);
   });
 });
 

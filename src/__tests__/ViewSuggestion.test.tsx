@@ -4,7 +4,7 @@
  */
 
 import { describe, test, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import ViewSuggestion from "@/components/ViewSuggestion";
 
 describe("ViewSuggestion — on the map", () => {
@@ -49,6 +49,25 @@ describe("ViewSuggestion — on the list", () => {
   test("renders normally on the list when the map is NOT disabled", () => {
     render(<ViewSuggestion mode="list" count={10} onSelect={vi.fn()} mapDisabled={false} />);
     expect(screen.getByRole("button", { name: /Back to the map/i })).toBeDefined();
+  });
+});
+
+describe("ViewSuggestion — onFocus/onBlur (keyboard-a11y fix, reviewer, PR #522)", () => {
+  test("the button forwards focus/blur to the parent's handlers", () => {
+    const onFocus = vi.fn();
+    const onBlur = vi.fn();
+    render(<ViewSuggestion mode="map" count={5} onSelect={vi.fn()} onFocus={onFocus} onBlur={onBlur} />);
+    const btn = screen.getByRole("button");
+
+    // fireEvent.focus/blur (not raw dispatchEvent) — React's delegated
+    // synthetic focus/blur listens for the bubbling focusin/focusout events,
+    // which is what fireEvent's FocusEvent map produces; a bare "focus"/
+    // "blur" dispatch (non-bubbling natively) never reaches it.
+    fireEvent.focus(btn);
+    expect(onFocus).toHaveBeenCalledTimes(1);
+
+    fireEvent.blur(btn);
+    expect(onBlur).toHaveBeenCalledTimes(1);
   });
 });
 

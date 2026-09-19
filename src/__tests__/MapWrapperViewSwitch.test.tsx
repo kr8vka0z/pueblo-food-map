@@ -22,7 +22,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import MapWrapper from "@/components/MapWrapper";
@@ -231,6 +231,59 @@ describe("MapWrapper — typed query's 'See all N matches as a list' row (#514, 
     expect(screen.queryByRole("button", { name: /matches as a list/i })).toBeNull();
     // Ordinary result options are still offered (jump to a specific venue still works).
     expect(screen.getAllByRole("option").length).toBeGreaterThan(0);
+  });
+});
+
+describe("MapWrapper — keyboard a11y: Tab reaches the suggestion rows (fix, reviewer, PR #522)", () => {
+  // Regression coverage for the reviewer's Important finding: Tabbing out of
+  // the search input used to arm handleSearchBlur's 150ms close timer AND
+  // (worse) handleSearchKeyDown force-closed the popover synchronously on
+  // every Tab keydown — either one unmounted the row before/just after the
+  // browser's own default Tab action could land focus on it. Fixed by
+  // dropping the Tab-keydown force-close and switching blur to a
+  // relatedTarget/containment check (searchAreaRef) instead of a blind timer.
+  test("Tab from the empty search input lands on the ViewSuggestion row, which stays mounted", async () => {
+    const user = userEvent.setup();
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox");
+    await user.click(input);
+    const row = screen.getByRole("button", { name: /See all places as a list/i });
+
+    await user.tab();
+
+    expect(document.activeElement).toBe(row);
+    // Re-query rather than trust the stale reference — proves the row is
+    // still the SAME mounted element, not a coincidentally-matching new one.
+    expect(screen.getByRole("button", { name: /See all places as a list/i })).toBe(row);
+  });
+
+  test("Tab from a typed query lands on the 'See all N matches' row, which stays mounted", async () => {
+    const user = userEvent.setup();
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox");
+    await user.click(input);
+    await user.type(input, "pantry");
+    const row = screen.getByRole("button", { name: /See all \d+ matches as a list/i });
+
+    // The option <li>s above this row carry no tabIndex (never in the tab
+    // sequence), so a single Tab from the input lands directly here.
+    await user.tab();
+
+    expect(document.activeElement).toBe(row);
+    expect(screen.getByRole("button", { name: /See all \d+ matches as a list/i })).toBe(row);
+  });
+
+  test("Tab-ing past the ViewSuggestion row still closes the popover (relatedTarget/containment, not a blind timer)", async () => {
+    const user = userEvent.setup();
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox");
+    await user.click(input);
+    await user.tab(); // lands on the row — stays open (asserted above)
+    await user.tab(); // leaves the search area entirely
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /See all places as a list/i })).toBeNull();
+    });
   });
 });
 

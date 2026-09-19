@@ -880,6 +880,13 @@ export default function MapWrapper({
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // searchAreaRef: wraps SearchBar + ViewSuggestion + SearchResultsPopover
+  // (display:contents — adds no box, purely a containment check target).
+  // Keyboard-a11y fix (reviewer, PR #522): blur needs to tell "focus moved to
+  // one of our own popover rows" (Tab) apart from "focus left the group
+  // entirely" (Tab past the last row, or click elsewhere) — relatedTarget
+  // containment answers that; a blind timer can't.
+  const searchAreaRef = useRef<HTMLDivElement>(null);
 
   // ── Deep link (#132) ──────────────────────────────────────────────────────────
   // Opened with ?venue=<id> → select that venue once the map is ready to fly.
@@ -1081,18 +1088,56 @@ export default function MapWrapper({
   }, []);
 
   /**
-   * Schedule popover close on blur with a grace period.
-   * The grace period allows a mousedown inside the popover (which fires before
-   * blur) to call e.preventDefault(), keeping the click target alive.
+   * Close the popover on blur — UNLESS focus is moving to one of our own
+   * rows (ViewSuggestion's button, SearchResultsPopover's "see all" row).
+   *
+   * Two distinct blur sources land here now:
+   *   - Mouse click on a row: the row's own onMouseDown already called
+   *     preventDefault, so the input never actually blurs — this handler
+   *     doesn't even run.
+   *   - Tab off the input: this DOES fire a real blur. e.relatedTarget is
+   *     the element about to receive focus (browsers set it before running
+   *     default focus-move handlers), so checking containment against
+   *     searchAreaRef tells "Tab into our own row" (relatedTarget inside)
+   *     apart from "Tab/click somewhere else" (relatedTarget outside or
+   *     null) — a keyboard-a11y fix (reviewer, PR #522): the previous blind
+   *     150ms timer raced Tab's own focus-move and could close mid-jump.
+   * The 150ms timer stays as the fallback for the "somewhere else" case
+   * (still gives a stray mousedown elsewhere a grace period).
    */
-  const handleSearchBlur = useCallback(() => {
+  const handleSearchBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    const next = e.relatedTarget;
+    if (next instanceof Node && searchAreaRef.current?.contains(next)) return;
     blurTimerRef.current = setTimeout(() => {
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     }, 150);
   }, []);
 
-  /** Keyboard handler forwarded from SearchBar: ArrowDown/Up/Enter/Escape/Tab. */
+  /**
+   * Shared blur handler for the popover rows themselves (ViewSuggestion's
+   * button, SearchResultsPopover's "see all" row) — same containment check
+   * as handleSearchBlur, needed because Tab-ing further (past the last row)
+   * blurs the ROW, not the input, so handleSearchBlur never sees it.
+   */
+  const handleSuggestionRowBlur = useCallback((e: React.FocusEvent) => {
+    const next = e.relatedTarget;
+    if (next instanceof Node && searchAreaRef.current?.contains(next)) return;
+    blurTimerRef.current = setTimeout(() => {
+      setIsPopoverOpen(false);
+      setActiveIndex(-1);
+    }, 150);
+  }, []);
+
+  /**
+   * Keyboard handler forwarded from SearchBar: ArrowDown/Up/Enter/Escape.
+   * Tab is deliberately NOT handled here — it used to force-close the
+   * popover on every Tab press, which raced (and usually won against) the
+   * browser's own default focus-move, closing the popover before Tab could
+   * land on ViewSuggestion's/SearchResultsPopover's row (keyboard-a11y fix,
+   * reviewer, PR #522). Tab's effect on the popover is now decided entirely
+   * by blur/focus containment — see handleSearchBlur/handleSuggestionRowBlur.
+   */
   const handleSearchKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       const popoverVisible = isPopoverOpen && filteredVenues.length > 0;
@@ -1114,9 +1159,6 @@ export default function MapWrapper({
         setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
       } else if (e.key === "Escape") {
         e.preventDefault();
-        setIsPopoverOpen(false);
-        setActiveIndex(-1);
-      } else if (e.key === "Tab") {
         setIsPopoverOpen(false);
         setActiveIndex(-1);
       } else if (e.key === "Enter") {
@@ -1358,71 +1400,88 @@ export default function MapWrapper({
         />
       )}
 
-      {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67).
-          filtersButton (#513) opens the FilterPanel below — search focus
-          opens ViewSuggestion (empty query) or SearchResultsPopover (typed),
-          never a category list of its own. Nothing renders on the right end
-          of the bar (#514 removed the inline Map/List switch — see
-          ViewSuggestion/HamburgerMenu for its replacements). */}
-      <SearchBar
-        value={query}
-        onChange={(next) => {
-          setQuery(next);
-          // Reset activeIndex on every keystroke — new results set.
-          setActiveIndex(-1);
-        }}
-        placeholder={t("search.placeholder", locale)}
-        ariaLabel={t("search.aria", locale)}
-        comboboxEnabled={true}
-        comboboxExpanded={showResultsPopover}
-        comboboxControls={showResultsPopover ? LISTBOX_ID : undefined}
-        comboboxActiveDescendant={activeDescendantId}
-        onFocus={handleSearchFocus}
-        onBlur={handleSearchBlur}
-        onKeyDownExtra={handleSearchKeyDown}
-        filtersButton={{
-          count: activeFilterCount,
-          onClick: () => setFilterPanelOpen(true),
-          ariaLabel:
-            activeFilterCount > 0
-              ? t("filters.button.labelActive", locale, { count: String(activeFilterCount) })
-              : t("filters.button.label", locale),
-        }}
-      />
-
-      {/* ViewSuggestion (#514) — shown on an EMPTY, focused search bar; offers
-          the other view. Mutually exclusive with SearchResultsPopover/
-          EmptySearchPopover below (both require a non-empty query). Renders
-          nothing itself while on the list with the map disabled (#165) —
-          see the component's own guard. */}
-      {showViewSuggestion && (
-        <ViewSuggestion
-          mode={viewMode}
-          count={filteredVenues.length}
-          mapDisabled={mapUnavailable}
-          locale={locale}
-          onSelect={() => handleViewSuggestionSelect(viewMode === "map" ? "list" : "map")}
-        />
-      )}
-
-      {/* SearchResultsPopover — shown when query is non-empty AND has matches (#67).
-          Mutually exclusive with EmptySearchPopover. onSeeAllAsList (#514) is
-          map-only — on the list, typing already updates ListView live. */}
-      {showResultsPopover && (
-        <SearchResultsPopover
-          venues={filteredVenues as VenueWithDistance[]}
-          activeIndex={activeIndex}
-          listboxId={LISTBOX_ID}
-          onSelect={handleSelectVenueFromPopover}
-          onClose={() => {
-            setIsPopoverOpen(false);
+      {/* searchAreaRef wraps these three — display:contents so it adds no box
+          of its own — purely so blur handlers can ask "did focus move to one
+          of OUR OWN rows, or leave the group entirely?" (keyboard-a11y fix,
+          reviewer, PR #522). See handleSearchBlur/handleSuggestionRowBlur. */}
+      <div ref={searchAreaRef} className="contents">
+        {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67).
+            filtersButton (#513) opens the FilterPanel below — search focus
+            opens ViewSuggestion (empty query) or SearchResultsPopover (typed),
+            never a category list of its own. Nothing renders on the right end
+            of the bar (#514 removed the inline Map/List switch — see
+            ViewSuggestion/HamburgerMenu for its replacements). */}
+        <SearchBar
+          value={query}
+          onChange={(next) => {
+            setQuery(next);
+            // Reset activeIndex on every keystroke — new results set.
             setActiveIndex(-1);
           }}
-          onSeeAllAsList={
-            viewMode === "map" ? () => handleViewSuggestionSelect("list") : undefined
-          }
+          placeholder={t("search.placeholder", locale)}
+          ariaLabel={t("search.aria", locale)}
+          comboboxEnabled={true}
+          comboboxExpanded={showResultsPopover}
+          comboboxControls={showResultsPopover ? LISTBOX_ID : undefined}
+          comboboxActiveDescendant={activeDescendantId}
+          onFocus={handleSearchFocus}
+          onBlur={handleSearchBlur}
+          onKeyDownExtra={handleSearchKeyDown}
+          filtersButton={{
+            count: activeFilterCount,
+            onClick: () => setFilterPanelOpen(true),
+            ariaLabel:
+              activeFilterCount > 0
+                ? t("filters.button.labelActive", locale, { count: String(activeFilterCount) })
+                : t("filters.button.label", locale),
+          }}
         />
-      )}
+
+        {/* ViewSuggestion (#514) — shown on an EMPTY, focused search bar; offers
+            the other view. Mutually exclusive with SearchResultsPopover/
+            EmptySearchPopover below (both require a non-empty query). Renders
+            nothing itself while on the list with the map disabled (#165) —
+            see the component's own guard. onFocus/onBlur (keyboard-a11y fix,
+            reviewer, PR #522) make its button Tab-reachable: onFocus mirrors
+            handleSearchFocus (clears any pending close timer), onBlur decides
+            whether Tab-ing further should close the popover. */}
+        {showViewSuggestion && (
+          <ViewSuggestion
+            mode={viewMode}
+            count={filteredVenues.length}
+            mapDisabled={mapUnavailable}
+            locale={locale}
+            onSelect={() => handleViewSuggestionSelect(viewMode === "map" ? "list" : "map")}
+            onFocus={handleSearchFocus}
+            onBlur={handleSuggestionRowBlur}
+          />
+        )}
+
+        {/* SearchResultsPopover — shown when query is non-empty AND has matches (#67).
+            Mutually exclusive with EmptySearchPopover. onSeeAllAsList (#514) is
+            map-only — on the list, typing already updates ListView live.
+            onSeeAllAsListFocus/onSeeAllAsListBlur (keyboard-a11y fix, reviewer,
+            PR #522) — same pattern as ViewSuggestion above, scoped to that one
+            new row (the option <li>s above it carry no tabIndex, so they were
+            never keyboard-reachable and need no such wiring). */}
+        {showResultsPopover && (
+          <SearchResultsPopover
+            venues={filteredVenues as VenueWithDistance[]}
+            activeIndex={activeIndex}
+            listboxId={LISTBOX_ID}
+            onSelect={handleSelectVenueFromPopover}
+            onClose={() => {
+              setIsPopoverOpen(false);
+              setActiveIndex(-1);
+            }}
+            onSeeAllAsList={
+              viewMode === "map" ? () => handleViewSuggestionSelect("list") : undefined
+            }
+            onSeeAllAsListFocus={handleSearchFocus}
+            onSeeAllAsListBlur={handleSuggestionRowBlur}
+          />
+        )}
+      </div>
 
       {/* FilterPanel (#513) — the left side panel opened by SearchBar's Filters
           button. Not tied to search focus (replaces CategoryDropdown, #95). */}

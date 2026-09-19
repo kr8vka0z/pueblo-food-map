@@ -347,6 +347,24 @@ export const STATUS_BADGE_CLASS: Record<BoxStatus, string> = {
   out_of_service: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
 };
 
+/** Card-redesign (2026-09-19) — the small solid dot on the status pill/check-in buttons. Same semantic-token pairing as STATUS_BADGE_CLASS above, just a solid fill instead of a 10%-tint background. */
+export const STATUS_DOT_CLASS: Record<BoxStatus, string> = {
+  stocked: "bg-[var(--color-success)]",
+  low: "bg-[var(--color-warning)]",
+  empty: "bg-[var(--color-danger)]",
+  unknown: "bg-[var(--color-ink-400)]",
+  out_of_service: "bg-[var(--color-ink-400)]",
+};
+
+/** Card-redesign (2026-09-19) — the status WORD's own text color on the photo pill (mockup v3: the word itself carries the status color; the "· filled {time}" detail segment stays neutral ink-500, set directly in BoxCardBody). Same pairing as STATUS_DOT_CLASS, just a text-color utility instead of a background one — kept as its own map rather than derived at render time so both are equally greppable/token-checkable. */
+export const STATUS_TEXT_CLASS: Record<BoxStatus, string> = {
+  stocked: "text-[var(--color-success)]",
+  low: "text-[var(--color-warning)]",
+  empty: "text-[var(--color-danger)]",
+  unknown: "text-[var(--color-ink-400)]",
+  out_of_service: "text-[var(--color-ink-400)]",
+};
+
 // ─── Check-in SQL (slice 2) ─────────────────────────────────────────────────
 // 'problem' is excluded at the SQL level, not just by toPublicCheckinEvents'
 // filter above — belt-and-suspenders, same structural-guarantee reasoning

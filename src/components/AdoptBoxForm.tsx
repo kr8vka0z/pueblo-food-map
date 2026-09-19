@@ -17,6 +17,16 @@
  * ponytail: this is the hook's own documented ceiling — no note/state
  * restore on failure, because this form simply stays open (nothing is
  * cleared until a real success), unlike a one-tap check-in button.
+ *
+ * Controlled open state (card redesign, 2026-09-19) — `open`/`onOpenChange`
+ * are OPTIONAL: omitted, the component behaves exactly as before (its own
+ * `useState` + its own collapsed-link trigger button). Passed, the caller
+ * (BoxCardBody's sponsor band, whose own "Apply to adopt this box" link is
+ * now the ONE trigger for this form) owns open/closed and this component
+ * renders no trigger of its own — otherwise the label would appear twice.
+ * The Turnstile container still mounts unconditionally either way (this
+ * file's own header, above) since the controlled case still needs a token
+ * ready before the visitor finishes typing.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -34,6 +44,9 @@ type SubmitState = "idle" | "submitting" | "success" | "error" | "rateLimited";
 
 interface AdoptBoxFormProps {
   boxId: string;
+  /** Controlled open state — see this file's own header. Omit for the standalone/uncontrolled case. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 interface PendingSubmit {
@@ -44,9 +57,15 @@ interface PendingSubmit {
 
 const RATE_LIMIT_ERRORS = new Set(["rate_limit_visitor", "rate_limit_box", "rate_limit_email", "rate_limit_global"]);
 
-export default function AdoptBoxForm({ boxId }: AdoptBoxFormProps) {
+export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: AdoptBoxFormProps) {
   const { locale } = useLocale();
-  const [open, setOpen] = useState(false);
+  const isControlled = openProp !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? openProp : internalOpen;
+  function setOpen(next: boolean) {
+    if (isControlled) onOpenChange?.(next);
+    else setInternalOpen(next);
+  }
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
@@ -171,13 +190,18 @@ export default function AdoptBoxForm({ boxId }: AdoptBoxFormProps) {
   if (!open) {
     return (
       <>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="min-h-[44px] text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline w-fit text-left"
-        >
-          {t("box.adopt.linkLabel", locale)}
-        </button>
+        {/* Controlled mode (BoxCardBody's sponsor band): the band's own link
+            IS the trigger — rendering a second one here would duplicate the
+            label. Uncontrolled mode (standalone use): own trigger, unchanged. */}
+        {!isControlled && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="min-h-[44px] text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline w-fit text-left"
+          >
+            {t("box.adopt.linkLabel", locale)}
+          </button>
+        )}
         {turnstileNodes}
       </>
     );

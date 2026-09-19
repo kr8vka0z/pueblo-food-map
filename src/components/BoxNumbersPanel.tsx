@@ -23,6 +23,7 @@ import { t, type Locale } from "@/lib/i18n";
 import {
   formatDurationMs,
   type CheckinCounts,
+  type NetworkOverview,
   type PairAverages,
   type PeriodKey,
 } from "@/lib/boxStats";
@@ -64,6 +65,14 @@ export interface BoxNumbersPanelProps {
   approvedPhotoCount: number;
   pairAverages: PairAverages;
   locale: Locale;
+  /**
+   * Current ("right now") network-wide counts (issue #512) — box count,
+   * sponsor count, and their average — independent of the period picker
+   * above, so passed as their own prop rather than folded into `counts`.
+   * Undefined on the per-box panel (/box/<id>/history's BoxHistoryContent),
+   * where "how many boxes" and "how many sponsors" don't apply to one box.
+   */
+  networkOverview?: NetworkOverview;
 }
 
 export default function BoxNumbersPanel({
@@ -74,11 +83,20 @@ export default function BoxNumbersPanel({
   approvedPhotoCount,
   pairAverages,
   locale,
+  networkOverview,
 }: BoxNumbersPanelProps) {
   const periodSelectId = `${idPrefix}-stats-period`;
 
   return (
     <div className="space-y-4">
+      {networkOverview && (
+        <dl>
+          <Row label={t("box.stats.boxCount", locale)} value={String(networkOverview.boxCount)} />
+          <Row label={t("box.stats.sponsorCount", locale)} value={String(networkOverview.sponsorCount)} />
+          <Row label={t("box.stats.avgSponsorsPerBox", locale)} value={networkOverview.avgSponsorsPerBox} />
+        </dl>
+      )}
+
       <div className="max-w-xs">
         <label htmlFor={periodSelectId} className={FIELD_LABEL}>
           {t("box.stats.period", locale)}

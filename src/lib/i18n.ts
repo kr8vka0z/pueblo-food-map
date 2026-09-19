@@ -644,6 +644,11 @@ const en: Record<string, string> = {
   // own; only the two heading keys below name which context they're in.
   "box.stats.perBoxHeading": "Numbers for this box",
   "box.stats.networkHeading": "Network numbers",
+  // Current ("right now") network counts, issue #512 — independent of the
+  // period picker below, unlike every other box.stats.* key on this page.
+  "box.stats.boxCount": "Blessing boxes",
+  "box.stats.sponsorCount": "Sponsors",
+  "box.stats.avgSponsorsPerBox": "Avg. sponsors per box",
   "box.stats.period": "Time period",
   "box.stats.period.7d": "Last 7 days",
   "box.stats.period.30d": "Last 30 days",
@@ -654,7 +659,10 @@ const en: Record<string, string> = {
   "box.stats.emptyReports": "Empty reports",
   "box.stats.lowReports": "Low reports",
   "box.stats.totalCheckins": "Total check-ins",
-  "box.stats.approvedPhotos": "Approved photos",
+  // Reworded from "Approved photos" (issue #512, Kyle) — "approved" reads
+  // like a moderation-status label; "shared" is what the photo actually is
+  // to the person who submitted it.
+  "box.stats.approvedPhotos": "Shared photos",
   "box.stats.avgHeading": "Typical timing",
   "box.stats.avg.emptyToFill": "Empty to next fill",
   "box.stats.avg.fillToFill": "Fill to next fill",
@@ -1397,6 +1405,9 @@ const es: Record<string, string> = {
 
   "box.stats.perBoxHeading": "Números de esta caja", // [CHECK]
   "box.stats.networkHeading": "Números de la red", // [CHECK]
+  "box.stats.boxCount": "Cajas de bendición", // [CHECK]
+  "box.stats.sponsorCount": "Patrocinadores", // [CHECK]
+  "box.stats.avgSponsorsPerBox": "Prom. de patrocinadores por caja", // [CHECK]
   "box.stats.period": "Periodo", // [CHECK]
   "box.stats.period.7d": "Últimos 7 días", // [CHECK]
   "box.stats.period.30d": "Últimos 30 días", // [CHECK]
@@ -1407,7 +1418,7 @@ const es: Record<string, string> = {
   "box.stats.emptyReports": "Avisos de vacío", // [CHECK]
   "box.stats.lowReports": "Avisos de poco surtido", // [CHECK]
   "box.stats.totalCheckins": "Total de visitas registradas", // [CHECK]
-  "box.stats.approvedPhotos": "Fotos aprobadas", // [CHECK]
+  "box.stats.approvedPhotos": "Fotos compartidas", // [CHECK]
   "box.stats.avgHeading": "Tiempos típicos", // [CHECK]
   "box.stats.avg.emptyToFill": "De vacío al siguiente surtido", // [CHECK]
   "box.stats.avg.fillToFill": "De un surtido al siguiente", // [CHECK]

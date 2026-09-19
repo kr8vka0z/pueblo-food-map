@@ -26,6 +26,12 @@
  * box's/network's ENTIRE history, never the period-scoped subset — see
  * boxStats.ts's own header for why period-scoping those would mostly starve
  * them of data.
+ *
+ * "Right now" overview (issue #512) — box count, sponsor count, and their
+ * average are current-state numbers, not period-scoped like the counts
+ * above: `networkOverview` reads networkStats.boxes.length and
+ * .approvedSponsorCount directly, bypassing periodCheckins entirely, so the
+ * period picker never moves them (task's own explicit rule).
  */
 
 import { useMemo, useState } from "react";
@@ -39,6 +45,7 @@ import { ACTIVITY_KINDS, ACTIVITY_PAGE_SIZE_DEFAULT } from "@/lib/boxActivity";
 import {
   computeCheckinCounts,
   computeMilestones,
+  computeNetworkOverview,
   computeNetworkPairAverages,
   filterByPeriod,
   groupCheckinsByVenue,
@@ -130,6 +137,14 @@ export default function BoxesActivityContent() {
     [allTimeCounts],
   );
 
+  // "Right now" counts (issue #512) — box count and sponsor count are
+  // current-state numbers, not period-scoped like the counts above, so they
+  // read straight off networkStats rather than periodCheckins.
+  const networkOverview = useMemo(
+    () => computeNetworkOverview(networkStats.boxes.length, networkStats.approvedSponsorCount ?? 0),
+    [networkStats.boxes.length, networkStats.approvedSponsorCount],
+  );
+
   const needLoveBoxes = useMemo(
     () =>
       networkStats.boxes.map((b) => ({
@@ -168,6 +183,7 @@ export default function BoxesActivityContent() {
             approvedPhotoCount={approvedPhotoCount}
             pairAverages={pairAverages}
             locale={locale}
+            networkOverview={networkOverview}
           />
           <BoxNeedLoveList
             longestSinceFill={longestSinceFill}

@@ -12,16 +12,18 @@
  * (blessingBoxes.ts, boxActivity.ts) — testable with fixtures, no fake D1
  * binding required for the logic that actually matters.
  *
- * WHY network totals are NOT simply "the live box list's own checkins":
+ * WHY network totals ALSO exclude archived boxes, same as everywhere else:
  * loadLiveBoxes/loadVisibleCheckinsForVenues (blessingBoxes.ts) and
- * loadBoxActivity (boxActivity.ts) both JOIN venues ON status != 'archived'
- * — correct for "what's live on the map right now," wrong for network
- * totals, which must keep counting an archived box's history (task's own
- * rule: archived boxes drop out of the "needs love" ranking, never out of
- * the network sum). loadNetworkStatsData() below is therefore a DELIBERATE,
- * NARROW widening of that JOIN — every other privacy/scope filter this
- * feature enforces (kind != 'problem', category = 'blessing_box') still
- * applies; only the archived-status exclusion is dropped, and only here.
+ * loadBoxActivity (boxActivity.ts) both JOIN venues ON status != 'archived'.
+ * loadNetworkStatsData() below applies the identical exclusion — no
+ * archived box's id, name, check-ins, or photos ever reach this route's
+ * response or any network number. (Reversed 2026-09-19 from this file's
+ * earlier design, which deliberately widened past that JOIN to keep an
+ * archived box's history in the network sum; consistency with every other
+ * public query in this repo won out — see AGENTS.md's slice 7 section for
+ * the record of that decision.) Every other privacy/scope filter this
+ * feature enforces (kind != 'problem', category = 'blessing_box',
+ * visibility = 'visible') is unchanged.
  *
  * WHY pair averages/need-love ranking are always computed over ALL-TIME
  * check-ins, never the period-scoped subset the counts panel uses: a 7-day
@@ -113,43 +115,78 @@ function sortByCreatedAt(checkins: readonly CheckinStatusInput[]): CheckinStatus
 }
 
 /**
- * For every check-in of `fromKind`, finds the FIRST later check-in of
- * `toKind` (chronologically — any other kinds in between are irrelevant,
- * this only asks "how long until the next one of THAT kind") and records the
- * gap in ms. A `fromKind` event with no later `toKind` at all contributes
- * NOTHING — never a 0, never dropped-as-if-instant — so a box with exactly
- * one 'empty' and no fill after it correctly produces no pair, not a
- * misleading average of one zero-length interval.
+ * Single forward pass over one box's chronologically-sorted, already
+ * public-filtered check-ins, producing all three pair-delta lists at once —
+ * replaces an earlier "for every fromKind, scan forward for the first
+ * toKind" approach (O(n²); the ponytail comment naming that ceiling is gone,
+ * it no longer applies).
  *
- * ponytail: O(n²) in the worst case (every event scans forward for its
- * match) — fine at this feature's real per-box/per-network volume (a
- * handful of check-ins a day, same scale every other blessing-box query in
- * this repo assumes); the upgrade path is a single forward pass tracking
- * "last unmatched fromKind index per toKind" if this ever needs to run over
- * a much larger history.
+ * `emptyToFillMs` — one pair per "empty spell": the FIRST 'empty' seen since
+ * the last 'filled' (or since the start of history) opens the spell; a
+ * repeat 'empty' before the next 'filled' adds NOTHING (still the same
+ * spell, not a second pair) — the next 'filled' closes it and the following
+ * 'empty' starts a fresh spell.
+ *
+ * `fillToEmptyMs` — the mirror rule, not a symmetric copy: every 'filled'
+ * re-opens the "waiting for a closing empty" window and OVERWRITES which
+ * fill is currently open, so only the LAST 'filled' before an 'empty' ever
+ * pairs with it (an earlier fill that was superseded by a later one before
+ * any empty arrived never pairs forward across that later fill). Once an
+ * 'empty' closes the window, a repeat 'empty' in the same spell closes
+ * nothing further — only the FIRST empty of a spell counts.
+ *
+ * `fillToFillMs` — every 'filled' pairs with the very next 'filled',
+ * unaffected by the empty-spell bookkeeping above (any other kind between
+ * two fills is irrelevant to this one).
+ *
+ * A `fromKind` event with nothing later to pair against contributes NOTHING
+ * to its list — never a 0, never dropped-as-if-instant — so a box with
+ * exactly one 'empty' and no fill after it correctly produces no pair, not
+ * a misleading average of one zero-length interval.
  */
-function collectPairDeltasMs(sorted: readonly CheckinStatusInput[], fromKind: CheckinKind, toKind: CheckinKind): number[] {
-  const deltas: number[] = [];
-  for (let i = 0; i < sorted.length; i++) {
-    if (sorted[i].kind !== fromKind) continue;
-    const fromMs = new Date(sorted[i].created_at).getTime();
-    for (let j = i + 1; j < sorted.length; j++) {
-      if (sorted[j].kind === toKind) {
-        deltas.push(new Date(sorted[j].created_at).getTime() - fromMs);
-        break;
+function collectCheckinPairDeltas(sorted: readonly CheckinStatusInput[]): {
+  emptyToFillMs: number[];
+  fillToFillMs: number[];
+  fillToEmptyMs: number[];
+} {
+  const emptyToFillMs: number[] = [];
+  const fillToFillMs: number[] = [];
+  const fillToEmptyMs: number[] = [];
+
+  let lastFillMs: number | null = null;
+  let fillToEmptyOpen = false; // true from a 'filled' until the next 'empty' closes it
+  let emptySpellStartMs: number | null = null; // the FIRST 'empty' since the last 'filled'
+
+  for (const c of sorted) {
+    const ts = new Date(c.created_at).getTime();
+    if (c.kind === "filled") {
+      if (lastFillMs !== null) fillToFillMs.push(ts - lastFillMs);
+      if (emptySpellStartMs !== null) {
+        emptyToFillMs.push(ts - emptySpellStartMs);
+        emptySpellStartMs = null;
+      }
+      lastFillMs = ts;
+      fillToEmptyOpen = true;
+    } else if (c.kind === "empty") {
+      if (emptySpellStartMs === null) emptySpellStartMs = ts;
+      if (fillToEmptyOpen && lastFillMs !== null) {
+        fillToEmptyMs.push(ts - lastFillMs);
+        fillToEmptyOpen = false;
       }
     }
   }
-  return deltas;
+
+  return { emptyToFillMs, fillToFillMs, fillToEmptyMs };
 }
 
 /** One box's own average timing, computed over its ENTIRE history (see this file's header for why period-scoping would mostly starve this of pairs). */
 export function computePairAverages(checkins: readonly CheckinStatusInput[]): PairAverages {
   const sorted = sortByCreatedAt(publicCheckins(checkins));
+  const deltas = collectCheckinPairDeltas(sorted);
   return {
-    emptyToFillMs: averageOf(collectPairDeltasMs(sorted, "empty", "filled")),
-    fillToFillMs: averageOf(collectPairDeltasMs(sorted, "filled", "filled")),
-    fillToEmptyMs: averageOf(collectPairDeltasMs(sorted, "filled", "empty")),
+    emptyToFillMs: averageOf(deltas.emptyToFillMs),
+    fillToFillMs: averageOf(deltas.fillToFillMs),
+    fillToEmptyMs: averageOf(deltas.fillToEmptyMs),
   };
 }
 
@@ -159,9 +196,9 @@ export function computePairAverages(checkins: readonly CheckinStatusInput[]): Pa
  * with many short refill cycles naturally outweighs a box with a single
  * long one, exactly as a plain average of every individual observation
  * would. Pairs never cross a box boundary: each box's own check-ins are
- * sorted and paired independently (collectPairDeltasMs never sees another
- * box's events), only the resulting delta lists are pooled before the final
- * average.
+ * sorted and paired independently (collectCheckinPairDeltas never sees
+ * another box's events), only the resulting delta lists are pooled before
+ * the final average.
  */
 export function computeNetworkPairAverages(checkinsByBox: ReadonlyMap<string, readonly CheckinStatusInput[]>): PairAverages {
   const emptyToFill: number[] = [];
@@ -169,9 +206,10 @@ export function computeNetworkPairAverages(checkinsByBox: ReadonlyMap<string, re
   const fillToEmpty: number[] = [];
   for (const checkins of checkinsByBox.values()) {
     const sorted = sortByCreatedAt(publicCheckins(checkins));
-    emptyToFill.push(...collectPairDeltasMs(sorted, "empty", "filled"));
-    fillToFill.push(...collectPairDeltasMs(sorted, "filled", "filled"));
-    fillToEmpty.push(...collectPairDeltasMs(sorted, "filled", "empty"));
+    const deltas = collectCheckinPairDeltas(sorted);
+    emptyToFill.push(...deltas.emptyToFillMs);
+    fillToFill.push(...deltas.fillToFillMs);
+    fillToEmpty.push(...deltas.fillToEmptyMs);
   }
   return {
     emptyToFillMs: averageOf(emptyToFill),
@@ -253,11 +291,14 @@ export interface LastFillEntry {
 }
 
 /**
- * Archived boxes never appear here (task's own explicit rule — their check-in
- * history still feeds the network totals elsewhere, just not this "needs
- * attention now" ranking, since nobody can act on an archived box). Boxes
- * that have been filled sort oldest-first (longest since); ties (including
- * every never-filled box) break by name for a deterministic, testable order.
+ * Archived boxes never appear here — since 2026-09-19 they never even reach
+ * `boxes` at all (loadNetworkStatsData()'s own header explains the SQL-level
+ * exclusion this filter now duplicates); kept as a second, redundant guard
+ * for any caller that ever hands this function a hand-built or fixture list
+ * containing one, same belt-and-suspenders posture the rest of this feature
+ * already takes with hidden/problem check-ins. Boxes that have been filled
+ * sort oldest-first (longest since); ties (including every never-filled
+ * box) break by name for a deterministic, testable order.
  */
 export function rankLongestSinceLastFill(boxes: readonly NeedLoveBox[], limit: number = NEED_LOVE_LIST_SIZE): LastFillEntry[] {
   return boxes
@@ -362,30 +403,31 @@ export interface NetworkStatsData {
 }
 
 /**
- * Every blessing-box venue (archived included — see this file's header for
- * why network totals must not drop an archived box's history). Still scoped
- * to real boxes only: JOINs `blessing_boxes` (a venue can't be a box without
- * a row there) the same way SELECT_LIVE_BOXES_SQL (blessingBoxes.ts) does.
+ * Every NON-ARCHIVED blessing-box venue — matches SELECT_LIVE_BOXES_SQL
+ * (blessingBoxes.ts) and boxActivity.ts's own VENUE_JOIN exactly (`v.status
+ * != 'archived'`), so an archived box's id and name never reach this
+ * route's public response at all (reversed 2026-09-19 — see this file's
+ * header for the earlier design this replaces). Still scoped to real boxes
+ * only: JOINs `blessing_boxes` (a venue can't be a box without a row there)
+ * the same way SELECT_LIVE_BOXES_SQL does.
  */
 const SELECT_ALL_BOX_VENUES_SQL = `
   SELECT v.id, v.name, v.status
   FROM venues v
   JOIN blessing_boxes b ON b.venue_id = v.id
-  WHERE v.category = 'blessing_box'
+  WHERE v.category = 'blessing_box' AND v.status != 'archived'
   ORDER BY v.name COLLATE NOCASE ASC
 `;
 
 /**
- * Every VISIBLE, non-problem check-in for every blessing-box venue,
- * regardless of that venue's archived status — the DELIBERATE widening this
- * file's header describes: boxActivity.ts's own VENUE_JOIN adds `AND
- * v.status != 'archived'` for the live activity feed; this query drops that
- * ONE clause and keeps every other guard intact (category = 'blessing_box',
- * kind != 'problem', AND visibility = 'visible' — this route's response is
- * public, and a hidden check-in must never even be fetched, not just
- * dropped in application code, same "never even reach the private thing"
- * structural rule migrations/0005's host_contact and every other public
- * check-in read in this repo already enforce, e.g.
+ * Every VISIBLE, non-problem check-in for every NON-ARCHIVED blessing-box
+ * venue — every guard boxActivity.ts's own VENUE_JOIN applies to the live
+ * activity feed now applies here too (category = 'blessing_box', v.status
+ * != 'archived'), plus this route's own public-response guards (kind !=
+ * 'problem', AND visibility = 'visible' — a hidden check-in must never even
+ * be fetched, not just dropped in application code, same "never even reach
+ * the private thing" structural rule migrations/0005's host_contact and
+ * every other public check-in read in this repo already enforce, e.g.
  * SELECT_VISIBLE_CHECKINS_SQL in blessingBoxes.ts). The pure aggregation
  * functions above ALSO filter `visibility` (publicCheckins()) — kept as a
  * second, redundant guard, same belt-and-suspenders split
@@ -396,16 +438,16 @@ const SELECT_ALL_BOX_VENUES_SQL = `
 const SELECT_ALL_BOX_CHECKINS_SQL = `
   SELECT c.venue_id, c.kind, c.visibility, c.created_at
   FROM box_checkins c
-  JOIN venues v ON v.id = c.venue_id AND v.category = 'blessing_box'
+  JOIN venues v ON v.id = c.venue_id AND v.category = 'blessing_box' AND v.status != 'archived'
   WHERE c.visibility = 'visible' AND c.kind != 'problem'
   ORDER BY c.created_at ASC
 `;
 
-/** Every APPROVED photo for every blessing-box venue, archived included — same widening as the check-ins query above, for the same reason. */
+/** Every APPROVED photo for every NON-ARCHIVED blessing-box venue — same exclusion as the two queries above, for the same reason. */
 const SELECT_ALL_BOX_PHOTOS_SQL = `
   SELECT p.venue_id, p.created_at
   FROM box_photos p
-  JOIN venues v ON v.id = p.venue_id AND v.category = 'blessing_box'
+  JOIN venues v ON v.id = p.venue_id AND v.category = 'blessing_box' AND v.status != 'archived'
   WHERE p.status = 'approved'
   ORDER BY p.created_at ASC
 `;

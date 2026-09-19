@@ -151,6 +151,63 @@ describe("computePairAverages", () => {
     // the only valid pair is empty(9/1) -> filled(9/5), the hidden filled on 9/2 must not win
     expect(computePairAverages(checkins).emptyToFillMs).toBe(4 * 24 * 60 * 60 * 1000);
   });
+
+  // ─── Repeat-safe empty<->fill pairing (fix, 2026-09-19) ─────────────────
+  // The earlier "for every fromKind, find the first later toKind" approach
+  // let a repeat check-in of the SAME kind generate a spurious extra pair —
+  // see collectCheckinPairDeltas' own header in boxStats.ts for the full
+  // spell/window reasoning these four tests each isolate one piece of.
+
+  test("empty -> fill: repeated 'empty' reports before the next fill add no extra pairs (one pair per empty spell)", () => {
+    const checkins = [
+      ci({ kind: "empty", created_at: "2026-09-01T00:00:00.000Z" }),
+      ci({ kind: "empty", created_at: "2026-09-01T06:00:00.000Z" }),
+      ci({ kind: "empty", created_at: "2026-09-01T12:00:00.000Z" }),
+      ci({ kind: "filled", created_at: "2026-09-03T00:00:00.000Z" }),
+    ];
+    // exactly ONE pair: the FIRST empty (9/1 00:00) -> the fill, not three.
+    expect(computePairAverages(checkins).emptyToFillMs).toBe(2 * 24 * 60 * 60 * 1000);
+  });
+
+  test("fill -> empty: only the LAST 'filled' before an 'empty' pairs with it, not an earlier superseded fill", () => {
+    const checkins = [
+      ci({ kind: "filled", created_at: "2026-09-01T00:00:00.000Z" }),
+      ci({ kind: "filled", created_at: "2026-09-02T00:00:00.000Z" }),
+      ci({ kind: "empty", created_at: "2026-09-05T00:00:00.000Z" }),
+    ];
+    // must pair with the 9/2 fill (3 days), never forward-pair the 9/1 fill (4 days).
+    expect(computePairAverages(checkins).fillToEmptyMs).toBe(3 * 24 * 60 * 60 * 1000);
+  });
+
+  test("fill -> empty: only the FIRST empty of a spell closes the pair", () => {
+    const checkins = [
+      ci({ kind: "filled", created_at: "2026-09-01T00:00:00.000Z" }),
+      ci({ kind: "empty", created_at: "2026-09-02T00:00:00.000Z" }), // closes the pair (1 day)
+      ci({ kind: "empty", created_at: "2026-09-04T00:00:00.000Z" }), // repeat in the same spell, no pair
+      ci({ kind: "filled", created_at: "2026-09-10T00:00:00.000Z" }),
+    ];
+    expect(computePairAverages(checkins).fillToEmptyMs).toBe(1 * 24 * 60 * 60 * 1000);
+  });
+
+  test("real dev data (practice box 2 timeline, all fields verified against Kyle's reported values)", () => {
+    const checkins = [
+      ci({ kind: "filled", created_at: "2026-09-02T01:45:10.000Z" }),
+      ci({ kind: "filled", created_at: "2026-09-02T07:59:20.000Z" }),
+      ci({ kind: "empty", created_at: "2026-09-02T08:01:13.000Z" }),
+      ci({ kind: "filled", created_at: "2026-09-02T08:01:59.000Z" }),
+      ci({ kind: "empty", created_at: "2026-09-02T08:26:37.000Z" }),
+      ci({ kind: "filled", created_at: "2026-09-02T08:26:49.000Z" }),
+    ];
+    const averages = computePairAverages(checkins);
+    // fill -> empty: exactly two pairs — (07:59:20 -> 08:01:13) = 113,000ms,
+    // (08:01:59 -> 08:26:37) = 1,478,000ms. The 01:45:10 fill must NOT pair
+    // forward across the later 07:59:20 fill to the 08:01:13 empty (the
+    // pre-fix bug: 3 pairs, adding a spurious 01:45:10 -> 08:01:13 pair).
+    expect(averages.fillToEmptyMs).toBe((113_000 + 1_478_000) / 2);
+    // empty -> fill: exactly two pairs — (08:01:13 -> 08:01:59) = 46,000ms,
+    // (08:26:37 -> 08:26:49) = 12,000ms.
+    expect(averages.emptyToFillMs).toBe((46_000 + 12_000) / 2);
+  });
 });
 
 // ─── computeNetworkPairAverages ──────────────────────────────────────────────
@@ -392,11 +449,11 @@ function makeFakeNetworkDb(
 }
 
 describe("loadNetworkStatsData", () => {
-  test("maps venue status into a plain archived boolean", async () => {
+  test("maps a non-archived venue's status into a plain archived boolean (draft and published both read false)", async () => {
     const db = makeFakeNetworkDb(
       [
         { id: "a", name: "A", status: "published" },
-        { id: "b", name: "B", status: "archived" },
+        { id: "b", name: "B", status: "draft" },
       ],
       [],
       [],
@@ -404,8 +461,54 @@ describe("loadNetworkStatsData", () => {
     const data = await loadNetworkStatsData(db);
     expect(data.boxes).toEqual([
       { id: "a", name: "A", archived: false },
-      { id: "b", name: "B", archived: true },
+      { id: "b", name: "B", archived: false },
     ]);
+  });
+
+  // Fix, 2026-09-19 (reversing this slice's earlier "network totals keep an
+  // archived box's history forever" design — see boxStats.ts's own header
+  // and AGENTS.md's slice 7 section for the record): archived boxes must
+  // never reach this route's response at all, same exclusion every other
+  // public box query in this repo already applies. The fake DB below
+  // doesn't simulate real SQL filtering (it just echoes back whatever rows
+  // the test hands it), so these three tests assert the SQL TEXT itself —
+  // the only way a unit test can catch a future edit that drops the
+  // exclusion clause, same pattern the `visibility = 'visible'` test below
+  // already established for the check-ins query.
+  test("the venues query excludes archived boxes at the SQL level", async () => {
+    let capturedSql = "";
+    const db = {
+      prepare: (sql: string) => {
+        if (sql.includes("FROM venues")) capturedSql = sql;
+        return { all: async () => ({ results: [] }) };
+      },
+    } as unknown as D1Database;
+    await loadNetworkStatsData(db);
+    expect(capturedSql).toContain("v.status != 'archived'");
+  });
+
+  test("the check-ins query excludes archived boxes at the SQL level, not only non-problem/visible", async () => {
+    let capturedSql = "";
+    const db = {
+      prepare: (sql: string) => {
+        if (sql.includes("FROM box_checkins")) capturedSql = sql;
+        return { all: async () => ({ results: [] }) };
+      },
+    } as unknown as D1Database;
+    await loadNetworkStatsData(db);
+    expect(capturedSql).toContain("v.status != 'archived'");
+  });
+
+  test("the photos query excludes archived boxes at the SQL level", async () => {
+    let capturedSql = "";
+    const db = {
+      prepare: (sql: string) => {
+        if (sql.includes("FROM box_photos")) capturedSql = sql;
+        return { all: async () => ({ results: [] }) };
+      },
+    } as unknown as D1Database;
+    await loadNetworkStatsData(db);
+    expect(capturedSql).toContain("v.status != 'archived'");
   });
 
   test("passes checkins and photos through unchanged", async () => {

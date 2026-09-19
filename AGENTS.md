@@ -3724,21 +3724,28 @@ new secret** — every number is computed from `box_checkins`/`box_events`/
 computed — pure functions over plain arrays (never a D1Database), same
 "testable against fixtures" split `blessingBoxes.ts`/`boxActivity.ts` already
 use. It also carries the ONE new D1 read this slice adds:
-`loadNetworkStatsData()`, three queries (every blessing-box venue + its
-archived flag, every non-`problem` check-in, every approved photo) — see the
-next paragraph for why this query is DELIBERATELY broader than every
-existing box query in this file.
+`loadNetworkStatsData()`, three queries (every non-archived blessing-box
+venue, every non-`problem` check-in on one, every approved photo on one) —
+see the next paragraph for the exclusion these three queries all share.
 
-**Every existing live-box/activity query filters `v.status != 'archived'`
-(SELECT_LIVE_BOXES_SQL, boxActivity.ts's VENUE_JOIN) — `loadNetworkStatsData()`
-does NOT.** Network-wide totals must keep counting an archived box's history
-forever (task's own rule); only the "boxes that need love" ranking drops
-archived boxes, and it does that in application code
-(`rankLongestSinceLastFill`/`rankMostEmptyReports`/`rankSlowestRefill`, all
-three filter `!b.archived`), not in SQL. Dev-only practice boxes
+**Every query `loadNetworkStatsData()` runs filters `v.status != 'archived'`,
+matching every other box query in this file (`SELECT_LIVE_BOXES_SQL`,
+boxActivity.ts's `VENUE_JOIN`) — no archived box's id, name, check-ins, or
+photos ever reach the network-stats response or any network number.**
+(Reversed 2026-09-19 from this slice's original design, which deliberately
+widened past that exclusion so network totals would keep counting an
+archived box's history forever; Kyle's later call was that consistency with
+every other public box query wins — see `boxStats.ts`'s own header comment
+for the fuller record.) The "boxes that need love" ranking's own
+`!b.archived` filter (`rankLongestSinceLastFill`/`rankMostEmptyReports`/
+`rankSlowestRefill`) is now redundant with the SQL-level exclusion, and kept
+anyway as a second guard — same belt-and-suspenders posture this feature
+already takes with hidden/`problem` check-ins. Dev-only practice boxes
 (`fake-blessing-box-practice-*`) get no special-case treatment anywhere in
 this slice — they're ordinary `blessing_box` venues and follow whatever the
-live layer already does with them (Kyle's own instruction for this slice).
+live layer already does with them (Kyle's own instruction for this slice;
+confirmed by grep — `blessingBoxes.ts`/`boxActivity.ts` have no
+practice/seed-specific filter for this slice to mirror).
 
 **Public counts (fills/uses/empty reports/low reports/total check-ins) are
 scoped to the picked period (7d/30d/90d/all); pair averages and the
@@ -3752,25 +3759,56 @@ kind, and the shared honesty note (`box.stats.honestyNote`) says outright
 that these are check-ins, not visits, so "uses" reads low on purpose.
 
 **Pair-average definition — exactly what's paired, not a general "gap
-between two events":** for every check-in of kind A, `collectPairDeltasMs`
-finds the FIRST later check-in of kind B (chronologically; other kinds in
-between don't matter) and records the gap. Three pairs are shown: empty ->
-next fill, fill -> next fill, fill -> next empty. A check-in with no later
-match of the paired kind contributes NOTHING (never a 0) — a box with one
-`empty` and no later `filled` shows "—", not an instant refill. The
-network average pools EVERY pair across every box and takes ONE mean —
-explicitly NOT the mean of each box's own mean, so a box with many short
-cycles correctly outweighs a box with one long one, the same way a plain
-average of every individual observation would (`computeNetworkPairAverages`'s
-own header spells out the arithmetic with a worked example).
+between two events" (corrected 2026-09-19 — the earlier "first later
+match" reading over-counted a repeat check-in; see `boxStats.ts`'s
+`collectCheckinPairDeltas` for the full reasoning):**
+
+- **`empty -> fill`** — one pair per "empty spell." The FIRST `empty` since
+  the last `filled` (or since the start of history) opens the spell; a
+  repeat `empty` before the next `filled` adds NOTHING — still the same
+  spell, not a second pair. The next `filled` closes it, then a following
+  `empty` opens a fresh spell.
+- **`fill -> empty`** — the mirror rule, not a symmetric copy. Every
+  `filled` re-opens the "waiting for a closing empty" window and
+  OVERWRITES which fill is open, so only the LAST `filled` before an
+  `empty` ever pairs with it (an earlier fill superseded by a later one
+  before any empty arrived never pairs forward across that later fill).
+  Once an `empty` closes the window, a repeat `empty` in the same spell
+  closes nothing further — only the FIRST empty of a spell counts.
+- **`fill -> fill`** — every `filled` pairs with the very next `filled`,
+  unaffected by the empty-spell bookkeeping above (any other kind between
+  two fills doesn't matter to this pair).
+
+A check-in with no later match of the paired kind contributes NOTHING
+(never a 0) — a box with one `empty` and no later `filled` shows "—", not
+an instant refill. The network average pools EVERY pair across every box
+and takes ONE mean — explicitly NOT the mean of each box's own mean, so a
+box with many short cycles correctly outweighs a box with one long one, the
+same way a plain average of every individual observation would
+(`computeNetworkPairAverages`'s own header spells out the arithmetic with a
+worked example). All three are now computed in a single forward pass over
+each box's sorted check-ins (`collectCheckinPairDeltas`) — the earlier
+per-kind "scan forward for the first match" approach and its `ponytail:`
+O(n²) comment are both gone.
+
+**Worked example (real dev data, practice box 2, all times same day):**
+`filled 01:45:10`, `filled 07:59:20`, `empty 08:01:13`, `filled 08:01:59`,
+`empty 08:26:37`, `filled 08:26:49`. `fill -> empty` yields exactly two
+pairs — `07:59:20 -> 08:01:13` (113,000 ms) and `08:01:59 -> 08:26:37`
+(1,478,000 ms), average 795,500 ms — the `01:45:10` fill does NOT pair
+forward across the later `07:59:20` fill to the same empty (that was the
+bug: 3 pairs, one spurious). `empty -> fill` yields `08:01:13 -> 08:01:59`
+(46,000 ms) and `08:26:37 -> 08:26:49` (12,000 ms), average 29,000 ms.
+Regression-guarded in `boxStats.test.ts` with this exact timeline.
 
 **Exclusions, applied consistently everywhere a count/average is computed:**
 a hidden check-in (`box_checkins.visibility = 'hidden'`) never counts, and
 neither does a `kind = 'problem'` report — the same two guarantees this
 whole feature already enforces at every other public read site, applied a
 second time here (belt-and-suspenders, matching `computeBoxStatus`'s own
-posture). Archived boxes (`venues.status = 'archived'`) are excluded from
-the "needs love" ranking only, never from network totals — see above.
+posture). Archived boxes (`venues.status = 'archived'`) are excluded
+everywhere in this slice — network totals and the "needs love" ranking
+alike — see above.
 
 **Per-box Numbers section (`/box/<id>/history`) reuses existing D1 reads,
 adding NONE of its own:** `page.tsx` calls the already-exported
@@ -3786,9 +3824,12 @@ server read** — that page is a deliberately static server shell (English
 existing public blessing-box API pattern instead: `GET
 /api/public/blessing-boxes/network-stats` (new route, same
 `respondWithEdgeCache()` 60s-at-the-edge helper every other public
-blessing-box GET already uses) ships the RAW data (every box's archived
-flag, every check-in, every approved-photo timestamp) rather than
-pre-aggregated numbers, and `useBoxNetworkStats.ts` fetches it once;
+blessing-box GET already uses) ships the RAW data (every non-archived box's
+id/name, every check-in on one, every approved-photo timestamp on one)
+rather than pre-aggregated numbers, and `useBoxNetworkStats.ts` fetches it
+once; `StatsBoxMeta.archived` stays in the response shape for type
+stability but is always `false` in practice, since an archived box's row
+never reaches this query at all (previous paragraph);
 `boxStats.ts`'s pure functions do the actual counting/averaging in the
 browser on every period change, so the exact logic `boxStats.test.ts`
 already proves against fixtures is what runs in production.

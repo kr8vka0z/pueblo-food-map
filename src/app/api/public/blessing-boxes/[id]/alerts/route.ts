@@ -4,16 +4,41 @@
  * location; see AGENTS.md's Blessing Boxes slice 6 section). Blessing Boxes
  * slice 6.
  *
- * Same guard ORDER as the adopt route (see that file's own header) and the
- * same shared "alert-email-target"/"alert-email-global" rate-limit scopes —
+ * Guard ORDER, same shared convention as the adopt route (see that file's
+ * own header): Content-Type -> Turnstile -> honeypot -> per-visitor rate
+ * limit -> field validation -> box lookup -> email-flood rate limit ->
+ * write -> confirm email. The email-flood scopes
+ * (alert-email-target/alert-email-global) are SHARED with the adopt route —
  * a flood of signups (this route) and adoption applications (../adopt) both
- * draw from one combined email-abuse budget.
+ * draw from one combined email-abuse budget. 2026-09-18 security review,
+ * item 5: those two scopes moved to run just before the write/send (after
+ * validation finds a real email and the box lookup finds a real box),
+ * exactly like the adopt route's own item-5 fix — see that file's header
+ * for the full reasoning, which applies identically here.
  *
  * Upsert semantics (new / resend / noop / reactivate) live in
  * src/lib/boxAlerts.ts's upsertGiverSubscription — every branch returns the
  * SAME generic {ok:true} response here, per the task's own spec, so a
  * caller can never learn from the response alone whether an address was
  * already subscribed.
+ *
+ * 2026-09-18 security review, item 4: the confirm-email send used to be
+ * awaited inline, with a Resend failure turning into a 502 the caller could
+ * see — a TIMING ORACLE, since "new"/"resend"/"reactivate" all had to wait
+ * on a real Resend round-trip while "noop" (address already confirmed and
+ * active) returned instantly, letting a caller distinguish "already
+ * subscribed" from "not yet" purely by response latency despite the
+ * response BODY being identical on every branch. Fixed by dispatching the
+ * send via ctx.waitUntil() (same pattern boxAlerts.ts's notifyBoxAlerts
+ * already uses from the checkins route, mirrored here) so every branch
+ * returns at the same speed with the same generic body — a failed send is
+ * now caught and logged (recipient count only — see logFormFailure below),
+ * never surfaced to the caller. The adopt route deliberately KEEPS its
+ * synchronous, fatal send (a single, non-enumerable applicant email, and
+ * the task's own spec requires a real error there) — this route's signup
+ * is the one an anonymous caller could probe repeatedly against many
+ * addresses, which is what makes the timing side-channel real here and not
+ * there.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,7 +46,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { resolveBoxTurnstileKey, verifyBoxTurnstile } from "@/lib/boxTurnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
-import { isValidEmail } from "@/lib/rateLimit";
+import { isValidEmail, normalizeEmail } from "@/lib/rateLimit";
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
 import { logFormFailure } from "@/lib/logger";
 import { sendGiverConfirmEmail, upsertGiverSubscription } from "@/lib/boxAlerts";
@@ -31,7 +56,7 @@ export const dynamic = "force-dynamic";
 const MAX_ALERT_SIGNUPS_PER_VISITOR_PER_HOUR = 5;
 /** Shared with the adopt-a-box route — see this file's own header. */
 const MAX_EMAIL_TARGET_PER_HOUR = 3;
-const MAX_EMAIL_GLOBAL_PER_HOUR = 60;
+const MAX_EMAIL_GLOBAL_PER_HOUR = 300;
 
 interface AlertSignupPayload {
   email?: string;
@@ -103,11 +128,32 @@ export async function POST(
     }
   }
 
-  const emailKey = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  // Normalized ONCE here (item 3) — reused below for validation, the
+  // email-flood rate-limit key, and storage.
+  const email = normalizeEmail(typeof body.email === "string" ? body.email : "");
+  if (!email || email.length > FIELD_LIMITS.EMAIL || !isValidEmail(email)) {
+    return NextResponse.json({ ok: false, error: "Invalid email" }, { status: 422 });
+  }
+
+  let box: BoxLookupRow | null;
+  try {
+    box = await db
+      .prepare("SELECT id, name FROM venues WHERE id = ? AND category = 'blessing_box' AND status != 'archived'")
+      .bind(boxId)
+      .first<BoxLookupRow>();
+  } catch (err) {
+    logFormFailure("alerts", "db_unavailable", { message: err instanceof Error ? err.message : "unknown error" });
+    return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 502 });
+  }
+  if (!box) {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  }
+
+  // Email-flood scopes moved here (item 5, see this file's own header).
   const emailTargetCap = await checkAndIncrement(
     db,
     rateLimitSecret,
-    { scope: "alert-email-target", id: emailKey },
+    { scope: "alert-email-target", id: email },
     MAX_EMAIL_TARGET_PER_HOUR,
   );
   if (!emailTargetCap) {
@@ -124,31 +170,39 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "rate_limit_global" }, { status: 429 });
   }
 
-  const email = typeof body.email === "string" ? body.email.trim() : "";
-  if (!email || email.length > FIELD_LIMITS.EMAIL || !isValidEmail(email)) {
-    return NextResponse.json({ ok: false, error: "Invalid email" }, { status: 422 });
+  let action: Awaited<ReturnType<typeof upsertGiverSubscription>>["action"];
+  let confirmToken: string | null;
+  try {
+    ({ action, confirmToken } = await upsertGiverSubscription(db, { venueId: boxId, email }, new Date()));
+  } catch (err) {
+    logFormFailure("alerts", "db_unavailable", { message: err instanceof Error ? err.message : "unknown error" });
+    return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 502 });
   }
 
-  const box = await db
-    .prepare("SELECT id, name FROM venues WHERE id = ? AND category = 'blessing_box' AND status != 'archived'")
-    .bind(boxId)
-    .first<BoxLookupRow>();
-  if (!box) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
-  }
-
-  const { action, confirmToken } = await upsertGiverSubscription(db, { venueId: boxId, email }, new Date());
-
+  // Dispatched via ctx.waitUntil(), never awaited — see this file's own
+  // header, item 4: awaiting here would make the "noop" branch (no email
+  // sent) answer faster than every other branch, a timing oracle revealing
+  // whether an address was already subscribed despite the identical
+  // response body below.
   if (action !== "noop" && confirmToken) {
-    try {
-      await sendGiverConfirmEmail({ to: email, boxName: box.name, origin: resolveEmailOrigin(req), confirmToken });
-    } catch (err) {
+    const emailPromise = sendGiverConfirmEmail({
+      to: email,
+      boxName: box.name,
+      origin: resolveEmailOrigin(req),
+      confirmToken,
+    }).catch((err) => {
       logFormFailure("alerts", "send_failed", { message: err instanceof Error ? err.message : "unknown error" });
-      return NextResponse.json({ ok: false, error: "send_failed" }, { status: 502 });
+    });
+    try {
+      getCloudflareContext().ctx.waitUntil(emailPromise);
+    } catch {
+      // No live ExecutionContext (local dev / a test harness) — the promise
+      // above still runs on its own and is already caught; nothing further
+      // to do here.
     }
   }
 
-  // Same generic response on EVERY branch (new/resend/noop/reactivate) —
-  // see this file's own header.
+  // Same generic response on EVERY branch (new/resend/noop/reactivate),
+  // and now at the same SPEED too (item 4) — see this file's own header.
   return NextResponse.json({ ok: true });
 }

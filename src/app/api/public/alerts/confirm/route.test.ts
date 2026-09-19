@@ -207,4 +207,22 @@ describe("POST /api/public/alerts/confirm", () => {
     const res = await POST(makeRequest({ token: "any-token" }));
     expect(res.status).toBe(503);
   });
+
+  // 2026-09-18 security review, item 9: a D1 exception on either table's
+  // lookup (a transient outage, or "no such table" if migration 0010 hasn't
+  // landed on this environment) used to bubble up as an unhandled 500.
+  test("D1 error on the adopter/subscription lookup -> 502 db_unavailable, not an unhandled 500 (item 9)", async () => {
+    const db = {
+      prepare: (sql: string) => {
+        if (sql === "SELECT * FROM box_adopters WHERE confirm_token = ?") {
+          return { bind: () => ({ first: async () => { throw new Error("no such table: box_adopters"); } }) };
+        }
+        throw new Error("unexpected SQL in fake db: " + sql);
+      },
+    } as unknown as D1Database;
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    const res = await POST(makeRequest({ token: "any-token" }));
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toBe("db_unavailable");
+  });
 });

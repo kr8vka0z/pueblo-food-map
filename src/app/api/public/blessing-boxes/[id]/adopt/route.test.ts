@@ -186,6 +186,33 @@ describe("POST /api/public/blessing-boxes/[id]/adopt", () => {
     expect(res.status).toBe(422);
   });
 
+  // 2026-09-18 security review, item 5: the email-flood scopes now run
+  // AFTER field validation and the box lookup — an invalid submission must
+  // never draw against that shared budget, since no email was ever going
+  // to be sent for it.
+  test("invalid displayName -> 422 WITHOUT ever checking the email-flood scopes (item 5)", async () => {
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
+    const res = await callPost({ email: "a@example.com", displayName: "", turnstileToken: "t" });
+    expect(res.status).toBe(422);
+    // Only adopt-box ran (no clientToken in this body) — never alert-email-target/global.
+    expect(mockCheckAndIncrement).toHaveBeenCalledTimes(1);
+    expect(mockCheckAndIncrement.mock.calls[0][2]).toEqual({ scope: "adopt-box", id: BOX_ID });
+  });
+
+  test("unknown/archived box id -> 404 WITHOUT ever checking the email-flood scopes (item 5)", async () => {
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb({ boxRow: null }).db } });
+    await callPost(VALID_BODY);
+    expect(mockCheckAndIncrement).toHaveBeenCalledTimes(1);
+    expect(mockCheckAndIncrement.mock.calls[0][2]).toEqual({ scope: "adopt-box", id: BOX_ID });
+  });
+
+  test("email-global cap is checked at 300/hour, not 60 (item 5)", async () => {
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
+    await callPost(VALID_BODY);
+    const globalCall = mockCheckAndIncrement.mock.calls.find((c) => (c[2] as { scope: string }).scope === "alert-email-global");
+    expect(globalCall?.[3]).toBe(300);
+  });
+
   test("displayName over the length cap -> 422", async () => {
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
     const res = await callPost({ ...VALID_BODY, displayName: "x".repeat(61) });
@@ -228,12 +255,42 @@ describe("POST /api/public/blessing-boxes/[id]/adopt", () => {
     expect(sentBody.subject).toContain("Test Blessing Box");
   });
 
+  // 2026-09-18 security review, item 3: email is normalized (trim +
+  // lowercase) ONCE at this route's boundary before storage, so
+  // "Foo@X.com" and "foo@x.com" land as the same row elsewhere.
+  test("email is lowercased + trimmed before storage (item 3)", async () => {
+    const { db, insertCalls } = makeFakeDb();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    const res = await callPost({ ...VALID_BODY, email: "  Adopter@Example.com  " });
+    expect(res.status).toBe(200);
+    expect(insertCalls[0][2]).toBe("adopter@example.com");
+  });
+
   test("D1 insert failure -> 502 db_write_failed, no email sent", async () => {
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb({ insertShouldThrow: true }).db } });
     const res = await callPost(VALID_BODY);
     expect(res.status).toBe(502);
     expect((await res.json()).error).toBe("db_write_failed");
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  // 2026-09-18 security review, item 9: an unguarded D1 exception on the box
+  // lookup (e.g. a transient D1 outage, or "no such table" if a migration
+  // hasn't landed on this environment yet) used to bubble up as an
+  // unhandled 500 — now a clean 502 db_unavailable.
+  test("D1 error on the box lookup -> 502 db_unavailable, not an unhandled 500 (item 9)", async () => {
+    const db = {
+      prepare: (sql: string) => {
+        if (sql.includes("FROM venues WHERE id")) {
+          return { bind: () => ({ first: async () => { throw new Error("D1 outage"); } }) };
+        }
+        throw new Error("unexpected SQL in fake db: " + sql);
+      },
+    } as unknown as D1Database;
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    const res = await callPost(VALID_BODY);
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toBe("db_unavailable");
   });
 
   test("Resend failure -> 502 send_failed (fatal, per the task's own spec)", async () => {

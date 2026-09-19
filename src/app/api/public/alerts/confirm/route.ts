@@ -18,6 +18,13 @@
  * ALREADY-confirmed token is NOT an error (idempotent) — both
  * markAdopterEmailConfirmed/confirmSubscription simply no-op and this route
  * still returns success.
+ *
+ * 2026-09-18 security review, item 9: every D1 read/write below (both
+ * tables' lookups and their confirm writes) is wrapped in ONE try/catch —
+ * a D1 outage, or "no such table" if migration 0010 hasn't landed on this
+ * environment yet, used to bubble up as an unhandled 500. The admin-notice
+ * email send already has its own inner try/catch (best-effort, unrelated to
+ * D1 health) and is unaffected by this outer one.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -64,35 +71,40 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const now = new Date();
 
-  const adopter = await loadAdopterByConfirmToken(db, token);
-  if (adopter) {
-    if (!isAdopterConfirmTokenValid(adopter, now)) {
-      return NextResponse.json({ ok: false, error: "invalid_token" }, { status: 200 });
-    }
-    const firstConfirm = await markAdopterEmailConfirmed(db, adopter.id, now.toISOString());
-    if (firstConfirm) {
-      try {
-        await sendAdopterConfirmedAdminEmail(db, adopter);
-      } catch (err) {
-        // Best-effort — the confirm itself already succeeded and is durable;
-        // a missed admin notice just means the queue is discovered a little
-        // later (the /admin/box-adopters list still shows it).
-        logFormFailure("adopt", "send_failed", {
-          message: err instanceof Error ? err.message : "unknown error",
-        });
+  try {
+    const adopter = await loadAdopterByConfirmToken(db, token);
+    if (adopter) {
+      if (!isAdopterConfirmTokenValid(adopter, now)) {
+        return NextResponse.json({ ok: false, error: "invalid_token" }, { status: 200 });
       }
+      const firstConfirm = await markAdopterEmailConfirmed(db, adopter.id, now.toISOString());
+      if (firstConfirm) {
+        try {
+          await sendAdopterConfirmedAdminEmail(db, adopter);
+        } catch (err) {
+          // Best-effort — the confirm itself already succeeded and is durable;
+          // a missed admin notice just means the queue is discovered a little
+          // later (the /admin/box-adopters list still shows it).
+          logFormFailure("adopt", "send_failed", {
+            message: err instanceof Error ? err.message : "unknown error",
+          });
+        }
+      }
+      return NextResponse.json({ ok: true });
     }
-    return NextResponse.json({ ok: true });
-  }
 
-  const subscription = await findSubscriptionByConfirmToken(db, token);
-  if (subscription) {
-    if (!isSubscriptionConfirmTokenValid(subscription, now)) {
-      return NextResponse.json({ ok: false, error: "invalid_token" }, { status: 200 });
+    const subscription = await findSubscriptionByConfirmToken(db, token);
+    if (subscription) {
+      if (!isSubscriptionConfirmTokenValid(subscription, now)) {
+        return NextResponse.json({ ok: false, error: "invalid_token" }, { status: 200 });
+      }
+      await confirmSubscription(db, subscription.id, now.toISOString());
+      return NextResponse.json({ ok: true });
     }
-    await confirmSubscription(db, subscription.id, now.toISOString());
-    return NextResponse.json({ ok: true });
-  }
 
-  return NextResponse.json({ ok: false, error: "invalid_token" }, { status: 200 });
+    return NextResponse.json({ ok: false, error: "invalid_token" }, { status: 200 });
+  } catch (err) {
+    logFormFailure("adopt", "db_unavailable", { message: err instanceof Error ? err.message : "unknown error" });
+    return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 502 });
+  }
 }

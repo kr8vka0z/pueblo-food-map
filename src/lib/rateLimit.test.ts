@@ -8,7 +8,7 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { isValidEmail } from "@/lib/rateLimit";
+import { isValidEmail, normalizeEmail } from "@/lib/rateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 
 describe("isValidEmail", () => {
@@ -37,5 +37,19 @@ describe("isValidEmail", () => {
     const atCap = "a".repeat(localLength) + "@b.co";
     expect(atCap.length).toBe(FIELD_LIMITS.EMAIL);
     expect(isValidEmail(atCap)).toBe(true);
+  });
+});
+
+describe("normalizeEmail (2026-09-18 security review, item 3)", () => {
+  test("trims surrounding whitespace and lowercases", () => {
+    expect(normalizeEmail("  Foo@X.com  ")).toBe("foo@x.com");
+  });
+
+  test("two differently-cased inputs normalize to the identical string", () => {
+    expect(normalizeEmail("Foo@X.com")).toBe(normalizeEmail("foo@x.com"));
+  });
+
+  test("empty input stays empty", () => {
+    expect(normalizeEmail("")).toBe("");
   });
 });

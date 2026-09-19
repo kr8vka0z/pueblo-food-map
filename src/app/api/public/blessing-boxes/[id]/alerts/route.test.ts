@@ -179,10 +179,68 @@ describe("POST /api/public/blessing-boxes/[id]/alerts", () => {
     expect(res.status).toBe(422);
   });
 
+  // 2026-09-18 security review, item 5: an invalid email must never draw
+  // against the shared email-flood budget — see the adopt route's own item
+  // 5 test for the identical reasoning, which applies here too.
+  test("invalid email -> 422 WITHOUT ever checking the email-flood scopes (item 5)", async () => {
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
+    const res = await callPost({ email: "not-an-email", turnstileToken: "t" });
+    expect(res.status).toBe(422);
+    expect(mockCheckAndIncrement).not.toHaveBeenCalled();
+  });
+
   test("unknown/archived box id -> 404", async () => {
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb({ boxRow: null }).db } });
     const res = await callPost(VALID_BODY);
     expect(res.status).toBe(404);
+  });
+
+  test("unknown/archived box id -> 404 WITHOUT ever checking the email-flood scopes (item 5)", async () => {
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb({ boxRow: null }).db } });
+    await callPost(VALID_BODY);
+    expect(mockCheckAndIncrement).not.toHaveBeenCalled();
+  });
+
+  test("email-global cap is checked at 300/hour, not 60 (item 5)", async () => {
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
+    await callPost(VALID_BODY);
+    const globalCall = mockCheckAndIncrement.mock.calls.find((c) => (c[2] as { scope: string }).scope === "alert-email-global");
+    expect(globalCall?.[3]).toBe(300);
+  });
+
+  // 2026-09-18 security review, item 3: normalized ONCE at this route's
+  // boundary — "Foo@X.com" and "foo@x.com" land as the same alert_subscriptions row.
+  test("email is lowercased + trimmed before storage (item 3)", async () => {
+    const { db, writeCalls } = makeFakeDb();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    const res = await callPost({ ...VALID_BODY, email: "  Giver@Example.com  " });
+    expect(res.status).toBe(200);
+    expect(writeCalls[0].args).toContain("giver@example.com");
+  });
+
+  // 2026-09-18 security review, item 9: an unguarded D1 exception (e.g. a
+  // transient outage, or "no such table" if migration 0010 hasn't landed on
+  // this environment) used to bubble up as an unhandled 500.
+  test("D1 error on the box lookup -> 502 db_unavailable, not an unhandled 500 (item 9)", async () => {
+    const db = {
+      prepare: (sql: string) => {
+        if (sql.includes("FROM venues WHERE id")) {
+          return { bind: () => ({ first: async () => { throw new Error("D1 outage"); } }) };
+        }
+        throw new Error("unexpected SQL in fake db: " + sql);
+      },
+    } as unknown as D1Database;
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    const res = await callPost(VALID_BODY);
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toBe("db_unavailable");
+  });
+
+  test("D1 error in upsertGiverSubscription (e.g. missing alert_subscriptions table) -> 502 db_unavailable (item 9)", async () => {
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb({ upsertShouldThrow: true }).db } });
+    const res = await callPost(VALID_BODY);
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toBe("db_unavailable");
   });
 
   test("new signup -> inserts an unconfirmed row and sends a confirm email", async () => {
@@ -218,12 +276,44 @@ describe("POST /api/public/blessing-boxes/[id]/alerts", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  test("Resend failure -> 502 send_failed", async () => {
+  // 2026-09-18 security review, item 4: the send is now dispatched via
+  // ctx.waitUntil(), never awaited by the response — a Resend failure must
+  // be caught/logged, never surfaced as an error to the (possibly
+  // anonymous, possibly probing) caller. This REPLACES the old
+  // "Resend failure -> 502 send_failed" test, which asserted the exact
+  // timing-oracle-adjacent behavior item 4 removes (per item 4's own
+  // instruction: "Drop that route's send_failed -> 502").
+  test("Resend failure is caught/logged, response is STILL {ok:true} (item 4)", async () => {
     mockFetch.mockResolvedValue(new Response("boom", { status: 500 }));
-    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
+    const waitUntil = vi.fn((p: Promise<unknown>) => p);
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db }, ctx: { waitUntil } });
     const res = await callPost(VALID_BODY);
-    expect(res.status).toBe(502);
-    expect((await res.json()).error).toBe("send_failed");
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    await expect(waitUntil.mock.calls[0][0]).resolves.toBeUndefined();
+  });
+
+  test("dispatched via ctx.waitUntil() when a live ExecutionContext is present (item 4)", async () => {
+    const waitUntil = vi.fn((p: Promise<unknown>) => p);
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db }, ctx: { waitUntil } });
+    await callPost(VALID_BODY);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+  });
+
+  test("noop action (already confirmed+active) never dispatches to ctx.waitUntil at all (item 4)", async () => {
+    const waitUntil = vi.fn((p: Promise<unknown>) => p);
+    const db = makeFakeDb({ existingGiver: { id: 1, confirmed_at: "2026-01-01T00:00:00Z", unsubscribed_at: null } }).db;
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db }, ctx: { waitUntil } });
+    await callPost(VALID_BODY);
+    expect(waitUntil).not.toHaveBeenCalled();
+  });
+
+  test("no ctx.waitUntil available (e.g. local dev) -> still succeeds, send degrades silently (item 4)", async () => {
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } }); // no ctx
+    const res = await callPost(VALID_BODY);
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
   });
 
   test("no Cloudflare context available -> 503, never throws", async () => {

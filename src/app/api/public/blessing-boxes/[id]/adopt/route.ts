@@ -5,20 +5,25 @@
  * the applicant confirms their email (POST /api/public/alerts/confirm) AND
  * an admin approves it (/admin/box-adopters).
  *
- * Same guard ORDER as every other public write on this box surface (see
- * the checkins route's own header): Content-Type -> Turnstile
- * (src/lib/boxTurnstile.ts, reused, not copied) -> honeypot -> rate limit ->
- * field validation -> box lookup -> write -> confirm email.
+ * Guard ORDER, same shared convention as every other public write on this
+ * box surface (see the checkins route's own header): Content-Type ->
+ * Turnstile (src/lib/boxTurnstile.ts, reused, not copied) -> honeypot ->
+ * per-visitor/per-box rate limit -> field validation -> box lookup ->
+ * email-flood rate limit -> write -> confirm email.
  *
- * Four rate-limit scopes, all via the shared D1-backed
- * src/lib/checkinRateLimit.ts module and the existing
- * CHECKIN_RATE_LIMIT_SECRET (no new secret needed): "adopt-visitor" (per
- * client token) and "adopt-box" (per box) bound THIS endpoint, mirroring the
- * checkins/photos routes' own per-visitor/per-box pair; "alert-email-target"
- * and "alert-email-global" are SHARED scope names with the giver alert
- * sign-up route (../alerts/route.ts) — the same person (or the same flood of
- * distinct addresses) hammering both endpoints hits one combined email-abuse
- * budget rather than two independently generous ones.
+ * 2026-09-18 security review, item 5: the two email-flood scopes below
+ * (alert-email-target/alert-email-global) used to run BEFORE field
+ * validation and the box lookup, alongside the per-visitor/per-box caps —
+ * so a burst of requests with an INVALID displayName/email/note, or an
+ * unknown box id, still counted against the shared email-abuse budget even
+ * though no email was ever going to be sent. Moved to run immediately
+ * before the write/send below (the only place they still guard something
+ * real) — the per-visitor/per-box scopes stay where they were, since those
+ * exist to cap the WRITE attempt itself, not the email. MAX_EMAIL_GLOBAL_PER_HOUR
+ * also raised 60 -> 300 (item 5): 60/hour shared across this route AND the
+ * giver alert route was tight enough to plausibly false-positive during
+ * ordinary sitewide traffic; 300 keeps the "catch a real flood" purpose
+ * without that risk, matching the checkins route's own 300/hour reasoning.
  *
  * A confirm-email send failure is FATAL to the response here (unlike the
  * checkins route's best-effort problem-report email) — per the task's own
@@ -32,10 +37,11 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { resolveBoxTurnstileKey, verifyBoxTurnstile } from "@/lib/boxTurnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
-import { isValidEmail } from "@/lib/rateLimit";
+import { isValidEmail, normalizeEmail } from "@/lib/rateLimit";
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
 import { logFormFailure } from "@/lib/logger";
 import { insertAdopterApplication, sendAdopterConfirmEmail } from "@/lib/boxAdopters";
+import { sanitizeDisplayName } from "@/lib/displayNameHygiene";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +49,7 @@ const MAX_ADOPT_APPLICATIONS_PER_VISITOR_PER_HOUR = 3;
 const MAX_ADOPT_APPLICATIONS_PER_BOX_PER_HOUR = 10;
 /** Shared with the giver alert sign-up route — see this file's own header. */
 const MAX_EMAIL_TARGET_PER_HOUR = 3;
-const MAX_EMAIL_GLOBAL_PER_HOUR = 60;
+const MAX_EMAIL_GLOBAL_PER_HOUR = 300;
 
 interface AdoptPayload {
   displayName?: string;
@@ -127,15 +133,53 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "rate_limit_box" }, { status: 429 });
   }
 
-  // Keyed off the raw (lowercased) submitted email, BEFORE format
-  // validation — an empty/garbage value just shares one harmless bucket, and
-  // running this before validation matches the task's own literal guard
-  // order (rate limits -> validation).
-  const emailKey = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  // Normalized ONCE here (item 3) — reused below for validation, the
+  // email-flood rate-limit key, and storage, so "Foo@X.com" and
+  // "foo@x.com" are always the same row (boxAdopters.ts's own lookups never
+  // re-derive this).
+  const email = normalizeEmail(typeof body.email === "string" ? body.email : "");
+
+  const rawDisplayName = typeof body.displayName === "string" ? body.displayName : "";
+  const displayName = sanitizeDisplayName(rawDisplayName);
+  if (!displayName || displayName.length > FIELD_LIMITS.BOX_ADOPTER_DISPLAY_NAME) {
+    return NextResponse.json({ ok: false, error: "Invalid display name" }, { status: 422 });
+  }
+
+  if (!email || email.length > FIELD_LIMITS.EMAIL || !isValidEmail(email)) {
+    return NextResponse.json({ ok: false, error: "Invalid email" }, { status: 422 });
+  }
+
+  let note: string | null = null;
+  if (typeof body.note === "string" && body.note.trim() !== "") {
+    const trimmed = body.note.trim();
+    if (trimmed.length > FIELD_LIMITS.BOX_ADOPTER_NOTE) {
+      return NextResponse.json({ ok: false, error: "Note too long" }, { status: 422 });
+    }
+    note = trimmed;
+  }
+
+  let box: BoxLookupRow | null;
+  try {
+    box = await db
+      .prepare("SELECT id, name FROM venues WHERE id = ? AND category = 'blessing_box' AND status != 'archived'")
+      .bind(boxId)
+      .first<BoxLookupRow>();
+  } catch (err) {
+    logFormFailure("adopt", "db_unavailable", { message: err instanceof Error ? err.message : "unknown error" });
+    return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 502 });
+  }
+  if (!box) {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  }
+
+  // Email-flood scopes moved here (item 5, see this file's own header) —
+  // only a request that already passed field validation and found a live
+  // box reaches these, since only such a request is ever actually going to
+  // send an email.
   const emailTargetCap = await checkAndIncrement(
     db,
     rateLimitSecret,
-    { scope: "alert-email-target", id: emailKey },
+    { scope: "alert-email-target", id: email },
     MAX_EMAIL_TARGET_PER_HOUR,
   );
   if (!emailTargetCap) {
@@ -150,33 +194,6 @@ export async function POST(
   );
   if (!globalCap) {
     return NextResponse.json({ ok: false, error: "rate_limit_global" }, { status: 429 });
-  }
-
-  const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
-  if (!displayName || displayName.length > FIELD_LIMITS.BOX_ADOPTER_DISPLAY_NAME) {
-    return NextResponse.json({ ok: false, error: "Invalid display name" }, { status: 422 });
-  }
-
-  const email = typeof body.email === "string" ? body.email.trim() : "";
-  if (!email || email.length > FIELD_LIMITS.EMAIL || !isValidEmail(email)) {
-    return NextResponse.json({ ok: false, error: "Invalid email" }, { status: 422 });
-  }
-
-  let note: string | null = null;
-  if (typeof body.note === "string" && body.note.trim() !== "") {
-    const trimmed = body.note.trim();
-    if (trimmed.length > FIELD_LIMITS.BOX_ADOPTER_NOTE) {
-      return NextResponse.json({ ok: false, error: "Note too long" }, { status: 422 });
-    }
-    note = trimmed;
-  }
-
-  const box = await db
-    .prepare("SELECT id, name FROM venues WHERE id = ? AND category = 'blessing_box' AND status != 'archived'")
-    .bind(boxId)
-    .first<BoxLookupRow>();
-  if (!box) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
   let confirmToken: string;

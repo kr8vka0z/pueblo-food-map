@@ -179,7 +179,14 @@ const en: Record<string, string> = {
   // Bottom navigation bar (docs/bottom-nav-spec.md §11)
   "nav.nearMe": "Near me",
   "nav.saved": "Saved",
-  "nav.resources": "Resources",
+  // Boxes (#516) — one-tap shortcut to the blessing-box category filter.
+  // Sits between Saved and Help so it's under the thumb (Kyle, 2026-09-19).
+  "nav.boxes": "Boxes",
+  // Renamed from "Resources" (#516, Kyle 2026-09-19) — the page itself keeps
+  // its own title ("Food help programs", nav.resourcesPage below); only the
+  // bar's short word changes. Kyle accepts some visitors may read "Help" as
+  // "how to use the site" for now; a tutorial is planned separately.
+  "nav.resources": "Help",
   "nav.menu": "Menu",
   "nav.aria": "Main",
   // PageNav's top "Back to map" bar (review item 7c) — distinct from BottomNav's
@@ -1022,9 +1029,12 @@ const es: Record<string, string> = {
   "locate.outsideCounty": "Tu ubicación está fuera del condado de Pueblo",
 
   // Bottom navigation bar (docs/bottom-nav-spec.md §11)
-  "nav.nearMe": "Cerca de mí",
+  // "Cercanos" (#516, Kyle 2026-09-19) — matches Google Maps' Spanish
+  // wording ("lugares cercanos") and is shorter, so it fits every phone.
+  "nav.nearMe": "Cercanos",
   "nav.saved": "Guardados",
-  "nav.resources": "Recursos",
+  "nav.boxes": "Cajas",
+  "nav.resources": "Ayuda",
   "nav.menu": "Menú",
   "nav.aria": "Principal",
   "nav.pageAria": "Página",

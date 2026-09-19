@@ -49,6 +49,7 @@
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { composeBilingualEmail, sendResendBatch, sendResendEmail, unsubscribeHeaders, type OutboundEmail } from "@/lib/emailSend";
 import { isWithinConfirmWindow, randomHexToken } from "@/lib/alertTokens";
+import { logFormFailure } from "@/lib/logger";
 import type { BoxStatus, CheckinKind } from "@/lib/blessingBoxes";
 
 export const ALERT_COOLDOWN_HOURS = 6;
@@ -208,7 +209,23 @@ export async function notifyBoxAlerts(db: D1Database, input: NotifyBoxAlertsInpu
       origin: input.origin,
     }),
   );
-  await sendResendBatch(emails);
+  try {
+    await sendResendBatch(emails);
+  } catch (err) {
+    // 2026-09-18 security review, item 13: these recipients were already
+    // CLAIMED above (their last_alerted_at is set — see claimAlertRecipients'
+    // own header) before this send even started, so a failure here means
+    // they lose this alert silently unless it's logged. Count only, never
+    // addresses (this file's own PII posture, logger.ts's own PII rule) —
+    // still rethrown, since the caller (the checkins route, via
+    // ctx.waitUntil) is what actually needs to catch and swallow this so it
+    // never blocks the check-in itself (see this file's own header).
+    logFormFailure("alerts", "send_failed", {
+      recipientCount: emails.length,
+      message: err instanceof Error ? err.message : "unknown error",
+    });
+    throw err;
+  }
 }
 
 // ─── Giver sign-up (self-service, double opt-in) ───────────────────────────
@@ -219,6 +236,39 @@ interface ExistingGiverRow {
   id: number;
   confirmed_at: string | null;
   unsubscribed_at: string | null;
+}
+
+/** Matches D1/SQLite's UNIQUE-violation error message shape — see upsertGiverSubscription's own header. */
+function isUniqueConstraintError(err: unknown): boolean {
+  return err instanceof Error && /UNIQUE constraint failed/i.test(err.message);
+}
+
+async function selectExistingGiverRow(db: D1Database, venueId: string, email: string): Promise<ExistingGiverRow | null> {
+  return db
+    .prepare("SELECT id, confirmed_at, unsubscribed_at FROM alert_subscriptions WHERE role = 'giver' AND venue_id = ? AND email = ?")
+    .bind(venueId, email)
+    .first<ExistingGiverRow>();
+}
+
+/** The three "a row already exists" branches, shared by both the ordinary path and the race-recovery path below. */
+async function upsertForExistingGiverRow(
+  db: D1Database,
+  existing: ExistingGiverRow,
+  now: Date,
+): Promise<{ action: GiverSignupAction; confirmToken: string | null }> {
+  if (existing.confirmed_at && !existing.unsubscribed_at) {
+    return { action: "noop", confirmToken: null };
+  }
+
+  const action: GiverSignupAction = existing.unsubscribed_at ? "reactivate" : "resend";
+  const confirmToken = randomHexToken();
+  await db
+    .prepare(
+      "UPDATE alert_subscriptions SET confirm_token = ?, created_at = ?, confirmed_at = NULL, unsubscribed_at = NULL WHERE id = ?",
+    )
+    .bind(confirmToken, now.toISOString(), existing.id)
+    .run();
+  return { action, confirmToken };
 }
 
 /**
@@ -237,19 +287,28 @@ interface ExistingGiverRow {
  * Every branch returns the SAME shape so the route can send the SAME
  * generic "check your email" response regardless of which happened — no
  * enumeration of whether an address was already subscribed.
+ *
+ * RACE SAFETY (2026-09-18 security review, item 9): the SELECT-then-INSERT
+ * above isn't atomic — two concurrent signups for the same venue+email can
+ * both pass the "no existing row" SELECT before either INSERTs. The
+ * UNIQUE(role, venue_id, email) index (migrations/0010) then rejects
+ * whichever INSERT loses the race. That isn't a real failure: the row now
+ * exists (the winner's insert), so this catches the UNIQUE violation and
+ * re-reads, falling through to the ordinary "existing row" branches above
+ * exactly as if the SELECT had found it the first time.
  */
 export async function upsertGiverSubscription(
   db: D1Database,
   input: { venueId: string; email: string },
   now: Date = new Date(),
 ): Promise<{ action: GiverSignupAction; confirmToken: string | null }> {
-  const existing = await db
-    .prepare("SELECT id, confirmed_at, unsubscribed_at FROM alert_subscriptions WHERE role = 'giver' AND venue_id = ? AND email = ?")
-    .bind(input.venueId, input.email)
-    .first<ExistingGiverRow>();
+  const existing = await selectExistingGiverRow(db, input.venueId, input.email);
+  if (existing) {
+    return upsertForExistingGiverRow(db, existing, now);
+  }
 
-  if (!existing) {
-    const confirmToken = randomHexToken();
+  const confirmToken = randomHexToken();
+  try {
     await db
       .prepare(
         "INSERT INTO alert_subscriptions (role, venue_id, email, confirm_token, unsubscribe_token, created_at) VALUES ('giver', ?, ?, ?, ?, ?)",
@@ -257,21 +316,12 @@ export async function upsertGiverSubscription(
       .bind(input.venueId, input.email, confirmToken, randomHexToken(), now.toISOString())
       .run();
     return { action: "new", confirmToken };
+  } catch (err) {
+    if (!isUniqueConstraintError(err)) throw err;
+    const reread = await selectExistingGiverRow(db, input.venueId, input.email);
+    if (!reread) throw err; // shouldn't happen, but don't swallow a real failure
+    return upsertForExistingGiverRow(db, reread, now);
   }
-
-  if (existing.confirmed_at && !existing.unsubscribed_at) {
-    return { action: "noop", confirmToken: null };
-  }
-
-  const action: GiverSignupAction = existing.unsubscribed_at ? "reactivate" : "resend";
-  const confirmToken = randomHexToken();
-  await db
-    .prepare(
-      "UPDATE alert_subscriptions SET confirm_token = ?, created_at = ?, confirmed_at = NULL, unsubscribed_at = NULL WHERE id = ?",
-    )
-    .bind(confirmToken, now.toISOString(), existing.id)
-    .run();
-  return { action, confirmToken };
 }
 
 /** Sends the giver's confirm email — no stop link (nothing to stop until confirmed), per the task's own list of which emails carry one. */
@@ -279,7 +329,9 @@ export async function sendGiverConfirmEmail(opts: { to: string; boxName: string;
   const url = `${opts.origin}/alerts/confirm?t=${opts.confirmToken}`;
   const { subject, text, html } = composeBilingualEmail({
     subjectKey: "email.alertConfirm.subject",
-    bodyLineKeys: ["email.alertConfirm.line1", "email.alertConfirm.line2", "email.alertConfirm.cta"],
+    // "disclaimer" (item 7, 2026-09-18 security review) — see
+    // boxAdopters.ts's sendAdopterConfirmEmail for the identical reasoning.
+    bodyLineKeys: ["email.alertConfirm.line1", "email.alertConfirm.line2", "email.alertConfirm.cta", "email.alertConfirm.disclaimer"],
     vars: { box: opts.boxName, url },
   });
   await sendResendEmail({ to: opts.to, subject, text, html });
@@ -303,45 +355,66 @@ export async function loadHostSubscriptions(db: D1Database, venueId: string): Pr
 }
 
 /**
- * Admin-added host rows start ALREADY confirmed — the admin vouches for the
- * address, per the task's own spec, so there's no double opt-in for a host
- * the way there is for an adopter/giver. Refuses (never silently
- * resubscribes) an email that previously clicked its own stop link — same
- * rule the task states for the general case; this also covers an admin's
- * own prior "Remove" (DELETE, below), since both set the same
- * unsubscribed_at column and there is no way to tell them apart. That is a
- * real, reported gap (see AGENTS.md's own note on this route) rather than
- * a redesign of the spec's literal DELETE/refuse behavior.
+ * The read half of POST's add flow — kept separate from the INSERT
+ * statement below (2026-09-18 security review, item 8) so the route can
+ * build the INSERT and an audit_log INSERT together and run both in ONE
+ * db.batch(), the same atomic pairing the box-adopters approve/reject
+ * routes already use. A plain `await ...run()` here couldn't be batched
+ * with a second statement.
  */
-export async function addHostSubscription(
+export async function findHostSubscription(db: D1Database, venueId: string, email: string): Promise<ExistingHostRow | null> {
+  return db
+    .prepare("SELECT id, unsubscribed_at FROM alert_subscriptions WHERE role = 'host' AND venue_id = ? AND email = ?")
+    .bind(venueId, email)
+    .first<ExistingHostRow>();
+}
+
+/**
+ * The statement the host-alerts POST route adds to its db.batch() — only
+ * called after findHostSubscription() above has already confirmed no row
+ * exists (an admin-vouched host starts ALREADY confirmed, per the task's
+ * own spec — no double opt-in the way there is for an adopter/giver).
+ */
+export function insertHostSubscriptionStatement(
   db: D1Database,
   input: { venueId: string; email: string },
   now: Date = new Date(),
-): Promise<HostAddResult> {
-  const existing = await db
-    .prepare("SELECT id, unsubscribed_at FROM alert_subscriptions WHERE role = 'host' AND venue_id = ? AND email = ?")
-    .bind(input.venueId, input.email)
-    .first<ExistingHostRow>();
-
-  if (existing) {
-    return existing.unsubscribed_at ? "refused" : "already";
-  }
-
-  await db
+): ReturnType<D1Database["prepare"]> {
+  return db
     .prepare(
       "INSERT INTO alert_subscriptions (role, venue_id, email, confirm_token, unsubscribe_token, confirmed_at, created_at) VALUES ('host', ?, ?, ?, ?, ?, ?)",
     )
-    .bind(input.venueId, input.email, randomHexToken(), randomHexToken(), now.toISOString(), now.toISOString())
-    .run();
-  return "added";
+    .bind(input.venueId, input.email, randomHexToken(), randomHexToken(), now.toISOString(), now.toISOString());
 }
 
-/** DELETE /api/admin/blessing-boxes/[id]/host-alerts — per the task's own literal spec, sets unsubscribed_at (does not hard-delete the row). */
-export async function removeHostSubscription(db: D1Database, venueId: string, email: string, now: Date = new Date()): Promise<void> {
-  await db
-    .prepare("UPDATE alert_subscriptions SET unsubscribed_at = ? WHERE role = 'host' AND venue_id = ? AND email = ? AND unsubscribed_at IS NULL")
-    .bind(now.toISOString(), venueId, email)
-    .run();
+/**
+ * The statement the host-alerts DELETE route adds to its db.batch() (see
+ * insertHostSubscriptionStatement's own header for why this is a statement
+ * builder, not a function that runs itself) — per the task's own literal
+ * spec, sets unsubscribed_at (does not hard-delete the row).
+ *
+ * ALSO rotates unsubscribe_token (2026-09-18 security review, item 2,
+ * BLOCKER): a host removed by an admin — or a rejected/removed adopter, see
+ * unsubscribeAdopterSubscriptionStatement below — kept their OLD
+ * unsubscribe_token live. That token is the exact value resubscribeByToken
+ * looks up by, so anyone still holding a copy of an old alert email (the
+ * stop link in every alert this row ever received) could resubscribe
+ * themselves right back after the admin explicitly removed them. Rotating
+ * the token in the SAME statement that sets unsubscribed_at makes the old
+ * link permanently dead the instant this runs — there is no window where
+ * the old token is simultaneously "unsubscribed" and still resubscribable.
+ */
+export function removeHostSubscriptionStatement(
+  db: D1Database,
+  venueId: string,
+  email: string,
+  now: Date = new Date(),
+): ReturnType<D1Database["prepare"]> {
+  return db
+    .prepare(
+      "UPDATE alert_subscriptions SET unsubscribed_at = ?, unsubscribe_token = ? WHERE role = 'host' AND venue_id = ? AND email = ? AND unsubscribed_at IS NULL",
+    )
+    .bind(now.toISOString(), randomHexToken(), venueId, email);
 }
 
 /** Best-effort "you'll now get alerts" email to a newly-added host — no stop-link omission here, this IS a welcome email per the task's own list. */
@@ -403,15 +476,30 @@ export function upsertApprovedAdopterSubscriptionStatement(
     );
 }
 
-/** The statement the box-adopters reject route adds to its atomic db.batch() when rejecting a PREVIOUSLY APPROVED adopter (the "Remove" action) — stops their alerts, never touches box_adopters.status's own row (that's the caller's separate UPDATE). A no-op (0 rows) when no subscription exists yet, e.g. rejecting a still-pending application. */
+/**
+ * The statement the box-adopters reject route adds to its atomic db.batch()
+ * when rejecting a PREVIOUSLY APPROVED adopter (the "Remove" action) —
+ * stops their alerts, never touches box_adopters.status's own row (that's
+ * the caller's separate UPDATE). A no-op (0 rows) when no subscription
+ * exists yet, e.g. rejecting a still-pending application.
+ *
+ * ALSO rotates unsubscribe_token (2026-09-18 security review, item 2,
+ * BLOCKER) — see removeHostSubscriptionStatement's own header for why: an
+ * admin-removed adopter's old stop link must die with the removal, or
+ * anyone still holding that link (it went out in every alert email this
+ * subscription ever received) could resubscribe the removed adopter right
+ * back.
+ */
 export function unsubscribeAdopterSubscriptionStatement(
   db: D1Database,
   adopterId: number,
   timestamp: string,
 ): ReturnType<D1Database["prepare"]> {
   return db
-    .prepare("UPDATE alert_subscriptions SET unsubscribed_at = ? WHERE role = 'adopter' AND adopter_id = ? AND unsubscribed_at IS NULL")
-    .bind(timestamp, adopterId);
+    .prepare(
+      "UPDATE alert_subscriptions SET unsubscribed_at = ?, unsubscribe_token = ? WHERE role = 'adopter' AND adopter_id = ? AND unsubscribed_at IS NULL",
+    )
+    .bind(timestamp, randomHexToken(), adopterId);
 }
 
 /** Best-effort "you're approved" email to a newly-approved adopter. */
@@ -455,11 +543,14 @@ export function isSubscriptionConfirmTokenValid(row: Pick<AlertSubscriptionRow, 
 export type StopResult = "stopped" | "not_found" | "rate_limited";
 
 /**
- * Looks up a subscription by its UNSUBSCRIBE token and stops it — used by
- * BOTH the API stop route (mail-client one-click) and the human-facing
- * /alerts/stop page's own GET (the task's own "visiting it stops the emails
- * immediately" rule — a mail scanner prefetching the link only causes an
- * unwanted unsubscribe, the safe direction). Rate-limited per token value
+ * Looks up a subscription by its UNSUBSCRIBE token and stops it — the sole
+ * caller is POST /api/public/alerts/stop (a route handler, never called
+ * from the /alerts/stop PAGE's own GET). 2026-09-18 security review (item
+ * 6): a GET-mutates page was found to be indistinguishable from a mail
+ * scanner's link-prefetch, which would silently unsubscribe someone who
+ * never asked to be — see src/app/alerts/stop/page.tsx's own header for the
+ * fix (the page never mutates; a client component auto-POSTs here on
+ * mount, real JS in a real browser only). Rate-limited per token value
  * (fold into the SAME neutral "not found" outcome as a genuinely unknown
  * token, so a brute-force attempt learns nothing either way) via the
  * existing checkinRateLimit.ts module and CHECKIN_RATE_LIMIT_SECRET — no new

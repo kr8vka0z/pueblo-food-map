@@ -25,16 +25,23 @@ vi.mock("@/lib/checkinRateLimit", () => ({
   checkAndIncrement: (...args: unknown[]) => mockCheckAndIncrement(...args),
 }));
 
+const mockLogFormFailure = vi.fn();
+vi.mock("@/lib/logger", () => ({
+  logFormFailure: (...args: unknown[]) => mockLogFormFailure(...args),
+}));
+
 import {
   ALERT_COOLDOWN_HOURS,
   MAX_ALERT_RECIPIENTS_PER_EVENT,
-  addHostSubscription,
+  findHostSubscription,
+  insertHostSubscriptionStatement,
   claimAlertRecipients,
   confirmSubscription,
   notifyBoxAlerts,
-  removeHostSubscription,
+  removeHostSubscriptionStatement,
   resubscribeByToken,
   rolesToNotify,
+  sendGiverConfirmEmail,
   stopSubscriptionByToken,
   unsubscribeAdopterSubscriptionStatement,
   upsertApprovedAdopterSubscriptionStatement,
@@ -45,6 +52,7 @@ beforeEach(() => {
   mockSendResendBatch.mockReset().mockResolvedValue(undefined);
   mockSendResendEmail.mockReset().mockResolvedValue(undefined);
   mockCheckAndIncrement.mockReset().mockResolvedValue(true);
+  mockLogFormFailure.mockReset();
 });
 
 afterEach(() => {
@@ -187,6 +195,29 @@ describe("notifyBoxAlerts — orchestration", () => {
       notifyBoxAlerts(db, { venueId: "box-1", kind: "empty", prevStatus: "stocked", origin: "https://pueblofoodmap.com" }),
     ).rejects.toThrow();
   });
+
+  // 2026-09-18 security review, item 13: recipients are already CLAIMED
+  // (last_alerted_at set) before the send even starts — a Resend failure
+  // here silently loses their alert unless logged. Count only, never
+  // addresses.
+  test("a sendResendBatch failure logs the recipient COUNT (never addresses), then still rejects (item 13)", async () => {
+    mockSendResendBatch.mockRejectedValue(new Error("Resend batch API error 500"));
+    const db = makeDb({
+      claimed: [
+        { id: 1, email: "a@example.com", unsubscribe_token: "tok-a" },
+        { id: 2, email: "b@example.com", unsubscribe_token: "tok-b" },
+      ],
+    });
+    await expect(
+      notifyBoxAlerts(db, { venueId: "box-1", kind: "empty", prevStatus: "stocked", origin: "https://pueblofoodmap.com" }),
+    ).rejects.toThrow("Resend batch API error 500");
+    expect(mockLogFormFailure).toHaveBeenCalledTimes(1);
+    const [form, reason, detail] = mockLogFormFailure.mock.calls[0];
+    expect(form).toBe("alerts");
+    expect(reason).toBe("send_failed");
+    expect(detail.recipientCount).toBe(2);
+    expect(JSON.stringify(detail)).not.toContain("@example.com");
+  });
 });
 
 describe("upsertGiverSubscription", () => {
@@ -233,53 +264,132 @@ describe("upsertGiverSubscription", () => {
     expect(result.action).toBe("reactivate");
     expect(result.confirmToken).not.toBeNull();
   });
-});
 
-describe("host subscriptions", () => {
-  test("addHostSubscription: no existing row -> inserts already-confirmed, 'added'", async () => {
-    const inserted: unknown[] = [];
+  // 2026-09-18 security review, item 9: two concurrent signups for the same
+  // venue+email can both pass the "no existing row" SELECT before either
+  // INSERTs — the UNIQUE(role, venue_id, email) index then rejects the
+  // loser. That must be recovered (re-read + treat like an existing row),
+  // never surfaced as an unhandled exception.
+  test("INSERT loses a UNIQUE-constraint race -> re-reads and falls through to the existing-row branch", async () => {
+    let selectCount = 0;
     const db = {
       prepare: (sql: string) => ({
-        bind: (...args: unknown[]) => ({
-          first: async () => null,
+        bind: () => ({
+          first: async () => {
+            selectCount += 1;
+            // First SELECT (before the INSERT attempt): nothing yet. Second
+            // SELECT (after the UNIQUE violation): the winner's row, already
+            // confirmed and active.
+            return selectCount === 1 ? null : { id: 1, confirmed_at: "2026-09-01T00:00:00.000Z", unsubscribed_at: null };
+          },
           run: async () => {
-            inserted.push(args);
+            if (sql.startsWith("INSERT")) throw new Error("UNIQUE constraint failed: alert_subscriptions.role, alert_subscriptions.venue_id, alert_subscriptions.email");
             return { meta: { changes: 1 } };
           },
         }),
       }),
     } as unknown as D1Database;
-    const result = await addHostSubscription(db, { venueId: "box-1", email: "host@example.com" });
-    expect(result).toBe("added");
+
+    const result = await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com" });
+    expect(result.action).toBe("noop"); // the winner's row was already confirmed+active
+    expect(selectCount).toBe(2);
   });
 
-  test("addHostSubscription: existing, active -> 'already', no duplicate insert", async () => {
+  test("INSERT throws a non-UNIQUE error -> rethrown, never swallowed", async () => {
     const db = {
-      prepare: () => ({ bind: () => ({ first: async () => ({ id: 1, unsubscribed_at: null }) }) }),
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => null,
+          run: async () => {
+            if (sql.startsWith("INSERT")) throw new Error("no such table: alert_subscriptions");
+            return { meta: { changes: 1 } };
+          },
+        }),
+      }),
     } as unknown as D1Database;
-    expect(await addHostSubscription(db, { venueId: "box-1", email: "host@example.com" })).toBe("already");
+
+    await expect(upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com" })).rejects.toThrow(
+      "no such table",
+    );
+  });
+});
+
+describe("sendGiverConfirmEmail", () => {
+  test("includes the 'if you didn't ask for this' disclaimer (2026-09-18 security review, item 7)", async () => {
+    mockSendResendEmail.mockClear();
+    await sendGiverConfirmEmail({ to: "giver@example.com", boxName: "Test Box", origin: "https://pueblofoodmap.com", confirmToken: "tok" });
+    expect(mockSendResendEmail).toHaveBeenCalledTimes(1);
+    const { text } = mockSendResendEmail.mock.calls[0][0] as { text: string };
+    expect(text).toContain("If you didn't ask for this, you can ignore this email.");
+  });
+});
+
+// 2026-09-18 security review, item 8: addHostSubscription/removeHostSubscription
+// used to run their own INSERT/UPDATE directly. The host-alerts route now
+// needs to batch that write with an audit_log INSERT (same atomic pairing
+// the box-adopters approve/reject routes already use) — a plain awaited
+// `run()` can't be combined into a db.batch(), so both are now split into a
+// read (findHostSubscription) plus a statement builder the route batches
+// itself. This is the covering criterion for renaming/restructuring these
+// tests (item 8's own instruction: "item 8 explicitly authorizes rewriting
+// makeFakeDb and the existing 'added'/'update' assertions").
+describe("host subscriptions", () => {
+  test("findHostSubscription: no existing row -> null", async () => {
+    const db = { prepare: () => ({ bind: () => ({ first: async () => null }) }) } as unknown as D1Database;
+    expect(await findHostSubscription(db, "box-1", "host@example.com")).toBeNull();
   });
 
-  test("addHostSubscription: existing, previously unsubscribed -> 'refused', never silently resubscribed", async () => {
-    const db = {
-      prepare: () => ({ bind: () => ({ first: async () => ({ id: 1, unsubscribed_at: "2026-09-05T00:00:00.000Z" }) }) }),
-    } as unknown as D1Database;
-    expect(await addHostSubscription(db, { venueId: "box-1", email: "host@example.com" })).toBe("refused");
+  test("findHostSubscription: existing row -> returned as-is", async () => {
+    const row = { id: 1, unsubscribed_at: null };
+    const db = { prepare: () => ({ bind: () => ({ first: async () => row }) }) } as unknown as D1Database;
+    expect(await findHostSubscription(db, "box-1", "host@example.com")).toEqual(row);
   });
 
-  test("removeHostSubscription sets unsubscribed_at, scoped to role='host' and this venue+email", async () => {
+  test("insertHostSubscriptionStatement: binds an ALREADY-confirmed row (no double opt-in for a host)", () => {
     let seenSql = "";
     let boundArgs: unknown[] = [];
     const db = {
       prepare: (sql: string) => {
         seenSql = sql;
-        return { bind: (...args: unknown[]) => { boundArgs = args; return { run: async () => ({}) }; } };
+        return { bind: (...args: unknown[]) => { boundArgs = args; return {}; } };
       },
     } as unknown as D1Database;
-    await removeHostSubscription(db, "box-1", "host@example.com");
+    const now = new Date("2026-09-18T00:00:00.000Z");
+    insertHostSubscriptionStatement(db, { venueId: "box-1", email: "host@example.com" }, now);
+    expect(seenSql).toContain("INSERT INTO alert_subscriptions");
+    expect(boundArgs[0]).toBe("box-1");
+    expect(boundArgs[1]).toBe("host@example.com");
+    expect(boundArgs[4]).toBe(now.toISOString()); // confirmed_at
+  });
+
+  test("removeHostSubscriptionStatement: sets unsubscribed_at, scoped to role='host' and this venue+email", () => {
+    let seenSql = "";
+    let boundArgs: unknown[] = [];
+    const db = {
+      prepare: (sql: string) => {
+        seenSql = sql;
+        return { bind: (...args: unknown[]) => { boundArgs = args; return {}; } };
+      },
+    } as unknown as D1Database;
+    removeHostSubscriptionStatement(db, "box-1", "host@example.com");
     expect(seenSql).toContain("role = 'host'");
     expect(boundArgs).toContain("box-1");
     expect(boundArgs).toContain("host@example.com");
+  });
+
+  // 2026-09-18 security review, item 2, BLOCKER: removing a host must also
+  // kill their OLD unsubscribe token, or anyone still holding a copy of an
+  // alert email this row received (every one carries the stop link) could
+  // resubscribe the removed host right back.
+  test("removeHostSubscriptionStatement: ALSO rotates unsubscribe_token — the old token stops working", () => {
+    let boundArgs: unknown[] = [];
+    const db = {
+      prepare: () => ({ bind: (...args: unknown[]) => { boundArgs = args; return {}; } }),
+    } as unknown as D1Database;
+    removeHostSubscriptionStatement(db, "box-1", "host@example.com");
+    const newToken = boundArgs.find((a) => typeof a === "string" && /^[0-9a-f]{64}$/.test(a));
+    expect(newToken).toBeDefined();
+    expect(newToken).not.toBe("host@example.com");
   });
 });
 
@@ -310,6 +420,55 @@ describe("upsertApprovedAdopterSubscriptionStatement / unsubscribeAdopterSubscri
     expect(seenSql).toContain("role = 'adopter'");
     expect(seenSql).toContain("adopter_id = ?");
     expect(boundArgs).toContain(9);
+  });
+
+  // 2026-09-18 security review, item 2, BLOCKER — same reasoning as
+  // removeHostSubscriptionStatement's own token-rotation test above: a
+  // removed/rejected adopter's old stop link must die with the removal.
+  test("the reject/remove statement ALSO rotates unsubscribe_token — the old token stops working", () => {
+    let boundArgs: unknown[] = [];
+    const db = {
+      prepare: () => ({ bind: (...args: unknown[]) => { boundArgs = args; return {}; } }),
+    } as unknown as D1Database;
+    unsubscribeAdopterSubscriptionStatement(db, 9, "2026-09-18T00:00:00.000Z");
+    const newToken = boundArgs.find((a) => typeof a === "string" && /^[0-9a-f]{64}$/.test(a));
+    expect(newToken).toBeDefined();
+  });
+
+  // End-to-end proof (not just "a token was bound somewhere") that the
+  // rotated token actually invalidates the OLD one: a stateful fake
+  // capturing whatever value the rotate-UPDATE binds, then answering the
+  // resubscribe lookup with null unless the caller presents THAT value.
+  test("after the rotate-UPDATE runs, resubscribeByToken with the OLD token -> 'not_found'", async () => {
+    const OLD_TOKEN = "old-token-that-should-die";
+    let capturedNewToken: string | null = null;
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => {
+          if (sql.includes("UPDATE alert_subscriptions SET unsubscribed_at = ?, unsubscribe_token = ?")) {
+            capturedNewToken = args[1] as string;
+            return { run: async () => ({}) };
+          }
+          if (sql.includes("SELECT id FROM alert_subscriptions WHERE unsubscribe_token = ?")) {
+            const presented = args[0] as string;
+            return { first: async () => (presented === capturedNewToken ? { id: 9 } : null) };
+          }
+          if (sql.includes("UPDATE alert_subscriptions SET unsubscribed_at = NULL")) {
+            return { run: async () => ({}) };
+          }
+          throw new Error("unexpected SQL: " + sql);
+        },
+      }),
+    } as unknown as D1Database;
+
+    // The reject route's own db.batch() would run this statement — a
+    // .bind() call is enough to capture the token this test cares about,
+    // since D1's batch() executes every bound statement it's given.
+    unsubscribeAdopterSubscriptionStatement(db, 9, "2026-09-18T00:00:00.000Z");
+    expect(capturedNewToken).not.toBeNull();
+
+    expect(await resubscribeByToken(db, OLD_TOKEN, "secret")).toBe("not_found");
+    expect(await resubscribeByToken(db, capturedNewToken!, "secret")).toBe("resubscribed");
   });
 });
 

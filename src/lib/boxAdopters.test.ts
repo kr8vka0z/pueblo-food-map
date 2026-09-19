@@ -1,10 +1,19 @@
 /**
  * Tests for src/lib/boxAdopters.ts (Blessing Boxes slice 6) — the D1
  * shapes/SQL/helpers layer, proved against fake D1Database objects, same
- * convention boxPhotos.test.ts uses.
+ * convention boxPhotos.test.ts uses. sendResendEmail is mocked but
+ * composeBilingualEmail runs for real (same split boxAlerts.test.ts uses),
+ * so email-content tests below see the actual composed text.
  */
 
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+
+const mockSendResendEmail = vi.fn();
+vi.mock("@/lib/emailSend", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/emailSend")>("@/lib/emailSend");
+  return { ...actual, sendResendEmail: (...args: unknown[]) => mockSendResendEmail(...args) };
+});
+
 import {
   countPendingAdopters,
   insertAdopterApplication,
@@ -14,6 +23,7 @@ import {
   loadApprovedAdopterNamesForVenues,
   loadApprovedAdopters,
   loadPendingAdopters,
+  sendAdopterConfirmEmail,
 } from "@/lib/boxAdopters";
 
 describe("loadPendingAdopters / loadApprovedAdopters", () => {
@@ -161,6 +171,16 @@ describe("insertAdopterApplication", () => {
     await expect(
       insertAdopterApplication(db, { venueId: "a", displayName: "x", email: "x@example.com", note: null }),
     ).rejects.toThrow("last_row_id");
+  });
+});
+
+describe("sendAdopterConfirmEmail", () => {
+  test("includes the 'if you didn't ask for this' disclaimer (2026-09-18 security review, item 7)", async () => {
+    mockSendResendEmail.mockClear();
+    await sendAdopterConfirmEmail({ to: "jane@example.com", boxName: "Test Box", origin: "https://pueblofoodmap.com", confirmToken: "tok" });
+    expect(mockSendResendEmail).toHaveBeenCalledTimes(1);
+    const { text } = mockSendResendEmail.mock.calls[0][0] as { text: string };
+    expect(text).toContain("If you didn't ask for this, you can ignore this email.");
   });
 });
 

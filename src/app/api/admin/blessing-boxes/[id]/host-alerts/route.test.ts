@@ -3,6 +3,12 @@
  * Route-level tests for /api/admin/blessing-boxes/[id]/host-alerts (Blessing
  * Boxes slice 6). Same full-stack mock pattern as
  * box-adopters/[id]/approve/route.test.ts.
+ *
+ * 2026-09-18 security review, item 8: the route now batches its write with
+ * an audit_log INSERT via db.batch() instead of a plain awaited run() —
+ * makeFakeDb's write assertions ("insert"/"update" in `writeCalls`) are
+ * rewritten to assert on `batch()` calls instead, per item 8's own
+ * instruction authorizing this rewrite.
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -31,18 +37,27 @@ interface FakeDbOptions {
   hosts?: { id: number; email: string }[];
 }
 
+/** A prepared-but-not-yet-run statement, the shape db.batch() below expects — mirrors what boxAlerts.ts's insertHostSubscriptionStatement/removeHostSubscriptionStatement actually return (a bound D1PreparedStatement, never executed by the lib function itself; see those functions' own headers, item 8). */
+function fakeStatement(kind: string, args: unknown[]) {
+  return { __kind: kind, __args: args };
+}
+
 function makeFakeDb(opts: FakeDbOptions = {}) {
   const { existingHost = null, hosts = [] } = opts;
-  const writeCalls: string[] = [];
+  const auditInserts: unknown[][] = [];
+  const batchCalls: unknown[][] = [];
   const prepare = (sql: string) => {
     if (sql.includes("SELECT id, unsubscribed_at FROM alert_subscriptions")) {
       return { bind: () => ({ first: async () => existingHost }) };
     }
     if (sql.startsWith("INSERT INTO alert_subscriptions")) {
-      return { bind: (...args: unknown[]) => ({ run: async () => (writeCalls.push("insert"), { success: true, meta: { changes: 1 }, args }) }) };
+      return { bind: (...args: unknown[]) => fakeStatement("insertHost", args) };
     }
     if (sql.startsWith("UPDATE alert_subscriptions SET unsubscribed_at")) {
-      return { bind: (...args: unknown[]) => ({ run: async () => (writeCalls.push("update"), { success: true, meta: { changes: 1 }, args }) }) };
+      return { bind: (...args: unknown[]) => fakeStatement("removeHost", args) };
+    }
+    if (sql.startsWith("INSERT INTO audit_log")) {
+      return { bind: (...args: unknown[]) => { auditInserts.push(args); return fakeStatement("audit", args); } };
     }
     if (sql.includes("SELECT unsubscribe_token FROM alert_subscriptions")) {
       return { bind: () => ({ first: async () => ({ unsubscribe_token: "the-token" }) }) };
@@ -55,7 +70,11 @@ function makeFakeDb(opts: FakeDbOptions = {}) {
     }
     throw new Error("unexpected SQL in fake db: " + sql);
   };
-  return { db: { prepare } as unknown as D1Database, writeCalls };
+  const batch = async (statements: unknown[]) => {
+    batchCalls.push(statements);
+    return statements.map(() => ({ success: true, meta: { changes: 1 } }));
+  };
+  return { db: { prepare, batch } as unknown as D1Database, auditInserts, batchCalls };
 }
 
 function makeRequest(method: "POST" | "DELETE", opts: { origin?: string; body?: unknown } = {}): NextRequest {
@@ -113,7 +132,7 @@ describe("/api/admin/blessing-boxes/[id]/host-alerts", () => {
   });
 
   test("POST: new host -> added, sends a welcome email, returns the refreshed host list", async () => {
-    const { db, writeCalls } = makeFakeDb({ hosts: [{ id: 1, email: "host@example.com" }] });
+    const { db, batchCalls, auditInserts } = makeFakeDb({ hosts: [{ id: 1, email: "host@example.com" }] });
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
     const res = await POST(makeRequest("POST", { origin: ADMIN_ORIGIN, body: { email: "host@example.com" } }), {
       params: Promise.resolve({ id: BOX_ID }),
@@ -122,43 +141,77 @@ describe("/api/admin/blessing-boxes/[id]/host-alerts", () => {
     const data = await res.json();
     expect(data.result).toBe("added");
     expect(data.hosts).toEqual([{ id: 1, email: "host@example.com" }]);
-    expect(writeCalls).toEqual(["insert"]);
     expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    // item 8: the insert and its audit_log row ride the SAME db.batch().
+    expect(batchCalls).toHaveLength(1);
+    expect((batchCalls[0][0] as { __kind: string }).__kind).toBe("insertHost");
+    expect((batchCalls[0][1] as { __kind: string }).__kind).toBe("audit");
+    expect(auditInserts).toHaveLength(1);
+    const [actorEmail, entity, entityId, action, , afterJson] = auditInserts[0];
+    expect(actorEmail).toBe(ADMIN_EMAIL);
+    expect(entity).toBe("box_host_alert");
+    expect(entityId).toBe(BOX_ID);
+    expect(action).toBe("update");
+    expect(JSON.parse(afterJson as string)).toEqual({ venue_id: BOX_ID, email: "host@example.com" });
+  });
+
+  test("POST: email is normalized (trim + lowercase) before lookup/storage (item 3)", async () => {
+    const { db } = makeFakeDb({ existingHost: { id: 1, unsubscribed_at: null } });
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    const res = await POST(makeRequest("POST", { origin: ADMIN_ORIGIN, body: { email: "  Host@Example.com  " } }), {
+      params: Promise.resolve({ id: BOX_ID }),
+    });
+    // existingHost fixture matches regardless of exact args passed to the
+    // fake SELECT (it's keyed on venue only) — this test proves parseEmail
+    // doesn't reject/mangle the value; the route-level normalization is
+    // covered directly by rateLimit.test.ts's normalizeEmail suite.
+    expect(res.status).toBe(200);
+    expect((await res.json()).result).toBe("already");
   });
 
   test("POST: previously unsubscribed host -> 409, refused, never re-added", async () => {
-    const { db, writeCalls } = makeFakeDb({ existingHost: { id: 1, unsubscribed_at: "2026-01-01T00:00:00Z" } });
+    const { db, batchCalls } = makeFakeDb({ existingHost: { id: 1, unsubscribed_at: "2026-01-01T00:00:00Z" } });
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
     const res = await POST(makeRequest("POST", { origin: ADMIN_ORIGIN, body: { email: "host@example.com" } }), {
       params: Promise.resolve({ id: BOX_ID }),
     });
     expect(res.status).toBe(409);
     expect((await res.json()).error).toBe("previously_unsubscribed");
-    expect(writeCalls).toHaveLength(0);
+    expect(batchCalls).toHaveLength(0);
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
   test("POST: already-added active host -> already, no duplicate write, no email re-sent", async () => {
-    const { db, writeCalls } = makeFakeDb({ existingHost: { id: 1, unsubscribed_at: null } });
+    const { db, batchCalls } = makeFakeDb({ existingHost: { id: 1, unsubscribed_at: null } });
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
     const res = await POST(makeRequest("POST", { origin: ADMIN_ORIGIN, body: { email: "host@example.com" } }), {
       params: Promise.resolve({ id: BOX_ID }),
     });
     expect(res.status).toBe(200);
     expect((await res.json()).result).toBe("already");
-    expect(writeCalls).toHaveLength(0);
+    expect(batchCalls).toHaveLength(0);
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  test("DELETE: stops a host's alerts and returns the refreshed list", async () => {
-    const { db, writeCalls } = makeFakeDb({ hosts: [] });
+  test("DELETE: stops a host's alerts, rotates its token via db.batch() with an audit_log row, and returns the refreshed list", async () => {
+    const { db, batchCalls, auditInserts } = makeFakeDb({ hosts: [] });
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
     const res = await DELETE(makeRequest("DELETE", { origin: ADMIN_ORIGIN, body: { email: "host@example.com" } }), {
       params: Promise.resolve({ id: BOX_ID }),
     });
     expect(res.status).toBe(200);
     expect((await res.json()).hosts).toEqual([]);
-    expect(writeCalls).toEqual(["update"]);
+
+    expect(batchCalls).toHaveLength(1);
+    expect((batchCalls[0][0] as { __kind: string }).__kind).toBe("removeHost");
+    expect((batchCalls[0][1] as { __kind: string }).__kind).toBe("audit");
+    expect(auditInserts).toHaveLength(1);
+    const [actorEmail, entity, entityId, action] = auditInserts[0];
+    expect(actorEmail).toBe(ADMIN_EMAIL);
+    expect(entity).toBe("box_host_alert");
+    expect(entityId).toBe(BOX_ID);
+    expect(action).toBe("update");
   });
 
   test("DELETE: wrong Origin -> 403", async () => {

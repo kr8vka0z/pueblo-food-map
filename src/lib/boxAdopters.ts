@@ -212,7 +212,10 @@ export async function sendAdopterConfirmEmail(opts: {
   const url = `${opts.origin}/alerts/confirm?t=${opts.confirmToken}`;
   const { subject, text, html } = composeBilingualEmail({
     subjectKey: "email.adoptConfirm.subject",
-    bodyLineKeys: ["email.adoptConfirm.line1", "email.adoptConfirm.line2", "email.adoptConfirm.cta"],
+    // "disclaimer" (item 7, 2026-09-18 security review) — someone else may
+    // have typed this address in; this line tells them nothing happens if
+    // they do nothing.
+    bodyLineKeys: ["email.adoptConfirm.line1", "email.adoptConfirm.line2", "email.adoptConfirm.cta", "email.adoptConfirm.disclaimer"],
     vars: { box: opts.boxName, url },
   });
   await sendResendEmail({ to: opts.to, subject, text, html });

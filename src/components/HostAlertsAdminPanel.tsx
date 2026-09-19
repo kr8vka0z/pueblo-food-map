@@ -7,7 +7,7 @@
  * (this file's sibling on the same edit page).
  *
  * A host row is admin-vouched — added already confirmed, no double opt-in
- * (see src/lib/boxAlerts.ts's addHostSubscription header) — so this panel's
+ * (see src/lib/boxAlerts.ts's insertHostSubscriptionStatement header) — so this panel's
  * job is just add/remove against POST/DELETE
  * /api/admin/blessing-boxes/[id]/host-alerts, which both return the
  * refreshed host list directly in their response body: this component keeps

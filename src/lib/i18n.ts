@@ -852,6 +852,16 @@ const en: Record<string, string> = {
   "activity.line.renamed": "{name} was renamed",
   "activity.line.paused": "{name} was paused",
   "activity.line.removed": "{name} was removed",
+  // #511 — per-box history log only (never the global feed's own vocabulary,
+  // see boxActivity.ts's PerBoxActivityKind). photo_added: no {name} — it's
+  // always rendered on the box's own history page, so naming the box again
+  // would be noise (unlike the checkin/event lines above, which are shared
+  // with the global feed and DO need the box's name). sponsor_added's
+  // {name} is the SPONSOR's display name, not the box's — see
+  // BoxActivityList.tsx's own header for why this one line gets a different
+  // `name` value than every other line template here.
+  "activity.line.photo_added": "A new photo was added",
+  "activity.line.sponsor_added": "{name} became a sponsor",
   // Short noun labels for the kind filter's <option> text — distinct from
   // box.checkin.* above, which is first-person button copy ("I filled it")
   // that reads oddly as a filter option.
@@ -1573,6 +1583,8 @@ const es: Record<string, string> = {
   "activity.line.renamed": "{name} cambió de nombre", // [CHECK]
   "activity.line.paused": "{name} se pausó", // [CHECK]
   "activity.line.removed": "{name} se eliminó", // [CHECK]
+  "activity.line.photo_added": "Se agregó una nueva foto", // [CHECK]
+  "activity.line.sponsor_added": "{name} se convirtió en patrocinador(a)", // [CHECK]
   "activity.kind.filled": "Surtida", // [CHECK]
   "activity.kind.took": "Se usó la caja", // [CHECK]
   "activity.kind.low": "Con poco", // [CHECK]

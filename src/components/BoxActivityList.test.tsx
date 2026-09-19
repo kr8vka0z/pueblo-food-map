@@ -7,6 +7,7 @@
 
 import { describe, expect, test } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import BoxActivityList from "@/components/BoxActivityList";
 import type { ActivityItem } from "@/lib/boxActivity";
@@ -18,6 +19,7 @@ function makeItem(overrides: Partial<ActivityItem> = {}): ActivityItem {
     source: "checkin",
     kind: "filled",
     detail: null,
+    photoId: null,
     createdAt: "2026-09-17T10:00:00.000Z", // 2h before NOW
     venueId: "box-1",
     venueName: "Blessing Box - 216 W Routt",
@@ -91,5 +93,50 @@ describe("BoxActivityList", () => {
     render(<BoxActivityList items={items} showVenueName now={NOW} />);
     expect(screen.getByText(/was filled/)).toBeInTheDocument();
     expect(screen.getByText(/Someone used/)).toBeInTheDocument();
+  });
+
+  // #511 — photo + sponsor entries (per-box history page only; see
+  // boxActivity.ts's own header for why the global feed never sees these).
+  describe("photo entries (#511)", () => {
+    function makePhotoItem(overrides: Partial<ActivityItem> = {}): ActivityItem {
+      return makeItem({ source: "photo", kind: "photo_added", detail: null, photoId: 42, ...overrides });
+    }
+
+    test("renders the 'Photo added' line and a thumbnail sourced from the public serve route", () => {
+      render(<BoxActivityList items={[makePhotoItem()]} showVenueName={false} now={NOW} />);
+      expect(screen.getByText(/A new photo was added/)).toBeInTheDocument();
+      const thumb = screen.getByRole("img") as HTMLImageElement;
+      expect(thumb.src).toContain("/api/public/box-photos/42");
+    });
+
+    test("tapping the thumbnail opens the full-size PhotoViewer", async () => {
+      const user = userEvent.setup();
+      render(<BoxActivityList items={[makePhotoItem()]} showVenueName={false} now={NOW} />);
+      await user.click(screen.getByRole("button", { name: /view photo full size/i }));
+      const dialog = screen.getByRole("dialog") as HTMLDialogElement;
+      expect(dialog.open).toBe(true);
+    });
+
+    test("a photo entry never renders a stray detail line (detail is always null on a photo row)", () => {
+      const { container } = render(<BoxActivityList items={[makePhotoItem()]} showVenueName={false} now={NOW} />);
+      expect(container.querySelectorAll("li p")).toHaveLength(1);
+    });
+  });
+
+  describe("sponsor entries (#511)", () => {
+    function makeSponsorItem(overrides: Partial<ActivityItem> = {}): ActivityItem {
+      return makeItem({ source: "sponsor", kind: "sponsor_added", detail: "Jane D.", photoId: null, ...overrides });
+    }
+
+    test("renders '<name> became a sponsor' using the sponsor's own display name, not the venue name", () => {
+      render(<BoxActivityList items={[makeSponsorItem()]} showVenueName={false} now={NOW} />);
+      expect(screen.getByText(/Jane D\. became a sponsor/)).toBeInTheDocument();
+      expect(screen.queryByText(/This box became a sponsor/)).not.toBeInTheDocument();
+    });
+
+    test("does not duplicate the sponsor's name as a second detail line (detail already appears in the main line)", () => {
+      const { container } = render(<BoxActivityList items={[makeSponsorItem()]} showVenueName={false} now={NOW} />);
+      expect(container.querySelectorAll("li p")).toHaveLength(1);
+    });
   });
 });

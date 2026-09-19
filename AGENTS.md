@@ -3600,6 +3600,12 @@ links) — the same "real people receive real email" caveat already true of
 every other Resend-backed path in this app (see "Resend Email Key
 Management" above), worth a moment's awareness before triggering a real
 send against production data.
+**Tell Kyle at promotion time, in plain words:** once this is on the live
+site, real hosts, adopters and givers start receiving email at the FIRST
+`empty`/`low`/`problem` report on their box, with no further switch to
+flip — promotion itself is the go-live of outward email. Any host emails
+entered on the live admin before that day start getting alerts the same
+moment.
 
 ---
 

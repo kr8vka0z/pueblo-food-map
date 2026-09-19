@@ -12,6 +12,11 @@
  *   - Menu / Saved — open the drawer in place (same HamburgerMenu).
  *   - Resources    — its page, as on the map (highlighted when you're on it).
  *   - Near me      — the map, locating you (/?near=1, read by HomePageClient).
+ *   - Boxes (#516) — the map, filtered to blessing boxes (/?boxes=1, same
+ *                    read-once-then-strip pattern as Near me). There's no
+ *                    filter state off the map, so `boxesActive` is always
+ *                    false here — the item can never show "on" until the
+ *                    map applies the filter and the resident is back on it.
  *   - A saved place — the map, opened on that pin (/?venue=<id>).
  * "Show welcome screen" is map-only (the splash lives there), so the drawer
  * omits it here.
@@ -107,6 +112,8 @@ export default function PageNav({ locale, backHref = "/" }: { locale: Locale; ba
         isLocating={false}
         isDrifted={false}
         onNearMe={() => router.push("/?near=1")}
+        boxesActive={false}
+        onBoxesToggle={() => router.push("/?boxes=1")}
         navRef={navRef}
         onResourcesPage={pathname === "/resources"}
       />

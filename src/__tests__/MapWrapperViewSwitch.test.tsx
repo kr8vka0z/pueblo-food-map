@@ -229,6 +229,42 @@ describe("MapWrapper — bottom nav (docs/bottom-nav-spec.md)", () => {
   });
 });
 
+describe("MapWrapper — Boxes bottom-nav shortcut (#516)", () => {
+  test("tapping Boxes sets aria-pressed and lights up the Filters badge; tapping again clears both", async () => {
+    await renderAndLoadMap();
+    const boxesBtn = screen.getByTestId("nav-boxes");
+    expect(boxesBtn.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: /^Filters$/i })).toBeDefined();
+
+    fireEvent.click(boxesBtn);
+    expect(boxesBtn.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: /^Filters, 1 on$/i })).toBeDefined();
+
+    fireEvent.click(boxesBtn);
+    expect(boxesBtn.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: /^Filters$/i })).toBeDefined();
+  });
+
+  test("two ways into one state: ticking Blessing Box in the Filters panel also lights up the bar item", async () => {
+    await renderAndLoadMap();
+    fireEvent.click(screen.getByRole("button", { name: /^Filters$/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Blessing Box/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Show \d+ places?$/i }));
+
+    expect(screen.getByTestId("nav-boxes").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("Boxes doesn't disturb other active filters (e.g. Open now)", async () => {
+    await renderAndLoadMap();
+    fireEvent.click(screen.getByRole("button", { name: /^Filters$/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /^Open now$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Show \d+ places?$/i }));
+
+    fireEvent.click(screen.getByTestId("nav-boxes"));
+    expect(screen.getByRole("button", { name: /^Filters, 2 on$/i })).toBeDefined();
+  });
+});
+
 describe("MapWrapper — phone venue sheet hides the bottom chrome (§10)", () => {
   test("the nav steps aside while a venue sheet is open (§10)", async () => {
     // Every media query matches → phone layout (isMobile, below 2xl).

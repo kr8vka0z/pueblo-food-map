@@ -14,15 +14,17 @@
  * Accessible labelled rows, not tiles — a <dl> of label/value pairs reads
  * correctly to a screen reader and needs no custom ARIA, same instinct this
  * repo already applies to every other data list (VenueListView's table,
- * BoxActivityList's items). Two `<dl>`s (counts, then averages) rather than
- * one long one, each with its own leading heading, so the semantic grouping
- * matches the visual one.
+ * BoxActivityList's items). Three `<dl>`s (the optional "right now" overview
+ * — issue #512 — then counts, then averages) rather than one long one, each
+ * with its own leading heading or none where the parent already labels the
+ * section, so the semantic grouping matches the visual one.
  */
 
 import { t, type Locale } from "@/lib/i18n";
 import {
   formatDurationMs,
   type CheckinCounts,
+  type NetworkOverview,
   type PairAverages,
   type PeriodKey,
 } from "@/lib/boxStats";
@@ -64,6 +66,14 @@ export interface BoxNumbersPanelProps {
   approvedPhotoCount: number;
   pairAverages: PairAverages;
   locale: Locale;
+  /**
+   * Current ("right now") network-wide counts (issue #512) — box count,
+   * sponsor count, and their average — independent of the period picker
+   * above, so passed as their own prop rather than folded into `counts`.
+   * Undefined on the per-box panel (/box/<id>/history's BoxHistoryContent),
+   * where "how many boxes" and "how many sponsors" don't apply to one box.
+   */
+  networkOverview?: NetworkOverview;
 }
 
 export default function BoxNumbersPanel({
@@ -74,11 +84,20 @@ export default function BoxNumbersPanel({
   approvedPhotoCount,
   pairAverages,
   locale,
+  networkOverview,
 }: BoxNumbersPanelProps) {
   const periodSelectId = `${idPrefix}-stats-period`;
 
   return (
     <div className="space-y-4">
+      {networkOverview && (
+        <dl>
+          <Row label={t("box.stats.boxCount", locale)} value={String(networkOverview.boxCount)} />
+          <Row label={t("box.stats.sponsorCount", locale)} value={String(networkOverview.sponsorCount)} />
+          <Row label={t("box.stats.avgSponsorsPerBox", locale)} value={networkOverview.avgSponsorsPerBox} />
+        </dl>
+      )}
+
       <div className="max-w-xs">
         <label htmlFor={periodSelectId} className={FIELD_LABEL}>
           {t("box.stats.period", locale)}

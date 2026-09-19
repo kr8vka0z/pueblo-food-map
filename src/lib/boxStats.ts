@@ -400,6 +400,17 @@ export interface NetworkStatsData {
   boxes: StatsBoxMeta[];
   checkins: NetworkStatsCheckin[];
   photos: NetworkStatsPhoto[];
+  /**
+   * Current (right-now) count of approved box_adopters rows on live boxes —
+   * issue #512. Independent of the period picker: unlike checkins/photos,
+   * which the client filters by period, this is a single point-in-time
+   * count computed here. Optional so the network-stats route's degraded
+   * (D1-failure) fallback literal doesn't need editing to add it — a
+   * missing value already reads as 0 at the consumer
+   * (useBoxNetworkStats.ts's normalize()), matching "never NaN" for the
+   * average this feeds into (computeNetworkOverview below).
+   */
+  approvedSponsorCount?: number;
 }
 
 /**
@@ -452,6 +463,21 @@ const SELECT_ALL_BOX_PHOTOS_SQL = `
   ORDER BY p.created_at ASC
 `;
 
+/**
+ * Count of APPROVED box_adopters rows on NON-ARCHIVED blessing-box venues —
+ * issue #512's "current sponsors" number. Counts rows, not distinct emails:
+ * a sponsor who has adopted two boxes counts once per box (task's own
+ * explicit rule), which a plain COUNT(*) already gives with no extra
+ * grouping needed. Selects nothing but the count — box_adopters.email is
+ * private (migrations/0010's own header) and never leaves this query.
+ */
+const SELECT_APPROVED_SPONSOR_COUNT_SQL = `
+  SELECT COUNT(*) as count
+  FROM box_adopters a
+  JOIN venues v ON v.id = a.venue_id AND v.category = 'blessing_box' AND v.status != 'archived'
+  WHERE a.status = 'approved'
+`;
+
 interface VenueMetaRow {
   id: string;
   name: string;
@@ -494,5 +520,32 @@ export async function loadNetworkStatsData(db: D1Database): Promise<NetworkStats
     photos = [];
   }
 
-  return { boxes, checkins, photos };
+  // Best-effort, same posture as the photos read above: a missing/broken
+  // box_adopters table must degrade this one number to 0, never take the
+  // whole stats response down.
+  let approvedSponsorCount = 0;
+  try {
+    const sponsorResult = await db.prepare(SELECT_APPROVED_SPONSOR_COUNT_SQL).all<{ count: number }>();
+    approvedSponsorCount = sponsorResult.results?.[0]?.count ?? 0;
+  } catch {
+    approvedSponsorCount = 0;
+  }
+
+  return { boxes, checkins, photos, approvedSponsorCount };
+}
+
+// ─── Current network overview (issue #512) ─────────────────────────────────
+
+export interface NetworkOverview {
+  /** Current count of live (non-archived) blessing boxes. */
+  boxCount: number;
+  /** Current count of approved sponsors on live boxes — see SELECT_APPROVED_SPONSOR_COUNT_SQL above for the exact counting rule. */
+  sponsorCount: number;
+  /** sponsorCount ÷ boxCount, formatted to one decimal (e.g. "0.4"). Divide-by-zero (no live boxes) reads a plain "0", never "NaN" or "0.0" — task's own explicit rule. */
+  avgSponsorsPerBox: string;
+}
+
+export function computeNetworkOverview(boxCount: number, sponsorCount: number): NetworkOverview {
+  const avgSponsorsPerBox = boxCount === 0 ? "0" : (sponsorCount / boxCount).toFixed(1);
+  return { boxCount, sponsorCount, avgSponsorsPerBox };
 }

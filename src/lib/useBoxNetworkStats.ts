@@ -15,19 +15,20 @@
 import { useEffect, useState } from "react";
 import type { NetworkStatsData } from "@/lib/boxStats";
 
-const EMPTY_DATA: NetworkStatsData = { boxes: [], checkins: [], photos: [] };
+const EMPTY_DATA: NetworkStatsData = { boxes: [], checkins: [], photos: [], approvedSponsorCount: 0 };
 
 export interface UseBoxNetworkStatsResult {
   data: NetworkStatsData;
   loading: boolean;
 }
 
-/** Fills in any missing array with [] rather than trusting the response shape blindly — belt-and-suspenders against a stale/partial cached response ever reaching a consumer that does `.map`/`for...of` on an undefined field. */
+/** Fills in any missing array with [] rather than trusting the response shape blindly — belt-and-suspenders against a stale/partial cached response ever reaching a consumer that does `.map`/`for...of` on an undefined field. `approvedSponsorCount` (issue #512) is optional on the wire (see boxStats.ts's own header) so it defaults to 0 the same way. */
 function normalize(result: Partial<NetworkStatsData> | null): NetworkStatsData {
   return {
     boxes: result?.boxes ?? [],
     checkins: result?.checkins ?? [],
     photos: result?.photos ?? [],
+    approvedSponsorCount: result?.approvedSponsorCount ?? 0,
   };
 }
 

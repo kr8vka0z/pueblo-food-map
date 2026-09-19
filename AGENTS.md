@@ -3351,6 +3351,180 @@ production per the checklist above.
 
 ---
 
+# Blessing Boxes — adopt a box and alerts (slice 6)
+
+Full design: `atlas-kb/projects/Pueblo Food Map/Blessing Boxes Build Plan.md`,
+"Slice 6 — Adopt a box + email alerts." Two new tables
+(`migrations/0010_box_adopters_alerts.sql`), a public application/signup
+pair, two admin review surfaces, and card UI wiring on top of every prior
+slice's box work above.
+
+**Two new tables, one moderation lifecycle, one shared alert engine.**
+`box_adopters` — one row per "adopt this box" application (`display_name`
+PUBLIC once approved, `email`/`note` PRIVATE forever), same
+pending→approved/rejected shape `box_photos` already established.
+`alert_subscriptions` — ONE shared table for all three recipient kinds
+(`role`: `host`/`adopter`/`giver`) rather than three near-identical tables,
+so confirm/stop/cooldown logic (`src/lib/boxAlerts.ts`) is written once and
+applies uniformly. See the migration file's own header for the full column
+rationale (confirm vs. unsubscribe tokens are deliberately separate values
+— a leaked unsubscribe link, which circulates in every alert email, must
+never forge a confirmation). Applied to staging and local dev only,
+2026-09-18 — production is the usual later, explicit, Kyle-gated step; see
+the updated promotion checklist below, now covering SIX migrations.
+
+**Who gets what, and the one hard rule every alert function serves:** host
++ approved adopters get an email when a box is reported EMPTY or has a
+PROBLEM. Givers (self-signed-up from the card) get an email when their
+chosen box is reported EMPTY or LOW — never a problem report. **The
+free-text note on a `filled`/`problem` check-in is never included in any
+alert email** — every function in `boxAlerts.ts` takes only
+`kind`/`boxName`/`boxUrl`; there is structurally no parameter for a note to
+travel through. Alerts fire ONLY ON CHANGE (an `empty`/`low` check-in
+alerts only if the box's prior computed status wasn't already that value —
+`problem` has no such gate, every report is independently worth flagging)
+and are cooldown-gated at `ALERT_COOLDOWN_HOURS = 6` per subscription,
+claimed atomically via one `UPDATE ... RETURNING` before any Resend call
+(a read-then-write would let two overlapping check-ins both send).
+Dispatch never blocks the check-in response: `notifyBoxAlerts()` is called
+from the checkins route via `ctx.waitUntil()` (falls back to an un-awaited,
+caught promise when no live `ExecutionContext` is available), wrapped
+end-to-end in try/catch — a Resend outage or a missing `alert_subscriptions`
+table degrades to a console warning, never a failed or slowed check-in.
+
+**Public write paths, same guard order convention as every other public
+route in this app** (Content-Type → Turnstile → honeypot → rate limit →
+field validation), reaching D1 directly via `getCloudflareContext()` (never
+`getAdminDb()` — these are public, unauthenticated routes):
+
+- **`POST /api/public/blessing-boxes/[id]/adopt`** — the adoption
+  application. Two D1-shared-counter rate-limit scopes via
+  `checkinRateLimit.ts` (the same atomic-upsert module check-ins and
+  photos already use, entirely separate budgets so a burst of one path
+  never eats another's): `adopt-visitor` (3/visitor/box/hour),
+  `adopt-box` (10/box/hour) — plus two shared `alert-email-target`
+  (3/email/hour) and `alert-email-global` (60/hour) scopes reused by both
+  this route and the giver-alert route below, since both ultimately send a
+  confirm email to an arbitrary address and both need the same
+  email-flood ceiling. Reuses `boxTurnstile.ts`'s dedicated invisible box
+  key + managed fallback (the same keypair check-ins/photos use, not a new
+  one).
+- **`POST /api/public/blessing-boxes/[id]/alerts`** — giver alert signup
+  (email only). `alert-visitor` (5/visitor/box/hour) plus the same shared
+  `alert-email-target`/`alert-email-global` scopes above.
+
+Both routes send a double-opt-in confirm email on success and always
+return the identical generic "check your email" response regardless of
+whether the address is new, already subscribed, or previously
+unsubscribed — never revealing which case occurred (anti-enumeration,
+same posture the stop/resubscribe routes take below).
+
+**Confirm/stop/resubscribe — one deliberate GET/POST asymmetry.**
+`GET /alerts/confirm?t=<token>` renders a page requiring a button click
+that POSTs to `POST /api/public/alerts/confirm` — **a bare GET must never
+mutate here**, because a mail client's link-prefetch scanner would
+silently auto-confirm every sent email before a human ever saw it.
+`GET /alerts/stop?t=<token>` is the opposite by design: it **mutates on
+its own GET**, because the safe failure direction for a prefetched
+unsubscribe link is an unwanted unsubscribe, not a wrongly-confirmed
+signup — see `stopSubscriptionByToken`'s own header in `src/lib/boxAlerts.ts`
+for the full reasoning. `POST /api/public/alerts/resubscribe` (the stop
+page's "undo" button) reactivates the same token.
+
+**Rate-limit response folding — the JSON API and the page disagree on
+purpose.** `stopSubscriptionByToken`/`resubscribeByToken` document that a
+rate-limited token lookup must fold into the SAME neutral "not found"
+outcome as a genuinely unknown token, so a brute-force attempt against the
+token space learns nothing either way. `/api/public/alerts/stop` and
+`/api/public/alerts/resubscribe` (the JSON routes, used by both the
+one-click mail-client path and the page's own fetch calls) follow this
+exactly — both `"not_found"` and `"rate_limited"` return the identical
+`200 {ok:false, error:"invalid_token"}`. The **`/alerts/stop` Server
+Component page**, which calls `stopSubscriptionByToken` directly rather
+than through the JSON API, shows a distinct "rate limited" message instead
+— a legitimate visitor landing on that URL isn't the enumeration threat
+model the API's neutral response protects against.
+
+**Admin review — two new surfaces, same auth pair as every other admin
+mutation (`getAdminDb()` then `requireAdminOrigin()`):**
+
+- **`/admin/box-adopters`** (`BoxAdoptersReviewView.tsx`) — the adoption
+  application queue. `POST /api/admin/box-adopters/[id]/approve` is
+  refused with `409` until the applicant's `email_confirmed_at` is set —
+  an admin can never publish a "Cared for by" display name for an email
+  nobody has proven they control. Approving also creates the matching
+  `alert_subscriptions` row (`role='adopter'`, linked via `adopter_id`) so
+  an approved adopter starts receiving empty/problem alerts immediately,
+  without a second signup.
+- **Host alert recipients** — `HostAlertsAdminPanel.tsx`, on a box's own
+  edit page, plus `POST /api/admin/blessing-boxes/[id]/host-alerts`.
+  **Host rows are admin-vouched, not self-signed-up and not double-opt-in**
+  — an admin adds a host's email directly (this is the one recipient role
+  with no public signup path and no confirm-email step), since the host is
+  already a known, trusted party the admin is coordinating with directly.
+
+**Card UI (`BoxCardBody.tsx`).** The "Cared for by …" line renders when
+`box.box.adopters` (every approved adopter's `display_name`, already public
+since the adopters-exposure commit earlier in this slice) is non-empty.
+Two inline-expand forms — `AdoptBoxForm.tsx` ("Adopt this box") and
+`BoxAlertSignupForm.tsx` ("Email me when it needs filling") — render below
+the check-in panel, both starting collapsed as a plain link. Both share a
+new `useBoxTurnstileWidget` hook (`src/lib/useBoxTurnstileWidget.ts`) for
+the Turnstile mount/fallback lifecycle, deliberately a SMALLER slice of
+`BoxCheckinPanel.tsx`'s own state machine (see that hook's own header for
+exactly what it keeps and drops) — extracted so the two forms share one
+mount implementation instead of two more copies of it.
+`BoxCheckinPanel.tsx` itself is NOT refactored to consume this hook (out
+of this slice's lane); unifying the two is a fair follow-up if a third
+form ever needs the same mount logic. **The container ref is a hook
+PARAMETER, not part of its return value** — this repo's React Compiler
+ESLint rule (`react-hooks/refs`) flags a ref bundled into the same object
+as ordinary reactive state, because it can't verify every later access of
+that object is ref-safe; every consuming form declares its own
+`useRef<HTMLDivElement>(null)` locally and passes it in, the same pattern
+`BoxCheckinPanel.tsx` already uses directly (why that file has never
+tripped this rule).
+
+**No note or photo in an alert email — enforced structurally, not by
+convention alone.** Every `boxAlerts.ts` send function's parameter list
+has no slot for a note; there is no code path that could thread one
+through even by mistake. Same "never even carry the private field"
+guarantee this schema already gives `box_photos`/`box_checkins`'
+`host_contact`/PII columns.
+
+**i18n.** All new `box.adopt.*`/`box.alerts.*`/`alerts.confirm.*`/
+`alerts.stop.*` keys carry both EN and ES strings, new Spanish marked
+`// [CHECK]` per this repo's established unreviewed-translation
+convention. The email-field disclosure on both new forms reuses the
+existing shared `privacy.emailDisclosure`/`privacy.linkLabel` keys (the
+same ones `ReportForm.tsx` already uses) rather than duplicating new ones
+— an existing code comment at that key's declaration already names this
+as the intended reuse.
+
+**Privacy page rewrite.** `PrivacyContent.tsx` was rewritten in this slice
+to describe the blessing-box data this feature now collects (adopter
+applications, alert-subscription emails, the confirm/unsubscribe token
+flow) alongside the pre-existing public-forms disclosure.
+
+**Blessing boxes — promotion checklist, updated again.** Run ALL SIX
+migrations now — `0005` through `0009` (see the checklist above, unchanged)
+PLUS **`0010_box_adopters_alerts.sql`** — against production D1
+(`pueblo-food-map-admin`) before promoting `dev` → `main`. **No new
+secret is required for this slice** — adopt/alert signup and the confirm/
+stop/resubscribe routes reuse `TURNSTILE_BOX_SECRET_KEY`/
+`TURNSTILE_SECRET_KEY` (the existing box + fallback keypair),
+`CHECKIN_RATE_LIMIT_SECRET` (the existing shared rate-limit HMAC key), and
+`RESEND_API_KEY` (the existing sending key) — the same secrets check-ins
+and photos already require in production per the checklists above.
+**This slice sends outward email to addresses a member of the public
+types into a form** (adoption applications, alert signups, confirm/stop
+links) — the same "real people receive real email" caveat already true of
+every other Resend-backed path in this app (see "Resend Email Key
+Management" above), worth a moment's awareness before triggering a real
+send against production data.
+
+---
+
 # Design system — DESIGN.md
 
 [DESIGN.md](DESIGN.md) is the agent-facing visual-identity reference. Read it before

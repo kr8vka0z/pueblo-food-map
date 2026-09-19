@@ -519,13 +519,24 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
         needsToken?: string;
       };
 
-      // Every Turnstile token is single-use — reset for the next possible
-      // tap regardless of outcome (see this file's own header). In BOX
-      // mode this also kicks off Turnstile's own re-execution (default
-      // `execution: "render"`), which is exactly what an attached photo
-      // below is waiting on.
-      if (window.turnstile && turnstileWidgetId.current) {
-        window.turnstile.reset(turnstileWidgetId.current);
+      // Reviewer fix pass (2026-09-19): the request already succeeded or
+      // failed by this point — that outcome must land in state regardless
+      // of what the widget does next. Every Turnstile token is single-use,
+      // so it's still reset for the next possible tap (and, in BOX mode,
+      // this kicks off Turnstile's own re-execution, default `execution:
+      // "render"`, which is exactly what an attached photo below is
+      // waiting on) — but `reset()` is a call into third-party widget code
+      // outside this try, and if IT throws, the outer catch below must not
+      // be allowed to reclassify a real success as "error". Own try/catch,
+      // after the outcome is already decided.
+      try {
+        if (window.turnstile && turnstileWidgetId.current) {
+          window.turnstile.reset(turnstileWidgetId.current);
+        }
+      } catch {
+        // Nothing to recover — the checkin itself already succeeded or
+        // failed above; a stale/broken widget only affects the NEXT tap
+        // (which re-queues normally, same as if no token ever arrived).
       }
       setTurnstileToken(null);
 
@@ -581,8 +592,15 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
 
       const res = await fetch(`/api/public/blessing-boxes/${boxId}/photos`, { method: "POST", body: form });
 
-      if (window.turnstile && turnstileWidgetId.current) {
-        window.turnstile.reset(turnstileWidgetId.current);
+      // Reviewer fix pass (2026-09-19) — see submitCheckin's own comment on
+      // this same pattern: reset() is third-party widget code and must not
+      // be able to reclassify a real outcome as an error via the outer catch.
+      try {
+        if (window.turnstile && turnstileWidgetId.current) {
+          window.turnstile.reset(turnstileWidgetId.current);
+        }
+      } catch {
+        // Nothing to recover — see submitCheckin's own comment.
       }
       setTurnstileToken(null);
 
@@ -619,8 +637,15 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
         }),
       });
 
-      if (window.turnstile && turnstileWidgetId.current) {
-        window.turnstile.reset(turnstileWidgetId.current);
+      // Reviewer fix pass (2026-09-19) — see submitCheckin's own comment on
+      // this same pattern: reset() is third-party widget code and must not
+      // be able to reclassify a real outcome as an error via the outer catch.
+      try {
+        if (window.turnstile && turnstileWidgetId.current) {
+          window.turnstile.reset(turnstileWidgetId.current);
+        }
+      } catch {
+        // Nothing to recover — see submitCheckin's own comment.
       }
       setTurnstileToken(null);
 

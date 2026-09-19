@@ -921,3 +921,80 @@ describe("BoxCheckinPanel — needs ask after 'took'", () => {
     expect(screen.getByRole("button", { name: "Pañales" })).toBeDefined();
   });
 });
+
+// ─── Reviewer fix pass (2026-09-19) — a throwing Turnstile reset() must
+// never strand a real outcome behind the wrong terminal state ─────────────
+//
+// `window.turnstile.reset()` is third-party widget code called AFTER the
+// checkin/photo/needs request has already succeeded or failed. Before this
+// fix, a throw there was caught by the SAME outer try/catch the fetch
+// itself runs in, which reclassified a real success as a generic error —
+// each of the three submit functions now wraps its own reset() call so a
+// broken widget can never do that.
+
+/** A reset() that throws on exactly the Nth call to it (1-indexed across the whole test), otherwise behaves like stubTurnstileReExecutingOnReset above (re-fires the SAME callback asynchronously with a fresh token — needed so a chained second submit, e.g. the needs ask after 'took', still has something to fire on). */
+function stubTurnstileThrowingResetOnCall(throwOnCall: number) {
+  let savedCallback: ((t: string) => void) | undefined;
+  let calls = 0;
+  vi.stubGlobal("turnstile", {
+    render: vi.fn((_c: HTMLElement, opts: { callback?: (t: string) => void }) => {
+      savedCallback = opts.callback;
+      opts.callback?.("test-turnstile-token");
+      return "widget-id-1";
+    }),
+    reset: vi.fn(() => {
+      calls += 1;
+      if (calls === throwOnCall) {
+        throw new Error("widget reset failed");
+      }
+      setTimeout(() => savedCallback?.(`test-turnstile-token-${calls + 1}`), 0);
+    }),
+    remove: vi.fn(),
+  });
+}
+
+describe("BoxCheckinPanel — a throwing Turnstile reset() never strands the outcome", () => {
+  test("submitCheckin: reset() throws right after a successful checkin — the success message still shows", async () => {
+    stubTurnstileThrowingResetOnCall(1);
+    mockSuccess(); // plain 'took' success, no checkinId/needsToken — keeps this test isolated to submitCheckin's own reset call
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+
+    expect(await screen.findByText("Thanks — enjoy!")).toBeDefined();
+  });
+
+  test("submitPhoto: reset() throws right after a successful standalone photo send — the success message still shows", async () => {
+    stubTurnstileThrowingResetOnCall(1);
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "Add a photo" }));
+    const input = document.getElementById("box-photo-standalone-input") as HTMLInputElement;
+    await user.upload(input, new File(["fake-bytes"], "photo.jpg", { type: "image/jpeg" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).not.toBeDisabled());
+
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText(/submitted for review/i)).toBeDefined();
+  });
+
+  test("submitNeeds: reset() throws right after a successful needs Send — the thank-you message still shows", async () => {
+    // Call 1 = the checkin's own reset (succeeds, re-fires a fresh token —
+    // needed for the needs Send below to have something to submit with);
+    // call 2 = the needs POST's own reset (throws).
+    stubTurnstileThrowingResetOnCall(2);
+    mockSuccessWithNeedsToken(42, "needs-token-abc");
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) }); // the needs POST
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+    await screen.findByText("What would help you next time?");
+
+    await user.click(screen.getByRole("button", { name: "Diapers" }));
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Got it — thank you.")).toBeDefined();
+  });
+});

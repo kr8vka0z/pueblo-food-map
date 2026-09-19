@@ -3654,7 +3654,17 @@ since 0007, `ALTER TABLE ADD COLUMN` has no `IF NOT EXISTS` form, so running
 it twice against the same database fails outright on the second run
 ("duplicate column name: lang"). It must run EXACTLY ONCE per database; the
 migration file's own header names the `PRAGMA table_info` check to run
-first if there's ever doubt. **No new
+first if there's ever doubt. **Apply migrations with `wrangler d1 migrations
+apply` (tracked in the `d1_migrations` table), never `d1 execute --file`,
+for anything not idempotent.** `deploy-dev.yml` runs `d1 migrations apply`
+against staging by itself on every merge to `dev` — so a hand-applied
+`execute --file` of 0011 on staging (done 2026-09-18, to get the column in
+ahead of the code) made the very next deploy fail on "duplicate column name:
+lang", because the tracker didn't know 0011 had run; the repair was one
+`INSERT INTO d1_migrations (name) VALUES ('0011_alert_email_lang.sql')` and a
+re-run. Staging needs no hand-applied migration at all: the deploy applies it
+before the new Worker goes out. `deploy-prod.yml` does NOT apply migrations —
+production is still the manual, Kyle-gated `d1 migrations apply` step. **No new
 secret is required for this slice** — adopt/alert signup and the confirm/
 stop/resubscribe routes reuse `TURNSTILE_BOX_SECRET_KEY`/
 `TURNSTILE_SECRET_KEY` (the existing box + fallback keypair),

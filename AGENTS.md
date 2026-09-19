@@ -3376,21 +3376,48 @@ the updated promotion checklist below, now covering SIX migrations.
 **Who gets what, and the one hard rule every alert function serves:** host
 + approved adopters get an email when a box is reported EMPTY or has a
 PROBLEM. Givers (self-signed-up from the card) get an email when their
-chosen box is reported EMPTY or LOW — never a problem report. **The
-free-text note on a `filled`/`problem` check-in is never included in any
-alert email** — every function in `boxAlerts.ts` takes only
+chosen box is reported EMPTY or LOW — never a problem report. **FILLED goes
+to EVERYONE subscribed to the box** — host, adopter, and giver alike — since
+"someone just filled it" is good news every recipient role cares about, not
+only the ones who'd otherwise get an empty/problem alert. **The free-text
+note on a `filled`/`problem` check-in is never included in any alert
+email** — every function in `boxAlerts.ts` takes only
 `kind`/`boxName`/`boxUrl`; there is structurally no parameter for a note to
-travel through. Alerts fire ONLY ON CHANGE (an `empty`/`low` check-in
-alerts only if the box's prior computed status wasn't already that value —
-`problem` has no such gate, every report is independently worth flagging)
-and are cooldown-gated at `ALERT_COOLDOWN_HOURS = 6` per subscription,
-claimed atomically via one `UPDATE ... RETURNING` before any Resend call
-(a read-then-write would let two overlapping check-ins both send).
-Dispatch never blocks the check-in response: `notifyBoxAlerts()` is called
-from the checkins route via `ctx.waitUntil()` (falls back to an un-awaited,
-caught promise when no live `ExecutionContext` is available), wrapped
-end-to-end in try/catch — a Resend outage or a missing `alert_subscriptions`
-table degrades to a console warning, never a failed or slowed check-in.
+travel through. Alerts fire ONLY ON CHANGE (an `empty`/`low`/`filled`
+check-in alerts only if the box's prior computed status wasn't already that
+value — `problem` has no such gate, every report is independently worth
+flagging) and are cooldown-gated at `ALERT_COOLDOWN_HOURS = 6` per
+subscription, claimed atomically via one `UPDATE ... RETURNING` before any
+Resend call (a read-then-write would let two overlapping check-ins both
+send). Dispatch never blocks the check-in response: `notifyBoxAlerts()` is
+called from the checkins route via `ctx.waitUntil()` (falls back to an
+un-awaited, caught promise when no live `ExecutionContext` is available),
+wrapped end-to-end in try/catch — a Resend outage or a missing
+`alert_subscriptions` table degrades to a console warning, never a failed or
+slowed check-in.
+
+**Filled alerts (follow-up) use a DIFFERENT cap than the 6h cooldown
+above — deliberately.** The 6-hour cooldown exists so a box sitting empty
+for a week doesn't re-alert on every "still empty" tap; gating a filled
+report behind that same cooldown would silently swallow the good news for
+anyone who was JUST alerted about the box being empty minutes earlier — the
+whole point of a filled alert is to reach them right away. So `'filled'`
+skips `claimAlertRecipients()` entirely and instead reads EVERY confirmed,
+not-unsubscribed subscription for the box (`claimFilledAlertRecipients()`
+— a plain `SELECT`, never an `UPDATE`, never touches `last_alerted_at`),
+then claims each one individually against
+`checkinRateLimit.ts`'s shared D1 counter under the new scope
+`alert-filled-sub` (id = the subscription's own row id), capped at 1 per
+hour (`MAX_FILLED_ALERTS_PER_SUB_PER_HOUR`) — only a subscription that wins
+its own claim is ever emailed. That cap exists solely to stop mailing the
+SAME subscription twice for what reads as the same fill event; it is not a
+"wait N hours" throttle the way the 6h cooldown is. No new secret or
+migration: it reuses the existing `CHECKIN_RATE_LIMIT_SECRET` and the
+existing `box_checkin_rate_limit` table, passed through from the checkins
+route's existing `notifyBoxAlerts()` call
+(`NotifyBoxAlertsInput.rateLimitSecret`, optional on the type since only
+`'filled'` reads it — missing it fails CLOSED, no filled emails, never an
+error surfaced to the visitor).
 
 **Public write paths, same guard order convention as every other public
 route in this app** (Content-Type → Turnstile → honeypot → per-visitor/

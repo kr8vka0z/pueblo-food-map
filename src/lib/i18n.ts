@@ -658,6 +658,12 @@ const en: Record<string, string> = {
   "email.alert.low.line1": "{box} was just marked as running low.",
   "email.alert.problem.subject": "A problem was reported at {box}",
   "email.alert.problem.line1": "A problem was just reported at {box}.",
+  // Filled alert (slice 6 follow-up) — the only alert every subscriber role
+  // (host/adopter/giver) gets, and the only one NOT gated by the 6h cooldown
+  // (boxAlerts.ts's own header, "FILLED IS A SEPARATE CAP").
+  "email.alert.filled.subject": "Good news: {box} was just filled",
+  "email.alert.filled.line1": "Someone just reported filling {box}.",
+  "email.alert.filled.line2": "Thanks for keeping an eye on it. You'll hear from us again when it needs filling.",
   "email.alert.line2": "See the box's page for details: {url}",
   "email.stopLine": "Don't want these emails anymore? Stop them any time, no login needed: {stopUrl}",
   "email.adoptConfirm.subject": "Confirm your application to adopt {box}",
@@ -1321,6 +1327,9 @@ const es: Record<string, string> = {
   "email.alert.low.line1": "{box} se acaba de marcar con poco surtido.", // [CHECK]
   "email.alert.problem.subject": "Se reportó un problema en {box}", // [CHECK]
   "email.alert.problem.line1": "Se acaba de reportar un problema en {box}.", // [CHECK]
+  "email.alert.filled.subject": "Buenas noticias: {box} se acaba de llenar", // [CHECK]
+  "email.alert.filled.line1": "Alguien acaba de reportar que llenó {box}.", // [CHECK]
+  "email.alert.filled.line2": "Gracias por estar pendiente. Te avisaremos de nuevo cuando necesite llenarse otra vez.", // [CHECK]
   "email.alert.line2": "Consulta la página de la caja para más detalles: {url}", // [CHECK]
   "email.stopLine": "¿Ya no quieres estos correos? Detenlos cuando quieras, sin iniciar sesión: {stopUrl}", // [CHECK]
   "email.adoptConfirm.subject": "Confirma tu solicitud para adoptar {box}", // [CHECK]

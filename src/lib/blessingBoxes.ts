@@ -92,6 +92,100 @@ export interface PublicCheckinEvent {
   createdAt: string;
 }
 
+// ─── "What would help you next time?" ask (migration 0012) ────────────────
+// Nine fixed choices, owner-approved mockup v3 Part 2. This array is the
+// SINGLE source of truth for the vocabulary — the needs route validates
+// against it, the admin panel labels off it, and BoxCheckinPanel.tsx's own
+// chip list order matches it exactly (see that component's own import).
+
+export const NEED_KEYS = [
+  "canned_food",
+  "fresh_food",
+  "bread",
+  "baby_items",
+  "diapers",
+  "hygiene",
+  "pet_food",
+  "drinks",
+  "warm_clothing",
+] as const;
+export type NeedKey = (typeof NEED_KEYS)[number];
+export const NEED_KEY_SET: ReadonlySet<string> = new Set(NEED_KEYS);
+/** "max 9" per the task spec — happens to equal NEED_KEYS.length, since every valid key is unique; kept as its own named constant rather than an inline `NEED_KEYS.length` so the needs route's own 400-on-oversized-array check reads as an intentional cap, not a coincidence. */
+export const MAX_NEEDS = NEED_KEYS.length;
+
+/**
+ * Validates and normalizes a client-submitted `needs` field (the needs
+ * route's own request body). `undefined` (field omitted) is valid and
+ * normalizes to `[]` — the "typed text only, no chips" case. Any other
+ * malformed shape (not an array, over MAX_NEEDS entries, a non-string
+ * item, or any string not in NEED_KEY_SET) fails closed — the needs route
+ * maps a `{ ok: false }` result to its own 400, per the task's own
+ * instruction ("unknown keys → 400"). A valid result is deduped (a client
+ * sending the same key twice) and returned in NEED_KEYS' own canonical
+ * order, not submission order — so the same picks always serialize
+ * identically regardless of tap order, which keeps `needs` JSON diffable
+ * and keeps computeNeededFromVisitorsMap's aggregation from needing to
+ * care about order at all.
+ */
+export function parseNeedsField(raw: unknown): { ok: true; keys: NeedKey[] } | { ok: false } {
+  if (raw === undefined) return { ok: true, keys: [] };
+  if (!Array.isArray(raw) || raw.length > MAX_NEEDS) return { ok: false };
+  const submitted = new Set<string>();
+  for (const item of raw) {
+    if (typeof item !== "string" || !NEED_KEY_SET.has(item)) return { ok: false };
+    submitted.add(item);
+  }
+  return { ok: true, keys: NEED_KEYS.filter((k) => submitted.has(k)) };
+}
+
+/** One box's top-3 aggregated visitor picks — computeNeededFromVisitorsMap's own output shape, and PublicBlessingBox.box.neededFromVisitors' element type. */
+export interface NeededFromVisitors {
+  key: NeedKey;
+  count: number;
+}
+
+/** computeNeededFromVisitorsMap's raw input row shape — one (venue, key) pair's aggregate, exactly what SELECT_NEEDED_FROM_VISITORS_SQL's GROUP BY produces (json_each's per-array-item expansion already collapsed by COUNT/MAX in SQL, not in JS — see that query's own comment for why). */
+export interface NeedCountRow {
+  venue_id: string;
+  key: string;
+  n: number;
+  last_at: string;
+}
+
+/**
+ * Groups already-aggregated (venue, key, count, last_at) rows by venue,
+ * ranks each venue's keys by count DESC then last_at DESC (a tie goes to
+ * whichever key was picked most recently — "most needed" reads as "still
+ * being asked for", not an arbitrary key-name tiebreak), and keeps the top
+ * 3. Pure — no D1 — so every branch (ties, an unknown/legacy key filtered
+ * out defensively, a venue with fewer than 3 distinct keys) is directly
+ * testable with plain fixtures, same convention as computeBoxStatus above.
+ */
+export function computeNeededFromVisitorsMap(rows: NeedCountRow[]): Map<string, NeededFromVisitors[]> {
+  const byVenue = new Map<string, NeedCountRow[]>();
+  for (const row of rows) {
+    // Defensive: a row whose key isn't (or is no longer) in NEED_KEY_SET —
+    // e.g. a future vocabulary change leaving old rows behind — is dropped
+    // rather than surfaced as a chip nobody can translate a label for.
+    if (!NEED_KEY_SET.has(row.key)) continue;
+    const existing = byVenue.get(row.venue_id);
+    if (existing) existing.push(row);
+    else byVenue.set(row.venue_id, [row]);
+  }
+
+  const result = new Map<string, NeededFromVisitors[]>();
+  for (const [venueId, venueRows] of byVenue) {
+    const ranked = venueRows
+      .slice()
+      .sort((a, b) => b.n - a.n || (a.last_at < b.last_at ? 1 : a.last_at > b.last_at ? -1 : 0))
+      .slice(0, 3)
+      .map((r) => ({ key: r.key as NeedKey, count: r.n }));
+    result.set(venueId, ranked);
+  }
+  return result;
+}
+
 /** How long a status-setting check-in keeps its status before fading to "unknown" — Build Plan default (7 days), Discovery §7 open question #3, "number TBD" in the Discovery table. */
 const STATUS_FADE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -222,6 +316,21 @@ export interface PublicBlessingBox extends Venue {
     latestPhoto: PublicBoxPhoto | null;
     /** Slice 6 — approved adopter display names ONLY, oldest first ("Cared for by A, B" reads as an accumulating roster). Never the adopter's email — see boxAdopters.ts's own header on why that column exists at all and is never selected here. Empty array (never null) when nobody's been approved yet, or on a degraded (D1-failure) read — same best-effort posture as latestPhoto above. */
     adopters: string[];
+    /**
+     * "What would help you next time?" ask (migration 0012) — the top 3
+     * need keys visitors have picked at this box in the last 30 days, most-
+     * picked first. Populated (never null, defaults to []) by every real
+     * loader (loadLiveBoxes/loadLiveBoxById), including on a degraded
+     * D1-failure read — same best-effort posture as latestPhoto/adopters
+     * above. Optional here (not `: NeededFromVisitors[]`) only so existing
+     * hand-written PublicBlessingBox test fixtures across this repo that
+     * predate migration 0012 keep compiling without every one of them
+     * being touched — every real reader treats a missing value as `[]` via
+     * `?? []`. The CALLER decides display precedence, not this shape: an
+     * admin-typed `mostNeeded` wins when set (see BoxCardBody.tsx), this
+     * field is what fills in when it isn't.
+     */
+    neededFromVisitors?: NeededFromVisitors[];
   };
 }
 
@@ -289,6 +398,7 @@ export function mapRowToPublicBox(
   now: Date = new Date(),
   latestPhoto: PublicBoxPhoto | null = null,
   adopters: string[] = [],
+  neededFromVisitors: NeededFromVisitors[] = [],
 ): PublicBlessingBox {
   const outOfService = row.removed_on !== null && row.removed_on !== "";
   return {
@@ -311,6 +421,7 @@ export function mapRowToPublicBox(
       recentCheckins: toPublicCheckinEvents(checkins),
       latestPhoto,
       adopters,
+      neededFromVisitors,
     },
   };
 }
@@ -448,10 +559,12 @@ export interface AdminCheckinRow {
   hidden_by: string | null;
   hidden_at: string | null;
   created_at: string;
+  /** Raw JSON array text from the needs ask (migration 0012), or null if never asked/skipped — see parseAdminNeeds() below for the parsed form BoxCheckinsAdminPanel.tsx actually renders. Optional (not `: string | null`) so existing hand-written AdminCheckinRow test fixtures that predate 0012 keep compiling — parseAdminNeeds(undefined-as-any) is never called directly; callers read `row.needs ?? null`. */
+  needs?: string | null;
 }
 
 const SELECT_ALL_CHECKINS_FOR_VENUE_SQL = `
-  SELECT id, venue_id, kind, note, visibility, hidden_by, hidden_at, created_at
+  SELECT id, venue_id, kind, note, visibility, hidden_by, hidden_at, created_at, needs
   FROM box_checkins
   WHERE venue_id = ?
   ORDER BY created_at DESC, id DESC
@@ -461,6 +574,79 @@ const SELECT_ALL_CHECKINS_FOR_VENUE_SQL = `
 export async function loadAllCheckinsForBox(db: D1Database, venueId: string): Promise<AdminCheckinRow[]> {
   const result = await db.prepare(SELECT_ALL_CHECKINS_FOR_VENUE_SQL).bind(venueId).all<AdminCheckinRow>();
   return result.results ?? [];
+}
+
+/** Parses an AdminCheckinRow's raw `needs` JSON text into a display-ready NeedKey[] — defensive against malformed/legacy JSON (never thrown from the admin render path over one bad row). Filters to known keys only, same defensive posture as computeNeededFromVisitorsMap above. Accepts undefined (as well as null) since AdminCheckinRow.needs is itself optional (see that field's own comment). */
+export function parseAdminNeeds(raw: string | null | undefined): NeedKey[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((v): v is NeedKey => typeof v === "string" && NEED_KEY_SET.has(v));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Needs aggregation (migration 0012) ────────────────────────────────────
+// json_each is SQLite's json1 table-valued function (D1 is SQLite, and json1
+// ships enabled by default) — expanding `needs`'s JSON array in SQL means
+// this never needs an IN(...) placeholder list (unlike
+// selectVisibleCheckinsForVenuesSql above), so D1's 100-bound-parameter cap
+// is never in play regardless of how many boxes exist: the all-boxes query
+// below takes exactly one bind param (the 30-day cutoff).
+
+/** Visitor picks fade out of "most needed" after 30 days — same order-of-magnitude freshness window as the rest of this feature's own design discussion (mirrors the task's own "over the last 30 days" instruction, not derived from any other constant in this file). */
+export const NEEDED_FROM_VISITORS_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+const SELECT_NEEDED_FROM_VISITORS_SQL = `
+  SELECT c.venue_id AS venue_id, j.value AS key, COUNT(*) AS n, MAX(c.created_at) AS last_at
+  FROM box_checkins c, json_each(c.needs) j
+  WHERE c.kind = 'took' AND c.visibility = 'visible' AND c.needs IS NOT NULL
+    AND c.created_at >= ?
+  GROUP BY c.venue_id, j.value
+`;
+
+const SELECT_NEEDED_FROM_VISITORS_FOR_VENUE_SQL = `
+  SELECT c.venue_id AS venue_id, j.value AS key, COUNT(*) AS n, MAX(c.created_at) AS last_at
+  FROM box_checkins c, json_each(c.needs) j
+  WHERE c.kind = 'took' AND c.visibility = 'visible' AND c.needs IS NOT NULL
+    AND c.created_at >= ? AND c.venue_id = ?
+  GROUP BY c.venue_id, j.value
+`;
+
+/** Best-effort, every box at once — feeds loadLiveBoxes. Same "degrade to empty, never take the box list down" posture as loadLatestPhotosBestEffort/loadAdoptersBestEffort below (a promotion landing before migration 0012, or any other read failure, must not re-create slice 2's "every pin disappears" outage for a purely additive display field). */
+async function loadNeededFromVisitorsBestEffort(
+  db: D1Database,
+  now: Date,
+): Promise<Map<string, NeededFromVisitors[]>> {
+  try {
+    const cutoff = new Date(now.getTime() - NEEDED_FROM_VISITORS_WINDOW_MS).toISOString();
+    const result = await db.prepare(SELECT_NEEDED_FROM_VISITORS_SQL).bind(cutoff).all<NeedCountRow>();
+    return computeNeededFromVisitorsMap(result.results ?? []);
+  } catch (err) {
+    logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error (needs aggregation read)");
+    return new Map();
+  }
+}
+
+/** Same as loadNeededFromVisitorsBestEffort, scoped to ONE venue — feeds loadLiveBoxById. */
+async function loadNeededFromVisitorsForVenueBestEffort(
+  db: D1Database,
+  venueId: string,
+  now: Date,
+): Promise<NeededFromVisitors[]> {
+  try {
+    const cutoff = new Date(now.getTime() - NEEDED_FROM_VISITORS_WINDOW_MS).toISOString();
+    const result = await db
+      .prepare(SELECT_NEEDED_FROM_VISITORS_FOR_VENUE_SQL)
+      .bind(cutoff, venueId)
+      .all<NeedCountRow>();
+    return computeNeededFromVisitorsMap(result.results ?? []).get(venueId) ?? [];
+  } catch (err) {
+    logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error (needs aggregation read)");
+    return [];
+  }
 }
 
 // ─── D1 reads ───────────────────────────────────────────────────────────────
@@ -517,6 +703,7 @@ export async function loadLiveBoxes(db: D1Database, now: Date = new Date()): Pro
   const checkinsByVenue = await loadVisibleCheckinsForVenues(db, venueIds);
   const photosByVenue = await loadLatestPhotosBestEffort(db, venueIds);
   const adoptersByVenue = await loadAdoptersBestEffort(db, venueIds);
+  const neededByVenue = await loadNeededFromVisitorsBestEffort(db, now);
   return rows.map((row) =>
     mapRowToPublicBox(
       row,
@@ -524,6 +711,7 @@ export async function loadLiveBoxes(db: D1Database, now: Date = new Date()): Pro
       now,
       photosByVenue.get(row.id) ?? null,
       adoptersByVenue.get(row.id) ?? [],
+      neededByVenue.get(row.id) ?? [],
     ),
   );
 }
@@ -538,5 +726,13 @@ export async function loadLiveBoxById(
   const checkins = await loadVisibleCheckins(db, id);
   const photosByVenue = await loadLatestPhotosBestEffort(db, [id]);
   const adoptersByVenue = await loadAdoptersBestEffort(db, [id]);
-  return mapRowToPublicBox(row, checkins, now, photosByVenue.get(id) ?? null, adoptersByVenue.get(id) ?? []);
+  const neededFromVisitors = await loadNeededFromVisitorsForVenueBestEffort(db, id, now);
+  return mapRowToPublicBox(
+    row,
+    checkins,
+    now,
+    photosByVenue.get(id) ?? null,
+    adoptersByVenue.get(id) ?? [],
+    neededFromVisitors,
+  );
 }

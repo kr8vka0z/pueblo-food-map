@@ -28,8 +28,14 @@ import {
   loadLiveBoxById,
   loadVisibleCheckins,
   loadVisibleCheckinsForVenues,
+  parseNeedsField,
+  computeNeededFromVisitorsMap,
+  parseAdminNeeds,
+  NEED_KEYS,
+  MAX_NEEDS,
   type BoxJoinRow,
   type CheckinStatusInput,
+  type NeedCountRow,
 } from "@/lib/blessingBoxes";
 
 function makeRow(overrides: Partial<BoxJoinRow> = {}): BoxJoinRow {
@@ -149,6 +155,24 @@ describe("mapRowToPublicBox", () => {
   test("adopters is passed straight through, in the order given (loadApprovedAdopterNamesForVenues' own ORDER BY decides order)", () => {
     const box = mapRowToPublicBox(makeRow(), [], new Date(), null, ["Mesa Church", "The Nguyen Family"]);
     expect(box.box.adopters).toEqual(["Mesa Church", "The Nguyen Family"]);
+  });
+
+  // ─── Needs ask (migration 0012) ────────────────────────────────────────────
+
+  test("neededFromVisitors defaults to an empty array when none is passed", () => {
+    const box = mapRowToPublicBox(makeRow());
+    expect(box.box.neededFromVisitors).toEqual([]);
+  });
+
+  test("neededFromVisitors is passed straight through", () => {
+    const box = mapRowToPublicBox(makeRow(), [], new Date(), null, [], [
+      { key: "diapers", count: 4 },
+      { key: "canned_food", count: 6 },
+    ]);
+    expect(box.box.neededFromVisitors).toEqual([
+      { key: "diapers", count: 4 },
+      { key: "canned_food", count: 6 },
+    ]);
   });
 });
 
@@ -459,5 +483,184 @@ describe("loadVisibleCheckins / loadVisibleCheckinsForVenues", () => {
     const map = await loadVisibleCheckinsForVenues(db, ["a", "b"]);
     expect(map.get("a")?.map((c) => c.kind)).toEqual(["filled"]);
     expect(map.get("b")?.map((c) => c.kind)).toEqual(["took"]);
+  });
+});
+
+// ─── Needs ask (migration 0012) ─────────────────────────────────────────────
+
+describe("parseNeedsField", () => {
+  test("undefined (field omitted) -> ok, empty array (typed-text-only case)", () => {
+    expect(parseNeedsField(undefined)).toEqual({ ok: true, keys: [] });
+  });
+
+  test("a valid subset of keys -> ok, normalized to NEED_KEYS' own canonical order regardless of submission order", () => {
+    expect(parseNeedsField(["pet_food", "canned_food"])).toEqual({ ok: true, keys: ["canned_food", "pet_food"] });
+  });
+
+  test("duplicate keys are deduped", () => {
+    expect(parseNeedsField(["diapers", "diapers"])).toEqual({ ok: true, keys: ["diapers"] });
+  });
+
+  test("all nine keys -> ok", () => {
+    expect(parseNeedsField([...NEED_KEYS])).toEqual({ ok: true, keys: [...NEED_KEYS] });
+  });
+
+  test("not an array -> rejected", () => {
+    expect(parseNeedsField("canned_food")).toEqual({ ok: false });
+    expect(parseNeedsField(null)).toEqual({ ok: false });
+    expect(parseNeedsField(42)).toEqual({ ok: false });
+  });
+
+  test("an unknown key -> rejected (the task's own 'unknown keys -> 400' instruction, enforced here)", () => {
+    expect(parseNeedsField(["canned_food", "not-a-real-key"])).toEqual({ ok: false });
+  });
+
+  test("a non-string item -> rejected", () => {
+    expect(parseNeedsField(["canned_food", 5])).toEqual({ ok: false });
+  });
+
+  test("more than MAX_NEEDS entries -> rejected", () => {
+    expect(parseNeedsField(new Array(MAX_NEEDS + 1).fill("canned_food"))).toEqual({ ok: false });
+  });
+
+  test("an empty array -> ok, empty keys (Skip / nothing picked)", () => {
+    expect(parseNeedsField([])).toEqual({ ok: true, keys: [] });
+  });
+});
+
+describe("computeNeededFromVisitorsMap", () => {
+  function row(overrides: Partial<NeedCountRow> = {}): NeedCountRow {
+    return { venue_id: "box-1", key: "canned_food", n: 1, last_at: "2026-09-17T09:00:00.000Z", ...overrides };
+  }
+
+  test("no rows -> empty map", () => {
+    expect(computeNeededFromVisitorsMap([]).size).toBe(0);
+  });
+
+  test("ranks by count descending", () => {
+    const map = computeNeededFromVisitorsMap([
+      row({ key: "canned_food", n: 2 }),
+      row({ key: "diapers", n: 6 }),
+      row({ key: "pet_food", n: 4 }),
+    ]);
+    expect(map.get("box-1")).toEqual([
+      { key: "diapers", count: 6 },
+      { key: "pet_food", count: 4 },
+      { key: "canned_food", count: 2 },
+    ]);
+  });
+
+  test("a tie on count breaks on last_at descending (most recently picked wins)", () => {
+    const map = computeNeededFromVisitorsMap([
+      row({ key: "canned_food", n: 3, last_at: "2026-09-10T09:00:00.000Z" }),
+      row({ key: "diapers", n: 3, last_at: "2026-09-17T09:00:00.000Z" }),
+    ]);
+    expect(map.get("box-1")).toEqual([
+      { key: "diapers", count: 3 },
+      { key: "canned_food", count: 3 },
+    ]);
+  });
+
+  test("keeps only the top 3 keys per venue", () => {
+    const map = computeNeededFromVisitorsMap([
+      row({ key: "canned_food", n: 9 }),
+      row({ key: "diapers", n: 8 }),
+      row({ key: "pet_food", n: 7 }),
+      row({ key: "bread", n: 6 }),
+    ]);
+    expect(map.get("box-1")).toHaveLength(3);
+    expect(map.get("box-1")?.map((r) => r.key)).toEqual(["canned_food", "diapers", "pet_food"]);
+  });
+
+  test("rows for different venues stay separate", () => {
+    const map = computeNeededFromVisitorsMap([row({ venue_id: "a", n: 5 }), row({ venue_id: "b", n: 1 })]);
+    expect(map.get("a")).toEqual([{ key: "canned_food", count: 5 }]);
+    expect(map.get("b")).toEqual([{ key: "canned_food", count: 1 }]);
+  });
+
+  test("a row with an unknown/legacy key is dropped, not surfaced", () => {
+    const map = computeNeededFromVisitorsMap([row({ key: "not-a-real-key" }), row({ key: "diapers", n: 2 })]);
+    expect(map.get("box-1")).toEqual([{ key: "diapers", count: 2 }]);
+  });
+});
+
+describe("parseAdminNeeds", () => {
+  test("null -> []", () => {
+    expect(parseAdminNeeds(null)).toEqual([]);
+  });
+
+  test("valid JSON array of known keys -> parsed", () => {
+    expect(parseAdminNeeds('["canned_food","diapers"]')).toEqual(["canned_food", "diapers"]);
+  });
+
+  test("malformed JSON -> [] (never throws)", () => {
+    expect(parseAdminNeeds("{not valid json")).toEqual([]);
+  });
+
+  test("valid JSON but not an array -> []", () => {
+    expect(parseAdminNeeds('{"a":1}')).toEqual([]);
+  });
+
+  test("an unknown key inside a valid array is filtered out, known ones kept", () => {
+    expect(parseAdminNeeds('["canned_food","not-a-real-key"]')).toEqual(["canned_food"]);
+  });
+});
+
+// ─── loadLiveBoxes / loadLiveBoxById — needs aggregation wiring ────────────
+// A dedicated SQL-discriminating fake db, same pattern as
+// makeFakeDbWithPhotos/makeFakeDbWithAdopters above — the shared makeFakeDb
+// doesn't distinguish this query from the checkins query by SQL text.
+
+describe("loadLiveBoxes / loadLiveBoxById — neededFromVisitors wiring", () => {
+  function makeFakeDbWithNeeds(row_: BoxJoinRow, needRows: { venue_id: string; key: string; n: number; last_at: string }[]) {
+    const prepare = (sql: string) => {
+      if (sql.includes("FROM venues")) {
+        return { all: async () => ({ results: [row_] }), bind: () => ({ first: async () => row_ }) };
+      }
+      if (sql.includes("json_each")) {
+        return {
+          bind: (...args: unknown[]) => ({
+            all: async () => ({
+              results: args.length > 1 ? needRows.filter((r) => r.venue_id === args[1]) : needRows,
+            }),
+          }),
+        };
+      }
+      return { bind: () => ({ all: async () => ({ results: [] }) }) };
+    };
+    return { prepare } as unknown as D1Database;
+  }
+
+  test("loadLiveBoxes attaches each box's own top-3 needed-from-visitors list", async () => {
+    const row_ = makeRow({ id: "known" });
+    const db = makeFakeDbWithNeeds(row_, [
+      { venue_id: "known", key: "diapers", n: 4, last_at: "2026-09-17T09:00:00.000Z" },
+    ]);
+    const boxes = await loadLiveBoxes(db);
+    expect(boxes[0]?.box.neededFromVisitors).toEqual([{ key: "diapers", count: 4 }]);
+  });
+
+  test("loadLiveBoxById attaches the needed-from-visitors list scoped to that box", async () => {
+    const row_ = makeRow({ id: "known" });
+    const db = makeFakeDbWithNeeds(row_, [
+      { venue_id: "known", key: "canned_food", n: 6, last_at: "2026-09-17T09:00:00.000Z" },
+      { venue_id: "other-box", key: "bread", n: 9, last_at: "2026-09-17T09:00:00.000Z" },
+    ]);
+    const box = await loadLiveBoxById(db, "known");
+    expect(box?.box.neededFromVisitors).toEqual([{ key: "canned_food", count: 6 }]);
+  });
+
+  test("loadLiveBoxById degrades neededFromVisitors to [] (never throws) when the aggregation query fails", async () => {
+    const row_ = makeRow({ id: "known" });
+    const db = {
+      prepare: (sql: string) => {
+        if (sql.includes("FROM venues")) return { bind: () => ({ first: async () => row_ }) };
+        if (sql.includes("json_each")) throw new Error("no such column: needs");
+        return { bind: () => ({ all: async () => ({ results: [] }) }) };
+      },
+    } as unknown as D1Database;
+    const box = await loadLiveBoxById(db, "known");
+    expect(box?.id).toBe("known");
+    expect(box?.box.neededFromVisitors).toEqual([]);
   });
 });

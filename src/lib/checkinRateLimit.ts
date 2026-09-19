@@ -63,7 +63,8 @@
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 
-async function hmacHex(secret: string, message: string): Promise<string> {
+/** Exported for src/lib/boxNeedsToken.ts (needs-ask ownership capability, migration 0012) — same HMAC-SHA256-hex primitive, a different message shape, no reason to duplicate the Web Crypto boilerplate. */
+export async function hmacHex(secret: string, message: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),

@@ -60,6 +60,7 @@ function renderPopover(
     activeIndex?: number;
     onSelect?: (id: string) => void;
     onClose?: () => void;
+    onSeeAllAsList?: () => void;
     locale?: "en" | "es";
   } = {},
 ) {
@@ -69,6 +70,7 @@ function renderPopover(
     listboxId: LISTBOX_ID,
     onSelect: overrides.onSelect ?? vi.fn(),
     onClose: overrides.onClose ?? vi.fn(),
+    onSeeAllAsList: overrides.onSeeAllAsList,
     locale: overrides.locale ?? ("en" as const),
   };
   return render(<SearchResultsPopover {...props} />);
@@ -297,6 +299,44 @@ describe("SearchResultsPopover — i18n category labels", () => {
     );
     renderPopover(venues, { locale: "es" });
     expect(screen.getByText(/más resultados/i)).toBeDefined();
+  });
+});
+
+// ─── "See all N matches as a list" footer row (#514) ─────────────────────────
+
+describe('SearchResultsPopover — "See all N matches as a list" row (#514)', () => {
+  test("does not render when onSeeAllAsList is not passed", () => {
+    renderPopover([makePantry("v0"), makePantry("v1")]);
+    expect(screen.queryByText(/matches as a list/i)).toBeNull();
+  });
+
+  test("renders with the total match count when onSeeAllAsList is passed", () => {
+    renderPopover([makePantry("v0"), makePantry("v1"), makePantry("v2")], {
+      onSeeAllAsList: vi.fn(),
+    });
+    expect(screen.getByText("See all 3 matches as a list")).toBeDefined();
+  });
+
+  test("clicking the row calls onSeeAllAsList", async () => {
+    const onSeeAllAsList = vi.fn();
+    const user = userEvent.setup();
+    renderPopover([makePantry("v0")], { onSeeAllAsList });
+    await user.click(screen.getByRole("button", { name: /See all 1 matches as a list/i }));
+    expect(onSeeAllAsList).toHaveBeenCalledTimes(1);
+  });
+
+  test("uses the total match count, not the MAX_VISIBLE-capped count", () => {
+    const venues = Array.from({ length: MAX_VISIBLE + 3 }, (_, i) => makePantry(`v${i}`, i * 0.1));
+    renderPopover(venues, { onSeeAllAsList: vi.fn() });
+    expect(screen.getByText(`See all ${MAX_VISIBLE + 3} matches as a list`)).toBeDefined();
+  });
+
+  test("ES: row is translated", () => {
+    renderPopover([makePantry("v0"), makePantry("v1")], {
+      onSeeAllAsList: vi.fn(),
+      locale: "es",
+    });
+    expect(screen.getByText(/Ver los 2 resultados en una lista/i)).toBeDefined();
   });
 });
 

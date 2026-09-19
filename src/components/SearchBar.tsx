@@ -16,8 +16,11 @@
  *   are controlled by parent (MapWrapper) and passed as comboboxProps.
  * - onFocus / onBlur / onKeyDown for popover lifecycle are also passed by parent.
  *
- * Inline Map/List view switch (#191) — optional `viewSwitch` prop renders a
- * ViewToggle at the pill's right end.
+ * Inline Map/List view switch (#191) — REMOVED by #514: the bar itself now
+ * carries nothing on the right. Switching views goes through the search
+ * bar's own suggestion row (ViewSuggestion, shown on an empty focused bar,
+ * or the last row of SearchResultsPopover once the user types) or a Menu
+ * line — see MapWrapper.tsx and HamburgerMenu.tsx.
  *
  * Filters button (#513) — the magnifier icon's spot on the left becomes a
  * "Filters" button when the `filtersButton` prop is passed (MapWrapper always
@@ -31,8 +34,6 @@
 import { useCallback } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
-import ViewToggle, { type ViewMode } from "./ViewToggle";
-import type { Locale } from "@/lib/i18n";
 
 interface SearchBarProps {
   /** Controlled value — owned by MapWrapper. */
@@ -78,24 +79,6 @@ interface SearchBarProps {
     onClick: () => void;
     ariaLabel: string;
   };
-
-  // ── Inline Map/List view switch (#191) ───────────────────────────────────
-  /**
-   * When set, renders the Map/List ViewToggle inside the search pill's right
-   * end. WHY here and not a new floating control: the issue owner's explicit
-   * instruction was "build
-   * it into the search bar" so the switch doesn't add a new element to an
-   * already-busy mobile screen — SearchBar is the one control already
-   * visible in BOTH map and list view (unlike LocateButton or the map-only
-   * banners), so it's reachable from wherever the user actually is.
-   */
-  viewSwitch?: {
-    mode: ViewMode;
-    onChange: (mode: ViewMode) => void;
-    locale?: Locale;
-    /** Renders the "map" side disabled when the map cannot mount (#165). */
-    mapDisabled?: boolean;
-  };
 }
 
 export default function SearchBar({
@@ -112,7 +95,6 @@ export default function SearchBar({
   onBlur,
   onKeyDownExtra,
   filtersButton,
-  viewSwitch,
 }: SearchBarProps) {
   const handleKey = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -233,16 +215,10 @@ export default function SearchBar({
             // inset + a little slack) at every width — unlike the removed
             // filterChip, its size never varies with content or breakpoint.
             (filtersButton ? "pl-11 " : "pl-9 md:pl-10 ") +
-            // pr reserves room for the inline view switch (#191), which is
-            // icons only under md and "Map/List" words from md up (see
-            // ViewToggle). MEASURED 2026-09-16 on the flush switch (`right-px`
-            // — 1px inset, no border of its own), not computed:
-            // - under md, icon-only (EN and ES alike): 84px + 1 + 8px slack = 93px.
-            // - md and up: 137.8px EN "Map/List", 151.1px ES "Mapa/Lista";
-            //   152 (rounded up) + 1 + 8 = 161px.
-            // Re-measure rather than adjusting these numbers by eye if the
-            // switch's own padding ever changes.
-            (viewSwitch ? "pr-[93px] md:pr-[161px] " : "pr-4 ") +
+            // No right-side reservation: the inline Map/List view switch
+            // (#191) that used to live here was removed by #514 — the bar
+            // now ends in plain typing room, nothing on the right.
+            "pr-4 " +
             "text-base md:text-sm text-[var(--color-ink-700)] " +
             "bg-[var(--color-bone-50)] " +
             "border border-[var(--color-bone-300)] " +
@@ -255,26 +231,6 @@ export default function SearchBar({
             "elevation-1"
           }
         />
-
-        {/* Inline Map/List view switch (#191) — right end of the pill,
-            mirroring filterChip's left anchor. Flush (Kyle, 2026-09-16: "no
-            gap… it just needs to look like a part of the search bar"): the
-            switch fills the pill's right end, 1px in so the pill's own
-            border wraps it — ViewToggle itself always renders this way now
-            (it has no other caller). Its buttons are 42px tall on mobile,
-            50px on desktop. Width reserved on the <input> above (`pr-*`) is
-            measured off the rendered control, not computed — see that
-            comment. */}
-        {viewSwitch && (
-          <div className="absolute top-px bottom-px right-px">
-            <ViewToggle
-              mode={viewSwitch.mode}
-              onChange={viewSwitch.onChange}
-              locale={viewSwitch.locale}
-              mapDisabled={viewSwitch.mapDisabled}
-            />
-          </div>
-        )}
       </div>
     </div>
   );

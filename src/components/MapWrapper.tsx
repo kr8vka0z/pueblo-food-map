@@ -36,6 +36,7 @@ import FilterPanel from "./FilterPanel";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
 import EmptySearchPopover from "./EmptySearchPopover";
+import ViewSuggestion from "./ViewSuggestion";
 import SearchResultsPopover, {
   MAX_VISIBLE,
   type VenueWithDistance,
@@ -49,7 +50,6 @@ import { t } from "@/lib/i18n";
 import { venues as allVenues } from "@/data/venues";
 import type { Venue } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
-import type { ViewMode } from "./ViewToggle";
 import ListView from "./ListView";
 import {
   PUEBLO_COUNTY_BBOX,
@@ -59,7 +59,7 @@ import { useMapFilters } from "@/lib/useMapFilters";
 import { useBoxesList } from "@/lib/useBoxesList";
 import { toVenue } from "@/lib/useBoxVenues";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
-import { useMapUI } from "@/lib/useMapUI";
+import { useMapUI, type ViewMode } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
 import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
 
@@ -153,8 +153,10 @@ export function computeCategoryBounds(
 
 // Stable listbox id — used for aria-controls on the search input and id on the
 // results listbox. The old category-browse listbox (CategoryDropdown, #95)
-// was removed by #513 — search focus no longer opens any list; the Filters
-// panel is a dialog, not a combobox popup.
+// was removed by #513 — search focus no longer opens a category list; the
+// Filters panel is a dialog, not a combobox popup. #514 gave empty focus a
+// new (non-listbox) popup instead: ViewSuggestion, a single button offering
+// the other view — see showViewSuggestion below.
 const LISTBOX_ID = "search-results-listbox";
 
 // ─── Viewport prop (from PR 3 splash gate) ────────────────────────────────────
@@ -1237,16 +1239,32 @@ export default function MapWrapper({
   const showResultsPopover =
     isPopoverOpen && query.trim() !== "" && filteredVenues.length > 0;
 
-  // WHY one shared handler: every path that switches views (the inline
-  // SearchBar control, #191, and "Near me" below) must honor the same
-  // mapUnavailable guard (selecting "map" while the map can't mount would show
-  // a blank screen, #165).
+  // ViewSuggestion (#514) shows on the OTHER half of the same condition:
+  // focused + EMPTY query. Mutually exclusive with showResultsPopover and
+  // EmptySearchPopover (both require a non-empty query) by construction.
+  const showViewSuggestion = isPopoverOpen && query.trim() === "";
+
+  // WHY one shared handler: every path that switches views (the search bar's
+  // own suggestion row and results row, #514, "Near me" below, and the Menu
+  // line) must honor the same mapUnavailable guard (selecting "map" while the
+  // map can't mount would show a blank screen, #165).
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
       if (mapUnavailable && mode === "map") return;
       setViewMode(mode);
     },
     [mapUnavailable, setViewMode],
+  );
+
+  /** ViewSuggestion / the results-popover's "See all N matches" row (#514):
+   * switch view then close whatever search popover triggered it. */
+  const handleViewSuggestionSelect = useCallback(
+    (mode: ViewMode) => {
+      handleViewModeChange(mode);
+      setIsPopoverOpen(false);
+      setActiveIndex(-1);
+    },
+    [handleViewModeChange],
   );
 
   // "Near me" (docs/bottom-nav-spec.md §6). The bar persists in list view, but
@@ -1322,8 +1340,11 @@ export default function MapWrapper({
       )}
 
       {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67).
-          filtersButton (#513) opens the FilterPanel below — search focus no
-          longer opens any list of its own. */}
+          filtersButton (#513) opens the FilterPanel below — search focus
+          opens ViewSuggestion (empty query) or SearchResultsPopover (typed),
+          never a category list of its own. Nothing renders on the right end
+          of the bar (#514 removed the inline Map/List switch — see
+          ViewSuggestion/HamburgerMenu for its replacements). */}
       <SearchBar
         value={query}
         onChange={(next) => {
@@ -1348,19 +1369,26 @@ export default function MapWrapper({
               ? t("filters.button.labelActive", locale, { count: String(activeFilterCount) })
               : t("filters.button.label", locale),
         }}
-        viewSwitch={{
-          mode: viewMode,
-          onChange: handleViewModeChange,
-          locale,
-          // Surface the guard instead of hiding it: handleViewModeChange
-          // silently ignores "map" while the map can't mount, which read as a
-          // dead button once #191 moved this control onto the main screen.
-          mapDisabled: mapUnavailable,
-        }}
       />
 
+      {/* ViewSuggestion (#514) — shown on an EMPTY, focused search bar; offers
+          the other view. Mutually exclusive with SearchResultsPopover/
+          EmptySearchPopover below (both require a non-empty query). Renders
+          nothing itself while on the list with the map disabled (#165) —
+          see the component's own guard. */}
+      {showViewSuggestion && (
+        <ViewSuggestion
+          mode={viewMode}
+          count={filteredVenues.length}
+          mapDisabled={mapUnavailable}
+          locale={locale}
+          onSelect={() => handleViewSuggestionSelect(viewMode === "map" ? "list" : "map")}
+        />
+      )}
+
       {/* SearchResultsPopover — shown when query is non-empty AND has matches (#67).
-          Mutually exclusive with EmptySearchPopover. */}
+          Mutually exclusive with EmptySearchPopover. onSeeAllAsList (#514) is
+          map-only — on the list, typing already updates ListView live. */}
       {showResultsPopover && (
         <SearchResultsPopover
           venues={filteredVenues as VenueWithDistance[]}
@@ -1371,6 +1399,9 @@ export default function MapWrapper({
             setIsPopoverOpen(false);
             setActiveIndex(-1);
           }}
+          onSeeAllAsList={
+            viewMode === "map" ? () => handleViewSuggestionSelect("list") : undefined
+          }
         />
       )}
 
@@ -1404,7 +1435,10 @@ export default function MapWrapper({
         />
       )}
 
-      {/* HamburgerMenu — the drawer, opened by BottomNav at a section (#71, spec §7). */}
+      {/* HamburgerMenu — the drawer, opened by BottomNav at a section (#71, spec §7).
+          viewMode/onToggleView/mapDisabled (#514) drive its "List view"/"Map
+          view" line — the second way into the switch, for anyone who never
+          taps search. */}
       <HamburgerMenu
         onShowWelcome={onShowWelcome}
         savedVenues={savedVenues}
@@ -1413,6 +1447,9 @@ export default function MapWrapper({
         onClose={handleMenuClose}
         view={menuSection ?? "top"}
         ignoreOutsideRef={navRef}
+        viewMode={viewMode}
+        onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map")}
+        mapDisabled={mapUnavailable}
       />
 
       {/* Outside-county message — appears when resolved position is beyond maxBounds (#108). Map mode only (#129). */}

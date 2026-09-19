@@ -51,7 +51,18 @@ const en: Record<string, string> = {
   "filter.snap": "Accepts SNAP",
   "filter.wic": "Accepts WIC",
   "filter.walkingDistance": "Walking distance",
-  "filter.favorites": "Favorites",
+
+  // Filters button + side panel (#513) — Favorites filter removed (Saved in
+  // the bottom bar covers it); the single-category dropdown became this
+  // multi-select panel.
+  "filters.button.label": "Filters",
+  "filters.button.labelActive": "Filters, {count} on",
+  "filters.panel.title": "Filters",
+  "filters.panel.close": "Close filters",
+  "filters.panel.showOnly": "Show only",
+  "filters.panel.kindOfPlace": "Kind of place",
+  "filters.panel.clearAll": "Clear all",
+  "filters.panel.showResults": "Show {count} places",
 
   // Bottom sheet / list
   "sheet.places": "{count} places near you",
@@ -188,9 +199,6 @@ const en: Record<string, string> = {
   "menu.sponsoredBy": "Sponsored by",
   "menu.showWelcome": "Show welcome screen",
   "menu.language": "Language / Idioma",
-
-  // Category browse dropdown (#95)
-  "categoryBrowse.clearFilter": "Clear category filter",
 
   // Suggest form (#71)
   "suggest.title": "Suggest a venue",
@@ -892,7 +900,16 @@ const es: Record<string, string> = {
   "filter.snap": "Acepta SNAP",
   "filter.wic": "Acepta WIC",
   "filter.walkingDistance": "Distancia caminando",
-  "filter.favorites": "Favoritos",
+
+  // Filters button + side panel (#513)
+  "filters.button.label": "Filtros",
+  "filters.button.labelActive": "Filtros, {count} activos", // [CHECK]
+  "filters.panel.title": "Filtros",
+  "filters.panel.close": "Cerrar filtros", // [CHECK]
+  "filters.panel.showOnly": "Mostrar solo", // [CHECK]
+  "filters.panel.kindOfPlace": "Tipo de lugar", // [CHECK]
+  "filters.panel.clearAll": "Borrar todo", // [CHECK]
+  "filters.panel.showResults": "Mostrar {count} lugares", // [CHECK]
 
   // Bottom sheet / list
   "sheet.places": "{count} lugares cerca de ti",
@@ -1025,9 +1042,6 @@ const es: Record<string, string> = {
   "menu.sponsoredBy": "Patrocinado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.language": "Language / Idioma",
-
-  // Category browse dropdown (#95)
-  "categoryBrowse.clearFilter": "Borrar filtro de categoría",
 
   // Suggest form (#71)
   "suggest.title": "Sugerir un lugar",

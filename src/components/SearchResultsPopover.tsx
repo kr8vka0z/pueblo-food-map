@@ -13,6 +13,11 @@
  *   - Controlled: open/close, activeIndex, and item selection are all driven by parent.
  *   - Cap: show MAX_VISIBLE rows in the scrollable list; "+N more matches" stub at bottom.
  *
+ * "See all N matches as a list" footer row (#514) — optional `onSeeAllAsList`
+ * prop. MapWrapper passes it only while on the map (typing already updates
+ * ListView live once you're on the list — see MapWrapper's own wiring), so
+ * this stays undefined and the row doesn't render there.
+ *
  * ARIA combobox pattern:
  *   - role="combobox" + aria-expanded + aria-controls + aria-activedescendant live on the
  *     <input> in SearchBar (wired by parent via searchBarProps).
@@ -23,6 +28,7 @@
  */
 
 import { useRef, useEffect } from "react";
+import { List } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import type { Venue, VenueCategory } from "@/types/venue";
@@ -61,6 +67,22 @@ export interface SearchResultsPopoverProps {
   onSelect: (venueId: string) => void;
   /** Called when the popover should close (e.g. blur outside). */
   onClose: () => void;
+  /**
+   * "See all N matches as a list" footer row (#514). Undefined = row doesn't
+   * render (MapWrapper omits it while already on the list — see file header).
+   */
+  onSeeAllAsList?: () => void;
+  /**
+   * Keyboard-a11y fix (reviewer, PR #522) — the "see all" row is a real Tab
+   * stop (the option <li>s above it carry no tabIndex, so they were never
+   * reachable and need no equivalent wiring). onSeeAllAsListFocus mirrors the
+   * search input's own focus handler (clears the parent's pending close
+   * timer); onSeeAllAsListBlur tells the parent whether Tab-ing further
+   * should close the popover (relatedTarget/containment check lives in the
+   * parent, not here).
+   */
+  onSeeAllAsListFocus?: () => void;
+  onSeeAllAsListBlur?: (e: React.FocusEvent<HTMLButtonElement>) => void;
   locale?: Locale;
 }
 
@@ -72,6 +94,9 @@ export default function SearchResultsPopover({
   listboxId,
   onSelect,
   onClose,
+  onSeeAllAsList,
+  onSeeAllAsListFocus,
+  onSeeAllAsListBlur,
   locale: localeProp,
 }: SearchResultsPopoverProps) {
   const { locale: ctxLocale } = useLocale();
@@ -200,6 +225,34 @@ export default function SearchResultsPopover({
         >
           {t("typeahead.moreMatches", locale, { count: String(hiddenCount) })}
         </p>
+      )}
+
+      {/* "See all N matches as a list" (#514) — map only, see file header. */}
+      {onSeeAllAsList && (
+        <button
+          type="button"
+          // Same grace-period trick as the option rows above.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onSeeAllAsList}
+          onFocus={onSeeAllAsListFocus}
+          onBlur={onSeeAllAsListBlur}
+          className={
+            "flex items-center gap-2.5 w-full px-4 h-[46px] text-left text-xs " +
+            "text-[var(--color-sage-700)] font-semibold " +
+            "border-t border-[var(--color-bone-200)] " +
+            "hover:bg-[var(--color-bone-100)] transition-colors duration-100 " +
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset " +
+            "focus-visible:ring-[var(--color-sage-500)]"
+          }
+        >
+          <List size={14} aria-hidden className="shrink-0 text-[var(--color-sage-600)]" />
+          <span className="flex-1 min-w-0 truncate">
+            {t("viewSuggestion.seeMatchesAsList", locale, { count: String(venues.length) })}
+          </span>
+          <span aria-hidden className="shrink-0 text-[var(--color-ink-400)] text-base leading-none">
+            ›
+          </span>
+        </button>
       )}
     </div>
   );

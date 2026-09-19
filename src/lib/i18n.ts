@@ -206,6 +206,12 @@ const en: Record<string, string> = {
   "menu.sponsoredBy": "Sponsored by",
   "menu.showWelcome": "Show welcome screen",
   "menu.language": "Language / Idioma",
+  // Map/List entry point (#514) — top of the Menu, for anyone who never taps
+  // search. Reads the OPPOSITE of the current view (the destination, same
+  // convention as viewSuggestion.* above). Hidden entirely while the map
+  // can't mount (#165) rather than shown disabled — see HamburgerMenu.tsx.
+  "menu.listView": "List view",
+  "menu.mapView": "Map view",
 
   // Suggest form (#71)
   "suggest.title": "Suggest a venue",
@@ -294,10 +300,15 @@ const en: Record<string, string> = {
   "share.labelGeneric": "Share this place",
   "share.copied": "Link copied",
 
-  // View toggle (#129)
-  "view.map": "Map",
-  "view.list": "List",
-  "view.toggleAria": "Choose map or list view",
+  // View switch — search-bar suggestion row + Menu line (#514). Replaces the
+  // old in-bar ViewToggle (#129/#191, removed): switching map/list now goes
+  // through one line under an empty, focused search bar, a "See all N
+  // matches as a list" row under a typed one, or a Menu item — never a
+  // standing control in the bar itself.
+  "viewSuggestion.seeAsList": "See all places as a list",
+  "viewSuggestion.backToMap": "Back to the map",
+  "viewSuggestion.placesCount": "{count} places",
+  "viewSuggestion.seeMatchesAsList": "See all {count} matches as a list",
 
   // Report form (#70)
   "report.button": "Report an issue with this venue",
@@ -1052,6 +1063,8 @@ const es: Record<string, string> = {
   "menu.sponsoredBy": "Patrocinado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.language": "Language / Idioma",
+  "menu.listView": "Vista de lista",
+  "menu.mapView": "Vista de mapa",
 
   // Suggest form (#71)
   "suggest.title": "Sugerir un lugar",
@@ -1140,10 +1153,11 @@ const es: Record<string, string> = {
   "share.labelGeneric": "Compartir este lugar",
   "share.copied": "Enlace copiado",
 
-  // View toggle (#129)
-  "view.map": "Mapa",
-  "view.list": "Lista",
-  "view.toggleAria": "Elegir vista de mapa o lista",
+  // View switch — search-bar suggestion row + Menu line (#514).
+  "viewSuggestion.seeAsList": "Ver todos los lugares en una lista",
+  "viewSuggestion.backToMap": "Volver al mapa",
+  "viewSuggestion.placesCount": "{count} lugares",
+  "viewSuggestion.seeMatchesAsList": "Ver los {count} resultados en una lista",
 
   // Report form (#70)
   "report.button": "Reportar un problema con este lugar",

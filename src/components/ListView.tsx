@@ -33,7 +33,8 @@ export default function ListView({
   const locale = localeProp ?? ctxLocale;
   return (
     <div className="absolute inset-0 z-[700] flex flex-col bg-[var(--color-bone-50)] overflow-hidden">
-      {/* Spacer clears the floating SearchBar + ViewToggle that sit above the list */}
+      {/* Spacer clears the floating SearchBar that sits above the list (its
+          inline Map/List switch, ViewToggle, was removed by #514) */}
       <div className="shrink-0 h-[116px]" aria-hidden />
       {/* Board review finding #2: map-wide freshness — shown unconditionally
           (not gated on venues.length) since it describes the whole dataset,

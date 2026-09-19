@@ -14,8 +14,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { isWebGLAvailable } from "@/lib/webgl";
-import type { ViewMode } from "@/components/ViewToggle";
 import type mapboxgl from "mapbox-gl";
+
+/**
+ * "map" or "list" — which of the two full-screen views MapWrapper shows.
+ * Owned here (not a component file) since #514 removed the last component
+ * (ViewToggle) that used to be this type's sole home; MapWrapper,
+ * HamburgerMenu, and ViewSuggestion all import it from this hook instead.
+ */
+export type ViewMode = "map" | "list";
 
 export function useMapUI() {
   // ── Selected venue ────────────────────────────────────────────────────────────

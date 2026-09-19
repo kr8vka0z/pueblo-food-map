@@ -10,7 +10,11 @@
  *     nothing saved the Saved section didn't render, so Saved opened the
  *     plain menu and looked like the same button as Menu (Kyle, 2026-09-16).
  * The navy trigger button this used to own was deleted with the bottom
- * nav, as was its Map/List row — that switch lives in the search box (§4.4).
+ * nav. Its Map/List row was deleted at the same time (§4.4: "that switch
+ * lives in the search box") and RE-ADDED by #514 as a single "List
+ * view"/"Map view" line at the top of the "top" view — a second way in for
+ * anyone who never taps search. Hidden entirely while the map can't mount
+ * (#165, `mapDisabled`) rather than shown pointing at a dead action.
  *
  * Desktop (≥768px): ~280px dropdown top-right, below the search row.
  * Mobile (<768px): full-height slide-in side sheet from the right, ~80% viewport width.
@@ -30,7 +34,7 @@
  */
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, HandHelping, Star, History } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Star, History } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
@@ -41,6 +45,7 @@ import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
+import type { ViewMode } from "@/lib/useMapUI";
 
 interface HamburgerMenuProps {
   locale?: Locale;
@@ -61,6 +66,12 @@ interface HamburgerMenuProps {
   view?: MenuSection;
   /** The nav bar — pointerdowns inside it are not "outside" (it toggles the drawer itself). */
   ignoreOutsideRef?: RefObject<HTMLElement | null>;
+  /** Current view mode (#514) — decides the top menu line's label/icon/direction. */
+  viewMode?: ViewMode;
+  /** Called when the "List view"/"Map view" line is tapped. Omit to hide the line entirely. */
+  onToggleView?: () => void;
+  /** #165 — true while the map can't mount; hides the line rather than showing a dead action. */
+  mapDisabled?: boolean;
 }
 
 // All focusable elements inside the panel for tab-trap.
@@ -76,6 +87,9 @@ export default function HamburgerMenu({
   onClose,
   view = "top",
   ignoreOutsideRef,
+  viewMode,
+  onToggleView,
+  mapDisabled = false,
 }: HamburgerMenuProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -385,6 +399,20 @@ export default function HamburgerMenu({
               </a>
               {/* Menu item list */}
               <ul role="menu" aria-label={menuLabel} className="py-2">
+                {/* List view / Map view (#514) — top of the menu, second way
+                    in for anyone who never taps search. Hidden while the map
+                    can't mount (#165) instead of pointing at a dead action —
+                    see the prop's own doc comment above. */}
+                {!mapDisabled && viewMode && onToggleView && (
+                  <HamburgerMenuItem
+                    label={t(viewMode === "map" ? "menu.listView" : "menu.mapView", locale)}
+                    onClick={() => {
+                      close();
+                      onToggleView();
+                    }}
+                    icon={viewMode === "map" ? <List size={14} /> : <MapIcon size={14} />}
+                  />
+                )}
                 {/* Show welcome screen (#99) — re-shows splash without clearing localStorage */}
                 {onShowWelcome && (
                   <HamburgerMenuItem

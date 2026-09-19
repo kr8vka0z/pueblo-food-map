@@ -71,7 +71,8 @@ describe("mobile review #14 — shared press-feedback style is defined once", ()
     "src/components/FavoriteButton.tsx",
     "src/components/ShareButton.tsx",
     "src/components/CategoryChips.tsx",
-    "src/components/ViewToggle.tsx",
+    // ViewToggle.tsx removed by #514 (the inline search-bar switch it
+    // rendered is gone) — dropped from this list, not just left to 404.
     "src/components/LanguageToggle.tsx",
   ])("%s imports the shared PRESS_FEEDBACK constant", (path) => {
     const src = readSource(path);

@@ -12,7 +12,9 @@
  *   3. Closes on X button click / outside click / Escape; panel unmounts.
  *   4. Focus returns to the opener after Escape / X-button close.
  *   5. ES locale: labels show Spanish strings.
- *   6. No Map/List row (spec §4.4).
+ *   6. No STANDING Map/List row when viewMode isn't wired (spec §4.4) — and,
+ *      once #514 wired it, the actual "List view"/"Map view" line: label,
+ *      direction, mapDisabled hiding it, and onToggleView firing.
  *   7. Saved view: saved places only, or an empty state (spec §7 amendment).
  */
 
@@ -416,7 +418,7 @@ describe("HamburgerMenu — Saved view", () => {
 // ─── docs/bottom-nav-spec.md §4.4 + §7 ───────────────────────────────────────
 
 describe("HamburgerMenu — bottom nav entry points", () => {
-  test("renders no Map/List row (the switch lives in the search box, §4.4)", () => {
+  test("renders no standing two-button Map/List row (that switch lived in the search box, §4.4 — removed by #514, not restored)", () => {
     render(<HamburgerMenu locale="en" open onClose={vi.fn()} />);
     expect(screen.getByRole("menu")).toBeDefined();
     expect(screen.queryByText("View")).toBeNull();
@@ -434,6 +436,85 @@ describe("HamburgerMenu — bottom nav entry points", () => {
     fireEvent.pointerDown(document.body);
     expect(onClose).toHaveBeenCalledTimes(1);
     nav.remove();
+  });
+});
+
+// ─── #514: "List view"/"Map view" line, top of the Menu ──────────────────────
+
+describe("HamburgerMenu — List view / Map view line (#514)", () => {
+  test("not rendered when viewMode/onToggleView aren't wired (back-compat default)", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /view$/i })).toBeNull();
+  });
+
+  test('on the map, the line reads "List view" and sits before "Show welcome screen"', () => {
+    render(
+      <HamburgerMenu
+        locale="en"
+        open
+        onClose={vi.fn()}
+        onShowWelcome={vi.fn()}
+        viewMode="map"
+        onToggleView={vi.fn()}
+      />,
+    );
+    const items = screen.getAllByRole("menuitem").map((li) => li.textContent);
+    const viewIdx = items.findIndex((t) => t?.includes("List view"));
+    const welcomeIdx = items.findIndex((t) => t?.includes("Show welcome screen"));
+    expect(viewIdx).toBeGreaterThanOrEqual(0);
+    expect(viewIdx).toBeLessThan(welcomeIdx);
+  });
+
+  test('on the list, the line reads "Map view"', () => {
+    render(
+      <HamburgerMenu locale="en" open onClose={vi.fn()} viewMode="list" onToggleView={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: "Map view" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "List view" })).toBeNull();
+  });
+
+  test("clicking the line closes the drawer and calls onToggleView", () => {
+    const onClose = vi.fn();
+    const onToggleView = vi.fn();
+    render(
+      <HamburgerMenu
+        locale="en"
+        open
+        onClose={onClose}
+        viewMode="map"
+        onToggleView={onToggleView}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "List view" }));
+    expect(onToggleView).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test("hidden entirely when mapDisabled (#165) — no dead action offered", () => {
+    render(
+      <HamburgerMenu
+        locale="en"
+        open
+        onClose={vi.fn()}
+        viewMode="list"
+        onToggleView={vi.fn()}
+        mapDisabled
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /view$/i })).toBeNull();
+  });
+
+  test("ES: labels are translated", () => {
+    render(
+      <HamburgerMenu
+        locale="es"
+        open
+        onClose={vi.fn()}
+        viewMode="map"
+        onToggleView={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Vista de lista" })).toBeDefined();
   });
 });
 

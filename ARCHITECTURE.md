@@ -27,13 +27,18 @@ Browser
         ├── VenueMarker.tsx  (Lucide MapPin button inside each Mapbox Marker)
         ├── BottomSheet.tsx  (mobile: vaul v2 bottom sheet)
         ├── DesktopVenueWindow.tsx  (desktop: marker-anchored detail panel)
-        ├── SearchBar / SearchResultsPopover / FilterPanel
-        │     (SearchBar also hosts the Map/List view toggle, #191, and the
-        │     Filters button that opens FilterPanel — a left side panel with
-        │     multi-category checkboxes + Open now/SNAP/WIC switches, #513;
-        │     replaces the old search-focus CategoryDropdown)
-        ├── HamburgerMenu    (the drawer: saved places, links, language;
-        │     controlled — opened by BottomNav at a section)
+        ├── SearchBar / ViewSuggestion / SearchResultsPopover / FilterPanel
+        │     (SearchBar hosts the Filters button that opens FilterPanel — a
+        │     left side panel with multi-category checkboxes + Open now/
+        │     SNAP/WIC switches, #513, replacing the old search-focus
+        │     CategoryDropdown. Map/List switching is NOT a standing control
+        │     in the bar, #514 — an empty focused bar drops down
+        │     ViewSuggestion offering the other view; a typed one adds a "See
+        │     all N matches as a list" row to SearchResultsPopover; a third
+        │     way in is the Menu's "List view"/"Map view" line)
+        ├── HamburgerMenu    (the drawer: List view/Map view line, saved
+        │     places, links, language; controlled — opened by BottomNav at
+        │     a section)
         ├── ListView         (full-screen nearest-first list, map mode off)
         └── BottomNav        (Near me · Saved · Boxes · Help · Menu — bar below 2xl (1536px),
               pill floating bottom-centre at 2xl+; Boxes toggles the blessing_box

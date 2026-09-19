@@ -27,8 +27,11 @@ Browser
         ├── VenueMarker.tsx  (Lucide MapPin button inside each Mapbox Marker)
         ├── BottomSheet.tsx  (mobile: vaul v2 bottom sheet)
         ├── DesktopVenueWindow.tsx  (desktop: marker-anchored detail panel)
-        ├── SearchBar / SearchResultsPopover / CategoryDropdown
-        │     (SearchBar also hosts the Map/List view toggle, #191)
+        ├── SearchBar / SearchResultsPopover / FilterPanel
+        │     (SearchBar also hosts the Map/List view toggle, #191, and the
+        │     Filters button that opens FilterPanel — a left side panel with
+        │     multi-category checkboxes + Open now/SNAP/WIC switches, #513;
+        │     replaces the old search-focus CategoryDropdown)
         ├── HamburgerMenu    (the drawer: saved places, links, language;
         │     controlled — opened by BottomNav at a section)
         ├── ListView         (full-screen nearest-first list, map mode off)
@@ -262,9 +265,9 @@ Key state atoms and their roles:
 | `viewport` | `'located' \| 'pueblo-center'` | Splash exit mode; determines initial map center |
 | `viewMode` | `'map' \| 'list'` | Map canvas vs. full-screen list |
 | `query` | `string` | Text search input |
-| `selectedCategories` | `Set<VenueCategory> \| null` | Multi-select category filter |
-| `activeCategoryFilter` | `VenueCategory \| null` | Single-select from category dropdown; syncs into `selectedCategories` and triggers autozoom |
-| `filterOpenNow / filterSnap / filterWic / filterFavorites` | `boolean` | Boolean filter toggles |
+| `selectedCategories` | `Set<VenueCategory> \| null` | Multi-select category filter, checked in FilterPanel (#513); drives the category-autozoom effect |
+| `filterOpenNow / filterSnap / filterWic` | `boolean` | Boolean filter toggles, shown as "Show only" switches in FilterPanel. Favorites was a 4th toggle here; removed by #513 — Saved in the bottom bar already covers it |
+| `filterPanelOpen` | `boolean` | Whether the FilterPanel side panel is open (#513) |
 | `isDrifted` | `boolean` | True when user-location dot has left the visible viewport — shows "Re-center" button |
 | `isLocating` | `boolean` | True while a geo request is in-flight — shows spinner on BottomNav's "Near me" |
 | `bannerVisible` | `boolean` | Location-denied banner after an active re-tap |

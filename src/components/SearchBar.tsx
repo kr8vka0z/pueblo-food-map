@@ -17,13 +17,19 @@
  * - onFocus / onBlur / onKeyDown for popover lifecycle are also passed by parent.
  *
  * Inline Map/List view switch (#191) — optional `viewSwitch` prop renders a
- * ViewToggle at the pill's right end, mirroring `filterChip`'s left anchor.
- * See that prop's own comment for why it lives here instead of a new
- * floating control.
+ * ViewToggle at the pill's right end.
+ *
+ * Filters button (#513) — the magnifier icon's spot on the left becomes a
+ * "Filters" button when the `filtersButton` prop is passed (MapWrapper always
+ * passes it). Replaces the old `filterChip` (a variable-width category-name
+ * chip) entirely: filters now live behind their own panel, so the bar only
+ * ever shows a small round icon button + an orange count badge, never a
+ * label. Falls back to the plain search icon when the prop is absent, so
+ * SearchBar stays usable standalone (e.g. a11y.test.tsx renders it bare).
  */
 
 import { useCallback } from "react";
-import { Search, X } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import ViewToggle, { type ViewMode } from "./ViewToggle";
 import type { Locale } from "@/lib/i18n";
@@ -59,21 +65,25 @@ interface SearchBarProps {
 
   // ── Category filter chip (#95) ──────��─────────────────────────────────────
   /**
-   * When set, renders a removable chip inside the search bar to the left of
-   * the placeholder, indicating an active category filter.
+   * When set, renders a round Filters button in the magnifier icon's spot.
+   * Plain when count is 0; green with an orange count badge when filters are
+   * active (#513). `ariaLabel` is built by the caller via i18n (t("filters.
+   * button.label"/"filters.button.labelActive")) — same pattern as the
+   * input's own `ariaLabel` prop — so this component stays locale-agnostic.
+   * Falls back to the plain search icon when absent (e.g. a11y.test.tsx
+   * renders SearchBar standalone with no filters concept at all).
    */
-  filterChip?: {
-    label: string;
-    /** aria-label for the × button. */
-    clearAriaLabel?: string;
-    onClear: () => void;
+  filtersButton?: {
+    count: number;
+    onClick: () => void;
+    ariaLabel: string;
   };
 
   // ── Inline Map/List view switch (#191) ───────────────────────────────────
   /**
    * When set, renders the Map/List ViewToggle inside the search pill's right
-   * end, mirroring how filterChip anchors to the left. WHY here and not a
-   * new floating control: the issue owner's explicit instruction was "build
+   * end. WHY here and not a new floating control: the issue owner's explicit
+   * instruction was "build
    * it into the search bar" so the switch doesn't add a new element to an
    * already-busy mobile screen — SearchBar is the one control already
    * visible in BOTH map and list view (unlike LocateButton or the map-only
@@ -101,7 +111,7 @@ export default function SearchBar({
   onFocus,
   onBlur,
   onKeyDownExtra,
-  filterChip,
+  filtersButton,
   viewSwitch,
 }: SearchBarProps) {
   const handleKey = useCallback(
@@ -143,8 +153,9 @@ export default function SearchBar({
         className="relative w-full ml-[max(1rem,env(safe-area-inset-left))] mr-[max(1rem,env(safe-area-inset-right))] md:ml-0 md:mr-0 md:w-[520px]"
         style={{ pointerEvents: "auto" }}
       >
-        {/* Search icon — 16×16 mobile, 18×18 desktop. Hidden when chip is active. */}
-        {!filterChip && (
+        {/* Search icon — 16×16 mobile, 18×18 desktop. Hidden when the Filters
+            button (#513) occupies this spot instead. */}
+        {!filtersButton && (
           <>
             <Search
               size={16}
@@ -167,48 +178,42 @@ export default function SearchBar({
           </>
         )}
 
-        {/* Active category filter chip — rendered inside the search bar (#95).
-            max-w shrinks from 40% to 26% when the view switch (#191) also
-            occupies the right end — on a 375px phone that's the difference
-            between a category chip that can crowd out the view switch and
-            one that still leaves the input a usable typing field. */}
-        {filterChip && (
-          <div
+        {/* Filters button (#513) — replaces the magnifier. Plain (bone/ink)
+            when no filters are on; sage-filled with an orange count badge
+            when count > 0. One fixed size at every width (unlike ViewToggle,
+            the mockups show no icon/word distinction for this control). */}
+        {filtersButton && (
+          <button
+            type="button"
+            onClick={filtersButton.onClick}
+            aria-label={filtersButton.ariaLabel}
             className={
-              "absolute left-3 top-1/2 -translate-y-1/2 " +
-              "flex items-center gap-1 " +
-              "bg-[var(--color-sage-100,#e8f1ed)] " +
-              "text-[var(--color-sage-700,#2d6e52)] " +
-              "text-xs font-semibold " +
-              "rounded-full px-2 py-0.5 " +
-              (viewSwitch ? "max-w-[26%]" : "max-w-[40%]")
+              "absolute left-1.5 top-1/2 -translate-y-1/2 " +
+              "flex items-center justify-center w-8 h-8 rounded-full border " +
+              "transition-colors duration-100 " +
+              PRESS_FEEDBACK + " " +
+              "focus-visible:outline-none focus-visible:ring-2 " +
+              "focus-visible:ring-[var(--color-sage-500)] " +
+              (filtersButton.count > 0
+                ? "bg-[var(--color-sage-600)] border-[var(--color-sage-600)] text-white"
+                : "bg-[var(--color-bone-50)] border-[var(--color-bone-300)] text-[var(--color-ink-500)]")
             }
           >
-            <span className="truncate">{filterChip.label}</span>
-            <button
-              type="button"
-              aria-label={filterChip.clearAriaLabel ?? `Clear filter: ${filterChip.label}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                filterChip.onClear();
-              }}
-              className={
-                "flex-shrink-0 flex items-center justify-center " +
-                // Visible icon (X size=10) is unchanged — the button's own box grows
-                // from 14px to 26px and a matching negative margin cancels the growth
-                // for layout purposes, so the icon renders at the exact same spot
-                // (mobile review #7: 14x14 was under the 24px WCAG floor).
-                "rounded-full w-[26px] h-[26px] -m-[6px] " +
-                "hover:bg-[var(--color-sage-200,#d0e4da)] " +
-                "transition-colors duration-100 " +
-                PRESS_FEEDBACK + " " +
-                "focus-visible:outline-none focus-visible:ring-1 " +
-                "focus-visible:ring-[var(--color-sage-500)]"
-              }
-            >
-              <X size={10} aria-hidden />
-            </button>
-          </div>
+            <SlidersHorizontal size={16} aria-hidden />
+            {filtersButton.count > 0 && (
+              <span
+                aria-hidden
+                className={
+                  "absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full " +
+                  "bg-[var(--color-orange)] text-[var(--color-navy)] " +
+                  "text-[10px] font-bold leading-4 text-center " +
+                  "border-2 border-[var(--color-bone-50)]"
+                }
+              >
+                {filtersButton.count}
+              </span>
+            )}
+          </button>
         )}
 
         <input
@@ -224,11 +229,10 @@ export default function SearchBar({
           {...comboboxAttrs}
           className={
             "w-full h-11 md:h-[52px] " +
-            (filterChip
-              ? viewSwitch
-                ? "pl-[calc(26%+8px)] "
-                : "pl-[calc(40%+8px)] "
-              : "pl-9 md:pl-10 ") +
+            // Filters button reserves a fixed 44px (32px button + left-1.5
+            // inset + a little slack) at every width — unlike the removed
+            // filterChip, its size never varies with content or breakpoint.
+            (filtersButton ? "pl-11 " : "pl-9 md:pl-10 ") +
             // pr reserves room for the inline view switch (#191), which is
             // icons only under md and "Map/List" words from md up (see
             // ViewToggle). MEASURED 2026-09-16 on the flush switch (`right-px`

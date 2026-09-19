@@ -55,7 +55,7 @@ describe("mobile viewport + form field zoom", () => {
     // a notched phone — each must reference the same inset, or it rides up
     // under the bar again.
     const files = [
-      "CategoryDropdown.tsx",
+      "FilterPanel.tsx",
       "EmptySearchPopover.tsx",
       "SearchResultsPopover.tsx",
       "LocationDeniedBanner.tsx",

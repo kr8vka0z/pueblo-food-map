@@ -172,24 +172,27 @@ describe("MapWrapper — search query survives a view switch (#191)", () => {
   });
 });
 
-describe("MapWrapper — category filter survives a view switch (#191)", () => {
-  test("an active category filter chip is still shown after switching views", async () => {
+describe("MapWrapper — category filter survives a view switch (#191, rewired to FilterPanel by #513)", () => {
+  test("an active category filter is still on (Filters button badge) after switching views", async () => {
     await renderAndLoadMap();
 
-    // Focus the empty search box to open the category browse dropdown (#95).
-    fireEvent.focus(screen.getByRole("combobox"));
-    const pantryOption = screen.getByText("Food Pantry").closest('[role="option"]');
-    expect(pantryOption).not.toBeNull();
-    fireEvent.click(pantryOption!);
+    // Open the Filters panel (#513) and check the Food Pantry checkbox —
+    // replaces the old search-focus category browse dropdown (#95), which
+    // #513 removed along with the search bar's filterChip text.
+    fireEvent.click(screen.getByRole("button", { name: /^Filters$/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Food Pantry/i }));
+    // "Show N places" closes the panel without discarding the selection —
+    // the filter pipeline (useMapFilters) already applied it live.
+    fireEvent.click(screen.getByRole("button", { name: /^Show \d+ places?$/i }));
 
-    // filterChip now renders inside the search bar.
-    expect(screen.getByText("Food Pantry")).toBeDefined();
+    // Filters button's spoken label carries the active count.
+    expect(screen.getByRole("button", { name: /^Filters, 1 on$/i })).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: /^List$/i }));
-    expect(screen.getByText("Food Pantry")).toBeDefined();
+    expect(screen.getByRole("button", { name: /^Filters, 1 on$/i })).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: /^Map$/i }));
-    expect(screen.getByText("Food Pantry")).toBeDefined();
+    expect(screen.getByRole("button", { name: /^Filters, 1 on$/i })).toBeDefined();
   });
 });
 

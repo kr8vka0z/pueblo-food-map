@@ -93,10 +93,13 @@ components:
     backgroundColor: "{colors.bone100}"
     textColor: "{colors.ink700}"
     rounded: "{rounded.full}"
-  filterChip:
-    backgroundColor: "{colors.sage100}"
-    textColor: "{colors.sage700}"
+  filtersButton:
+    backgroundColor: "{colors.sage600}"
+    textColor: "{colors.white}"
     rounded: "{rounded.full}"
+  filterPanel:
+    backgroundColor: "{colors.bone50}"
+    rounded: "{rounded.md}"
   bottomSheet:
     backgroundColor: "{colors.bone50}"
     rounded: "{rounded.xl}"
@@ -172,7 +175,7 @@ A pre-existing design sidecar (`docs/pueblo-food-map-v2-handoff.md`) documents p
 
 **Sage is the primary interactive color.** Every link, focus ring, active filter chip, selected marker ring, and interactive affordance uses sage — NOT blue. `sage-600` (#2C5F4F) is the primary color, used for the "Show details" toggle text, operator links on hover, and the Plentiful CTA hover state. `sage-500` (#4A8466) is the focus ring and selected marker ring color. `sage-100` + `sage-700` form the SNAP/WIC benefit badge pairing (calm, not urgent).
 
-**Orange and navy are the brand colors** from Pueblo Food Project (`pueblofoodproject.org`). Orange (#F7943C) appears on exactly one thing: the splash CTA buttons. (The orange LocateButton pill on the map was retired for the bottom nav's "Near me" item, docs/bottom-nav-spec.md §6.) Navy (#190F3F) is the wordmark color and the text rendered on orange-background controls. These are the loudest, most declarative elements. Do not apply them to secondary actions, metadata, or hover states.
+**Orange and navy are the brand colors** from Pueblo Food Project (`pueblofoodproject.org`). Orange (#F7943C) appears on the splash CTA buttons, and — added by #513, Kyle's explicit call on the mockup — the Filters button's active-count badge and FilterPanel's "Show N places" button, its one live-count call-to-action. (The orange LocateButton pill on the map was retired for the bottom nav's "Near me" item, docs/bottom-nav-spec.md §6.) Navy (#190F3F) is the wordmark color and the text rendered on orange-background controls. These are the loudest, most declarative elements. Do not apply them anywhere else — no other secondary action, metadata, or hover state.
 
 **Yellow (#FFD166)** is for support/classification badges only. It does not appear as a button, interactive state, or background fill.
 
@@ -257,7 +260,9 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **SnapWicPill** (benefit indicator): `sage-100` bg, `sage-700` text, `rounded` (sm radius), `px-2 py-0.5 text-xs font-medium`. Calm, not urgent — sage reads "civic info," not "alert."
 
-**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. Lucide `Search` icon at `ink-400` (16px mobile / 18px desktop), left-inset. When a category filter is active, a `filterChip` (sage-100/sage-700/full radius) appears inside the bar left of the placeholder. The Map/List **ViewToggle** (see below) sits flush inside the bar's right end (#191) — full height, no border of its own, 1px in so the pill's own border wraps it (`right-px`); the input reserves a measured 93px for it on phones (icons only) and 161px from `md` up (words).
+**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. Left-inset icon spot: the plain Lucide `Search` icon (`ink-400`, 16px mobile / 18px desktop) when no `filtersButton` prop is passed, or the round **Filters button** (#513, replaces the old `filterChip`) when it is — `w-8 h-8 rounded-full`, `bone-50`/`ink-500` at rest, `sage-600` fill + white icon when one or more filters are on, with an `orange`/`navy` count badge (see the orange-usage exception above). The Map/List **ViewToggle** (see below) sits flush inside the bar's right end (#191) — full height, no border of its own, 1px in so the pill's own border wraps it (`right-px`); the input reserves a measured 93px for it on phones (icons only) and 161px from `md` up (words).
+
+**FilterPanel** (#513, replaces the old search-focus CategoryDropdown): `bone-50` full-height side panel sliding in from the left, `85vw` capped at `360px`, opened by SearchBar's Filters button — not tied to search focus. Header: title, `sage-600` "Clear all" text button, `×` close (`ink-500`, `bone-100` hover). Body: "Show only" section with three `role="switch"` rows (`sage-600` track when on, `bone-300` off) for Open now/SNAP/WIC, then "Kind of place" — 8 checkboxes, each with a 10px category-accent dot, allowing several at once. Footer: the one `orange`/`navy` "Show N places" button — a live count, and the panel's only close-and-commit action (checking a box already applies live; this just closes). Backdrop `rgba(26,24,23,0.4)`. Closes via ×, Escape, backdrop tap, or swipe-left. Same layout at every width (no separate desktop treatment).
 
 **ViewToggle** (Map/List switch): `bone-100` bg, `rounded-full`, segmented two-button group — no border of its own; it reads as the search pill's own right end. Active side: `ink-700` fill, `bone-50` text. Inactive: `ink-500` text. One size now (SearchBar's flush instance, #191 — the bordered `sm`/`md` variants had no callers left once HamburgerMenu's own Map/List row was deleted with the bottom nav, and were removed). Icons only on phones (under `md`, 768px) and "Map / List" words from `md` up (Kyle, 2026-09-16) — the words go visually hidden (`sr-only`), so accessible names survive. This replaces the earlier words-at-every-width rule (docs/bottom-nav-spec.md §4 amendment). When the map cannot mount, the Map side renders `disabled` at `ink-400`/60% opacity rather than accepting a tap that does nothing.
 
@@ -289,7 +294,7 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 **Don't:**
 - Don't introduce cool or neutral grays anywhere. Bone and ink are warm-tinted; a neutral gray creates a visible temperature mismatch.
 - Don't use `catGrocery` (`#1F4E8C`) for links, buttons, or any interactive state. It is a data color reserved for the grocery category pin only — the only blue in the system.
-- Don't use orange for secondary actions, badges, hover states, or metadata. Orange is reserved for the splash CTAs.
+- Don't use orange for secondary actions, hover states, or metadata. Orange is reserved for the splash CTAs plus the Filters button's count badge and FilterPanel's "Show N places" button (#513, Kyle's call) — nowhere else.
 - Don't use yellow (`#FFD166`) for anything other than support/classification badges.
 - Don't use Fraunces for body text, button labels, form inputs, or any running text at 16px or smaller. Its variable weight range is seductive, but it is a display serif built for headlines.
 - Don't add a sidebar. The v1 360px categories rail + 280px detail panel were removed in v2. A sidebar competes with the map for viewport space and violates the chrome budget.

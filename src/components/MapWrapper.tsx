@@ -32,7 +32,7 @@ import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
 import BottomNav, { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
-import CategoryDropdown from "./CategoryDropdown";
+import FilterPanel from "./FilterPanel";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
 import EmptySearchPopover from "./EmptySearchPopover";
@@ -47,7 +47,7 @@ import { useGeolocation, type GeoState } from "@/lib/useGeolocation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import { venues as allVenues } from "@/data/venues";
-import type { Venue, VenueCategory } from "@/types/venue";
+import type { Venue } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
 import type { ViewMode } from "./ViewToggle";
 import ListView from "./ListView";
@@ -151,11 +151,11 @@ export function computeCategoryBounds(
   return [[lngW, latS], [lngE, latN]];
 }
 
-// Stable listbox ids — used for aria-controls on the search input and id on each listbox.
+// Stable listbox id — used for aria-controls on the search input and id on the
+// results listbox. The old category-browse listbox (CategoryDropdown, #95)
+// was removed by #513 — search focus no longer opens any list; the Filters
+// panel is a dialog, not a combobox popup.
 const LISTBOX_ID = "search-results-listbox";
-// Mirrors the LISTBOX_ID constant inside CategoryDropdown — kept in sync here so
-// MapWrapper can compute the correct aria-controls without importing a private const.
-const CATEGORY_LISTBOX_ID = "category-browse-listbox";
 
 // ─── Viewport prop (from PR 3 splash gate) ────────────────────────────────────
 // 'located'      → use the user's geolocation position as initial map center.
@@ -815,23 +815,29 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     setFilterSnap,
     filterWic,
     setFilterWic,
-    filterFavorites,
-    setFilterFavorites,
-    activeCategoryFilter,
-    setActiveCategoryFilter,
     venuesWithDistance,
     filteredVenues,
     savedVenues,
-    favoriteSet,
-    favoritesCount,
     anyFilterActive,
-    allVenueCounts,
     openNowCount,
     snapCount,
     wicCount,
-    handleCategoryBrowseSelect,
+    toggleCategory,
+    clearFilters,
     handleClearAllFilters,
   } = useMapFilters(origin, boxVenues);
+
+  // ── Filters panel (#513) — the side panel behind SearchBar's Filters button.
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  // Spoken/visible count on the Filters button's badge: every independent
+  // filter counts once — the proof step in #513 ("two kinds + Open now →
+  // badge 3") is per-item, not per-group, so a multi-category selection
+  // contributes its full size, not a flat 1.
+  const activeFilterCount =
+    (selectedCategories?.size ?? 0) +
+    (filterOpenNow ? 1 : 0) +
+    (filterSnap ? 1 : 0) +
+    (filterWic ? 1 : 0);
 
   // ── Typeahead popover state (issue #67) ──────────────────────────────────────
   // isPopoverOpen: true when input is focused + query is non-empty + matches exist.
@@ -903,38 +909,49 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapUnavailable, boxIdSet, liveBoxesLoading]);
 
-  // ── Category autozoom (#111) ─────────────────────────────────────────────────
-  // When a single category is activated from the dropdown, fit the map to all
-  // venues in that category. When the user CLEARS an active category, return
-  // to the all-venues overview.
+  // ── Category autozoom (#111, generalized to multi-select by #513) ───────────
+  // When one or more categories are checked in the Filters panel, fit the map
+  // to the UNION of venues across every checked category. When the user
+  // CLEARS every category, return to the all-venues overview.
   //
-  // Fires after `activeCategoryFilter` or `mapboxMap` changes — including the
+  // Fires after `selectedCategories` or `mapboxMap` changes — including the
   // map's first ready run, when `mapboxMap` flips from null to real. The
-  // category dropdown is interactive before the map loads, so a filter can
-  // already be set (or cleared) by then. `prevActiveCategoryFilterRef` (below)
-  // tells that first-ready run apart from a genuine user clear so it never
+  // Filters panel is interactive before the map loads, so a filter can
+  // already be set (or cleared) by then. `prevCategoriesKeyRef` (below) tells
+  // that first-ready run apart from a genuine user clear so it never
   // fitBounds-to-all-venues over the #231 fixed home view on a fresh load (#247).
   //
   // Interaction with #108 drift detection: `fitBounds` will fire a `moveend`
   // event which calls `handleMoveEnd` → may set `isDrifted`. That's expected;
   // the Re-center button will appear if the user-dot isn't in the new view, which
   // is correct UX. No loop risk because `handleMoveEnd` only reads bounds, it
-  // does not change `activeCategoryFilter`.
+  // does not change `selectedCategories`.
 
-  // Previous `activeCategoryFilter`, updated only on runs where `mapboxMap` is
+  // Previous categories signature, updated only on runs where `mapboxMap` is
   // ready — `undefined` means "the map has never been ready before." Filter
   // churn that happens before the map exists to zoom on is invisible to this
   // ref, so it can't be mistaken for a real clear once the map finally loads.
-  const prevActiveCategoryFilterRef = useRef<VenueCategory | null | undefined>(undefined);
+  // A sorted, joined string (not the Set itself) is what's compared/stored:
+  // `selectedCategories` gets a new Set identity on every toggle, so a
+  // reference comparison would never read as "unchanged," and checking/
+  // unchecking the SAME single category back to itself (add then remove a
+  // different one) must still compare equal when the resulting membership is
+  // equal — a plain string key gives that for free.
+  const prevCategoriesKeyRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     if (!mapboxMap) return;
 
+    const categoriesKey =
+      selectedCategories && selectedCategories.size > 0
+        ? Array.from(selectedCategories).sort().join(",")
+        : null;
+
     // Compare against, then overwrite with, the CURRENT value — only for runs
     // that reach here (map ready). Pre-ready renders bail above without
     // touching the ref.
-    const prevActiveCategoryFilter = prevActiveCategoryFilterRef.current;
-    prevActiveCategoryFilterRef.current = activeCategoryFilter;
+    const prevCategoriesKey = prevCategoriesKeyRef.current;
+    prevCategoriesKeyRef.current = categoriesKey;
 
     const reducedMotion =
       typeof window !== "undefined" &&
@@ -949,13 +966,13 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       bottom: basePadding.bottom + (isBelow2xl ? BOTTOM_NAV_HEIGHT_PX : 24 + 52),
     };
 
-    if (activeCategoryFilter === null) {
-      // Skip unless a real category was active on the previous ready run —
+    if (categoriesKey === null) {
+      // Skip unless a real category set was active on the previous ready run —
       // `== null` catches both "map's first ready run" (undefined) and
-      // "filter was already null." Only a genuine non-null → null transition
+      // "filter was already empty." Only a genuine non-null → null transition
       // below is a real clear; otherwise whatever view is already showing
       // (the #231 home view, on a fresh load) stands untouched.
-      if (prevActiveCategoryFilter == null) return;
+      if (prevCategoriesKey == null) return;
 
       // Real clear — fit the all-venues bounds, capped at CATEGORY_FIT_MAX_ZOOM.
       // NOT the wordmark/home zoom: this is a computed bounds-fit over the
@@ -972,14 +989,17 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       return;
     }
 
-    // Single category selected — compute bounds from all (unfiltered) venues in
-    // this category so the view doesn't depend on other active filters.
+    // One or more categories checked — compute bounds from all (unfiltered)
+    // venues across the UNION of checked categories, so the view doesn't
+    // depend on other active filters (Open now/SNAP/WIC).
     // [...allVenues, ...boxVenues]: boxVenues is the only place `blessing_box`
     // category venues live (allVenues is the static published-venues.ts
     // snapshot, which never includes boxes — see "Blessing Boxes — live box
-    // layer" in AGENTS.md) — without it, selecting the blessing-box chip
+    // layer" in AGENTS.md) — without it, checking the blessing-box category
     // computed bounds over an empty array and never zoomed at all.
-    const categoryVenues = [...allVenues, ...boxVenues].filter((v) => v.category === activeCategoryFilter);
+    const categoryVenues = [...allVenues, ...boxVenues].filter((v) =>
+      selectedCategories!.has(v.category),
+    );
     const bounds = computeCategoryBounds(categoryVenues);
     if (!bounds) return;
 
@@ -989,7 +1009,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       duration: reducedMotion ? 0 : 600,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategoryFilter, mapboxMap, boxVenues]);
+  }, [selectedCategories, mapboxMap, boxVenues]);
   // Note: `isMobile` / `isBelow2xl` intentionally excluded from deps — we want the padding that
   // was current at the time the category was selected, not re-zoom on resize.
   // `boxVenues` IS included (map-first rework, 2026-09-18) — unlike allVenues
@@ -1185,15 +1205,6 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const showResultsPopover =
     isPopoverOpen && query.trim() !== "" && filteredVenues.length > 0;
 
-  // Category browse dropdown: focused + empty query (#95).
-  const showCategoryDropdown = isPopoverOpen && query.trim() === "";
-
-  // Cancel blur timer when mousedown fires inside the category dropdown —
-  // same grace-period pattern as the results popover.
-  const handleCategoryDropdownMouseDown = useCallback(() => {
-    if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
-  }, []);
-
   // WHY one shared handler: every path that switches views (the inline
   // SearchBar control, #191, and "Near me" below) must honor the same
   // mapUnavailable guard (selecting "map" while the map can't mount would show
@@ -1278,8 +1289,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67)
-          filterChip shows the active category filter (#95). */}
+      {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67).
+          filtersButton (#513) opens the FilterPanel below — search focus no
+          longer opens any list of its own. */}
       <SearchBar
         value={query}
         onChange={(next) => {
@@ -1290,27 +1302,20 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         placeholder={t("search.placeholder", locale)}
         ariaLabel={t("search.aria", locale)}
         comboboxEnabled={true}
-        comboboxExpanded={showResultsPopover || showCategoryDropdown}
-        comboboxControls={
-          showCategoryDropdown
-            ? CATEGORY_LISTBOX_ID
-            : showResultsPopover
-              ? LISTBOX_ID
-              : undefined
-        }
+        comboboxExpanded={showResultsPopover}
+        comboboxControls={showResultsPopover ? LISTBOX_ID : undefined}
         comboboxActiveDescendant={activeDescendantId}
         onFocus={handleSearchFocus}
         onBlur={handleSearchBlur}
         onKeyDownExtra={handleSearchKeyDown}
-        filterChip={
-          activeCategoryFilter !== null
-            ? {
-                label: t(`category.full.${activeCategoryFilter}`, locale),
-                clearAriaLabel: t("categoryBrowse.clearFilter", locale),
-                onClear: () => handleCategoryBrowseSelect(null),
-              }
-            : undefined
-        }
+        filtersButton={{
+          count: activeFilterCount,
+          onClick: () => setFilterPanelOpen(true),
+          ariaLabel:
+            activeFilterCount > 0
+              ? t("filters.button.labelActive", locale, { count: String(activeFilterCount) })
+              : t("filters.button.label", locale),
+        }}
         viewSwitch={{
           mode: viewMode,
           onChange: handleViewModeChange,
@@ -1337,32 +1342,26 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* CategoryDropdown — shown when search is focused + query is empty (#95).
-          Mutually exclusive with SearchResultsPopover and EmptySearchPopover. */}
-      {showCategoryDropdown && (
-        <CategoryDropdown
-          counts={allVenueCounts}
-          activeCategory={activeCategoryFilter}
-          onSelect={(cat) => {
-            handleCategoryBrowseSelect(cat);
-            // Close dropdown after selection
-            setIsPopoverOpen(false);
-          }}
-          onMouseDown={handleCategoryDropdownMouseDown}
-          openNowActive={filterOpenNow}
-          openNowCount={openNowCount}
-          onToggleOpenNow={() => setFilterOpenNow((v) => !v)}
-          snapActive={filterSnap}
-          snapCount={snapCount}
-          onToggleSnap={() => setFilterSnap((v) => !v)}
-          wicActive={filterWic}
-          wicCount={wicCount}
-          onToggleWic={() => setFilterWic((v) => !v)}
-          favoritesActive={filterFavorites}
-          favoritesCount={favoritesCount}
-          onToggleFavorites={() => setFilterFavorites((v) => !v)}
-        />
-      )}
+      {/* FilterPanel (#513) — the left side panel opened by SearchBar's Filters
+          button. Not tied to search focus (replaces CategoryDropdown, #95). */}
+      <FilterPanel
+        open={filterPanelOpen}
+        onClose={() => setFilterPanelOpen(false)}
+        locale={locale}
+        resultCount={filteredVenues.length}
+        filterOpenNow={filterOpenNow}
+        onToggleOpenNow={() => setFilterOpenNow((v) => !v)}
+        openNowCount={openNowCount}
+        filterSnap={filterSnap}
+        onToggleSnap={() => setFilterSnap((v) => !v)}
+        snapCount={snapCount}
+        filterWic={filterWic}
+        onToggleWic={() => setFilterWic((v) => !v)}
+        wicCount={wicCount}
+        selectedCategories={selectedCategories}
+        onToggleCategory={toggleCategory}
+        onClearAll={clearFilters}
+      />
 
       {/* EmptySearchPopover — shown when query is non-empty but yields no results.
           Mutually exclusive with SearchResultsPopover (they depend on filteredVenues.length). */}

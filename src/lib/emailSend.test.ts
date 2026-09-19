@@ -46,6 +46,38 @@ describe("composeBilingualEmail", () => {
     });
     expect(html).toContain('<a href="https://pueblofoodmap.com/box/1">https://pueblofoodmap.com/box/1</a>');
   });
+
+  test("dev.pueblofoodmap.com also becomes a clickable anchor", () => {
+    const { html } = composeBilingualEmail({
+      subjectKey: "box.checkin.heading",
+      bodyLineKeys: ["box.lastFilled"],
+      vars: { time: "https://dev.pueblofoodmap.com/box/1" },
+    });
+    expect(html).toContain('<a href="https://dev.pueblofoodmap.com/box/1">');
+  });
+
+  test("localhost also becomes a clickable anchor (local dev)", () => {
+    const { html } = composeBilingualEmail({
+      subjectKey: "box.checkin.heading",
+      bodyLineKeys: ["box.lastFilled"],
+      vars: { time: "http://localhost:3000/box/1" },
+    });
+    expect(html).toContain('<a href="http://localhost:3000/box/1">');
+  });
+
+  // 2026-09-18 security review, item 12: a URL whose origin ISN'T one of
+  // this app's own hosts must stay plain escaped text, never become a
+  // clickable anchor — see htmlParagraph's own header for why the old
+  // "never user input" assumption was wrong.
+  test("a URL on a DIFFERENT host stays plain text, not a clickable anchor (item 12)", () => {
+    const { html } = composeBilingualEmail({
+      subjectKey: "box.checkin.heading",
+      bodyLineKeys: ["box.lastFilled"],
+      vars: { time: "https://phish.example/steal" },
+    });
+    expect(html).not.toContain("<a href=");
+    expect(html).toContain("https://phish.example/steal");
+  });
 });
 
 describe("unsubscribeHeaders", () => {

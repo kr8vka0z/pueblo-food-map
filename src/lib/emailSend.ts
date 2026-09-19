@@ -15,10 +15,13 @@
  */
 
 import { t } from "@/lib/i18n";
+import { ALLOWED_HOSTS } from "@/lib/alertOrigin";
 
 const FROM = "Pueblo Food Map <noreply@pueblofoodmap.com>";
 /** Resend's own hard cap on a single POST /emails/batch call — sendResendBatch chunks anything larger. */
 const RESEND_BATCH_MAX = 100;
+
+const URL_RE = /(https?:\/\/[^\s<]+)/g;
 
 export function escapeHtml(value: string): string {
   return value
@@ -29,10 +32,35 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Escapes one already-interpolated line for HTML, then turns any of OUR OWN generated https:// links (never user input — see composeBilingualEmail's callers) into a real anchor, so the HTML part isn't just plain unclickable text. */
+/** True when `urlText`'s origin is one this app actually generates outbound-email links for — the two real hostnames (ALLOWED_HOSTS, shared with alertOrigin.ts's resolveEmailOrigin) plus localhost for local dev. */
+function isAllowedLinkOrigin(urlText: string): boolean {
+  try {
+    const url = new URL(urlText);
+    return ALLOWED_HOSTS.includes(url.hostname) || url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false; // not a parseable URL at all -> never a link
+  }
+}
+
+/**
+ * Escapes one already-interpolated line for HTML, then turns any embedded
+ * URL whose origin is one of OUR OWN allowed hosts into a real anchor, so
+ * the HTML part isn't just plain unclickable text.
+ *
+ * 2026-09-18 security review, item 12: this used to link EVERY https://
+ * substring under the claim "never user input" — false. displayName (the
+ * box-adoption applicant's own free-text name — sendAdopterApprovedEmail's
+ * `vars`) is website-visitor-supplied, and this is a shared helper every
+ * composeBilingualEmail caller in this file funnels through, present and
+ * future — it can't assume every caller's vars are pre-vetted (item 11's
+ * sanitizeDisplayName refusing an in-name URL at submission time closes
+ * THAT one path, but doesn't make this function's own claim true in
+ * general). Any URL-looking text whose origin isn't one of ours now stays
+ * plain escaped text instead of becoming a clickable link.
+ */
 function htmlParagraph(line: string): string {
   const escaped = escapeHtml(line);
-  return `<p>${escaped.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>')}</p>`;
+  return `<p>${escaped.replace(URL_RE, (match) => (isAllowedLinkOrigin(match) ? `<a href="${match}">${match}</a>` : match))}</p>`;
 }
 
 export interface OutboundEmail {

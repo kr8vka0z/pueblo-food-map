@@ -17,7 +17,8 @@
  * to the canonical production origin, never an attacker-supplied value.
  */
 
-const ALLOWED_HOSTS = ["pueblofoodmap.com", "dev.pueblofoodmap.com"];
+/** Exported for src/lib/emailSend.ts's htmlParagraph — the two real hostnames a generated email link is ever allowed to point at (plus localhost, below) — see that function's own header for why. */
+export const ALLOWED_HOSTS = ["pueblofoodmap.com", "dev.pueblofoodmap.com"];
 const DEFAULT_ORIGIN = "https://pueblofoodmap.com";
 
 /** `req` needs only `.url` — satisfied by both NextRequest and a plain Request. */

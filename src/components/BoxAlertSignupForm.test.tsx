@@ -34,9 +34,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderForm() {
+function renderForm(locale: "en" | "es" = "en") {
   return render(
-    <LocaleProvider initialLocale="en">
+    <LocaleProvider initialLocale={locale}>
       <BoxAlertSignupForm boxId="box-1" />
     </LocaleProvider>,
   );
@@ -68,7 +68,21 @@ describe("BoxAlertSignupForm", () => {
     await waitFor(() => expect(screen.getByText("Check your email to confirm.")).toBeDefined());
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/public/blessing-boxes/box-1/alerts");
-    expect(JSON.parse(init.body as string).email).toBe("giver@example.com");
+    const body = JSON.parse(init.body as string);
+    expect(body.email).toBe("giver@example.com");
+    expect(body.lang).toBe("en"); // single-language alert emails: sends the page's own current locale
+  });
+
+  test("sends 'es' when the page's own locale is Spanish", async () => {
+    const user = userEvent.setup();
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    renderForm("es");
+    await user.click(screen.getByRole("button", { name: "Avísame cuando necesite surtido" }));
+    await user.type(screen.getByLabelText(/tu correo/i), "giver@example.com");
+    await user.click(screen.getByRole("button", { name: "Suscribirme" }));
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.lang).toBe("es");
   });
 
   test("a rate-limit error response shows the rate-limit message", async () => {

@@ -20,11 +20,12 @@
  */
 
 import { isWithinConfirmWindow, randomHexToken } from "@/lib/alertTokens";
-import { composeBilingualEmail, sendResendEmail } from "@/lib/emailSend";
+import { composeEmail, sendResendEmail } from "@/lib/emailSend";
+import type { Locale } from "@/lib/i18n";
 
 // ─── D1 row shapes ──────────────────────────────────────────────────────────
 
-/** Mirrors migrations/0010_box_adopters_alerts.sql's `box_adopters` table exactly. PRIVATE: email/note are never mapped into a public shape. */
+/** Mirrors migrations/0010_box_adopters_alerts.sql + 0011_alert_email_lang.sql's `box_adopters` table exactly. PRIVATE: email/note are never mapped into a public shape. */
 export interface BoxAdopterRow {
   id: number;
   venue_id: string;
@@ -38,6 +39,8 @@ export interface BoxAdopterRow {
   reviewed_at: string | null;
   review_reason: string | null;
   created_at: string;
+  /** The UI locale the applicant was using at signup (0011) — every email this application's own lifecycle sends (confirm, approved) renders in ONLY this language. */
+  lang: Locale;
 }
 
 /** One row for the admin adoption-requests queue — box name joined once, never N+1. */
@@ -77,9 +80,11 @@ const SELECT_ADOPTER_BY_ID_SQL = "SELECT * FROM box_adopters WHERE id = ?";
 
 const SELECT_ADOPTER_BY_CONFIRM_TOKEN_SQL = "SELECT * FROM box_adopters WHERE confirm_token = ?";
 
+// `lang` bound LAST — see insertAdopterApplication's own header for why the
+// column order here matters to callers that assert on bound-arg position.
 const INSERT_ADOPTER_SQL = `
-  INSERT INTO box_adopters (venue_id, display_name, email, note, confirm_token)
-  VALUES (?, ?, ?, ?, ?)
+  INSERT INTO box_adopters (venue_id, display_name, email, note, confirm_token, lang)
+  VALUES (?, ?, ?, ?, ?, ?)
 `;
 
 /**
@@ -157,6 +162,8 @@ export interface NewAdopterApplication {
   displayName: string;
   email: string;
   note: string | null;
+  /** The UI locale the applicant was using — see BoxAdopterRow.lang's own header. */
+  lang: Locale;
 }
 
 /** Inserts one new pending, unconfirmed application and returns its id + the confirm token to email. */
@@ -167,7 +174,7 @@ export async function insertAdopterApplication(
   const confirmToken = randomHexToken();
   const result = await db
     .prepare(INSERT_ADOPTER_SQL)
-    .bind(input.venueId, input.displayName, input.email, input.note, confirmToken)
+    .bind(input.venueId, input.displayName, input.email, input.note, confirmToken, input.lang)
     .run();
   const id = result.meta?.last_row_id;
   if (typeof id !== "number") {
@@ -208,9 +215,12 @@ export async function sendAdopterConfirmEmail(opts: {
   boxName: string;
   origin: string;
   confirmToken: string;
+  /** The applicant's own signup-time locale (BoxAdopterRow.lang) — this email renders in ONLY this language. */
+  lang: Locale;
 }): Promise<void> {
   const url = `${opts.origin}/alerts/confirm?t=${opts.confirmToken}`;
-  const { subject, text, html } = composeBilingualEmail({
+  const { subject, text, html } = composeEmail({
+    lang: opts.lang,
     subjectKey: "email.adoptConfirm.subject",
     // "disclaimer" (item 7, 2026-09-18 security review) — someone else may
     // have typed this address in; this line tells them nothing happens if
@@ -227,8 +237,9 @@ export async function sendAdopterConfirmEmail(opts: {
  * confirm of a given application (markAdopterEmailConfirmed's own
  * idempotency), never on a re-click of an already-confirmed link. Plain
  * internal text mail, same shape/recipient as the checkins route's own
- * problem-report and photo-upload admin notices — not a subscriber-facing
- * bilingual email, so it doesn't go through composeBilingualEmail.
+ * problem-report and photo-upload admin notices — an internal admin email,
+ * not a member-of-the-public one, so it stays plain English regardless of
+ * the applicant's own lang and doesn't go through composeEmail.
  */
 export async function sendAdopterConfirmedAdminEmail(
   db: D1Database,

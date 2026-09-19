@@ -176,7 +176,7 @@ describe("BoxCardBody — cared-for-by sponsor slot (slice 6)", () => {
 describe("BoxCardBody — adopt/alert inline-expand forms (slice 6)", () => {
   test("renders both forms collapsed to a plain link", () => {
     renderCard();
-    expect(screen.getByRole("button", { name: "Adopt this box" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Apply to adopt this box" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Email me when it needs filling" })).toBeDefined();
   });
 });

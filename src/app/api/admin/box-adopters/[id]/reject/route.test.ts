@@ -44,6 +44,7 @@ function makeExistingRow(overrides: Partial<BoxAdopterRow> = {}): BoxAdopterRow 
     reviewed_at: null,
     review_reason: null,
     created_at: "2026-09-17T11:00:00.000Z",
+    lang: "en",
     ...overrides,
   };
 }

@@ -156,6 +156,29 @@ describe("/api/admin/blessing-boxes/[id]/host-alerts", () => {
     expect(JSON.parse(afterJson as string)).toEqual({ venue_id: BOX_ID, email: "host@example.com" });
   });
 
+  // Single-language alert emails: the admin's own language pick on the
+  // "add a host" panel is stored on the row and used for the welcome email.
+  test("POST: lang 'es' is stored on the row and used for the welcome email", async () => {
+    const { db } = makeFakeDb({ hosts: [{ id: 1, email: "host@example.com" }] });
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    const res = await POST(
+      makeRequest("POST", { origin: ADMIN_ORIGIN, body: { email: "host@example.com", lang: "es" } }),
+      { params: Promise.resolve({ id: BOX_ID }) },
+    );
+    expect(res.status).toBe(200);
+    const sentBody = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(sentBody.subject).toContain("Ahora recibirás alertas");
+  });
+
+  test("POST: missing/garbage lang defaults to 'en' (strict resolution)", async () => {
+    const { db, batchCalls } = makeFakeDb({ hosts: [{ id: 1, email: "host@example.com" }] });
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    await POST(makeRequest("POST", { origin: ADMIN_ORIGIN, body: { email: "host@example.com", lang: "ES" } }), {
+      params: Promise.resolve({ id: BOX_ID }),
+    });
+    expect((batchCalls[0][0] as { __args: unknown[] }).__args).toContain("en");
+  });
+
   test("POST: email is normalized (trim + lowercase) before lookup/storage (item 3)", async () => {
     const { db } = makeFakeDb({ existingHost: { id: 1, unsubscribed_at: null } });
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });

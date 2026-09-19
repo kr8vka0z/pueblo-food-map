@@ -266,6 +266,25 @@ describe("POST /api/public/blessing-boxes/[id]/adopt", () => {
     expect(insertCalls[0][2]).toBe("adopter@example.com");
   });
 
+  // Single-language alert emails: "the exact literal 'es' resolves to
+  // 'es'; anything else (missing, garbage) resolves to 'en'."
+  test("lang 'es' is stored on the row and used for the confirm email", async () => {
+    const { db, insertCalls } = makeFakeDb();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    const res = await callPost({ ...VALID_BODY, lang: "es" });
+    expect(res.status).toBe(200);
+    expect(insertCalls[0]).toContain("es");
+    const sentBody = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(sentBody.subject).toContain("Confirma tu solicitud");
+  });
+
+  test("missing/garbage lang defaults to 'en' (strict resolution)", async () => {
+    const { db, insertCalls } = makeFakeDb();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    await callPost({ ...VALID_BODY, lang: "ES" });
+    expect(insertCalls[0]).toContain("en");
+  });
+
   test("D1 insert failure -> 502 db_write_failed, no email sent", async () => {
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb({ insertShouldThrow: true }).db } });
     const res = await callPost(VALID_BODY);

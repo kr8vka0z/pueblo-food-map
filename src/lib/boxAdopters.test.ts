@@ -2,8 +2,8 @@
  * Tests for src/lib/boxAdopters.ts (Blessing Boxes slice 6) — the D1
  * shapes/SQL/helpers layer, proved against fake D1Database objects, same
  * convention boxPhotos.test.ts uses. sendResendEmail is mocked but
- * composeBilingualEmail runs for real (same split boxAlerts.test.ts uses),
- * so email-content tests below see the actual composed text.
+ * composeEmail runs for real (same split boxAlerts.test.ts uses), so
+ * email-content tests below see the actual composed text.
  */
 
 import { describe, expect, test, vi } from "vitest";
@@ -157,11 +157,13 @@ describe("insertAdopterApplication", () => {
       displayName: "Jane Doe",
       email: "jane@example.com",
       note: "We stock it every Sunday",
+      lang: "es",
     });
     expect(result.id).toBe(7);
     expect(typeof result.confirmToken).toBe("string");
     expect(result.confirmToken).toHaveLength(64); // 32 bytes hex-encoded
-    expect(boundArgs).toEqual(["box-1", "Jane Doe", "jane@example.com", "We stock it every Sunday", result.confirmToken]);
+    // lang bound LAST (0011) — "Store it on the row."
+    expect(boundArgs).toEqual(["box-1", "Jane Doe", "jane@example.com", "We stock it every Sunday", result.confirmToken, "es"]);
   });
 
   test("throws if D1 doesn't return a last_row_id — never silently returns an undefined id", async () => {
@@ -169,7 +171,7 @@ describe("insertAdopterApplication", () => {
       prepare: () => ({ bind: () => ({ run: async () => ({ meta: {} }) }) }),
     } as unknown as D1Database;
     await expect(
-      insertAdopterApplication(db, { venueId: "a", displayName: "x", email: "x@example.com", note: null }),
+      insertAdopterApplication(db, { venueId: "a", displayName: "x", email: "x@example.com", note: null, lang: "en" }),
     ).rejects.toThrow("last_row_id");
   });
 });
@@ -177,10 +179,21 @@ describe("insertAdopterApplication", () => {
 describe("sendAdopterConfirmEmail", () => {
   test("includes the 'if you didn't ask for this' disclaimer (2026-09-18 security review, item 7)", async () => {
     mockSendResendEmail.mockClear();
-    await sendAdopterConfirmEmail({ to: "jane@example.com", boxName: "Test Box", origin: "https://pueblofoodmap.com", confirmToken: "tok" });
+    await sendAdopterConfirmEmail({ to: "jane@example.com", boxName: "Test Box", origin: "https://pueblofoodmap.com", confirmToken: "tok", lang: "en" });
     expect(mockSendResendEmail).toHaveBeenCalledTimes(1);
     const { text } = mockSendResendEmail.mock.calls[0][0] as { text: string };
     expect(text).toContain("If you didn't ask for this, you can ignore this email.");
+  });
+
+  // Blessing Boxes slice 6, single-language alert emails: the applicant's
+  // OWN signup-time lang picks the whole message, not a fixed default.
+  test("lang 'es' renders the Spanish confirm email only", async () => {
+    mockSendResendEmail.mockClear();
+    await sendAdopterConfirmEmail({ to: "jane@example.com", boxName: "Test Box", origin: "https://pueblofoodmap.com", confirmToken: "tok", lang: "es" });
+    const { subject, text } = mockSendResendEmail.mock.calls[0][0] as { subject: string; text: string };
+    expect(subject).toContain("Confirma tu solicitud");
+    expect(text).toContain("Si tú no pediste esto");
+    expect(text).not.toContain("If you didn't ask for this");
   });
 });
 

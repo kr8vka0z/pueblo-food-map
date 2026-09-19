@@ -16,6 +16,13 @@
  * a host's list is small, per-box, and the route already computes the exact
  * post-write list for free, so a second round trip through the whole page
  * would be pure overhead for no correctness gain.
+ *
+ * Single-language alert emails: the "Add a host email" form also carries an
+ * "Email language" select (English/Spanish, default English) — a host is
+ * admin-added, not self-signed-up, so there's no page locale to read the
+ * way the two public forms (AdoptBoxForm/BoxAlertSignupForm) do; the admin
+ * picks it directly. The route stores it and every future alert this host
+ * receives renders in ONLY that language.
  */
 
 import { useState } from "react";
@@ -52,6 +59,7 @@ type PanelState = { status: "idle" } | { status: "submitting" } | { status: "err
 export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAlertsAdminPanelProps) {
   const [hosts, setHosts] = useState<HostRow[]>(initialHosts);
   const [email, setEmail] = useState("");
+  const [lang, setLang] = useState<"en" | "es">("en");
   const [state, setState] = useState<PanelState>({ status: "idle" });
 
   const genericErrorMessage = "Something went wrong. Try again.";
@@ -63,7 +71,7 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
       const res = await fetch(`/api/admin/blessing-boxes/${venueId}/host-alerts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, lang }),
       });
       const data = (await res.json().catch(() => null)) as { hosts?: HostRow[]; error?: string } | null;
       if (res.status === 200 && data?.hosts) {
@@ -138,6 +146,20 @@ export default function HostAlertsAdminPanel({ venueId, initialHosts }: HostAler
             placeholder="host@example.com"
             className={inputClass}
           />
+        </div>
+        <div>
+          <label htmlFor="host-alert-lang" className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]">
+            Email language
+          </label>
+          <select
+            id="host-alert-lang"
+            value={lang}
+            onChange={(e) => setLang(e.target.value === "es" ? "es" : "en")}
+            className={inputClass}
+          >
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+          </select>
         </div>
         <button type="submit" disabled={state.status === "submitting"} className={primaryButtonClass}>
           {state.status === "submitting" ? "Adding…" : "Add host"}

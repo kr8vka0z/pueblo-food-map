@@ -47,6 +47,7 @@ function makeExistingRow(overrides: Partial<BoxAdopterRow> = {}): BoxAdopterRow 
     reviewed_at: null,
     review_reason: null,
     created_at: "2026-09-17T11:00:00.000Z",
+    lang: "en",
     ...overrides,
   };
 }
@@ -151,6 +152,30 @@ describe("POST /api/admin/box-adopters/[id]/approve", () => {
     expect(auditStmt.args[1]).toBe("box_adopter");
     expect(subStmt.sql).toContain("INSERT INTO alert_subscriptions");
     expect(subStmt.sql).toContain("ON CONFLICT");
+  });
+
+  // Single-language alert emails (Blessing Boxes slice 6 follow-up): "On
+  // adopter approval, the alert_subscriptions row inherits the adopter
+  // row's `lang`."
+  test("the subscription upsert inherits the applicant's OWN lang, not a fixed default", async () => {
+    const existing = makeExistingRow({ lang: "es" });
+    const { db, batch } = makeFakeDb(existing);
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    await callApprove(makeRequest({ origin: ADMIN_ORIGIN }));
+
+    const stmts = batch.mock.calls[0][0] as BoundStatement[];
+    const subStmt = stmts[2];
+    expect(subStmt.args).toContain("es");
+    expect(subStmt.sql).toContain("lang = excluded.lang");
+  });
+
+  test("the approved email renders in the applicant's OWN lang", async () => {
+    const { db } = makeFakeDb(makeExistingRow({ lang: "es" }), "the-unsub-token");
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    await callApprove(makeRequest({ origin: ADMIN_ORIGIN }));
+    const sentBody = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(sentBody.subject).toContain("Fuiste aprobado");
+    expect(sentBody.text).not.toContain("Good news");
   });
 
   test("sends an approved email to the adopter when a subscription row exists", async () => {

@@ -86,6 +86,9 @@ export async function POST(
     email: existing.email,
     adopterId,
     timestamp,
+    // Inherits the applicant's own signup-time locale (BoxAdopterRow.lang)
+    // — see upsertApprovedAdopterSubscriptionStatement's own header.
+    lang: existing.lang,
   });
 
   await db.batch([updateAdopter, insertAudit, upsertSubscription]);
@@ -113,6 +116,7 @@ export async function POST(
         displayName: existing.display_name,
         origin: resolveEmailOrigin(req),
         unsubscribeToken: subscription.unsubscribe_token,
+        lang: existing.lang,
       });
     }
   } catch (err) {

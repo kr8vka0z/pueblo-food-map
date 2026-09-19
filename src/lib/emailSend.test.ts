@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { composeBilingualEmail, escapeHtml, sendResendBatch, sendResendEmail, unsubscribeHeaders } from "@/lib/emailSend";
+import { composeEmail, escapeHtml, sendResendBatch, sendResendEmail, unsubscribeHeaders } from "@/lib/emailSend";
 
 describe("escapeHtml", () => {
   test("escapes the five HTML-significant characters", () => {
@@ -8,18 +8,47 @@ describe("escapeHtml", () => {
   });
 });
 
-describe("composeBilingualEmail", () => {
-  test("text carries an English block, then an em-dash separator, then a Spanish block", () => {
-    const { text } = composeBilingualEmail({
-      subjectKey: "app.name", // any real key with distinct en/es-independent content works for structure
-      bodyLineKeys: ["app.name"],
+// Replaces the old composeBilingualEmail describe block — see this file's
+// own header, "WHY single-language, not bilingual": every email now renders
+// in ONE locale, the recipient's own, never an EN-block-then-ES-block pair.
+describe("composeEmail", () => {
+  test("lang 'en' renders only the English string, never the Spanish one", () => {
+    const { text } = composeEmail({
+      lang: "en",
+      subjectKey: "email.adoptConfirm.subject",
+      bodyLineKeys: ["email.adoptConfirm.disclaimer"],
+      vars: { box: "Test Box" },
     });
-    const parts = text.split("\n\n");
-    expect(parts).toContain("—");
+    expect(text).toContain("If you didn't ask for this, you can ignore this email.");
+    expect(text).not.toContain("Si tú no pediste esto");
   });
 
-  test("interpolates vars into both locale blocks", () => {
-    const { text } = composeBilingualEmail({
+  test("lang 'es' renders only the Spanish string, never the English one", () => {
+    const { subject, text } = composeEmail({
+      lang: "es",
+      subjectKey: "email.adoptConfirm.subject",
+      bodyLineKeys: ["email.adoptConfirm.disclaimer"],
+      vars: { box: "Test Box" },
+    });
+    expect(subject).toBe("Confirma tu solicitud para adoptar Test Box");
+    expect(text).toContain("Si tú no pediste esto, puedes ignorar este correo.");
+    expect(text).not.toContain("If you didn't ask for this");
+  });
+
+  test("no bilingual separator or second block — a single message, not two glued together", () => {
+    const { text, html } = composeEmail({
+      lang: "en",
+      subjectKey: "app.name",
+      bodyLineKeys: ["app.name"],
+    });
+    expect(text).not.toContain("—");
+    expect(html).not.toContain("<hr/>");
+    expect(html.match(/<div>/g)).toHaveLength(1);
+  });
+
+  test("interpolates vars into the one rendered block", () => {
+    const { text } = composeEmail({
+      lang: "en",
       subjectKey: "box.checkin.heading",
       bodyLineKeys: ["box.lastFilled"],
       vars: { time: "3 hours ago" },
@@ -27,19 +56,20 @@ describe("composeBilingualEmail", () => {
     expect(text).toContain("3 hours ago");
   });
 
-  test("html wraps each block in its own <div>, separated by an <hr>, and escapes injected content", () => {
-    const { html } = composeBilingualEmail({
+  test("html wraps the block in one <div> and escapes injected content", () => {
+    const { html } = composeEmail({
+      lang: "en",
       subjectKey: "box.checkin.heading",
       bodyLineKeys: ["box.lastFilled"],
       vars: { time: `<img src=x onerror=alert(1)>` },
     });
-    expect(html).toContain("<hr/>");
     expect(html).not.toContain("<img src=x");
     expect(html).toContain("&lt;img");
   });
 
   test("a plain https:// URL substituted into a line becomes a clickable anchor in the html part", () => {
-    const { html } = composeBilingualEmail({
+    const { html } = composeEmail({
+      lang: "en",
       subjectKey: "box.checkin.heading",
       bodyLineKeys: ["box.lastFilled"],
       vars: { time: "https://pueblofoodmap.com/box/1" },
@@ -48,7 +78,8 @@ describe("composeBilingualEmail", () => {
   });
 
   test("dev.pueblofoodmap.com also becomes a clickable anchor", () => {
-    const { html } = composeBilingualEmail({
+    const { html } = composeEmail({
+      lang: "en",
       subjectKey: "box.checkin.heading",
       bodyLineKeys: ["box.lastFilled"],
       vars: { time: "https://dev.pueblofoodmap.com/box/1" },
@@ -57,7 +88,8 @@ describe("composeBilingualEmail", () => {
   });
 
   test("localhost also becomes a clickable anchor (local dev)", () => {
-    const { html } = composeBilingualEmail({
+    const { html } = composeEmail({
+      lang: "en",
       subjectKey: "box.checkin.heading",
       bodyLineKeys: ["box.lastFilled"],
       vars: { time: "http://localhost:3000/box/1" },
@@ -70,7 +102,8 @@ describe("composeBilingualEmail", () => {
   // clickable anchor — see htmlParagraph's own header for why the old
   // "never user input" assumption was wrong.
   test("a URL on a DIFFERENT host stays plain text, not a clickable anchor (item 12)", () => {
-    const { html } = composeBilingualEmail({
+    const { html } = composeEmail({
+      lang: "en",
       subjectKey: "box.checkin.heading",
       bodyLineKeys: ["box.lastFilled"],
       vars: { time: "https://phish.example/steal" },

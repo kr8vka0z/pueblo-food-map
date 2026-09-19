@@ -47,9 +47,10 @@
  */
 
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
-import { composeBilingualEmail, sendResendBatch, sendResendEmail, unsubscribeHeaders, type OutboundEmail } from "@/lib/emailSend";
+import { composeEmail, sendResendBatch, sendResendEmail, unsubscribeHeaders, type OutboundEmail } from "@/lib/emailSend";
 import { isWithinConfirmWindow, randomHexToken } from "@/lib/alertTokens";
 import { logFormFailure } from "@/lib/logger";
+import type { Locale } from "@/lib/i18n";
 import type { BoxStatus, CheckinKind } from "@/lib/blessingBoxes";
 
 export const ALERT_COOLDOWN_HOURS = 6;
@@ -73,6 +74,8 @@ export interface AlertSubscriptionRow {
   unsubscribed_at: string | null;
   last_alerted_at: string | null;
   created_at: string;
+  /** The UI locale this recipient was using at signup (0011) — every email this subscription's own lifecycle sends renders in ONLY this language. */
+  lang: Locale;
 }
 
 // ─── Who gets what ──────────────────────────────────────────────────────────
@@ -96,6 +99,8 @@ interface ClaimedRecipient {
   id: number;
   email: string;
   unsubscribe_token: string;
+  /** Needed so the batched send below (notifyBoxAlerts) can compose each recipient's own email in ITS OWN language, not one shared lang for the whole batch. */
+  lang: Locale;
 }
 
 function claimRecipientsSql(roleCount: number): string {
@@ -113,7 +118,7 @@ function claimRecipientsSql(roleCount: number): string {
         AND (last_alerted_at IS NULL OR last_alerted_at < ?)
       LIMIT ${MAX_ALERT_RECIPIENTS_PER_EVENT}
     )
-    RETURNING id, email, unsubscribe_token
+    RETURNING id, email, unsubscribe_token, lang
   `;
 }
 
@@ -146,7 +151,7 @@ const ALERT_COPY: Record<AlertableKind, { subjectKey: string; bodyLineKey: strin
   problem: { subjectKey: "email.alert.problem.subject", bodyLineKey: "email.alert.problem.line1" },
 };
 
-/** Builds one recipient's alert email — its OWN stop link, never a shared one. */
+/** Builds one recipient's alert email — its OWN stop link, never a shared one, and its OWN lang (a batched send can mix EN and ES recipients in one call). */
 function buildAlertEmail(opts: {
   to: string;
   unsubscribeToken: string;
@@ -154,11 +159,13 @@ function buildAlertEmail(opts: {
   boxName: string;
   boxUrl: string;
   origin: string;
+  lang: Locale;
 }): OutboundEmail {
   const copy = ALERT_COPY[opts.kind];
   const stopApiUrl = `${opts.origin}/api/public/alerts/stop?t=${opts.unsubscribeToken}`;
   const stopPageUrl = `${opts.origin}/alerts/stop?t=${opts.unsubscribeToken}`;
-  const { subject, text, html } = composeBilingualEmail({
+  const { subject, text, html } = composeEmail({
+    lang: opts.lang,
     subjectKey: copy.subjectKey,
     bodyLineKeys: [copy.bodyLineKey, "email.alert.line2", "email.stopLine"],
     vars: { box: opts.boxName, url: opts.boxUrl, stopUrl: stopPageUrl },
@@ -207,6 +214,7 @@ export async function notifyBoxAlerts(db: D1Database, input: NotifyBoxAlertsInpu
       boxName,
       boxUrl,
       origin: input.origin,
+      lang: r.lang,
     }),
   );
   try {
@@ -250,10 +258,18 @@ async function selectExistingGiverRow(db: D1Database, venueId: string, email: st
     .first<ExistingGiverRow>();
 }
 
-/** The three "a row already exists" branches, shared by both the ordinary path and the race-recovery path below. */
+/**
+ * The three "a row already exists" branches, shared by both the ordinary
+ * path and the race-recovery path below. `lang` is the value freshly
+ * submitted THIS time (the caller's own current page locale) — on
+ * resend/reactivate it OVERWRITES the row's stored lang (the person may be
+ * re-signing up from a page in a different language than their original
+ * attempt), never on noop, since noop sends no email and touches no row.
+ */
 async function upsertForExistingGiverRow(
   db: D1Database,
   existing: ExistingGiverRow,
+  lang: Locale,
   now: Date,
 ): Promise<{ action: GiverSignupAction; confirmToken: string | null }> {
   if (existing.confirmed_at && !existing.unsubscribed_at) {
@@ -264,9 +280,9 @@ async function upsertForExistingGiverRow(
   const confirmToken = randomHexToken();
   await db
     .prepare(
-      "UPDATE alert_subscriptions SET confirm_token = ?, created_at = ?, confirmed_at = NULL, unsubscribed_at = NULL WHERE id = ?",
+      "UPDATE alert_subscriptions SET confirm_token = ?, created_at = ?, confirmed_at = NULL, unsubscribed_at = NULL, lang = ? WHERE id = ?",
     )
-    .bind(confirmToken, now.toISOString(), existing.id)
+    .bind(confirmToken, now.toISOString(), lang, existing.id)
     .run();
   return { action, confirmToken };
 }
@@ -299,35 +315,36 @@ async function upsertForExistingGiverRow(
  */
 export async function upsertGiverSubscription(
   db: D1Database,
-  input: { venueId: string; email: string },
+  input: { venueId: string; email: string; lang: Locale },
   now: Date = new Date(),
 ): Promise<{ action: GiverSignupAction; confirmToken: string | null }> {
   const existing = await selectExistingGiverRow(db, input.venueId, input.email);
   if (existing) {
-    return upsertForExistingGiverRow(db, existing, now);
+    return upsertForExistingGiverRow(db, existing, input.lang, now);
   }
 
   const confirmToken = randomHexToken();
   try {
     await db
       .prepare(
-        "INSERT INTO alert_subscriptions (role, venue_id, email, confirm_token, unsubscribe_token, created_at) VALUES ('giver', ?, ?, ?, ?, ?)",
+        "INSERT INTO alert_subscriptions (role, venue_id, email, confirm_token, unsubscribe_token, created_at, lang) VALUES ('giver', ?, ?, ?, ?, ?, ?)",
       )
-      .bind(input.venueId, input.email, confirmToken, randomHexToken(), now.toISOString())
+      .bind(input.venueId, input.email, confirmToken, randomHexToken(), now.toISOString(), input.lang)
       .run();
     return { action: "new", confirmToken };
   } catch (err) {
     if (!isUniqueConstraintError(err)) throw err;
     const reread = await selectExistingGiverRow(db, input.venueId, input.email);
     if (!reread) throw err; // shouldn't happen, but don't swallow a real failure
-    return upsertForExistingGiverRow(db, reread, now);
+    return upsertForExistingGiverRow(db, reread, input.lang, now);
   }
 }
 
 /** Sends the giver's confirm email — no stop link (nothing to stop until confirmed), per the task's own list of which emails carry one. */
-export async function sendGiverConfirmEmail(opts: { to: string; boxName: string; origin: string; confirmToken: string }): Promise<void> {
+export async function sendGiverConfirmEmail(opts: { to: string; boxName: string; origin: string; confirmToken: string; lang: Locale }): Promise<void> {
   const url = `${opts.origin}/alerts/confirm?t=${opts.confirmToken}`;
-  const { subject, text, html } = composeBilingualEmail({
+  const { subject, text, html } = composeEmail({
+    lang: opts.lang,
     subjectKey: "email.alertConfirm.subject",
     // "disclaimer" (item 7, 2026-09-18 security review) — see
     // boxAdopters.ts's sendAdopterConfirmEmail for the identical reasoning.
@@ -377,14 +394,14 @@ export async function findHostSubscription(db: D1Database, venueId: string, emai
  */
 export function insertHostSubscriptionStatement(
   db: D1Database,
-  input: { venueId: string; email: string },
+  input: { venueId: string; email: string; lang: Locale },
   now: Date = new Date(),
 ): ReturnType<D1Database["prepare"]> {
   return db
     .prepare(
-      "INSERT INTO alert_subscriptions (role, venue_id, email, confirm_token, unsubscribe_token, confirmed_at, created_at) VALUES ('host', ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO alert_subscriptions (role, venue_id, email, confirm_token, unsubscribe_token, confirmed_at, created_at, lang) VALUES ('host', ?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(input.venueId, input.email, randomHexToken(), randomHexToken(), now.toISOString(), now.toISOString());
+    .bind(input.venueId, input.email, randomHexToken(), randomHexToken(), now.toISOString(), now.toISOString(), input.lang);
 }
 
 /**
@@ -418,10 +435,11 @@ export function removeHostSubscriptionStatement(
 }
 
 /** Best-effort "you'll now get alerts" email to a newly-added host — no stop-link omission here, this IS a welcome email per the task's own list. */
-export async function sendHostWelcomeEmail(opts: { to: string; boxName: string; origin: string; unsubscribeToken: string }): Promise<void> {
+export async function sendHostWelcomeEmail(opts: { to: string; boxName: string; origin: string; unsubscribeToken: string; lang: Locale }): Promise<void> {
   const stopApiUrl = `${opts.origin}/api/public/alerts/stop?t=${opts.unsubscribeToken}`;
   const stopPageUrl = `${opts.origin}/alerts/stop?t=${opts.unsubscribeToken}`;
-  const { subject, text, html } = composeBilingualEmail({
+  const { subject, text, html } = composeEmail({
+    lang: opts.lang,
     subjectKey: "email.hostWelcome.subject",
     bodyLineKeys: ["email.hostWelcome.line1", "email.hostWelcome.line2", "email.stopLine"],
     vars: { box: opts.boxName, stopUrl: stopPageUrl },
@@ -451,19 +469,27 @@ export async function sendHostWelcomeEmail(opts: { to: string; boxName: string; 
  * its existing confirm/unsubscribe tokens intact — the newly-generated
  * tokens bound into the INSERT branch are only used on a genuine first
  * insert.
+ *
+ * `lang` is the box_adopters row's OWN lang (the applicant's signup-time
+ * locale) — the alert subscription this creates INHERITS it, rather than
+ * defaulting to 'en' or asking the applicant to pick again. The ON CONFLICT
+ * branch also overwrites lang on a re-approval, same "the newest submitted
+ * value wins" reasoning upsertForExistingGiverRow's own header gives for its
+ * resend/reactivate branches.
  */
 export function upsertApprovedAdopterSubscriptionStatement(
   db: D1Database,
-  input: { venueId: string; email: string; adopterId: number; timestamp: string },
+  input: { venueId: string; email: string; adopterId: number; timestamp: string; lang: Locale },
 ): ReturnType<D1Database["prepare"]> {
   return db
     .prepare(
-      `INSERT INTO alert_subscriptions (role, venue_id, email, adopter_id, confirmed_at, confirm_token, unsubscribe_token, created_at)
-       VALUES ('adopter', ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO alert_subscriptions (role, venue_id, email, adopter_id, confirmed_at, confirm_token, unsubscribe_token, created_at, lang)
+       VALUES ('adopter', ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(role, venue_id, email) DO UPDATE SET
          unsubscribed_at = NULL,
          adopter_id = excluded.adopter_id,
-         confirmed_at = excluded.confirmed_at`,
+         confirmed_at = excluded.confirmed_at,
+         lang = excluded.lang`,
     )
     .bind(
       input.venueId,
@@ -473,6 +499,7 @@ export function upsertApprovedAdopterSubscriptionStatement(
       randomHexToken(),
       randomHexToken(),
       input.timestamp,
+      input.lang,
     );
 }
 
@@ -509,10 +536,13 @@ export async function sendAdopterApprovedEmail(opts: {
   displayName: string;
   origin: string;
   unsubscribeToken: string;
+  /** The adopter's own signup-time locale (BoxAdopterRow.lang). */
+  lang: Locale;
 }): Promise<void> {
   const stopApiUrl = `${opts.origin}/api/public/alerts/stop?t=${opts.unsubscribeToken}`;
   const stopPageUrl = `${opts.origin}/alerts/stop?t=${opts.unsubscribeToken}`;
-  const { subject, text, html } = composeBilingualEmail({
+  const { subject, text, html } = composeEmail({
+    lang: opts.lang,
     subjectKey: "email.adoptApproved.subject",
     bodyLineKeys: ["email.adoptApproved.line1", "email.adoptApproved.line2", "email.stopLine"],
     vars: { box: opts.boxName, displayName: opts.displayName, stopUrl: stopPageUrl },

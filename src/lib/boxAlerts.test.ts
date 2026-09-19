@@ -118,16 +118,31 @@ describe("claimAlertRecipients", () => {
     expect(seenSql).toContain("unsubscribed_at IS NULL");
   });
 
+  // Single-language alert emails: each claimed recipient's OWN lang must
+  // come back with the claim, so the batched send below can compose each
+  // recipient's email in ITS OWN language, not one shared lang.
+  test("the RETURNING clause includes lang", async () => {
+    let seenSql = "";
+    const db = {
+      prepare: (sql: string) => {
+        seenSql = sql;
+        return { bind: () => ({ all: async () => ({ results: [] }) }) };
+      },
+    } as unknown as D1Database;
+    await claimAlertRecipients(db, "box-1", ["giver"], new Date());
+    expect(seenSql).toContain("RETURNING id, email, unsubscribe_token, lang");
+  });
+
   test("returns exactly what the RETURNING clause hands back", async () => {
-    const rows = [{ id: 1, email: "a@example.com", unsubscribe_token: "tok-a" }];
+    const rows = [{ id: 1, email: "a@example.com", unsubscribe_token: "tok-a", lang: "en" }];
     const db = { prepare: () => ({ bind: () => ({ all: async () => ({ results: rows }) }) }) } as unknown as D1Database;
     expect(await claimAlertRecipients(db, "box-1", ["giver"], new Date())).toEqual(rows);
   });
 });
 
 describe("notifyBoxAlerts — orchestration", () => {
-  function makeDb(opts: { claimed?: { id: number; email: string; unsubscribe_token: string }[]; boxName?: string } = {}) {
-    const claimed = opts.claimed ?? [{ id: 1, email: "giver@example.com", unsubscribe_token: "tok-1" }];
+  function makeDb(opts: { claimed?: { id: number; email: string; unsubscribe_token: string; lang?: "en" | "es" }[]; boxName?: string } = {}) {
+    const claimed = opts.claimed ?? [{ id: 1, email: "giver@example.com", unsubscribe_token: "tok-1", lang: "en" }];
     return {
       prepare: (sql: string) => {
         if (sql.includes("UPDATE alert_subscriptions")) {
@@ -175,6 +190,27 @@ describe("notifyBoxAlerts — orchestration", () => {
     expect(emails[1].to).toBe("b@example.com");
     expect(emails[0].headers?.["List-Unsubscribe"]).toContain("tok-a");
     expect(emails[1].headers?.["List-Unsubscribe"]).toContain("tok-b");
+  });
+
+  // Single-language alert emails: one batched Resend call can carry BOTH an
+  // English and a Spanish recipient — each email renders in ITS OWN lang,
+  // never one shared lang for the whole batch.
+  test("a batch mixing en and es recipients composes each email in its own lang", async () => {
+    const db = makeDb({
+      claimed: [
+        { id: 1, email: "en@example.com", unsubscribe_token: "tok-en", lang: "en" },
+        { id: 2, email: "es@example.com", unsubscribe_token: "tok-es", lang: "es" },
+      ],
+      boxName: "Test Box",
+    });
+    await notifyBoxAlerts(db, { venueId: "box-1", kind: "empty", prevStatus: "stocked", origin: "https://pueblofoodmap.com" });
+    const emails = mockSendResendBatch.mock.calls[0][0] as { to: string; subject: string; text: string }[];
+    const en = emails.find((e) => e.to === "en@example.com")!;
+    const es = emails.find((e) => e.to === "es@example.com")!;
+    expect(en.subject).toBe("Test Box is empty");
+    expect(en.text).not.toContain("está vacía");
+    expect(es.subject).toBe("Test Box está vacía");
+    expect(es.text).not.toContain("was just marked empty");
   });
 
   test("the note is never a parameter this function (or its email builder) can carry — structural, not just 'don't pass it'", async () => {
@@ -237,32 +273,58 @@ describe("upsertGiverSubscription", () => {
 
   test("no existing row -> inserts, action 'new'", async () => {
     const { db, calls } = makeDb(null);
-    const result = await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com" });
+    const result = await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com", lang: "en" });
     expect(result.action).toBe("new");
     expect(result.confirmToken).not.toBeNull();
     expect(calls.some((c) => c.sql.includes("INSERT INTO alert_subscriptions"))).toBe(true);
   });
 
+  // Single-language alert emails (Blessing Boxes slice 6 follow-up): "Store
+  // it on the row."
+  test("no existing row -> the submitted lang is bound into the INSERT", async () => {
+    const { db, calls } = makeDb(null);
+    await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com", lang: "es" });
+    const insert = calls.find((c) => c.sql.includes("INSERT INTO alert_subscriptions"));
+    expect(insert?.args).toContain("es");
+  });
+
   test("existing, confirmed, active -> sends nothing, action 'noop'", async () => {
     const { db } = makeDb({ id: 1, confirmed_at: "2026-09-01T00:00:00.000Z", unsubscribed_at: null });
-    const result = await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com" });
+    const result = await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com", lang: "en" });
     expect(result.action).toBe("noop");
     expect(result.confirmToken).toBeNull();
   });
 
   test("existing, unconfirmed, active -> resends with a rotated token, action 'resend'", async () => {
     const { db, calls } = makeDb({ id: 1, confirmed_at: null, unsubscribed_at: null });
-    const result = await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com" });
+    const result = await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com", lang: "en" });
     expect(result.action).toBe("resend");
     expect(result.confirmToken).not.toBeNull();
     expect(calls.some((c) => c.sql.includes("UPDATE alert_subscriptions SET confirm_token"))).toBe(true);
   });
 
+  // "On the giver upsert's resend/reactivate branches, update `lang` to the
+  // newly submitted value."
+  test("resend -> the newly submitted lang overwrites the row's stored lang", async () => {
+    const { db, calls } = makeDb({ id: 1, confirmed_at: null, unsubscribed_at: null });
+    await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com", lang: "es" });
+    const update = calls.find((c) => c.sql.includes("UPDATE alert_subscriptions SET confirm_token"));
+    expect(update?.sql).toContain("lang = ?");
+    expect(update?.args).toContain("es");
+  });
+
   test("existing, previously unsubscribed -> clears it and rotates the token, action 'reactivate'", async () => {
     const { db } = makeDb({ id: 1, confirmed_at: "2026-09-01T00:00:00.000Z", unsubscribed_at: "2026-09-05T00:00:00.000Z" });
-    const result = await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com" });
+    const result = await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com", lang: "en" });
     expect(result.action).toBe("reactivate");
     expect(result.confirmToken).not.toBeNull();
+  });
+
+  test("reactivate -> the newly submitted lang overwrites the row's stored lang", async () => {
+    const { db, calls } = makeDb({ id: 1, confirmed_at: "2026-09-01T00:00:00.000Z", unsubscribed_at: "2026-09-05T00:00:00.000Z" });
+    await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com", lang: "es" });
+    const update = calls.find((c) => c.sql.includes("UPDATE alert_subscriptions SET confirm_token"));
+    expect(update?.args).toContain("es");
   });
 
   // 2026-09-18 security review, item 9: two concurrent signups for the same
@@ -290,7 +352,7 @@ describe("upsertGiverSubscription", () => {
       }),
     } as unknown as D1Database;
 
-    const result = await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com" });
+    const result = await upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com", lang: "en" });
     expect(result.action).toBe("noop"); // the winner's row was already confirmed+active
     expect(selectCount).toBe(2);
   });
@@ -308,7 +370,7 @@ describe("upsertGiverSubscription", () => {
       }),
     } as unknown as D1Database;
 
-    await expect(upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com" })).rejects.toThrow(
+    await expect(upsertGiverSubscription(db, { venueId: "box-1", email: "a@example.com", lang: "en" })).rejects.toThrow(
       "no such table",
     );
   });
@@ -317,10 +379,19 @@ describe("upsertGiverSubscription", () => {
 describe("sendGiverConfirmEmail", () => {
   test("includes the 'if you didn't ask for this' disclaimer (2026-09-18 security review, item 7)", async () => {
     mockSendResendEmail.mockClear();
-    await sendGiverConfirmEmail({ to: "giver@example.com", boxName: "Test Box", origin: "https://pueblofoodmap.com", confirmToken: "tok" });
+    await sendGiverConfirmEmail({ to: "giver@example.com", boxName: "Test Box", origin: "https://pueblofoodmap.com", confirmToken: "tok", lang: "en" });
     expect(mockSendResendEmail).toHaveBeenCalledTimes(1);
     const { text } = mockSendResendEmail.mock.calls[0][0] as { text: string };
     expect(text).toContain("If you didn't ask for this, you can ignore this email.");
+  });
+
+  test("lang 'es' renders the Spanish confirm email only", async () => {
+    mockSendResendEmail.mockClear();
+    await sendGiverConfirmEmail({ to: "giver@example.com", boxName: "Test Box", origin: "https://pueblofoodmap.com", confirmToken: "tok", lang: "es" });
+    const { subject, text } = mockSendResendEmail.mock.calls[0][0] as { subject: string; text: string };
+    expect(subject).toContain("Confirma tus alertas");
+    expect(text).toContain("Si tú no pediste esto");
+    expect(text).not.toContain("If you didn't ask for this");
   });
 });
 
@@ -355,11 +426,23 @@ describe("host subscriptions", () => {
       },
     } as unknown as D1Database;
     const now = new Date("2026-09-18T00:00:00.000Z");
-    insertHostSubscriptionStatement(db, { venueId: "box-1", email: "host@example.com" }, now);
+    insertHostSubscriptionStatement(db, { venueId: "box-1", email: "host@example.com", lang: "en" }, now);
     expect(seenSql).toContain("INSERT INTO alert_subscriptions");
     expect(boundArgs[0]).toBe("box-1");
     expect(boundArgs[1]).toBe("host@example.com");
     expect(boundArgs[4]).toBe(now.toISOString()); // confirmed_at
+    expect(boundArgs[6]).toBe("en"); // lang, bound last — see this file's own header
+  });
+
+  // Single-language alert emails: "the admin's own language pick" on the
+  // host-alerts panel is stored on the row, not defaulted.
+  test("insertHostSubscriptionStatement: stores the admin-picked lang", () => {
+    let boundArgs: unknown[] = [];
+    const db = {
+      prepare: () => ({ bind: (...args: unknown[]) => { boundArgs = args; return {}; } }),
+    } as unknown as D1Database;
+    insertHostSubscriptionStatement(db, { venueId: "box-1", email: "host@example.com", lang: "es" });
+    expect(boundArgs).toContain("es");
   });
 
   test("removeHostSubscriptionStatement: sets unsubscribed_at, scoped to role='host' and this venue+email", () => {
@@ -402,9 +485,27 @@ describe("upsertApprovedAdopterSubscriptionStatement / unsubscribeAdopterSubscri
         return { bind: () => ({}) };
       },
     } as unknown as D1Database;
-    upsertApprovedAdopterSubscriptionStatement(db, { venueId: "box-1", email: "a@example.com", adopterId: 9, timestamp: "2026-09-18T00:00:00.000Z" });
+    upsertApprovedAdopterSubscriptionStatement(db, { venueId: "box-1", email: "a@example.com", adopterId: 9, timestamp: "2026-09-18T00:00:00.000Z", lang: "en" });
     expect(seenSql).toContain("ON CONFLICT(role, venue_id, email) DO UPDATE");
     expect(seenSql).toContain("unsubscribed_at = NULL");
+  });
+
+  // Single-language alert emails: "On adopter approval, the
+  // alert_subscriptions row inherits the adopter row's `lang`" — including
+  // on a RE-approval, where the ON CONFLICT branch must overwrite a stale
+  // lang, not just set it once on first insert.
+  test("the approve statement's ON CONFLICT branch also overwrites lang on a re-approval", () => {
+    let seenSql = "";
+    let boundArgs: unknown[] = [];
+    const db = {
+      prepare: (sql: string) => {
+        seenSql = sql;
+        return { bind: (...args: unknown[]) => { boundArgs = args; return {}; } };
+      },
+    } as unknown as D1Database;
+    upsertApprovedAdopterSubscriptionStatement(db, { venueId: "box-1", email: "a@example.com", adopterId: 9, timestamp: "2026-09-18T00:00:00.000Z", lang: "es" });
+    expect(seenSql).toContain("lang = excluded.lang");
+    expect(boundArgs).toContain("es");
   });
 
   test("the reject/remove statement scopes to role='adopter' AND this adopter_id only", () => {

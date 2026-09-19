@@ -1,20 +1,28 @@
 /**
- * emailSend.ts — shared Resend HTTP + bilingual-email-composition helpers
- * for the adopt-a-box and email-alert flows (Blessing Boxes slice 6).
+ * emailSend.ts — shared Resend HTTP + single-language-email-composition
+ * helpers for the adopt-a-box and email-alert flows (Blessing Boxes slice 6).
  *
  * WHY this exists: every other Resend send in this app (report/suggest/
  * feedback forms, check-in problem reports, photo moderation alerts) is a
  * one-off inline `fetch()` sending TEXT-ONLY mail to a single internal admin
  * address. This slice is the first to (a) send HTML mail to real site
- * visitors, (b) need the identical bilingual EN-block/ES-block composition
- * across six different email kinds (adopt confirm, adoption-approved, giver
- * confirm, host welcome, and the batched empty/low/problem alert), and (c)
- * need Resend's BATCH endpoint (up to 100 recipients per call) rather than
- * one-at-a-time sends. One shared module means those three things exist in
- * exactly one place instead of six near-identical copies.
+ * visitors, (b) need the identical composition (in the recipient's OWN
+ * language — see composeEmail's own header) across six different email
+ * kinds (adopt confirm, adoption-approved, giver confirm, host welcome, and
+ * the batched empty/low/problem alert), and (c) need Resend's BATCH endpoint
+ * (up to 100 recipients per call) rather than one-at-a-time sends. One
+ * shared module means those three things exist in exactly one place instead
+ * of six near-identical copies.
+ *
+ * WHY single-language, not bilingual: every email here used to carry an
+ * English block, then a Spanish block, in every message regardless of who
+ * received it. Kyle's own call — a recipient should see the message in the
+ * SAME language the page was in when they signed up (box_adopters.lang /
+ * alert_subscriptions.lang, migrations/0011_alert_email_lang.sql), not a
+ * doubled-length email half of which they can't read.
  */
 
-import { t } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 import { ALLOWED_HOSTS } from "@/lib/alertOrigin";
 
 const FROM = "Pueblo Food Map <noreply@pueblofoodmap.com>";
@@ -51,7 +59,7 @@ function isAllowedLinkOrigin(urlText: string): boolean {
  * substring under the claim "never user input" — false. displayName (the
  * box-adoption applicant's own free-text name — sendAdopterApprovedEmail's
  * `vars`) is website-visitor-supplied, and this is a shared helper every
- * composeBilingualEmail caller in this file funnels through, present and
+ * composeEmail caller in this file funnels through, present and
  * future — it can't assume every caller's vars are pre-vetted (item 11's
  * sanitizeDisplayName refusing an in-name URL at submission time closes
  * THAT one path, but doesn't make this function's own claim true in
@@ -73,25 +81,28 @@ export interface OutboundEmail {
 }
 
 /**
- * Builds a bilingual (English block, then Spanish block) subject/text/html
- * triple from i18n.ts keys — keeps every user-visible email string in the
- * SAME dictionary (and parity test) as the rest of the app's UI copy,
- * rather than a seventh set of hand-written strings living only in this
- * file. `subjectKey` is rendered in English only (a dual-language subject
- * line reads oddly in an inbox list and isn't named in the task's own
- * spec, which only requires the MESSAGE body to be bilingual).
+ * Builds a single-language subject/text/html triple from i18n.ts keys —
+ * keeps every user-visible email string in the SAME dictionary (and parity
+ * test) as the rest of the app's UI copy, rather than a seventh set of
+ * hand-written strings living only in this file. `lang` picks ONE locale for
+ * the whole message, subject included — the recipient's own
+ * box_adopters.lang/alert_subscriptions.lang, captured at signup (this
+ * file's own header). This REPLACES the old composeBilingualEmail, which
+ * built an English block followed by a Spanish block in every message
+ * regardless of the recipient — deleted rather than kept alongside this,
+ * since nothing in this app sends bilingual mail anymore.
  */
-export function composeBilingualEmail(opts: {
+export function composeEmail(opts: {
+  lang: Locale;
   subjectKey: string;
   bodyLineKeys: string[];
   vars?: Record<string, string>;
 }): { subject: string; text: string; html: string } {
   const vars = opts.vars ?? {};
-  const subject = t(opts.subjectKey, "en", vars);
-  const enLines = opts.bodyLineKeys.map((k) => t(k, "en", vars));
-  const esLines = opts.bodyLineKeys.map((k) => t(k, "es", vars));
-  const text = [...enLines, "", "—", "", ...esLines].join("\n\n");
-  const html = `<div>${enLines.map(htmlParagraph).join("")}</div><hr/><div>${esLines.map(htmlParagraph).join("")}</div>`;
+  const subject = t(opts.subjectKey, opts.lang, vars);
+  const lines = opts.bodyLineKeys.map((k) => t(k, opts.lang, vars));
+  const text = lines.join("\n\n");
+  const html = `<div>${lines.map(htmlParagraph).join("")}</div>`;
   return { subject, text, html };
 }
 

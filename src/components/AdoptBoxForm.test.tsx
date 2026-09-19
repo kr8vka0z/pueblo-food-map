@@ -35,9 +35,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderForm() {
+function renderForm(locale: "en" | "es" = "en") {
   return render(
-    <LocaleProvider initialLocale="en">
+    <LocaleProvider initialLocale={locale}>
       <AdoptBoxForm boxId="box-1" />
     </LocaleProvider>,
   );
@@ -46,14 +46,14 @@ function renderForm() {
 describe("AdoptBoxForm", () => {
   test("starts collapsed as a plain link", () => {
     renderForm();
-    expect(screen.getByRole("button", { name: "Adopt this box" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Apply to adopt this box" })).toBeDefined();
     expect(screen.queryByLabelText(/your name/i)).toBeNull();
   });
 
   test("expands to the full form on tap", async () => {
     const user = userEvent.setup();
     renderForm();
-    await user.click(screen.getByRole("button", { name: "Adopt this box" }));
+    await user.click(screen.getByRole("button", { name: "Apply to adopt this box" }));
     expect(screen.getByLabelText(/your name/i)).toBeDefined();
     expect(screen.getByLabelText(/your email/i)).toBeDefined();
     // Privacy disclosure link, same convention as the three canonical public forms
@@ -64,7 +64,7 @@ describe("AdoptBoxForm", () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
     renderForm();
-    await user.click(screen.getByRole("button", { name: "Adopt this box" }));
+    await user.click(screen.getByRole("button", { name: "Apply to adopt this box" }));
 
     await user.type(screen.getByLabelText(/your name/i), "The Martinez Family");
     await user.type(screen.getByLabelText(/your email/i), "family@example.com");
@@ -77,13 +77,27 @@ describe("AdoptBoxForm", () => {
     expect(body.displayName).toBe("The Martinez Family");
     expect(body.email).toBe("family@example.com");
     expect(body.turnstileToken).toBe("test-turnstile-token");
+    expect(body.lang).toBe("en"); // single-language alert emails: sends the page's own current locale
+  });
+
+  test("sends 'es' when the page's own locale is Spanish", async () => {
+    const user = userEvent.setup();
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    renderForm("es");
+    await user.click(screen.getByRole("button", { name: "Solicitar adoptar esta caja" }));
+    await user.type(screen.getByLabelText(/tu nombre/i), "La Familia Martínez");
+    await user.type(screen.getByLabelText(/tu correo/i), "family@example.com");
+    await user.click(screen.getByRole("button", { name: "Enviar solicitud" }));
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.lang).toBe("es");
   });
 
   test("a rate-limit error response shows the rate-limit message", async () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: false, error: "rate_limit_box" }) });
     renderForm();
-    await user.click(screen.getByRole("button", { name: "Adopt this box" }));
+    await user.click(screen.getByRole("button", { name: "Apply to adopt this box" }));
     await user.type(screen.getByLabelText(/your name/i), "Name");
     await user.type(screen.getByLabelText(/your email/i), "a@example.com");
     await user.click(screen.getByRole("button", { name: "Send application" }));
@@ -95,7 +109,7 @@ describe("AdoptBoxForm", () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: false, error: "send_failed" }) });
     renderForm();
-    await user.click(screen.getByRole("button", { name: "Adopt this box" }));
+    await user.click(screen.getByRole("button", { name: "Apply to adopt this box" }));
     await user.type(screen.getByLabelText(/your name/i), "Name");
     await user.type(screen.getByLabelText(/your email/i), "a@example.com");
     await user.click(screen.getByRole("button", { name: "Send application" }));
@@ -106,7 +120,7 @@ describe("AdoptBoxForm", () => {
   test("Cancel collapses the form back to the plain link", async () => {
     const user = userEvent.setup();
     renderForm();
-    await user.click(screen.getByRole("button", { name: "Adopt this box" }));
+    await user.click(screen.getByRole("button", { name: "Apply to adopt this box" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByLabelText(/your name/i)).toBeNull();
   });
@@ -122,7 +136,7 @@ describe("AdoptBoxForm", () => {
 
     const user = userEvent.setup();
     renderForm();
-    await user.click(screen.getByRole("button", { name: "Adopt this box" }));
+    await user.click(screen.getByRole("button", { name: "Apply to adopt this box" }));
     await user.type(screen.getByLabelText(/your name/i), "Name");
     await user.type(screen.getByLabelText(/your email/i), "a@example.com");
     await user.click(screen.getByRole("button", { name: "Send application" }));

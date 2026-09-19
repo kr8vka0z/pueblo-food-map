@@ -3577,17 +3577,84 @@ convention. The email-field disclosure on both new forms reuses the
 existing shared `privacy.emailDisclosure`/`privacy.linkLabel` keys (the
 same ones `ReportForm.tsx` already uses) rather than duplicating new ones
 — an existing code comment at that key's declaration already names this
-as the intended reuse.
+as the intended reuse. **The adopt link/heading reads "Apply to adopt this
+box"** (`box.adopt.linkLabel`, ES "Solicitar adoptar esta caja" `// [CHECK]`)
+— reworded from "Adopt this box" since an admin still has to approve the
+application; it isn't instant.
+
+**Single-language alert emails (follow-up to the initial slice 6 ship).**
+Every email this slice sends to a member of the public — adopter confirm,
+giver confirm, adopter approved, host welcome, and every empty/low/problem
+alert — used to be bilingual (an English block, then a Spanish block, in
+EVERY message). Kyle's call: render each email in ONLY the language the
+recipient's own page was in at signup, never both. `box_adopters.lang` and
+`alert_subscriptions.lang` (`migrations/0011_alert_email_lang.sql`, `TEXT
+NOT NULL DEFAULT 'en' CHECK (lang IN ('en','es'))`) hold that value;
+`src/lib/emailSend.ts`'s `composeEmail(opts: { lang, ... })` replaces the
+old `composeBilingualEmail` (deleted, not kept alongside). Emails to
+`issues@pueblofoodmap.com` (admin notices) are unaffected — always plain
+English, never member-of-the-public mail.
+
+- **Resolution is strict** — `resolveEmailLang()` (`src/lib/i18n.ts`):
+  anything other than the literal string `"es"` becomes `"en"`, same
+  convention `boxTurnstile.ts`'s `resolveBoxTurnstileKey` uses for its own
+  two-value enum. A client can never smuggle anything but exactly `"en"`/
+  `"es"` into a CHECK-constrained column.
+- **The two public forms send their own current UI locale** —
+  `AdoptBoxForm.tsx`/`BoxAlertSignupForm.tsx` both already read
+  `useLocale()`; they now include it as `lang` in their POST body. On a
+  giver's resend/reactivate (re-signing up from a page in a different
+  language than their first attempt), the newly submitted value OVERWRITES
+  the row's stored lang — `upsertForExistingGiverRow`'s own header.
+- **Approval inherits the applicant's lang** — the box-adopters approve
+  route's `alert_subscriptions` upsert copies `box_adopters.lang` onto the
+  new/reactivated subscription row (including on a RE-approval, where the
+  `ON CONFLICT` branch also does `lang = excluded.lang`), rather than
+  defaulting to English or asking the applicant to choose again.
+- **A host row has no page locale to read** (admin-vouched, no self-signup)
+  — `HostAlertsAdminPanel.tsx` gained an "Email language" select (English/
+  Spanish, default English) sent alongside the email on add; the route
+  validates it the same strict way and stores it.
+- **A batched alert send can mix languages** — `notifyBoxAlerts`'s claim
+  query now returns each recipient's own `lang` in the `RETURNING` clause,
+  so one Resend batch call composes an English recipient's email in English
+  and a Spanish recipient's in Spanish in the same pass.
+- **Confirm/stop page links stay in the site's own locale mechanism, not a
+  URL param** — `LocaleContext.tsx` reads a `pfm-locale` COOKIE, not a
+  query string; there is no cheap `?lang=es`-style hook to carry a
+  recipient's email language into the confirm/stop page link. A Spanish
+  email's links open the confirm/stop page in whatever locale that
+  browser's cookie already holds (English by default on a fresh browser) —
+  NOT necessarily Spanish. Building a URL-param override was out of this
+  follow-up's scope; flagged, not built.
+- **Degrades safely if 0011 hasn't landed on an environment yet** — the
+  public card/list loaders (`loadApprovedAdopterNamesForVenues` and every
+  other public SELECT) never name `lang`, so they're unaffected either way.
+  The check-in route's alert fan-out is already wrapped end-to-end in
+  try/catch (`notifyBoxAlerts`'s own header, "NEVER BLOCKS THE CHECK-IN") —
+  a missing `lang` column there just degrades to a console warning, same as
+  a missing `alert_subscriptions` table always has. The adopt/giver-alert
+  routes' own `lang`-bearing INSERT/UPDATE calls are already inside this
+  slice's existing try/catch blocks, so a pre-migration environment gets a
+  clean `db_write_failed`/`db_unavailable` response there, never an
+  unhandled 500.
 
 **Privacy page rewrite.** `PrivacyContent.tsx` was rewritten in this slice
 to describe the blessing-box data this feature now collects (adopter
 applications, alert-subscription emails, the confirm/unsubscribe token
 flow) alongside the pre-existing public-forms disclosure.
 
-**Blessing boxes — promotion checklist, updated again.** Run ALL SIX
-migrations now — `0005` through `0009` (see the checklist above, unchanged)
-PLUS **`0010_box_adopters_alerts.sql`** — against production D1
-(`pueblo-food-map-admin`) before promoting `dev` → `main`. **No new
+**Blessing boxes — promotion checklist, updated again.** Run ALL SEVEN
+migrations now — `0005` through `0009` (see the checklist above, unchanged),
+`0010_box_adopters_alerts.sql`, PLUS **`0011_alert_email_lang.sql`** —
+against production D1 (`pueblo-food-map-admin`) before promoting `dev` →
+`main`, and run 0011 AFTER 0010 (it `ALTER TABLE ADD COLUMN`s onto the two
+tables 0010 creates). **0011 is NOT idempotent** — unlike every migration
+since 0007, `ALTER TABLE ADD COLUMN` has no `IF NOT EXISTS` form, so running
+it twice against the same database fails outright on the second run
+("duplicate column name: lang"). It must run EXACTLY ONCE per database; the
+migration file's own header names the `PRAGMA table_info` check to run
+first if there's ever doubt. **No new
 secret is required for this slice** — adopt/alert signup and the confirm/
 stop/resubscribe routes reuse `TURNSTILE_BOX_SECRET_KEY`/
 `TURNSTILE_SECRET_KEY` (the existing box + fallback keypair),

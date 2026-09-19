@@ -236,6 +236,25 @@ describe("POST /api/public/blessing-boxes/[id]/alerts", () => {
     expect((await res.json()).error).toBe("db_unavailable");
   });
 
+  // Single-language alert emails: strict lang resolution, same convention
+  // the adopt route's own tests prove.
+  test("lang 'es' is stored on the row and used for the confirm email", async () => {
+    const { db, writeCalls } = makeFakeDb();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    const res = await callPost({ ...VALID_BODY, lang: "es" });
+    expect(res.status).toBe(200);
+    expect(writeCalls[0].args).toContain("es");
+    const sentBody = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(sentBody.subject).toContain("Confirma tus alertas");
+  });
+
+  test("missing/garbage lang defaults to 'en' (strict resolution)", async () => {
+    const { db, writeCalls } = makeFakeDb();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    await callPost({ ...VALID_BODY, lang: "es-MX" });
+    expect(writeCalls[0].args).toContain("en");
+  });
+
   test("D1 error in upsertGiverSubscription (e.g. missing alert_subscriptions table) -> 502 db_unavailable (item 9)", async () => {
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb({ upsertShouldThrow: true }).db } });
     const res = await callPost(VALID_BODY);

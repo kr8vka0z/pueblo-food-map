@@ -1031,10 +1031,10 @@ const es: Record<string, string> = {
   // Bottom navigation bar (docs/bottom-nav-spec.md §11)
   // "Cercanos" (#516, Kyle 2026-09-19) — matches Google Maps' Spanish
   // wording ("lugares cercanos") and is shorter, so it fits every phone.
-  "nav.nearMe": "Cercanos",
+  "nav.nearMe": "Cercanos", // [CHECK]
   "nav.saved": "Guardados",
-  "nav.boxes": "Cajas",
-  "nav.resources": "Ayuda",
+  "nav.boxes": "Cajas", // [CHECK]
+  "nav.resources": "Ayuda", // [CHECK]
   "nav.menu": "Menú",
   "nav.aria": "Principal",
   "nav.pageAria": "Página",

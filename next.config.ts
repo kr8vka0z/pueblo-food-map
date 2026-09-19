@@ -60,6 +60,18 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
+      {
+        // /alerts/confirm and /alerts/stop carry a live subscription token in
+        // their `?t=` query string (Blessing Boxes slice 6). The blanket
+        // strict-origin-when-cross-origin policy above still sends the full
+        // URL — token included — as the Referer header on any outbound link
+        // click from these two pages; this later, more specific match
+        // overrides it to no-referrer for just these paths (Next.js applies
+        // header sets in definition order, last match wins on a key
+        // conflict).
+        source: "/alerts/:path*",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
     ];
   },
   // Blessing Boxes slice 1: the one real box (216 W Routt) is being

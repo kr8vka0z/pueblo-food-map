@@ -2,8 +2,11 @@
  * robots.txt generation for Pueblo Food Map.
  *
  * WHY: Allows all crawlers on public pages while blocking /api/ (form-
- * submission endpoints) and /admin/ (internal tool, not public content) —
- * neither is meant to be indexed or crawled.
+ * submission endpoints), /admin/ (internal tool, not public content), and
+ * /alerts/ (Blessing Boxes slice 6's confirm/stop links — each carries a
+ * live subscription token in its `?t=` query string, same reasoning as the
+ * per-page `robots: noindex` those two pages' own metadata already sets) —
+ * none of the three is meant to be indexed or crawled.
  *
  * WHY the second rule (#164 quick win, S7b): explicit AI-bot policy — block
  * bulk-training scrapers by name, but deliberately do NOT list citation /
@@ -24,7 +27,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/api/", "/admin/"],
+        disallow: ["/api/", "/admin/", "/alerts/"],
       },
       {
         // Bulk-training scrapers — blocked entirely, no crawl access at all.

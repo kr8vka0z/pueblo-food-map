@@ -45,8 +45,10 @@ interface FakeDbOptions {
 function makeFakeDb(opts: FakeDbOptions = {}) {
   const { matchedRows = 1, updateShouldThrow = false } = opts;
   const updateCalls: unknown[][] = [];
+  let updateSql = "";
   const prepare = (sql: string) => {
     if (sql.includes("UPDATE box_checkins")) {
+      updateSql = sql;
       return {
         bind: (...args: unknown[]) => ({
           run: async () => {
@@ -59,7 +61,9 @@ function makeFakeDb(opts: FakeDbOptions = {}) {
     }
     throw new Error("unexpected SQL in fake db: " + sql);
   };
-  return { db: { prepare } as unknown as D1Database, updateCalls };
+  // getUpdateSql() reads AFTER the route calls prepare() — a plain string
+  // captured at makeFakeDb() call time would always be empty.
+  return { db: { prepare } as unknown as D1Database, updateCalls, getUpdateSql: () => updateSql };
 }
 
 function makeRequest(body: unknown): NextRequest {
@@ -77,7 +81,13 @@ function callPost(body: unknown, id: string = BOX_ID) {
 async function validBody(overrides: Record<string, unknown> = {}) {
   const clientToken = "clientToken" in overrides ? (overrides.clientToken as string | null) : "client-abc";
   const checkinId = "checkinId" in overrides ? (overrides.checkinId as number) : CHECKIN_ID;
-  const needsToken = await computeNeedsToken(SECRET, CHECKIN_ID, "client-abc");
+  // Reviewer fix pass (2026-09-19) — must be computed from the SAME
+  // checkinId/clientToken this body actually sends, not a hardcoded pair:
+  // the route now verifies this HMAC before anything else, so a stale
+  // computation here (e.g. a test overriding clientToken to undefined) was
+  // silently failing ownership verification instead of testing what its own
+  // name claimed.
+  const needsToken = await computeNeedsToken(SECRET, checkinId, clientToken ?? null);
   return {
     checkinId,
     needsToken,
@@ -221,6 +231,25 @@ describe("POST /api/public/blessing-boxes/[id]/needs", () => {
     expect(updateCalls).toHaveLength(0);
   });
 
+  // Reviewer fix pass (2026-09-19) — checkinId/needsToken shape validation
+  // and the HMAC ownership check now run BEFORE rate limiting (both are
+  // pure compute, no D1 write of their own), so a garbage/forged request
+  // can never burn the box's shared 300/hr needs budget or cost D1 the
+  // read+write checkAndIncrement itself does.
+  test("a bad needsToken is rejected WITHOUT ever touching the rate limiter or Cloudflare context", async () => {
+    const res = await callPost(await validBody({ needsToken: "0".repeat(64) }));
+    expect(res.status).toBe(403);
+    expect(mockCheckAndIncrement).not.toHaveBeenCalled();
+    expect(mockGetCloudflareContext).not.toHaveBeenCalled();
+  });
+
+  test("an invalid checkinId is rejected WITHOUT ever touching the rate limiter or Cloudflare context", async () => {
+    const res = await callPost(await validBody({ checkinId: -1 }));
+    expect(res.status).toBe(422);
+    expect(mockCheckAndIncrement).not.toHaveBeenCalled();
+    expect(mockGetCloudflareContext).not.toHaveBeenCalled();
+  });
+
   test("a needsToken computed with the wrong clientToken -> 403 (proves the token is bound to the exact clientToken used at mint time)", async () => {
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeDb().db } });
     const wrongToken = await computeNeedsToken(SECRET, CHECKIN_ID, "someone-elses-client-token");
@@ -254,6 +283,19 @@ describe("POST /api/public/blessing-boxes/[id]/needs", () => {
     const res = await callPost(await validBody());
     expect(res.status).toBe(404);
     expect((await res.json()).error).toBe("not_found_or_expired");
+  });
+
+  // Reviewer fix pass (2026-09-19) — an admin hiding a 'took' row
+  // (BoxCheckinsAdminPanel) must close the needs-attach window on it too,
+  // not just the 15-minute timer: the SAME device could otherwise rewrite
+  // a moderated-away row's needs/note behind the admin's back.
+  test("an admin-hidden row reads identically to not-found — the guarded UPDATE requires visibility = 'visible'", async () => {
+    const { db, getUpdateSql } = makeFakeDb({ matchedRows: 0 }); // hidden row -> WHERE excludes it -> 0 changes
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
+    const res = await callPost(await validBody());
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe("not_found_or_expired");
+    expect(getUpdateSql()).toContain("visibility = 'visible'");
   });
 
   test("D1 update failure -> 502, never throws", async () => {

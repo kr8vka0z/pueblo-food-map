@@ -6,12 +6,19 @@
  * second, optional request offered — attaching a set of need keys (and/or a
  * short typed note) to that exact check-in row.
  *
- * Same anti-abuse guard ORDER as the checkins/photos routes: Content-Type
- * check -> Turnstile (shared box/fallback key logic, src/lib/boxTurnstile.ts
- * — reused, not copied, same "Turnstile via the same box/fallback key logic
+ * Guard ORDER (reviewer fix pass, 2026-09-19): Content-Type check ->
+ * Turnstile (shared box/fallback key logic, src/lib/boxTurnstile.ts —
+ * reused, not copied, same "Turnstile via the same box/fallback key logic
  * already in the check-in route" instruction slice 5's photo route already
- * followed) -> honeypot -> rate limit -> field validation -> ownership proof
- * -> write.
+ * followed) -> honeypot -> field validation -> ownership proof (HMAC) ->
+ * rate limit -> write. Field validation and the HMAC check moved AHEAD of
+ * rate limiting (they used to sit after it, matching the checkins/photos
+ * routes' own order) because both are pure in-memory compute with no D1
+ * write of their own — checking them first means a malformed or
+ * ownership-failing request can never burn a box's shared 300/hr needs
+ * budget (or cost the D1 read+write `checkAndIncrement` itself does) before
+ * being rejected. Turnstile/honeypot keep their original position ahead of
+ * everything else, same as every sibling public route in this app.
  *
  * Rate limiting mirrors the checkins route's own two-scope, visitor-first
  * shape (src/lib/checkinRateLimit.ts's shared D1 counter, new scope names
@@ -119,39 +126,9 @@ export async function POST(
     return NextResponse.json({ ok: true }); // bots think it worked
   }
 
-  let db: D1Database;
-  try {
-    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
-  } catch {
-    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
-  }
-
-  // Visitor cap first, box cap second — same reasoning as the checkins
-  // route's own header ("WHY the visitor cap is checked BEFORE the box
-  // cap"): an over-tapping visitor must never burn the shared box-wide
-  // budget on their own rejected attempts.
-  const clientToken = typeof body.clientToken === "string" ? body.clientToken.slice(0, 200) : null;
-  if (clientToken) {
-    const visitorCap = await checkAndIncrement(
-      db,
-      checkinRateLimitSecret,
-      { scope: "needs-visitor-box", id: `${clientToken}:${boxId}` },
-      MAX_PER_VISITOR_PER_BOX_PER_HOUR,
-    );
-    if (!visitorCap) {
-      return NextResponse.json({ ok: false, error: "rate_limit_visitor" }, { status: 429 });
-    }
-  }
-  const boxCap = await checkAndIncrement(
-    db,
-    checkinRateLimitSecret,
-    { scope: "needs-box", id: boxId },
-    MAX_PER_BOX_PER_HOUR,
-  );
-  if (!boxCap) {
-    return NextResponse.json({ ok: false, error: "rate_limit_box" }, { status: 429 });
-  }
-
+  // Field validation (reviewer fix pass, 2026-09-19: moved ahead of rate
+  // limiting — see this file's own header for why) — shape only, no D1
+  // involved yet.
   const checkinId = body.checkinId;
   if (typeof checkinId !== "number" || !Number.isInteger(checkinId) || checkinId <= 0) {
     return NextResponse.json({ ok: false, error: "Invalid checkinId" }, { status: 422 });
@@ -180,10 +157,45 @@ export async function POST(
 
   // Ownership proof — recompute the SAME HMAC the checkins route minted and
   // compare in constant time. See boxNeedsToken.ts's own header for why
-  // this is a stateless capability rather than a stored correlator.
+  // this is a stateless capability rather than a stored correlator. Pure
+  // compute, no D1 — runs before rate limiting/the write for the same
+  // reason field validation above does.
+  const clientToken = typeof body.clientToken === "string" ? body.clientToken.slice(0, 200) : null;
   const expectedToken = await computeNeedsToken(checkinRateLimitSecret, checkinId, clientToken);
   if (!timingSafeEqualHex(expectedToken, body.needsToken)) {
     return NextResponse.json({ ok: false, error: "invalid_needs_token" }, { status: 403 });
+  }
+
+  let db: D1Database;
+  try {
+    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
+  } catch {
+    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
+  }
+
+  // Visitor cap first, box cap second — same reasoning as the checkins
+  // route's own header ("WHY the visitor cap is checked BEFORE the box
+  // cap"): an over-tapping visitor must never burn the shared box-wide
+  // budget on their own rejected attempts.
+  if (clientToken) {
+    const visitorCap = await checkAndIncrement(
+      db,
+      checkinRateLimitSecret,
+      { scope: "needs-visitor-box", id: `${clientToken}:${boxId}` },
+      MAX_PER_VISITOR_PER_BOX_PER_HOUR,
+    );
+    if (!visitorCap) {
+      return NextResponse.json({ ok: false, error: "rate_limit_visitor" }, { status: 429 });
+    }
+  }
+  const boxCap = await checkAndIncrement(
+    db,
+    checkinRateLimitSecret,
+    { scope: "needs-box", id: boxId },
+    MAX_PER_BOX_PER_HOUR,
+  );
+  if (!boxCap) {
+    return NextResponse.json({ ok: false, error: "rate_limit_box" }, { status: 429 });
   }
 
   const cutoff = new Date(Date.now() - NEEDS_ATTACH_WINDOW_MS).toISOString();
@@ -192,14 +204,21 @@ export async function POST(
   try {
     const result = await db
       .prepare(
-        "UPDATE box_checkins SET needs = ?, note = ? WHERE id = ? AND venue_id = ? AND kind = 'took' AND created_at >= ?",
+        // Reviewer fix pass (2026-09-19) — `visibility = 'visible'` closes a
+        // gap: an admin can hide a 'took' row (BoxCheckinsAdminPanel) for
+        // any reason, and without this guard the SAME device could still
+        // rewrite that hidden row's needs/note within the 15-minute window
+        // — an admin moderation action the visitor's own follow-up request
+        // would silently undo. Once hidden, a checkin is done accepting a
+        // needs answer, same as if the window had already expired.
+        "UPDATE box_checkins SET needs = ?, note = ? WHERE id = ? AND venue_id = ? AND kind = 'took' AND visibility = 'visible' AND created_at >= ?",
       )
       .bind(needsJson, note, checkinId, boxId, cutoff)
       .run();
     if (result.meta?.changes !== 1) {
-      // Not found, wrong box, wrong kind, or the 15-minute window has
-      // passed — every one of those reads identically to the client (this
-      // check-in can no longer accept a needs answer).
+      // Not found, wrong box, wrong kind, hidden by an admin, or the
+      // 15-minute window has passed — every one of those reads identically
+      // to the client (this check-in can no longer accept a needs answer).
       return NextResponse.json({ ok: false, error: "not_found_or_expired" }, { status: 404 });
     }
   } catch (err) {

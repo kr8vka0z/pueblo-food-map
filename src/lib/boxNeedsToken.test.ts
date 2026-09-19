@@ -1,5 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { computeNeedsToken, timingSafeEqualHex } from "@/lib/boxNeedsToken";
+import { hmacHex } from "@/lib/checkinRateLimit";
 
 describe("computeNeedsToken", () => {
   test("is deterministic for the same secret/checkinId/clientToken", async () => {
@@ -35,6 +36,23 @@ describe("computeNeedsToken", () => {
   test("returns a hex string", async () => {
     const token = await computeNeedsToken("secret", 42, "client-abc");
     expect(token).toMatch(/^[0-9a-f]+$/);
+  });
+
+  // Reviewer fix pass (2026-09-19) — versioned, pipe-delimited message
+  // shape (this file's own header explains why).
+  test("the HMAC message is the versioned, pipe-delimited 'needs-v1|<checkinId>|<clientToken>' shape", async () => {
+    const token = await computeNeedsToken("secret", 42, "client-abc");
+    const expected = await hmacHex("secret", "needs-v1|42|client-abc");
+    expect(token).toBe(expected);
+  });
+
+  test("can never collide with checkinRateLimit.ts's own '${scope}:${id}:${bucket}' key shape, even with the SAME secret — the message spaces are structurally disjoint (colon- vs pipe-delimited, versioned prefix)", async () => {
+    const needsToken = await computeNeedsToken("shared-secret", 1, "23:abc");
+    // The closest a rate-limit key could get to this input: same secret,
+    // similar-looking digits/colons, but built through checkAndIncrement's
+    // own colon-joined shape rather than boxNeedsToken's pipe-joined one.
+    const rateLimitKey = await hmacHex("shared-secret", "needs-box:1:23");
+    expect(needsToken).not.toBe(rateLimitKey);
   });
 });
 

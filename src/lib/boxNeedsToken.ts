@@ -20,6 +20,18 @@
  * the same low-stakes failure mode checkinClientToken.ts's own header
  * already accepts for its rate-limit token.
  *
+ * Message shape — reviewer fix pass (2026-09-19): `needs-v1|<checkinId>|
+ * <clientToken>`, pipe-delimited with a versioned prefix, not the earlier
+ * `needs:<checkinId>:<clientToken>`. Same secret (CHECKIN_RATE_LIMIT_SECRET)
+ * as checkinRateLimit.ts's own `${scope}:${id}:${bucket}` rate-limit keys —
+ * no scope this app uses is literally "needs", so there was never an actual
+ * collision, but nothing structurally prevented one either. `needs-v1`
+ * (distinct from every rate-limit scope string, and from any future scope
+ * that might start with "needs-") plus `|` (never a valid character in a
+ * checkinId or a rate-limit scope/id/bucket) closes that off for good, and
+ * the `-v1` suffix leaves room to change the message shape later without
+ * old tokens silently verifying against a new format.
+ *
  * WHY a manual constant-time compare, not crypto.subtle.timingSafeEqual:
  * that API is a Node/Workers-runtime addition, absent under vitest/jsdom
  * (this route's own test environment) — a hand-rolled equal-length XOR
@@ -36,7 +48,7 @@ export async function computeNeedsToken(
   checkinId: number,
   clientToken: string | null,
 ): Promise<string> {
-  return hmacHex(secret, `needs:${checkinId}:${clientToken ?? ""}`);
+  return hmacHex(secret, `needs-v1|${checkinId}|${clientToken ?? ""}`);
 }
 
 /** Equal-length XOR compare — see this file's own header for why this replaces crypto.subtle.timingSafeEqual here. */

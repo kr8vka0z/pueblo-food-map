@@ -1,7 +1,9 @@
 /**
  * BoxCardBody tests (card redesign, 2026-09-19 — see this component's own
- * header, and AGENTS.md's "Blessing Boxes — card redesign" section, for the
- * full as-built record). Covers: the status pill's "· filled {time}"/"·
+ * header, and the atlas-kb note "PFM AGENTS History — Blessing Boxes", for
+ * the full as-built record; AGENTS.md itself was cut to a 150-line cap the
+ * same day (#504) and no longer carries this history inline). Covers: the
+ * status pill's "· filled {time}"/"·
  * Not marked filled yet" detail segment, the always-present sponsor band in
  * all three adopter-count states, the address-as-directions-link (and the
  * explicit absence of any DirectionButtons/Walk-Bus-Drive row on a box),

@@ -8,8 +8,10 @@
  * ... to just happen on the map ... like a venue card, not take you to a
  * different page."
  *
- * Card redesign (2026-09-19, mockups v1-v3 in atlas-kb — see AGENTS.md's
- * "Blessing Boxes — card redesign" section for the as-built record).
+ * Card redesign (2026-09-19, mockups v1-v3 in atlas-kb — see the atlas-kb
+ * note "PFM AGENTS History — Blessing Boxes" for the as-built record;
+ * AGENTS.md itself was cut to a 150-line cap on 2026-09-19 (#504) and no
+ * longer carries this history inline).
  * `BoxCardBody` now owns the WHOLE card top to bottom — photo, status pill,
  * sponsor band, category badge, name, address-as-directions-link,
  * most-needed, host note, check-in panel, and a two-link footer — where it
@@ -30,15 +32,18 @@
  * No orange "Directions" button — deviation from a literal reading of the
  * task brief, resolved via `advisor()` mid-build. `DirectionButtons.tsx`
  * (Walk/Bus/Drive) has existed since PR #134, predating the Blessing Boxes
- * epic; AGENTS.md's "map-first card rework" section (2026-09-18) documents
- * it being DELIBERATELY extended to box cards. Mockup v3's own lede — "The
- * orange button is gone in all three [directions options]" — and Kyle's
- * pick of option B (the address text itself IS the link, no icon, no
- * button) make clear the approved design has no Walk/Bus/Drive row on a box
- * card at all; this reverses that 09-18 decision for boxes only. The
- * address `<a>` below reuses DirectionButtons.tsx's own `googleMapsUrl()`
- * (now exported) rather than re-deriving the query string, so there is
- * still exactly one URL builder for a "driving directions" deeplink.
+ * epic; the atlas-kb note above documents it being DELIBERATELY extended to
+ * box cards on 2026-09-18. Mockup v3's own lede — "The orange button is
+ * gone in all three [directions options]" — and Kyle's pick of option B
+ * (the address text itself IS the link, no icon, no button) make clear the
+ * approved design has no Walk/Bus/Drive row on a box card at all; this
+ * reverses that 09-18 decision for boxes only. The address `<a>` below
+ * reuses DirectionButtons.tsx's own `googleMapsUrl()` (now exported, and
+ * its `travelmode` param made optional in the fix pass — item 4) rather
+ * than re-deriving the query string, so there is still exactly one URL
+ * builder; the box card calls it with NO travel mode at all (many visitors
+ * walk or ride the bus), while `DirectionButtons.tsx`'s own three ordinary-
+ * venue callers keep passing an explicit mode, unaffected by this change.
  * `MapWrapper.tsx`'s Walk-resume effect still reads `boxVenues` as a
  * fallback target — now unreachable for a box (no Walk button to resume
  * from) but harmless dead code, left in place rather than touched (out of

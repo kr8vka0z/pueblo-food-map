@@ -5,6 +5,14 @@
 > aggregator, MapWrapper state machine, i18n, form-route triad, hosting).
 > This file covers operational details only — tokens, deploy, rollback, env
 > vars, and runtime gotchas for AI coders.
+>
+> **Reviewing a pull request?** Read [REVIEW.md](REVIEW.md) first and report
+> Blocker / Important / Nit the way it defines them. Repo rules go in `REVIEW.md`, never
+> in the CI reviewer's workflow file: `claude-code-action` refuses to run unless
+> `.github/workflows/claude-code-review.yml` is byte-identical to the copy on `main`, so
+> any edit to it on `dev` silently switches reviews off until the next promotion. Until
+> 2026-09-19 that workflow also lacked permission to post, so its reviews were discarded
+> unseen (#502 fixes it; live after the next promotion).
 
 ---
 

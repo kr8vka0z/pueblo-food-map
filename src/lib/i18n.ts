@@ -589,10 +589,12 @@ const en: Record<string, string> = {
   // link already covers it (backHref, see PageNav.tsx's own header) — two
   // "back to map" links on one page was the bug being fixed.
 
-  // Adopt-a-box + email alerts (slice 6). Both card forms reuse
-  // privacy.emailDisclosure/privacy.linkLabel for their email-field
-  // disclosure (already established by the 3 public forms) rather than a
-  // second, near-identical disclosure string.
+  // Adopt-a-box + email alerts (slice 6). Both card forms use their OWN
+  // disclosure string, not privacy.emailDisclosure: that one says the email
+  // is "used only to follow up on your submission", which is false here —
+  // these two forms KEEP the address and send recurring mail to it, and the
+  // privacy page Kyle signed off says so.
+  "box.alerts.emailDisclosure": "We keep your email only to send these emails. Every alert email has a stop link.",
   "box.adopt.linkLabel": "Adopt this box",
   "box.adopt.displayNameLabel": "Your name (shown publicly, e.g. a group or family name)",
   "box.adopt.displayNamePlaceholder": "e.g. The Martinez Family",
@@ -1268,6 +1270,7 @@ const es: Record<string, string> = {
   "box.history.link": "Historial", // [CHECK]
   "box.history.subheading": "Historial completo de esta caja", // [CHECK]
 
+  "box.alerts.emailDisclosure": "Guardamos tu correo solo para enviarte estos mensajes. Cada correo de alerta trae un enlace para dejar de recibirlos.", // [CHECK]
   "box.adopt.linkLabel": "Adoptar esta caja", // [CHECK]
   "box.adopt.displayNameLabel": "Tu nombre (se muestra públicamente, por ejemplo el de un grupo o familia)", // [CHECK]
   "box.adopt.displayNamePlaceholder": "ej. La Familia Martínez", // [CHECK]

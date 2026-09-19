@@ -178,7 +178,7 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
           className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
         />
         <p className="mt-1 text-xs text-[var(--color-ink-400)]">
-          {t("privacy.emailDisclosure", locale)}{" "}
+          {t("box.alerts.emailDisclosure", locale)}{" "}
           <Link href="/privacy" className="underline hover:text-[var(--color-sage-600)] transition-colors">
             {t("privacy.linkLabel", locale)}
           </Link>

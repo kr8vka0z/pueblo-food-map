@@ -153,14 +153,19 @@ export interface NeedCountRow {
   last_at: string;
 }
 
+/** Reviewer fix pass (2026-09-19) — display floor: a need key needs at least this many distinct picks within the 30-day window before "Most needed" will show it at all. One visitor's single pick shouldn't headline a box as its top community-reported need; below this floor, that key is dropped from consideration entirely (not just deprioritized), so a 1-pick key can never occupy a top-3 slot ahead of, or instead of, a key that clears the floor. Upgrade path if this ever needs to be per-box or admin-configurable: thread it through as a parameter here instead of a module constant. */
+export const NEEDED_FROM_VISITORS_MIN_COUNT = 2;
+
 /**
  * Groups already-aggregated (venue, key, count, last_at) rows by venue,
- * ranks each venue's keys by count DESC then last_at DESC (a tie goes to
- * whichever key was picked most recently — "most needed" reads as "still
- * being asked for", not an arbitrary key-name tiebreak), and keeps the top
- * 3. Pure — no D1 — so every branch (ties, an unknown/legacy key filtered
- * out defensively, a venue with fewer than 3 distinct keys) is directly
- * testable with plain fixtures, same convention as computeBoxStatus above.
+ * drops any key that hasn't cleared NEEDED_FROM_VISITORS_MIN_COUNT, ranks
+ * what's left by count DESC then last_at DESC (a tie goes to whichever key
+ * was picked most recently — "most needed" reads as "still being asked
+ * for", not an arbitrary key-name tiebreak), and keeps the top 3. Pure — no
+ * D1 — so every branch (ties, an unknown/legacy key filtered out
+ * defensively, the display floor, a venue with fewer than 3 qualifying
+ * keys) is directly testable with plain fixtures, same convention as
+ * computeBoxStatus above.
  */
 export function computeNeededFromVisitorsMap(rows: NeedCountRow[]): Map<string, NeededFromVisitors[]> {
   const byVenue = new Map<string, NeedCountRow[]>();
@@ -169,6 +174,7 @@ export function computeNeededFromVisitorsMap(rows: NeedCountRow[]): Map<string, 
     // e.g. a future vocabulary change leaving old rows behind — is dropped
     // rather than surfaced as a chip nobody can translate a label for.
     if (!NEED_KEY_SET.has(row.key)) continue;
+    if (row.n < NEEDED_FROM_VISITORS_MIN_COUNT) continue;
     const existing = byVenue.get(row.venue_id);
     if (existing) existing.push(row);
     else byVenue.set(row.venue_id, [row]);
@@ -599,17 +605,31 @@ export function parseAdminNeeds(raw: string | null | undefined): NeedKey[] {
 /** Visitor picks fade out of "most needed" after 30 days — same order-of-magnitude freshness window as the rest of this feature's own design discussion (mirrors the task's own "over the last 30 days" instruction, not derived from any other constant in this file). */
 export const NEEDED_FROM_VISITORS_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
-const SELECT_NEEDED_FROM_VISITORS_SQL = `
+// Reviewer fix pass (2026-09-19) — json_each(c.needs) throws a SQL error if
+// c.needs is ever non-NULL but not valid JSON (this app's own write path,
+// the needs route, always writes a clean JSON.stringify'd array or NULL, so
+// this shouldn't happen in practice — but a direct D1 edit, a future write
+// path, or row corruption would otherwise take down the WHOLE aggregation
+// query for every box at once, not just the one bad row, since json_each is
+// evaluated per-row inside the join). The CASE falls back to an empty JSON
+// array for a malformed value, which json_each expands to zero rows —
+// exactly as if that one check-in had no needs at all.
+// Exported (unlike SELECT_VISIBLE_CHECKINS_SQL/SELECT_ALL_CHECKINS_FOR_VENUE_SQL
+// above) so blessingBoxes.test.ts can run the ACTUAL query text against a
+// real better-sqlite3 engine — the fake-D1 mocks everywhere else in that
+// file discriminate on SQL substrings and can't catch a real syntax error
+// or a wrong column in a query this shaped (json_each + a CASE guard).
+export const SELECT_NEEDED_FROM_VISITORS_SQL = `
   SELECT c.venue_id AS venue_id, j.value AS key, COUNT(*) AS n, MAX(c.created_at) AS last_at
-  FROM box_checkins c, json_each(c.needs) j
+  FROM box_checkins c, json_each(CASE WHEN json_valid(c.needs) THEN c.needs ELSE '[]' END) j
   WHERE c.kind = 'took' AND c.visibility = 'visible' AND c.needs IS NOT NULL
     AND c.created_at >= ?
   GROUP BY c.venue_id, j.value
 `;
 
-const SELECT_NEEDED_FROM_VISITORS_FOR_VENUE_SQL = `
+export const SELECT_NEEDED_FROM_VISITORS_FOR_VENUE_SQL = `
   SELECT c.venue_id AS venue_id, j.value AS key, COUNT(*) AS n, MAX(c.created_at) AS last_at
-  FROM box_checkins c, json_each(c.needs) j
+  FROM box_checkins c, json_each(CASE WHEN json_valid(c.needs) THEN c.needs ELSE '[]' END) j
   WHERE c.kind = 'took' AND c.visibility = 'visible' AND c.needs IS NOT NULL
     AND c.created_at >= ? AND c.venue_id = ?
   GROUP BY c.venue_id, j.value

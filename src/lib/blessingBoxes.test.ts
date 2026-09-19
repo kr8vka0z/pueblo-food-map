@@ -573,14 +573,43 @@ describe("computeNeededFromVisitorsMap", () => {
   });
 
   test("rows for different venues stay separate", () => {
-    const map = computeNeededFromVisitorsMap([row({ venue_id: "a", n: 5 }), row({ venue_id: "b", n: 1 })]);
+    // n: 2 on both — clears the display floor (see the describe block
+    // below); this test's own concern is venue separation, not the floor.
+    const map = computeNeededFromVisitorsMap([row({ venue_id: "a", n: 5 }), row({ venue_id: "b", n: 2 })]);
     expect(map.get("a")).toEqual([{ key: "canned_food", count: 5 }]);
-    expect(map.get("b")).toEqual([{ key: "canned_food", count: 1 }]);
+    expect(map.get("b")).toEqual([{ key: "canned_food", count: 2 }]);
   });
 
   test("a row with an unknown/legacy key is dropped, not surfaced", () => {
-    const map = computeNeededFromVisitorsMap([row({ key: "not-a-real-key" }), row({ key: "diapers", n: 2 })]);
+    const map = computeNeededFromVisitorsMap([row({ key: "not-a-real-key", n: 5 }), row({ key: "diapers", n: 2 })]);
     expect(map.get("box-1")).toEqual([{ key: "diapers", count: 2 }]);
+  });
+
+  // Reviewer fix pass (2026-09-19) — display floor (NEEDED_FROM_VISITORS_MIN_COUNT).
+  describe("display floor — a key needs at least 2 picks before it's shown", () => {
+    test("a single pick (n: 1) never appears, even alone with no competing keys", () => {
+      const map = computeNeededFromVisitorsMap([row({ key: "canned_food", n: 1 })]);
+      expect(map.has("box-1")).toBe(false);
+    });
+
+    test("a sub-floor key is dropped even when it would otherwise rank #1 by count — it never occupies a top-3 slot", () => {
+      // canned_food has the single HIGHEST count here, but n:1 never clears
+      // the floor, so it must not appear at all, and must not push a
+      // qualifying key out of the top 3.
+      const map = computeNeededFromVisitorsMap([
+        row({ key: "canned_food", n: 1 }),
+        row({ key: "diapers", n: 2 }),
+        row({ key: "bread", n: 2 }),
+        row({ key: "pet_food", n: 2 }),
+      ]);
+      expect(map.get("box-1")?.map((r) => r.key).sort()).toEqual(["bread", "diapers", "pet_food"]);
+      expect(map.get("box-1")?.some((r) => r.key === "canned_food")).toBe(false);
+    });
+
+    test("exactly the floor (n: 2) clears it", () => {
+      const map = computeNeededFromVisitorsMap([row({ key: "diapers", n: 2 })]);
+      expect(map.get("box-1")).toEqual([{ key: "diapers", count: 2 }]);
+    });
   });
 });
 

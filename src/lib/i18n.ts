@@ -595,7 +595,13 @@ const en: Record<string, string> = {
   // these two forms KEEP the address and send recurring mail to it, and the
   // privacy page Kyle signed off says so.
   "box.alerts.emailDisclosure": "We keep your email only to send these emails. Every alert email has a stop link.",
-  "box.adopt.linkLabel": "Adopt this box",
+  // Reworded (Blessing Boxes slice 6 follow-up) from "Adopt this box" —
+  // adoption is an APPLICATION an admin approves, not something that
+  // happens the moment this form is submitted; the old wording implied
+  // instant adoption. Also the form's own <h3> heading (AdoptBoxForm.tsx
+  // reuses this same key for both the collapsed link and the expanded
+  // heading), so both read consistently.
+  "box.adopt.linkLabel": "Apply to adopt this box",
   "box.adopt.displayNameLabel": "Your name (shown publicly, e.g. a group or family name)",
   "box.adopt.displayNamePlaceholder": "e.g. The Martinez Family",
   "box.adopt.emailLabel": "Your email (kept private)",
@@ -641,10 +647,11 @@ const en: Record<string, string> = {
   "alerts.stop.undone": "You're back on the list.",
   "alerts.stop.undoError": "That didn't go through. Please try again.",
 
-  // Outbound email copy (slice 6) — rendered via composeBilingualEmail
-  // (src/lib/emailSend.ts), which builds EN+ES blocks in one message. The
-  // *.subject keys are rendered EN-only (see that file's own header) but
-  // still need an ES entry for the i18n parity test.
+  // Outbound email copy (slice 6) — rendered via composeEmail
+  // (src/lib/emailSend.ts), which builds ONE message in the recipient's own
+  // `lang` (see migrations/0011_alert_email_lang.sql) — every key here,
+  // subject included, still needs both an EN and an ES entry so the SAME
+  // dictionary/parity test covers whichever language actually gets sent.
   "email.alert.empty.subject": "{box} is empty",
   "email.alert.empty.line1": "{box} was just marked empty.",
   "email.alert.low.subject": "{box} is running low",
@@ -1271,7 +1278,7 @@ const es: Record<string, string> = {
   "box.history.subheading": "Historial completo de esta caja", // [CHECK]
 
   "box.alerts.emailDisclosure": "Guardamos tu correo solo para enviarte estos mensajes. Cada correo de alerta trae un enlace para dejar de recibirlos.", // [CHECK]
-  "box.adopt.linkLabel": "Adoptar esta caja", // [CHECK]
+  "box.adopt.linkLabel": "Solicitar adoptar esta caja", // [CHECK]
   "box.adopt.displayNameLabel": "Tu nombre (se muestra públicamente, por ejemplo el de un grupo o familia)", // [CHECK]
   "box.adopt.displayNamePlaceholder": "ej. La Familia Martínez", // [CHECK]
   "box.adopt.emailLabel": "Tu correo (privado)", // [CHECK]
@@ -1385,6 +1392,19 @@ export function t(
   // Defensive fallback: if the ES key is missing, use EN.
   const raw = dict[key] ?? en[key] ?? key;
   return vars ? interpolate(raw, vars) : raw;
+}
+
+/**
+ * Strict lang resolution for the adopt/alert/host-alert routes (Blessing
+ * Boxes slice 6, single-language alert emails) — same "anything other than
+ * the one literal alternate value falls back to the default" convention
+ * boxTurnstile.ts's resolveBoxTurnstileKey uses for its own two-value enum.
+ * A client-supplied value is never trusted past this: "ES", "es-MX",
+ * missing, or garbage all resolve to "en" rather than throwing or leaking
+ * into a CHECK-constrained D1 column as anything but exactly "en"/"es".
+ */
+export function resolveEmailLang(raw: unknown): Locale {
+  return raw === "es" ? "es" : "en";
 }
 
 /**

@@ -31,7 +31,7 @@
  *     display names only — see boxAdopters.ts) when non-empty.
  *
  * Slice 6 also adds the two inline-expand forms from the Build Plan's card
- * UX item 4 — "Adopt this box" (AdoptBoxForm) and "Email me when it needs
+ * UX item 4 — "Apply to adopt this box" (AdoptBoxForm) and "Email me when it needs
  * filling" (BoxAlertSignupForm) — rendered below the check-in panel, each
  * a standalone collapsed-link-until-tapped component owning its own
  * Turnstile hand-off (src/lib/useBoxTurnstileWidget.ts).

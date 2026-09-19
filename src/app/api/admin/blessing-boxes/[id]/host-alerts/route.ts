@@ -20,6 +20,13 @@
  * before/after JSON carry `{venue_id, email}` (add) or
  * `{venue_id, email, unsubscribed_at}` (remove), the one detail worth
  * recording for a single-column host-list mutation.
+ *
+ * Single-language alert emails: POST also accepts an admin-picked `lang`
+ * ("en"/"es", strict via resolveEmailLang — anything else defaults to
+ * "en") and stores it on the new alert_subscriptions row, so the welcome
+ * email below (and every future alert this host receives) renders in ONLY
+ * that language, per the same box_adopters.lang/alert_subscriptions.lang
+ * scheme migrations/0011_alert_email_lang.sql adds for the public forms.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -30,6 +37,7 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { isValidEmail, normalizeEmail } from "@/lib/rateLimit";
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
 import { logFormFailure } from "@/lib/logger";
+import { resolveEmailLang } from "@/lib/i18n";
 import {
   findHostSubscription,
   insertHostSubscriptionStatement,
@@ -67,7 +75,7 @@ export async function POST(
   const { db, identity } = access;
   const { id: venueId } = await params;
 
-  let body: { email?: unknown };
+  let body: { email?: unknown; lang?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -77,6 +85,9 @@ export async function POST(
   if (!email) {
     return NextResponse.json({ ok: false, error: "Invalid email" }, { status: 422 });
   }
+  // Admin's own language pick on the "add a host" panel — strict, same
+  // convention every other lang-accepting route in this slice uses.
+  const lang = resolveEmailLang(body.lang);
 
   const existing = await findHostSubscription(db, venueId, email);
   if (existing) {
@@ -89,7 +100,7 @@ export async function POST(
   }
 
   const timestamp = new Date().toISOString();
-  const insertStatement = insertHostSubscriptionStatement(db, { venueId, email }, new Date(timestamp));
+  const insertStatement = insertHostSubscriptionStatement(db, { venueId, email, lang }, new Date(timestamp));
   const insertAudit = db
     .prepare(AUDIT_INSERT_SQL)
     .bind(
@@ -115,6 +126,9 @@ export async function POST(
         boxName: boxRow?.name ?? venueId,
         origin: resolveEmailOrigin(req),
         unsubscribeToken: subscription.unsubscribe_token,
+        // The value already validated above — no reason to round-trip D1
+        // for a lang we just inserted ourselves.
+        lang,
       });
     }
   } catch (err) {

@@ -57,7 +57,25 @@ describe("HostAlertsAdminPanel", () => {
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/admin/blessing-boxes/box-1/host-alerts");
     expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({ email: "new@example.com" });
+    // Single-language alert emails: defaults to "en" when the admin never touches the select.
+    expect(JSON.parse(init.body as string)).toEqual({ email: "new@example.com", lang: "en" });
+  });
+
+  test("picking Spanish from the language select sends lang 'es'", async () => {
+    const user = userEvent.setup();
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true, result: "added", hosts: [{ id: 1, email: "new@example.com" }] }), {
+        status: 200,
+      }),
+    );
+    render(<HostAlertsAdminPanel venueId="box-1" initialHosts={[]} />);
+
+    await user.type(screen.getByLabelText("Add a host email"), "new@example.com");
+    await user.selectOptions(screen.getByLabelText("Email language"), "es");
+    await user.click(screen.getByRole("button", { name: "Add host" }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    expect(JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string).lang).toBe("es");
   });
 
   test("a 409 (previously unsubscribed) shows the specific inline message", async () => {

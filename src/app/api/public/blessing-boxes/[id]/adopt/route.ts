@@ -30,6 +30,11 @@
  * spec: "Resend failure -> row stays, respond error." The application row is
  * already durable at that point, but the applicant sees a real error rather
  * than a false "check your email."
+ *
+ * Single-language alert emails: `lang` is resolved strictly (resolveEmailLang,
+ * src/lib/i18n.ts — anything but the literal "es" becomes "en") and stored
+ * on the new box_adopters row; the confirm email above renders in ONLY that
+ * language. AdoptBoxForm.tsx sends its own current locale.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -42,6 +47,7 @@ import { resolveEmailOrigin } from "@/lib/alertOrigin";
 import { logFormFailure } from "@/lib/logger";
 import { insertAdopterApplication, sendAdopterConfirmEmail } from "@/lib/boxAdopters";
 import { sanitizeDisplayName } from "@/lib/displayNameHygiene";
+import { resolveEmailLang } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +61,8 @@ interface AdoptPayload {
   displayName?: string;
   email?: string;
   note?: string;
+  /** The UI locale the page was in at submission — resolveEmailLang() below is strict, so anything but the literal "es" becomes "en". */
+  lang?: string;
   /** Honeypot — must be empty string or absent, same convention as every other public form route. */
   website?: string;
   turnstileToken?: string;
@@ -138,6 +146,7 @@ export async function POST(
   // "foo@x.com" are always the same row (boxAdopters.ts's own lookups never
   // re-derive this).
   const email = normalizeEmail(typeof body.email === "string" ? body.email : "");
+  const lang = resolveEmailLang(body.lang);
 
   const rawDisplayName = typeof body.displayName === "string" ? body.displayName : "";
   const displayName = sanitizeDisplayName(rawDisplayName);
@@ -198,7 +207,7 @@ export async function POST(
 
   let confirmToken: string;
   try {
-    ({ confirmToken } = await insertAdopterApplication(db, { venueId: boxId, displayName, email, note }));
+    ({ confirmToken } = await insertAdopterApplication(db, { venueId: boxId, displayName, email, note, lang }));
   } catch (err) {
     logFormFailure("adopt", "db_write_failed", {
       message: err instanceof Error ? err.message : "unknown error",
@@ -207,7 +216,7 @@ export async function POST(
   }
 
   try {
-    await sendAdopterConfirmEmail({ to: email, boxName: box.name, origin: resolveEmailOrigin(req), confirmToken });
+    await sendAdopterConfirmEmail({ to: email, boxName: box.name, origin: resolveEmailOrigin(req), confirmToken, lang });
   } catch (err) {
     // Fatal per the task's own spec — see this file's header. The row
     // stays (it's a real, reviewable application either way), but the

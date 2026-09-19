@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { I18N_DICTIONARIES, t } from "@/lib/i18n";
+import { I18N_DICTIONARIES, resolveEmailLang, t } from "@/lib/i18n";
 
 const { en, es } = I18N_DICTIONARIES;
 
@@ -95,4 +95,20 @@ describe("i18n dictionary parity", () => {
       expect(value.trim().length, `Empty ES value for ${key}`).toBeGreaterThan(0);
     }
   });
+});
+
+// Blessing Boxes slice 6, single-language alert emails: adopt/alerts/
+// host-alerts routes trust NOTHING a caller sends past this — strict, same
+// convention boxTurnstile.ts's resolveBoxTurnstileKey uses.
+describe("resolveEmailLang", () => {
+  test("the literal string 'es' resolves to 'es'", () => {
+    expect(resolveEmailLang("es")).toBe("es");
+  });
+
+  test.each([["ES"], ["en-US"], ["es-MX"], [undefined], [null], [1], [""], ["en"]])(
+    "%p resolves to 'en' (strict — only the exact literal 'es' escapes the default)",
+    (raw) => {
+      expect(resolveEmailLang(raw)).toBe("en");
+    },
+  );
 });

@@ -54,6 +54,10 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: emailValue,
+          // The page's own current locale — the route stores it and every
+          // alert email this subscription sends renders in ONLY this
+          // language (see the alerts route's own header).
+          lang: locale,
           website: honeypot,
           turnstileToken: turnstile.token ?? "",
           turnstileKey: turnstile.mode,

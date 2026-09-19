@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * AdoptBoxForm — the "Adopt this box" inline-expand form on a blessing
+ * AdoptBoxForm — the "Apply to adopt this box" inline-expand form on a blessing
  * box's card (Blessing Boxes slice 6, Build Plan card UX item 4). Posts to
  * POST /api/public/blessing-boxes/[id]/adopt (that route's own header has
  * the full guard order and rate-limit scopes); this component only owns
@@ -71,6 +71,10 @@ export default function AdoptBoxForm({ boxId }: AdoptBoxFormProps) {
           displayName: values.displayName,
           email: values.email,
           note: values.note || undefined,
+          // The page's own current locale — the route stores it and every
+          // email this application's lifecycle sends renders in ONLY this
+          // language (see the adopt route's own header).
+          lang: locale,
           website: honeypot,
           turnstileToken: turnstile.token ?? "",
           turnstileKey: turnstile.mode,

@@ -39,6 +39,13 @@
  * is the one an anonymous caller could probe repeatedly against many
  * addresses, which is what makes the timing side-channel real here and not
  * there.
+ *
+ * Single-language alert emails: `lang` is resolved strictly (resolveEmailLang,
+ * src/lib/i18n.ts — anything but the literal "es" becomes "en"). On a
+ * resend/reactivate this OVERWRITES the row's stored lang with whatever was
+ * just submitted (upsertForExistingGiverRow's own header) — the confirm
+ * email above renders in ONLY that language. BoxAlertSignupForm.tsx sends
+ * its own current locale.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -50,6 +57,7 @@ import { isValidEmail, normalizeEmail } from "@/lib/rateLimit";
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
 import { logFormFailure } from "@/lib/logger";
 import { sendGiverConfirmEmail, upsertGiverSubscription } from "@/lib/boxAlerts";
+import { resolveEmailLang } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +68,8 @@ const MAX_EMAIL_GLOBAL_PER_HOUR = 300;
 
 interface AlertSignupPayload {
   email?: string;
+  /** The UI locale the page was in at submission — resolveEmailLang() below is strict, so anything but the literal "es" becomes "en". */
+  lang?: string;
   /** Honeypot — must be empty string or absent, same convention as every other public form route. */
   website?: string;
   turnstileToken?: string;
@@ -134,6 +144,7 @@ export async function POST(
   if (!email || email.length > FIELD_LIMITS.EMAIL || !isValidEmail(email)) {
     return NextResponse.json({ ok: false, error: "Invalid email" }, { status: 422 });
   }
+  const lang = resolveEmailLang(body.lang);
 
   let box: BoxLookupRow | null;
   try {
@@ -173,7 +184,7 @@ export async function POST(
   let action: Awaited<ReturnType<typeof upsertGiverSubscription>>["action"];
   let confirmToken: string | null;
   try {
-    ({ action, confirmToken } = await upsertGiverSubscription(db, { venueId: boxId, email }, new Date()));
+    ({ action, confirmToken } = await upsertGiverSubscription(db, { venueId: boxId, email, lang }, new Date()));
   } catch (err) {
     logFormFailure("alerts", "db_unavailable", { message: err instanceof Error ? err.message : "unknown error" });
     return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 502 });
@@ -190,6 +201,7 @@ export async function POST(
       boxName: box.name,
       origin: resolveEmailOrigin(req),
       confirmToken,
+      lang,
     }).catch((err) => {
       logFormFailure("alerts", "send_failed", { message: err instanceof Error ? err.message : "unknown error" });
     });

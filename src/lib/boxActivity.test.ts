@@ -102,6 +102,48 @@ describe("buildActivityQuery", () => {
     const { params } = buildActivityQuery({ page: 2, pageSize: 5 });
     expect(params).toEqual([6, 5]); // LIMIT 5+1, OFFSET (2-1)*5
   });
+
+  // #511 — photo + sponsor entries. Gated behind `includeBoxExtras`, NOT
+  // `venueId`: the global /boxes/activity feed also lets a visitor filter to
+  // one box via its own dropdown, and these two kinds must appear on the
+  // dedicated per-box history page ONLY (issue #511's own risk note).
+  describe("includeBoxExtras (photo + sponsor entries, #511)", () => {
+    test("false/undefined — neither box_photos nor box_adopters is queried at all", () => {
+      const { sql } = buildActivityQuery({ venueId: "box-1" });
+      expect(sql).not.toContain("box_photos");
+      expect(sql).not.toContain("box_adopters");
+    });
+
+    test("true — both halves join in, approved-only, with the deterministic 9-column shape", () => {
+      const { sql } = buildActivityQuery({ includeBoxExtras: true });
+      expect(sql).toContain("FROM box_photos t");
+      expect(sql).toContain("FROM box_adopters t");
+      expect(sql).toContain("'photo' AS source");
+      expect(sql).toContain("'sponsor' AS source");
+      expect(sql).toContain("'photo_added' AS kind");
+      expect(sql).toContain("'sponsor_added' AS kind");
+      // Approved-only, never a pending/rejected/flagged row.
+      expect(sql).toContain("t.status = 'approved'");
+      // Sponsors are dated by approval, not application — box_adopters.reviewed_at.
+      expect(sql).toContain("t.reviewed_at AS created_at");
+      expect(sql).toContain("t.reviewed_at IS NOT NULL");
+      // Sponsor display name only, never carries the email column.
+      expect(sql).not.toContain("t.email");
+    });
+
+    test("true + venueId — the venue filter binds into every half, including the two new ones", () => {
+      const { params } = buildActivityQuery({ includeBoxExtras: true, venueId: "box-1" });
+      expect(params.filter((p) => p === "box-1")).toHaveLength(4); // checkin, event, photo, sponsor
+    });
+
+    test("still respects date-range filters on the new halves", () => {
+      const { sql, params } = buildActivityQuery({ includeBoxExtras: true, from: "2026-09-01", to: "2026-09-05" });
+      expect(sql).toContain("t.created_at >= ?");
+      expect(sql).toContain("t.reviewed_at >= ?");
+      // Bound into all 4 halves now: checkin + event (created_at), photo (created_at), sponsor (reviewed_at).
+      expect(params.filter((p) => p === "2026-09-01T00:00:00.000Z")).toHaveLength(4);
+    });
+  });
 });
 
 describe("loadBoxActivity", () => {
@@ -149,5 +191,40 @@ describe("loadBoxActivity", () => {
     const page = await loadBoxActivity(fakeDb([]), {});
     expect(page.items).toEqual([]);
     expect(page.hasMore).toBe(false);
+  });
+
+  test("a photo row maps photo_id onto ActivityItem.photoId", async () => {
+    const rows = [
+      {
+        venue_id: "box-1",
+        venue_name: "Box",
+        venue_address: "1 Main St",
+        source: "photo",
+        kind: "photo_added",
+        detail: null,
+        photo_id: 42,
+        created_at: "2026-09-01T00:00:00.000Z",
+      },
+    ];
+    const page = await loadBoxActivity(fakeDb(rows), { includeBoxExtras: true });
+    expect(page.items[0].photoId).toBe(42);
+  });
+
+  test("a sponsor row maps detail (the approved display name) onto ActivityItem.detail, photoId null", async () => {
+    const rows = [
+      {
+        venue_id: "box-1",
+        venue_name: "Box",
+        venue_address: "1 Main St",
+        source: "sponsor",
+        kind: "sponsor_added",
+        detail: "Jane D.",
+        photo_id: null,
+        created_at: "2026-09-01T00:00:00.000Z",
+      },
+    ];
+    const page = await loadBoxActivity(fakeDb(rows), { includeBoxExtras: true });
+    expect(page.items[0].detail).toBe("Jane D.");
+    expect(page.items[0].photoId).toBeNull();
   });
 });

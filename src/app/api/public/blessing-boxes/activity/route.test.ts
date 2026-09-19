@@ -51,7 +51,15 @@ describe("GET /api/public/blessing-boxes/activity", () => {
     expect(res.status).toBe(200);
     expect(mockLoadBoxActivity).toHaveBeenCalledWith(
       {},
-      { venueId: undefined, kind: undefined, from: undefined, to: undefined, page: undefined, pageSize: undefined },
+      {
+        venueId: undefined,
+        kind: undefined,
+        from: undefined,
+        to: undefined,
+        page: undefined,
+        pageSize: undefined,
+        includeBoxExtras: false,
+      },
     );
   });
 
@@ -60,8 +68,26 @@ describe("GET /api/public/blessing-boxes/activity", () => {
     await GET(makeRequest("?box=box-1&kind=filled&from=2026-09-01&to=2026-09-05&page=2&limit=5"));
     expect(mockLoadBoxActivity).toHaveBeenCalledWith(
       {},
-      { venueId: "box-1", kind: "filled", from: "2026-09-01", to: "2026-09-05", page: 2, pageSize: 5 },
+      {
+        venueId: "box-1",
+        kind: "filled",
+        from: "2026-09-01",
+        to: "2026-09-05",
+        page: 2,
+        pageSize: 5,
+        includeBoxExtras: false,
+      },
     );
+  });
+
+  // #511 — includeExtras=1 is how BoxHistoryContent's per-box history page
+  // asks for the photo/sponsor halves; every other caller (the global
+  // /boxes/activity feed) never sends it, even when filtered to one box.
+  test("includeExtras=1 parses to includeBoxExtras: true", async () => {
+    mockLoadBoxActivity.mockResolvedValue(emptyPage);
+    await GET(makeRequest("?box=box-1&includeExtras=1"));
+    const call = mockLoadBoxActivity.mock.calls[0][1] as { includeBoxExtras?: boolean };
+    expect(call.includeBoxExtras).toBe(true);
   });
 
   test("non-numeric page/limit are dropped (undefined), never crash the route", async () => {
@@ -80,6 +106,7 @@ describe("GET /api/public/blessing-boxes/activity", () => {
           source: "checkin",
           kind: "filled",
           detail: null,
+          photoId: null,
           createdAt: "2026-09-17T12:00:00.000Z",
           venueId: "box-1",
           venueName: "216 W Routt",

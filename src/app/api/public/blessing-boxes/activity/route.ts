@@ -10,7 +10,12 @@
  * an empty page rather than a 400, same "never error a public GET on bad
  * input" convention every other public route in this app follows), `from`/
  * `to` ('YYYY-MM-DD', both inclusive), `page` (1-based), `limit` (page
- * size — smaller for D3's embed than the global feed's default).
+ * size — smaller for D3's embed than the global feed's default),
+ * `includeExtras` ('1' — #511's photo/sponsor entries; see
+ * boxActivity.ts's own header for why this is a dedicated param rather than
+ * inferred from `box`). Only BoxHistoryContent's per-box history page ever
+ * sends it; BoxesActivityContent's global feed never does, even when a
+ * visitor filters that feed down to one box via its own dropdown.
  *
  * Auth: none — same public-route convention as GET /api/public/blessing-
  * boxes (getCloudflareContext().env.ADMIN_DB read directly).
@@ -49,6 +54,7 @@ function parseFilters(url: URL): ActivityFilters {
     to: url.searchParams.get("to") || undefined,
     page: num(url.searchParams.get("page")),
     pageSize: num(url.searchParams.get("limit")),
+    includeBoxExtras: url.searchParams.get("includeExtras") === "1",
   };
 }
 

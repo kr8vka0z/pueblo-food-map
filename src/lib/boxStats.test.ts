@@ -443,4 +443,27 @@ describe("loadNetworkStatsData", () => {
     } as unknown as D1Database;
     await expect(loadNetworkStatsData(db)).rejects.toThrow("no such table: box_checkins");
   });
+
+  // Belt-and-suspenders: the pure aggregation functions filter `visibility`
+  // themselves (see publicCheckins() in boxStats.ts), but a hidden check-in
+  // must never even leave D1 in a PUBLIC route's response — same structural
+  // "never even fetch the private thing" rule every other public check-in
+  // read in this repo enforces at the SQL level (SELECT_VISIBLE_CHECKINS_SQL,
+  // blessingBoxes.ts). This asserts the SQL text itself, not just the
+  // pure-function layer, so a future edit that drops the WHERE clause fails
+  // a test instead of shipping a data leak silently.
+  test("the check-ins query filters visibility = 'visible' at the SQL level, not only in application code", async () => {
+    let capturedSql = "";
+    const db = {
+      prepare: (sql: string) => {
+        if (sql.includes("FROM box_checkins")) capturedSql = sql;
+        if (sql.includes("FROM venues")) return { all: async () => ({ results: [] }) };
+        if (sql.includes("FROM box_checkins")) return { all: async () => ({ results: [] }) };
+        if (sql.includes("FROM box_photos")) return { all: async () => ({ results: [] }) };
+        throw new Error(`unexpected query: ${sql}`);
+      },
+    } as unknown as D1Database;
+    await loadNetworkStatsData(db);
+    expect(capturedSql).toContain("visibility = 'visible'");
+  });
 });

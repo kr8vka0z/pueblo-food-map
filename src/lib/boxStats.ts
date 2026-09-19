@@ -376,21 +376,28 @@ const SELECT_ALL_BOX_VENUES_SQL = `
 `;
 
 /**
- * Every non-problem check-in for every blessing-box venue, regardless of
- * that venue's archived status — the DELIBERATE widening this file's header
- * describes: boxActivity.ts's own VENUE_JOIN adds `AND v.status != 'archived'`
- * for the live activity feed; this query drops that one clause and keeps
- * every other guard (category = 'blessing_box', kind != 'problem') intact.
- * Hidden check-ins are NOT filtered here — the pure aggregation functions
- * above filter `visibility` themselves (publicCheckins()), same
- * belt-and-suspenders split blessingBoxes.ts's computeBoxStatus already uses
- * for its own inputs.
+ * Every VISIBLE, non-problem check-in for every blessing-box venue,
+ * regardless of that venue's archived status — the DELIBERATE widening this
+ * file's header describes: boxActivity.ts's own VENUE_JOIN adds `AND
+ * v.status != 'archived'` for the live activity feed; this query drops that
+ * ONE clause and keeps every other guard intact (category = 'blessing_box',
+ * kind != 'problem', AND visibility = 'visible' — this route's response is
+ * public, and a hidden check-in must never even be fetched, not just
+ * dropped in application code, same "never even reach the private thing"
+ * structural rule migrations/0005's host_contact and every other public
+ * check-in read in this repo already enforce, e.g.
+ * SELECT_VISIBLE_CHECKINS_SQL in blessingBoxes.ts). The pure aggregation
+ * functions above ALSO filter `visibility` (publicCheckins()) — kept as a
+ * second, redundant guard, same belt-and-suspenders split
+ * computeBoxStatus's own inputs already use; that second layer is what
+ * boxStats.test.ts's fixture-based "hidden exclusion" tests actually
+ * exercise, independent of what this SQL returns.
  */
 const SELECT_ALL_BOX_CHECKINS_SQL = `
   SELECT c.venue_id, c.kind, c.visibility, c.created_at
   FROM box_checkins c
   JOIN venues v ON v.id = c.venue_id AND v.category = 'blessing_box'
-  WHERE c.kind != 'problem'
+  WHERE c.visibility = 'visible' AND c.kind != 'problem'
   ORDER BY c.created_at ASC
 `;
 

@@ -161,6 +161,26 @@ describe("BoxCardBody — extension points render nothing today", () => {
   });
 });
 
+describe("BoxCardBody — cared-for-by sponsor slot (slice 6)", () => {
+  test("renders nothing when there are no approved adopters", () => {
+    renderCard({ adopters: [] });
+    expect(screen.queryByText(/cared for by/i)).toBeNull();
+  });
+
+  test("renders the joined display names when adopters is non-empty", () => {
+    renderCard({ adopters: ["The Martinez Family", "Jane Doe"] });
+    expect(screen.getByText("Cared for by The Martinez Family, Jane Doe")).toBeDefined();
+  });
+});
+
+describe("BoxCardBody — adopt/alert inline-expand forms (slice 6)", () => {
+  test("renders both forms collapsed to a plain link", () => {
+    renderCard();
+    expect(screen.getByRole("button", { name: "Adopt this box" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Email me when it needs filling" })).toBeDefined();
+  });
+});
+
 describe("BoxCardBody — most-recent photo slot (slice 5)", () => {
   test("renders the approved photo, its caption, and a Report link when latestPhoto is set", () => {
     renderCard({

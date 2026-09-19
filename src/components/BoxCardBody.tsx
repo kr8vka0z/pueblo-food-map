@@ -26,8 +26,15 @@
  *   - the most-recent-PHOTO slot — BUILT, slice 5 (2026-09-18, box_photos):
  *     renders box.box.latestPhoto when set, via the public approved-only
  *     serve route, with a "Report this photo" link (ReportPhotoButton.tsx).
- *   - a current-SPONSOR ("Cared for by …") slot — still unbuilt, arrives in
- *     slice 6 (box_adopters); still renders nothing today.
+ *   - a current-SPONSOR ("Cared for by …") slot — BUILT, slice 6
+ *     (2026-09-18, box_adopters): renders box.box.adopters (approved
+ *     display names only — see boxAdopters.ts) when non-empty.
+ *
+ * Slice 6 also adds the two inline-expand forms from the Build Plan's card
+ * UX item 4 — "Adopt this box" (AdoptBoxForm) and "Email me when it needs
+ * filling" (BoxAlertSignupForm) — rendered below the check-in panel, each
+ * a standalone collapsed-link-until-tapped component owning its own
+ * Turnstile hand-off (src/lib/useBoxTurnstileWidget.ts).
  *
  * No expand/collapse state (fix, 2026-09-18 — Kyle: "When I click show
  * details, nothing shows up," because the old `showExpandedDetails` gate
@@ -55,6 +62,8 @@ import { useLocale } from "@/lib/LocaleContext";
 import { formatRelativeTime } from "@/lib/relativeTime";
 import BoxCheckinPanel from "@/components/BoxCheckinPanel";
 import ReportPhotoButton from "@/components/ReportPhotoButton";
+import AdoptBoxForm from "@/components/AdoptBoxForm";
+import BoxAlertSignupForm from "@/components/BoxAlertSignupForm";
 import { STATUS_BADGE_CLASS, type BoxStatus, type CheckinKind, type PublicBlessingBox } from "@/lib/blessingBoxes";
 
 interface BoxCardBodyProps {
@@ -153,8 +162,14 @@ export default function BoxCardBody({ box, onCheckinSuccess, showHistoryLink = t
         </div>
       )}
 
-      {/* Slice 6 extension point: current-sponsor ("Cared for by …") slot.
-          Renders nothing until box_adopters exists (same rule as above). */}
+      {/* Slice 6: current-sponsor ("Cared for by …") slot. Approved display
+          names only (box.box.adopters) — renders nothing when empty, same
+          extension-point rule the photo slot above follows. */}
+      {box.box.adopters.length > 0 && (
+        <p className="text-sm text-[var(--color-ink-700)]">
+          {t("box.adopters.caredForBy", locale, { names: box.box.adopters.join(", ") })}
+        </p>
+      )}
 
       {(box.box.hostName || box.box.hostNote) && (
         <div>
@@ -175,6 +190,11 @@ export default function BoxCardBody({ box, onCheckinSuccess, showHistoryLink = t
         boxId={box.id}
         onCheckinSuccess={(result) => onCheckinSuccess?.(result)}
       />
+
+      {/* Slice 6 card UX — two inline-expand forms, each collapsed to a
+          plain link until tapped (Build Plan item 4). */}
+      <AdoptBoxForm boxId={box.id} />
+      <BoxAlertSignupForm boxId={box.id} />
     </div>
   );
 }

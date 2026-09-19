@@ -118,11 +118,22 @@ export function useBoxTurnstileWidget(containerRef: RefObject<HTMLDivElement | n
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount() only touches refs and stable setState setters; this effect should run once per mount, not once per render.
   }, []);
 
+  // WHY the try/catch: window.turnstile.reset() THROWS if the widget's
+  // container has left the DOM. Both card forms call reset() right after
+  // their POST returns, before reading the response — so a throw here skipped
+  // the success state entirely and left the button on "Sending…" forever even
+  // though the server had saved the application (Kyle's phone, 2026-09-19).
+  // A reset that fails must never break the caller; drop the dead widget id
+  // and mount a fresh one if the container is still around.
   function reset() {
-    if (window.turnstile && widgetId.current) {
-      window.turnstile.reset(widgetId.current);
-    }
     setToken(null);
+    if (!window.turnstile || !widgetId.current) return;
+    try {
+      window.turnstile.reset(widgetId.current);
+    } catch {
+      widgetId.current = null;
+      if (modeRef.current === "box") mount();
+    }
   }
 
   return { token, mode, error, reset, mount };

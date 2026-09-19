@@ -81,7 +81,6 @@ export default function AdoptBoxForm({ boxId }: AdoptBoxFormProps) {
           clientToken: getCheckinClientToken() ?? undefined,
         }),
       });
-      turnstile.reset();
       const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (data?.ok) {
         setState("success");
@@ -91,9 +90,12 @@ export default function AdoptBoxForm({ boxId }: AdoptBoxFormProps) {
         setState("error");
       }
     } catch {
-      turnstile.reset();
       setState("error");
     }
+    // AFTER the state is set, never before: the token is single-use so the
+    // widget must be reset, but nothing about the reset may decide what the
+    // visitor sees for a request the server already answered.
+    turnstile.reset();
   }
 
   // Fires a queued submit the moment a token becomes available — see this
@@ -189,6 +191,7 @@ export default function AdoptBoxForm({ boxId }: AdoptBoxFormProps) {
   }
 
   return (
+    <>
     <form
       onSubmit={handleSubmit}
       className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-bone-200)] p-3"
@@ -295,8 +298,12 @@ export default function AdoptBoxForm({ boxId }: AdoptBoxFormProps) {
           onChange={(e) => setHoneypot(e.target.value)}
         />
       </div>
-
-      {turnstileNodes}
     </form>
+    {/* OUTSIDE the form, in the same tree position as the closed and success
+        branches above (fragment child #2) — so React keeps the SAME container
+        div across open/close/success instead of unmounting it and orphaning
+        the Turnstile widget mounted inside. */}
+    {turnstileNodes}
+    </>
   );
 }

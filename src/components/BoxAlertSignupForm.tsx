@@ -64,7 +64,6 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
           clientToken: getCheckinClientToken() ?? undefined,
         }),
       });
-      turnstile.reset();
       const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (data?.ok) {
         setState("success");
@@ -74,9 +73,10 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
         setState("error");
       }
     } catch {
-      turnstile.reset();
       setState("error");
     }
+    // AFTER the state is set, never before — see AdoptBoxForm.tsx's submit().
+    turnstile.reset();
   }
 
   // Fires a queued submit the moment a token becomes available — see
@@ -160,6 +160,7 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
   }
 
   return (
+    <>
     <form
       onSubmit={handleSubmit}
       className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-bone-200)] p-3"
@@ -236,8 +237,10 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
           onChange={(e) => setHoneypot(e.target.value)}
         />
       </div>
-
-      {turnstileNodes}
     </form>
+    {/* Outside the form, same tree position as the other two branches — see
+        AdoptBoxForm.tsx's matching comment. */}
+    {turnstileNodes}
+    </>
   );
 }

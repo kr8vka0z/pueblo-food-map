@@ -80,6 +80,37 @@ describe("AdoptBoxForm", () => {
     expect(body.lang).toBe("en"); // single-language alert emails: sends the page's own current locale
   });
 
+  // Regression — Kyle's phone, 2026-09-19: the server saved the application
+  // (200) but the button stayed on "Sending…" forever, because
+  // window.turnstile.reset() threw before the success state was ever set.
+  test("still shows success when turnstile.reset() throws", async () => {
+    const user = userEvent.setup();
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    mockTurnstile.reset.mockImplementationOnce(() => {
+      throw new Error("widget container is gone");
+    });
+    renderForm();
+    await user.click(screen.getByRole("button", { name: "Apply to adopt this box" }));
+    await user.type(screen.getByLabelText(/your name/i), "The Martinez Family");
+    await user.type(screen.getByLabelText(/your email/i), "family@example.com");
+    await user.click(screen.getByRole("button", { name: "Send application" }));
+    await waitFor(() => expect(screen.getByText("Check your email to confirm.")).toBeDefined());
+  });
+
+  test("keeps the SAME Turnstile container across closed → open → success", async () => {
+    const user = userEvent.setup();
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    renderForm();
+    const closed = screen.getByTestId("adopt-turnstile-widget");
+    await user.click(screen.getByRole("button", { name: "Apply to adopt this box" }));
+    expect(screen.getByTestId("adopt-turnstile-widget")).toBe(closed);
+    await user.type(screen.getByLabelText(/your name/i), "The Martinez Family");
+    await user.type(screen.getByLabelText(/your email/i), "family@example.com");
+    await user.click(screen.getByRole("button", { name: "Send application" }));
+    await waitFor(() => expect(screen.getByText("Check your email to confirm.")).toBeDefined());
+    expect(screen.getByTestId("adopt-turnstile-widget")).toBe(closed);
+  });
+
   test("sends 'es' when the page's own locale is Spanish", async () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });

@@ -117,7 +117,7 @@ scripts/           One-off ingestion scripts (run locally; not imported by app)
   Deployments → pick a previous build → "Rollback to this deployment".
 
 See [AGENTS.md](AGENTS.md) for token management, environment variables,
-preview-deploy URL restrictions, and the full deploy runbook.
+preview-deploy URL restrictions, and the full deploy playbook.
 
 ---
 

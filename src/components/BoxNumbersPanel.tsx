@@ -14,9 +14,10 @@
  * Accessible labelled rows, not tiles — a <dl> of label/value pairs reads
  * correctly to a screen reader and needs no custom ARIA, same instinct this
  * repo already applies to every other data list (VenueListView's table,
- * BoxActivityList's items). Two `<dl>`s (counts, then averages) rather than
- * one long one, each with its own leading heading, so the semantic grouping
- * matches the visual one.
+ * BoxActivityList's items). Three `<dl>`s (the optional "right now" overview
+ * — issue #512 — then counts, then averages) rather than one long one, each
+ * with its own leading heading or none where the parent already labels the
+ * section, so the semantic grouping matches the visual one.
  */
 
 import { t, type Locale } from "@/lib/i18n";

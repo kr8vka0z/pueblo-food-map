@@ -264,4 +264,32 @@ describe("BoxesActivityContent — Network numbers (slice 7)", () => {
     render(<BoxesActivityContent />);
     expect(screen.queryByText(t("box.stats.milestonesHeading", "en"))).toBeNull();
   });
+
+  // issue #512 — box count / sponsor count / average are "right now" numbers,
+  // computed off networkStats.boxes/.approvedSponsorCount directly, never
+  // off the period-filtered counts — so changing the period picker must
+  // leave them exactly as they were.
+  test("the current network numbers (issue #512) don't change when the period picker changes", async () => {
+    const boxes = Array.from({ length: 7 }, (_, i) => ({ id: `box-${i + 1}`, name: `Box ${i + 1}`, archived: false }));
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/blessing-boxes/activity")) return Promise.resolve(jsonResponse({ items: [], hasMore: false, page: 1 }));
+      if (url.includes("/network-stats")) {
+        return Promise.resolve(jsonResponse({ boxes, checkins: [], photos: [], approvedSponsorCount: 5 }));
+      }
+      return Promise.resolve(jsonResponse({ boxes: [] }));
+    });
+    render(<BoxesActivityContent />);
+
+    await screen.findByText(t("box.stats.boxCount", "en"));
+    expect(screen.getByText("7")).toBeDefined(); // boxCount
+    expect(screen.getByText("5")).toBeDefined(); // sponsorCount
+    expect(screen.getByText("0.7")).toBeDefined(); // avgSponsorsPerBox (5/7 -> one decimal)
+
+    const periodSelect = screen.getByLabelText(t("box.stats.period", "en"));
+    await userEvent.selectOptions(periodSelect, "7d");
+
+    expect(screen.getByText("7")).toBeDefined();
+    expect(screen.getByText("5")).toBeDefined();
+    expect(screen.getByText("0.7")).toBeDefined();
+  });
 });

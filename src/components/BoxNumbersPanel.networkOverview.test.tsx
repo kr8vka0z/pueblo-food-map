@@ -1,8 +1,7 @@
 /**
  * BoxNumbersPanel tests for the "current network numbers" addition
- * (issue #512) — new file, not an edit to BoxNumbersPanel.test.tsx: this is
- * a fix/ branch and this repo's policy keeps every pre-existing test
- * untouched, so a new prop's behavior gets its own test file.
+ * (issue #512) — new file, not an edit to BoxNumbersPanel.test.tsx, to keep
+ * this addition's tests scoped to the new `networkOverview` prop.
  */
 
 import { describe, expect, test } from "vitest";

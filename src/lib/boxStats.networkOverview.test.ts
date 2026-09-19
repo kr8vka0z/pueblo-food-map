@@ -2,9 +2,8 @@
  * Tests for boxStats.ts's "current network numbers" addition (issue #512):
  * computeNetworkOverview's pure math, and loadNetworkStatsData()'s new
  * approved-sponsor-count query. New file rather than an edit to
- * boxStats.test.ts — this branch is a fix/ branch, and this repo's policy
- * keeps every pre-existing test untouched so a fix is proven by a test that
- * existed before it; a new feature test file is always allowed.
+ * boxStats.test.ts, to keep this addition's tests scoped to what it actually
+ * changed.
  */
 
 import { describe, test, expect } from "vitest";

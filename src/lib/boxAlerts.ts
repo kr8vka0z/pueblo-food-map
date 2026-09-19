@@ -17,25 +17,42 @@
  * since it's the one rule every other function in this file exists to
  * serve: host + approved adopters get an email when a box is reported
  * EMPTY or has a PROBLEM. Givers get an email when their chosen box is
- * reported EMPTY or LOW. Givers NEVER get a problem report. The free-text
- * note on a 'filled'/'problem' check-in is NEVER included in any email this
- * file sends — every function here takes only `kind`/`boxName`/`boxUrl`,
+ * reported EMPTY or LOW. Givers NEVER get a problem report. **FILLED goes to
+ * ALL THREE roles** — host, adopter, AND giver — since a "someone just
+ * filled it" report is good news every subscriber cares about, not only the
+ * people who'd otherwise get an empty/problem alert. The free-text note on
+ * a 'filled'/'problem' check-in is NEVER included in any email this file
+ * sends — every function here takes only `kind`/`boxName`/`boxUrl`,
  * structurally no parameter exists for a note to travel through.
  *
- * ONLY ON CHANGE: an 'empty'/'low' check-in only triggers an alert if the
- * box's status computed from check-ins BEFORE this one wasn't already that
- * value — a box sitting empty for a week shouldn't re-alert on every
- * subsequent "still empty" tap. 'problem' has no such gate (every report is
- * independently worth flagging). See notifyBoxAlerts()'s own header for how
- * the caller (the checkins route) supplies `prevStatus`.
+ * ONLY ON CHANGE: an 'empty'/'low'/'filled' check-in only triggers an alert
+ * if the box's status computed from check-ins BEFORE this one wasn't
+ * already that value — a box sitting empty for a week shouldn't re-alert on
+ * every subsequent "still empty" tap, and a box that's already 'stocked'
+ * shouldn't re-alert on a second "filled" tap right behind the first.
+ * 'problem' has no such gate (every report is independently worth
+ * flagging). See notifyBoxAlerts()'s own header for how the caller (the
+ * checkins route) supplies `prevStatus`.
  *
- * COOLDOWN: at most one alert email per subscription per
- * ALERT_COOLDOWN_HOURS (6) — claimed ATOMICALLY, before any Resend call, via
- * one `UPDATE ... WHERE last_alerted_at IS NULL OR < ? RETURNING ...`
- * statement (claimAlertRecipients). A read-then-write ("SELECT eligible
- * rows, then UPDATE each") would let two overlapping check-ins both read
- * "not yet cooled down" and both send — same race checkinRateLimit.ts's own
- * header warns against for its unrelated counter.
+ * COOLDOWN (empty/low/problem only): at most one alert email per
+ * subscription per ALERT_COOLDOWN_HOURS (6) — claimed ATOMICALLY, before
+ * any Resend call, via one `UPDATE ... WHERE last_alerted_at IS NULL OR < ?
+ * RETURNING ...` statement (claimAlertRecipients). A read-then-write
+ * ("SELECT eligible rows, then UPDATE each") would let two overlapping
+ * check-ins both read "not yet cooled down" and both send — same race
+ * checkinRateLimit.ts's own header warns against for its unrelated counter.
+ *
+ * FILLED IS A SEPARATE CAP, deliberately NOT this cooldown: the whole point
+ * of a filled alert is that "it's been filled" can (and should) follow an
+ * "it's empty" alert minutes later — gating it behind the same 6-hour
+ * cooldown would silently swallow the good news for anyone who was just
+ * alerted about the empty box. Instead every confirmed subscription is read
+ * (claimFilledAlertRecipients, below — this SELECT never writes
+ * last_alerted_at at all), then claimed one subscription at a time against
+ * checkinRateLimit.ts's shared D1 counter under ALERT_FILLED_SUB_RATE_SCOPE,
+ * capped at MAX_FILLED_ALERTS_PER_SUB_PER_HOUR — the cap that actually
+ * matters here is "don't double-mail the same subscription for what reads
+ * as the same filled event," not "wait N hours between any two alerts."
  *
  * NEVER BLOCKS THE CHECK-IN: notifyBoxAlerts() is called from the checkins
  * route wrapped end-to-end in try/catch, via ctx.waitUntil() when a live
@@ -60,7 +77,7 @@ const ALERT_COOLDOWN_MS = ALERT_COOLDOWN_HOURS * 60 * 60 * 1000;
 export const MAX_ALERT_RECIPIENTS_PER_EVENT = 200;
 
 export type AlertRole = "host" | "adopter" | "giver";
-type AlertableKind = Extract<CheckinKind, "empty" | "low" | "problem">;
+type AlertableKind = Extract<CheckinKind, "empty" | "low" | "problem" | "filled">;
 
 export interface AlertSubscriptionRow {
   id: number;
@@ -82,7 +99,7 @@ export interface AlertSubscriptionRow {
 
 /**
  * The one place "who gets what" is encoded — see this file's own header.
- * `prevStatus` is required for 'empty'/'low' (the only two kinds that gate
+ * `prevStatus` is required for 'empty'/'low'/'filled' (the kinds that gate
  * on a status CHANGE) and ignored for 'problem' (which always qualifies,
  * every report is independently worth flagging).
  */
@@ -90,6 +107,7 @@ export function rolesToNotify(kind: AlertableKind, prevStatus: BoxStatus | null)
   if (kind === "problem") return ["host", "adopter"];
   if (kind === "empty") return prevStatus === "empty" ? [] : ["host", "adopter", "giver"];
   if (kind === "low") return prevStatus === "low" ? [] : ["giver"];
+  if (kind === "filled") return prevStatus === "stocked" ? [] : ["host", "adopter", "giver"];
   return [];
 }
 
@@ -143,12 +161,78 @@ export async function claimAlertRecipients(
   return result.results ?? [];
 }
 
+// ─── Filled recipient claim — a SEPARATE cap, NOT the 6h cooldown above ────
+// See this file's own header, "FILLED IS A SEPARATE CAP," for why 'filled'
+// can't reuse claimAlertRecipients: the 6-hour cooldown exists to stop
+// re-alerting on every "still empty" tap, but a filled report is exactly
+// the good news someone who was JUST alerted about an empty box should
+// still hear about minutes later.
+
+export const ALERT_FILLED_SUB_RATE_SCOPE = "alert-filled-sub";
+/** ponytail: fixed at 1/hour rather than configurable — multiple people independently reporting the same fill inside an hour is expected, ordinary use; the cap only exists to stop mailing the SAME subscription twice for what reads as the same event. If a future need arises for a different cadence, thread it through as a parameter instead of changing this constant's meaning. */
+export const MAX_FILLED_ALERTS_PER_SUB_PER_HOUR = 1;
+
+function selectUncappedFilledRecipientsSql(roleCount: number): string {
+  const placeholders = Array(roleCount).fill("?").join(", ");
+  // No cooldown filter and no UPDATE — this SELECT never touches
+  // last_alerted_at, unlike claimRecipientsSql above (this file's own
+  // header, "does not modify last_alerted_at").
+  return `
+    SELECT id, email, unsubscribe_token, lang FROM alert_subscriptions
+    WHERE venue_id = ? AND role IN (${placeholders})
+      AND confirmed_at IS NOT NULL AND unsubscribed_at IS NULL
+    LIMIT ${MAX_ALERT_RECIPIENTS_PER_EVENT}
+  `;
+}
+
+/**
+ * Every confirmed, not-unsubscribed subscription for `venueId`/`roles`
+ * (ignoring the 6h cooldown entirely), each then claimed ONE AT A TIME
+ * against ALERT_FILLED_SUB_RATE_SCOPE — checkinRateLimit.ts's shared,
+ * atomic D1 counter, scoped by subscription id — BEFORE any Resend call, so
+ * only a subscription that wins its own claim this hour is ever emailed.
+ * checkAndIncrement already fails CLOSED on any D1 error (its own header):
+ * a limiter outage here means fewer filled emails go out, never a failed or
+ * slowed check-in.
+ */
+export async function claimFilledAlertRecipients(
+  db: D1Database,
+  venueId: string,
+  roles: AlertRole[],
+  rateLimitSecret: string,
+  now: Date,
+): Promise<ClaimedRecipient[]> {
+  if (roles.length === 0) return [];
+  const candidates = await db
+    .prepare(selectUncappedFilledRecipientsSql(roles.length))
+    .bind(venueId, ...roles)
+    .all<ClaimedRecipient>();
+
+  const claimed: ClaimedRecipient[] = [];
+  for (const candidate of candidates.results ?? []) {
+    const allowed = await checkAndIncrement(
+      db,
+      rateLimitSecret,
+      { scope: ALERT_FILLED_SUB_RATE_SCOPE, id: String(candidate.id) },
+      MAX_FILLED_ALERTS_PER_SUB_PER_HOUR,
+      now,
+    );
+    if (allowed) claimed.push(candidate);
+  }
+  return claimed;
+}
+
 // ─── Email content ──────────────────────────────────────────────────────────
 
-const ALERT_COPY: Record<AlertableKind, { subjectKey: string; bodyLineKey: string }> = {
-  empty: { subjectKey: "email.alert.empty.subject", bodyLineKey: "email.alert.empty.line1" },
-  low: { subjectKey: "email.alert.low.subject", bodyLineKey: "email.alert.low.line1" },
-  problem: { subjectKey: "email.alert.problem.subject", bodyLineKey: "email.alert.problem.line1" },
+// bodyLineKeys is an ARRAY (not a single key) so 'filled' can carry its own
+// two-line body ("someone filled it" + "you'll hear from us again when it
+// needs filling") ahead of the shared box-link/stop-link lines every kind
+// gets — see buildAlertEmail below.
+const ALERT_COPY: Record<AlertableKind, { subjectKey: string; bodyLineKeys: string[] }> = {
+  empty: { subjectKey: "email.alert.empty.subject", bodyLineKeys: ["email.alert.empty.line1"] },
+  low: { subjectKey: "email.alert.low.subject", bodyLineKeys: ["email.alert.low.line1"] },
+  problem: { subjectKey: "email.alert.problem.subject", bodyLineKeys: ["email.alert.problem.line1"] },
+  filled: { subjectKey: "email.alert.filled.subject", bodyLineKeys: ["email.alert.filled.line1", "email.alert.filled.line2"] },
 };
 
 /** Builds one recipient's alert email — its OWN stop link, never a shared one, and its OWN lang (a batched send can mix EN and ES recipients in one call). */
@@ -167,7 +251,7 @@ function buildAlertEmail(opts: {
   const { subject, text, html } = composeEmail({
     lang: opts.lang,
     subjectKey: copy.subjectKey,
-    bodyLineKeys: [copy.bodyLineKey, "email.alert.line2", "email.stopLine"],
+    bodyLineKeys: [...copy.bodyLineKeys, "email.alert.line2", "email.stopLine"],
     vars: { box: opts.boxName, url: opts.boxUrl, stopUrl: stopPageUrl },
   });
   return { to: opts.to, subject, text, html, headers: unsubscribeHeaders(stopApiUrl) };
@@ -181,6 +265,16 @@ export interface NotifyBoxAlertsInput {
   /** Box status computed from check-ins BEFORE this one — null when unknown/unavailable, treated as "not already this status" (i.e. an alert still fires). */
   prevStatus: BoxStatus | null;
   origin: string;
+  /**
+   * Required only for kind 'filled' — the same CHECKIN_RATE_LIMIT_SECRET the
+   * checkins route already has in hand, needed to claim each subscription's
+   * own per-hour cap (claimFilledAlertRecipients, this file's own header
+   * "FILLED IS A SEPARATE CAP"). Optional on the type since every other kind
+   * never reads it; missing it on a 'filled' call fails CLOSED (no filled
+   * emails sent) rather than skipping the cap or reusing the unrelated 6h
+   * cooldown.
+   */
+  rateLimitSecret?: string;
   now?: Date;
 }
 
@@ -192,14 +286,20 @@ export interface NotifyBoxAlertsInput {
  * qualify, claims recipients, and sends via ONE batched Resend call.
  */
 export async function notifyBoxAlerts(db: D1Database, input: NotifyBoxAlertsInput): Promise<void> {
-  if (input.kind !== "empty" && input.kind !== "low" && input.kind !== "problem") return;
+  if (input.kind !== "empty" && input.kind !== "low" && input.kind !== "problem" && input.kind !== "filled") return;
   const kind = input.kind;
   const now = input.now ?? new Date();
 
   const roles = rolesToNotify(kind, input.prevStatus);
   if (roles.length === 0) return;
 
-  const recipients = await claimAlertRecipients(db, input.venueId, roles, now);
+  let recipients: ClaimedRecipient[];
+  if (kind === "filled") {
+    if (!input.rateLimitSecret) return; // see NotifyBoxAlertsInput's own header — fail closed
+    recipients = await claimFilledAlertRecipients(db, input.venueId, roles, input.rateLimitSecret, now);
+  } else {
+    recipients = await claimAlertRecipients(db, input.venueId, roles, now);
+  }
   if (recipients.length === 0) return;
 
   const boxRow = await db.prepare("SELECT name FROM venues WHERE id = ?").bind(input.venueId).first<{ name: string }>();

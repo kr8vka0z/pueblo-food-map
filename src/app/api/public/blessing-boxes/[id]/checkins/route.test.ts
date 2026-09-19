@@ -407,13 +407,39 @@ describe("POST /api/public/blessing-boxes/[id]/checkins", () => {
   // header for who-gets-what; this route's own job is only to compute
   // prevStatus correctly and never let a failure here affect the response. ──
   describe("slice 6 — notifyBoxAlerts wiring", () => {
-    test("'filled'/'took' never compute a prevStatus read — no extra box_checkins query beyond the response's own", async () => {
+    test("'took' never computes a prevStatus read — no extra box_checkins query beyond the response's own", async () => {
       const { db } = makeFakeDb();
+      const waitUntil = vi.fn((p: Promise<unknown>) => p);
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db }, ctx: { waitUntil } });
+      await callPost({ kind: "took", turnstileToken: "t" });
+      expect(mockNotifyBoxAlerts).toHaveBeenCalledTimes(1);
+      expect(mockNotifyBoxAlerts.mock.calls[0][1]).toMatchObject({ kind: "took", prevStatus: null });
+    });
+
+    // Filled-alert follow-up: 'filled' now joins 'empty'/'low' in the
+    // pre-insert prevStatus read (rolesToNotify gates it on the box not
+    // already being 'stocked') — this is the covering criterion for
+    // changing the test above, which used to assert 'filled' skipped this
+    // read entirely.
+    test("'filled' DOES compute a prevStatus read, same as 'empty'/'low'", async () => {
+      const priorStocked = new Date().toISOString();
+      const { db } = makeFakeDb({ checkinRows: [{ kind: "filled", visibility: "visible", created_at: priorStocked }] });
       const waitUntil = vi.fn((p: Promise<unknown>) => p);
       mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db }, ctx: { waitUntil } });
       await callPost({ kind: "filled", turnstileToken: "t" });
       expect(mockNotifyBoxAlerts).toHaveBeenCalledTimes(1);
-      expect(mockNotifyBoxAlerts.mock.calls[0][1]).toMatchObject({ kind: "filled", prevStatus: null });
+      expect(mockNotifyBoxAlerts.mock.calls[0][1]).toMatchObject({ kind: "filled", prevStatus: "stocked" });
+    });
+
+    // The route always has CHECKIN_RATE_LIMIT_SECRET in hand (throws earlier
+    // if missing) and passes it through unconditionally — only the 'filled'
+    // path inside boxAlerts.ts actually reads it.
+    test("rateLimitSecret is passed through to notifyBoxAlerts", async () => {
+      const { db } = makeFakeDb();
+      const waitUntil = vi.fn((p: Promise<unknown>) => p);
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db }, ctx: { waitUntil } });
+      await callPost({ kind: "filled", turnstileToken: "t" });
+      expect(mockNotifyBoxAlerts.mock.calls[0][1]).toMatchObject({ rateLimitSecret: "test-rate-limit-secret" });
     });
 
     test("'empty' check-in with no prior status-setting check-ins -> prevStatus computed as 'unknown', not null", async () => {

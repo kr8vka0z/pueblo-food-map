@@ -32,10 +32,13 @@ vi.mock("@/lib/logger", () => ({
 
 import {
   ALERT_COOLDOWN_HOURS,
+  ALERT_FILLED_SUB_RATE_SCOPE,
   MAX_ALERT_RECIPIENTS_PER_EVENT,
+  MAX_FILLED_ALERTS_PER_SUB_PER_HOUR,
   findHostSubscription,
   insertHostSubscriptionStatement,
   claimAlertRecipients,
+  claimFilledAlertRecipients,
   confirmSubscription,
   notifyBoxAlerts,
   removeHostSubscriptionStatement,
@@ -75,6 +78,13 @@ describe("rolesToNotify — who gets what", () => {
   test("'low' -> giver ONLY (never host/adopter), and only when the box wasn't already low", () => {
     expect(rolesToNotify("low", "stocked")).toEqual(["giver"]);
     expect(rolesToNotify("low", "low")).toEqual([]);
+  });
+
+  test("'filled' -> host + adopter + giver (everyone), but only when the box wasn't already stocked", () => {
+    expect(rolesToNotify("filled", "empty")).toEqual(["host", "adopter", "giver"]);
+    expect(rolesToNotify("filled", "low")).toEqual(["host", "adopter", "giver"]);
+    expect(rolesToNotify("filled", null)).toEqual(["host", "adopter", "giver"]);
+    expect(rolesToNotify("filled", "stocked")).toEqual([]);
   });
 });
 
@@ -140,12 +150,80 @@ describe("claimAlertRecipients", () => {
   });
 });
 
+describe("claimFilledAlertRecipients — separate cap, NOT the 6h cooldown", () => {
+  test("empty roles list short-circuits without querying", async () => {
+    const db = { prepare: () => { throw new Error("should never be called"); } } as unknown as D1Database;
+    expect(await claimFilledAlertRecipients(db, "box-1", [], "secret", new Date())).toEqual([]);
+  });
+
+  test("the SELECT has no cooldown filter and never writes last_alerted_at", async () => {
+    let seenSql = "";
+    const db = {
+      prepare: (sql: string) => {
+        seenSql = sql;
+        return { bind: () => ({ all: async () => ({ results: [] }) }) };
+      },
+    } as unknown as D1Database;
+    await claimFilledAlertRecipients(db, "box-1", ["giver"], "secret", new Date());
+    expect(seenSql).toContain("SELECT id, email, unsubscribe_token, lang FROM alert_subscriptions");
+    expect(seenSql).not.toContain("UPDATE");
+    expect(seenSql).not.toContain("last_alerted_at");
+    expect(seenSql).toContain("confirmed_at IS NOT NULL");
+    expect(seenSql).toContain("unsubscribed_at IS NULL");
+  });
+
+  test("every candidate is claimed against ALERT_FILLED_SUB_RATE_SCOPE, scoped by subscription id", async () => {
+    const rows = [
+      { id: 1, email: "a@example.com", unsubscribe_token: "tok-a", lang: "en" },
+      { id: 2, email: "b@example.com", unsubscribe_token: "tok-b", lang: "en" },
+    ];
+    const db = { prepare: () => ({ bind: () => ({ all: async () => ({ results: rows }) }) }) } as unknown as D1Database;
+    mockCheckAndIncrement.mockResolvedValue(true);
+    const now = new Date("2026-09-19T00:00:00.000Z");
+    const claimed = await claimFilledAlertRecipients(db, "box-1", ["host", "adopter", "giver"], "secret", now);
+    expect(claimed).toEqual(rows);
+    expect(mockCheckAndIncrement).toHaveBeenCalledTimes(2);
+    expect(mockCheckAndIncrement).toHaveBeenNthCalledWith(
+      1,
+      db,
+      "secret",
+      { scope: ALERT_FILLED_SUB_RATE_SCOPE, id: "1" },
+      MAX_FILLED_ALERTS_PER_SUB_PER_HOUR,
+      now,
+    );
+    expect(mockCheckAndIncrement).toHaveBeenNthCalledWith(
+      2,
+      db,
+      "secret",
+      { scope: ALERT_FILLED_SUB_RATE_SCOPE, id: "2" },
+      MAX_FILLED_ALERTS_PER_SUB_PER_HOUR,
+      now,
+    );
+  });
+
+  test("a candidate whose claim is refused (already claimed this hour) is excluded from the result", async () => {
+    const rows = [
+      { id: 1, email: "a@example.com", unsubscribe_token: "tok-a", lang: "en" },
+      { id: 2, email: "b@example.com", unsubscribe_token: "tok-b", lang: "en" },
+    ];
+    const db = { prepare: () => ({ bind: () => ({ all: async () => ({ results: rows }) }) }) } as unknown as D1Database;
+    mockCheckAndIncrement.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const claimed = await claimFilledAlertRecipients(db, "box-1", ["giver"], "secret", new Date());
+    expect(claimed).toEqual([rows[0]]);
+  });
+});
+
 describe("notifyBoxAlerts — orchestration", () => {
   function makeDb(opts: { claimed?: { id: number; email: string; unsubscribe_token: string; lang?: "en" | "es" }[]; boxName?: string } = {}) {
     const claimed = opts.claimed ?? [{ id: 1, email: "giver@example.com", unsubscribe_token: "tok-1", lang: "en" }];
     return {
       prepare: (sql: string) => {
         if (sql.includes("UPDATE alert_subscriptions")) {
+          return { bind: () => ({ all: async () => ({ results: claimed }) }) };
+        }
+        // The 'filled' path (claimFilledAlertRecipients) SELECTs candidates
+        // instead of UPDATEing — same fixture list, different query shape.
+        if (sql.includes("SELECT id, email, unsubscribe_token, lang FROM alert_subscriptions")) {
           return { bind: () => ({ all: async () => ({ results: claimed }) }) };
         }
         if (sql.includes("SELECT name FROM venues")) {
@@ -253,6 +331,140 @@ describe("notifyBoxAlerts — orchestration", () => {
     expect(reason).toBe("send_failed");
     expect(detail.recipientCount).toBe(2);
     expect(JSON.stringify(detail)).not.toContain("@example.com");
+  });
+
+  // ─── Filled-alert follow-up: everyone subscribed gets it, capped
+  // per-subscription per hour, NOT the shared 6h cooldown. ─────────────────
+  describe("'filled' — everyone subscribed, separate per-subscription cap", () => {
+    test("prevStatus 'empty' -> host, adopter, AND giver all get the filled email", async () => {
+      const claimed = [
+        { id: 1, email: "host@example.com", unsubscribe_token: "tok-h", lang: "en" as const },
+        { id: 2, email: "adopter@example.com", unsubscribe_token: "tok-a", lang: "en" as const },
+        { id: 3, email: "giver@example.com", unsubscribe_token: "tok-g", lang: "en" as const },
+      ];
+      const db = makeDb({ claimed, boxName: "Test Box" });
+      await notifyBoxAlerts(db, {
+        venueId: "box-1",
+        kind: "filled",
+        prevStatus: "empty",
+        origin: "https://pueblofoodmap.com",
+        rateLimitSecret: "secret",
+      });
+      expect(mockSendResendBatch).toHaveBeenCalledTimes(1);
+      const emails = mockSendResendBatch.mock.calls[0][0] as { to: string; subject: string }[];
+      expect(emails.map((e) => e.to)).toEqual(["host@example.com", "adopter@example.com", "giver@example.com"]);
+      expect(emails[0].subject).toBe("Good news: Test Box was just filled");
+    });
+
+    test("prevStatus 'stocked' (already filled) -> nobody gets an email, never queries recipients", async () => {
+      const db = { prepare: () => { throw new Error("should never be called"); } } as unknown as D1Database;
+      await notifyBoxAlerts(db, {
+        venueId: "box-1",
+        kind: "filled",
+        prevStatus: "stocked",
+        origin: "https://pueblofoodmap.com",
+        rateLimitSecret: "secret",
+      });
+      expect(mockSendResendBatch).not.toHaveBeenCalled();
+    });
+
+    test("goes out even when last_alerted_at was set seconds ago, and never touches last_alerted_at", async () => {
+      let sawUpdateToLastAlerted = false;
+      const claimed = [{ id: 1, email: "a@example.com", unsubscribe_token: "tok-a", lang: "en" as const }];
+      const db = {
+        prepare: (sql: string) => {
+          if (sql.includes("UPDATE") && sql.includes("last_alerted_at")) {
+            sawUpdateToLastAlerted = true;
+            return { bind: () => ({ all: async () => ({ results: [] }) }) };
+          }
+          if (sql.includes("SELECT id, email, unsubscribe_token, lang FROM alert_subscriptions")) {
+            return { bind: () => ({ all: async () => ({ results: claimed }) }) };
+          }
+          if (sql.includes("SELECT name FROM venues")) {
+            return { bind: () => ({ first: async () => ({ name: "Test Box" }) }) };
+          }
+          throw new Error("unexpected SQL: " + sql);
+        },
+      } as unknown as D1Database;
+      await notifyBoxAlerts(db, {
+        venueId: "box-1",
+        kind: "filled",
+        prevStatus: "empty",
+        origin: "https://pueblofoodmap.com",
+        rateLimitSecret: "secret",
+      });
+      expect(mockSendResendBatch).toHaveBeenCalledTimes(1);
+      expect(sawUpdateToLastAlerted).toBe(false);
+    });
+
+    test("second filled event in the same hour for the same subscription -> refused, no second email", async () => {
+      const claimed = [{ id: 1, email: "a@example.com", unsubscribe_token: "tok-a", lang: "en" as const }];
+      const db = makeDb({ claimed, boxName: "Test Box" });
+
+      mockCheckAndIncrement.mockResolvedValueOnce(true); // first filled event claims it
+      await notifyBoxAlerts(db, {
+        venueId: "box-1",
+        kind: "filled",
+        prevStatus: "empty",
+        origin: "https://pueblofoodmap.com",
+        rateLimitSecret: "secret",
+      });
+      expect(mockSendResendBatch).toHaveBeenCalledTimes(1);
+
+      mockSendResendBatch.mockClear();
+      mockCheckAndIncrement.mockResolvedValueOnce(false); // second filled event, same hour -> refused
+      await notifyBoxAlerts(db, {
+        venueId: "box-1",
+        kind: "filled",
+        prevStatus: "empty",
+        origin: "https://pueblofoodmap.com",
+        rateLimitSecret: "secret",
+      });
+      expect(mockSendResendBatch).not.toHaveBeenCalled();
+    });
+
+    test("an 'es' subscription row gets the Spanish subject/body only", async () => {
+      const claimed = [{ id: 1, email: "es@example.com", unsubscribe_token: "tok-es", lang: "es" as const }];
+      const db = makeDb({ claimed, boxName: "Test Box" });
+      await notifyBoxAlerts(db, {
+        venueId: "box-1",
+        kind: "filled",
+        prevStatus: "empty",
+        origin: "https://pueblofoodmap.com",
+        rateLimitSecret: "secret",
+      });
+      const [email] = mockSendResendBatch.mock.calls[0][0] as { subject: string; text: string }[];
+      expect(email.subject).toBe("Buenas noticias: Test Box se acaba de llenar");
+      expect(email.text).not.toContain("Good news");
+    });
+
+    test("no rateLimitSecret -> fails closed, no filled emails, never throws", async () => {
+      const db = { prepare: () => { throw new Error("should never be called"); } } as unknown as D1Database;
+      await expect(
+        notifyBoxAlerts(db, { venueId: "box-1", kind: "filled", prevStatus: "empty", origin: "https://pueblofoodmap.com" }),
+      ).resolves.toBeUndefined();
+      expect(mockSendResendBatch).not.toHaveBeenCalled();
+    });
+
+    // Limiter throwing / Resend failing must never fail the CHECK-IN — that
+    // guarantee lives at the route (its ctx.waitUntil().catch()), but this
+    // proves notifyBoxAlerts itself still only ever rejects (never hangs or
+    // silently drops without logging), same contract the empty/low/problem
+    // path already has (item 13 above).
+    test("the per-subscription limiter throwing propagates as a rejection, same as any other D1 failure", async () => {
+      const claimed = [{ id: 1, email: "a@example.com", unsubscribe_token: "tok-a", lang: "en" as const }];
+      const db = makeDb({ claimed, boxName: "Test Box" });
+      mockCheckAndIncrement.mockRejectedValueOnce(new Error("D1 outage"));
+      await expect(
+        notifyBoxAlerts(db, {
+          venueId: "box-1",
+          kind: "filled",
+          prevStatus: "empty",
+          origin: "https://pueblofoodmap.com",
+          rateLimitSecret: "secret",
+        }),
+      ).rejects.toThrow("D1 outage");
+    });
   });
 });
 

@@ -287,11 +287,12 @@ export async function POST(
   }
   const outOfService = box.removed_on !== null && box.removed_on !== "";
 
-  // Slice 6 (alerts): 'empty'/'low' only fire an alert on a status CHANGE
-  // (boxAlerts.ts's rolesToNotify), so the box's status BEFORE this
-  // check-in is read now, before the insert below — 'problem' never needs
-  // this (every report qualifies regardless of status), so it's skipped for
-  // every other kind to avoid an unnecessary extra D1 read.
+  // Slice 6 (alerts): 'empty'/'low'/'filled' only fire an alert on a status
+  // CHANGE (boxAlerts.ts's rolesToNotify — 'filled' added in the filled-alert
+  // follow-up), so the box's status BEFORE this check-in is read now, before
+  // the insert below — 'problem' never needs this (every report qualifies
+  // regardless of status), so it's skipped for every other kind to avoid an
+  // unnecessary extra D1 read.
   //
   // 2026-09-18 security review, item 10: this read is guarded — it exists
   // ONLY to feed alert targeting (see boxAlerts.ts's own header, "NEVER
@@ -301,7 +302,7 @@ export async function POST(
   // an alert still fires, the same safe-by-default direction the rest of
   // this file already takes for a note that can't be attached, etc.
   let prevStatus: BoxStatus | null = null;
-  if (checkinKind === "empty" || checkinKind === "low") {
+  if (checkinKind === "empty" || checkinKind === "low" || checkinKind === "filled") {
     try {
       const priorCheckins = await loadVisibleCheckins(db, boxId);
       prevStatus = computeBoxStatus(priorCheckins, new Date(), outOfService);
@@ -362,6 +363,10 @@ export async function POST(
     kind: checkinKind,
     prevStatus,
     origin: resolveEmailOrigin(req),
+    // Only 'filled' actually reads this (its own per-subscription hourly
+    // cap, NOT the 6h cooldown every other kind uses — boxAlerts.ts's own
+    // header, "FILLED IS A SEPARATE CAP") — harmless to pass unconditionally.
+    rateLimitSecret: checkinRateLimitSecret,
   }).catch((err) => {
     logFormFailure("checkin", "send_failed", {
       message: err instanceof Error ? err.message : "unknown error",

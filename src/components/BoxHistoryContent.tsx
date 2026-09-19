@@ -119,23 +119,25 @@ export default function BoxHistoryContent({ box, allCheckins = [], approvedPhoto
       <PageNav locale={locale} backHref={`/?venue=${encodeURIComponent(liveBox.id)}`} />
 
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-6">
-        <div>
-          <h1
-            className="mt-2 text-3xl font-normal text-[var(--color-ink-900)]"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {liveBox.name}
-          </h1>
-          <p className="mt-2 text-sm text-[var(--color-ink-700)]">{t("box.history.subheading", locale)}</p>
-        </div>
+        <p className="mt-2 text-sm text-[var(--color-ink-700)]">{t("box.history.subheading", locale)}</p>
 
         {/* Full current-snapshot card, incl. check-in panel and host note —
             see this file's own header. `showHistoryLink={false}` (2026-09-18):
             a History link pointing at the page it's already on is dead
             weight — everything else about BoxCardBody's default rendering
             still applies, since a no-WebGL visitor's only box page is THIS
-            one and needs the full snapshot. */}
-        <BoxCardBody box={liveBox} onCheckinSuccess={handleCheckinSuccess} showHistoryLink={false} />
+            one and needs the full snapshot. `headingLevel="h1"` (card
+            redesign, 2026-09-19): BoxCardBody now renders the box's own
+            name as part of its badge/name/address block — this page no
+            longer renders a separate <h1> above it (that would duplicate
+            the name as two headings); the card's own name IS this page's
+            page-level heading now. */}
+        <BoxCardBody
+          box={liveBox}
+          onCheckinSuccess={handleCheckinSuccess}
+          showHistoryLink={false}
+          headingLevel="h1"
+        />
 
         {/* Approved-photo grid (slice 5) — reuses the same public serve
             route the card's own single-photo slot uses; this is the "see

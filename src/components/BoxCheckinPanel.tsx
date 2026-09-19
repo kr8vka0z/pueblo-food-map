@@ -133,12 +133,12 @@ import type { BoxStatus, CheckinKind } from "@/lib/blessingBoxes";
 
 const { BOX_CHECKIN_NOTE } = FIELD_LIMITS;
 
-// Card redesign (2026-09-19) — the five kinds now render in three groups
-// instead of one flat grid: a colored-dot status trio (filled/low/empty), a
-// two-up row (took, add a photo), and 'problem' as a quiet text link beside
-// "Report photo". CHECKIN_KINDS keeps every kind handleTap/busyKind key off
-// of; STATUS_KINDS is just the trio's display order.
-const CHECKIN_KINDS: readonly CheckinKind[] = ["took", "filled", "low", "empty", "problem"];
+// Card redesign (2026-09-19) — the five kinds now render in three explicit
+// groups instead of one CHECKIN_KINDS.map'd flat grid: a colored-dot status
+// trio (filled/low/empty, STATUS_KINDS' order), a two-up row (took, add a
+// photo), and 'problem' as a quiet text link beside "Report photo" — each
+// group's own JSX below names its kinds directly, so the old single
+// display-order array no longer has a reader.
 const STATUS_KINDS: readonly CheckinKind[] = ["filled", "low", "empty"];
 /** Dot color per status-trio kind — same success/warning/danger tokens STATUS_DOT_CLASS (blessingBoxes.ts) uses, keyed by CheckinKind instead of BoxStatus (different domain: what someone just reported vs. the box's current computed status), so kept local rather than shared. */
 const KIND_DOT_CLASS: Partial<Record<CheckinKind, string>> = {

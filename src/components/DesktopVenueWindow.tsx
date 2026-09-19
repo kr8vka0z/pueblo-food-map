@@ -539,11 +539,19 @@ export default function DesktopVenueWindow({
   );
 
   // ── Blessing-box body ─────────────────────────────────────────────────────
-  // A box's card content is entirely BoxCardBody (status, latest check-in,
-  // most-needed, host note, check-in panel) — none of the ordinary-venue
-  // address/hours/SNAP-WIC/phone/Plentiful-link sections apply to a box. No
-  // History link here: the header renders it instead (see VenuePopupHeader's
-  // own header for why), so `showHistoryLink={false}`.
+  // Card redesign (2026-09-19): BoxCardBody now owns the WHOLE box card —
+  // photo, sponsor band, badge, name, address-as-directions-link,
+  // most-needed, host note, check-in panel, footer — so this branch no
+  // longer renders venueNameBlock, the category badge, or DirectionButtons
+  // itself (all now inside BoxCardBody); Share/Favorite are handed in via
+  // its `actions` slot instead, same visual weight/position the shared
+  // venueNameBlock used to give them. No History link here: the header
+  // renders it instead (see VenuePopupHeader's own header for why), so
+  // `showHistoryLink={false}`. `photoRadiusClassName` is left at its
+  // default "" — the box's photo sits below the persistent header bar, not
+  // flush against the window's own top corners, so there's no radius to
+  // put on it; the outer window's existing `overflow-hidden` still clips
+  // anything that runs past its rounded-lg edge regardless.
   //
   // ONE tree, always the scrollable/expanded-style wrapper (fix, 2026-09-18 —
   // Kyle: "When I click show details, nothing shows up"): a box has no
@@ -553,29 +561,21 @@ export default function DesktopVenueWindow({
   // independent of `expanded` — BoxCardBody (and its child BoxCheckinPanel,
   // which holds in-progress note-form state) never remounts.
   const boxBody = (
-    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-      {venueNameBlock}
-      <span
-        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-[var(--color-bone-50)] w-fit"
-        style={{ backgroundColor: categoryColors[venue.category] }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" aria-hidden />
-        {t(`category.full.${venue.category}`, locale)}
-      </span>
-      <DirectionButtons
-        venue={venue}
-        onWalk={onWalkRoute ?? (() => {})}
-        locale={locale}
-        isRouteActive={isWalkRouteActive}
-        onClearRoute={onClearWalkRoute}
-        routeInfo={isWalkRouteActive ? walkRouteInfo : null}
-        walkSteps={isWalkRouteActive ? walkRouteSteps : null}
-        showLocationHint={showWalkLocationHint}
-      />
+    <div className="flex-1 overflow-y-auto">
       {box ? (
-        <BoxCardBody box={box} onCheckinSuccess={onCheckinSuccess} showHistoryLink={false} />
+        <BoxCardBody
+          box={box}
+          onCheckinSuccess={onCheckinSuccess}
+          showHistoryLink={false}
+          actions={
+            <>
+              <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} isBox />
+              <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} />
+            </>
+          }
+        />
       ) : (
-        <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
+        <p className="px-4 py-4 text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
       )}
     </div>
   );

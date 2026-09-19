@@ -95,9 +95,28 @@ interface BoxCardBodyProps {
   photoRadiusClassName?: string;
   /** Rendered to the right of the name (Share/Favorite/Close, owned by the caller — different per caller, see BottomSheet/DesktopVenueWindow). */
   actions?: React.ReactNode;
+  /** DOM id for the name heading (fix pass, 2026-09-19, BLOCKER). DesktopVenueWindow's outer `role="dialog"` points `aria-labelledby` at `venue-window-title-<id>` — before BoxCardBody owned the whole card, that id lived on a header-rendered heading; now it has to live on THIS component's own name heading, or the dialog's accessible name dangles (points at no element) for every box. Optional/undefined elsewhere (BottomSheet uses a Drawer.Title instead, and BoxHistoryContent's page has no such dialog role to satisfy). */
+  nameId?: string;
 }
 
-/** The status pill — a colored dot + the status word in its own semantic color, then a neutral "· filled {time}" detail. Overlaid on the photo (bone-50 chip, bottom-left) when there's a photo; a plain inline pill (bone-100 background) otherwise. */
+/**
+ * The status pill — a colored dot + the status word in its own semantic
+ * color, then a neutral "· filled {time}" detail. Overlaid on the photo
+ * (bone-50 chip, bottom-left) when there's a photo; a plain inline pill
+ * (bone-100 background) otherwise.
+ *
+ * Fix pass (2026-09-19, item 2): the overlaid pill used to collide with the
+ * caption chip (also bottom-right at the time) at 360-420px, worse with
+ * longer Spanish/never-filled strings — two chips both trying to occupy the
+ * photo's bottom edge with no shared width budget. The caption chip moved to
+ * top-right (this component's photo block, below) so the two never compete
+ * for the same corner; this pill ALSO gets its own width ceiling
+ * (`max-w-[calc(100%-1.5rem)]`, leaving the photo's 12px side insets) so an
+ * unusually long detail string can't push the pill past the photo's edge —
+ * only the detail segment truncates (`truncate min-w-0`), never the status
+ * word itself (`shrink-0` on the dot + word keeps them at their natural
+ * width).
+ */
 function StatusPill({ box, locale, overlay }: { box: PublicBlessingBox; locale: Locale; overlay: boolean }) {
   const status = box.box.status;
   // "unknown" always shows the "no recent check-ins" detail, even if
@@ -116,13 +135,13 @@ function StatusPill({ box, locale, overlay }: { box: PublicBlessingBox; locale: 
       data-testid="box-status-badge"
       className={
         overlay
-          ? "absolute left-3 bottom-3 flex items-center gap-2 rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 text-sm font-semibold shadow-sm"
+          ? "absolute left-3 bottom-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 text-sm font-semibold shadow-sm"
           : "inline-flex w-fit items-center gap-2 rounded-full bg-[var(--color-bone-100)] px-3 py-1.5 text-sm font-semibold"
       }
     >
-      <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_CLASS[status]}`} aria-hidden="true" />
-      <span className={STATUS_TEXT_CLASS[status]}>{t(`box.status.${status}`, locale)}</span>
-      <span className="font-normal text-[var(--color-ink-500)]">· {detail}</span>
+      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${STATUS_DOT_CLASS[status]}`} aria-hidden="true" />
+      <span className={`shrink-0 ${STATUS_TEXT_CLASS[status]}`}>{t(`box.status.${status}`, locale)}</span>
+      <span className="min-w-0 truncate font-normal text-[var(--color-ink-500)]">· {detail}</span>
     </div>
   );
 }
@@ -154,6 +173,7 @@ export default function BoxCardBody({
   className = "",
   photoRadiusClassName = "",
   actions,
+  nameId,
 }: BoxCardBodyProps) {
   const { locale } = useLocale();
   const [adoptOpen, setAdoptOpen] = useState(false);
@@ -184,8 +204,11 @@ export default function BoxCardBody({
             className={`block h-[170px] w-full object-cover bg-[var(--color-bone-200)] ${photoRadiusClassName}`}
           />
           <StatusPill box={box} locale={locale} overlay />
-          <div className="absolute right-3 bottom-3 rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 shadow-sm">
-            <span className="text-xs font-medium text-[var(--color-ink-500)]">
+          {/* Caption chip moved to top-right (fix pass, item 2) — see
+              StatusPill's own header for why it used to collide with the
+              status pill sharing the bottom edge. */}
+          <div className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 shadow-sm">
+            <span className="block truncate text-xs font-medium text-[var(--color-ink-500)]">
               {t("box.photo.caption", locale, { time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale) })}
             </span>
           </div>
@@ -222,7 +245,7 @@ export default function BoxCardBody({
               type="button"
               aria-expanded={adoptOpen}
               onClick={() => setAdoptOpen((open) => !open)}
-              className="font-medium underline underline-offset-2"
+              className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
             >
               {t("box.adopt.linkLabel", locale)}
             </button>
@@ -240,6 +263,7 @@ export default function BoxCardBody({
               {t("category.full.blessing_box", locale)}
             </span>
             <NameTag
+              id={nameId}
               className="mt-1 text-xl font-normal leading-tight text-[var(--color-ink-900)]"
               style={{ fontFamily: "var(--font-display)" }}
             >
@@ -251,12 +275,21 @@ export default function BoxCardBody({
 
         {/* Address — the text itself is the directions link (mockup v3,
             option B — Kyle's pick, no icon, no button). See this file's own
-            header for why there's no DirectionButtons row on a box card. */}
+            header for why there's no DirectionButtons row on a box card.
+            Fix pass (2026-09-19): NO preset travelmode (item 4) — many box
+            visitors walk or ride the bus, so `googleMapsUrl` is called with
+            no third argument and Google Maps itself lets the person pick a
+            mode once it opens, rather than assuming "driving." The
+            aria-label is prefixed with the visible address text (item 3,
+            WCAG 2.5.3 label-in-name) — a screen-reader/voice-control user
+            saying "click <the address>" must find a match inside the
+            accessible name, not just the unrelated "Directions to <name>"
+            phrase that used to be the WHOLE label. */}
         <a
-          href={googleMapsUrl(box.lat, box.lng, "driving")}
+          href={googleMapsUrl(box.lat, box.lng)}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={t("directions.driveAriaLabel", locale, { name: box.name })}
+          aria-label={`${box.address} — ${t("directions.boxAriaLabel", locale, { name: box.name })}`}
           className="-mt-2 inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
         >
           {box.address}
@@ -300,7 +333,7 @@ export default function BoxCardBody({
           {showHistoryLink && (
             <Link
               href={`/box/${encodeURIComponent(box.id)}/history`}
-              className="text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+              className="inline-flex min-h-[44px] items-center text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
             >
               {t("box.history.link", locale)}
             </Link>

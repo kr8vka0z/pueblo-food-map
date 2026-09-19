@@ -141,7 +141,7 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="min-h-[44px] text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline w-fit text-left"
+          className="inline-flex min-h-[44px] w-fit items-center text-left text-sm font-medium text-[var(--color-sage-600)] underline hover:text-[var(--color-sage-700)]"
         >
           {t("box.alerts.linkLabel", locale)}
         </button>

@@ -137,14 +137,26 @@ describe("BoxCardBody — History link (footer)", () => {
 });
 
 describe("BoxCardBody — address is the directions link, no orange button", () => {
-  test("the address text itself opens driving directions — same URL DirectionButtons' Drive button builds", () => {
+  // Fix pass (2026-09-19, item 4): no preset travel mode — googleMapsUrl is
+  // called with no third argument, so the deeplink carries no `travelmode`
+  // param and Google Maps itself lets the visitor pick walk/bus/drive.
+  test("the address text itself opens directions with no preset travel mode", () => {
     renderCard();
-    // aria-label ("Drive directions to <name>…") is the accessible name here,
-    // not the visible address text — assert on the visible text plus the href.
     const addressText = screen.getByText("123 Test St, Pueblo, CO");
     expect(addressText.tagName).toBe("A");
-    expect(addressText.getAttribute("href")).toBe(googleMapsUrl(BASE_BOX.lat, BASE_BOX.lng, "driving"));
+    expect(addressText.getAttribute("href")).toBe(googleMapsUrl(BASE_BOX.lat, BASE_BOX.lng));
+    expect(addressText.getAttribute("href")).not.toContain("travelmode");
     expect(addressText.getAttribute("target")).toBe("_blank");
+  });
+
+  // Fix pass (2026-09-19, item 3, WCAG 2.5.3 label-in-name): the accessible
+  // name must CONTAIN the visible address text, not just an unrelated
+  // "Directions to <name>" phrase.
+  test("the accessible name (aria-label) contains the visible address text", () => {
+    renderCard();
+    const addressText = screen.getByText("123 Test St, Pueblo, CO");
+    const label = addressText.getAttribute("aria-label") ?? "";
+    expect(label).toContain("123 Test St, Pueblo, CO");
   });
 
   test("no Walk/Bus/Drive DirectionButtons row renders on a box card", () => {

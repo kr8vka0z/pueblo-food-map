@@ -419,6 +419,27 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
     expect(link.getAttribute("href")).toBe("/box/test-box-1/history");
   });
 
+  // Fix pass (2026-09-19, item 1, BLOCKER): the outer dialog's
+  // aria-labelledby pointed at an id that only ever existed on
+  // venueNameBlock's own heading — a box branch never renders that block,
+  // so the dialog's accessible name dangled (pointed at no element) for
+  // every box until BoxCardBody's new `nameId` prop was wired through.
+  test("the dialog's accessible name resolves to the box's own name (aria-labelledby no longer dangles)", () => {
+    render(
+      <DesktopVenueWindow
+        venue={makeBoxVenue()}
+        box={makeBox()}
+        expanded={false}
+        mapboxMap={mockMapboxMap}
+        onExpand={vi.fn()}
+        onCollapse={vi.fn()}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+    expect(screen.getByRole("dialog", { name: "Test Blessing Box" })).toBeDefined();
+  });
+
   test("host note and status render unconditionally — no 'nothing shows up' gap (Kyle, 2026-09-18)", () => {
     render(
       <DesktopVenueWindow

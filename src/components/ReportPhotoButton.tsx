@@ -51,7 +51,7 @@ export default function ReportPhotoButton({ photoId, locale }: { photoId: number
         type="button"
         onClick={handleClick}
         disabled={state === "submitting"}
-        className="text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
+        className="inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
       >
         {state === "submitting" ? t("box.photo.reporting", locale) : t("box.photo.report", locale)}
       </button>

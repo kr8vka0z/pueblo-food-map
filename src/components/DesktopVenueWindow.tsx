@@ -551,7 +551,13 @@ export default function DesktopVenueWindow({
   // default "" — the box's photo sits below the persistent header bar, not
   // flush against the window's own top corners, so there's no radius to
   // put on it; the outer window's existing `overflow-hidden` still clips
-  // anything that runs past its rounded-lg edge regardless.
+  // anything that runs past its rounded-lg edge regardless. `nameId` (fix
+  // pass, 2026-09-19, BLOCKER) wires this window's own `aria-labelledby`
+  // (below) to the name heading BoxCardBody now renders — before the card
+  // redesign consolidated ownership, that id lived on venueNameBlock's own
+  // heading; since a box branch never renders venueNameBlock, the dialog's
+  // accessible name was dangling (pointing at no element) for every box
+  // until this was wired through.
   //
   // ONE tree, always the scrollable/expanded-style wrapper (fix, 2026-09-18 —
   // Kyle: "When I click show details, nothing shows up"): a box has no
@@ -567,6 +573,7 @@ export default function DesktopVenueWindow({
           box={box}
           onCheckinSuccess={onCheckinSuccess}
           showHistoryLink={false}
+          nameId={`venue-window-title-${venue.id}`}
           actions={
             <>
               <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} isBox />

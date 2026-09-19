@@ -712,7 +712,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
           disabled={busy}
           aria-disabled={busy}
           onClick={() => handleTap("problem")}
-          className="text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
+          className="inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
         >
           {busyKind === "problem" ? t("box.checkin.submitting", locale) : t("box.checkin.problem", locale)}
         </button>

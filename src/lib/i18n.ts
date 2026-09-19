@@ -383,6 +383,10 @@ const en: Record<string, string> = {
   "directions.walkAriaLabel": "Walking directions to {name} (opens on map)",
   "directions.busAriaLabel": "Bus directions to {name} (opens in new tab)",
   "directions.driveAriaLabel": "Drive directions to {name} (opens in new tab)",
+  // Box card fix pass (2026-09-19, item 4) — the address link has no preset
+  // travel mode (walk/bus/drive all left to Google Maps), so its aria text
+  // is deliberately mode-neutral, unlike the three labels above.
+  "directions.boxAriaLabel": "Directions to {name} (opens in new tab)",
   "directions.routeDistance": "{distance} walk",
   "directions.routeDuration": "{duration}",
   "directions.clearRoute": "Clear walking route",
@@ -1168,6 +1172,7 @@ const es: Record<string, string> = {
   "directions.walkAriaLabel": "Cómo llegar caminando a {name} (se muestra en el mapa)",
   "directions.busAriaLabel": "Cómo llegar en autobús a {name} (se abre en una pestaña nueva)",
   "directions.driveAriaLabel": "Cómo llegar manejando a {name} (se abre en una pestaña nueva)",
+  "directions.boxAriaLabel": "Cómo llegar a {name} (se abre en una pestaña nueva)", // [CHECK]
   "directions.routeDistance": "{distance} caminando",
   "directions.routeDuration": "{duration}",
   "directions.clearRoute": "Eliminar ruta a pie",

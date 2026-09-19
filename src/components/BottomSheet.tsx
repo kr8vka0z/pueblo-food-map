@@ -158,6 +158,12 @@ export default function BottomSheet({
                     onCheckinSuccess={onCheckinSuccess}
                     className="pb-[max(1rem,env(safe-area-inset-bottom))]"
                     photoRadiusClassName="rounded-t-[var(--radius-xl)]"
+                    onWalkRoute={onWalkRoute ? () => onWalkRoute(box) : undefined}
+                    isWalkRouteActive={isWalkRouteActive}
+                    onClearWalkRoute={onClearWalkRoute}
+                    walkRouteInfo={isWalkRouteActive ? walkRouteInfo : null}
+                    walkRouteSteps={isWalkRouteActive ? walkRouteSteps : null}
+                    showWalkLocationHint={showWalkLocationHint}
                     actions={
                       <>
                         <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} isBox />
@@ -302,9 +308,10 @@ export default function BottomSheet({
                     routeInfo threads distance+duration down for the in-card readout.
                     walkSteps provides the collapsible turn-by-turn list.
                     Ordinary venues only as of the card redesign (2026-09-19)
-                    — a box's directions are the address-as-link BoxCardBody
-                    itself renders now (see that component's own header for
-                    why), so this branch is guaranteed non-box already. */}
+                    — a box's own Walk trigger is the address text
+                    BoxCardBody renders (walk restore pass, same day; see
+                    that component's own header), not this three-button row,
+                    so this branch is guaranteed non-box already. */}
                 <DirectionButtons
                   venue={venue}
                   onWalk={onWalkRoute ?? (() => {})}

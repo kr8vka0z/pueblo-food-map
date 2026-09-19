@@ -739,9 +739,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
     const action = decideWalkResume(awaitingId, selectedVenueId, geo.state);
     if (action.kind === "fetch") {
-      // Includes boxVenues (map-first rework, 2026-09-18) — a box card
-      // shares DirectionButtons/Walk with every other venue now, so a Walk
-      // tap awaiting location can target a box id, not just allVenues.
+      // Includes boxVenues (map-first rework, 2026-09-18) — a box card's
+      // address doubles as its own Walk trigger (walk restore pass,
+      // 2026-09-19, see BoxCardBody's own header), sharing this same
+      // handleWalkRoute/fetchWalkingRoute path every other venue's Walk
+      // button uses, so a Walk tap awaiting location can target a box id,
+      // not just allVenues.
       const venue = allVenues.find((v) => v.id === awaitingId) ?? boxVenues.find((v) => v.id === awaitingId);
       if (venue) void fetchWalkingRoute(venue, action.origin);
     } else if (action.kind === "show-hint") {

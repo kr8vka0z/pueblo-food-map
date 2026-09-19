@@ -29,25 +29,39 @@
  * own name to render as the page's `<h1>` instead of duplicating a second
  * heading above it — see that component for the caller-side half of this.
  *
- * No orange "Directions" button — deviation from a literal reading of the
- * task brief, resolved via `advisor()` mid-build. `DirectionButtons.tsx`
- * (Walk/Bus/Drive) has existed since PR #134, predating the Blessing Boxes
- * epic; the atlas-kb note above documents it being DELIBERATELY extended to
- * box cards on 2026-09-18. Mockup v3's own lede — "The orange button is
- * gone in all three [directions options]" — and Kyle's pick of option B
- * (the address text itself IS the link, no icon, no button) make clear the
- * approved design has no Walk/Bus/Drive row on a box card at all; this
- * reverses that 09-18 decision for boxes only. The address `<a>` below
- * reuses DirectionButtons.tsx's own `googleMapsUrl()` (now exported, and
- * its `travelmode` param made optional in the fix pass — item 4) rather
- * than re-deriving the query string, so there is still exactly one URL
- * builder; the box card calls it with NO travel mode at all (many visitors
- * walk or ride the bus), while `DirectionButtons.tsx`'s own three ordinary-
- * venue callers keep passing an explicit mode, unaffected by this change.
- * `MapWrapper.tsx`'s Walk-resume effect still reads `boxVenues` as a
- * fallback target — now unreachable for a box (no Walk button to resume
- * from) but harmless dead code, left in place rather than touched (out of
- * this slice's lane).
+ * No orange "Directions" button, no Walk/Bus/Drive row — deviation from a
+ * literal reading of the original task brief, resolved via `advisor()`
+ * mid-build (2026-09-19). `DirectionButtons.tsx` (Walk/Bus/Drive) has
+ * existed since PR #134, predating the Blessing Boxes epic; the atlas-kb
+ * note above documents it being DELIBERATELY extended to box cards on
+ * 2026-09-18. Mockup v3's own lede — "The orange button is gone in all
+ * three [directions options]" — and Kyle's pick of option B (the address
+ * text itself IS the link, no icon, no button) made clear the approved
+ * design has no three-button row on a box card. Kyle then walked the
+ * result and asked to KEEP the in-app walking route (2026-09-19, walk
+ * restore pass): the address stays the one visible control (no icon, no
+ * extra row) but now DOUBLES as that Walk trigger when a map is present.
+ * `onWalkRoute` presence is the switch: absent (BoxHistoryContent, no map
+ * to draw a route on) → the address is a plain external `<a>` to Google
+ * Maps, unchanged from before. Present (BottomSheet/DesktopVenueWindow,
+ * always forwarded from MapWrapper's own `handleWalkRoute`) → the address
+ * is a `<button>` that fires the SAME callback, geolocation-request, and
+ * location-hint behavior DirectionButtons' own Walk button uses for every
+ * other venue, and the active-route readout (distance/duration, steps,
+ * Clear route, Open in Google Maps) renders below it via
+ * `DirectionButtons.tsx`'s exported `WalkRouteStatus` — extracted from that
+ * file's own JSX (not duplicated) specifically so this restore could reuse
+ * it byte-for-byte. The address `<a>`/`<button>` both build their href/
+ * click target via `DirectionButtons.tsx`'s own exported `googleMapsUrl()`
+ * (its `travelmode` param optional since the fix pass, item 4) — one URL
+ * builder either way; the inactive/link form still omits travel mode
+ * entirely (many visitors walk or ride the bus and Google Maps lets them
+ * pick once it opens), while the active-route "Open in Google Maps" link
+ * inside `WalkRouteStatus` uses "walking" (same as every ordinary venue's
+ * own walk handoff). `MapWrapper.tsx`'s Walk-resume effect reading
+ * `boxVenues` as a fallback target (previously dead code — see that
+ * file's own comment) is live again now that a box can be the target of a
+ * Walk tap that's still waiting on geolocation.
  *
  * Shows ONLY the box's current snapshot, never a list (Kyle, 2026-09-18
  * scope addition to the map-first rework): status + last filled, the single
@@ -69,7 +83,7 @@
  *     `adoptOpen` state.
  */
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
@@ -77,7 +91,7 @@ import { formatRelativeTime } from "@/lib/relativeTime";
 import BoxCheckinPanel from "@/components/BoxCheckinPanel";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 import BoxAlertSignupForm from "@/components/BoxAlertSignupForm";
-import { googleMapsUrl } from "@/components/DirectionButtons";
+import { googleMapsUrl, WalkRouteStatus, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 import { categoryColors } from "@/data/venues";
 import {
   STATUS_DOT_CLASS,
@@ -102,6 +116,28 @@ interface BoxCardBodyProps {
   actions?: React.ReactNode;
   /** DOM id for the name heading (fix pass, 2026-09-19, BLOCKER). DesktopVenueWindow's outer `role="dialog"` points `aria-labelledby` at `venue-window-title-<id>` — before BoxCardBody owned the whole card, that id lived on a header-rendered heading; now it has to live on THIS component's own name heading, or the dialog's accessible name dangles (points at no element) for every box. Optional/undefined elsewhere (BottomSheet uses a Drawer.Title instead, and BoxHistoryContent's page has no such dialog role to satisfy). */
   nameId?: string;
+  /**
+   * In-app walking directions (walk restore pass, 2026-09-19) — see this
+   * file's own header for the full rationale. Absent (default): the address
+   * renders as a plain external `<a>` to Google Maps, exactly as before
+   * (BoxHistoryContent's use — no map on that page to draw a route on).
+   * Present: the address becomes a `<button>` that calls this on tap,
+   * mirroring DirectionButtons' own Walk button (same callback contract the
+   * caller already wires for ordinary venues — MapWrapper's
+   * `handleWalkRoute`, which self-toggles off on a second tap for the same
+   * venue, so this needs no separate "already active" branch here).
+   */
+  onWalkRoute?: () => void;
+  /** True when a walking route for this box is currently drawn on the map. Drives the active-route readout below the address and the address's own aria-label. */
+  isWalkRouteActive?: boolean;
+  /** Renders the readout's standalone "Clear route" control (see WalkRouteStatus's own `onClearRoute` doc for why the box card needs this while ordinary venues don't — the address stays labeled as the address, never relabels to "Clear route"). */
+  onClearWalkRoute?: () => void;
+  /** Walking route distance + duration for the in-card readout (threaded from MapWrapper via BottomSheet/DesktopVenueWindow, same as DirectionButtons' own prop). */
+  walkRouteInfo?: RouteInfo | null;
+  /** Turn-by-turn steps from Mapbox (pre-localized), same as DirectionButtons' own prop. */
+  walkRouteSteps?: WalkStep[] | null;
+  /** True when this box's Walk tap requested geolocation and it was denied or is unavailable (#207) — same as DirectionButtons' own prop. */
+  showWalkLocationHint?: boolean;
 }
 
 /**
@@ -179,9 +215,20 @@ export default function BoxCardBody({
   photoRadiusClassName = "",
   actions,
   nameId,
+  onWalkRoute,
+  isWalkRouteActive = false,
+  onClearWalkRoute,
+  walkRouteInfo = null,
+  walkRouteSteps = null,
+  showWalkLocationHint = false,
 }: BoxCardBodyProps) {
   const { locale } = useLocale();
   const [adoptOpen, setAdoptOpen] = useState(false);
+  // Per-instance id for the "share your location" hint (#207) — shared with
+  // WalkRouteStatus's own <p id>, same reasoning as DirectionButtons' own
+  // identical field. Always called (Rules of Hooks) even in link mode
+  // (onWalkRoute absent); unused in that branch.
+  const walkLocationHintId = useId();
   const hasPhoto = box.box.latestPhoto != null;
   const hasSponsors = box.box.adopters.length > 0;
   const mostNeededChips = box.box.mostNeeded
@@ -283,27 +330,60 @@ export default function BoxCardBody({
           {actions && <div className="flex shrink-0 items-center gap-0.5">{actions}</div>}
         </div>
 
-        {/* Address — the text itself is the directions link (mockup v3,
-            option B — Kyle's pick, no icon, no button). See this file's own
-            header for why there's no DirectionButtons row on a box card.
-            Fix pass (2026-09-19): NO preset travelmode (item 4) — many box
-            visitors walk or ride the bus, so `googleMapsUrl` is called with
-            no third argument and Google Maps itself lets the person pick a
-            mode once it opens, rather than assuming "driving." The
-            aria-label is prefixed with the visible address text (item 3,
-            WCAG 2.5.3 label-in-name) — a screen-reader/voice-control user
-            saying "click <the address>" must find a match inside the
-            accessible name, not just the unrelated "Directions to <name>"
-            phrase that used to be the WHOLE label. */}
-        <a
-          href={googleMapsUrl(box.lat, box.lng)}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`${box.address} — ${t("directions.boxAriaLabel", locale, { name: box.name })}`}
-          className="-mt-2 inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
-        >
-          {box.address}
-        </a>
+        {/* Address — the text itself is the directions link/trigger (mockup
+            v3, option B — Kyle's pick, no icon, no button row). See this
+            file's own header for the full walk-restore rationale.
+            `onWalkRoute` absent (BoxHistoryContent, no map on that page):
+            plain external `<a>` to Google Maps, NO preset travelmode (fix
+            pass, item 4) — many box visitors walk or ride the bus, so
+            Google Maps itself lets the person pick a mode once it opens.
+            `onWalkRoute` present (BottomSheet/DesktopVenueWindow): a
+            `<button>` that starts the SAME in-app walking route
+            DirectionButtons' own Walk button does — same style as the link
+            (underlined sage text, no icon, min-h 44px) so the card looks
+            identical either way; the visible text always stays the address
+            itself (never relabels to "Clear route" — see WalkRouteStatus's
+            own `onClearRoute` doc for why a box needs a separate clear
+            control instead of DirectionButtons' relabel-the-trigger
+            pattern). Both forms prefix the aria-label with the visible
+            address text (WCAG 2.5.3 label-in-name) — a screen-reader/
+            voice-control user saying "click <the address>" must find a
+            match inside the accessible name. */}
+        <div className="-mt-2 flex flex-col items-start">
+          {onWalkRoute ? (
+            <button
+              type="button"
+              onClick={onWalkRoute}
+              aria-describedby={showWalkLocationHint ? walkLocationHintId : undefined}
+              aria-label={`${box.address} — ${t("directions.walkAriaLabel", locale, { name: box.name })}`}
+              className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+            >
+              {box.address}
+            </button>
+          ) : (
+            <a
+              href={googleMapsUrl(box.lat, box.lng)}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${box.address} — ${t("directions.boxAriaLabel", locale, { name: box.name })}`}
+              className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+            >
+              {box.address}
+            </a>
+          )}
+          {onWalkRoute && (
+            <WalkRouteStatus
+              venue={box}
+              locale={locale}
+              isRouteActive={isWalkRouteActive}
+              routeInfo={walkRouteInfo}
+              walkSteps={walkRouteSteps}
+              showLocationHint={showWalkLocationHint}
+              locationHintId={walkLocationHintId}
+              onClearRoute={onClearWalkRoute}
+            />
+          )}
+        </div>
 
         {/* Most needed — admin-typed text wins when set; the self-filling
             visitor-sourced list (migration 0012) only renders when it

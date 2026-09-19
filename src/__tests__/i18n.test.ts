@@ -29,6 +29,9 @@ const IDENTICAL_ALLOWLIST = new Set([
   // directions.stepMi uses the same "mi" abbreviation in both EN and ES — international
   // convention; "mi" is understood universally in the Pueblo CO context (#134).
   "directions.stepMi",
+  // box.stats.noData is a bare em dash ("—") standing in for "no pair yet" —
+  // a symbol, not prose, so it's correctly identical in both locales (slice 7).
+  "box.stats.noData",
 ]);
 
 /** Keys that must differ between EN and ES. */

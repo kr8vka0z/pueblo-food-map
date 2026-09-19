@@ -138,6 +138,18 @@ describe("mapRowToPublicBox", () => {
     const box = mapRowToPublicBox(makeRow(), [], new Date(), { id: 42, createdAt: "2026-09-18T10:00:00.000Z" });
     expect(box.box.latestPhoto).toEqual({ id: 42, createdAt: "2026-09-18T10:00:00.000Z" });
   });
+
+  // ─── Slice 6 (adopt-a-box) ─────────────────────────────────────────────────
+
+  test("adopters defaults to an empty array when none is passed", () => {
+    const box = mapRowToPublicBox(makeRow());
+    expect(box.box.adopters).toEqual([]);
+  });
+
+  test("adopters is passed straight through, in the order given (loadApprovedAdopterNamesForVenues' own ORDER BY decides order)", () => {
+    const box = mapRowToPublicBox(makeRow(), [], new Date(), null, ["Mesa Church", "The Nguyen Family"]);
+    expect(box.box.adopters).toEqual(["Mesa Church", "The Nguyen Family"]);
+  });
 });
 
 describe("mapRowsToPublicBoxes", () => {
@@ -384,6 +396,49 @@ describe("loadLiveBoxes / loadLiveBoxById", () => {
     const box = await loadLiveBoxById(db, "known");
     expect(box?.id).toBe("known"); // the box itself still loads
     expect(box?.box.latestPhoto).toBeNull();
+  });
+
+  // ─── Slice 6 (adopt-a-box) ─────────────────────────────────────────────────
+
+  function makeFakeDbWithAdopters(row: BoxJoinRow, adopterRows: { venue_id: string; display_name: string }[]) {
+    const prepare = (sql: string) => {
+      if (sql.includes("FROM venues")) {
+        return { bind: () => ({ first: async () => row }) };
+      }
+      if (sql.includes("FROM box_adopters")) {
+        return {
+          bind: (...ids: unknown[]) => ({
+            all: async () => ({ results: adopterRows.filter((a) => (ids as string[]).includes(a.venue_id)) }),
+          }),
+        };
+      }
+      return { bind: () => ({ all: async () => ({ results: [] }) }) };
+    };
+    return { prepare } as unknown as D1Database;
+  }
+
+  test("loadLiveBoxById attaches every approved adopter's display name", async () => {
+    const row = makeRow({ id: "known" });
+    const db = makeFakeDbWithAdopters(row, [
+      { venue_id: "known", display_name: "Mesa Church" },
+      { venue_id: "known", display_name: "The Nguyen Family" },
+    ]);
+    const box = await loadLiveBoxById(db, "known");
+    expect(box?.box.adopters).toEqual(["Mesa Church", "The Nguyen Family"]);
+  });
+
+  test("loadLiveBoxById degrades adopters to [] (never throws) when the box_adopters query fails — a promotion landing before migration 0010 must not take the box down", async () => {
+    const row = makeRow({ id: "known" });
+    const db = {
+      prepare: (sql: string) => {
+        if (sql.includes("FROM venues")) return { bind: () => ({ first: async () => row }) };
+        if (sql.includes("FROM box_adopters")) throw new Error("no such table: box_adopters");
+        return { bind: () => ({ all: async () => ({ results: [] }) }) };
+      },
+    } as unknown as D1Database;
+    const box = await loadLiveBoxById(db, "known");
+    expect(box?.id).toBe("known");
+    expect(box?.box.adopters).toEqual([]);
   });
 });
 

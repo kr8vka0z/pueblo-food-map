@@ -81,9 +81,12 @@ import {
   computeBoxStatus,
   computeLastFilledAt,
   loadVisibleCheckins,
+  type BoxStatus,
   type CheckinKind,
   type CheckinStatusInput,
 } from "@/lib/blessingBoxes";
+import { notifyBoxAlerts } from "@/lib/boxAlerts";
+import { resolveEmailOrigin } from "@/lib/alertOrigin";
 
 export const dynamic = "force-dynamic";
 
@@ -282,6 +285,32 @@ export async function POST(
   if (!box) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
+  const outOfService = box.removed_on !== null && box.removed_on !== "";
+
+  // Slice 6 (alerts): 'empty'/'low' only fire an alert on a status CHANGE
+  // (boxAlerts.ts's rolesToNotify), so the box's status BEFORE this
+  // check-in is read now, before the insert below — 'problem' never needs
+  // this (every report qualifies regardless of status), so it's skipped for
+  // every other kind to avoid an unnecessary extra D1 read.
+  //
+  // 2026-09-18 security review, item 10: this read is guarded — it exists
+  // ONLY to feed alert targeting (see boxAlerts.ts's own header, "NEVER
+  // BLOCKS THE CHECK-IN"), so its own failure must never fail the check-in
+  // itself. On failure, prevStatus is treated as unknown (null), which
+  // rolesToNotify already interprets as "not already this status" — i.e.
+  // an alert still fires, the same safe-by-default direction the rest of
+  // this file already takes for a note that can't be attached, etc.
+  let prevStatus: BoxStatus | null = null;
+  if (checkinKind === "empty" || checkinKind === "low") {
+    try {
+      const priorCheckins = await loadVisibleCheckins(db, boxId);
+      prevStatus = computeBoxStatus(priorCheckins, new Date(), outOfService);
+    } catch (err) {
+      logFormFailure("checkin", "send_failed", {
+        message: err instanceof Error ? err.message : "unknown error",
+      });
+    }
+  }
 
   let newCheckinId: number | null = null;
   try {
@@ -322,12 +351,34 @@ export async function POST(
 
   await bustListCache(req);
 
+  // Slice 6 (alerts): never blocks or fails the check-in response — see
+  // boxAlerts.ts's own header, "NEVER BLOCKS THE CHECK-IN." Runs via
+  // ctx.waitUntil() when a live ExecutionContext is available (a normal
+  // deployed Worker), falling back to an un-awaited, already-caught promise
+  // otherwise (e.g. local dev / a test harness with no ctx) — either way the
+  // response below is built and returned without waiting on this.
+  const alertsPromise = notifyBoxAlerts(db, {
+    venueId: boxId,
+    kind: checkinKind,
+    prevStatus,
+    origin: resolveEmailOrigin(req),
+  }).catch((err) => {
+    logFormFailure("checkin", "send_failed", {
+      message: err instanceof Error ? err.message : "unknown error",
+    });
+  });
+  try {
+    getCloudflareContext().ctx.waitUntil(alertsPromise);
+  } catch {
+    // No live ExecutionContext — the promise above still runs on its own and
+    // is already caught; nothing further to do here.
+  }
+
   // Recompute this box's own status/lastFilled/recentCheckins from the
   // check-ins table (including the row just inserted) so the response — and
   // therefore BoxContent's panel — reflects the write immediately, with no
   // second fetch and no dependency on the 60s list cache at all.
   const checkins: CheckinStatusInput[] = await loadVisibleCheckins(db, boxId);
-  const outOfService = box.removed_on !== null && box.removed_on !== "";
   const now = new Date();
 
   // Returning status/lastFilledAt here regardless of `checkinKind` is safe

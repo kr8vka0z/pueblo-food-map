@@ -59,6 +59,7 @@ const BASE_BOX: PublicBlessingBox = {
     lastFilledAt: "2026-09-17T09:00:00.000Z",
     recentCheckins: [],
     latestPhoto: null,
+    adopters: [],
   },
 };
 
@@ -157,6 +158,26 @@ describe("BoxCardBody — extension points render nothing today", () => {
     expect(screen.queryByText(/coming soon/i)).toBeNull();
     expect(screen.queryByAltText(/photo/i)).toBeNull();
     expect(screen.queryByText(/cared for by/i)).toBeNull();
+  });
+});
+
+describe("BoxCardBody — cared-for-by sponsor slot (slice 6)", () => {
+  test("renders nothing when there are no approved adopters", () => {
+    renderCard({ adopters: [] });
+    expect(screen.queryByText(/cared for by/i)).toBeNull();
+  });
+
+  test("renders the joined display names when adopters is non-empty", () => {
+    renderCard({ adopters: ["The Martinez Family", "Jane Doe"] });
+    expect(screen.getByText("Cared for by The Martinez Family, Jane Doe")).toBeDefined();
+  });
+});
+
+describe("BoxCardBody — adopt/alert inline-expand forms (slice 6)", () => {
+  test("renders both forms collapsed to a plain link", () => {
+    renderCard();
+    expect(screen.getByRole("button", { name: "Adopt this box" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Email me when it needs filling" })).toBeDefined();
   });
 });
 

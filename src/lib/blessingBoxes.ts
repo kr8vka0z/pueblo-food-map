@@ -29,6 +29,7 @@
 
 import type { Venue, VenueCategory } from "@/types/venue";
 import { loadLatestApprovedPhotosForVenues, type PublicBoxPhoto } from "@/lib/boxPhotos";
+import { loadApprovedAdopterNamesForVenues } from "@/lib/boxAdopters";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
 
 // ─── D1 row shapes ──────────────────────────────────────────────────────────
@@ -219,6 +220,8 @@ export interface PublicBlessingBox extends Venue {
     recentCheckins: PublicCheckinEvent[];
     /** Slice 5 — the most recent APPROVED photo, or null (never uploaded, or nothing approved yet). Null is also what a degraded (D1-failure) photo read returns — see loadLiveBoxes'/loadLiveBoxById's own comment for why a photos-table failure must never take the whole box down the way a checkins-table failure does. */
     latestPhoto: PublicBoxPhoto | null;
+    /** Slice 6 — approved adopter display names ONLY, oldest first ("Cared for by A, B" reads as an accumulating roster). Never the adopter's email — see boxAdopters.ts's own header on why that column exists at all and is never selected here. Empty array (never null) when nobody's been approved yet, or on a degraded (D1-failure) read — same best-effort posture as latestPhoto above. */
+    adopters: string[];
   };
 }
 
@@ -285,6 +288,7 @@ export function mapRowToPublicBox(
   checkins: CheckinStatusInput[] = [],
   now: Date = new Date(),
   latestPhoto: PublicBoxPhoto | null = null,
+  adopters: string[] = [],
 ): PublicBlessingBox {
   const outOfService = row.removed_on !== null && row.removed_on !== "";
   return {
@@ -306,6 +310,7 @@ export function mapRowToPublicBox(
       lastFilledAt: computeLastFilledAt(checkins),
       recentCheckins: toPublicCheckinEvents(checkins),
       latestPhoto,
+      adopters,
     },
   };
 }
@@ -471,14 +476,37 @@ async function loadLatestPhotosBestEffort(db: D1Database, venueIds: string[]): P
   }
 }
 
+/**
+ * Best-effort approved-adopter-names lookup, same "degrade to empty, never
+ * take the box down" posture as loadLatestPhotosBestEffort above — a
+ * missing/broken box_adopters table (e.g. a promotion landing before
+ * migration 0010 is applied) must never re-create slice 2's "every pin
+ * disappears" outage for a purely additive display field.
+ */
+async function loadAdoptersBestEffort(db: D1Database, venueIds: string[]): Promise<Map<string, string[]>> {
+  try {
+    return await loadApprovedAdopterNamesForVenues(db, venueIds);
+  } catch (err) {
+    logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error (box_adopters read)");
+    return new Map();
+  }
+}
+
 export async function loadLiveBoxes(db: D1Database, now: Date = new Date()): Promise<PublicBlessingBox[]> {
   const result = await db.prepare(SELECT_LIVE_BOXES_SQL).all<BoxJoinRow>();
   const rows = result.results ?? [];
   const venueIds = rows.map((r) => r.id);
   const checkinsByVenue = await loadVisibleCheckinsForVenues(db, venueIds);
   const photosByVenue = await loadLatestPhotosBestEffort(db, venueIds);
+  const adoptersByVenue = await loadAdoptersBestEffort(db, venueIds);
   return rows.map((row) =>
-    mapRowToPublicBox(row, checkinsByVenue.get(row.id) ?? [], now, photosByVenue.get(row.id) ?? null),
+    mapRowToPublicBox(
+      row,
+      checkinsByVenue.get(row.id) ?? [],
+      now,
+      photosByVenue.get(row.id) ?? null,
+      adoptersByVenue.get(row.id) ?? [],
+    ),
   );
 }
 
@@ -491,5 +519,6 @@ export async function loadLiveBoxById(
   if (!row) return null;
   const checkins = await loadVisibleCheckins(db, id);
   const photosByVenue = await loadLatestPhotosBestEffort(db, [id]);
-  return mapRowToPublicBox(row, checkins, now, photosByVenue.get(id) ?? null);
+  const adoptersByVenue = await loadAdoptersBestEffort(db, [id]);
+  return mapRowToPublicBox(row, checkins, now, photosByVenue.get(id) ?? null, adoptersByVenue.get(id) ?? []);
 }

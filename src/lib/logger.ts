@@ -27,12 +27,28 @@
 
 import type { AccessDeniedReason } from "./cfAccess";
 
-export type FormName = "suggest" | "report" | "feedback" | "checkin" | "checkin_photo";
-export type FormFailureReason = "turnstile_failed" | "send_failed" | "db_write_failed";
+export type FormName =
+  | "suggest"
+  | "report"
+  | "feedback"
+  | "checkin"
+  | "checkin_photo"
+  // Blessing Boxes slice 6: "adopt" covers the adopt-a-box application route;
+  // "alerts" covers every other alert-subscription route (giver sign-up,
+  // confirm, stop, resubscribe, admin host-alerts) — split the same way
+  // "checkin"/"checkin_photo" split two related-but-distinct write paths.
+  | "adopt"
+  | "alerts";
+// "db_unavailable" (2026-09-18 security review, item 9): an unhandled D1
+// exception on a public route, distinct from "db_write_failed" (a write that
+// completed its round-trip but returned an unexpected result).
+export type FormFailureReason = "turnstile_failed" | "send_failed" | "db_write_failed" | "db_unavailable";
 
 interface FailureDetail {
   status?: number;
   message?: string;
+  /** Blessing Boxes slice 6 (boxAlerts.ts's notifyBoxAlerts): how many claimed recipients lost their alert to this failure — a COUNT only, never the addresses themselves (this file's own PII rule). */
+  recipientCount?: number;
 }
 
 /**
@@ -55,6 +71,9 @@ export function logFormFailure(
   }
   if (detail?.message !== undefined) {
     entry.message = detail.message;
+  }
+  if (detail?.recipientCount !== undefined) {
+    entry.recipientCount = detail.recipientCount;
   }
 
   const line = JSON.stringify(entry);

@@ -359,7 +359,21 @@ const en: Record<string, string> = {
   "privacy.linkLabel": "Privacy",
   "privacy.pageTitle": "Privacy — Pueblo Food Map",
   "privacy.heading": "Privacy",
-  "privacy.body": "Pueblo Food Map collects the information you type into our forms (venue reports, suggestions, and feedback). That information is used to review your submission and, if you provide an email address, to follow up with you. We do not sell, share, or store your contact information beyond what is needed to respond. Your IP address is checked to block spam when you submit a form, and is never saved with your submission.",
+  // Rewrite (slice 6, Blessing Boxes adopt-a-box + alerts): the old, single
+  // un-headed "privacy.body" paragraph is REPLACED by "What we collect"
+  // below (privacy.collect.*), plus two new headed sections — one paragraph
+  // per i18n key, per the task's own instruction ("not overloading
+  // privacy.body"). privacy.analytics (below) is unchanged wording, kept
+  // last, per the task's own "keep the analytics paragraph unchanged."
+  "privacy.collect.heading": "What we collect",
+  "privacy.collect.body": "Pueblo Food Map collects the information you type into our forms (place reports, suggestions, and feedback). We use it to review what you sent and, if you gave an email address, to write back. Your IP address is checked to block spam when you send a form, and is never saved with what you sent.",
+  "privacy.checkins.heading": "Blessing box check-ins",
+  "privacy.checkins.body": "Checking in at a blessing box is anonymous. We do not ask for your name or email, and we do not save your IP address. A photo you add is reviewed before it shows, and location details hidden inside the photo file are removed.",
+  "privacy.alerts.heading": "Email alerts and adopting a box",
+  "privacy.alerts.body1": "We keep your email address only if you ask for it: when you sign up for emails about a blessing box, or when you apply to adopt one. If you host a box, Pueblo Food Map staff may add your email, with your OK, so you hear when your box is empty or has a problem. We use these addresses only to send those emails. We never sell them, share them, or show them on the site.",
+  "privacy.alerts.body2": "If you adopt a box, the name you give us (for example, a group or family name) is shown on that box's card. Your email is not.",
+  "privacy.alerts.body3": "Every alert email has a stop link. One click stops the emails, with no login. To have your email address deleted completely, write to issues@pueblofoodmap.com.",
+  "privacy.alerts.body4": "Our emails are delivered by a mail service called Resend, which handles your address only to deliver them.",
   "privacy.analytics": "We use Cloudflare Web Analytics to count visits and measure how quickly pages load. It sets no cookies and stores nothing on your device, it does not identify you by your IP address or your browser, and it does not follow you to other websites. It records things like which page was viewed, the site you arrived from, your browser and device type, your country, and how long the page took to load. We use no advertising pixels and no other analytics service.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
@@ -574,6 +588,89 @@ const en: Record<string, string> = {
   // "Back to the map" link) was deleted 2026-09-18: PageNav's chrome-level
   // link already covers it (backHref, see PageNav.tsx's own header) — two
   // "back to map" links on one page was the bug being fixed.
+
+  // Adopt-a-box + email alerts (slice 6). Both card forms reuse
+  // privacy.emailDisclosure/privacy.linkLabel for their email-field
+  // disclosure (already established by the 3 public forms) rather than a
+  // second, near-identical disclosure string.
+  "box.adopt.linkLabel": "Adopt this box",
+  "box.adopt.displayNameLabel": "Your name (shown publicly, e.g. a group or family name)",
+  "box.adopt.displayNamePlaceholder": "e.g. The Martinez Family",
+  "box.adopt.emailLabel": "Your email (kept private)",
+  "box.adopt.noteLabel": "Note for the admin (optional, private)",
+  "box.adopt.submit": "Send application",
+  "box.adopt.submitting": "Sending…",
+  "box.adopt.cancel": "Cancel",
+  "box.adopt.success": "Check your email to confirm.",
+  "box.alerts.linkLabel": "Email me when it needs filling",
+  "box.alerts.emailLabel": "Your email",
+  "box.alerts.submit": "Sign me up",
+  "box.alerts.submitting": "Sending…",
+  "box.alerts.cancel": "Cancel",
+  "box.alerts.success": "Check your email to confirm.",
+  // Shared between both forms above — same "one generic message per class
+  // of failure" convention as box.checkin.error, but not scope-split like
+  // that one: the adopt/alert forms don't need per-scope wording, only "try
+  // again" vs. "try again later."
+  "box.form.error.generic": "That didn't go through. Please try again.",
+  "box.form.error.rateLimit": "Too many attempts right now. Please try again later.",
+
+  // Cared-for-by sponsor slot (BoxCardBody's approved-adopters list)
+  "box.adopters.caredForBy": "Cared for by {names}",
+
+  // /alerts/confirm and /alerts/stop — the shared double-opt-in confirm and
+  // one-click-unsubscribe pages (slice 6). Both carry `robots: noindex` and
+  // a `Referrer-Policy: no-referrer` (tokens live in the URL) — see
+  // next.config.ts and each page's own metadata export.
+  "alerts.confirm.heading": "Confirm your email",
+  "alerts.confirm.body": "Click the button below to confirm you'd like these emails.",
+  "alerts.confirm.button": "Confirm",
+  "alerts.confirm.confirming": "Confirming…",
+  "alerts.confirm.success": "You're confirmed! You'll get emails as described.",
+  "alerts.confirm.invalid": "This confirmation link is no longer valid.",
+  "alerts.confirm.error": "Something went wrong. Please try again.",
+  "alerts.stop.heading": "Emails stopped",
+  "alerts.stop.stopping": "Stopping…",
+  "alerts.stop.body": "You won't get any more emails about this.",
+  "alerts.stop.invalid": "This link is no longer valid.",
+  "alerts.stop.noscriptButton": "Stop these emails",
+  "alerts.stop.undoButton": "That was a mistake — turn emails back on",
+  "alerts.stop.undoing": "Turning back on…",
+  "alerts.stop.undone": "You're back on the list.",
+  "alerts.stop.undoError": "That didn't go through. Please try again.",
+
+  // Outbound email copy (slice 6) — rendered via composeBilingualEmail
+  // (src/lib/emailSend.ts), which builds EN+ES blocks in one message. The
+  // *.subject keys are rendered EN-only (see that file's own header) but
+  // still need an ES entry for the i18n parity test.
+  "email.alert.empty.subject": "{box} is empty",
+  "email.alert.empty.line1": "{box} was just marked empty.",
+  "email.alert.low.subject": "{box} is running low",
+  "email.alert.low.line1": "{box} was just marked as running low.",
+  "email.alert.problem.subject": "A problem was reported at {box}",
+  "email.alert.problem.line1": "A problem was just reported at {box}.",
+  "email.alert.line2": "See the box's page for details: {url}",
+  "email.stopLine": "Don't want these emails anymore? Stop them any time, no login needed: {stopUrl}",
+  "email.adoptConfirm.subject": "Confirm your application to adopt {box}",
+  "email.adoptConfirm.line1": "Thanks for applying to adopt {box}. Please confirm your email to finish your application.",
+  "email.adoptConfirm.line2": "An admin will review your application once you've confirmed.",
+  "email.adoptConfirm.cta": "Confirm your email: {url}",
+  // 2026-09-18 security review, item 7: an "if you didn't ask for this"
+  // line on every confirm email — someone else could have typed this
+  // address in by mistake (or on purpose), and this line tells them
+  // exactly what happens if they do nothing (nothing).
+  "email.adoptConfirm.disclaimer": "If you didn't ask for this, you can ignore this email. We won't write again unless someone confirms.",
+  "email.adoptApproved.subject": "You're approved to adopt {box}",
+  "email.adoptApproved.line1": "Good news — your application to adopt {box} as \"{displayName}\" has been approved.",
+  "email.adoptApproved.line2": "Your name will now show on the box's card, and you'll get an email if it's reported empty or has a problem.",
+  "email.alertConfirm.subject": "Confirm your alerts for {box}",
+  "email.alertConfirm.line1": "Please confirm you'd like email alerts for {box}.",
+  "email.alertConfirm.line2": "We'll email you if it's reported empty or running low.",
+  "email.alertConfirm.cta": "Confirm your email: {url}",
+  "email.alertConfirm.disclaimer": "If you didn't ask for this, you can ignore this email. We won't write again unless someone confirms.",
+  "email.hostWelcome.subject": "You're now getting alerts for {box}",
+  "email.hostWelcome.line1": "You've been added as a host contact for {box}.",
+  "email.hostWelcome.line2": "You'll get an email if it's reported empty or has a problem.",
 
   // Activity log (/boxes/activity, slice 3) and nav entry
   "nav.boxActivity": "Blessing box activity",
@@ -979,7 +1076,15 @@ const es: Record<string, string> = {
   "privacy.linkLabel": "Privacidad",
   "privacy.pageTitle": "Privacidad — Pueblo Food Map",
   "privacy.heading": "Privacidad",
-  "privacy.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). Esa información se usa para revisar tu envío y, si proporcionas un correo, para darte seguimiento. No vendemos, compartimos ni guardamos tu información de contacto más allá de lo necesario para responder. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con tu envío.",
+  "privacy.collect.heading": "Qué recopilamos", // [CHECK]
+  "privacy.collect.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). La usamos para revisar lo que enviaste y, si diste un correo electrónico, para responderte. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con lo que enviaste.", // [CHECK]
+  "privacy.checkins.heading": "Registros en cajas de bendición", // [CHECK]
+  "privacy.checkins.body": "Registrar tu visita a una caja de bendición es anónimo. No pedimos tu nombre ni tu correo, y no guardamos tu dirección IP. Una foto que agregues se revisa antes de publicarse, y los detalles de ubicación ocultos en el archivo de la foto se eliminan.", // [CHECK]
+  "privacy.alerts.heading": "Alertas por correo y adopción de una caja", // [CHECK]
+  "privacy.alerts.body1": "Guardamos tu correo electrónico solo si tú lo pides: cuando te suscribes a alertas de una caja de bendición, o cuando solicitas adoptar una. Si eres anfitrión de una caja, el personal de Pueblo Food Map puede agregar tu correo, con tu autorización, para avisarte cuando tu caja esté vacía o tenga un problema. Usamos estas direcciones solo para enviar esos correos. Nunca las vendemos, las compartimos, ni las mostramos en el sitio.", // [CHECK]
+  "privacy.alerts.body2": "Si adoptas una caja, el nombre que nos das (por ejemplo, el de un grupo o una familia) se muestra en la tarjeta de esa caja. Tu correo no.", // [CHECK]
+  "privacy.alerts.body3": "Cada correo de alerta tiene un enlace para detenerlo. Un clic detiene los correos, sin necesidad de iniciar sesión. Para que eliminemos tu correo por completo, escribe a issues@pueblofoodmap.com.", // [CHECK]
+  "privacy.alerts.body4": "Nuestros correos se envían a través de un servicio de correo llamado Resend, que solo maneja tu dirección para entregarlos.", // [CHECK]
   "privacy.analytics": "Usamos Cloudflare Web Analytics para contar visitas y medir qué tan rápido cargan las páginas. No usa cookies ni guarda nada en tu dispositivo, no te identifica por tu dirección IP ni por tu navegador, y no te sigue a otros sitios web. Registra datos como qué página se vio, el sitio desde el que llegaste, tu tipo de navegador y dispositivo, tu país y cuánto tardó en cargar la página. No usamos píxeles de publicidad ni ningún otro servicio de análisis.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
@@ -1162,6 +1267,68 @@ const es: Record<string, string> = {
   "box.recentCheckin.none": "Aún no hay visitas registradas", // [CHECK]
   "box.history.link": "Historial", // [CHECK]
   "box.history.subheading": "Historial completo de esta caja", // [CHECK]
+
+  "box.adopt.linkLabel": "Adoptar esta caja", // [CHECK]
+  "box.adopt.displayNameLabel": "Tu nombre (se muestra públicamente, por ejemplo el de un grupo o familia)", // [CHECK]
+  "box.adopt.displayNamePlaceholder": "ej. La Familia Martínez", // [CHECK]
+  "box.adopt.emailLabel": "Tu correo (privado)", // [CHECK]
+  "box.adopt.noteLabel": "Nota para el administrador (opcional, privada)", // [CHECK]
+  "box.adopt.submit": "Enviar solicitud", // [CHECK]
+  "box.adopt.submitting": "Enviando…", // [CHECK]
+  "box.adopt.cancel": "Cancelar", // [CHECK]
+  "box.adopt.success": "Revisa tu correo para confirmar.", // [CHECK]
+  "box.alerts.linkLabel": "Avísame cuando necesite surtido", // [CHECK]
+  "box.alerts.emailLabel": "Tu correo", // [CHECK]
+  "box.alerts.submit": "Suscribirme", // [CHECK]
+  "box.alerts.submitting": "Enviando…", // [CHECK]
+  "box.alerts.cancel": "Cancelar", // [CHECK]
+  "box.alerts.success": "Revisa tu correo para confirmar.", // [CHECK]
+  "box.form.error.generic": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "box.form.error.rateLimit": "Demasiados intentos por ahora. Por favor intenta más tarde.", // [CHECK]
+
+  "box.adopters.caredForBy": "A cargo de {names}", // [CHECK]
+
+  "alerts.confirm.heading": "Confirma tu correo", // [CHECK]
+  "alerts.confirm.body": "Toca el botón de abajo para confirmar que quieres recibir estos correos.", // [CHECK]
+  "alerts.confirm.button": "Confirmar", // [CHECK]
+  "alerts.confirm.confirming": "Confirmando…", // [CHECK]
+  "alerts.confirm.success": "¡Confirmado! Recibirás los correos descritos.", // [CHECK]
+  "alerts.confirm.invalid": "Este enlace de confirmación ya no es válido.", // [CHECK]
+  "alerts.confirm.error": "Algo salió mal. Por favor intenta de nuevo.", // [CHECK]
+  "alerts.stop.heading": "Correos detenidos", // [CHECK]
+  "alerts.stop.stopping": "Deteniendo…", // [CHECK]
+  "alerts.stop.body": "Ya no recibirás más correos sobre esto.", // [CHECK]
+  "alerts.stop.invalid": "Este enlace ya no es válido.", // [CHECK]
+  "alerts.stop.noscriptButton": "Detener estos correos", // [CHECK]
+  "alerts.stop.undoButton": "Fue un error — vuelve a activar los correos", // [CHECK]
+  "alerts.stop.undoing": "Reactivando…", // [CHECK]
+  "alerts.stop.undone": "Vuelves a estar en la lista.", // [CHECK]
+  "alerts.stop.undoError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+
+  "email.alert.empty.subject": "{box} está vacía", // [CHECK]
+  "email.alert.empty.line1": "{box} se acaba de marcar como vacía.", // [CHECK]
+  "email.alert.low.subject": "{box} tiene poco surtido", // [CHECK]
+  "email.alert.low.line1": "{box} se acaba de marcar con poco surtido.", // [CHECK]
+  "email.alert.problem.subject": "Se reportó un problema en {box}", // [CHECK]
+  "email.alert.problem.line1": "Se acaba de reportar un problema en {box}.", // [CHECK]
+  "email.alert.line2": "Consulta la página de la caja para más detalles: {url}", // [CHECK]
+  "email.stopLine": "¿Ya no quieres estos correos? Detenlos cuando quieras, sin iniciar sesión: {stopUrl}", // [CHECK]
+  "email.adoptConfirm.subject": "Confirma tu solicitud para adoptar {box}", // [CHECK]
+  "email.adoptConfirm.line1": "Gracias por solicitar adoptar {box}. Confirma tu correo para terminar tu solicitud.", // [CHECK]
+  "email.adoptConfirm.line2": "Un administrador revisará tu solicitud una vez que confirmes.", // [CHECK]
+  "email.adoptConfirm.cta": "Confirma tu correo: {url}", // [CHECK]
+  "email.adoptConfirm.disclaimer": "Si tú no pediste esto, puedes ignorar este correo. No te escribiremos de nuevo a menos que alguien confirme.", // [CHECK]
+  "email.adoptApproved.subject": "Fuiste aprobado para adoptar {box}", // [CHECK]
+  "email.adoptApproved.line1": "Buenas noticias — tu solicitud para adoptar {box} como \"{displayName}\" fue aprobada.", // [CHECK]
+  "email.adoptApproved.line2": "Tu nombre ahora aparecerá en la tarjeta de la caja, y recibirás un correo si se reporta vacía o con un problema.", // [CHECK]
+  "email.alertConfirm.subject": "Confirma tus alertas para {box}", // [CHECK]
+  "email.alertConfirm.line1": "Confirma que quieres recibir alertas por correo de {box}.", // [CHECK]
+  "email.alertConfirm.line2": "Te avisaremos por correo si se reporta vacía o con poco surtido.", // [CHECK]
+  "email.alertConfirm.cta": "Confirma tu correo: {url}", // [CHECK]
+  "email.alertConfirm.disclaimer": "Si tú no pediste esto, puedes ignorar este correo. No te escribiremos de nuevo a menos que alguien confirme.", // [CHECK]
+  "email.hostWelcome.subject": "Ahora recibirás alertas de {box}", // [CHECK]
+  "email.hostWelcome.line1": "Se te agregó como contacto anfitrión de {box}.", // [CHECK]
+  "email.hostWelcome.line2": "Recibirás un correo si se reporta vacía o con un problema.", // [CHECK]
 
   // Activity log (/boxes/activity, slice 3) and nav entry
   "nav.boxActivity": "Actividad de las cajas de bendiciones", // [CHECK]

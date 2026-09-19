@@ -34,7 +34,7 @@ npm run deploy    # OpenNext build + wrangler deploy — rarely needed, CI handl
 
 ### Rollback
 
-**Last rehearsed on dev: never.** Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments → pick a prior successful deployment → "Rollback to this deployment" (~30s to switch). **Covers bad code only** — does NOT touch D1 (`pueblo-food-map-admin` prod / `-staging` dev) or an already-applied migration, and `main` still holds the bad commit, so follow with a `git revert` PR into `dev` → promote, or the next merge redeploys the break.
+**Last rehearsed on dev: 2026-09-19** — by command, on `pueblo-food-map-staging`: `bunx wrangler deployments list --name <worker>` for the version ids, `bunx wrangler rollback <older-id> --name <worker> -y` to step back (site kept answering), same command with the newer id to step forward. The dashboard route does the same thing: Cloudflare dashboard → Workers & Pages → `pueblo-food-map` → Deployments → pick a prior successful deployment → "Rollback to this deployment" (~30s to switch). **Covers bad code only** — does NOT touch D1 (`pueblo-food-map-admin` prod / `-staging` dev) or an already-applied migration, and `main` still holds the bad commit, so follow with a `git revert` PR into `dev` → promote, or the next merge redeploys the break.
 
 ## Operational notes
 

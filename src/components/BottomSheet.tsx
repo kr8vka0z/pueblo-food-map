@@ -15,6 +15,32 @@
  *   1. Escape key (vaul handles natively via onOpenChange)
  *   2. Tap on scrim (vaul handles by default)
  *   3. Explicit close X button
+ *
+ * Route strip (#509, walk-route standard for every venue card): starting a
+ * walking route (a box's address tap, or an ordinary place's Walk button —
+ * both call the SAME `onWalkRoute`) shrinks this sheet to a short `RouteStrip`
+ * instead of leaving the full card covering the map. This is the one place
+ * v2's retired snap-point model comes back — but scoped ONLY to while a
+ * route is active, and only ever between two points (full card / strip), not
+ * v2's ambient three-point drag everywhere. `dismissible={false}` while a
+ * route is active is what makes vaul rest at the strip instead of closing on
+ * a drag-down (vaul's own contract: with snapPoints + dismissible=false,
+ * dragging down from the lowest snap point is a no-op — see vaul's
+ * `onDrag`/`noCloseSnapPointsPreCondition`); the same flag also blocks
+ * Escape/scrim from fully dismissing while a route is active (vaul's
+ * `onOpenChange` short-circuits on `!dismissible && !open` before it ever
+ * reaches OUR `handleOpenChange`) — handled below by collapsing to the
+ * strip instead of doing nothing on Escape, so it isn't a dead key. Only the
+ * explicit × button (an imperative `onClose()` call, never routed through
+ * vaul's dismissible gate) still closes everything, unchanged.
+ *
+ * `key={isWalkRouteActive ? "route" : "card"}` on `Drawer.Root` remounts vaul
+ * fresh across that transition rather than mutating `snapPoints`/`dismissible`
+ * on a live instance — vaul's internal transform/offset state from the
+ * pre-transition mode isn't guaranteed to reset otherwise (advisor()-reviewed
+ * 2026-09-19). The trade-off: the shrink-to-strip transition is a fresh open
+ * (a slide-in), not a morph of the outgoing full card — acceptable, and
+ * simpler than vaul's snap-point internals to get provably right.
  */
 
 import { useState } from "react";
@@ -36,7 +62,14 @@ import ShareButton from "@/components/ShareButton";
 import HoursList from "@/components/HoursList";
 import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 import BoxCardBody from "@/components/BoxCardBody";
+import RouteStrip, { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
+
+// vaul's px snapPoints can't use calc() — a literal string, computed once.
+const ROUTE_STRIP_SNAP = `${ROUTE_STRIP_HEIGHT_PX}px`;
+// The "full card" snap point — 100% of the drawer's own (fixed, see the
+// `height` style swap below) height.
+const FULL_CARD_SNAP = 1;
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -96,10 +129,38 @@ export default function BottomSheet({
   const locale = localeProp ?? ctxLocale;
   const [expanded, setExpanded] = useState(false);
 
+  // ── Route strip (#509) ──────────────────────────────────────────────────
+  // cardRevealed: true = full card showing, false = strip. Defaults to the
+  // OPPOSITE of isWalkRouteActive at first render — if a BottomSheet ever
+  // mounts with a route already active (deep link, or this exact prop
+  // combination in a test), it should open straight to the strip, matching
+  // "starting a route shows the strip" instead of needing a follow-up render
+  // to catch up.
+  //
+  // prevRouteActive + the render-time comparison below is React's own
+  // "adjusting state when a prop changes" pattern (not a useEffect) — it
+  // reacts ONLY on an actual isWalkRouteActive transition, not every
+  // re-render, so tapping "Show card" isn't immediately fought by a
+  // re-render that still sees isWalkRouteActive=true. Doing this as a
+  // useEffect (setState inside an effect body) is exactly what
+  // MapWrapper.tsx's own walking-route-clear effect works around with
+  // queueMicrotask (see that file's own comment) — the render-time variant
+  // has no such rule to satisfy since it isn't in an effect at all.
+  const [cardRevealed, setCardRevealed] = useState(!isWalkRouteActive);
+  const [prevRouteActive, setPrevRouteActive] = useState(isWalkRouteActive);
+  if (isWalkRouteActive !== prevRouteActive) {
+    setPrevRouteActive(isWalkRouteActive);
+    // Route just started -> strip (cardRevealed=false). Route just cleared
+    // -> always back to the full card (cardRevealed=true), regardless of
+    // whether the strip or the full card was showing when it cleared.
+    setCardRevealed(!isWalkRouteActive);
+  }
+
   const open = venue !== null;
   const isBox = venue?.category === "blessing_box";
   const status = venue ? computeOpenStatus(venue.hours_weekly) : null;
   const displayNotes = venue ? getDisplayNotes(venue) : undefined;
+  const showStrip = isWalkRouteActive && !cardRevealed;
 
   function handleOpenChange(isOpen: boolean) {
     if (!isOpen) onClose();
@@ -109,10 +170,17 @@ export default function BottomSheet({
 
   return (
     <Drawer.Root
+      key={isWalkRouteActive ? "route" : "card"}
       open={open}
       onOpenChange={handleOpenChange}
       modal={false}
-      dismissible
+      dismissible={!isWalkRouteActive}
+      snapPoints={isWalkRouteActive ? [ROUTE_STRIP_SNAP, FULL_CARD_SNAP] : undefined}
+      activeSnapPoint={isWalkRouteActive ? (cardRevealed ? FULL_CARD_SNAP : ROUTE_STRIP_SNAP) : undefined}
+      setActiveSnapPoint={(snap) => {
+        if (!isWalkRouteActive) return;
+        setCardRevealed(snap === FULL_CARD_SNAP);
+      }}
     >
       <Drawer.Portal>
         <Drawer.Content
@@ -124,7 +192,22 @@ export default function BottomSheet({
             "elevation-2 " +
             "focus:outline-none"
           }
-          style={{ maxHeight: "calc(100dvh - 100px)" }}
+          // A route-active sheet needs a FIXED height (not maxHeight) for
+          // vaul's px snap point math to land where expected — snapPointsOffset
+          // is computed against the drawer's actual rendered height (see
+          // vaul's useSnapPoints), so a content-hugging maxHeight would put
+          // the "104px from the bottom" strip snap partway through whatever
+          // content happens to render, not at a real fixed strip. Same numeric
+          // value as the non-route maxHeight, so the full-card view (snap
+          // FULL_CARD_SNAP) looks the same size as before; the one visible
+          // change is that the full-card view is now a fixed height rather
+          // than hugging its (usually shorter) content while a route is
+          // active — accepted trade-off, only while a route is active.
+          style={
+            isWalkRouteActive
+              ? { height: "calc(100dvh - 100px)" }
+              : { maxHeight: "calc(100dvh - 100px)" }
+          }
           aria-label={t("detail.venueDetailsPanel", locale)}
           // #508 fix pass: Escape while a box's PhotoViewer is open must
           // close ONLY the photo, not this whole sheet. vaul forwards this
@@ -134,7 +217,23 @@ export default function BottomSheet({
           // point (Radix's Escape listener is a document-level CAPTURE
           // listener; nothing inside the photo dialog can out-race it).
           onEscapeKeyDown={(event) => {
-            if (isNativeDialogOpen()) event.preventDefault();
+            if (isNativeDialogOpen()) {
+              event.preventDefault();
+              return;
+            }
+            // #509: dismissible={false} while a route is active means vaul's
+            // own onOpenChange short-circuits Escape (and scrim-tap) before
+            // it ever reaches handleOpenChange above — silently blocking
+            // BOTH would make Escape a dead key with a route active. Collapse
+            // to the strip instead (same outcome as a drag-down), so Escape
+            // still does something; only the full card can be collapsed —
+            // pressing it again while the strip is already showing is a
+            // no-op (nothing further to collapse to except closing, which
+            // stays × ‑only per the issue's "unchanged" close behavior).
+            if (isWalkRouteActive && cardRevealed) {
+              event.preventDefault();
+              setCardRevealed(false);
+            }
           }}
         >
           {/* Drawer.Title — required by Radix to fix a11y missing-title violation */}
@@ -151,7 +250,22 @@ export default function BottomSheet({
               `actions` prop below, rather than duplicating this markup
               between the box and non-box branches. Same visual weight/
               position as the ordinary header row's own trio. */}
-          {venue && (
+          {venue && showStrip && (
+            // #509: strip replaces the full card entirely while a route is
+            // active and not revealed — same trigger (onWalkRoute) and
+            // onClearWalkRoute callback contract every card branch below
+            // already wires, so RouteStrip needs no knowledge of box vs
+            // ordinary venue.
+            <RouteStrip
+              venueName={venue.name}
+              routeInfo={walkRouteInfo ?? null}
+              locale={locale}
+              onShowCard={() => setCardRevealed(true)}
+              onClearRoute={onClearWalkRoute}
+            />
+          )}
+
+          {venue && !showStrip && (
             <div className="flex-1 overflow-y-auto">
               {isBox ? (
                 box ? (

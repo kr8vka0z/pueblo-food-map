@@ -28,6 +28,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { WalkingRouteGeoJSON, WalkingRouteInfo, WalkStep } from "@/components/Map";
+import { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
@@ -132,6 +133,22 @@ export const CATEGORY_FIT_PADDING_DESKTOP = { top: 80, bottom: 60, left: 60, rig
  * to street level. Tune during live review.
  */
 export const CATEGORY_FIT_MAX_ZOOM = 14;
+
+// Padding (px) around a walking-route fitBounds (#509) — mobile (BottomSheet)
+// only, since the route strip is a phone-only concept (desktop's
+// DesktopVenueWindow keeps its own unchanged layout, out of scope for #509).
+// `bottom` clears the route strip (ROUTE_STRIP_HEIGHT_PX, shared with
+// RouteStrip.tsx/BottomSheet.tsx so the two can't drift) plus a small gap —
+// NOT BOTTOM_NAV_HEIGHT_PX, which the category-fit padding above adds:
+// `venueSheetOpen` already hides the bottom nav whenever any card (or strip)
+// is open, so there is nothing there to clear.
+// Deliberately NOT capped at CATEGORY_FIT_MAX_ZOOM=14 — that cap exists so a
+// sparse category's 2-3 far-apart venues don't slam to street level; a
+// walking route is usually well under a mile and WANTS a close, walkable
+// zoom. ROUTE_FIT_MAX_ZOOM caps only the opposite failure (an extremely
+// short route zooming in absurdly far).
+export const ROUTE_FIT_PADDING_MOBILE = { top: 80, bottom: ROUTE_STRIP_HEIGHT_PX + 24, left: 40, right: 40 };
+export const ROUTE_FIT_MAX_ZOOM = 17;
 
 /**
  * Compute the [[lngW, latS], [lngE, latN]] bounding box for a list of venues.
@@ -1058,6 +1075,33 @@ export default function MapWrapper({
   // the blessing-box chip's zoom must re-run once that fetch resolves if the
   // filter was already active when the effect first ran with an empty array.
   // `allVenues` is a module-level constant (stable ref); no dep needed.
+
+  // ── Route fit (#509) — fit the map to the whole walking route once it's ──
+  // drawn, in the space ABOVE the route strip (BottomSheet shrinks to that
+  // strip the moment a route starts — see BottomSheet.tsx's own header).
+  // Fires once when `walkingRoute` becomes non-null, not on every strip <->
+  // full-card toggle — the map view shouldn't jump around just because the
+  // user tapped "Show card" to re-read the venue details.
+  // Mobile only: the strip (and this padding) is a phone-only concept;
+  // desktop's DesktopVenueWindow is explicitly out of scope for #509.
+  useEffect(() => {
+    if (!mapboxMap || !isMobile || !walkingRoute) return;
+
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const routeBounds = computeCategoryBounds(
+      walkingRoute.geometry.coordinates.map(([lng, lat]) => ({ lat, lng })),
+    );
+    if (!routeBounds) return;
+
+    mapboxMap.fitBounds(routeBounds, {
+      padding: ROUTE_FIT_PADDING_MOBILE,
+      maxZoom: ROUTE_FIT_MAX_ZOOM,
+      duration: reducedMotion ? 0 : 600,
+    });
+  }, [walkingRoute, mapboxMap, isMobile]);
 
   // Pre-compute distance map for Map.tsx (aria-labels on markers)
   const userDistances = useMemo(() => {

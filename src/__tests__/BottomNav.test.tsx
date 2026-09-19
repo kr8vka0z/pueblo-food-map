@@ -1,11 +1,17 @@
 /**
- * BottomNav tests — docs/bottom-nav-spec.md §13, items 1–4.
+ * BottomNav tests — docs/bottom-nav-spec.md §13, items 1–4, 9.
  *
  * Class-and-attribute contract assertions in the style of
  * SearchBarViewSwitch.test.tsx: jsdom has no layout engine, so the geometry
  * (bar height, pill placement, credits clearance) is verified by hand on dev
  * (§14), not here. Items 2–3 at the real-MapWrapper level live in
  * MapWrapperViewSwitch.test.tsx; item 5 (the band) too.
+ *
+ * #516 (2026-09-19): five items now, not four — "Resources" renamed "Help"
+ * ("Ayuda"), "Cerca de mí" renamed "Cercanos", and "Boxes" ("Cajas") inserted
+ * third. Every label-text assertion below is updated to match — covered by
+ * the issue's own acceptance criteria ("Rename Resources → Help/Ayuda",
+ * "Cerca de mí → Cercanos"), not a self-authorized test change.
  */
 
 import { describe, test, expect, vi } from "vitest";
@@ -27,28 +33,31 @@ function renderNav(overrides: Partial<Props> = {}) {
     isLocating: false,
     isDrifted: false,
     onNearMe: vi.fn(),
+    boxesActive: false,
+    onBoxesToggle: vi.fn(),
     ...overrides,
   };
   return { props, ...render(<BottomNav {...props} />) };
 }
 
 describe("BottomNav", () => {
-  test("renders four items, each with a visible text label (§13.1)", () => {
+  test("renders five items, each with a visible text label (§13.1, #516)", () => {
     const { container } = renderNav();
     const items = Array.from(container.querySelectorAll("li > button, li > a"));
-    expect(items.map((b) => b.textContent)).toEqual(["Near me", "Saved", "Resources", "Menu"]);
+    expect(items.map((b) => b.textContent)).toEqual(["Near me", "Saved", "Boxes", "Help", "Menu"]);
     for (const b of items) {
       const label = b.querySelector("span");
       expect(label?.className ?? "").not.toContain("sr-only");
     }
   });
 
-  test("Spanish labels (§11)", () => {
+  test("Spanish labels (§11, #516)", () => {
     const { container } = renderNav({ locale: "es" });
     expect(Array.from(container.querySelectorAll("li > button, li > a")).map((b) => b.textContent)).toEqual([
-      "Cerca de mí",
+      "Cercanos",
       "Guardados",
-      "Recursos",
+      "Cajas",
+      "Ayuda",
       "Menú",
     ]);
   });
@@ -74,10 +83,10 @@ describe("BottomNav", () => {
     expect(onSectionTap.mock.calls).toEqual([["saved"], ["top"]]);
   });
 
-  test("Resources is a link to the /resources page, not a drawer section (Kyle, 2026-09-16)", () => {
+  test("Help (renamed from Resources, #516) is a link to the /resources page, not a drawer section (Kyle, 2026-09-16)", () => {
     const onSectionTap = vi.fn();
     renderNav({ onSectionTap });
-    const link = screen.getByRole("link", { name: "Resources" });
+    const link = screen.getByRole("link", { name: "Help" });
     expect(link.getAttribute("href")).toBe("/resources");
     fireEvent.click(link);
     expect(onSectionTap).not.toHaveBeenCalled();
@@ -115,6 +124,39 @@ describe("BottomNav", () => {
   test("is a labelled navigation landmark (§12)", () => {
     renderNav();
     expect(screen.getByRole("navigation", { name: "Main" })).toBeDefined();
+  });
+});
+
+describe("BottomNav — Boxes (#516)", () => {
+  test("aria-pressed is false by default and true when boxesActive", () => {
+    const { rerender, props } = renderNav();
+    const btn = () => screen.getByTestId("nav-boxes");
+    expect(btn().getAttribute("aria-pressed")).toBe("false");
+    rerender(<BottomNav {...props} boxesActive />);
+    expect(btn().getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("tapping Boxes calls onBoxesToggle, not onSectionTap (§13.9)", () => {
+    const onBoxesToggle = vi.fn();
+    const onSectionTap = vi.fn();
+    renderNav({ onBoxesToggle, onSectionTap });
+    fireEvent.click(screen.getByTestId("nav-boxes"));
+    expect(onBoxesToggle).toHaveBeenCalledTimes(1);
+    expect(onSectionTap).not.toHaveBeenCalled();
+  });
+
+  test("Boxes is drawn in the blessing-box raspberry token when active", () => {
+    const { rerender, props } = renderNav();
+    const btn = () => screen.getByTestId("nav-boxes");
+    expect(btn().className).not.toContain("--color-cat-blessing");
+    rerender(<BottomNav {...props} boxesActive />);
+    expect(btn().className).toContain("--color-cat-blessing");
+  });
+
+  test("Boxes sits third, between Saved and Help", () => {
+    const { container } = renderNav();
+    const items = Array.from(container.querySelectorAll("li > button, li > a"));
+    expect(items[2]).toBe(screen.getByTestId("nav-boxes"));
   });
 });
 

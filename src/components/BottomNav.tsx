@@ -1,9 +1,17 @@
 "use client";
 
 /**
- * BottomNav — the app's four navigation targets: Near me · Saved · Resources · Menu.
+ * BottomNav — the app's five navigation targets: Near me · Saved · Boxes · Help · Menu.
  *
  * Spec: docs/bottom-nav-spec.md (§3 bar, §5 breakpoints, §6 Near me, §12 a11y).
+ *
+ * Boxes (#516, Kyle 2026-09-19) is a plain toggle, not a MenuSection: tapping
+ * it flips `blessing_box` in the same category Set the Filters panel (#513)
+ * writes to — two ways into one piece of state, so ticking the box in either
+ * place lights up both the bar item and the Filters badge count. The caller
+ * (MapWrapper/PageNav) owns that state; this component only reflects it via
+ * `boxesActive`/`onBoxesToggle`, the same controlled-prop shape `onNearMe`
+ * already uses for "Near me".
  *
  * One component, two layouts, one set of buttons:
  *   below 2xl  — floating rounded pill near the bottom, icon above its word
@@ -53,16 +61,69 @@ interface BottomNavProps {
   isLocating: boolean;
   isDrifted: boolean;
   onNearMe: () => void;
+  /**
+   * Boxes (#516) — whether the blessing-box category filter is currently on.
+   * Required (like `onNearMe`) so a caller can't silently forget to wire it
+   * and ship a dead button.
+   */
+  boxesActive: boolean;
+  /** Tapping Boxes: toggle `blessing_box` in the caller's category filter. */
+  onBoxesToggle: () => void;
   /** Used by HamburgerMenu's outside-click check so tapping the nav doesn't count as "outside". */
   navRef?: RefObject<HTMLElement | null>;
   /** On /resources itself (PageNav): Resources shows as the current item. */
   onResourcesPage?: boolean;
 }
 
+/**
+ * Small box with a roof and a heart on the door (#516 mockup: "Bottom Nav
+ * Blessing Box Shortcut - Mockup.html", `#box` symbol) — no lucide icon
+ * matches, so this is hand-drawn to lucide's own stroke conventions
+ * (24×24 viewBox, stroke-width 2, round caps/joins, no fill) so it sits
+ * naturally beside Locate/Star/HandHelping/Menu.
+ *
+ * The pressed (active) state does NOT fill the paths, unlike the mockup's
+ * `.bb.on .ico{fill:...}` — filling the roof+wall path renders as a solid
+ * house and the heart collapses into it at 24px. The raspberry tint on the
+ * cell background plus the raspberry stroke color (see BOXES_ACTIVE_STYLE
+ * below) carries the "on" state instead, the same way every other active
+ * bar item is colour-only, never fill-only.
+ */
+function BoxHeartIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M3 10 12 4l9 6" />
+      <path d="M5 9v11h14V9" />
+      <path d="M12 17.5s-3-1.8-3-3.6a1.6 1.6 0 0 1 3-.8 1.6 1.6 0 0 1 3 .8c0 1.8-3 3.6-3 3.6z" />
+    </svg>
+  );
+}
+
+// Boxes' own "on" tint: raspberry text + a light raspberry background wash.
+// color-mix against the existing --color-cat-blessing token rather than a
+// new CSS variable — design:drift only allows tokens already in globals.css.
+const BOXES_ACTIVE_STYLE: React.CSSProperties = {
+  backgroundColor: "color-mix(in srgb, var(--color-cat-blessing) 12%, transparent)",
+};
+
 const ITEM_CLASS =
   // Below 2xl: equal-width cell, 24px icon above a 12px/700 label, 3px gap.
+  // #516: a 5th item narrows each cell (~67px @375, ~57px @320) — the label
+  // drops to 11px under 360px (mockup's own fix for "Resources" not fitting
+  // at 320 on the 4-item bar) and returns to 12px at 360px and up. One
+  // conditional, not a layout system (ponytail: the 360px floor is the
+  // mockup's measured number, not a breakpoint — re-measure before touching it).
   "flex flex-1 flex-col items-center justify-center gap-[3px] h-full min-w-0 rounded-full " +
-  "text-[12px] leading-[14px] font-bold " +
+  "text-[11px] min-[360px]:text-[12px] leading-[14px] font-bold " +
   // 2xl: icon and word on one line inside the pill (§5).
   "2xl:flex-none 2xl:flex-row 2xl:gap-1.5 2xl:px-3 " +
   "transition-colors duration-150 " +
@@ -87,6 +148,8 @@ export default function BottomNav({
   isLocating,
   isDrifted,
   onNearMe,
+  boxesActive,
+  onBoxesToggle,
   navRef,
   onResourcesPage = false,
 }: BottomNavProps) {
@@ -162,8 +225,27 @@ export default function BottomNav({
         </li>
         {/* Star, not heart: matches the save button on every venue card (Kyle, 2026-09-16). */}
         {sectionItem("saved", t("nav.saved", locale), <Star aria-hidden className={ICON_CLASS} />)}
-        {/* Resources opens its own page (/resources) — Kyle, 2026-09-16: as a
-            drawer section it looked like it did the same thing as Menu. */}
+        {/* Boxes (#516) — a plain toggle, not a drawer section: tapping it
+            flips the shared blessing_box category filter (see file header).
+            Middle position keeps Near me first / Menu last, under the thumb. */}
+        <li className="flex flex-1 2xl:flex-none 2xl:h-11">
+          <button
+            type="button"
+            onClick={onBoxesToggle}
+            aria-pressed={boxesActive}
+            data-testid="nav-boxes"
+            className={
+              ITEM_CLASS + " " + (boxesActive ? "text-[var(--color-cat-blessing)]" : colorFor(false))
+            }
+            style={boxesActive ? BOXES_ACTIVE_STYLE : undefined}
+          >
+            <BoxHeartIcon className={ICON_CLASS} />
+            <span>{t("nav.boxes", locale)}</span>
+          </button>
+        </li>
+        {/* Resources ("Help", #516) opens its own page (/resources) — Kyle,
+            2026-09-16: as a drawer section it looked like it did the same
+            thing as Menu. */}
         <li className="flex flex-1 2xl:flex-none 2xl:h-11">
           <Link
             href="/resources"

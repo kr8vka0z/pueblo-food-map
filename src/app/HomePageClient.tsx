@@ -74,6 +74,10 @@ export default function HomePageClient() {
   const [viewport, setViewport] = useState<'located' | 'pueblo-center'>('pueblo-center');
   // Deep link (#132): a ?venue=<id> URL opens straight to that pin.
   const [initialVenueId, setInitialVenueId] = useState<string | null>(null);
+  // Boxes (#516): "Boxes" on a Menu page (PageNav, no map/filter state of its
+  // own) links to /?boxes=1 — read once below, same as ?near=1, and applied
+  // by MapWrapper's own one-shot effect.
+  const [initialBoxesFilter, setInitialBoxesFilter] = useState(false);
 
   // Ref to the map container element — focus moves here on splash dismiss.
   const mapContainerRef = useRef<HTMLElement | null>(null);
@@ -100,6 +104,15 @@ export default function HomePageClient() {
         const qs = params.toString();
         window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
       }
+      // "Boxes" in the bottom nav on a Menu page (PageNav) links to
+      // /?boxes=1: same read-once-then-strip shape as near, above.
+      const boxesParam = params.get('boxes') === '1';
+      if (boxesParam) {
+        setInitialBoxesFilter(true);
+        params.delete('boxes');
+        const qs = params.toString();
+        window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+      }
       // Also read #venue=<id> fragment: used by /venue/[id]'s "View on the map"
       // CTA. There's no /?venue= → /venue/<id> redirect to bypass (next.config.ts
       // removed it — a `has`-query redirect on "/" 500'd on OpenNext/Cloudflare,
@@ -111,8 +124,9 @@ export default function HomePageClient() {
       const resolvedId = venueParam ?? hashParam;
       setInitialVenueId(resolvedId);
       // A shared venue link (either form) goes straight to the pin — skip the splash.
-      // Near me comes from inside the app, so the splash was already seen.
-      setSplashShown(resolvedId || nearParam ? false : !readGate());
+      // Near me and Boxes both come from inside the app (PageNav), so the
+      // splash was already seen.
+      setSplashShown(resolvedId || nearParam || boxesParam ? false : !readGate());
     });
   }, []);
 
@@ -153,7 +167,12 @@ export default function HomePageClient() {
         inert={splashShown || undefined}
         aria-hidden={splashShown || undefined}
       >
-        <MapWrapper viewport={viewport} onShowWelcome={showSplashAgain} initialVenueId={initialVenueId} />
+        <MapWrapper
+          viewport={viewport}
+          onShowWelcome={showSplashAgain}
+          initialVenueId={initialVenueId}
+          initialBoxesFilter={initialBoxesFilter}
+        />
       </main>
 
       {/* Splash overlay — full-viewport frosted scrim on top of the map */}

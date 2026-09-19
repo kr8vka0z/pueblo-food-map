@@ -278,9 +278,21 @@ interface MapWrapperProps {
   onShowWelcome?: () => void;
   /** Deep link (#132): venue id from a ?venue=<id> URL to open on load. */
   initialVenueId?: string | null;
+  /**
+   * Boxes (#516): true when the resident arrived via a Menu page's "Boxes"
+   * link (/?boxes=1, read once by HomePageClient). Applies the blessing_box
+   * category filter on mount, the same one-shot shape `viewport === 'located'`
+   * uses for auto-locate below.
+   */
+  initialBoxesFilter?: boolean;
 }
 
-export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, initialVenueId }: MapWrapperProps) {
+export default function MapWrapper({
+  viewport = 'pueblo-center',
+  onShowWelcome,
+  initialVenueId,
+  initialBoxesFilter = false,
+}: MapWrapperProps) {
   const router = useRouter();
 
   // ── Locale — from context ─────────────────────────────────────────────────────
@@ -826,6 +838,26 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     clearFilters,
     handleClearAllFilters,
   } = useMapFilters(origin, boxVenues);
+
+  // ── Boxes (#516) — bottom-nav shortcut for the blessing-box category filter.
+  // Reuses toggleCategory directly rather than a second flag, so ticking
+  // "Blessing Box" in the Filters panel (#513) and tapping Boxes in the bar
+  // stay in sync automatically — both read/write the same Set.
+  const handleBoxesToggle = useCallback(() => {
+    toggleCategory("blessing_box");
+  }, [toggleCategory]);
+
+  // ── PageNav "Boxes" (#516) → apply the filter on entry ───────────────────────
+  // Same one-shot shape as the auto-locate effect above: a Menu page has no
+  // filter state of its own, so it hands off via /?boxes=1 and this effect
+  // applies the real filter once the map (and toggleCategory) exist.
+  const initialBoxesFilterDoneRef = useRef(false);
+  useEffect(() => {
+    if (!initialBoxesFilter) return;
+    if (initialBoxesFilterDoneRef.current) return;
+    initialBoxesFilterDoneRef.current = true;
+    toggleCategory("blessing_box");
+  }, [initialBoxesFilter, toggleCategory]);
 
   // ── Filters panel (#513) — the side panel behind SearchBar's Filters button.
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
@@ -1525,6 +1557,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           isLocating={isLocating}
           isDrifted={isDrifted}
           onNearMe={handleNearMe}
+          boxesActive={selectedCategories?.has("blessing_box") ?? false}
+          onBoxesToggle={handleBoxesToggle}
           navRef={navRef}
         />
       )}

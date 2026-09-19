@@ -35,8 +35,9 @@ Browser
         ├── HamburgerMenu    (the drawer: saved places, links, language;
         │     controlled — opened by BottomNav at a section)
         ├── ListView         (full-screen nearest-first list, map mode off)
-        └── BottomNav        (Near me · Saved · Resources · Menu — bar below 2xl (1536px),
-              pill floating bottom-centre at 2xl+; docs/bottom-nav-spec.md)
+        └── BottomNav        (Near me · Saved · Boxes · Help · Menu — bar below 2xl (1536px),
+              pill floating bottom-centre at 2xl+; Boxes toggles the blessing_box
+              category filter, #516; docs/bottom-nav-spec.md)
 
 Shared utility components
   └── src/components/SiteFooter.tsx  (slim nav footer on utility pages: /about, /privacy, /suggest, /feedback)
@@ -46,7 +47,8 @@ Next.js App Router (Cloudflare Worker, SSR)
   └── src/app/page.tsx        (splash gate; mounts MapWrapper)
   └── src/app/about/page.tsx  (mission, vision, origin story, venue sourcing — #155)
   └── src/app/resources/page.tsx  (food help programs: 2-1-1, SNAP, WIC, Double Up,
-        hotline, Everyday Eats — what each is and how to get it; BottomNav's Resources item)
+        hotline, Everyday Eats — what each is and how to get it; BottomNav's Help
+        item, renamed from "Resources" #516 — page title unchanged)
   └── src/app/report/[venueId]/page.tsx + submit/route.ts
   └── src/app/suggest/page.tsx + submit/route.ts
   └── src/app/feedback/page.tsx + submit/route.ts

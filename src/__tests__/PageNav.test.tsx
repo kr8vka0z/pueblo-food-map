@@ -80,6 +80,16 @@ describe("PageNav", () => {
     expect(push).toHaveBeenCalledWith("/?near=1");
   });
 
+  // #516: off the map there's no filter state to reflect, so Boxes just
+  // hands off to the map via /?boxes=1 — same shape as Near me above.
+  test("Boxes (#516) goes to the map, filtered", () => {
+    render(<PageNav locale="en" />);
+    const btn = screen.getByTestId("nav-boxes") as HTMLButtonElement;
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(btn);
+    expect(push).toHaveBeenCalledWith("/?boxes=1");
+  });
+
   test("Resources shows as current only on /resources", () => {
     const { unmount } = render(<PageNav locale="en" />);
     expect(screen.getByTestId("nav-resources").getAttribute("aria-current")).toBeNull();

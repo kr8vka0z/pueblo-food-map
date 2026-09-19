@@ -42,6 +42,10 @@ beforeEach(() => {
     if (url.includes("/blessing-boxes/activity")) {
       return Promise.resolve(jsonResponse({ items: [], hasMore: false, page: 1 }));
     }
+    // useBoxNetworkStats() -> GET /api/public/blessing-boxes/network-stats (slice 7)
+    if (url.includes("/network-stats")) {
+      return Promise.resolve(jsonResponse({ boxes: [], checkins: [], photos: [] }));
+    }
     // useBoxVenues() -> GET /api/public/blessing-boxes
     return Promise.resolve(jsonResponse({ boxes: [] }));
   });
@@ -215,5 +219,49 @@ describe("BoxesActivityContent", () => {
     render(<BoxesActivityContent />);
     const next = await screen.findByText(t("activity.nextPage", "en"));
     expect(next.closest("button")).toBeDisabled();
+  });
+});
+
+describe("BoxesActivityContent — Network numbers (slice 7)", () => {
+  test("renders the Numbers heading and counts computed from network-stats data", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/blessing-boxes/activity")) return Promise.resolve(jsonResponse({ items: [], hasMore: false, page: 1 }));
+      if (url.includes("/network-stats")) {
+        return Promise.resolve(
+          jsonResponse({
+            boxes: [{ id: "box-1", name: "Box 1", archived: false }],
+            checkins: [
+              { venue_id: "box-1", kind: "filled", visibility: "visible", created_at: new Date().toISOString() },
+              { venue_id: "box-1", kind: "took", visibility: "visible", created_at: new Date().toISOString() },
+            ],
+            photos: [],
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse({ boxes: [] }));
+    });
+    render(<BoxesActivityContent />);
+    expect(screen.getByText(t("box.stats.networkHeading", "en"))).toBeDefined();
+    await waitFor(() => expect(screen.getAllByText("1")).not.toHaveLength(0)); // fills=1, uses=1 both render "1"
+  });
+
+  test("renders a never-filled box in the 'needs love' list", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/blessing-boxes/activity")) return Promise.resolve(jsonResponse({ items: [], hasMore: false, page: 1 }));
+      if (url.includes("/network-stats")) {
+        return Promise.resolve(
+          jsonResponse({ boxes: [{ id: "box-1", name: "Never Filled Box", archived: false }], checkins: [], photos: [] }),
+        );
+      }
+      return Promise.resolve(jsonResponse({ boxes: [] }));
+    });
+    render(<BoxesActivityContent />);
+    expect(await screen.findByText("Never Filled Box")).toBeDefined();
+    expect(screen.getByText(t("box.stats.neverFilled", "en"))).toBeDefined();
+  });
+
+  test("renders no milestones section when no threshold has been reached", () => {
+    render(<BoxesActivityContent />);
+    expect(screen.queryByText(t("box.stats.milestonesHeading", "en"))).toBeNull();
   });
 });

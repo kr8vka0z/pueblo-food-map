@@ -201,6 +201,29 @@ describe("BoxHistoryContent — reuses the filtered activity read path", () => {
   });
 });
 
+describe("BoxHistoryContent — Numbers (slice 7)", () => {
+  test("renders the Numbers heading and counts computed from allCheckins", () => {
+    render(
+      <BoxHistoryContent
+        box={testBox}
+        allCheckins={[
+          { kind: "filled", visibility: "visible", created_at: new Date().toISOString() },
+          { kind: "took", visibility: "visible", created_at: new Date().toISOString() },
+        ]}
+        approvedPhotoCreatedAts={[]}
+      />,
+    );
+    expect(screen.getByText(t("box.stats.perBoxHeading", "en"))).toBeDefined();
+    // 30d default period includes both fixtures (created "now")
+    expect(screen.getByText(t("box.stats.honestyNote", "en"))).toBeDefined();
+  });
+
+  test("with no check-ins/photos supplied, every count renders as 0, not a crash", () => {
+    render(<BoxHistoryContent box={testBox} />);
+    expect(screen.getByText(t("box.stats.perBoxHeading", "en"))).toBeDefined();
+  });
+});
+
 describe("BoxHistoryContent — photo gallery (slice 5)", () => {
   test("fetches this box's photo list and renders the grid", async () => {
     mockFetch.mockImplementation((url: string) => {

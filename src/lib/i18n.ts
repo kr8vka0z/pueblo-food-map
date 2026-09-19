@@ -589,6 +589,44 @@ const en: Record<string, string> = {
   // link already covers it (backHref, see PageNav.tsx's own header) — two
   // "back to map" links on one page was the bug being fixed.
 
+  // Numbers (slice 7) — BoxNumbersPanel.tsx is shared by BOTH the per-box
+  // section (/box/<id>/history) and the network-wide section
+  // (/boxes/activity), so these keys carry no per-box/network split of their
+  // own; only the two heading keys below name which context they're in.
+  "box.stats.perBoxHeading": "Numbers for this box",
+  "box.stats.networkHeading": "Network numbers",
+  "box.stats.period": "Time period",
+  "box.stats.period.7d": "Last 7 days",
+  "box.stats.period.30d": "Last 30 days",
+  "box.stats.period.90d": "Last 90 days",
+  "box.stats.period.all": "All time",
+  "box.stats.fills": "Fills",
+  "box.stats.uses": "Uses (“I used this box”)",
+  "box.stats.emptyReports": "Empty reports",
+  "box.stats.lowReports": "Low reports",
+  "box.stats.totalCheckins": "Total check-ins",
+  "box.stats.approvedPhotos": "Approved photos",
+  "box.stats.avgHeading": "Typical timing",
+  "box.stats.avg.emptyToFill": "Empty to next fill",
+  "box.stats.avg.fillToFill": "Fill to next fill",
+  "box.stats.avg.fillToEmpty": "Fill to next empty",
+  // No pair of that type has happened yet for the selected box(es) — never a
+  // 0, see boxStats.ts's own computePairAverages header for why.
+  "box.stats.noData": "—",
+  "box.stats.duration.hours": "{value} hours",
+  "box.stats.duration.days": "{value} days",
+  "box.stats.honestyNote": "These numbers count check-ins, not every visit — so “uses” reads lower than real foot traffic, on purpose.",
+  "box.stats.neverFilled": "Never filled",
+  "box.stats.needLoveHeading": "Boxes that need love",
+  "box.stats.needLove.longestSinceFill": "Longest since last fill",
+  "box.stats.needLove.mostEmptyReports": "Most empty reports",
+  "box.stats.needLove.slowestRefill": "Slowest to refill",
+  "box.stats.needLove.empty": "Not enough history yet.",
+  "box.stats.needLove.emptyReportCount": "{count} empty reports",
+  "box.stats.milestonesHeading": "Milestones",
+  "box.stats.milestone.fills": "Pueblo has filled its blessing boxes {threshold}+ times",
+  "box.stats.milestone.uses": "Neighbors have used Pueblo's blessing boxes {threshold}+ times",
+
   // Adopt-a-box + email alerts (slice 6). Both card forms use their OWN
   // disclosure string, not privacy.emailDisclosure: that one says the email
   // is "used only to follow up on your submission", which is false here —
@@ -1282,6 +1320,38 @@ const es: Record<string, string> = {
   "box.recentCheckin.none": "Aún no hay visitas registradas", // [CHECK]
   "box.history.link": "Historial", // [CHECK]
   "box.history.subheading": "Historial completo de esta caja", // [CHECK]
+
+  "box.stats.perBoxHeading": "Números de esta caja", // [CHECK]
+  "box.stats.networkHeading": "Números de la red", // [CHECK]
+  "box.stats.period": "Periodo", // [CHECK]
+  "box.stats.period.7d": "Últimos 7 días", // [CHECK]
+  "box.stats.period.30d": "Últimos 30 días", // [CHECK]
+  "box.stats.period.90d": "Últimos 90 días", // [CHECK]
+  "box.stats.period.all": "Todo el tiempo", // [CHECK]
+  "box.stats.fills": "Surtidos", // [CHECK]
+  "box.stats.uses": "Usos (“Usé esta caja”)", // [CHECK]
+  "box.stats.emptyReports": "Avisos de vacío", // [CHECK]
+  "box.stats.lowReports": "Avisos de poco surtido", // [CHECK]
+  "box.stats.totalCheckins": "Total de visitas registradas", // [CHECK]
+  "box.stats.approvedPhotos": "Fotos aprobadas", // [CHECK]
+  "box.stats.avgHeading": "Tiempos típicos", // [CHECK]
+  "box.stats.avg.emptyToFill": "De vacío al siguiente surtido", // [CHECK]
+  "box.stats.avg.fillToFill": "De un surtido al siguiente", // [CHECK]
+  "box.stats.avg.fillToEmpty": "De surtido al siguiente vacío", // [CHECK]
+  "box.stats.noData": "—", // [CHECK]
+  "box.stats.duration.hours": "{value} horas", // [CHECK]
+  "box.stats.duration.days": "{value} días", // [CHECK]
+  "box.stats.honestyNote": "Estos números cuentan las visitas registradas, no cada visita real — por eso “usos” se ve más bajo que el tráfico real, a propósito.", // [CHECK]
+  "box.stats.neverFilled": "Nunca surtida", // [CHECK]
+  "box.stats.needLoveHeading": "Cajas que necesitan atención", // [CHECK]
+  "box.stats.needLove.longestSinceFill": "Más tiempo sin surtirse", // [CHECK]
+  "box.stats.needLove.mostEmptyReports": "Más avisos de vacío", // [CHECK]
+  "box.stats.needLove.slowestRefill": "Las más lentas en volver a surtirse", // [CHECK]
+  "box.stats.needLove.empty": "Todavía no hay suficiente historial.", // [CHECK]
+  "box.stats.needLove.emptyReportCount": "{count} avisos de vacío", // [CHECK]
+  "box.stats.milestonesHeading": "Logros de la comunidad", // [CHECK]
+  "box.stats.milestone.fills": "Pueblo ha surtido sus cajas de bendiciones {threshold}+ veces", // [CHECK]
+  "box.stats.milestone.uses": "Los vecinos han usado las cajas de bendiciones de Pueblo {threshold}+ veces", // [CHECK]
 
   "box.alerts.emailDisclosure": "Guardamos tu correo solo para enviarte estos mensajes. Cada correo de alerta trae un enlace para dejar de recibirlos.", // [CHECK]
   "box.adopt.linkLabel": "Solicitar adoptar esta caja", // [CHECK]

@@ -145,6 +145,35 @@ describe("MapWrapper — ViewSuggestion on an empty, focused search bar (#514)",
     expect(screen.queryByRole("button", { name: /Back to the map/i })).toBeNull();
   });
 
+  // Both rows' onMouseDown preventDefault (matching SearchResultsPopover's
+  // option rows) keeps the input focused THROUGH the click so the 150ms
+  // blur grace period can't race the tap closed — but that same
+  // preventDefault means the input never naturally loses focus on its own.
+  // "Tap → list view, search closes" (#514 spec) requires an explicit blur.
+  test("clicking a suggestion row blurs the input — search actually closes", async () => {
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    act(() => input.focus());
+    expect(document.activeElement).toBe(input);
+
+    fireEvent.click(screen.getByRole("button", { name: /See all places as a list/i }));
+    expect(document.activeElement).not.toBe(input);
+  });
+
+  test("real flow: tapping the (now-blurred) bar again after switching still offers the other direction", async () => {
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    act(() => input.focus());
+    fireEvent.click(screen.getByRole("button", { name: /See all places as a list/i }));
+    expect(screen.getByText(/sorted by/i)).toBeTruthy();
+
+    // jsdom (like a real browser) only fires a `focus` event on an ACTUAL
+    // transition — calling .focus() on an already-focused element is a
+    // no-op. This only passes if the click above genuinely released focus.
+    act(() => input.focus());
+    expect(screen.getByRole("button", { name: /Back to the map/i })).toBeDefined();
+  });
+
   test('on the list, focusing the empty bar offers "Back to the map"; clicking returns to the map', async () => {
     await renderAndLoadMap();
     switchViewViaMenu("List view");

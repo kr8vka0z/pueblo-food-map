@@ -1256,13 +1256,32 @@ export default function MapWrapper({
     [mapUnavailable, setViewMode],
   );
 
-  /** ViewSuggestion / the results-popover's "See all N matches" row (#514):
-   * switch view then close whatever search popover triggered it. */
+  /**
+   * ViewSuggestion / the results-popover's "See all N matches" row (#514):
+   * switch view then close whatever search popover triggered it.
+   *
+   * WHY blur the input: both rows call `onMouseDown={(e) => e.preventDefault()}`
+   * (mirrors SearchResultsPopover's option rows) so the 150ms blur grace
+   * period can't race the tap closed before this handler runs — but that
+   * same preventDefault means the input never naturally loses focus on its
+   * own. Without an explicit blur here, "search closes" (#514 spec) isn't
+   * true: the keyboard stays up on phone, and — worse — a second empty tap
+   * on the now-unfocused-looking bar fires no `focus` event (it was already
+   * focused), so the OTHER direction's row (e.g. "Back to the map" right
+   * after switching to list) never appears until the user taps away first.
+   * Same pattern SearchBar's own Enter handler already uses
+   * (`e.currentTarget.blur()`). The blur this triggers re-schedules
+   * isPopoverOpen=false via the normal 150ms timer — harmless, since it's
+   * already false.
+   */
   const handleViewSuggestionSelect = useCallback(
     (mode: ViewMode) => {
       handleViewModeChange(mode);
       setIsPopoverOpen(false);
       setActiveIndex(-1);
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
     },
     [handleViewModeChange],
   );

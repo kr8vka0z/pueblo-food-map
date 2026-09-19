@@ -110,6 +110,45 @@ describe("BoxCardBody — conditional sections", () => {
     expect(screen.getByText("Canned goods")).toBeDefined();
   });
 
+  // ─── Needs ask (migration 0012) — "Most needed · from people who use
+  // this box" self-fills when there's no admin-typed mostNeeded text. ────
+  describe("BoxCardBody — neededFromVisitors (self-filling 'Most needed')", () => {
+    test("renders the visitor-sourced list with counts when mostNeeded is unset", () => {
+      renderCard({
+        mostNeeded: null,
+        neededFromVisitors: [
+          { key: "canned_food", count: 6 },
+          { key: "diapers", count: 4 },
+        ],
+      });
+      expect(screen.getByText("Most needed · from people who use this box")).toBeDefined();
+      expect(screen.getByText("Canned food")).toBeDefined();
+      expect(screen.getByText("· 6")).toBeDefined();
+      expect(screen.getByText("Diapers")).toBeDefined();
+      expect(screen.getByText("· 4")).toBeDefined();
+    });
+
+    test("the admin-typed mostNeeded wins — the visitor-sourced block does not render alongside it", () => {
+      renderCard({
+        mostNeeded: "Canned goods",
+        neededFromVisitors: [{ key: "canned_food", count: 6 }],
+      });
+      expect(screen.getByText("Most needed")).toBeDefined();
+      expect(screen.queryByText("Most needed · from people who use this box")).toBeNull();
+    });
+
+    test("neither block renders when both are empty", () => {
+      renderCard({ mostNeeded: null, neededFromVisitors: [] });
+      expect(screen.queryByText("Most needed")).toBeNull();
+      expect(screen.queryByText("Most needed · from people who use this box")).toBeNull();
+    });
+
+    test("neededFromVisitors omitted entirely (undefined) -> no crash, no visitor block", () => {
+      expect(() => renderCard({ mostNeeded: null, neededFromVisitors: undefined })).not.toThrow();
+      expect(screen.queryByText("Most needed · from people who use this box")).toBeNull();
+    });
+  });
+
   // Redesign spec item 4: "Remove the public host NAME and the 'Host'
   // heading entirely." Only the host's own note (when set) survives, as a
   // plain quiet line with no heading above it.

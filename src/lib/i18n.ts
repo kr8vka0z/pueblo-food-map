@@ -556,6 +556,32 @@ const en: Record<string, string> = {
   // this case (BoxCheckinPanel.tsx, "Fallback to a visible checkbox").
   "box.checkin.turnstileFallbackPrompt": "Tap the box below to confirm you're a person.",
 
+  // "What would help you next time?" ask (migration 0012, mockup v3 Part 2)
+  // — shown IN PLACE of the check-in buttons right after a 'took' check-in
+  // succeeds. Nine fixed choices below (box.needs.<key>) mirror
+  // NEED_KEYS in src/lib/blessingBoxes.ts exactly — that array is the
+  // single source of truth for the vocabulary; these are only the display
+  // labels.
+  "box.needs.heading": "What would help you next time?",
+  "box.needs.sub": "Tap any. This tells givers what to bring.",
+  "box.needs.otherLabel": "Something else? (optional)",
+  "box.needs.send": "Send",
+  "box.needs.skip": "Skip",
+  "box.needs.success": "Got it — thank you.",
+  "box.needs.canned_food": "Canned food",
+  "box.needs.fresh_food": "Fresh food",
+  "box.needs.bread": "Bread",
+  "box.needs.baby_items": "Baby items",
+  "box.needs.diapers": "Diapers",
+  "box.needs.hygiene": "Hygiene items",
+  "box.needs.pet_food": "Pet food",
+  "box.needs.drinks": "Water / drinks",
+  "box.needs.warm_clothing": "Warm clothing",
+  // The self-filling "Most needed" label (BoxCardBody.tsx) when no admin
+  // most_needed text is set — distinguishes visitor-sourced data from the
+  // admin-typed line above it (box.mostNeeded), which keeps its own label.
+  "box.mostNeeded.fromVisitors": "Most needed · from people who use this box",
+
   // Slice 5 photo-upload UI (BoxCheckinPanel.tsx / imageResize.ts). The
   // disclosure line is shown under every picker, standalone and
   // note-attached alike — moderation + "no faces or plates" in one short
@@ -1315,6 +1341,23 @@ const es: Record<string, string> = {
   "box.checkin.error.rateLimitVisitor": "Demasiadas visitas desde este dispositivo por ahora. Por favor intenta más tarde.", // [CHECK]
   "box.checkin.error.rateLimitBox": "Esta caja está recibiendo un número inusual de visitas en este momento. Por favor intenta más tarde.", // [CHECK]
   "box.checkin.turnstileFallbackPrompt": "Toca el recuadro de abajo para confirmar que eres una persona.", // [CHECK]
+
+  "box.needs.heading": "¿Qué te ayudaría la próxima vez?", // [CHECK]
+  "box.needs.sub": "Toca las que quieras. Esto le dice a quienes donan qué traer.", // [CHECK]
+  "box.needs.otherLabel": "¿Algo más? (opcional)", // [CHECK]
+  "box.needs.send": "Enviar", // [CHECK]
+  "box.needs.skip": "Omitir", // [CHECK]
+  "box.needs.success": "Recibido — ¡gracias!", // [CHECK]
+  "box.needs.canned_food": "Comida enlatada", // [CHECK]
+  "box.needs.fresh_food": "Comida fresca", // [CHECK]
+  "box.needs.bread": "Pan", // [CHECK]
+  "box.needs.baby_items": "Artículos para bebé", // [CHECK]
+  "box.needs.diapers": "Pañales", // [CHECK]
+  "box.needs.hygiene": "Artículos de higiene", // [CHECK]
+  "box.needs.pet_food": "Comida para mascotas", // [CHECK]
+  "box.needs.drinks": "Agua / bebidas", // [CHECK]
+  "box.needs.warm_clothing": "Ropa de abrigo", // [CHECK]
+  "box.mostNeeded.fromVisitors": "Lo más necesitado · según quienes usan esta caja", // [CHECK]
 
   "box.photo.addButton": "Agregar una foto", // [CHECK]
   "box.photo.attachLabel": "Agregar una foto (opcional)", // [CHECK]

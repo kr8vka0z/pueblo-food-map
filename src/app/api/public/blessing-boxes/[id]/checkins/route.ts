@@ -46,6 +46,15 @@
  * dedicated "Add a photo" choice) uploads in a SEPARATE request, after this
  * one returns, and needs the id to link box_photos.checkin_id to it.
  *
+ * Needs ask (migration 0012): a successful 'took' check-in also carries
+ * `needsToken` — an HMAC capability (src/lib/boxNeedsToken.ts) proving this
+ * exact browser made THIS exact check-in, which the client must echo back
+ * on the follow-up POST /api/public/blessing-boxes/[id]/needs request. Only
+ * minted for 'took' (the ask never appears after any other kind) and only
+ * when a usable checkinId exists — see boxNeedsToken.ts's own header for
+ * why this is a stateless capability, never a stored client-token hash.
+ *
+
  * WHY 'problem' reports never touch the public read path: the INSERT below
  * is identical for every kind, but every public SELECT elsewhere in this
  * app (src/lib/blessingBoxes.ts) filters `kind != 'problem'` at the query —
@@ -74,6 +83,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { resolveBoxTurnstileKey, verifyBoxTurnstile } from "@/lib/boxTurnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
+import { computeNeedsToken } from "@/lib/boxNeedsToken";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
 import { bustEdgeCache } from "@/lib/edgeCache";
@@ -386,6 +396,13 @@ export async function POST(
   const checkins: CheckinStatusInput[] = await loadVisibleCheckins(db, boxId);
   const now = new Date();
 
+  // Needs ask (migration 0012) — only 'took' ever shows the ask
+  // client-side, and only when there's a real row to attach picks to.
+  const needsToken =
+    checkinKind === "took" && newCheckinId !== null
+      ? await computeNeedsToken(checkinRateLimitSecret, newCheckinId, clientToken)
+      : undefined;
+
   // Returning status/lastFilledAt here regardless of `checkinKind` is safe
   // even for a 'problem' report: both are computed only from filled/low/
   // empty check-ins (computeBoxStatus/computeLastFilledAt exclude
@@ -396,5 +413,6 @@ export async function POST(
     status: computeBoxStatus(checkins, now, outOfService),
     lastFilledAt: computeLastFilledAt(checkins),
     checkinId: newCheckinId,
+    needsToken,
   });
 }

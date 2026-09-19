@@ -72,6 +72,42 @@ function mockSuccess(status = "stocked", lastFilledAt: string | null = "2026-09-
   mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, status, lastFilledAt }) });
 }
 
+/** A 'took' success carrying checkinId/needsToken — the only response shape that opens the needs ask. */
+function mockSuccessWithNeedsToken(checkinId = 42, needsToken = "needs-token-abc") {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ ok: true, status: "unknown", lastFilledAt: null, checkinId, needsToken }),
+  });
+}
+
+/**
+ * The default `mockTurnstile` stub (module scope, above) hands back exactly
+ * one token at mount and never re-fires on `reset()` — fine for every test
+ * that submits once, wrong for a needs-ask Send, which submits a SECOND
+ * request (the checkin, then the needs POST) after `submitCheckin` resets
+ * the widget for its single-use-token rule. Mirrors the real widget's
+ * `execution: "render"` auto-re-challenge the same way the "filled +
+ * attached photo" chained-upload test (above) already does: `reset()`
+ * asynchronously fires the SAME callback again with a fresh token, so a
+ * queued (or direct) second submit has something to fire on.
+ */
+function stubTurnstileReExecutingOnReset() {
+  let savedCallback: ((t: string) => void) | undefined;
+  let calls = 0;
+  vi.stubGlobal("turnstile", {
+    render: vi.fn((_c: HTMLElement, opts: { callback?: (t: string) => void }) => {
+      savedCallback = opts.callback;
+      opts.callback?.("test-turnstile-token");
+      return "widget-id-1";
+    }),
+    reset: vi.fn(() => {
+      calls += 1;
+      setTimeout(() => savedCallback?.(`test-turnstile-token-${calls + 1}`), 0);
+    }),
+    remove: vi.fn(),
+  });
+}
+
 function mockError(error: string) {
   mockFetch.mockResolvedValueOnce({ ok: false, json: async () => ({ ok: false, error }) });
 }
@@ -689,5 +725,276 @@ describe("BoxCheckinPanel — photo attach on the 'filled' note form", () => {
     const body = photoInit.body as FormData;
     expect(body.get("checkinId")).toBe("42");
     expect(body.get("photo")).toBeInstanceOf(Blob);
+  });
+});
+
+// ─── "What would help you next time?" ask (migration 0012) ────────────────
+
+describe("BoxCheckinPanel — needs ask after 'took'", () => {
+  test("a 'took' success carrying checkinId+needsToken replaces the button grid with the ask", async () => {
+    mockSuccessWithNeedsToken();
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+
+    expect(await screen.findByText("What would help you next time?")).toBeDefined();
+    expect(screen.getByText("Tap any. This tells givers what to bring.")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "I filled it" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Report a problem" })).toBeNull();
+    // The thanks line still shows alongside the ask — success state is unconditional.
+    expect(screen.getByText("Thanks — enjoy!")).toBeDefined();
+  });
+
+  test("renders all nine need chips as toggle buttons", async () => {
+    mockSuccessWithNeedsToken();
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+    await screen.findByText("What would help you next time?");
+
+    for (const label of [
+      "Canned food",
+      "Fresh food",
+      "Bread",
+      "Baby items",
+      "Diapers",
+      "Hygiene items",
+      "Pet food",
+      "Water / drinks",
+      "Warm clothing",
+    ]) {
+      const chip = screen.getByRole("button", { name: label });
+      expect(chip.getAttribute("aria-pressed")).toBe("false");
+    }
+  });
+
+  test("tapping a chip toggles aria-pressed", async () => {
+    mockSuccessWithNeedsToken();
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+    await screen.findByText("What would help you next time?");
+
+    const chip = screen.getByRole("button", { name: "Diapers" });
+    await user.click(chip);
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
+    await user.click(chip);
+    expect(chip.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  test("Skip closes the ask, sends no request, and returns to the normal button grid", async () => {
+    mockSuccessWithNeedsToken();
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+    await screen.findByText("What would help you next time?");
+
+    await user.click(screen.getByRole("button", { name: "Skip" }));
+
+    expect(screen.queryByText("What would help you next time?")).toBeNull();
+    expect(await screen.findByRole("button", { name: "I filled it" })).toBeDefined();
+    expect(mockFetch).toHaveBeenCalledTimes(1); // only the original checkin POST
+  });
+
+  test("Send with nothing picked and nothing typed behaves like Skip — no request sent", async () => {
+    mockSuccessWithNeedsToken();
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+    await screen.findByText("What would help you next time?");
+
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(screen.queryByText("What would help you next time?")).toBeNull();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("Send with picks selected POSTs checkinId/needsToken/needs to the needs route and shows the thank-you message", async () => {
+    stubTurnstileReExecutingOnReset();
+    mockSuccessWithNeedsToken(42, "needs-token-abc");
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) }); // the needs POST
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+    await screen.findByText("What would help you next time?");
+
+    await user.click(screen.getByRole("button", { name: "Diapers" }));
+    await user.click(screen.getByRole("button", { name: "Canned food" }));
+    await user.type(screen.getByLabelText(/Something else/i), "Extra formula too");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+    const [url, init] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe("/api/public/blessing-boxes/box-1/needs");
+    const body = JSON.parse(init.body as string);
+    expect(body.checkinId).toBe(42);
+    expect(body.needsToken).toBe("needs-token-abc");
+    expect(body.needs.sort()).toEqual(["canned_food", "diapers"]);
+    expect(body.note).toBe("Extra formula too");
+    // The SECOND token this render — submitCheckin resets the single-use
+    // widget right after the checkin POST, and stubTurnstileReExecutingOnReset
+    // mirrors Turnstile's real auto-re-challenge with a fresh value.
+    expect(body.turnstileToken).toBe("test-turnstile-token-2");
+
+    expect(await screen.findByText("Got it — thank you.")).toBeDefined();
+    expect(await screen.findByRole("button", { name: "I filled it" })).toBeDefined();
+  });
+
+  test("Send with only typed text (no chips picked) still submits", async () => {
+    stubTurnstileReExecutingOnReset();
+    mockSuccessWithNeedsToken();
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+    await screen.findByText("What would help you next time?");
+
+    await user.type(screen.getByLabelText(/Something else/i), "Just diapers please");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+    const body = JSON.parse((mockFetch.mock.calls[1][1] as RequestInit).body as string);
+    expect(body.needs).toEqual([]);
+    expect(body.note).toBe("Just diapers please");
+  });
+
+  test("a 'took' success with no checkinId (D1 didn't hand one back) never opens the ask", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true, status: "unknown", lastFilledAt: null, checkinId: null }),
+    });
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+
+    await waitFor(() => expect(screen.getByText("Thanks — enjoy!")).toBeDefined());
+    expect(screen.queryByText("What would help you next time?")).toBeNull();
+  });
+
+  test("'filled' never opens the ask, even with a checkinId in the response (only 'took' shows it)", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true, status: "stocked", lastFilledAt: null, checkinId: 7 }),
+    });
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I filled it" }));
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(screen.getByText("Thanks for filling it!")).toBeDefined());
+    expect(screen.queryByText("What would help you next time?")).toBeNull();
+  });
+
+  test("focus moves to the ask's own heading when it appears", async () => {
+    mockSuccessWithNeedsToken();
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+
+    const heading = await screen.findByText("What would help you next time?");
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+  });
+
+  test("a failed needs Send shows the generic error message and returns to the normal button grid", async () => {
+    stubTurnstileReExecutingOnReset();
+    mockSuccessWithNeedsToken();
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: false, error: "not_found_or_expired" }) });
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+    await screen.findByText("What would help you next time?");
+
+    await user.click(screen.getByRole("button", { name: "Diapers" }));
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(screen.getByText("That didn't go through. Please try again.")).toBeDefined());
+    expect(await screen.findByRole("button", { name: "I filled it" })).toBeDefined();
+  });
+
+  test("ES locale renders the Spanish ask heading and chip labels", async () => {
+    mockSuccessWithNeedsToken();
+    const user = userEvent.setup();
+    renderPanel("es");
+    await user.click(await screen.findByRole("button", { name: "Usé esta caja" }));
+
+    expect(await screen.findByText("¿Qué te ayudaría la próxima vez?")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Pañales" })).toBeDefined();
+  });
+});
+
+// ─── Reviewer fix pass (2026-09-19) — a throwing Turnstile reset() must
+// never strand a real outcome behind the wrong terminal state ─────────────
+//
+// `window.turnstile.reset()` is third-party widget code called AFTER the
+// checkin/photo/needs request has already succeeded or failed. Before this
+// fix, a throw there was caught by the SAME outer try/catch the fetch
+// itself runs in, which reclassified a real success as a generic error —
+// each of the three submit functions now wraps its own reset() call so a
+// broken widget can never do that.
+
+/** A reset() that throws on exactly the Nth call to it (1-indexed across the whole test), otherwise behaves like stubTurnstileReExecutingOnReset above (re-fires the SAME callback asynchronously with a fresh token — needed so a chained second submit, e.g. the needs ask after 'took', still has something to fire on). */
+function stubTurnstileThrowingResetOnCall(throwOnCall: number) {
+  let savedCallback: ((t: string) => void) | undefined;
+  let calls = 0;
+  vi.stubGlobal("turnstile", {
+    render: vi.fn((_c: HTMLElement, opts: { callback?: (t: string) => void }) => {
+      savedCallback = opts.callback;
+      opts.callback?.("test-turnstile-token");
+      return "widget-id-1";
+    }),
+    reset: vi.fn(() => {
+      calls += 1;
+      if (calls === throwOnCall) {
+        throw new Error("widget reset failed");
+      }
+      setTimeout(() => savedCallback?.(`test-turnstile-token-${calls + 1}`), 0);
+    }),
+    remove: vi.fn(),
+  });
+}
+
+describe("BoxCheckinPanel — a throwing Turnstile reset() never strands the outcome", () => {
+  test("submitCheckin: reset() throws right after a successful checkin — the success message still shows", async () => {
+    stubTurnstileThrowingResetOnCall(1);
+    mockSuccess(); // plain 'took' success, no checkinId/needsToken — keeps this test isolated to submitCheckin's own reset call
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+
+    expect(await screen.findByText("Thanks — enjoy!")).toBeDefined();
+  });
+
+  test("submitPhoto: reset() throws right after a successful standalone photo send — the success message still shows", async () => {
+    stubTurnstileThrowingResetOnCall(1);
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "Add a photo" }));
+    const input = document.getElementById("box-photo-standalone-input") as HTMLInputElement;
+    await user.upload(input, new File(["fake-bytes"], "photo.jpg", { type: "image/jpeg" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).not.toBeDisabled());
+
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText(/submitted for review/i)).toBeDefined();
+  });
+
+  test("submitNeeds: reset() throws right after a successful needs Send — the thank-you message still shows", async () => {
+    // Call 1 = the checkin's own reset (succeeds, re-fires a fresh token —
+    // needed for the needs Send below to have something to submit with);
+    // call 2 = the needs POST's own reset (throws).
+    stubTurnstileThrowingResetOnCall(2);
+    mockSuccessWithNeedsToken(42, "needs-token-abc");
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) }); // the needs POST
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "I used this box" }));
+    await screen.findByText("What would help you next time?");
+
+    await user.click(screen.getByRole("button", { name: "Diapers" }));
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Got it — thank you.")).toBeDefined();
   });
 });

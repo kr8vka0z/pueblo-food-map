@@ -75,6 +75,28 @@ describe("BoxCheckinsAdminPanel — rendering", () => {
     expect(screen.getByText("Admin only")).toBeDefined();
   });
 
+  // ─── Needs ask (migration 0012) ─────────────────────────────────────────
+  test("a 'took' row with picked needs shows the translated labels", () => {
+    render(
+      <BoxCheckinsAdminPanel
+        checkins={[makeRow({ kind: "took", needs: JSON.stringify(["canned_food", "diapers"]) })]}
+      />,
+    );
+    expect(screen.getByText("Needs: Canned food, Diapers")).toBeDefined();
+  });
+
+  test("a row with no needs (null) shows no 'Needs:' line", () => {
+    render(<BoxCheckinsAdminPanel checkins={[makeRow({ kind: "took", needs: null })]} />);
+    expect(screen.queryByText(/^Needs:/)).toBeNull();
+  });
+
+  test("malformed needs JSON never throws — degrades to no 'Needs:' line", () => {
+    expect(() =>
+      render(<BoxCheckinsAdminPanel checkins={[makeRow({ kind: "took", needs: "{not valid json" })]} />),
+    ).not.toThrow();
+    expect(screen.queryByText(/^Needs:/)).toBeNull();
+  });
+
   test("a hidden row shows a 'Hidden' badge and an Unhide button; a visible row shows Hide", () => {
     render(
       <BoxCheckinsAdminPanel

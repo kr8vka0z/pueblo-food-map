@@ -1,0 +1,56 @@
+-- migrations/0012_box_checkin_needs.sql
+--
+-- Blessing Boxes "What would help you next time?" ask (owner-approved
+-- mockup v3, Part 2; the owner's follow-up: "let's also create a type
+-- field so they can type in whatever they want" — reuses box_checkins.note
+-- for that typed text rather than a new column, see below).
+--
+-- Adds ONE nullable column, `needs`, to the existing box_checkins table: a
+-- JSON array of fixed keys (canned_food/fresh_food/bread/baby_items/
+-- diapers/hygiene/pet_food/drinks/warm_clothing — see
+-- src/lib/blessingBoxes.ts's NEED_KEYS, the single source of truth for the
+-- list) picked on a 'took' check-in's own row, via a follow-up PATCH-style
+-- request AFTER the check-in itself already saved (see
+-- src/app/api/public/blessing-boxes/[id]/needs/route.ts). NULL means "never
+-- asked, or asked and skipped" — no distinction is made between the two,
+-- same "no signal" convention every other nullable column in this schema
+-- already uses (e.g. blessing_boxes.removed_on).
+--
+-- The typed "Something else?" text reuses the EXISTING `note` column
+-- (0007) instead of a second free-text column — same length cap
+-- (FIELD_LIMITS.BOX_CHECKIN_NOTE), same admin-only visibility (every public
+-- read site names its columns explicitly and never selects `note` — see
+-- 0007's own header). This is a real, deliberate widening of 0007's
+-- original claim that `note` is written only for 'filled'/'problem': a
+-- 'took' row can now ALSO carry a note, but only ever via the needs
+-- follow-up request, never the initial check-in POST (that route's own
+-- "silently drop a note on any kind other than filled/problem" behavior is
+-- unchanged — see KINDS_ALLOWING_NOTE in checkins/route.ts).
+--
+-- WHY no new table: the ask is 1:1 with a single 'took' row (one ask per
+-- check-in, replace-on-repeat), not a many-to-many relationship needing its
+-- own join table — a nullable column on the row it describes is the
+-- smaller, more honest shape.
+--
+-- WHY no ownership column (no client-token hash stored here): see
+-- src/lib/boxNeedsToken.ts's own header — proof that the SAME device made
+-- both the check-in and the needs follow-up is a stateless HMAC capability
+-- minted in the check-in's own response and verified again on the needs
+-- request, never persisted. box_checkins keeps 0007's original PRIVACY
+-- guarantee ("no name, no email, no IP address — ever") with nothing new
+-- added that could correlate a row to a browser.
+--
+-- Applied to STAGING (pueblo-food-map-admin-staging) and local dev only for
+-- this slice — production is a later, explicit, Kyle-gated step, same
+-- convention as every migration since 0001 (see AGENTS.md "promotion
+-- checklist").
+--
+-- NOT IDEMPOTENT — SQLite's ALTER TABLE ... ADD COLUMN has no IF NOT EXISTS
+-- form (same limitation 0011's own header documents). Running this file
+-- twice against the same database fails on the second run with "duplicate
+-- column name: needs". This migration must run EXACTLY ONCE per database,
+-- and only ever via `wrangler d1 migrations apply` (tracked) — never
+-- `d1 execute --file` outside that ledger, unless first confirming via
+-- `PRAGMA table_info(box_checkins);` that the column doesn't already exist.
+
+ALTER TABLE box_checkins ADD COLUMN needs TEXT;

@@ -118,6 +118,28 @@
  * fallback mode only triggers when the invisible check already doubted the
  * visitor once, and the queued photo upload simply waits, same as any other
  * queued submit does.)
+ *
+ * "What would help you next time?" ask (migration 0012, mockup v3 Part 2):
+ * a successful 'took' check-in (only 'took' — never filled/low/empty/
+ * problem) that comes back with a `checkinId` AND `needsToken` opens the
+ * ask IN PLACE of the three button groups (`needsAsk` state) — chips for
+ * the nine fixed NEED_KEYS plus one optional short text field. Skip, or
+ * Send with nothing picked and nothing typed, just clears `needsAsk`
+ * locally with NO request — there is nothing meaningful to save. A real
+ * Send chains onto the SAME single-widget Turnstile flow as the photo
+ * attach above (queued in `pendingSubmit` as a `"needs"` variant): by the
+ * time a visitor has read the heading and tapped a chip, the checkin's own
+ * post-success `turnstile.reset()` has almost always already produced a
+ * fresh token, but the queue exists for the rare case it hasn't yet.
+ * `checkinId`/`needsToken` are held only in component state, never
+ * persisted — losing them (a page refresh mid-ask) simply means the ask
+ * can no longer be answered for that check-in, the same low-stakes ceiling
+ * boxNeedsToken.ts's own header describes. A failed Send (network error,
+ * expired 15-minute window, rate limit) closes the ask and shows the
+ * existing generic error copy — ponytail: this drops the visitor's picks on
+ * a transient failure rather than restoring the ask with them intact; the
+ * upgrade path is the same `note`/`photoBlob`-restore pattern
+ * failQueuedSubmit already uses for a note-kind checkin, extended to needs.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -129,7 +151,7 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
 import { shrinkImageToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import ReportPhotoButton from "@/components/ReportPhotoButton";
-import type { BoxStatus, CheckinKind } from "@/lib/blessingBoxes";
+import { NEED_KEYS, type BoxStatus, type CheckinKind, type NeedKey } from "@/lib/blessingBoxes";
 
 const { BOX_CHECKIN_NOTE } = FIELD_LIMITS;
 
@@ -187,7 +209,14 @@ type PhotoSubmitState = "idle" | "submitting" | "success" | "error";
 /** A queued action waiting on the next Turnstile token — see this file's own header, "Chaining onto the SAME single-widget Turnstile flow." */
 type PendingSubmit =
   | { type: "checkin"; kind: CheckinKind; note: string; photoBlob: Blob | null }
-  | { type: "photo"; blob: Blob; checkinId: number | null };
+  | { type: "photo"; blob: Blob; checkinId: number | null }
+  | { type: "needs"; checkinId: number; needsToken: string; needs: NeedKey[]; note: string };
+
+/** A 'took' check-in that came back with enough to open the needs ask — see this file's own header, "What would help you next time?" ask. */
+interface NeedsAsk {
+  checkinId: number;
+  needsToken: string;
+}
 
 /**
  * The pick -> shrink -> preview -> error state machine for one photo-attach
@@ -260,6 +289,19 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   const [photoSubmitState, setPhotoSubmitState] = useState<PhotoSubmitState>("idle");
   const standalonePhoto = usePhotoAttach();
   const notePhoto = usePhotoAttach();
+
+  // Needs ask (migration 0012) — see this file's own header.
+  const [needsAsk, setNeedsAsk] = useState<NeedsAsk | null>(null);
+  const [selectedNeeds, setSelectedNeeds] = useState<ReadonlySet<NeedKey>>(new Set());
+  const [needsText, setNeedsText] = useState("");
+  const [needsSubmitState, setNeedsSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  // needsAsk's own heading gets focus the moment it appears — the ask
+  // replaces the button grid in place, so a keyboard/screen-reader user
+  // needs to be told where they landed rather than losing focus context.
+  const needsHeadingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (needsAsk) needsHeadingRef.current?.focus();
+  }, [needsAsk]);
 
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState(false);
@@ -375,8 +417,10 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
     queueMicrotask(() => setPendingSubmit(null));
     if (pending.type === "checkin") {
       void submitCheckin(pending.kind, pending.note, pending.photoBlob);
-    } else {
+    } else if (pending.type === "photo") {
       void submitPhoto(pending.blob, pending.checkinId);
+    } else {
+      void submitNeeds(pending.checkinId, pending.needsToken, pending.needs, pending.note);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- submitCheckin/submitPhoto close over this render's turnstileToken/honeypot/boxId already; re-running per pendingSubmit/turnstileToken change (not per render) is what this effect wants.
   }, [turnstileToken, pendingSubmit]);
@@ -398,8 +442,15 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
         setNote(pending.note);
         if (pending.photoBlob) notePhoto.restore(pending.photoBlob);
       }
-    } else {
+    } else if (pending.type === "photo") {
       setPhotoSubmitState("error");
+    } else {
+      // Needs ask — ponytail: drops the visitor's picks rather than
+      // restoring the ask with them intact (see this file's own header,
+      // "A failed Send ... closes the ask"). needsAsk is already null by
+      // this point (cleared at queue time, same as the note form above),
+      // so there's no form left open to fail into.
+      setNeedsSubmitState("error");
     }
   }
 
@@ -465,15 +516,27 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
         status?: BoxStatus;
         lastFilledAt?: string | null;
         checkinId?: number;
+        needsToken?: string;
       };
 
-      // Every Turnstile token is single-use — reset for the next possible
-      // tap regardless of outcome (see this file's own header). In BOX
-      // mode this also kicks off Turnstile's own re-execution (default
-      // `execution: "render"`), which is exactly what an attached photo
-      // below is waiting on.
-      if (window.turnstile && turnstileWidgetId.current) {
-        window.turnstile.reset(turnstileWidgetId.current);
+      // Reviewer fix pass (2026-09-19): the request already succeeded or
+      // failed by this point — that outcome must land in state regardless
+      // of what the widget does next. Every Turnstile token is single-use,
+      // so it's still reset for the next possible tap (and, in BOX mode,
+      // this kicks off Turnstile's own re-execution, default `execution:
+      // "render"`, which is exactly what an attached photo below is
+      // waiting on) — but `reset()` is a call into third-party widget code
+      // outside this try, and if IT throws, the outer catch below must not
+      // be allowed to reclassify a real success as "error". Own try/catch,
+      // after the outcome is already decided.
+      try {
+        if (window.turnstile && turnstileWidgetId.current) {
+          window.turnstile.reset(turnstileWidgetId.current);
+        }
+      } catch {
+        // Nothing to recover — the checkin itself already succeeded or
+        // failed above; a stale/broken widget only affects the NEXT tap
+        // (which re-queues normally, same as if no token ever arrived).
       }
       setTurnstileToken(null);
 
@@ -491,6 +554,17 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
         // "Chaining onto the SAME single-widget Turnstile flow."
         if (photoBlob) {
           setPendingSubmit({ type: "photo", blob: photoBlob, checkinId: data.checkinId ?? null });
+        }
+        // Needs ask (migration 0012) — only 'took' ever gets asked, and
+        // only when there's a real row + capability to attach picks to (see
+        // this file's own header). A 'filled' checkin can carry BOTH a
+        // queued photo (above) and, structurally, could never also open the
+        // ask — the checkins route only mints needsToken for kind==='took'.
+        if (kind === "took" && data.checkinId != null && data.needsToken) {
+          setNeedsAsk({ checkinId: data.checkinId, needsToken: data.needsToken });
+          setSelectedNeeds(new Set());
+          setNeedsText("");
+          setNeedsSubmitState("idle");
         }
       } else if (data.error === "rate_limit_visitor") {
         setSubmitState("rate_limited_visitor");
@@ -518,8 +592,15 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
 
       const res = await fetch(`/api/public/blessing-boxes/${boxId}/photos`, { method: "POST", body: form });
 
-      if (window.turnstile && turnstileWidgetId.current) {
-        window.turnstile.reset(turnstileWidgetId.current);
+      // Reviewer fix pass (2026-09-19) — see submitCheckin's own comment on
+      // this same pattern: reset() is third-party widget code and must not
+      // be able to reclassify a real outcome as an error via the outer catch.
+      try {
+        if (window.turnstile && turnstileWidgetId.current) {
+          window.turnstile.reset(turnstileWidgetId.current);
+        }
+      } catch {
+        // Nothing to recover — see submitCheckin's own comment.
       }
       setTurnstileToken(null);
 
@@ -534,6 +615,44 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
       }
     } catch {
       setPhotoSubmitState("error");
+    }
+  }
+
+  /** Needs ask (migration 0012) — see this file's own header. Same turnstile-reset-after-every-attempt convention as submitCheckin/submitPhoto (a token is single-use regardless of outcome). */
+  async function submitNeeds(checkinId: number, needsToken: string, needs: NeedKey[], noteValue: string) {
+    setNeedsSubmitState("submitting");
+    try {
+      const res = await fetch(`/api/public/blessing-boxes/${boxId}/needs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          checkinId,
+          needsToken,
+          needs,
+          note: noteValue || undefined,
+          website: honeypot,
+          turnstileToken: turnstileToken ?? "",
+          turnstileKey: turnstileModeRef.current,
+          clientToken: getCheckinClientToken() ?? undefined,
+        }),
+      });
+
+      // Reviewer fix pass (2026-09-19) — see submitCheckin's own comment on
+      // this same pattern: reset() is third-party widget code and must not
+      // be able to reclassify a real outcome as an error via the outer catch.
+      try {
+        if (window.turnstile && turnstileWidgetId.current) {
+          window.turnstile.reset(turnstileWidgetId.current);
+        }
+      } catch {
+        // Nothing to recover — see submitCheckin's own comment.
+      }
+      setTurnstileToken(null);
+
+      const data = (await res.json()) as { ok: boolean };
+      setNeedsSubmitState(data.ok ? "success" : "error");
+    } catch {
+      setNeedsSubmitState("error");
     }
   }
 
@@ -571,6 +690,50 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
     }
   }
 
+  /** Toggles one chip in the needs ask — multi-select, per the mockup ("Tap any"). */
+  function toggleNeed(key: NeedKey) {
+    setSelectedNeeds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  /** Skip always just closes the ask locally — no request, nothing to save. */
+  function handleNeedsSkip() {
+    setNeedsAsk(null);
+    setSelectedNeeds(new Set());
+    setNeedsText("");
+  }
+
+  /**
+   * Send with nothing picked and nothing typed behaves exactly like Skip —
+   * there's nothing meaningful to save, and sending an empty payload would
+   * just be a wasted round trip against the rate limit this shares with the
+   * check-in itself. A real submission clears `needsAsk` immediately (the
+   * ask disappears whether the request ultimately succeeds or fails — see
+   * this file's own header on why a failure doesn't restore it).
+   */
+  function handleNeedsSend() {
+    if (!needsAsk) return;
+    const needs = NEED_KEYS.filter((k) => selectedNeeds.has(k));
+    const noteValue = needsText.trim();
+    if (needs.length === 0 && noteValue === "") {
+      handleNeedsSkip();
+      return;
+    }
+    const { checkinId, needsToken } = needsAsk;
+    setNeedsAsk(null);
+    setSelectedNeeds(new Set());
+    setNeedsText("");
+    if (turnstileToken) {
+      void submitNeeds(checkinId, needsToken, needs, noteValue);
+    } else {
+      setPendingSubmit({ type: "needs", checkinId, needsToken, needs, note: noteValue });
+    }
+  }
+
   function handleSendStandalonePhoto() {
     if (!standalonePhoto.blob || photoSubmitState === "submitting" || pendingSubmit) return;
     setPhotoSubmitState("submitting");
@@ -590,8 +753,12 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   // One action at a time: busy while an actual submit is in flight OR one is
   // queued waiting on a token (see handleTap/handleNoteSubmit above) — never
   // gated on turnstileToken alone, since that would be the old "disabled
-  // until Verifying… resolves" behavior this rework removes.
-  const busy = submitState === "submitting" || pendingSubmit !== null;
+  // until Verifying… resolves" behavior this rework removes. Includes
+  // needsSubmitState (migration 0012) — a direct (non-queued) needs Send
+  // never touches submitState/pendingSubmit at all, so without this the
+  // just-reappeared button grid would be tappable WHILE that request is
+  // still in flight.
+  const busy = submitState === "submitting" || pendingSubmit !== null || needsSubmitState === "submitting";
   // Which single button (if any) shows the "Sending…" label — either the
   // tap actually in flight, or the one queued waiting on a token.
   const busyKind = pendingSubmit?.type === "checkin" ? pendingSubmit.kind : submitState === "submitting" ? lastKind : null;
@@ -659,65 +826,173 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
         </p>
       )}
 
-      {/* Status trio — colored dot above the label (mockup's ".tri"). */}
-      <div className="grid grid-cols-3 gap-2">
-        {STATUS_KINDS.map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            className={buttonBase}
-            disabled={busy}
-            aria-disabled={busy}
-            onClick={() => handleTap(kind)}
-          >
-            <i aria-hidden className={`block w-2 h-2 rounded-full mx-auto mb-1 ${KIND_DOT_CLASS[kind]}`} />
-            {kind === busyKind ? t("box.checkin.submitting", locale) : t(`box.checkin.${kind}`, locale)}
-          </button>
-        ))}
-      </div>
+      {/* The needs ask replaces the three button groups below IN PLACE
+          (task spec: "the check-in buttons are replaced IN PLACE") — never
+          rendered alongside them. */}
+      {!needsAsk && (
+        <>
+          {/* Status trio — colored dot above the label (mockup's ".tri"). */}
+          <div className="grid grid-cols-3 gap-2">
+            {STATUS_KINDS.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                className={buttonBase}
+                disabled={busy}
+                aria-disabled={busy}
+                onClick={() => handleTap(kind)}
+              >
+                <i aria-hidden className={`block w-2 h-2 rounded-full mx-auto mb-1 ${KIND_DOT_CLASS[kind]}`} />
+                {kind === busyKind ? t("box.checkin.submitting", locale) : t(`box.checkin.${kind}`, locale)}
+              </button>
+            ))}
+          </div>
 
-      {/* Second row — "took" (most common action) + "Add a photo". */}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          className={buttonBase}
-          disabled={busy}
-          aria-disabled={busy}
-          onClick={() => handleTap("took")}
-        >
-          {busyKind === "took" ? t("box.checkin.submitting", locale) : t("box.checkin.took", locale)}
-        </button>
-        {/* Slice 5 — opens the standalone photo form below rather than submitting anything itself. */}
-        <button
-          type="button"
-          className={buttonBase}
-          disabled={busy}
-          aria-disabled={busy}
-          aria-expanded={photoOpen}
-          onClick={() => {
-            setPhotoOpen((open) => !open);
-            setPhotoSubmitState("idle");
-          }}
-        >
-          {t("box.photo.addButton", locale)}
-        </button>
-      </div>
+          {/* Second row — "took" (most common action) + "Add a photo". */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className={buttonBase}
+              disabled={busy}
+              aria-disabled={busy}
+              onClick={() => handleTap("took")}
+            >
+              {busyKind === "took" ? t("box.checkin.submitting", locale) : t("box.checkin.took", locale)}
+            </button>
+            {/* Slice 5 — opens the standalone photo form below rather than submitting anything itself. */}
+            <button
+              type="button"
+              className={buttonBase}
+              disabled={busy}
+              aria-disabled={busy}
+              aria-expanded={photoOpen}
+              onClick={() => {
+                setPhotoOpen((open) => !open);
+                setPhotoSubmitState("idle");
+              }}
+            >
+              {t("box.photo.addButton", locale)}
+            </button>
+          </div>
 
-      {/* Quiet text links — "Report a problem" (was a grid button; same
-          behavior, tap opens the same note form via handleTap below) beside
-          "Report photo" when the box has a current photo. */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
-        <button
-          type="button"
-          disabled={busy}
-          aria-disabled={busy}
-          onClick={() => handleTap("problem")}
-          className="inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
-        >
-          {busyKind === "problem" ? t("box.checkin.submitting", locale) : t("box.checkin.problem", locale)}
-        </button>
-        {latestPhotoId != null && <ReportPhotoButton photoId={latestPhotoId} locale={locale} />}
+          {/* Quiet text links — "Report a problem" (was a grid button; same
+              behavior, tap opens the same note form via handleTap below) beside
+              "Report photo" when the box has a current photo. */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <button
+              type="button"
+              disabled={busy}
+              aria-disabled={busy}
+              onClick={() => handleTap("problem")}
+              className="inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
+            >
+              {busyKind === "problem" ? t("box.checkin.submitting", locale) : t("box.checkin.problem", locale)}
+            </button>
+            {latestPhotoId != null && <ReportPhotoButton photoId={latestPhotoId} locale={locale} />}
+          </div>
+        </>
+      )}
+
+      {/* "What would help you next time?" ask (migration 0012) — see this
+          file's own header. */}
+      {needsAsk && (
+        <div className="space-y-3">
+          <div>
+            <h3
+              ref={needsHeadingRef}
+              tabIndex={-1}
+              className="text-lg font-semibold text-[var(--color-ink-900)] focus:outline-none"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {t("box.needs.heading", locale)}
+            </h3>
+            <p className="text-sm text-[var(--color-ink-500)]">{t("box.needs.sub", locale)}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {NEED_KEYS.map((key) => {
+              const selected = selectedNeeds.has(key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={selected}
+                  disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
+                  onClick={() => toggleNeed(key)}
+                  className={
+                    "min-h-[44px] rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 " +
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+                    "disabled:opacity-60 disabled:cursor-not-allowed " +
+                    (selected
+                      ? "border-[var(--color-sage-500)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)]"
+                      : "border-[var(--color-bone-300)] bg-white text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]")
+                  }
+                >
+                  {t(`box.needs.${key}`, locale)}
+                </button>
+              );
+            })}
+          </div>
+          <div>
+            <label htmlFor="box-needs-other" className="block text-xs font-medium text-[var(--color-ink-700)]">
+              {t("box.needs.otherLabel", locale)}
+            </label>
+            <input
+              id="box-needs-other"
+              type="text"
+              value={needsText}
+              onChange={(e) => setNeedsText(e.target.value)}
+              maxLength={BOX_CHECKIN_NOTE}
+              disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
+              className={
+                "mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 " +
+                "text-base md:text-sm text-[var(--color-ink-900)] bg-white " +
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+              }
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleNeedsSend}
+              disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
+              aria-disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
+              className={
+                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
+                "text-sm font-semibold hover:bg-[var(--color-sage-600)] disabled:opacity-60 disabled:cursor-not-allowed " +
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+              }
+            >
+              {needsSubmitState === "submitting" || pendingSubmit?.type === "needs"
+                ? t("box.checkin.submitting", locale)
+                : t("box.needs.send", locale)}
+            </button>
+            <button
+              type="button"
+              onClick={handleNeedsSkip}
+              className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+            >
+              {t("box.needs.skip", locale)}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Persistent (not inside `needsAsk &&`) — the ask disappears the
+          instant Send/Skip is tapped (handleNeedsSend/handleNeedsSkip both
+          clear needsAsk immediately), so the confirmation must live
+          somewhere that survives the close, same reasoning the checkin/
+          photo success messages above live outside their own forms'
+          conditionals. */}
+      <div role="status" aria-live="polite">
+        {needsSubmitState === "success" && (
+          <p className="text-sm font-medium text-[var(--color-success)]">{t("box.needs.success", locale)}</p>
+        )}
       </div>
+      {needsSubmitState === "error" && (
+        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
+          {t("box.checkin.error", locale)}
+        </p>
+      )}
 
       {openKind && (
         <form onSubmit={handleNoteSubmit} className="space-y-2 rounded-[var(--radius-md)] border border-[var(--color-bone-200)] p-3">

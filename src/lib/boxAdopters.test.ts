@@ -117,6 +117,18 @@ describe("loadApprovedAdopterNamesForVenues", () => {
     await loadApprovedAdopterNamesForVenues(db, ["a"]);
     expect(seenSql).toContain("ORDER BY created_at ASC");
   });
+
+  test("the PUBLIC query never selects the private email column — structural, not just 'never mapped'", async () => {
+    let seenSql = "";
+    const db = {
+      prepare: (sql: string) => {
+        seenSql = sql;
+        return { bind: () => ({ all: async () => ({ results: [] }) }) };
+      },
+    } as unknown as D1Database;
+    await loadApprovedAdopterNamesForVenues(db, ["a"]);
+    expect(seenSql).not.toMatch(/\bemail\b/);
+  });
 });
 
 describe("insertAdopterApplication", () => {

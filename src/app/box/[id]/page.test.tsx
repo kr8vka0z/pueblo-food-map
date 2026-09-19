@@ -43,6 +43,7 @@ function makeBox(overrides: Partial<PublicBlessingBox> = {}): PublicBlessingBox 
       lastFilledAt: null,
       recentCheckins: [],
       latestPhoto: null,
+      adopters: [],
     },
     ...overrides,
   };

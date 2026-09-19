@@ -292,10 +292,24 @@ export async function POST(
   // check-in is read now, before the insert below — 'problem' never needs
   // this (every report qualifies regardless of status), so it's skipped for
   // every other kind to avoid an unnecessary extra D1 read.
+  //
+  // 2026-09-18 security review, item 10: this read is guarded — it exists
+  // ONLY to feed alert targeting (see boxAlerts.ts's own header, "NEVER
+  // BLOCKS THE CHECK-IN"), so its own failure must never fail the check-in
+  // itself. On failure, prevStatus is treated as unknown (null), which
+  // rolesToNotify already interprets as "not already this status" — i.e.
+  // an alert still fires, the same safe-by-default direction the rest of
+  // this file already takes for a note that can't be attached, etc.
   let prevStatus: BoxStatus | null = null;
   if (checkinKind === "empty" || checkinKind === "low") {
-    const priorCheckins = await loadVisibleCheckins(db, boxId);
-    prevStatus = computeBoxStatus(priorCheckins, new Date(), outOfService);
+    try {
+      const priorCheckins = await loadVisibleCheckins(db, boxId);
+      prevStatus = computeBoxStatus(priorCheckins, new Date(), outOfService);
+    } catch (err) {
+      logFormFailure("checkin", "send_failed", {
+        message: err instanceof Error ? err.message : "unknown error",
+      });
+    }
   }
 
   let newCheckinId: number | null = null;

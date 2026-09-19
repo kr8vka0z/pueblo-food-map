@@ -436,6 +436,37 @@ describe("POST /api/public/blessing-boxes/[id]/checkins", () => {
       expect(mockNotifyBoxAlerts.mock.calls[0][1]).toMatchObject({ kind: "low", prevStatus: "low" });
     });
 
+    // 2026-09-18 security review, item 10: the prevStatus pre-read must
+    // never fail the check-in itself. This fake throws ONLY on the FIRST
+    // box_checkins SELECT (the prevStatus pre-read, before the insert) —
+    // the SECOND (the post-insert response computation, unguarded, out of
+    // item 10's scope — see this file's Surprises in the handoff report)
+    // still succeeds normally, proving the check-in completes end to end.
+    test("prevStatus pre-read throwing -> treated as unknown, check-in still succeeds (item 10)", async () => {
+      const { db: baseDb } = makeFakeDb({ checkinRows: [] });
+      let selectCount = 0;
+      const db = {
+        prepare: (sql: string) => {
+          if (sql.includes("FROM box_checkins") && !sql.includes("INSERT")) {
+            selectCount += 1;
+            if (selectCount === 1) {
+              return { bind: () => ({ all: async () => { throw new Error("D1 outage"); } }) };
+            }
+          }
+          return baseDb.prepare(sql);
+        },
+      } as unknown as D1Database;
+      const waitUntil = vi.fn((p: Promise<unknown>) => p);
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db }, ctx: { waitUntil } });
+
+      const res = await callPost({ kind: "empty", turnstileToken: "t" });
+      expect(res.status).toBe(200);
+      expect((await res.clone().json()).ok).toBe(true);
+      // rolesToNotify treats null the same as "not already this status" —
+      // an alert still fires, just without a known prior status.
+      expect(mockNotifyBoxAlerts.mock.calls[0][1]).toMatchObject({ kind: "empty", prevStatus: null });
+    });
+
     test("dispatched via ctx.waitUntil() when a live ExecutionContext is present", async () => {
       const { db } = makeFakeDb();
       const waitUntil = vi.fn((p: Promise<unknown>) => p);

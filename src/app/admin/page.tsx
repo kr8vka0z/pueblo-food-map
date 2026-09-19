@@ -48,6 +48,7 @@ import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { summarizePublishChanges } from "@/lib/adminVenues";
 import { countPendingReview } from "@/lib/boxPhotos";
+import { countPendingAdopters } from "@/lib/boxAdopters";
 import VenueListView from "@/components/VenueListView";
 import PublishPanel from "@/components/PublishPanel";
 import type { AdminVenueRow } from "@/types/venue";
@@ -56,6 +57,7 @@ export default async function AdminPage() {
   let email: string;
   let venues: AdminVenueRow[];
   let pendingPhotoCount = 0;
+  let pendingAdopterCount = 0;
 
   try {
     const { db, identity } = await getAdminDb(await headers());
@@ -64,14 +66,19 @@ export default async function AdminPage() {
       .prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC")
       .all<AdminVenueRow>();
     venues = result.results;
-    // Best-effort: a missing box_photos table (e.g. migration 0009 not yet
-    // applied on this environment) must never break the whole admin shell —
-    // the count just shows 0, same "degrade, don't 500" posture every other
-    // best-effort read in this app already follows.
+    // Best-effort: a missing box_photos/box_adopters table (e.g. migration
+    // 0009/0010 not yet applied on this environment) must never break the
+    // whole admin shell — the count just shows 0, same "degrade, don't 500"
+    // posture every other best-effort read in this app already follows.
     try {
       pendingPhotoCount = await countPendingReview(db);
     } catch {
       pendingPhotoCount = 0;
+    }
+    try {
+      pendingAdopterCount = await countPendingAdopters(db);
+    } catch {
+      pendingAdopterCount = 0;
     }
   } catch (err) {
     handlePageAuthError(err);
@@ -113,6 +120,12 @@ export default async function AdminPage() {
             className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
           >
             Photo review{pendingPhotoCount > 0 && ` (${pendingPhotoCount})`}
+          </Link>
+          <Link
+            href="/admin/box-adopters"
+            className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+          >
+            Adoption requests{pendingAdopterCount > 0 && ` (${pendingAdopterCount})`}
           </Link>
           <p className="text-sm text-[var(--color-ink-500)]">
             Signed in as{" "}

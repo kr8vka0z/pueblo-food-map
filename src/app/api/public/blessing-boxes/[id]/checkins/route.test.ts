@@ -27,6 +27,11 @@ vi.mock("@opennextjs/cloudflare", () => ({
 
 const mockFetch = vi.fn();
 
+const mockNotifyBoxAlerts = vi.fn();
+vi.mock("@/lib/boxAlerts", () => ({
+  notifyBoxAlerts: (...args: unknown[]) => mockNotifyBoxAlerts(...args),
+}));
+
 import { POST } from "@/app/api/public/blessing-boxes/[id]/checkins/route";
 
 const BOX_ID = "plentiful-blessing-box-216-w-routt-plentiful-1454";
@@ -99,6 +104,8 @@ describe("POST /api/public/blessing-boxes/[id]/checkins", () => {
 
     mockVerifyTurnstileToken.mockResolvedValue(true);
     mockCheckAndIncrement.mockResolvedValue(true);
+    mockNotifyBoxAlerts.mockReset();
+    mockNotifyBoxAlerts.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -394,5 +401,68 @@ describe("POST /api/public/blessing-boxes/[id]/checkins", () => {
     });
     const res = await callPost({ kind: "took", turnstileToken: "t" });
     expect(res.status).toBe(503);
+  });
+
+  // ─── Slice 6 (alerts): notifyBoxAlerts wiring — see boxAlerts.ts's own
+  // header for who-gets-what; this route's own job is only to compute
+  // prevStatus correctly and never let a failure here affect the response. ──
+  describe("slice 6 — notifyBoxAlerts wiring", () => {
+    test("'filled'/'took' never compute a prevStatus read — no extra box_checkins query beyond the response's own", async () => {
+      const { db } = makeFakeDb();
+      const waitUntil = vi.fn((p: Promise<unknown>) => p);
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db }, ctx: { waitUntil } });
+      await callPost({ kind: "filled", turnstileToken: "t" });
+      expect(mockNotifyBoxAlerts).toHaveBeenCalledTimes(1);
+      expect(mockNotifyBoxAlerts.mock.calls[0][1]).toMatchObject({ kind: "filled", prevStatus: null });
+    });
+
+    test("'empty' check-in with no prior status-setting check-ins -> prevStatus computed as 'unknown', not null", async () => {
+      const { db } = makeFakeDb({ checkinRows: [] });
+      const waitUntil = vi.fn((p: Promise<unknown>) => p);
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db }, ctx: { waitUntil } });
+      await callPost({ kind: "empty", turnstileToken: "t" });
+      expect(mockNotifyBoxAlerts).toHaveBeenCalledTimes(1);
+      const [, input] = mockNotifyBoxAlerts.mock.calls[0];
+      expect(input).toMatchObject({ venueId: BOX_ID, kind: "empty", prevStatus: "unknown" });
+      expect(input.origin).toBe("https://pueblofoodmap.com");
+    });
+
+    test("'low' check-in already low (a prior visible 'low' check-in) -> prevStatus computed as 'low'", async () => {
+      const priorLow = new Date().toISOString();
+      const { db } = makeFakeDb({ checkinRows: [{ kind: "low", visibility: "visible", created_at: priorLow }] });
+      const waitUntil = vi.fn((p: Promise<unknown>) => p);
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db }, ctx: { waitUntil } });
+      await callPost({ kind: "low", turnstileToken: "t" });
+      expect(mockNotifyBoxAlerts.mock.calls[0][1]).toMatchObject({ kind: "low", prevStatus: "low" });
+    });
+
+    test("dispatched via ctx.waitUntil() when a live ExecutionContext is present", async () => {
+      const { db } = makeFakeDb();
+      const waitUntil = vi.fn((p: Promise<unknown>) => p);
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db }, ctx: { waitUntil } });
+      const res = await callPost({ kind: "empty", turnstileToken: "t" });
+      expect(res.status).toBe(200);
+      expect(waitUntil).toHaveBeenCalledTimes(1);
+    });
+
+    test("no ctx.waitUntil available (e.g. local dev) -> still succeeds, alert dispatch degrades silently", async () => {
+      const { db } = makeFakeDb();
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } }); // no ctx at all
+      const res = await callPost({ kind: "empty", turnstileToken: "t" });
+      expect(res.status).toBe(200);
+      expect(mockNotifyBoxAlerts).toHaveBeenCalledTimes(1);
+    });
+
+    test("notifyBoxAlerts rejecting never fails or slows the check-in response", async () => {
+      mockNotifyBoxAlerts.mockRejectedValue(new Error("Resend outage"));
+      const { db } = makeFakeDb();
+      const waitUntil = vi.fn((p: Promise<unknown>) => p);
+      mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db }, ctx: { waitUntil } });
+      const res = await callPost({ kind: "empty", turnstileToken: "t" });
+      expect(res.status).toBe(200);
+      // The rejection is awaited here only so the test can assert it never
+      // threw past the route — the route itself never awaits this promise.
+      await expect(waitUntil.mock.calls[0][0]).resolves.toBeUndefined();
+    });
   });
 });

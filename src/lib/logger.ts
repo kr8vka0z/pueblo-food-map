@@ -27,7 +27,18 @@
 
 import type { AccessDeniedReason } from "./cfAccess";
 
-export type FormName = "suggest" | "report" | "feedback" | "checkin" | "checkin_photo";
+export type FormName =
+  | "suggest"
+  | "report"
+  | "feedback"
+  | "checkin"
+  | "checkin_photo"
+  // Blessing Boxes slice 6: "adopt" covers the adopt-a-box application route;
+  // "alerts" covers every other alert-subscription route (giver sign-up,
+  // confirm, stop, resubscribe, admin host-alerts) — split the same way
+  // "checkin"/"checkin_photo" split two related-but-distinct write paths.
+  | "adopt"
+  | "alerts";
 export type FormFailureReason = "turnstile_failed" | "send_failed" | "db_write_failed";
 
 interface FailureDetail {

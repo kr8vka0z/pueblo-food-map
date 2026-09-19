@@ -20,6 +20,7 @@
  */
 
 import { isWithinConfirmWindow, randomHexToken } from "@/lib/alertTokens";
+import { composeBilingualEmail, sendResendEmail } from "@/lib/emailSend";
 
 // ─── D1 row shapes ──────────────────────────────────────────────────────────
 
@@ -192,4 +193,73 @@ export async function markAdopterEmailConfirmed(db: D1Database, id: number, time
 /** True when `row`'s confirm token is still within its 7-day validity window (alertTokens.ts's shared CONFIRM_TOKEN_MAX_AGE_MS). */
 export function isAdopterConfirmTokenValid(row: Pick<BoxAdopterRow, "created_at">, now: Date = new Date()): boolean {
   return isWithinConfirmWindow(row.created_at, now);
+}
+
+// ─── Emails ─────────────────────────────────────────────────────────────────
+// Kept here (rather than boxAlerts.ts) because both fire directly off this
+// file's own write path (insertAdopterApplication / markAdopterEmailConfirmed)
+// — boxAlerts.ts's own adopter email (sendAdopterApprovedEmail) is a
+// different lifecycle event (admin approval, alongside the
+// alert_subscriptions upsert), not an adoption-APPLICATION event.
+
+/** Sent right after insertAdopterApplication(). No stop link — nothing to stop until the application is even confirmed, same "no stop link before there's anything to unsubscribe from" convention sendGiverConfirmEmail (boxAlerts.ts) uses. */
+export async function sendAdopterConfirmEmail(opts: {
+  to: string;
+  boxName: string;
+  origin: string;
+  confirmToken: string;
+}): Promise<void> {
+  const url = `${opts.origin}/alerts/confirm?t=${opts.confirmToken}`;
+  const { subject, text, html } = composeBilingualEmail({
+    subjectKey: "email.adoptConfirm.subject",
+    bodyLineKeys: ["email.adoptConfirm.line1", "email.adoptConfirm.line2", "email.adoptConfirm.cta"],
+    vars: { box: opts.boxName, url },
+  });
+  await sendResendEmail({ to: opts.to, subject, text, html });
+}
+
+/**
+ * Best-effort internal notice that a NEWLY-CONFIRMED application is waiting
+ * for review — sent by POST /api/public/alerts/confirm only on the FIRST
+ * confirm of a given application (markAdopterEmailConfirmed's own
+ * idempotency), never on a re-click of an already-confirmed link. Plain
+ * internal text mail, same shape/recipient as the checkins route's own
+ * problem-report and photo-upload admin notices — not a subscriber-facing
+ * bilingual email, so it doesn't go through composeBilingualEmail.
+ */
+export async function sendAdopterConfirmedAdminEmail(
+  db: D1Database,
+  adopter: Pick<BoxAdopterRow, "venue_id" | "display_name" | "email" | "note">,
+): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY not configured");
+  }
+  const boxName =
+    (await db.prepare("SELECT name FROM venues WHERE id = ?").bind(adopter.venue_id).first<{ name: string }>())
+      ?.name ?? adopter.venue_id;
+  const lines = [
+    `A new box-adoption application is confirmed and waiting for review.`,
+    ``,
+    `Box: ${boxName}`,
+    `Name: ${adopter.display_name}`,
+    `Email: ${adopter.email}`,
+    `Note: ${adopter.note ?? "(none)"}`,
+    ``,
+    `Review it at https://pueblofoodmap.com/admin/box-adopters`,
+  ];
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      from: "Pueblo Food Map <noreply@pueblofoodmap.com>",
+      to: ["issues@pueblofoodmap.com"],
+      subject: `[PFM Blessing Box] New adoption application — ${boxName}`,
+      text: lines.join("\n"),
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "(unreadable)");
+    throw new Error(`Resend API error ${res.status}: ${body}`);
+  }
 }

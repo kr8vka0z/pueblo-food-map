@@ -86,6 +86,13 @@ describe("AdoptBoxForm", () => {
   test("still shows success when turnstile.reset() throws", async () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    // A live widget (iframe in the container), so reset() really is called —
+    // and the throw is consumed here rather than leaking into a later test.
+    mockTurnstile.render.mockImplementationOnce((container: HTMLElement, opts: { callback?: (t: string) => void }) => {
+      container.appendChild(document.createElement("iframe"));
+      opts.callback?.("test-turnstile-token");
+      return "widget-id-1";
+    });
     mockTurnstile.reset.mockImplementationOnce(() => {
       throw new Error("widget container is gone");
     });
@@ -159,7 +166,10 @@ describe("AdoptBoxForm", () => {
   test("no token available yet — the tap queues and fires once the widget calls back", async () => {
     // Simulate the invisible check not resolving synchronously.
     let capturedCallback: ((t: string) => void) | undefined;
-    mockTurnstile.render.mockImplementationOnce((_container: HTMLElement, opts: { callback?: (t: string) => void }) => {
+    mockTurnstile.render.mockImplementationOnce((container: HTMLElement, opts: { callback?: (t: string) => void }) => {
+      // A live widget has its iframe in the container — so the submit-time
+      // reset() restarts THIS widget rather than rebuilding a new one.
+      container.appendChild(document.createElement("iframe"));
       capturedCallback = opts.callback;
       return "widget-id-1";
     });

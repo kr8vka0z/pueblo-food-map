@@ -1,35 +1,43 @@
 "use client";
 
 /**
- * BoxHistoryContent — the visible body of /box/[id]/history (map-first
- * rework, scope addition 2026-09-18: Kyle wanted the in-map card to show
- * only the CURRENT snapshot — "the most recent check-in... and then there
- * could be a history link... that could take you to a separate page where
- * we could show all the historical information, check-ins, and all that
- * fun stuff").
+ * BoxHistoryContent — the visible body of /box/[id]/history: a
+ * history-first log (issue #511, 2026-09-19 — "Tapping History on a box
+ * card should land on a history log, not a second copy of the card").
+ * Top to bottom: the box's own name as the page's <h1> + the back link
+ * (PageNav), the combined history log newest-first (visible without
+ * scrolling), then the box's numbers (slice 7) at the bottom.
  *
- * Also the ONLY check-in surface for a visitor whose device can't show the
- * map (fix, PR review 2026-09-18): MapWrapper.tsx routes a mapUnavailable
- * box selection straight to this page (no in-map card exists to open there),
- * so BoxCardBody — the SAME snapshot-plus-check-in-panel component the map
- * card renders — is rendered here too, above the history list. Without this,
- * a no-WebGL visitor could see a box's status but had no way to check in at
- * all, a real regression from the pre-rework standalone /box/<id> page.
- * `liveBox` is local state seeded from the server-loaded `box` prop (same
- * pattern the old deleted BoxContent.tsx used) so a successful check-in
- * updates the badge/last-filled/recent-check-in line here instantly, with no
- * refetch — mirrors MapWrapper.tsx's own handleBoxCheckinSuccess patch
- * (including skipping 'problem' reports, which set no status) since this
- * page needs the identical optimistic update, just for one box instead of a
- * whole map's worth.
+ * #511 REMOVED the current-snapshot card (BoxCardBody) and the separate
+ * approved-photo grid (BoxPhotoGrid) that used to sit above/below the log —
+ * card photo, sponsor band, address, most needed, host note, and the
+ * check-in buttons are all gone from this page along with it. A photo is
+ * now a log entry ("Photo added", small thumbnail, tap opens the SAME
+ * PhotoViewer via BoxActivityList — see that file's own header) instead of
+ * a separate grid section, and an approved sponsor is now a log entry
+ * ("<name> became a sponsor") instead of a card band.
+ *
+ * KNOWN REGRESSION, not fixed here (see this PR's own report to Atlas):
+ * BoxCardBody's check-in panel was this page's own PR-review fix
+ * (2026-09-18) for a no-WebGL visitor — MapWrapper.tsx's mapUnavailable
+ * branch routes every box tap straight to `/box/<id>/history` with no other
+ * check-in surface. Removing BoxCardBody here removes that visitor's only
+ * way to check in, adopt, or even read the address. #511's own acceptance
+ * criteria explicitly name "check-in buttons" as removed, so this is a
+ * scoped, spec'd tradeoff — not an oversight — but it needs its own
+ * decision (accept the loss, or a follow-up issue for a no-WebGL check-in
+ * path), which is Kyle's/Atlas's to make, not this slice's.
  *
  * Reuses the SAME activity read path slice 3 built (useBoxActivity ->
  * GET /api/public/blessing-boxes/activity), filtered to this one box via
- * its existing `venueId` filter — not a second query, and the same
- * structural privacy guarantee: that route's SQL already excludes
- * `problem` reports and hidden check-ins for every caller (see
- * boxActivity.ts's own header), so this page needs no extra filtering of
- * its own to honor "same privacy rules as the activity feed."
+ * its existing `venueId` filter, with `includeBoxExtras: true` added for
+ * #511's two new per-box-only kinds (photo/sponsor — see boxActivity.ts's
+ * own header for why this is a dedicated flag, never inferred from
+ * `venueId`, and why the global /boxes/activity feed never sets it) — not a
+ * second query, and the same structural privacy guarantee: that route's SQL
+ * already excludes `problem` reports, hidden check-ins, and any non-
+ * approved photo/sponsor row for every caller, so this page needs no extra
+ * filtering of its own to honor "same privacy rules as the activity feed."
  *
  * Pagination mirrors BoxesActivityContent.tsx's own Prev/Next pattern
  * exactly (no "Load more" — avoids an accumulated-items state) — this page
@@ -49,16 +57,13 @@ import { useMemo, useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { useBoxActivity } from "@/lib/useBoxActivity";
-import { useBoxPhotos } from "@/lib/useBoxPhotos";
 import { ACTIVITY_PAGE_SIZE_DEFAULT } from "@/lib/boxActivity";
 import { computeCheckinCounts, computePairAverages, filterByPeriod, type PeriodKey } from "@/lib/boxStats";
 import BoxActivityList from "@/components/BoxActivityList";
-import BoxCardBody from "@/components/BoxCardBody";
 import BoxNumbersPanel from "@/components/BoxNumbersPanel";
-import BoxPhotoGrid from "@/components/BoxPhotoGrid";
 import SiteFooter from "@/components/SiteFooter";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
-import type { BoxStatus, CheckinKind, CheckinStatusInput, PublicBlessingBox } from "@/lib/blessingBoxes";
+import type { CheckinStatusInput, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 interface BoxHistoryContentProps {
   box: PublicBlessingBox;
@@ -71,15 +76,17 @@ interface BoxHistoryContentProps {
 export default function BoxHistoryContent({ box, allCheckins = [], approvedPhotoCreatedAts = [] }: BoxHistoryContentProps) {
   const { locale } = useLocale();
   const [page, setPage] = useState(1);
-  const [liveBox, setLiveBox] = useState(box);
   const [statsPeriod, setStatsPeriod] = useState<PeriodKey>("30d");
 
+  // includeBoxExtras: true — this page is the ONE caller that gets #511's
+  // photo/sponsor entries; see boxActivity.ts's own header for why that's a
+  // dedicated flag rather than inferred from venueId.
   const { page: activityPage, loading } = useBoxActivity({
-    venueId: liveBox.id,
+    venueId: box.id,
     page,
     pageSize: ACTIVITY_PAGE_SIZE_DEFAULT,
+    includeBoxExtras: true,
   });
-  const { photos } = useBoxPhotos(liveBox.id);
 
   // Counts (fills/uses/empty/low/total/approved photos) are scoped to the
   // selected period; pair averages read the box's ENTIRE history regardless
@@ -92,69 +99,57 @@ export default function BoxHistoryContent({ box, allCheckins = [], approvedPhoto
     return filterByPeriod(asRows, statsPeriod, new Date()).length;
   }, [approvedPhotoCreatedAts, statsPeriod]);
 
-  const handleCheckinSuccess = (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => {
-    setLiveBox((current) => ({
-      ...current,
-      box: {
-        ...current.box,
-        status: result.status,
-        lastFilledAt: result.lastFilledAt,
-        // Same "problem" skip + cap-at-5 as MapWrapper's handleBoxCheckinSuccess.
-        recentCheckins:
-          result.kind === "problem"
-            ? current.box.recentCheckins
-            : [{ kind: result.kind, createdAt: new Date().toISOString() }, ...current.box.recentCheckins].slice(0, 5),
-      },
-    }));
-  };
-
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
       {/* backHref points PageNav's own "Back to map" chrome link at the
           exact box's card (?venue=<id>), not just the bare map — the in-map
-          deep link MapWrapper already reads. Fix, 2026-09-18: this page used
-          to ALSO render its own "Back to the map" link below, so a visitor
-          saw two of them; deleted in favor of pointing the one chrome link
-          everywhere else already has. */}
-      <PageNav locale={locale} backHref={`/?venue=${encodeURIComponent(liveBox.id)}`} />
+          deep link MapWrapper already reads. */}
+      <PageNav locale={locale} backHref={`/?venue=${encodeURIComponent(box.id)}`} />
 
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-6">
-        <p className="mt-2 text-sm text-[var(--color-ink-700)]">{t("box.history.subheading", locale)}</p>
+        {/* #511 — box name is the page title. The log immediately follows,
+            with no other section between title and log, so it's visible on
+            first screen without scrolling (the page's own spec). */}
+        <h1 className="text-3xl font-normal text-[var(--color-ink-900)]" style={{ fontFamily: "var(--font-display)" }}>
+          {box.name}
+        </h1>
 
-        {/* Full current-snapshot card, incl. check-in panel and host note —
-            see this file's own header. `showHistoryLink={false}` (2026-09-18):
-            a History link pointing at the page it's already on is dead
-            weight — everything else about BoxCardBody's default rendering
-            still applies, since a no-WebGL visitor's only box page is THIS
-            one and needs the full snapshot. `headingLevel="h1"` (card
-            redesign, 2026-09-19): BoxCardBody now renders the box's own
-            name as part of its badge/name/address block — this page no
-            longer renders a separate <h1> above it (that would duplicate
-            the name as two headings); the card's own name IS this page's
-            page-level heading now. */}
-        <BoxCardBody
-          box={liveBox}
-          onCheckinSuccess={handleCheckinSuccess}
-          showHistoryLink={false}
-          headingLevel="h1"
-        />
-
-        {/* Approved-photo grid (slice 5) — reuses the same public serve
-            route the card's own single-photo slot uses; this is the "see
-            every photo" counterpart to that most-recent-only slot. */}
         <div>
-          <h2
-            className="text-xl font-normal text-[var(--color-ink-900)] mb-2"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {t("box.photo.galleryHeading", locale)}
-          </h2>
-          <BoxPhotoGrid photos={photos} boxName={liveBox.name} locale={locale} />
+          <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">
+            {loading && activityPage.items.length === 0
+              ? t("activity.loading", locale)
+              : t("activity.resultCount", locale, { count: String(activityPage.items.length) })}
+          </p>
+          {!(loading && activityPage.items.length === 0) && (
+            <BoxActivityList items={activityPage.items} showVenueName={false} emptyMessageKey="activity.recentEmpty" />
+          )}
+
+          {activityPage.items.length > 0 && (
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {t("activity.prevPage", locale)}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!activityPage.hasMore}
+                className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {t("activity.nextPage", locale)}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Numbers (slice 7) — this box's own counts/typical-timing, driven
-            by allCheckins/approvedPhotoCreatedAts loaded server-side (see
-            page.tsx's own header for why no extra fetch is needed here). */}
+        {/* Numbers (slice 7), below the log per #511's own spec — this
+            box's own counts/typical-timing, driven by allCheckins/
+            approvedPhotoCreatedAts loaded server-side (see page.tsx's own
+            header for why no extra fetch is needed here). */}
         <div>
           <h2
             className="text-xl font-normal text-[var(--color-ink-900)] mb-2"
@@ -172,36 +167,6 @@ export default function BoxHistoryContent({ box, allCheckins = [], approvedPhoto
             locale={locale}
           />
         </div>
-
-        <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">
-          {loading && activityPage.items.length === 0
-            ? t("activity.loading", locale)
-            : t("activity.resultCount", locale, { count: String(activityPage.items.length) })}
-        </p>
-        {!(loading && activityPage.items.length === 0) && (
-          <BoxActivityList items={activityPage.items} showVenueName={false} emptyMessageKey="activity.recentEmpty" />
-        )}
-
-        {activityPage.items.length > 0 && (
-          <div className="flex items-center justify-between gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t("activity.prevPage", locale)}
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={!activityPage.hasMore}
-              className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t("activity.nextPage", locale)}
-            </button>
-          </div>
-        )}
       </div>
 
       <SiteFooter />

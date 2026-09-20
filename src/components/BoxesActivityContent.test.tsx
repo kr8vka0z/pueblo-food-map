@@ -91,6 +91,21 @@ describe("BoxesActivityContent", () => {
     });
   });
 
+  // #511 — structural proof that the global feed never asks for the new
+  // photo/sponsor kinds, even when filtered down to one box via its own
+  // dropdown (`?box=<id>`, the case boxActivity.ts's own header calls out
+  // by name as the reason `includeBoxExtras` can't be inferred from
+  // `venueId` alone). Counterpart: BoxHistoryContent.test.tsx's own
+  // "includeExtras=1" assertion for the per-box page.
+  test("never sends includeExtras, even when filtered to one box", async () => {
+    searchParamsValue = new URLSearchParams("box=box-1");
+    render(<BoxesActivityContent />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    const activityCall = mockFetch.mock.calls.find((c) => (c[0] as string).includes("/blessing-boxes/activity"));
+    expect(activityCall?.[0] as string).toContain("box=box-1");
+    expect(activityCall?.[0] as string).not.toContain("includeExtras");
+  });
+
   test("renders fetched activity items", async () => {
     mockFetch.mockImplementation((url: string) => {
       if (url.includes("/blessing-boxes/activity")) {

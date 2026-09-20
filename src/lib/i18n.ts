@@ -641,6 +641,11 @@ const en: Record<string, string> = {
   "box.photo.altText": "Photo of {name}, shared {time}",
   // #508: the card photo becomes a button that opens PhotoViewer full-screen.
   "box.photo.viewFullSize": "View photo full size",
+  // #511 review nit: BoxActivityList's per-entry thumbnail button needs a
+  // label that varies per row (the generic viewFullSize text above is
+  // identical for every photo entry in the log, so multiple photos are
+  // indistinguishable to a screen reader) — {time} makes each one unique.
+  "box.photo.viewFullSizeAt": "View photo full size · {time}",
   "box.photo.report": "Report this photo",
   "box.photo.reporting": "Reporting…",
   "box.photo.reportConfirm": "Hide this photo and send it for review?",
@@ -852,6 +857,16 @@ const en: Record<string, string> = {
   "activity.line.renamed": "{name} was renamed",
   "activity.line.paused": "{name} was paused",
   "activity.line.removed": "{name} was removed",
+  // #511 — per-box history log only (never the global feed's own vocabulary,
+  // see boxActivity.ts's PerBoxActivityKind). photo_added: no {name} — it's
+  // always rendered on the box's own history page, so naming the box again
+  // would be noise (unlike the checkin/event lines above, which are shared
+  // with the global feed and DO need the box's name). sponsor_added's
+  // {name} is the SPONSOR's display name, not the box's — see
+  // BoxActivityList.tsx's own header for why this one line gets a different
+  // `name` value than every other line template here.
+  "activity.line.photo_added": "A new photo was added",
+  "activity.line.sponsor_added": "{name} became a sponsor",
   // Short noun labels for the kind filter's <option> text — distinct from
   // box.checkin.* above, which is first-person button copy ("I filled it")
   // that reads oddly as a filter option.
@@ -1429,6 +1444,7 @@ const es: Record<string, string> = {
   "box.photo.caption": "Foto · {time}", // [CHECK]
   "box.photo.altText": "Foto de {name}, compartida {time}", // [CHECK]
   "box.photo.viewFullSize": "Ver foto en tamaño completo", // [CHECK]
+  "box.photo.viewFullSizeAt": "Ver foto en tamaño completo · {time}", // [CHECK]
   "box.photo.report": "Reportar esta foto", // [CHECK]
   "box.photo.reporting": "Reportando…", // [CHECK]
   "box.photo.reportConfirm": "¿Ocultar esta foto y enviarla para revisión?", // [CHECK]
@@ -1573,6 +1589,8 @@ const es: Record<string, string> = {
   "activity.line.renamed": "{name} cambió de nombre", // [CHECK]
   "activity.line.paused": "{name} se pausó", // [CHECK]
   "activity.line.removed": "{name} se eliminó", // [CHECK]
+  "activity.line.photo_added": "Se agregó una nueva foto", // [CHECK]
+  "activity.line.sponsor_added": "{name} se convirtió en patrocinador(a)", // [CHECK]
   "activity.kind.filled": "Surtida", // [CHECK]
   "activity.kind.took": "Se usó la caja", // [CHECK]
   "activity.kind.low": "Con poco", // [CHECK]

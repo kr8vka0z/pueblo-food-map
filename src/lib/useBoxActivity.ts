@@ -33,6 +33,7 @@ function buildQuery(filters: ActivityFilters): string {
   if (filters.to) params.set("to", filters.to);
   if (filters.page) params.set("page", String(filters.page));
   if (filters.pageSize) params.set("limit", String(filters.pageSize));
+  if (filters.includeBoxExtras) params.set("includeExtras", "1");
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 }

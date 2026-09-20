@@ -269,21 +269,41 @@ describe("#541 — bottom-pinned chrome uses env(safe-area-inset-bottom) alone, 
  * are source-level guards, in the same spirit as the `vh`/`dvh` guards above.
  */
 describe("#553 — overscroll chaining is contained", () => {
-  test("globals.css sets overscroll-behavior: none on html", () => {
+  test("globals.css sets overscroll-behavior-y: none on html", () => {
     const css = readSrc("src/app/globals.css");
-    expect(css).toMatch(/html\s*\{[^}]*overscroll-behavior:\s*none;/);
+    expect(css).toMatch(/html\s*\{[^}]*overscroll-behavior-y:\s*none;/);
   });
 
+  test("the html rule stays on the y axis — the shorthand would kill edge-swipe back/forward", () => {
+    // `overscroll-behavior: none` at the document root also zeroes the X
+    // axis, which is the documented way to disable Chrome/Android's
+    // edge-swipe navigation gesture. Nothing here wants that, and no Android
+    // device is available to catch the regression, so the shorthand must not
+    // come back. Matches a rule declaration only, never the prose above it.
+    const css = readSrc("src/app/globals.css");
+    expect(css).not.toMatch(/^\s*overscroll-behavior:\s*none;/m);
+  });
+
+  // Deliberately NOT "every scroller in src/" — only the ones that render
+  // inside the mobile bottom sheet, where a pull-down at scrollTop 0 is the
+  // reported gesture. Other scrollers (DesktopVenueWindow, SearchResultsPopover,
+  // FilterPanel, SplashScreen) rely on the `html` backstop above instead;
+  // widening this list would mean touching files this bug never reached.
   test.each([
     ["src/components/BottomSheet.tsx"],
     ["src/components/RouteStrip.tsx"],
+    ["src/components/DirectionButtons.tsx"],
     ["src/components/ListView.tsx"],
   ])("%s: every overflow-y-auto scroller also opts out of scroll chaining", (relPath) => {
-    // Drop whole-line `//` comments first. Several of these files discuss
-    // `overflow-y-auto` in prose (BottomSheet.tsx's repositionInputs note,
-    // and this fix's own comments) — counting those as scrollers would fail
-    // the assertion on documentation rather than on code.
+    // Drop comments first. Several of these files discuss `overflow-y-auto`
+    // in prose (BottomSheet.tsx's repositionInputs note, DirectionButtons'
+    // "FIX 4" note, and this fix's own comments) — counting those as
+    // scrollers would fail the assertion on documentation rather than code.
+    // Block comments are stripped too: JSX attribute comments in these files
+    // are `{/* ... */}`, and a future docs edit mentioning the utility inside
+    // one would otherwise trip this.
     const src = readSrc(relPath)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
       .split("\n")
       .filter((line) => !line.trimStart().startsWith("//"))
       .join("\n");

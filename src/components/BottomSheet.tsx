@@ -401,8 +401,12 @@ export default function BottomSheet({
             // ListView's own scroller has carried this since it was written.
             //
             // NOT the toolbar-resize residual documented on `snapPoints`
-            // above: Safari's bottom toolbar held a constant screen position
-            // across all 2039 frames of that recording, so no resize fired.
+            // above. The structural tell is that the MAP moved too, and that
+            // residual can only re-animate the sheet, never the map behind
+            // it. Corroborating but secondary, and true of one recording on
+            // one device rather than proven in general: Safari's bottom
+            // toolbar held a constant screen position in every frame of that
+            // clip, so no resize appears to have fired.
             <div className="flex-1 overflow-y-auto overscroll-contain">
               {isBox ? (
                 box ? (

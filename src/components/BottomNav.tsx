@@ -185,24 +185,15 @@ export default function BottomNav({
     <nav
       ref={navRef}
       aria-label={t("nav.aria", locale)}
+      // #530 review round 2: the `bottom` position lives in globals.css
+      // (`[data-bottom-nav]`), NOT here as a class or inline style — an
+      // inline style always outranks a stylesheet rule (short of
+      // `!important`), so a Tailwind `2xl:` class or a media-scoped CSS
+      // reset can never override one, no matter which comes later in the
+      // cascade. See globals.css's own comment for the actual formula and
+      // the reasoning (a stable gap derived from the large/small viewport
+      // difference, no env(safe-area-inset-bottom) term — see that file).
       data-bottom-nav=""
-      // Below 2xl: positioned from the TOP rather than the bottom (#530:
-      // iOS Safari's own toolbar was slicing the pill off). `bottom: 0`
-      // anchors against a `position:fixed` containing block sized to the
-      // viewport with its toolbar COLLAPSED, so the pill's bottom half
-      // landed underneath the toolbar once it re-expanded. Measuring down
-      // from the top against `--viewport-small` (globals.css — the small/
-      // `svh` viewport, invariant across the toolbar's own collapse/expand
-      // animation) instead guarantees the pill sits fully inside the
-      // always-visible area and never jumps on scroll. BOTTOM_NAV_HEIGHT_PX
-      // is the pill's own height (64) plus the 12px gap below it. An inline
-      // style (not a Tailwind class) because the value is computed from
-      // that TS constant; globals.css resets it back to `auto` at 2xl (see
-      // the `[data-bottom-nav]` rule there) since desktop's `2xl:bottom-6`
-      // needs `top` out of the way — a fixed element with an explicit
-      // height and both `top` and `bottom` set is over-constrained, and CSS
-      // drops `bottom`.
-      style={{ top: `calc(var(--viewport-small) - ${BOTTOM_NAV_HEIGHT_PX}px - env(safe-area-inset-bottom))` }}
       className={
         // Below 2xl: a 64px pill floating 12px in from the sides — same
         // fill, border and radius as the search bar, with a slightly
@@ -216,6 +207,9 @@ export default function BottomNav({
         // background as SearchBar's input (h-[52px], rounded-full, bone-50,
         // bone-300 border, elevation-1). 24px up, clear of the Mapbox corner.
         // fixed, not absolute: on the Menu pages (PageNav) the document scrolls.
+        // Overrides globals.css's below-2xl `[data-bottom-nav]` bottom rule
+        // outright (that rule is scoped to `@media (width < 96rem)`, so it
+        // simply doesn't match here — no specificity fight, no reset needed).
         "2xl:right-auto 2xl:z-[1000] " +
         "2xl:bottom-6 2xl:left-1/2 2xl:-translate-x-1/2 " +
         "2xl:h-[52px] 2xl:px-1 2xl:shadow-none 2xl:elevation-1"

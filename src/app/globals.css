@@ -124,6 +124,33 @@
   }
 }
 
+/* #530 review round 2 — `--viewport-toolbar-gap`: the STABLE distance
+   between the large viewport (`100vh`, what a `position:fixed` element's
+   own containing block is always sized to, as if Safari's toolbar were
+   already collapsed) and the small viewport (`--viewport-small` above,
+   toolbar always assumed expanded). Both operands are themselves invariant
+   across the toolbar's live collapse/expand animation, so this gap is too —
+   it evaluates to the toolbar's own worst-case height on every browser,
+   never fluctuating. A `bottom:` offset built from it (see `[data-bottom-nav]`
+   and `[data-bottom-sheet]` below) therefore always lands exactly at the
+   line where the (possibly expanded) toolbar starts, regardless of the
+   fixed CB's own always-large sizing, and never moves as the toolbar
+   animates — no `env(safe-area-inset-bottom)` term anywhere in it.
+   That's deliberate, not an oversight: `env(safe-area-inset-bottom)` itself
+   reads 0 while Safari's toolbar is expanded and only the physical
+   home-indicator height (~34px) once it collapses (the exact bug #530
+   reports), so folding it into a position calc reintroduces the very jump
+   this fix removes. It isn't needed for clearance either — this boundary
+   line already sits above the home-indicator's own reserved zone in every
+   toolbar state, since the toolbar's worst-case height is itself larger
+   than any real device's safe-area inset. Browsers without `svh` support
+   fall back to `--viewport-small: 100vh`, making this gap resolve to `0` —
+   identical to this app's pre-fix `bottom: 0`-style behaviour for them, not
+   a regression. */
+:root {
+  --viewport-toolbar-gap: calc(100vh - var(--viewport-small));
+}
+
 body {
   background: var(--color-bone-50);
   color: var(--color-ink-700);
@@ -243,17 +270,38 @@ body {
   }
 }
 
-/* ─── #530: reset BottomNav's below-2xl top offset at 2xl ────────────────────
-   BottomNav.tsx sets `top` inline (computed from --viewport-small, see that
-   file's own comment) so the pill sits above Safari's toolbar below 2xl. At
-   2xl the pill goes back to floating bottom-centre via the `2xl:bottom-6`
-   Tailwind class — but a fixed element with an explicit height and both
-   `top` and `bottom` set is over-constrained, and CSS drops `bottom`, so
-   `2xl:bottom-6` would silently never take effect without this reset. */
-@media (width >= 96rem) {
+/* ─── #530 review round 2: BottomNav's own bottom offset ─────────────────────
+   Lives here, in plain CSS, NOT as a Tailwind class or a React inline style
+   on BottomNav.tsx — the first attempt used an inline `style={{ top: ... }}`
+   plus a `[data-bottom-nav] { top: auto }` reset meant to win back at 2xl;
+   an inline style always outranks a stylesheet rule (short of `!important`),
+   so that reset was dead CSS and desktop was only correct by numeric
+   coincidence (52+24 == 64+12). Scoping this rule to `@media (width < 96rem)`
+   instead means it simply doesn't match at 2xl — Tailwind's own
+   `2xl:bottom-6` class (BottomNav.tsx) applies there with no fight, no
+   reset needed. See `--viewport-toolbar-gap`'s own comment above for the
+   gap formula and why it excludes env(safe-area-inset-bottom). 12px is the
+   pill's own designed gap above that boundary line (docs/bottom-nav-spec.md
+   §3), matching its pre-#530 value. */
+@media (width < 96rem) {
   [data-bottom-nav] {
-    top: auto;
+    bottom: calc(var(--viewport-toolbar-gap) + 12px);
   }
+}
+
+/* ─── #530 review round 2: BottomSheet's own bottom offset ───────────────────
+   Same root cause and fix as BottomNav above: vaul's `Drawer.Content`
+   rendered with a literal `bottom-0` Tailwind class, landing the sheet's
+   resting edge under Safari's expanded toolbar. `data-bottom-sheet` is a
+   plain attribute added in BottomSheet.tsx purely to hook this rule — no
+   Tailwind class carries the value, for the same reason BottomNav's doesn't.
+   Mobile-only in practice (BottomSheet only ever mounts when `isMobile`,
+   see MapWrapper.tsx), so no 2xl override is needed the way BottomNav's
+   needs one. No extra gap added: the sheet is meant to sit flush against
+   this boundary (a "bottom sheet" reads as docked to the screen edge),
+   unlike the nav's floating pill. */
+[data-bottom-sheet] {
+  bottom: var(--viewport-toolbar-gap);
 }
 
 /* ─── Hover tooltip popups (venue name + category, "You are here") ─────────── */

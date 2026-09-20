@@ -185,8 +185,18 @@ export default function BottomSheet({
       <Drawer.Portal>
         <Drawer.Content
           key={venue?.id ?? "empty"}
+          // #530 review round 2: no `bottom-0` Tailwind class — Safari's own
+          // toolbar was slicing the sheet's resting edge off the same way it
+          // sliced BottomNav's pill (root cause: a `position:fixed`
+          // element's containing block is always sized to the LARGE
+          // viewport, as if the toolbar were collapsed, so a literal
+          // `bottom: 0` lands under the toolbar once it's actually
+          // expanded). `data-bottom-sheet` hooks the real `bottom` value —
+          // see globals.css's own comment for the formula and why it never
+          // jumps as the toolbar animates.
+          data-bottom-sheet=""
           className={
-            "fixed bottom-0 left-0 right-0 z-[800] flex flex-col " +
+            "fixed left-0 right-0 z-[800] flex flex-col " +
             "bg-[var(--color-bone-50)] " +
             "rounded-t-[var(--radius-xl)] " +
             "elevation-2 " +

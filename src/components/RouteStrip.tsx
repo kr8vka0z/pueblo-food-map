@@ -37,7 +37,7 @@
  * #537 (Kyle, 2026-09-19): Kyle saw no Steps control at all on a real
  * walking route. Evidence gathered before touching this file: a real Mapbox
  * Directions API walking response captured for a short Pueblo route
- * (test/fixture data, see RouteStrip.test.tsx) returned 7 usable steps —
+ * (test/fixture data, see RouteStripStepsEvidence.test.tsx) returned 7 usable steps —
  * `parseWalkSteps` (MapWrapper.tsx) keeps all 7 — and the prop chain from
  * there (MapWrapper's `walkingRouteSteps` -> BottomSheet's `walkRouteSteps`
  * -> here) has no additional gate beyond `walkingRouteVenueId ===

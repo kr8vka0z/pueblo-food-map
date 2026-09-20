@@ -134,8 +134,11 @@ describe("#530 review round 2 — position lives in CSS, not a React inline styl
     // rule with no media scoping would apply at every width, including 2xl,
     // and (same specificity as a Tailwind class, later in source) silently
     // win over BottomNav.tsx's 2xl:bottom-6 — correct only by coincidence.
+    // #536 review: the value itself is `max(--viewport-toolbar-gap,
+    // env(safe-area-inset-bottom))`, not a bare --viewport-toolbar-gap — see
+    // the dedicated "anti-correlated" describe block below for why.
     expect(css).toMatch(
-      /@media\s*\(width\s*<\s*96rem\)\s*\{\s*\[data-bottom-nav\]\s*\{\s*bottom:\s*calc\(var\(--viewport-toolbar-gap\)/
+      /@media\s*\(width\s*<\s*96rem\)\s*\{\s*\[data-bottom-nav\]\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\)/
     );
     // [data-bottom-nav] names an actual CSS selector exactly once in the
     // whole file — inside that media block. Strip /* */ comments first (the
@@ -190,16 +193,39 @@ describe("#536 — Mapbox attribution clearance is re-derived from the bar's rea
     // #536: this rule used to omit the toolbar-gap term entirely (written for
     // the bar's pre-#530 resting position), so once #530 moved the bar up,
     // the credits no longer cleared it. It must now build on the SAME
-    // variable the bar itself positions against, and must NOT reintroduce
-    // env(safe-area-inset-bottom) — see that rule's own comment for why
-    // (it jumps 0 -> ~34px as the toolbar collapses, exactly the discrete
-    // snap this fix avoids elsewhere).
+    // max(...) floor the nav pill itself positions against (review round 2 —
+    // see the dedicated describe block below for why a bare
+    // --viewport-toolbar-gap under-clears the pill on a notched phone).
     expect(
       css,
-      "expected .mapboxgl-ctrl-bottom-right's bottom rule to read var(--viewport-toolbar-gap) + var(--bottom-nav-clearance) + 8px, no env(safe-area-inset-bottom)"
+      "expected .mapboxgl-ctrl-bottom-right's bottom rule to read max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom)) + var(--bottom-nav-clearance) + 8px"
     ).toMatch(
-      /\.mapboxgl-map \.mapboxgl-ctrl-bottom-right\s*\{\s*bottom:\s*calc\(var\(--viewport-toolbar-gap\)\s*\+\s*var\(--bottom-nav-clearance\)\s*\+\s*8px\);/
+      /\.mapboxgl-map \.mapboxgl-ctrl-bottom-right\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\),\s*env\(safe-area-inset-bottom\)\)\s*\+\s*var\(--bottom-nav-clearance\)\s*\+\s*8px\);/
     );
+  });
+});
+
+describe("#536 review — the toolbar-gap and safe-area-inset terms are anti-correlated, so both consuming rules must use max(), never a bare --viewport-toolbar-gap", () => {
+  // With the #536 dvh override, --viewport-toolbar-gap correctly reaches
+  // exactly 0 the instant Safari's toolbar fully collapses — the SAME
+  // instant env(safe-area-inset-bottom) jumps from 0 to the physical
+  // home-indicator height (~34px) on a notched iPhone. A bare
+  // --viewport-toolbar-gap would then park roughly a third of the 64px nav
+  // pill inside the home-indicator's gesture zone after an ordinary scroll.
+  // This pins max() on BOTH rules that build on that gap, so a future edit
+  // can't drop the guard on one while "cleaning up" the other.
+  test.each([
+    [
+      "[data-bottom-nav]",
+      /\[data-bottom-nav\]\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\),\s*env\(safe-area-inset-bottom\)\)\s*\+\s*12px\);/,
+    ],
+    [
+      ".mapboxgl-map .mapboxgl-ctrl-bottom-right",
+      /\.mapboxgl-map \.mapboxgl-ctrl-bottom-right\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\),\s*env\(safe-area-inset-bottom\)\)\s*\+\s*var\(--bottom-nav-clearance\)\s*\+\s*8px\);/,
+    ],
+  ])("%s's bottom rule wraps --viewport-toolbar-gap in max(..., env(safe-area-inset-bottom))", (_selector, pattern) => {
+    const css = readSrc("src/app/globals.css");
+    expect(css).toMatch(pattern);
   });
 });
 

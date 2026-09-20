@@ -297,16 +297,19 @@ body {
    #536: this used to omit the toolbar-gap term entirely — a formula written
    for the bar's PRE-#530 position (`bottom: 0`-ish), so once #530 moved the
    bar up by that gap, the credits stopped clearing it and sat at the bar's
-   old resting line. No `env(safe-area-inset-bottom)` term, deliberately, to
-   match `[data-bottom-nav]`'s own rule below: that env() value jumps from 0
-   to ~34px exactly as the toolbar collapses (see `--viewport-toolbar-gap`'s
-   own comment above), and this credits row already sits above the
-   home-indicator's reserved zone in every toolbar state without it — adding
-   it back would make the credits jump relative to a bar that doesn't. 2xl
-   and up the nav is a pill in the bottom centre, clear of the corner. */
+   old resting line.
+   #536 review: `max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom))`,
+   not a bare `--viewport-toolbar-gap` — see `[data-bottom-nav]`'s own rule
+   below for why the two terms are anti-correlated (the toolbar-gap goes to
+   0 at the EXACT moment the safe-area inset appears on a notched phone) and
+   why this must track whichever is currently larger. This rule needs the
+   same guard as the nav's own bottom offset because it lifts clear of that
+   SAME pill — using a smaller floor here would under-clear the pill the
+   instant the toolbar fully collapses. 2xl and up the nav is a pill in the
+   bottom centre, clear of the corner. */
 @media (width < 96rem) {
   .mapboxgl-map .mapboxgl-ctrl-bottom-right {
-    bottom: calc(var(--viewport-toolbar-gap) + var(--bottom-nav-clearance) + 8px);
+    bottom: calc(max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom)) + var(--bottom-nav-clearance) + 8px);
   }
 }
 
@@ -320,12 +323,29 @@ body {
    instead means it simply doesn't match at 2xl — Tailwind's own
    `2xl:bottom-6` class (BottomNav.tsx) applies there with no fight, no
    reset needed. See `--viewport-toolbar-gap`'s own comment above for the
-   gap formula and why it excludes env(safe-area-inset-bottom). 12px is the
-   pill's own designed gap above that boundary line (docs/bottom-nav-spec.md
-   §3), matching its pre-#530 value. */
+   gap formula. 12px is the pill's own designed gap above that boundary
+   line (docs/bottom-nav-spec.md §3), matching its pre-#530 value.
+
+   #536 review — `max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom))`,
+   NOT a bare `--viewport-toolbar-gap`: with the #536 dvh override, the
+   toolbar-gap term now correctly goes to exactly 0 the instant Safari's
+   toolbar fully collapses — the SAME instant `env(safe-area-inset-bottom)`
+   jumps from 0 to the physical home-indicator height (~34px) on a notched
+   iPhone. The two terms are anti-correlated, not additive: after an
+   ordinary scroll settles, a bare toolbar-gap value would park roughly a
+   third of the 64px pill inside the home-indicator's own gesture zone.
+   `max()` always keeps whichever clearance is actually needed at that
+   instant — the toolbar's real height while it's still showing, the
+   home-indicator's real height once the toolbar is gone — so the pill
+   never sits lower than either boundary requires. (The original,
+   svh-based #530 comment's reasoning for excluding env() entirely held
+   only for that formula: `--viewport-toolbar-gap` never went below the
+   toolbar's own worst-case height, which is always bigger than any real
+   safe-area inset, so env() was genuinely redundant there. #536's live
+   formula can go to 0, so it no longer is.) */
 @media (width < 96rem) {
   [data-bottom-nav] {
-    bottom: calc(var(--viewport-toolbar-gap) + 12px);
+    bottom: calc(max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom)) + 12px);
   }
 }
 

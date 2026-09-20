@@ -46,6 +46,7 @@
 
 import { useEffect, useRef } from "react";
 import { t, type Locale } from "@/lib/i18n";
+import { useOverlayRegistration } from "@/lib/overlayRegistry";
 
 export interface PhotoViewerProps {
   /** Image URL, passed straight to the <img src>. */
@@ -60,6 +61,10 @@ export interface PhotoViewerProps {
 }
 
 export default function PhotoViewer({ src, alt, caption, open, onClose, locale }: PhotoViewerProps) {
+  // #542: full-screen at every width (no desktop variant, unlike
+  // HamburgerMenu/FilterPanel) — always hides BottomNav while open.
+  useOverlayRegistration(open);
+
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Whatever had focus right before this opened (the card's "View photo
   // full size" button, in practice) — captured explicitly rather than

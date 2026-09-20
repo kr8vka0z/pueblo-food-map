@@ -30,6 +30,7 @@ import { categoryColors } from "@/data/venues";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { useOverlayRegistration } from "@/lib/overlayRegistry";
 import type { VenueCategory } from "@/types/venue";
 
 // Same order the old CategoryDropdown's BROWSE_CATEGORIES used (legend order,
@@ -145,6 +146,11 @@ export default function FilterPanel({
 }: FilterPanelProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
+
+  // #542: full-height 85vw side panel with a full-screen dimmed backdrop at
+  // EVERY width (no desktop-narrower variant, unlike HamburgerMenu below) —
+  // always hides BottomNav while open.
+  useOverlayRegistration(open);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);

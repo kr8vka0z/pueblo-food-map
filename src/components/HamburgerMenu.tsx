@@ -42,6 +42,7 @@ import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuer
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { useOverlayRegistration } from "@/lib/overlayRegistry";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
@@ -207,8 +208,23 @@ export default function HamburgerMenu({
 
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const isBelow2xl = useMediaQuery(BELOW_2XL_QUERY);
-  // The bottom bar (z 1003) draws over the drawer below 2xl; keep the drawer's
-  // last item (the language toggle) scrollable clear of it.
+
+  // #542: on mobile the drawer is a full-height side sheet covering the
+  // whole screen — one of the "full-surface overlay hides the bottom bar"
+  // cases — so BottomNav unmounts entirely while it's open there (see
+  // overlayRegistry.ts). The tablet/desktop dropdown below (`panelStyle`'s
+  // else branch: 280px, top-right) is NOT full-surface — its own
+  // `maxHeight` already clears the bar via `barClearance` — so it stays out
+  // of the registry and the bar stays visible for it, same as before.
+  useOverlayRegistration(open && isMobile);
+
+  // The bottom bar (z 1003) still draws over the tablet/desktop DROPDOWN
+  // variant below 2xl (isBelow2xl but !isMobile) — keep its last item
+  // scrollable clear of it there, same as before #542. On MOBILE this used
+  // to reserve the same bar-height space inside the full-sheet's own
+  // padding, but #542 now hides the bar outright while that sheet is open —
+  // reserving its height inside the sheet is dead padding once the bar it
+  // was clearing is never drawn; see `panelStyle`'s mobile branch below.
   const barClearance = isBelow2xl
     ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + env(safe-area-inset-bottom))`
     : "0px";
@@ -232,10 +248,12 @@ export default function HamburgerMenu({
         boxShadow: "0 4px 32px rgba(0,0,0,0.22)",
         overflowY: "auto",
         paddingTop: "env(safe-area-inset-top)",
-        // isMobile (this branch) implies isBelow2xl — MOBILE_QUERY (767px) is
-        // narrower than BELOW_2XL_QUERY (1535px) — so barClearance always
-        // applies here; the env(...)-only alternative was unreachable.
-        paddingBottom: barClearance,
+        // #542: BottomNav now unmounts entirely on mobile while this sheet
+        // is open (see the registration above), so there's no bar left to
+        // clear — only the home-indicator/notch safe area matters here.
+        // Previously this reserved `barClearance` (the bar's own height)
+        // for a bar that, post-#542, is never drawn underneath it.
+        paddingBottom: "env(safe-area-inset-bottom)",
         paddingRight: "env(safe-area-inset-right)",
       }
     : {

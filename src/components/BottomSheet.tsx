@@ -203,10 +203,15 @@ export default function BottomSheet({
           // change is that the full-card view is now a fixed height rather
           // than hugging its (usually shorter) content while a route is
           // active — accepted trade-off, only while a route is active.
+          // #530: `var(--viewport-small)` (globals.css), not the dynamic
+          // viewport-height unit — that one tracks Safari's toolbar live as
+          // it collapses/expands on scroll, so the sheet's own height would
+          // resize (jump) mid-drag/scroll. The small viewport is invariant
+          // across that animation.
           style={
             isWalkRouteActive
-              ? { height: "calc(100dvh - 100px)" }
-              : { maxHeight: "calc(100dvh - 100px)" }
+              ? { height: "calc(var(--viewport-small) - 100px)" }
+              : { maxHeight: "calc(var(--viewport-small) - 100px)" }
           }
           aria-label={t("detail.venueDetailsPanel", locale)}
           // #508 fix pass: Escape while a box's PhotoViewer is open must

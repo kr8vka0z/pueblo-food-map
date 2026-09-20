@@ -100,6 +100,28 @@
      by DESIGN.md via `npm run design:drift`, and this is an internal layout
      constant, not a design token. */
   --bottom-nav-clearance: 76px;
+
+  /* #530 — iOS Safari's own toolbar slices off anything pinned to the
+     bottom via `vh`/`bottom: 0`: `100vh` (and a `position:fixed` element's
+     containing block) sizes to the LARGEST possible viewport — as if the
+     toolbar were already collapsed — so a bar anchored against it lands
+     underneath the toolbar once it re-expands. `100svh` (small viewport
+     height) is the SMALLEST possible viewport (toolbar always assumed
+     expanded) and, unlike `100dvh`, its value never changes as the toolbar
+     animates on scroll — so math built on it is both always fully visible
+     AND never jumps. Anything pinned to the bottom of the screen
+     (BottomNav, BottomSheet) sizes against this variable, never a bare vh
+     unit, so the fallback and the fix can't drift apart in two places.
+     `vh` here is the fallback for browsers without `svh` support (iOS
+     <15.4, older Firefox/Chrome) — identical to this app's pre-fix
+     behaviour, not a regression for them. */
+  --viewport-small: 100vh;
+}
+
+@supports (height: 100svh) {
+  :root {
+    --viewport-small: 100svh;
+  }
 }
 
 body {
@@ -218,6 +240,19 @@ body {
 @media (width < 96rem) {
   .mapboxgl-map .mapboxgl-ctrl-bottom-right {
     bottom: calc(var(--bottom-nav-clearance) + 8px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ─── #530: reset BottomNav's below-2xl top offset at 2xl ────────────────────
+   BottomNav.tsx sets `top` inline (computed from --viewport-small, see that
+   file's own comment) so the pill sits above Safari's toolbar below 2xl. At
+   2xl the pill goes back to floating bottom-centre via the `2xl:bottom-6`
+   Tailwind class — but a fixed element with an explicit height and both
+   `top` and `bottom` set is over-constrained, and CSS drops `bottom`, so
+   `2xl:bottom-6` would silently never take effect without this reset. */
+@media (width >= 96rem) {
+  [data-bottom-nav] {
+    top: auto;
   }
 }
 

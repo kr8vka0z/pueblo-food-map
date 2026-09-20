@@ -186,13 +186,29 @@ export default function BottomNav({
       ref={navRef}
       aria-label={t("nav.aria", locale)}
       data-bottom-nav=""
+      // Below 2xl: positioned from the TOP rather than the bottom (#530:
+      // iOS Safari's own toolbar was slicing the pill off). `bottom: 0`
+      // anchors against a `position:fixed` containing block sized to the
+      // viewport with its toolbar COLLAPSED, so the pill's bottom half
+      // landed underneath the toolbar once it re-expanded. Measuring down
+      // from the top against `--viewport-small` (globals.css — the small/
+      // `svh` viewport, invariant across the toolbar's own collapse/expand
+      // animation) instead guarantees the pill sits fully inside the
+      // always-visible area and never jumps on scroll. BOTTOM_NAV_HEIGHT_PX
+      // is the pill's own height (64) plus the 12px gap below it. An inline
+      // style (not a Tailwind class) because the value is computed from
+      // that TS constant; globals.css resets it back to `auto` at 2xl (see
+      // the `[data-bottom-nav]` rule there) since desktop's `2xl:bottom-6`
+      // needs `top` out of the way — a fixed element with an explicit
+      // height and both `top` and `bottom` set is over-constrained, and CSS
+      // drops `bottom`.
+      style={{ top: `calc(var(--viewport-small) - ${BOTTOM_NAV_HEIGHT_PX}px - env(safe-area-inset-bottom))` }}
       className={
-        // Below 2xl: a 64px pill floating 12px in from the sides and 12px above
-        // the home indicator — same bone-50 fill, bone-300 border and full
-        // radius as the search bar, with a slightly stronger shadow because
-        // it sits over the busiest part of the map. Cells stay ~90px wide at
-        // 393px, well past the 44px tap floor.
-        "fixed left-3 right-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-[1003] " +
+        // Below 2xl: a 64px pill floating 12px in from the sides — same
+        // fill, border and radius as the search bar, with a slightly
+        // stronger shadow because it sits over the busiest part of the map.
+        // Cells stay ~90px wide at 393px, well past the 44px tap floor.
+        "fixed left-3 right-3 z-[1003] " +
         "h-16 px-1.5 " +
         "bg-[var(--color-bone-50)] border border-[var(--color-bone-300)] rounded-[var(--radius-full)] " +
         "shadow-[0_4px_16px_rgba(26,24,23,0.14),0_0_0_1px_rgba(26,24,23,0.04)] " +

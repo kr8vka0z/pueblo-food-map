@@ -138,16 +138,22 @@ export const CATEGORY_FIT_MAX_ZOOM = 14;
 // only, since the route strip is a phone-only concept (desktop's
 // DesktopVenueWindow keeps its own unchanged layout, out of scope for #509).
 // `bottom` clears the route strip (ROUTE_STRIP_HEIGHT_PX, shared with
-// RouteStrip.tsx/BottomSheet.tsx so the two can't drift) plus a small gap —
-// NOT BOTTOM_NAV_HEIGHT_PX, which the category-fit padding above adds:
-// `venueSheetOpen` already hides the bottom nav whenever any card (or strip)
-// is open, so there is nothing there to clear.
+// RouteStrip.tsx/BottomSheet.tsx so the two can't drift) PLUS
+// BOTTOM_NAV_HEIGHT_PX (#531, Kyle 2026-09-19): the nav now stays visible
+// underneath the strip instead of hiding (see `stripVisible`/`venueSheetOpen`
+// above) — unlike the old version of this comment, there IS real bottom
+// chrome below the strip now, so it has to be cleared too. Plus a small gap.
 // Deliberately NOT capped at CATEGORY_FIT_MAX_ZOOM=14 — that cap exists so a
 // sparse category's 2-3 far-apart venues don't slam to street level; a
 // walking route is usually well under a mile and WANTS a close, walkable
 // zoom. ROUTE_FIT_MAX_ZOOM caps only the opposite failure (an extremely
 // short route zooming in absurdly far).
-export const ROUTE_FIT_PADDING_MOBILE = { top: 80, bottom: ROUTE_STRIP_HEIGHT_PX + 24, left: 40, right: 40 };
+export const ROUTE_FIT_PADDING_MOBILE = {
+  top: 80,
+  bottom: ROUTE_STRIP_HEIGHT_PX + BOTTOM_NAV_HEIGHT_PX + 24,
+  left: 40,
+  right: 40,
+};
 export const ROUTE_FIT_MAX_ZOOM = 17;
 
 /**
@@ -439,6 +445,13 @@ export default function MapWrapper({
   const [walkingRouteInfo, setWalkingRouteInfo] = useState<WalkingRouteInfo | null>(null);
   const [walkingRouteSteps, setWalkingRouteSteps] = useState<WalkStep[] | null>(null);
   const [walkingRouteVenueId, setWalkingRouteVenueId] = useState<string | null>(null);
+  // #531: is BottomSheet currently showing the route strip (collapsed) rather
+  // than the full card? Reported by BottomSheet.tsx's own onStripVisibleChange
+  // — that decision (`cardRevealed`) is its internal state (mount default, a
+  // "Show card" tap, a vaul drag, or Escape-collapses-to-strip), so this is
+  // the only way MapWrapper learns it. Drives venueSheetOpen just below: the
+  // strip must NOT hide BottomNav the way the full card still does (#509).
+  const [stripVisible, setStripVisible] = useState(false);
 
   // ── Walk-without-location (#207) ─────────────────────────────────────────────
   // walkAwaitingVenueIdRef: the venue a Walk tap is waiting on geolocation for.
@@ -1381,8 +1394,11 @@ export default function MapWrapper({
   }, [handleViewModeChange, handleLocateRequest]);
 
   // §10: the venue sheet (phone only) covers the bottom edge; the nav steps
-  // aside while it is open at any detent.
-  const venueSheetOpen = isMobile && viewMode === "map" && selectedVenue !== null;
+  // aside while the FULL CARD is open. #531 (Kyle, 2026-09-19): the route
+  // strip is a different case — it stays short on purpose, so BottomNav
+  // stays visible above it instead of stepping aside (`!stripVisible`, fed
+  // by BottomSheet.tsx's onStripVisibleChange below).
+  const venueSheetOpen = isMobile && viewMode === "map" && selectedVenue !== null && !stripVisible;
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -1648,6 +1664,7 @@ export default function MapWrapper({
           box={getBoxById(selectedVenueId)}
           onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
           onClose={() => setSelectedVenueId(null)}
+          onStripVisibleChange={setStripVisible}
           onWalkRoute={handleWalkRoute}
           isWalkRouteActive={
             selectedVenueId !== null && walkingRouteVenueId === selectedVenueId

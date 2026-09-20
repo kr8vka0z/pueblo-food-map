@@ -7,18 +7,39 @@
  * Walk button) used to leave the full-height card covering the map, with no
  * way to see the route or get back to the card. This strip replaces the full
  * card's content while a route is drawn: place name, distance/time, "Clear
- * route", and "Show card" (which restores the full card).
+ * route", "Steps" (#531, see below), and "Show card" (which restores the
+ * full card).
  *
  * BottomSheet.tsx owns the vaul mechanics that make this reachable three
  * ways (starting a route, dragging the full card down, or the Show card
  * button) — see that file's own header for the snapPoints/dismissible
- * wiring. This component is presentation-only: no state, no vaul awareness.
+ * wiring. This component is otherwise presentation-only (no vaul awareness)
+ * — the one piece of local state it owns is whether its own Steps sheet
+ * (below) is open, which never needs to reach BottomSheet.
+ *
+ * #531 (Kyle, 2026-09-19): the written turn-by-turn steps already exist
+ * end to end (MapWrapper.tsx fetches+parses them, DirectionButtons.tsx
+ * renders them) but only inside the FULL card — from the strip, reaching
+ * them was "Show card" then "Show steps", two taps. "Steps" here opens them
+ * directly as a sheet over the map, reusing DirectionButtons.tsx's own
+ * `WalkStepsList` (same `<ol>` markup, not a second copy — see that
+ * component's own header). Built as a native `<dialog>` + `showModal()`,
+ * the same primitive PhotoViewer.tsx (#508) already established for this
+ * repo's one other ad-hoc overlay — see that file's own header for why
+ * (Escape/focus-trap/back-gesture for free, no library). That choice also
+ * satisfies this issue's "must not fight the existing Escape/overlay
+ * handling" risk for free: `dialogGuard.ts`'s `isNativeDialogOpen()` (which
+ * BottomSheet.tsx's own Escape handler already checks first) tests for ANY
+ * open `dialog[open]` in the document, not specifically PhotoViewer's — so
+ * this sheet is already covered without touching BottomSheet.tsx's Escape
+ * wiring at all.
  */
 
-import { ChevronUp } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronUp, X } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
-import type { RouteInfo } from "@/components/DirectionButtons";
+import { WalkStepsList, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 
 /**
  * Fixed pixel height of the strip. vaul's snapPoints accept a CSS px string
@@ -44,6 +65,14 @@ interface RouteStripProps {
   onShowCard: () => void;
   /** "Clear route" — same callback DirectionButtons/BoxCardBody's own clear control uses. */
   onClearRoute?: () => void;
+  /**
+   * Turn-by-turn steps (#531) — pre-localized by Mapbox, same shape
+   * DirectionButtons/BottomSheet already thread through. No "Steps" control
+   * is rendered when this is missing/empty (nothing to show); mirrors
+   * DirectionButtons' own `hasSteps` guard so the two surfaces agree on
+   * when steps "exist."
+   */
+  walkSteps?: WalkStep[] | null;
 }
 
 const linkClass =
@@ -52,7 +81,56 @@ const linkClass =
   PRESS_FEEDBACK + " " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded";
 
-export default function RouteStrip({ venueName, routeInfo, locale, onShowCard, onClearRoute }: RouteStripProps) {
+export default function RouteStrip({
+  venueName,
+  routeInfo,
+  locale,
+  onShowCard,
+  onClearRoute,
+  walkSteps,
+}: RouteStripProps) {
+  const hasSteps = Array.isArray(walkSteps) && walkSteps.length > 0;
+
+  // ── Steps sheet (#531) ──────────────────────────────────────────────────
+  const [stepsOpen, setStepsOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  // Explicit focus restore, not relied-on-native — same reasoning as
+  // PhotoViewer.tsx's own header: this repo's jsdom test environment has no
+  // real <dialog> implementation (see vitest.setup.ts's polyfill), so
+  // "native behavior" here would be untested by construction.
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  // Drive the dialog's open/closed state imperatively — <dialog> has no
+  // declarative `open`-via-attribute path that also gets the modal
+  // backdrop/focus-trap/Escape behavior; only showModal()/close() do.
+  // Same pattern as PhotoViewer.tsx.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (stepsOpen && !dialog.open) {
+      previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      dialog.showModal();
+    } else if (!stepsOpen && dialog.open) {
+      dialog.close();
+    }
+  }, [stepsOpen]);
+
+  // The dialog's native `close` event fires however it closed — the × button,
+  // a tap on the backdrop (see the dialog's own onClick below), or Escape
+  // (via the CloseWatcher API in real browsers / vitest.setup.ts's polyfill
+  // in tests) — so this is the single place that syncs `stepsOpen` back to
+  // false and restores focus. Mount-once, same as PhotoViewer.tsx.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    function handleClose() {
+      setStepsOpen(false);
+      previouslyFocusedRef.current?.focus();
+    }
+    dialog.addEventListener("close", handleClose);
+    return () => dialog.removeEventListener("close", handleClose);
+  }, []);
+
   return (
     <div
       data-testid="route-strip"
@@ -84,16 +162,91 @@ export default function RouteStrip({ venueName, routeInfo, locale, onShowCard, o
           <span />
         )}
 
-        <button
-          type="button"
-          data-testid="route-strip-show-card"
-          onClick={onShowCard}
-          className={`flex items-center gap-1 ${linkClass}`}
-        >
-          {t("directions.showCard", locale)}
-          <ChevronUp size={16} aria-hidden />
-        </button>
+        <div className="flex items-center gap-3">
+          {hasSteps && (
+            <button
+              type="button"
+              data-testid="route-strip-steps"
+              onClick={() => setStepsOpen(true)}
+              className={linkClass}
+            >
+              {t("directions.showSteps", locale)}
+            </button>
+          )}
+
+          <button
+            type="button"
+            data-testid="route-strip-show-card"
+            onClick={onShowCard}
+            className={`flex items-center gap-1 ${linkClass}`}
+          >
+            {t("directions.showCard", locale)}
+            <ChevronUp size={16} aria-hidden />
+          </button>
+        </div>
       </div>
+
+      {/* Steps sheet (#531) — see this file's own header for why a native
+          <dialog> and why that alone keeps it out of BottomSheet.tsx's
+          Escape handling. Bottom-anchored (not full-screen like
+          PhotoViewer): `bottom-[var(--viewport-toolbar-gap)]` reuses the
+          same #530 fix BottomSheet/BottomNav already apply (globals.css)
+          rather than a bare `bottom-0`, which Safari's own toolbar would
+          slice on this new element too. `m-0`/`top-auto` override the UA's
+          own centered-dialog default. */}
+      {hasSteps && (
+        <dialog
+          ref={dialogRef}
+          aria-label={t("directions.stepsListLabel", locale)}
+          // A click landing on the dialog element ITSELF (never a child —
+          // the content div below fills the dialog's own box) is a tap on
+          // the ::backdrop area above the sheet, i.e. "outside the panel" —
+          // the standard <dialog> light-dismiss idiom (no library equivalent
+          // exists for a plain <dialog>, unlike vaul's own scrim tap).
+          onClick={(e) => {
+            if (e.target === dialogRef.current) setStepsOpen(false);
+          }}
+          className={
+            "fixed inset-x-0 bottom-[var(--viewport-toolbar-gap)] top-auto z-[900] " +
+            "m-0 max-h-[70vh] w-full max-w-none border-0 bg-transparent p-0 " +
+            "backdrop:bg-black/40"
+          }
+        >
+          {/* Only mounted while open — same jsdom-visibility reasoning as
+              PhotoViewer.tsx's own comment on this exact pattern. */}
+          {stepsOpen && (
+            <div className="flex max-h-[70vh] flex-col rounded-t-[var(--radius-xl)] bg-[var(--color-bone-50)] elevation-2 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p
+                  className="min-w-0 flex-1 truncate text-base font-medium text-[var(--color-ink-900)]"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {venueName}
+                </p>
+                <button
+                  type="button"
+                  data-testid="route-strip-steps-close"
+                  onClick={() => setStepsOpen(false)}
+                  aria-label={t("detail.close", locale)}
+                  className={
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-md " +
+                    "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
+                    PRESS_FEEDBACK + " " +
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                  }
+                >
+                  <X size={18} aria-hidden />
+                </button>
+              </div>
+              <WalkStepsList
+                steps={walkSteps!}
+                locale={locale}
+                className="flex-1 space-y-1.5 overflow-y-auto text-sm text-[var(--color-ink-700)]"
+              />
+            </div>
+          )}
+        </dialog>
+      )}
     </div>
   );
 }

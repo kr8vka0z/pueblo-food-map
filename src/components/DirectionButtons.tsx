@@ -138,6 +138,55 @@ function formatStepDistance(meters: number, locale: Locale): string {
   return t("directions.stepMi", locale, { distance: mi });
 }
 
+// ─── Step list (extracted, #531) ──────────────────────────────────────────────
+//
+// The `<ol>` of turn-by-turn steps only — no toggle, no "Clear route"/"Open in
+// Google Maps" links. Pulled out of WalkRouteStatus below (which still owns
+// those, wrapping this list behind its own Show/Hide steps disclosure) so
+// RouteStrip.tsx's "Steps" sheet (#531 — the strip's own way into the same
+// list, two taps away otherwise) can render the identical markup instead of
+// forking a second copy that could drift from this one (distance thresholds,
+// per-step layout, i18n keys).
+export interface WalkStepsListProps {
+  steps: Array<{ instruction: string; distance: number }>;
+  locale: Locale;
+  /** Forwarded to the `<ol>` — lets a disclosure trigger elsewhere point `aria-controls` at it. Omit when nothing needs to reference it (RouteStrip's sheet doesn't). */
+  id?: string;
+  /** WalkRouteStatus hides (not unmounts) the list while its toggle is collapsed, so screen readers skip it (`hidden`, not CSS display:none). RouteStrip's sheet never needs this — its own conditional mount already covers the same requirement. */
+  hidden?: boolean;
+  /** Caller-owned layout classes (spacing, max-height/scroll, text size) — this component supplies no default so the two callers can size it differently (WalkRouteStatus scrolls inside a fixed-height card; RouteStrip's sheet scrolls inside its own panel). */
+  className?: string;
+}
+
+export function WalkStepsList({ steps, locale, id, hidden, className }: WalkStepsListProps) {
+  return (
+    <ol
+      id={id}
+      data-testid="walk-steps-list"
+      aria-label={t("directions.stepsListLabel", locale)}
+      hidden={hidden}
+      className={className}
+    >
+      {steps.map((step, i) => {
+        const distText = formatStepDistance(step.distance, locale);
+        return (
+          <li key={i} className="flex items-start gap-2">
+            <span className="shrink-0 w-5 text-right text-[var(--color-ink-400)] text-xs font-mono select-none">
+              {i + 1}.
+            </span>
+            <span className="flex-1">{step.instruction}</span>
+            {distText && (
+              <span className="shrink-0 text-xs text-[var(--color-ink-400)] font-mono">
+                {distText}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 // ─── Active-route status (readout) ───────────────────────────────────────────
 //
 // Distance/duration, the collapsible turn-by-turn steps, and the "Open in
@@ -289,30 +338,13 @@ export function WalkRouteStatus({
               refresh when the user toggles EN/ES while a route is active. The t()-localized
               toggle label and distance readout update immediately, but instruction text stays
               in the language active at fetch time until the user re-taps Walk. */}
-          <ol
+          <WalkStepsList
+            steps={walkSteps!}
+            locale={locale}
             id={stepsListId}
-            data-testid="walk-steps-list"
-            aria-label={t("directions.stepsListLabel", locale)}
             hidden={!stepsExpanded}
             className="mt-2 space-y-1.5 text-sm text-[var(--color-ink-700)] max-h-48 overflow-y-auto"
-          >
-            {walkSteps!.map((step, i) => {
-              const distText = formatStepDistance(step.distance, locale);
-              return (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="shrink-0 w-5 text-right text-[var(--color-ink-400)] text-xs font-mono select-none">
-                    {i + 1}.
-                  </span>
-                  <span className="flex-1">{step.instruction}</span>
-                  {distText && (
-                    <span className="shrink-0 text-xs text-[var(--color-ink-400)] font-mono">
-                      {distText}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
+          />
         </div>
       )}
 

@@ -304,6 +304,25 @@ body {
   bottom: var(--viewport-toolbar-gap);
 }
 
+/* ─── #531: route strip sits ABOVE the (now-visible) bottom nav ──────────────
+   #509's strip used to inherit the full card's "hide the nav" behavior, so
+   it could sit flush at the screen edge like the card does. #531 keeps the
+   nav visible while the strip shows (BottomSheet.tsx's `showStrip` ->
+   MapWrapper.tsx's `stripVisible`), so the strip itself must clear the
+   nav's own height instead — `data-strip-open` is set on the SAME element
+   only while `showStrip` is true (BottomSheet.tsx), never for the full
+   card. `--bottom-nav-clearance` already models the nav's real visual
+   height below 2xl (BottomNav.tsx's own comment: 64px pill + 12px gap) —
+   reused here rather than a third hard-coded number that could drift from
+   the nav's actual size. 8px mirrors the gap the Mapbox credits row already
+   keeps above this same pill (see that rule above). No 2xl branch needed:
+   BottomSheet only ever mounts on phone layout (`isMobile`, MapWrapper.tsx)
+   — the strip never reaches the 2xl breakpoint (RouteStrip.tsx's own
+   header). */
+[data-bottom-sheet][data-strip-open] {
+  bottom: calc(var(--viewport-toolbar-gap) + var(--bottom-nav-clearance) + 8px);
+}
+
 /* ─── Hover tooltip popups (venue name + category, "You are here") ─────────── */
 /* Strip default Mapbox popup chrome; render a minimal sage-bordered chip. */
 .pfm-tooltip .mapboxgl-popup-content {

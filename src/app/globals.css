@@ -124,31 +124,59 @@
   }
 }
 
-/* #530 review round 2 — `--viewport-toolbar-gap`: the STABLE distance
-   between the large viewport (`100vh`, what a `position:fixed` element's
-   own containing block is always sized to, as if Safari's toolbar were
-   already collapsed) and the small viewport (`--viewport-small` above,
-   toolbar always assumed expanded). Both operands are themselves invariant
-   across the toolbar's live collapse/expand animation, so this gap is too —
-   it evaluates to the toolbar's own worst-case height on every browser,
-   never fluctuating. A `bottom:` offset built from it (see `[data-bottom-nav]`
-   and `[data-bottom-sheet]` below) therefore always lands exactly at the
-   line where the (possibly expanded) toolbar starts, regardless of the
-   fixed CB's own always-large sizing, and never moves as the toolbar
-   animates — no `env(safe-area-inset-bottom)` term anywhere in it.
-   That's deliberate, not an oversight: `env(safe-area-inset-bottom)` itself
-   reads 0 while Safari's toolbar is expanded and only the physical
-   home-indicator height (~34px) once it collapses (the exact bug #530
-   reports), so folding it into a position calc reintroduces the very jump
-   this fix removes. It isn't needed for clearance either — this boundary
-   line already sits above the home-indicator's own reserved zone in every
-   toolbar state, since the toolbar's worst-case height is itself larger
-   than any real device's safe-area inset. Browsers without `svh` support
-   fall back to `--viewport-small: 100vh`, making this gap resolve to `0` —
-   identical to this app's pre-fix `bottom: 0`-style behaviour for them, not
-   a regression. */
+/* #530 review round 2 — `--viewport-toolbar-gap`, ORIGINAL definition:
+   the distance between the large viewport (`100vh`, what a `position:fixed`
+   element's own containing block is always sized to, as if Safari's toolbar
+   were already collapsed) and the small viewport (`--viewport-small` above,
+   toolbar ALWAYS assumed expanded). Both operands are invariant across the
+   toolbar's live collapse/expand animation, so this reserved the toolbar's
+   own WORST-CASE height at all times, never fluctuating — safe (never
+   sliced) but, per #536, wrong once the toolbar actually collapses: nothing
+   pinned to the bottom ever comes back down to reclaim the freed space, so
+   a permanent dead gap opens under the bar (and, separately, the Mapbox
+   attribution clearance below — written against this same reserve — no
+   longer matched the bar's real position). This block is now only the
+   FALLBACK for browsers without `dvh` support; #536's live-tracking
+   override follows immediately below and wins wherever it applies. */
 :root {
   --viewport-toolbar-gap: calc(100vh - var(--viewport-small));
+}
+
+/* #536 — `--viewport-toolbar-gap`, LIVE override. `100dvh` (dynamic
+   viewport height) is Safari's own toolbar-aware unit: unlike `100svh`
+   (always the small/expanded-toolbar assumption) it re-evaluates to the
+   viewport's REAL current visible height, continuously, on every frame of
+   the toolbar's own collapse/expand animation — so `100vh - 100dvh` is 0
+   the instant the toolbar is fully collapsed and grows smoothly back to the
+   toolbar's real height as it re-expands, always matching the toolbar's
+   actual current position with no separate reserve to fall out of sync.
+   That continuous native tracking is also why no JS/visualViewport-driven
+   variable was used instead: a JS listener only fires on discrete resize
+   events (necessarily lagging a frame or more behind, the visible "jump"
+   this issue calls out) and, on this app's own admission elsewhere
+   (BottomSheet.tsx's `max-height`, which deliberately still uses
+   `--viewport-small`/`svh`, NOT `dvh`), `visualViewport` resize also fires
+   for the on-screen keyboard opening — exactly the confound
+   `repositionInputs={false}` on that same Drawer.Root already has to fight.
+   `dvh` has neither failure mode: WebKit does not resize it for the
+   keyboard, only for the toolbar. `--viewport-small` keeps using `svh`
+   for the sheet's own *height* (BottomSheet.tsx) because resizing a
+   scrollable panel's content mid-drag is disorienting; this variable only
+   ever drives a `bottom:` *position* offset, where continuous tracking is
+   exactly the fix, not a hazard. No fallback branch is needed here beyond
+   the plain `:root` block above: browsers lacking `dvh` support also lack
+   `@supports (height: 100dvh)` matching, so they simply keep the original,
+   safe (if imperfectly positioned) worst-case reserve — not a regression
+   for them. If a real device ever shows a visible snap rather than a smooth
+   slide as the toolbar animates, the next step is a short
+   `transition: bottom var(--duration-fast)` on the three rules that consume
+   this variable — deliberately not added pre-emptively, since `dvh` is
+   documented to track per-frame already and an unneeded transition would
+   make the bar visibly trail behind the real toolbar instead. */
+@supports (height: 100dvh) {
+  :root {
+    --viewport-toolbar-gap: calc(100vh - 100dvh);
+  }
 }
 
 body {
@@ -261,12 +289,27 @@ body {
 }
 
 /* ─── Credits above the bottom nav bar — docs/bottom-nav-spec.md §9 ──────────
-   Below 2xl the floating nav pill (64px + 12px gap + home-indicator inset)
-   would cover this corner, so the control group lifts 8px above it. 2xl and up the nav is a pill
-   in the bottom centre, clear of the corner. */
+   Below 2xl the floating nav pill would cover this corner, so the control
+   group lifts clear of it: `--viewport-toolbar-gap` (the nav's own bottom
+   offset, see `[data-bottom-nav]` below) + `--bottom-nav-clearance` (the
+   pill's own full height, 64px pill + 12px gap — BottomNav.tsx's
+   BOTTOM_NAV_HEIGHT_PX) + 8px breathing room above the pill's top edge.
+   #536: this used to omit the toolbar-gap term entirely — a formula written
+   for the bar's PRE-#530 position (`bottom: 0`-ish), so once #530 moved the
+   bar up by that gap, the credits stopped clearing it and sat at the bar's
+   old resting line.
+   #536 review: `max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom))`,
+   not a bare `--viewport-toolbar-gap` — see `[data-bottom-nav]`'s own rule
+   below for why the two terms are anti-correlated (the toolbar-gap goes to
+   0 at the EXACT moment the safe-area inset appears on a notched phone) and
+   why this must track whichever is currently larger. This rule needs the
+   same guard as the nav's own bottom offset because it lifts clear of that
+   SAME pill — using a smaller floor here would under-clear the pill the
+   instant the toolbar fully collapses. 2xl and up the nav is a pill in the
+   bottom centre, clear of the corner. */
 @media (width < 96rem) {
   .mapboxgl-map .mapboxgl-ctrl-bottom-right {
-    bottom: calc(var(--bottom-nav-clearance) + 8px + env(safe-area-inset-bottom));
+    bottom: calc(max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom)) + var(--bottom-nav-clearance) + 8px);
   }
 }
 
@@ -280,12 +323,29 @@ body {
    instead means it simply doesn't match at 2xl — Tailwind's own
    `2xl:bottom-6` class (BottomNav.tsx) applies there with no fight, no
    reset needed. See `--viewport-toolbar-gap`'s own comment above for the
-   gap formula and why it excludes env(safe-area-inset-bottom). 12px is the
-   pill's own designed gap above that boundary line (docs/bottom-nav-spec.md
-   §3), matching its pre-#530 value. */
+   gap formula. 12px is the pill's own designed gap above that boundary
+   line (docs/bottom-nav-spec.md §3), matching its pre-#530 value.
+
+   #536 review — `max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom))`,
+   NOT a bare `--viewport-toolbar-gap`: with the #536 dvh override, the
+   toolbar-gap term now correctly goes to exactly 0 the instant Safari's
+   toolbar fully collapses — the SAME instant `env(safe-area-inset-bottom)`
+   jumps from 0 to the physical home-indicator height (~34px) on a notched
+   iPhone. The two terms are anti-correlated, not additive: after an
+   ordinary scroll settles, a bare toolbar-gap value would park roughly a
+   third of the 64px pill inside the home-indicator's own gesture zone.
+   `max()` always keeps whichever clearance is actually needed at that
+   instant — the toolbar's real height while it's still showing, the
+   home-indicator's real height once the toolbar is gone — so the pill
+   never sits lower than either boundary requires. (The original,
+   svh-based #530 comment's reasoning for excluding env() entirely held
+   only for that formula: `--viewport-toolbar-gap` never went below the
+   toolbar's own worst-case height, which is always bigger than any real
+   safe-area inset, so env() was genuinely redundant there. #536's live
+   formula can go to 0, so it no longer is.) */
 @media (width < 96rem) {
   [data-bottom-nav] {
-    bottom: calc(var(--viewport-toolbar-gap) + 12px);
+    bottom: calc(max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom)) + 12px);
   }
 }
 

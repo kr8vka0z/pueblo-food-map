@@ -33,10 +33,31 @@
  * open `dialog[open]` in the document, not specifically PhotoViewer's — so
  * this sheet is already covered without touching BottomSheet.tsx's Escape
  * wiring at all.
+ *
+ * #537 (Kyle, 2026-09-19): Kyle saw no Steps control at all on a real
+ * walking route. Evidence gathered before touching this file: a real Mapbox
+ * Directions API walking response captured for a short Pueblo route
+ * (test/fixture data, see RouteStripStepsEvidence.test.tsx) returned 7 usable steps —
+ * `parseWalkSteps` (MapWrapper.tsx) keeps all 7 — and the prop chain from
+ * there (MapWrapper's `walkingRouteSteps` -> BottomSheet's `walkRouteSteps`
+ * -> here) has no additional gate beyond `walkingRouteVenueId ===
+ * selectedVenueId`, the same one that already has to pass for the strip
+ * itself to render. So `hasSteps` being false is not the normal case; the
+ * real bug was candidate 2 from the issue — the control DID render, but as
+ * a small underlined text link squeezed between "Clear route" and "Show
+ * card" (three identical-looking links in one row), easy to miss on a
+ * phone. Fixed here by promoting it to a filled `sage-600`/white pill — the
+ * same fill/text-color pairing DESIGN.md's `filtersButton` token already
+ * uses for an active-state pill, so no new token — placed first in the
+ * right-hand group so it reads as the strip's primary action, not a third
+ * peer link. When a route genuinely has no steps, the button's slot shows a
+ * muted line instead of silently having nothing there (the issue's proof
+ * criterion) — a resident should never wonder if the control is just
+ * missing.
  */
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronUp, X } from "lucide-react";
+import { ChevronUp, ListOrdered, X } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { WalkStepsList, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
@@ -67,10 +88,13 @@ interface RouteStripProps {
   onClearRoute?: () => void;
   /**
    * Turn-by-turn steps (#531) — pre-localized by Mapbox, same shape
-   * DirectionButtons/BottomSheet already thread through. No "Steps" control
-   * is rendered when this is missing/empty (nothing to show); mirrors
+   * DirectionButtons/BottomSheet already thread through; mirrors
    * DirectionButtons' own `hasSteps` guard so the two surfaces agree on
-   * when steps "exist."
+   * when steps "exist." #537: when this is missing/empty, the Steps
+   * button's slot renders a muted "no steps for this route" line instead
+   * of nothing — a real Mapbox route reliably carries steps (see this
+   * file's own header), so an empty state here is the exception, not the
+   * norm, and should read as one rather than as a missing control.
    */
   walkSteps?: WalkStep[] | null;
 }
@@ -80,6 +104,16 @@ const linkClass =
   "hover:text-[var(--color-sage-700)] underline-offset-2 hover:underline " +
   PRESS_FEEDBACK + " " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded";
+
+// #537 — the strip's one primary action, so it reads as a real button
+// rather than a third peer text link. Fill/text pairing matches DESIGN.md's
+// `filtersButton` token (sage-600 bg, white text, rounded-full) — an
+// existing "filled pill" precedent, not a new one.
+const stepsButtonClass =
+  "flex items-center gap-1.5 rounded-full bg-[var(--color-sage-600)] px-3.5 py-2 " +
+  "text-sm font-semibold text-white hover:bg-[var(--color-sage-700)] " +
+  PRESS_FEEDBACK + " " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2";
 
 export default function RouteStrip({
   venueName,
@@ -163,15 +197,22 @@ export default function RouteStrip({
         )}
 
         <div className="flex items-center gap-3">
-          {hasSteps && (
+          {hasSteps ? (
             <button
               type="button"
               data-testid="route-strip-steps"
               onClick={() => setStepsOpen(true)}
-              className={linkClass}
+              className={stepsButtonClass}
             >
+              <ListOrdered size={16} aria-hidden />
               {t("directions.showSteps", locale)}
             </button>
+          ) : (
+            // #537 Proof: a route with genuinely no steps says so rather
+            // than silently omitting the control.
+            <span data-testid="route-strip-no-steps" className="text-sm text-[var(--color-ink-500)]">
+              {t("directions.noStepsForRoute", locale)}
+            </span>
           )}
 
           <button

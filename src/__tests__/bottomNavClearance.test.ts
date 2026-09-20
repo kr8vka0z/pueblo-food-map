@@ -41,6 +41,18 @@
  *     — the exact class of bug just fixed, just with the roles reversed.
  *   - `[data-bottom-sheet]` gets a `bottom` rule too (BottomSheet's own half
  *     of #530, not attempted in the first pass).
+ *
+ * Extended for #536 (the static reserve above left a dead gap once Safari's
+ * toolbar actually collapsed, and separately desynced the Mapbox attribution
+ * clearance from the bar's real position): `--viewport-toolbar-gap` keeps its
+ * original `100vh - var(--viewport-small)` formula only as a fallback for
+ * browsers without `dvh` support; an `@supports (height: 100dvh)` block now
+ * overrides it with `100vh - 100dvh`, which tracks the toolbar's REAL,
+ * live height instead of always reserving its worst case (see that
+ * declaration's own comment in globals.css for why `dvh`, not a
+ * visualViewport-driven JS variable, was the fix). The Mapbox credits'
+ * below-2xl offset is re-derived from that same variable, dropping the
+ * `env(safe-area-inset-bottom)` term it never should have needed either.
  */
 
 import { describe, test, expect } from "vitest";
@@ -108,11 +120,11 @@ describe("#530 review round 2 — position lives in CSS, not a React inline styl
     ).not.toMatch(/style=\{\{?\s*(top|bottom|left|right)\s*:/);
   });
 
-  test("--viewport-toolbar-gap is declared from 100vh and --viewport-small", () => {
+  test("--viewport-toolbar-gap has a static fallback declared from 100vh and --viewport-small", () => {
     const css = readSrc("src/app/globals.css");
     expect(
       css,
-      "expected --viewport-toolbar-gap: calc(100vh - var(--viewport-small));"
+      "expected the pre-#536 fallback: --viewport-toolbar-gap: calc(100vh - var(--viewport-small));"
     ).toMatch(/--viewport-toolbar-gap:\s*calc\(100vh\s*-\s*var\(--viewport-small\)\);/);
   });
 
@@ -122,8 +134,11 @@ describe("#530 review round 2 — position lives in CSS, not a React inline styl
     // rule with no media scoping would apply at every width, including 2xl,
     // and (same specificity as a Tailwind class, later in source) silently
     // win over BottomNav.tsx's 2xl:bottom-6 — correct only by coincidence.
+    // #536 review: the value itself is `max(--viewport-toolbar-gap,
+    // env(safe-area-inset-bottom))`, not a bare --viewport-toolbar-gap — see
+    // the dedicated "anti-correlated" describe block below for why.
     expect(css).toMatch(
-      /@media\s*\(width\s*<\s*96rem\)\s*\{\s*\[data-bottom-nav\]\s*\{\s*bottom:\s*calc\(var\(--viewport-toolbar-gap\)/
+      /@media\s*\(width\s*<\s*96rem\)\s*\{\s*\[data-bottom-nav\]\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\)/
     );
     // [data-bottom-nav] names an actual CSS selector exactly once in the
     // whole file — inside that media block. Strip /* */ comments first (the
@@ -139,6 +154,78 @@ describe("#530 review round 2 — position lives in CSS, not a React inline styl
   test("[data-bottom-sheet] has its own bottom rule built on --viewport-toolbar-gap", () => {
     const css = readSrc("src/app/globals.css");
     expect(css).toMatch(/\[data-bottom-sheet\]\s*\{\s*bottom:\s*var\(--viewport-toolbar-gap\);/);
+  });
+});
+
+describe("#536 — --viewport-toolbar-gap tracks the toolbar's REAL, live height", () => {
+  test("an @supports(height: 100dvh) block overrides the static fallback with a live dvh-based gap", () => {
+    const css = readSrc("src/app/globals.css");
+    // The static `calc(100vh - var(--viewport-small))` fallback (guarded
+    // above) reserves the toolbar's worst-case height at ALL times, which is
+    // exactly #536's bug: no dead gap opens once the toolbar collapses, but
+    // nothing ever comes back down to reclaim the freed space either. This
+    // override — `100vh - 100dvh` — re-evaluates continuously as the real
+    // toolbar animates, so it must exist and must be scoped behind
+    // `@supports (height: 100dvh)` (browsers without dvh keep the safe,
+    // if imperfectly-positioned, static fallback — not a regression for
+    // them).
+    expect(
+      css,
+      "expected @supports (height: 100dvh) { :root { --viewport-toolbar-gap: calc(100vh - 100dvh); } }"
+    ).toMatch(
+      /@supports\s*\(height:\s*100dvh\)\s*\{\s*:root\s*\{\s*--viewport-toolbar-gap:\s*calc\(100vh\s*-\s*100dvh\);/
+    );
+  });
+
+  test("the dvh override is declared strictly after the static fallback (source order = cascade order)", () => {
+    const css = readSrc("src/app/globals.css");
+    const fallbackIndex = css.indexOf("--viewport-toolbar-gap: calc(100vh - var(--viewport-small));");
+    const overrideIndex = css.indexOf("--viewport-toolbar-gap: calc(100vh - 100dvh);");
+    expect(fallbackIndex, "fallback declaration not found").toBeGreaterThanOrEqual(0);
+    expect(overrideIndex, "dvh override declaration not found").toBeGreaterThanOrEqual(0);
+    expect(overrideIndex).toBeGreaterThan(fallbackIndex);
+  });
+});
+
+describe("#536 — Mapbox attribution clearance is re-derived from the bar's real position", () => {
+  test("the below-2xl credits offset is built on --viewport-toolbar-gap, not a bare safe-area/reserve", () => {
+    const css = readSrc("src/app/globals.css");
+    // #536: this rule used to omit the toolbar-gap term entirely (written for
+    // the bar's pre-#530 resting position), so once #530 moved the bar up,
+    // the credits no longer cleared it. It must now build on the SAME
+    // max(...) floor the nav pill itself positions against (review round 2 —
+    // see the dedicated describe block below for why a bare
+    // --viewport-toolbar-gap under-clears the pill on a notched phone).
+    expect(
+      css,
+      "expected .mapboxgl-ctrl-bottom-right's bottom rule to read max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom)) + var(--bottom-nav-clearance) + 8px"
+    ).toMatch(
+      /\.mapboxgl-map \.mapboxgl-ctrl-bottom-right\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\),\s*env\(safe-area-inset-bottom\)\)\s*\+\s*var\(--bottom-nav-clearance\)\s*\+\s*8px\);/
+    );
+  });
+});
+
+describe("#536 review — the toolbar-gap and safe-area-inset terms are anti-correlated, so both consuming rules must use max(), never a bare --viewport-toolbar-gap", () => {
+  // With the #536 dvh override, --viewport-toolbar-gap correctly reaches
+  // exactly 0 the instant Safari's toolbar fully collapses — the SAME
+  // instant env(safe-area-inset-bottom) jumps from 0 to the physical
+  // home-indicator height (~34px) on a notched iPhone. A bare
+  // --viewport-toolbar-gap would then park roughly a third of the 64px nav
+  // pill inside the home-indicator's gesture zone after an ordinary scroll.
+  // This pins max() on BOTH rules that build on that gap, so a future edit
+  // can't drop the guard on one while "cleaning up" the other.
+  test.each([
+    [
+      "[data-bottom-nav]",
+      /\[data-bottom-nav\]\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\),\s*env\(safe-area-inset-bottom\)\)\s*\+\s*12px\);/,
+    ],
+    [
+      ".mapboxgl-map .mapboxgl-ctrl-bottom-right",
+      /\.mapboxgl-map \.mapboxgl-ctrl-bottom-right\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\),\s*env\(safe-area-inset-bottom\)\)\s*\+\s*var\(--bottom-nav-clearance\)\s*\+\s*8px\);/,
+    ],
+  ])("%s's bottom rule wraps --viewport-toolbar-gap in max(..., env(safe-area-inset-bottom))", (_selector, pattern) => {
+    const css = readSrc("src/app/globals.css");
+    expect(css).toMatch(pattern);
   });
 });
 

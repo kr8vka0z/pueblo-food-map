@@ -120,8 +120,13 @@ describe("BottomSheet — route active, mounts straight to the strip", () => {
       />,
     );
     expect(rootPropsHolder.dismissible).toBe(false);
-    expect(rootPropsHolder.snapPoints).toEqual(["112px", 1]);
-    expect(rootPropsHolder.activeSnapPoint).toBe("112px");
+    // #549: 212px, not 112px — the strip's own height (ROUTE_STRIP_HEIGHT_PX)
+    // PLUS the map peek (MAP_PEEK_PX), because vaul measures a px snap point
+    // against window.innerHeight while the drawer is MAP_PEEK_PX shorter than
+    // that. See BottomSheet.tsx's `style` prop for the derivation, and
+    // src/__tests__/routeStripSnapMath.test.ts for the guard on the arithmetic.
+    expect(rootPropsHolder.snapPoints).toEqual(["212px", 1]);
+    expect(rootPropsHolder.activeSnapPoint).toBe("212px");
     expect(screen.getByTestId("route-strip")).toBeDefined();
     expect(screen.getByText("Pueblo Test Pantry")).toBeDefined();
     expect(screen.queryByTestId("walking-route-info")).toBeNull();
@@ -164,7 +169,7 @@ describe("BottomSheet — route active, mounts straight to the strip", () => {
     // Stand-in for vaul's own drag-release handler calling back into the
     // controlled setActiveSnapPoint with the lowest snap point.
     act(() => {
-      rootPropsHolder.setActiveSnapPoint!("112px");
+      rootPropsHolder.setActiveSnapPoint!("212px");
     });
 
     expect(screen.getByTestId("route-strip")).toBeDefined();

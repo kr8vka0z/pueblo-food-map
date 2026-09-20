@@ -104,10 +104,22 @@ export interface WalkingRouteInfo {
  * A single turn-by-turn step from the Mapbox Directions API.
  * `instruction` comes pre-localized (Mapbox `language=` param).
  * `distance` is raw meters from `step.distance`.
+ * `location` (#555, step-through directions) is `maneuver.location` — the
+ * turn's own [lng, lat], required (not optional) because the step-through
+ * stepper flies the camera to it on every arrow tap; `parseWalkSteps`
+ * (MapWrapper.tsx) drops any step that doesn't carry a valid one, so a
+ * `WalkStep` reaching this type's consumers always has real coordinates.
+ * `maneuverType`/`maneuverModifier` (e.g. "turn"/"left") drive the
+ * stepper's turn icon (DirectionButtons.tsx's `WalkStepper`) — both stay
+ * optional since the icon mapping already has a straight-ahead fallback for
+ * anything unrecognized or absent.
  */
 export interface WalkStep {
   instruction: string;
   distance: number; // meters
+  location: [number, number]; // [lng, lat] of the turn itself — maneuver.location
+  maneuverType?: string; // e.g. "turn", "depart", "arrive"
+  maneuverModifier?: string; // e.g. "left", "right", "straight"
 }
 
 // ─── County mask constants ─────────────────────────────────────────────────────
@@ -176,6 +188,45 @@ interface MapProps {
    * Passed as a controlled prop from MapWrapper, which owns the Directions API fetch.
    */
   walkingRoute?: WalkingRouteGeoJSON | null;
+  /**
+   * Step-through focus point (#555): the [lng,lat] the camera flies to when
+   * the turn-by-turn stepper moves to a new step. Kept separate from
+   * `selectedVenueId`/`userLocation` — a turn wants a tighter zoom (17) than
+   * a selected venue's (16), and the map must move on EVERY step tap, even
+   * a back-and-forth between two turns that lands on the same coordinate
+   * twice — `focusRequestId` (below) is what makes a repeat point still fire.
+   */
+  focusPoint?: { lng: number; lat: number } | null;
+  /**
+   * Monotonic counter, bumped by MapWrapper on every step change — same
+   * "fire on every tap, not just the first" idiom `recenterRequestId` uses
+   * for the locate button.
+   */
+  focusRequestId?: number;
+}
+
+/** One camera move target: where to end up, at what zoom. */
+type CameraTarget = { center: [number, number]; zoom: number };
+
+/**
+ * Shared body for every one-shot camera move in this file (selected-venue
+ * flyTo, user-location flyTo, and the step-through focus flyTo below) —
+ * flyTo when motion is fine, jumpTo (instant) under prefers-reduced-motion.
+ * Extracted (#555) so a third call site doesn't paste a fourth copy of the
+ * same reduced-motion branch.
+ */
+function moveCamera(
+  map: MapRef | null,
+  target: CameraTarget,
+  duration: number,
+  reducedMotion: boolean,
+): void {
+  if (!map) return;
+  if (reducedMotion) {
+    map.jumpTo(target);
+  } else {
+    map.flyTo({ ...target, duration });
+  }
 }
 
 export default function Map({
@@ -189,6 +240,8 @@ export default function Map({
   recenterRequestId = 0,
   onMoveEnd,
   walkingRoute = null,
+  focusPoint = null,
+  focusRequestId = 0,
 }: MapProps) {
   // Centralized hover state — one Popup for the whole map avoids per-marker mount churn.
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
@@ -267,15 +320,7 @@ export default function Map({
     const venue = venues.find((v) => v.id === selectedVenueId);
     if (!venue) return;
 
-    if (prefersReducedMotion()) {
-      mapRef.current?.jumpTo({ center: [venue.lng, venue.lat], zoom: 16 });
-    } else {
-      mapRef.current?.flyTo({
-        center: [venue.lng, venue.lat],
-        zoom: 16,
-        duration: 800,
-      });
-    }
+    moveCamera(mapRef.current, { center: [venue.lng, venue.lat], zoom: 16 }, 800, prefersReducedMotion());
   }, [selectedVenueId, venues, prefersReducedMotion]);
 
   // ── User-location flyTo — 600ms, zoom 14 ────────────────────────────────────
@@ -312,19 +357,25 @@ export default function Map({
       passiveFlownRef.current = true;
     }
 
-    if (prefersReducedMotion()) {
-      mapRef.current?.jumpTo({
-        center: [userLocation.lng, userLocation.lat],
-        zoom: 14,
-      });
-    } else {
-      mapRef.current?.flyTo({
-        center: [userLocation.lng, userLocation.lat],
-        zoom: 14,
-        duration: 600,
-      });
-    }
+    moveCamera(mapRef.current, { center: [userLocation.lng, userLocation.lat], zoom: 14 }, 600, prefersReducedMotion());
   }, [userLocation, selectedVenueId, recenterRequestId, prefersReducedMotion]);
+
+  // ── Step-through focus flyTo — 600ms, zoom 17 (#555) ──────────────────────
+  //
+  // Fires whenever MapWrapper bumps focusRequestId (every stepper arrow tap
+  // or "All turns" row click), even if focusPoint repeats a coordinate the
+  // camera already sits on — lastFocusIdRef gates on the REQUEST id, not on
+  // whether the point changed, same idiom lastRecenterIdRef uses above for
+  // the locate button. Zoom 17 is tighter than the selected-venue effect's
+  // 16 — a turn is a street-level detail, not a venue-scale landmark.
+  const lastFocusIdRef = useRef(0);
+  useEffect(() => {
+    if (!focusPoint) return;
+    if (focusRequestId === lastFocusIdRef.current) return;
+    lastFocusIdRef.current = focusRequestId;
+
+    moveCamera(mapRef.current, { center: [focusPoint.lng, focusPoint.lat], zoom: 17 }, 600, prefersReducedMotion());
+  }, [focusPoint, focusRequestId, prefersReducedMotion]);
 
   // ── Marker interaction handlers ───────────────────────────────────────────
 

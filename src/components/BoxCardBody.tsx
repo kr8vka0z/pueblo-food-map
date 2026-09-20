@@ -92,7 +92,7 @@ import BoxCheckinPanel from "@/components/BoxCheckinPanel";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 import BoxAlertSignupForm from "@/components/BoxAlertSignupForm";
 import PhotoViewer from "@/components/PhotoViewer";
-import { googleMapsUrl, WalkRouteStatus, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
+import { googleMapsUrl, WalkRouteStatus, type RouteInfo } from "@/components/DirectionButtons";
 import { categoryColors } from "@/data/venues";
 import {
   STATUS_DOT_CLASS,
@@ -135,10 +135,26 @@ interface BoxCardBodyProps {
   onClearWalkRoute?: () => void;
   /** Walking route distance + duration for the in-card readout (threaded from MapWrapper via BottomSheet/DesktopVenueWindow, same as DirectionButtons' own prop). */
   walkRouteInfo?: RouteInfo | null;
-  /** Turn-by-turn steps from Mapbox (pre-localized), same as DirectionButtons' own prop. */
-  walkRouteSteps?: WalkStep[] | null;
+  /**
+   * Turn-by-turn steps from Mapbox (pre-localized), same as DirectionButtons'
+   * own prop — including its loose optional `location`/`maneuverType`/
+   * `maneuverModifier` shape (#555; see that prop's own WHY comment). This
+   * value passes straight through to WalkRouteStatus below, which does the
+   * actual location-filtering before handing anything to WalkStepper.
+   */
+  walkRouteSteps?: Array<{
+    instruction: string;
+    distance: number;
+    location?: [number, number];
+    maneuverType?: string;
+    maneuverModifier?: string;
+  }> | null;
   /** True when this box's Walk tap requested geolocation and it was denied or is unavailable (#207) — same as DirectionButtons' own prop. */
   showWalkLocationHint?: boolean;
+  /** Which turn the step-through stepper is showing (#555) — same as WalkRouteStatus's own prop. */
+  activeStepIndex?: number;
+  /** Moves the stepper to a different turn (#555) — same as WalkRouteStatus's own prop. */
+  onStepChange?: (index: number) => void;
 }
 
 /**
@@ -226,6 +242,8 @@ export default function BoxCardBody({
   walkRouteInfo = null,
   walkRouteSteps = null,
   showWalkLocationHint = false,
+  activeStepIndex = 0,
+  onStepChange = () => {},
 }: BoxCardBodyProps) {
   const { locale } = useLocale();
   const [adoptOpen, setAdoptOpen] = useState(false);
@@ -421,6 +439,8 @@ export default function BoxCardBody({
               showLocationHint={showWalkLocationHint}
               locationHintId={walkLocationHintId}
               onClearRoute={onClearWalkRoute}
+              activeStepIndex={activeStepIndex}
+              onStepChange={onStepChange}
             />
           )}
         </div>

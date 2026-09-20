@@ -33,10 +33,28 @@
  *
  * WHY turn instructions are NOT in i18n: Mapbox returns them pre-localized via the
  * language= query param (set to the active locale in MapWrapper). No client translation needed.
+ *
+ * WalkStepper (#555, step-through directions): the compact "Step N of M"
+ * panel with Back/Next arrows — MapWrapper owns which step is active
+ * (activeStepIndex/onStepChange) so the phone strip and this card's own
+ * readout can share one turn without a second source of truth. Reuses
+ * WalkStepsList for its "All turns" disclosure rather than forking a second
+ * list, and formatStepDistance for its "in 280 ft" line.
  */
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
+import {
+  ArrowUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  CornerUpLeft,
+  CornerUpRight,
+  MapPin as MapPinIcon,
+} from "lucide-react";
 import type { Venue } from "@/types/venue";
+import type { WalkStep } from "@/components/Map";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
@@ -82,9 +100,25 @@ interface DirectionButtonsProps {
   /**
    * Turn-by-turn steps from Mapbox Directions API.
    * Instructions are pre-localized (Mapbox language= param in MapWrapper).
-   * Rendered as a collapsible list when the route is active.
+   * Rendered via WalkStepper when the route is active.
+   *
+   * WHY `location`/`maneuverType`/`maneuverModifier` stay OPTIONAL on this
+   * prop's own shape rather than importing the stricter `WalkStep` type
+   * directly (#555): real callers always pass `WalkStep[]` (MapWrapper's
+   * `parseWalkSteps` guarantees every item has a valid `location`), but this
+   * prop predates that guarantee and existing tests construct plain
+   * `{instruction, distance}` literals for it. WalkRouteStatus below builds
+   * the stricter list WalkStepper needs by filtering out anything missing a
+   * real location — a no-op against real data, a safe no-render against a
+   * hand-built literal missing it.
    */
-  walkSteps?: Array<{ instruction: string; distance: number }> | null;
+  walkSteps?: Array<{
+    instruction: string;
+    distance: number;
+    location?: [number, number];
+    maneuverType?: string;
+    maneuverModifier?: string;
+  }> | null;
   /**
    * True when Walk was tapped with no shared location and the resulting
    * geolocation request was denied or is unavailable (#207). Renders a
@@ -92,6 +126,10 @@ interface DirectionButtonsProps {
    * MapWrapper never falls back to drawing a route from PUEBLO_CENTER.
    */
   showLocationHint?: boolean;
+  /** Which turn the step-through stepper is showing (#555). Defaults to 0. */
+  activeStepIndex?: number;
+  /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap. */
+  onStepChange?: (index: number) => void;
 }
 
 // ─── Google Maps deeplink builder ────────────────────────────────────────────
@@ -156,9 +194,18 @@ export interface WalkStepsListProps {
   hidden?: boolean;
   /** Caller-owned layout classes (spacing, max-height/scroll, text size) — this component supplies no default so the two callers can size it differently (WalkRouteStatus scrolls inside a fixed-height card; RouteStrip's sheet scrolls inside its own panel). */
   className?: string;
+  /**
+   * #555: when provided, each row becomes a button that calls this with its
+   * index — WalkStepper's "All turns" disclosure uses this to let someone
+   * jump straight to an arbitrary turn. Omit (both pre-#555 callers do,
+   * unchanged) to keep the plain, non-interactive list exactly as it was.
+   */
+  onSelectStep?: (index: number) => void;
+  /** #555: highlights the row matching this index. Only meaningful alongside `onSelectStep`. */
+  activeIndex?: number;
 }
 
-export function WalkStepsList({ steps, locale, id, hidden, className }: WalkStepsListProps) {
+export function WalkStepsList({ steps, locale, id, hidden, className, onSelectStep, activeIndex }: WalkStepsListProps) {
   return (
     <ol
       id={id}
@@ -169,8 +216,8 @@ export function WalkStepsList({ steps, locale, id, hidden, className }: WalkStep
     >
       {steps.map((step, i) => {
         const distText = formatStepDistance(step.distance, locale);
-        return (
-          <li key={i} className="flex items-start gap-2">
+        const rowContent = (
+          <>
             <span className="shrink-0 w-5 text-right text-[var(--color-ink-400)] text-xs font-mono select-none">
               {i + 1}.
             </span>
@@ -180,10 +227,229 @@ export function WalkStepsList({ steps, locale, id, hidden, className }: WalkStep
                 {distText}
               </span>
             )}
+          </>
+        );
+        return (
+          <li key={i} className="flex items-start gap-2">
+            {onSelectStep ? (
+              <button
+                type="button"
+                onClick={() => onSelectStep(i)}
+                className={
+                  "flex flex-1 items-start gap-2 text-left rounded " +
+                  (i === activeIndex ? "text-[var(--color-sage-700)] font-medium" : "") +
+                  " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                }
+              >
+                {rowContent}
+              </button>
+            ) : (
+              rowContent
+            )}
           </li>
         );
       })}
     </ol>
+  );
+}
+
+// ─── Turn glyph (#555) ────────────────────────────────────────────────────────
+//
+// Picks one of the four icons already imported for this file's own use
+// (no new dependency) based on Mapbox's `maneuver.type`/`.modifier`. Not a
+// full icon set for every Mapbox maneuver type (roundabout, fork, merge,
+// etc. all fall through to the plain "continue straight" arrow) — a
+// ponytail-scope call: those are rare turns, and Mapbox's own instruction
+// text already names them, so the glyph is a visual accent, not the only
+// signal.
+function TurnGlyph({
+  maneuverType,
+  maneuverModifier,
+}: {
+  maneuverType?: string;
+  maneuverModifier?: string;
+}) {
+  const className = "h-5 w-5 shrink-0 text-[var(--color-sage-600)]";
+  if (maneuverType === "arrive" || maneuverType === "depart") {
+    return <MapPinIcon className={className} aria-hidden />;
+  }
+  if (maneuverModifier?.includes("left")) {
+    return <CornerUpLeft className={className} aria-hidden />;
+  }
+  if (maneuverModifier?.includes("right")) {
+    return <CornerUpRight className={className} aria-hidden />;
+  }
+  return <ArrowUp className={className} aria-hidden />;
+}
+
+// 48px square — WCAG 2.5.5-comfortable touch target for the one-handed,
+// walking-while-glancing-at-the-phone use case this stepper is built for.
+const stepNavClass =
+  "flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-md)] " +
+  "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
+  "disabled:bg-[var(--color-bone-200)] disabled:text-[var(--color-ink-400)] " +
+  "hover:enabled:bg-[var(--color-sage-600)] " +
+  PRESS_FEEDBACK + " " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-1";
+
+// ─── WalkStepper (#555) ────────────────────────────────────────────────────────
+//
+// The step-through panel: one turn at a time, Back/Next, and an "All turns"
+// disclosure that reuses WalkStepsList (above) rather than a second list
+// implementation. Owns ONLY the disclosure's open/closed state — which turn
+// is active lives in MapWrapper (activeIndex/onStepChange props) because the
+// map's per-turn camera focus and this panel must always agree on the
+// current step; two independent pieces of state here could drift apart.
+export interface WalkStepperProps {
+  /** Real `maneuver.location` on every entry — MapWrapper's parseWalkSteps
+   *  already guarantees this; WalkRouteStatus below filters for it before
+   *  ever constructing this component. */
+  steps: WalkStep[];
+  activeIndex: number;
+  onStepChange: (index: number) => void;
+  locale: Locale;
+  className?: string;
+}
+
+export function WalkStepper({
+  steps,
+  activeIndex,
+  onStepChange,
+  locale,
+  className,
+}: WalkStepperProps) {
+  const [allTurnsOpen, setAllTurnsOpen] = useState(false);
+  const allTurnsId = useId();
+
+  const total = steps.length;
+  // Defensive clamp: activeIndex is owned by the caller, so a stale value
+  // surviving a route swap (fewer steps than before) can't index past the end.
+  const index = Math.min(Math.max(activeIndex, 0), Math.max(total - 1, 0));
+  const step = steps[index];
+  if (!step) return null;
+
+  const nextStep = steps[index + 1];
+  const isLast = index === total - 1;
+  const distText = formatStepDistance(step.distance, locale);
+  // "You have arrived" replaces the distance line on the final step (distance
+  // is always 0 there) rather than showing a meaningless "0 ft".
+  const distanceLine =
+    isLast || step.distance === 0
+      ? t("directions.stepArrived", locale)
+      : distText
+        ? t("directions.stepIn", locale, { distance: distText })
+        : null;
+
+  return (
+    <div className={className}>
+      <p
+        className="text-xs font-medium text-[var(--color-ink-400)]"
+        data-testid="walk-stepper-counter"
+      >
+        {t("directions.stepCounter", locale, {
+          current: String(index + 1),
+          total: String(total),
+        })}
+      </p>
+
+      {/* aria-live: announces the new turn to screen reader users on every
+          Back/Next tap without them needing to re-navigate to this text. */}
+      <div
+        className="mt-1 flex items-start gap-2"
+        role="status"
+        aria-live="polite"
+        data-testid="walk-stepper-instruction"
+      >
+        <TurnGlyph
+          maneuverType={step.maneuverType}
+          maneuverModifier={step.maneuverModifier}
+        />
+        <span className="text-base font-semibold text-[var(--color-ink-900)]">
+          {step.instruction}
+        </span>
+      </div>
+
+      {distanceLine && (
+        <p
+          className="mt-0.5 pl-7 text-sm text-[var(--color-ink-400)]"
+          data-testid="walk-stepper-distance"
+        >
+          {distanceLine}
+        </p>
+      )}
+
+      {nextStep && (
+        <p
+          className="mt-2 border-t border-[var(--color-bone-200)] pt-2 text-xs text-[var(--color-ink-400)]"
+          data-testid="walk-stepper-then"
+        >
+          {t("directions.stepThen", locale, { instruction: nextStep.instruction })}
+        </p>
+      )}
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          data-testid="walk-stepper-back"
+          aria-label={t("directions.stepBack", locale)}
+          disabled={index === 0}
+          onClick={() => onStepChange(index - 1)}
+          className={stepNavClass}
+        >
+          <ChevronLeft className="h-5 w-5" aria-hidden />
+        </button>
+        <button
+          type="button"
+          data-testid="walk-stepper-next"
+          aria-label={t("directions.stepNext", locale)}
+          disabled={isLast}
+          onClick={() => onStepChange(index + 1)}
+          className={stepNavClass}
+        >
+          <ChevronRight className="h-5 w-5" aria-hidden />
+        </button>
+      </div>
+
+      <div className="mt-2">
+        <button
+          type="button"
+          data-testid="walk-stepper-all-turns-toggle"
+          aria-expanded={allTurnsOpen}
+          aria-controls={allTurnsId}
+          onClick={() => setAllTurnsOpen((v) => !v)}
+          className={
+            "flex items-center gap-1 py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
+            "hover:text-[var(--color-sage-700)] " +
+            PRESS_FEEDBACK + " " +
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          }
+        >
+          {allTurnsOpen ? (
+            <>
+              <ChevronUp className="h-4 w-4" aria-hidden />
+              {t("directions.fewerTurns", locale)}
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-4 w-4" aria-hidden />
+              {t("directions.allTurns", locale)}
+            </>
+          )}
+        </button>
+
+        <WalkStepsList
+          steps={steps}
+          locale={locale}
+          id={allTurnsId}
+          hidden={!allTurnsOpen}
+          onSelectStep={onStepChange}
+          activeIndex={index}
+          // Same overscroll-contain reasoning as WalkRouteStatus's pre-#555
+          // list — see that component's own comment on this class.
+          className="mt-2 space-y-1.5 text-sm text-[var(--color-ink-700)] max-h-48 overflow-y-auto overscroll-contain"
+        />
+      </div>
+    </div>
   );
 }
 
@@ -211,7 +477,15 @@ export interface WalkRouteStatusProps {
   locale: Locale;
   isRouteActive: boolean;
   routeInfo?: RouteInfo | null;
-  walkSteps?: Array<{ instruction: string; distance: number }> | null;
+  /** See DirectionButtonsProps.walkSteps's own WHY comment (#555) — same
+   *  loose-optional-field bridging pattern, for the same reason. */
+  walkSteps?: Array<{
+    instruction: string;
+    distance: number;
+    location?: [number, number];
+    maneuverType?: string;
+    maneuverModifier?: string;
+  }> | null;
   showLocationHint?: boolean;
   locationHintId: string;
   /**
@@ -228,6 +502,12 @@ export interface WalkRouteStatusProps {
    * restore pass, advisor()-reviewed).
    */
   onClearRoute?: () => void;
+  /** Which turn WalkStepper shows (#555). Defaults to 0. */
+  activeStepIndex?: number;
+  /** Moves the stepper to a different turn (#555). Defaults to a no-op —
+   *  callers that never draw a route (most WalkRouteStatus instances, most
+   *  of the time) don't need to wire anything. */
+  onStepChange?: (index: number) => void;
 }
 
 export function WalkRouteStatus({
@@ -239,28 +519,22 @@ export function WalkRouteStatus({
   showLocationHint = false,
   locationHintId,
   onClearRoute,
+  activeStepIndex = 0,
+  onStepChange = () => {},
 }: WalkRouteStatusProps) {
-  // Toggle state for the step list — collapsed by default.
-  const [stepsExpanded, setStepsExpanded] = useState(false);
-
-  // FIX 2 (unchanged from pre-extraction DirectionButtons): reset
-  // stepsExpanded to collapsed when the venue changes, via a ref so the
-  // effect only fires on a real id change, not every render.
-  const prevVenueIdRef = useRef<string>(venue.id);
-  useEffect(() => {
-    if (prevVenueIdRef.current !== venue.id) {
-      prevVenueIdRef.current = venue.id;
-      setStepsExpanded(false);
-    }
-  }, [venue.id]);
-
-  // Per-instance id for the step list <ol> — see stepsListId's own reasoning
-  // in this file's pre-extraction history; useId() over a module constant
-  // stays robust if two instances of this readout ever mount simultaneously.
-  const stepsListId = useId();
-
   const walkGoogleUrl = googleMapsUrl(venue.lat, venue.lng, "walking");
-  const hasSteps = isRouteActive && Array.isArray(walkSteps) && walkSteps.length > 0;
+
+  // WalkStepper indexes into `steps[activeIndex]` and hands each step's
+  // location to the map's camera-focus effect, so it needs a REAL location
+  // on every entry, not the loose optional-field shape this prop accepts
+  // (see the WHY above). Filtering here — rather than trusting the prop
+  // type — is a no-op against real routes (MapWrapper's parseWalkSteps
+  // already drops locationless steps) and a safe empty render against a
+  // hand-built test literal that omits `location`.
+  const stepperSteps: WalkStep[] = (walkSteps ?? []).filter(
+    (s): s is WalkStep => Array.isArray(s.location) && s.location.length === 2,
+  );
+  const hasSteps = isRouteActive && stepperSteps.length > 0;
 
   return (
     <>
@@ -304,55 +578,22 @@ export function WalkRouteStatus({
         </div>
       )}
 
-      {/* Turn-by-turn step list — collapsible, shown only when route is active with steps.
-          Toggle button with aria-expanded/aria-controls for WCAG 4.1.2 disclosure pattern.
-          Instructions arrive pre-localized from Mapbox (language= param in MapWrapper). */}
+      {/* Step-through directions (#555) — replaces the old collapsible
+          Show/Hide steps toggle + full list. One turn at a time; its own
+          "All turns" disclosure (inside WalkStepper) still reaches the full
+          WalkStepsList for anyone who wants to scan every turn at once.
+          KNOWN LIMITATION (unchanged from the pre-#555 toggle): Mapbox-sourced
+          turn instructions do not refresh when the user toggles EN/ES while a
+          route is active — they stay in the language active at fetch time
+          until the user re-taps Walk. */}
       {hasSteps && (
-        <div className="mt-2">
-          <button
-            type="button"
-            data-testid="walk-steps-toggle"
-            aria-expanded={stepsExpanded}
-            aria-controls={stepsListId}
-            onClick={() => setStepsExpanded((v) => !v)}
-            className={
-              // ~20px tall -> real padding growth, same treatment as BottomSheet's
-              // Show/Hide details toggle (mobile review #9).
-              "py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
-              "hover:text-[var(--color-sage-700)] underline-offset-2 hover:underline " +
-              PRESS_FEEDBACK + " " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-            }
-          >
-            {stepsExpanded
-              ? t("directions.hideSteps", locale)
-              : t("directions.showSteps", locale)}
-          </button>
-
-          {/* WHY hidden attribute over CSS display:none: screen readers skip hidden elements.
-              The list must not be announced when collapsed.
-              FIX 4: max-h-48 + overflow-y-auto so a long step list scrolls internally and
-              keeps the trigger + route readout visible on mobile without pushing them
-              below the viewport fold.
-              KNOWN LIMITATION (FIX 5 deferred): Mapbox-sourced turn instructions do not
-              refresh when the user toggles EN/ES while a route is active. The t()-localized
-              toggle label and distance readout update immediately, but instruction text stays
-              in the language active at fetch time until the user re-taps Walk. */}
-          <WalkStepsList
-            steps={walkSteps!}
-            locale={locale}
-            id={stepsListId}
-            hidden={!stepsExpanded}
-            // `overscroll-contain` (#553): this list renders inside the mobile
-            // bottom sheet (BottomSheet.tsx for ordinary venues, BoxCardBody's
-            // WalkRouteStatus for boxes), so a pull-down here at scrollTop 0
-            // would chain outward and rubber-band the whole page in iOS
-            // Safari. The sheet's own wrapper already contains the chain
-            // today, but only by accident of nesting — stated here so moving
-            // this list can't quietly reopen the bug.
-            className="mt-2 space-y-1.5 text-sm text-[var(--color-ink-700)] max-h-48 overflow-y-auto overscroll-contain"
-          />
-        </div>
+        <WalkStepper
+          steps={stepperSteps}
+          activeIndex={activeStepIndex}
+          onStepChange={onStepChange}
+          locale={locale}
+          className="mt-2"
+        />
       )}
 
       {/* Clear route — only rendered when the trigger itself doesn't already
@@ -444,6 +685,8 @@ export default function DirectionButtons({
   routeInfo = null,
   walkSteps = null,
   showLocationHint = false,
+  activeStepIndex = 0,
+  onStepChange = () => {},
 }: DirectionButtonsProps) {
   // Per-instance id for the "share your location" hint (#207) — aria-describedby
   // target on the Walk button below, shared with WalkRouteStatus's own <p id>
@@ -516,6 +759,8 @@ export default function DirectionButtons({
         walkSteps={walkSteps}
         showLocationHint={showLocationHint}
         locationHintId={locationHintId}
+        activeStepIndex={activeStepIndex}
+        onStepChange={onStepChange}
       />
     </div>
   );

@@ -117,6 +117,10 @@ interface BottomSheetProps {
    * "share your location" hint instead of silently doing nothing.
    */
   showWalkLocationHint?: boolean;
+  /** Which turn the step-through stepper is showing (#555) — owned by MapWrapper so the map's camera focus agrees with every stepper instance. */
+  activeStepIndex?: number;
+  /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap, in either the RouteStrip sheet or the full card's own readout. */
+  onStepChange?: (index: number) => void;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
@@ -134,6 +138,8 @@ export default function BottomSheet({
   walkRouteInfo,
   walkRouteSteps,
   showWalkLocationHint = false,
+  activeStepIndex = 0,
+  onStepChange = () => {},
 }: BottomSheetProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -386,6 +392,8 @@ export default function BottomSheet({
               onShowCard={() => setCardRevealed(true)}
               onClearRoute={onClearWalkRoute}
               walkSteps={walkRouteSteps}
+              activeStepIndex={activeStepIndex}
+              onStepChange={onStepChange}
             />
           )}
 
@@ -430,6 +438,8 @@ export default function BottomSheet({
                     walkRouteInfo={isWalkRouteActive ? walkRouteInfo : null}
                     walkRouteSteps={isWalkRouteActive ? walkRouteSteps : null}
                     showWalkLocationHint={showWalkLocationHint}
+                    activeStepIndex={activeStepIndex}
+                    onStepChange={onStepChange}
                     actions={
                       <>
                         <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} isBox />
@@ -587,6 +597,8 @@ export default function BottomSheet({
                   routeInfo={isWalkRouteActive ? walkRouteInfo : null}
                   walkSteps={isWalkRouteActive ? walkRouteSteps : null}
                   showLocationHint={showWalkLocationHint}
+                  activeStepIndex={activeStepIndex}
+                  onStepChange={onStepChange}
                 />
 
                 {/* Show/Hide details toggle */}

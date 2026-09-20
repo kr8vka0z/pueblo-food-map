@@ -114,7 +114,13 @@
      unit, so the fallback and the fix can't drift apart in two places.
      `vh` here is the fallback for browsers without `svh` support (iOS
      <15.4, older Firefox/Chrome) — identical to this app's pre-fix
-     behaviour, not a regression for them. */
+     behaviour, not a regression for them.
+     Exception (#549): BottomSheet.tsx's route-active height sizes against
+     `100dvh` instead of this variable — vaul's own px snap points are
+     computed against `window.innerHeight`, which this small-viewport
+     variable is deliberately shorter than, so it has to match `innerHeight`
+     via `100dvh` there or vaul's snap math clips the route strip. See
+     BottomSheet.tsx's own `style` prop comment for the full derivation. */
   --viewport-small: 100vh;
 }
 

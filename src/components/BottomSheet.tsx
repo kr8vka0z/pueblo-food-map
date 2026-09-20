@@ -65,8 +65,18 @@ import BoxCardBody from "@/components/BoxCardBody";
 import RouteStrip, { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 
+// #549: the map-peek gap deliberately left visible above the drawer at rest
+// (100px, matches the non-route maxHeight below). Named so the height calc
+// and the strip snap point (ROUTE_STRIP_SNAP, which must be
+// ROUTE_STRIP_HEIGHT_PX + this) can't drift apart — see the `style` prop
+// below for the full derivation.
+const MAP_PEEK_PX = 100;
 // vaul's px snapPoints can't use calc() — a literal string, computed once.
-const ROUTE_STRIP_SNAP = `${ROUTE_STRIP_HEIGHT_PX}px`;
+// #549: this is ROUTE_STRIP_HEIGHT_PX + MAP_PEEK_PX, not ROUTE_STRIP_HEIGHT_PX
+// alone — see the `style` prop below for why the map peek has to be added
+// back in on top of the strip's own height for vaul's snap math to land on
+// a strip that's actually ROUTE_STRIP_HEIGHT_PX tall on screen.
+const ROUTE_STRIP_SNAP = `${ROUTE_STRIP_HEIGHT_PX + MAP_PEEK_PX}px`;
 // The "full card" snap point — 100% of the drawer's own (fixed, see the
 // `height` style swap below) height.
 const FULL_CARD_SNAP = 1;
@@ -254,15 +264,49 @@ export default function BottomSheet({
           // change is that the full-card view is now a fixed height rather
           // than hugging its (usually shorter) content while a route is
           // active — accepted trade-off, only while a route is active.
-          // #530: `var(--viewport-small)` (globals.css), not the dynamic
-          // viewport-height unit — that one tracks Safari's toolbar live as
-          // it collapses/expands on scroll, so the sheet's own height would
-          // resize (jump) mid-drag/scroll. The small viewport is invariant
-          // across that animation.
+          // #549: vaul computes a px snap point's transform offset as
+          // `offset = window.innerHeight - snapPx` (vaul/dist/index.mjs
+          // ~line 540). For a drawer with `bottom: S` and `height: H`, the
+          // resulting visible height at that snap is
+          //   visible = S + H - window.innerHeight + snapPx
+          // — which only equals `snapPx` (the strip's own height) when
+          // `S + H === window.innerHeight`. This drawer's `bottom` is
+          // `env(safe-area-inset-bottom)` (0 on the test device), so H alone
+          // has to equal window.innerHeight, or the strip snap lands short
+          // (partly or fully off-screen — this issue's bug).
+          // `var(--viewport-small)` (100svh, #530's fix, kept below for the
+          // NON-route branch) is deliberately SHORTER than innerHeight — it
+          // is pinned to the smallest possible viewport specifically so a
+          // bottom-pinned bar never resizes as Safari's toolbar animates —
+          // so using it here under-sizes H by however much svh trails
+          // innerHeight, and vaul's math pushes the strip that far off the
+          // bottom edge. `100dvh` tracks the CURRENT viewport instead, which
+          // Kyle measured equal to `window.innerHeight` on the real device
+          // in both toolbar states (iOS 26, 2026-09-20: Safari 714/714,
+          // Chrome 683/683) — exactly the reference vaul's snap math needs.
+          // Safe to use here specifically because this element is
+          // bottom-pinned (`[data-bottom-sheet]`, globals.css): a
+          // dvh-driven height change moves only the drawer's OFF-SCREEN top
+          // edge while a snap point is showing, never the visible strip
+          // itself, so it can't reintroduce the mid-scroll "jump" #530
+          // fixed for the non-route case below.
+          //
+          // The 100px map peek is carved out of H and added back into the
+          // snap point instead (MAP_PEEK_PX, folded into ROUTE_STRIP_SNAP
+          // above) — that keeps the drawer's resting top edge a constant
+          // MAP_PEEK_PX below the window top in both toolbar states, and
+          // the strip's own visible height pinned at exactly
+          // ROUTE_STRIP_HEIGHT_PX regardless of toolbar collapse.
+          //
+          // The NON-route branch is unaffected by any of this: it has no
+          // snapPoints (vaul never runs the offset math above against it),
+          // so it keeps `var(--viewport-small)` for #530's original reason
+          // — its own "never jumps mid-scroll" property — with no snap-
+          // offset constraint forcing it onto dvh.
           style={
             isWalkRouteActive
-              ? { height: "calc(var(--viewport-small) - 100px)" }
-              : { maxHeight: "calc(var(--viewport-small) - 100px)" }
+              ? { height: `calc(100dvh - ${MAP_PEEK_PX}px - env(safe-area-inset-bottom))` }
+              : { maxHeight: `calc(var(--viewport-small) - ${MAP_PEEK_PX}px)` }
           }
           aria-label={t("detail.venueDetailsPanel", locale)}
           // #508 fix pass: Escape while a box's PhotoViewer is open must

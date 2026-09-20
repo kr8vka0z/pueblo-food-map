@@ -69,9 +69,12 @@ import { WalkStepsList, type RouteInfo, type WalkStep } from "@/components/Direc
  * the way the rest of the app pads for the home-indicator area. A fixed
  * buffer is baked in below instead.
  *
- * BottomSheet.tsx imports this SAME constant for its snap point so the two
- * numbers can never drift apart (a strip taller/shorter than its own snap
- * point would either clip content or leave a dead gap above the strip).
+ * BottomSheet.tsx imports this SAME constant as part of its snap point (its
+ * ROUTE_STRIP_SNAP = this + its own MAP_PEEK_PX — see that file's `style`
+ * prop comment for why the map peek has to be added back in) so this
+ * number and the strip's own rendered height can never drift apart (a strip
+ * taller/shorter than its share of the snap point would either clip content
+ * or leave a dead gap above the strip).
  *
  * ponytail: not exact on notched phones (the safe-area buffer is a fixed
  * guess, not the real inset) — tune during live review if the strip ever

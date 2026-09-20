@@ -46,7 +46,14 @@ describe("SearchBar — right end of the pill (#514: the view switch that used t
 // swapped to match, and the magnifier restored on the left unconditionally
 // so the bar still reads as a search box.
 describe("SearchBar — input padding swaps sides with the Filters button (#528)", () => {
-  test("reserves left padding for the magnifier and right padding for the Filters button when present", () => {
+  // #539: the count pill now sits BESIDE the icon instead of overlapping it,
+  // so the control's real width grows when a filter is on. Issue #539's
+  // Plan: "reserve the input's right padding for the widest state (count
+  // present) so typed text never reflows when a filter is toggled" — so the
+  // reservation must already be big enough for the count-present state even
+  // when rendered here with count: 0 (the reservation is a fixed constant,
+  // not conditional on the current count).
+  test("reserves left padding for the magnifier and right padding for the widest (count-present) Filters state when present", () => {
     const { container } = render(
       <SearchBar
         value=""
@@ -56,8 +63,55 @@ describe("SearchBar — input padding swaps sides with the Filters button (#528)
     );
     const inputClass = container.querySelector("input[type='search']")?.className ?? "";
     expect(inputClass).toContain("pl-9");
-    expect(inputClass).toContain("pr-11");
     expect(inputClass).not.toContain("pl-11");
+    // Widest-state reservation is wider than the old fixed-badge-overlap
+    // value (pr-11 = 44px) now that the count pill grows the control.
+    expect(inputClass).toMatch(/pr-\[\d+px\]/);
+    const match = inputClass.match(/pr-\[(\d+)px\]/);
+    expect(match).not.toBeNull();
+    expect(Number(match![1])).toBeGreaterThan(44);
+  });
+
+  // Same reservation whether or not a filter is actually on right now — it's
+  // sized for the widest state up front so toggling a filter never reflows
+  // the typed text (the whole point of reserving for the widest state).
+  test("the reservation does not change when a filter is actually on", () => {
+    const { container: off } = render(
+      <SearchBar value="" onChange={vi.fn()} filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }} />,
+    );
+    const { container: on } = render(
+      <SearchBar value="" onChange={vi.fn()} filtersButton={{ count: 2, onClick: vi.fn(), ariaLabel: "Filters, 2 on" }} />,
+    );
+    const offClass = off.querySelector("input[type='search']")?.className ?? "";
+    const onClass = on.querySelector("input[type='search']")?.className ?? "";
+    expect(offClass).toBe(onClass);
+  });
+
+  // Reviewer finding on #539's first pass: pr-[76px] left only 0-2px of
+  // slack against the true worst case (10px pad + 20px icon + 6px gap +
+  // 14px pad = 50px fixed, plus a 2-digit count pill) — FilterPanel allows
+  // up to 11 simultaneous filters (8 categories + 3 switches,
+  // MapWrapper.tsx ~900-904), so 11 is the real maximum count, not a made-up
+  // edge case. Pins the reservation at the max realistic count so a future
+  // shrink of this value gets caught here instead of on a real phone.
+  test("the reservation still has real margin at the maximum realistic count (11 — 8 categories + 3 switches)", () => {
+    const { container } = render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 11, onClick: vi.fn(), ariaLabel: "Filters, 11 on" }}
+      />,
+    );
+    const inputClass = container.querySelector("input[type='search']")?.className ?? "";
+    const match = inputClass.match(/pr-\[(\d+)px\]/);
+    expect(match).not.toBeNull();
+    // Fixed 50px chrome (10 pad + 20 icon + 6 gap + 14 pad) leaves this much
+    // for the count pill itself — must comfortably clear a 2-digit pill's
+    // real rendered width, not just its 19px CSS min-width floor.
+    const budgetForPill = Number(match![1]) - 50;
+    expect(budgetForPill).toBeGreaterThanOrEqual(24);
+    // Same fixed value as any other count (still a constant, not scaled).
+    expect(Number(match![1])).toBe(84);
   });
 
   test("reserves only the magnifier's left padding when filtersButton is absent", () => {
@@ -101,12 +155,15 @@ describe("SearchBar — filtersButton (#513, right end of the bar as of #528)", 
     expect(screen.getByRole("button", { name: "Filters" })).toBeDefined();
   });
 
-  // #532 review: the button was a 32×32 tap target, under the 44px minimum
-  // used elsewhere (FilterPanel.tsx close, HamburgerMenu.tsx close,
-  // BottomSheet.tsx close all use w-11 h-11). The invisible-hitbox pattern
-  // grows the <button> to 44×44 while an inner <span> keeps the always-
-  // visible circle at its original 32×32.
-  test("the button (tap target) is 44px; the visible circle inside it stays 32px", () => {
+  // #539, Kyle's mockup C: "put the icon for the filters just into the
+  // search bar instead of it appearing like a different button" — no
+  // circle, no border, no separate-button look. Supersedes #532's
+  // invisible-44px-hitbox-around-a-32px-circle pattern: the <button> itself
+  // is now the only box, and its own padding (10px + 20px icon + 14px, per
+  // the approved mockup's `.c-filter`) already totals 44px with no count —
+  // more once the count pill adds its own width — so it clears the 44px
+  // minimum in every state without a separate invisible hit area.
+  test("the control is icon-only — no background, no border, no separate visible circle (#539)", () => {
     render(
       <SearchBar
         value=""
@@ -115,11 +172,69 @@ describe("SearchBar — filtersButton (#513, right end of the bar as of #528)", 
       />,
     );
     const button = screen.getByRole("button", { name: "Filters" });
-    expect(button.className).toContain("w-11");
+    expect(button.className).not.toMatch(/\bborder(?!-0)/);
+    expect(button.className).not.toMatch(/\bbg-\[/);
+    expect(button.className).not.toContain("rounded-full");
+    // No inner circle span wrapping the icon — only the hairline-divider
+    // span (aria-hidden, no size classes) is a direct child now.
+    expect(button.querySelector("span.w-8")).toBeNull();
+  });
+
+  test("the control's own box is at least 44px tall, and at least 44px wide even with no count on", () => {
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "Filters" });
     expect(button.className).toContain("h-11");
-    const visibleCircle = button.querySelector("span");
-    expect(visibleCircle?.className).toContain("w-8");
-    expect(visibleCircle?.className).toContain("h-8");
+    // 10px left pad + 20px icon + 14px right pad = 44px with no count pill
+    // (matches the approved mockup's `.c-filter` padding/icon geometry).
+    expect(button.className).toContain("pl-2.5");
+    expect(button.className).toContain("pr-3.5");
+  });
+
+  // A hairline divider separates the control from the input without making
+  // it look like its own button — issue #539: "1px, `--color-bone-200`,
+  // inset ~12px top and bottom."
+  test("a hairline divider (bone-200) sits on the control's left, inset from top/bottom", () => {
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "Filters" });
+    const divider = button.querySelector('span[aria-hidden]:not(:has(*))');
+    expect(divider?.className).toContain("bg-[var(--color-bone-200)]");
+    expect(divider?.className).toContain("top-[12px]");
+    expect(divider?.className).toContain("bottom-[12px]");
+  });
+
+  test("the icon turns sage-600 when a filter is on, ink-500 at rest", () => {
+    const { rerender } = render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Filters" }).className).toContain(
+      "text-[var(--color-ink-500)]",
+    );
+    rerender(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 2, onClick: vi.fn(), ariaLabel: "Filters, 2 on" }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Filters, 2 on" }).className).toContain(
+      "text-[var(--color-sage-600)]",
+    );
   });
 
   test("clicking the Filters button fires onClick", async () => {
@@ -176,5 +291,23 @@ describe("SearchBar — filtersButton (#513, right end of the bar as of #528)", 
     expect(badge.className).toContain("text-[var(--color-brand-navy)]");
     expect(badge.className).not.toContain("--color-orange)");
     expect(badge.className).not.toContain("--color-navy)");
+  });
+
+  // #539: the old badge hung `-top-1 -left-1` OVER the icon (absolute,
+  // negative-inset). The mockup C design puts it BESIDE the icon in normal
+  // flow instead, so nothing overlaps.
+  test("the count pill sits beside the icon in normal flow, not absolutely positioned over it", () => {
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 2, onClick: vi.fn(), ariaLabel: "Filters, 2 on" }}
+      />,
+    );
+    const badge = screen.getByText("2");
+    expect(badge.className).not.toContain("absolute");
+    expect(badge.className).not.toMatch(/-top-|-left-|-right-|-bottom-/);
+    expect(badge.className).toContain("min-w-[19px]");
+    expect(badge.className).toContain("h-[19px]");
   });
 });

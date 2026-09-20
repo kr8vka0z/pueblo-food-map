@@ -262,4 +262,28 @@ describe("#531 — Steps control on the route strip", () => {
     expect(screen.getByTestId("route-strip")).toBeDefined();
     expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
   });
+
+  // #542: the steps sheet is a full-surface overlay over the map (unlike the
+  // collapsed strip itself, which #531 keeps the nav visible beneath) — it
+  // registers with the shared overlay registry and hides the nav while open.
+  test("#542: Steps hides the nav while open; closing it restores the nav", async () => {
+    const user = userEvent.setup();
+    await renderMobile();
+
+    const walkButton = await screen.findByRole(
+      "button",
+      { name: new RegExp(`Walking directions to ${TEST_VENUE.name}`, "i") },
+    );
+    await user.click(walkButton);
+    await screen.findByTestId("route-strip");
+    expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
+
+    await user.click(screen.getByTestId("route-strip-steps"));
+    expect(screen.getByText("Head north on Main St")).toBeDefined();
+    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
+
+    await user.click(screen.getByTestId("route-strip-steps-close"));
+    await waitFor(() => expect(screen.queryByTestId("walk-steps-list")).toBeNull());
+    expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
+  });
 });

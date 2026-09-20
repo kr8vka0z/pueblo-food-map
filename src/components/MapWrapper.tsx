@@ -52,6 +52,7 @@ import { venues as allVenues } from "@/data/venues";
 import type { Venue } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
 import ListView from "./ListView";
+import { useOverlayRegistration } from "@/lib/overlayRegistry";
 import {
   PUEBLO_COUNTY_BBOX,
   PUEBLO_CENTER,
@@ -1399,6 +1400,11 @@ export default function MapWrapper({
   // stays visible above it instead of stepping aside (`!stripVisible`, fed
   // by BottomSheet.tsx's onStripVisibleChange below).
   const venueSheetOpen = isMobile && viewMode === "map" && selectedVenue !== null && !stripVisible;
+  // #542: feeds the same shared registry every other full-surface overlay
+  // uses — BottomNav hides itself (overlayRegistry.ts) instead of this
+  // component wrapping <BottomNav/> in a `{!venueSheetOpen && ...}` JSX
+  // conditional, which was the "fifth ad-hoc boolean" #542 called out.
+  useOverlayRegistration(venueSheetOpen);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -1723,21 +1729,22 @@ export default function MapWrapper({
       )}
 
       {/* BottomNav — LAST in DOM order so keyboard users reach the map and the
-          search first (spec §12). */}
-      {!venueSheetOpen && (
-        <BottomNav
-          locale={locale}
-          openSection={menuSection}
-          onSectionTap={handleNavSectionTap}
-          geoState={geo.state}
-          isLocating={isLocating}
-          isDrifted={isDrifted}
-          onNearMe={handleNearMe}
-          boxesActive={selectedCategories?.has("blessing_box") ?? false}
-          onBoxesToggle={handleBoxesToggle}
-          navRef={navRef}
-        />
-      )}
+          search first (spec §12). Rendered unconditionally: it hides ITSELF
+          (overlayRegistry.ts) whenever venueSheetOpen or any other
+          full-surface overlay is open (#542) — see the useOverlayRegistration
+          call above for venueSheetOpen's own registration. */}
+      <BottomNav
+        locale={locale}
+        openSection={menuSection}
+        onSectionTap={handleNavSectionTap}
+        geoState={geo.state}
+        isLocating={isLocating}
+        isDrifted={isDrifted}
+        onNearMe={handleNearMe}
+        boxesActive={selectedCategories?.has("blessing_box") ?? false}
+        onBoxesToggle={handleBoxesToggle}
+        navRef={navRef}
+      />
     </div>
   );
 }

@@ -36,6 +36,7 @@ import { Locate, LocateFixed, Loader2, Star, HandHelping, Menu } from "lucide-re
 import type { GeoState } from "@/lib/useGeolocation";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { useAnyOverlayOpen } from "@/lib/overlayRegistry";
 
 /**
  * Space the nav takes off the bottom of the screen below 2xl, excluding the
@@ -153,6 +154,14 @@ export default function BottomNav({
   navRef,
   onResourcesPage = false,
 }: BottomNavProps) {
+  // #542: single choke point for "hide the bar while a full-surface overlay
+  // is open" — every overlay (Menu on mobile, Filters, PhotoViewer, the
+  // route steps sheet, the full venue/box card via MapWrapper's
+  // venueSheetOpen) registers into the SAME shared registry
+  // (overlayRegistry.ts) instead of each call site (MapWrapper, PageNav)
+  // re-deriving its own boolean and wrapping this component in JSX.
+  if (useAnyOverlayOpen()) return null;
+
   // §6: the label never changes, only the icon does — so the bar never reflows.
   const located = geoState.permission === "granted" && geoState.position !== null;
   const nearMeIcon = isLocating ? (

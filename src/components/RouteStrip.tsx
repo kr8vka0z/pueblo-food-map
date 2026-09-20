@@ -60,6 +60,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronUp, ListOrdered, X } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { useOverlayRegistration } from "@/lib/overlayRegistry";
 import { WalkStepsList, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 
 /**
@@ -127,6 +128,10 @@ export default function RouteStrip({
 
   // ── Steps sheet (#531) ──────────────────────────────────────────────────
   const [stepsOpen, setStepsOpen] = useState(false);
+  // #542: the steps sheet (not the collapsed strip itself, which stays
+  // visible alongside the nav per #531) is a full-surface overlay — it
+  // covers the map and, below it, the nav — so it hides BottomNav while open.
+  useOverlayRegistration(stepsOpen);
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Explicit focus restore, not relied-on-native — same reasoning as
   // PhotoViewer.tsx's own header: this repo's jsdom test environment has no

@@ -336,20 +336,49 @@ function collectSourceFiles(dir, results = []) {
   return results;
 }
 
+/**
+ * Grandfather key: file + token, NOT token alone. Keying by name only means
+ * a brand-new file introducing `var(--color-ink-300)` for the first time
+ * would pass silently, because the NAME was already exempt somewhere else —
+ * the exemption has to be tied to the exact site captured at authoring time,
+ * so it protects only the 20 original (file, token) pairs and nothing else
+ * with that name, in that file or any other.
+ */
+function grandfatherKey(rel, varName) {
+  return `${rel}::${varName}`;
+}
+
 // Pre-existing undefined-token usages found while building this check
 // (2026-09-19, PR for #528/#529) that are OUTSIDE those two issues' scope —
 // 15 files, none of them SearchBar.tsx or FilterPanel.tsx. Grandfathered so
 // this new check can ship without failing the build on bugs it didn't
 // introduce and wasn't asked to fix. Do NOT add to this list going forward:
-// a new violation should fail the build. Fix a token forward by defining it
-// in globals.css or correcting the usage, then delete its line here.
+// a new violation — including a listed token name appearing in a NEW file,
+// or a second time in a file not listed for it — should fail the build.
+// Fix a token forward by defining it in globals.css or correcting the
+// usage, then delete its line here.
 const GRANDFATHERED_UNDEFINED_COLOR_TOKENS = new Set([
-  '--color-ink-300',  // AddVenueForm, AdminLoginForm, FeedbackForm, ReportForm, SuggestForm
-  '--color-ink-600',  // FeedbackForm, HamburgerMenu, ReportForm, ReportVenueButton, SuggestForm
-  '--color-ink-800',  // AboutContent, FilterPanel, HamburgerMenu(Item), ResourcesContent, VenuesDirectoryContent
-  '--color-sage-300',  // BottomSheet, DesktopVenueWindow
-  '--color-sage-400',  // DirectionButtons
-  '--color-bone-400',  // DirectionButtons
+  grandfatherKey('src/components/AboutContent.tsx', '--color-ink-800'),
+  grandfatherKey('src/components/AddVenueForm.tsx', '--color-ink-300'),
+  grandfatherKey('src/components/AdminLoginForm.tsx', '--color-ink-300'),
+  grandfatherKey('src/components/BottomSheet.tsx', '--color-sage-300'),
+  grandfatherKey('src/components/DesktopVenueWindow.tsx', '--color-sage-300'),
+  grandfatherKey('src/components/DirectionButtons.tsx', '--color-bone-400'),
+  grandfatherKey('src/components/DirectionButtons.tsx', '--color-sage-400'),
+  grandfatherKey('src/components/FeedbackForm.tsx', '--color-ink-300'),
+  grandfatherKey('src/components/FeedbackForm.tsx', '--color-ink-600'),
+  grandfatherKey('src/components/FilterPanel.tsx', '--color-ink-800'),
+  grandfatherKey('src/components/HamburgerMenu.tsx', '--color-ink-600'),
+  grandfatherKey('src/components/HamburgerMenu.tsx', '--color-ink-800'),
+  grandfatherKey('src/components/HamburgerMenuItem.tsx', '--color-ink-800'),
+  grandfatherKey('src/components/ReportForm.tsx', '--color-ink-300'),
+  grandfatherKey('src/components/ReportForm.tsx', '--color-ink-600'),
+  grandfatherKey('src/components/ReportVenueButton.tsx', '--color-ink-300'),
+  grandfatherKey('src/components/ReportVenueButton.tsx', '--color-ink-600'),
+  grandfatherKey('src/components/ResourcesContent.tsx', '--color-ink-800'),
+  grandfatherKey('src/components/SuggestForm.tsx', '--color-ink-300'),
+  grandfatherKey('src/components/SuggestForm.tsx', '--color-ink-600'),
+  grandfatherKey('src/components/VenuesDirectoryContent.tsx', '--color-ink-800'),
 ]);
 
 const definedColorVars = new Set(
@@ -366,7 +395,7 @@ for (const filePath of collectSourceFiles(SRC_DIR)) {
     for (const m of line.matchAll(/var\(\s*(--color-[a-z0-9-]+)\s*\)/g)) {
       const varName = m[1];
       if (definedColorVars.has(varName)) continue;
-      if (GRANDFATHERED_UNDEFINED_COLOR_TOKENS.has(varName)) {
+      if (GRANDFATHERED_UNDEFINED_COLOR_TOKENS.has(grandfatherKey(rel, varName))) {
         grandfatheredHits++;
         continue;
       }

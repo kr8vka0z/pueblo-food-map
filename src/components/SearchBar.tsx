@@ -194,44 +194,66 @@ export default function SearchBar({
             Plain (bone/ink) when no filters are on; sage-filled with an
             orange count badge when count > 0. One fixed size at every width
             (unlike ViewToggle, the mockups show no icon/word distinction for
-            this control). */}
+            this control).
+            Tap target is 44×44 (#532 review) even though the VISIBLE circle
+            stays 32×32 — this control's circle is always drawn (bone/sage,
+            never hover-only), unlike the app's other 44px controls
+            (FilterPanel.tsx close, HamburgerMenu.tsx close, BottomSheet.tsx
+            close), whose visible affordance IS the full 44px hover/focus box
+            and so can just grow outright. Here the outer <button> is the
+            invisible 44px hit area; the inner <span> is the real 32px
+            circle. right-0 on the outer (not right-1.5) is deliberate: the
+            +12px of growth splits 6px/side around the original 32px box, so
+            right-0 at 44px re-centers on the exact same point right-1.5 at
+            32px did — the inner span, flex-centered inside, lands with its
+            own right edge back at that original 6px inset. Do the math again
+            before changing either number. */}
         {filtersButton && (
           <button
             type="button"
             onClick={filtersButton.onClick}
             aria-label={filtersButton.ariaLabel}
             className={
-              "absolute right-1.5 top-1/2 -translate-y-1/2 " +
-              "flex items-center justify-center w-8 h-8 rounded-full border " +
-              "transition-colors duration-100 " +
+              "absolute right-0 top-1/2 -translate-y-1/2 " +
+              "flex items-center justify-center w-11 h-11 rounded-full " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 " +
-              "focus-visible:ring-[var(--color-sage-500)] " +
-              (filtersButton.count > 0
-                ? "bg-[var(--color-sage-600)] border-[var(--color-sage-600)] text-white"
-                : "bg-[var(--color-bone-50)] border-[var(--color-bone-300)] text-[var(--color-ink-500)]")
+              "focus-visible:ring-[var(--color-sage-500)]"
             }
           >
-            <FilterIcon size={16} />
-            {filtersButton.count > 0 && (
-              <span
-                aria-hidden
-                className={
-                  // Badge hangs toward the CENTER of the bar (-left-1), not
-                  // the outer edge (-right-1 would push it past the button's
-                  // right edge into the pill's rounded corner and clip —
-                  // #528's risk note). Mirrors the original left-anchored
-                  // button, whose badge also hung inward (-right-1 there,
-                  // toward the input, away from that side's outer curve).
-                  "absolute -top-1 -left-1 min-w-[16px] h-4 px-0.5 rounded-full " +
-                  "bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)] " +
-                  "text-[10px] font-bold leading-4 text-center " +
-                  "border-2 border-[var(--color-bone-50)]"
-                }
-              >
-                {filtersButton.count}
-              </span>
-            )}
+            <span
+              className={
+                "relative flex items-center justify-center w-8 h-8 rounded-full border " +
+                "transition-colors duration-100 " +
+                (filtersButton.count > 0
+                  ? "bg-[var(--color-sage-600)] border-[var(--color-sage-600)] text-white"
+                  : "bg-[var(--color-bone-50)] border-[var(--color-bone-300)] text-[var(--color-ink-500)]")
+              }
+            >
+              <FilterIcon size={16} />
+              {filtersButton.count > 0 && (
+                <span
+                  aria-hidden
+                  className={
+                    // Badge hangs toward the CENTER of the bar (-left-1), not
+                    // the outer edge (-right-1 would push it past the visible
+                    // circle's right edge into the pill's rounded corner and
+                    // clip — #528's risk note). Mirrors the original
+                    // left-anchored button, whose badge also hung inward
+                    // (-right-1 there, toward the input, away from that
+                    // side's outer curve). Positioned relative to the 32px
+                    // visible circle (this span), not the 44px hit area, so
+                    // this geometry is unaffected by the #532 tap-target fix.
+                    "absolute -top-1 -left-1 min-w-[16px] h-4 px-0.5 rounded-full " +
+                    "bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)] " +
+                    "text-[10px] font-bold leading-4 text-center " +
+                    "border-2 border-[var(--color-bone-50)]"
+                  }
+                >
+                  {filtersButton.count}
+                </span>
+              )}
+            </span>
           </button>
         )}
 

@@ -101,6 +101,27 @@ describe("SearchBar — filtersButton (#513, right end of the bar as of #528)", 
     expect(screen.getByRole("button", { name: "Filters" })).toBeDefined();
   });
 
+  // #532 review: the button was a 32×32 tap target, under the 44px minimum
+  // used elsewhere (FilterPanel.tsx close, HamburgerMenu.tsx close,
+  // BottomSheet.tsx close all use w-11 h-11). The invisible-hitbox pattern
+  // grows the <button> to 44×44 while an inner <span> keeps the always-
+  // visible circle at its original 32×32.
+  test("the button (tap target) is 44px; the visible circle inside it stays 32px", () => {
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "Filters" });
+    expect(button.className).toContain("w-11");
+    expect(button.className).toContain("h-11");
+    const visibleCircle = button.querySelector("span");
+    expect(visibleCircle?.className).toContain("w-8");
+    expect(visibleCircle?.className).toContain("h-8");
+  });
+
   test("clicking the Filters button fires onClick", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();

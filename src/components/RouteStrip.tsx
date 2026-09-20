@@ -235,11 +235,13 @@ export default function RouteStrip({
       {/* Steps sheet (#531) — see this file's own header for why a native
           <dialog> and why that alone keeps it out of BottomSheet.tsx's
           Escape handling. Bottom-anchored (not full-screen like
-          PhotoViewer): `bottom-[var(--viewport-toolbar-gap)]` reuses the
-          same #530 fix BottomSheet/BottomNav already apply (globals.css)
-          rather than a bare `bottom-0`, which Safari's own toolbar would
-          slice on this new element too. `m-0`/`top-auto` override the UA's
-          own centered-dialog default. */}
+          PhotoViewer): `bottom-[env(safe-area-inset-bottom)]` (#541 — see
+          globals.css's `[data-bottom-nav]` comment for the real-iPhone
+          measurement behind dropping the old toolbar-height reserve)
+          matches the same offset BottomSheet/BottomNav use, rather than a
+          bare `bottom-0`, which a notched phone's home-indicator would
+          slice into. `m-0`/`top-auto` override the UA's own centered-dialog
+          default. */}
       {hasSteps && (
         <dialog
           ref={dialogRef}
@@ -253,7 +255,7 @@ export default function RouteStrip({
             if (e.target === dialogRef.current) setStepsOpen(false);
           }}
           className={
-            "fixed inset-x-0 bottom-[var(--viewport-toolbar-gap)] top-auto z-[900] " +
+            "fixed inset-x-0 bottom-[env(safe-area-inset-bottom)] top-auto z-[900] " +
             "m-0 max-h-[70vh] w-full max-w-none border-0 bg-transparent p-0 " +
             "backdrop:bg-black/40"
           }

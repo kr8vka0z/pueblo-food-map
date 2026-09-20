@@ -87,6 +87,33 @@ describe("SearchBar — input padding swaps sides with the Filters button (#528)
     expect(offClass).toBe(onClass);
   });
 
+  // Reviewer finding on #539's first pass: pr-[76px] left only 0-2px of
+  // slack against the true worst case (10px pad + 20px icon + 6px gap +
+  // 14px pad = 50px fixed, plus a 2-digit count pill) — FilterPanel allows
+  // up to 11 simultaneous filters (8 categories + 3 switches,
+  // MapWrapper.tsx ~900-904), so 11 is the real maximum count, not a made-up
+  // edge case. Pins the reservation at the max realistic count so a future
+  // shrink of this value gets caught here instead of on a real phone.
+  test("the reservation still has real margin at the maximum realistic count (11 — 8 categories + 3 switches)", () => {
+    const { container } = render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 11, onClick: vi.fn(), ariaLabel: "Filters, 11 on" }}
+      />,
+    );
+    const inputClass = container.querySelector("input[type='search']")?.className ?? "";
+    const match = inputClass.match(/pr-\[(\d+)px\]/);
+    expect(match).not.toBeNull();
+    // Fixed 50px chrome (10 pad + 20 icon + 6 gap + 14 pad) leaves this much
+    // for the count pill itself — must comfortably clear a 2-digit pill's
+    // real rendered width, not just its 19px CSS min-width floor.
+    const budgetForPill = Number(match![1]) - 50;
+    expect(budgetForPill).toBeGreaterThanOrEqual(24);
+    // Same fixed value as any other count (still a constant, not scaled).
+    expect(Number(match![1])).toBe(84);
+  });
+
   test("reserves only the magnifier's left padding when filtersButton is absent", () => {
     const { container } = render(<SearchBar value="" onChange={vi.fn()} />);
     const inputClass = container.querySelector("input[type='search']")?.className ?? "";

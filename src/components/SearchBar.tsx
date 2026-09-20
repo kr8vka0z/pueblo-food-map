@@ -267,14 +267,19 @@ export default function SearchBar({
             // Filters control reserves a FIXED width on the right sized for
             // its WIDEST state (count pill present) — #539's plan requires
             // this stay constant regardless of the current count, so typed
-            // text never reflows when a filter is toggled on/off. 10px pad +
-            // 20px icon + 6px gap + up to a 2-digit count pill (~23px, up to
-            // 11 filters exist across FilterPanel's switches+categories) +
-            // 14px pad ≈ 73px; 76px leaves a little slack, same convention
-            // the old fixed reservation used. No reservation when absent:
-            // the inline Map/List view switch (#191) that used to live here
+            // text never reflows when a filter is toggled on/off. Math:
+            // 10px pad + 20px icon + 6px gap + 14px pad = 50px fixed, plus
+            // the count pill itself. Max real count is 11 (8 FilterPanel
+            // categories + 3 switches, MapWrapper.tsx ~900-904), so the
+            // pill must fit 2 digits — the button isn't width-clamped, so
+            // an undersized reservation lets a 2-digit pill lap the last
+            // typed character (review finding on #539's first pass: 76px
+            // left only 0-2px of slack). Budget the pill generously at
+            // ~28px (not just its 19px min-width) for real margin: 50 + 28
+            // = 78px, rounded up to 84px. No reservation when absent: the
+            // inline Map/List view switch (#191) that used to live here
             // was removed by #514, so the bar ends in plain typing room.
-            (filtersButton ? "pr-[76px] " : "pr-4 ") +
+            (filtersButton ? "pr-[84px] " : "pr-4 ") +
             "text-base md:text-sm text-[var(--color-ink-700)] " +
             "bg-[var(--color-bone-50)] " +
             "border border-[var(--color-bone-300)] " +

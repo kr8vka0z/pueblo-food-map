@@ -128,9 +128,17 @@ export default function RouteStrip({
 
   // ── Steps sheet (#531) ──────────────────────────────────────────────────
   const [stepsOpen, setStepsOpen] = useState(false);
-  // #542: the steps sheet (not the collapsed strip itself, which stays
-  // visible alongside the nav per #531) is a full-surface overlay — it
-  // covers the map and, below it, the nav — so it hides BottomNav while open.
+  // #542: the steps sheet is its own full-surface overlay on top of the
+  // strip, so it registers independently while open. The strip itself no
+  // longer needs a registration of its own here: #547 (Kyle, 2026-09-20)
+  // reversed #531's "nav stays visible under the strip" carve-out by
+  // removing MapWrapper.tsx's `!stripVisible` term from `venueSheetOpen`
+  // instead — that keeps the nav hidden for the strip's entire mounted
+  // lifetime in the SAME commit BottomSheet.tsx flips `showStrip`, with
+  // nothing here to register/unregister on "Show card"/"Clear route" and
+  // risk a stray frame (BottomSheet's own `onStripVisibleChange` is a
+  // passive effect, one render behind — a `useOverlayRegistration` call at
+  // this component's mount/unmount would inherit that lag).
   useOverlayRegistration(stepsOpen);
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Explicit focus restore, not relied-on-native — same reasoning as

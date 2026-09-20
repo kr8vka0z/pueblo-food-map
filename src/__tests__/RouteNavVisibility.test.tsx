@@ -1,5 +1,13 @@
 /**
- * RouteNavVisibility — #531 end-to-end proof, mounting the REAL MapWrapper.
+ * RouteNavVisibility — #547 end-to-end proof, mounting the REAL MapWrapper.
+ * Originally written for #531 ("bar stays visible under the route strip");
+ * #547 (Kyle, 2026-09-20, after walking the app on his phone) reverses that
+ * on purpose — the bar now hides for the whole time a route is on screen,
+ * the same way it already hides for the full card and every other
+ * full-surface overlay. Every assertion below is inverted from #531's
+ * version, per that issue's own instruction not to treat the old assertions
+ * as the source of truth — they are what this file inverts.
+ *
  * Mocking recipe (WebGL/next-dynamic/Map/DesktopVenueWindow) copied verbatim
  * from MapWrapperViewSwitch.test.tsx — see that file's own header. Unlike
  * RouteFit.test.tsx's harness (which needs the real react-map-gl mock for
@@ -9,12 +17,14 @@
  * walking-route fetch flow this file exercises lives entirely in
  * MapWrapper.tsx itself, so a real Map component isn't needed.
  *
- * Covers the issue's two acceptance criteria together, since both need the
- * same "route active + strip showing" setup:
- *   1. The bottom nav stays visible under the route strip, and hides again
- *      once "Show card" restores the full card (#509's prior behavior).
+ * Covers #547's acceptance criteria together, since both need the same
+ * "route active + strip showing" setup:
+ *   1. The bottom nav hides the instant the route strip shows, and stays
+ *      hidden once "Show card" swaps in the full card (#509's unchanged
+ *      behavior for the full card itself — it already hid the nav before
+ *      this issue, and still does).
  *   2. "Steps" on the strip opens the written directions without disturbing
- *      the nav or fighting Escape's overlay handling.
+ *      the (already-hidden) nav or fighting Escape's overlay handling.
  */
 
 import { describe, test, expect, vi, beforeAll, beforeEach } from "vitest";
@@ -168,13 +178,13 @@ async function renderMobile() {
   );
 }
 
-describe("#531 — bottom nav stays visible under the route strip", () => {
+describe("#547 — bottom nav hides while the route strip is showing", () => {
   test("full card (no route yet): nav is hidden, as before (#509)", async () => {
     await renderMobile();
     expect(document.querySelector("[data-bottom-nav]")).toBeNull();
   });
 
-  test("route active -> strip showing: nav is visible", async () => {
+  test("route active -> strip showing: nav is hidden", async () => {
     const user = userEvent.setup();
     await renderMobile();
 
@@ -185,10 +195,13 @@ describe("#531 — bottom nav stays visible under the route strip", () => {
     await user.click(walkButton);
 
     await screen.findByTestId("route-strip");
-    expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
+    // #547 (was: not.toBeNull() under #531 — the bar used to stay visible
+    // under the strip; Kyle reversed that after walking the app on his
+    // phone, since the bar covered the route controls).
+    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
   });
 
-  test("tapping 'Show card' restores the full card and hides the nav again", async () => {
+  test("tapping 'Show card' restores the full card; nav stays hidden throughout", async () => {
     const user = userEvent.setup();
     await renderMobile();
 
@@ -198,7 +211,7 @@ describe("#531 — bottom nav stays visible under the route strip", () => {
     );
     await user.click(walkButton);
     await screen.findByTestId("route-strip");
-    expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
+    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
 
     await user.click(screen.getByTestId("route-strip-show-card"));
 
@@ -207,8 +220,8 @@ describe("#531 — bottom nav stays visible under the route strip", () => {
   });
 });
 
-describe("#531 — venue switched while a route runs (reviewer risk)", () => {
-  test("tapping a different venue's pin drops the strip and hides the nav under B's own full card", async () => {
+describe("#547 — venue switched while a route runs (reviewer risk)", () => {
+  test("tapping a different venue's pin drops the strip and keeps the nav hidden under B's own full card", async () => {
     const user = userEvent.setup();
     await renderMobile();
 
@@ -218,7 +231,7 @@ describe("#531 — venue switched while a route runs (reviewer risk)", () => {
     );
     await user.click(walkButton);
     await screen.findByTestId("route-strip");
-    expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
+    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
 
     // Stand-in for tapping venue B's real map pin — MapCanvas would call the
     // same onSelectVenue prop from a marker click.
@@ -232,14 +245,17 @@ describe("#531 — venue switched while a route runs (reviewer risk)", () => {
       expect(screen.getByTestId("map-canvas").getAttribute("data-selected-venue-id")).toBe(VENUE_B.id),
     );
     expect(screen.queryByTestId("route-strip")).toBeNull();
-    // Full card open (for B) hides the nav again — same as the no-route
-    // baseline, not stuck showing (stale `stripVisible` from A's strip).
+    // Full card open (for B) keeps the nav hidden — same as the strip just
+    // shown for A, and the same as the no-route baseline: #547 registers
+    // the nav's hide/show off `selectedVenue !== null` alone (MapWrapper.tsx's
+    // `venueSheetOpen`), so switching between strip and full card can never
+    // leave it stuck in the wrong state either way.
     expect(document.querySelector("[data-bottom-nav]")).toBeNull();
   });
 });
 
-describe("#531 — Steps control on the route strip", () => {
-  test("Steps opens the written directions; Escape closes only the sheet, leaving the strip and nav alone", async () => {
+describe("#547 — Steps control on the route strip", () => {
+  test("Steps opens the written directions; Escape closes only the sheet, leaving the strip up and the nav hidden", async () => {
     const user = userEvent.setup();
     await renderMobile();
 
@@ -257,16 +273,17 @@ describe("#531 — Steps control on the route strip", () => {
     await user.keyboard("{Escape}");
 
     await waitFor(() => expect(screen.queryByTestId("walk-steps-list")).toBeNull());
-    // The strip and the nav are both still up — Escape didn't cascade past
-    // the steps sheet into BottomSheet's own Escape handling (dialogGuard.ts).
+    // The strip is still up and the nav is still hidden — Escape didn't
+    // cascade past the steps sheet into BottomSheet's own Escape handling
+    // (dialogGuard.ts).
     expect(screen.getByTestId("route-strip")).toBeDefined();
-    expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
+    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
   });
 
-  // #542: the steps sheet is a full-surface overlay over the map (unlike the
-  // collapsed strip itself, which #531 keeps the nav visible beneath) — it
-  // registers with the shared overlay registry and hides the nav while open.
-  test("#542: Steps hides the nav while open; closing it restores the nav", async () => {
+  // #542: the steps sheet is a full-surface overlay over the map, exactly
+  // like the strip itself now is (#547) — both register with the shared
+  // overlay registry, so the nav is hidden by either or both at once.
+  test("#547: Steps hides the nav while open; closing it leaves the nav hidden since the strip is still showing", async () => {
     const user = userEvent.setup();
     await renderMobile();
 
@@ -276,7 +293,9 @@ describe("#531 — Steps control on the route strip", () => {
     );
     await user.click(walkButton);
     await screen.findByTestId("route-strip");
-    expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
+    // Nav already hidden the instant the strip shows (#547) — before Steps
+    // is even opened.
+    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
 
     await user.click(screen.getByTestId("route-strip-steps"));
     expect(screen.getByText("Head north on Main St")).toBeDefined();
@@ -284,6 +303,43 @@ describe("#531 — Steps control on the route strip", () => {
 
     await user.click(screen.getByTestId("route-strip-steps-close"));
     await waitFor(() => expect(screen.queryByTestId("walk-steps-list")).toBeNull());
-    expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
+    // (Was: nav returns here under #531/#542, since the strip alone used to
+    // leave the nav visible.) #547: the strip is still showing, so the nav
+    // stays hidden — it does not "return" until the venue sheet itself
+    // closes (see the RouteClear describe block below for that proof).
+    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
+  });
+});
+
+// #547 acceptance: "Clear the route → bar returns." Tracing the real code
+// (MapWrapper.tsx's handleClearWalkingRoute, BottomSheet.tsx's cardRevealed
+// effect): clearing the route does not deselect the venue, so BottomSheet
+// swaps the strip for the FULL CARD (isWalkRouteActive flips false ->
+// cardRevealed=true) rather than closing outright — and the full card hides
+// the nav too (#509, unchanged). The nav only actually reappears once the
+// venue sheet itself closes. This proves that path is not "stranded" (the
+// issue's own worded risk): closing after a clear does bring the bar back.
+describe("#547 — clearing the route never strands the nav hidden", () => {
+  test("Clear route swaps in the full card (nav still hidden); closing the sheet is what brings the nav back", async () => {
+    const user = userEvent.setup();
+    await renderMobile();
+
+    const walkButton = await screen.findByRole(
+      "button",
+      { name: new RegExp(`Walking directions to ${TEST_VENUE.name}`, "i") },
+    );
+    await user.click(walkButton);
+    await screen.findByTestId("route-strip");
+    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
+
+    await user.click(screen.getByTestId("route-strip-clear"));
+
+    await waitFor(() => expect(screen.queryByTestId("route-strip")).toBeNull());
+    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
+
+    const closeButton = screen.getByRole("button", { name: /close/i });
+    await user.click(closeButton);
+
+    await waitFor(() => expect(document.querySelector("[data-bottom-nav]")).not.toBeNull());
   });
 });

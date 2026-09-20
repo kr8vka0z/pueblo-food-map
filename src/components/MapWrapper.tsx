@@ -140,10 +140,13 @@ export const CATEGORY_FIT_MAX_ZOOM = 14;
 // DesktopVenueWindow keeps its own unchanged layout, out of scope for #509).
 // `bottom` clears the route strip (ROUTE_STRIP_HEIGHT_PX, shared with
 // RouteStrip.tsx/BottomSheet.tsx so the two can't drift) PLUS
-// BOTTOM_NAV_HEIGHT_PX (#531, Kyle 2026-09-19): the nav now stays visible
-// underneath the strip instead of hiding (see `stripVisible`/`venueSheetOpen`
-// above) — unlike the old version of this comment, there IS real bottom
-// chrome below the strip now, so it has to be cleared too. Plus a small gap.
+// BOTTOM_NAV_HEIGHT_PX. #531 (Kyle, 2026-09-19) added the nav term because
+// the bar stayed visible underneath the strip back then; #547 (Kyle,
+// 2026-09-20) reverses that — the nav now hides for the whole time a route
+// is on screen (see `venueSheetOpen` below), so this term is conservative
+// slack rather than a real clearance need. Left in: it only fits the route
+// a little smaller than strictly necessary, never overlapping anything, and
+// removing it isn't part of #547's ask. Plus a small gap.
 // Deliberately NOT capped at CATEGORY_FIT_MAX_ZOOM=14 — that cap exists so a
 // sparse category's 2-3 far-apart venues don't slam to street level; a
 // walking route is usually well under a mile and WANTS a close, walkable
@@ -446,13 +449,6 @@ export default function MapWrapper({
   const [walkingRouteInfo, setWalkingRouteInfo] = useState<WalkingRouteInfo | null>(null);
   const [walkingRouteSteps, setWalkingRouteSteps] = useState<WalkStep[] | null>(null);
   const [walkingRouteVenueId, setWalkingRouteVenueId] = useState<string | null>(null);
-  // #531: is BottomSheet currently showing the route strip (collapsed) rather
-  // than the full card? Reported by BottomSheet.tsx's own onStripVisibleChange
-  // — that decision (`cardRevealed`) is its internal state (mount default, a
-  // "Show card" tap, a vaul drag, or Escape-collapses-to-strip), so this is
-  // the only way MapWrapper learns it. Drives venueSheetOpen just below: the
-  // strip must NOT hide BottomNav the way the full card still does (#509).
-  const [stripVisible, setStripVisible] = useState(false);
 
   // ── Walk-without-location (#207) ─────────────────────────────────────────────
   // walkAwaitingVenueIdRef: the venue a Walk tap is waiting on geolocation for.
@@ -1395,11 +1391,17 @@ export default function MapWrapper({
   }, [handleViewModeChange, handleLocateRequest]);
 
   // §10: the venue sheet (phone only) covers the bottom edge; the nav steps
-  // aside while the FULL CARD is open. #531 (Kyle, 2026-09-19): the route
-  // strip is a different case — it stays short on purpose, so BottomNav
-  // stays visible above it instead of stepping aside (`!stripVisible`, fed
-  // by BottomSheet.tsx's onStripVisibleChange below).
-  const venueSheetOpen = isMobile && viewMode === "map" && selectedVenue !== null && !stripVisible;
+  // aside for as long as a venue is selected — the FULL CARD (unchanged,
+  // #509) or the collapsed route strip alike. #531 (Kyle, 2026-09-19) had
+  // carved the strip out with a `!stripVisible` term here so the bar stayed
+  // visible underneath it; #547 (Kyle, 2026-09-20) reverses that on sight of
+  // the bar covering the route controls on his phone — the strip now hides
+  // the bar too, so the carve-out is gone. Kept as one `selectedVenue !==
+  // null` term (not two branches for strip vs. card) so there is nothing for
+  // "Show card"/"Clear route" to desync — the registration only ever depends
+  // on whether a venue is selected, never on which of the two views is
+  // showing, so switching between them can't flicker the bar.
+  const venueSheetOpen = isMobile && viewMode === "map" && selectedVenue !== null;
   // #542: feeds the same shared registry every other full-surface overlay
   // uses — BottomNav hides itself (overlayRegistry.ts) instead of this
   // component wrapping <BottomNav/> in a `{!venueSheetOpen && ...}` JSX
@@ -1670,7 +1672,6 @@ export default function MapWrapper({
           box={getBoxById(selectedVenueId)}
           onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
           onClose={() => setSelectedVenueId(null)}
-          onStripVisibleChange={setStripVisible}
           onWalkRoute={handleWalkRoute}
           isWalkRouteActive={
             selectedVenueId !== null && walkingRouteVenueId === selectedVenueId

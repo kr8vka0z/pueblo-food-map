@@ -187,11 +187,18 @@ describe("#541 — bottom-pinned chrome uses env(safe-area-inset-bottom) alone, 
     expect(css).toMatch(/\[data-bottom-sheet\]\s*\{\s*bottom:\s*env\(safe-area-inset-bottom\);/);
   });
 
-  test("[data-bottom-sheet][data-strip-open]'s bottom rule is env(safe-area-inset-bottom) + --bottom-nav-clearance + 8px", () => {
+  // #547 (Kyle, 2026-09-20) reverses #531: the nav now hides for the whole
+  // time the route strip is on screen (MapWrapper.tsx's `venueSheetOpen`),
+  // so the strip has no nav left to clear and this rule is gone — inverted
+  // from asserting its presence to asserting it never comes back, same as
+  // RouteNavVisibility.test.tsx's own inversion for the same issue.
+  test("#547: [data-bottom-sheet][data-strip-open] clearance rule is GONE — the strip falls through to the plain [data-bottom-sheet] rule", () => {
     const css = readSrc("src/app/globals.css");
-    expect(css).toMatch(
-      /\[data-bottom-sheet\]\[data-strip-open\]\s*\{\s*bottom:\s*calc\(env\(safe-area-inset-bottom\)\s*\+\s*var\(--bottom-nav-clearance\)\s*\+\s*8px\);/
-    );
+    // Matches only an actual rule declaration (selector immediately followed
+    // by `{`), not the historical note left in the surrounding comment —
+    // that comment names the old selector in prose on purpose (WHY the rule
+    // is gone), which would otherwise false-fail this assertion.
+    expect(css).not.toMatch(/\[data-bottom-sheet\]\[data-strip-open\]\s*\{/);
   });
 
   test("RouteStrip.tsx's Steps sheet uses the bottom-[env(safe-area-inset-bottom)] arbitrary value", () => {

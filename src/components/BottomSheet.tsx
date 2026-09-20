@@ -43,7 +43,7 @@
  * simpler than vaul's snap-point internals to get provably right.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Drawer } from "vaul";
 import { X, ChevronUp, ChevronDown, MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import type { Venue } from "@/types/venue";
@@ -89,22 +89,6 @@ interface BottomSheetProps {
   onClose: () => void;
   /** Called when expanded state changes — e.g. to hide overlapping UI when expanded. */
   onExpandedChange?: (expanded: boolean) => void;
-  /**
-   * #531 — fires whenever the route strip's own shown/hidden state changes
-   * (true = strip showing, false = full card or no venue). MapWrapper needs
-   * this to decide whether BottomNav stays visible: the full card still
-   * hides it (unchanged, #509 behavior), but the strip must not — and
-   * `cardRevealed` (what actually decides that) is this component's own
-   * internal state (initial mount default, the "Show card" tap, a vaul
-   * drag, or the Escape-collapses-to-strip handler below), so MapWrapper
-   * has no way to derive it without this callback. A plain `useEffect` on
-   * `showStrip` (not scattering the call at each of those four call sites)
-   * keeps it a single source of truth. Safe against a fresh inline closure
-   * on every MapWrapper render: it passes its own `setStripVisible` state
-   * setter directly, which React guarantees is referentially stable, and
-   * setting a boolean state to its current value is a no-op re-render.
-   */
-  onStripVisibleChange?: (visible: boolean) => void;
   /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
   /** Called when the user taps the Walk direction button. MapWrapper fetches the route. */
@@ -133,7 +117,6 @@ export default function BottomSheet({
   onCheckinSuccess,
   onClose,
   onExpandedChange,
-  onStripVisibleChange,
   locale: localeProp,
   onWalkRoute,
   isWalkRouteActive = false,
@@ -178,12 +161,6 @@ export default function BottomSheet({
   const status = venue ? computeOpenStatus(venue.hours_weekly) : null;
   const displayNotes = venue ? getDisplayNotes(venue) : undefined;
   const showStrip = isWalkRouteActive && !cardRevealed;
-
-  // #531: notify MapWrapper on every real showStrip transition (see this
-  // prop's own doc above for why an effect, not four call sites).
-  useEffect(() => {
-    onStripVisibleChange?.(showStrip);
-  }, [showStrip, onStripVisibleChange]);
 
   function handleOpenChange(isOpen: boolean) {
     if (!isOpen) onClose();
@@ -259,12 +236,6 @@ export default function BottomSheet({
           // see globals.css's own comment for the formula and why it never
           // jumps as the toolbar animates.
           data-bottom-sheet=""
-          // #531: distinguishes the strip's resting position from the full
-          // card's — globals.css's `[data-bottom-sheet][data-strip-open]`
-          // rule lifts it clear of the now-visible BottomNav; the full card
-          // (data-strip-open absent) stays flush at the screen edge,
-          // unchanged, since the nav is hidden while it's up (#509).
-          data-strip-open={showStrip ? "" : undefined}
           className={
             "fixed left-0 right-0 z-[800] flex flex-col " +
             "bg-[var(--color-bone-50)] " +

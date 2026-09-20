@@ -60,17 +60,28 @@ vi.mock("@/components/Map", async () => {
   function MapMock({
     selectedVenueId,
     onMapReady,
+    onSelectVenue,
   }: {
     selectedVenueId?: string | null;
     onMapReady?: (map: unknown) => void;
+    onSelectVenue?: (id: string) => void;
   }) {
     ReactActual.useEffect(() => {
       onMapReady?.({ fitBounds: vi.fn(), flyTo: vi.fn(), jumpTo: vi.fn() });
     }, [onMapReady]);
-    return ReactActual.createElement("div", {
-      "data-testid": "map-canvas",
-      "data-selected-venue-id": selectedVenueId ?? "",
-    });
+    return ReactActual.createElement(
+      "div",
+      { "data-testid": "map-canvas", "data-selected-venue-id": selectedVenueId ?? "" },
+      // Stand-in for tapping a different venue's real pin (MapCanvas calls
+      // the same onSelectVenue prop from a marker click) — #531 review's
+      // "venue switched while a route runs" case needs a way to select
+      // VENUE_B without a real map.
+      ReactActual.createElement("button", {
+        type: "button",
+        "data-testid": "select-venue-b",
+        onClick: () => onSelectVenue?.(VENUE_B.id),
+      }),
+    );
   }
   return { default: MapMock };
 });
@@ -81,6 +92,9 @@ vi.mock("@/components/DesktopVenueWindow", () => ({
 
 const TEST_POSITION = { lat: 38.25, lng: -104.6 };
 const TEST_VENUE = allRealVenues[0];
+// A second, distinct venue — the #531 review's "venue switched while a
+// route runs" case taps this one's pin while a route to TEST_VENUE is active.
+const VENUE_B = allRealVenues[1];
 const ROUTE_COORDINATES: [number, number][] = [
   [-104.6, 38.25],
   [TEST_VENUE.lng, TEST_VENUE.lat],
@@ -189,6 +203,37 @@ describe("#531 — bottom nav stays visible under the route strip", () => {
     await user.click(screen.getByTestId("route-strip-show-card"));
 
     await waitFor(() => expect(screen.queryByTestId("route-strip")).toBeNull());
+    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
+  });
+});
+
+describe("#531 — venue switched while a route runs (reviewer risk)", () => {
+  test("tapping a different venue's pin drops the strip and hides the nav under B's own full card", async () => {
+    const user = userEvent.setup();
+    await renderMobile();
+
+    const walkButton = await screen.findByRole(
+      "button",
+      { name: new RegExp(`Walking directions to ${TEST_VENUE.name}`, "i") },
+    );
+    await user.click(walkButton);
+    await screen.findByTestId("route-strip");
+    expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
+
+    // Stand-in for tapping venue B's real map pin — MapCanvas would call the
+    // same onSelectVenue prop from a marker click.
+    await user.click(screen.getByTestId("select-venue-b"));
+
+    // BottomSheet is keyed by selectedVenueId (BottomSheet.tsx), so it
+    // remounts fresh for B: no route targets B (walkingRouteVenueId still
+    // names TEST_VENUE), so isWalkRouteActive is false for B and it opens
+    // straight to the full card, never the strip.
+    await waitFor(() =>
+      expect(screen.getByTestId("map-canvas").getAttribute("data-selected-venue-id")).toBe(VENUE_B.id),
+    );
+    expect(screen.queryByTestId("route-strip")).toBeNull();
+    // Full card open (for B) hides the nav again — same as the no-route
+    // baseline, not stuck showing (stale `stripVisible` from A's strip).
     expect(document.querySelector("[data-bottom-nav]")).toBeNull();
   });
 });

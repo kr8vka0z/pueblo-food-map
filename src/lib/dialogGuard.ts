@@ -1,6 +1,7 @@
 /**
- * isNativeDialogOpen — true when a native `<dialog>` (currently only
- * PhotoViewer.tsx, #508) is showing modally anywhere in the document.
+ * isNativeDialogOpen — true when a native `<dialog>` (PhotoViewer.tsx, #508,
+ * or RouteStrip.tsx's Steps sheet, #531) is showing modally anywhere in the
+ * document.
  *
  * WHY this exists: BottomSheet.tsx and DesktopVenueWindow.tsx each own
  * their own Escape-to-dismiss-the-whole-card handling, and neither can be
@@ -34,9 +35,11 @@
  *     default) — same fix shape, checked directly inside that handler.
  *
  * A plain existence check (rather than tracing the event target through the
- * open dialog) is deliberate and sufficient: this repo has exactly one
- * dialog-based component, and the guard only needs to answer "is some
- * modal photo viewer currently showing" — see vitest.setup.ts's own note
+ * open dialog) is deliberate and sufficient: this repo has exactly two
+ * dialog-based components (never more than one open at once — PhotoViewer
+ * only mounts inside a box card, RouteStrip's sheet only while a route is
+ * active, and neither opens the other), and the guard only needs to answer
+ * "is SOME modal dialog currently showing" — see vitest.setup.ts's own note
  * for why the jsdom Escape-closes-dialog polyfill defers via
  * `queueMicrotask` rather than closing synchronously: it must not flip this
  * to `false` before the guards above get to read it during the SAME

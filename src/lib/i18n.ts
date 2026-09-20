@@ -426,6 +426,10 @@ const en: Record<string, string> = {
   "directions.showSteps": "Show steps",
   "directions.hideSteps": "Hide steps",
   "directions.stepsListLabel": "Turn-by-turn directions",
+  // #537 — the route strip's Steps control only renders when a route has
+  // steps; shown in its place (never silently hidden) when it genuinely
+  // doesn't, so the strip reads as complete rather than broken.
+  "directions.noStepsForRoute": "No turn-by-turn steps for this route",
   // Per-step distance suffixes — used when formatting short distances in the step list.
   // "ft" for sub-528 ft steps (sub-0.1 mi), otherwise the decimal miles value.
   "directions.stepFt": "{distance} ft",
@@ -1279,6 +1283,8 @@ const es: Record<string, string> = {
   "directions.showSteps": "Ver indicaciones",
   "directions.hideSteps": "Ocultar indicaciones",
   "directions.stepsListLabel": "Indicaciones paso a paso",
+  // #537
+  "directions.noStepsForRoute": "No hay indicaciones paso a paso para esta ruta",
   // Per-step distance suffixes
   "directions.stepFt": "{distance} pies",
   "directions.stepMi": "{distance} mi",

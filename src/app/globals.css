@@ -148,6 +148,37 @@
    toggle. See `[data-bottom-nav]`'s own comment below for the replacement
    formula and why `env(safe-area-inset-bottom)` is kept. */
 
+/* #553 — document-level backstop against iOS Safari's rubber-band bounce.
+   Measured off Kyle's 2026-09-20 screen recording: a swipe down on the
+   blessing-box card dragged the WHOLE page — header, map and card together —
+   down ~104 CSS px and sprang it back, once per swipe attempt. The sheet's
+   own scroller now carries `overscroll-contain` (see BottomSheet.tsx), which
+   stops the usual chain; this rule catches the rest, including drags that
+   land on non-scrolling chrome, because `modal={false}` on the drawer means
+   vaul never applies its body scroll-lock.
+
+   Deliberately `overscroll-behavior-y`, NOT `overflow: hidden`. This only
+   suppresses the vertical bounce and pull-to-refresh — it does not stop
+   scrolling, so the ordinary document-scrolling routes (venue pages, About,
+   Resources, admin) are unaffected and no route-scoping is needed.
+
+   Equally deliberately the `-y` axis ONLY, never the `overscroll-behavior`
+   shorthand: the shorthand also sets the X axis at the document root, which
+   is exactly how a site disables Chrome/Android's edge-swipe back/forward
+   navigation gesture. Nothing here wants that, and there is no Android rig
+   on this machine to catch the regression, so the axis that isn't part of
+   the bug is left alone.
+
+   Set on `html` rather than `body` so it propagates to the viewport from the
+   root. Note this is a spec-level expectation, NOT measured on Kyle's phone
+   — see this file's #530/#536/#541 history for how that has gone before. The
+   per-scroller `overscroll-contain` in BottomSheet.tsx / RouteStrip.tsx /
+   DirectionButtons.tsx does not depend on it and stops the chain on its own
+   for every scroller inside the sheet. */
+html {
+  overscroll-behavior-y: none;
+}
+
 body {
   background: var(--color-bone-50);
   color: var(--color-ink-700);

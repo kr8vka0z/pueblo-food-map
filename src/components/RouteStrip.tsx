@@ -307,7 +307,11 @@ export default function RouteStrip({
               <WalkStepsList
                 steps={walkSteps!}
                 locale={locale}
-                className="flex-1 space-y-1.5 overflow-y-auto text-sm text-[var(--color-ink-700)]"
+                // `overscroll-contain` (#553): same scroll-chaining fix as the
+                // sheet's own body — a pull-down here at scrollTop 0 would
+                // otherwise reach the document and rubber-band the whole page
+                // in iOS Safari. See BottomSheet.tsx for the measurement.
+                className="flex-1 space-y-1.5 overflow-y-auto overscroll-contain text-sm text-[var(--color-ink-700)]"
               />
             </div>
           )}

@@ -343,7 +343,14 @@ export function WalkRouteStatus({
             locale={locale}
             id={stepsListId}
             hidden={!stepsExpanded}
-            className="mt-2 space-y-1.5 text-sm text-[var(--color-ink-700)] max-h-48 overflow-y-auto"
+            // `overscroll-contain` (#553): this list renders inside the mobile
+            // bottom sheet (BottomSheet.tsx for ordinary venues, BoxCardBody's
+            // WalkRouteStatus for boxes), so a pull-down here at scrollTop 0
+            // would chain outward and rubber-band the whole page in iOS
+            // Safari. The sheet's own wrapper already contains the chain
+            // today, but only by accident of nesting — stated here so moving
+            // this list can't quietly reopen the bug.
+            className="mt-2 space-y-1.5 text-sm text-[var(--color-ink-700)] max-h-48 overflow-y-auto overscroll-contain"
           />
         </div>
       )}

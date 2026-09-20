@@ -364,9 +364,11 @@ export default function FilterPanel({
             onClick={close}
             className={
               "w-full h-11 rounded-[var(--radius-md)] font-semibold text-sm " +
-              "bg-[var(--color-orange)] text-[var(--color-navy)] " +
+              // #529: --color-orange/--color-navy don't exist — DESIGN.md's
+              // orange exception is --color-brand-orange/--color-brand-navy.
+              "bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)] " +
               "hover:brightness-105 active:brightness-95 " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-orange)]"
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-brand-orange)]"
             }
           >
             {t("filters.panel.showResults", locale, { count: String(resultCount) })}

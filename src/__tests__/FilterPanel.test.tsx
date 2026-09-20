@@ -153,6 +153,18 @@ describe("FilterPanel — Clear all / Show N places / close", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  // #529: this button referenced --color-orange/--color-navy, neither
+  // defined in globals.css — DESIGN.md's real orange exception is
+  // --color-brand-orange/--color-brand-navy.
+  test("Show N places button uses the real brand tokens, not the undefined --color-orange/--color-navy", () => {
+    render(<FilterPanel {...baseProps({ resultCount: 7 })} />);
+    const btn = screen.getByRole("button", { name: /show 7 places/i });
+    expect(btn.className).toContain("bg-[var(--color-brand-orange)]");
+    expect(btn.className).toContain("text-[var(--color-brand-navy)]");
+    expect(btn.className).not.toContain("--color-orange)");
+    expect(btn.className).not.toContain("--color-navy)");
+  });
+
   test("× close button fires onClose", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

@@ -22,13 +22,21 @@
  * key and isn't in a known skip list, this script FAILS — forcing the author to update
  * DESIGN.md and the map before the PR can merge.
  *
+ * A second, independent check (#529) also scans src/ for var(--color-...) USAGE and
+ * fails on any name that doesn't resolve to a real @theme entry — the parity checks
+ * above only compare globals.css against DESIGN.md, neither one looks at whether
+ * component code referencing a token actually got the name right (SearchBar/
+ * FilterPanel referenced --color-orange/--color-navy, which never existed, and the
+ * class silently fell back to transparent). A short grandfather list keeps this from
+ * failing the build on unrelated pre-existing bugs discovered while adding the check.
+ *
  * Usage:
  *   node scripts/check-design-drift.mjs [path/to/DESIGN.md]
  * Exits 0 if all in-scope tokens match, 1 if any drift or unmapped tokens detected.
  */
 
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { resolve, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -302,11 +310,83 @@ for (const [cssVar, designVal] of designTokens) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Check 3: every var(--color-...) reference under src/ must resolve to a
+// real @theme custom property (#529 — SearchBar/FilterPanel referenced
+// --color-orange/--color-navy, which globals.css never defines; the class
+// falls back to transparent/inherited and the badge silently went invisible.
+// Checks 1/2 above only catch drift between globals.css and DESIGN.md's
+// prose mirror — neither one looks at whether a *usage* in component code
+// actually resolves. This closes that gap.
+// ---------------------------------------------------------------------------
+
+const SRC_DIR = resolve(ROOT, 'src');
+const SCAN_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.css']);
+
+/** Recursively collect scannable source files under a directory. */
+function collectSourceFiles(dir, results = []) {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      collectSourceFiles(full, results);
+    } else if (SCAN_EXTS.has(full.slice(full.lastIndexOf('.')))) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
+// Pre-existing undefined-token usages found while building this check
+// (2026-09-19, PR for #528/#529) that are OUTSIDE those two issues' scope —
+// 15 files, none of them SearchBar.tsx or FilterPanel.tsx. Grandfathered so
+// this new check can ship without failing the build on bugs it didn't
+// introduce and wasn't asked to fix. Do NOT add to this list going forward:
+// a new violation should fail the build. Fix a token forward by defining it
+// in globals.css or correcting the usage, then delete its line here.
+const GRANDFATHERED_UNDEFINED_COLOR_TOKENS = new Set([
+  '--color-ink-300',  // AddVenueForm, AdminLoginForm, FeedbackForm, ReportForm, SuggestForm
+  '--color-ink-600',  // FeedbackForm, HamburgerMenu, ReportForm, ReportVenueButton, SuggestForm
+  '--color-ink-800',  // AboutContent, FilterPanel, HamburgerMenu(Item), ResourcesContent, VenuesDirectoryContent
+  '--color-sage-300',  // BottomSheet, DesktopVenueWindow
+  '--color-sage-400',  // DirectionButtons
+  '--color-bone-400',  // DirectionButtons
+]);
+
+const definedColorVars = new Set(
+  [...allCssVars.keys()].filter((v) => v.startsWith('--color-'))
+);
+
+let grandfatheredHits = 0;
+const colorUsageErrors = [];
+
+for (const filePath of collectSourceFiles(SRC_DIR)) {
+  const rel = relative(ROOT, filePath).replace(/\\/g, '/');
+  const lines = readFileSync(filePath, 'utf8').split('\n');
+  lines.forEach((line, i) => {
+    for (const m of line.matchAll(/var\(\s*(--color-[a-z0-9-]+)\s*\)/g)) {
+      const varName = m[1];
+      if (definedColorVars.has(varName)) continue;
+      if (GRANDFATHERED_UNDEFINED_COLOR_TOKENS.has(varName)) {
+        grandfatheredHits++;
+        continue;
+      }
+      colorUsageErrors.push(
+        `UNDEFINED COLOR TOKEN  ${varName}\n` +
+        `  ${rel}:${i + 1}  ${line.trim()}\n` +
+        `  -> Define ${varName} in src/app/globals.css @theme, or fix the usage to reference a real token.`
+      );
+    }
+  });
+}
+
+errors.push(...colorUsageErrors);
+
 // Report
 if (errors.length === 0) {
   console.log('Design token parity check passed.');
   console.log(`  Compared ${globalsTokens.size} in-scope globals.css tokens against DESIGN.md.`);
   console.log('  All values match.');
+  console.log(`  Scanned src/ for var(--color-...) usage: 0 undefined (${grandfatheredHits} pre-existing, grandfathered).`);
   process.exit(0);
 } else {
   console.error(`Design token parity check FAILED -- ${errors.length} issue(s):\n`);

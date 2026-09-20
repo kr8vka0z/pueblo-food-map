@@ -425,6 +425,12 @@ const en: Record<string, string> = {
   // Turn-by-turn step list (#134 enhancement)
   "directions.showSteps": "Show steps",
   "directions.hideSteps": "Hide steps",
+  // #539: RouteStrip's own "Steps" button (opens the steps SHEET, no
+  // show/hide toggle state) is a separate control from the in-card
+  // showSteps/hideSteps TOGGLE above (DirectionButtons.tsx) — Kyle approved
+  // shortening the strip's label only; the in-card toggle still needs its
+  // two-state "Show steps"/"Hide steps" wording, so it keeps its own key.
+  "directions.steps": "Steps",
   "directions.stepsListLabel": "Turn-by-turn directions",
   // #537 — the route strip's Steps control only renders when a route has
   // steps; shown in its place (never silently hidden) when it genuinely
@@ -1282,6 +1288,8 @@ const es: Record<string, string> = {
   // Turn-by-turn step list (#134 enhancement)
   "directions.showSteps": "Ver indicaciones",
   "directions.hideSteps": "Ocultar indicaciones",
+  // #539 — see the EN dictionary's comment: separate key from showSteps/hideSteps.
+  "directions.steps": "Pasos", // [CHECK]
   "directions.stepsListLabel": "Indicaciones paso a paso",
   // #537
   "directions.noStepsForRoute": "No hay indicaciones paso a paso para esta ruta",

@@ -22,21 +22,24 @@
  * or the last row of SearchResultsPopover once the user types) or a Menu
  * line — see MapWrapper.tsx and HamburgerMenu.tsx.
  *
- * Filters button (#513, moved to the right edge by #528) — a round button at
- * the RIGHT end of the bar when the `filtersButton` prop is passed (MapWrapper
- * always passes it). Originally sat in the magnifier's spot on the left, but
- * that collided with the placeholder text on a phone (#528) — the right end
- * was free once the Map/List view switch that used to live there was removed
- * by #514, and a button there can never overlap typed text. Replaces the old
- * `filterChip` (a variable-width category-name chip) entirely: filters now
- * live behind their own panel, so the bar only ever shows a small round icon
- * button + an orange count badge, never a label. The magnifier is always
- * shown now (previously hidden when filtersButton occupied its spot) so the
- * bar still reads as a search box with the button gone from that side.
+ * Filters control (#539, mockup C — supersedes #513/#528/#529's round
+ * bordered button with an orange badge overlapping its corner) — lives
+ * INSIDE the bar at the right end when the `filtersButton` prop is passed
+ * (MapWrapper always passes it), not as a separate button floating on top of
+ * it: no background, no border, just the icon plus a 1px hairline divider on
+ * its left so it still reads as part of the bar. Kyle, 2026-09-20: "put the
+ * icon for the filters just into the search bar instead of it appearing like
+ * a different button" — the old badge overlapping the icon's corner "looks
+ * like shit." Filters on: the icon turns sage-600 and an orange/navy count
+ * pill appears BESIDE the icon (normal flow, not absolutely overlapping it)
+ * — nothing overlaps anything. The magnifier is always shown at the left
+ * (previously hidden when a control occupied its spot) so the bar still
+ * reads as a search box regardless of the right-end control's state.
  *
  * Icon is a hand-drawn inline SVG (three bars of decreasing width) matching
  * the approved mockup (atlas-kb "Search Filters Redesign - Button Placement",
- * symbol #f) — not lucide's SlidersHorizontal, which Kyle rejected (#528).
+ * symbol #f, and Filters-In-Bar-Mockup.html's `.c-filter`/`.c-count`) — not
+ * lucide's SlidersHorizontal, which Kyle rejected (#528).
  */
 
 import { useCallback } from "react";
@@ -97,12 +100,12 @@ interface SearchBarProps {
 
   // ── Category filter chip (#95) ──────��─────────────────────────────────────
   /**
-   * When set, renders a round Filters button at the right end of the bar
-   * (#528 — was the magnifier's spot on the left until it collided with the
-   * placeholder text). Plain when count is 0; green with an orange count
-   * badge when filters are active (#513). `ariaLabel` is built by the caller
-   * via i18n (t("filters.button.label"/"filters.button.labelActive")) — same
-   * pattern as the input's own `ariaLabel` prop — so this component stays
+   * When set, renders an icon-only Filters control at the right end of the
+   * bar (#539 mockup C — see this file's own header). ink-500 icon at rest;
+   * sage-600 icon + a beside-icon orange count pill when filters are active
+   * (#513). `ariaLabel` is built by the caller via i18n
+   * (t("filters.button.label"/"filters.button.labelActive")) — same pattern
+   * as the input's own `ariaLabel` prop — so this component stays
    * locale-agnostic. Absent for standalone use (e.g. a11y.test.tsx renders
    * SearchBar bare with no filters concept at all) — the magnifier shows
    * either way now.
@@ -189,25 +192,17 @@ export default function SearchBar({
           aria-hidden
         />
 
-        {/* Filters button (#513, right-anchored by #528) — the RIGHT end of
-            the bar, where the removed Map/List view switch used to live.
-            Plain (bone/ink) when no filters are on; sage-filled with an
-            orange count badge when count > 0. One fixed size at every width
-            (unlike ViewToggle, the mockups show no icon/word distinction for
-            this control).
-            Tap target is 44×44 (#532 review) even though the VISIBLE circle
-            stays 32×32 — this control's circle is always drawn (bone/sage,
-            never hover-only), unlike the app's other 44px controls
-            (FilterPanel.tsx close, HamburgerMenu.tsx close, BottomSheet.tsx
-            close), whose visible affordance IS the full 44px hover/focus box
-            and so can just grow outright. Here the outer <button> is the
-            invisible 44px hit area; the inner <span> is the real 32px
-            circle. right-0 on the outer (not right-1.5) is deliberate: the
-            +12px of growth splits 6px/side around the original 32px box, so
-            right-0 at 44px re-centers on the exact same point right-1.5 at
-            32px did — the inner span, flex-centered inside, lands with its
-            own right edge back at that original 6px inset. Do the math again
-            before changing either number. */}
+        {/* Filters control (#539, mockup C) — icon-only, no background, no
+            border, so it reads as part of the bar rather than a separate
+            button. `.c-filter` in Filters-In-Bar-Mockup.html is the
+            geometry reference: 10px left / 14px right padding around a
+            20px icon, gap-1.5 (6px) before the count pill, height 44px
+            fixed at every width (unlike ViewToggle, the mockups show no
+            icon/word distinction for this control). With no count, the
+            control's own box is already exactly 44px wide (10+20+14) — no
+            separate invisible hit-area box is needed the way #532's
+            32px-circle-in-a-44px-button pattern required, since there is no
+            visible circle left to keep small. */}
         {filtersButton && (
           <button
             type="button"
@@ -215,45 +210,40 @@ export default function SearchBar({
             aria-label={filtersButton.ariaLabel}
             className={
               "absolute right-0 top-1/2 -translate-y-1/2 " +
-              "flex items-center justify-center w-11 h-11 rounded-full " +
+              "flex items-center gap-1.5 h-11 pl-2.5 pr-3.5 " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 " +
-              "focus-visible:ring-[var(--color-sage-500)]"
+              "focus-visible:ring-[var(--color-sage-500)] " +
+              (filtersButton.count > 0
+                ? "text-[var(--color-sage-600)]"
+                : "text-[var(--color-ink-500)]")
             }
           >
+            {/* Hairline divider — 1px, bone-200, inset 12px top/bottom
+                (`.c-filter::before` in the mockup). Absolutely positioned
+                against this <button> (already the containing block via the
+                `absolute` above), so it always tracks the control, not the
+                bar's own edge. */}
             <span
-              className={
-                "relative flex items-center justify-center w-8 h-8 rounded-full border " +
-                "transition-colors duration-100 " +
-                (filtersButton.count > 0
-                  ? "bg-[var(--color-sage-600)] border-[var(--color-sage-600)] text-white"
-                  : "bg-[var(--color-bone-50)] border-[var(--color-bone-300)] text-[var(--color-ink-500)]")
-              }
-            >
-              <FilterIcon size={16} />
-              {filtersButton.count > 0 && (
-                <span
-                  aria-hidden
-                  className={
-                    // Badge hangs toward the CENTER of the bar (-left-1), not
-                    // the outer edge (-right-1 would push it past the visible
-                    // circle's right edge into the pill's rounded corner and
-                    // clip — #528's risk note). Mirrors the original
-                    // left-anchored button, whose badge also hung inward
-                    // (-right-1 there, toward the input, away from that
-                    // side's outer curve). Positioned relative to the 32px
-                    // visible circle (this span), not the 44px hit area, so
-                    // this geometry is unaffected by the #532 tap-target fix.
-                    "absolute -top-1 -left-1 min-w-[16px] h-4 px-0.5 rounded-full " +
-                    "bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)] " +
-                    "text-[10px] font-bold leading-4 text-center " +
-                    "border-2 border-[var(--color-bone-50)]"
-                  }
-                >
-                  {filtersButton.count}
-                </span>
-              )}
-            </span>
+              aria-hidden
+              className="absolute left-0 top-[12px] bottom-[12px] w-px bg-[var(--color-bone-200)]"
+            />
+            <FilterIcon size={20} />
+            {filtersButton.count > 0 && (
+              <span
+                aria-hidden
+                className={
+                  // Beside the icon in normal flow (the gap-1.5 above), never
+                  // absolutely overlapping it — #539 fixes #529's badge that
+                  // hung over the icon's corner ("looks like shit," Kyle).
+                  "flex items-center justify-center min-w-[19px] h-[19px] px-[5px] rounded-full " +
+                  "bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)] " +
+                  "text-[11px] font-bold leading-none"
+                }
+              >
+                {filtersButton.count}
+              </span>
+            )}
           </button>
         )}
 
@@ -274,14 +264,17 @@ export default function SearchBar({
             // (#528) — the magnifier is always shown, unlike before when the
             // Filters button replaced it in this spot.
             "pl-9 md:pl-10 " +
-            // Filters button reserves a fixed 44px (32px button + right-1.5
-            // inset + a little slack) on the RIGHT at every width (#528,
-            // moved from the left where it collided with the placeholder
-            // text) — unlike the removed filterChip, its size never varies
-            // with content or breakpoint. No reservation when absent: the
-            // inline Map/List view switch (#191) that used to live here was
-            // removed by #514, so the bar ends in plain typing room.
-            (filtersButton ? "pr-11 " : "pr-4 ") +
+            // Filters control reserves a FIXED width on the right sized for
+            // its WIDEST state (count pill present) — #539's plan requires
+            // this stay constant regardless of the current count, so typed
+            // text never reflows when a filter is toggled on/off. 10px pad +
+            // 20px icon + 6px gap + up to a 2-digit count pill (~23px, up to
+            // 11 filters exist across FilterPanel's switches+categories) +
+            // 14px pad ≈ 73px; 76px leaves a little slack, same convention
+            // the old fixed reservation used. No reservation when absent:
+            // the inline Map/List view switch (#191) that used to live here
+            // was removed by #514, so the bar ends in plain typing room.
+            (filtersButton ? "pr-[76px] " : "pr-4 ") +
             "text-base md:text-sm text-[var(--color-ink-700)] " +
             "bg-[var(--color-bone-50)] " +
             "border border-[var(--color-bone-300)] " +

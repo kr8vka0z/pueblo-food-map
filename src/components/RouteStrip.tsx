@@ -205,7 +205,7 @@ export default function RouteStrip({
               className={stepsButtonClass}
             >
               <ListOrdered size={16} aria-hidden />
-              {t("directions.showSteps", locale)}
+              {t("directions.steps", locale)}
             </button>
           ) : (
             // #537 Proof: a route with genuinely no steps says so rather

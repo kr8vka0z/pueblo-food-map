@@ -44,6 +44,14 @@ describe("RouteStrip — Steps control (#531)", () => {
     expect(screen.getByTestId("route-strip-steps")).toBeDefined();
   });
 
+  // #539: Kyle approved the mockup's shortened "Steps" wording for this
+  // button specifically — DirectionButtons.tsx's own in-card toggle keeps
+  // "Show steps"/"Hide steps" (a different i18n key, unaffected by this).
+  test("the button reads 'Steps', not 'Show steps' (#539)", () => {
+    render(<RouteStrip {...baseProps} walkSteps={STEPS} />);
+    expect(screen.getByTestId("route-strip-steps").textContent).toBe("Steps");
+  });
+
   test("tapping Steps opens the sheet with the reused step-list markup", async () => {
     const user = userEvent.setup();
     render(<RouteStrip {...baseProps} walkSteps={STEPS} />);

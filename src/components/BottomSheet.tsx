@@ -284,12 +284,35 @@ export default function BottomSheet({
           // Kyle measured equal to `window.innerHeight` on the real device
           // in both toolbar states (iOS 26, 2026-09-20: Safari 714/714,
           // Chrome 683/683) — exactly the reference vaul's snap math needs.
-          // Safe to use here specifically because this element is
-          // bottom-pinned (`[data-bottom-sheet]`, globals.css): a
-          // dvh-driven height change moves only the drawer's OFF-SCREEN top
-          // edge while a snap point is showing, never the visible strip
-          // itself, so it can't reintroduce the mid-scroll "jump" #530
-          // fixed for the non-route case below.
+          // KNOWN RESIDUAL, honestly stated because an unmeasured claim in a
+          // comment here hardens into fact for the next agent: this trades
+          // #530's "never jumps" property for correctness at rest, and the
+          // trade is not free. `100svh` was chosen in #530 precisely because
+          // it is INVARIANT through the toolbar animation, so it could never
+          // desync from anything. `100dvh` is the opposite — it tracks the
+          // toolbar continuously, while vaul's own `innerHeight` is cached
+          // and refreshed only on a `window` resize event (index.mjs
+          // ~518-527). If iOS Safari doesn't fire resize continuously through
+          // that animation, the two references can drift apart mid-scroll and
+          // the strip can visibly move, which is the artifact #530 set out to
+          // kill. Kyle's measurement proves the two are EQUAL once the
+          // toolbar settles (both states, both browsers) — it says nothing
+          // about the frames in between, and jsdom cannot test it.
+          //
+          // Accepted anyway, because the alternative is strictly worse, not
+          // merely different: on `--viewport-small` the strip was wrong AT
+          // REST by however far svh trails innerHeight (12px visible instead
+          // of 112, or fully off-screen with the toolbar collapsed). A
+          // possible transient wobble during a toolbar animation beats a
+          // permanently unreachable control. Note also that vaul ALREADY
+          // re-animates to a new snapped position on every resize (see the
+          // `snapPoints` prop's own comment above) — a mid-scroll transition
+          // is pre-existing here, not introduced by this unit change.
+          // If a real device shows the strip jumping while scrolling with a
+          // route up, the next thing to try is vaul's `container` prop, which
+          // replaces `window.innerHeight` as its size reference outright —
+          // read that same comment first for the two side effects that
+          // carries.
           //
           // The 100px map peek is carved out of H and added back into the
           // snap point instead (MAP_PEEK_PX, folded into ROUTE_STRIP_SNAP

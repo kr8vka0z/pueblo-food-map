@@ -117,31 +117,17 @@
   }
   .bar-bottom-0   { left: 0;      width: 33.33vw; bottom: 0; background: #b91c1c; }
   .bar-bottom-12  { left: 33.33vw; width: 33.34vw; bottom: 12px; background: #1f4e8c; }
-  .bar-formula    { left: 66.67vw; width: 33.33vw; bottom: calc(max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom)) + 12px); background: #2c5f4f; }
-
   /*
-    ─── Copied verbatim from src/app/globals.css (lines ~118-180, #530/#536)
-    — the app's OWN viewport variables, not a re-derivation. Anything that
-    disagrees with globals.css here would make the third bar not actually
-    "the app's formula".
+    #541 RESULT: the measurements taken on this page 2026-09-20 killed the
+    old `max(--viewport-toolbar-gap, env(safe-area-inset-bottom)) + 12px`
+    formula — a `bottom: 0` bar already clears the toolbar on this device,
+    so that reserve double-counted it. This bar now renders globals.css's
+    POST-#541 formula (`[data-bottom-nav]`'s own rule) for the confirmation
+    screenshot: it should sit exactly on top of the blue `bottom: 12px` bar
+    in every screenshot, on this iPhone, since env(safe-area-inset-bottom)
+    measured 0 here in both toolbar states.
   */
-  :root {
-    --viewport-small: 100vh;
-  }
-  @supports (height: 100svh) {
-    :root {
-      --viewport-small: 100svh;
-    }
-  }
-  :root {
-    --viewport-toolbar-gap: calc(100vh - var(--viewport-small));
-  }
-  @supports (height: 100dvh) {
-    :root {
-      --viewport-toolbar-gap: calc(100vh - 100dvh);
-    }
-  }
-  /* ─── end verbatim copy from globals.css ─────────────────────────────── */
+  .bar-formula    { left: 66.67vw; width: 33.33vw; bottom: calc(env(safe-area-inset-bottom) + 12px); background: #2c5f4f; }
 </style>
 </head>
 <body>
@@ -165,7 +151,6 @@
   <div class="row"><span class="k">100svh (computed px)</span><span class="v" id="v-100svh">–</span></div>
   <div class="row"><span class="k">100lvh (computed px)</span><span class="v" id="v-100lvh">–</span></div>
   <div class="row"><span class="k">env(safe-area-inset-bottom)</span><span class="v" id="v-safeBottom">–</span></div>
-  <div class="row"><span class="k">--viewport-toolbar-gap (computed)</span><span class="v" id="v-toolbarGap">–</span></div>
 </div>
 
 <div class="filler">
@@ -184,7 +169,7 @@
 
 <div class="bar bar-bottom-0">bottom: 0</div>
 <div class="bar bar-bottom-12">bottom: 12px</div>
-<div class="bar bar-formula">app formula<br />max(gap, safe-area) + 12</div>
+<div class="bar bar-formula">app formula (#541)<br />safe-area + 12</div>
 
 <script>
 (function () {
@@ -208,7 +193,6 @@
   var probe100svh = document.getElementById("probe-100svh");
   var probe100lvh = document.getElementById("probe-100lvh");
   var probeSafeBottom = document.getElementById("probe-safe-bottom");
-  var barFormula = document.querySelector(".bar-formula");
 
   function update() {
     set("v-innerHeight", window.innerHeight + "px");
@@ -227,11 +211,6 @@
     set("v-100svh", px(probe100svh));
     set("v-100lvh", px(probe100lvh));
     set("v-safeBottom", computedPx(probeSafeBottom));
-    // Read the SAME custom property the app formula bar consumes, straight
-    // off the root element, so this number and the bar's real position can
-    // never silently disagree.
-    var gap = getComputedStyle(document.documentElement).getPropertyValue("--viewport-toolbar-gap");
-    set("v-toolbarGap", gap.trim());
   }
 
   // Explicit listeners for every trigger the issue calls out...
@@ -244,10 +223,9 @@
   window.addEventListener("scroll", update, { passive: true });
 
   // ...plus a continuous rAF loop: Safari animates the toolbar's collapse
-  // over several frames, and `100dvh`/the app's --viewport-toolbar-gap
-  // track that continuously (globals.css's own #536 comment) — a screenshot
-  // taken mid-animation should show live numbers, not whatever the last
-  // discrete event happened to catch.
+  // over several frames, and `100dvh` tracks that continuously — a
+  // screenshot taken mid-animation should show live numbers, not whatever
+  // the last discrete event happened to catch.
   function loop() {
     update();
     window.requestAnimationFrame(loop);

@@ -9,58 +9,62 @@
  * BOTTOM_NAV_HEIGHT_PX (the nav's real, measured height) ever changes.
  *
  * Extended for #530 (Safari bottom-bar slice fix): guards the same kind of
- * silent-drift risk for the two pieces that fix added —
- *   - `--viewport-small` (globals.css): must have both a `vh` base (pre-svh
- *     browsers) and an `@supports (height: 100svh)` override, or a bottom-
- *     pinned element silently loses either the fallback or the real fix.
- *   - `themeColor` (layout.tsx): must literally equal `--color-bone-50`
- *     (globals.css) — a `<meta name="theme-color">` value can't reference a
- *     CSS custom property, so it's a second hard-coded hex with no compiler
- *     link to the first; only a test catches the two drifting apart.
- *   - BottomNav.tsx / BottomSheet.tsx must contain no bare `vh`/`dvh` unit on
- *     bottom-anchored chrome — the whole point of `--viewport-small` is that
- *     nothing pinned to the bottom re-introduces the browser-default unit
- *     that caused #530 (`vh`) or the toolbar-tracking one that jumps (`dvh`).
+ * silent-drift risk for `--viewport-small` (globals.css: must have both a
+ * `vh` base for pre-svh browsers and an `@supports (height: 100svh)`
+ * override, or a bottom-pinned element silently loses either the fallback
+ * or the real fix) and `themeColor` (layout.tsx: must literally equal
+ * `--color-bone-50`, globals.css — a `<meta name="theme-color">` value
+ * can't reference a CSS custom property, so it's a second hard-coded hex
+ * with no compiler link to the first). Also guards that BottomNav.tsx /
+ * BottomSheet.tsx carry no bare `vh`/`dvh` unit on bottom-anchored chrome,
+ * and (#530 review round 2) that neither component positions itself via an
+ * inline `style={{ top/bottom/left/right: ... }}` — an inline style always
+ * outranks a stylesheet rule, which is what made the first #530 attempt's
+ * 2xl reset dead CSS.
  *
- * Extended again for #530 review round 2 (the first attempt's `top` position
- * lived in a React inline style, which always outranks a stylesheet rule —
- * a `[data-bottom-nav] { top: auto }` reset meant to win back at 2xl was
- * dead CSS, and desktop was only correct because 52+24 happened to equal
- * 64+12). Guards:
- *   - Neither BottomNav.tsx nor BottomSheet.tsx sets a `style={{` position
- *     prop at all — the position lives in globals.css as a plain rule, so
- *     it can never out-rank a later stylesheet override the way an inline
- *     style did.
- *   - `--viewport-toolbar-gap` (globals.css) is declared from `100vh` and
- *     `--viewport-small` — the stable gap the position rules below build on.
- *   - `[data-bottom-nav]`'s `bottom` rule is scoped inside
- *     `@media (width < 96rem)` — this is what "pins desktop's position" per
- *     the review: if a future edit ever drops that scoping, this same rule
- *     would apply unconditionally and silently fight BottomNav.tsx's own
- *     `2xl:bottom-6` Tailwind class (same specificity, last-in-source wins)
- *     — the exact class of bug just fixed, just with the roles reversed.
- *   - `[data-bottom-sheet]` gets a `bottom` rule too (BottomSheet's own half
- *     of #530, not attempted in the first pass).
- *
- * Extended for #536 (the static reserve above left a dead gap once Safari's
- * toolbar actually collapsed, and separately desynced the Mapbox attribution
- * clearance from the bar's real position): `--viewport-toolbar-gap` keeps its
- * original `100vh - var(--viewport-small)` formula only as a fallback for
- * browsers without `dvh` support; an `@supports (height: 100dvh)` block now
- * overrides it with `100vh - 100dvh`, which tracks the toolbar's REAL,
- * live height instead of always reserving its worst case (see that
- * declaration's own comment in globals.css for why `dvh`, not a
- * visualViewport-driven JS variable, was the fix). The Mapbox credits'
- * below-2xl offset is re-derived from that same variable, dropping the
- * `env(safe-area-inset-bottom)` term it never should have needed either.
+ * #541 — REPLACES the #530/#536 toolbar-height-reserve model entirely, and
+ * this file's #536-era tests along with it. Real iPhone measurement (iOS
+ * 26, 2026-09-20, `/viewport-check`, both Safari and Chrome, toolbar
+ * expanded and collapsed) found a plain `position: fixed; bottom: 0`
+ * element already renders fully visible directly above the browser's own
+ * toolbar — the premise `--viewport-toolbar-gap` (#530's static
+ * `100vh - var(--viewport-small)` fallback, #536's live `100vh - 100dvh`
+ * override) was built on was FALSE on the real device. Stacking that
+ * reserve on top of `bottom: 0`/`env(safe-area-inset-bottom)` double-
+ * counted the toolbar and lifted every bottom-pinned bar 40-74px too high.
+ * `--viewport-toolbar-gap` is deleted outright (both declarations), and the
+ * four rules that consumed it now read `env(safe-area-inset-bottom)` alone
+ * (0 on the test device, kept for standalone/home-screen installs and
+ * devices that DO report a home-indicator inset) plus their own fixed
+ * pixel offset. This file's job below is to guard the NEW formula on all
+ * four rules and on RouteStrip.tsx's Steps sheet, and to make sure the
+ * toolbar-gap term never quietly comes back anywhere in `src/`.
  */
 
 import { describe, test, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { BOTTOM_NAV_HEIGHT_PX } from "@/components/BottomNav";
 
 const readSrc = (relPath: string) => readFileSync(join(process.cwd(), relPath), "utf-8");
+
+// Recursively lists every file under a directory (relative to repo root) —
+// used by the #541 regression guard below, which must scan all of `src/`,
+// not just the handful of files the older, formula-specific tests name.
+function listFiles(relDir: string): string[] {
+  const absDir = join(process.cwd(), relDir);
+  const out: string[] = [];
+  for (const entry of readdirSync(absDir)) {
+    const relPath = join(relDir, entry);
+    const absPath = join(process.cwd(), relPath);
+    if (statSync(absPath).isDirectory()) {
+      out.push(...listFiles(relPath));
+    } else {
+      out.push(relPath);
+    }
+  }
+  return out;
+}
 
 describe("--bottom-nav-clearance mirrors BOTTOM_NAV_HEIGHT_PX", () => {
   test("globals.css's :root value equals the BottomNav.tsx constant", () => {
@@ -120,25 +124,14 @@ describe("#530 review round 2 — position lives in CSS, not a React inline styl
     ).not.toMatch(/style=\{\{?\s*(top|bottom|left|right)\s*:/);
   });
 
-  test("--viewport-toolbar-gap has a static fallback declared from 100vh and --viewport-small", () => {
-    const css = readSrc("src/app/globals.css");
-    expect(
-      css,
-      "expected the pre-#536 fallback: --viewport-toolbar-gap: calc(100vh - var(--viewport-small));"
-    ).toMatch(/--viewport-toolbar-gap:\s*calc\(100vh\s*-\s*var\(--viewport-small\)\);/);
-  });
-
   test("[data-bottom-nav]'s bottom rule is scoped below 2xl, so it can't fight 2xl:bottom-6", () => {
     const css = readSrc("src/app/globals.css");
     // Pins the exact bug this issue's review caught: a [data-bottom-nav]
     // rule with no media scoping would apply at every width, including 2xl,
     // and (same specificity as a Tailwind class, later in source) silently
     // win over BottomNav.tsx's 2xl:bottom-6 — correct only by coincidence.
-    // #536 review: the value itself is `max(--viewport-toolbar-gap,
-    // env(safe-area-inset-bottom))`, not a bare --viewport-toolbar-gap — see
-    // the dedicated "anti-correlated" describe block below for why.
     expect(css).toMatch(
-      /@media\s*\(width\s*<\s*96rem\)\s*\{\s*\[data-bottom-nav\]\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\)/
+      /@media\s*\(width\s*<\s*96rem\)\s*\{\s*\[data-bottom-nav\]\s*\{\s*bottom:\s*calc\(env\(safe-area-inset-bottom\)\s*\+\s*12px\);/
     );
     // [data-bottom-nav] names an actual CSS selector exactly once in the
     // whole file — inside that media block. Strip /* */ comments first (the
@@ -151,81 +144,9 @@ describe("#530 review round 2 — position lives in CSS, not a React inline styl
     expect(occurrences.length, "expected [data-bottom-nav] to appear exactly once as a real selector in globals.css").toBe(1);
   });
 
-  test("[data-bottom-sheet] has its own bottom rule built on --viewport-toolbar-gap", () => {
+  test("[data-bottom-sheet] has its own bottom rule built on env(safe-area-inset-bottom)", () => {
     const css = readSrc("src/app/globals.css");
-    expect(css).toMatch(/\[data-bottom-sheet\]\s*\{\s*bottom:\s*var\(--viewport-toolbar-gap\);/);
-  });
-});
-
-describe("#536 — --viewport-toolbar-gap tracks the toolbar's REAL, live height", () => {
-  test("an @supports(height: 100dvh) block overrides the static fallback with a live dvh-based gap", () => {
-    const css = readSrc("src/app/globals.css");
-    // The static `calc(100vh - var(--viewport-small))` fallback (guarded
-    // above) reserves the toolbar's worst-case height at ALL times, which is
-    // exactly #536's bug: no dead gap opens once the toolbar collapses, but
-    // nothing ever comes back down to reclaim the freed space either. This
-    // override — `100vh - 100dvh` — re-evaluates continuously as the real
-    // toolbar animates, so it must exist and must be scoped behind
-    // `@supports (height: 100dvh)` (browsers without dvh keep the safe,
-    // if imperfectly-positioned, static fallback — not a regression for
-    // them).
-    expect(
-      css,
-      "expected @supports (height: 100dvh) { :root { --viewport-toolbar-gap: calc(100vh - 100dvh); } }"
-    ).toMatch(
-      /@supports\s*\(height:\s*100dvh\)\s*\{\s*:root\s*\{\s*--viewport-toolbar-gap:\s*calc\(100vh\s*-\s*100dvh\);/
-    );
-  });
-
-  test("the dvh override is declared strictly after the static fallback (source order = cascade order)", () => {
-    const css = readSrc("src/app/globals.css");
-    const fallbackIndex = css.indexOf("--viewport-toolbar-gap: calc(100vh - var(--viewport-small));");
-    const overrideIndex = css.indexOf("--viewport-toolbar-gap: calc(100vh - 100dvh);");
-    expect(fallbackIndex, "fallback declaration not found").toBeGreaterThanOrEqual(0);
-    expect(overrideIndex, "dvh override declaration not found").toBeGreaterThanOrEqual(0);
-    expect(overrideIndex).toBeGreaterThan(fallbackIndex);
-  });
-});
-
-describe("#536 — Mapbox attribution clearance is re-derived from the bar's real position", () => {
-  test("the below-2xl credits offset is built on --viewport-toolbar-gap, not a bare safe-area/reserve", () => {
-    const css = readSrc("src/app/globals.css");
-    // #536: this rule used to omit the toolbar-gap term entirely (written for
-    // the bar's pre-#530 resting position), so once #530 moved the bar up,
-    // the credits no longer cleared it. It must now build on the SAME
-    // max(...) floor the nav pill itself positions against (review round 2 —
-    // see the dedicated describe block below for why a bare
-    // --viewport-toolbar-gap under-clears the pill on a notched phone).
-    expect(
-      css,
-      "expected .mapboxgl-ctrl-bottom-right's bottom rule to read max(var(--viewport-toolbar-gap), env(safe-area-inset-bottom)) + var(--bottom-nav-clearance) + 8px"
-    ).toMatch(
-      /\.mapboxgl-map \.mapboxgl-ctrl-bottom-right\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\),\s*env\(safe-area-inset-bottom\)\)\s*\+\s*var\(--bottom-nav-clearance\)\s*\+\s*8px\);/
-    );
-  });
-});
-
-describe("#536 review — the toolbar-gap and safe-area-inset terms are anti-correlated, so both consuming rules must use max(), never a bare --viewport-toolbar-gap", () => {
-  // With the #536 dvh override, --viewport-toolbar-gap correctly reaches
-  // exactly 0 the instant Safari's toolbar fully collapses — the SAME
-  // instant env(safe-area-inset-bottom) jumps from 0 to the physical
-  // home-indicator height (~34px) on a notched iPhone. A bare
-  // --viewport-toolbar-gap would then park roughly a third of the 64px nav
-  // pill inside the home-indicator's gesture zone after an ordinary scroll.
-  // This pins max() on BOTH rules that build on that gap, so a future edit
-  // can't drop the guard on one while "cleaning up" the other.
-  test.each([
-    [
-      "[data-bottom-nav]",
-      /\[data-bottom-nav\]\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\),\s*env\(safe-area-inset-bottom\)\)\s*\+\s*12px\);/,
-    ],
-    [
-      ".mapboxgl-map .mapboxgl-ctrl-bottom-right",
-      /\.mapboxgl-map \.mapboxgl-ctrl-bottom-right\s*\{\s*bottom:\s*calc\(max\(var\(--viewport-toolbar-gap\),\s*env\(safe-area-inset-bottom\)\)\s*\+\s*var\(--bottom-nav-clearance\)\s*\+\s*8px\);/,
-    ],
-  ])("%s's bottom rule wraps --viewport-toolbar-gap in max(..., env(safe-area-inset-bottom))", (_selector, pattern) => {
-    const css = readSrc("src/app/globals.css");
-    expect(css).toMatch(pattern);
+    expect(css).toMatch(/\[data-bottom-sheet\]\s*\{\s*bottom:\s*env\(safe-area-inset-bottom\);/);
   });
 });
 
@@ -243,5 +164,54 @@ describe("#530 review round 3 — vaul's own keyboard-avoidance reintroduces the
     expect(src, "expected repositionInputs={false} on Drawer.Root").toMatch(
       /repositionInputs=\{false\}/
     );
+  });
+});
+
+describe("#541 — bottom-pinned chrome uses env(safe-area-inset-bottom) alone, no toolbar reserve", () => {
+  test("[data-bottom-nav]'s bottom rule is env(safe-area-inset-bottom) + 12px", () => {
+    const css = readSrc("src/app/globals.css");
+    expect(css).toMatch(
+      /\[data-bottom-nav\]\s*\{\s*bottom:\s*calc\(env\(safe-area-inset-bottom\)\s*\+\s*12px\);/
+    );
+  });
+
+  test(".mapboxgl-ctrl-bottom-right's bottom rule is env(safe-area-inset-bottom) + --bottom-nav-clearance + 8px", () => {
+    const css = readSrc("src/app/globals.css");
+    expect(css).toMatch(
+      /\.mapboxgl-map \.mapboxgl-ctrl-bottom-right\s*\{\s*bottom:\s*calc\(env\(safe-area-inset-bottom\)\s*\+\s*var\(--bottom-nav-clearance\)\s*\+\s*8px\);/
+    );
+  });
+
+  test("[data-bottom-sheet]'s bottom rule is env(safe-area-inset-bottom) alone", () => {
+    const css = readSrc("src/app/globals.css");
+    expect(css).toMatch(/\[data-bottom-sheet\]\s*\{\s*bottom:\s*env\(safe-area-inset-bottom\);/);
+  });
+
+  test("[data-bottom-sheet][data-strip-open]'s bottom rule is env(safe-area-inset-bottom) + --bottom-nav-clearance + 8px", () => {
+    const css = readSrc("src/app/globals.css");
+    expect(css).toMatch(
+      /\[data-bottom-sheet\]\[data-strip-open\]\s*\{\s*bottom:\s*calc\(env\(safe-area-inset-bottom\)\s*\+\s*var\(--bottom-nav-clearance\)\s*\+\s*8px\);/
+    );
+  });
+
+  test("RouteStrip.tsx's Steps sheet uses the bottom-[env(safe-area-inset-bottom)] arbitrary value", () => {
+    const src = readSrc("src/components/RouteStrip.tsx");
+    expect(src).toMatch(/bottom-\[env\(safe-area-inset-bottom\)\]/);
+  });
+
+  test("--viewport-toolbar-gap appears nowhere in src/ — regression guard against the double-count coming back", () => {
+    // toolbarGapNeedle is built at runtime, not written literally, so this
+    // very file — which has to name the retired property to describe what
+    // it's guarding against — doesn't trip its own assertion.
+    const toolbarGapNeedle = ["--viewport", "-toolbar-gap"].join("");
+    const selfPath = join("src", "__tests__", "bottomNavClearance.test.ts");
+    const files = listFiles("src")
+      .filter((f) => /\.(ts|tsx|css|js|jsx)$/.test(f))
+      .filter((f) => f !== selfPath);
+    const offenders = files.filter((f) => readSrc(f).includes(toolbarGapNeedle));
+    expect(
+      offenders,
+      `${toolbarGapNeedle} must not appear anywhere in src/ (found in: ${offenders.join(", ")})`
+    ).toEqual([]);
   });
 });

@@ -259,12 +259,6 @@ export default function BottomSheet({
           // see globals.css's own comment for the formula and why it never
           // jumps as the toolbar animates.
           data-bottom-sheet=""
-          // #531: distinguishes the strip's resting position from the full
-          // card's — globals.css's `[data-bottom-sheet][data-strip-open]`
-          // rule lifts it clear of the now-visible BottomNav; the full card
-          // (data-strip-open absent) stays flush at the screen edge,
-          // unchanged, since the nav is hidden while it's up (#509).
-          data-strip-open={showStrip ? "" : undefined}
           className={
             "fixed left-0 right-0 z-[800] flex flex-col " +
             "bg-[var(--color-bone-50)] " +

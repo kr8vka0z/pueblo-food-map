@@ -43,7 +43,7 @@
 
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -188,7 +188,7 @@ function isInPuebloBbox(lat: number, lng: number): boolean {
 
 // ─── Geocoding results / report ────────────────────────────────────────────
 
-interface GeocodedBox extends RealBoxSource {
+export interface GeocodedBox extends RealBoxSource {
   fullQuery: string;
   lat: number | null;
   lng: number | null;
@@ -256,10 +256,49 @@ function boxId(streetAddress: string): string {
   return `real-blessing-box-${slug}`;
 }
 
-function boxName(box: GeocodedBox): string {
+export function boxName(box: GeocodedBox): string {
   // Naming convention is Kyle's, not invented here: entries carry no host or
   // box name of their own except the church, which he named explicitly.
-  return box.name ?? `Blessing Box — ${box.streetAddress}`;
+  // Plain hyphen, NOT an em dash: the one real box already live on the map
+  // (216 W Routt, converted by migrations/0006_convert_routt_blessing_box.sql)
+  // is named "Blessing Box - 216 W Routt". These 27 sit beside it in the same
+  // list and the same search results, so they have to match it character for
+  // character or the set reads as two different naming schemes.
+  return box.name ?? `Blessing Box - ${box.streetAddress}`;
+}
+
+/**
+ * The address shown on the public card.
+ *
+ * NOT the geocoder's own `matchedAddress`: the Census service returns
+ * SHOUTING CASE ("573 S ROGERS DR, PUEBLO, CO, 81007"), which is fine as a
+ * match receipt and wrong as display text — every other venue on this map
+ * carries a normally-cased address, so an all-caps one is instantly the odd
+ * row out.
+ *
+ * Kyle's own list text is used for the street part rather than case-fixing
+ * the geocoder's: he wrote those by hand and they are already correct,
+ * whereas title-casing the returned string mangles the real cases
+ * ("36TH" -> "36Th", "US HWY" -> "Us Hwy"). City/state/ZIP come from the
+ * geocoder because the list mostly omits them — only the city needs casing
+ * repair, and a plain word-wise capitalisation is exact for all three that
+ * actually occur (PUEBLO, PUEBLO WEST, AVONDALE).
+ *
+ * ponytail: word-wise capitalisation is not a general-purpose city caser
+ * (it would spoil a name like "McCLAVE"). Ceiling accepted because the
+ * cities here are a closed set of three, checked by eye against the
+ * geocode table. A new town in the list needs a look, not a bigger
+ * function.
+ */
+export function displayAddress(box: GeocodedBox): string {
+  const matched = box.matchedAddress;
+  if (!matched) return box.fullQuery;
+  const [, city, state, zip] = matched.split(",").map((part) => part.trim());
+  if (!city || !state) return box.fullQuery;
+  const casedCity = city
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+  return `${box.streetAddress}, ${casedCity}, ${state}${zip ? ` ${zip}` : ""}`;
 }
 
 const RUN_LABEL = "load-real-blessing-boxes.ts";
@@ -284,7 +323,7 @@ function buildLoadSql(boxes: GeocodedBox[], today: string): string {
     lines.push(
       `INSERT OR IGNORE INTO venues (${VENUES_INSERT_COLUMNS.join(", ")}) VALUES (` +
         `${sqlString(id)}, ${sqlString(boxName(box))}, 'blessing_box', ${box.lat}, ${box.lng}, ` +
-        `${sqlString(box.matchedAddress ?? box.fullQuery)}, ${sqlOptString(box.phone)}, ` +
+        `${sqlString(displayAddress(box))}, ${sqlOptString(box.phone)}, ` +
         `${sqlOptString(box.website)}, ${sqlOptString(box.description)}, ` +
         `${sqlString(RUN_LABEL)}, ${sqlString(today)}, 'published', 'manual', 0, ` +
         `${sqlString(RUN_LABEL)}, ${sqlString(RUN_LABEL)});`,
@@ -362,7 +401,18 @@ async function main(): Promise<void> {
   console.log("\nReview both files, then apply with wrangler yourself (staging or prod).");
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+// Run only when this file is the entry point. Without the guard, merely
+// IMPORTING it (which the test beside it does, to check the two text helpers
+// that decide what a resident actually reads on a box card) would fire the
+// whole run: live geocoder calls and two overwritten .sql files as a side
+// effect of `bun run test`.
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+}

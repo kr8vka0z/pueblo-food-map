@@ -42,7 +42,7 @@ import { WalkStepper, type WalkStepperProps } from "@/components/DirectionButton
 
 // ─── parseWalkSteps — location-drop behavior (#555) ───────────────────────────
 
-describe("parseWalkSteps — drops steps with no usable maneuver.location (#555)", () => {
+describe("parseWalkSteps — keeps steps with no usable maneuver.location (#555)", () => {
   test("a step with a valid [lng, lat] location is kept, carrying location/type/modifier", () => {
     const route = {
       legs: [
@@ -67,7 +67,11 @@ describe("parseWalkSteps — drops steps with no usable maneuver.location (#555)
     });
   });
 
-  test("a step with no maneuver.location at all is dropped", () => {
+  // The written turn list predates step-through and matters more than the
+  // camera hop, so a step WITHOUT a usable coordinate is kept and readable —
+  // only its `location` is dropped. Reverting that would delete turns from
+  // the list on a malformed response, which these two tests exist to catch.
+  test("a step with no maneuver.location at all is KEPT, with location undefined", () => {
     const route = {
       legs: [
         {
@@ -79,11 +83,13 @@ describe("parseWalkSteps — drops steps with no usable maneuver.location (#555)
       ],
     };
     const steps = parseWalkSteps(route);
-    expect(steps).toHaveLength(1);
-    expect(steps[0].instruction).toBe("Arrive");
+    expect(steps).toHaveLength(2);
+    expect(steps[0].instruction).toBe("Turn left");
+    expect(steps[0].location).toBeUndefined();
+    expect(steps[1].location).toEqual([-104.6, 38.25]);
   });
 
-  test("a malformed location (wrong length, or non-number entries) is dropped", () => {
+  test("a malformed location (wrong length, or non-number entries) keeps the step but discards the coordinate", () => {
     const route = {
       legs: [
         {
@@ -97,8 +103,9 @@ describe("parseWalkSteps — drops steps with no usable maneuver.location (#555)
       ],
     };
     const steps = parseWalkSteps(route);
-    expect(steps).toHaveLength(1);
-    expect(steps[0].instruction).toBe("Good");
+    expect(steps.map((s) => s.instruction)).toEqual(["Bad 1", "Bad 2", "Bad 3", "Good"]);
+    expect(steps.slice(0, 3).every((s) => s.location === undefined)).toBe(true);
+    expect(steps[3].location).toEqual([-104.6, 38.25]);
   });
 
   test("maneuverType/maneuverModifier are omitted (not crashed on) when Mapbox doesn't send them", () => {

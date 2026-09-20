@@ -52,18 +52,24 @@ describe("RouteStrip — Steps control (#531)", () => {
     expect(screen.getByTestId("route-strip-steps").textContent).toBe("Steps");
   });
 
-  test("tapping Steps opens the sheet with the reused step-list markup", async () => {
+  test("tapping Steps opens the stepper, with the reused step-list markup behind All turns", async () => {
     const user = userEvent.setup();
     render(<RouteStrip {...baseProps} walkSteps={STEPS} />);
 
     expect(screen.queryByTestId("walk-steps-list")).toBeNull();
     await user.click(screen.getByTestId("route-strip-steps"));
 
+    // #555: the sheet leads with ONE turn so the map keeps the screen —
+    // Kyle's explicit ask. The full list still exists, one tap away.
+    expect(screen.getByTestId("walk-stepper-instruction").textContent)
+      .toContain("Head north on Main St");
+    expect(screen.getByTestId("walk-stepper-counter").textContent)
+      .toContain(`1 of ${STEPS.length}`);
+
     const list = screen.getByTestId("walk-steps-list");
     expect(list.tagName).toBe("OL");
     expect(list.querySelectorAll("li")).toHaveLength(STEPS.length);
-    expect(screen.getByText("Head north on Main St")).toBeDefined();
-    expect(screen.getByText("Turn right on Union Ave")).toBeDefined();
+    expect(list.textContent).toContain("Turn right on Union Ave");
   });
 
   test("the sheet shows the venue name as its own heading", async () => {

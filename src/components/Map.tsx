@@ -105,10 +105,19 @@ export interface WalkingRouteInfo {
  * `instruction` comes pre-localized (Mapbox `language=` param).
  * `distance` is raw meters from `step.distance`.
  * `location` (#555, step-through directions) is `maneuver.location` — the
- * turn's own [lng, lat], required (not optional) because the step-through
- * stepper flies the camera to it on every arrow tap; `parseWalkSteps`
- * (MapWrapper.tsx) drops any step that doesn't carry a valid one, so a
- * `WalkStep` reaching this type's consumers always has real coordinates.
+ * turn's own [lng, lat], which the step-through stepper flies the camera to.
+ *
+ * WHY optional rather than required: the written turn list predates
+ * step-through and is the feature people rely on most. Requiring a
+ * coordinate would make `parseWalkSteps` DROP an otherwise perfectly
+ * readable instruction whenever a malformed response omitted one —
+ * degrading the older, more important feature to serve the newer one. The
+ * live Directions API supplies `location` on every step (measured
+ * 2026-09-20, including the depart and arrive steps), so the absent case is
+ * malformed-response-only; there, showing the turn and skipping the camera
+ * hop beats hiding the turn. Consumers must therefore guard before reading
+ * it (see MapWrapper's `handleStepChange`).
+ *
  * `maneuverType`/`maneuverModifier` (e.g. "turn"/"left") drive the
  * stepper's turn icon (DirectionButtons.tsx's `WalkStepper`) — both stay
  * optional since the icon mapping already has a straight-ahead fallback for
@@ -117,7 +126,7 @@ export interface WalkingRouteInfo {
 export interface WalkStep {
   instruction: string;
   distance: number; // meters
-  location: [number, number]; // [lng, lat] of the turn itself — maneuver.location
+  location?: [number, number]; // [lng, lat] of the turn itself — maneuver.location
   maneuverType?: string; // e.g. "turn", "depart", "arrive"
   maneuverModifier?: string; // e.g. "left", "right", "straight"
 }

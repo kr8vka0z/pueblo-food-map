@@ -92,7 +92,7 @@ import BoxCheckinPanel from "@/components/BoxCheckinPanel";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 import BoxAlertSignupForm from "@/components/BoxAlertSignupForm";
 import PhotoViewer from "@/components/PhotoViewer";
-import { googleMapsUrl, WalkRouteStatus, type RouteInfo } from "@/components/DirectionButtons";
+import { googleMapsUrl, WalkRouteStatus, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 import { categoryColors } from "@/data/venues";
 import {
   STATUS_DOT_CLASS,
@@ -137,18 +137,9 @@ interface BoxCardBodyProps {
   walkRouteInfo?: RouteInfo | null;
   /**
    * Turn-by-turn steps from Mapbox (pre-localized), same as DirectionButtons'
-   * own prop — including its loose optional `location`/`maneuverType`/
-   * `maneuverModifier` shape (#555; see that prop's own WHY comment). This
-   * value passes straight through to WalkRouteStatus below, which does the
-   * actual location-filtering before handing anything to WalkStepper.
+   * own prop — passed straight through to WalkRouteStatus below.
    */
-  walkRouteSteps?: Array<{
-    instruction: string;
-    distance: number;
-    location?: [number, number];
-    maneuverType?: string;
-    maneuverModifier?: string;
-  }> | null;
+  walkRouteSteps?: WalkStep[] | null;
   /** True when this box's Walk tap requested geolocation and it was denied or is unavailable (#207) — same as DirectionButtons' own prop. */
   showWalkLocationHint?: boolean;
   /** Which turn the step-through stepper is showing (#555) — same as WalkRouteStatus's own prop. */

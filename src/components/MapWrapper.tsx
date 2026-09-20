@@ -263,19 +263,23 @@ export function parseWalkSteps(
     // Drop steps whose instruction is missing or empty — they are malformed
     // API responses that would render as blank list items.
     if (!instruction) return [];
-    const location = s.maneuver?.location;
-    if (
-      !Array.isArray(location) ||
-      location.length !== 2 ||
-      typeof location[0] !== "number" ||
-      typeof location[1] !== "number"
-    ) {
-      return [];
-    }
+    // WHY a malformed location is dropped but the STEP is kept (#555): the
+    // written turn list is the older, more-relied-on half of this feature.
+    // Dropping the whole step would delete a readable instruction to protect
+    // a camera hop — the stepper simply doesn't move the map for a step it
+    // has no coordinate for (handleStepChange guards on it). The live API
+    // supplies `location` on every step (measured 2026-09-20), so this only
+    // ever fires on a malformed response.
+    const raw = s.maneuver?.location;
+    const location =
+      Array.isArray(raw) && raw.length === 2 &&
+      typeof raw[0] === "number" && typeof raw[1] === "number"
+        ? ([raw[0], raw[1]] as [number, number])
+        : undefined;
     return [{
       instruction,
       distance: s.distance,
-      location: location as [number, number],
+      location,
       maneuverType: s.maneuver?.type,
       maneuverModifier: s.maneuver?.modifier,
     }];
@@ -739,9 +743,12 @@ export default function MapWrapper({
    */
   const handleStepChange = useCallback((index: number) => {
     setActiveStepIndex(index);
-    const step = walkingRouteSteps?.[index];
-    if (step) {
-      setFocusPoint({ lng: step.location[0], lat: step.location[1] });
+    // A step with no coordinate (malformed response only — see parseWalkSteps)
+    // still advances and still refreshes location; only the camera hop is
+    // skipped, so the person keeps a readable instruction either way.
+    const location = walkingRouteSteps?.[index]?.location;
+    if (location) {
+      setFocusPoint({ lng: location[0], lat: location[1] });
       setFocusRequestId((n) => n + 1);
     }
     requestStepLocationRefresh();

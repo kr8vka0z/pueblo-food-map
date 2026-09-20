@@ -312,11 +312,36 @@ describe("#553 — overscroll chaining is contained", () => {
     // containment utility beside it, so a NEW scroller added to one of these
     // components can't silently reopen the bug.
     const scrollers = src.match(/[^"'`]*overflow-y-auto[^"'`]*/g) ?? [];
-    expect(scrollers.length, `expected at least one scroller in ${relPath}`).toBeGreaterThan(0);
+    // WHY no per-file "at least one scroller" assertion (#555): a scroller can
+    // legitimately MOVE between these files without the bug reopening. The
+    // Steps sheet's list moved out of RouteStrip.tsx into DirectionButtons.tsx
+    // (WalkStepper's "All turns" disclosure) carrying its overscroll-contain
+    // with it, which left RouteStrip.tsx with zero scrollers and failed this
+    // file's precondition while the actual containment was intact. The rule
+    // worth enforcing is "no UNGUARDED scroller in any of these files"; the
+    // whole-list coverage check below keeps the scan from silently becoming a
+    // no-op if every scroller ever disappeared.
     const unguarded = scrollers.filter((s) => !s.includes("overscroll-contain"));
     expect(
       unguarded,
       `overflow-y-auto without overscroll-contain in ${relPath}: ${unguarded.join(" | ")}`
     ).toEqual([]);
+  });
+
+  test("the sheet-rendered files still contain at least one scroller between them", () => {
+    const total = [
+      "src/components/BottomSheet.tsx",
+      "src/components/RouteStrip.tsx",
+      "src/components/DirectionButtons.tsx",
+      "src/components/ListView.tsx",
+    ].reduce((n, relPath) => {
+      const src = readSrc(relPath)
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .split("\n")
+        .filter((line) => !line.trimStart().startsWith("//"))
+        .join("\n");
+      return n + (src.match(/[^"'`]*overflow-y-auto[^"'`]*/g) ?? []).length;
+    }, 0);
+    expect(total, "the scroll-chaining scan matched nothing at all").toBeGreaterThan(0);
   });
 });

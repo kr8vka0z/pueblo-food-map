@@ -100,22 +100,8 @@ interface RouteStripProps {
    * file's own header), so an empty state here is the exception, not the
    * norm, and should read as one rather than as a missing control.
    *
-   * WHY `location`/`maneuverType`/`maneuverModifier` are OPTIONAL here rather
-   * than importing the stricter `WalkStep` shape directly (#555): same
-   * bridging reasoning as DirectionButtonsProps.walkSteps's own WHY comment
-   * — real callers always pass MapWrapper's parseWalkSteps() output (every
-   * entry has a real location), but this prop predates that guarantee and
-   * RouteStrip.test.tsx constructs plain `{instruction, distance}` literals
-   * for it. `hasSteps`/WalkStepper below filter for a real location before
-   * ever indexing into it.
    */
-  walkSteps?: Array<{
-    instruction: string;
-    distance: number;
-    location?: [number, number];
-    maneuverType?: string;
-    maneuverModifier?: string;
-  }> | null;
+  walkSteps?: WalkStep[] | null;
   /** Which turn WalkStepper shows inside the Steps sheet (#555). */
   activeStepIndex?: number;
   /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap. */
@@ -148,14 +134,7 @@ export default function RouteStrip({
   activeStepIndex = 0,
   onStepChange = () => {},
 }: RouteStripProps) {
-  // WalkStepper needs a real `location` on every entry (it flies the map's
-  // camera there) — filter for it here rather than trusting the loose prop
-  // type above. No-op against real routes (parseWalkSteps already
-  // guarantees this); a hand-built test literal missing `location` just
-  // renders no Steps control instead of crashing WalkStepper's lookup.
-  const stepperSteps: WalkStep[] = (walkSteps ?? []).filter(
-    (s): s is WalkStep => Array.isArray(s.location) && s.location.length === 2,
-  );
+  const stepperSteps = walkSteps ?? [];
   const hasSteps = stepperSteps.length > 0;
 
   // ── Steps sheet (#531) ──────────────────────────────────────────────────

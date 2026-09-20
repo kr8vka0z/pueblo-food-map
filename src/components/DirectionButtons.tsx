@@ -101,24 +101,8 @@ interface DirectionButtonsProps {
    * Turn-by-turn steps from Mapbox Directions API.
    * Instructions are pre-localized (Mapbox language= param in MapWrapper).
    * Rendered via WalkStepper when the route is active.
-   *
-   * WHY `location`/`maneuverType`/`maneuverModifier` stay OPTIONAL on this
-   * prop's own shape rather than importing the stricter `WalkStep` type
-   * directly (#555): real callers always pass `WalkStep[]` (MapWrapper's
-   * `parseWalkSteps` guarantees every item has a valid `location`), but this
-   * prop predates that guarantee and existing tests construct plain
-   * `{instruction, distance}` literals for it. WalkRouteStatus below builds
-   * the stricter list WalkStepper needs by filtering out anything missing a
-   * real location — a no-op against real data, a safe no-render against a
-   * hand-built literal missing it.
    */
-  walkSteps?: Array<{
-    instruction: string;
-    distance: number;
-    location?: [number, number];
-    maneuverType?: string;
-    maneuverModifier?: string;
-  }> | null;
+  walkSteps?: WalkStep[] | null;
   /**
    * True when Walk was tapped with no shared location and the resulting
    * geolocation request was denied or is unavailable (#207). Renders a
@@ -477,15 +461,7 @@ export interface WalkRouteStatusProps {
   locale: Locale;
   isRouteActive: boolean;
   routeInfo?: RouteInfo | null;
-  /** See DirectionButtonsProps.walkSteps's own WHY comment (#555) — same
-   *  loose-optional-field bridging pattern, for the same reason. */
-  walkSteps?: Array<{
-    instruction: string;
-    distance: number;
-    location?: [number, number];
-    maneuverType?: string;
-    maneuverModifier?: string;
-  }> | null;
+  walkSteps?: WalkStep[] | null;
   showLocationHint?: boolean;
   locationHintId: string;
   /**
@@ -524,16 +500,7 @@ export function WalkRouteStatus({
 }: WalkRouteStatusProps) {
   const walkGoogleUrl = googleMapsUrl(venue.lat, venue.lng, "walking");
 
-  // WalkStepper indexes into `steps[activeIndex]` and hands each step's
-  // location to the map's camera-focus effect, so it needs a REAL location
-  // on every entry, not the loose optional-field shape this prop accepts
-  // (see the WHY above). Filtering here — rather than trusting the prop
-  // type — is a no-op against real routes (MapWrapper's parseWalkSteps
-  // already drops locationless steps) and a safe empty render against a
-  // hand-built test literal that omits `location`.
-  const stepperSteps: WalkStep[] = (walkSteps ?? []).filter(
-    (s): s is WalkStep => Array.isArray(s.location) && s.location.length === 2,
-  );
+  const stepperSteps = walkSteps ?? [];
   const hasSteps = isRouteActive && stepperSteps.length > 0;
 
   return (
@@ -588,6 +555,14 @@ export function WalkRouteStatus({
           until the user re-taps Walk. */}
       {hasSteps && (
         <WalkStepper
+          // WHY keyed on the venue (#555, preserving FIX 2's behavior): the
+          // "All turns" disclosure is local state inside WalkStepper, and
+          // this component stays mounted across a venue change — so without
+          // a key, a list left open on venue A would still be open on venue
+          // B's unrelated route. The pre-#555 code spent a ref + an effect
+          // collapsing `stepsExpanded` for exactly this; remounting on the
+          // venue id is the same guarantee with neither.
+          key={venue.id}
           steps={stepperSteps}
           activeIndex={activeStepIndex}
           onStepChange={onStepChange}

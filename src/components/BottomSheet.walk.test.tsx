@@ -115,7 +115,14 @@ describe("BottomSheet — forwards walk props into BoxCardBody", () => {
     expect(trigger.tagName).toBe("A");
   });
 
-  test("isWalkRouteActive + walkRouteInfo render the active-route readout inside the box card", () => {
+  // #509 changed this test's expected behavior — quoting the issue's own
+  // acceptance criterion for the update: "Starting a walking route shrinks
+  // the card to a short strip at the bottom: place name, walking
+  // distance/time, 'Clear route', and 'Show card'." A box's route starts
+  // the SAME way as any other venue's (both call onWalkRoute), so mounting
+  // with isWalkRouteActive already true must land on the strip, not the
+  // full box card's own readout.
+  test("isWalkRouteActive + walkRouteInfo render the route strip, not the full box card", () => {
     render(
       <BottomSheet
         venue={makeBoxVenue()}
@@ -126,6 +133,26 @@ describe("BottomSheet — forwards walk props into BoxCardBody", () => {
         walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
       />,
     );
+    expect(screen.getByTestId("route-strip")).toBeDefined();
+    expect(screen.getByText("Test Blessing Box")).toBeDefined();
+    expect(screen.getByTestId("route-strip-info").textContent).toMatch(/0\.4/);
+    expect(screen.queryByTestId("walking-route-info")).toBeNull();
+  });
+
+  test("'Show card' restores the full box card with the active-route readout", async () => {
+    const user = userEvent.setup();
+    render(
+      <BottomSheet
+        venue={makeBoxVenue()}
+        box={makeBox()}
+        onClose={() => {}}
+        onWalkRoute={vi.fn()}
+        isWalkRouteActive
+        walkRouteInfo={{ distance: "0.4", duration: "8 min" }}
+      />,
+    );
+    await user.click(screen.getByTestId("route-strip-show-card"));
+    expect(screen.queryByTestId("route-strip")).toBeNull();
     expect(screen.getByTestId("walking-route-info")).toBeDefined();
   });
 });

@@ -285,9 +285,12 @@ const stepNavClass =
 // map's per-turn camera focus and this panel must always agree on the
 // current step; two independent pieces of state here could drift apart.
 export interface WalkStepperProps {
-  /** Real `maneuver.location` on every entry — MapWrapper's parseWalkSteps
-   *  already guarantees this; WalkRouteStatus below filters for it before
-   *  ever constructing this component. */
+  /** Every step Mapbox returned, INCLUDING any whose `location` is undefined
+   *  — nothing filters these out (see `WalkStep.location`'s own WHY in
+   *  Map.tsx: a turn with no usable coordinate is still worth reading, so it
+   *  is kept and only its camera hop is skipped). Anything here that reaches
+   *  for a coordinate must guard first, the way MapWrapper's
+   *  `handleStepChange` does. */
   steps: WalkStep[];
   activeIndex: number;
   onStepChange: (index: number) => void;

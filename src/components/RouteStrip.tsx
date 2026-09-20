@@ -323,6 +323,19 @@ export default function RouteStrip({
                   turns" list has its own internal scroll (max-h-48), so the
                   outer dialog is the only element that still needs a height
                   cap. */}
+              {/* WHY no `key` here, unlike WalkRouteStatus's own mount (#555):
+                  that one keys on venue.id because it stays mounted across a
+                  venue change, so its WalkStepper's local "All turns" state
+                  would bleed from one venue's route to the next. This mount
+                  cannot: the `{stepsOpen && ...}` guard above unmounts the
+                  whole subtree on every close, so the disclosure is always
+                  freshly collapsed when the sheet reopens, and the native
+                  <dialog>'s showModal() makes every other venue's Walk
+                  trigger inert while it's open.
+                  THAT IS LOAD-BEARING, not incidental: keeping this content
+                  mounted across close/reopen (say, to animate it) would
+                  silently reintroduce the bleed. RouteStrip.test.tsx pins the
+                  reset so such a change fails a test rather than shipping. */}
               <WalkStepper
                 steps={stepperSteps}
                 activeIndex={activeStepIndex}

@@ -72,6 +72,35 @@ describe("RouteStrip — Steps control (#531)", () => {
     expect(list.textContent).toContain("Turn right on Union Ave");
   });
 
+  // #555 (reviewer finding): this WalkStepper mount has no venue `key`,
+  // unlike WalkRouteStatus's. It doesn't need one ONLY because the sheet's
+  // `{stepsOpen && ...}` guard unmounts the subtree on close, so "All turns"
+  // is always collapsed again on reopen. That reset is load-bearing and was
+  // previously implicit — keeping the content mounted across close/reopen
+  // (e.g. to animate the sheet) would let one venue's expanded list bleed
+  // into the next route. This test makes that change fail here instead.
+  test("All turns collapses again when the sheet is closed and reopened", async () => {
+    const user = userEvent.setup();
+    render(<RouteStrip {...baseProps} walkSteps={STEPS} />);
+
+    await user.click(screen.getByTestId("route-strip-steps"));
+    await user.click(screen.getByTestId("walk-stepper-all-turns-toggle"));
+    expect(
+      screen.getByTestId("walk-stepper-all-turns-toggle").getAttribute("aria-expanded"),
+    ).toBe("true");
+
+    await user.click(screen.getByTestId("route-strip-steps-close"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("walk-stepper-all-turns-toggle")).toBeNull(),
+    );
+
+    await user.click(screen.getByTestId("route-strip-steps"));
+    expect(
+      screen.getByTestId("walk-stepper-all-turns-toggle").getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(screen.getByTestId("walk-steps-list").getAttribute("hidden")).not.toBeNull();
+  });
+
   test("the sheet shows the venue name as its own heading", async () => {
     const user = userEvent.setup();
     render(<RouteStrip {...baseProps} walkSteps={STEPS} />);

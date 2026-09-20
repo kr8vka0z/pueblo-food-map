@@ -517,10 +517,12 @@ new one.
 > Show card) — the opposite of "leaving room." The exception is deleted.
 > This section's original rule is restored to being the whole story again:
 > the bar (and the band) hide for the sheet's entire open lifetime, strip or
-> full card alike, with no carve-out. Mechanism: `RouteStrip` no longer needs
-> its own overlay registration for this — `MapWrapper.tsx`'s `venueSheetOpen`
-> (fed into `overlayRegistry.ts`, #542) now depends only on whether a venue
-> is selected, not on which of the two sheet states is showing.
+> full card alike, with no carve-out. Mechanism: `RouteStrip` never registers
+> itself with the overlay registry (only its own Steps sheet does, unchanged
+> since #542) — `MapWrapper.tsx`'s `venueSheetOpen` (fed into
+> `overlayRegistry.ts`, #542) now depends only on whether a venue is
+> selected, not on which of the two sheet states is showing, so one
+> registration covers both without RouteStrip needing one of its own.
 
 **Map padding:** `MapWrapper`'s map `padding.bottom` increases by the bar's height below
 `2xl`, so `fitBounds` and marker-fly animations stop centring results underneath the bar.

@@ -129,16 +129,23 @@ export default function RouteStrip({
   // ── Steps sheet (#531) ──────────────────────────────────────────────────
   const [stepsOpen, setStepsOpen] = useState(false);
   // #542: the steps sheet is its own full-surface overlay on top of the
-  // strip, so it registers independently while open. The strip itself no
-  // longer needs a registration of its own here: #547 (Kyle, 2026-09-20)
-  // reversed #531's "nav stays visible under the strip" carve-out by
-  // removing MapWrapper.tsx's `!stripVisible` term from `venueSheetOpen`
-  // instead — that keeps the nav hidden for the strip's entire mounted
-  // lifetime in the SAME commit BottomSheet.tsx flips `showStrip`, with
-  // nothing here to register/unregister on "Show card"/"Clear route" and
-  // risk a stray frame (BottomSheet's own `onStripVisibleChange` is a
-  // passive effect, one render behind — a `useOverlayRegistration` call at
-  // this component's mount/unmount would inherit that lag).
+  // strip, so it registers independently while open. The strip itself
+  // doesn't register here: #547 (Kyle, 2026-09-20) reversed #531's "nav
+  // stays visible under the strip" carve-out by removing MapWrapper.tsx's
+  // `!stripVisible` term from `venueSheetOpen` instead of adding a second,
+  // strip-local registration alongside it. Not a lag concern — a
+  // `useOverlayRegistration(true)` here would itself be synchronous
+  // (`useLayoutEffect`, same commit as mount/unmount, just like this one).
+  // The actual hazard was the two mechanisms coexisting: if `!stripVisible`
+  // had stayed in `venueSheetOpen` while this component also registered
+  // itself, then on "Show card" this component's unmount (removing its id,
+  // same commit) and MapWrapper's registration (still gated on a
+  // `stripVisible` that hasn't caught up yet — `onStripVisibleChange` is a
+  // passive effect, one render behind) would BOTH have the registry empty
+  // for one frame, showing the nav before the next render hid it again.
+  // Deleting the `!stripVisible` term — what actually shipped — removes
+  // that race outright, so there is nothing left for a second registration
+  // here to coordinate with.
   useOverlayRegistration(stepsOpen);
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Explicit focus restore, not relied-on-native — same reasoning as

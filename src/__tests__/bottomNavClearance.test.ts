@@ -100,10 +100,40 @@ describe("#530 — small-viewport anchoring for bottom-pinned chrome", () => {
   test.each([
     ["src/components/BottomNav.tsx"],
     ["src/components/BottomSheet.tsx"],
-  ])("%s pins bottom-anchored chrome with no bare vh/dvh unit", (relPath) => {
+  ])("%s pins bottom-anchored chrome with no bare vh unit", (relPath) => {
     const src = readSrc(relPath);
     expect(src, `${relPath} must not size/position against a bare vh unit`).not.toMatch(/\b\d+vh\b/);
-    expect(src, `${relPath} must not size/position against a bare dvh unit`).not.toMatch(/\b\d+dvh\b/);
+  });
+
+  test("BottomNav.tsx uses no dvh unit at all", () => {
+    const src = readSrc("src/components/BottomNav.tsx");
+    expect(
+      src,
+      "BottomNav.tsx must not size/position against a bare dvh unit — it has no snap-point " +
+        "constraint forcing it off --viewport-small, so dvh here would only reintroduce #530's " +
+        "mid-scroll jump"
+    ).not.toMatch(/\b\d+dvh\b/);
+  });
+
+  // #549 — narrowed from a blanket dvh ban to "only 100dvh, and only in
+  // BottomSheet.tsx". The blanket ban was written for #530, before vaul's
+  // snap-point math was understood: vaul measures a px snap point against
+  // `window.innerHeight`, so the route-active drawer's height MUST use the
+  // one CSS unit that equals `window.innerHeight` in both toolbar states —
+  // measured on the real iPhone, iOS 26, 2026-09-20 (Safari 714/714, Chrome
+  // 683/683). `--viewport-small` is deliberately shorter than that, which is
+  // exactly what pushed the route strip off the bottom edge. Still has teeth:
+  // any OTHER dvh fraction (90dvh, 50dvh — the kind of unmeasured "size it to
+  // the viewport" guess this guard exists to catch) still fails here, and the
+  // exact height expression is pinned separately in routeStripSnapMath.test.ts.
+  test("BottomSheet.tsx's only dvh unit is the measured 100dvh", () => {
+    const src = readSrc("src/components/BottomSheet.tsx");
+    const used = Array.from(new Set(src.match(/\b\d+dvh\b/g) ?? []));
+    expect(
+      used,
+      "BottomSheet.tsx may use 100dvh (it must match vaul's window.innerHeight reference — " +
+        "see its own `style` prop comment) and no other dvh value"
+    ).toEqual(["100dvh"]);
   });
 });
 

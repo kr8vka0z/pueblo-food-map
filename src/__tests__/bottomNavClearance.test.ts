@@ -252,3 +252,51 @@ describe("#541 — bottom-pinned chrome uses env(safe-area-inset-bottom) alone, 
     ).toEqual([]);
   });
 });
+
+/**
+ * #553 — iOS Safari rubber-band bounce on swipe-down.
+ *
+ * A downward drag starting inside a scroller that is already at scrollTop 0
+ * CHAINS to the document unless the scroller opts out, and iOS Safari answers
+ * that by bouncing the entire page. Measured off Kyle's 2026-09-20 screen
+ * recording: header, map and card translated down together by ~104 CSS px and
+ * sprang back, once per swipe-down attempt. `modal={false}` on the drawer
+ * means vaul never applies its body scroll-lock, so nothing else intercepts
+ * it.
+ *
+ * Neither half is reachable from a jsdom test — jsdom implements no scrolling,
+ * no touch physics, and BottomSheet's own tests mock vaul outright — so these
+ * are source-level guards, in the same spirit as the `vh`/`dvh` guards above.
+ */
+describe("#553 — overscroll chaining is contained", () => {
+  test("globals.css sets overscroll-behavior: none on html", () => {
+    const css = readSrc("src/app/globals.css");
+    expect(css).toMatch(/html\s*\{[^}]*overscroll-behavior:\s*none;/);
+  });
+
+  test.each([
+    ["src/components/BottomSheet.tsx"],
+    ["src/components/RouteStrip.tsx"],
+    ["src/components/ListView.tsx"],
+  ])("%s: every overflow-y-auto scroller also opts out of scroll chaining", (relPath) => {
+    // Drop whole-line `//` comments first. Several of these files discuss
+    // `overflow-y-auto` in prose (BottomSheet.tsx's repositionInputs note,
+    // and this fix's own comments) — counting those as scrollers would fail
+    // the assertion on documentation rather than on code.
+    const src = readSrc(relPath)
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("//"))
+      .join("\n");
+    // What's left: the utility appears only inside class strings. Pull each
+    // quoted/templated run containing the scroll utility and require the
+    // containment utility beside it, so a NEW scroller added to one of these
+    // components can't silently reopen the bug.
+    const scrollers = src.match(/[^"'`]*overflow-y-auto[^"'`]*/g) ?? [];
+    expect(scrollers.length, `expected at least one scroller in ${relPath}`).toBeGreaterThan(0);
+    const unguarded = scrollers.filter((s) => !s.includes("overscroll-contain"));
+    expect(
+      unguarded,
+      `overflow-y-auto without overscroll-contain in ${relPath}: ${unguarded.join(" | ")}`
+    ).toEqual([]);
+  });
+});

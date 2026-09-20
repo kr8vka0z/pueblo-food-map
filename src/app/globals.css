@@ -148,6 +148,24 @@
    toggle. See `[data-bottom-nav]`'s own comment below for the replacement
    formula and why `env(safe-area-inset-bottom)` is kept. */
 
+/* #553 — document-level backstop against iOS Safari's rubber-band bounce.
+   Measured off Kyle's 2026-09-20 screen recording: a swipe down on the
+   blessing-box card dragged the WHOLE page — header, map and card together —
+   down ~104 CSS px and sprang it back, once per swipe attempt. The sheet's
+   own scroller now carries `overscroll-contain` (see BottomSheet.tsx), which
+   stops the usual chain; this rule catches the rest, including drags that
+   land on non-scrolling chrome, because `modal={false}` on the drawer means
+   vaul never applies its body scroll-lock.
+
+   Deliberately `overscroll-behavior`, NOT `overflow: hidden`. This only
+   suppresses the bounce and pull-to-refresh — it does not stop scrolling, so
+   the ordinary document-scrolling routes (venue pages, About, admin) are
+   unaffected and no route-scoping is needed. Set on `html` rather than
+   `body` so it propagates to the viewport from the root. */
+html {
+  overscroll-behavior: none;
+}
+
 body {
   background: var(--color-bone-50);
   color: var(--color-ink-700);

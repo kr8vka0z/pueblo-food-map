@@ -390,7 +390,20 @@ export default function BottomSheet({
           )}
 
           {venue && !showStrip && (
-            <div className="flex-1 overflow-y-auto">
+            // `overscroll-contain` (#553): without it, a downward drag that
+            // starts inside this scroller while it is already at scrollTop 0
+            // CHAINS to the document, and iOS Safari rubber-bands the entire
+            // page — measured off Kyle's 2026-09-20 screen recording as the
+            // header, map and card all translating down together by ~104 CSS
+            // px and springing back, four times in four swipe-down attempts.
+            // `modal={false}` on Drawer.Root above means vaul never applies
+            // its body scroll-lock, so nothing else stops that chain.
+            // ListView's own scroller has carried this since it was written.
+            //
+            // NOT the toolbar-resize residual documented on `snapPoints`
+            // above: Safari's bottom toolbar held a constant screen position
+            // across all 2039 frames of that recording, so no resize fired.
+            <div className="flex-1 overflow-y-auto overscroll-contain">
               {isBox ? (
                 box ? (
                   // Card-redesign (2026-09-19): BoxCardBody now owns the

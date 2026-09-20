@@ -507,6 +507,21 @@ new one.
 > fully expanded. It sits above the sheet's z-index, so at the peek detent "Sponsored by
 > Pueblo Food Project" printed across the Walk / Bus / Drive buttons (seen on an iPhone).
 
+> **Amended 2026-09-19 by #531, then reversed 2026-09-20 by #547 (Kyle) — this
+> section's own "open at any detent" rule was briefly NOT the whole story.**
+> #531 added a walking-route exception: while the sheet's collapsed to the
+> `RouteStrip` (a route in progress), the bar stayed visible underneath it
+> instead of hiding, on the theory that the strip is short enough to leave
+> the bar room. #547: Kyle walked the app on his own phone and found the bar
+> covering the strip's route controls (distance/time, Clear route, Steps,
+> Show card) — the opposite of "leaving room." The exception is deleted.
+> This section's original rule is restored to being the whole story again:
+> the bar (and the band) hide for the sheet's entire open lifetime, strip or
+> full card alike, with no carve-out. Mechanism: `RouteStrip` no longer needs
+> its own overlay registration for this — `MapWrapper.tsx`'s `venueSheetOpen`
+> (fed into `overlayRegistry.ts`, #542) now depends only on whether a venue
+> is selected, not on which of the two sheet states is showing.
+
 **Map padding:** `MapWrapper`'s map `padding.bottom` increases by the bar's height below
 `2xl`, so `fitBounds` and marker-fly animations stop centring results underneath the bar.
 

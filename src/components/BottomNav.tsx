@@ -185,14 +185,21 @@ export default function BottomNav({
     <nav
       ref={navRef}
       aria-label={t("nav.aria", locale)}
+      // #530 review round 2: the `bottom` position lives in globals.css
+      // (`[data-bottom-nav]`), NOT here as a class or inline style — an
+      // inline style always outranks a stylesheet rule (short of
+      // `!important`), so a Tailwind `2xl:` class or a media-scoped CSS
+      // reset can never override one, no matter which comes later in the
+      // cascade. See globals.css's own comment for the actual formula and
+      // the reasoning (a stable gap derived from the large/small viewport
+      // difference, no env(safe-area-inset-bottom) term — see that file).
       data-bottom-nav=""
       className={
-        // Below 2xl: a 64px pill floating 12px in from the sides and 12px above
-        // the home indicator — same bone-50 fill, bone-300 border and full
-        // radius as the search bar, with a slightly stronger shadow because
-        // it sits over the busiest part of the map. Cells stay ~90px wide at
-        // 393px, well past the 44px tap floor.
-        "fixed left-3 right-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-[1003] " +
+        // Below 2xl: a 64px pill floating 12px in from the sides — same
+        // fill, border and radius as the search bar, with a slightly
+        // stronger shadow because it sits over the busiest part of the map.
+        // Cells stay ~90px wide at 393px, well past the 44px tap floor.
+        "fixed left-3 right-3 z-[1003] " +
         "h-16 px-1.5 " +
         "bg-[var(--color-bone-50)] border border-[var(--color-bone-300)] rounded-[var(--radius-full)] " +
         "shadow-[0_4px_16px_rgba(26,24,23,0.14),0_0_0_1px_rgba(26,24,23,0.04)] " +
@@ -200,6 +207,9 @@ export default function BottomNav({
         // background as SearchBar's input (h-[52px], rounded-full, bone-50,
         // bone-300 border, elevation-1). 24px up, clear of the Mapbox corner.
         // fixed, not absolute: on the Menu pages (PageNav) the document scrolls.
+        // Overrides globals.css's below-2xl `[data-bottom-nav]` bottom rule
+        // outright (that rule is scoped to `@media (width < 96rem)`, so it
+        // simply doesn't match here — no specificity fight, no reset needed).
         "2xl:right-auto 2xl:z-[1000] " +
         "2xl:bottom-6 2xl:left-1/2 2xl:-translate-x-1/2 " +
         "2xl:h-[52px] 2xl:px-1 2xl:shadow-none 2xl:elevation-1"

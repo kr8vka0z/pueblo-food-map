@@ -141,3 +141,20 @@ describe("#530 review round 2 — position lives in CSS, not a React inline styl
     expect(css).toMatch(/\[data-bottom-sheet\]\s*\{\s*bottom:\s*var\(--viewport-toolbar-gap\);/);
   });
 });
+
+describe("#530 review round 3 — vaul's own keyboard-avoidance reintroduces the slice", () => {
+  test("Drawer.Root disables vaul's repositionInputs", () => {
+    const src = readSrc("src/components/BottomSheet.tsx");
+    // vaul defaults repositionInputs to true: on visualViewport resize (the
+    // keyboard opening/closing) it writes an inline `drawerRef.current
+    // .style.bottom` and never clears it — which always outranks
+    // globals.css's [data-bottom-sheet] rule for the life of the instance,
+    // and leaves the sheet at a literal `bottom: 0px` (the #530 slice bug)
+    // once the keyboard closes. This is invisible to every OTHER test in
+    // this file/suite, which all mock vaul — this regex-on-source is the
+    // only guard available.
+    expect(src, "expected repositionInputs={false} on Drawer.Root").toMatch(
+      /repositionInputs=\{false\}/
+    );
+  });
+});

@@ -174,7 +174,48 @@ export default function BottomSheet({
       open={open}
       onOpenChange={handleOpenChange}
       modal={false}
+      // #530 review round 3 (BLOCKER, invisible to every test here — every
+      // BottomSheet test mocks vaul): vaul defaults `repositionInputs` to
+      // true, which listens for visualViewport resize (the keyboard
+      // opening/closing) and writes an inline `drawerRef.current.style
+      // .bottom` — and never clears it (vaul/dist/index.mjs's own
+      // onVisualViewportChange effect, ~line 1153). BoxCheckinPanel (inside
+      // this sheet via BoxCardBody) has real input/textarea fields, so
+      // focusing one fires that effect; an inline style always outranks
+      // globals.css's `[data-bottom-sheet]` rule for the life of the
+      // instance, and after the keyboard closes vaul leaves it at literally
+      // `bottom: 0px` — reintroducing the exact #530 slice bug in the check-
+      // in flow. `repositionInputs={false}` turns the whole effect off at
+      // its own early-return guard. Safe here: nothing in this sheet is a
+      // bottom-docked input relying on vaul's keyboard-avoidance resize —
+      // BoxCheckinPanel's fields sit in the sheet's own normal scrollable
+      // flow (`overflow-y-auto`), which the browser's native
+      // focus-scroll-into-view already handles.
+      repositionInputs={false}
       dismissible={!isWalkRouteActive}
+      // #530 review round 3 (IMPORTANT, KNOWN RESIDUAL, not fixed here):
+      // vaul's useSnapPoints measures `window.innerHeight` for these two px
+      // snap points (unless a `container` prop is passed to Drawer.Root)
+      // and re-runs snapToPoint — an ANIMATED transform — on every window
+      // resize (vaul/dist/index.mjs ~lines 517-524, 540-548, 608-613). iOS
+      // Safari fires a resize event when its toolbar collapses/expands on
+      // scroll, so the route strip (or full card, while a route is active)
+      // can still visibly re-animate to a new snapped position mid-scroll —
+      // in tension with this issue's "must not jump" criterion, though it's
+      // a smooth transition rather than an instant cut.
+      //
+      // Considered passing a `container` element sized from
+      // `var(--viewport-small)` to make vaul's own size reference stable.
+      // Rejected: `container` is ALSO handed straight to `Drawer.Portal`
+      // as its React-portal render target (defaults from context — see
+      // vaul's `Portal()`) and flips `data-vaul-custom-container`, which
+      // disables vaul's own `::after` background-fill rule for the
+      // rubber-band overscroll area. Fixing this one animation would mean
+      // relocating where the sheet portals to AND losing its overscroll
+      // background fill — both unverifiable here (every BottomSheet test
+      // mocks vaul; there's no real Safari touch/drag/overscroll rig on
+      // this machine) and each a plausible regression of its own. Left as
+      // a known residual rather than trading one unverified bug for two.
       snapPoints={isWalkRouteActive ? [ROUTE_STRIP_SNAP, FULL_CARD_SNAP] : undefined}
       activeSnapPoint={isWalkRouteActive ? (cardRevealed ? FULL_CARD_SNAP : ROUTE_STRIP_SNAP) : undefined}
       setActiveSnapPoint={(snap) => {

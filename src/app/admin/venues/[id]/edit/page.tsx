@@ -68,6 +68,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
+import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
+import AdminNav from "@/components/AdminNav";
 import AddVenueForm from "@/components/AddVenueForm";
 import ArchiveVenueButton from "@/components/ArchiveVenueButton";
 import BoxCheckinsAdminPanel from "@/components/BoxCheckinsAdminPanel";
@@ -211,6 +213,7 @@ export default async function EditVenuePage({
   let linkHealthContext: LinkHealthProposalContext | null = null;
   let boxCheckins: AdminCheckinRow[] = [];
   let hostAlerts: { id: number; email: string }[] = [];
+  let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
 
   try {
     const { db, identity } = await getAdminDb(await headers());
@@ -225,6 +228,7 @@ export default async function EditVenuePage({
         hostAlerts = await resolveHostAlerts(db, id);
       }
     }
+    navCounts = await loadAdminNavCounts(db);
   } catch (err) {
     handlePageAuthError(err);
   }
@@ -233,22 +237,9 @@ export default async function EditVenuePage({
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <header className="flex flex-col gap-2 border-b border-[var(--color-bone-200)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div>
-          <h1 className="wordmark text-2xl text-[var(--color-ink-900)]">Edit {venue.name}</h1>
-          <Link
-            href="/admin"
-            className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
-          >
-            Back to venue list
-          </Link>
-        </div>
-        <p className="text-sm text-[var(--color-ink-500)]">
-          Signed in as{" "}
-          <span className="font-medium text-[var(--color-sage-700)]">{email}</span>
-        </p>
-      </header>
+      <AdminNav email={email} active="places" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6 space-y-6">
+        <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Edit {venue.name}</h2>
         {closureContext && (
           <div className="max-w-2xl rounded-[var(--radius-lg)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
             <p className="font-semibold">Reviewing a closure report</p>

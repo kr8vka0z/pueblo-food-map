@@ -162,7 +162,7 @@ still exist and still work exactly as before, but their output
 (`src/data/pantries-plentiful.ts`, `src/data/grocery-osm.ts`) is no longer
 read by the build. This is why venue data went unverified for four months
 (2026-05 to 2026-09): the only remaining path to correct a venue was a human
-editing it by hand in `/admin`.
+editing it by hand in the admin panel (`/admin/places`).
 
 **The real refresh path (as of #133/#234's automated pipeline):**
 [`.github/workflows/refresh-proposals.yml`](.github/workflows/refresh-proposals.yml)

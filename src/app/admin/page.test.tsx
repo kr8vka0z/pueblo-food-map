@@ -1,138 +1,96 @@
 /**
- * Auth-guard regression test for the /admin Server Component page (#237
- * checkpoint c; venue list #253).
+ * DashboardPage (/admin) auth-guard test — same rationale as every other
+ * admin page's own page.test.tsx (e.g. src/app/admin/submissions/page.test.tsx):
+ * this page's getAdminDb() -> forbidden() fail-closed wiring is the one
+ * thing worth pinning at this layer. The Dashboard's actual data shaping
+ * (stale-places selection, box-health ranking, publish-summary math,
+ * "needs a decision" grouping) is already covered by dedicated tests
+ * against the pure functions themselves (src/lib/adminDashboard.test.ts,
+ * boxHealth.test.ts, adminVenues.test.ts) and the presentational
+ * components that render them (NeedsDecisionPanel.test.tsx,
+ * BoxHealthList.test.tsx, StalePlacesList.test.tsx) — this file does not
+ * re-derive any of that, only that a real render reaches those components
+ * with SOME data and that the auth failure paths behave.
  *
- * WHY this exists: page.tsx's own header says RSC page tests are hard in
- * this stack, so nothing pinned its auth contract directly — a future edit
- * could route around getAdminDb() (the single D1 choke point,
- * src/lib/adminDb.ts) or drop the try/catch's fail-closed handling and
- * nothing would fail red. This test calls the async Server Component
- * directly (`await AdminPage()`) and mocks only getAdminDb, next/headers,
- * next/navigation's forbidden(), and the logger — cfAccess.ts's real
- * AccessDeniedError is imported unmocked so `err instanceof
- * AccessDeniedError` inside the page still resolves true. Real JWT/D1
- * plumbing stays covered by adminDb.test.ts and cfAccess.test.ts; this file
- * only proves the page wires those pieces together correctly.
+ * The fake db below is deliberately lenient (every `.all()` resolves to
+ * zero rows, every `.first()` to `{n: 0}`) rather than routing by exact SQL
+ * text: with zero venues/zero pending rows in every table, every panel this
+ * page renders lands on its own already-tested empty state, and the one
+ * conditional query this page skips entirely when its inputs are empty
+ * (loadVenueLookup's proposal-id lookup, loadBoxHealthEntries' check-in/
+ * adopter reads once the box-venues query returns nothing) never fires —
+ * see this page's own header for why that's true, not assumed.
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { AccessDeniedError } from "@/lib/cfAccess";
-import type { AdminVenueRow } from "@/types/venue";
 
-// Per-file vi.mock style matches src/app/api/admin/publish/route.test.ts and
-// src/lib/adminDb.test.ts: a "mock"-prefixed const declared before the
-// vi.mock call, referenced from inside the (hoisted) factory.
 const mockGetAdminDb = vi.fn();
 vi.mock("@/lib/adminDb", () => ({
   getAdminDb: (...args: unknown[]) => mockGetAdminDb(...args),
 }));
 
-// Value is irrelevant -- getAdminDb is mocked, so the page never actually
-// reads these headers. Only its shape (a Headers-like .get()) matters.
 vi.mock("next/headers", () => ({
   headers: vi.fn(async () => ({ get: () => null })),
 }));
 
-// Real Next.js forbidden() is a control-flow signal (it throws internally
-// to unwind to the nearest forbidden boundary) -- throwing here lets the
-// test assert it fired via `.rejects.toThrow`. useRouter is stubbed too
-// (#256): the page's tree now includes PublishPanel, a Client Component
-// that calls useRouter() for its post-publish router.refresh() -- this
-// file's focus is the auth guard, not Publish, so a plain no-op stub is
-// enough to let PublishPanel mount without crashing.
 vi.mock("next/navigation", () => ({
   forbidden: vi.fn(() => {
     throw new Error("FORBIDDEN_CALLED");
   }),
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  // NeedsDecisionPanel (rendered by this page) calls useRouter() for its
+  // own router.refresh() on a successful approve/reject — never exercised
+  // by this page-level test, but the component still calls the hook on
+  // every render, so it must resolve to something.
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
 
 vi.mock("@/lib/logger", () => ({
   logAdminAuthFailure: vi.fn(),
 }));
 
-import AdminPage from "@/app/admin/page";
+import DashboardPage from "@/app/admin/page";
 import { forbidden } from "next/navigation";
 import { logAdminAuthFailure } from "@/lib/logger";
 
-function makeVenueRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
-  return {
-    id: "venue-a",
-    name: "Eastside Pantry",
-    category: "pantry",
-    lat: 38.25,
-    lng: -104.6,
-    address: "123 Test St",
-    hours_weekly: null,
-    accepts_snap: null,
-    accepts_wic: null,
-    phone: null,
-    email: null,
-    url: null,
-    notes: null,
-    operator: null,
-    source: "test",
-    last_verified: "2026-01-01",
-    status: "published",
-    source_type: "manual",
-    outside_county: 0,
-    created_at: "2026-01-01T00:00:00.000Z",
-    created_by: "admin@example.com",
-    updated_at: "2026-01-01T00:00:00.000Z",
-    updated_by: "admin@example.com",
-    published_at: "2026-01-01T00:00:00.000Z",
-    published_by: "admin@example.com",
-    ...overrides,
+/** Every query this page (and every lib function it calls) issues resolves to zero rows — see file header for why nothing deeper ever fires with this input. */
+function makeFakeDb() {
+  const stmt = {
+    bind: () => stmt,
+    all: async () => ({ success: true, results: [], meta: {} }),
+    first: async () => ({ n: 0 }),
   };
+  return { prepare: () => stmt } as unknown as object;
 }
 
-/** Matches the page's real call chain: db.prepare(sql).all<AdminVenueRow>(). */
-function makeFakeDb(seedRows: AdminVenueRow[]) {
-  return {
-    prepare: () => ({
-      all: async () => ({ success: true, results: seedRows, meta: {} }),
-    }),
-  } as unknown as D1Database;
-}
-
-describe("AdminPage — auth guard", () => {
+describe("DashboardPage (/admin) — auth guard", () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  test("success: renders the signed-in email and venue rows, forbidden() not called", async () => {
-    const venues = [
-      makeVenueRow(),
-      makeVenueRow({ id: "venue-b", name: "Main Street Grocery", category: "grocery" }),
-    ];
-    mockGetAdminDb.mockResolvedValue({
-      db: makeFakeDb(venues),
-      identity: { email: "admin@example.com" },
-    });
+  test("success: renders the signed-in email and every panel's empty state, forbidden() not called", async () => {
+    mockGetAdminDb.mockResolvedValue({ db: makeFakeDb(), identity: { email: "admin@example.com" } });
 
-    render(await AdminPage());
+    render(await DashboardPage());
 
     expect(screen.getByText("admin@example.com")).toBeDefined();
-    expect(screen.getByText("Eastside Pantry")).toBeDefined();
-    expect(screen.getByText("Main Street Grocery")).toBeDefined();
-    // Nav link to the review queue (#259 follow-up) — reachable from the
-    // admin home instead of only by typing the URL.
-    const reviewQueueLink = screen.getByRole("link", { name: "Review queue" });
-    expect(reviewQueueLink.getAttribute("href")).toBe("/admin/submissions");
-    // #390 follow-up: nav link to the change-proposal review queue.
-    const flagsQueueLink = screen.getByRole("link", { name: "Data refresh queue" });
-    expect(flagsQueueLink.getAttribute("href")).toBe("/admin/flags");
+    expect(
+      screen.getByText(
+        "Nothing waiting on you. New suggestions, data changes, box photos and adoption requests show up here as they come in.",
+      ),
+    ).toBeDefined();
+    expect(screen.getByText("Every box is doing fine.")).toBeDefined();
+    expect(screen.getByText(/Every published place has been checked recently/)).toBeDefined();
+    // No unpublished changes -> the Publish bar itself never renders.
+    expect(screen.queryByText(/waiting to go live/i)).toBeNull();
     expect(forbidden).not.toHaveBeenCalled();
   });
 
   test("access denied -> fails closed: forbidden() fires and the denial is logged", async () => {
-    // "not_allowlisted" stands in for any AccessDeniedError reason OTHER
-    // than "no_session" here — this test proves the generic forbidden()/403
-    // branch, not this specific reason (see adminAuthErrors.ts).
     mockGetAdminDb.mockRejectedValue(new AccessDeniedError("not_allowlisted"));
 
-    await expect(AdminPage()).rejects.toThrow("FORBIDDEN_CALLED");
+    await expect(DashboardPage()).rejects.toThrow("FORBIDDEN_CALLED");
 
     expect(logAdminAuthFailure).toHaveBeenCalledWith("not_allowlisted");
     expect(forbidden).toHaveBeenCalledTimes(1);
@@ -141,7 +99,7 @@ describe("AdminPage — auth guard", () => {
   test("unexpected error -> re-thrown, not swallowed; forbidden() and the logger are untouched", async () => {
     mockGetAdminDb.mockRejectedValue(new Error("boom"));
 
-    await expect(AdminPage()).rejects.toThrow("boom");
+    await expect(DashboardPage()).rejects.toThrow("boom");
 
     expect(forbidden).not.toHaveBeenCalled();
     expect(logAdminAuthFailure).not.toHaveBeenCalled();

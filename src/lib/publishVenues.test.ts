@@ -444,6 +444,37 @@ describe("fetchPublishSnapshot", () => {
     expect(snapshot.editedPublishedIds).toEqual(["edited"]);
     expect(snapshot.draftIds).toEqual(["d"]);
   });
+
+  // Item 1 regression: archived rows must never re-enter the published
+  // snapshot (`rows`), but a PREVIOUSLY-PUBLISHED row archived AFTER its
+  // last publish still needs its published_at re-stamped — otherwise
+  // summarizePublishChanges() (adminVenues.ts) counts it "pending removal"
+  // forever, even after this exact publish ships the removal.
+  test("archivedIds names previously-published rows archived after their last publish; never appears in rows", async () => {
+    const { db } = makeFakeDb([
+      makeRow({ id: "b", status: "published" }),
+      // archived AFTER its last publish -> pending removal
+      makeRow({
+        id: "pending-removal",
+        status: "archived",
+        published_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-02-01T00:00:00.000Z",
+      }),
+      // already re-stamped by an earlier publish -> not pending anymore
+      makeRow({
+        id: "already-removed",
+        status: "archived",
+        published_at: "2026-02-01T00:00:00.000Z",
+        updated_at: "2026-01-01T00:00:00.000Z",
+      }),
+      // archived, never published -> was never live, not pending
+      makeRow({ id: "never-live", status: "archived", published_at: null }),
+    ]);
+    const snapshot = await fetchPublishSnapshot(db);
+    expect(snapshot.archivedIds).toEqual(["pending-removal"]);
+    // No archived row of any kind may leak into the published file's rows.
+    expect(snapshot.rows.map((r) => r.id)).toEqual(["b"]);
+  });
 });
 
 describe("promotePublishedDrafts", () => {
@@ -545,6 +576,42 @@ describe("promotePublishedDrafts", () => {
     );
     expect(batch).toHaveBeenCalledTimes(1);
     expect(boundStatements.filter((s) => s.sql.startsWith("UPDATE venues"))).toHaveLength(0);
+  });
+
+  // Item 1 fix: an archived row's published_at re-stamp must NOT flip its
+  // status to 'published' — it's leaving the map, not joining it. This is a
+  // different UPDATE statement than the draft/edited-published one above
+  // (which does set status = 'published').
+  test("re-stamps published_at/published_by on a pending-removal archived row WITHOUT touching status", async () => {
+    const { db, boundStatements, batch } = makeFakeDb([]);
+    await promotePublishedDrafts(
+      db,
+      [],
+      {
+        actorEmail: "admin@pueblofoodmap.com",
+        publishedAt: "2026-07-04T00:00:00.000Z",
+        prUrl: "https://github.com/kr8vka0z/pueblo-food-map/pull/4",
+        snapshotCount: 1,
+      },
+      [],
+      ["removed-venue"],
+    );
+
+    expect(batch).toHaveBeenCalledTimes(1);
+    const updates = boundStatements.filter((s) => s.sql.startsWith("UPDATE venues"));
+    expect(updates).toHaveLength(1);
+    expect(updates[0].sql).not.toContain("status");
+    expect(updates[0].args).toEqual([
+      "2026-07-04T00:00:00.000Z", // published_at
+      "admin@pueblofoodmap.com", // published_by
+      "removed-venue", // WHERE id = ?
+    ]);
+
+    const afterJson = JSON.parse(
+      boundStatements.find((s) => s.sql.startsWith("INSERT INTO audit_log"))?.args[5] as string,
+    );
+    expect(afterJson.archivedIds).toEqual(["removed-venue"]);
+    expect(afterJson.archivedCount).toBe(1);
   });
 });
 

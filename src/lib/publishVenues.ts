@@ -295,28 +295,55 @@ export interface PublishSnapshot {
    * still need published_at/published_by re-stamped.
    */
   editedPublishedIds: string[];
+  /**
+   * Ids with status='archived' at snapshot time, previously published
+   * (`published_at !== null`), and archived AFTER that last publish
+   * (`updated_at > published_at`) — i.e. exactly what
+   * summarizePublishChanges() (adminVenues.ts) counts as "will be removed."
+   * NEVER included in `rows` (an archived row must never re-enter the
+   * published file), but its `published_at` needs the same re-stamp
+   * editedPublishedIds gets below — otherwise, once a publish actually
+   * removes it, the row stays counted "pending removal" FOREVER, since
+   * nothing else ever advances an archived row's published_at (the bug this
+   * field fixes; see adminVenues.ts's summarizePublishChanges).
+   */
+  archivedIds: string[];
 }
 
 /**
- * Step 1: snapshot every draft+published row. Drafts ARE included — they're
- * what's about to go live (spec NB1: the pre-fix version queried
- * status='published' only, silently dropping every pending draft).
+ * Step 1: snapshot every draft+published+pending-removal-archived row.
+ * Drafts ARE included — they're what's about to go live (spec NB1: the
+ * pre-fix version queried status='published' only, silently dropping every
+ * pending draft). Archived rows are fetched in the SAME query (so a fake-D1
+ * test only needs to seed one result set) but partitioned out of `rows`
+ * immediately below — they must never re-enter the published snapshot, only
+ * have their published_at re-stamped (see archivedIds' own doc comment).
  */
 export async function fetchPublishSnapshot(db: D1Database): Promise<PublishSnapshot> {
   // AND category != 'blessing_box': boxes are live, not published (Build
   // Plan architecture call #1) — they read straight from D1 through their
   // own endpoint/page, and must never ride a Publish into the static
   // snapshot. Left out here rather than filtered after the query so a box
-  // row can never even become a draftId/editedPublishedId candidate below.
+  // row can never even become a draftId/editedPublishedId/archivedId
+  // candidate below.
   const result = await db
-    .prepare("SELECT * FROM venues WHERE status IN ('draft','published') AND category != 'blessing_box' ORDER BY id")
+    .prepare(
+      "SELECT * FROM venues WHERE status IN ('draft','published','archived') AND category != 'blessing_box' ORDER BY id",
+    )
     .all<VenueRow>();
-  const rows = result.results;
+  const allRows = result.results;
+  // The published file's own row set — archived rows are excluded here, not
+  // just left out of draftIds/editedPublishedIds, so validateSnapshot/
+  // serializePublishedVenuesFile can never accidentally re-publish one.
+  const rows = allRows.filter((row) => row.status !== "archived");
   const draftIds = rows.filter((row) => row.status === "draft").map((row) => row.id);
   const editedPublishedIds = rows
     .filter((row) => row.status === "published" && row.published_at !== null && row.updated_at > row.published_at)
     .map((row) => row.id);
-  return { rows, draftIds, editedPublishedIds };
+  const archivedIds = allRows
+    .filter((row) => row.status === "archived" && row.published_at !== null && row.updated_at > row.published_at)
+    .map((row) => row.id);
+  return { rows, draftIds, editedPublishedIds, archivedIds };
 }
 
 export interface PublishAuditMeta {
@@ -329,9 +356,10 @@ export interface PublishAuditMeta {
 /**
  * Step 6 (spec §5 step 5 / §8 NB1): promotes exactly the draft ids captured
  * at snapshot time to 'published', ALSO re-stamps every already-published
- * row edited since its last publish (#284), and writes ONE audit_log row
- * for the whole publish event, atomically via db.batch(). The caller
- * (route.ts) MUST NOT call this unless commitPublishedVenues() already
+ * row edited since its last publish (#284) AND every archived row pending
+ * removal (item 1 fix, admin dashboard build review), and writes ONE
+ * audit_log row for the whole publish event, atomically via db.batch(). The
+ * caller (route.ts) MUST NOT call this unless commitPublishedVenues() already
  * resolved — that ordering is what this function assumes, not what it
  * enforces.
  *
@@ -344,6 +372,13 @@ export interface PublishAuditMeta {
  * them here, in the SAME post-commit batch as the draft promotions, keeps
  * the NB1 ordering intact — nothing in D1 is touched unless the GitHub
  * commit above already succeeded.
+ *
+ * `archivedIds` gets the identical root-cause fix, but a DIFFERENT UPDATE:
+ * an archived row's `status` must stay 'archived' (it's leaving the public
+ * map, not joining it) — only `published_at`/`published_by` advance, which
+ * is exactly enough to flip summarizePublishChanges()'s
+ * `updated_at > published_at` guard back to false once this publish ships
+ * its removal.
  *
  * `entity_id` on the audit row is the publish's own timestamp (same value
  * stamped onto every promoted venue's `published_at`) rather than a single
@@ -360,6 +395,7 @@ export async function promotePublishedDrafts(
   draftIds: string[],
   meta: PublishAuditMeta,
   editedPublishedIds: string[] = [],
+  archivedIds: string[] = [],
 ): Promise<void> {
   const stampedIds = [...draftIds, ...editedPublishedIds];
   const statements = stampedIds.map((id) =>
@@ -369,12 +405,24 @@ export async function promotePublishedDrafts(
       )
       .bind(meta.publishedAt, meta.actorEmail, id),
   );
+  // Archived rows keep status='archived' — only the "pending removal" clock
+  // (published_at) resets, so summarizePublishChanges() stops counting an
+  // already-shipped removal forever (see this function's own header).
+  statements.push(
+    ...archivedIds.map((id) =>
+      db
+        .prepare("UPDATE venues SET published_at = ?, published_by = ? WHERE id = ?")
+        .bind(meta.publishedAt, meta.actorEmail, id),
+    ),
+  );
 
   const afterJson = JSON.stringify({
     promotedIds: draftIds,
     promotedCount: draftIds.length,
     editedIds: editedPublishedIds,
     editedCount: editedPublishedIds.length,
+    archivedIds,
+    archivedCount: archivedIds.length,
     snapshotCount: meta.snapshotCount,
     prUrl: meta.prUrl,
   });

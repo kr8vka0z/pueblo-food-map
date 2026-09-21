@@ -661,10 +661,29 @@ parallel. While the splash is visible, `main` receives `inert` and
 
 ---
 
-## Admin — read-only venue list (#253)
+## Admin — dashboard, venue list, and Blessing Boxes tab (#253, admin dashboard build)
 
-`/admin` (src/app/admin/page.tsx) is a Better-Auth-gated Server Component
-(see AGENTS.md "Admin authentication" for the auth chain). It
+**`/admin` (src/app/admin/page.tsx)** is the Dashboard — the admin landing
+page since the admin dashboard build (approved mockup Direction A). It is a
+Better-Auth-gated Server Component (see AGENTS.md "Admin authentication"
+for the auth chain) that `Promise.all`s several independent, mostly
+best-effort D1 reads: preview rows + counts for public submissions and
+change proposals, the full pending-photo and pending-adopter queues, and
+`loadBoxHealthEntries()` (src/lib/adminBoxes.ts). It renders the shared
+`AdminNav` header, a conditional `PublishPanel` (shown only when unpublished
+changes exist — the exact same component and Publish action `/admin/places`
+uses, via an added `reviewHref` prop rather than a second publish path),
+`NeedsDecisionPanel` (the to-do queue, grouped Suggestions / Data refresh /
+Blessing boxes, each capped to a few preview rows with a link to its full
+queue — "correctness over inline convenience": any decision needing more
+than a single click links out instead of growing an inline form here), and
+two side panels, `BoxHealthList` ("Boxes that need help") and
+`StalePlacesList` ("Places due for a check" — published venues whose
+`last_verified` is over 12 months old, oldest first).
+
+**`/admin/places` (src/app/admin/places/page.tsx)** is the venue list —
+moved here unchanged from where `/admin` used to render it (#253's original
+build). It
 fetches every `venues` row — draft, published, and archived — via
 `getAdminDb()` (src/lib/adminDb.ts, the single D1 choke point) and renders
 them through `VenueListView` (src/components/VenueListView.tsx), a Client
@@ -691,6 +710,23 @@ conforms to — importing from a `lib/` module, risking the same circular
 import this codebase already hit once (see "Why `pfp-venues.ts` lives in
 its own file" above); a few duplicated field names is cheaper than that
 failure mode.
+
+**`/admin/boxes` (src/app/admin/boxes/page.tsx)** is the Blessing Boxes tab
+(approved mockup Direction B). It calls the same
+`loadBoxHealthEntries()` (src/lib/adminBoxes.ts) the Dashboard's side panel
+uses — one pure status function (`computeBoxHealth`, src/lib/boxHealth.ts)
+feeding both screens means they can never disagree about whether a given
+box needs help. The tab adds what the Dashboard deliberately leaves out:
+`AdminBoxesMap` (src/components/AdminBoxesMap.tsx, a small dedicated
+`react-map-gl` component — not the public map's much larger `Map.tsx`) with
+pins colored by status, "Needs help now" / "Gone quiet" lists
+(`BoxHealthList`, shared with the Dashboard via a `variant` prop),
+`BoxReportsChart` (plain-div stacked bars, no charting library, 8-week
+window bucketed by `bucketCheckinsByWeek()` in src/lib/adminDashboard.ts),
+and `AllBoxesTable` (every box, including ones removed from service —
+`blessing_boxes.removed_on` is a display flag here too, same as the public
+map's `mapRowToPublicBox`, never a query filter). "Places due for a check"
+does not appear on this tab — that panel is Dashboard-only by design.
 
 ---
 

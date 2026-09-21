@@ -81,7 +81,7 @@ describe("ArchiveVenueButton — confirm gate", () => {
 
     await user.click(screen.getByRole("button", { name: /Remove from map/i }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places"));
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
@@ -153,6 +153,6 @@ describe("ArchiveVenueButton — optional submissionId (#270)", () => {
     expect(url).toBe("/api/admin/venues/manual-abc/archive");
     expect(init.body).toBeUndefined();
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places"));
   });
 });

@@ -1,13 +1,17 @@
 /**
- * Auth-guard regression test for the /admin Server Component page (#237
- * checkpoint c; venue list #253).
+ * Auth-guard regression test for the /admin/places Server Component page
+ * (#237 checkpoint c; venue list #253). MOVED from /admin's own
+ * page.test.tsx unchanged in intent (admin dashboard build moved the venue
+ * list from /admin to /admin/places — see page.tsx's own header) — only the
+ * import path, component name, and the nav-label assertions that follow
+ * from swapping the old bespoke header for the shared AdminNav are updated.
  *
  * WHY this exists: page.tsx's own header says RSC page tests are hard in
  * this stack, so nothing pinned its auth contract directly — a future edit
  * could route around getAdminDb() (the single D1 choke point,
  * src/lib/adminDb.ts) or drop the try/catch's fail-closed handling and
  * nothing would fail red. This test calls the async Server Component
- * directly (`await AdminPage()`) and mocks only getAdminDb, next/headers,
+ * directly (`await PlacesPage()`) and mocks only getAdminDb, next/headers,
  * next/navigation's forbidden(), and the logger — cfAccess.ts's real
  * AccessDeniedError is imported unmocked so `err instanceof
  * AccessDeniedError` inside the page still resolves true. Real JWT/D1
@@ -52,7 +56,7 @@ vi.mock("@/lib/logger", () => ({
   logAdminAuthFailure: vi.fn(),
 }));
 
-import AdminPage from "@/app/admin/page";
+import PlacesPage from "@/app/admin/places/page";
 import { forbidden } from "next/navigation";
 import { logAdminAuthFailure } from "@/lib/logger";
 
@@ -96,7 +100,7 @@ function makeFakeDb(seedRows: AdminVenueRow[]) {
   } as unknown as D1Database;
 }
 
-describe("AdminPage — auth guard", () => {
+describe("PlacesPage — auth guard", () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
@@ -111,17 +115,19 @@ describe("AdminPage — auth guard", () => {
       identity: { email: "admin@example.com" },
     });
 
-    render(await AdminPage());
+    render(await PlacesPage());
 
     expect(screen.getByText("admin@example.com")).toBeDefined();
     expect(screen.getByText("Eastside Pantry")).toBeDefined();
     expect(screen.getByText("Main Street Grocery")).toBeDefined();
-    // Nav link to the review queue (#259 follow-up) — reachable from the
-    // admin home instead of only by typing the URL.
+    // Shared AdminNav (admin dashboard build) renders the nav row now —
+    // "Places" is the active tab, and the review/data-refresh queues are
+    // still one click away from here.
+    const placesLink = screen.getByRole("link", { name: "Places" });
+    expect(placesLink.getAttribute("aria-current")).toBe("page");
     const reviewQueueLink = screen.getByRole("link", { name: "Review queue" });
     expect(reviewQueueLink.getAttribute("href")).toBe("/admin/submissions");
-    // #390 follow-up: nav link to the change-proposal review queue.
-    const flagsQueueLink = screen.getByRole("link", { name: "Data refresh queue" });
+    const flagsQueueLink = screen.getByRole("link", { name: "Data refresh" });
     expect(flagsQueueLink.getAttribute("href")).toBe("/admin/flags");
     expect(forbidden).not.toHaveBeenCalled();
   });
@@ -132,7 +138,7 @@ describe("AdminPage — auth guard", () => {
     // branch, not this specific reason (see adminAuthErrors.ts).
     mockGetAdminDb.mockRejectedValue(new AccessDeniedError("not_allowlisted"));
 
-    await expect(AdminPage()).rejects.toThrow("FORBIDDEN_CALLED");
+    await expect(PlacesPage()).rejects.toThrow("FORBIDDEN_CALLED");
 
     expect(logAdminAuthFailure).toHaveBeenCalledWith("not_allowlisted");
     expect(forbidden).toHaveBeenCalledTimes(1);
@@ -141,7 +147,7 @@ describe("AdminPage — auth guard", () => {
   test("unexpected error -> re-thrown, not swallowed; forbidden() and the logger are untouched", async () => {
     mockGetAdminDb.mockRejectedValue(new Error("boom"));
 
-    await expect(AdminPage()).rejects.toThrow("boom");
+    await expect(PlacesPage()).rejects.toThrow("boom");
 
     expect(forbidden).not.toHaveBeenCalled();
     expect(logAdminAuthFailure).not.toHaveBeenCalled();

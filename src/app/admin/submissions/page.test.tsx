@@ -69,12 +69,21 @@ function makeRow(overrides: Partial<PublicSubmissionRow> = {}): PublicSubmission
   };
 }
 
-/** Matches the page's real call chain: db.prepare(sql).all<PublicSubmissionRow>(); captures the SQL for AC1's ordering assertion. */
+/**
+ * Matches the page's real call chain: db.prepare(sql).all<PublicSubmissionRow>().
+ * Captures EVERY prepared statement, not just the last — this page now also
+ * runs loadAdminNavCounts() (admin dashboard build, AdminNav's pending-count
+ * pills) after its own main query, so a single-slot capture would silently
+ * get overwritten by one of those COUNT queries. `.first()` is deliberately
+ * absent from the returned object: loadAdminNavCounts' four counts each
+ * degrade to 0 on exactly that shape mismatch (src/lib/adminNavCounts.ts's
+ * countOrZero), same as every other admin page's fake db in this test suite.
+ */
 function makeFakeDb(rows: PublicSubmissionRow[]) {
-  let capturedSql = "";
+  const capturedSql: string[] = [];
   const db = {
     prepare: (sql: string) => {
-      capturedSql = sql;
+      capturedSql.push(sql);
       return { all: async () => ({ success: true, results: rows, meta: {} }) };
     },
   } as unknown as object;
@@ -109,9 +118,9 @@ describe("SubmissionsPage — auth guard", () => {
     render(await SubmissionsPage());
 
     const sql = getSql();
-    expect(sql).toContain("FROM public_submissions");
-    expect(sql).toContain("status = 'pending'");
-    expect(sql).toContain("ORDER BY created_at DESC");
+    expect(
+      sql.some((s) => s.includes("FROM public_submissions") && s.includes("status = 'pending'") && s.includes("ORDER BY created_at DESC")),
+    ).toBe(true);
   });
 
   test("access denied -> fails closed: forbidden() fires and the denial is logged", async () => {

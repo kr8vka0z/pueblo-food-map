@@ -1,11 +1,13 @@
 /**
- * /admin/venues/new — Cloudflare Access-gated "Add a venue" page (#254;
+ * /admin/venues/new — Better-Auth-gated "Add a venue" page (#254;
  * `?submission=<id>` review-queue pre-fill added #259).
  *
- * Same auth chain as /admin (src/app/admin/page.tsx, AGENTS.md "Admin
- * authentication"): getAdminDb() verifies the caller's Cloudflare Access
- * identity before this page renders anything, failing closed via Next's
- * forbidden() control-flow function on AccessDeniedError.
+ * Same auth chain as /admin/places (src/app/admin/places/page.tsx, AGENTS.md
+ * "Admin authentication"): getAdminDb() verifies the caller's Better Auth
+ * session before this page renders anything, failing closed via Next's
+ * forbidden() control-flow function on AccessDeniedError. Header swapped
+ * for the shared AdminNav (admin dashboard build) — see that component's
+ * own header for why.
  *
  * The actual form is a Client Component (AddVenueForm) so it can hold input
  * state and POST to /api/admin/venues — this Server Component's only job is
@@ -34,9 +36,10 @@
  */
 
 import { headers } from "next/headers";
-import Link from "next/link";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
+import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
+import AdminNav from "@/components/AdminNav";
 import AddVenueForm, { type AddVenueFormValues } from "@/components/AddVenueForm";
 import { mapSubmissionPayloadToFormValues } from "@/lib/adminVenueForm";
 import type { NewVenuePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
@@ -83,34 +86,23 @@ export default async function NewVenuePage({
 } = {}) {
   let email: string;
   let prefill: NewVenuePrefill | null = null;
+  let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
 
   try {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
     const { submission } = searchParams ? await searchParams : {};
     prefill = await resolveSubmissionPrefill(db, submission);
+    navCounts = await loadAdminNavCounts(db);
   } catch (err) {
     handlePageAuthError(err);
   }
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <header className="flex flex-col gap-2 border-b border-[var(--color-bone-200)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div>
-          <h1 className="wordmark text-2xl text-[var(--color-ink-900)]">Add a venue</h1>
-          <Link
-            href="/admin"
-            className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
-          >
-            Back to venue list
-          </Link>
-        </div>
-        <p className="text-sm text-[var(--color-ink-500)]">
-          Signed in as{" "}
-          <span className="font-medium text-[var(--color-sage-700)]">{email}</span>
-        </p>
-      </header>
+      <AdminNav email={email} active="places" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6">
+        <h2 className="wordmark mb-4 text-xl text-[var(--color-ink-900)]">Add a venue</h2>
         {prefill ? (
           <AddVenueForm initialValues={prefill.initialValues} submissionId={prefill.submissionId} />
         ) : (

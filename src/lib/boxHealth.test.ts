@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, test } from "vitest";
-import { computeBoxHealth, rankNeedsHelp, rankQuiet, type BoxHealthCheckin, type BoxHealthEntry } from "@/lib/boxHealth";
+import { computeBoxHealth, rankNeedsHelp, rankQuiet, activeBoxes, type BoxHealthCheckin, type BoxHealthEntry } from "@/lib/boxHealth";
 
 const NOW = new Date("2026-09-21T12:00:00.000Z");
 
@@ -84,6 +84,14 @@ function entry(overrides: Partial<BoxHealthEntry>): BoxHealthEntry {
   };
 }
 
+describe("activeBoxes", () => {
+  test("excludes a removed box, keeps everything else", () => {
+    const removed = entry({ venueId: "removed", removedOn: "2026-08-01T00:00:00.000Z" });
+    const active = entry({ venueId: "active", removedOn: null });
+    expect(activeBoxes([removed, active]).map((e) => e.venueId)).toEqual(["active"]);
+  });
+});
+
 describe("rankNeedsHelp", () => {
   test("filters to low/empty/problem only, newest report first", () => {
     const empty = entry({
@@ -98,6 +106,24 @@ describe("rankNeedsHelp", () => {
 
     const result = rankNeedsHelp([low, ok, empty]);
     expect(result.map((e) => e.venueId)).toEqual(["empty", "low"]);
+  });
+
+  // Item 2 regression: a removed box needing help must not show up on "Boxes
+  // that need help" / "Needs help now" — it's out of service, nobody is
+  // going to go check on it.
+  test("excludes a removed box even when its status is empty/low/problem", () => {
+    const removedEmpty = entry({
+      venueId: "removed-empty",
+      removedOn: "2026-08-01T00:00:00.000Z",
+      health: { status: "empty", latest: checkin({ kind: "empty" }), daysSinceLastReport: 1 },
+    });
+    const activeEmpty = entry({
+      venueId: "active-empty",
+      removedOn: null,
+      health: { status: "empty", latest: checkin({ kind: "empty" }), daysSinceLastReport: 1 },
+    });
+    const result = rankNeedsHelp([removedEmpty, activeEmpty]);
+    expect(result.map((e) => e.venueId)).toEqual(["active-empty"]);
   });
 
   test("respects an optional limit", () => {
@@ -120,6 +146,15 @@ describe("rankQuiet", () => {
 
     const result = rankQuiet([quiet33, ok, quiet41, neverReported]);
     expect(result.map((e) => e.venueId)).toEqual(["never", "q41", "q33"]);
+  });
+
+  // Item 2 regression: same exclusion as rankNeedsHelp — a removed box
+  // reading "quiet" isn't a monitoring gap worth surfacing.
+  test("excludes a removed box even when its status is quiet", () => {
+    const removedQuiet = entry({ venueId: "removed-quiet", removedOn: "2026-08-01T00:00:00.000Z", health: { status: "quiet", latest: null, daysSinceLastReport: null } });
+    const activeQuiet = entry({ venueId: "active-quiet", removedOn: null, health: { status: "quiet", latest: null, daysSinceLastReport: null } });
+    const result = rankQuiet([removedQuiet, activeQuiet]);
+    expect(result.map((e) => e.venueId)).toEqual(["active-quiet"]);
   });
 
   test("respects an optional limit", () => {

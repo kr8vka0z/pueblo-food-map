@@ -99,14 +99,30 @@ export interface BoxHealthEntry {
 }
 
 /**
+ * Boxes still in service — `removed_on` is a display flag on
+ * BoxHealthEntry, not a query filter (see that field's own doc comment), so
+ * every "needs attention" surface (Dashboard's help panel, both Boxes-tab
+ * lists, the Boxes-tab map — see src/app/admin/boxes/page.tsx) filters it
+ * out HERE, in one shared place, rather than each caller re-deriving the
+ * same `removedOn === null` check. A removed box is out of service; nobody
+ * needs to go check on it or see it flagged "gone quiet." It still appears
+ * in AllBoxesTable (src/components/AllBoxesTable.tsx), marked removed — that
+ * table intentionally does NOT call this filter.
+ */
+export function activeBoxes(entries: BoxHealthEntry[]): BoxHealthEntry[] {
+  return entries.filter((e) => e.removedOn === null);
+}
+
+/**
  * Boxes needing help right now (status low/empty/problem), most recent
  * report first — feeds BOTH the Dashboard's compact "Boxes that need help"
  * panel and the Boxes tab's fuller "Needs help now" list, same ranking
  * either way so the two screens never disagree about which box is most
- * urgent.
+ * urgent. Removed boxes are excluded (activeBoxes) — see that function's
+ * own header.
  */
 export function rankNeedsHelp(entries: BoxHealthEntry[], limit?: number): BoxHealthEntry[] {
-  const needing = entries
+  const needing = activeBoxes(entries)
     .filter((e) => e.health.status === "low" || e.health.status === "empty" || e.health.status === "problem")
     .sort((a, b) => {
       const at = a.health.latest?.createdAt ?? "";
@@ -121,10 +137,11 @@ export function rankNeedsHelp(entries: BoxHealthEntry[], limit?: number): BoxHea
  * has NEVER had a check-in (`daysSinceLastReport === null`) sorts ahead of
  * every numeric age — it is the least-known of the two, not the
  * "freshest" quiet box, which a naive numeric sort (treating null as 0)
- * would produce.
+ * would produce. Removed boxes are excluded (activeBoxes) — see that
+ * function's own header.
  */
 export function rankQuiet(entries: BoxHealthEntry[], limit?: number): BoxHealthEntry[] {
-  const quiet = entries
+  const quiet = activeBoxes(entries)
     .filter((e) => e.health.status === "quiet")
     .sort((a, b) => {
       const ad = a.health.daysSinceLastReport;

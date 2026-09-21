@@ -26,12 +26,12 @@ import { headers } from "next/headers";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { loadBoxHealthEntries } from "@/lib/adminBoxes";
-import { rankNeedsHelp, rankQuiet } from "@/lib/boxHealth";
+import { rankNeedsHelp, rankQuiet, activeBoxes } from "@/lib/boxHealth";
 import { bucketCheckinsByWeek } from "@/lib/adminDashboard";
 import { loadRecentCheckinsAllBoxes } from "@/lib/blessingBoxes";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
-import type { AdminNavCounts } from "@/lib/adminNavCounts";
+import { loadAdminNavCounts, type AdminNavCounts } from "@/lib/adminNavCounts";
 import AdminNav from "@/components/AdminNav";
 import BoxesWaitingChips from "@/components/BoxesWaitingChips";
 import BoxHealthList from "@/components/BoxHealthList";
@@ -49,6 +49,7 @@ export default async function BoxesPage() {
   let recentCheckins: Awaited<ReturnType<typeof loadRecentCheckinsAllBoxes>>;
   let photos: AdminBoxPhotoRow[];
   let adopters: AdminBoxAdopterRow[];
+  let navCounts: AdminNavCounts;
 
   const now = new Date();
   // Window start for the 8-week chart — same boundary bucketCheckinsByWeek's
@@ -61,31 +62,27 @@ export default async function BoxesPage() {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
 
-    [boxHealthEntries, recentCheckins, photos, adopters] = await Promise.all([
+    [boxHealthEntries, recentCheckins, photos, adopters, navCounts] = await Promise.all([
       loadBoxHealthEntries(db, now).catch(() => [] as Awaited<ReturnType<typeof loadBoxHealthEntries>>),
       loadRecentCheckinsAllBoxes(db, sinceIso),
       loadReviewQueue(db).catch(() => [] as AdminBoxPhotoRow[]),
       loadPendingAdopters(db).catch(() => [] as AdminBoxAdopterRow[]),
+      // Same shared counts helper every other admin page calls (item 7 fix)
+      // — this page used to hard-code submissions/proposals to 0, which read
+      // as "nothing pending" even when the full queues had real rows.
+      loadAdminNavCounts(db),
     ]);
   } catch (err) {
     handlePageAuthError(err);
   }
 
-  const navCounts: AdminNavCounts = {
-    // Nav pills for submissions/proposals aren't this page's concern to
-    // compute — AdminNav only shows a pill when the count is non-zero, so
-    // 0 here simply means "no pill," never a wrong number (this page just
-    // doesn't have those two counts in hand without an extra query neither
-    // this tab nor the task spec asks for).
-    submissions: 0,
-    proposals: 0,
-    photos: photos.length,
-    adopters: adopters.length,
-  };
-
   const inServiceCount = boxHealthEntries.filter((e) => e.removedOn === null).length;
   const needsHelp = rankNeedsHelp(boxHealthEntries);
   const quiet = rankQuiet(boxHealthEntries);
+  // The map is a "does this need attention" surface same as the two lists
+  // above — a removed box has nothing to check on (item 2 fix). AllBoxesTable
+  // below still gets the FULL boxHealthEntries, unfiltered.
+  const activeBoxHealthEntries = activeBoxes(boxHealthEntries);
   const weeklyBuckets = bucketCheckinsByWeek(
     recentCheckins.map((c) => ({ kind: c.kind, createdAt: c.created_at })),
     now,
@@ -102,7 +99,7 @@ export default async function BoxesPage() {
           <h2 className="wordmark text-lg text-[var(--color-ink-900)]">Blessing boxes — {inServiceCount} in service</h2>
           <div className="mt-3 flex flex-col gap-6 lg:flex-row lg:items-start">
             <div className="min-w-0 flex-1">
-              <AdminBoxesMap entries={boxHealthEntries} />
+              <AdminBoxesMap entries={activeBoxHealthEntries} />
             </div>
             <div className="flex w-full flex-col gap-5 lg:w-[320px] lg:flex-none">
               <div>

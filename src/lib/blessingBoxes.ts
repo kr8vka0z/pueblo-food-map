@@ -736,6 +736,75 @@ export async function loadLiveBoxes(db: D1Database, now: Date = new Date()): Pro
   );
 }
 
+// ─── Admin health (Dashboard + Blessing Boxes tab) ─────────────────────────
+// Unlike every query above, these read EVERY visible check-in kind,
+// including 'problem' — an admin needs to see a problem report to act on
+// it; 'problem' being excluded from the public shape is a scope/privacy
+// rule for visitors (this file's own header), not a reason to hide "needs
+// help" signal from the person who fixes it. Both queries join directly on
+// `venues.category = 'blessing_box'` rather than an IN(...) id list (same
+// technique SELECT_NEEDED_FROM_VISITORS_SQL above already uses) — a FIXED
+// number of bind params regardless of how many boxes exist, so D1's
+// 100-bound-param ceiling (src/lib/d1.ts) never comes into play here even
+// as the box count grows well past 100.
+
+export interface AdminLatestCheckinRow {
+  venue_id: string;
+  kind: CheckinKind;
+  note: string | null;
+  created_at: string;
+}
+
+/** One row per box — its single most recent VISIBLE check-in, any kind — the input src/lib/boxHealth.ts's computeBoxHealth needs for every box at once. */
+export const SELECT_LATEST_CHECKIN_PER_BOX_SQL = `
+  SELECT venue_id, kind, note, created_at FROM (
+    SELECT c.venue_id AS venue_id, c.kind AS kind, c.note AS note, c.created_at AS created_at,
+           ROW_NUMBER() OVER (PARTITION BY c.venue_id ORDER BY c.created_at DESC, c.id DESC) AS rn
+    FROM box_checkins c
+    JOIN venues v ON v.id = c.venue_id
+    WHERE v.category = 'blessing_box' AND v.status != 'archived' AND c.visibility = 'visible'
+  )
+  WHERE rn = 1
+`;
+
+/** Best-effort — a broken/missing box_checkins table must degrade to "every box unknown," never take down the Dashboard/Boxes tab (same posture loadLatestPhotosBestEffort above already applies to box_photos). */
+export async function loadLatestCheckinPerBox(db: D1Database): Promise<Map<string, AdminLatestCheckinRow>> {
+  try {
+    const result = await db.prepare(SELECT_LATEST_CHECKIN_PER_BOX_SQL).all<AdminLatestCheckinRow>();
+    const map = new Map<string, AdminLatestCheckinRow>();
+    for (const row of result.results ?? []) map.set(row.venue_id, row);
+    return map;
+  } catch (err) {
+    logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error (admin latest-checkin read)");
+    return new Map();
+  }
+}
+
+export interface AdminRecentCheckinRow {
+  venue_id: string;
+  kind: CheckinKind;
+  created_at: string;
+}
+
+/** Every visible check-in across every box, no per-box cap — feeds the Boxes tab's "Box reports, last 8 weeks" chart (src/lib/adminDashboard.ts's bucketCheckinsByWeek). The caller supplies the window's start so this file never has to know how many weeks the chart shows. */
+export const SELECT_RECENT_CHECKINS_ALL_BOXES_SQL = `
+  SELECT c.venue_id AS venue_id, c.kind AS kind, c.created_at AS created_at
+  FROM box_checkins c
+  JOIN venues v ON v.id = c.venue_id
+  WHERE v.category = 'blessing_box' AND v.status != 'archived' AND c.visibility = 'visible' AND c.created_at >= ?
+`;
+
+/** Best-effort, same degrade-to-empty posture as loadLatestCheckinPerBox above. */
+export async function loadRecentCheckinsAllBoxes(db: D1Database, sinceIso: string): Promise<AdminRecentCheckinRow[]> {
+  try {
+    const result = await db.prepare(SELECT_RECENT_CHECKINS_ALL_BOXES_SQL).bind(sinceIso).all<AdminRecentCheckinRow>();
+    return result.results ?? [];
+  } catch (err) {
+    logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error (admin recent-checkins read)");
+    return [];
+  }
+}
+
 export async function loadLiveBoxById(
   db: D1Database,
   id: string,

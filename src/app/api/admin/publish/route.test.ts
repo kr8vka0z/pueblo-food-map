@@ -273,6 +273,37 @@ describe("POST /api/admin/publish", () => {
     expect(update?.args[1]).toBe(ADMIN_EMAIL); // published_by
   });
 
+  // Item 1 fix, end to end: an archived row pending removal (previously
+  // published, archived after that publish) gets published_at/published_by
+  // re-stamped, WITHOUT flipping status back to 'published'.
+  test("publishing with an archived pending-removal row re-stamps its published_at but keeps status='archived'", async () => {
+    const { db, batch, boundStatements } = makeFakeDb([
+      // At least one real published row so the snapshot isn't empty (the
+      // archived row below is excluded from the published file entirely).
+      makeRow({ id: "still-live", status: "published" }),
+      makeRow({
+        id: "removed-venue",
+        status: "archived",
+        published_at: "2026-01-01T00:00:00.000Z", // its last real publish
+        updated_at: "2026-06-01T00:00:00.000Z", // archived after that publish
+      }),
+    ]);
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    vi.stubGlobal("fetch", makeGithubFetchMock());
+
+    const res = await POST(makeRequest({ origin: ADMIN_ORIGIN }));
+    expect(res.status).toBe(200);
+    expect(batch).toHaveBeenCalledTimes(1);
+
+    const update = boundStatements.find(
+      (s) => s.sql.startsWith("UPDATE venues") && s.args[2] === "removed-venue",
+    );
+    expect(update).toBeDefined();
+    expect(update?.sql).not.toContain("status");
+    expect(update?.args[0]).not.toBe("2026-01-01T00:00:00.000Z"); // re-stamped to this publish's timestamp
+    expect(update?.args[1]).toBe(ADMIN_EMAIL);
+  });
+
   test.each(["main-ref", "file-sha", "commit", "create-pr", "auto-merge"] as const)(
     "GitHub failure at the %s step -> 502, D1 batch() is NEVER called (NB1, failure side)",
     async (failStep) => {

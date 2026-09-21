@@ -122,9 +122,34 @@ describe("summarizePublishChanges", () => {
     expect(summarizePublishChanges(rows)).toEqual({ newDrafts: 0, editedSincePublish: 0, archived: 0 });
   });
 
-  test("archived counts a PREVIOUSLY-PUBLISHED venue that was then archived (will be removed)", () => {
-    const rows = [makeRow({ status: "archived", published_at: "2026-01-01T00:00:00.000Z" })];
+  // Item 1 fix: "archived" only means "pending removal on the next
+  // publish" when the archive happened AFTER the last publish
+  // (updated_at > published_at) — see summarizePublishChanges' own header.
+  test("archived counts a PREVIOUSLY-PUBLISHED venue archived AFTER its last publish (pending removal)", () => {
+    const rows = [
+      makeRow({
+        status: "archived",
+        published_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-02-01T00:00:00.000Z", // archived (updated) after the publish
+      }),
+    ];
     expect(summarizePublishChanges(rows)).toEqual({ newDrafts: 0, editedSincePublish: 0, archived: 1 });
+  });
+
+  // Regression for the reported bug: prod's 5 archived venues kept inflating
+  // this count FOREVER because nothing ever advanced published_at past the
+  // row's original publish date. Once a publish re-stamps published_at (the
+  // publishVenues.ts half of this fix), the SAME row must read "already
+  // removed" (archived: 0), not "still pending."
+  test("archived does NOT count an archived row whose published_at already reflects the removal", () => {
+    const rows = [
+      makeRow({
+        status: "archived",
+        published_at: "2026-02-01T00:00:00.000Z", // re-stamped by the publish that removed it
+        updated_at: "2026-01-01T00:00:00.000Z", // the archive action itself, before that publish
+      }),
+    ];
+    expect(summarizePublishChanges(rows)).toEqual({ newDrafts: 0, editedSincePublish: 0, archived: 0 });
   });
 
   test("archived does NOT count a draft that was archived without ever being published", () => {
@@ -151,7 +176,12 @@ describe("summarizePublishChanges", () => {
         published_at: "2026-02-01T00:00:00.000Z",
         updated_at: "2026-02-01T00:00:00.000Z",
       }),
-      makeRow({ id: "e", status: "archived", published_at: "2026-01-01T00:00:00.000Z" }),
+      makeRow({
+        id: "e",
+        status: "archived",
+        published_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-02-01T00:00:00.000Z", // archived after its last publish -> pending removal
+      }),
       makeRow({ id: "f", status: "archived", published_at: null }),
     ];
     expect(summarizePublishChanges(rows)).toEqual({ newDrafts: 2, editedSincePublish: 1, archived: 1 });

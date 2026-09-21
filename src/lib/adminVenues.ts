@@ -49,10 +49,20 @@ export interface PublishChangeSummary {
  *   status-gated at all) so an archived row can never double-count into
  *   this bucket too.
  * - `archived`: `archived` rows that were PREVIOUSLY PUBLISHED
- *   (`published_at !== null`) — these are what will actually disappear from
- *   the public map on the next publish. A draft that got archived
+ *   (`published_at !== null`) AND archived AFTER their last publish
+ *   (`updated_at > published_at`) — these are what will actually disappear
+ *   from the public map on the NEXT publish. A draft that got archived
  *   (`published_at` still null) was never live, so archiving it changes
- *   nothing the public map shows; it must not inflate this count.
+ *   nothing the public map shows; it must not inflate this count. The
+ *   `updated_at > published_at` half of the guard (bug found in review,
+ *   admin dashboard build) matters just as much: without it, an archived row
+ *   stayed counted "pending removal" FOREVER after the publish that actually
+ *   removed it, because nothing ever advanced its `published_at` past the
+ *   original publish date. publishVenues.ts's promotePublishedDrafts()
+ *   re-stamps `published_at` on exactly these rows in the same batch a
+ *   publish already ships, the same way it already does for
+ *   `editedSincePublish` rows (#284) — see that file for the D1 half of this
+ *   fix.
  */
 export function summarizePublishChanges(rows: AdminVenueRow[]): PublishChangeSummary {
   let newDrafts = 0;
@@ -74,7 +84,7 @@ export function summarizePublishChanges(rows: AdminVenueRow[]): PublishChangeSum
         if (row.published_at !== null && row.updated_at > row.published_at) editedSincePublish += 1;
         break;
       case "archived":
-        if (row.published_at !== null) archived += 1;
+        if (row.published_at !== null && row.updated_at > row.published_at) archived += 1;
         break;
     }
   }

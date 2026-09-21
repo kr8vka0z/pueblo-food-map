@@ -22,6 +22,7 @@ function makeEntry(overrides: Partial<BoxHealthEntry> = {}): BoxHealthEntry {
     lng: -104.6,
     health: { status: "ok", latest: null, daysSinceLastReport: null },
     caretaker: null,
+    removedOn: null,
     ...overrides,
   };
 }

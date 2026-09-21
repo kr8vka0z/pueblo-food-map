@@ -24,10 +24,16 @@ interface BoxVenueRow {
   address: string;
   lat: number;
   lng: number;
+  /** blessing_boxes.removed_on, via LEFT JOIN — null both when the box is in service AND when it has no blessing_boxes row at all (shouldn't happen post-#? but never treated differently; see BoxHealthEntry.removedOn's own header). */
+  removed_on: string | null;
 }
 
-const SELECT_BOX_VENUES_SQL =
-  "SELECT id, name, address, lat, lng FROM venues WHERE category = 'blessing_box' AND status != 'archived'";
+export const SELECT_BOX_VENUES_SQL = `
+  SELECT v.id, v.name, v.address, v.lat, v.lng, b.removed_on
+  FROM venues v
+  LEFT JOIN blessing_boxes b ON b.venue_id = v.id
+  WHERE v.category = 'blessing_box' AND v.status != 'archived'
+`;
 
 /**
  * Every in-service box's health entry — cheap at Pueblo's real box count (a
@@ -69,6 +75,7 @@ export async function loadBoxHealthEntries(db: D1Database, now: Date = new Date(
       lng: venue.lng,
       health: computeBoxHealth(checkins, now),
       caretaker: names?.[0] ?? null,
+      removedOn: venue.removed_on,
     };
   });
 }

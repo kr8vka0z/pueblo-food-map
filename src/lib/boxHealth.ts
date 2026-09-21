@@ -86,6 +86,16 @@ export interface BoxHealthEntry {
   health: BoxHealth;
   /** First approved adopter's display name, or null — "no caretaker" is a display-layer decision, not this module's. */
   caretaker: string | null;
+  /**
+   * `blessing_boxes.removed_on` — same "box no longer in service" meaning
+   * blessingBoxes.ts's own mapRowToPublicBox already gives it (a display
+   * flag, NOT a query filter: a removed box still appears here, same as it
+   * still appears on the public map marked out-of-service, rather than
+   * disappearing from admin management entirely). Feeds the Boxes tab's
+   * "N in service" count (src/app/admin/boxes/page.tsx); unused by the
+   * Dashboard's "Boxes that need help" panel, which doesn't distinguish it.
+   */
+  removedOn: string | null;
 }
 
 /**

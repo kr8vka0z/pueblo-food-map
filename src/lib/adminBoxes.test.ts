@@ -17,6 +17,7 @@ interface FakeBoxVenueRow {
   address: string;
   lat: number;
   lng: number;
+  removed_on?: string | null;
 }
 
 /** Minimal fake D1: routes by a substring match on the SQL text, same convention every other admin lib's own test file uses when a real SQLite fixture isn't warranted. */
@@ -37,11 +38,14 @@ function makeFakeDb(opts: {
         },
       }),
       all: async () => {
-        if (sql.includes("FROM venues WHERE category = 'blessing_box'")) {
-          return { results: opts.venues, meta: {} };
-        }
+        // Check box_checkins FIRST — SELECT_LATEST_CHECKIN_PER_BOX_SQL's own
+        // WHERE clause also contains "v.category = 'blessing_box'", so the
+        // venues check below would otherwise shadow it.
         if (sql.includes("box_checkins")) {
           return { results: opts.latestCheckins ?? [], meta: {} };
+        }
+        if (sql.includes("LEFT JOIN blessing_boxes")) {
+          return { results: opts.venues.map((v) => ({ removed_on: null, ...v })), meta: {} };
         }
         return { results: [], meta: {} };
       },
@@ -91,5 +95,15 @@ describe("loadBoxHealthEntries", () => {
     const entries = await loadBoxHealthEntries(db, new Date("2026-09-20T00:00:00.000Z"));
 
     expect(entries[0].caretaker).toBeNull();
+  });
+
+  test("passes blessing_boxes.removed_on straight through as removedOn", async () => {
+    const db = makeFakeDb({
+      venues: [{ id: "box-4", name: "Blessing Box - Gone", address: "4 Test St", lat: 38.2, lng: -104.5, removed_on: "2026-08-01" }],
+    });
+
+    const entries = await loadBoxHealthEntries(db, new Date("2026-09-20T00:00:00.000Z"));
+
+    expect(entries[0].removedOn).toBe("2026-08-01");
   });
 });

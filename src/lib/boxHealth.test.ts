@@ -79,6 +79,7 @@ function entry(overrides: Partial<BoxHealthEntry>): BoxHealthEntry {
     lng: -104.6,
     health: { status: "quiet", latest: null, daysSinceLastReport: null },
     caretaker: null,
+    removedOn: null,
     ...overrides,
   };
 }

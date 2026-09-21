@@ -5,11 +5,11 @@
  * Source of truth is Cloudflare D1 (`pueblo-food-map-admin`.venues); this
  * file is the build-time snapshot the public map imports at request time
  * (docs/admin/cloudflare-native-admin-spec.md §3.3, §3.5 step 3).
- * Last published: 2026-09-15T18:31:42.457Z
+ * Last published: 2026-09-21T18:30:48.738Z
  */
 import type { Venue } from "@/types/venue";
 
-export const publishedAt = "2026-09-15T18:31:42.457Z";
+export const publishedAt = "2026-09-21T18:30:48.738Z";
 export const publishedVenues: Venue[] = [
   {
     "id": "garden-bethany-lutheran",

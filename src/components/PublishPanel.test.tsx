@@ -200,3 +200,19 @@ describe("PublishPanel — response branches", () => {
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 });
+
+describe("PublishPanel — reviewHref (admin dashboard build)", () => {
+  test("shows a 'Review changes' link to reviewHref only when there are unpublished changes", () => {
+    const { rerender } = render(<PublishPanel summary={summary()} reviewHref="/admin/places" />);
+    expect(screen.queryByRole("link", { name: "Review changes" })).toBeNull();
+
+    rerender(<PublishPanel summary={summary({ newDrafts: 1 })} reviewHref="/admin/places" />);
+    const link = screen.getByRole("link", { name: "Review changes" });
+    expect(link.getAttribute("href")).toBe("/admin/places");
+  });
+
+  test("omitting reviewHref renders exactly as before (no link, no crash)", () => {
+    render(<PublishPanel summary={summary({ newDrafts: 1 })} />);
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+});

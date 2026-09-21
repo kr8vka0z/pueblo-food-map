@@ -120,7 +120,7 @@ import { formatSlot } from "@/lib/hours";
 import { safeUrl } from "@/lib/safeUrl";
 import VenueCard from "@/components/VenueCard";
 import type { Venue, VenueCategory, WeeklyHours } from "@/types/venue";
-import { isDateOnlyUpdateProposal } from "@/lib/adminProposals";
+import { isDateOnlyUpdateProposal, reviewableDiffFields } from "@/lib/adminProposals";
 import type { ParsedProposal, ProposalChangeType, ProposalSourceValue, ProposedDiff } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/app/admin/flags/page";
 
@@ -134,7 +134,10 @@ export interface ProposalsReviewViewProps {
 const cardClass =
   "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5";
 
-const SOURCE_BADGE: Record<ProposalSourceValue, { label: string; className: string }> = {
+// Exported: NeedsDecisionPanel.tsx (Dashboard's "Needs a decision" panel)
+// reuses this SAME label map for its own source display, rather than a
+// second copy that could drift from this one.
+export const SOURCE_BADGE: Record<ProposalSourceValue, { label: string; className: string }> = {
   osm: { label: "OpenStreetMap", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   plentiful: { label: "Plentiful", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   gtfs: { label: "GTFS", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
@@ -189,7 +192,8 @@ const FIELD_LABELS: Record<string, string> = {
   last_verified: "Last verified",
 };
 
-function fieldLabel(field: string): string {
+// Exported for the same reuse reason as SOURCE_BADGE above.
+export function fieldLabel(field: string): string {
   return FIELD_LABELS[field] ?? field;
 }
 
@@ -213,8 +217,8 @@ function formatHoursSummary(hours: WeeklyHours): string {
     .join(" · ");
 }
 
-/** Renders one Venue field's value for the diff view — hours_weekly gets a compact per-day summary, everything else stringifies plainly. Empty/null/undefined renders as an explicit "(empty)" so a real value clearing to nothing reads clearly, not as a blank cell. */
-function formatFieldValue(field: string, value: unknown): string {
+/** Renders one Venue field's value for the diff view — hours_weekly gets a compact per-day summary, everything else stringifies plainly. Empty/null/undefined renders as an explicit "(empty)" so a real value clearing to nothing reads clearly, not as a blank cell. Exported for the same reuse reason as SOURCE_BADGE above. */
+export function formatFieldValue(field: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "(empty)";
   if (field === "hours_weekly" && typeof value === "object") {
     return formatHoursSummary(value as WeeklyHours);
@@ -764,7 +768,9 @@ function FieldDiff({ diff, sourceLabel }: { diff: ProposedDiff; sourceLabel: str
   // excluded too (an `add` proposal's fields_changed always includes it,
   // straight off Object.keys(incoming venue) in diffEngine.ts) — the card
   // header already shows the target id directly under the venue name.
-  const reviewFields = diff.fields_changed.filter((f) => f !== "last_verified" && f !== "id");
+  // reviewableDiffFields (adminProposals.ts) is the shared selection —
+  // NeedsDecisionPanel.tsx's compact diff summary reads the same set.
+  const reviewFields = reviewableDiffFields(diff);
 
   if (reviewFields.length === 0) {
     // WHY name the source and date rather than the old source-less

@@ -148,7 +148,7 @@ describe("AddVenueForm — submit", () => {
 
     await user.click(screen.getByRole("button", { name: /Add venue/i }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places"));
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
@@ -194,7 +194,7 @@ describe("AddVenueForm — edit mode (#255)", () => {
 
     await user.click(screen.getByRole("button", { name: /Save changes/i }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places"));
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
@@ -267,7 +267,7 @@ describe("AddVenueForm — submissionId threading (#259)", () => {
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
-  test("a successful create WITHOUT submissionId still redirects to /admin (unchanged)", async () => {
+  test("a successful create WITHOUT submissionId still redirects to /admin/places (unchanged)", async () => {
     mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
     const user = userEvent.setup();
     render(<AddVenueForm />);
@@ -275,7 +275,7 @@ describe("AddVenueForm — submissionId threading (#259)", () => {
 
     await user.click(screen.getByRole("button", { name: /Add venue/i }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places"));
   });
 
   test("edit mode ignores submissionId entirely: PATCH body omits it, redirect still goes to /admin", async () => {
@@ -290,7 +290,7 @@ describe("AddVenueForm — submissionId threading (#259)", () => {
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(init.body as string);
     expect(body.submissionId).toBeUndefined();
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places"));
   });
 });
 

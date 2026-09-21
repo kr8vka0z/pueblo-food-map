@@ -409,8 +409,11 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
         // #259/#390: a create that approved a submission returns to the
         // review queue; an edit that approved a proposal returns to the
         // flags queue — so the admin picks up the next pending card in
-        // either case, rather than the plain venue list.
-        let redirectTo = "/admin";
+        // either case, rather than the plain venue list. Default target is
+        // /admin/places (moved from /admin, admin dashboard build — /admin
+        // is now the Dashboard, a different screen; a venue-edit flow
+        // should land back on the venue list, not the to-do list).
+        let redirectTo = "/admin/places";
         if (!isEditMode && submissionId != null) redirectTo = "/admin/submissions";
         else if (isEditMode && proposalId != null) redirectTo = "/admin/flags";
         router.push(redirectTo);

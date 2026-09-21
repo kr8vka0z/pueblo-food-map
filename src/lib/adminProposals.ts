@@ -115,6 +115,22 @@ export function isDateOnlyUpdateProposal(
   return diff.fields_changed.length === 1 && diff.fields_changed[0] === "last_verified";
 }
 
+// ─── Shared diff-field selection (admin dashboard build, NeedsDecisionPanel) ─
+
+/**
+ * Fields worth showing in a before/after diff view — `last_verified` is a
+ * pure freshness stamp (every add/update proposal carries it, but it isn't
+ * something an admin needs to eyeball) and `id` is already shown elsewhere as
+ * the card's own venue identifier. Exported so ProposalsReviewView.tsx's
+ * full FieldDiff table AND NeedsDecisionPanel's compact one-line summary
+ * (Dashboard's "Needs a decision" panel) read the SAME set — a second,
+ * independently-filtered list here would risk the two screens disagreeing
+ * about which fields "changed" for the same proposal.
+ */
+export function reviewableDiffFields(diff: ProposedDiff): string[] {
+  return diff.fields_changed.filter((f) => f !== "last_verified" && f !== "id");
+}
+
 // ─── Stale-apply guard (spec §6.10c) ────────────────────────────────────────
 
 /**

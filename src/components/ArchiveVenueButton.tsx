@@ -89,7 +89,10 @@ export default function ArchiveVenueButton({
           : { method: "POST" },
       );
       if (res.status === 200) {
-        router.push(submissionId != null ? "/admin/submissions" : "/admin");
+        // Default target is /admin/places (moved from /admin, admin
+        // dashboard build) — an archive that didn't come from the review
+        // queue should return to the venue list, not the Dashboard.
+        router.push(submissionId != null ? "/admin/submissions" : "/admin/places");
         router.refresh();
         return;
       }

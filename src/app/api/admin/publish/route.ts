@@ -93,7 +93,8 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   // 6. ONLY now: promote drafts + re-stamp edited-published rows (#284) +
-  // write the audit row, atomically
+  // re-stamp pending-removal archived rows (item 1 fix) + write the audit
+  // row, atomically
   await promotePublishedDrafts(
     db,
     snapshot.draftIds,
@@ -104,6 +105,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       snapshotCount: validation.venues.length,
     },
     snapshot.editedPublishedIds,
+    snapshot.archivedIds,
   );
 
   logPublishResult("success", { prUrl: commitResult.prUrl });

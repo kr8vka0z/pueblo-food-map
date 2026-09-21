@@ -37,14 +37,25 @@
  * lingering with stale non-zero counts right after a successful publish.
  * The success message itself is untouched by the refresh (same DOM
  * position, component doesn't unmount), so it stays visible underneath.
+ *
+ * `reviewHref` (admin dashboard build): the new /admin Dashboard reuses this
+ * SAME component + SAME POST /api/admin/publish action for its own publish
+ * bar ("don't write a new publish path" per spec) rather than re-implementing
+ * publish. The one thing the Dashboard's bar needs that /admin/places's
+ * version doesn't is a "Review changes" link back to the full venue list —
+ * optional and additive, so /admin/places's call site (no `reviewHref`
+ * passed) renders byte-identical to before this prop existed.
  */
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PublishChangeSummary } from "@/lib/adminVenues";
 
 export interface PublishPanelProps {
   summary: PublishChangeSummary;
+  /** Optional "Review changes" link shown next to the summary text (Dashboard only). */
+  reviewHref?: string;
 }
 
 interface PublishSuccessBody {
@@ -114,7 +125,7 @@ function friendlyErrorMessage(status: number, error?: string): string {
   return "Something went wrong publishing. Nothing was changed — try again in a moment.";
 }
 
-export default function PublishPanel({ summary }: PublishPanelProps) {
+export default function PublishPanel({ summary, reviewHref }: PublishPanelProps) {
   const router = useRouter();
   const [state, setState] = useState<PublishState>({ status: "idle" });
   const { newDrafts, editedSincePublish, archived } = summary;
@@ -160,14 +171,24 @@ export default function PublishPanel({ summary }: PublishPanelProps) {
             </>
           )}
         </p>
-        <button
-          type="button"
-          onClick={handlePublish}
-          disabled={upToDate || state.status === "submitting"}
-          className={primaryButtonClass}
-        >
-          {state.status === "submitting" ? "Publishing…" : "Publish"}
-        </button>
+        <div className="flex items-center gap-3">
+          {reviewHref && !upToDate && (
+            <Link
+              href={reviewHref}
+              className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+            >
+              Review changes
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={handlePublish}
+            disabled={upToDate || state.status === "submitting"}
+            className={primaryButtonClass}
+          >
+            {state.status === "submitting" ? "Publishing…" : "Publish"}
+          </button>
+        </div>
       </div>
 
       {state.status === "success" && (

@@ -51,6 +51,14 @@ updates:
           - patch
     # Major updates remain individual PRs so each can be reviewed for breaking changes.
     ignore:
+      # mapbox-gl 3.31.0 breaks the inverted county-mask fill in Map.tsx: the
+      # world-ring polygon renders as large opaque black triangles over the map
+      # (live on prod 2026-09-21 via #565, rolled back the same hour). Pinned to
+      # exact 3.30.0 in package.json. Before lifting this, open the map on a
+      # preview and confirm the out-of-county dimming still looks right.
+      - dependency-name: mapbox-gl
+        versions:
+          - ">=3.31.0"
       # ESLint majors are gated on the rest of the lint plugin ecosystem (especially
       # eslint-plugin-react, pulled in transitively via eslint-config-next) shipping
       # compatible releases. The 9 → 10 bump (PR #10) failed because

@@ -560,6 +560,14 @@ function ProposalApproveAction({ proposal, onDone }: { proposal: ParsedProposal;
       label={changeType === "remove" ? "Archive" : "Approve"}
       submittingLabel={changeType === "remove" ? "Applying…" : "Approving…"}
       variant={changeType === "remove" ? "danger" : "primary"}
+      // Override: a 409 here can mean the venue changed after the proposal was
+      // made — applyApprovedProposal then marks it superseded and applies
+      // NOTHING. Refreshing silently would make the row vanish as if the fix
+      // landed, so show the route's own explanation instead (review finding).
+      interpretError={(status, body) => {
+        if (status === 404) return "handled";
+        return body?.message ?? "Try again";
+      }}
     />
   );
 }

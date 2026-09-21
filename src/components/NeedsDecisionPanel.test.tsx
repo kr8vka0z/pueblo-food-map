@@ -308,9 +308,10 @@ describe("NeedsDecisionPanel — data refresh group", () => {
     expect(screen.queryByText(/→/)).toBeNull();
   });
 
-  // Item 5 regression: a proposal already reviewed/superseded elsewhere
-  // (POST .../approve returns 409 "stale") must refresh quietly.
-  test("Approve: a 409 (stale/superseded) response refreshes instead of showing an error", async () => {
+  // A 409 from proposals/approve can mean the venue changed and NOTHING was
+  // applied (superseded) — the row must not vanish as if the fix landed, so
+  // the route's own explanation is shown instead of a silent refresh.
+  test("Approve: a 409 (stale/superseded) response shows the route's message, not a silent refresh", async () => {
     mockFetch.mockResolvedValueOnce({
       status: 409,
       json: async () => ({ ok: false, error: "stale", message: "This proposal is no longer current." }),
@@ -319,8 +320,8 @@ describe("NeedsDecisionPanel — data refresh group", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Approve" }));
 
-    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
-    expect(screen.queryByText("This proposal is no longer current.")).toBeNull();
+    expect(await screen.findByText("This proposal is no longer current.")).toBeDefined();
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 });
 

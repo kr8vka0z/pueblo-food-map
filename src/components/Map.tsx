@@ -134,11 +134,29 @@ export interface WalkStep {
 // ─── County mask constants ─────────────────────────────────────────────────────
 //
 // The mask is a GeoJSON polygon with two rings:
-//   1. A world-covering outer ring (CCW — standard GeoJSON exterior winding).
+//   1. An outer ring covering the county bbox plus a wide margin (CCW —
+//      standard GeoJSON exterior winding).
 //   2. The county boundary as a hole (CW — GeoJSON hole winding).
 //
 // This causes the fill layer to cover everything EXCEPT the county, creating
 // the dimmed-surroundings effect (#62).
+//
+// WHY not a world-covering ring: the ring used to be [-180,-90]..[180,90].
+// mapbox-gl 3.31.0 draws that polygon as large opaque black triangles across
+// the whole map (live on prod 2026-09-21, rolled back the same hour). Latitude
+// ±90 is outside what Web Mercator can project (limit ±85.0511), and a
+// world-spanning polygon gets clipped into every tile. maxBounds already keeps
+// the camera inside PUEBLO_COUNTY_BBOX, so a ring MASK_MARGIN_DEG beyond that
+// bbox covers everything a user can ever see.
+const MASK_MARGIN_DEG = 10;
+const [[BBOX_WEST, BBOX_SOUTH], [BBOX_EAST, BBOX_NORTH]] = PUEBLO_COUNTY_BBOX;
+const MASK_OUTER_RING: number[][] = [
+  [BBOX_WEST - MASK_MARGIN_DEG, BBOX_SOUTH - MASK_MARGIN_DEG],
+  [BBOX_EAST + MASK_MARGIN_DEG, BBOX_SOUTH - MASK_MARGIN_DEG],
+  [BBOX_EAST + MASK_MARGIN_DEG, BBOX_NORTH + MASK_MARGIN_DEG],
+  [BBOX_WEST - MASK_MARGIN_DEG, BBOX_NORTH + MASK_MARGIN_DEG],
+  [BBOX_WEST - MASK_MARGIN_DEG, BBOX_SOUTH - MASK_MARGIN_DEG],
+];
 //
 // The county boundary ring coordinates are sourced from
 // public/data/pueblo-county-boundary.geojson (Census TIGER/Line, FIPS 08-101,
@@ -291,10 +309,8 @@ export default function Map({
       geometry: {
         type: "Polygon" as const,
         coordinates: [
-          // Outer ring: entire world (CCW)
-          [
-            [-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90],
-          ],
+          // Outer ring: county bbox + margin (CCW) — see MASK_OUTER_RING
+          MASK_OUTER_RING,
           // Hole: county boundary (CW)
           holeRing,
         ],

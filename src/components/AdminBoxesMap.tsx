@@ -32,16 +32,17 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { PUEBLO_CENTER_LAT, PUEBLO_CENTER_LNG, PUEBLO_DEFAULT_ZOOM } from "@/data/pueblo-bbox";
 import type { BoxHealthEntry, BoxHealthStatus } from "@/lib/boxHealth";
 
-// Same hex values BoxHealthList.tsx's STATUS_META resolves its CSS vars to
-// (globals.css @theme) — a literal hex here because Marker dots are styled
-// via inline `style`, not Tailwind classes (Mapbox markers render outside
-// the normal DOM flow this app's Tailwind build scans).
+// Same CSS vars BoxHealthList.tsx's STATUS_META uses (globals.css @theme) —
+// a raw `var(--color-…)` string works fine in an inline `style` object (CSS
+// custom properties resolve at render time regardless of how the element got
+// styled); a literal hex here was unnecessary duplication that could drift
+// from globals.css, not something Tailwind's inline-style limitation forced.
 const STATUS_DOT_COLOR: Record<BoxHealthStatus, string> = {
-  ok: "#4A8466", // --color-sage-500
-  low: "#B45309", // --color-warning
-  empty: "#B91C1C", // --color-danger
-  problem: "#C2410C", // --color-clay-500
-  quiet: "#6A645A", // --color-ink-400
+  ok: "var(--color-sage-500)",
+  low: "var(--color-warning)",
+  empty: "var(--color-danger)",
+  problem: "var(--color-clay-500)",
+  quiet: "var(--color-ink-400)",
 };
 
 const STATUS_LABEL: Record<BoxHealthStatus, string> = {

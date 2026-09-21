@@ -267,7 +267,7 @@ describe("AddVenueForm — submissionId threading (#259)", () => {
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
-  test("a successful create WITHOUT submissionId still redirects to /admin (unchanged)", async () => {
+  test("a successful create WITHOUT submissionId still redirects to /admin/places (unchanged)", async () => {
     mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
     const user = userEvent.setup();
     render(<AddVenueForm />);

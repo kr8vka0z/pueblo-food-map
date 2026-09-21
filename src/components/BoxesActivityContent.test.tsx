@@ -1,0 +1,310 @@
+/**
+ * BoxesActivityContent tests (Blessing Boxes slice 3 — /boxes/activity).
+ * `next/navigation` is re-mocked locally (usePathname + useSearchParams,
+ * both real implementations that need Next router context this jsdom
+ * render doesn't provide — same "PageNav needs usePathname" reasoning
+ * PageNav.test.tsx's own local override documents) and global fetch is
+ * stubbed (same convention as BoxContent.test.tsx / BoxCheckinsAdminPanel.test.tsx)
+ * so nothing here makes a real network call.
+ */
+
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+
+let searchParamsValue = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/boxes/activity",
+  useSearchParams: () => searchParamsValue,
+}));
+
+import BoxesActivityContent from "@/components/BoxesActivityContent";
+import { t } from "@/lib/i18n";
+
+const mockFetch = vi.fn();
+
+function jsonResponse(body: unknown) {
+  return { ok: true, json: async () => body };
+}
+
+beforeEach(() => {
+  // PageNav (rendered inside BoxesActivityContent) uses a media-query hook
+  // jsdom doesn't implement — same stub PageNav.test.tsx's own beforeEach
+  // establishes.
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }),
+  });
+  searchParamsValue = new URLSearchParams();
+  mockFetch.mockReset();
+  mockFetch.mockImplementation((url: string) => {
+    if (url.includes("/blessing-boxes/activity")) {
+      return Promise.resolve(jsonResponse({ items: [], hasMore: false, page: 1 }));
+    }
+    // useBoxNetworkStats() -> GET /api/public/blessing-boxes/network-stats (slice 7)
+    if (url.includes("/network-stats")) {
+      return Promise.resolve(jsonResponse({ boxes: [], checkins: [], photos: [] }));
+    }
+    // useBoxVenues() -> GET /api/public/blessing-boxes
+    return Promise.resolve(jsonResponse({ boxes: [] }));
+  });
+  vi.stubGlobal("fetch", mockFetch);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("BoxesActivityContent", () => {
+  test("renders the heading and intro (EN)", () => {
+    render(<BoxesActivityContent />);
+    expect(screen.getByText(t("activity.heading", "en"))).toBeDefined();
+    expect(screen.getByText(t("activity.intro", "en"))).toBeDefined();
+  });
+
+  test("filter controls have real labels (accessibility)", () => {
+    render(<BoxesActivityContent />);
+    expect(screen.getByLabelText(t("activity.filters.box", "en"))).toBeDefined();
+    expect(screen.getByLabelText(t("activity.filters.kind", "en"))).toBeDefined();
+    expect(screen.getByLabelText(t("activity.filters.from", "en"))).toBeDefined();
+    expect(screen.getByLabelText(t("activity.filters.to", "en"))).toBeDefined();
+  });
+
+  test("initial `?box=<id>` query param pre-selects that box in the filter", async () => {
+    searchParamsValue = new URLSearchParams("box=box-1");
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/activity")) return Promise.resolve(jsonResponse({ items: [], hasMore: false, page: 1 }));
+      return Promise.resolve(
+        jsonResponse({
+          boxes: [{ id: "box-1", name: "Blessing Box - 216 W Routt", category: "blessing_box", lat: 0, lng: 0, address: "", source: "", last_verified: "" }],
+        }),
+      );
+    });
+    render(<BoxesActivityContent />);
+    // A native <select> ignores a `value` with no matching <option> yet —
+    // wait for useBoxVenues' own fetch to populate the box-1 option before
+    // asserting the select actually reflects it.
+    await waitFor(() => {
+      const select = screen.getByLabelText(t("activity.filters.box", "en")) as HTMLSelectElement;
+      expect(select.value).toBe("box-1");
+    });
+  });
+
+  // #511 — structural proof that the global feed never asks for the new
+  // photo/sponsor kinds, even when filtered down to one box via its own
+  // dropdown (`?box=<id>`, the case boxActivity.ts's own header calls out
+  // by name as the reason `includeBoxExtras` can't be inferred from
+  // `venueId` alone). Counterpart: BoxHistoryContent.test.tsx's own
+  // "includeExtras=1" assertion for the per-box page.
+  test("never sends includeExtras, even when filtered to one box", async () => {
+    searchParamsValue = new URLSearchParams("box=box-1");
+    render(<BoxesActivityContent />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    const activityCall = mockFetch.mock.calls.find((c) => (c[0] as string).includes("/blessing-boxes/activity"));
+    expect(activityCall?.[0] as string).toContain("box=box-1");
+    expect(activityCall?.[0] as string).not.toContain("includeExtras");
+  });
+
+  test("renders fetched activity items", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/blessing-boxes/activity")) {
+        return Promise.resolve(
+          jsonResponse({
+            items: [
+              {
+                source: "checkin",
+                kind: "filled",
+                detail: null,
+                createdAt: new Date().toISOString(),
+                venueId: "box-1",
+                venueName: "Blessing Box - 216 W Routt",
+                venueAddress: "216 W Routt Ave",
+              },
+            ],
+            hasMore: false,
+            page: 1,
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse({ boxes: [] }));
+    });
+    render(<BoxesActivityContent />);
+    expect(await screen.findByText(/Blessing Box - 216 W Routt was filled/)).toBeDefined();
+  });
+
+  test("changing a filter re-fetches with the new query param", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/blessing-boxes")) {
+        if (url.includes("/activity")) return Promise.resolve(jsonResponse({ items: [], hasMore: false, page: 1 }));
+        return Promise.resolve(
+          jsonResponse({
+            boxes: [{ id: "box-1", name: "Blessing Box - 216 W Routt", category: "blessing_box", lat: 0, lng: 0, address: "", source: "", last_verified: "" }],
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
+    render(<BoxesActivityContent />);
+    await waitFor(() => expect(screen.getByLabelText(t("activity.filters.box", "en")) as HTMLSelectElement).toBeDefined());
+
+    const user = userEvent.setup();
+    const kindSelect = screen.getByLabelText(t("activity.filters.kind", "en"));
+    await user.selectOptions(kindSelect, "filled");
+
+    await waitFor(() => {
+      const lastUrl = mockFetch.mock.calls.at(-1)?.[0] as string;
+      expect(lastUrl).toContain("kind=filled");
+    });
+  });
+
+  test("'Clear filters' only shows once a filter is active, and resets it", async () => {
+    render(<BoxesActivityContent />);
+    expect(screen.queryByText(t("activity.filters.clear", "en"))).toBeNull();
+
+    const user = userEvent.setup();
+    const kindSelect = screen.getByLabelText(t("activity.filters.kind", "en"));
+    await user.selectOptions(kindSelect, "filled");
+
+    const clearButton = await screen.findByText(t("activity.filters.clear", "en"));
+    await user.click(clearButton);
+    expect((kindSelect as HTMLSelectElement).value).toBe("");
+  });
+
+  test("shows the empty state when there is no activity", async () => {
+    render(<BoxesActivityContent />);
+    expect(await screen.findByText(t("activity.empty", "en"))).toBeDefined();
+  });
+
+  test("aria-live is scoped to the short status line, not the whole item list (PR #472 review, nit 2)", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/blessing-boxes/activity")) {
+        return Promise.resolve(
+          jsonResponse({
+            items: [
+              {
+                source: "checkin",
+                kind: "filled",
+                detail: null,
+                createdAt: new Date().toISOString(),
+                venueId: "box-1",
+                venueName: "Box",
+                venueAddress: "1 Main St",
+              },
+            ],
+            hasMore: false,
+            page: 1,
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse({ boxes: [] }));
+    });
+    render(<BoxesActivityContent />);
+    const status = await screen.findByText("1 results");
+    expect(status.getAttribute("aria-live")).toBe("polite");
+    // The list itself sits OUTSIDE any aria-live ancestor — re-rendering it
+    // on a filter change must not re-announce every item to a screen reader.
+    const list = await screen.findByText(/was filled/);
+    expect(list.closest("[aria-live]")).toBeNull();
+  });
+
+  test("Next page button is disabled when hasMore is false", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/activity")) {
+        return Promise.resolve(
+          jsonResponse({
+            items: [
+              {
+                source: "checkin",
+                kind: "filled",
+                detail: null,
+                createdAt: new Date().toISOString(),
+                venueId: "box-1",
+                venueName: "Box",
+                venueAddress: "1 Main St",
+              },
+            ],
+            hasMore: false,
+            page: 1,
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse({ boxes: [] }));
+    });
+    render(<BoxesActivityContent />);
+    const next = await screen.findByText(t("activity.nextPage", "en"));
+    expect(next.closest("button")).toBeDisabled();
+  });
+});
+
+describe("BoxesActivityContent — Network numbers (slice 7)", () => {
+  test("renders the Numbers heading and counts computed from network-stats data", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/blessing-boxes/activity")) return Promise.resolve(jsonResponse({ items: [], hasMore: false, page: 1 }));
+      if (url.includes("/network-stats")) {
+        return Promise.resolve(
+          jsonResponse({
+            boxes: [{ id: "box-1", name: "Box 1", archived: false }],
+            checkins: [
+              { venue_id: "box-1", kind: "filled", visibility: "visible", created_at: new Date().toISOString() },
+              { venue_id: "box-1", kind: "took", visibility: "visible", created_at: new Date().toISOString() },
+            ],
+            photos: [],
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse({ boxes: [] }));
+    });
+    render(<BoxesActivityContent />);
+    expect(screen.getByText(t("box.stats.networkHeading", "en"))).toBeDefined();
+    await waitFor(() => expect(screen.getAllByText("1")).not.toHaveLength(0)); // fills=1, uses=1 both render "1"
+  });
+
+  test("renders a never-filled box in the 'needs love' list", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/blessing-boxes/activity")) return Promise.resolve(jsonResponse({ items: [], hasMore: false, page: 1 }));
+      if (url.includes("/network-stats")) {
+        return Promise.resolve(
+          jsonResponse({ boxes: [{ id: "box-1", name: "Never Filled Box", archived: false }], checkins: [], photos: [] }),
+        );
+      }
+      return Promise.resolve(jsonResponse({ boxes: [] }));
+    });
+    render(<BoxesActivityContent />);
+    expect(await screen.findByText("Never Filled Box")).toBeDefined();
+    expect(screen.getByText(t("box.stats.neverFilled", "en"))).toBeDefined();
+  });
+
+  test("renders no milestones section when no threshold has been reached", () => {
+    render(<BoxesActivityContent />);
+    expect(screen.queryByText(t("box.stats.milestonesHeading", "en"))).toBeNull();
+  });
+
+  // issue #512 — box count / sponsor count / average are "right now" numbers,
+  // computed off networkStats.boxes/.approvedSponsorCount directly, never
+  // off the period-filtered counts — so changing the period picker must
+  // leave them exactly as they were.
+  test("the current network numbers (issue #512) don't change when the period picker changes", async () => {
+    const boxes = Array.from({ length: 7 }, (_, i) => ({ id: `box-${i + 1}`, name: `Box ${i + 1}`, archived: false }));
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/blessing-boxes/activity")) return Promise.resolve(jsonResponse({ items: [], hasMore: false, page: 1 }));
+      if (url.includes("/network-stats")) {
+        return Promise.resolve(jsonResponse({ boxes, checkins: [], photos: [], approvedSponsorCount: 5 }));
+      }
+      return Promise.resolve(jsonResponse({ boxes: [] }));
+    });
+    render(<BoxesActivityContent />);
+
+    await screen.findByText(t("box.stats.boxCount", "en"));
+    expect(screen.getByText("7")).toBeDefined(); // boxCount
+    expect(screen.getByText("5")).toBeDefined(); // sponsorCount
+    expect(screen.getByText("0.7")).toBeDefined(); // avgSponsorsPerBox (5/7 -> one decimal)
+
+    const periodSelect = screen.getByLabelText(t("box.stats.period", "en"));
+    await userEvent.selectOptions(periodSelect, "7d");
+
+    expect(screen.getByText("7")).toBeDefined();
+    expect(screen.getByText("5")).toBeDefined();
+    expect(screen.getByText("0.7")).toBeDefined();
+  });
+});

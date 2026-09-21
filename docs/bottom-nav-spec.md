@@ -1,6 +1,8 @@
 # Pueblo Food Access Map — Bottom Navigation & View Switch Specification
 
 **Status:** v1.0 — design approved by Kyle 2026-09-16. **Implemented** in #449 (PR to `dev`).
+**Amended 2026-09-19** (#516, Kyle): 5th item "Boxes", "Resources" renamed "Help", Spanish
+"Cerca de mí" → "Cercanos" — see the dated amendment blocks in §3, §3.2, §11, §12, §13.
 **§5 amended 2026-09-16 by Kyle:** cutover moved from `2xl` (1280px) to `2xl` (1536px) —
 at 1280 the pill measured wider than the space beside the search box.
 **Author:** Atlas (Claude Opus 5), 2026-09-16.
@@ -32,7 +34,7 @@ both vanish while a venue card is open). Those are the four to read first.
 | "Pueblo Food Map" wordmark (top-left) | Laptop only | **Deleted** |
 | Map/List switch | Inside search box, "List" label hidden below `md` | Inside search box, **both labels visible at every width** |
 | Orange "Find food near me" pill | Floating on the map at `top: 72px` | **Retired** — becomes "Near me" in the bar |
-| Navigation | Hidden behind the hamburger menu | **Near me · Saved · Resources · Menu** |
+| Navigation | Hidden behind the hamburger menu | **Near me · Saved · Boxes · Help · Menu** *(was Resources; Boxes added #516, 2026-09-19)* |
 | Navigation placement | — | Bottom bar below `2xl`; inline pill right of the search box at `2xl`+ |
 | Mapbox mark + sponsor line | Bottom corners of the map | Lifted above the bar, with a soft fade band behind them |
 
@@ -84,6 +86,25 @@ or any data path.
 
 ## 3. The bottom bar
 
+> **Amended 2026-09-19 by Kyle (5th item — Boxes, #516):** a 5th item, "Boxes"
+> ("Cajas" in Spanish), sits third in order — **Near me · Saved · Boxes ·
+> Help · Menu** (Boxes in the middle, under the thumb). It is not a
+> `MenuSection`: tapping it toggles `blessing_box` in the same category `Set`
+> the Filters panel (#513) writes to, so ticking Blessing Box in either place
+> lights up both the bar item and the Filters badge count. While on, the item
+> is drawn in the blessing-box raspberry (`--color-cat-blessing`, `#C2447B`)
+> with a tinted background and carries `aria-pressed="true"`. Icon is a small
+> box with a roof and a heart (mockup: "Bottom Nav Blessing Box Shortcut -
+> Mockup.html"), hand-drawn to lucide's stroke conventions since no lucide
+> icon matches. §3.2's table, below, is superseded by the 5-row table in the
+> same amendment. In the same change, "Resources" was renamed **"Help"**
+> ("Ayuda") — the page itself keeps its own title ("Food help programs") —
+> and the Spanish "Cerca de mí" became **"Cercanos"** (matches Google Maps'
+> Spanish wording, and is shorter). A 5th item narrows each cell (~67px @375,
+> ~57px @320, still well past the 44px tap floor) — the label already dropped
+> to 11px under 360px on the 4-item bar for "Resources"; the same 11px floor
+> now covers every label at that width, returning to 12px at 360px and up.
+
 > **Amended 2026-09-16 by Kyle (floating pill):** below `2xl` the bar is now a 64px floating
 > pill — `left/right: 12px`, `bottom: 12px + safe-area inset`, `bone-50`, `bone-300` border,
 > full radius, matching the search bar and the `2xl` pill. Icon still sits above the word
@@ -122,6 +143,18 @@ content stays at a fixed 78px and the extra space becomes dead zone under the ho
 indicator, which is what iOS expects.
 
 ### 3.2 Items
+
+**Superseded 2026-09-19 (#516) — now 5 items, Boxes inserted third:**
+
+| Order | Label (EN) | Label (ES) | Icon | Behaviour |
+|---|---|---|---|---|
+| 1 | Near me | Cercanos *(was "Cerca de mí")* | `locate` | Requests location, flies to it, re-centres if already located |
+| 2 | Saved | Guardados | `star` (was `heart`; changed 2026-09-16 by Kyle to match the venue cards' save star) | Opens the drawer's saved-places view |
+| 3 | Boxes | Cajas | hand-drawn box + heart (no lucide match, see §3 amendment) | Toggles the `blessing_box` category filter; `aria-pressed`, raspberry when on |
+| 4 | Help *(was "Resources")* | Ayuda *(was "Recursos")* | `hand-helping` | Opens the `/resources` page *(amended 2026-09-16, see §7)* |
+| 5 | Menu | Menú | `menu` | Opens the drawer at the top |
+
+Original 4-item table, for history:
 
 | Order | Label (EN) | Label (ES) | lucide icon | Behaviour |
 |---|---|---|---|---|
@@ -474,6 +507,23 @@ new one.
 > fully expanded. It sits above the sheet's z-index, so at the peek detent "Sponsored by
 > Pueblo Food Project" printed across the Walk / Bus / Drive buttons (seen on an iPhone).
 
+> **Amended 2026-09-19 by #531, then reversed 2026-09-20 by #547 (Kyle) — this
+> section's own "open at any detent" rule was briefly NOT the whole story.**
+> #531 added a walking-route exception: while the sheet's collapsed to the
+> `RouteStrip` (a route in progress), the bar stayed visible underneath it
+> instead of hiding, on the theory that the strip is short enough to leave
+> the bar room. #547: Kyle walked the app on his own phone and found the bar
+> covering the strip's route controls (distance/time, Clear route, Steps,
+> Show card) — the opposite of "leaving room." The exception is deleted.
+> This section's original rule is restored to being the whole story again:
+> the bar (and the band) hide for the sheet's entire open lifetime, strip or
+> full card alike, with no carve-out. Mechanism: `RouteStrip` never registers
+> itself with the overlay registry (only its own Steps sheet does, unchanged
+> since #542) — `MapWrapper.tsx`'s `venueSheetOpen` (fed into
+> `overlayRegistry.ts`, #542) now depends only on whether a venue is
+> selected, not on which of the two sheet states is showing, so one
+> registration covers both without RouteStrip needing one of its own.
+
 **Map padding:** `MapWrapper`'s map `padding.bottom` increases by the bar's height below
 `2xl`, so `fitBounds` and marker-fly animations stop centring results underneath the bar.
 
@@ -487,7 +537,7 @@ on its final row.
 
 ## 11. Copy and translation
 
-Four new keys in `src/lib/i18n.ts`:
+Four new keys in `src/lib/i18n.ts`, original build:
 
 | Key | EN | ES |
 |---|---|---|
@@ -495,6 +545,18 @@ Four new keys in `src/lib/i18n.ts`:
 | `nav.saved` | Saved | Guardados |
 | `nav.resources` | Resources | Recursos |
 | `nav.menu` | Menu | Menú |
+
+**Superseded 2026-09-19 (#516)** — `nav.nearMe` (ES) and `nav.resources` (both
+languages) changed value in place, no key rename (avoids churning every test
+and caller that already asserts on the key name); one new key, `nav.boxes`:
+
+| Key | EN | ES | Note |
+|---|---|---|---|
+| `nav.nearMe` | Near me | **Cercanos** | matches Google Maps' Spanish wording, shorter |
+| `nav.saved` | Saved | Guardados | unchanged |
+| `nav.boxes` | **Boxes** | **Cajas** | new |
+| `nav.resources` | **Help** | **Ayuda** | page title (`nav.resourcesPage`) unchanged |
+| `nav.menu` | Menu | Menú | unchanged |
 
 `splash.cta.primary` ("Find food near me") is unchanged and stays on the splash screen.
 `menu.view` and its two option strings become unused when §4.4 lands; remove them in the
@@ -506,8 +568,8 @@ same change rather than leaving dead keys.
 
 | Requirement | How it is met |
 |---|---|
-| Touch target ≥ 44px | Each bar item is ≥ 88 × 78px |
-| Visible text label on every control | All four bar items carry their word; the view switch carries both words (except §4.3, where `sr-only` names survive) |
+| Touch target ≥ 44px | Each bar item is ≥ 88 × 78px *(superseded 2026-09-19, #516: 5 items narrows each cell to ~67px @375 / ~57px @320 — still clear of the 44px floor)* |
+| Visible text label on every control | All five bar items carry their word *(was four; Boxes added #516)*; the view switch carries both words (except §4.3, where `sr-only` names survive) |
 | Contrast | `ink-500` (`#5F5A52`) on `bone-50` and `brand-navy` on `bone-50` both clear AA at 12px/700 |
 | No drag-only interaction (WCAG 2.5.7) | Every bar item is a tap. Nothing added here requires a gesture |
 | Decorative layer not announced | Band is `aria-hidden` and `pointer-events: none` |
@@ -525,7 +587,7 @@ In the style of `src/__tests__/SearchBarViewSwitch.test.tsx` — class-and-attri
 contract assertions, since jsdom has no layout engine and cannot measure any of the
 geometry above.
 
-1. `BottomNav` renders four items, each with a visible text label.
+1. `BottomNav` renders five items, each with a visible text label *(was four; Boxes added #516)*.
 2. No item carries `aria-current` when no panel is open.
 3. Opening the Saved panel sets `aria-current` on Saved and on nothing else.
 4. "Near me" is disabled and shows the spinner while `isLocating` is true.
@@ -533,6 +595,7 @@ geometry above.
 6. `ViewToggle` at `size="md"` renders both labels as visible text (not `sr-only`) in the default case.
 7. `HamburgerMenu` no longer renders a Map/List row.
 8. `SponsorCredit`'s computed bottom offset includes the bar height below `2xl`.
+9. **(#516)** Boxes carries `aria-pressed` matching `boxesActive`, and tapping it calls `onBoxesToggle` — not `onSectionTap` (it never opens the drawer).
 
 Test 6 is the regression guard for the whole §4 premise — if a future change reinstates
 `sr-only` on the inactive segment, that test fails.

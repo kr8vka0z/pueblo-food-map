@@ -60,6 +60,47 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
+      {
+        // /alerts/confirm and /alerts/stop carry a live subscription token in
+        // their `?t=` query string (Blessing Boxes slice 6). The blanket
+        // strict-origin-when-cross-origin policy above still sends the full
+        // URL — token included — as the Referer header on any outbound link
+        // click from these two pages; this later, more specific match
+        // overrides it to no-referrer for just these paths (Next.js applies
+        // header sets in definition order, last match wins on a key
+        // conflict).
+        source: "/alerts/:path*",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
+    ];
+  },
+  // Blessing Boxes slice 1: the one real box (216 W Routt) is being
+  // converted from a plain pantry to category='blessing_box' and dropped
+  // from published-venues.ts, so /venue/<its-id> would otherwise 404
+  // (that page is dynamicParams=false — see its own header on why a
+  // redirect inside the page component runs too late to help: the static
+  // layer 404s before any page code executes). A PLAIN path redirect (no
+  // `has` query-string matcher) — unlike the /?venue=<id> redirect removed
+  // 2026-06-20 above, which broke because of a `has` rule on `source: "/"`
+  // — is the ordinary, well-supported Next.js/OpenNext case, so this one is
+  // safe to add. permanent: true -> 308, matching "its old address must
+  // keep working" (a real, indefinite redirect, not a temporary one).
+  //
+  // Destination updated for the map-first rework (2026-09-18): /box/<id>
+  // itself now just client-redirects to /?venue=<id> (BoxRedirectClient.tsx)
+  // to keep its own generateMetadata for link previews — pointing THIS
+  // redirect straight at /?venue=<id> skips that extra hop for a visitor
+  // following the old /venue/<id> link. A plain query string on the
+  // DESTINATION is fine here — only a `has` MATCHER on the SOURCE broke on
+  // OpenNext/Cloudflare (the 2026-06-20 incident this comment already
+  // documents), and this redirect's source is still a plain path.
+  async redirects() {
+    return [
+      {
+        source: "/venue/plentiful-blessing-box-216-w-routt-plentiful-1454",
+        destination: "/?venue=plentiful-blessing-box-216-w-routt-plentiful-1454",
+        permanent: true,
+      },
     ];
   },
 };

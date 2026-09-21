@@ -1,78 +1,76 @@
+# Automatic second reader on every human-authored pull request into `dev`.
+# Advisory only -- deliberately NOT a required status check, so a Claude outage
+# can never freeze merges. Rules it applies live in REVIEW.md (repo root).
+# Authenticates with the Claude subscription token (repo secret
+# CLAUDE_CODE_OAUTH_TOKEN), not a metered API key. This repo is public, so runs
+# cost no GitHub Actions minutes; the job timeout is still the ceiling.
+#
+# TWO TRAPS, both silent (the job stays green):
+#  1. The action skips itself unless this file is byte-identical to the copy on
+#     the default branch. Editing it on `dev` switches reviews off until the next
+#     promotion -- so keep repo rules in REVIEW.md and leave this file alone.
+#  2. Without the `--allowedTools` line below the reviewer may read but not post,
+#     and the review is thrown away. A healthy run takes minutes and leaves a
+#     PR comment; a 13-second green run reviewed nothing.
 name: Claude Code Review
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  issue_comment:
-    types: [created]
 
 concurrency:
-  group: claude-review-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: claude-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
   contents: read
   pull-requests: write
   issues: write
-  # OIDC is required by the Claude action in trusted contexts.
-  # Keep this enabled so same repository pull requests can mint a token.
+  # The action mints an OIDC token; only same-repo pull requests can.
   id-token: write
 
 jobs:
   claude-review:
-    # Auto-review every PR from a human author; skip ALL bots (Dependabot,
-    # release-please, etc.) — bot PRs auto-merge or release on their own and the
-    # action refuses non-human actors, which otherwise shows up as a red check.
-    # Also respond to @claude mentions in PR comments for ad-hoc reviews.
-    # Fork pull requests do not get OIDC tokens for this job.
-    # We skip those runs to avoid false red checks and keep required CI signal clean.
-    # Maintainers can still request an explicit review through @claude comments.
-    #
-    # Also skip the publish-bot PR specifically (#336): it's opened with
-    # Kyle's fine-grained personal PAT (see AGENTS.md "Publish -> static",
-    # GITHUB_PUBLISH_TOKEN), not a bot account, so `user.type != 'Bot'` above
-    # doesn't catch it -- every venue-data publish otherwise fires a paid AI
-    # review job against a generated data file with no code to review. The
-    # @claude-mention path is untouched, so a maintainer can still request a
-    # review on that PR by hand if one is ever actually wanted.
+    # Skipped on purpose:
+    #  - bot authors (Dependabot): the action refuses non-human actors and would
+    #    show a red check on PRs that auto-merge anyway;
+    #  - promotion PRs (base main): every commit in them was already reviewed on
+    #    its way into dev, so a second pass only burns minutes;
+    #  - forks: no OIDC token, would always fail;
+    #  - the publish-bot PR (#336): opened with Kyle's personal token, not a bot
+    #    account, so the Bot test misses it -- a generated venue-data file with
+    #    no code to review.
     if: >-
-      (github.event_name == 'pull_request' &&
-       github.event.pull_request.user.type != 'Bot' &&
-       github.event.pull_request.head.ref != 'publish-bot' &&
-       github.event.pull_request.head.repo.fork == false) ||
-      (github.event_name == 'issue_comment' &&
-       github.event.issue.pull_request != null &&
-       contains(github.event.comment.body, '@claude'))
+      github.event.pull_request.user.type != 'Bot' &&
+      github.event.pull_request.head.ref != 'publish-bot' &&
+      github.event.pull_request.base.ref != 'main' &&
+      github.event.pull_request.head.repo.fork == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Run Claude Code review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            You are a senior software engineer reviewing this pull request
-            for the Pueblo Food Access Map — a Next.js 16 + TypeScript +
-            Tailwind v4 + Mapbox (react-map-gl) community project that helps Pueblo
-            County residents find food resources.
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Review the diff in this PR. Focus areas, in priority order:
+            Review this pull request. First read REVIEW.md and AGENTS.md at the
+            repo root: REVIEW.md defines severity, the checks to run every time,
+            this repo's standing rules, and what to skip. Read the change with
+            `gh pr diff` and `gh pr view`.
 
-            1. Correctness — does the change do what its title and description claim?
-            2. Bugs and edge cases — null/undefined, off-by-one, async races, SSR vs client.
-            3. Security — XSS in user-provided strings, leaked tokens or secrets, unsafe `eval`/`dangerouslySetInnerHTML`, weak validation on any new API surface.
-            4. Accessibility — keyboard navigation, color contrast, ARIA labels, screen-reader-friendly DOM, focus management.
-            5. Code quality — readability, naming, dead code, over-engineering, premature abstractions.
-            6. Domain integrity — venue data must include stable `id`, `name`, `category`, `address`, geocoded `lat`/`lng`, `source`, `last_verified` (see `src/types/venue.ts`). Geolocation handling must be SSR-safe. Mobile layout must remain functional below the `md` breakpoint.
+            Report findings grouped Blocker / Important / Nit with
+            `path/to/file:line` references and a concrete fix for each.
+            Concise, no praise. If the PR is clean, say so in one line.
 
-            Style:
-            - Concise. No filler, no generic praise.
-            - Use `path/to/file.ts:42` references for every concrete comment.
-            - If the PR is clean, say so in one line.
-            - If one issue clearly dominates, call it out first and explicitly.
-            - Suggest a concrete fix when flagging an issue, not just "consider X".
+            Post the whole review as ONE top-level comment with `gh pr comment`.
+            Your text output is discarded -- only a posted comment reaches anyone.
+          claude_args: |
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"

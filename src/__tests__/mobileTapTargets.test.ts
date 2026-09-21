@@ -22,12 +22,9 @@ function readSource(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf-8");
 }
 
-describe("mobile review #7 — SearchBar filter-chip clear button (14px -> 26px)", () => {
-  test("clear button box grows to 26px with a compensating negative margin", () => {
-    const src = readSource("src/components/SearchBar.tsx");
-    expect(src).toMatch(/w-\[26px\]\s+h-\[26px\]\s+-m-\[6px\]/);
-  });
-});
+// mobile review #7's SearchBar filter-chip clear button was removed outright
+// by #513 ("Category chip leaves the search bar entirely") — the chip and its
+// 14px->26px clear button no longer exist; filters live in FilterPanel instead.
 
 describe("mobile review #8 — BottomSheet Show/Hide details toggle (~20px -> >=24px)", () => {
   test("toggle button gains vertical padding", () => {
@@ -74,7 +71,8 @@ describe("mobile review #14 — shared press-feedback style is defined once", ()
     "src/components/FavoriteButton.tsx",
     "src/components/ShareButton.tsx",
     "src/components/CategoryChips.tsx",
-    "src/components/ViewToggle.tsx",
+    // ViewToggle.tsx removed by #514 (the inline search-bar switch it
+    // rendered is gone) — dropped from this list, not just left to 404.
     "src/components/LanguageToggle.tsx",
   ])("%s imports the shared PRESS_FEEDBACK constant", (path) => {
     const src = readSource(path);

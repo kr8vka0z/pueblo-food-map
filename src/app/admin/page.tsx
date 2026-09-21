@@ -10,9 +10,12 @@
  * venues row (draft + published + archived), plus an "Add place" link to
  * /admin/venues/new (src/app/admin/venues/new/page.tsx), the only OTHER
  * mutation entry point besides Publish, a "Review queue" link to
- * /admin/submissions (src/app/admin/submissions/page.tsx), and a "Data
- * refresh queue" link to /admin/flags (src/app/admin/flags/page.tsx, #390)
- * — all plain navigation links, not mutation entry points, styled as the
+ * /admin/submissions (src/app/admin/submissions/page.tsx), a "Data
+ * refresh queue" link to /admin/flags (src/app/admin/flags/page.tsx, #390),
+ * and a "Photo review" link to /admin/box-photos (Blessing Boxes slice 5)
+ * carrying a pending-count badge when non-zero (countPendingReview() — one
+ * cheap COUNT(*), not a second full row fetch) — all plain navigation
+ * links, not mutation entry points, styled as the
  * same secondary sage-underline link this admin shell already uses
  * elsewhere (e.g. "Back to venue list") so "Add place" stays the header's
  * one primary action. This page itself still performs no mutation and issues
@@ -44,6 +47,8 @@ import Link from "next/link";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { summarizePublishChanges } from "@/lib/adminVenues";
+import { countPendingReview } from "@/lib/boxPhotos";
+import { countPendingAdopters } from "@/lib/boxAdopters";
 import VenueListView from "@/components/VenueListView";
 import PublishPanel from "@/components/PublishPanel";
 import type { AdminVenueRow } from "@/types/venue";
@@ -51,6 +56,8 @@ import type { AdminVenueRow } from "@/types/venue";
 export default async function AdminPage() {
   let email: string;
   let venues: AdminVenueRow[];
+  let pendingPhotoCount = 0;
+  let pendingAdopterCount = 0;
 
   try {
     const { db, identity } = await getAdminDb(await headers());
@@ -59,6 +66,20 @@ export default async function AdminPage() {
       .prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC")
       .all<AdminVenueRow>();
     venues = result.results;
+    // Best-effort: a missing box_photos/box_adopters table (e.g. migration
+    // 0009/0010 not yet applied on this environment) must never break the
+    // whole admin shell — the count just shows 0, same "degrade, don't 500"
+    // posture every other best-effort read in this app already follows.
+    try {
+      pendingPhotoCount = await countPendingReview(db);
+    } catch {
+      pendingPhotoCount = 0;
+    }
+    try {
+      pendingAdopterCount = await countPendingAdopters(db);
+    } catch {
+      pendingAdopterCount = 0;
+    }
   } catch (err) {
     handlePageAuthError(err);
   }
@@ -93,6 +114,18 @@ export default async function AdminPage() {
             className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
           >
             Data refresh queue
+          </Link>
+          <Link
+            href="/admin/box-photos"
+            className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+          >
+            Photo review{pendingPhotoCount > 0 && ` (${pendingPhotoCount})`}
+          </Link>
+          <Link
+            href="/admin/box-adopters"
+            className="text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+          >
+            Adoption requests{pendingAdopterCount > 0 && ` (${pendingAdopterCount})`}
           </Link>
           <p className="text-sm text-[var(--color-ink-500)]">
             Signed in as{" "}

@@ -1,15 +1,21 @@
 /**
- * CategoryAutoZoomHomeView — MapWrapper's category-autozoom effect (#111) vs.
- * the #231 fixed home view. Issue #247.
+ * CategoryAutoZoomHomeView — MapWrapper's category-autozoom effect (#111,
+ * generalized to multi-select by #513) vs. the #231 fixed home view. Issue #247.
  *
  * Reproduces: on a fresh load, `mapboxMap` transitions null -> ready while
- * `activeCategoryFilter` is still its initial `null` (never touched). The
+ * `selectedCategories` is still its initial `null` (never touched). The
  * pre-fix effect read that "map ready" run as "the user cleared a category"
  * and fitBounds-ed to the whole venue set, overriding the #231 fixed Pueblo
  * home view a few hundred ms after paint. Fix (MapWrapper.tsx): a ref records
- * the previous `activeCategoryFilter` only on runs where `mapboxMap` is ready,
+ * the previous categories signature only on runs where `mapboxMap` is ready,
  * so the effect can tell "map just became ready" apart from a genuine user
- * clear (a real non-null -> null transition).
+ * clear (a real non-empty -> empty transition).
+ *
+ * #513 rewired the selection UI from CategoryDropdown (search-focus browse
+ * list, single-select) to the Filters button + FilterPanel (multi-select
+ * checkboxes) — selectCategory()/clearCategoryFilter() below now drive that
+ * panel instead. The autozoom behavior under test is unchanged: a single
+ * checked category still fits to exactly that category's venues.
  *
  * Mounts the REAL MapWrapper (the fitBounds call under test lives in
  * MapWrapper's own effect, not in any sub-component) instead of the
@@ -196,27 +202,25 @@ function fireMapReady() {
   return fakeMap;
 }
 
-/** Find a CategoryDropdown option row by its visible label text. */
-function findCategoryOption(labelSubstring: string): HTMLElement {
-  const options = screen.getAllByRole("option");
-  const match = options.find((el) => el.textContent?.includes(labelSubstring));
-  if (!match) throw new Error(`No category option found containing "${labelSubstring}"`);
-  return match;
+/** Open the FilterPanel via SearchBar's Filters button. */
+function openFilterPanel() {
+  const filtersButton = screen.getByRole("button", { name: /^Filters/i });
+  fireEvent.click(filtersButton);
 }
 
-/** Open the category dropdown (search input focus, empty query) and click one row. */
+/** Open the Filters panel and check the category checkbox with this label. */
 async function selectCategory(labelSubstring: string) {
-  const input = screen.getByRole("combobox");
-  fireEvent.focus(input);
-  const option = findCategoryOption(labelSubstring);
+  openFilterPanel();
+  const checkbox = screen.getByRole("checkbox", { name: new RegExp(labelSubstring, "i") });
   await act(async () => {
-    fireEvent.click(option);
+    fireEvent.click(checkbox);
   });
 }
 
-/** Click the active-category chip's clear (×) button in the search bar. */
+/** Open the Filters panel (if not already) and click "Clear all". */
 async function clearCategoryFilter() {
-  const clearBtn = screen.getByRole("button", { name: /Clear category filter/i });
+  if (!screen.queryByRole("dialog")) openFilterPanel();
+  const clearBtn = screen.getByRole("button", { name: /Clear all/i });
   await act(async () => {
     fireEvent.click(clearBtn);
   });

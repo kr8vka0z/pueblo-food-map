@@ -15,6 +15,32 @@
  *   1. Escape key (vaul handles natively via onOpenChange)
  *   2. Tap on scrim (vaul handles by default)
  *   3. Explicit close X button
+ *
+ * Route strip (#509, walk-route standard for every venue card): starting a
+ * walking route (a box's address tap, or an ordinary place's Walk button —
+ * both call the SAME `onWalkRoute`) shrinks this sheet to a short `RouteStrip`
+ * instead of leaving the full card covering the map. This is the one place
+ * v2's retired snap-point model comes back — but scoped ONLY to while a
+ * route is active, and only ever between two points (full card / strip), not
+ * v2's ambient three-point drag everywhere. `dismissible={false}` while a
+ * route is active is what makes vaul rest at the strip instead of closing on
+ * a drag-down (vaul's own contract: with snapPoints + dismissible=false,
+ * dragging down from the lowest snap point is a no-op — see vaul's
+ * `onDrag`/`noCloseSnapPointsPreCondition`); the same flag also blocks
+ * Escape/scrim from fully dismissing while a route is active (vaul's
+ * `onOpenChange` short-circuits on `!dismissible && !open` before it ever
+ * reaches OUR `handleOpenChange`) — handled below by collapsing to the
+ * strip instead of doing nothing on Escape, so it isn't a dead key. Only the
+ * explicit × button (an imperative `onClose()` call, never routed through
+ * vaul's dismissible gate) still closes everything, unchanged.
+ *
+ * `key={isWalkRouteActive ? "route" : "card"}` on `Drawer.Root` remounts vaul
+ * fresh across that transition rather than mutating `snapPoints`/`dismissible`
+ * on a live instance — vaul's internal transform/offset state from the
+ * pre-transition mode isn't guaranteed to reset otherwise (advisor()-reviewed
+ * 2026-09-19). The trade-off: the shrink-to-strip transition is a fresh open
+ * (a slide-in), not a morph of the outgoing full card — acceptable, and
+ * simpler than vaul's snap-point internals to get provably right.
  */
 
 import { useState } from "react";
@@ -29,16 +55,47 @@ import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { safeUrl } from "@/lib/safeUrl";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { isNativeDialogOpen } from "@/lib/dialogGuard";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import HoursList from "@/components/HoursList";
 import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
+import BoxCardBody from "@/components/BoxCardBody";
+import RouteStrip, { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
+import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
+
+// #549: the map-peek gap deliberately left visible above the drawer at rest
+// (100px, matches the non-route maxHeight below). Named so the height calc
+// and the strip snap point (ROUTE_STRIP_SNAP, which must be
+// ROUTE_STRIP_HEIGHT_PX + this) can't drift apart — see the `style` prop
+// below for the full derivation.
+const MAP_PEEK_PX = 100;
+// vaul's px snapPoints can't use calc() — a literal string, computed once.
+// #549: this is ROUTE_STRIP_HEIGHT_PX + MAP_PEEK_PX, not ROUTE_STRIP_HEIGHT_PX
+// alone — see the `style` prop below for why the map peek has to be added
+// back in on top of the strip's own height for vaul's snap math to land on
+// a strip that's actually ROUTE_STRIP_HEIGHT_PX tall on screen.
+const ROUTE_STRIP_SNAP = `${ROUTE_STRIP_HEIGHT_PX + MAP_PEEK_PX}px`;
+// The "full card" snap point — 100% of the drawer's own (fixed, see the
+// `height` style swap below) height.
+const FULL_CARD_SNAP = 1;
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface BottomSheetProps {
   venue: (Venue & { distanceMiles?: number }) | null;
+  /**
+   * Full blessing-box record when `venue.category === "blessing_box"` —
+   * `venue` itself only carries the plain-Venue fields every marker uses
+   * (see useBoxVenues.ts's own header), so the box-specific card body
+   * (status, host note, most-needed, check-ins) needs this separately.
+   * `null`/`undefined` while MapWrapper's box fetch hasn't resolved yet —
+   * BoxCardBody isn't rendered until it has (see the render below).
+   */
+  box?: PublicBlessingBox | null;
+  /** Forwarded to BoxCardBody's check-in panel — MapWrapper patches its cached box record so the card stays current after close/reopen. */
+  onCheckinSuccess?: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
   onClose: () => void;
   /** Called when expanded state changes — e.g. to hide overlapping UI when expanded. */
   onExpandedChange?: (expanded: boolean) => void;
@@ -60,12 +117,18 @@ interface BottomSheetProps {
    * "share your location" hint instead of silently doing nothing.
    */
   showWalkLocationHint?: boolean;
+  /** Which turn the step-through stepper is showing (#555) — owned by MapWrapper so the map's camera focus agrees with every stepper instance. */
+  activeStepIndex?: number;
+  /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap, in either the RouteStrip sheet or the full card's own readout. */
+  onStepChange?: (index: number) => void;
 }
 
 // ─── BottomSheet ─────────────────────────────────────────────────────────────
 
 export default function BottomSheet({
   venue,
+  box,
+  onCheckinSuccess,
   onClose,
   onExpandedChange,
   locale: localeProp,
@@ -75,14 +138,45 @@ export default function BottomSheet({
   walkRouteInfo,
   walkRouteSteps,
   showWalkLocationHint = false,
+  activeStepIndex = 0,
+  onStepChange = () => {},
 }: BottomSheetProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
   const [expanded, setExpanded] = useState(false);
 
+  // ── Route strip (#509) ──────────────────────────────────────────────────
+  // cardRevealed: true = full card showing, false = strip. Defaults to the
+  // OPPOSITE of isWalkRouteActive at first render — if a BottomSheet ever
+  // mounts with a route already active (deep link, or this exact prop
+  // combination in a test), it should open straight to the strip, matching
+  // "starting a route shows the strip" instead of needing a follow-up render
+  // to catch up.
+  //
+  // prevRouteActive + the render-time comparison below is React's own
+  // "adjusting state when a prop changes" pattern (not a useEffect) — it
+  // reacts ONLY on an actual isWalkRouteActive transition, not every
+  // re-render, so tapping "Show card" isn't immediately fought by a
+  // re-render that still sees isWalkRouteActive=true. Doing this as a
+  // useEffect (setState inside an effect body) is exactly what
+  // MapWrapper.tsx's own walking-route-clear effect works around with
+  // queueMicrotask (see that file's own comment) — the render-time variant
+  // has no such rule to satisfy since it isn't in an effect at all.
+  const [cardRevealed, setCardRevealed] = useState(!isWalkRouteActive);
+  const [prevRouteActive, setPrevRouteActive] = useState(isWalkRouteActive);
+  if (isWalkRouteActive !== prevRouteActive) {
+    setPrevRouteActive(isWalkRouteActive);
+    // Route just started -> strip (cardRevealed=false). Route just cleared
+    // -> always back to the full card (cardRevealed=true), regardless of
+    // whether the strip or the full card was showing when it cleared.
+    setCardRevealed(!isWalkRouteActive);
+  }
+
   const open = venue !== null;
+  const isBox = venue?.category === "blessing_box";
   const status = venue ? computeOpenStatus(venue.hours_weekly) : null;
   const displayNotes = venue ? getDisplayNotes(venue) : undefined;
+  const showStrip = isWalkRouteActive && !cardRevealed;
 
   function handleOpenChange(isOpen: boolean) {
     if (!isOpen) onClose();
@@ -92,23 +186,184 @@ export default function BottomSheet({
 
   return (
     <Drawer.Root
+      key={isWalkRouteActive ? "route" : "card"}
       open={open}
       onOpenChange={handleOpenChange}
       modal={false}
-      dismissible
+      // #530 review round 3 (BLOCKER, invisible to every test here — every
+      // BottomSheet test mocks vaul): vaul defaults `repositionInputs` to
+      // true, which listens for visualViewport resize (the keyboard
+      // opening/closing) and writes an inline `drawerRef.current.style
+      // .bottom` — and never clears it (vaul/dist/index.mjs's own
+      // onVisualViewportChange effect, ~line 1153). BoxCheckinPanel (inside
+      // this sheet via BoxCardBody) has real input/textarea fields, so
+      // focusing one fires that effect; an inline style always outranks
+      // globals.css's `[data-bottom-sheet]` rule for the life of the
+      // instance, and after the keyboard closes vaul leaves it at literally
+      // `bottom: 0px` — reintroducing the exact #530 slice bug in the check-
+      // in flow. `repositionInputs={false}` turns the whole effect off at
+      // its own early-return guard. Safe here: nothing in this sheet is a
+      // bottom-docked input relying on vaul's keyboard-avoidance resize —
+      // BoxCheckinPanel's fields sit in the sheet's own normal scrollable
+      // flow (`overflow-y-auto`), which the browser's native
+      // focus-scroll-into-view already handles.
+      repositionInputs={false}
+      dismissible={!isWalkRouteActive}
+      // #530 review round 3 (IMPORTANT, KNOWN RESIDUAL, not fixed here):
+      // vaul's useSnapPoints measures `window.innerHeight` for these two px
+      // snap points (unless a `container` prop is passed to Drawer.Root)
+      // and re-runs snapToPoint — an ANIMATED transform — on every window
+      // resize (vaul/dist/index.mjs ~lines 517-524, 540-548, 608-613). iOS
+      // Safari fires a resize event when its toolbar collapses/expands on
+      // scroll, so the route strip (or full card, while a route is active)
+      // can still visibly re-animate to a new snapped position mid-scroll —
+      // in tension with this issue's "must not jump" criterion, though it's
+      // a smooth transition rather than an instant cut.
+      //
+      // Considered passing a `container` element sized from
+      // `var(--viewport-small)` to make vaul's own size reference stable.
+      // Rejected: `container` is ALSO handed straight to `Drawer.Portal`
+      // as its React-portal render target (defaults from context — see
+      // vaul's `Portal()`) and flips `data-vaul-custom-container`, which
+      // disables vaul's own `::after` background-fill rule for the
+      // rubber-band overscroll area. Fixing this one animation would mean
+      // relocating where the sheet portals to AND losing its overscroll
+      // background fill — both unverifiable here (every BottomSheet test
+      // mocks vaul; there's no real Safari touch/drag/overscroll rig on
+      // this machine) and each a plausible regression of its own. Left as
+      // a known residual rather than trading one unverified bug for two.
+      snapPoints={isWalkRouteActive ? [ROUTE_STRIP_SNAP, FULL_CARD_SNAP] : undefined}
+      activeSnapPoint={isWalkRouteActive ? (cardRevealed ? FULL_CARD_SNAP : ROUTE_STRIP_SNAP) : undefined}
+      setActiveSnapPoint={(snap) => {
+        if (!isWalkRouteActive) return;
+        setCardRevealed(snap === FULL_CARD_SNAP);
+      }}
     >
       <Drawer.Portal>
         <Drawer.Content
           key={venue?.id ?? "empty"}
+          // #530 review round 2: no `bottom-0` Tailwind class — Safari's own
+          // toolbar was slicing the sheet's resting edge off the same way it
+          // sliced BottomNav's pill (root cause: a `position:fixed`
+          // element's containing block is always sized to the LARGE
+          // viewport, as if the toolbar were collapsed, so a literal
+          // `bottom: 0` lands under the toolbar once it's actually
+          // expanded). `data-bottom-sheet` hooks the real `bottom` value —
+          // see globals.css's own comment for the formula and why it never
+          // jumps as the toolbar animates.
+          data-bottom-sheet=""
           className={
-            "fixed bottom-0 left-0 right-0 z-[800] flex flex-col " +
+            "fixed left-0 right-0 z-[800] flex flex-col " +
             "bg-[var(--color-bone-50)] " +
             "rounded-t-[var(--radius-xl)] " +
             "elevation-2 " +
             "focus:outline-none"
           }
-          style={{ maxHeight: "calc(100dvh - 100px)" }}
+          // A route-active sheet needs a FIXED height (not maxHeight) for
+          // vaul's px snap point math to land where expected — snapPointsOffset
+          // is computed against the drawer's actual rendered height (see
+          // vaul's useSnapPoints), so a content-hugging maxHeight would put
+          // the "104px from the bottom" strip snap partway through whatever
+          // content happens to render, not at a real fixed strip. Same numeric
+          // value as the non-route maxHeight, so the full-card view (snap
+          // FULL_CARD_SNAP) looks the same size as before; the one visible
+          // change is that the full-card view is now a fixed height rather
+          // than hugging its (usually shorter) content while a route is
+          // active — accepted trade-off, only while a route is active.
+          // #549: vaul computes a px snap point's transform offset as
+          // `offset = window.innerHeight - snapPx` (vaul/dist/index.mjs
+          // ~line 540). For a drawer with `bottom: S` and `height: H`, the
+          // resulting visible height at that snap is
+          //   visible = S + H - window.innerHeight + snapPx
+          // — which only equals `snapPx` (the strip's own height) when
+          // `S + H === window.innerHeight`. This drawer's `bottom` is
+          // `env(safe-area-inset-bottom)` (0 on the test device), so H alone
+          // has to equal window.innerHeight, or the strip snap lands short
+          // (partly or fully off-screen — this issue's bug).
+          // `var(--viewport-small)` (100svh, #530's fix, kept below for the
+          // NON-route branch) is deliberately SHORTER than innerHeight — it
+          // is pinned to the smallest possible viewport specifically so a
+          // bottom-pinned bar never resizes as Safari's toolbar animates —
+          // so using it here under-sizes H by however much svh trails
+          // innerHeight, and vaul's math pushes the strip that far off the
+          // bottom edge. `100dvh` tracks the CURRENT viewport instead, which
+          // Kyle measured equal to `window.innerHeight` on the real device
+          // in both toolbar states (iOS 26, 2026-09-20: Safari 714/714,
+          // Chrome 683/683) — exactly the reference vaul's snap math needs.
+          // KNOWN RESIDUAL, honestly stated because an unmeasured claim in a
+          // comment here hardens into fact for the next agent: this trades
+          // #530's "never jumps" property for correctness at rest, and the
+          // trade is not free. `100svh` was chosen in #530 precisely because
+          // it is INVARIANT through the toolbar animation, so it could never
+          // desync from anything. `100dvh` is the opposite — it tracks the
+          // toolbar continuously, while vaul's own `innerHeight` is cached
+          // and refreshed only on a `window` resize event (index.mjs
+          // ~518-527). If iOS Safari doesn't fire resize continuously through
+          // that animation, the two references can drift apart mid-scroll and
+          // the strip can visibly move, which is the artifact #530 set out to
+          // kill. Kyle's measurement proves the two are EQUAL once the
+          // toolbar settles (both states, both browsers) — it says nothing
+          // about the frames in between, and jsdom cannot test it.
+          //
+          // Accepted anyway, because the alternative is strictly worse, not
+          // merely different: on `--viewport-small` the strip was wrong AT
+          // REST by however far svh trails innerHeight (12px visible instead
+          // of 112, or fully off-screen with the toolbar collapsed). A
+          // possible transient wobble during a toolbar animation beats a
+          // permanently unreachable control. Note also that vaul ALREADY
+          // re-animates to a new snapped position on every resize (see the
+          // `snapPoints` prop's own comment above) — a mid-scroll transition
+          // is pre-existing here, not introduced by this unit change.
+          // If a real device shows the strip jumping while scrolling with a
+          // route up, the next thing to try is vaul's `container` prop, which
+          // replaces `window.innerHeight` as its size reference outright —
+          // read that same comment first for the two side effects that
+          // carries.
+          //
+          // The 100px map peek is carved out of H and added back into the
+          // snap point instead (MAP_PEEK_PX, folded into ROUTE_STRIP_SNAP
+          // above) — that keeps the drawer's resting top edge a constant
+          // MAP_PEEK_PX below the window top in both toolbar states, and
+          // the strip's own visible height pinned at exactly
+          // ROUTE_STRIP_HEIGHT_PX regardless of toolbar collapse.
+          //
+          // The NON-route branch is unaffected by any of this: it has no
+          // snapPoints (vaul never runs the offset math above against it),
+          // so it keeps `var(--viewport-small)` for #530's original reason
+          // — its own "never jumps mid-scroll" property — with no snap-
+          // offset constraint forcing it onto dvh.
+          style={
+            isWalkRouteActive
+              ? { height: `calc(100dvh - ${MAP_PEEK_PX}px - env(safe-area-inset-bottom))` }
+              : { maxHeight: `calc(var(--viewport-small) - ${MAP_PEEK_PX}px)` }
+          }
           aria-label={t("detail.venueDetailsPanel", locale)}
+          // #508 fix pass: Escape while a box's PhotoViewer is open must
+          // close ONLY the photo, not this whole sheet. vaul forwards this
+          // prop straight through to Radix's DismissableLayer, which only
+          // dismisses `if (!event.defaultPrevented)` — see dialogGuard.ts's
+          // own header for why this is the one race-free interception
+          // point (Radix's Escape listener is a document-level CAPTURE
+          // listener; nothing inside the photo dialog can out-race it).
+          onEscapeKeyDown={(event) => {
+            if (isNativeDialogOpen()) {
+              event.preventDefault();
+              return;
+            }
+            // #509: dismissible={false} while a route is active means vaul's
+            // own onOpenChange short-circuits Escape (and scrim-tap) before
+            // it ever reaches handleOpenChange above — silently blocking
+            // BOTH would make Escape a dead key with a route active. Collapse
+            // to the strip instead (same outcome as a drag-down), so Escape
+            // still does something; only the full card can be collapsed —
+            // pressing it again while the strip is already showing is a
+            // no-op (nothing further to collapse to except closing, which
+            // stays × ‑only per the issue's "unchanged" close behavior).
+            if (isWalkRouteActive && cardRevealed) {
+              event.preventDefault();
+              setCardRevealed(false);
+            }
+          }}
         >
           {/* Drawer.Title — required by Radix to fix a11y missing-title violation */}
           <Drawer.Title className="sr-only">
@@ -119,9 +374,99 @@ export default function BottomSheet({
               No drag handle: the "Show details" button is the one expand
               affordance — a grabber bar wrongly implied swipe-to-expand (#122
               follow-up). vaul still allows swipe-down-to-dismiss on the content. */}
-          {venue && (
-            <div className="flex-1 overflow-y-auto">
-              {/* pb clears the iPhone home-indicator strip instead of sitting under it. */}
+          {/* Card-redesign box actions slot (Share/Fav/Close) — one JSX
+              constant so it's built once and handed to BoxCardBody's
+              `actions` prop below, rather than duplicating this markup
+              between the box and non-box branches. Same visual weight/
+              position as the ordinary header row's own trio. */}
+          {venue && showStrip && (
+            // #509: strip replaces the full card entirely while a route is
+            // active and not revealed — same trigger (onWalkRoute) and
+            // onClearWalkRoute callback contract every card branch below
+            // already wires, so RouteStrip needs no knowledge of box vs
+            // ordinary venue.
+            <RouteStrip
+              venueName={venue.name}
+              routeInfo={walkRouteInfo ?? null}
+              locale={locale}
+              onShowCard={() => setCardRevealed(true)}
+              onClearRoute={onClearWalkRoute}
+              walkSteps={walkRouteSteps}
+              activeStepIndex={activeStepIndex}
+              onStepChange={onStepChange}
+            />
+          )}
+
+          {venue && !showStrip && (
+            // `overscroll-contain` (#553): without it, a downward drag that
+            // starts inside this scroller while it is already at scrollTop 0
+            // CHAINS to the document, and iOS Safari rubber-bands the entire
+            // page — measured off Kyle's 2026-09-20 screen recording as the
+            // header, map and card all translating down together by ~104 CSS
+            // px and springing back, four times in four swipe-down attempts.
+            // `modal={false}` on Drawer.Root above means vaul never applies
+            // its body scroll-lock, so nothing else stops that chain.
+            // ListView's own scroller has carried this since it was written.
+            //
+            // NOT the toolbar-resize residual documented on `snapPoints`
+            // above. The structural tell is that the MAP moved too, and that
+            // residual can only re-animate the sheet, never the map behind
+            // it. Corroborating but secondary, and true of one recording on
+            // one device rather than proven in general: Safari's bottom
+            // toolbar held a constant screen position in every frame of that
+            // clip, so no resize appears to have fired.
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              {isBox ? (
+                box ? (
+                  // Card-redesign (2026-09-19): BoxCardBody now owns the
+                  // WHOLE box card — photo, sponsor band, badge, name,
+                  // address-as-directions-link, most-needed, host note,
+                  // check-in panel, footer — not just the content below a
+                  // caller-rendered header (see that component's own
+                  // header). No px-5/pt-5 padding wrapper here: the photo
+                  // needs to sit flush against the sheet's own
+                  // rounded-t-xl top edge, so BoxCardBody pads its own body
+                  // internally and only the photo itself stays full-bleed.
+                  <BoxCardBody
+                    box={box}
+                    onCheckinSuccess={onCheckinSuccess}
+                    className="pb-[max(1rem,env(safe-area-inset-bottom))]"
+                    photoRadiusClassName="rounded-t-[var(--radius-xl)]"
+                    onWalkRoute={onWalkRoute ? () => onWalkRoute(box) : undefined}
+                    isWalkRouteActive={isWalkRouteActive}
+                    onClearWalkRoute={onClearWalkRoute}
+                    walkRouteInfo={isWalkRouteActive ? walkRouteInfo : null}
+                    walkRouteSteps={isWalkRouteActive ? walkRouteSteps : null}
+                    showWalkLocationHint={showWalkLocationHint}
+                    activeStepIndex={activeStepIndex}
+                    onStepChange={onStepChange}
+                    actions={
+                      <>
+                        <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} isBox />
+                        <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} />
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          aria-label={t("detail.close", locale)}
+                          className={
+                            "flex items-center justify-center w-11 h-11 " +
+                            "-mt-1.5 -mb-1.5 -ml-1.5 -mr-[10px] rounded-md " +
+                            "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
+                            PRESS_FEEDBACK + " " +
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                          }
+                        >
+                          <X size={18} aria-hidden />
+                        </button>
+                      </>
+                    }
+                  />
+                ) : (
+                  <div className="px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                    <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
+                  </div>
+                )
+              ) : (
               <div className="flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3">
                 {/* Header row: title + close */}
                 <div className="flex items-start gap-2">
@@ -131,7 +476,7 @@ export default function BottomSheet({
                   >
                     {venue.name}
                   </h2>
-                  <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} />
+                  <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} isBox={isBox} />
                   <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={20} />
                   <button
                     type="button"
@@ -198,7 +543,10 @@ export default function BottomSheet({
                       {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
                     </span>
                   )}
-                  {status && status.state !== "no_hours" && (
+                  {/* Hours badges don't apply to a blessing box (it has no
+                      hours_weekly) — BoxCardBody's own status badge covers
+                      the equivalent "is it usable right now" read. */}
+                  {!isBox && status && status.state !== "no_hours" && (
                     <span className="flex items-center gap-1.5">
                       <Clock size={14} aria-hidden className="text-[var(--color-ink-400)]" />
                       {status.state === "open"
@@ -213,7 +561,7 @@ export default function BottomSheet({
                       tells the user why there's no open/closed read, using a
                       different icon (not Clock) + explicit text so it's never
                       mistaken for "open" by shape alone, not just color. */}
-                  {status && status.state === "no_hours" && (
+                  {!isBox && status && status.state === "no_hours" && (
                     <span className="flex items-center gap-1.5 text-[var(--color-ink-700)] font-medium">
                       <CircleHelp size={14} aria-hidden className="text-[var(--color-ink-700)]" />
                       {t("badge.hoursUnknown", locale)}
@@ -222,8 +570,11 @@ export default function BottomSheet({
                 </div>
 
                 {/* Notes (2 lines max) — suppressed for OSM artifacts and
-                    Plentiful's auto-generated boilerplate (src/lib/venueNotes.ts) */}
-                {displayNotes && (
+                    Plentiful's auto-generated boilerplate (src/lib/venueNotes.ts).
+                    Also suppressed for a box — its host note renders inside
+                    BoxCardBody instead, alongside the rest of the box-specific
+                    content. */}
+                {!isBox && displayNotes && (
                   <p className="text-sm text-[var(--color-ink-700)] leading-relaxed line-clamp-2">
                     {displayNotes}
                   </p>
@@ -231,7 +582,12 @@ export default function BottomSheet({
 
                 {/* Direction buttons (#134) — Walk (in-app route) / Bus / Drive.
                     routeInfo threads distance+duration down for the in-card readout.
-                    walkSteps provides the collapsible turn-by-turn list. */}
+                    walkSteps provides the collapsible turn-by-turn list.
+                    Ordinary venues only as of the card redesign (2026-09-19)
+                    — a box's own Walk trigger is the address text
+                    BoxCardBody renders (walk restore pass, same day; see
+                    that component's own header), not this three-button row,
+                    so this branch is guaranteed non-box already. */}
                 <DirectionButtons
                   venue={venue}
                   onWalk={onWalkRoute ?? (() => {})}
@@ -241,6 +597,8 @@ export default function BottomSheet({
                   routeInfo={isWalkRouteActive ? walkRouteInfo : null}
                   walkSteps={isWalkRouteActive ? walkRouteSteps : null}
                   showLocationHint={showWalkLocationHint}
+                  activeStepIndex={activeStepIndex}
+                  onStepChange={onStepChange}
                 />
 
                 {/* Show/Hide details toggle */}
@@ -370,6 +728,7 @@ export default function BottomSheet({
                   )}
                 </div>
               </div>
+              )}
             </div>
           )}
         </Drawer.Content>

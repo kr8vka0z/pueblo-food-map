@@ -1,13 +1,16 @@
 /**
- * SearchBar inline Map/List view switch tests (#191).
+ * SearchBar tests (#513/#514/#528/#529).
  *
- * Unit-level coverage for the `viewSwitch` prop SearchBar.tsx added: renders
- * (or doesn't) the ViewToggle at the pill's right end, tracks aria-pressed,
- * fires onChange, and shrinks the filterChip's max-w when both the chip and
- * the switch are present at once (the collision the issue called out).
- * MapWrapperViewSwitch.test.tsx covers the same feature wired through the
- * real MapWrapper (both view states, query/filter preservation, sync with
- * the HamburgerMenu instance).
+ * Originally covered the `viewSwitch` prop (#191) — an inline ViewToggle at
+ * the pill's right end. #514 removed that prop and the ViewToggle component
+ * entirely: Map/List switching goes through the search bar's own suggestion
+ * popups (ViewSuggestion / SearchResultsPopover's "See all N matches" row —
+ * see their own test files) or a Menu line (HamburgerMenu.test.tsx), never a
+ * standing control in the bar. #528 then gave the right end a NEW occupant —
+ * the Filters button, moved there from the magnifier's old spot on the left
+ * — so "the right end stays empty" now means "empty when there's no
+ * filtersButton prop," not "always empty." What's left here is `filtersButton`
+ * (#513/#528) coverage plus a regression guard on the no-filtersButton case.
  */
 
 import { describe, test, expect, vi } from "vitest";
@@ -15,152 +18,296 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SearchBar from "@/components/SearchBar";
 
-describe("SearchBar — viewSwitch absent (default)", () => {
-  test("renders no view-switch group when viewSwitch is not passed", () => {
+describe("SearchBar — right end of the pill (#514: the view switch that used to live here is gone)", () => {
+  test("renders no group/toggle control on the right, filtersButton or not", () => {
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
+    );
+    expect(screen.queryByRole("group")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Map$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^List$/i })).toBeNull();
+  });
+
+  test("the input reserves no right-side padding for a switch", () => {
+    const { container } = render(<SearchBar value="" onChange={vi.fn()} />);
+    const inputClass = container.querySelector("input[type='search']")?.className ?? "";
+    expect(inputClass).toContain("pr-4");
+    expect(inputClass).not.toMatch(/pr-\[\d+px\]/);
+  });
+});
+
+// #528: Kyle found the Filters button on the LEFT half-covering the
+// placeholder text on a phone ("earch" instead of "Search"). Moved to the
+// right end (empty since #514 removed the view switch), padding reservation
+// swapped to match, and the magnifier restored on the left unconditionally
+// so the bar still reads as a search box.
+describe("SearchBar — input padding swaps sides with the Filters button (#528)", () => {
+  // #539: the count pill now sits BESIDE the icon instead of overlapping it,
+  // so the control's real width grows when a filter is on. Issue #539's
+  // Plan: "reserve the input's right padding for the widest state (count
+  // present) so typed text never reflows when a filter is toggled" — so the
+  // reservation must already be big enough for the count-present state even
+  // when rendered here with count: 0 (the reservation is a fixed constant,
+  // not conditional on the current count).
+  test("reserves left padding for the magnifier and right padding for the widest (count-present) Filters state when present", () => {
+    const { container } = render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
+    );
+    const inputClass = container.querySelector("input[type='search']")?.className ?? "";
+    expect(inputClass).toContain("pl-9");
+    expect(inputClass).not.toContain("pl-11");
+    // Widest-state reservation is wider than the old fixed-badge-overlap
+    // value (pr-11 = 44px) now that the count pill grows the control.
+    expect(inputClass).toMatch(/pr-\[\d+px\]/);
+    const match = inputClass.match(/pr-\[(\d+)px\]/);
+    expect(match).not.toBeNull();
+    expect(Number(match![1])).toBeGreaterThan(44);
+  });
+
+  // Same reservation whether or not a filter is actually on right now — it's
+  // sized for the widest state up front so toggling a filter never reflows
+  // the typed text (the whole point of reserving for the widest state).
+  test("the reservation does not change when a filter is actually on", () => {
+    const { container: off } = render(
+      <SearchBar value="" onChange={vi.fn()} filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }} />,
+    );
+    const { container: on } = render(
+      <SearchBar value="" onChange={vi.fn()} filtersButton={{ count: 2, onClick: vi.fn(), ariaLabel: "Filters, 2 on" }} />,
+    );
+    const offClass = off.querySelector("input[type='search']")?.className ?? "";
+    const onClass = on.querySelector("input[type='search']")?.className ?? "";
+    expect(offClass).toBe(onClass);
+  });
+
+  // Reviewer finding on #539's first pass: pr-[76px] left only 0-2px of
+  // slack against the true worst case (10px pad + 20px icon + 6px gap +
+  // 14px pad = 50px fixed, plus a 2-digit count pill) — FilterPanel allows
+  // up to 11 simultaneous filters (8 categories + 3 switches,
+  // MapWrapper.tsx ~900-904), so 11 is the real maximum count, not a made-up
+  // edge case. Pins the reservation at the max realistic count so a future
+  // shrink of this value gets caught here instead of on a real phone.
+  test("the reservation still has real margin at the maximum realistic count (11 — 8 categories + 3 switches)", () => {
+    const { container } = render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 11, onClick: vi.fn(), ariaLabel: "Filters, 11 on" }}
+      />,
+    );
+    const inputClass = container.querySelector("input[type='search']")?.className ?? "";
+    const match = inputClass.match(/pr-\[(\d+)px\]/);
+    expect(match).not.toBeNull();
+    // Fixed 50px chrome (10 pad + 20 icon + 6 gap + 14 pad) leaves this much
+    // for the count pill itself — must comfortably clear a 2-digit pill's
+    // real rendered width, not just its 19px CSS min-width floor.
+    const budgetForPill = Number(match![1]) - 50;
+    expect(budgetForPill).toBeGreaterThanOrEqual(24);
+    // Same fixed value as any other count (still a constant, not scaled).
+    expect(Number(match![1])).toBe(84);
+  });
+
+  test("reserves only the magnifier's left padding when filtersButton is absent", () => {
+    const { container } = render(<SearchBar value="" onChange={vi.fn()} />);
+    const inputClass = container.querySelector("input[type='search']")?.className ?? "";
+    expect(inputClass).toContain("pl-9");
+    expect(inputClass).toContain("pr-4");
+  });
+});
+
+// filterChip was removed (#513): the chosen-category tag left the search bar
+// entirely (also resolves #507's chip/placeholder overlap — there's no chip
+// left to overlap anything).
+describe("SearchBar — filtersButton (#513, right end of the bar as of #528)", () => {
+  test("no filters button renders when filtersButton is not passed (plain search icon default)", () => {
     render(<SearchBar value="" onChange={vi.fn()} />);
-    expect(screen.queryByRole("group", { name: /choose map or list view/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /filters/i })).toBeNull();
   });
-});
 
-describe("SearchBar — viewSwitch present", () => {
-  test("renders a Map/List group inside the search bar", () => {
+  test("the magnifier is always present, filtersButton or not (#528)", () => {
+    const { container } = render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
+    );
+    // lucide's Search icon renders as an <svg> with no accessible role of
+    // its own (aria-hidden); assert by count instead of role.
+    expect(container.querySelectorAll("svg.lucide-search").length).toBeGreaterThan(0);
+  });
+
+  test("renders a Filters button at the right end when filtersButton is passed", () => {
     render(
-      <SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "map", onChange: vi.fn() }} />,
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
     );
-    expect(screen.getByRole("group", { name: /choose map or list view/i })).toBeDefined();
-    expect(screen.getByRole("button", { name: /^Map$/i })).toBeDefined();
-    expect(screen.getByRole("button", { name: /^List$/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Filters" })).toBeDefined();
   });
 
-  test("aria-pressed tracks mode=map", () => {
+  // #539, Kyle's mockup C: "put the icon for the filters just into the
+  // search bar instead of it appearing like a different button" — no
+  // circle, no border, no separate-button look. Supersedes #532's
+  // invisible-44px-hitbox-around-a-32px-circle pattern: the <button> itself
+  // is now the only box, and its own padding (10px + 20px icon + 14px, per
+  // the approved mockup's `.c-filter`) already totals 44px with no count —
+  // more once the count pill adds its own width — so it clears the 44px
+  // minimum in every state without a separate invisible hit area.
+  test("the control is icon-only — no background, no border, no separate visible circle (#539)", () => {
     render(
-      <SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "map", onChange: vi.fn() }} />,
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
     );
-    expect(screen.getByRole("button", { name: /^Map$/i }).getAttribute("aria-pressed")).toBe(
-      "true",
-    );
-    expect(screen.getByRole("button", { name: /^List$/i }).getAttribute("aria-pressed")).toBe(
-      "false",
-    );
+    const button = screen.getByRole("button", { name: "Filters" });
+    expect(button.className).not.toMatch(/\bborder(?!-0)/);
+    expect(button.className).not.toMatch(/\bbg-\[/);
+    expect(button.className).not.toContain("rounded-full");
+    // No inner circle span wrapping the icon — only the hairline-divider
+    // span (aria-hidden, no size classes) is a direct child now.
+    expect(button.querySelector("span.w-8")).toBeNull();
   });
 
-  test("aria-pressed tracks mode=list", () => {
+  test("the control's own box is at least 44px tall, and at least 44px wide even with no count on", () => {
     render(
-      <SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "list", onChange: vi.fn() }} />,
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
     );
-    expect(screen.getByRole("button", { name: /^List$/i }).getAttribute("aria-pressed")).toBe(
-      "true",
+    const button = screen.getByRole("button", { name: "Filters" });
+    expect(button.className).toContain("h-11");
+    // 10px left pad + 20px icon + 14px right pad = 44px with no count pill
+    // (matches the approved mockup's `.c-filter` padding/icon geometry).
+    expect(button.className).toContain("pl-2.5");
+    expect(button.className).toContain("pr-3.5");
+  });
+
+  // A hairline divider separates the control from the input without making
+  // it look like its own button — issue #539: "1px, `--color-bone-200`,
+  // inset ~12px top and bottom."
+  test("a hairline divider (bone-200) sits on the control's left, inset from top/bottom", () => {
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
     );
-    expect(screen.getByRole("button", { name: /^Map$/i }).getAttribute("aria-pressed")).toBe(
-      "false",
+    const button = screen.getByRole("button", { name: "Filters" });
+    const divider = button.querySelector('span[aria-hidden]:not(:has(*))');
+    expect(divider?.className).toContain("bg-[var(--color-bone-200)]");
+    expect(divider?.className).toContain("top-[12px]");
+    expect(divider?.className).toContain("bottom-[12px]");
+  });
+
+  test("the icon turns sage-600 when a filter is on, ink-500 at rest", () => {
+    const { rerender } = render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Filters" }).className).toContain(
+      "text-[var(--color-ink-500)]",
+    );
+    rerender(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 2, onClick: vi.fn(), ariaLabel: "Filters, 2 on" }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Filters, 2 on" }).className).toContain(
+      "text-[var(--color-sage-600)]",
     );
   });
 
-  test("clicking List calls viewSwitch.onChange('list')", async () => {
+  test("clicking the Filters button fires onClick", async () => {
     const user = userEvent.setup();
-    const onChange = vi.fn();
-    render(<SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "map", onChange }} />);
-    await user.click(screen.getByRole("button", { name: /^List$/i }));
-    expect(onChange).toHaveBeenCalledWith("list");
-  });
-
-  test("clicking Map calls viewSwitch.onChange('map')", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    render(<SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "list", onChange }} />);
-    await user.click(screen.getByRole("button", { name: /^Map$/i }));
-    expect(onChange).toHaveBeenCalledWith("map");
-  });
-
-  test("renders Mapa/Lista labels when viewSwitch.locale is es", () => {
+    const onClick = vi.fn();
     render(
       <SearchBar
         value=""
         onChange={vi.fn()}
-        viewSwitch={{ mode: "map", onChange: vi.fn(), locale: "es" }}
+        filtersButton={{ count: 0, onClick, ariaLabel: "Filters" }}
       />,
     );
-    expect(screen.getByRole("button", { name: /^Mapa$/i })).toBeDefined();
-    expect(screen.getByRole("button", { name: /^Lista$/i })).toBeDefined();
-  });
-});
-
-describe("SearchBar — viewSwitch + filterChip collision (#191)", () => {
-  test("filterChip max-w shrinks to 26% when viewSwitch is also present", () => {
-    const { container } = render(
-      <SearchBar
-        value=""
-        onChange={vi.fn()}
-        filterChip={{ label: "Food Pantry", onClear: vi.fn() }}
-        viewSwitch={{ mode: "map", onChange: vi.fn() }}
-      />,
-    );
-    const chip = container.querySelector(".max-w-\\[26\\%\\]");
-    expect(chip).not.toBeNull();
-    expect(container.querySelector(".max-w-\\[40\\%\\]")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  test("filterChip max-w stays 40% when viewSwitch is absent", () => {
-    const { container } = render(
-      <SearchBar
-        value=""
-        onChange={vi.fn()}
-        filterChip={{ label: "Food Pantry", onClear: vi.fn() }}
-      />,
-    );
-    expect(container.querySelector(".max-w-\\[40\\%\\]")).not.toBeNull();
-  });
-
-  test("both the chip and the view switch render at once, without one replacing the other", () => {
+  test("no count badge when count is 0", () => {
     render(
       <SearchBar
         value=""
         onChange={vi.fn()}
-        filterChip={{ label: "Food Pantry", onClear: vi.fn() }}
-        viewSwitch={{ mode: "map", onChange: vi.fn() }}
+        filtersButton={{ count: 0, onClick: vi.fn(), ariaLabel: "Filters" }}
       />,
     );
-    expect(screen.getByText("Food Pantry")).toBeDefined();
-    expect(screen.getByRole("group", { name: /choose map or list view/i })).toBeDefined();
+    expect(screen.queryByText("0")).toBeNull();
   });
 
-  // docs/bottom-nav-spec.md §4.2: the menu button that forced the mobile-only
-  // right-12 inset is gone, so the switch sits at one inset and the input
-  // reserves one measured width at every breakpoint. jsdom has no layout, so
-  // the class contract is what's assertable — the pixel proof is the browser
-  // measurement recorded in SearchBar.tsx's own comment.
-  test("the view switch sits flush in the pill with one reserved width at every width", () => {
-    const { container } = render(
-      <SearchBar value="" onChange={vi.fn()} viewSwitch={{ mode: "map", onChange: vi.fn() }} />,
-    );
-    expect(container.querySelector(".right-12")).toBeNull();
-    // Flush with the pill (Kyle, 2026-09-16): 1px in, full height, no inset.
-    expect(container.querySelector(".right-px.top-px.bottom-px")).not.toBeNull();
-    const inputClass = container.querySelector("input[type='search']")?.className ?? "";
-    // Icon-only switch under md, worded from md up (Kyle, 2026-09-16).
-    expect(inputClass).toContain("pr-[93px]");
-    expect(inputClass).toContain("md:pr-[161px]");
-  });
-
-  // Chip or no chip, the switch is icons only under md and the reservation
-  // matches it — the chip no longer changes the right side at all.
-  test.each([
-    ["no chip", undefined],
-    ["chip", { label: "Food Pantry", onClear: vi.fn() }],
-  ])("%s: labels hidden under md only, reservation matches", (_name, chip) => {
-    const { container } = render(
+  test("shows the count badge when count > 0, and the caller-built aria-label carries the spoken count", () => {
+    render(
       <SearchBar
         value=""
         onChange={vi.fn()}
-        filterChip={chip}
-        viewSwitch={{ mode: "map", onChange: vi.fn() }}
+        filtersButton={{ count: 2, onClick: vi.fn(), ariaLabel: "Filters, 2 on" }}
       />,
     );
-    const inputClass = container.querySelector("input[type='search']")?.className ?? "";
-    expect(inputClass).toContain("pr-[93px] md:pr-[161px]");
-    expect(inputClass).not.toContain("max-[400px]");
-    const labels = Array.from(container.querySelectorAll("[role=group] span"));
-    expect(labels).toHaveLength(2);
-    labels.forEach((span) => expect(span.className).toBe("max-md:sr-only"));
+    expect(screen.getByText("2")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Filters, 2 on" })).toBeDefined();
+  });
+
+  // #529: the badge referenced --color-orange/--color-navy, neither of which
+  // is defined in globals.css — it rendered as a blank pale dot, count and
+  // orange background both invisible. Guards the fix (--color-brand-orange/
+  // --color-brand-navy) directly, not just that a "2" is somewhere in the DOM.
+  test("the count badge uses the real brand tokens, not the undefined --color-orange/--color-navy", () => {
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 2, onClick: vi.fn(), ariaLabel: "Filters, 2 on" }}
+      />,
+    );
+    const badge = screen.getByText("2");
+    expect(badge.className).toContain("bg-[var(--color-brand-orange)]");
+    expect(badge.className).toContain("text-[var(--color-brand-navy)]");
+    expect(badge.className).not.toContain("--color-orange)");
+    expect(badge.className).not.toContain("--color-navy)");
+  });
+
+  // #539: the old badge hung `-top-1 -left-1` OVER the icon (absolute,
+  // negative-inset). The mockup C design puts it BESIDE the icon in normal
+  // flow instead, so nothing overlaps.
+  test("the count pill sits beside the icon in normal flow, not absolutely positioned over it", () => {
+    render(
+      <SearchBar
+        value=""
+        onChange={vi.fn()}
+        filtersButton={{ count: 2, onClick: vi.fn(), ariaLabel: "Filters, 2 on" }}
+      />,
+    );
+    const badge = screen.getByText("2");
+    expect(badge.className).not.toContain("absolute");
+    expect(badge.className).not.toMatch(/-top-|-left-|-right-|-bottom-/);
+    expect(badge.className).toContain("min-w-[19px]");
+    expect(badge.className).toContain("h-[19px]");
   });
 });

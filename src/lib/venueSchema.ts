@@ -15,7 +15,15 @@ import { venues, categoryLabels } from "@/data/venues";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
 import { DISPLAY_DAY_KEYS, slotToIsoTimes } from "@/lib/hours";
 
-/** @type record maps VenueCategory → schema.org @type value */
+/**
+ * @type record maps VenueCategory → schema.org @type value.
+ *
+ * blessing_box is never actually routed through buildVenueJsonLd — boxes are
+ * excluded from the published snapshot venues.ts reads (Build Plan
+ * architecture call #1) and get their own JSON-LD builder on /box/[id]
+ * instead. This entry exists purely so the Record type stays exhaustive over
+ * VenueCategory; "Place" is the same fallback garden/edible_landscape use.
+ */
 const CATEGORY_SCHEMA_TYPE: Record<Venue["category"], string> = {
   pantry: "LocalBusiness",
   grocery: "GroceryStore",
@@ -24,6 +32,7 @@ const CATEGORY_SCHEMA_TYPE: Record<Venue["category"], string> = {
   garden: "Place",
   edible_landscape: "Place",
   meal_site: "FoodEstablishment",
+  blessing_box: "Place",
 };
 
 /** Maps a WeeklyHours day key to its schema.org DayOfWeek IRI. */

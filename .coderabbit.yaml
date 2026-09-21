@@ -1,0 +1,31 @@
+language: "en-US"
+
+reviews:
+  # Claude already reviews human PRs, so start CodeRabbit in its least noisy mode.
+  profile: "quiet"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+
+  # Generated venue snapshots are validated by the repository's existing tests.
+  path_filters:
+    - "!src/data/published-venues.ts"
+    - "!src/data/grocery-osm.ts"
+    - "!src/data/pantries-plentiful.ts"
+    - "!src/data/benefit-flags.ts"
+
+  auto_review:
+    enabled: true
+    drafts: false
+    # The default branch (main) is always reviewed; add the dev-first branch.
+    base_branches:
+      - "dev"
+    ignore_title_keywords:
+      - "Publish venues update"
+    ignore_usernames:
+      - "dependabot[bot]"
+      - "kr8vka0z-release-bot[bot]"
+
+chat:
+  auto_reply: true

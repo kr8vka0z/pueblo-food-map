@@ -60,6 +60,7 @@
   --color-cat-garden:      #2C5F4F;
   --color-cat-landscape:   #58772B;
   --color-cat-meal:        #6B3FA0;
+  --color-cat-blessing:    #C2447B;
 
   /* Type families — sourced from self-hosted @font-face above */
   --font-sans:    'Public Sans', system-ui, -apple-system, sans-serif;
@@ -99,6 +100,83 @@
      by DESIGN.md via `npm run design:drift`, and this is an internal layout
      constant, not a design token. */
   --bottom-nav-clearance: 76px;
+
+  /* #530 — iOS Safari's own toolbar slices off anything pinned to the
+     bottom via `vh`/`bottom: 0`: `100vh` (and a `position:fixed` element's
+     containing block) sizes to the LARGEST possible viewport — as if the
+     toolbar were already collapsed — so a bar anchored against it lands
+     underneath the toolbar once it re-expands. `100svh` (small viewport
+     height) is the SMALLEST possible viewport (toolbar always assumed
+     expanded) and, unlike `100dvh`, its value never changes as the toolbar
+     animates on scroll — so math built on it is both always fully visible
+     AND never jumps. Anything pinned to the bottom of the screen
+     (BottomNav, BottomSheet) sizes against this variable, never a bare vh
+     unit, so the fallback and the fix can't drift apart in two places.
+     `vh` here is the fallback for browsers without `svh` support (iOS
+     <15.4, older Firefox/Chrome) — identical to this app's pre-fix
+     behaviour, not a regression for them.
+     Exception (#549): BottomSheet.tsx's route-active height sizes against
+     `100dvh` instead of this variable — vaul's own px snap points are
+     computed against `window.innerHeight`, which this small-viewport
+     variable is deliberately shorter than, so it has to match `innerHeight`
+     via `100dvh` there or vaul's snap math clips the route strip. See
+     BottomSheet.tsx's own `style` prop comment for the full derivation. */
+  --viewport-small: 100vh;
+}
+
+@supports (height: 100svh) {
+  :root {
+    --viewport-small: 100svh;
+  }
+}
+
+/* #541 — the live-tracking toolbar-height custom property this section used
+   to declare is DELETED. #530 and #536 (see this file's git history for
+   their superseded reasoning) both assumed a
+   `position: fixed` element's containing block is the LARGE viewport
+   (`100vh`), so a `bottom: 0` bar would land underneath Safari's own
+   toolbar once it re-expanded — and built a `100vh - 100dvh` toolbar-height
+   reserve on top of `bottom: 0`/`env(safe-area-inset-bottom)` to compensate.
+   Real iPhone measurement (iOS 26, 2026-09-20, `/viewport-check`) shows that
+   premise is FALSE on the real device: a plain `bottom: 0` element already
+   renders fully visible, directly above the browser's toolbar, in both
+   Safari and Chrome, in both the toolbar-expanded and toolbar-collapsed
+   states. Stacking a toolbar-height reserve on top of that double-counted
+   the toolbar and lifted every bottom-pinned bar 40-74px too high (measured
+   `100vh - 100dvh`: Safari 40px, Chrome 74px, toolbar expanded) — enough to
+   cover the Mapbox logo, the walking-directions controls, and the language
+   toggle. See `[data-bottom-nav]`'s own comment below for the replacement
+   formula and why `env(safe-area-inset-bottom)` is kept. */
+
+/* #553 — document-level backstop against iOS Safari's rubber-band bounce.
+   Measured off Kyle's 2026-09-20 screen recording: a swipe down on the
+   blessing-box card dragged the WHOLE page — header, map and card together —
+   down ~104 CSS px and sprang it back, once per swipe attempt. The sheet's
+   own scroller now carries `overscroll-contain` (see BottomSheet.tsx), which
+   stops the usual chain; this rule catches the rest, including drags that
+   land on non-scrolling chrome, because `modal={false}` on the drawer means
+   vaul never applies its body scroll-lock.
+
+   Deliberately `overscroll-behavior-y`, NOT `overflow: hidden`. This only
+   suppresses the vertical bounce and pull-to-refresh — it does not stop
+   scrolling, so the ordinary document-scrolling routes (venue pages, About,
+   Resources, admin) are unaffected and no route-scoping is needed.
+
+   Equally deliberately the `-y` axis ONLY, never the `overscroll-behavior`
+   shorthand: the shorthand also sets the X axis at the document root, which
+   is exactly how a site disables Chrome/Android's edge-swipe back/forward
+   navigation gesture. Nothing here wants that, and there is no Android rig
+   on this machine to catch the regression, so the axis that isn't part of
+   the bug is left alone.
+
+   Set on `html` rather than `body` so it propagates to the viewport from the
+   root. Note this is a spec-level expectation, NOT measured on Kyle's phone
+   — see this file's #530/#536/#541 history for how that has gone before. The
+   per-scroller `overscroll-contain` in BottomSheet.tsx / RouteStrip.tsx /
+   DirectionButtons.tsx does not depend on it and stops the chain on its own
+   for every scroller inside the sheet. */
+html {
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -211,14 +289,84 @@ body {
 }
 
 /* ─── Credits above the bottom nav bar — docs/bottom-nav-spec.md §9 ──────────
-   Below 2xl the floating nav pill (64px + 12px gap + home-indicator inset)
-   would cover this corner, so the control group lifts 8px above it. 2xl and up the nav is a pill
-   in the bottom centre, clear of the corner. */
+   Below 2xl the floating nav pill would cover this corner, so the control
+   group lifts clear of it: `env(safe-area-inset-bottom)` (see
+   `[data-bottom-nav]`'s own comment below for the #541 real-device
+   measurement behind dropping the old toolbar-height reserve) +
+   `--bottom-nav-clearance` (the pill's own full height, 64px pill + 12px
+   gap — BottomNav.tsx's BOTTOM_NAV_HEIGHT_PX) + 8px breathing room above
+   the pill's top edge. This rule needs the same base offset as the nav's
+   own bottom rule because it lifts clear of that SAME pill. 2xl and up the
+   nav is a pill in the bottom centre, clear of the corner. */
 @media (width < 96rem) {
   .mapboxgl-map .mapboxgl-ctrl-bottom-right {
-    bottom: calc(var(--bottom-nav-clearance) + 8px + env(safe-area-inset-bottom));
+    bottom: calc(env(safe-area-inset-bottom) + var(--bottom-nav-clearance) + 8px);
   }
 }
+
+/* ─── #541 — BottomNav's own bottom offset: no toolbar-height reserve ────────
+   Lives here, in plain CSS, NOT as a Tailwind class or a React inline style
+   on BottomNav.tsx — the first attempt used an inline `style={{ top: ... }}`
+   plus a `[data-bottom-nav] { top: auto }` reset meant to win back at 2xl;
+   an inline style always outranks a stylesheet rule (short of `!important`),
+   so that reset was dead CSS and desktop was only correct by numeric
+   coincidence (52+24 == 64+12). Scoping this rule to `@media (width < 96rem)`
+   instead means it simply doesn't match at 2xl — Tailwind's own
+   `2xl:bottom-6` class (BottomNav.tsx) applies there with no fight, no
+   reset needed. 12px is the pill's own designed gap above that boundary
+   line (docs/bottom-nav-spec.md §3), matching its pre-#530 value.
+
+   #541 — real iPhone measurement (iOS 26, 2026-09-20, `/viewport-check`,
+   both Safari and Chrome, toolbar expanded and collapsed): a plain
+   `position: fixed; bottom: 0` element already sits fully visible directly
+   above the browser's own toolbar. #530 and #536 both assumed the
+   opposite — that a fixed element's containing block is the large viewport
+   (`100vh`), so a bottom-anchored bar lands underneath the toolbar once it
+   re-expands — and reserved the toolbar's height in a custom property
+   (`100vh - 100dvh`) on top of `bottom: 0` to compensate. That premise was
+   false on the real device, so the reserve double-counted the toolbar and
+   lifted the pill 40-74px too high, covering the Mapbox logo, the walking-
+   directions controls, and the language toggle. That custom property is
+   deleted; `env(safe-area-inset-bottom)` alone remains. It measured 0px on
+   the test iPhone in both toolbar states, so it contributes nothing there —
+   it stays in the formula because it is the correct, only protection for a
+   standalone/home-screen-installed PWA (no browser toolbar to measure
+   against at all) and for any device that DOES report a non-zero home-
+   indicator inset. */
+@media (width < 96rem) {
+  [data-bottom-nav] {
+    bottom: calc(env(safe-area-inset-bottom) + 12px);
+  }
+}
+
+/* ─── BottomSheet's own bottom offset ─────────────────────────────────────
+   Same root cause as BottomNav above, fixed the same way (see
+   `[data-bottom-nav]`'s own comment for the #541 real-device measurement):
+   vaul's `Drawer.Content` rendered with a literal `bottom-0` Tailwind
+   class. `data-bottom-sheet` is a plain attribute added in BottomSheet.tsx
+   purely to hook this rule — no Tailwind class carries the value, for the
+   same reason BottomNav's doesn't. Mobile-only in practice (BottomSheet
+   only ever mounts when `isMobile`, see MapWrapper.tsx), so no 2xl override
+   is needed the way BottomNav's needs one. No extra gap added: the sheet is
+   meant to sit flush against this boundary (a "bottom sheet" reads as
+   docked to the screen edge), unlike the nav's floating pill. */
+[data-bottom-sheet] {
+  bottom: env(safe-area-inset-bottom);
+}
+
+/* ─── #547: route strip sits flush at the screen edge, like the full card ────
+   #509's strip originally inherited the full card's "hide the nav" behavior
+   and sat flush at `[data-bottom-sheet]`'s base rule above. #531 (Kyle,
+   2026-09-19) kept the nav visible underneath the strip instead, and added a
+   `[data-bottom-sheet][data-strip-open]` rule here that lifted the strip
+   clear of the nav's height. #547 (Kyle, 2026-09-20) reverses #531 — the nav
+   now hides for the strip too (MapWrapper.tsx's `venueSheetOpen`), so there
+   is no longer any bottom chrome for the strip to clear, and this rule is
+   deleted outright rather than left pointing at a nav that isn't there
+   (leaving it would float the strip ~84px above the edge with a dead gap
+   below it). The strip now falls through to the plain `[data-bottom-sheet]`
+   rule above, same as the full card. `data-strip-open` is dropped from
+   BottomSheet.tsx alongside this — it had no other consumer. */
 
 /* ─── Hover tooltip popups (venue name + category, "You are here") ─────────── */
 /* Strip default Mapbox popup chrome; render a minimal sage-bordered chip. */

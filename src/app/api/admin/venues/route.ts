@@ -28,6 +28,7 @@ import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
 import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
+import { boxEventsForCreate, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";
 
 /**
  * getAdminDb() FIRST (identity/JWT), THEN the CSRF/Origin check — same
@@ -56,6 +57,14 @@ const VENUES_INSERT_SQL = `INSERT INTO venues (${VENUES_INSERT_COLUMNS.join(", "
 
 const AUDIT_INSERT_SQL =
   "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+// Blessing Boxes slice 1: a fresh blessing_box create always inserts its
+// blessing_boxes row too (never an upsert here — the venue row is brand
+// new, so there is no existing box row to conflict with). created_at/
+// updated_at omitted so the schema's own DEFAULT fills them, same
+// convention as VENUES_INSERT_COLUMNS above.
+const BOX_INSERT_SQL =
+  "INSERT INTO blessing_boxes (venue_id, host_name, host_note, host_contact, most_needed, installed_on, removed_on) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
 function buildVenueInsertValues(id: string, fields: ValidatedVenueFields, actorEmail: string): unknown[] {
   return [
@@ -171,6 +180,19 @@ export async function POST(req: NextRequest): Promise<Response> {
   };
 
   const insertVenue = db.prepare(VENUES_INSERT_SQL).bind(...buildVenueInsertValues(id, fields, identity.email));
+  const insertBox =
+    fields.box !== null
+      ? db
+          .prepare(BOX_INSERT_SQL)
+          .bind(id, fields.box.hostName, fields.box.hostNote, fields.box.hostContact, fields.box.mostNeeded, fields.box.installedOn, fields.box.removedOn)
+      : null;
+  // Blessing Boxes slice 3: a fresh blessing_box create always gets exactly
+  // one 'added' box_events row (boxEventsForCreate returns [] for every
+  // other category) — see src/lib/boxEvents.ts's own header for why this
+  // rides the SAME batch as the venue/audit writes below.
+  const insertBoxEvents = boxEventsForCreate(fields).map((e) =>
+    db.prepare(BOX_EVENT_INSERT_SQL).bind(id, e.kind, e.detail, timestamp),
+  );
   const insertAudit = db
     .prepare(AUDIT_INSERT_SQL)
     .bind(
@@ -179,7 +201,10 @@ export async function POST(req: NextRequest): Promise<Response> {
       id,
       "create",
       null,
-      JSON.stringify(venueRowForAudit),
+      // host_contact included here even though it's never in a public
+      // response — audit_log is admin-internal (AGENTS.md's own note on
+      // this table), so the full box payload belongs in the create record.
+      JSON.stringify(fields.box !== null ? { ...venueRowForAudit, box: fields.box } : venueRowForAudit),
       timestamp,
     );
 
@@ -195,9 +220,16 @@ export async function POST(req: NextRequest): Promise<Response> {
       ? db.prepare(APPROVE_SUBMISSION_SQL).bind(identity.email, timestamp, submissionId)
       : null;
 
-  // Atomic: the venue row, its audit trail, and (#259) the originating
+  // Atomic: the venue row, its blessing_boxes row (if any), its box_events
+  // lifecycle row(s) (if any), its audit trail, and (#259) the originating
   // submission's approval either all land together or none does.
-  await db.batch([insertVenue, insertAudit, ...(approveSubmission !== null ? [approveSubmission] : [])]);
+  await db.batch([
+    insertVenue,
+    ...(insertBox !== null ? [insertBox] : []),
+    ...insertBoxEvents,
+    insertAudit,
+    ...(approveSubmission !== null ? [approveSubmission] : []),
+  ]);
 
   return NextResponse.json({ id }, { status: 201 });
 }

@@ -30,6 +30,7 @@ const en: Record<string, string> = {
   "category.garden": "Garden",
   "category.edible_landscape": "Edible Landscape",
   "category.meal_site": "Meal Site",
+  "category.blessing_box": "Blessing Box",
 
   // Category labels (full)
   "category.full.pantry": "Food Pantry",
@@ -39,6 +40,7 @@ const en: Record<string, string> = {
   "category.full.garden": "Community Garden",
   "category.full.edible_landscape": "Edible Landscape",
   "category.full.meal_site": "Meal Site",
+  "category.full.blessing_box": "Blessing Box",
 
   // Category rail section headers
   "rail.categories": "Categories",
@@ -49,7 +51,18 @@ const en: Record<string, string> = {
   "filter.snap": "Accepts SNAP",
   "filter.wic": "Accepts WIC",
   "filter.walkingDistance": "Walking distance",
-  "filter.favorites": "Favorites",
+
+  // Filters button + side panel (#513) — Favorites filter removed (Saved in
+  // the bottom bar covers it); the single-category dropdown became this
+  // multi-select panel.
+  "filters.button.label": "Filters",
+  "filters.button.labelActive": "Filters, {count} on",
+  "filters.panel.title": "Filters",
+  "filters.panel.close": "Close filters",
+  "filters.panel.showOnly": "Show only",
+  "filters.panel.kindOfPlace": "Kind of place",
+  "filters.panel.clearAll": "Clear all",
+  "filters.panel.showResults": "Show {count} places",
 
   // Bottom sheet / list
   "sheet.places": "{count} places near you",
@@ -143,6 +156,7 @@ const en: Record<string, string> = {
   "splash.cat.garden": "Community garden",
   "splash.cat.edible_landscape": "Edible landscape",
   "splash.cat.meal_site": "Meal site",
+  "splash.cat.blessing_box": "Blessing box",
 
   // Location denied banner (#68)
   "banner.title": "Location turned off",
@@ -165,7 +179,14 @@ const en: Record<string, string> = {
   // Bottom navigation bar (docs/bottom-nav-spec.md §11)
   "nav.nearMe": "Near me",
   "nav.saved": "Saved",
-  "nav.resources": "Resources",
+  // Boxes (#516) — one-tap shortcut to the blessing-box category filter.
+  // Sits between Saved and Help so it's under the thumb (Kyle, 2026-09-19).
+  "nav.boxes": "Boxes",
+  // Renamed from "Resources" (#516, Kyle 2026-09-19) — the page itself keeps
+  // its own title ("Food help programs", nav.resourcesPage below); only the
+  // bar's short word changes. Kyle accepts some visitors may read "Help" as
+  // "how to use the site" for now; a tutorial is planned separately.
+  "nav.resources": "Help",
   "nav.menu": "Menu",
   "nav.aria": "Main",
   // PageNav's top "Back to map" bar (review item 7c) — distinct from BottomNav's
@@ -185,9 +206,12 @@ const en: Record<string, string> = {
   "menu.sponsoredBy": "Sponsored by",
   "menu.showWelcome": "Show welcome screen",
   "menu.language": "Language / Idioma",
-
-  // Category browse dropdown (#95)
-  "categoryBrowse.clearFilter": "Clear category filter",
+  // Map/List entry point (#514) — top of the Menu, for anyone who never taps
+  // search. Reads the OPPOSITE of the current view (the destination, same
+  // convention as viewSuggestion.* above). Hidden entirely while the map
+  // can't mount (#165) rather than shown disabled — see HamburgerMenu.tsx.
+  "menu.listView": "List view",
+  "menu.mapView": "Map view",
 
   // Suggest form (#71)
   "suggest.title": "Suggest a venue",
@@ -205,6 +229,7 @@ const en: Record<string, string> = {
   "suggest.category.garden": "Community Garden",
   "suggest.category.edible_landscape": "Edible Landscape",
   "suggest.category.meal_site": "Meal Site",
+  "suggest.category.blessing_box": "Blessing Box",
   "suggest.hours.label": "Hours (optional)",
   "suggest.hours.placeholder": "e.g. Mon–Fri 9am–5pm",
   "suggest.contact.label": "Contact info (optional)",
@@ -275,10 +300,15 @@ const en: Record<string, string> = {
   "share.labelGeneric": "Share this place",
   "share.copied": "Link copied",
 
-  // View toggle (#129)
-  "view.map": "Map",
-  "view.list": "List",
-  "view.toggleAria": "Choose map or list view",
+  // View switch — search-bar suggestion row + Menu line (#514). Replaces the
+  // old in-bar ViewToggle (#129/#191, removed): switching map/list now goes
+  // through one line under an empty, focused search bar, a "See all N
+  // matches as a list" row under a typed one, or a Menu item — never a
+  // standing control in the bar itself.
+  "viewSuggestion.seeAsList": "See all places as a list",
+  "viewSuggestion.backToMap": "Back to the map",
+  "viewSuggestion.placesCount": "{count} places",
+  "viewSuggestion.seeMatchesAsList": "See all {count} matches as a list",
 
   // Report form (#70)
   "report.button": "Report an issue with this venue",
@@ -328,6 +358,7 @@ const en: Record<string, string> = {
   "marker.category.garden": "Community garden",
   "marker.category.edible_landscape": "Edible landscape",
   "marker.category.meal_site": "Meal site",
+  "marker.category.blessing_box": "Blessing box",
 
   // External links (#162)
   "menu.opensInNewTab": "(opens in new tab)",
@@ -354,7 +385,21 @@ const en: Record<string, string> = {
   "privacy.linkLabel": "Privacy",
   "privacy.pageTitle": "Privacy — Pueblo Food Map",
   "privacy.heading": "Privacy",
-  "privacy.body": "Pueblo Food Map collects the information you type into our forms (venue reports, suggestions, and feedback). That information is used to review your submission and, if you provide an email address, to follow up with you. We do not sell, share, or store your contact information beyond what is needed to respond. Your IP address is checked to block spam when you submit a form, and is never saved with your submission.",
+  // Rewrite (slice 6, Blessing Boxes adopt-a-box + alerts): the old, single
+  // un-headed "privacy.body" paragraph is REPLACED by "What we collect"
+  // below (privacy.collect.*), plus two new headed sections — one paragraph
+  // per i18n key, per the task's own instruction ("not overloading
+  // privacy.body"). privacy.analytics (below) is unchanged wording, kept
+  // last, per the task's own "keep the analytics paragraph unchanged."
+  "privacy.collect.heading": "What we collect",
+  "privacy.collect.body": "Pueblo Food Map collects the information you type into our forms (place reports, suggestions, and feedback). We use it to review what you sent and, if you gave an email address, to write back. Your IP address is checked to block spam when you send a form, and is never saved with what you sent.",
+  "privacy.checkins.heading": "Blessing box check-ins",
+  "privacy.checkins.body": "Checking in at a blessing box is anonymous. We do not ask for your name or email, and we do not save your IP address. A photo you add is reviewed before it shows, and location details hidden inside the photo file are removed.",
+  "privacy.alerts.heading": "Email alerts and adopting a box",
+  "privacy.alerts.body1": "We keep your email address only if you ask for it: when you sign up for emails about a blessing box, or when you apply to adopt one. If you host a box, Pueblo Food Map staff may add your email, with your OK, so you hear when your box is empty or has a problem. We use these addresses only to send those emails. We never sell them, share them, or show them on the site.",
+  "privacy.alerts.body2": "If you adopt a box, the name you give us (for example, a group or family name) is shown on that box's card. Your email is not.",
+  "privacy.alerts.body3": "Every alert email has a stop link. One click stops the emails, with no login. To have your email address deleted completely, write to issues@pueblofoodmap.com.",
+  "privacy.alerts.body4": "Our emails are delivered by a mail service called Resend, which handles your address only to deliver them.",
   "privacy.analytics": "We use Cloudflare Web Analytics to count visits and measure how quickly pages load. It sets no cookies and stores nothing on your device, it does not identify you by your IP address or your browser, and it does not follow you to other websites. It records things like which page was viewed, the site you arrived from, your browser and device type, your country, and how long the page took to load. We use no advertising pixels and no other analytics service.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
@@ -364,20 +409,43 @@ const en: Record<string, string> = {
   "directions.walkAriaLabel": "Walking directions to {name} (opens on map)",
   "directions.busAriaLabel": "Bus directions to {name} (opens in new tab)",
   "directions.driveAriaLabel": "Drive directions to {name} (opens in new tab)",
+  // Box card fix pass (2026-09-19, item 4) — the address link has no preset
+  // travel mode (walk/bus/drive all left to Google Maps), so its aria text
+  // is deliberately mode-neutral, unlike the three labels above.
+  "directions.boxAriaLabel": "Directions to {name} (opens in new tab)",
   "directions.routeDistance": "{distance} walk",
   "directions.routeDuration": "{duration}",
   "directions.clearRoute": "Clear walking route",
+  // Route strip (#509) — "Show card" restores the full card BottomSheet
+  // shrinks to a strip while a walking route is active.
+  "directions.showCard": "Show card",
   // Walk-without-location hint (#207) — shown when Walk requests geolocation
   // (userLocation was null) and the browser denies it or it's unavailable.
   "directions.locationHint": "Share your location to see walking directions.",
-  // Turn-by-turn step list (#134 enhancement)
-  "directions.showSteps": "Show steps",
-  "directions.hideSteps": "Hide steps",
+  // Turn-by-turn step list (#134 enhancement). showSteps/hideSteps (the
+  // in-card Show/Hide toggle) retired 2026-09-20 (#555) — WalkStepper
+  // replaced the toggle+full-list with the one-turn-at-a-time stepper below.
+  "directions.steps": "Steps",
   "directions.stepsListLabel": "Turn-by-turn directions",
+  // #537 — the route strip's Steps control only renders when a route has
+  // steps; shown in its place (never silently hidden) when it genuinely
+  // doesn't, so the strip reads as complete rather than broken.
+  "directions.noStepsForRoute": "No turn-by-turn steps for this route",
   // Per-step distance suffixes — used when formatting short distances in the step list.
   // "ft" for sub-528 ft steps (sub-0.1 mi), otherwise the decimal miles value.
   "directions.stepFt": "{distance} ft",
   "directions.stepMi": "{distance} mi",
+  // Step-through stepper (#555) — "Step N of M" counter, the muted
+  // distance/arrival line, the "Then: <next>" peek, Back/Next aria-labels,
+  // and the "All turns" disclosure that reuses WalkStepsList.
+  "directions.stepCounter": "Step {current} of {total}",
+  "directions.stepIn": "In {distance}",
+  "directions.stepArrived": "You have arrived",
+  "directions.stepThen": "Then: {instruction}",
+  "directions.stepBack": "Previous turn",
+  "directions.stepNext": "Next turn",
+  "directions.allTurns": "All turns",
+  "directions.fewerTurns": "Fewer turns",
   // Google Maps walk handoff (#134 enhancement)
   "directions.openInGoogleMaps": "Open in Google Maps",
   "directions.openInGoogleMapsAria": "Open walking directions to {name} in Google Maps (opens in new tab)",
@@ -473,6 +541,364 @@ const en: Record<string, string> = {
   "resources.everydayeats.what": "A free box of 22–25 basic foods every month from Pueblo County — things like milk, cheese, cereal, rice or pasta, and canned fruits, vegetables and protein.",
   "resources.everydayeats.goodFor": "Adults 60 and older with limited income. Households of any age on SNAP, Medicaid, SSI and some other programs can also get emergency food (called TEFAP) the same way.",
   "resources.everydayeats.how": "Text FOOD to 1-877-644-3663. You'll get a link to a short sign-up form. You'll renew every 6 months, and if you miss your box 3 months in a row you lose your spot.",
+
+  // Blessing box card (rendered in-map, BottomSheet/DesktopVenueWindow, slice 1)
+  // "box.host" deleted (card redesign, 2026-09-19) — the public host NAME
+  // and "Host" heading are gone from the card entirely (display only; the
+  // admin surface and host email alerts are untouched).
+  "box.mostNeeded": "Most needed",
+  "box.status": "Status",
+  // Card redesign (2026-09-19): shortened for the status pill — the pill's
+  // own second segment now carries "no recent check-ins" separately (see
+  // box.status.unknown.detail below) rather than one long combined sentence.
+  "box.status.unknown": "Unknown",
+  "box.status.unknown.detail": "no recent check-ins",
+  // Card is opening on the map (client redirect from /box/<id>) or the
+  // full box record hasn't loaded into the card yet — both share this line.
+  "box.cardLoading": "Loading…",
+  // No-JS fallback (fix, PR review 2026-09-18): the redirect above needs a
+  // client effect to run, so a JS-disabled visitor is never sent anywhere —
+  // this is the plain link that gets them there by hand.
+  "box.redirectLink": "View this box on the map",
+
+  // Check-ins and live status (slice 2)
+  "box.status.stocked": "Stocked",
+  "box.status.low": "Running low",
+  "box.status.empty": "Empty",
+  "box.status.out_of_service": "Out of service",
+  // Card redesign (2026-09-19): repurposed as the status pill's second
+  // segment ("· filled {time}") — the pill itself supplies the "· " and the
+  // leading "Last " no longer reads naturally there. Not used anywhere else
+  // (grepped before changing — see this file's own header for the rule).
+  "box.lastFilled": "filled {time}",
+  "box.lastFilled.never": "Not marked filled yet",
+  // #510: shortened to fit one line on a phone (was "How does the box look
+  // right now?" — wrapped to two lines at 375px). "Update" covers every
+  // button under the heading (filled/low/empty/took/photo); "check in" was
+  // internal wording never meant for the visitor-facing card.
+  "box.checkin.heading": "Please update this box",
+  "box.checkin.filled": "I filled it",
+  "box.checkin.took": "I used this box",
+  "box.checkin.low": "Running low",
+  "box.checkin.empty": "It's empty",
+  "box.checkin.problem": "Report a problem",
+  "box.checkin.noteLabel": "Add a short note (optional)",
+  "box.checkin.notePlaceholder.filled": "e.g. Topped it off with canned soup",
+  "box.checkin.notePlaceholder.problem": "e.g. Door is broken",
+  "box.checkin.submit": "Send",
+  "box.checkin.submitting": "Sending…",
+  "box.checkin.cancel": "Cancel",
+  "box.checkin.success.filled": "Thanks for filling it!",
+  "box.checkin.success.took": "Thanks — enjoy!",
+  "box.checkin.success.low": "Thanks for the heads up.",
+  "box.checkin.success.empty": "Thanks for letting us know.",
+  "box.checkin.success.problem": "Thanks — we've let the admin know.",
+  "box.checkin.error": "That didn't go through. Please try again.",
+  // Split 2026-09-17 (review correction) from one shared "rateLimit" key —
+  // a single message misdirected blame between "this device is over its
+  // own cap" and "this box is busy right now." See the checkins route's
+  // own header for the two distinct error codes these key off.
+  "box.checkin.error.rateLimitVisitor": "Too many check-ins from this device right now. Please try again later.",
+  "box.checkin.error.rateLimitBox": "This box is getting an unusual number of check-ins right now. Please try again later.",
+  // Shown while the fallback (visible) Turnstile widget is on screen,
+  // waiting for the visitor to tap it — replaces the old red error text for
+  // this case (BoxCheckinPanel.tsx, "Fallback to a visible checkbox").
+  "box.checkin.turnstileFallbackPrompt": "Tap the box below to confirm you're a person.",
+
+  // "What would help you next time?" ask (migration 0012, mockup v3 Part 2)
+  // — shown IN PLACE of the check-in buttons right after a 'took' check-in
+  // succeeds. Nine fixed choices below (box.needs.<key>) mirror
+  // NEED_KEYS in src/lib/blessingBoxes.ts exactly — that array is the
+  // single source of truth for the vocabulary; these are only the display
+  // labels.
+  "box.needs.heading": "What would help you next time?",
+  "box.needs.sub": "Tap any. This tells givers what to bring.",
+  "box.needs.otherLabel": "Something else? (optional)",
+  "box.needs.send": "Send",
+  "box.needs.skip": "Skip",
+  "box.needs.success": "Got it — thank you.",
+  "box.needs.canned_food": "Canned food",
+  "box.needs.fresh_food": "Fresh food",
+  "box.needs.bread": "Bread",
+  "box.needs.baby_items": "Baby items",
+  "box.needs.diapers": "Diapers",
+  "box.needs.hygiene": "Hygiene items",
+  "box.needs.pet_food": "Pet food",
+  "box.needs.drinks": "Water / drinks",
+  "box.needs.warm_clothing": "Warm clothing",
+  // The self-filling "Most needed" label (BoxCardBody.tsx) when no admin
+  // most_needed text is set — distinguishes visitor-sourced data from the
+  // admin-typed line above it (box.mostNeeded), which keeps its own label.
+  "box.mostNeeded.fromVisitors": "Most needed · from people who use this box",
+
+  // Slice 5 photo-upload UI (BoxCheckinPanel.tsx / imageResize.ts). The
+  // disclosure line is shown under every picker, standalone and
+  // note-attached alike — moderation + "no faces or plates" in one short
+  // sentence, per the task's own spec.
+  "box.photo.addButton": "Add a photo",
+  "box.photo.attachLabel": "Add a photo (optional)",
+  "box.photo.chooseLabel": "Choose a photo",
+  "box.photo.disclosure": "Photos are reviewed before they're shown publicly. Please don't include faces or license plates.",
+  "box.photo.processing": "Preparing photo…",
+  "box.photo.processError": "Couldn't process that photo. Please try a different one.",
+  "box.photo.unsupportedFormat": "That photo format isn't supported. Please try a JPEG or PNG.",
+  "box.photo.previewAlt": "Preview of the photo you selected",
+  "box.photo.remove": "Remove",
+  "box.photo.send": "Send",
+  "box.photo.sending": "Sending…",
+  "box.photo.success": "Thanks! Your photo has been submitted for review.",
+  "box.photo.error": "That didn't go through. Please try again.",
+
+  // Photo DISPLAY (card slot + history grid) and "Report this photo"
+  // (ReportPhotoButton.tsx) — separate from the upload-picker keys above.
+  "box.photo.heading": "Photo",
+  // Card redesign (2026-09-19): repurposed as the small caption chip on the
+  // photo's bottom-right corner ("Photo · {time}") — was "Shared {time}" as
+  // a caption line below the image, a layout this key's only caller no
+  // longer has.
+  "box.photo.caption": "Photo · {time}",
+  "box.photo.altText": "Photo of {name}, shared {time}",
+  // #508: the card photo becomes a button that opens PhotoViewer full-screen.
+  "box.photo.viewFullSize": "View photo full size",
+  // #511 review nit: BoxActivityList's per-entry thumbnail button needs a
+  // label that varies per row (the generic viewFullSize text above is
+  // identical for every photo entry in the log, so multiple photos are
+  // indistinguishable to a screen reader) — {time} makes each one unique.
+  "box.photo.viewFullSizeAt": "View photo full size · {time}",
+  "box.photo.report": "Report this photo",
+  "box.photo.reporting": "Reporting…",
+  "box.photo.reportConfirm": "Hide this photo and send it for review?",
+  "box.photo.reportThanks": "Thanks — this photo has been hidden pending review.",
+  "box.photo.reportError": "That didn't go through. Please try again.",
+  "box.photo.morePhotos": "Show more photos",
+  "box.photo.none": "No photos yet",
+  "box.photo.galleryHeading": "Photos",
+
+  // "box.recentCheckin.heading"/"box.recentCheckin.none" deleted (card
+  // redesign, 2026-09-19) — the standalone "Most recent check-in" line is
+  // gone; the status pill now carries recency (box.lastFilled above), and
+  // the full timeline still lives at /box/<id>/history via the link below.
+  // "History" link on the card -> /box/<id>/history (map-first rework)
+  "box.history.link": "History",
+  "box.history.subheading": "Full history for this box",
+  // /box/<id>/history page (map-first rework scope addition, 2026-09-18) —
+  // reuses BoxActivityList/useBoxActivity filtered to one box, so it needs
+  // no new heading/empty-state keys of its own. "box.history.back" (its own
+  // "Back to the map" link) was deleted 2026-09-18: PageNav's chrome-level
+  // link already covers it (backHref, see PageNav.tsx's own header) — two
+  // "back to map" links on one page was the bug being fixed.
+
+  // Numbers (slice 7) — BoxNumbersPanel.tsx is shared by BOTH the per-box
+  // section (/box/<id>/history) and the network-wide section
+  // (/boxes/activity), so these keys carry no per-box/network split of their
+  // own; only the two heading keys below name which context they're in.
+  "box.stats.perBoxHeading": "Numbers for this box",
+  "box.stats.networkHeading": "Network numbers",
+  // Current ("right now") network counts, issue #512 — independent of the
+  // period picker below, unlike every other box.stats.* key on this page.
+  "box.stats.boxCount": "Blessing boxes",
+  "box.stats.sponsorCount": "Sponsors",
+  "box.stats.avgSponsorsPerBox": "Avg. sponsors per box",
+  "box.stats.period": "Time period",
+  "box.stats.period.7d": "Last 7 days",
+  "box.stats.period.30d": "Last 30 days",
+  "box.stats.period.90d": "Last 90 days",
+  "box.stats.period.all": "All time",
+  "box.stats.fills": "Fills",
+  "box.stats.uses": "Uses (“I used this box”)",
+  "box.stats.emptyReports": "Empty reports",
+  "box.stats.lowReports": "Low reports",
+  "box.stats.totalCheckins": "Total check-ins",
+  // Reworded from "Approved photos" (issue #512, Kyle) — "approved" reads
+  // like a moderation-status label; "shared" is what the photo actually is
+  // to the person who submitted it.
+  "box.stats.approvedPhotos": "Shared photos",
+  "box.stats.avgHeading": "Typical timing",
+  "box.stats.avg.emptyToFill": "Empty to next fill",
+  "box.stats.avg.fillToFill": "Fill to next fill",
+  "box.stats.avg.fillToEmpty": "Fill to next empty",
+  // No pair of that type has happened yet for the selected box(es) — never a
+  // 0, see boxStats.ts's own computePairAverages header for why.
+  "box.stats.noData": "—",
+  "box.stats.duration.hours": "{value} hours",
+  "box.stats.duration.days": "{value} days",
+  "box.stats.honestyNote": "These numbers count check-ins, not every visit — so “uses” reads lower than real foot traffic, on purpose.",
+  "box.stats.neverFilled": "Never filled",
+  "box.stats.needLoveHeading": "Boxes that need love",
+  "box.stats.needLove.longestSinceFill": "Longest since last fill",
+  "box.stats.needLove.mostEmptyReports": "Most empty reports",
+  "box.stats.needLove.slowestRefill": "Slowest to refill",
+  "box.stats.needLove.empty": "Not enough history yet.",
+  "box.stats.needLove.emptyReportCount": "{count} empty reports",
+  "box.stats.milestonesHeading": "Milestones",
+  "box.stats.milestone.fills": "Pueblo has filled its blessing boxes {threshold}+ times",
+  "box.stats.milestone.uses": "Neighbors have used Pueblo's blessing boxes {threshold}+ times",
+
+  // Adopt-a-box + email alerts (slice 6). Both card forms use their OWN
+  // disclosure string, not privacy.emailDisclosure: that one says the email
+  // is "used only to follow up on your submission", which is false here —
+  // these two forms KEEP the address and send recurring mail to it, and the
+  // privacy page Kyle signed off says so.
+  "box.alerts.emailDisclosure": "We keep your email only to send these emails. Every alert email has a stop link.",
+  // Reworded (Blessing Boxes slice 6 follow-up) from "Adopt this box" —
+  // adoption is an APPLICATION an admin approves, not something that
+  // happens the moment this form is submitted; the old wording implied
+  // instant adoption. Also the form's own <h3> heading (AdoptBoxForm.tsx
+  // reuses this same key for both the collapsed link and the expanded
+  // heading), so both read consistently.
+  "box.adopt.linkLabel": "Apply to adopt this box",
+  "box.adopt.displayNameLabel": "Your name (shown publicly, e.g. a group or family name)",
+  "box.adopt.displayNamePlaceholder": "e.g. The Martinez Family",
+  "box.adopt.emailLabel": "Your email (kept private)",
+  "box.adopt.noteLabel": "Note for the admin (optional, private)",
+  "box.adopt.submit": "Send application",
+  "box.adopt.submitting": "Sending…",
+  "box.adopt.cancel": "Cancel",
+  "box.adopt.success": "Check your email to confirm.",
+  "box.alerts.linkLabel": "Email me when it needs filling",
+  "box.alerts.emailLabel": "Your email",
+  "box.alerts.submit": "Sign me up",
+  "box.alerts.submitting": "Sending…",
+  "box.alerts.cancel": "Cancel",
+  "box.alerts.success": "Check your email to confirm.",
+  // Shared between both forms above — same "one generic message per class
+  // of failure" convention as box.checkin.error, but not scope-split like
+  // that one: the adopt/alert forms don't need per-scope wording, only "try
+  // again" vs. "try again later."
+  "box.form.error.generic": "That didn't go through. Please try again.",
+  "box.form.error.rateLimit": "Too many attempts right now. Please try again later.",
+
+  // Sponsor band (card redesign, 2026-09-19) — replaces the old flat
+  // "Cared for by {names}" line AND the collapsed "Apply to adopt this box"
+  // link that used to sit lower on the card; both now live in one band
+  // right under the photo. Names render as bold JSX <b> per adopter (not
+  // interpolated into one string), so "Sponsored by" is a plain prefix key.
+  "box.sponsor.needsSponsor": "This box needs a sponsor.",
+  "box.sponsor.sponsoredByPrefix": "Sponsored by ",
+  "box.sponsor.and": "and",
+  "box.sponsor.moreCount": "+{count} more",
+  "box.sponsor.wantToHelp": "Want to help too? ",
+
+  // /alerts/confirm and /alerts/stop — the shared double-opt-in confirm and
+  // one-click-unsubscribe pages (slice 6). Both carry `robots: noindex` and
+  // a `Referrer-Policy: no-referrer` (tokens live in the URL) — see
+  // next.config.ts and each page's own metadata export.
+  "alerts.confirm.heading": "Confirm your email",
+  "alerts.confirm.body": "Click the button below to confirm you'd like these emails.",
+  "alerts.confirm.button": "Confirm",
+  "alerts.confirm.confirming": "Confirming…",
+  "alerts.confirm.success": "You're confirmed! You'll get emails as described.",
+  "alerts.confirm.invalid": "This confirmation link is no longer valid.",
+  "alerts.confirm.error": "Something went wrong. Please try again.",
+  "alerts.stop.heading": "Emails stopped",
+  "alerts.stop.stopping": "Stopping…",
+  "alerts.stop.body": "You won't get any more emails about this.",
+  "alerts.stop.invalid": "This link is no longer valid.",
+  "alerts.stop.noscriptButton": "Stop these emails",
+  "alerts.stop.undoButton": "That was a mistake — turn emails back on",
+  "alerts.stop.undoing": "Turning back on…",
+  "alerts.stop.undone": "You're back on the list.",
+  "alerts.stop.undoError": "That didn't go through. Please try again.",
+
+  // Outbound email copy (slice 6) — rendered via composeEmail
+  // (src/lib/emailSend.ts), which builds ONE message in the recipient's own
+  // `lang` (see migrations/0011_alert_email_lang.sql) — every key here,
+  // subject included, still needs both an EN and an ES entry so the SAME
+  // dictionary/parity test covers whichever language actually gets sent.
+  "email.alert.empty.subject": "{box} is empty",
+  "email.alert.empty.line1": "{box} was just marked empty.",
+  "email.alert.low.subject": "{box} is running low",
+  "email.alert.low.line1": "{box} was just marked as running low.",
+  "email.alert.problem.subject": "A problem was reported at {box}",
+  "email.alert.problem.line1": "A problem was just reported at {box}.",
+  // Filled alert (slice 6 follow-up) — the only alert every subscriber role
+  // (host/adopter/giver) gets, and the only one NOT gated by the 6h cooldown
+  // (boxAlerts.ts's own header, "FILLED IS A SEPARATE CAP").
+  "email.alert.filled.subject": "Good news: {box} was just filled",
+  "email.alert.filled.line1": "Someone just reported filling {box}.",
+  "email.alert.filled.line2": "Thanks for keeping an eye on it. You'll hear from us again when it needs filling.",
+  "email.alert.line2": "See the box's page for details: {url}",
+  "email.stopLine": "Don't want these emails anymore? Stop them any time, no login needed: {stopUrl}",
+  "email.adoptConfirm.subject": "Confirm your application to adopt {box}",
+  "email.adoptConfirm.line1": "Thanks for applying to adopt {box}. Please confirm your email to finish your application.",
+  "email.adoptConfirm.line2": "An admin will review your application once you've confirmed.",
+  "email.adoptConfirm.cta": "Confirm your email: {url}",
+  // 2026-09-18 security review, item 7: an "if you didn't ask for this"
+  // line on every confirm email — someone else could have typed this
+  // address in by mistake (or on purpose), and this line tells them
+  // exactly what happens if they do nothing (nothing).
+  "email.adoptConfirm.disclaimer": "If you didn't ask for this, you can ignore this email. We won't write again unless someone confirms.",
+  "email.adoptApproved.subject": "You're approved to adopt {box}",
+  "email.adoptApproved.line1": "Good news — your application to adopt {box} as \"{displayName}\" has been approved.",
+  "email.adoptApproved.line2": "Your name will now show on the box's card, and you'll get an email if it's reported empty or has a problem.",
+  "email.alertConfirm.subject": "Confirm your alerts for {box}",
+  "email.alertConfirm.line1": "Please confirm you'd like email alerts for {box}.",
+  "email.alertConfirm.line2": "We'll email you if it's reported empty or running low.",
+  "email.alertConfirm.cta": "Confirm your email: {url}",
+  "email.alertConfirm.disclaimer": "If you didn't ask for this, you can ignore this email. We won't write again unless someone confirms.",
+  "email.hostWelcome.subject": "You're now getting alerts for {box}",
+  "email.hostWelcome.line1": "You've been added as a host contact for {box}.",
+  "email.hostWelcome.line2": "You'll get an email if it's reported empty or has a problem.",
+
+  // Activity log (/boxes/activity, slice 3) and nav entry
+  "nav.boxActivity": "Blessing box activity",
+  "activity.heading": "Blessing box activity",
+  "activity.intro": "Every fill, low report, empty report, and box change across the network, newest first.",
+  "activity.empty": "No activity to show yet.",
+  "activity.prevPage": "Previous",
+  "activity.nextPage": "Next",
+  "activity.loading": "Loading…",
+  "activity.resultCount": "{count} results",
+  "activity.filters.box": "Box",
+  "activity.filters.boxAll": "All boxes",
+  "activity.filters.kind": "Kind",
+  "activity.filters.kindAll": "All kinds",
+  "activity.filters.from": "From",
+  "activity.filters.to": "To",
+  "activity.filters.clear": "Clear filters",
+  // activity.recentEmpty: BoxHistoryContent's per-box empty state
+  // (/box/<id>/history). activity.recentHeading and activity.viewFull
+  // (the old BoxContent per-box "Recent activity" section header + "See
+  // full activity" link) were removed with it (map-first rework scope
+  // addition, 2026-09-18) — the card shows one line, not a list, and
+  // "History" (box.history.link, above) replaces "See full activity".
+  "activity.recentEmpty": "No activity at this box yet.",
+  "activity.thisBox": "This box",
+  // Line templates — {name} is the box's own name (already reads
+  // "Blessing Box - 216 W Routt" etc., so these deliberately don't repeat
+  // "Box at" ahead of it, per the Discovery doc's own example lines).
+  "activity.line.filled": "{name} was filled",
+  "activity.line.took": "Someone used {name}",
+  "activity.line.low": "{name} is running low",
+  "activity.line.empty": "{name} is empty",
+  "activity.line.added": "{name} was added as a new blessing box",
+  "activity.line.moved": "{name} moved",
+  "activity.line.renamed": "{name} was renamed",
+  "activity.line.paused": "{name} was paused",
+  "activity.line.removed": "{name} was removed",
+  // #511 — per-box history log only (never the global feed's own vocabulary,
+  // see boxActivity.ts's PerBoxActivityKind). photo_added: no {name} — it's
+  // always rendered on the box's own history page, so naming the box again
+  // would be noise (unlike the checkin/event lines above, which are shared
+  // with the global feed and DO need the box's name). sponsor_added's
+  // {name} is the SPONSOR's display name, not the box's — see
+  // BoxActivityList.tsx's own header for why this one line gets a different
+  // `name` value than every other line template here.
+  "activity.line.photo_added": "A new photo was added",
+  "activity.line.sponsor_added": "{name} became a sponsor",
+  // Short noun labels for the kind filter's <option> text — distinct from
+  // box.checkin.* above, which is first-person button copy ("I filled it")
+  // that reads oddly as a filter option.
+  "activity.kind.filled": "Filled",
+  "activity.kind.took": "Used the box",
+  "activity.kind.low": "Running low",
+  "activity.kind.empty": "Empty",
+  "activity.kind.added": "Box added",
+  "activity.kind.moved": "Box moved",
+  "activity.kind.renamed": "Box renamed",
+  "activity.kind.paused": "Box paused",
+  "activity.kind.removed": "Box removed",
+
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -505,6 +931,7 @@ const es: Record<string, string> = {
   "category.garden": "Huerto",
   "category.edible_landscape": "Paisaje comestible", // [CHECK]
   "category.meal_site": "Comedor",
+  "category.blessing_box": "Caja de bendiciones", // [CHECK]
 
   // Category labels (full)
   "category.full.pantry": "Despensa de alimentos",
@@ -514,6 +941,7 @@ const es: Record<string, string> = {
   "category.full.garden": "Huerto comunitario",
   "category.full.edible_landscape": "Paisaje comestible", // [CHECK]
   "category.full.meal_site": "Comedor comunitario",
+  "category.full.blessing_box": "Caja de bendiciones", // [CHECK]
 
   // Category rail section headers
   "rail.categories": "Categorías",
@@ -524,7 +952,16 @@ const es: Record<string, string> = {
   "filter.snap": "Acepta SNAP",
   "filter.wic": "Acepta WIC",
   "filter.walkingDistance": "Distancia caminando",
-  "filter.favorites": "Favoritos",
+
+  // Filters button + side panel (#513)
+  "filters.button.label": "Filtros",
+  "filters.button.labelActive": "Filtros, {count} activos", // [CHECK]
+  "filters.panel.title": "Filtros",
+  "filters.panel.close": "Cerrar filtros", // [CHECK]
+  "filters.panel.showOnly": "Mostrar solo", // [CHECK]
+  "filters.panel.kindOfPlace": "Tipo de lugar", // [CHECK]
+  "filters.panel.clearAll": "Borrar todo", // [CHECK]
+  "filters.panel.showResults": "Mostrar {count} lugares", // [CHECK]
 
   // Bottom sheet / list
   "sheet.places": "{count} lugares cerca de ti",
@@ -616,6 +1053,7 @@ const es: Record<string, string> = {
   "splash.cat.garden": "Huerto comunitario",
   "splash.cat.edible_landscape": "Paisaje comestible", // [CHECK]
   "splash.cat.meal_site": "Comedor comunitario",
+  "splash.cat.blessing_box": "Caja de bendiciones", // [CHECK]
 
   // Location denied banner (#68)
   "banner.title": "Ubicación desactivada",
@@ -636,9 +1074,12 @@ const es: Record<string, string> = {
   "locate.outsideCounty": "Tu ubicación está fuera del condado de Pueblo",
 
   // Bottom navigation bar (docs/bottom-nav-spec.md §11)
-  "nav.nearMe": "Cerca de mí",
+  // "Cercanos" (#516, Kyle 2026-09-19) — matches Google Maps' Spanish
+  // wording ("lugares cercanos") and is shorter, so it fits every phone.
+  "nav.nearMe": "Cercanos", // [CHECK]
   "nav.saved": "Guardados",
-  "nav.resources": "Recursos",
+  "nav.boxes": "Cajas", // [CHECK]
+  "nav.resources": "Ayuda", // [CHECK]
   "nav.menu": "Menú",
   "nav.aria": "Principal",
   "nav.pageAria": "Página",
@@ -656,9 +1097,8 @@ const es: Record<string, string> = {
   "menu.sponsoredBy": "Patrocinado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.language": "Language / Idioma",
-
-  // Category browse dropdown (#95)
-  "categoryBrowse.clearFilter": "Borrar filtro de categoría",
+  "menu.listView": "Vista de lista",
+  "menu.mapView": "Vista de mapa",
 
   // Suggest form (#71)
   "suggest.title": "Sugerir un lugar",
@@ -676,6 +1116,7 @@ const es: Record<string, string> = {
   "suggest.category.garden": "Huerto comunitario",
   "suggest.category.edible_landscape": "Paisaje comestible",
   "suggest.category.meal_site": "Comedor comunitario",
+  "suggest.category.blessing_box": "Caja de bendiciones", // [CHECK]
   "suggest.hours.label": "Horario (opcional)",
   "suggest.hours.placeholder": "p. ej. Lun–Vie 9am–5pm",
   "suggest.contact.label": "Información de contacto (opcional)",
@@ -746,10 +1187,11 @@ const es: Record<string, string> = {
   "share.labelGeneric": "Compartir este lugar",
   "share.copied": "Enlace copiado",
 
-  // View toggle (#129)
-  "view.map": "Mapa",
-  "view.list": "Lista",
-  "view.toggleAria": "Elegir vista de mapa o lista",
+  // View switch — search-bar suggestion row + Menu line (#514).
+  "viewSuggestion.seeAsList": "Ver todos los lugares en una lista",
+  "viewSuggestion.backToMap": "Volver al mapa",
+  "viewSuggestion.placesCount": "{count} lugares",
+  "viewSuggestion.seeMatchesAsList": "Ver los {count} resultados en una lista",
 
   // Report form (#70)
   "report.button": "Reportar un problema con este lugar",
@@ -798,6 +1240,7 @@ const es: Record<string, string> = {
   "marker.category.garden": "Huerto",
   "marker.category.edible_landscape": "Paisaje comestible",
   "marker.category.meal_site": "Comedor",
+  "marker.category.blessing_box": "Caja de bendiciones", // [CHECK]
 
   // External links (#162)
   "menu.opensInNewTab": "(se abre en una pestaña nueva)",
@@ -823,7 +1266,15 @@ const es: Record<string, string> = {
   "privacy.linkLabel": "Privacidad",
   "privacy.pageTitle": "Privacidad — Pueblo Food Map",
   "privacy.heading": "Privacidad",
-  "privacy.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). Esa información se usa para revisar tu envío y, si proporcionas un correo, para darte seguimiento. No vendemos, compartimos ni guardamos tu información de contacto más allá de lo necesario para responder. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con tu envío.",
+  "privacy.collect.heading": "Qué recopilamos", // [CHECK]
+  "privacy.collect.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). La usamos para revisar lo que enviaste y, si diste un correo electrónico, para responderte. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con lo que enviaste.", // [CHECK]
+  "privacy.checkins.heading": "Registros en cajas de bendición", // [CHECK]
+  "privacy.checkins.body": "Registrar tu visita a una caja de bendición es anónimo. No pedimos tu nombre ni tu correo, y no guardamos tu dirección IP. Una foto que agregues se revisa antes de publicarse, y los detalles de ubicación ocultos en el archivo de la foto se eliminan.", // [CHECK]
+  "privacy.alerts.heading": "Alertas por correo y adopción de una caja", // [CHECK]
+  "privacy.alerts.body1": "Guardamos tu correo electrónico solo si tú lo pides: cuando te suscribes a alertas de una caja de bendición, o cuando solicitas adoptar una. Si eres anfitrión de una caja, el personal de Pueblo Food Map puede agregar tu correo, con tu autorización, para avisarte cuando tu caja esté vacía o tenga un problema. Usamos estas direcciones solo para enviar esos correos. Nunca las vendemos, las compartimos, ni las mostramos en el sitio.", // [CHECK]
+  "privacy.alerts.body2": "Si adoptas una caja, el nombre que nos das (por ejemplo, el de un grupo o una familia) se muestra en la tarjeta de esa caja. Tu correo no.", // [CHECK]
+  "privacy.alerts.body3": "Cada correo de alerta tiene un enlace para detenerlo. Un clic detiene los correos, sin necesidad de iniciar sesión. Para que eliminemos tu correo por completo, escribe a issues@pueblofoodmap.com.", // [CHECK]
+  "privacy.alerts.body4": "Nuestros correos se envían a través de un servicio de correo llamado Resend, que solo maneja tu dirección para entregarlos.", // [CHECK]
   "privacy.analytics": "Usamos Cloudflare Web Analytics para contar visitas y medir qué tan rápido cargan las páginas. No usa cookies ni guarda nada en tu dispositivo, no te identifica por tu dirección IP ni por tu navegador, y no te sigue a otros sitios web. Registra datos como qué página se vio, el sitio desde el que llegaste, tu tipo de navegador y dispositivo, tu país y cuánto tardó en cargar la página. No usamos píxeles de publicidad ni ningún otro servicio de análisis.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
@@ -833,18 +1284,31 @@ const es: Record<string, string> = {
   "directions.walkAriaLabel": "Cómo llegar caminando a {name} (se muestra en el mapa)",
   "directions.busAriaLabel": "Cómo llegar en autobús a {name} (se abre en una pestaña nueva)",
   "directions.driveAriaLabel": "Cómo llegar manejando a {name} (se abre en una pestaña nueva)",
+  "directions.boxAriaLabel": "Cómo llegar a {name} (se abre en una pestaña nueva)", // [CHECK]
   "directions.routeDistance": "{distance} caminando",
   "directions.routeDuration": "{duration}",
   "directions.clearRoute": "Eliminar ruta a pie",
+  "directions.showCard": "Mostrar tarjeta", // [CHECK]
   // Walk-without-location hint (#207)
   "directions.locationHint": "Comparte tu ubicación para ver cómo llegar a pie.",
-  // Turn-by-turn step list (#134 enhancement)
-  "directions.showSteps": "Ver indicaciones",
-  "directions.hideSteps": "Ocultar indicaciones",
+  // Turn-by-turn step list (#134 enhancement). showSteps/hideSteps retired
+  // 2026-09-20 (#555) — see the EN dictionary's comment.
+  "directions.steps": "Pasos", // [CHECK]
   "directions.stepsListLabel": "Indicaciones paso a paso",
+  // #537
+  "directions.noStepsForRoute": "No hay indicaciones paso a paso para esta ruta",
   // Per-step distance suffixes
   "directions.stepFt": "{distance} pies",
   "directions.stepMi": "{distance} mi",
+  // Step-through stepper (#555) — see the EN dictionary's comment.
+  "directions.stepCounter": "Paso {current} de {total}", // [CHECK]
+  "directions.stepIn": "En {distance}", // [CHECK]
+  "directions.stepArrived": "Has llegado", // [CHECK]
+  "directions.stepThen": "Luego: {instruction}", // [CHECK]
+  "directions.stepBack": "Giro anterior", // [CHECK]
+  "directions.stepNext": "Siguiente giro", // [CHECK]
+  "directions.allTurns": "Todos los giros", // [CHECK]
+  "directions.fewerTurns": "Menos giros", // [CHECK]
   // Google Maps walk handoff (#134 enhancement)
   "directions.openInGoogleMaps": "Abrir en Google Maps",
   "directions.openInGoogleMapsAria": "Abrir indicaciones a pie a {name} en Google Maps (se abre en una pestaña nueva)",
@@ -938,6 +1402,235 @@ const es: Record<string, string> = {
   "resources.everydayeats.what": "Una caja gratuita con 22 a 25 alimentos básicos cada mes del Condado de Pueblo, como leche, queso, cereal, arroz o pasta, y frutas, verduras y proteína enlatadas.",
   "resources.everydayeats.goodFor": "Adultos de 60 años o más con ingresos limitados. Los hogares de cualquier edad que reciben SNAP, Medicaid, SSI y algunos otros programas también pueden obtener comida de emergencia (llamada TEFAP) de la misma manera.",
   "resources.everydayeats.how": "Envía FOOD por mensaje de texto al 1-877-644-3663. Recibirás un enlace a un formulario corto de inscripción. Hay que renovar cada 6 meses, y si no recoges tu caja 3 meses seguidos pierdes tu lugar.",
+
+  // Blessing box card (rendered in-map, BottomSheet/DesktopVenueWindow, slice 1)
+  "box.mostNeeded": "Lo que más se necesita",
+  "box.status": "Estado",
+  "box.status.unknown": "Desconocido", // [CHECK]
+  "box.status.unknown.detail": "sin visitas recientes", // [CHECK]
+  "box.cardLoading": "Cargando…", // [CHECK]
+  "box.redirectLink": "Ver esta caja en el mapa", // [CHECK]
+
+  // Check-ins and live status (slice 2)
+  "box.status.stocked": "Surtida", // [CHECK]
+  "box.status.low": "Quedan pocas cosas", // [CHECK]
+  "box.status.empty": "Vacía", // [CHECK]
+  "box.status.out_of_service": "Fuera de servicio", // [CHECK]
+  "box.lastFilled": "surtida {time}", // [CHECK]
+  "box.lastFilled.never": "Aún no se ha marcado como surtida", // [CHECK]
+  "box.checkin.heading": "Por favor, actualiza esta caja", // [CHECK]
+  "box.checkin.filled": "La surtí", // [CHECK]
+  "box.checkin.took": "Usé esta caja", // [CHECK]
+  "box.checkin.low": "Quedan pocas cosas", // [CHECK]
+  "box.checkin.empty": "Está vacía", // [CHECK]
+  "box.checkin.problem": "Reportar un problema", // [CHECK]
+  "box.checkin.noteLabel": "Agrega una nota breve (opcional)", // [CHECK]
+  "box.checkin.notePlaceholder.filled": "ej. La llené con sopa enlatada", // [CHECK]
+  "box.checkin.notePlaceholder.problem": "ej. La puerta está rota", // [CHECK]
+  "box.checkin.submit": "Enviar", // [CHECK]
+  "box.checkin.submitting": "Enviando…", // [CHECK]
+  "box.checkin.cancel": "Cancelar", // [CHECK]
+  "box.checkin.success.filled": "¡Gracias por surtirla!", // [CHECK]
+  "box.checkin.success.took": "Gracias — ¡disfrútalo!", // [CHECK]
+  "box.checkin.success.low": "Gracias por avisarnos.", // [CHECK]
+  "box.checkin.success.empty": "Gracias por avisarnos.", // [CHECK]
+  "box.checkin.success.problem": "Gracias — ya avisamos al administrador.", // [CHECK]
+  "box.checkin.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "box.checkin.error.rateLimitVisitor": "Demasiadas visitas desde este dispositivo por ahora. Por favor intenta más tarde.", // [CHECK]
+  "box.checkin.error.rateLimitBox": "Esta caja está recibiendo un número inusual de visitas en este momento. Por favor intenta más tarde.", // [CHECK]
+  "box.checkin.turnstileFallbackPrompt": "Toca el recuadro de abajo para confirmar que eres una persona.", // [CHECK]
+
+  "box.needs.heading": "¿Qué te ayudaría la próxima vez?", // [CHECK]
+  "box.needs.sub": "Toca las que quieras. Esto le dice a quienes donan qué traer.", // [CHECK]
+  "box.needs.otherLabel": "¿Algo más? (opcional)", // [CHECK]
+  "box.needs.send": "Enviar", // [CHECK]
+  "box.needs.skip": "Omitir", // [CHECK]
+  "box.needs.success": "Recibido — ¡gracias!", // [CHECK]
+  "box.needs.canned_food": "Comida enlatada", // [CHECK]
+  "box.needs.fresh_food": "Comida fresca", // [CHECK]
+  "box.needs.bread": "Pan", // [CHECK]
+  "box.needs.baby_items": "Artículos para bebé", // [CHECK]
+  "box.needs.diapers": "Pañales", // [CHECK]
+  "box.needs.hygiene": "Artículos de higiene", // [CHECK]
+  "box.needs.pet_food": "Comida para mascotas", // [CHECK]
+  "box.needs.drinks": "Agua / bebidas", // [CHECK]
+  "box.needs.warm_clothing": "Ropa de abrigo", // [CHECK]
+  "box.mostNeeded.fromVisitors": "Lo más necesitado · según quienes usan esta caja", // [CHECK]
+
+  "box.photo.addButton": "Agregar una foto", // [CHECK]
+  "box.photo.attachLabel": "Agregar una foto (opcional)", // [CHECK]
+  "box.photo.chooseLabel": "Elige una foto", // [CHECK]
+  "box.photo.disclosure": "Las fotos se revisan antes de mostrarse públicamente. Por favor no incluyas rostros ni placas.", // [CHECK]
+  "box.photo.processing": "Preparando la foto…", // [CHECK]
+  "box.photo.processError": "No se pudo procesar esa foto. Por favor intenta con otra.", // [CHECK]
+  "box.photo.unsupportedFormat": "Ese formato de foto no es compatible. Por favor intenta con un JPEG o PNG.", // [CHECK]
+  "box.photo.previewAlt": "Vista previa de la foto seleccionada", // [CHECK]
+  "box.photo.remove": "Quitar", // [CHECK]
+  "box.photo.send": "Enviar", // [CHECK]
+  "box.photo.sending": "Enviando…", // [CHECK]
+  "box.photo.success": "¡Gracias! Tu foto fue enviada para revisión.", // [CHECK]
+  "box.photo.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+
+  "box.photo.heading": "Foto", // [CHECK]
+  "box.photo.caption": "Foto · {time}", // [CHECK]
+  "box.photo.altText": "Foto de {name}, compartida {time}", // [CHECK]
+  "box.photo.viewFullSize": "Ver foto en tamaño completo", // [CHECK]
+  "box.photo.viewFullSizeAt": "Ver foto en tamaño completo · {time}", // [CHECK]
+  "box.photo.report": "Reportar esta foto", // [CHECK]
+  "box.photo.reporting": "Reportando…", // [CHECK]
+  "box.photo.reportConfirm": "¿Ocultar esta foto y enviarla para revisión?", // [CHECK]
+  "box.photo.reportThanks": "Gracias — esta foto se ha ocultado en espera de revisión.", // [CHECK]
+  "box.photo.reportError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "box.photo.morePhotos": "Mostrar más fotos", // [CHECK]
+  "box.photo.none": "Aún no hay fotos", // [CHECK]
+  "box.photo.galleryHeading": "Fotos", // [CHECK]
+
+  "box.history.link": "Historial", // [CHECK]
+  "box.history.subheading": "Historial completo de esta caja", // [CHECK]
+
+  "box.stats.perBoxHeading": "Números de esta caja", // [CHECK]
+  "box.stats.networkHeading": "Números de la red", // [CHECK]
+  "box.stats.boxCount": "Cajas de bendición", // [CHECK]
+  "box.stats.sponsorCount": "Patrocinadores", // [CHECK]
+  "box.stats.avgSponsorsPerBox": "Prom. de patrocinadores por caja", // [CHECK]
+  "box.stats.period": "Periodo", // [CHECK]
+  "box.stats.period.7d": "Últimos 7 días", // [CHECK]
+  "box.stats.period.30d": "Últimos 30 días", // [CHECK]
+  "box.stats.period.90d": "Últimos 90 días", // [CHECK]
+  "box.stats.period.all": "Todo el tiempo", // [CHECK]
+  "box.stats.fills": "Surtidos", // [CHECK]
+  "box.stats.uses": "Usos (“Usé esta caja”)", // [CHECK]
+  "box.stats.emptyReports": "Avisos de vacío", // [CHECK]
+  "box.stats.lowReports": "Avisos de poco surtido", // [CHECK]
+  "box.stats.totalCheckins": "Total de visitas registradas", // [CHECK]
+  "box.stats.approvedPhotos": "Fotos compartidas", // [CHECK]
+  "box.stats.avgHeading": "Tiempos típicos", // [CHECK]
+  "box.stats.avg.emptyToFill": "De vacío al siguiente surtido", // [CHECK]
+  "box.stats.avg.fillToFill": "De un surtido al siguiente", // [CHECK]
+  "box.stats.avg.fillToEmpty": "De surtido al siguiente vacío", // [CHECK]
+  "box.stats.noData": "—", // [CHECK]
+  "box.stats.duration.hours": "{value} horas", // [CHECK]
+  "box.stats.duration.days": "{value} días", // [CHECK]
+  "box.stats.honestyNote": "Estos números cuentan las visitas registradas, no cada visita real — por eso “usos” se ve más bajo que el tráfico real, a propósito.", // [CHECK]
+  "box.stats.neverFilled": "Nunca surtida", // [CHECK]
+  "box.stats.needLoveHeading": "Cajas que necesitan atención", // [CHECK]
+  "box.stats.needLove.longestSinceFill": "Más tiempo sin surtirse", // [CHECK]
+  "box.stats.needLove.mostEmptyReports": "Más avisos de vacío", // [CHECK]
+  "box.stats.needLove.slowestRefill": "Las más lentas en volver a surtirse", // [CHECK]
+  "box.stats.needLove.empty": "Todavía no hay suficiente historial.", // [CHECK]
+  "box.stats.needLove.emptyReportCount": "{count} avisos de vacío", // [CHECK]
+  "box.stats.milestonesHeading": "Logros de la comunidad", // [CHECK]
+  "box.stats.milestone.fills": "Pueblo ha surtido sus cajas de bendiciones {threshold}+ veces", // [CHECK]
+  "box.stats.milestone.uses": "Los vecinos han usado las cajas de bendiciones de Pueblo {threshold}+ veces", // [CHECK]
+
+  "box.alerts.emailDisclosure": "Guardamos tu correo solo para enviarte estos mensajes. Cada correo de alerta trae un enlace para dejar de recibirlos.", // [CHECK]
+  "box.adopt.linkLabel": "Solicitar adoptar esta caja", // [CHECK]
+  "box.adopt.displayNameLabel": "Tu nombre (se muestra públicamente, por ejemplo el de un grupo o familia)", // [CHECK]
+  "box.adopt.displayNamePlaceholder": "ej. La Familia Martínez", // [CHECK]
+  "box.adopt.emailLabel": "Tu correo (privado)", // [CHECK]
+  "box.adopt.noteLabel": "Nota para el administrador (opcional, privada)", // [CHECK]
+  "box.adopt.submit": "Enviar solicitud", // [CHECK]
+  "box.adopt.submitting": "Enviando…", // [CHECK]
+  "box.adopt.cancel": "Cancelar", // [CHECK]
+  "box.adopt.success": "Revisa tu correo para confirmar.", // [CHECK]
+  "box.alerts.linkLabel": "Avísame cuando necesite surtido", // [CHECK]
+  "box.alerts.emailLabel": "Tu correo", // [CHECK]
+  "box.alerts.submit": "Suscribirme", // [CHECK]
+  "box.alerts.submitting": "Enviando…", // [CHECK]
+  "box.alerts.cancel": "Cancelar", // [CHECK]
+  "box.alerts.success": "Revisa tu correo para confirmar.", // [CHECK]
+  "box.form.error.generic": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+  "box.form.error.rateLimit": "Demasiados intentos por ahora. Por favor intenta más tarde.", // [CHECK]
+
+  "box.sponsor.needsSponsor": "Esta caja necesita un patrocinador.", // [CHECK]
+  "box.sponsor.sponsoredByPrefix": "Patrocinada por ", // [CHECK]
+  "box.sponsor.and": "y", // [CHECK]
+  "box.sponsor.moreCount": "+{count} más", // [CHECK]
+  "box.sponsor.wantToHelp": "¿Quieres ayudar también? ", // [CHECK]
+
+  "alerts.confirm.heading": "Confirma tu correo", // [CHECK]
+  "alerts.confirm.body": "Toca el botón de abajo para confirmar que quieres recibir estos correos.", // [CHECK]
+  "alerts.confirm.button": "Confirmar", // [CHECK]
+  "alerts.confirm.confirming": "Confirmando…", // [CHECK]
+  "alerts.confirm.success": "¡Confirmado! Recibirás los correos descritos.", // [CHECK]
+  "alerts.confirm.invalid": "Este enlace de confirmación ya no es válido.", // [CHECK]
+  "alerts.confirm.error": "Algo salió mal. Por favor intenta de nuevo.", // [CHECK]
+  "alerts.stop.heading": "Correos detenidos", // [CHECK]
+  "alerts.stop.stopping": "Deteniendo…", // [CHECK]
+  "alerts.stop.body": "Ya no recibirás más correos sobre esto.", // [CHECK]
+  "alerts.stop.invalid": "Este enlace ya no es válido.", // [CHECK]
+  "alerts.stop.noscriptButton": "Detener estos correos", // [CHECK]
+  "alerts.stop.undoButton": "Fue un error — vuelve a activar los correos", // [CHECK]
+  "alerts.stop.undoing": "Reactivando…", // [CHECK]
+  "alerts.stop.undone": "Vuelves a estar en la lista.", // [CHECK]
+  "alerts.stop.undoError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
+
+  "email.alert.empty.subject": "{box} está vacía", // [CHECK]
+  "email.alert.empty.line1": "{box} se acaba de marcar como vacía.", // [CHECK]
+  "email.alert.low.subject": "{box} tiene poco surtido", // [CHECK]
+  "email.alert.low.line1": "{box} se acaba de marcar con poco surtido.", // [CHECK]
+  "email.alert.problem.subject": "Se reportó un problema en {box}", // [CHECK]
+  "email.alert.problem.line1": "Se acaba de reportar un problema en {box}.", // [CHECK]
+  "email.alert.filled.subject": "Buenas noticias: {box} se acaba de llenar", // [CHECK]
+  "email.alert.filled.line1": "Alguien acaba de reportar que llenó {box}.", // [CHECK]
+  "email.alert.filled.line2": "Gracias por estar pendiente. Te avisaremos de nuevo cuando necesite llenarse otra vez.", // [CHECK]
+  "email.alert.line2": "Consulta la página de la caja para más detalles: {url}", // [CHECK]
+  "email.stopLine": "¿Ya no quieres estos correos? Detenlos cuando quieras, sin iniciar sesión: {stopUrl}", // [CHECK]
+  "email.adoptConfirm.subject": "Confirma tu solicitud para adoptar {box}", // [CHECK]
+  "email.adoptConfirm.line1": "Gracias por solicitar adoptar {box}. Confirma tu correo para terminar tu solicitud.", // [CHECK]
+  "email.adoptConfirm.line2": "Un administrador revisará tu solicitud una vez que confirmes.", // [CHECK]
+  "email.adoptConfirm.cta": "Confirma tu correo: {url}", // [CHECK]
+  "email.adoptConfirm.disclaimer": "Si tú no pediste esto, puedes ignorar este correo. No te escribiremos de nuevo a menos que alguien confirme.", // [CHECK]
+  "email.adoptApproved.subject": "Fuiste aprobado para adoptar {box}", // [CHECK]
+  "email.adoptApproved.line1": "Buenas noticias — tu solicitud para adoptar {box} como \"{displayName}\" fue aprobada.", // [CHECK]
+  "email.adoptApproved.line2": "Tu nombre ahora aparecerá en la tarjeta de la caja, y recibirás un correo si se reporta vacía o con un problema.", // [CHECK]
+  "email.alertConfirm.subject": "Confirma tus alertas para {box}", // [CHECK]
+  "email.alertConfirm.line1": "Confirma que quieres recibir alertas por correo de {box}.", // [CHECK]
+  "email.alertConfirm.line2": "Te avisaremos por correo si se reporta vacía o con poco surtido.", // [CHECK]
+  "email.alertConfirm.cta": "Confirma tu correo: {url}", // [CHECK]
+  "email.alertConfirm.disclaimer": "Si tú no pediste esto, puedes ignorar este correo. No te escribiremos de nuevo a menos que alguien confirme.", // [CHECK]
+  "email.hostWelcome.subject": "Ahora recibirás alertas de {box}", // [CHECK]
+  "email.hostWelcome.line1": "Se te agregó como contacto anfitrión de {box}.", // [CHECK]
+  "email.hostWelcome.line2": "Recibirás un correo si se reporta vacía o con un problema.", // [CHECK]
+
+  // Activity log (/boxes/activity, slice 3) and nav entry
+  "nav.boxActivity": "Actividad de las cajas de bendiciones", // [CHECK]
+  "activity.heading": "Actividad de las cajas de bendiciones", // [CHECK]
+  "activity.intro": "Cada surtido, aviso de poco, aviso de vacío y cambio de caja en toda la red, del más reciente al más antiguo.", // [CHECK]
+  "activity.empty": "Todavía no hay actividad que mostrar.", // [CHECK]
+  "activity.prevPage": "Anterior", // [CHECK]
+  "activity.nextPage": "Siguiente", // [CHECK]
+  "activity.loading": "Cargando…", // [CHECK]
+  "activity.resultCount": "{count} resultados", // [CHECK]
+  "activity.filters.box": "Caja", // [CHECK]
+  "activity.filters.boxAll": "Todas las cajas", // [CHECK]
+  "activity.filters.kind": "Tipo", // [CHECK]
+  "activity.filters.kindAll": "Todos los tipos", // [CHECK]
+  "activity.filters.from": "Desde", // [CHECK]
+  "activity.filters.to": "Hasta", // [CHECK]
+  "activity.filters.clear": "Quitar filtros", // [CHECK]
+  "activity.recentEmpty": "Todavía no hay actividad en esta caja.", // [CHECK]
+  "activity.thisBox": "Esta caja", // [CHECK]
+  "activity.line.filled": "{name} fue surtida", // [CHECK]
+  "activity.line.took": "Alguien usó {name}", // [CHECK]
+  "activity.line.low": "{name} tiene poco", // [CHECK]
+  "activity.line.empty": "{name} está vacía", // [CHECK]
+  "activity.line.added": "{name} se agregó como una nueva caja de bendiciones", // [CHECK]
+  "activity.line.moved": "{name} se cambió de lugar", // [CHECK]
+  "activity.line.renamed": "{name} cambió de nombre", // [CHECK]
+  "activity.line.paused": "{name} se pausó", // [CHECK]
+  "activity.line.removed": "{name} se eliminó", // [CHECK]
+  "activity.line.photo_added": "Se agregó una nueva foto", // [CHECK]
+  "activity.line.sponsor_added": "{name} se convirtió en patrocinador(a)", // [CHECK]
+  "activity.kind.filled": "Surtida", // [CHECK]
+  "activity.kind.took": "Se usó la caja", // [CHECK]
+  "activity.kind.low": "Con poco", // [CHECK]
+  "activity.kind.empty": "Vacía", // [CHECK]
+  "activity.kind.added": "Caja agregada", // [CHECK]
+  "activity.kind.moved": "Caja cambiada de lugar", // [CHECK]
+  "activity.kind.renamed": "Caja con nombre cambiado", // [CHECK]
+  "activity.kind.paused": "Caja pausada", // [CHECK]
+  "activity.kind.removed": "Caja eliminada", // [CHECK]
 };
 
 /** Substitute simple {key} placeholders. */
@@ -954,6 +1647,19 @@ export function t(
   // Defensive fallback: if the ES key is missing, use EN.
   const raw = dict[key] ?? en[key] ?? key;
   return vars ? interpolate(raw, vars) : raw;
+}
+
+/**
+ * Strict lang resolution for the adopt/alert/host-alert routes (Blessing
+ * Boxes slice 6, single-language alert emails) — same "anything other than
+ * the one literal alternate value falls back to the default" convention
+ * boxTurnstile.ts's resolveBoxTurnstileKey uses for its own two-value enum.
+ * A client-supplied value is never trusted past this: "ES", "es-MX",
+ * missing, or garbage all resolve to "en" rather than throwing or leaking
+ * into a CHECK-constrained D1 column as anything but exactly "en"/"es".
+ */
+export function resolveEmailLang(raw: unknown): Locale {
+  return raw === "es" ? "es" : "en";
 }
 
 /**

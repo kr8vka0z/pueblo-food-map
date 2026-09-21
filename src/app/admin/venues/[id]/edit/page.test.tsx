@@ -64,6 +64,12 @@ vi.mock("@/components/ArchiveVenueButton", () => ({
   ),
 }));
 
+vi.mock("@/components/BoxCheckinsAdminPanel", () => ({
+  default: (props: { checkins: Array<{ id: number }> }) => (
+    <div data-testid="box-checkins-panel-stub" data-count={props.checkins.length} />
+  ),
+}));
+
 import EditVenuePage from "@/app/admin/venues/[id]/edit/page";
 import { forbidden, notFound } from "next/navigation";
 import { logAdminAuthFailure } from "@/lib/logger";
@@ -353,5 +359,90 @@ describe("EditVenuePage — closure report context via ?submission=<id> (#270)",
     expect(screen.getByTestId("archive-button-stub").getAttribute("data-submission-id")).toBe("9");
     expect(screen.getByText(/Reviewing a closure report/i)).toBeDefined();
     expect(screen.getByText(/a closure report was submitted/i)).toBeDefined();
+  });
+});
+
+describe("EditVenuePage — blessing box check-ins panel (slice 2)", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /** Matches the page's real call chain for a blessing_box venue: a venues
+   *  SELECT, then (only when the venue is a blessing_box) a box_checkins
+   *  SELECT via .all() — dispatched on SQL text, same convention as
+   *  makeDualQueryDb above. */
+  function makeBoxCheckinsDb(
+    venueRow: AdminVenueRow | null,
+    checkinRows: Array<{ id: number }> | (() => never),
+  ) {
+    return {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => {
+            if (sql.includes("FROM venues")) return venueRow;
+            return venueRow;
+          },
+          all: async () => {
+            if (typeof checkinRows === "function") return checkinRows();
+            return { results: checkinRows };
+          },
+        }),
+      }),
+    } as unknown as object;
+  }
+
+  test("a blessing_box venue renders the check-ins panel with the loaded rows", async () => {
+    mockGetAdminDb.mockResolvedValue({
+      db: makeBoxCheckinsDb(makeRow({ category: "blessing_box" }), [{ id: 1 }, { id: 2 }, { id: 3 }]),
+      identity: { email: "admin@example.com" },
+    });
+
+    render(
+      await EditVenuePage({
+        params: Promise.resolve({ id: "manual-abc" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(screen.getByText("Check-ins")).toBeDefined();
+    expect(screen.getByTestId("box-checkins-panel-stub").getAttribute("data-count")).toBe("3");
+  });
+
+  test("an ordinary (non-box) venue renders no check-ins panel, and box_checkins is never queried", async () => {
+    const throwIfCalled = () => {
+      throw new Error("box_checkins should never be queried for a non-blessing_box venue");
+    };
+    mockGetAdminDb.mockResolvedValue({
+      db: makeBoxCheckinsDb(makeRow({ category: "pantry" }), throwIfCalled),
+      identity: { email: "admin@example.com" },
+    });
+
+    render(
+      await EditVenuePage({
+        params: Promise.resolve({ id: "manual-abc" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(screen.queryByText("Check-ins")).toBeNull();
+    expect(screen.queryByTestId("box-checkins-panel-stub")).toBeNull();
+  });
+
+  test("a D1 failure reading box_checkins degrades to an empty panel, never crashes the page", async () => {
+    mockGetAdminDb.mockResolvedValue({
+      db: makeBoxCheckinsDb(makeRow({ category: "blessing_box" }), () => {
+        throw new Error("D1 unavailable");
+      }),
+      identity: { email: "admin@example.com" },
+    });
+
+    render(
+      await EditVenuePage({
+        params: Promise.resolve({ id: "manual-abc" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(screen.getByTestId("box-checkins-panel-stub").getAttribute("data-count")).toBe("0");
   });
 });

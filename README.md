@@ -104,6 +104,8 @@ scripts/           One-off ingestion scripts (run locally; not imported by app)
 - **CI:** `lint → typecheck → test (with coverage) → audit → build` on every
   PR and push to `main`
   ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+- **AI review:** CodeRabbit reviews human-authored pull requests targeting
+  `dev` or `main` using the low-noise settings in [`.coderabbit.yaml`](.coderabbit.yaml).
 - **Deploys:** GitHub Actions
   ([`deploy-prod.yml`](.github/workflows/deploy-prod.yml) /
   [`deploy-dev.yml`](.github/workflows/deploy-dev.yml)), not Cloudflare
@@ -115,7 +117,7 @@ scripts/           One-off ingestion scripts (run locally; not imported by app)
   Deployments → pick a previous build → "Rollback to this deployment".
 
 See [AGENTS.md](AGENTS.md) for token management, environment variables,
-preview-deploy URL restrictions, and the full deploy runbook.
+preview-deploy URL restrictions, and the full deploy playbook.
 
 ---
 

@@ -28,14 +28,16 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { WalkingRouteGeoJSON, WalkingRouteInfo, WalkStep } from "@/components/Map";
+import { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
 import BottomNav, { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
-import CategoryDropdown from "./CategoryDropdown";
+import FilterPanel from "./FilterPanel";
 import BottomSheet from "./BottomSheet";
 import DesktopVenueWindow from "./DesktopVenueWindow";
 import EmptySearchPopover from "./EmptySearchPopover";
+import ViewSuggestion from "./ViewSuggestion";
 import SearchResultsPopover, {
   MAX_VISIBLE,
   type VenueWithDistance,
@@ -47,16 +49,19 @@ import { useGeolocation, type GeoState } from "@/lib/useGeolocation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import { venues as allVenues } from "@/data/venues";
-import type { Venue, VenueCategory } from "@/types/venue";
+import type { Venue } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
-import type { ViewMode } from "./ViewToggle";
 import ListView from "./ListView";
+import { useOverlayRegistration } from "@/lib/overlayRegistry";
 import {
   PUEBLO_COUNTY_BBOX,
   PUEBLO_CENTER,
 } from "@/data/pueblo-bbox";
 import { useMapFilters } from "@/lib/useMapFilters";
-import { useMapUI } from "@/lib/useMapUI";
+import { useBoxesList } from "@/lib/useBoxesList";
+import { toVenue } from "@/lib/useBoxVenues";
+import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
+import { useMapUI, type ViewMode } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
 import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
 
@@ -130,6 +135,31 @@ export const CATEGORY_FIT_PADDING_DESKTOP = { top: 80, bottom: 60, left: 60, rig
  */
 export const CATEGORY_FIT_MAX_ZOOM = 14;
 
+// Padding (px) around a walking-route fitBounds (#509) — mobile (BottomSheet)
+// only, since the route strip is a phone-only concept (desktop's
+// DesktopVenueWindow keeps its own unchanged layout, out of scope for #509).
+// `bottom` clears the route strip (ROUTE_STRIP_HEIGHT_PX, shared with
+// RouteStrip.tsx/BottomSheet.tsx so the two can't drift) PLUS
+// BOTTOM_NAV_HEIGHT_PX. #531 (Kyle, 2026-09-19) added the nav term because
+// the bar stayed visible underneath the strip back then; #547 (Kyle,
+// 2026-09-20) reverses that — the nav now hides for the whole time a route
+// is on screen (see `venueSheetOpen` below), so this term is conservative
+// slack rather than a real clearance need. Left in: it only fits the route
+// a little smaller than strictly necessary, never overlapping anything, and
+// removing it isn't part of #547's ask. Plus a small gap.
+// Deliberately NOT capped at CATEGORY_FIT_MAX_ZOOM=14 — that cap exists so a
+// sparse category's 2-3 far-apart venues don't slam to street level; a
+// walking route is usually well under a mile and WANTS a close, walkable
+// zoom. ROUTE_FIT_MAX_ZOOM caps only the opposite failure (an extremely
+// short route zooming in absurdly far).
+export const ROUTE_FIT_PADDING_MOBILE = {
+  top: 80,
+  bottom: ROUTE_STRIP_HEIGHT_PX + BOTTOM_NAV_HEIGHT_PX + 24,
+  left: 40,
+  right: 40,
+};
+export const ROUTE_FIT_MAX_ZOOM = 17;
+
 /**
  * Compute the [[lngW, latS], [lngE, latN]] bounding box for a list of venues.
  * Returns null if the array is empty.
@@ -148,11 +178,13 @@ export function computeCategoryBounds(
   return [[lngW, latS], [lngE, latN]];
 }
 
-// Stable listbox ids — used for aria-controls on the search input and id on each listbox.
+// Stable listbox id — used for aria-controls on the search input and id on the
+// results listbox. The old category-browse listbox (CategoryDropdown, #95)
+// was removed by #513 — search focus no longer opens a category list; the
+// Filters panel is a dialog, not a combobox popup. #514 gave empty focus a
+// new (non-listbox) popup instead: ViewSuggestion, a single button offering
+// the other view — see showViewSuggestion below.
 const LISTBOX_ID = "search-results-listbox";
-// Mirrors the LISTBOX_ID constant inside CategoryDropdown — kept in sync here so
-// MapWrapper can compute the correct aria-controls without importing a private const.
-const CATEGORY_LISTBOX_ID = "category-browse-listbox";
 
 // ─── Viewport prop (from PR 3 splash gate) ────────────────────────────────────
 // 'located'      → use the user's geolocation position as initial map center.
@@ -202,12 +234,24 @@ export function buildWalkingRouteUrl(
  * and an empty or trivial instruction. It is kept here (dropped in formatting
  * via formatStepDistance) rather than filtered at parse time so callers that
  * want to show the arrival step can still do so.
+ *
+ * WHY also drop a step with no valid maneuver.location (#555, step-through
+ * directions): the stepper flies the camera to a step's own coordinate on
+ * every arrow tap (Map.tsx's focus effect). A step missing that coordinate —
+ * same "malformed API response" category as a missing instruction — would
+ * step the camera to `undefined` and throw, so it is dropped here rather
+ * than defended against at every later read site.
  */
 export function parseWalkSteps(
   route: {
     legs?: Array<{
       steps?: Array<{
-        maneuver?: { instruction?: string };
+        maneuver?: {
+          instruction?: string;
+          location?: unknown;
+          type?: string;
+          modifier?: string;
+        };
         distance: number;
       }>;
     }>;
@@ -219,7 +263,26 @@ export function parseWalkSteps(
     // Drop steps whose instruction is missing or empty — they are malformed
     // API responses that would render as blank list items.
     if (!instruction) return [];
-    return [{ instruction, distance: s.distance }];
+    // WHY a malformed location is dropped but the STEP is kept (#555): the
+    // written turn list is the older, more-relied-on half of this feature.
+    // Dropping the whole step would delete a readable instruction to protect
+    // a camera hop — the stepper simply doesn't move the map for a step it
+    // has no coordinate for (handleStepChange guards on it). The live API
+    // supplies `location` on every step (measured 2026-09-20), so this only
+    // ever fires on a malformed response.
+    const raw = s.maneuver?.location;
+    const location =
+      Array.isArray(raw) && raw.length === 2 &&
+      typeof raw[0] === "number" && typeof raw[1] === "number"
+        ? ([raw[0], raw[1]] as [number, number])
+        : undefined;
+    return [{
+      instruction,
+      distance: s.distance,
+      location,
+      maneuverType: s.maneuver?.type,
+      maneuverModifier: s.maneuver?.modifier,
+    }];
   });
 }
 
@@ -275,9 +338,21 @@ interface MapWrapperProps {
   onShowWelcome?: () => void;
   /** Deep link (#132): venue id from a ?venue=<id> URL to open on load. */
   initialVenueId?: string | null;
+  /**
+   * Boxes (#516): true when the resident arrived via a Menu page's "Boxes"
+   * link (/?boxes=1, read once by HomePageClient). Applies the blessing_box
+   * category filter on mount, the same one-shot shape `viewport === 'located'`
+   * uses for auto-locate below.
+   */
+  initialBoxesFilter?: boolean;
 }
 
-export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, initialVenueId }: MapWrapperProps) {
+export default function MapWrapper({
+  viewport = 'pueblo-center',
+  onShowWelcome,
+  initialVenueId,
+  initialBoxesFilter = false,
+}: MapWrapperProps) {
   const router = useRouter();
 
   // ── Locale — from context ─────────────────────────────────────────────────────
@@ -406,6 +481,22 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const [walkingRouteSteps, setWalkingRouteSteps] = useState<WalkStep[] | null>(null);
   const [walkingRouteVenueId, setWalkingRouteVenueId] = useState<string | null>(null);
 
+  // ── Step-through directions (#555) ──────────────────────────────────────────
+  // activeStepIndex: which turn the stepper panel (BottomSheet's RouteStrip /
+  // DesktopVenueWindow) is showing. Lives here, not inside the panel, because
+  // the phone strip and the venue card both render the stepper for the same
+  // route and must agree on the current turn. Reset to 0 wherever the route
+  // itself resets: a fresh fetch, walkingRouteVenueId clearing, or an
+  // explicit clear (see fetchWalkingRoute / the clearing effect below /
+  // handleWalkRoute's toggle-off / handleClearWalkingRoute).
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  // focusPoint/focusRequestId: the camera target Map.tsx's step-through
+  // focus effect watches. A separate pair from recenterRequestId — bumping
+  // that one would fly the camera to the USER, fighting the turn the stepper
+  // just centered on (see requestStepLocationRefresh's own WHY comment below).
+  const [focusPoint, setFocusPoint] = useState<{ lng: number; lat: number } | null>(null);
+  const [focusRequestId, setFocusRequestId] = useState(0);
+
   // ── Walk-without-location (#207) ─────────────────────────────────────────────
   // walkAwaitingVenueIdRef: the venue a Walk tap is waiting on geolocation for.
   //   Set when handleWalkRoute is called with no userLocation (instead of
@@ -464,6 +555,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         setWalkingRouteInfo(null);
         setWalkingRouteSteps(null);
         setWalkingRouteVenueId(null);
+        setActiveStepIndex(0);
       });
     }
     // #207: a stale "share your location" hint belongs to the venue that
@@ -517,7 +609,12 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
           duration: number;  // seconds
           legs?: Array<{
             steps?: Array<{
-              maneuver?: { instruction?: string };
+              maneuver?: {
+                instruction?: string;
+                location?: number[];
+                type?: string;
+                modifier?: string;
+              };
               distance: number; // meters
             }>;
           }>;
@@ -551,6 +648,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       });
       setWalkingRouteSteps(steps.length > 0 ? steps : null);
       setWalkingRouteVenueId(venue.id);
+      setActiveStepIndex(0);
     } catch (err) {
       // Network failure — fail silently. The user can still use the Bus/Drive deeplinks.
       console.warn("[MapWrapper] Directions fetch failed:", err);
@@ -575,6 +673,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       setWalkingRouteInfo(null);
       setWalkingRouteSteps(null);
       setWalkingRouteVenueId(null);
+      setActiveStepIndex(0);
       return;
     }
 
@@ -608,7 +707,138 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     setWalkingRouteInfo(null);
     setWalkingRouteSteps(null);
     setWalkingRouteVenueId(null);
+    setActiveStepIndex(0);
   }, []);
+
+  /**
+   * Refreshes the user's location on each step-through arrow tap (#555)
+   * WITHOUT bumping recenterRequestId. handleLocateRequest's own counter
+   * bump is what makes Map.tsx fly the camera to the USER — reusing it here
+   * would fight the flyTo-the-turn move the same tap just triggered via
+   * focusRequestId (handleStepChange, below). Only the "ask the browser for
+   * a fresh reading" half of handleLocateRequest is shared; the camera stays
+   * owned by the turn the stepper is on. Mirrors handleLocateRequest's own
+   * "already located" guard so a tap doesn't flip the spinner on when the
+   * position is already known (the overwhelmingly common case here, since a
+   * route can't be active without a resolved position in the first place).
+   */
+  const requestStepLocationRefresh = useCallback(() => {
+    const alreadyLocated =
+      geo.state.permission === "granted" && geo.state.position !== null;
+    if (!alreadyLocated) {
+      geoRequestedAtRef.current = Date.now();
+      setIsLocating(true);
+    }
+    geo.request();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geo.request, geo.state]);
+
+  /**
+   * Move the step-through stepper to a new turn (#555): updates which step
+   * is active, points the map's focus effect at that turn's own coordinate,
+   * and refreshes the user's location so the dot is current for the new
+   * vantage point — the three things a "Next"/"Back" tap or an "All turns"
+   * row click all need, in one place so the phone strip and the desktop
+   * card can share it.
+   */
+  const handleStepChange = useCallback((index: number) => {
+    setActiveStepIndex(index);
+    // A step with no coordinate (malformed response only — see parseWalkSteps)
+    // still advances and still refreshes location; only the camera hop is
+    // skipped, so the person keeps a readable instruction either way.
+    const location = walkingRouteSteps?.[index]?.location;
+    if (location) {
+      setFocusPoint({ lng: location[0], lat: location[1] });
+      setFocusRequestId((n) => n + 1);
+    }
+    requestStepLocationRefresh();
+  }, [walkingRouteSteps, requestStepLocationRefresh]);
+
+  // ── Blessing boxes (slice 1, map-first rework 2026-09-18) — live layer,
+  // fetched ONCE client-side (useBoxesList's full PublicBlessingBox shape,
+  // not useBoxVenues' second fetch of the same endpoint — see toVenue's own
+  // header in useBoxVenues.ts) and merged into the same filter/count/marker
+  // pipeline every other venue flows through (useMapFilters' own header
+  // explains why). boxIdSet lets every selection handler below tell "this
+  // id is a box" apart from an ordinary venue with one Set lookup — a box
+  // click now opens the SAME in-map card every other venue uses (just with
+  // BoxCardBody content), not a separate page, so boxIdSet is only needed
+  // where mapUnavailable still routes to a standalone page (below).
+  // boxesById/boxOverrides let the open card show the box's full record
+  // (status, host note, most-needed, check-ins) that the plain Venue shape
+  // doesn't carry, and stay current after a check-in without a refetch.
+  // WHY declared THIS early (2026-09-18 fix): the Walk-resume effect below
+  // reads boxVenues in its own body and dependency array — a dependency
+  // array is evaluated during THIS render pass, not deferred like an effect
+  // body, so boxVenues must already be a assigned `const` by the time
+  // JS execution reaches that array literal, or it's a ReferenceError
+  // (temporal dead zone), not merely stale data. Caught by
+  // MapWrapperBoxSelection.test.tsx failing with exactly that error.
+  const { boxes: liveBoxes, loading: liveBoxesLoading } = useBoxesList();
+  const boxVenues = useMemo(() => liveBoxes.map(toVenue), [liveBoxes]);
+  const boxIdSet = useMemo(() => new Set(liveBoxes.map((b) => b.id)), [liveBoxes]);
+  const boxesById = useMemo(() => new Map(liveBoxes.map((b) => [b.id, b])), [liveBoxes]);
+  // Check-in success patches (kind/status/lastFilledAt) so the open card
+  // reflects the just-submitted check-in immediately — see
+  // handleBoxCheckinSuccess below. getBoxById checks this map FIRST, so an
+  // override always wins over boxesById while it exists.
+  //
+  // Nothing clears an override today: useBoxesList() fetches exactly once on
+  // mount (empty effect deps — see its own header) and never refetches, so
+  // there is no later "fresh fetch" that could supersede a stale override.
+  // ponytail: an override can drift from reality if the box changes by some
+  // OTHER path in the same session (another tab's check-in, an admin edit).
+  // Ceiling: acceptable today because nothing refetches to reconcile against.
+  // If a periodic/background refetch of liveBoxes is ever added, this map
+  // must be explicitly cleared or merged against the fresh data at that
+  // point, or the override will permanently shadow it.
+  const [boxOverrides, setBoxOverrides] = useState<Map<string, PublicBlessingBox>>(new Map());
+  const getBoxById = useCallback(
+    (id: string | null): PublicBlessingBox | null => {
+      if (!id) return null;
+      return boxOverrides.get(id) ?? boxesById.get(id) ?? null;
+    },
+    [boxOverrides, boxesById],
+  );
+  const handleBoxCheckinSuccess = useCallback(
+    (boxId: string | null, result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => {
+      if (!boxId) return;
+      setBoxOverrides((prev) => {
+        const current = prev.get(boxId) ?? boxesById.get(boxId);
+        if (!current) return prev;
+        const next = new Map(prev);
+        next.set(boxId, {
+          ...current,
+          box: {
+            ...current.box,
+            status: result.status,
+            lastFilledAt: result.lastFilledAt,
+            // Cap at 5 — the card only ever shows recentCheckins[0], and
+            // BoxActivityList/history reads its own separate query, not
+            // this in-memory list; keeping a handful avoids unbounded growth
+            // across many check-ins in one page view.
+            //
+            // "problem" is skipped here, not just narrowly typed away: a
+            // problem report is admin-only (PublicCheckinEvent's own kind
+            // union excludes it — see blessingBoxes.ts's toPublicCheckinEvents,
+            // the same structural privacy rule this in-memory patch must not
+            // undermine) and never sets status (computeBoxStatus excludes it
+            // too), so there is nothing for a problem submission to update on
+            // the open card besides this optimistic list — correctly, nothing.
+            recentCheckins:
+              result.kind === "problem"
+                ? current.box.recentCheckins
+                : [
+                    { kind: result.kind, createdAt: new Date().toISOString() },
+                    ...current.box.recentCheckins,
+                  ].slice(0, 5),
+          },
+        });
+        return next;
+      });
+    },
+    [boxesById],
+  );
 
   // Watch geo.state for resolution of an in-flight locate request.
   // Mirrors the existing bannerVisible effect: use refs (not isLocating state)
@@ -650,7 +880,13 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
 
     const action = decideWalkResume(awaitingId, selectedVenueId, geo.state);
     if (action.kind === "fetch") {
-      const venue = allVenues.find((v) => v.id === awaitingId);
+      // Includes boxVenues (map-first rework, 2026-09-18) — a box card's
+      // address doubles as its own Walk trigger (walk restore pass,
+      // 2026-09-19, see BoxCardBody's own header), sharing this same
+      // handleWalkRoute/fetchWalkingRoute path every other venue's Walk
+      // button uses, so a Walk tap awaiting location can target a box id,
+      // not just allVenues.
+      const venue = allVenues.find((v) => v.id === awaitingId) ?? boxVenues.find((v) => v.id === awaitingId);
       if (venue) void fetchWalkingRoute(venue, action.origin);
     } else if (action.kind === "show-hint") {
       setWalkLocationHintVenueId(awaitingId);
@@ -658,7 +894,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     // action.kind === "noop": the venue that asked is no longer selected —
     // nothing to attach the result to (see decideWalkResume's WHY comment).
   // Only re-run when geo.state (object ref) changes — same pattern as bannerVisible.
-  }, [geo.state, selectedVenueId, fetchWalkingRoute]);
+  }, [geo.state, selectedVenueId, fetchWalkingRoute, boxVenues]);
 
   // Handle map moveend: update drift state (called from Map's onMoveEnd prop).
   // Runs from a DOM event callback, not from a React effect.
@@ -720,23 +956,49 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     setFilterSnap,
     filterWic,
     setFilterWic,
-    filterFavorites,
-    setFilterFavorites,
-    activeCategoryFilter,
-    setActiveCategoryFilter,
     venuesWithDistance,
     filteredVenues,
     savedVenues,
-    favoriteSet,
-    favoritesCount,
     anyFilterActive,
-    allVenueCounts,
     openNowCount,
     snapCount,
     wicCount,
-    handleCategoryBrowseSelect,
+    toggleCategory,
+    clearFilters,
     handleClearAllFilters,
-  } = useMapFilters(origin);
+  } = useMapFilters(origin, boxVenues);
+
+  // ── Boxes (#516) — bottom-nav shortcut for the blessing-box category filter.
+  // Reuses toggleCategory directly rather than a second flag, so ticking
+  // "Blessing Box" in the Filters panel (#513) and tapping Boxes in the bar
+  // stay in sync automatically — both read/write the same Set.
+  const handleBoxesToggle = useCallback(() => {
+    toggleCategory("blessing_box");
+  }, [toggleCategory]);
+
+  // ── PageNav "Boxes" (#516) → apply the filter on entry ───────────────────────
+  // Same one-shot shape as the auto-locate effect above: a Menu page has no
+  // filter state of its own, so it hands off via /?boxes=1 and this effect
+  // applies the real filter once the map (and toggleCategory) exist.
+  const initialBoxesFilterDoneRef = useRef(false);
+  useEffect(() => {
+    if (!initialBoxesFilter) return;
+    if (initialBoxesFilterDoneRef.current) return;
+    initialBoxesFilterDoneRef.current = true;
+    toggleCategory("blessing_box");
+  }, [initialBoxesFilter, toggleCategory]);
+
+  // ── Filters panel (#513) — the side panel behind SearchBar's Filters button.
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  // Spoken/visible count on the Filters button's badge: every independent
+  // filter counts once — the proof step in #513 ("two kinds + Open now →
+  // badge 3") is per-item, not per-group, so a multi-category selection
+  // contributes its full size, not a flat 1.
+  const activeFilterCount =
+    (selectedCategories?.size ?? 0) +
+    (filterOpenNow ? 1 : 0) +
+    (filterSnap ? 1 : 0) +
+    (filterWic ? 1 : 0);
 
   // ── Typeahead popover state (issue #67) ──────────────────────────────────────
   // isPopoverOpen: true when input is focused + query is non-empty + matches exist.
@@ -745,6 +1007,13 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // searchAreaRef: wraps SearchBar + ViewSuggestion + SearchResultsPopover
+  // (display:contents — adds no box, purely a containment check target).
+  // Keyboard-a11y fix (reviewer, PR #522): blur needs to tell "focus moved to
+  // one of our own popover rows" (Tab) apart from "focus left the group
+  // entirely" (Tab past the last row, or click elsewhere) — relatedTarget
+  // containment answers that; a blind timer can't.
+  const searchAreaRef = useRef<HTMLDivElement>(null);
 
   // ── Deep link (#132) ──────────────────────────────────────────────────────────
   // Opened with ?venue=<id> → select that venue once the map is ready to fly.
@@ -755,7 +1024,14 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     if (deepLinkDoneRef.current) return;
     if (!mapboxMap) return; // wait until the map can fly
     deepLinkDoneRef.current = true;
-    if (initialVenueId && allVenues.some((v) => v.id === initialVenueId)) {
+    // No existence check against allVenues/boxVenues here (map-first rework,
+    // 2026-09-18) — a box's data arrives async from useBoxesList, so an
+    // existence check at this exact instant could reject a valid box id
+    // before its fetch resolves. selectedVenue's own lookup (below) and
+    // getBoxById both gracefully return null/undefined for an unknown id,
+    // and Map.tsx's flyTo effect re-fires once `venues`/liveBoxes populate
+    // (new array reference) — so there's nothing here to guard against.
+    if (initialVenueId) {
       queueMicrotask(() => setSelectedVenueId(initialVenueId));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -765,52 +1041,85 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   // map can't mount, Map.tsx never renders, so mapboxMap stays null forever
   // and the effect above never fires — a shared `/?venue=<id>` link silently
   // selected nothing (PageNav's saved-venue links reuse this same query
-  // param). Route straight to the venue detail page instead, mirroring the
-  // mapUnavailable branches in handleSelect*/handleSelectSavedVenue below.
-  // Shares deepLinkDoneRef so whichever branch resolves first (map ready vs.
-  // map unavailable — mutually exclusive in practice) wins, never both.
+  // param). Route straight to the venue/box detail page instead, mirroring
+  // the mapUnavailable branches in handleSelect*/handleSelectSavedVenue
+  // below. Shares deepLinkDoneRef so whichever branch resolves first (map
+  // ready vs. map unavailable — mutually exclusive in practice) wins, never
+  // both.
+  //
+  // WHY this waits on liveBoxesLoading (2026-09-18 fix, found by
+  // MapWrapperBoxSelection.test.tsx): mapUnavailable can flip true in the
+  // SAME tick useBoxesList's fetch is still in flight, so boxIdSet can still
+  // be empty the first (and, before this fix, only — deepLinkDoneRef made it
+  // one-shot) time this effect runs. allVenues is a static, always-ready
+  // array, so a plain-venue id still resolves instantly on the first pass;
+  // only the box case needs to wait for the fetch to settle before this
+  // effect is allowed to give up and mark itself done.
   useEffect(() => {
     if (deepLinkDoneRef.current) return;
     if (!mapUnavailable) return; // starts false; flips in a client effect (#165)
-    deepLinkDoneRef.current = true;
-    if (initialVenueId && allVenues.some((v) => v.id === initialVenueId)) {
-      router.replace(`/venue/${encodeURIComponent(initialVenueId)}`);
+    if (!initialVenueId) {
+      deepLinkDoneRef.current = true;
+      return;
     }
+    if (allVenues.some((v) => v.id === initialVenueId)) {
+      deepLinkDoneRef.current = true;
+      router.replace(`/venue/${encodeURIComponent(initialVenueId)}`);
+      return;
+    }
+    if (boxIdSet.has(initialVenueId)) {
+      deepLinkDoneRef.current = true;
+      router.replace(`/box/${encodeURIComponent(initialVenueId)}/history`);
+      return;
+    }
+    if (liveBoxesLoading) return; // could still resolve to a box — wait
+    deepLinkDoneRef.current = true; // genuinely unknown id — no redirect
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapUnavailable]);
+  }, [mapUnavailable, boxIdSet, liveBoxesLoading]);
 
-  // ── Category autozoom (#111) ─────────────────────────────────────────────────
-  // When a single category is activated from the dropdown, fit the map to all
-  // venues in that category. When the user CLEARS an active category, return
-  // to the all-venues overview.
+  // ── Category autozoom (#111, generalized to multi-select by #513) ───────────
+  // When one or more categories are checked in the Filters panel, fit the map
+  // to the UNION of venues across every checked category. When the user
+  // CLEARS every category, return to the all-venues overview.
   //
-  // Fires after `activeCategoryFilter` or `mapboxMap` changes — including the
+  // Fires after `selectedCategories` or `mapboxMap` changes — including the
   // map's first ready run, when `mapboxMap` flips from null to real. The
-  // category dropdown is interactive before the map loads, so a filter can
-  // already be set (or cleared) by then. `prevActiveCategoryFilterRef` (below)
-  // tells that first-ready run apart from a genuine user clear so it never
+  // Filters panel is interactive before the map loads, so a filter can
+  // already be set (or cleared) by then. `prevCategoriesKeyRef` (below) tells
+  // that first-ready run apart from a genuine user clear so it never
   // fitBounds-to-all-venues over the #231 fixed home view on a fresh load (#247).
   //
   // Interaction with #108 drift detection: `fitBounds` will fire a `moveend`
   // event which calls `handleMoveEnd` → may set `isDrifted`. That's expected;
   // the Re-center button will appear if the user-dot isn't in the new view, which
   // is correct UX. No loop risk because `handleMoveEnd` only reads bounds, it
-  // does not change `activeCategoryFilter`.
+  // does not change `selectedCategories`.
 
-  // Previous `activeCategoryFilter`, updated only on runs where `mapboxMap` is
+  // Previous categories signature, updated only on runs where `mapboxMap` is
   // ready — `undefined` means "the map has never been ready before." Filter
   // churn that happens before the map exists to zoom on is invisible to this
   // ref, so it can't be mistaken for a real clear once the map finally loads.
-  const prevActiveCategoryFilterRef = useRef<VenueCategory | null | undefined>(undefined);
+  // A sorted, joined string (not the Set itself) is what's compared/stored:
+  // `selectedCategories` gets a new Set identity on every toggle, so a
+  // reference comparison would never read as "unchanged," and checking/
+  // unchecking the SAME single category back to itself (add then remove a
+  // different one) must still compare equal when the resulting membership is
+  // equal — a plain string key gives that for free.
+  const prevCategoriesKeyRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     if (!mapboxMap) return;
 
+    const categoriesKey =
+      selectedCategories && selectedCategories.size > 0
+        ? Array.from(selectedCategories).sort().join(",")
+        : null;
+
     // Compare against, then overwrite with, the CURRENT value — only for runs
     // that reach here (map ready). Pre-ready renders bail above without
     // touching the ref.
-    const prevActiveCategoryFilter = prevActiveCategoryFilterRef.current;
-    prevActiveCategoryFilterRef.current = activeCategoryFilter;
+    const prevCategoriesKey = prevCategoriesKeyRef.current;
+    prevCategoriesKeyRef.current = categoriesKey;
 
     const reducedMotion =
       typeof window !== "undefined" &&
@@ -825,18 +1134,20 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       bottom: basePadding.bottom + (isBelow2xl ? BOTTOM_NAV_HEIGHT_PX : 24 + 52),
     };
 
-    if (activeCategoryFilter === null) {
-      // Skip unless a real category was active on the previous ready run —
+    if (categoriesKey === null) {
+      // Skip unless a real category set was active on the previous ready run —
       // `== null` catches both "map's first ready run" (undefined) and
-      // "filter was already null." Only a genuine non-null → null transition
+      // "filter was already empty." Only a genuine non-null → null transition
       // below is a real clear; otherwise whatever view is already showing
       // (the #231 home view, on a fresh load) stands untouched.
-      if (prevActiveCategoryFilter == null) return;
+      if (prevCategoriesKey == null) return;
 
       // Real clear — fit the all-venues bounds, capped at CATEGORY_FIT_MAX_ZOOM.
       // NOT the wordmark/home zoom: this is a computed bounds-fit over the
       // whole venue set, a different view than PUEBLO_CENTER/PUEBLO_DEFAULT_ZOOM.
-      const allBounds = computeCategoryBounds(allVenues);
+      // Includes boxVenues (map-first rework, 2026-09-18) — without this, the
+      // blessing-box category chip never actually zoomed to box pins.
+      const allBounds = computeCategoryBounds([...allVenues, ...boxVenues]);
       if (!allBounds) return;
       mapboxMap.fitBounds(allBounds, {
         padding: fitPadding,
@@ -846,9 +1157,17 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       return;
     }
 
-    // Single category selected — compute bounds from all (unfiltered) venues in
-    // this category so the view doesn't depend on other active filters.
-    const categoryVenues = allVenues.filter((v) => v.category === activeCategoryFilter);
+    // One or more categories checked — compute bounds from all (unfiltered)
+    // venues across the UNION of checked categories, so the view doesn't
+    // depend on other active filters (Open now/SNAP/WIC).
+    // [...allVenues, ...boxVenues]: boxVenues is the only place `blessing_box`
+    // category venues live (allVenues is the static published-venues.ts
+    // snapshot, which never includes boxes — see "Blessing Boxes — live box
+    // layer" in AGENTS.md) — without it, checking the blessing-box category
+    // computed bounds over an empty array and never zoomed at all.
+    const categoryVenues = [...allVenues, ...boxVenues].filter((v) =>
+      selectedCategories!.has(v.category),
+    );
     const bounds = computeCategoryBounds(categoryVenues);
     if (!bounds) return;
 
@@ -858,10 +1177,41 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       duration: reducedMotion ? 0 : 600,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategoryFilter, mapboxMap]);
+  }, [selectedCategories, mapboxMap, boxVenues]);
   // Note: `isMobile` / `isBelow2xl` intentionally excluded from deps — we want the padding that
   // was current at the time the category was selected, not re-zoom on resize.
+  // `boxVenues` IS included (map-first rework, 2026-09-18) — unlike allVenues
+  // (a stable module-level constant), it arrives async from useBoxesList, so
+  // the blessing-box chip's zoom must re-run once that fetch resolves if the
+  // filter was already active when the effect first ran with an empty array.
   // `allVenues` is a module-level constant (stable ref); no dep needed.
+
+  // ── Route fit (#509) — fit the map to the whole walking route once it's ──
+  // drawn, in the space ABOVE the route strip (BottomSheet shrinks to that
+  // strip the moment a route starts — see BottomSheet.tsx's own header).
+  // Fires once when `walkingRoute` becomes non-null, not on every strip <->
+  // full-card toggle — the map view shouldn't jump around just because the
+  // user tapped "Show card" to re-read the venue details.
+  // Mobile only: the strip (and this padding) is a phone-only concept;
+  // desktop's DesktopVenueWindow is explicitly out of scope for #509.
+  useEffect(() => {
+    if (!mapboxMap || !isMobile || !walkingRoute) return;
+
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const routeBounds = computeCategoryBounds(
+      walkingRoute.geometry.coordinates.map(([lng, lat]) => ({ lat, lng })),
+    );
+    if (!routeBounds) return;
+
+    mapboxMap.fitBounds(routeBounds, {
+      padding: ROUTE_FIT_PADDING_MOBILE,
+      maxZoom: ROUTE_FIT_MAX_ZOOM,
+      duration: reducedMotion ? 0 : 600,
+    });
+  }, [walkingRoute, mapboxMap, isMobile]);
 
   // Pre-compute distance map for Map.tsx (aria-labels on markers)
   const userDistances = useMemo(() => {
@@ -892,18 +1242,56 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   }, []);
 
   /**
-   * Schedule popover close on blur with a grace period.
-   * The grace period allows a mousedown inside the popover (which fires before
-   * blur) to call e.preventDefault(), keeping the click target alive.
+   * Close the popover on blur — UNLESS focus is moving to one of our own
+   * rows (ViewSuggestion's button, SearchResultsPopover's "see all" row).
+   *
+   * Two distinct blur sources land here now:
+   *   - Mouse click on a row: the row's own onMouseDown already called
+   *     preventDefault, so the input never actually blurs — this handler
+   *     doesn't even run.
+   *   - Tab off the input: this DOES fire a real blur. e.relatedTarget is
+   *     the element about to receive focus (browsers set it before running
+   *     default focus-move handlers), so checking containment against
+   *     searchAreaRef tells "Tab into our own row" (relatedTarget inside)
+   *     apart from "Tab/click somewhere else" (relatedTarget outside or
+   *     null) — a keyboard-a11y fix (reviewer, PR #522): the previous blind
+   *     150ms timer raced Tab's own focus-move and could close mid-jump.
+   * The 150ms timer stays as the fallback for the "somewhere else" case
+   * (still gives a stray mousedown elsewhere a grace period).
    */
-  const handleSearchBlur = useCallback(() => {
+  const handleSearchBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    const next = e.relatedTarget;
+    if (next instanceof Node && searchAreaRef.current?.contains(next)) return;
     blurTimerRef.current = setTimeout(() => {
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     }, 150);
   }, []);
 
-  /** Keyboard handler forwarded from SearchBar: ArrowDown/Up/Enter/Escape/Tab. */
+  /**
+   * Shared blur handler for the popover rows themselves (ViewSuggestion's
+   * button, SearchResultsPopover's "see all" row) — same containment check
+   * as handleSearchBlur, needed because Tab-ing further (past the last row)
+   * blurs the ROW, not the input, so handleSearchBlur never sees it.
+   */
+  const handleSuggestionRowBlur = useCallback((e: React.FocusEvent) => {
+    const next = e.relatedTarget;
+    if (next instanceof Node && searchAreaRef.current?.contains(next)) return;
+    blurTimerRef.current = setTimeout(() => {
+      setIsPopoverOpen(false);
+      setActiveIndex(-1);
+    }, 150);
+  }, []);
+
+  /**
+   * Keyboard handler forwarded from SearchBar: ArrowDown/Up/Enter/Escape.
+   * Tab is deliberately NOT handled here — it used to force-close the
+   * popover on every Tab press, which raced (and usually won against) the
+   * browser's own default focus-move, closing the popover before Tab could
+   * land on ViewSuggestion's/SearchResultsPopover's row (keyboard-a11y fix,
+   * reviewer, PR #522). Tab's effect on the popover is now decided entirely
+   * by blur/focus containment — see handleSearchBlur/handleSuggestionRowBlur.
+   */
   const handleSearchKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       const popoverVisible = isPopoverOpen && filteredVenues.length > 0;
@@ -927,13 +1315,29 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         e.preventDefault();
         setIsPopoverOpen(false);
         setActiveIndex(-1);
-      } else if (e.key === "Tab") {
-        setIsPopoverOpen(false);
-        setActiveIndex(-1);
       } else if (e.key === "Enter") {
         if (popoverVisible && activeIndex >= 0 && activeIndex < filteredVenues.length) {
           e.preventDefault();
           const venue = filteredVenues[activeIndex];
+          // mapUnavailable branch added (fix, 2026-09-18): unlike a map pin
+          // tap (handleSelectVenueFromMap, correctly branch-free — no pins
+          // exist to tap when Map.tsx never renders), SearchBar itself is
+          // rendered unconditionally, mapUnavailable or not (see its render
+          // call below) — so this Enter path stays reachable even when the
+          // map can't mount. Without this branch, setSelectedVenueId alone
+          // did nothing visible: showVenueOnMap() no-ops while mapUnavailable
+          // (useMapUI.ts), and both card components (BottomSheet/
+          // DesktopVenueWindow) only render when viewMode === "map" — so a
+          // keyboard Enter on a box result silently went nowhere. Same
+          // box-vs-venue redirect the other three selection handlers already
+          // use (handleSelectSavedVenue/handleSelectVenueFromPopover/
+          // handleSelectFromList).
+          if (mapUnavailable) {
+            router.push(boxIdSet.has(venue.id) ? `/box/${venue.id}/history` : `/venue/${venue.id}`);
+            setIsPopoverOpen(false);
+            setActiveIndex(-1);
+            return;
+          }
           setSelectedVenueId(venue.id);
           showVenueOnMap();
           if (!isMobile) setWindowExpanded(false);
@@ -943,7 +1347,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       }
     },
     // filteredVenues reference is stable between renders with same query/filters.
-    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap],
+    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap, mapUnavailable, boxIdSet, router],
   );
 
   // Select a venue from the Saved list (#132 9c). Clears active filters + search
@@ -955,13 +1359,16 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       handleClearAllFilters();
       setSelectedVenueId(venueId);
       if (mapUnavailable) {
-        router.push(`/venue/${venueId}`);
+        // A box has no /venue/<id> page (that route is static, restricted
+        // to allVenues' build-time id set) — send it to its own history
+        // page instead, the one standalone page a box still has.
+        router.push(boxIdSet.has(venueId) ? `/box/${venueId}/history` : `/venue/${venueId}`);
         return;
       }
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [handleClearAllFilters, isMobile, mapUnavailable, router, showVenueOnMap],
+    [boxIdSet, handleClearAllFilters, isMobile, mapUnavailable, router, showVenueOnMap],
   );
 
   /** Called when user clicks/taps a result row inside the popover. */
@@ -969,7 +1376,7 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
     (venueId: string) => {
       setSelectedVenueId(venueId);
       if (mapUnavailable) {
-        router.push(`/venue/${venueId}`);
+        router.push(boxIdSet.has(venueId) ? `/box/${venueId}/history` : `/venue/${venueId}`);
         return;
       }
       showVenueOnMap();
@@ -977,25 +1384,30 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     },
-    [isMobile, mapUnavailable, router, showVenueOnMap],
+    [boxIdSet, isMobile, mapUnavailable, router, showVenueOnMap],
   );
 
   // Select a venue from the list (#129) — switch back to the map, centered on it.
-  // When mapUnavailable (#165 / #285), navigating to /venue/[id] reaches full venue details
-  // including hours, phone, SNAP/WIC details, notes, and directions.
+  // When mapUnavailable (#165 / #285), navigating to /venue/[id] (or a box's
+  // /box/<id>/history — the one standalone page a box still has) reaches
+  // full details.
   const handleSelectFromList = useCallback(
     (venueId: string) => {
       setSelectedVenueId(venueId);
       if (mapUnavailable) {
-        router.push(`/venue/${venueId}`);
+        router.push(boxIdSet.has(venueId) ? `/box/${venueId}/history` : `/venue/${venueId}`);
         return;
       }
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [isMobile, mapUnavailable, router, showVenueOnMap],
+    [boxIdSet, isMobile, mapUnavailable, router, showVenueOnMap],
   );
 
+  // A box pin now opens the SAME in-map card every other venue uses
+  // (map-first rework, 2026-09-18) — no special-case here at all; the map
+  // view is never rendered when mapUnavailable, so there's no redirect
+  // branch to thread through on this path either.
   const handleSelectVenueFromMap = useCallback(
     (id: string) => {
       setSelectedVenueId(id);
@@ -1023,25 +1435,51 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   const showResultsPopover =
     isPopoverOpen && query.trim() !== "" && filteredVenues.length > 0;
 
-  // Category browse dropdown: focused + empty query (#95).
-  const showCategoryDropdown = isPopoverOpen && query.trim() === "";
+  // ViewSuggestion (#514) shows on the OTHER half of the same condition:
+  // focused + EMPTY query. Mutually exclusive with showResultsPopover and
+  // EmptySearchPopover (both require a non-empty query) by construction.
+  const showViewSuggestion = isPopoverOpen && query.trim() === "";
 
-  // Cancel blur timer when mousedown fires inside the category dropdown —
-  // same grace-period pattern as the results popover.
-  const handleCategoryDropdownMouseDown = useCallback(() => {
-    if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
-  }, []);
-
-  // WHY one shared handler: every path that switches views (the inline
-  // SearchBar control, #191, and "Near me" below) must honor the same
-  // mapUnavailable guard (selecting "map" while the map can't mount would show
-  // a blank screen, #165).
+  // WHY one shared handler: every path that switches views (the search bar's
+  // own suggestion row and results row, #514, "Near me" below, and the Menu
+  // line) must honor the same mapUnavailable guard (selecting "map" while the
+  // map can't mount would show a blank screen, #165).
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
       if (mapUnavailable && mode === "map") return;
       setViewMode(mode);
     },
     [mapUnavailable, setViewMode],
+  );
+
+  /**
+   * ViewSuggestion / the results-popover's "See all N matches" row (#514):
+   * switch view then close whatever search popover triggered it.
+   *
+   * WHY blur the input: both rows call `onMouseDown={(e) => e.preventDefault()}`
+   * (mirrors SearchResultsPopover's option rows) so the 150ms blur grace
+   * period can't race the tap closed before this handler runs — but that
+   * same preventDefault means the input never naturally loses focus on its
+   * own. Without an explicit blur here, "search closes" (#514 spec) isn't
+   * true: the keyboard stays up on phone, and — worse — a second empty tap
+   * on the now-unfocused-looking bar fires no `focus` event (it was already
+   * focused), so the OTHER direction's row (e.g. "Back to the map" right
+   * after switching to list) never appears until the user taps away first.
+   * Same pattern SearchBar's own Enter handler already uses
+   * (`e.currentTarget.blur()`). The blur this triggers re-schedules
+   * isPopoverOpen=false via the normal 150ms timer — harmless, since it's
+   * already false.
+   */
+  const handleViewSuggestionSelect = useCallback(
+    (mode: ViewMode) => {
+      handleViewModeChange(mode);
+      setIsPopoverOpen(false);
+      setActiveIndex(-1);
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    },
+    [handleViewModeChange],
   );
 
   // "Near me" (docs/bottom-nav-spec.md §6). The bar persists in list view, but
@@ -1053,8 +1491,22 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
   }, [handleViewModeChange, handleLocateRequest]);
 
   // §10: the venue sheet (phone only) covers the bottom edge; the nav steps
-  // aside while it is open at any detent.
+  // aside for as long as a venue is selected — the FULL CARD (unchanged,
+  // #509) or the collapsed route strip alike. #531 (Kyle, 2026-09-19) had
+  // carved the strip out with a `!stripVisible` term here so the bar stayed
+  // visible underneath it; #547 (Kyle, 2026-09-20) reverses that on sight of
+  // the bar covering the route controls on his phone — the strip now hides
+  // the bar too, so the carve-out is gone. Kept as one `selectedVenue !==
+  // null` term (not two branches for strip vs. card) so there is nothing for
+  // "Show card"/"Clear route" to desync — the registration only ever depends
+  // on whether a venue is selected, never on which of the two views is
+  // showing, so switching between them can't flicker the bar.
   const venueSheetOpen = isMobile && viewMode === "map" && selectedVenue !== null;
+  // #542: feeds the same shared registry every other full-surface overlay
+  // uses — BottomNav hides itself (overlayRegistry.ts) instead of this
+  // component wrapping <BottomNav/> in a `{!venueSheetOpen && ...}` JSX
+  // conditional, which was the "fifth ad-hoc boolean" #542 called out.
+  useOverlayRegistration(venueSheetOpen);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -1076,6 +1528,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
             onMapReady={handleMapReady}
             onMoveEnd={handleMoveEnd}
             walkingRoute={walkingRouteVenueId === selectedVenueId ? walkingRoute : null}
+            focusPoint={focusPoint}
+            focusRequestId={focusRequestId}
           />
         </MapErrorBoundary>
       )}
@@ -1116,91 +1570,109 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67)
-          filterChip shows the active category filter (#95). */}
-      <SearchBar
-        value={query}
-        onChange={(next) => {
-          setQuery(next);
-          // Reset activeIndex on every keystroke — new results set.
-          setActiveIndex(-1);
-        }}
-        placeholder={t("search.placeholder", locale)}
-        ariaLabel={t("search.aria", locale)}
-        comboboxEnabled={true}
-        comboboxExpanded={showResultsPopover || showCategoryDropdown}
-        comboboxControls={
-          showCategoryDropdown
-            ? CATEGORY_LISTBOX_ID
-            : showResultsPopover
-              ? LISTBOX_ID
-              : undefined
-        }
-        comboboxActiveDescendant={activeDescendantId}
-        onFocus={handleSearchFocus}
-        onBlur={handleSearchBlur}
-        onKeyDownExtra={handleSearchKeyDown}
-        filterChip={
-          activeCategoryFilter !== null
-            ? {
-                label: t(`category.full.${activeCategoryFilter}`, locale),
-                clearAriaLabel: t("categoryBrowse.clearFilter", locale),
-                onClear: () => handleCategoryBrowseSelect(null),
-              }
-            : undefined
-        }
-        viewSwitch={{
-          mode: viewMode,
-          onChange: handleViewModeChange,
-          locale,
-          // Surface the guard instead of hiding it: handleViewModeChange
-          // silently ignores "map" while the map can't mount, which read as a
-          // dead button once #191 moved this control onto the main screen.
-          mapDisabled: mapUnavailable,
-        }}
-      />
-
-      {/* SearchResultsPopover — shown when query is non-empty AND has matches (#67).
-          Mutually exclusive with EmptySearchPopover. */}
-      {showResultsPopover && (
-        <SearchResultsPopover
-          venues={filteredVenues as VenueWithDistance[]}
-          activeIndex={activeIndex}
-          listboxId={LISTBOX_ID}
-          onSelect={handleSelectVenueFromPopover}
-          onClose={() => {
-            setIsPopoverOpen(false);
+      {/* searchAreaRef wraps these three — display:contents so it adds no box
+          of its own — purely so blur handlers can ask "did focus move to one
+          of OUR OWN rows, or leave the group entirely?" (keyboard-a11y fix,
+          reviewer, PR #522). See handleSearchBlur/handleSuggestionRowBlur. */}
+      <div ref={searchAreaRef} className="contents">
+        {/* SearchBar — controlled (PR 6), ARIA combobox wired (#67).
+            filtersButton (#513) opens the FilterPanel below — search focus
+            opens ViewSuggestion (empty query) or SearchResultsPopover (typed),
+            never a category list of its own. Nothing renders on the right end
+            of the bar (#514 removed the inline Map/List switch — see
+            ViewSuggestion/HamburgerMenu for its replacements). */}
+        <SearchBar
+          value={query}
+          onChange={(next) => {
+            setQuery(next);
+            // Reset activeIndex on every keystroke — new results set.
             setActiveIndex(-1);
           }}
-        />
-      )}
-
-      {/* CategoryDropdown — shown when search is focused + query is empty (#95).
-          Mutually exclusive with SearchResultsPopover and EmptySearchPopover. */}
-      {showCategoryDropdown && (
-        <CategoryDropdown
-          counts={allVenueCounts}
-          activeCategory={activeCategoryFilter}
-          onSelect={(cat) => {
-            handleCategoryBrowseSelect(cat);
-            // Close dropdown after selection
-            setIsPopoverOpen(false);
+          placeholder={t("search.placeholder", locale)}
+          ariaLabel={t("search.aria", locale)}
+          comboboxEnabled={true}
+          comboboxExpanded={showResultsPopover}
+          comboboxControls={showResultsPopover ? LISTBOX_ID : undefined}
+          comboboxActiveDescendant={activeDescendantId}
+          onFocus={handleSearchFocus}
+          onBlur={handleSearchBlur}
+          onKeyDownExtra={handleSearchKeyDown}
+          filtersButton={{
+            count: activeFilterCount,
+            onClick: () => setFilterPanelOpen(true),
+            ariaLabel:
+              activeFilterCount > 0
+                ? t("filters.button.labelActive", locale, { count: String(activeFilterCount) })
+                : t("filters.button.label", locale),
           }}
-          onMouseDown={handleCategoryDropdownMouseDown}
-          openNowActive={filterOpenNow}
-          openNowCount={openNowCount}
-          onToggleOpenNow={() => setFilterOpenNow((v) => !v)}
-          snapActive={filterSnap}
-          snapCount={snapCount}
-          onToggleSnap={() => setFilterSnap((v) => !v)}
-          wicActive={filterWic}
-          wicCount={wicCount}
-          onToggleWic={() => setFilterWic((v) => !v)}
-          favoritesActive={filterFavorites}
-          favoritesCount={favoritesCount}
-          onToggleFavorites={() => setFilterFavorites((v) => !v)}
         />
-      )}
+
+        {/* ViewSuggestion (#514) — shown on an EMPTY, focused search bar; offers
+            the other view. Mutually exclusive with SearchResultsPopover/
+            EmptySearchPopover below (both require a non-empty query). Renders
+            nothing itself while on the list with the map disabled (#165) —
+            see the component's own guard. onFocus/onBlur (keyboard-a11y fix,
+            reviewer, PR #522) make its button Tab-reachable: onFocus mirrors
+            handleSearchFocus (clears any pending close timer), onBlur decides
+            whether Tab-ing further should close the popover. */}
+        {showViewSuggestion && (
+          <ViewSuggestion
+            mode={viewMode}
+            count={filteredVenues.length}
+            mapDisabled={mapUnavailable}
+            locale={locale}
+            onSelect={() => handleViewSuggestionSelect(viewMode === "map" ? "list" : "map")}
+            onFocus={handleSearchFocus}
+            onBlur={handleSuggestionRowBlur}
+          />
+        )}
+
+        {/* SearchResultsPopover — shown when query is non-empty AND has matches (#67).
+            Mutually exclusive with EmptySearchPopover. onSeeAllAsList (#514) is
+            map-only — on the list, typing already updates ListView live.
+            onSeeAllAsListFocus/onSeeAllAsListBlur (keyboard-a11y fix, reviewer,
+            PR #522) — same pattern as ViewSuggestion above, scoped to that one
+            new row (the option <li>s above it carry no tabIndex, so they were
+            never keyboard-reachable and need no such wiring). */}
+        {showResultsPopover && (
+          <SearchResultsPopover
+            venues={filteredVenues as VenueWithDistance[]}
+            activeIndex={activeIndex}
+            listboxId={LISTBOX_ID}
+            onSelect={handleSelectVenueFromPopover}
+            onClose={() => {
+              setIsPopoverOpen(false);
+              setActiveIndex(-1);
+            }}
+            onSeeAllAsList={
+              viewMode === "map" ? () => handleViewSuggestionSelect("list") : undefined
+            }
+            onSeeAllAsListFocus={handleSearchFocus}
+            onSeeAllAsListBlur={handleSuggestionRowBlur}
+          />
+        )}
+      </div>
+
+      {/* FilterPanel (#513) — the left side panel opened by SearchBar's Filters
+          button. Not tied to search focus (replaces CategoryDropdown, #95). */}
+      <FilterPanel
+        open={filterPanelOpen}
+        onClose={() => setFilterPanelOpen(false)}
+        locale={locale}
+        resultCount={filteredVenues.length}
+        filterOpenNow={filterOpenNow}
+        onToggleOpenNow={() => setFilterOpenNow((v) => !v)}
+        openNowCount={openNowCount}
+        filterSnap={filterSnap}
+        onToggleSnap={() => setFilterSnap((v) => !v)}
+        snapCount={snapCount}
+        filterWic={filterWic}
+        onToggleWic={() => setFilterWic((v) => !v)}
+        wicCount={wicCount}
+        selectedCategories={selectedCategories}
+        onToggleCategory={toggleCategory}
+        onClearAll={clearFilters}
+      />
 
       {/* EmptySearchPopover — shown when query is non-empty but yields no results.
           Mutually exclusive with SearchResultsPopover (they depend on filteredVenues.length). */}
@@ -1211,7 +1683,10 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         />
       )}
 
-      {/* HamburgerMenu — the drawer, opened by BottomNav at a section (#71, spec §7). */}
+      {/* HamburgerMenu — the drawer, opened by BottomNav at a section (#71, spec §7).
+          viewMode/onToggleView/mapDisabled (#514) drive its "List view"/"Map
+          view" line — the second way into the switch, for anyone who never
+          taps search. */}
       <HamburgerMenu
         onShowWelcome={onShowWelcome}
         savedVenues={savedVenues}
@@ -1220,6 +1695,9 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         onClose={handleMenuClose}
         view={menuSection ?? "top"}
         ignoreOutsideRef={navRef}
+        viewMode={viewMode}
+        onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map")}
+        mapDisabled={mapUnavailable}
       />
 
       {/* Outside-county message — appears when resolved position is beyond maxBounds (#108). Map mode only (#129). */}
@@ -1293,6 +1771,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         <BottomSheet
           key={selectedVenueId ?? "empty"}
           venue={selectedVenue}
+          box={getBoxById(selectedVenueId)}
+          onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
           onClose={() => setSelectedVenueId(null)}
           onWalkRoute={handleWalkRoute}
           isWalkRouteActive={
@@ -1309,6 +1789,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
               ? walkingRouteSteps
               : null
           }
+          activeStepIndex={activeStepIndex}
+          onStepChange={handleStepChange}
           showWalkLocationHint={
             selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
           }
@@ -1320,6 +1802,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
         <DesktopVenueWindow
           key={selectedVenueId}
           venue={selectedVenue}
+          box={getBoxById(selectedVenueId)}
+          onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
           expanded={windowExpanded}
           mapboxMap={mapboxMap}
           onExpand={() => setWindowExpanded(true)}
@@ -1343,6 +1827,8 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
               ? walkingRouteSteps
               : null
           }
+          activeStepIndex={activeStepIndex}
+          onStepChange={handleStepChange}
           showWalkLocationHint={
             selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
           }
@@ -1350,19 +1836,22 @@ export default function MapWrapper({ viewport = 'pueblo-center', onShowWelcome, 
       )}
 
       {/* BottomNav — LAST in DOM order so keyboard users reach the map and the
-          search first (spec §12). */}
-      {!venueSheetOpen && (
-        <BottomNav
-          locale={locale}
-          openSection={menuSection}
-          onSectionTap={handleNavSectionTap}
-          geoState={geo.state}
-          isLocating={isLocating}
-          isDrifted={isDrifted}
-          onNearMe={handleNearMe}
-          navRef={navRef}
-        />
-      )}
+          search first (spec §12). Rendered unconditionally: it hides ITSELF
+          (overlayRegistry.ts) whenever venueSheetOpen or any other
+          full-surface overlay is open (#542) — see the useOverlayRegistration
+          call above for venueSheetOpen's own registration. */}
+      <BottomNav
+        locale={locale}
+        openSection={menuSection}
+        onSectionTap={handleNavSectionTap}
+        geoState={geo.state}
+        isLocating={isLocating}
+        isDrifted={isDrifted}
+        onNearMe={handleNearMe}
+        boxesActive={selectedCategories?.has("blessing_box") ?? false}
+        onBoxesToggle={handleBoxesToggle}
+        navRef={navRef}
+      />
     </div>
   );
 }

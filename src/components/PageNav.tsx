@@ -12,9 +12,22 @@
  *   - Menu / Saved — open the drawer in place (same HamburgerMenu).
  *   - Resources    — its page, as on the map (highlighted when you're on it).
  *   - Near me      — the map, locating you (/?near=1, read by HomePageClient).
+ *   - Boxes (#516) — the map, filtered to blessing boxes (/?boxes=1, same
+ *                    read-once-then-strip pattern as Near me). There's no
+ *                    filter state off the map, so `boxesActive` is always
+ *                    false here — the item can never show "on" until the
+ *                    map applies the filter and the resident is back on it.
  *   - A saved place — the map, opened on that pin (/?venue=<id>).
  * "Show welcome screen" is map-only (the splash lives there), so the drawer
  * omits it here.
+ *
+ * `backHref` (default "/") lets a page point the chrome-level "Back to map"
+ * link at a richer destination than the bare map — e.g. BoxHistoryContent
+ * passes `/?venue=<id>` so it reopens the exact box card instead of landing
+ * on an empty map. Added 2026-09-18 to remove a second, page-level "Back to
+ * the map" link that page used to render itself (two back-to-map links on
+ * one page was the actual bug — this keeps the one chrome link everywhere
+ * else already has, just smarter about where it points).
  *
  * The page's <main> must clear the fixed bar at its bottom — see PAGE_NAV_CLEARANCE.
  */
@@ -42,7 +55,7 @@ export const PAGE_NAV_CLEARANCE =
 
 const NO_GEO = { permission: "prompt", position: null } as const;
 
-export default function PageNav({ locale }: { locale: Locale }) {
+export default function PageNav({ locale, backHref = "/" }: { locale: Locale; backHref?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const [section, setSection] = useState<MenuSection | null>(null);
@@ -70,7 +83,7 @@ export default function PageNav({ locale }: { locale: Locale }) {
         className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0"
       >
         <Link
-          href="/"
+          href={backHref}
           className={
             "text-sm font-medium text-[var(--color-sage-600)] " +
             "hover:text-[var(--color-sage-700)] transition-colors rounded " +
@@ -99,6 +112,8 @@ export default function PageNav({ locale }: { locale: Locale }) {
         isLocating={false}
         isDrifted={false}
         onNearMe={() => router.push("/?near=1")}
+        boxesActive={false}
+        onBoxesToggle={() => router.push("/?boxes=1")}
         navRef={navRef}
         onResourcesPage={pathname === "/resources"}
       />

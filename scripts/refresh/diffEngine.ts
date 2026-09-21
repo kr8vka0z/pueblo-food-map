@@ -195,6 +195,32 @@ export function pendingKey(source: ProposalSource, targetVenueId: string): strin
   return `${source}:${targetVenueId}`;
 }
 
+// ─── Blessing boxes (Build Plan, slice 1) ──────────────────────────────────
+
+/**
+ * Blessing boxes are live, not managed by this pipeline (Build Plan
+ * architecture call #1) — a scraper re-encountering a box under its OLD
+ * upstream category (e.g. Plentiful's own site still lists 216 W Routt as a
+ * plain pantry; it has no idea we recategorized it) must never produce an
+ * add/update/remove proposal for it. Strips box rows from BOTH sides of the
+ * diff: existing D1 rows already tagged category='blessing_box' (so no
+ * update/remove proposal), and any freshly scraped record sharing a box's id
+ * regardless of what category the scrape itself assigns it (so no "add"
+ * proposal reintroducing it under the old category either). Pure and
+ * exported so this is unit-testable without a live scrape or D1 — the one
+ * caller is scripts/refresh-ingest.ts, right before diffSource().
+ */
+export function excludeBlessingBoxes(
+  currentRows: CurrentVenueRow[],
+  incoming: Venue[],
+): { currentRows: CurrentVenueRow[]; incoming: Venue[] } {
+  const boxIds = new Set(currentRows.filter((r) => r.category === "blessing_box").map((r) => r.id));
+  return {
+    currentRows: currentRows.filter((r) => r.category !== "blessing_box"),
+    incoming: incoming.filter((v) => !boxIds.has(v.id)),
+  };
+}
+
 // ─── Field comparison ───────────────────────────────────────────────────────
 
 /** Normalizes a WeeklyHours-shaped value (object OR its JSON-string D1 form) for equality comparison. */

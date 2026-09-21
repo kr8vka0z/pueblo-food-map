@@ -60,13 +60,28 @@ vi.mock("next/dynamic", () => ({
 
 // ─── Mock MapWrapper — renders a testid sentinel; no WebGL needed ─────────────
 vi.mock("@/components/MapWrapper", () => ({
-  default: vi.fn(({ onShowWelcome, viewport }: { onShowWelcome?: () => void; viewport?: string }) => (
-    <div data-testid="map-wrapper" data-viewport={viewport} tabIndex={-1}>
-      <button type="button" onClick={onShowWelcome} data-testid="show-welcome-btn">
-        Show welcome
-      </button>
-    </div>
-  )),
+  default: vi.fn(
+    ({
+      onShowWelcome,
+      viewport,
+      initialBoxesFilter,
+    }: {
+      onShowWelcome?: () => void;
+      viewport?: string;
+      initialBoxesFilter?: boolean;
+    }) => (
+      <div
+        data-testid="map-wrapper"
+        data-viewport={viewport}
+        data-initial-boxes-filter={initialBoxesFilter ? "1" : "0"}
+        tabIndex={-1}
+      >
+        <button type="button" onClick={onShowWelcome} data-testid="show-welcome-btn">
+          Show welcome
+        </button>
+      </div>
+    ),
+  ),
 }));
 
 // ─── Mock SplashScreen — renders dialog role + dismiss CTA sentinel ───────────
@@ -311,5 +326,23 @@ describe("Near me from a Menu page (/?near=1, Kyle 2026-09-16)", () => {
     localStorage.setItem(GATE_KEY, "1");
     await renderPage();
     expect(screen.getByTestId("map-wrapper").getAttribute("data-viewport")).toBe("pueblo-center");
+  });
+});
+
+describe("Boxes from a Menu page (/?boxes=1, #516)", () => {
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  test("opens the map with the blessing-box filter applied, skips the splash, and strips the param", async () => {
+    window.history.replaceState(null, "", "/?boxes=1");
+    await renderPage();
+    expect(screen.getByTestId("map-wrapper").getAttribute("data-initial-boxes-filter")).toBe("1");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(window.location.search).toBe("");
+  });
+
+  test("a plain visit does not apply the filter", async () => {
+    localStorage.setItem(GATE_KEY, "1");
+    await renderPage();
+    expect(screen.getByTestId("map-wrapper").getAttribute("data-initial-boxes-filter")).toBe("0");
   });
 });

@@ -66,3 +66,18 @@ export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function isValidEmail(value: string): boolean {
   return EMAIL_RE.test(value.slice(0, FIELD_LIMITS.EMAIL));
 }
+
+/**
+ * Trims and lowercases an email ONCE at a route boundary (2026-09-18
+ * security review, item 3) — every public/admin route touching a Blessing
+ * Boxes alert email (adopt, giver alert sign-up, host-alerts admin) now
+ * calls this exactly once, before validation, storage, or use as a
+ * rate-limit key, so "Foo@X.com" and "foo@x.com" are always the same row
+ * rather than two. Email addresses are case-INsensitive at the domain part
+ * always, and in practice for the local part too for every mail provider
+ * this app's users plausibly use — normalizing once here is simpler and
+ * safer than trying to match on either casing everywhere a lookup happens.
+ */
+export function normalizeEmail(raw: string): string {
+  return raw.trim().toLowerCase();
+}

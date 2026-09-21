@@ -4,7 +4,7 @@
  * Covers the primary entry surfaces:
  *   1. SplashScreen — first-visit gate (PR 3)
  *   2. SearchBar — floating search bar above map (PR 6)
- *   3. BottomNav — Near me / Saved / Resources / Menu (idle / locating / open states)
+ *   3. BottomNav — Near me / Saved / Boxes / Help / Menu (idle / locating / open / Boxes-active states)
  *   4. LocationDeniedBanner — permission-denied overlay (PR 7)
  *   5. VenueMarker — Mapbox marker button (PR 45, Mapbox migration)
  *
@@ -116,9 +116,11 @@ const GEO_GRANTED: GeoState = {
 
 describe("BottomNav a11y", () => {
   const cases: Array<[string, React.ComponentProps<typeof BottomNav>]> = [
-    ["idle, nothing open", { locale: "en", openSection: null, onSectionTap: vi.fn(), geoState: GEO_IDLE, isLocating: false, isDrifted: false, onNearMe: vi.fn() }],
-    ["locating", { locale: "en", openSection: null, onSectionTap: vi.fn(), geoState: GEO_IDLE, isLocating: true, isDrifted: false, onNearMe: vi.fn() }],
-    ["located + drifted, Saved open", { locale: "es", openSection: "saved", onSectionTap: vi.fn(), geoState: GEO_GRANTED, isLocating: false, isDrifted: true, onNearMe: vi.fn() }],
+    ["idle, nothing open", { locale: "en", openSection: null, onSectionTap: vi.fn(), geoState: GEO_IDLE, isLocating: false, isDrifted: false, onNearMe: vi.fn(), boxesActive: false, onBoxesToggle: vi.fn() }],
+    ["locating", { locale: "en", openSection: null, onSectionTap: vi.fn(), geoState: GEO_IDLE, isLocating: true, isDrifted: false, onNearMe: vi.fn(), boxesActive: false, onBoxesToggle: vi.fn() }],
+    ["located + drifted, Saved open", { locale: "es", openSection: "saved", onSectionTap: vi.fn(), geoState: GEO_GRANTED, isLocating: false, isDrifted: true, onNearMe: vi.fn(), boxesActive: false, onBoxesToggle: vi.fn() }],
+    // #516: Boxes active (raspberry tint + aria-pressed) gets its own a11y pass.
+    ["Boxes active", { locale: "en", openSection: null, onSectionTap: vi.fn(), geoState: GEO_IDLE, isLocating: false, isDrifted: false, onNearMe: vi.fn(), boxesActive: true, onBoxesToggle: vi.fn() }],
   ];
   test.each(cases)("%s has no axe violations", async (_label, props) => {
     const { container } = render(<BottomNav {...props} />);

@@ -19,7 +19,7 @@ import { haversineMiles } from "@/lib/distance";
 import { computeOpenStatus } from "@/lib/hours";
 import { searchVenues } from "@/lib/searchVenues";
 import { useFavorites } from "@/lib/favorites";
-import type { VenueCategory } from "@/types/venue";
+import type { Venue, VenueCategory } from "@/types/venue";
 
 /** Lat/lng origin — user position or Pueblo center fallback. */
 export interface LatLng {
@@ -27,7 +27,22 @@ export interface LatLng {
   lng: number;
 }
 
-export function useMapFilters(origin: LatLng) {
+/**
+ * `extraVenues` (Blessing Boxes slice 1): blessing_box venues, fetched
+ * client-side at request time from the live endpoint — they're excluded
+ * from `venues.ts`'s build-time snapshot on purpose (boxes are live, not
+ * published), so this hook can't just import them the way it imports
+ * `allVenues`. Merging them in HERE, rather than duplicating a second
+ * filter/count/distance pipeline in MapWrapper, is what makes every existing
+ * category-chip/count/search/sort rule apply to boxes automatically — every
+ * field this pipeline reads (hours_weekly, accepts_snap/wic) is already
+ * optional on Venue, and a box simply doesn't have them (same as many
+ * existing garden/edible_landscape rows today), so no category-specific
+ * branch was needed anywhere in this file. Defaults to [] so every existing
+ * caller/test keeps working unchanged.
+ */
+export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
+  const combinedVenues = useMemo(() => [...allVenues, ...extraVenues], [extraVenues]);
   // ── Filter state ────────────────────────────────────────────────────────────
   const [query, setQuery] = useState("");
   const [selectedCategories, setSelectedCategories] =
@@ -35,23 +50,17 @@ export function useMapFilters(origin: LatLng) {
   const [filterOpenNow, setFilterOpenNow] = useState(false);
   const [filterSnap, setFilterSnap] = useState(false);
   const [filterWic, setFilterWic] = useState(false);
-  const [filterFavorites, setFilterFavorites] = useState(false);
-
-  // ── Category browse filter (#95) ────────────────────────────────────────────
-  // Single-select from the category dropdown — syncs into selectedCategories.
-  const [activeCategoryFilter, setActiveCategoryFilter] =
-    useState<VenueCategory | null>(null);
 
   // ── Favorites ────────────────────────────────────────────────────────────────
   const favoriteIds = useFavorites();
 
   // ── Derived: venues with Haversine distances ─────────────────────────────────
   const venuesWithDistance = useMemo(() => {
-    return allVenues.map((v) => ({
+    return combinedVenues.map((v) => ({
       ...v,
       distanceMiles: haversineMiles(origin, { lat: v.lat, lng: v.lng }),
     }));
-  }, [origin]);
+  }, [combinedVenues, origin]);
 
   // ── Derived: saved venues (favorites, nearest-first) ─────────────────────────
   const savedVenues = useMemo(() => {
@@ -62,18 +71,17 @@ export function useMapFilters(origin: LatLng) {
   }, [favoriteIds, venuesWithDistance]);
 
   const favoriteSet = useMemo(() => new Set(savedVenues.map((v) => v.id)), [savedVenues]);
-  const favoritesCount = favoriteSet.size;
 
   // ── Derived: filter badge counts (computed from all venues, not filtered) ────
   const allVenueCounts = useMemo(() => {
-    return allVenues.reduce<Partial<Record<VenueCategory, number>>>(
+    return combinedVenues.reduce<Partial<Record<VenueCategory, number>>>(
       (acc, v) => {
         acc[v.category] = (acc[v.category] ?? 0) + 1;
         return acc;
       },
       {},
     );
-  }, []);
+  }, [combinedVenues]);
 
   // WHY confirmed-open only, deliberately NOT matching the filtered list below:
   // the "Open now" filter itself lets "no_hours" venues survive (board review
@@ -127,7 +135,6 @@ export function useMapFilters(origin: LatLng) {
         }
         if (filterSnap && !v.accepts_snap) return false;
         if (filterWic && !v.accepts_wic) return false;
-        if (filterFavorites && favoriteSet.size > 0 && !favoriteSet.has(v.id)) return false;
         return true;
       })
       .sort((a, b) => {
@@ -154,8 +161,6 @@ export function useMapFilters(origin: LatLng) {
     filterOpenNow,
     filterSnap,
     filterWic,
-    filterFavorites,
-    favoriteSet,
     query,
   ]);
 
@@ -164,22 +169,40 @@ export function useMapFilters(origin: LatLng) {
     (selectedCategories !== null && selectedCategories.size > 0) ||
     filterOpenNow ||
     filterSnap ||
-    filterWic ||
-    (filterFavorites && favoriteSet.size > 0);
+    filterWic;
 
-  // ── Category browse handler ──────────────────────────────────────────────────
-  const handleCategoryBrowseSelect = useCallback(
-    (cat: VenueCategory | null) => {
-      setActiveCategoryFilter(cat);
-      setSelectedCategories(cat !== null ? new Set([cat]) : null);
-    },
-    [],
-  );
+  // ── Category checkbox toggle (#513 — Filters panel, multi-select) ───────────
+  // Replaces the old single-select handleCategoryBrowseSelect: the panel
+  // renders 8 independent checkboxes, so toggling one must add/remove just
+  // that category from the set, not replace the whole selection. Empty Set
+  // normalizes back to null so `selectedCategories !== null && size > 0` (the
+  // filter guard above, and every other null-check on this state) stays the
+  // single source of truth for "no category filter active" — a lingering
+  // empty Set would read as "active" everywhere else that only checks !== null.
+  const toggleCategory = useCallback((cat: VenueCategory) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev ?? []);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next.size > 0 ? next : null;
+    });
+  }, []);
+
+  // ── Filters panel's "Clear all" (#513) — categories/open-now/SNAP/WIC only.
+  // Deliberately does NOT touch `query`: clearing filter toggles wiping out
+  // text the user typed into the search box would be surprising. Compare
+  // handleClearAllFilters below, which ListView's own "clear filters" button
+  // keeps using (it also clears an empty-result search).
+  const clearFilters = useCallback(() => {
+    setSelectedCategories(null);
+    setFilterOpenNow(false);
+    setFilterSnap(false);
+    setFilterWic(false);
+  }, []);
 
   // ── Clear ALL filters + search ────────────────────────────────────────────────
   const handleClearAllFilters = useCallback(() => {
     setSelectedCategories(null);
-    setActiveCategoryFilter(null);
     setFilterOpenNow(false);
     setFilterSnap(false);
     setFilterWic(false);
@@ -198,23 +221,19 @@ export function useMapFilters(origin: LatLng) {
     setFilterSnap,
     filterWic,
     setFilterWic,
-    filterFavorites,
-    setFilterFavorites,
-    activeCategoryFilter,
-    setActiveCategoryFilter,
     // Derived
     venuesWithDistance,
     filteredVenues,
     savedVenues,
     favoriteSet,
-    favoritesCount,
     anyFilterActive,
     allVenueCounts,
     openNowCount,
     snapCount,
     wicCount,
     // Handlers
-    handleCategoryBrowseSelect,
+    toggleCategory,
+    clearFilters,
     handleClearAllFilters,
   };
 }

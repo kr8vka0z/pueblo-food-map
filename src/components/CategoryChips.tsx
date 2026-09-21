@@ -14,6 +14,7 @@ const ALL_CATEGORIES: VenueCategory[] = [
   "garden",
   "edible_landscape",
   "meal_site",
+  "blessing_box",
 ];
 
 interface CategoryChipsProps {

@@ -33,10 +33,28 @@
  *
  * WHY turn instructions are NOT in i18n: Mapbox returns them pre-localized via the
  * language= query param (set to the active locale in MapWrapper). No client translation needed.
+ *
+ * WalkStepper (#555, step-through directions): the compact "Step N of M"
+ * panel with Back/Next arrows — MapWrapper owns which step is active
+ * (activeStepIndex/onStepChange) so the phone strip and this card's own
+ * readout can share one turn without a second source of truth. Reuses
+ * WalkStepsList for its "All turns" disclosure rather than forking a second
+ * list, and formatStepDistance for its "in 280 ft" line.
  */
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
+import {
+  ArrowUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  CornerUpLeft,
+  CornerUpRight,
+  MapPin as MapPinIcon,
+} from "lucide-react";
 import type { Venue } from "@/types/venue";
+import type { WalkStep } from "@/components/Map";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
@@ -82,9 +100,9 @@ interface DirectionButtonsProps {
   /**
    * Turn-by-turn steps from Mapbox Directions API.
    * Instructions are pre-localized (Mapbox language= param in MapWrapper).
-   * Rendered as a collapsible list when the route is active.
+   * Rendered via WalkStepper when the route is active.
    */
-  walkSteps?: Array<{ instruction: string; distance: number }> | null;
+  walkSteps?: WalkStep[] | null;
   /**
    * True when Walk was tapped with no shared location and the resulting
    * geolocation request was denied or is unavailable (#207). Renders a
@@ -92,14 +110,25 @@ interface DirectionButtonsProps {
    * MapWrapper never falls back to drawing a route from PUEBLO_CENTER.
    */
   showLocationHint?: boolean;
+  /** Which turn the step-through stepper is showing (#555). Defaults to 0. */
+  activeStepIndex?: number;
+  /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap. */
+  onStepChange?: (index: number) => void;
 }
 
 // ─── Google Maps deeplink builder ────────────────────────────────────────────
 
-function googleMapsUrl(
+// Exported (2026-09-19, Blessing Box card redesign) so BoxCardBody's plain
+// address-as-directions-link can build the same deeplink this component's own
+// Bus/Drive buttons use — one URL builder, not a second copy of the
+// query-string logic. `travelmode` is OPTIONAL (fix pass, 2026-09-19): a box
+// card omits it entirely rather than forcing "driving" — many box visitors
+// walk or ride the bus, and Google Maps' own destination-only deeplink
+// already lets the person pick a mode once it opens.
+export function googleMapsUrl(
   lat: number,
   lng: number,
-  travelmode: "transit" | "driving" | "walking",
+  travelmode?: "transit" | "driving" | "walking",
 ): string {
   // WHY URLSearchParams: avoids manual encoding bugs (e.g. commas in destination).
   // Using a base URL + params avoids the OpenNext routing trap of server-side
@@ -107,7 +136,7 @@ function googleMapsUrl(
   const params = new URLSearchParams({
     api: "1",
     destination: `${lat},${lng}`,
-    travelmode,
+    ...(travelmode ? { travelmode } : {}),
   });
   return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
@@ -129,6 +158,473 @@ function formatStepDistance(meters: number, locale: Locale): string {
   }
   const mi = (meters / METERS_PER_MILE).toFixed(2);
   return t("directions.stepMi", locale, { distance: mi });
+}
+
+// ─── Step list (extracted, #531) ──────────────────────────────────────────────
+//
+// The `<ol>` of turn-by-turn steps only — no toggle, no "Clear route"/"Open in
+// Google Maps" links. Pulled out of WalkRouteStatus below (which still owns
+// those, wrapping this list behind its own Show/Hide steps disclosure) so
+// RouteStrip.tsx's "Steps" sheet (#531 — the strip's own way into the same
+// list, two taps away otherwise) can render the identical markup instead of
+// forking a second copy that could drift from this one (distance thresholds,
+// per-step layout, i18n keys).
+export interface WalkStepsListProps {
+  steps: Array<{ instruction: string; distance: number }>;
+  locale: Locale;
+  /** Forwarded to the `<ol>` — lets a disclosure trigger elsewhere point `aria-controls` at it. Omit when nothing needs to reference it (RouteStrip's sheet doesn't). */
+  id?: string;
+  /** WalkRouteStatus hides (not unmounts) the list while its toggle is collapsed, so screen readers skip it (`hidden`, not CSS display:none). RouteStrip's sheet never needs this — its own conditional mount already covers the same requirement. */
+  hidden?: boolean;
+  /** Caller-owned layout classes (spacing, max-height/scroll, text size) — this component supplies no default so the two callers can size it differently (WalkRouteStatus scrolls inside a fixed-height card; RouteStrip's sheet scrolls inside its own panel). */
+  className?: string;
+  /**
+   * #555: when provided, each row becomes a button that calls this with its
+   * index — WalkStepper's "All turns" disclosure uses this to let someone
+   * jump straight to an arbitrary turn. Omit (both pre-#555 callers do,
+   * unchanged) to keep the plain, non-interactive list exactly as it was.
+   */
+  onSelectStep?: (index: number) => void;
+  /** #555: highlights the row matching this index. Only meaningful alongside `onSelectStep`. */
+  activeIndex?: number;
+}
+
+export function WalkStepsList({ steps, locale, id, hidden, className, onSelectStep, activeIndex }: WalkStepsListProps) {
+  return (
+    <ol
+      id={id}
+      data-testid="walk-steps-list"
+      aria-label={t("directions.stepsListLabel", locale)}
+      hidden={hidden}
+      className={className}
+    >
+      {steps.map((step, i) => {
+        const distText = formatStepDistance(step.distance, locale);
+        const rowContent = (
+          <>
+            <span className="shrink-0 w-5 text-right text-[var(--color-ink-400)] text-xs font-mono select-none">
+              {i + 1}.
+            </span>
+            <span className="flex-1">{step.instruction}</span>
+            {distText && (
+              <span className="shrink-0 text-xs text-[var(--color-ink-400)] font-mono">
+                {distText}
+              </span>
+            )}
+          </>
+        );
+        return (
+          <li key={i} className="flex items-start gap-2">
+            {onSelectStep ? (
+              <button
+                type="button"
+                onClick={() => onSelectStep(i)}
+                className={
+                  "flex flex-1 items-start gap-2 text-left rounded " +
+                  (i === activeIndex ? "text-[var(--color-sage-700)] font-medium" : "") +
+                  " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                }
+              >
+                {rowContent}
+              </button>
+            ) : (
+              rowContent
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+// ─── Turn glyph (#555) ────────────────────────────────────────────────────────
+//
+// Picks one of the four icons already imported for this file's own use
+// (no new dependency) based on Mapbox's `maneuver.type`/`.modifier`. Not a
+// full icon set for every Mapbox maneuver type (roundabout, fork, merge,
+// etc. all fall through to the plain "continue straight" arrow) — a
+// ponytail-scope call: those are rare turns, and Mapbox's own instruction
+// text already names them, so the glyph is a visual accent, not the only
+// signal.
+function TurnGlyph({
+  maneuverType,
+  maneuverModifier,
+}: {
+  maneuverType?: string;
+  maneuverModifier?: string;
+}) {
+  const className = "h-5 w-5 shrink-0 text-[var(--color-sage-600)]";
+  if (maneuverType === "arrive" || maneuverType === "depart") {
+    return <MapPinIcon className={className} aria-hidden />;
+  }
+  if (maneuverModifier?.includes("left")) {
+    return <CornerUpLeft className={className} aria-hidden />;
+  }
+  if (maneuverModifier?.includes("right")) {
+    return <CornerUpRight className={className} aria-hidden />;
+  }
+  return <ArrowUp className={className} aria-hidden />;
+}
+
+// 48px square — WCAG 2.5.5-comfortable touch target for the one-handed,
+// walking-while-glancing-at-the-phone use case this stepper is built for.
+const stepNavClass =
+  "flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-md)] " +
+  "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
+  "disabled:bg-[var(--color-bone-200)] disabled:text-[var(--color-ink-400)] " +
+  "hover:enabled:bg-[var(--color-sage-600)] " +
+  PRESS_FEEDBACK + " " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-1";
+
+// ─── WalkStepper (#555) ────────────────────────────────────────────────────────
+//
+// The step-through panel: one turn at a time, Back/Next, and an "All turns"
+// disclosure that reuses WalkStepsList (above) rather than a second list
+// implementation. Owns ONLY the disclosure's open/closed state — which turn
+// is active lives in MapWrapper (activeIndex/onStepChange props) because the
+// map's per-turn camera focus and this panel must always agree on the
+// current step; two independent pieces of state here could drift apart.
+export interface WalkStepperProps {
+  /** Every step Mapbox returned, INCLUDING any whose `location` is undefined
+   *  — nothing filters these out (see `WalkStep.location`'s own WHY in
+   *  Map.tsx: a turn with no usable coordinate is still worth reading, so it
+   *  is kept and only its camera hop is skipped). Anything here that reaches
+   *  for a coordinate must guard first, the way MapWrapper's
+   *  `handleStepChange` does. */
+  steps: WalkStep[];
+  activeIndex: number;
+  onStepChange: (index: number) => void;
+  locale: Locale;
+  className?: string;
+}
+
+export function WalkStepper({
+  steps,
+  activeIndex,
+  onStepChange,
+  locale,
+  className,
+}: WalkStepperProps) {
+  const [allTurnsOpen, setAllTurnsOpen] = useState(false);
+  const allTurnsId = useId();
+
+  const total = steps.length;
+  // Defensive clamp: activeIndex is owned by the caller, so a stale value
+  // surviving a route swap (fewer steps than before) can't index past the end.
+  const index = Math.min(Math.max(activeIndex, 0), Math.max(total - 1, 0));
+  const step = steps[index];
+  if (!step) return null;
+
+  const nextStep = steps[index + 1];
+  const isLast = index === total - 1;
+  const distText = formatStepDistance(step.distance, locale);
+  // "You have arrived" replaces the distance line on the final step (distance
+  // is always 0 there) rather than showing a meaningless "0 ft".
+  const distanceLine =
+    isLast || step.distance === 0
+      ? t("directions.stepArrived", locale)
+      : distText
+        ? t("directions.stepIn", locale, { distance: distText })
+        : null;
+
+  return (
+    <div className={className}>
+      <p
+        className="text-xs font-medium text-[var(--color-ink-400)]"
+        data-testid="walk-stepper-counter"
+      >
+        {t("directions.stepCounter", locale, {
+          current: String(index + 1),
+          total: String(total),
+        })}
+      </p>
+
+      {/* aria-live: announces the new turn to screen reader users on every
+          Back/Next tap without them needing to re-navigate to this text. */}
+      <div
+        className="mt-1 flex items-start gap-2"
+        role="status"
+        aria-live="polite"
+        data-testid="walk-stepper-instruction"
+      >
+        <TurnGlyph
+          maneuverType={step.maneuverType}
+          maneuverModifier={step.maneuverModifier}
+        />
+        <span className="text-base font-semibold text-[var(--color-ink-900)]">
+          {step.instruction}
+        </span>
+      </div>
+
+      {distanceLine && (
+        <p
+          className="mt-0.5 pl-7 text-sm text-[var(--color-ink-400)]"
+          data-testid="walk-stepper-distance"
+        >
+          {distanceLine}
+        </p>
+      )}
+
+      {nextStep && (
+        <p
+          className="mt-2 border-t border-[var(--color-bone-200)] pt-2 text-xs text-[var(--color-ink-400)]"
+          data-testid="walk-stepper-then"
+        >
+          {t("directions.stepThen", locale, { instruction: nextStep.instruction })}
+        </p>
+      )}
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          data-testid="walk-stepper-back"
+          aria-label={t("directions.stepBack", locale)}
+          disabled={index === 0}
+          onClick={() => onStepChange(index - 1)}
+          className={stepNavClass}
+        >
+          <ChevronLeft className="h-5 w-5" aria-hidden />
+        </button>
+        <button
+          type="button"
+          data-testid="walk-stepper-next"
+          aria-label={t("directions.stepNext", locale)}
+          disabled={isLast}
+          onClick={() => onStepChange(index + 1)}
+          className={stepNavClass}
+        >
+          <ChevronRight className="h-5 w-5" aria-hidden />
+        </button>
+      </div>
+
+      <div className="mt-2">
+        <button
+          type="button"
+          data-testid="walk-stepper-all-turns-toggle"
+          aria-expanded={allTurnsOpen}
+          aria-controls={allTurnsId}
+          onClick={() => setAllTurnsOpen((v) => !v)}
+          className={
+            "flex items-center gap-1 py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
+            "hover:text-[var(--color-sage-700)] " +
+            PRESS_FEEDBACK + " " +
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          }
+        >
+          {allTurnsOpen ? (
+            <>
+              <ChevronUp className="h-4 w-4" aria-hidden />
+              {t("directions.fewerTurns", locale)}
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-4 w-4" aria-hidden />
+              {t("directions.allTurns", locale)}
+            </>
+          )}
+        </button>
+
+        <WalkStepsList
+          steps={steps}
+          locale={locale}
+          id={allTurnsId}
+          hidden={!allTurnsOpen}
+          onSelectStep={onStepChange}
+          activeIndex={index}
+          // Same overscroll-contain reasoning as WalkRouteStatus's pre-#555
+          // list — see that component's own comment on this class.
+          className="mt-2 space-y-1.5 text-sm text-[var(--color-ink-700)] max-h-48 overflow-y-auto overscroll-contain"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Active-route status (readout) ───────────────────────────────────────────
+//
+// Distance/duration, the collapsible turn-by-turn steps, and the "Open in
+// Google Maps" walk handoff — everything this component shows below its Walk
+// button once a route is active, plus the "share your location" hint (#207)
+// for the sibling case where no route exists yet. Extracted (2026-09-19,
+// Blessing Box walk restore — see BoxCardBody's own header) so BoxCardBody's
+// address-as-directions-link can render the identical readout for a box's
+// in-app walking route without duplicating this JSX; DirectionButtons itself
+// keeps calling it below, byte-identical output for ordinary venues.
+//
+// WHY `locationHintId` is a prop, not generated here: the trigger element's
+// own `aria-describedby` must point at the same id this component puts on
+// the hint `<p>`, and a trigger rendered by the CALLER (this component's own
+// Walk button, or BoxCardBody's address button) can't reach an id minted
+// inside a child it hasn't rendered yet. `stepsListId` has no such
+// cross-component wiring need — nothing outside this component ever
+// references it — so it stays internal via useId(), same as before extraction.
+export interface WalkRouteStatusProps {
+  /** Only id/name/lat/lng are read — a box (PublicBlessingBox extends Venue) or an ordinary Venue both satisfy this with no conversion. */
+  venue: Pick<Venue, "id" | "name" | "lat" | "lng">;
+  locale: Locale;
+  isRouteActive: boolean;
+  routeInfo?: RouteInfo | null;
+  walkSteps?: WalkStep[] | null;
+  showLocationHint?: boolean;
+  locationHintId: string;
+  /**
+   * Renders a standalone "Clear route" text control between the steps block
+   * and the "Open in Google Maps" link, when the route is active. Optional —
+   * DirectionButtons itself never passes this (its own Walk button IS the
+   * clear affordance, re-labeling to "Clear walking route" on tap, so a
+   * second control here would be redundant for ordinary venues; leaving it
+   * undefined keeps their output byte-identical). BoxCardBody's own trigger
+   * (the address) stays labeled as the address at all times instead of
+   * relabeling (the address text is the box's one visible location cue on
+   * the card — losing it while a route is drawn would be a regression), so
+   * it needs this explicit control to clear a route (2026-09-19, walk
+   * restore pass, advisor()-reviewed).
+   */
+  onClearRoute?: () => void;
+  /** Which turn WalkStepper shows (#555). Defaults to 0. */
+  activeStepIndex?: number;
+  /** Moves the stepper to a different turn (#555). Defaults to a no-op —
+   *  callers that never draw a route (most WalkRouteStatus instances, most
+   *  of the time) don't need to wire anything. */
+  onStepChange?: (index: number) => void;
+}
+
+export function WalkRouteStatus({
+  venue,
+  locale,
+  isRouteActive,
+  routeInfo = null,
+  walkSteps = null,
+  showLocationHint = false,
+  locationHintId,
+  onClearRoute,
+  activeStepIndex = 0,
+  onStepChange = () => {},
+}: WalkRouteStatusProps) {
+  const walkGoogleUrl = googleMapsUrl(venue.lat, venue.lng, "walking");
+
+  const stepperSteps = walkSteps ?? [];
+  const hasSteps = isRouteActive && stepperSteps.length > 0;
+
+  return (
+    <>
+      {/* Location-needed hint (#207) — shown when Walk requested geolocation
+          (because userLocation was null) and the browser denied it or it's
+          unavailable. role="status" + aria-live announces it immediately for
+          screen reader users; aria-describedby on the trigger element links
+          it for users who tab back later. !isRouteActive is defensive — the
+          two states shouldn't ever coexist, but the guard makes that
+          invariant explicit here too. */}
+      {!isRouteActive && showLocationHint && (
+        <p
+          id={locationHintId}
+          data-testid="walk-location-hint"
+          role="status"
+          aria-live="polite"
+          className="mt-2 text-sm text-[var(--color-ink-500)]"
+        >
+          {t("directions.locationHint", locale)}
+        </p>
+      )}
+
+      {/* In-card walking route readout — distance + duration. Shown only
+          when a route is active. Uses i18n keys so Spanish users see
+          localized unit strings (e.g. "{distance} caminando"). */}
+      {isRouteActive && routeInfo && (
+        <div
+          data-testid="walking-route-info"
+          className={[
+            "mt-2 flex items-center justify-center gap-2",
+            "text-sm font-semibold text-[var(--color-sage-700)]",
+          ].join(" ")}
+        >
+          <span data-testid="walking-route-distance">
+            {t("directions.routeDistance", locale, { distance: routeInfo.distance })}
+          </span>
+          <span aria-hidden>·</span>
+          <span data-testid="walking-route-duration">
+            {t("directions.routeDuration", locale, { duration: routeInfo.duration })}
+          </span>
+        </div>
+      )}
+
+      {/* Step-through directions (#555) — replaces the old collapsible
+          Show/Hide steps toggle + full list. One turn at a time; its own
+          "All turns" disclosure (inside WalkStepper) still reaches the full
+          WalkStepsList for anyone who wants to scan every turn at once.
+          KNOWN LIMITATION (unchanged from the pre-#555 toggle): Mapbox-sourced
+          turn instructions do not refresh when the user toggles EN/ES while a
+          route is active — they stay in the language active at fetch time
+          until the user re-taps Walk. */}
+      {hasSteps && (
+        <WalkStepper
+          // WHY keyed on the venue (#555, preserving FIX 2's behavior): the
+          // "All turns" disclosure is local state inside WalkStepper, and
+          // this component stays mounted across a venue change — so without
+          // a key, a list left open on venue A would still be open on venue
+          // B's unrelated route. The pre-#555 code spent a ref + an effect
+          // collapsing `stepsExpanded` for exactly this; remounting on the
+          // venue id is the same guarantee with neither.
+          key={venue.id}
+          steps={stepperSteps}
+          activeIndex={activeStepIndex}
+          onStepChange={onStepChange}
+          locale={locale}
+          className="mt-2"
+        />
+      )}
+
+      {/* Clear route — only rendered when the trigger itself doesn't already
+          double as the clear affordance (see onClearRoute's own doc above).
+          Same visual weight as the steps toggle above it. */}
+      {isRouteActive && onClearRoute && (
+        <div className="mt-2">
+          <button
+            type="button"
+            data-testid="walk-clear-route"
+            onClick={onClearRoute}
+            className={
+              "py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
+              "hover:text-[var(--color-sage-700)] underline-offset-2 hover:underline " +
+              PRESS_FEEDBACK + " " +
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+            }
+          >
+            {t("directions.clearRoute", locale)}
+          </button>
+        </div>
+      )}
+
+      {/* "Open in Google Maps" walk handoff — secondary text link, shown when route is active.
+          WHY text link (not button): it opens an external URL, so an <a> is semantically correct.
+          WHY secondary (not a full button): the in-app route is the primary action; this is a
+          fallback for users who want native GPS turn-by-turn on their phone.
+          WHY origin is omitted: same as Bus/Drive — Google uses device location automatically. */}
+      {isRouteActive && (
+        <div className="mt-2 text-center">
+          <a
+            data-testid="walk-googlemaps-link"
+            href={walkGoogleUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={t("directions.openInGoogleMapsAria", locale, { name: venue.name })}
+            className={
+              // ~16px tall -> inline-block so the padding growth actually
+              // expands this link's own box (a plain inline element's padding
+              // doesn't reliably grow its hit rect across browsers). Same type
+              // size/color as before (mobile review #10).
+              "inline-block py-1.5 text-xs text-[var(--color-ink-500)] underline underline-offset-2 " +
+              "hover:text-[var(--color-ink-700)] " +
+              PRESS_FEEDBACK + " " +
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+            }
+          >
+            {t("directions.openInGoogleMaps", locale)}
+          </a>
+        </div>
+      )}
+    </>
+  );
 }
 
 // ─── Button styles ────────────────────────────────────────────────────────────
@@ -167,43 +663,17 @@ export default function DirectionButtons({
   routeInfo = null,
   walkSteps = null,
   showLocationHint = false,
+  activeStepIndex = 0,
+  onStepChange = () => {},
 }: DirectionButtonsProps) {
-  // Toggle state for the step list — collapsed by default.
-  const [stepsExpanded, setStepsExpanded] = useState(false);
-
-  // FIX 2: Reset stepsExpanded to collapsed when the venue changes.
-  // WHY useRef to track the previous id: we want to reset only on a real change,
-  // not on every render. A direct dep on venue.id in the effect captures the right
-  // moment — a new venue always means the old route's steps are gone and the new
-  // one should start collapsed. Using a ref avoids reading stale closure state.
-  //
-  // NOTE: this effect also fires when walkSteps changes identity (new route same
-  // venue) if we depended on walkSteps, but venue.id is sufficient — it covers
-  // the cross-venue case (the primary bug) without over-firing on re-fetches for
-  // the same venue (e.g. locale change triggering a re-fetch, FIX 5 path).
-  const prevVenueIdRef = useRef<string>(venue.id);
-  useEffect(() => {
-    if (prevVenueIdRef.current !== venue.id) {
-      prevVenueIdRef.current = venue.id;
-      setStepsExpanded(false);
-    }
-  }, [venue.id]);
-
-  // FIX 6: Per-instance id for the step list <ol>.
-  // WHY useId (not a module constant): React's useId() generates a unique id per
-  // component instance, which is robust if two DirectionButtons ever mount
-  // simultaneously (e.g. future side-by-side compare view). The module constant
-  // "walk-steps-list" was shared across all instances — fragile.
-  // data-testid="walk-steps-list" is unchanged — tests query by testid, not id.
-  const stepsListId = useId();
-
   // Per-instance id for the "share your location" hint (#207) — aria-describedby
-  // target on the Walk button below, same useId reasoning as stepsListId.
+  // target on the Walk button below, shared with WalkRouteStatus's own <p id>
+  // (see that component's own header for why this one stays a prop instead of
+  // being generated internally like stepsListId).
   const locationHintId = useId();
 
   const busUrl = googleMapsUrl(venue.lat, venue.lng, "transit");
   const driveUrl = googleMapsUrl(venue.lat, venue.lng, "driving");
-  const walkGoogleUrl = googleMapsUrl(venue.lat, venue.lng, "walking");
 
   function handleWalkClick() {
     if (isRouteActive && onClearRoute) {
@@ -221,8 +691,6 @@ export default function DirectionButtons({
   const walkVisibleLabel = isRouteActive
     ? t("directions.clearRoute", locale)
     : t("directions.walk", locale);
-
-  const hasSteps = isRouteActive && Array.isArray(walkSteps) && walkSteps.length > 0;
 
   return (
     <div>
@@ -261,142 +729,17 @@ export default function DirectionButtons({
         </a>
       </div>
 
-      {/* Location-needed hint (#207) — shown when Walk requested geolocation
-          (because userLocation was null) and the browser denied it or it's
-          unavailable. role="status" + aria-live announces it immediately for
-          screen reader users; aria-describedby on the Walk button above links
-          it for users who tab back later. !isRouteActive is defensive — the
-          two states shouldn't ever coexist (MapWrapper clears this the instant
-          a new Walk tap starts, and a successful fetch never sets it), but the
-          guard makes that invariant explicit here too. */}
-      {!isRouteActive && showLocationHint && (
-        <p
-          id={locationHintId}
-          data-testid="walk-location-hint"
-          role="status"
-          aria-live="polite"
-          className="mt-2 text-sm text-[var(--color-ink-500)]"
-        >
-          {t("directions.locationHint", locale)}
-        </p>
-      )}
-
-      {/* In-card walking route readout — distance + duration below the buttons.
-          Shown only when a route is active for this venue. Uses i18n keys so
-          Spanish users see localized unit strings (e.g. "{distance} caminando"). */}
-      {isRouteActive && routeInfo && (
-        <div
-          data-testid="walking-route-info"
-          className={[
-            "mt-2 flex items-center justify-center gap-2",
-            "text-sm font-semibold text-[var(--color-sage-700)]",
-          ].join(" ")}
-        >
-          <span data-testid="walking-route-distance">
-            {t("directions.routeDistance", locale, { distance: routeInfo.distance })}
-          </span>
-          <span aria-hidden>·</span>
-          <span data-testid="walking-route-duration">
-            {t("directions.routeDuration", locale, { duration: routeInfo.duration })}
-          </span>
-        </div>
-      )}
-
-      {/* Turn-by-turn step list — collapsible, shown only when route is active with steps.
-          Toggle button with aria-expanded/aria-controls for WCAG 4.1.2 disclosure pattern.
-          Instructions arrive pre-localized from Mapbox (language= param in MapWrapper). */}
-      {hasSteps && (
-        <div className="mt-2">
-          <button
-            type="button"
-            data-testid="walk-steps-toggle"
-            aria-expanded={stepsExpanded}
-            aria-controls={stepsListId}
-            onClick={() => setStepsExpanded((v) => !v)}
-            className={
-              // ~20px tall -> real padding growth, same treatment as BottomSheet's
-              // Show/Hide details toggle (mobile review #9).
-              "py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
-              "hover:text-[var(--color-sage-700)] underline-offset-2 hover:underline " +
-              PRESS_FEEDBACK + " " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-            }
-          >
-            {stepsExpanded
-              ? t("directions.hideSteps", locale)
-              : t("directions.showSteps", locale)}
-          </button>
-
-          {/* WHY hidden attribute over CSS display:none: screen readers skip hidden elements.
-              The list must not be announced when collapsed.
-              FIX 4: max-h-48 + overflow-y-auto so a long step list scrolls internally and
-              keeps the Walk button + route readout visible on mobile without pushing them
-              below the viewport fold. The BottomSheet body already scrolls (overflow-y-auto),
-              so this inner scroll is intentionally nested — it caps the list specifically.
-              KNOWN LIMITATION (FIX 5 deferred): Mapbox-sourced turn instructions do not
-              refresh when the user toggles EN/ES while a route is active. The t()-localized
-              toggle label and distance readout update immediately, but instruction text stays
-              in the language active at fetch time until the user re-taps Walk. Fixing this
-              requires a locale-change effect in MapWrapper that re-fetches the active route
-              with the new language= param. Deferred because: (a) it adds an async fetch
-              effect triggered by locale change — a new async path that needs race-guarding
-              itself; (b) the most common user path is to set language once before tapping
-              Walk. The current behavior is a minor UX limitation, not a breakage. */}
-          <ol
-            id={stepsListId}
-            data-testid="walk-steps-list"
-            aria-label={t("directions.stepsListLabel", locale)}
-            hidden={!stepsExpanded}
-            className="mt-2 space-y-1.5 text-sm text-[var(--color-ink-700)] max-h-48 overflow-y-auto"
-          >
-            {walkSteps!.map((step, i) => {
-              const distText = formatStepDistance(step.distance, locale);
-              return (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="shrink-0 w-5 text-right text-[var(--color-ink-400)] text-xs font-mono select-none">
-                    {i + 1}.
-                  </span>
-                  <span className="flex-1">{step.instruction}</span>
-                  {distText && (
-                    <span className="shrink-0 text-xs text-[var(--color-ink-400)] font-mono">
-                      {distText}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-      )}
-
-      {/* "Open in Google Maps" walk handoff — secondary text link, shown when route is active.
-          WHY text link (not button): it opens an external URL, so an <a> is semantically correct.
-          WHY secondary (not a full button): the in-app route is the primary action; this is a
-          fallback for users who want native GPS turn-by-turn on their phone.
-          WHY origin is omitted: same as Bus/Drive — Google uses device location automatically. */}
-      {isRouteActive && (
-        <div className="mt-2 text-center">
-          <a
-            data-testid="walk-googlemaps-link"
-            href={walkGoogleUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={t("directions.openInGoogleMapsAria", locale, { name: venue.name })}
-            className={
-              // ~16px tall -> inline-block so the padding growth actually
-              // expands this link's own box (a plain inline element's padding
-              // doesn't reliably grow its hit rect across browsers). Same type
-              // size/color as before (mobile review #10).
-              "inline-block py-1.5 text-xs text-[var(--color-ink-500)] underline underline-offset-2 " +
-              "hover:text-[var(--color-ink-700)] " +
-              PRESS_FEEDBACK + " " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-            }
-          >
-            {t("directions.openInGoogleMaps", locale)}
-          </a>
-        </div>
-      )}
+      <WalkRouteStatus
+        venue={venue}
+        locale={locale}
+        isRouteActive={isRouteActive}
+        routeInfo={routeInfo}
+        walkSteps={walkSteps}
+        showLocationHint={showLocationHint}
+        locationHintId={locationHintId}
+        activeStepIndex={activeStepIndex}
+        onStepChange={onStepChange}
+      />
     </div>
   );
 }

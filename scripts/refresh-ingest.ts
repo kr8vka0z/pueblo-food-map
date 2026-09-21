@@ -65,6 +65,7 @@ import type { Venue } from "@/types/venue";
 import {
   diffSource,
   exceedsPerRunCap,
+  excludeBlessingBoxes,
   isValidIncomingRecord,
   pendingKey,
   rejectionKey,
@@ -350,6 +351,15 @@ async function main(): Promise<void> {
     if (dropped > 0) console.log(`  ${source}: dropped ${dropped} scraped record(s) that failed schema validation`);
   }
 
+  // Blessing boxes are live, not managed by this pipeline — strip them from
+  // both sides of every source's diff before it ever runs (see
+  // excludeBlessingBoxes's own header for why both sides matter).
+  for (const source of ["plentiful", "osm"] as const) {
+    const stripped = excludeBlessingBoxes(currentByType[source], incomingByType[source]);
+    currentByType[source] = stripped.currentRows;
+    incomingByType[source] = stripped.incoming;
+  }
+
   let allProposals: ProposalDraft[] = [];
   let anySourceAborted = false;
 
@@ -375,9 +385,12 @@ async function main(): Promise<void> {
   }
 
   // ── 4: link-health pass over every active venue with a stored url ──
+  // AND category != 'blessing_box': boxes produce no proposals of any kind
+  // from this pipeline (same reasoning as excludeBlessingBoxes above) —
+  // link_health is a separate proposal source, so it needs its own guard.
   const urlRows = d1Query<UrlRow>(
     dbMode,
-    "SELECT id, url FROM venues WHERE status IN ('draft','published') AND url IS NOT NULL AND url != ''",
+    "SELECT id, url FROM venues WHERE status IN ('draft','published') AND category != 'blessing_box' AND url IS NOT NULL AND url != ''",
   );
   console.log(`\nlink_health: checking ${urlRows.length} url(s)...`);
   const checkedAt = new Date().toISOString();

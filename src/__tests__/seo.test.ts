@@ -18,14 +18,19 @@ import { venues } from "@/data/venues";
 // ─── sitemap ─────────────────────────────────────────────────────────────────
 
 describe("sitemap", () => {
-  test("returns an array of entries", () => {
-    const entries = sitemap();
+  // sitemap() is async as of Blessing Boxes slice 1 — it reads live box
+  // routes from D1 (see src/app/sitemap.ts's loadBoxRoutes). In this jsdom
+  // test environment getCloudflareContext() throws (no Worker context), so
+  // loadBoxRoutes' own try/catch degrades to zero box entries — these tests
+  // exercise exactly the same static + venue routes they always did.
+  test("returns an array of entries", async () => {
+    const entries = await sitemap();
     expect(Array.isArray(entries)).toBe(true);
     expect(entries.length).toBeGreaterThan(0);
   });
 
-  test("root URL is present", () => {
-    const entries = sitemap();
+  test("root URL is present", async () => {
+    const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     // Root may be SITE_URL bare or SITE_URL + "/"
     const hasRoot =
@@ -33,53 +38,53 @@ describe("sitemap", () => {
     expect(hasRoot).toBe(true);
   });
 
-  test("every URL is absolute and starts with SITE_URL", () => {
-    const entries = sitemap();
+  test("every URL is absolute and starts with SITE_URL", async () => {
+    const entries = await sitemap();
     for (const entry of entries) {
       expect(entry.url.startsWith(SITE_URL)).toBe(true);
     }
   });
 
-  test("/suggest is included", () => {
-    const entries = sitemap();
+  test("/suggest is included", async () => {
+    const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${SITE_URL}/suggest`);
   });
 
-  test("/feedback is included", () => {
-    const entries = sitemap();
+  test("/feedback is included", async () => {
+    const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${SITE_URL}/feedback`);
   });
 
-  test("/privacy is included", () => {
-    const entries = sitemap();
+  test("/privacy is included", async () => {
+    const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${SITE_URL}/privacy`);
   });
 
-  test("no duplicate URLs", () => {
-    const entries = sitemap();
+  test("no duplicate URLs", async () => {
+    const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     const unique = new Set(urls);
     expect(unique.size).toBe(urls.length);
   });
 
   // PR2 (#164 6.3/6.4) — venue URLs are now included
-  test("includes venue URLs (length > 4)", () => {
-    const entries = sitemap();
+  test("includes venue URLs (length > 4)", async () => {
+    const entries = await sitemap();
     expect(entries.length).toBeGreaterThan(4);
   });
 
-  test("contains at least one /venue/ URL for a real venue id", () => {
-    const entries = sitemap();
+  test("contains at least one /venue/ URL for a real venue id", async () => {
+    const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     const firstVenueUrl = `${SITE_URL}/venue/${venues[0].id}`;
     expect(urls).toContain(firstVenueUrl);
   });
 
-  test("all venue URLs start with SITE_URL/venue/", () => {
-    const entries = sitemap();
+  test("all venue URLs start with SITE_URL/venue/", async () => {
+    const entries = await sitemap();
     const venueEntries = entries.filter((e) =>
       e.url.includes("/venue/"),
     );
@@ -92,8 +97,8 @@ describe("sitemap", () => {
   // S6 (#164 quick win) — venue entries carry a real lastModified so crawlers
   // can tell which venue pages actually changed, instead of re-crawling every
   // page as if it were equally fresh.
-  test("every venue entry includes lastModified", () => {
-    const entries = sitemap();
+  test("every venue entry includes lastModified", async () => {
+    const entries = await sitemap();
     const venueEntries = entries.filter((e) => e.url.includes("/venue/"));
     expect(venueEntries.length).toBeGreaterThan(0);
     for (const entry of venueEntries) {
@@ -101,8 +106,8 @@ describe("sitemap", () => {
     }
   });
 
-  test("a venue's lastModified matches its last_verified date", () => {
-    const entries = sitemap();
+  test("a venue's lastModified matches its last_verified date", async () => {
+    const entries = await sitemap();
     const v = venues[0];
     const entry = entries.find((e) => e.url === `${SITE_URL}/venue/${v.id}`);
     expect(entry?.lastModified).toBe(v.last_verified);

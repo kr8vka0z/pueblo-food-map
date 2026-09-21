@@ -60,6 +60,7 @@ import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
 import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
+import { computeBoxEventWrites, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";
 import type { AdminVenueRow } from "@/types/venue";
 
 /**
@@ -84,6 +85,20 @@ const VENUE_UPDATE_SQL = `UPDATE venues SET
 
 const AUDIT_INSERT_SQL =
   "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+// Blessing Boxes slice 1: an edit keeps the invariant "a blessing_boxes row
+// exists iff venues.category = 'blessing_box'". DELETE-then-INSERT (rather
+// than SQLite's ON CONFLICT upsert syntax) covers both the ordinary
+// box-edit case and the "admin changed this venue's category AWAY FROM
+// blessing_box" cleanup case in the same two statements — but ONLY when the
+// edit actually touches a box, either direction (see needsBoxTouch below).
+// Every ordinary non-box edit must add zero statements to the batch — the
+// pre-existing #255/#390 tests assert an exact 2/3-statement shape for
+// pantry/garden/etc. edits, and a box row that never existed has nothing to
+// delete.
+const BOX_DELETE_SQL = "DELETE FROM blessing_boxes WHERE venue_id = ?";
+const BOX_INSERT_SQL =
+  "INSERT INTO blessing_boxes (venue_id, host_name, host_note, host_contact, most_needed, installed_on, removed_on) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
 // ponytail: AND status = 'pending' is a deliberate idempotency ceiling, not
 // an oversight — same shape as public_submissions' own approve statements
@@ -201,23 +216,77 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
+  // Blessing Boxes slice 3: computeBoxEventWrites needs the box's pre-edit
+  // removed_on to detect a null->set transition (the "removed" event) —
+  // only fetched when this venue is CURRENTLY a box, since a plain venue
+  // has no blessing_boxes row to read at all.
+  const existingBoxRow =
+    existing.category === "blessing_box"
+      ? await db.prepare("SELECT removed_on FROM blessing_boxes WHERE venue_id = ?").bind(id).first<{ removed_on: string | null }>()
+      : null;
+
   const updatedAt = new Date().toISOString();
   const afterRow = buildAfterRow(existing, fields, identity.email, updatedAt);
 
   const updateVenue = db
     .prepare(VENUE_UPDATE_SQL)
     .bind(...buildVenueUpdateValues(id, fields, identity.email, updatedAt));
+
+  // Only touch blessing_boxes when this edit is relevant to it: the venue
+  // is (still or newly) a box, OR it WAS a box and is being edited away
+  // from one (the cleanup case) — every other edit skips both statements
+  // entirely, preserving the plain 2-statement (or 3 with a proposal)
+  // batch shape every pre-existing edit test asserts.
+  const needsBoxTouch = fields.box !== null || existing.category === "blessing_box";
+  const deleteBox = needsBoxTouch ? db.prepare(BOX_DELETE_SQL).bind(id) : null;
+  const insertBox =
+    fields.box !== null
+      ? db
+          .prepare(BOX_INSERT_SQL)
+          .bind(id, fields.box.hostName, fields.box.hostNote, fields.box.hostContact, fields.box.mostNeeded, fields.box.installedOn, fields.box.removedOn)
+      : null;
+  // Blessing Boxes slice 3: zero, one, or several box_events rows, computed
+  // by diffing the pre-edit row against this save (renamed/moved/removed —
+  // see src/lib/boxEvents.ts's own header for why "becoming a box" and
+  // "leaving box-hood" are handled specially, and why archiving writes
+  // nothing at all). An ordinary non-box edit returns [] here, same
+  // "zero statements added" invariant needsBoxTouch already guarantees for
+  // the box INSERT/DELETE pair above.
+  const insertBoxEvents = computeBoxEventWrites(
+    { category: existing.category, name: existing.name, address: existing.address, removedOn: existingBoxRow?.removed_on ?? null },
+    { name: fields.name, address: fields.address, box: fields.box },
+  ).map((e) => db.prepare(BOX_EVENT_INSERT_SQL).bind(id, e.kind, e.detail, updatedAt));
   const insertAudit = db
     .prepare(AUDIT_INSERT_SQL)
-    .bind(identity.email, "venue", id, "update", JSON.stringify(existing), JSON.stringify(afterRow), updatedAt);
+    .bind(
+      identity.email,
+      "venue",
+      id,
+      "update",
+      JSON.stringify(existing),
+      // host_contact included here even though it's never in a public
+      // response — audit_log is admin-internal, same reasoning as the
+      // create route's own after_json.
+      JSON.stringify(fields.box !== null ? { ...afterRow, box: fields.box } : afterRow),
+      updatedAt,
+    );
   const approveProposal =
     proposalId !== null
       ? db.prepare(APPROVE_PROPOSAL_SQL).bind(identity.email, updatedAt, updatedAt, proposalId, id)
       : null;
 
-  // Atomic: the update, its own audit trail, and (when present) the
-  // originating link_health proposal's approval either all land or none do.
-  await db.batch([updateVenue, insertAudit, ...(approveProposal !== null ? [approveProposal] : [])]);
+  // Atomic: the update, the box row delete+reinsert (only when relevant —
+  // see needsBoxTouch above), its box_events lifecycle row(s) (if any), its
+  // own audit trail, and (when present) the originating link_health
+  // proposal's approval either all land or none do.
+  await db.batch([
+    updateVenue,
+    ...(deleteBox !== null ? [deleteBox] : []),
+    ...(insertBox !== null ? [insertBox] : []),
+    ...insertBoxEvents,
+    insertAudit,
+    ...(approveProposal !== null ? [approveProposal] : []),
+  ]);
 
   return NextResponse.json({ ok: true, id });
 }

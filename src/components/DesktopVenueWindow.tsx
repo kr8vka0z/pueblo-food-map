@@ -13,9 +13,11 @@
  *
  * Persistent header bar (issue #64):
  *   - Always visible, same height (~44px), same background in both states.
- *   - Left: "Show details" / "Hide details" toggle (replaces chevron + text-link).
+ *   - Left: "Show details" / "Hide details" toggle (replaces chevron + text-link) —
+ *     for a blessing box (no collapsed state, see the box-body section below)
+ *     this slot is a "History" link to /box/<id>/history instead (2026-09-18).
  *   - Right: X-close (clears selectedVenueId).
- *   - Tab order: X-close → Show/Hide details → body content.
+ *   - Tab order: X-close → Show/Hide details (or History) → body content.
  *   - Venue title lives in the body, same layout container in both states
  *     (no title jump between states).
  *
@@ -66,6 +68,9 @@ import { useLocale } from "@/lib/LocaleContext";
 import VenuePopupHeader from "@/components/VenuePopupHeader";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import HoursList from "@/components/HoursList";
+import BoxCardBody from "@/components/BoxCardBody";
+import { isNativeDialogOpen } from "@/lib/dialogGuard";
+import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -139,6 +144,16 @@ function computeWindowPosition(
 
 interface DesktopVenueWindowProps {
   venue: Venue & { distanceMiles?: number };
+  /**
+   * Full blessing-box record when `venue.category === "blessing_box"` — see
+   * BottomSheet's identical prop for the full rationale (`venue` only ever
+   * carries plain-Venue fields). `null`/`undefined` while MapWrapper's box
+   * fetch hasn't resolved yet — the box collapsed/expanded bodies show a
+   * loading line until it has.
+   */
+  box?: PublicBlessingBox | null;
+  /** Forwarded to BoxCardBody's check-in panel — see BottomSheet's identical prop. */
+  onCheckinSuccess?: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
   expanded: boolean;
   /** mapboxgl.Map instance delivered by Map.tsx onLoad → onMapReady. */
   mapboxMap: MapboxMap | null;
@@ -163,12 +178,18 @@ interface DesktopVenueWindowProps {
    * "share your location" hint instead of silently doing nothing.
    */
   showWalkLocationHint?: boolean;
+  /** Which turn the step-through stepper is showing (#555) — same as BottomSheet's identical prop, MapWrapper-owned so desktop and mobile agree with the map's camera focus. */
+  activeStepIndex?: number;
+  /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap. */
+  onStepChange?: (index: number) => void;
 }
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
 
 export default function DesktopVenueWindow({
   venue,
+  box,
+  onCheckinSuccess,
   expanded,
   mapboxMap,
   onExpand,
@@ -181,14 +202,21 @@ export default function DesktopVenueWindow({
   walkRouteInfo,
   walkRouteSteps,
   showWalkLocationHint = false,
+  activeStepIndex = 0,
+  onStepChange = () => {},
 }: DesktopVenueWindowProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
   const windowRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<WindowPosition>({ left: 0, top: 0 });
 
-  const windowW = expanded ? WINDOW_EXPANDED_W : WINDOW_QUICK_W;
-  const windowH = expanded ? WINDOW_EXPANDED_H : WINDOW_QUICK_H;
+  const isBox = venue.category === "blessing_box";
+  // A box has no expand/collapse state (2026-09-18 — see boxBody's own
+  // comment below) and always shows its full content, so it always sizes
+  // like an ordinary venue's expanded window regardless of the `expanded`
+  // prop (still meaningful for ordinary venues, which genuinely toggle).
+  const windowW = expanded || isBox ? WINDOW_EXPANDED_W : WINDOW_QUICK_W;
+  const windowH = expanded || isBox ? WINDOW_EXPANDED_H : WINDOW_QUICK_H;
 
   const status = computeOpenStatus(venue.hours_weekly);
   const displayNotes = getDisplayNotes(venue);
@@ -246,9 +274,24 @@ export default function DesktopVenueWindow({
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        onClose();
-      }
+      if (e.key !== "Escape") return;
+      // #508 fix pass: Escape while a box's PhotoViewer is open must close
+      // ONLY the photo, not this whole window — see dialogGuard.ts's own
+      // header. This handler is a plain bubble-phase document listener
+      // (registered below, no `{capture: true}`), so unlike the vaul/Radix
+      // case (see BottomSheet.tsx's own comment) checking the guard
+      // directly here is enough; there is no ordering race to work around.
+      if (isNativeDialogOpen()) return;
+      // A box's check-in panel (BoxCardBody -> BoxCheckinPanel) has a note
+      // textarea living inside this window. Without this guard, Escape while
+      // typing a note both loses focus AND closes the whole card — the
+      // browser's own "Escape clears an input" behavior competing with this
+      // window's own Escape-to-dismiss. Only global-dismiss when focus is on
+      // the window shell itself, not on a form control inside it.
+      const active = document.activeElement;
+      const typing = active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+      if (typing && windowRef.current?.contains(active)) return;
+      onClose();
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -292,7 +335,7 @@ export default function DesktopVenueWindow({
         )}
       </div>
       <div className="flex items-center gap-0.5 shrink-0">
-        <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} />
+        <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} isBox={isBox} />
         <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} />
       </div>
     </div>
@@ -376,6 +419,8 @@ export default function DesktopVenueWindow({
         routeInfo={isWalkRouteActive ? walkRouteInfo : null}
         walkSteps={isWalkRouteActive ? walkRouteSteps : null}
         showLocationHint={showWalkLocationHint}
+        activeStepIndex={activeStepIndex}
+        onStepChange={onStepChange}
       />
     </div>
   );
@@ -424,6 +469,8 @@ export default function DesktopVenueWindow({
         routeInfo={isWalkRouteActive ? walkRouteInfo : null}
         walkSteps={isWalkRouteActive ? walkRouteSteps : null}
         showLocationHint={showWalkLocationHint}
+        activeStepIndex={activeStepIndex}
+        onStepChange={onStepChange}
       />
 
       {/* Report an issue — secondary action (#70) */}
@@ -509,6 +556,72 @@ export default function DesktopVenueWindow({
     </div>
   );
 
+  // ── Blessing-box body ─────────────────────────────────────────────────────
+  // Card redesign (2026-09-19): BoxCardBody now owns the WHOLE box card —
+  // photo, sponsor band, badge, name, address-as-directions-link/trigger,
+  // most-needed, host note, check-in panel, footer — so this branch no
+  // longer renders venueNameBlock, the category badge, or the three-button
+  // DirectionButtons row itself (all now inside BoxCardBody, and the walk
+  // restore pass the same day gives the box its own in-app Walk trigger —
+  // the address — without bringing that row back; see BoxCardBody's own
+  // header). Share/Favorite are handed in via its `actions` slot instead,
+  // same visual weight/position the shared venueNameBlock used to give
+  // them. Walk props (onWalkRoute etc.) are forwarded straight through from
+  // this component's own identically-named props — MapWrapper already
+  // passes them here unconditionally (same handleWalkRoute every ordinary
+  // venue's DirectionButtons uses below), so wiring is a pure pass-through:
+  // `onWalkRoute ? () => onWalkRoute(box) : undefined` binds the box (a
+  // PublicBlessingBox, itself a Venue) as the callback's target. No History
+  // link here: the header renders it instead (see VenuePopupHeader's own
+  // header for why), so `showHistoryLink={false}`. `photoRadiusClassName` is
+  // left at its
+  // default "" — the box's photo sits below the persistent header bar, not
+  // flush against the window's own top corners, so there's no radius to
+  // put on it; the outer window's existing `overflow-hidden` still clips
+  // anything that runs past its rounded-lg edge regardless. `nameId` (fix
+  // pass, 2026-09-19, BLOCKER) wires this window's own `aria-labelledby`
+  // (below) to the name heading BoxCardBody now renders — before the card
+  // redesign consolidated ownership, that id lived on venueNameBlock's own
+  // heading; since a box branch never renders venueNameBlock, the dialog's
+  // accessible name was dangling (pointing at no element) for every box
+  // until this was wired through.
+  //
+  // ONE tree, always the scrollable/expanded-style wrapper (fix, 2026-09-18 —
+  // Kyle: "When I click show details, nothing shows up"): a box has no
+  // collapsed state anymore, so unlike collapsedBody/expandedBody above
+  // (a genuine ternary-swapped pair for ordinary venues, whose content really
+  // does differ per state) this is one element at a stable tree position,
+  // independent of `expanded` — BoxCardBody (and its child BoxCheckinPanel,
+  // which holds in-progress note-form state) never remounts.
+  const boxBody = (
+    <div className="flex-1 overflow-y-auto">
+      {box ? (
+        <BoxCardBody
+          box={box}
+          onCheckinSuccess={onCheckinSuccess}
+          showHistoryLink={false}
+          nameId={`venue-window-title-${venue.id}`}
+          onWalkRoute={onWalkRoute ? () => onWalkRoute(box) : undefined}
+          isWalkRouteActive={isWalkRouteActive}
+          onClearWalkRoute={onClearWalkRoute}
+          walkRouteInfo={isWalkRouteActive ? walkRouteInfo : null}
+          walkRouteSteps={isWalkRouteActive ? walkRouteSteps : null}
+          showWalkLocationHint={showWalkLocationHint}
+          activeStepIndex={activeStepIndex}
+          onStepChange={onStepChange}
+          actions={
+            <>
+              <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} isBox />
+              <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} />
+            </>
+          }
+        />
+      ) : (
+        <p className="px-4 py-4 text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
+      )}
+    </div>
+  );
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -536,17 +649,30 @@ export default function DesktopVenueWindow({
         maxHeight: "calc(100% - 24px)",
       }}
     >
-      {/* Persistent header bar — always visible in both states */}
+      {/* Persistent header bar — always visible in both states. A box has no
+          Show/Hide toggle (historyHref swaps that slot for a History link —
+          see VenuePopupHeader's own header); expanded/onToggle are unused
+          in that branch but still passed since the prop is shared with the
+          ordinary-venue case. */}
       <VenuePopupHeader
         venueId={venue.id}
         expanded={expanded}
         onToggle={expanded ? onCollapse : onExpand}
         onClose={onClose}
         locale={locale}
+        historyHref={isBox ? `/box/${encodeURIComponent(venue.id)}/history` : undefined}
       />
 
-      {/* Body — collapsed or expanded. id wired to toggle's aria-controls. */}
-      {expanded ? (
+      {/* Body — collapsed or expanded. id wired to toggle's aria-controls.
+          Box branch stays at a stable top-level position, always the
+          scrollable-content wrapper (see boxBody's own header) so
+          BoxCardBody never remounts; ordinary venues keep the real ternary
+          swap since their collapsed/expanded content genuinely differs. */}
+      {isBox ? (
+        <div id={`venue-popup-body-${venue.id}`} className="flex flex-col flex-1 overflow-hidden">
+          {boxBody}
+        </div>
+      ) : expanded ? (
         <div
           id={`venue-popup-body-${venue.id}`}
           className="flex flex-col flex-1 overflow-hidden"

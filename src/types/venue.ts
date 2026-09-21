@@ -13,7 +13,8 @@ export type VenueCategory =
   | "farm"
   | "garden"
   | "edible_landscape"
-  | "meal_site";
+  | "meal_site"
+  | "blessing_box";
 
 export type WeeklyHours = Partial<
   Record<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun", string[]>

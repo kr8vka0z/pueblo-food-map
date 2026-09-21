@@ -11,6 +11,8 @@ interface ShareButtonProps {
   venueName?: string;
   locale?: Locale;
   size?: number;
+  /** See share.ts's venueShareUrl — a blessing box shares /box/<id>, not /venue/<id>. */
+  isBox?: boolean;
 }
 
 export default function ShareButton({
@@ -18,6 +20,7 @@ export default function ShareButton({
   venueName,
   locale = "en",
   size = 20,
+  isBox = false,
 }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -39,6 +42,7 @@ export default function ShareButton({
       venueId,
       title: venueName ?? "Pueblo Food Map",
       text: venueName ? `${venueName} — Pueblo Food Map` : "Pueblo Food Map",
+      isBox,
     });
     if (result === "copied") {
       if (timerRef.current !== null) {

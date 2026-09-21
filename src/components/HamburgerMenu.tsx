@@ -10,7 +10,11 @@
  *     nothing saved the Saved section didn't render, so Saved opened the
  *     plain menu and looked like the same button as Menu (Kyle, 2026-09-16).
  * The navy trigger button this used to own was deleted with the bottom
- * nav, as was its Map/List row — that switch lives in the search box (§4.4).
+ * nav. Its Map/List row was deleted at the same time (§4.4: "that switch
+ * lives in the search box") and RE-ADDED by #514 as a single "List
+ * view"/"Map view" line at the top of the "top" view — a second way in for
+ * anyone who never taps search. Hidden entirely while the map can't mount
+ * (#165, `mapDisabled`) rather than shown pointing at a dead action.
  *
  * Desktop (≥768px): ~280px dropdown top-right, below the search row.
  * Mobile (<768px): full-height slide-in side sheet from the right, ~80% viewport width.
@@ -30,7 +34,7 @@
  */
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, HandHelping, Star } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Star, History } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
@@ -38,9 +42,11 @@ import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuer
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { useOverlayRegistration } from "@/lib/overlayRegistry";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
+import type { ViewMode } from "@/lib/useMapUI";
 
 interface HamburgerMenuProps {
   locale?: Locale;
@@ -61,6 +67,12 @@ interface HamburgerMenuProps {
   view?: MenuSection;
   /** The nav bar — pointerdowns inside it are not "outside" (it toggles the drawer itself). */
   ignoreOutsideRef?: RefObject<HTMLElement | null>;
+  /** Current view mode (#514) — decides the top menu line's label/icon/direction. */
+  viewMode?: ViewMode;
+  /** Called when the "List view"/"Map view" line is tapped. Omit to hide the line entirely. */
+  onToggleView?: () => void;
+  /** #165 — true while the map can't mount; hides the line rather than showing a dead action. */
+  mapDisabled?: boolean;
 }
 
 // All focusable elements inside the panel for tab-trap.
@@ -76,6 +88,9 @@ export default function HamburgerMenu({
   onClose,
   view = "top",
   ignoreOutsideRef,
+  viewMode,
+  onToggleView,
+  mapDisabled = false,
 }: HamburgerMenuProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -193,8 +208,23 @@ export default function HamburgerMenu({
 
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const isBelow2xl = useMediaQuery(BELOW_2XL_QUERY);
-  // The bottom bar (z 1003) draws over the drawer below 2xl; keep the drawer's
-  // last item (the language toggle) scrollable clear of it.
+
+  // #542: on mobile the drawer is a full-height side sheet covering the
+  // whole screen — one of the "full-surface overlay hides the bottom bar"
+  // cases — so BottomNav unmounts entirely while it's open there (see
+  // overlayRegistry.ts). The tablet/desktop dropdown below (`panelStyle`'s
+  // else branch: 280px, top-right) is NOT full-surface — its own
+  // `maxHeight` already clears the bar via `barClearance` — so it stays out
+  // of the registry and the bar stays visible for it, same as before.
+  useOverlayRegistration(open && isMobile);
+
+  // The bottom bar (z 1003) still draws over the tablet/desktop DROPDOWN
+  // variant below 2xl (isBelow2xl but !isMobile) — keep its last item
+  // scrollable clear of it there, same as before #542. On MOBILE this used
+  // to reserve the same bar-height space inside the full-sheet's own
+  // padding, but #542 now hides the bar outright while that sheet is open —
+  // reserving its height inside the sheet is dead padding once the bar it
+  // was clearing is never drawn; see `panelStyle`'s mobile branch below.
   const barClearance = isBelow2xl
     ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + env(safe-area-inset-bottom))`
     : "0px";
@@ -218,10 +248,12 @@ export default function HamburgerMenu({
         boxShadow: "0 4px 32px rgba(0,0,0,0.22)",
         overflowY: "auto",
         paddingTop: "env(safe-area-inset-top)",
-        // isMobile (this branch) implies isBelow2xl — MOBILE_QUERY (767px) is
-        // narrower than BELOW_2XL_QUERY (1535px) — so barClearance always
-        // applies here; the env(...)-only alternative was unreachable.
-        paddingBottom: barClearance,
+        // #542: BottomNav now unmounts entirely on mobile while this sheet
+        // is open (see the registration above), so there's no bar left to
+        // clear — only the home-indicator/notch safe area matters here.
+        // Previously this reserved `barClearance` (the bar's own height)
+        // for a bar that, post-#542, is never drawn underneath it.
+        paddingBottom: "env(safe-area-inset-bottom)",
         paddingRight: "env(safe-area-inset-right)",
       }
     : {
@@ -385,6 +417,20 @@ export default function HamburgerMenu({
               </a>
               {/* Menu item list */}
               <ul role="menu" aria-label={menuLabel} className="py-2">
+                {/* List view / Map view (#514) — top of the menu, second way
+                    in for anyone who never taps search. Hidden while the map
+                    can't mount (#165) instead of pointing at a dead action —
+                    see the prop's own doc comment above. */}
+                {!mapDisabled && viewMode && onToggleView && (
+                  <HamburgerMenuItem
+                    label={t(viewMode === "map" ? "menu.listView" : "menu.mapView", locale)}
+                    onClick={() => {
+                      close();
+                      onToggleView();
+                    }}
+                    icon={viewMode === "map" ? <List size={14} /> : <MapIcon size={14} />}
+                  />
+                )}
                 {/* Show welcome screen (#99) — re-shows splash without clearing localStorage */}
                 {onShowWelcome && (
                   <HamburgerMenuItem
@@ -426,6 +472,15 @@ export default function HamburgerMenu({
                   href="/venues"
                   onClick={close}
                   icon={<List size={14} />}
+                />
+
+                {/* Blessing box activity log (Blessing Boxes slice 3) — internal
+                    link to the public feed of box fills/moves/etc. */}
+                <HamburgerMenuItem
+                  label={t("nav.boxActivity", locale)}
+                  href="/boxes/activity"
+                  onClick={close}
+                  icon={<History size={14} />}
                 />
 
                 {/* Food help programs — the five external links that lived here

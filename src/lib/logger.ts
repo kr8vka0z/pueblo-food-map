@@ -27,12 +27,31 @@
 
 import type { AccessDeniedReason } from "./cfAccess";
 
-export type FormName = "suggest" | "report" | "feedback";
-export type FormFailureReason = "turnstile_failed" | "send_failed" | "db_write_failed";
+export type FormName =
+  | "suggest"
+  | "report"
+  | "feedback"
+  | "checkin"
+  | "checkin_photo"
+  // Migration 0012 — the "what would help you next time?" needs-ask
+  // follow-up route, same split reasoning as "checkin"/"checkin_photo".
+  | "checkin_needs"
+  // Blessing Boxes slice 6: "adopt" covers the adopt-a-box application route;
+  // "alerts" covers every other alert-subscription route (giver sign-up,
+  // confirm, stop, resubscribe, admin host-alerts) — split the same way
+  // "checkin"/"checkin_photo" split two related-but-distinct write paths.
+  | "adopt"
+  | "alerts";
+// "db_unavailable" (2026-09-18 security review, item 9): an unhandled D1
+// exception on a public route, distinct from "db_write_failed" (a write that
+// completed its round-trip but returned an unexpected result).
+export type FormFailureReason = "turnstile_failed" | "send_failed" | "db_write_failed" | "db_unavailable";
 
 interface FailureDetail {
   status?: number;
   message?: string;
+  /** Blessing Boxes slice 6 (boxAlerts.ts's notifyBoxAlerts): how many claimed recipients lost their alert to this failure — a COUNT only, never the addresses themselves (this file's own PII rule). */
+  recipientCount?: number;
 }
 
 /**
@@ -55,6 +74,9 @@ export function logFormFailure(
   }
   if (detail?.message !== undefined) {
     entry.message = detail.message;
+  }
+  if (detail?.recipientCount !== undefined) {
+    entry.recipientCount = detail.recipientCount;
   }
 
   const line = JSON.stringify(entry);
@@ -95,6 +117,18 @@ export type AdminAuthEvent = "login";
  */
 export function logAdminAuthEvent(event: AdminAuthEvent): void {
   console.log(JSON.stringify({ event: "admin_auth_event", type: event }));
+}
+
+/**
+ * Emit a single-line JSON structured log entry when the public live
+ * blessing-boxes read (GET /api/public/blessing-boxes, /box/<id>,
+ * sitemap.ts) fails to reach D1. Error-level: unlike a form's db_write_failed
+ * (where the email still went out), this is the ONLY data path for a box —
+ * a failure here means the box layer degrades to empty/absent for that
+ * request, so it's worth the same alert-level visibility as a Resend outage.
+ */
+export function logBlessingBoxesReadFailure(message: string): void {
+  console.error(JSON.stringify({ event: "blessing_boxes_read_failure", message }));
 }
 
 export type PublishOutcome = "success" | "failure";

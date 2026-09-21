@@ -38,6 +38,7 @@ colors:
   catGarden: "#2C5F4F"
   catLandscape: "#58772B"
   catMeal: "#6B3FA0"
+  catBlessing: "#C2447B"
 
 typography:
   fontDisplay: "'Fraunces', Georgia, serif"
@@ -92,10 +93,13 @@ components:
     backgroundColor: "{colors.bone100}"
     textColor: "{colors.ink700}"
     rounded: "{rounded.full}"
-  filterChip:
-    backgroundColor: "{colors.sage100}"
-    textColor: "{colors.sage700}"
+  filtersButton:
+    backgroundColor: "{colors.sage600}"
+    textColor: "{colors.white}"
     rounded: "{rounded.full}"
+  filterPanel:
+    backgroundColor: "{colors.bone50}"
+    rounded: "{rounded.md}"
   bottomSheet:
     backgroundColor: "{colors.bone50}"
     rounded: "{rounded.xl}"
@@ -135,6 +139,8 @@ components:
     backgroundColor: "{colors.catLandscape}"
   venueMarkerMeal:
     backgroundColor: "{colors.catMeal}"
+  venueMarkerBlessingBox:
+    backgroundColor: "{colors.catBlessing}"
   focusRing:
     backgroundColor: "{colors.sage500}"
   hoverSurface:
@@ -169,11 +175,11 @@ A pre-existing design sidecar (`docs/pueblo-food-map-v2-handoff.md`) documents p
 
 **Sage is the primary interactive color.** Every link, focus ring, active filter chip, selected marker ring, and interactive affordance uses sage — NOT blue. `sage-600` (#2C5F4F) is the primary color, used for the "Show details" toggle text, operator links on hover, and the Plentiful CTA hover state. `sage-500` (#4A8466) is the focus ring and selected marker ring color. `sage-100` + `sage-700` form the SNAP/WIC benefit badge pairing (calm, not urgent).
 
-**Orange and navy are the brand colors** from Pueblo Food Project (`pueblofoodproject.org`). Orange (#F7943C) appears on exactly one thing: the splash CTA buttons. (The orange LocateButton pill on the map was retired for the bottom nav's "Near me" item, docs/bottom-nav-spec.md §6.) Navy (#190F3F) is the wordmark color and the text rendered on orange-background controls. These are the loudest, most declarative elements. Do not apply them to secondary actions, metadata, or hover states.
+**Orange and navy are the brand colors** from Pueblo Food Project (`pueblofoodproject.org`). Orange (#F7943C) appears on the splash CTA buttons, and — added by #513, Kyle's explicit call on the mockup — the Filters button's active-count badge and FilterPanel's "Show N places" button, its one live-count call-to-action. (The orange LocateButton pill on the map was retired for the bottom nav's "Near me" item, docs/bottom-nav-spec.md §6.) Navy (#190F3F) is the wordmark color and the text rendered on orange-background controls. These are the loudest, most declarative elements. Do not apply them anywhere else — no other secondary action, metadata, or hover state.
 
 **Yellow (#FFD166)** is for support/classification badges only. It does not appear as a button, interactive state, or background fill.
 
-**Category colors** are a 7-color data palette for map pins. Each maintains drop-shadow contrast against the Mapbox Streets basemap at day rendering:
+**Category colors** are an 8-color data palette for map pins. Each maintains drop-shadow contrast against the Mapbox Streets basemap at day rendering:
 - Pantry: deep crimson `#BE2D45`
 - Grocery: dark cobalt `#1F4E8C` — the only blue in the entire palette
 - Convenience: teal `#0F6573`
@@ -181,6 +187,7 @@ A pre-existing design sidecar (`docs/pueblo-food-map-v2-handoff.md`) documents p
 - Garden: `#2C5F4F` — same hex as `sage-600` and `primary` (intentional: the garden category maps to the brand's calming green)
 - Edible landscape: olive `#58772B`
 - Meal site: plum `#6B3FA0`
+- Blessing box: raspberry `#C2447B` (Blessing Boxes slice 1, 2026-09-17) — the one hue bucket (magenta/berry) not already claimed by the other 7
 
 ## Typography
 
@@ -201,11 +208,11 @@ Section headers in detail cards (hours, contact, about) are 10–11px uppercase 
 The spacing scale is a 4px base grid: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 px. Most inter-element gaps and component padding land on 16px or 24px.
 
 The Mapbox canvas fills the entire viewport — there is no persistent sidebar. Persistent chrome at default state:
-- Search bar: floating pill, full-width minus 16px margins mobile / 520px centered desktop, 44px tall mobile / 52px desktop, Map/List switch inside its right end
-- BottomNav (docs/bottom-nav-spec.md): Near me · Saved · Resources · Menu (Resources links to the `/resources` page; Saved opens the drawer showing only saved places — or a "No saved places yet" empty state — and Menu opens it showing the menu). Below `2xl` (1536px) a 64px floating `bone-50` pill, 12px in from the sides and 12px above the bottom, `bone-300` border, full radius — matching the search bar (icon above a 12px/700 label, `ink-500` / `brand-navy` when its panel is open); at `2xl`+ a white pill floating bottom-centre, 24px up
-- Mapbox credits: bottom-right, one row — compact "i" then the logo at 65×20 (the smallest size Mapbox's attribution guide lists) — lifted 8px above the pill below `2xl`
+- Search bar: floating pill, full-width minus 16px margins mobile / 520px centered desktop, 44px tall mobile / 52px desktop, nothing on its right end (#514 removed the inline Map/List switch that used to live there — see ViewSuggestion below)
+- BottomNav (docs/bottom-nav-spec.md): Near me · Saved · Boxes · Help · Menu (Help — renamed from Resources, #516 — links to the `/resources` page; Boxes toggles the blessing_box category filter, raspberry `--color-cat-blessing` when on; Saved opens the drawer showing only saved places — or a "No saved places yet" empty state — and Menu opens it showing the menu). Below `2xl` (1536px) a 64px floating `bone-50` pill, 12px in from the sides and `calc(env(safe-area-inset-bottom) + 12px)` up from the bottom (globals.css — #541: measured on a real iPhone, a `position: fixed; bottom: 0` element already clears the browser toolbar in Safari and Chrome, collapsed or expanded, so no toolbar reserve is added on top; #530/#536's `100vh - 100dvh` reserve did, and lifted the pill 40-74px too high), `bone-300` border, full radius — matching the search bar (icon above a 12px/700 label, `ink-500` / `brand-navy` when its panel is open); at `2xl`+ a white pill floating bottom-centre, 24px up
+- Mapbox credits: bottom-right, one row — compact "i" then the logo at 65×20 (the smallest size Mapbox's attribution guide lists) — lifted 8px above the pill below `2xl`, derived from the pill's own real position (`env(safe-area-inset-bottom)` + `--bottom-nav-clearance` + 8px, #541) so the logo/"i" are never covered regardless of toolbar state
 - Sponsor credit: not on the map. "Sponsored by Pueblo Food Project" is a sage card at the top of the Menu drawer, linking to pueblofoodproject.org in a new tab (no splash credit since 2026-09-16)
-- PageNav (pages the Menu opens — About, Suggest, Feedback, Browse all venues, Food help programs): "← Back to map" at the top plus the same BottomNav as the map; Menu and Saved open the drawer over the page, Near me returns to the map locating (`/?near=1`), Resources is highlighted on its own page
+- PageNav (pages the Menu opens — About, Suggest, Feedback, Browse all venues, Food help programs): "← Back to map" at the top plus the same BottomNav as the map; Menu and Saved open the drawer over the page, Near me returns to the map locating (`/?near=1`), Boxes returns to the map filtered to blessing boxes (`/?boxes=1`, #516), Help (renamed from Resources, #516) is highlighted on its own page
 
 Together these occupy less than 10% of the 1440×900 desktop viewport at default state. When a venue is selected, the BottomSheet (mobile) or DesktopVenueWindow (desktop) appears — still leaving the bulk of the map exposed.
 
@@ -253,15 +260,19 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **SnapWicPill** (benefit indicator): `sage-100` bg, `sage-700` text, `rounded` (sm radius), `px-2 py-0.5 text-xs font-medium`. Calm, not urgent — sage reads "civic info," not "alert."
 
-**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. Lucide `Search` icon at `ink-400` (16px mobile / 18px desktop), left-inset. When a category filter is active, a `filterChip` (sage-100/sage-700/full radius) appears inside the bar left of the placeholder. The Map/List **ViewToggle** (see below) sits flush inside the bar's right end (#191) — full height, no border of its own, 1px in so the pill's own border wraps it (`right-px`); the input reserves a measured 93px for it on phones (icons only) and 161px from `md` up (words).
+**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. The magnifier (plain Lucide `Search` icon, `ink-400`, 16px mobile / 18px desktop) sits at the left, always. The **Filters control** (#539, mockup C — supersedes #513/#528/#529's round bordered button with a corner-overlapping badge) sits at the right end, inline with the bar rather than looking like a separate button: no background, no border, just the three-bar icon (`ink-500` at rest, `sage-600` when one or more filters are on, 20px) with a 1px `bone-200` hairline divider on its left (inset 12px top/bottom) marking it off from the input. When filters are on, an `orange`/`navy` count pill (min 19×19, fully rounded, 11px bold — see the orange-usage exception above) appears BESIDE the icon in normal flow, never overlapping it. 44px tall; its own padding keeps the tap area at least 44px wide in every state. The input reserves right padding sized for the widest (count-present) state so typed text never reflows when a filter toggles; with no `filtersButton` prop at all, the bar ends in plain `pr-4` typing room (#514 removed the inline Map/List `ViewToggle` that used to occupy that space).
 
-**ViewToggle** (Map/List switch): `bone-100` bg, `rounded-full`, segmented two-button group — no border of its own; it reads as the search pill's own right end. Active side: `ink-700` fill, `bone-50` text. Inactive: `ink-500` text. One size now (SearchBar's flush instance, #191 — the bordered `sm`/`md` variants had no callers left once HamburgerMenu's own Map/List row was deleted with the bottom nav, and were removed). Icons only on phones (under `md`, 768px) and "Map / List" words from `md` up (Kyle, 2026-09-16) — the words go visually hidden (`sr-only`), so accessible names survive. This replaces the earlier words-at-every-width rule (docs/bottom-nav-spec.md §4 amendment). When the map cannot mount, the Map side renders `disabled` at `ink-400`/60% opacity rather than accepting a tap that does nothing.
+**FilterPanel** (#513, replaces the old search-focus CategoryDropdown): `bone-50` full-height side panel sliding in from the left, `85vw` capped at `360px`, opened by SearchBar's Filters button — not tied to search focus. Header: title, `sage-600` "Clear all" text button, `×` close (`ink-500`, `bone-100` hover). Body: "Show only" section with three `role="switch"` rows (`sage-600` track when on, `bone-300` off) for Open now/SNAP/WIC, then "Kind of place" — 8 checkboxes, each with a 10px category-accent dot, allowing several at once. Footer: the one `orange`/`navy` "Show N places" button — a live count, and the panel's only close-and-commit action (checking a box already applies live; this just closes). Backdrop `rgba(26,24,23,0.4)`. Closes via ×, Escape, backdrop tap, or swipe-left. Same layout at every width (no separate desktop treatment).
+
+**ViewSuggestion** (#514, replaces the `ViewToggle` Map/List switch): a single-row popup under the search bar, identical anchor/border/shadow to the search popovers below (`bone-50` bg, `bone-200` border, `radius-lg`, `elevation-2`) — shown ONLY while the bar is focused and empty. One button, full-width, `52px` tall: a `sage-600` icon (list or map), `sage-700` label ("See all places as a list" / "Back to the map"), an `ink-500` count subtext ("N places" — honours active filters), and an `ink-400` chevron. Typing replaces it with `SearchResultsPopover`, whose own last row (map only) reads "See all N matches as a list" in the same sage/list-icon styling at `46px`. On the list, with the map disabled (#165), this renders nothing rather than a dead "Back to the map" row. A third way in — `HamburgerMenu`'s "List view"/"Map view" line, top of the menu, hidden under the same `mapDisabled` guard.
 
 **CategoryChip** (filter chip row): `bone-100` bg / `ink-700` text when unselected, with a 10px colored dot at left. Category accent bg / `bone-50` text when selected (dot hidden). `rounded-full`, `h-9 px-3 text-sm`. Scrollable row with `no-scrollbar` utility and a right-edge bone-50 fade mask.
 
-**BottomSheet** (mobile venue detail): vaul `Drawer.Content`, `bone-50` bg, `rounded-t-xl` (top corners only — bottom clips to viewport), `elevation-2`, `max-height: calc(100dvh - 100px)`. No drag handle — vaul provides swipe-to-dismiss. Venue name heading uses `font-display` (Fraunces). Two states toggled by a single "Show details / Hide details" button (`sage-600` text, `chevron` icon).
+**BottomSheet** (mobile venue detail): vaul `Drawer.Content`, `bone-50` bg, `rounded-t-xl` (top corners only — bottom clips to viewport), `elevation-2`, `max-height: calc(var(--viewport-small) - 100px)` (the small/`svh` viewport, not `dvh` — #530: `dvh` tracks Safari's toolbar live and would resize the sheet mid-scroll). The sheet's own bottom offset is `env(safe-area-inset-bottom)`, matching the nav pill above (#541 — no toolbar reserve).. No drag handle — vaul provides swipe-to-dismiss. Venue name heading uses `font-display` (Fraunces). Two states toggled by a single "Show details / Hide details" button (`sage-600` text, `chevron` icon). A blessing-box card has no such toggle — it renders `BoxCardBody` (below) instead, which owns its own name/badge/address and puts the "History" link in its own footer, not near the top. While a walking route is active (any card's address/Walk trigger, #509), the sheet collapses to a fixed-height `RouteStrip` instead — venue name, distance/time, "Clear route", a filled `sage-600`/white "Steps" button (#537 — promoted from a third text link to a real, primary-looking button; hidden in favor of a muted "No turn-by-turn steps for this route" line when the route genuinely has none) — tapping it opens a bottom sheet holding the `WalkStepper` step-through panel (#555: "Step N of M", one turn at a time with 48px Back/Next buttons, a muted distance/arrival line, a "Then: `<next>`" peek, and an "All turns" text disclosure for anyone who wants the full list at once) rather than a plain scrolling list — and "Show card" — reachable via drag-down or its own "Show card" control; the full card returns to its normal collapsed/expanded states once revealed. The strip sits flush at the screen edge (`env(safe-area-inset-bottom)`, the same base offset as the full card) and BottomNav hides for its entire time on screen, same as it does for the full card — #547 (Kyle, 2026-09-20, after walking the app on his phone and finding the bar covering the strip's route controls) supersedes #531, which had instead kept the bar visible underneath the strip and lifted the strip clear of it; see docs/bottom-nav-spec.md §10 for the full history.
 
-**DesktopVenueWindow** (desktop venue detail): floating panel anchored to the selected marker. 360px × auto collapsed / 420px × 720px expanded. `bone-50` bg, `bone-200` border, `radius-lg`, heavy shadow `0 8px 32px rgba(0,0,0,0.18)`. Animates `width/height` at `duration-150`. Edge-flip prevents viewport clipping (hand-rolled, no @floating-ui dependency).
+**DesktopVenueWindow** (desktop venue detail): floating panel anchored to the selected marker. 360px × auto collapsed / 420px × 720px expanded. `bone-50` bg, `bone-200` border, `radius-lg`, heavy shadow `0 8px 32px rgba(0,0,0,0.18)`. Animates `width/height` at `duration-150`. Edge-flip prevents viewport clipping (hand-rolled, no @floating-ui dependency). A blessing-box card always sizes like the expanded state (no collapsed state) and its header's Show/Hide details slot is replaced by a "History" link — same position, classes, and weight the toggle used (the in-card footer "History" link `BoxCardBody` renders elsewhere is suppressed here so the two never duplicate).
+
+**BoxCard** (`BoxCardBody`, the blessing-box card content shared by `BottomSheet` and `DesktopVenueWindow`, card redesign 2026-09-19, fix pass same day): full-bleed photo (`h-[170px] object-cover`, no border) with the status pill overlaid bottom-left (`bone-50` chip, a colored dot + the status word in its own success/warning/danger/ink-400 text color, then a neutral `ink-500` "· filled {time}" detail, capped at `max-w-[calc(100%-1.5rem)]` with only the detail segment truncating) and a caption chip top-right (moved off the bottom edge in the fix pass — it used to share bottom-right with the pill and collide at narrow widths); no photo → the same pill renders inline instead, un-overlaid. Directly under the photo, a full-bleed sponsor band: `clay-100`/`clay-700` "This box needs a sponsor" when unsponsored, `sage-50`/`sage-700` "Sponsored by …" otherwise — both states always carry a "Want to help too?" adopt-application link. The category badge below uses the `catBlessing` raspberry fill (unchanged). The address renders as the directions link itself — `sage-600` underlined text, no icon, no button (mockup v3's approved design; supersedes any orange "Directions" affordance for a box specifically). Most-needed items render as `bone-100` pill chips. The check-in question uses `font-display`; its status-report trio repeats the same colored-dot convention the photo pill uses.
 
 **VenueMarker**: Lucide `MapPin` SVG filled with category accent color, `stroke: #FFFFFF`, `strokeWidth: 1.5`, `filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25))`. Default 28px / selected 36px. Selected state: an outer SVG `circle` with `sage-500` stroke (4px, no fill) wrapping the pin. Hover: `scale(1.15)` inline transform.
 
@@ -283,11 +294,12 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 **Don't:**
 - Don't introduce cool or neutral grays anywhere. Bone and ink are warm-tinted; a neutral gray creates a visible temperature mismatch.
 - Don't use `catGrocery` (`#1F4E8C`) for links, buttons, or any interactive state. It is a data color reserved for the grocery category pin only — the only blue in the system.
-- Don't use orange for secondary actions, badges, hover states, or metadata. Orange is reserved for the splash CTAs.
+- Don't use orange for secondary actions, hover states, or metadata. Orange is reserved for the splash CTAs plus the Filters button's count badge and FilterPanel's "Show N places" button (#513, Kyle's call) — nowhere else.
 - Don't use yellow (`#FFD166`) for anything other than support/classification badges.
 - Don't use Fraunces for body text, button labels, form inputs, or any running text at 16px or smaller. Its variable weight range is seductive, but it is a display serif built for headlines.
 - Don't add a sidebar. The v1 360px categories rail + 280px detail panel were removed in v2. A sidebar competes with the map for viewport space and violates the chrome budget.
 - Don't use unmodified Tailwind palette tokens (`gray-500`, `blue-50`, `blue-500`, etc.). Every color in this system is a custom token that overrides the Tailwind defaults.
 - Don't add decorative imagery. The v2 design handoff budget is ~5 KB for all images (favicon + inline SVG pins). No hero images, no stock photos, no illustrations.
 - Don't add a dark mode. `color-scheme: light` is explicit in `:root`. The bone palette has no dark-mode counterpart.
-- Don't treat `clay` (warm accent, `#C2410C`) as unused or reserved — it is the established informational-emphasis accent, already in use for the SNAP badge (VenueCard), the map's SNAP chip (MapWrapper), the favorited-heart fill (FavoriteButton), the location-denied banner (LocationDeniedBanner), and the admin "Unpublished changes" marker (VenueListView). Reach for it only for that same warm-attention/informational role, never as a third action color alongside sage.
+- Don't treat `clay` (warm accent, `#C2410C`) as unused or reserved — it is the established informational-emphasis accent, already in use for the SNAP badge (VenueCard), the map's SNAP chip (MapWrapper), the favorited-heart fill (FavoriteButton), the location-denied banner (LocationDeniedBanner), the admin "Unpublished changes" marker (VenueListView), and a blessing box's unsponsored "needs a sponsor" band (BoxCardBody). Reach for it only for that same warm-attention/informational role, never as a third action color alongside sage.
+- Don't add colored border stripes, nest a card inside another card, or introduce a gradient anywhere — the box card redesign (2026-09-19) deliberately used only flat fills, hairline `bone-200` rules, and existing radius tokens; none of those three techniques exist anywhere in this design language today.

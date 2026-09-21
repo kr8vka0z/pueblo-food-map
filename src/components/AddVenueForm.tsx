@@ -88,6 +88,14 @@ export interface AddVenueFormValues {
   notes: string;
   source: string;
   outsideCounty: boolean;
+  // Blessing-box-only fields (blessing_boxes table, migrations/0005) — only
+  // ever read/sent when category === "blessing_box"; see handleSubmit.
+  hostName: string;
+  hostNote: string;
+  hostContact: string;
+  mostNeeded: string;
+  installedOn: string;
+  removedOn: string;
 }
 
 export interface AddVenueFormProps {
@@ -147,7 +155,13 @@ type FieldErrorKey =
   | "url"
   | "operator"
   | "notes"
-  | "outside_county";
+  | "outside_county"
+  | "host_name"
+  | "host_note"
+  | "host_contact"
+  | "most_needed"
+  | "installed_on"
+  | "removed_on";
 
 type FieldErrors = Partial<Record<FieldErrorKey, string>>;
 
@@ -204,6 +218,12 @@ function defaultValues(initialValues?: Partial<AddVenueFormValues>): AddVenueFor
     notes: "",
     source: "Manual entry",
     outsideCounty: false,
+    hostName: "",
+    hostNote: "",
+    hostContact: "",
+    mostNeeded: "",
+    installedOn: "",
+    removedOn: "",
     ...initialValues,
   };
 }
@@ -346,6 +366,21 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
       operator: values.operator.trim() || undefined,
       notes: values.notes.trim() || undefined,
       outside_county: values.outsideCounty ? 1 : 0,
+      // Blessing-box-only fields: only sent when the admin picked that
+      // category — the server (validateBoxFields, src/lib/adminVenueValidation.ts)
+      // ignores these keys entirely for every other category anyway, but
+      // omitting them here keeps an ordinary venue's request body identical
+      // to what it was before this feature existed.
+      ...(values.category === "blessing_box"
+        ? {
+            host_name: values.hostName.trim() || undefined,
+            host_note: values.hostNote.trim() || undefined,
+            host_contact: values.hostContact.trim() || undefined,
+            most_needed: values.mostNeeded.trim() || undefined,
+            installed_on: values.installedOn || undefined,
+            removed_on: values.removedOn || undefined,
+          }
+        : {}),
       // #259: only ever sent on a fresh create reached from the review
       // queue — never in edit mode (submissionId is meaningless there; see
       // this prop's own doc comment above).
@@ -494,6 +529,100 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           </p>
         )}
       </div>
+
+      {/* Blessing box details — only when this venue IS a blessing box
+          (Blessing Boxes slice 1). Every field optional, matching the build
+          plan's admin story ("expose the box-only fields") with no stated
+          required-ness. */}
+      {values.category === "blessing_box" && (
+        <fieldset className="space-y-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] p-4">
+          <legend className={labelClass.replace("mb-1", "px-1")}>Blessing box details</legend>
+
+          <div>
+            <label htmlFor="box-host-name" className={labelClass}>
+              Host name
+            </label>
+            <input
+              type="text"
+              id="box-host-name"
+              value={values.hostName}
+              onChange={(e) => setField("hostName", e.target.value)}
+              placeholder="e.g. First Baptist Church"
+              className={`${inputBase} border-[var(--color-bone-300)]`}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="box-host-note" className={labelClass}>
+              Public note from the host
+            </label>
+            <textarea
+              id="box-host-note"
+              rows={2}
+              value={values.hostNote}
+              onChange={(e) => setField("hostNote", e.target.value)}
+              placeholder="Shown on the box's public page"
+              className={`${inputBase} border-[var(--color-bone-300)] resize-y min-h-[56px]`}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="box-host-contact" className={labelClass}>
+              Host contact{" "}
+              <span className="font-normal text-[var(--color-ink-400)]">(private — never shown publicly)</span>
+            </label>
+            <input
+              type="text"
+              id="box-host-contact"
+              value={values.hostContact}
+              onChange={(e) => setField("hostContact", e.target.value)}
+              placeholder="Phone or email, for admin use only"
+              className={`${inputBase} border-[var(--color-bone-300)]`}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="box-most-needed" className={labelClass}>
+              Most needed
+            </label>
+            <input
+              type="text"
+              id="box-most-needed"
+              value={values.mostNeeded}
+              onChange={(e) => setField("mostNeeded", e.target.value)}
+              placeholder="e.g. canned protein, diapers, no glass"
+              className={`${inputBase} border-[var(--color-bone-300)]`}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="box-installed-on" className={labelClass}>
+                Installed on
+              </label>
+              <input
+                type="date"
+                id="box-installed-on"
+                value={values.installedOn}
+                onChange={(e) => setField("installedOn", e.target.value)}
+                className={`${inputBase} border-[var(--color-bone-300)]`}
+              />
+            </div>
+            <div>
+              <label htmlFor="box-removed-on" className={labelClass}>
+                Removed on
+              </label>
+              <input
+                type="date"
+                id="box-removed-on"
+                value={values.removedOn}
+                onChange={(e) => setField("removedOn", e.target.value)}
+                className={`${inputBase} border-[var(--color-bone-300)]`}
+              />
+            </div>
+          </div>
+        </fieldset>
+      )}
 
       {/* Address */}
       <div>

@@ -1,13 +1,20 @@
 /**
- * MapWrapper inline view switch tests (#191) — the Map/List switch built
- * into SearchBar, reachable from the main screen without opening the menu.
+ * MapWrapper view-switch tests (#514) — Map/List switching now goes through
+ * three entry points instead of a standing control in the search bar:
+ *   1. ViewSuggestion — the one-line drop-down under an EMPTY, focused
+ *      search bar ("See all places as a list" / "Back to the map").
+ *   2. SearchResultsPopover's "See all N matches as a list" row, once the
+ *      user has typed something (map only).
+ *   3. HamburgerMenu's "List view"/"Map view" line, for anyone who never
+ *      taps search.
  *
- * Covers, at the real-MapWrapper level (the acceptance criteria this issue
- * named): the switch renders inside the search bar in both view states,
- * clicking it actually switches the view, aria-pressed tracks the active
- * view, and a query/category filter survives a view switch. The bottom
- * nav (docs/bottom-nav-spec.md) is covered at this level too: one switch
- * only, aria-current on the open panel's item, Near me.
+ * #191's inline ViewToggle (a standing group of two buttons at the pill's
+ * right end) was removed entirely — that mechanism's own tests
+ * (SearchBarViewSwitch.test.tsx, ViewToggle.test.tsx) were retired/rewritten
+ * with it. ViewSuggestion.tsx and SearchResultsPopover.test.tsx cover the
+ * component-level behavior (including mapDisabled hiding "Back to the map")
+ * in isolation; this file covers the same acceptance criteria wired through
+ * the real MapWrapper.
  *
  * Mocking recipe (WebGL/next-dynamic/Map/DesktopVenueWindow) copied
  * verbatim from MapWrapperDeferredLoad.test.tsx — see that file's header
@@ -15,7 +22,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import MapWrapper from "@/components/MapWrapper";
@@ -101,61 +108,186 @@ async function renderAndLoadMap() {
   return result;
 }
 
-/** The inline switch inside SearchBar — the sole match while the hamburger menu is closed. */
-function getInlineSwitch() {
-  return screen.getByRole("group", { name: /choose map or list view/i });
+/** Menu-based switch — a deterministic route for tests that just need to GET
+ * into the other view, independent of the search-bar mechanism under test
+ * elsewhere in this file. */
+function switchViewViaMenu(label: "List view" | "Map view") {
+  fireEvent.click(screen.getByRole("button", { name: /^Menu$/i }));
+  fireEvent.click(screen.getByRole("button", { name: label }));
 }
 
-describe("MapWrapper — inline view switch renders in the search bar (#191)", () => {
-  test("renders in map view (default)", async () => {
+describe("MapWrapper — default view is map; the Menu line reaches the list", () => {
+  test("map-canvas renders by default; List view switches to the list overlay", async () => {
     await renderAndLoadMap();
-    expect(getInlineSwitch()).toBeDefined();
     expect(screen.getByTestId("map-canvas")).toBeTruthy();
-  });
 
-  test("renders in list view too", async () => {
-    await renderAndLoadMap();
-    fireEvent.click(screen.getByRole("button", { name: /^List$/i }));
-    expect(getInlineSwitch()).toBeDefined();
+    switchViewViaMenu("List view");
     // ListView (#129) renders as a full-screen overlay ABOVE the map rather
     // than unmounting it — "sorted by" is its own summary-line sentinel
-    // (same convention as MapWrapperDeferredLoad.test.tsx), the real signal
-    // that list view is now showing.
+    // (same convention as MapWrapperDeferredLoad.test.tsx).
     expect(screen.getByText(/sorted by/i)).toBeTruthy();
   });
 });
 
-describe("MapWrapper — clicking the inline switch changes the view (#191)", () => {
-  test("clicking List shows the list overlay and marks List pressed", async () => {
+describe("MapWrapper — ViewSuggestion on an empty, focused search bar (#514)", () => {
+  test('on the map, focusing the empty bar offers "See all places as a list" with a count', async () => {
     await renderAndLoadMap();
-    fireEvent.click(screen.getByRole("button", { name: /^List$/i }));
-
-    expect(screen.getByText(/sorted by/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^List$/i }).getAttribute("aria-pressed")).toBe(
-      "true",
-    );
-    expect(screen.getByRole("button", { name: /^Map$/i }).getAttribute("aria-pressed")).toBe(
-      "false",
-    );
+    fireEvent.focus(screen.getByRole("combobox"));
+    const row = screen.getByRole("button", { name: /See all places as a list/i });
+    expect(row.textContent).toMatch(/\d+ places/);
   });
 
-  test("clicking Map after List hides the list overlay and marks Map pressed", async () => {
+  test("clicking it switches to list view and closes the popover", async () => {
     await renderAndLoadMap();
-    fireEvent.click(screen.getByRole("button", { name: /^List$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Map$/i }));
+    fireEvent.focus(screen.getByRole("combobox"));
+    fireEvent.click(screen.getByRole("button", { name: /See all places as a list/i }));
+    expect(screen.getByText(/sorted by/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Back to the map/i })).toBeNull();
+  });
 
+  // Both rows' onMouseDown preventDefault (matching SearchResultsPopover's
+  // option rows) keeps the input focused THROUGH the click so the 150ms
+  // blur grace period can't race the tap closed — but that same
+  // preventDefault means the input never naturally loses focus on its own.
+  // "Tap → list view, search closes" (#514 spec) requires an explicit blur.
+  test("clicking a suggestion row blurs the input — search actually closes", async () => {
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    act(() => input.focus());
+    expect(document.activeElement).toBe(input);
+
+    fireEvent.click(screen.getByRole("button", { name: /See all places as a list/i }));
+    expect(document.activeElement).not.toBe(input);
+  });
+
+  test("real flow: tapping the (now-blurred) bar again after switching still offers the other direction", async () => {
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    act(() => input.focus());
+    fireEvent.click(screen.getByRole("button", { name: /See all places as a list/i }));
+    expect(screen.getByText(/sorted by/i)).toBeTruthy();
+
+    // jsdom (like a real browser) only fires a `focus` event on an ACTUAL
+    // transition — calling .focus() on an already-focused element is a
+    // no-op. This only passes if the click above genuinely released focus.
+    act(() => input.focus());
+    expect(screen.getByRole("button", { name: /Back to the map/i })).toBeDefined();
+  });
+
+  test('on the list, focusing the empty bar offers "Back to the map"; clicking returns to the map', async () => {
+    await renderAndLoadMap();
+    switchViewViaMenu("List view");
+
+    fireEvent.focus(screen.getByRole("combobox"));
+    const row = screen.getByRole("button", { name: /Back to the map/i });
+    expect(row).toBeDefined();
+
+    fireEvent.click(row);
     expect(screen.getByTestId("map-canvas")).toBeTruthy();
-    expect(screen.queryByText(/sorted by/i)).toBeNull();
-    expect(screen.getByRole("button", { name: /^Map$/i }).getAttribute("aria-pressed")).toBe(
-      "true",
+  });
+
+  test("the count honours an active category filter (#514 spec: 'honours active filters')", async () => {
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    const baseline = Number(
+      screen.getByRole("button", { name: /See all places as a list/i }).textContent!.match(/(\d+) places/)![1],
     );
-    expect(screen.getByRole("button", { name: /^List$/i }).getAttribute("aria-pressed")).toBe(
-      "false",
+
+    fireEvent.click(screen.getByRole("button", { name: /^Filters$/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Food Pantry/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Show \d+ places?$/i }));
+
+    const filtered = Number(
+      screen.getByRole("button", { name: /See all places as a list/i }).textContent!.match(/(\d+) places/)![1],
     );
+    expect(filtered).toBeGreaterThan(0);
+    expect(filtered).toBeLessThan(baseline);
   });
 });
 
-describe("MapWrapper — search query survives a view switch (#191)", () => {
+describe("MapWrapper — typed query's 'See all N matches as a list' row (#514, map only)", () => {
+  test("appears while on the map, with the match count; clicking switches to list and keeps the query", async () => {
+    const user = userEvent.setup();
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox");
+    await user.type(input, "pantry");
+
+    const row = screen.getByRole("button", { name: /See all \d+ matches as a list/i });
+    fireEvent.click(row);
+
+    expect(screen.getByText(/sorted by/i)).toBeTruthy();
+    expect((screen.getByRole("combobox") as HTMLInputElement).value).toBe("pantry");
+  });
+
+  test("does not appear once already on the list — typing there already filters ListView live", async () => {
+    const user = userEvent.setup();
+    await renderAndLoadMap();
+    switchViewViaMenu("List view");
+
+    const input = screen.getByRole("combobox");
+    await user.type(input, "pantry");
+
+    expect(screen.queryByRole("button", { name: /matches as a list/i })).toBeNull();
+    // Ordinary result options are still offered (jump to a specific venue still works).
+    expect(screen.getAllByRole("option").length).toBeGreaterThan(0);
+  });
+});
+
+describe("MapWrapper — keyboard a11y: Tab reaches the suggestion rows (fix, reviewer, PR #522)", () => {
+  // Regression coverage for the reviewer's Important finding: Tabbing out of
+  // the search input used to arm handleSearchBlur's 150ms close timer AND
+  // (worse) handleSearchKeyDown force-closed the popover synchronously on
+  // every Tab keydown — either one unmounted the row before/just after the
+  // browser's own default Tab action could land focus on it. Fixed by
+  // dropping the Tab-keydown force-close and switching blur to a
+  // relatedTarget/containment check (searchAreaRef) instead of a blind timer.
+  test("Tab from the empty search input lands on the ViewSuggestion row, which stays mounted", async () => {
+    const user = userEvent.setup();
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox");
+    await user.click(input);
+    const row = screen.getByRole("button", { name: /See all places as a list/i });
+
+    await user.tab();
+
+    expect(document.activeElement).toBe(row);
+    // Re-query rather than trust the stale reference — proves the row is
+    // still the SAME mounted element, not a coincidentally-matching new one.
+    expect(screen.getByRole("button", { name: /See all places as a list/i })).toBe(row);
+  });
+
+  test("Tab from a typed query lands on the 'See all N matches' row, which stays mounted", async () => {
+    const user = userEvent.setup();
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox");
+    await user.click(input);
+    await user.type(input, "pantry");
+    const row = screen.getByRole("button", { name: /See all \d+ matches as a list/i });
+
+    // The option <li>s above this row carry no tabIndex (never in the tab
+    // sequence), so a single Tab from the input lands directly here.
+    await user.tab();
+
+    expect(document.activeElement).toBe(row);
+    expect(screen.getByRole("button", { name: /See all \d+ matches as a list/i })).toBe(row);
+  });
+
+  test("Tab-ing past the ViewSuggestion row still closes the popover (relatedTarget/containment, not a blind timer)", async () => {
+    const user = userEvent.setup();
+    await renderAndLoadMap();
+    const input = screen.getByRole("combobox");
+    await user.click(input);
+    await user.tab(); // lands on the row — stays open (asserted above)
+    await user.tab(); // leaves the search area entirely
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /See all places as a list/i })).toBeNull();
+    });
+  });
+});
+
+describe("MapWrapper — search query survives a view switch (#514)", () => {
   test("typed query is unchanged after switching to list and back to map", async () => {
     const user = userEvent.setup();
     await renderAndLoadMap();
@@ -164,43 +296,32 @@ describe("MapWrapper — search query survives a view switch (#191)", () => {
     await user.type(input, "pantry");
     expect((input as HTMLInputElement).value).toBe("pantry");
 
-    fireEvent.click(screen.getByRole("button", { name: /^List$/i }));
+    switchViewViaMenu("List view");
     expect((screen.getByRole("combobox") as HTMLInputElement).value).toBe("pantry");
 
-    fireEvent.click(screen.getByRole("button", { name: /^Map$/i }));
+    switchViewViaMenu("Map view");
     expect((screen.getByRole("combobox") as HTMLInputElement).value).toBe("pantry");
   });
 });
 
-describe("MapWrapper — category filter survives a view switch (#191)", () => {
-  test("an active category filter chip is still shown after switching views", async () => {
+describe("MapWrapper — category filter survives a view switch (#514, rewired to FilterPanel by #513)", () => {
+  test("an active category filter is still on (Filters button badge) after switching views", async () => {
     await renderAndLoadMap();
 
-    // Focus the empty search box to open the category browse dropdown (#95).
-    fireEvent.focus(screen.getByRole("combobox"));
-    const pantryOption = screen.getByText("Food Pantry").closest('[role="option"]');
-    expect(pantryOption).not.toBeNull();
-    fireEvent.click(pantryOption!);
+    fireEvent.click(screen.getByRole("button", { name: /^Filters$/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Food Pantry/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Show \d+ places?$/i }));
+    expect(screen.getByRole("button", { name: /^Filters, 1 on$/i })).toBeDefined();
 
-    // filterChip now renders inside the search bar.
-    expect(screen.getByText("Food Pantry")).toBeDefined();
+    switchViewViaMenu("List view");
+    expect(screen.getByRole("button", { name: /^Filters, 1 on$/i })).toBeDefined();
 
-    fireEvent.click(screen.getByRole("button", { name: /^List$/i }));
-    expect(screen.getByText("Food Pantry")).toBeDefined();
-
-    fireEvent.click(screen.getByRole("button", { name: /^Map$/i }));
-    expect(screen.getByText("Food Pantry")).toBeDefined();
+    switchViewViaMenu("Map view");
+    expect(screen.getByRole("button", { name: /^Filters, 1 on$/i })).toBeDefined();
   });
 });
 
 describe("MapWrapper — bottom nav (docs/bottom-nav-spec.md)", () => {
-  test("the Map/List switch exists exactly once — the drawer no longer carries its own (§4.4)", async () => {
-    await renderAndLoadMap();
-    fireEvent.click(screen.getByRole("button", { name: /^Menu$/i }));
-    expect(screen.getByRole("menu")).toBeDefined();
-    expect(screen.getAllByRole("group", { name: /choose map or list view/i })).toHaveLength(1);
-  });
-
   test("no nav item is current until its panel opens; then only that one is (§3.3)", async () => {
     await renderAndLoadMap();
     const nav = screen.getByRole("navigation");
@@ -219,10 +340,47 @@ describe("MapWrapper — bottom nav (docs/bottom-nav-spec.md)", () => {
 
   test("Near me from list view returns to the map (§6)", async () => {
     await renderAndLoadMap();
-    fireEvent.click(screen.getByRole("button", { name: /^List$/i }));
-    expect(screen.getByRole("button", { name: /^List$/i }).getAttribute("aria-pressed")).toBe("true");
+    switchViewViaMenu("List view");
+    expect(screen.getByText(/sorted by/i)).toBeTruthy();
+
     fireEvent.click(screen.getByRole("button", { name: /^Near me$/i }));
-    expect(screen.getByRole("button", { name: /^Map$/i }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("map-canvas")).toBeTruthy();
+  });
+});
+
+describe("MapWrapper — Boxes bottom-nav shortcut (#516)", () => {
+  test("tapping Boxes sets aria-pressed and lights up the Filters badge; tapping again clears both", async () => {
+    await renderAndLoadMap();
+    const boxesBtn = screen.getByTestId("nav-boxes");
+    expect(boxesBtn.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: /^Filters$/i })).toBeDefined();
+
+    fireEvent.click(boxesBtn);
+    expect(boxesBtn.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: /^Filters, 1 on$/i })).toBeDefined();
+
+    fireEvent.click(boxesBtn);
+    expect(boxesBtn.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: /^Filters$/i })).toBeDefined();
+  });
+
+  test("two ways into one state: ticking Blessing Box in the Filters panel also lights up the bar item", async () => {
+    await renderAndLoadMap();
+    fireEvent.click(screen.getByRole("button", { name: /^Filters$/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Blessing Box/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Show \d+ places?$/i }));
+
+    expect(screen.getByTestId("nav-boxes").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("Boxes doesn't disturb other active filters (e.g. Open now)", async () => {
+    await renderAndLoadMap();
+    fireEvent.click(screen.getByRole("button", { name: /^Filters$/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /^Open now$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Show \d+ places?$/i }));
+
+    fireEvent.click(screen.getByTestId("nav-boxes"));
+    expect(screen.getByRole("button", { name: /^Filters, 2 on$/i })).toBeDefined();
   });
 });
 

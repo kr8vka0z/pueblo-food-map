@@ -336,4 +336,145 @@ describe("PATCH /api/admin/venues/[id]", () => {
       expect(stmts).toHaveLength(2);
     });
   });
+
+  // Blessing Boxes slice 1 (migrations/0005) — the blessing_boxes row only
+  // gets touched when this edit is actually relevant to it (see route.ts's
+  // needsBoxTouch); an ordinary pantry/garden/etc. edit (above) stays at
+  // exactly 2 statements.
+  describe("blessing_boxes row lifecycle", () => {
+    // makeExistingRow()'s default name ("Old Name") and address ("Old
+    // Address") both differ from validPayload()'s defaults ("Eastside
+    // Pantry" / "123 Test St, Pueblo, CO") — so an ordinary still-a-box edit
+    // using both defaults genuinely renames AND moves the box in the same
+    // save (slice 3, migrations/0008): 2 box_events rows, one each.
+    test("editing an existing blessing_box (still a box, name+address both change) -> batch has 6 statements: UPDATE, DELETE box, INSERT box, box_events 'renamed', box_events 'moved', audit", async () => {
+      const existing = makeExistingRow({ category: "blessing_box" });
+      const { db, batch } = makeFakeDb(existing);
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(
+        makeRequest({
+          origin: ADMIN_ORIGIN,
+          body: validPayload({
+            category: "blessing_box",
+            host_name: "New Host",
+            host_contact: "new@example.org",
+          }),
+        }),
+      );
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(6);
+      const [updateStmt, deleteStmt, insertStmt, renamedStmt, movedStmt, auditStmt] = stmts;
+      expect(updateStmt.sql).toContain("UPDATE venues SET");
+      expect(deleteStmt.sql).toBe("DELETE FROM blessing_boxes WHERE venue_id = ?");
+      expect(deleteStmt.args).toEqual([VENUE_ID]);
+      expect(insertStmt.sql).toContain("INSERT INTO blessing_boxes");
+      expect(insertStmt.args).toContain("New Host");
+      expect(insertStmt.args).toContain("new@example.org");
+
+      expect(renamedStmt.sql).toBe("INSERT INTO box_events (venue_id, kind, detail, created_at) VALUES (?, ?, ?, ?)");
+      expect(renamedStmt.args[1]).toBe("renamed");
+      expect(renamedStmt.args[2]).toBe("Old Name → Eastside Pantry");
+
+      expect(movedStmt.sql).toBe("INSERT INTO box_events (venue_id, kind, detail, created_at) VALUES (?, ?, ?, ?)");
+      expect(movedStmt.args[1]).toBe("moved");
+      expect(movedStmt.args[2]).toBe("Old Address → 123 Test St, Pueblo, CO");
+
+      expect(auditStmt.sql).toContain("INSERT INTO audit_log");
+      const afterJson = JSON.parse(auditStmt.args[5] as string);
+      expect(afterJson.box.hostContact).toBe("new@example.org");
+    });
+
+    test("editing an existing blessing_box with NO name/address change -> no box_events rows (batch stays at 4)", async () => {
+      const existing = makeExistingRow({ category: "blessing_box", name: "Eastside Pantry", address: "123 Test St, Pueblo, CO" });
+      const { db, batch } = makeFakeDb(existing);
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(
+        makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ category: "blessing_box", host_name: "Same Place, New Host" }) }),
+      );
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(4);
+      expect(stmts.some((s) => s.sql.includes("box_events"))).toBe(false);
+    });
+
+    test("removed_on null -> set on an existing box -> one box_events 'removed' row", async () => {
+      const existing = makeExistingRow({ category: "blessing_box", name: "Eastside Pantry", address: "123 Test St, Pueblo, CO" });
+      const { db, batch } = makeFakeDb(existing);
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(
+        makeRequest({
+          origin: ADMIN_ORIGIN,
+          body: validPayload({ category: "blessing_box", host_name: "Host", removed_on: "2026-09-20" }),
+        }),
+      );
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      const eventStmts = stmts.filter((s) => s.sql.includes("box_events"));
+      expect(eventStmts).toHaveLength(1);
+      expect(eventStmts[0].args[1]).toBe("removed");
+      expect(eventStmts[0].args[2]).toBe("2026-09-20");
+    });
+
+    test("category changed FROM blessing_box to a plain kind -> batch DELETEs the stale box row, no INSERT, no box_events row (archiving-equivalent — see boxEvents.ts's header)", async () => {
+      const existing = makeExistingRow({ category: "blessing_box" });
+      const { db, batch } = makeFakeDb(existing);
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(
+        makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ category: "pantry" }) }),
+      );
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(3);
+      const [, deleteStmt, auditStmt] = stmts;
+      expect(deleteStmt.sql).toBe("DELETE FROM blessing_boxes WHERE venue_id = ?");
+      expect(auditStmt.sql).toContain("INSERT INTO audit_log");
+      expect(stmts.some((s) => s.sql.includes("box_events"))).toBe(false);
+    });
+
+    test("category changed TO blessing_box from a plain kind -> batch DELETEs (no-op), INSERTs the new box row, and writes one box_events 'added' row (not renamed/moved — see boxEvents.ts's header)", async () => {
+      const existing = makeExistingRow({ category: "pantry" });
+      const { db, batch } = makeFakeDb(existing);
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(
+        makeRequest({
+          origin: ADMIN_ORIGIN,
+          body: validPayload({ category: "blessing_box", host_name: "First Host" }),
+        }),
+      );
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(5);
+      const [, deleteStmt, insertStmt, eventStmt] = stmts;
+      expect(deleteStmt.sql).toBe("DELETE FROM blessing_boxes WHERE venue_id = ?");
+      expect(insertStmt.sql).toContain("INSERT INTO blessing_boxes");
+      expect(insertStmt.args).toContain("First Host");
+      expect(eventStmt.sql).toBe("INSERT INTO box_events (venue_id, kind, detail, created_at) VALUES (?, ?, ?, ?)");
+      expect(eventStmt.args[1]).toBe("added");
+      expect(eventStmt.args[2]).toBeNull();
+    });
+
+    test("an ordinary pantry-to-pantry edit never touches blessing_boxes at all", async () => {
+      const existing = makeExistingRow({ category: "pantry" });
+      const { db, batch } = makeFakeDb(existing);
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await callPatch(makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ category: "pantry" }) }));
+      expect(res.status).toBe(200);
+
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(2);
+      expect(stmts.some((s) => s.sql.includes("blessing_boxes"))).toBe(false);
+    });
+  });
 });

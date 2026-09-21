@@ -8,10 +8,11 @@
  *   3. Open-now filter — only currently-open venues returned
  *   4. SNAP filter — only SNAP-accepting venues returned
  *   5. WIC filter — only WIC-accepting venues returned
- *   6. Favorites filter — only favorited venues returned (or all if none saved)
+ *   6. Favorites — filter removed (#513); savedVenues/favoriteSet remain for
+ *      HamburgerMenu's Saved view
  *   7. Text search — query narrows venue list by name/category/benefit alias
- *   8. Category browse — handleCategoryBrowseSelect syncs both filter states
- *   9. Clear all — handleClearAllFilters resets every filter + query
+ *   8. toggleCategory — multi-select category checkboxes (#513)
+ *   9. clearFilters (panel) vs. handleClearAllFilters (query + everything)
  *  10. Counts — allVenueCounts/snapCount/wicCount/openNowCount are consistent
  *  11. anyFilterActive — reflects true/false correctly
  *  12. Nearest-first sort — filteredVenues are in ascending distance order
@@ -27,6 +28,7 @@ import { useMapFilters } from "@/lib/useMapFilters";
 import { venues as allVenues } from "@/data/venues";
 import { __resetFavoritesForTests, addFavorite } from "@/lib/favorites";
 import { computeOpenStatus } from "@/lib/hours";
+import type { Venue } from "@/types/venue";
 
 // Pueblo center — same default as MapWrapper
 const PUEBLO_CENTER = { lat: 38.2667, lng: -104.6167 };
@@ -50,9 +52,9 @@ describe("useMapFilters — initial state", () => {
     expect(result.current.anyFilterActive).toBe(false);
   });
 
-  test("activeCategoryFilter starts null", () => {
+  test("selectedCategories starts null", () => {
     const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
-    expect(result.current.activeCategoryFilter).toBeNull();
+    expect(result.current.selectedCategories).toBeNull();
   });
 
   test("query starts empty", () => {
@@ -217,27 +219,23 @@ describe("useMapFilters — WIC filter", () => {
   });
 });
 
-// ── 6. Favorites filter ───────────────────────────────────────────────────────
+// ── 6. Favorites ─────────────────────────────────────────────────────────────
+// The Favorites FILTER was removed (#513 — "Saved in the bottom bar already
+// covers it"). favoriteSet/savedVenues stay (HamburgerMenu's Saved view still
+// needs them); there is no longer a filterFavorites toggle to test.
 
-describe("useMapFilters — favorites filter", () => {
-  test("filterFavorites=true with no saved venues shows all (no blank state)", () => {
-    // If no venues are favorited, the filter has no effect (avoids empty-result trap).
+describe("useMapFilters — favorites (filter removed, #513)", () => {
+  test("no filterFavorites/setFilterFavorites on the returned API", () => {
     const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
-    act(() => result.current.setFilterFavorites(true));
-    // favoriteSet.size === 0 → filter is not applied (all venues returned)
-    expect(result.current.filteredVenues.length).toBe(allVenues.length);
-    // anyFilterActive is false when favorites is on but no favorites exist
-    expect(result.current.anyFilterActive).toBe(false);
+    expect((result.current as Record<string, unknown>).filterFavorites).toBeUndefined();
+    expect((result.current as Record<string, unknown>).setFilterFavorites).toBeUndefined();
   });
 
-  test("filterFavorites=true with a saved venue returns only that venue", () => {
+  test("savedVenues still reflects a favorited venue (used by HamburgerMenu's Saved view)", () => {
     const firstId = allVenues[0]!.id;
     addFavorite(firstId);
     const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
-    act(() => result.current.setFilterFavorites(true));
-    expect(result.current.filteredVenues.length).toBe(1);
-    expect(result.current.filteredVenues[0]!.id).toBe(firstId);
-    expect(result.current.anyFilterActive).toBe(true);
+    expect(result.current.savedVenues.some((v) => v.id === firstId)).toBe(true);
   });
 });
 
@@ -265,28 +263,75 @@ describe("useMapFilters — text search", () => {
   });
 });
 
-// ── 8. handleCategoryBrowseSelect ────────────────────────────────────────────
+// ── 8. toggleCategory (#513 — multi-category select) ─────────────────────────
+// Replaces the old single-select handleCategoryBrowseSelect: the Filters panel
+// renders 8 independent checkboxes, so toggling one category must not clobber
+// another that's already on.
 
-describe("useMapFilters — handleCategoryBrowseSelect", () => {
-  test("selecting a category sets both activeCategoryFilter and selectedCategories", () => {
+describe("useMapFilters — toggleCategory", () => {
+  test("toggling one category on filters to just that category", () => {
     const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
-    act(() => result.current.handleCategoryBrowseSelect("grocery"));
-    expect(result.current.activeCategoryFilter).toBe("grocery");
-    // filteredVenues should only have grocery venues
+    act(() => result.current.toggleCategory("grocery"));
+    expect(result.current.selectedCategories).toEqual(new Set(["grocery"]));
     const categories = result.current.filteredVenues.map((v) => v.category);
     expect(categories.every((c) => c === "grocery")).toBe(true);
   });
 
-  test("selecting null clears the browse filter", () => {
+  test("toggling a second category adds it — both categories' venues show", () => {
     const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
-    act(() => result.current.handleCategoryBrowseSelect("grocery"));
-    act(() => result.current.handleCategoryBrowseSelect(null));
-    expect(result.current.activeCategoryFilter).toBeNull();
+    act(() => result.current.toggleCategory("grocery"));
+    act(() => result.current.toggleCategory("pantry"));
+    expect(result.current.selectedCategories).toEqual(new Set(["grocery", "pantry"]));
+    const categories = new Set(result.current.filteredVenues.map((v) => v.category));
+    expect(categories.has("grocery")).toBe(true);
+    expect(categories.has("pantry")).toBe(true);
+    expect(categories.size).toBe(2);
+  });
+
+  test("toggling an active category off removes just that one", () => {
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
+    act(() => result.current.toggleCategory("grocery"));
+    act(() => result.current.toggleCategory("pantry"));
+    act(() => result.current.toggleCategory("grocery"));
+    expect(result.current.selectedCategories).toEqual(new Set(["pantry"]));
+  });
+
+  test("toggling the last active category off normalizes to null (restores all venues)", () => {
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
+    act(() => result.current.toggleCategory("grocery"));
+    act(() => result.current.toggleCategory("grocery"));
+    expect(result.current.selectedCategories).toBeNull();
     expect(result.current.filteredVenues.length).toBe(allVenues.length);
   });
 });
 
-// ── 9. handleClearAllFilters ──────────────────────────────────────────────────
+// ── 9. clearFilters / handleClearAllFilters ───────────────────────────────────
+// #513 gives the Filters panel its own "Clear all" distinct from ListView's
+// existing "clear filters" action: the panel only owns categories/open-now/
+// SNAP/WIC, and must NOT also wipe the user's typed search text — a search
+// box clearing itself when you tap a filter control would be surprising.
+// handleClearAllFilters (query + everything) keeps its existing behavior for
+// ListView's own clear-filters button.
+
+describe("useMapFilters — clearFilters (Filters panel's Clear all)", () => {
+  test("clears categories/open-now/SNAP/WIC but leaves the typed query alone", () => {
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
+    act(() => {
+      result.current.setFilterSnap(true);
+      result.current.setFilterOpenNow(true);
+      result.current.setQuery("test");
+      result.current.toggleCategory("pantry");
+    });
+    act(() => result.current.clearFilters());
+    expect(result.current.selectedCategories).toBeNull();
+    expect(result.current.filterOpenNow).toBe(false);
+    expect(result.current.filterSnap).toBe(false);
+    expect(result.current.filterWic).toBe(false);
+    expect(result.current.anyFilterActive).toBe(false);
+    // Query is untouched by the panel's Clear all.
+    expect(result.current.query).toBe("test");
+  });
+});
 
 describe("useMapFilters — handleClearAllFilters", () => {
   test("clears all active filters and query, restores full venue list", () => {
@@ -295,14 +340,14 @@ describe("useMapFilters — handleClearAllFilters", () => {
       result.current.setFilterSnap(true);
       result.current.setFilterOpenNow(true);
       result.current.setQuery("test");
-      result.current.handleCategoryBrowseSelect("pantry");
+      result.current.toggleCategory("pantry");
     });
     expect(result.current.anyFilterActive).toBe(true);
     act(() => result.current.handleClearAllFilters());
     expect(result.current.filteredVenues.length).toBe(allVenues.length);
     expect(result.current.anyFilterActive).toBe(false);
     expect(result.current.query).toBe("");
-    expect(result.current.activeCategoryFilter).toBeNull();
+    expect(result.current.selectedCategories).toBeNull();
   });
 });
 
@@ -341,7 +386,7 @@ describe("useMapFilters — anyFilterActive", () => {
 
   test("true when category filter is active", () => {
     const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
-    act(() => result.current.setSelectedCategories(new Set(["grocery"])));
+    act(() => result.current.toggleCategory("grocery"));
     expect(result.current.anyFilterActive).toBe(true);
   });
 
@@ -379,5 +424,63 @@ describe("useMapFilters — nearest-first sort", () => {
     const avgPueblo = r1.current.filteredVenues.reduce((s, v) => s + (v as unknown as { distanceMiles: number }).distanceMiles, 0) / r1.current.filteredVenues.length;
     const avgBoulder = r2.current.filteredVenues.reduce((s, v) => s + (v as unknown as { distanceMiles: number }).distanceMiles, 0) / r2.current.filteredVenues.length;
     expect(avgBoulder).toBeGreaterThan(avgPueblo);
+  });
+});
+
+// ── 13. Blessing boxes (extraVenues) — map-first rework, 2026-09-18 ─────────
+// Confirms boxes merged in via `extraVenues` flow through the SAME
+// category-filter/count/sort pipeline every other venue uses (build
+// requirement #4: "closest box to me" via the existing nearest-first sort),
+// with no box-specific branch needed anywhere in this file.
+
+function makeBoxVenue(id: string, lat: number, lng: number): Venue {
+  return {
+    id,
+    name: `Box ${id}`,
+    category: "blessing_box",
+    lat,
+    lng,
+    address: "Test address",
+    source: "manual",
+    last_verified: "2026-09-01",
+  };
+}
+
+describe("useMapFilters — blessing boxes via extraVenues", () => {
+  test("boxes are included in filteredVenues alongside the static venue set", () => {
+    const boxes = [makeBoxVenue("box-1", 38.27, -104.61)];
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER, boxes));
+    expect(result.current.filteredVenues.length).toBe(allVenues.length + 1);
+    expect(result.current.filteredVenues.some((v) => v.id === "box-1")).toBe(true);
+  });
+
+  test("the blessing_box category filter returns only boxes, and the count matches", () => {
+    const boxes = [makeBoxVenue("box-1", 38.27, -104.61), makeBoxVenue("box-2", 38.3, -104.65)];
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER, boxes));
+    act(() => {
+      result.current.setSelectedCategories(new Set(["blessing_box"]));
+    });
+    expect(result.current.filteredVenues.length).toBe(2);
+    expect(result.current.filteredVenues.every((v) => v.category === "blessing_box")).toBe(true);
+    expect(result.current.allVenueCounts.blessing_box).toBe(2);
+  });
+
+  test("boxes sort into the nearest-first order with ordinary venues, not appended separately", () => {
+    // A box placed essentially AT the origin should rank first, ahead of
+    // every real venue (all of which sit some real distance away).
+    const boxes = [makeBoxVenue("box-at-origin", PUEBLO_CENTER.lat, PUEBLO_CENTER.lng)];
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER, boxes));
+    expect(result.current.filteredVenues[0]?.id).toBe("box-at-origin");
+    const distances = result.current.filteredVenues.map(
+      (v) => (v as unknown as { distanceMiles: number }).distanceMiles,
+    );
+    for (let i = 1; i < distances.length; i++) {
+      expect(distances[i]!).toBeGreaterThanOrEqual(distances[i - 1]!);
+    }
+  });
+
+  test("an empty extraVenues array (default) behaves exactly like no boxes fetched yet", () => {
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER, []));
+    expect(result.current.filteredVenues.length).toBe(allVenues.length);
   });
 });

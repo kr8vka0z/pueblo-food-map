@@ -32,6 +32,11 @@ describe("PageNav", () => {
     expect(document.querySelector("[data-bottom-nav]")).not.toBeNull();
   });
 
+  test("backHref overrides the default '/' destination (BoxHistoryContent points it at ?venue=<id>)", () => {
+    render(<PageNav locale="en" backHref="/?venue=box-1" />);
+    expect(screen.getByRole("link", { name: /Back to map/ }).getAttribute("href")).toBe("/?venue=box-1");
+  });
+
   test("the top 'Back to map' nav has its own aria-label, distinct from BottomNav's 'Main' (review item 7c)", () => {
     render(<PageNav locale="en" />);
     expect(screen.getByRole("navigation", { name: "Page" })).toBeDefined();
@@ -73,6 +78,16 @@ describe("PageNav", () => {
     render(<PageNav locale="en" />);
     fireEvent.click(screen.getByTestId("nav-near-me"));
     expect(push).toHaveBeenCalledWith("/?near=1");
+  });
+
+  // #516: off the map there's no filter state to reflect, so Boxes just
+  // hands off to the map via /?boxes=1 — same shape as Near me above.
+  test("Boxes (#516) goes to the map, filtered", () => {
+    render(<PageNav locale="en" />);
+    const btn = screen.getByTestId("nav-boxes") as HTMLButtonElement;
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(btn);
+    expect(push).toHaveBeenCalledWith("/?boxes=1");
   });
 
   test("Resources shows as current only on /resources", () => {

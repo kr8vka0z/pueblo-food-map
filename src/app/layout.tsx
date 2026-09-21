@@ -44,10 +44,18 @@ export const metadata: Metadata = {
 
 // viewportFit "cover" draws edge-to-edge and enables env(safe-area-inset-*)
 // everywhere; without it those insets all resolve to 0.
+//
+// themeColor (#530, Kyle's reference: YouTube on a phone) tints Safari's own
+// toolbar the same cream as the page, so the two read as one piece instead
+// of a visible seam. A <meta name="theme-color"> value can't reference a CSS
+// custom property, so this is a hard-coded literal of --color-bone-50
+// (globals.css) — kept from drifting apart by
+// src/__tests__/bottomNavClearance.test.ts.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#FBFAF6",
 };
 
 export default function RootLayout({

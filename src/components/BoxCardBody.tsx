@@ -135,10 +135,17 @@ interface BoxCardBodyProps {
   onClearWalkRoute?: () => void;
   /** Walking route distance + duration for the in-card readout (threaded from MapWrapper via BottomSheet/DesktopVenueWindow, same as DirectionButtons' own prop). */
   walkRouteInfo?: RouteInfo | null;
-  /** Turn-by-turn steps from Mapbox (pre-localized), same as DirectionButtons' own prop. */
+  /**
+   * Turn-by-turn steps from Mapbox (pre-localized), same as DirectionButtons'
+   * own prop — passed straight through to WalkRouteStatus below.
+   */
   walkRouteSteps?: WalkStep[] | null;
   /** True when this box's Walk tap requested geolocation and it was denied or is unavailable (#207) — same as DirectionButtons' own prop. */
   showWalkLocationHint?: boolean;
+  /** Which turn the step-through stepper is showing (#555) — same as WalkRouteStatus's own prop. */
+  activeStepIndex?: number;
+  /** Moves the stepper to a different turn (#555) — same as WalkRouteStatus's own prop. */
+  onStepChange?: (index: number) => void;
 }
 
 /**
@@ -226,6 +233,8 @@ export default function BoxCardBody({
   walkRouteInfo = null,
   walkRouteSteps = null,
   showWalkLocationHint = false,
+  activeStepIndex = 0,
+  onStepChange = () => {},
 }: BoxCardBodyProps) {
   const { locale } = useLocale();
   const [adoptOpen, setAdoptOpen] = useState(false);
@@ -421,6 +430,8 @@ export default function BoxCardBody({
               showLocationHint={showWalkLocationHint}
               locationHintId={walkLocationHintId}
               onClearRoute={onClearWalkRoute}
+              activeStepIndex={activeStepIndex}
+              onStepChange={onStepChange}
             />
           )}
         </div>

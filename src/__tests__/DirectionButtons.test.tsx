@@ -267,7 +267,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
     );
     expect(container.querySelector("[data-testid='walk-steps-list']")).toBeNull();
     // Toggle button also absent when no steps
-    expect(container.querySelector("[data-testid='walk-steps-toggle']")).toBeNull();
+    expect(container.querySelector("[data-testid='walk-stepper-all-turns-toggle']")).toBeNull();
   });
 
   test("step list is NOT rendered when steps is an empty array", () => {
@@ -282,7 +282,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
       />,
     );
     expect(container.querySelector("[data-testid='walk-steps-list']")).toBeNull();
-    expect(container.querySelector("[data-testid='walk-steps-toggle']")).toBeNull();
+    expect(container.querySelector("[data-testid='walk-stepper-all-turns-toggle']")).toBeNull();
   });
 
   test("toggle button is rendered when steps are present", () => {
@@ -296,7 +296,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={SAMPLE_STEPS}
       />,
     );
-    expect(container.querySelector("[data-testid='walk-steps-toggle']")).not.toBeNull();
+    expect(container.querySelector("[data-testid='walk-stepper-all-turns-toggle']")).not.toBeNull();
   });
 
   test("step list is initially collapsed (hidden)", () => {
@@ -311,7 +311,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
       />,
     );
     // List exists in DOM but not visible (hidden attribute or aria-hidden) OR absent until toggled
-    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    const toggle = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     // List should be hidden when collapsed
     const list = container.querySelector("[data-testid='walk-steps-list']");
@@ -333,7 +333,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={SAMPLE_STEPS}
       />,
     );
-    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    const toggle = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
     await user.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     // List should now be visible
@@ -354,7 +354,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={SAMPLE_STEPS}
       />,
     );
-    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    const toggle = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
     await user.click(toggle);
     await user.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
@@ -372,7 +372,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={SAMPLE_STEPS}
       />,
     );
-    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    const toggle = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
     await user.click(toggle);
     const list = container.querySelector("[data-testid='walk-steps-list']") as HTMLOListElement;
     expect(list.tagName).toBe("OL");
@@ -392,10 +392,14 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={SAMPLE_STEPS}
       />,
     );
-    const toggle = screen.getByTestId("walk-steps-toggle");
+    const toggle = screen.getByTestId("walk-stepper-all-turns-toggle");
     await user.click(toggle);
-    expect(screen.getByText("Head north on Main St")).toBeDefined();
-    expect(screen.getByText("Turn right on Union Ave")).toBeDefined();
+    // Scoped to the list because #555's stepper ALSO renders the current
+    // step's instruction above it — an unscoped getByText now matches twice
+    // for step 1 and throws. The list must still carry every instruction.
+    const list = screen.getByTestId("walk-steps-list");
+    expect(list.textContent).toContain("Head north on Main St");
+    expect(list.textContent).toContain("Turn right on Union Ave");
   });
 
   test("short steps (<528 ft threshold) show distance in feet", async () => {
@@ -410,7 +414,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={[{ instruction: "Head north on Main St", distance: 50 }]}
       />,
     );
-    await user.click(screen.getByTestId("walk-steps-toggle"));
+    await user.click(screen.getByTestId("walk-stepper-all-turns-toggle"));
     // 50m ≈ 164 ft
     expect(screen.getByTestId("walk-steps-list").textContent).toContain("ft");
   });
@@ -427,7 +431,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={[{ instruction: "Continue on Union Ave", distance: 500 }]}
       />,
     );
-    await user.click(screen.getByTestId("walk-steps-toggle"));
+    await user.click(screen.getByTestId("walk-stepper-all-turns-toggle"));
     // 500m ≈ 0.31 mi
     expect(screen.getByTestId("walk-steps-list").textContent).toContain("mi");
   });
@@ -444,7 +448,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={SAMPLE_STEPS}
       />,
     );
-    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    const toggle = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
     const controlsId = toggle.getAttribute("aria-controls");
     expect(controlsId).toBeTruthy();
     await user.click(toggle);
@@ -464,7 +468,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={SAMPLE_STEPS}
       />,
     );
-    await user.click(screen.getByTestId("walk-steps-toggle"));
+    await user.click(screen.getByTestId("walk-stepper-all-turns-toggle"));
     const list = screen.getByTestId("walk-steps-list");
     // aria-label or aria-labelledby must be present
     const hasA11yName =
@@ -472,7 +476,7 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
     expect(hasA11yName).toBeTruthy();
   });
 
-  test("toggle button shows 'Show steps' when collapsed (EN)", () => {
+  test("toggle button shows 'All turns' when collapsed (EN)", () => {
     const { container } = render(
       <DirectionButtons
         venue={makeVenue()}
@@ -483,11 +487,11 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={SAMPLE_STEPS}
       />,
     );
-    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
-    expect(toggle.textContent).toContain("Show steps");
+    const toggle = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
+    expect(toggle.textContent).toContain("All turns");
   });
 
-  test("toggle button shows 'Hide steps' when expanded (EN)", async () => {
+  test("toggle button shows 'Fewer turns' when expanded (EN)", async () => {
     const user = userEvent.setup();
     const { container } = render(
       <DirectionButtons
@@ -499,12 +503,12 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={SAMPLE_STEPS}
       />,
     );
-    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    const toggle = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
     await user.click(toggle);
-    expect(toggle.textContent).toContain("Hide steps");
+    expect(toggle.textContent).toContain("Fewer turns");
   });
 
-  test("toggle shows 'Ver indicaciones' (ES) when collapsed", () => {
+  test("toggle shows 'Todos los giros' (ES) when collapsed", () => {
     const { container } = render(
       <DirectionButtons
         venue={makeVenue()}
@@ -515,8 +519,8 @@ describe("DirectionButtons — turn-by-turn step list (#134 enhancement)", () =>
         walkSteps={SAMPLE_STEPS}
       />,
     );
-    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
-    expect(toggle.textContent).toContain("Ver indicaciones");
+    const toggle = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
+    expect(toggle.textContent).toContain("Todos los giros");
   });
 });
 
@@ -687,14 +691,14 @@ describe("DirectionButtons — in-card route readout (#134 FIX 1+2)", () => {
   });
 });
 
-// ─── stepsExpanded resets on venue change (FIX 2) ────────────────────────────
+// ─── All-turns disclosure resets on venue change (FIX 2, ported to WalkStepper #555) ────────────────────────────
 //
 // DirectionButtons is NOT remounted between venue selections. Once stepsExpanded
 // is true it must reset to false when the venue prop changes — otherwise every
 // subsequent venue's step list renders already expanded, violating "collapsed by
 // default."
 
-describe("DirectionButtons — stepsExpanded resets on venue change (FIX 2)", () => {
+describe("DirectionButtons — All-turns disclosure resets on venue change (FIX 2, ported to WalkStepper #555)", () => {
   const STEPS = [
     { instruction: "Head north on Main St", distance: 50 },
     { instruction: "Arrive at destination", distance: 0 },
@@ -711,7 +715,7 @@ describe("DirectionButtons — stepsExpanded resets on venue change (FIX 2)", ()
         walkSteps={STEPS}
       />,
     );
-    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    const toggle = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
   });
 
@@ -729,7 +733,7 @@ describe("DirectionButtons — stepsExpanded resets on venue change (FIX 2)", ()
     );
 
     // Expand on venue A
-    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    const toggle = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
     await user.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
 
@@ -748,7 +752,7 @@ describe("DirectionButtons — stepsExpanded resets on venue change (FIX 2)", ()
     });
 
     // Toggle should be collapsed again on venue B
-    const toggleAfter = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    const toggleAfter = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
     expect(toggleAfter.getAttribute("aria-expanded")).toBe("false");
   });
 
@@ -766,7 +770,7 @@ describe("DirectionButtons — stepsExpanded resets on venue change (FIX 2)", ()
       />,
     );
 
-    const toggle = container.querySelector("[data-testid='walk-steps-toggle']") as HTMLButtonElement;
+    const toggle = container.querySelector("[data-testid='walk-stepper-all-turns-toggle']") as HTMLButtonElement;
     await user.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
 

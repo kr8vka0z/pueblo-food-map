@@ -267,8 +267,12 @@ describe("#547 — Steps control on the route strip", () => {
     await screen.findByTestId("route-strip");
 
     await user.click(screen.getByTestId("route-strip-steps"));
-    expect(screen.getByText("Head north on Main St")).toBeDefined();
-    expect(screen.getByText(`Arrive at ${TEST_VENUE.name}`)).toBeDefined();
+    // #555: the written directions now open on the stepper. Both the current
+    // turn and the last one are still reachable — the latter via the list.
+    expect(screen.getByTestId("walk-stepper-instruction").textContent)
+      .toContain("Head north on Main St");
+    expect(screen.getByTestId("walk-steps-list").textContent)
+      .toContain(`Arrive at ${TEST_VENUE.name}`);
 
     await user.keyboard("{Escape}");
 
@@ -298,7 +302,8 @@ describe("#547 — Steps control on the route strip", () => {
     expect(document.querySelector("[data-bottom-nav]")).toBeNull();
 
     await user.click(screen.getByTestId("route-strip-steps"));
-    expect(screen.getByText("Head north on Main St")).toBeDefined();
+    expect(screen.getByTestId("walk-stepper-instruction").textContent)
+      .toContain("Head north on Main St");
     expect(document.querySelector("[data-bottom-nav]")).toBeNull();
 
     await user.click(screen.getByTestId("route-strip-steps-close"));

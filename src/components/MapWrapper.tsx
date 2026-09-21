@@ -234,12 +234,24 @@ export function buildWalkingRouteUrl(
  * and an empty or trivial instruction. It is kept here (dropped in formatting
  * via formatStepDistance) rather than filtered at parse time so callers that
  * want to show the arrival step can still do so.
+ *
+ * WHY also drop a step with no valid maneuver.location (#555, step-through
+ * directions): the stepper flies the camera to a step's own coordinate on
+ * every arrow tap (Map.tsx's focus effect). A step missing that coordinate —
+ * same "malformed API response" category as a missing instruction — would
+ * step the camera to `undefined` and throw, so it is dropped here rather
+ * than defended against at every later read site.
  */
 export function parseWalkSteps(
   route: {
     legs?: Array<{
       steps?: Array<{
-        maneuver?: { instruction?: string };
+        maneuver?: {
+          instruction?: string;
+          location?: unknown;
+          type?: string;
+          modifier?: string;
+        };
         distance: number;
       }>;
     }>;
@@ -251,7 +263,26 @@ export function parseWalkSteps(
     // Drop steps whose instruction is missing or empty — they are malformed
     // API responses that would render as blank list items.
     if (!instruction) return [];
-    return [{ instruction, distance: s.distance }];
+    // WHY a malformed location is dropped but the STEP is kept (#555): the
+    // written turn list is the older, more-relied-on half of this feature.
+    // Dropping the whole step would delete a readable instruction to protect
+    // a camera hop — the stepper simply doesn't move the map for a step it
+    // has no coordinate for (handleStepChange guards on it). The live API
+    // supplies `location` on every step (measured 2026-09-20), so this only
+    // ever fires on a malformed response.
+    const raw = s.maneuver?.location;
+    const location =
+      Array.isArray(raw) && raw.length === 2 &&
+      typeof raw[0] === "number" && typeof raw[1] === "number"
+        ? ([raw[0], raw[1]] as [number, number])
+        : undefined;
+    return [{
+      instruction,
+      distance: s.distance,
+      location,
+      maneuverType: s.maneuver?.type,
+      maneuverModifier: s.maneuver?.modifier,
+    }];
   });
 }
 
@@ -450,6 +481,22 @@ export default function MapWrapper({
   const [walkingRouteSteps, setWalkingRouteSteps] = useState<WalkStep[] | null>(null);
   const [walkingRouteVenueId, setWalkingRouteVenueId] = useState<string | null>(null);
 
+  // ── Step-through directions (#555) ──────────────────────────────────────────
+  // activeStepIndex: which turn the stepper panel (BottomSheet's RouteStrip /
+  // DesktopVenueWindow) is showing. Lives here, not inside the panel, because
+  // the phone strip and the venue card both render the stepper for the same
+  // route and must agree on the current turn. Reset to 0 wherever the route
+  // itself resets: a fresh fetch, walkingRouteVenueId clearing, or an
+  // explicit clear (see fetchWalkingRoute / the clearing effect below /
+  // handleWalkRoute's toggle-off / handleClearWalkingRoute).
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  // focusPoint/focusRequestId: the camera target Map.tsx's step-through
+  // focus effect watches. A separate pair from recenterRequestId — bumping
+  // that one would fly the camera to the USER, fighting the turn the stepper
+  // just centered on (see requestStepLocationRefresh's own WHY comment below).
+  const [focusPoint, setFocusPoint] = useState<{ lng: number; lat: number } | null>(null);
+  const [focusRequestId, setFocusRequestId] = useState(0);
+
   // ── Walk-without-location (#207) ─────────────────────────────────────────────
   // walkAwaitingVenueIdRef: the venue a Walk tap is waiting on geolocation for.
   //   Set when handleWalkRoute is called with no userLocation (instead of
@@ -508,6 +555,7 @@ export default function MapWrapper({
         setWalkingRouteInfo(null);
         setWalkingRouteSteps(null);
         setWalkingRouteVenueId(null);
+        setActiveStepIndex(0);
       });
     }
     // #207: a stale "share your location" hint belongs to the venue that
@@ -561,7 +609,12 @@ export default function MapWrapper({
           duration: number;  // seconds
           legs?: Array<{
             steps?: Array<{
-              maneuver?: { instruction?: string };
+              maneuver?: {
+                instruction?: string;
+                location?: number[];
+                type?: string;
+                modifier?: string;
+              };
               distance: number; // meters
             }>;
           }>;
@@ -595,6 +648,7 @@ export default function MapWrapper({
       });
       setWalkingRouteSteps(steps.length > 0 ? steps : null);
       setWalkingRouteVenueId(venue.id);
+      setActiveStepIndex(0);
     } catch (err) {
       // Network failure — fail silently. The user can still use the Bus/Drive deeplinks.
       console.warn("[MapWrapper] Directions fetch failed:", err);
@@ -619,6 +673,7 @@ export default function MapWrapper({
       setWalkingRouteInfo(null);
       setWalkingRouteSteps(null);
       setWalkingRouteVenueId(null);
+      setActiveStepIndex(0);
       return;
     }
 
@@ -652,7 +707,52 @@ export default function MapWrapper({
     setWalkingRouteInfo(null);
     setWalkingRouteSteps(null);
     setWalkingRouteVenueId(null);
+    setActiveStepIndex(0);
   }, []);
+
+  /**
+   * Refreshes the user's location on each step-through arrow tap (#555)
+   * WITHOUT bumping recenterRequestId. handleLocateRequest's own counter
+   * bump is what makes Map.tsx fly the camera to the USER — reusing it here
+   * would fight the flyTo-the-turn move the same tap just triggered via
+   * focusRequestId (handleStepChange, below). Only the "ask the browser for
+   * a fresh reading" half of handleLocateRequest is shared; the camera stays
+   * owned by the turn the stepper is on. Mirrors handleLocateRequest's own
+   * "already located" guard so a tap doesn't flip the spinner on when the
+   * position is already known (the overwhelmingly common case here, since a
+   * route can't be active without a resolved position in the first place).
+   */
+  const requestStepLocationRefresh = useCallback(() => {
+    const alreadyLocated =
+      geo.state.permission === "granted" && geo.state.position !== null;
+    if (!alreadyLocated) {
+      geoRequestedAtRef.current = Date.now();
+      setIsLocating(true);
+    }
+    geo.request();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geo.request, geo.state]);
+
+  /**
+   * Move the step-through stepper to a new turn (#555): updates which step
+   * is active, points the map's focus effect at that turn's own coordinate,
+   * and refreshes the user's location so the dot is current for the new
+   * vantage point — the three things a "Next"/"Back" tap or an "All turns"
+   * row click all need, in one place so the phone strip and the desktop
+   * card can share it.
+   */
+  const handleStepChange = useCallback((index: number) => {
+    setActiveStepIndex(index);
+    // A step with no coordinate (malformed response only — see parseWalkSteps)
+    // still advances and still refreshes location; only the camera hop is
+    // skipped, so the person keeps a readable instruction either way.
+    const location = walkingRouteSteps?.[index]?.location;
+    if (location) {
+      setFocusPoint({ lng: location[0], lat: location[1] });
+      setFocusRequestId((n) => n + 1);
+    }
+    requestStepLocationRefresh();
+  }, [walkingRouteSteps, requestStepLocationRefresh]);
 
   // ── Blessing boxes (slice 1, map-first rework 2026-09-18) — live layer,
   // fetched ONCE client-side (useBoxesList's full PublicBlessingBox shape,
@@ -1428,6 +1528,8 @@ export default function MapWrapper({
             onMapReady={handleMapReady}
             onMoveEnd={handleMoveEnd}
             walkingRoute={walkingRouteVenueId === selectedVenueId ? walkingRoute : null}
+            focusPoint={focusPoint}
+            focusRequestId={focusRequestId}
           />
         </MapErrorBoundary>
       )}
@@ -1687,6 +1789,8 @@ export default function MapWrapper({
               ? walkingRouteSteps
               : null
           }
+          activeStepIndex={activeStepIndex}
+          onStepChange={handleStepChange}
           showWalkLocationHint={
             selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
           }
@@ -1723,6 +1827,8 @@ export default function MapWrapper({
               ? walkingRouteSteps
               : null
           }
+          activeStepIndex={activeStepIndex}
+          onStepChange={handleStepChange}
           showWalkLocationHint={
             selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
           }

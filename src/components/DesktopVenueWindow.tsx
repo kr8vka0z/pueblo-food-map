@@ -178,6 +178,10 @@ interface DesktopVenueWindowProps {
    * "share your location" hint instead of silently doing nothing.
    */
   showWalkLocationHint?: boolean;
+  /** Which turn the step-through stepper is showing (#555) — same as BottomSheet's identical prop, MapWrapper-owned so desktop and mobile agree with the map's camera focus. */
+  activeStepIndex?: number;
+  /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap. */
+  onStepChange?: (index: number) => void;
 }
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
@@ -198,6 +202,8 @@ export default function DesktopVenueWindow({
   walkRouteInfo,
   walkRouteSteps,
   showWalkLocationHint = false,
+  activeStepIndex = 0,
+  onStepChange = () => {},
 }: DesktopVenueWindowProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -413,6 +419,8 @@ export default function DesktopVenueWindow({
         routeInfo={isWalkRouteActive ? walkRouteInfo : null}
         walkSteps={isWalkRouteActive ? walkRouteSteps : null}
         showLocationHint={showWalkLocationHint}
+        activeStepIndex={activeStepIndex}
+        onStepChange={onStepChange}
       />
     </div>
   );
@@ -461,6 +469,8 @@ export default function DesktopVenueWindow({
         routeInfo={isWalkRouteActive ? walkRouteInfo : null}
         walkSteps={isWalkRouteActive ? walkRouteSteps : null}
         showLocationHint={showWalkLocationHint}
+        activeStepIndex={activeStepIndex}
+        onStepChange={onStepChange}
       />
 
       {/* Report an issue — secondary action (#70) */}
@@ -597,6 +607,8 @@ export default function DesktopVenueWindow({
           walkRouteInfo={isWalkRouteActive ? walkRouteInfo : null}
           walkRouteSteps={isWalkRouteActive ? walkRouteSteps : null}
           showWalkLocationHint={showWalkLocationHint}
+          activeStepIndex={activeStepIndex}
+          onStepChange={onStepChange}
           actions={
             <>
               <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} isBox />

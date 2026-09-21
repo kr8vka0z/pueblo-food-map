@@ -61,7 +61,7 @@ import { ChevronUp, ListOrdered, X } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { useOverlayRegistration } from "@/lib/overlayRegistry";
-import { WalkStepsList, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
+import { WalkStepper, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 
 /**
  * Fixed pixel height of the strip. vaul's snapPoints accept a CSS px string
@@ -99,8 +99,13 @@ interface RouteStripProps {
    * of nothing — a real Mapbox route reliably carries steps (see this
    * file's own header), so an empty state here is the exception, not the
    * norm, and should read as one rather than as a missing control.
+   *
    */
   walkSteps?: WalkStep[] | null;
+  /** Which turn WalkStepper shows inside the Steps sheet (#555). */
+  activeStepIndex?: number;
+  /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap. */
+  onStepChange?: (index: number) => void;
 }
 
 const linkClass =
@@ -126,8 +131,11 @@ export default function RouteStrip({
   onShowCard,
   onClearRoute,
   walkSteps,
+  activeStepIndex = 0,
+  onStepChange = () => {},
 }: RouteStripProps) {
-  const hasSteps = Array.isArray(walkSteps) && walkSteps.length > 0;
+  const stepperSteps = walkSteps ?? [];
+  const hasSteps = stepperSteps.length > 0;
 
   // ── Steps sheet (#531) ──────────────────────────────────────────────────
   const [stepsOpen, setStepsOpen] = useState(false);
@@ -281,7 +289,7 @@ export default function RouteStrip({
           {/* Only mounted while open — same jsdom-visibility reasoning as
               PhotoViewer.tsx's own comment on this exact pattern. */}
           {stepsOpen && (
-            <div className="flex max-h-[70vh] flex-col rounded-t-[var(--radius-xl)] bg-[var(--color-bone-50)] elevation-2 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="flex flex-col rounded-t-[var(--radius-xl)] bg-[var(--color-bone-50)] elevation-2 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <p
                   className="min-w-0 flex-1 truncate text-base font-medium text-[var(--color-ink-900)]"
@@ -304,14 +312,35 @@ export default function RouteStrip({
                   <X size={18} aria-hidden />
                 </button>
               </div>
-              <WalkStepsList
-                steps={walkSteps!}
+              {/* #555: the sheet now shows the same step-through stepper as
+                  the in-card readout — MapWrapper's activeStepIndex/
+                  onStepChange keep this sheet, the map's camera focus, and
+                  BottomSheet's own DirectionButtons in agreement on which
+                  turn is current, so opening this sheet mid-walk lands on
+                  the same turn instead of resetting to the first one.
+                  `max-h-[70vh]` moved from this inner div to the dialog
+                  element itself (unchanged above) — WalkStepper's own "All
+                  turns" list has its own internal scroll (max-h-48), so the
+                  outer dialog is the only element that still needs a height
+                  cap. */}
+              {/* WHY no `key` here, unlike WalkRouteStatus's own mount (#555):
+                  that one keys on venue.id because it stays mounted across a
+                  venue change, so its WalkStepper's local "All turns" state
+                  would bleed from one venue's route to the next. This mount
+                  cannot: the `{stepsOpen && ...}` guard above unmounts the
+                  whole subtree on every close, so the disclosure is always
+                  freshly collapsed when the sheet reopens, and the native
+                  <dialog>'s showModal() makes every other venue's Walk
+                  trigger inert while it's open.
+                  THAT IS LOAD-BEARING, not incidental: keeping this content
+                  mounted across close/reopen (say, to animate it) would
+                  silently reintroduce the bleed. RouteStrip.test.tsx pins the
+                  reset so such a change fails a test rather than shipping. */}
+              <WalkStepper
+                steps={stepperSteps}
+                activeIndex={activeStepIndex}
+                onStepChange={onStepChange}
                 locale={locale}
-                // `overscroll-contain` (#553): same scroll-chaining fix as the
-                // sheet's own body — a pull-down here at scrollTop 0 would
-                // otherwise reach the document and rubber-band the whole page
-                // in iOS Safari. See BottomSheet.tsx for the measurement.
-                className="flex-1 space-y-1.5 overflow-y-auto overscroll-contain text-sm text-[var(--color-ink-700)]"
               />
             </div>
           )}

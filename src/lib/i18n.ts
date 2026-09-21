@@ -422,14 +422,9 @@ const en: Record<string, string> = {
   // Walk-without-location hint (#207) — shown when Walk requests geolocation
   // (userLocation was null) and the browser denies it or it's unavailable.
   "directions.locationHint": "Share your location to see walking directions.",
-  // Turn-by-turn step list (#134 enhancement)
-  "directions.showSteps": "Show steps",
-  "directions.hideSteps": "Hide steps",
-  // #539: RouteStrip's own "Steps" button (opens the steps SHEET, no
-  // show/hide toggle state) is a separate control from the in-card
-  // showSteps/hideSteps TOGGLE above (DirectionButtons.tsx) — Kyle approved
-  // shortening the strip's label only; the in-card toggle still needs its
-  // two-state "Show steps"/"Hide steps" wording, so it keeps its own key.
+  // Turn-by-turn step list (#134 enhancement). showSteps/hideSteps (the
+  // in-card Show/Hide toggle) retired 2026-09-20 (#555) — WalkStepper
+  // replaced the toggle+full-list with the one-turn-at-a-time stepper below.
   "directions.steps": "Steps",
   "directions.stepsListLabel": "Turn-by-turn directions",
   // #537 — the route strip's Steps control only renders when a route has
@@ -440,6 +435,17 @@ const en: Record<string, string> = {
   // "ft" for sub-528 ft steps (sub-0.1 mi), otherwise the decimal miles value.
   "directions.stepFt": "{distance} ft",
   "directions.stepMi": "{distance} mi",
+  // Step-through stepper (#555) — "Step N of M" counter, the muted
+  // distance/arrival line, the "Then: <next>" peek, Back/Next aria-labels,
+  // and the "All turns" disclosure that reuses WalkStepsList.
+  "directions.stepCounter": "Step {current} of {total}",
+  "directions.stepIn": "In {distance}",
+  "directions.stepArrived": "You have arrived",
+  "directions.stepThen": "Then: {instruction}",
+  "directions.stepBack": "Previous turn",
+  "directions.stepNext": "Next turn",
+  "directions.allTurns": "All turns",
+  "directions.fewerTurns": "Fewer turns",
   // Google Maps walk handoff (#134 enhancement)
   "directions.openInGoogleMaps": "Open in Google Maps",
   "directions.openInGoogleMapsAria": "Open walking directions to {name} in Google Maps (opens in new tab)",
@@ -1285,10 +1291,8 @@ const es: Record<string, string> = {
   "directions.showCard": "Mostrar tarjeta", // [CHECK]
   // Walk-without-location hint (#207)
   "directions.locationHint": "Comparte tu ubicación para ver cómo llegar a pie.",
-  // Turn-by-turn step list (#134 enhancement)
-  "directions.showSteps": "Ver indicaciones",
-  "directions.hideSteps": "Ocultar indicaciones",
-  // #539 — see the EN dictionary's comment: separate key from showSteps/hideSteps.
+  // Turn-by-turn step list (#134 enhancement). showSteps/hideSteps retired
+  // 2026-09-20 (#555) — see the EN dictionary's comment.
   "directions.steps": "Pasos", // [CHECK]
   "directions.stepsListLabel": "Indicaciones paso a paso",
   // #537
@@ -1296,6 +1300,15 @@ const es: Record<string, string> = {
   // Per-step distance suffixes
   "directions.stepFt": "{distance} pies",
   "directions.stepMi": "{distance} mi",
+  // Step-through stepper (#555) — see the EN dictionary's comment.
+  "directions.stepCounter": "Paso {current} de {total}", // [CHECK]
+  "directions.stepIn": "En {distance}", // [CHECK]
+  "directions.stepArrived": "Has llegado", // [CHECK]
+  "directions.stepThen": "Luego: {instruction}", // [CHECK]
+  "directions.stepBack": "Giro anterior", // [CHECK]
+  "directions.stepNext": "Siguiente giro", // [CHECK]
+  "directions.allTurns": "Todos los giros", // [CHECK]
+  "directions.fewerTurns": "Menos giros", // [CHECK]
   // Google Maps walk handoff (#134 enhancement)
   "directions.openInGoogleMaps": "Abrir en Google Maps",
   "directions.openInGoogleMapsAria": "Abrir indicaciones a pie a {name} en Google Maps (se abre en una pestaña nueva)",

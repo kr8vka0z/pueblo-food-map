@@ -115,12 +115,13 @@ describe("BoxCardBody — active-route readout (reused from DirectionButtons' Wa
     expect(screen.getByTestId("walking-route-distance").textContent).toContain("0.4");
     expect(screen.getByTestId("walking-route-duration").textContent).toContain("8 min");
 
-    // Collapsible steps — collapsed by default, expands on toggle.
-    const stepsToggle = screen.getByTestId("walk-steps-toggle");
+    // Collapsible steps — collapsed by default, expands on toggle. #555 moved
+    // this disclosure into WalkStepper ("All turns"); same behaviour, new id.
+    const stepsToggle = screen.getByTestId("walk-stepper-all-turns-toggle");
     expect(screen.getByTestId("walk-steps-list")).toHaveProperty("hidden", true);
     await user.click(stepsToggle);
     expect(screen.getByTestId("walk-steps-list")).toHaveProperty("hidden", false);
-    expect(screen.getByText("Head north")).toBeDefined();
+    expect(screen.getByTestId("walk-steps-list").textContent).toContain("Head north");
 
     // Clear route — a standalone control here (the address itself never
     // relabels — see BoxCardBody's own header for why).

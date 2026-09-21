@@ -150,7 +150,7 @@ export interface WalkStep {
 // bbox covers everything a user can ever see.
 const MASK_MARGIN_DEG = 10;
 const [[BBOX_WEST, BBOX_SOUTH], [BBOX_EAST, BBOX_NORTH]] = PUEBLO_COUNTY_BBOX;
-const MASK_OUTER_RING: number[][] = [
+export const MASK_OUTER_RING: number[][] = [
   [BBOX_WEST - MASK_MARGIN_DEG, BBOX_SOUTH - MASK_MARGIN_DEG],
   [BBOX_EAST + MASK_MARGIN_DEG, BBOX_SOUTH - MASK_MARGIN_DEG],
   [BBOX_EAST + MASK_MARGIN_DEG, BBOX_NORTH + MASK_MARGIN_DEG],
@@ -296,7 +296,7 @@ export default function Map({
     return () => { cancelled = true; };
   }, []);
 
-  // Build the inverted mask GeoJSON: world outer ring (CCW) + county hole (CW).
+  // Build the inverted mask GeoJSON: bbox+margin outer ring (CCW) + county hole (CW).
   // Memoized on countyRing so it only rebuilds when the boundary data arrives.
   const maskGeoJSON = useMemo(() => {
     if (!countyRing) return null;

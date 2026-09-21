@@ -175,6 +175,31 @@ describe("NeedsDecisionPanel — suggestions group", () => {
     const more = screen.getByText("+3 more →");
     expect(more.getAttribute("href")).toBe("/admin/submissions");
   });
+
+  // Item 3 regression: one-click Reject had NO confirm at all before this
+  // fix — a mis-click was irreversible with zero warning.
+  test("Reject asks for confirmation first; cancelling the confirm makes no request", async () => {
+    confirmSpy.mockReturnValue(false);
+    render(<NeedsDecisionPanel {...emptyProps()} submissions={[makeSubmission()]} submissionsTotal={1} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Reject" }));
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(confirmSpy.mock.calls[0][0]).toMatch(/reject this suggestion/i);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  // Item 5 regression: a stale card (already rejected/approved elsewhere)
+  // must refresh quietly instead of showing "Try again" forever.
+  test("Reject: a 404 response (row already gone) refreshes instead of showing an error", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 404, json: async () => ({ ok: false, error: "Not found" }) } as Response);
+    render(<NeedsDecisionPanel {...emptyProps()} submissions={[makeSubmission()]} submissionsTotal={1} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Reject" }));
+
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("Try again")).toBeNull();
+  });
 });
 
 describe("NeedsDecisionPanel — data refresh group", () => {
@@ -219,6 +244,84 @@ describe("NeedsDecisionPanel — data refresh group", () => {
     render(<NeedsDecisionPanel {...emptyProps()} proposals={[makeProposal({ anomaly: 1 })]} proposalsTotal={1} />);
     expect(screen.getByText("Unusual run")).toBeDefined();
   });
+
+  // Item 4 regression: the row used to show only a name + "Field update"
+  // badge, with no source and no hint what actually changed — an admin was
+  // approving a change they couldn't see.
+  test("update proposal shows its source label and a one-line before -> after diff", () => {
+    render(
+      <NeedsDecisionPanel
+        {...emptyProps()}
+        proposals={[makeProposal({ source: "osm" }, { before: { phone: "111" }, after: { phone: "222" }, fields_changed: ["phone"] })]}
+        proposalsTotal={1}
+      />,
+    );
+    expect(screen.getByText(/OpenStreetMap/)).toBeDefined();
+    expect(screen.getByText("111")).toBeDefined();
+    expect(screen.getByText("222")).toBeDefined();
+  });
+
+  test("a single-field update still gets a plain inline Approve button", () => {
+    render(
+      <NeedsDecisionPanel
+        {...emptyProps()}
+        proposals={[makeProposal({}, { before: { phone: "111" }, after: { phone: "222" }, fields_changed: ["phone"] })]}
+        proposalsTotal={1}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
+  });
+
+  // Item 4: more changed fields than fit on one line -> show the first plus
+  // "+N more", and route Approve to the full queue instead of a blind
+  // one-click approve.
+  test("a multi-field update shows '+N more' and replaces Approve with a link to /admin/flags", () => {
+    render(
+      <NeedsDecisionPanel
+        {...emptyProps()}
+        proposals={[
+          makeProposal(
+            {},
+            {
+              before: { phone: "111", url: "http://old.example.com" },
+              after: { phone: "222", url: "http://new.example.com" },
+              fields_changed: ["phone", "url"],
+            },
+          ),
+        ]}
+        proposalsTotal={1}
+      />,
+    );
+    expect(screen.getByText("(+1 more)")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Review in queue" }).getAttribute("href")).toBe("/admin/flags");
+  });
+
+  test("a freshness-only update (no reviewable fields) shows no diff line", () => {
+    render(
+      <NeedsDecisionPanel
+        {...emptyProps()}
+        proposals={[makeProposal({}, { before: {}, after: { last_verified: "2026-09-01" }, fields_changed: ["last_verified"] })]}
+        proposalsTotal={1}
+      />,
+    );
+    expect(screen.queryByText(/→/)).toBeNull();
+  });
+
+  // Item 5 regression: a proposal already reviewed/superseded elsewhere
+  // (POST .../approve returns 409 "stale") must refresh quietly.
+  test("Approve: a 409 (stale/superseded) response refreshes instead of showing an error", async () => {
+    mockFetch.mockResolvedValueOnce({
+      status: 409,
+      json: async () => ({ ok: false, error: "stale", message: "This proposal is no longer current." }),
+    } as Response);
+    render(<NeedsDecisionPanel {...emptyProps()} proposals={[makeProposal()]} proposalsTotal={1} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("This proposal is no longer current.")).toBeNull();
+  });
 });
 
 describe("NeedsDecisionPanel — blessing boxes group", () => {
@@ -233,8 +336,25 @@ describe("NeedsDecisionPanel — blessing boxes group", () => {
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
+  // Item 3 regression: rejecting a photo permanently deletes its stored R2
+  // object (box-photos/[id]/reject/route.ts) — the confirm wording must warn
+  // about that, not just say "reject."
+  test("photo row: Reject's confirm warns the photo will be permanently deleted", async () => {
+    confirmSpy.mockReturnValue(false);
+    render(<NeedsDecisionPanel {...emptyProps()} photos={[makePhoto()]} photosTotal={1} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Reject" }));
+
+    expect(confirmSpy.mock.calls[0][0]).toMatch(/permanently deleted/i);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   test("adopter row: shows email-confirmed state, and a 409 approve response surfaces the unconfirmed message", async () => {
-    mockFetch.mockResolvedValueOnce({ status: 409, json: async () => ({}) } as Response);
+    // Real shape POST /api/admin/box-adopters/[id]/approve returns for this
+    // case (route.ts: `{ ok: false, error: "unconfirmed" }`, status 409) —
+    // ApproveButton's default 404/409 "already handled" behavior must NOT
+    // swallow this real, non-stale business rule (item 5's own scope).
+    mockFetch.mockResolvedValueOnce({ status: 409, json: async () => ({ ok: false, error: "unconfirmed" }) } as Response);
     render(
       <NeedsDecisionPanel
         {...emptyProps()}

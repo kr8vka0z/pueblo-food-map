@@ -21,11 +21,13 @@
  * re-implemented flow.
  *
  * One deliberate simplification from the full queues: reject's optional
- * "reason" textarea is dropped here (POSTs `{ reason: null }` directly on
- * click, no confirm step) — a fast-triage panel benefits more from a true
- * one-click reject than from carrying every full-queue affordance, and the
+ * "reason" textarea is dropped here (POSTs `{ reason: null }` after a native
+ * window.confirm() gate) — a fast-triage panel benefits more from a quick
+ * confirm-then-reject than from carrying every full-queue affordance, and the
  * reason field is genuinely optional everywhere it's used (the full queue,
- * one click away, still offers it for anyone who wants to leave one).
+ * one click away, still offers it for anyone who wants to leave one). The
+ * confirm step itself is NOT optional (review finding) — see RejectButton's
+ * own header for why.
  *
  * On any successful action, router.refresh() re-runs the Dashboard's own
  * Server Component queries — same "no local list copy to reconcile"
@@ -36,7 +38,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReviewSubmission } from "@/components/SubmissionsReviewView";
-import type { ParsedProposal, ProposalChangeType } from "@/lib/adminProposals";
+import { SOURCE_BADGE, fieldLabel, formatFieldValue } from "@/components/ProposalsReviewView";
+import { reviewableDiffFields } from "@/lib/adminProposals";
+import type { ParsedProposal, ProposalChangeType, ProposalSourceValue, ProposedDiff } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/lib/adminVenueLookup";
 import type { AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import type { AdminBoxAdopterRow } from "@/lib/boxAdopters";
@@ -93,11 +97,26 @@ function formatWhen(iso: string): string {
 
 type RejectState = "idle" | "submitting" | "error";
 
-/** One-click reject POST — `path` is the exact same route each full queue's own reject button calls. */
-function RejectButton({ path, onDone }: { path: string; onDone: () => void }) {
+/**
+ * One-click reject POST — `path` is the exact same route each full queue's
+ * own reject button calls.
+ *
+ * `confirmMessage` is REQUIRED, not optional (review finding: one-click
+ * reject with no confirm at all made a mis-click on this fast-triage panel
+ * irreversible with zero warning — a box-photo reject in particular
+ * permanently deletes the stored R2 object, see box-photos/[id]/reject's own
+ * header). Every call site below supplies its own wording.
+ *
+ * A 404/409 response means this row was already handled elsewhere (approved,
+ * rejected, or deleted) between page load and click — a stale card, not a
+ * real failure — so it refreshes the same as success rather than showing a
+ * "Try again" that would just repeat the same 404/409 (review finding).
+ */
+function RejectButton({ path, confirmMessage, onDone }: { path: string; confirmMessage: string; onDone: () => void }) {
   const [state, setState] = useState<RejectState>("idle");
 
   async function handleReject() {
+    if (!window.confirm(confirmMessage)) return;
     setState("submitting");
     try {
       const res = await fetch(path, {
@@ -105,7 +124,7 @@ function RejectButton({ path, onDone }: { path: string; onDone: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: null }),
       });
-      if (res.status === 200) {
+      if (res.status === 200 || res.status === 404 || res.status === 409) {
         onDone();
         return;
       }
@@ -123,6 +142,96 @@ function RejectButton({ path, onDone }: { path: string; onDone: () => void }) {
       {state === "error" && (
         <span role="alert" className="text-xs text-[var(--color-danger)]">
           Try again
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─── Shared inline approve (item 5/6: collapses ProposalApproveAction /  ───
+// ─── PhotoApproveAction / AdopterApproveAction into one component)      ───
+
+/**
+ * Reads a non-200 JSON response and decides what to do. Returns `"handled"`
+ * when the row should be treated as already resolved (refresh, no error
+ * shown) — the default for 404/409, which mean this row moved under the
+ * admin (approved/rejected/superseded/deleted elsewhere) since page load,
+ * not a real failure worth retrying. Returns a string to show that message
+ * instead of the default "Try again" (box-adopters/approve's real 409 —
+ * "unconfirmed" — is NOT a stale row, so AdopterApproveAction overrides this
+ * default below).
+ */
+function defaultInterpretApproveError(status: number, body: { message?: string } | null): "handled" | string {
+  if (status === 404 || status === 409) return "handled";
+  return body?.message ?? "Try again";
+}
+
+interface ApproveButtonProps {
+  path: string;
+  onDone: () => void;
+  /** window.confirm() gate before POSTing — omitted means no confirm (the common case: approving a field edit or a new upload isn't destructive). */
+  confirmMessage?: string;
+  label?: string;
+  submittingLabel?: string;
+  variant?: "primary" | "danger";
+  interpretError?: (status: number, body: { error?: string; message?: string } | null) => "handled" | string;
+}
+
+/**
+ * One shared inline-approve button for every "Needs a decision" row
+ * (proposals, box photos, box adopters) — collapses three near-identical
+ * copies (ProposalApproveAction/PhotoApproveAction/AdopterApproveAction used
+ * to each hand-roll their own fetch + error state) so the stale-row fix
+ * above (404/409 -> refresh, not "Try again") lives in exactly one place.
+ */
+function ApproveButton({
+  path,
+  onDone,
+  confirmMessage,
+  label = "Approve",
+  submittingLabel = "Approving…",
+  variant = "primary",
+  interpretError = defaultInterpretApproveError,
+}: ApproveButtonProps) {
+  const [state, setState] = useState<"idle" | "submitting" | "error">("idle");
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function handleApprove() {
+    if (confirmMessage && !window.confirm(confirmMessage)) return;
+    setState("submitting");
+    try {
+      const res = await fetch(path, { method: "POST" });
+      if (res.status === 200) {
+        onDone();
+        return;
+      }
+      const body = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
+      const outcome = interpretError(res.status, body);
+      if (outcome === "handled") {
+        onDone();
+        return;
+      }
+      setMessage(outcome);
+      setState("error");
+    } catch {
+      setMessage("Try again");
+      setState("error");
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={handleApprove}
+        disabled={state === "submitting"}
+        className={variant === "danger" ? dangerButtonClass : primaryButtonClass}
+      >
+        {state === "submitting" ? submittingLabel : label}
+      </button>
+      {state === "error" && (
+        <span role="alert" className="text-xs text-[var(--color-danger)]">
+          {message}
         </span>
       )}
     </div>
@@ -219,7 +328,11 @@ export default function NeedsDecisionPanel({
                       Review &amp; approve
                     </Link>
                   )}
-                  <RejectButton path={`/api/admin/submissions/${s.id}/reject`} onDone={refresh} />
+                  <RejectButton
+                    path={`/api/admin/submissions/${s.id}/reject`}
+                    confirmMessage="Reject this suggestion? This can't be undone."
+                    onDone={refresh}
+                  />
                 </div>
               </li>
             ))}
@@ -238,7 +351,11 @@ export default function NeedsDecisionPanel({
                 <ProposalRowDetail proposal={p} venueLookup={venueLookup} />
                 <div className="flex items-center gap-2">
                   <ProposalApproveAction proposal={p} onDone={refresh} />
-                  <RejectButton path={`/api/admin/proposals/${p.row.id}/reject`} onDone={refresh} />
+                  <RejectButton
+                    path={`/api/admin/proposals/${p.row.id}/reject`}
+                    confirmMessage="Reject this proposed change? This can't be undone."
+                    onDone={refresh}
+                  />
                 </div>
               </li>
             ))}
@@ -263,7 +380,11 @@ export default function NeedsDecisionPanel({
                         <PhotoRowDetail photo={photo} />
                         <div className="flex items-center gap-2">
                           <PhotoApproveAction photoId={photo.id} onDone={refresh} />
-                          <RejectButton path={`/api/admin/box-photos/${photo.id}/reject`} onDone={refresh} />
+                          <RejectButton
+                            path={`/api/admin/box-photos/${photo.id}/reject`}
+                            confirmMessage="Reject this photo? The photo will be permanently deleted. This can't be undone."
+                            onDone={refresh}
+                          />
                         </div>
                       </li>
                     ))}
@@ -286,7 +407,11 @@ export default function NeedsDecisionPanel({
                         <AdopterRowDetail adopter={adopter} />
                         <div className="flex items-center gap-2">
                           <AdopterApproveAction adopterId={adopter.id} onDone={refresh} />
-                          <RejectButton path={`/api/admin/box-adopters/${adopter.id}/reject`} onDone={refresh} />
+                          <RejectButton
+                            path={`/api/admin/box-adopters/${adopter.id}/reject`}
+                            confirmMessage="Reject this adoption request? This can't be undone."
+                            onDone={refresh}
+                          />
                         </div>
                       </li>
                     ))}
@@ -330,6 +455,32 @@ const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
   remove: "Remove",
 };
 
+/**
+ * Compact one-line "what changed" for an `update` proposal — the Dashboard's
+ * fast-triage panel has no room for the full queue's FieldDiff table
+ * (ProposalsReviewView.tsx), so this shows only the FIRST reviewable field's
+ * before -> after plus a "+N more" count. Reuses reviewableDiffFields/
+ * fieldLabel/formatFieldValue (the SAME field selection + formatting the
+ * full queue's own diff view uses) rather than a second diff parser — the
+ * two views can never disagree about what a field's value reads as.
+ */
+function ProposalDiffPreview({ diff }: { diff: ProposedDiff }) {
+  const fields = reviewableDiffFields(diff);
+  if (fields.length === 0) return null;
+  const [first, ...rest] = fields;
+  const before = (diff.before ?? {}) as Record<string, unknown>;
+  const after = (diff.after ?? {}) as Record<string, unknown>;
+  return (
+    <p className="mt-1 text-xs text-[var(--color-ink-500)]">
+      {fieldLabel(first)}:{" "}
+      <span className="line-through decoration-1">{formatFieldValue(first, before[first])}</span>{" "}
+      <span aria-hidden>→</span>{" "}
+      <span className="font-medium text-[var(--color-sage-700)]">{formatFieldValue(first, after[first])}</span>
+      {rest.length > 0 && <span className="text-[var(--color-ink-400)]"> (+{rest.length} more)</span>}
+    </p>
+  );
+}
+
 function ProposalRowDetail({
   proposal,
   venueLookup,
@@ -342,6 +493,7 @@ function ProposalRowDetail({
   const afterName = !proposal.parseError && typeof proposal.diff.after?.name === "string" ? proposal.diff.after.name : undefined;
   const name = targetVenue?.name ?? afterName ?? row.target_venue_id;
   const changeType = row.change_type as ProposalChangeType;
+  const sourceLabel = SOURCE_BADGE[row.source as ProposalSourceValue]?.label ?? row.source;
   return (
     <div className="min-w-0">
       <p className="text-sm font-medium text-[var(--color-ink-700)]">
@@ -355,13 +507,21 @@ function ProposalRowDetail({
           </span>
         )}
       </p>
-      <p className="text-xs text-[var(--color-ink-400)]">{formatWhen(row.created_at)}</p>
+      <p className="text-xs text-[var(--color-ink-400)]">
+        {sourceLabel} · {formatWhen(row.created_at)}
+      </p>
+      {/* Only `update` proposals get a diff line — `add`/`remove` are
+          already fully described by the badge above, and link_health's own
+          "no blind approve" rule (ProposalApproveAction below) means an
+          admin never approves one from this preview anyway. */}
+      {!proposal.parseError && changeType === "update" && row.source !== "link_health" && (
+        <ProposalDiffPreview diff={proposal.diff} />
+      )}
     </div>
   );
 }
 
 function ProposalApproveAction({ proposal, onDone }: { proposal: ParsedProposal; onDone: () => void }) {
-  const [state, setState] = useState<"idle" | "submitting" | "error">("idle");
   const { row } = proposal;
   const source = row.source;
   const changeType = row.change_type as ProposalChangeType;
@@ -377,42 +537,30 @@ function ProposalApproveAction({ proposal, onDone }: { proposal: ParsedProposal;
   }
   if (proposal.parseError) return null;
 
-  async function handleApprove() {
-    if (
-      changeType === "remove" &&
-      !window.confirm("Remove this venue from the map? Its record is kept, not deleted, and can be reviewed later.")
-    ) {
-      return;
-    }
-    setState("submitting");
-    try {
-      const res = await fetch(`/api/admin/proposals/${row.id}/approve`, { method: "POST" });
-      if (res.status === 200) {
-        onDone();
-        return;
-      }
-      setState("error");
-    } catch {
-      setState("error");
-    }
+  // A multi-field update doesn't fit this row's one-line diff preview — send
+  // the admin to the full queue to review every changed field rather than
+  // approving something they can't fully see here (review finding).
+  if (changeType === "update" && reviewableDiffFields(proposal.diff).length > 1) {
+    return (
+      <Link href="/admin/flags" className={primaryButtonClass}>
+        Review in queue
+      </Link>
+    );
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={handleApprove}
-        disabled={state === "submitting"}
-        className={changeType === "remove" ? dangerButtonClass : primaryButtonClass}
-      >
-        {state === "submitting" ? "Applying…" : changeType === "remove" ? "Archive" : "Approve"}
-      </button>
-      {state === "error" && (
-        <span role="alert" className="text-xs text-[var(--color-danger)]">
-          Try again
-        </span>
-      )}
-    </div>
+    <ApproveButton
+      path={`/api/admin/proposals/${row.id}/approve`}
+      onDone={onDone}
+      confirmMessage={
+        changeType === "remove"
+          ? "Remove this venue from the map? Its record is kept, not deleted, and can be reviewed later."
+          : undefined
+      }
+      label={changeType === "remove" ? "Archive" : "Approve"}
+      submittingLabel={changeType === "remove" ? "Applying…" : "Approving…"}
+      variant={changeType === "remove" ? "danger" : "primary"}
+    />
   );
 }
 
@@ -445,34 +593,7 @@ function PhotoRowDetail({ photo }: { photo: AdminBoxPhotoRow }) {
 }
 
 function PhotoApproveAction({ photoId, onDone }: { photoId: number; onDone: () => void }) {
-  const [state, setState] = useState<"idle" | "submitting" | "error">("idle");
-
-  async function handleApprove() {
-    setState("submitting");
-    try {
-      const res = await fetch(`/api/admin/box-photos/${photoId}/approve`, { method: "POST" });
-      if (res.status === 200) {
-        onDone();
-        return;
-      }
-      setState("error");
-    } catch {
-      setState("error");
-    }
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      <button type="button" onClick={handleApprove} disabled={state === "submitting"} className={primaryButtonClass}>
-        {state === "submitting" ? "Approving…" : "Approve"}
-      </button>
-      {state === "error" && (
-        <span role="alert" className="text-xs text-[var(--color-danger)]">
-          Try again
-        </span>
-      )}
-    </div>
-  );
+  return <ApproveButton path={`/api/admin/box-photos/${photoId}/approve`} onDone={onDone} />;
 }
 
 function AdopterRowDetail({ adopter }: { adopter: AdminBoxAdopterRow }) {
@@ -496,40 +617,20 @@ function AdopterRowDetail({ adopter }: { adopter: AdminBoxAdopterRow }) {
 }
 
 function AdopterApproveAction({ adopterId, onDone }: { adopterId: number; onDone: () => void }) {
-  const [state, setState] = useState<"idle" | "submitting" | "error">("idle");
-  const [message, setMessage] = useState<string | null>(null);
-
-  async function handleApprove() {
-    setState("submitting");
-    try {
-      const res = await fetch(`/api/admin/box-adopters/${adopterId}/approve`, { method: "POST" });
-      if (res.status === 200) {
-        onDone();
-        return;
-      }
-      if (res.status === 409) {
-        setMessage("Not confirmed yet");
-        setState("error");
-        return;
-      }
-      setMessage("Try again");
-      setState("error");
-    } catch {
-      setMessage("Try again");
-      setState("error");
-    }
-  }
-
   return (
-    <div className="flex items-center gap-2">
-      <button type="button" onClick={handleApprove} disabled={state === "submitting"} className={primaryButtonClass}>
-        {state === "submitting" ? "Approving…" : "Approve"}
-      </button>
-      {state === "error" && (
-        <span role="alert" className="text-xs text-[var(--color-danger)]">
-          {message}
-        </span>
-      )}
-    </div>
+    <ApproveButton
+      path={`/api/admin/box-adopters/${adopterId}/approve`}
+      onDone={onDone}
+      // Override: this route's 409 is a REAL, non-stale business rule
+      // ("the applicant hasn't clicked their own confirm-email link yet" —
+      // see box-adopters/[id]/approve/route.ts's own header), not a row that
+      // moved under the admin — so it must NOT silently refresh like the
+      // default 404/409 handling does everywhere else.
+      interpretError={(status, body) => {
+        if (status === 409 && body?.error === "unconfirmed") return "Not confirmed yet";
+        if (status === 404) return "handled";
+        return body?.message ?? "Try again";
+      }}
+    />
   );
 }

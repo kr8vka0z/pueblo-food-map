@@ -521,16 +521,19 @@ worker at dev.pueblofoodmap.com. Neither workflow has a
 deploy only happens as a side effect of a push landing on that branch (see
 "Gap: Dependabot auto-merge can strand commits undeployed" below for why
 that matters). Separately, `.github/workflows/ci.yml` runs
-`lint → design:lint → design:drift → typecheck → test:coverage → npm audit
-→ build` on every PR and push to `main` — that's the correctness gate;
-`deploy-prod.yml`/`deploy-dev.yml` re-run the same `predeploy` suite before
-deploying, so a red build never reaches production.
+`lint → design:lint → design:drift → typecheck → test:ci → npm audit
+→ build` on every PR and push to `main` — that's the correctness gate, and
+it's a required check on both `main` and `dev`. `deploy-prod.yml`/
+`deploy-dev.yml` re-run only the fast part (lint, design:drift, typecheck),
+not the full test suite, since nothing reaches either branch without that
+required check passing (changed 2026-09-23: the re-run cost ~3 min per
+deploy and let flaky tests block already-green changes).
 
 **One scoped exception:** a `publish-bot` PR whose full diff (merge-base of
 base/head, not a raw two-dot diff) touches EXACTLY
 `src/data/published-venues.ts` — the file the admin Publish action
 regenerates from D1 (see AGENTS.md "Publish → static" for the full flow) —
-skips `lint`, `design:lint`, `design:drift`, `test:coverage` (replaced by a
+skips `lint`, `design:lint`, `design:drift`, `test:ci` (replaced by a
 narrower published-data/venue-shape test subset), and `npm audit`.
 `typecheck` and `build` still run unconditionally, on every publish PR, with
 no exception — see AGENTS.md "Publish → static" for the exact skip list and

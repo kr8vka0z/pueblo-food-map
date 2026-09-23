@@ -41,7 +41,7 @@ suggested change does not apply.
 
 ## Development setup
 
-Requirements: Node.js 20 (LTS) or later and npm.
+Requirements: Node.js 22 (see `.node-version`) and npm.
 
 ```bash
 git clone https://github.com/kr8vka0z/pueblo-food-map.git

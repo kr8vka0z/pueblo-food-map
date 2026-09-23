@@ -21,7 +21,7 @@ any smartphone browser; no app install required.
 
 ## Local development
 
-Requirements: Node.js 20 LTS or later.
+Requirements: Node.js 22 (see `.node-version`).
 
 ```bash
 git clone https://github.com/kr8vka0z/pueblo-food-map.git

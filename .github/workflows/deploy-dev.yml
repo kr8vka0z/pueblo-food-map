@@ -6,7 +6,7 @@
 # dev.pueblofoodmap.com (/admin gated by Better Auth alone — magic link +
 # passkey, own allowlist and rpID; see AGENTS.md "Admin authentication —
 # Better Auth is the sole gate"). Gated by
-# the same `predeploy` suite deploy-prod.yml runs, plus a staging-D1
+# the same fast checks deploy-prod.yml runs, plus a staging-D1
 # remote-migration step: unlike a Worker deploy, a D1 schema migration is a
 # separate database operation that never auto-applies on `wrangler deploy`
 # (AGENTS.md "Applying the migration — NOT part of a Worker deploy").
@@ -77,10 +77,19 @@ jobs:
           # Matches ToastHoster's deploy workflows.
           node-version: 22
           cache: npm
-      - run: npm ci
-      # Same gate deploy-prod.yml and ci.yml run — a broken build must never
-      # reach dev.pueblofoodmap.com either.
-      - run: npm run predeploy
+      # Reuse node_modules when the lockfile is unchanged (see ci.yml).
+      - id: nm-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
+      - if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci
+      # Fast gate only. The full test suite is NOT re-run here: nothing lands
+      # on `dev` without ci.yml's required "Lint, typecheck, build" check
+      # (full suite) passing first — ruleset 22116897. Re-running it cost ~3
+      # min per deploy and let a flaky test block an already-green change.
+      - run: npm run lint && npm run design:drift && npm run typecheck
       # D1 remote migrations are NOT applied by `wrangler deploy` / OpenNext
       # deploy — must run explicitly against the staging database on every
       # deploy that could carry a schema change. `--env staging` resolves

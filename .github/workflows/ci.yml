@@ -79,7 +79,18 @@ jobs:
           node-version: 20
           cache: npm
 
+      # Reuse the installed node_modules when package-lock.json hasn't changed:
+      # a fresh `npm ci` was ~97s of every run. The key changes with the
+      # lockfile, so any dependency bump still gets a clean install.
+      - name: Cache node_modules
+        id: nm-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Lint
@@ -106,13 +117,13 @@ jobs:
         # Venue shape (#336).
         run: npm run typecheck
 
-      - name: Test with coverage
-        # Runs the full test suite and generates lcov for visibility.
-        # No global percentage floor — coverage thresholds reward junk tests
-        # on solo projects. Required coverage lives in specific test files
-        # (filter/search pipeline, hours, 3 API routes, i18n, axe/a11y).
+      - name: Test
+        # Full suite, without coverage instrumentation: nothing read the
+        # coverage report (no floor, no Codecov), and instrumenting made this
+        # the slowest step (2026-09-23). `npm run test:coverage` still works
+        # locally when a report is wanted.
         if: steps.detect.outputs.data_only != 'true'
-        run: npm run test:coverage
+        run: npm run test:ci
 
       - name: Test — published data / venue shape only (data-only publish PR)
         # A scoped-down substitute for the full suite above, not a silent
@@ -123,16 +134,6 @@ jobs:
         # UI/i18n/a11y test a pure data change can't affect.
         if: steps.detect.outputs.data_only == 'true'
         run: npx vitest run src/lib/publishVenues.test.ts src/__tests__/publishedVenues.test.ts src/__tests__/pueblo-bbox.test.ts src/__tests__/hours.test.ts src/__tests__/venueSchema.test.ts
-
-      - name: Upload coverage report
-        # Publish the lcov report as a CI artifact for visibility in the PR.
-        if: steps.detect.outputs.data_only != 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-report
-          path: coverage/lcov.info
-          if-no-files-found: warn
-          retention-days: 14
 
       - name: npm audit (production deps, high/critical only)
         # Only production deps are shipped to the Worker; dev CVEs stay local.

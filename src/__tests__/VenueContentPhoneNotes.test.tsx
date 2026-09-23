@@ -16,8 +16,6 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { t } from "@/lib/i18n";
 import VenueContent from "@/components/VenueContent";
@@ -72,12 +70,12 @@ describe("VenueContent — notes suppression", () => {
   });
 });
 
-describe("tap target — phone link floors to 44px (mobile review convention)", () => {
-  test("tel: link carries min-h-11 (Tailwind 44px), unlike BottomSheet/DesktopVenueWindow's own unfloored phone anchor", () => {
-    const src = readFileSync(
-      join(process.cwd(), "src/components/VenueContent.tsx"),
-      "utf-8",
+describe("phone link looks tappable (Kyle, 2026-09-23: option A, underlined green link)", () => {
+  test("tel: link is underlined, green, and floors to a 44px tap target", () => {
+    render(<VenueContent venue={{ ...BASE_VENUE, phone: "(719) 555-0100" }} />);
+    const cls = screen.getByRole("link", { name: /555-0100/ }).className.split(/\s+/);
+    expect(cls).toEqual(
+      expect.arrayContaining(["underline", "text-[var(--color-sage-700)]", "min-h-11"]),
     );
-    expect(src).toMatch(/flex items-center gap-2\.5 min-h-11 text-sm/);
   });
 });

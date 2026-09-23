@@ -142,6 +142,17 @@ describe("BottomSheet — expand / collapse toggle", () => {
     expect(screen.getByText("(719) 555-0122")).toBeDefined();
   });
 
+  test("revealed phone number is an underlined, green, 44px tel: link (option A, 2026-09-23)", async () => {
+    const user = userEvent.setup();
+    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
+    await user.click(screen.getByRole("button", { name: /show details/i }));
+    const link = screen.getByRole("link", { name: /555-0122/ });
+    expect(link.getAttribute("href")).toBe("tel:(719) 555-0122");
+    expect(link.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(["underline", "text-[var(--color-sage-700)]", "min-h-11"]),
+    );
+  });
+
   test("clicking 'Hide details' hides phone number again", async () => {
     const user = userEvent.setup();
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);

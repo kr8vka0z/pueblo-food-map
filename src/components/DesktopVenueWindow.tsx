@@ -513,9 +513,9 @@ export default function DesktopVenueWindow({
           </h3>
           <a
             href={`tel:${venue.phone}`}
-            className="flex items-center gap-2 text-sm text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
           >
-            <Phone size={13} className="text-[var(--color-ink-400)]" aria-hidden />
+            <Phone size={13} className="text-[var(--color-sage-600)]" aria-hidden />
             {venue.phone}
           </a>
         </section>

@@ -236,6 +236,15 @@ describe("MapWrapper — cold load with a venue deep link bypasses the gate (#22
 // ─── No layout shift across the placeholder → live-map swap ──────────────────
 
 describe("MapWrapper — placeholder/map swap introduces no layout shift (#226)", () => {
+  // Same "not yet mounted" assertion as the cold-load block — same fake-timer
+  // guard against the 200ms idle fallback firing under CI load (#577).
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   test("the same fill-parent wrapper hosts both the placeholder and the live map", async () => {
     const { container } = await renderMapWrapper();
     const wrapper = container.querySelector(":scope > div");

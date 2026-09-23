@@ -181,7 +181,9 @@ async function renderMobile() {
 describe("#547 — bottom nav hides while the route strip is showing", () => {
   test("full card (no route yet): nav is hidden, as before (#509)", async () => {
     await renderMobile();
-    expect(document.querySelector("[data-bottom-nav]")).toBeNull();
+    // The nav hides via useOverlayRegistration, one effect-hop after the
+    // selection renderMobile() waits for — so wait for it too (#577).
+    await waitFor(() => expect(document.querySelector("[data-bottom-nav]")).toBeNull());
   });
 
   test("route active -> strip showing: nav is hidden", async () => {
@@ -235,6 +237,10 @@ describe("#547 — venue switched while a route runs (reviewer risk)", () => {
 
     // Stand-in for tapping venue B's real map pin — MapCanvas would call the
     // same onSelectVenue prop from a marker click.
+    // Radix (under vaul) briefly sets body pointer-events:none while the
+    // sheet opens; vaul clears it on the next animation frame. Wait for that
+    // so the click isn't rejected mid-animation (#577).
+    await waitFor(() => expect(document.body.style.pointerEvents).not.toBe("none"));
     await user.click(screen.getByTestId("select-venue-b"));
 
     // BottomSheet is keyed by selectedVenueId (BottomSheet.tsx), so it

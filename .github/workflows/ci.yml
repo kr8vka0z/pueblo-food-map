@@ -76,7 +76,9 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # 22 to match .node-version and the deploy workflows, so all three
+          # share one node_modules cache (native modules are per-Node-version).
+          node-version: 22
           cache: npm
 
       # Reuse the installed node_modules when package-lock.json hasn't changed:
@@ -87,7 +89,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'

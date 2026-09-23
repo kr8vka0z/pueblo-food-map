@@ -408,13 +408,14 @@ def parse_detail(html: str) -> dict:
     if "wic" in text:
         accepts_wic = True
 
-    # Notes: pull description meta or first paragraph that looks substantive
+    # Notes: NOT the page's <meta name="description"> — that's Plentiful's
+    # own SEO summary, English-only and just a restatement of fields this
+    # app already shows (name/city/phone: "{name}. in Pueblo, CO. Phone:
+    # ...") — pure filler that leaked onto /venue/<id> untranslated,
+    # especially visible in Spanish mode. See migrations/0013 for the
+    # one-time cleanup of rows already scraped with it. Only the two
+    # genuinely informative sources below feed `notes` now.
     notes: Optional[str] = None
-    meta_desc = soup.find("meta", attrs={"name": "description"})
-    if meta_desc and meta_desc.get("content"):
-        candidate = meta_desc["content"].strip()
-        if len(candidate) > 20:
-            notes = candidate
 
     # Eligibility keywords
     elig_keywords = ["eligib", "requirement", "must bring", "income", "documentation", "id required"]
@@ -430,8 +431,8 @@ def parse_detail(html: str) -> dict:
     # A non-weekly recurrence (e.g. "Once a month") has no home in
     # hours_weekly's Monday-Sunday grid — fold it into notes instead of
     # dropping it, so a human reviewing this venue's admin change-proposal
-    # still sees when it's actually open. Appended, never replacing the
-    # meta-description text above, so both survive.
+    # still sees when it's actually open. Appended, never replacing an
+    # eligibility sentence found above, so both survive.
     if recurrence_notes:
         extra = " ".join(recurrence_notes)
         notes = f"{notes} {extra}".strip() if notes else extra
@@ -695,6 +696,44 @@ def _self_check() -> int:
     assert wrapper_result == {"mon": ["4:00 PM - 6:00 PM"]}, f"_infer_weekly_hours wrapper: got {wrapper_result!r}"
     checked += 1
     print("  OK  _infer_weekly_hours() wrapper")
+
+    # parse_detail() notes: proves the meta-description-as-notes bug (fixed
+    # by fix/venue-page-phone-notes) stays fixed, while the eligibility-
+    # keyword sentence and recurrence-notes logic it must NOT break keep
+    # working. `monthly.html` has no <meta name="description"> or eligibility
+    # text (real captured HTML, no head), so it isolates recurrence-only
+    # behavior; the synthetic HTML below isolates meta-suppression +
+    # eligibility together (not a "captured verbatim" fixture — invented
+    # inline, deliberately, since no real Plentiful page needs faking to
+    # prove a code-level guard).
+    monthly_html = (FIXTURES_DIR / "monthly.html").read_text(encoding="utf-8")
+    monthly_detail = parse_detail(monthly_html)
+    assert monthly_detail["notes"] == "Open the 4th Tuesday of each month, 11:00 AM – 12:00 PM.", (
+        f"parse_detail(monthly.html) notes: got {monthly_detail['notes']!r}"
+    )
+    checked += 1
+    print("  OK  parse_detail() recurrence-only notes (monthly.html)")
+
+    # No preceding heading text in the body — get_text(separator=" ") joins
+    # sibling elements with no punctuation between them, so a heading right
+    # before this paragraph would merge into the same "sentence" once split
+    # on [.!?] and break the exact-match assertion below.
+    synthetic_html = """
+    <html><head><meta name="description" content="Synthetic Pantry. in Pueblo, CO. Phone: (719) 555-0100."></head>
+    <body><div class="detail-grid"><div class="card">
+    <p>Must bring photo ID and proof of income to receive food assistance.</p>
+    </div></div></body></html>
+    """
+    synthetic_detail = parse_detail(synthetic_html)
+    synthetic_notes = synthetic_detail["notes"]
+    assert synthetic_notes is not None and "Synthetic Pantry. in Pueblo, CO" not in synthetic_notes, (
+        f"parse_detail() must not use <meta name=\"description\"> as notes: got {synthetic_notes!r}"
+    )
+    assert synthetic_notes == "Must bring photo ID and proof of income to receive food assistance.", (
+        f"parse_detail() eligibility-keyword sentence: got {synthetic_notes!r}"
+    )
+    checked += 1
+    print("  OK  parse_detail() ignores <meta description>, keeps eligibility sentence")
 
     print(f"\nOK: {checked}/{checked} self-checks passed.")
     return 0

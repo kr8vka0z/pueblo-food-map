@@ -595,11 +595,14 @@ GitHub calls with the `GITHUB_PUBLISH_TOKEN` fine-grained PAT (provisioned
 under #260), not `GITHUB_TOKEN` — a PAT-authored push isn't covered by the
 recursion guard, so it deploys normally.
 
-**The fix applied.** `dependabot-auto-merge.yml` now mints a short-lived
-installation token from the same GitHub App that backs release-please
-(`actions/create-github-app-token`) and enables auto-merge with that instead
-of `GITHUB_TOKEN`. An App token is not covered by the recursion guard, so the
-resulting push to `main` starts Deploy Prod normally.
+**The fix applied.** `dependabot-auto-merge.yml` mints a short-lived
+installation token from a GitHub App (`actions/create-github-app-token`,
+`RELEASE_PLEASE_APP_*` secrets — named for the release-please workflow that
+originally provisioned the App; that workflow was retired 2026-09-23 in favor
+of continuous deploy-on-push, but the App and its secrets still back this
+job) and enables auto-merge with that instead of `GITHUB_TOKEN`. An App token
+is not covered by the recursion guard, so the resulting push to `main` starts
+Deploy Prod normally.
 
 That swap forced a second change: on a plain `pull_request` event a Dependabot
 PR is handed the *Dependabot* secret store, which does not contain

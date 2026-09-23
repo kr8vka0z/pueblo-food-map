@@ -4,7 +4,7 @@
  * A world-spanning ring ([-180,-90]..[180,90]) rendered as huge black
  * triangles over the whole map on mapbox-gl 3.31 (prod, 2026-09-21). These
  * checks are pure geometry, so they fail against that old ring without
- * needing a WebGL canvas.
+ * needing a WebGL canvas. Incident record: #576.
  */
 import { describe, test, expect, vi } from "vitest";
 
@@ -17,7 +17,7 @@ import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
 // Web Mercator can only project latitudes inside ±85.0511°.
 const MERCATOR_MAX_LAT = 85.0511;
 
-describe("county mask outer ring", () => {
+describe("incident-2026-09-21-county-mask-black-triangles: county mask outer ring", () => {
   test("is a closed ring", () => {
     expect(MASK_OUTER_RING[0]).toEqual(MASK_OUTER_RING[MASK_OUTER_RING.length - 1]);
   });

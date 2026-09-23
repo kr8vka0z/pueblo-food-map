@@ -25,6 +25,13 @@ name: Dependabot auto-merge
 # pairs elevated secrets with untrusted PR code, but this workflow never checks
 # out the PR: it only reads Dependabot metadata and calls the `gh` CLI against
 # the PR URL. No untrusted code executes here.
+#
+# RELEASE_PLEASE_APP_* secret names are historical: the release-please workflow
+# and config that first provisioned this GitHub App were retired 2026-09-23
+# (deploys are continuous on push to `main`, so a changelog-PR/versioning bot
+# added nothing on top of that). The App itself and its two secrets
+# (contents + pull-requests write, proven by this workflow) still back this
+# job — only the release-please workflow/config files were deleted.
 
 on: pull_request_target
 
@@ -39,17 +46,17 @@ jobs:
     steps:
       - name: Fetch Dependabot metadata
         id: meta
-        uses: dependabot/fetch-metadata@v3
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Same App used by release-please, which already opens PRs and pushes
-      # commits on this repo — so it demonstrably holds contents + pull-requests
-      # write here. Minted per-run and short-lived; nothing long-lived is stored.
+      # Same App that used to back release-please (see the top-of-file WHY) —
+      # it demonstrably holds contents + pull-requests write on this repo.
+      # Minted per-run and short-lived; nothing long-lived is stored.
       - name: Mint a GitHub App token
         id: app-token
         if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}

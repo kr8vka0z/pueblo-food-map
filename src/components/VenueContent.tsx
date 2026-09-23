@@ -18,10 +18,12 @@
  */
 
 import Link from "next/link";
+import { Phone } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot } from "@/lib/hours";
+import { getDisplayNotes } from "@/lib/venueNotes";
 
 interface VenueContentProps {
   venue: Venue;
@@ -29,6 +31,7 @@ interface VenueContentProps {
 
 export default function VenueContent({ venue: v }: VenueContentProps) {
   const { locale } = useLocale();
+  const displayNotes = getDisplayNotes(v);
 
   const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}`;
   // Fragment form, matching HomePageClient's #venue= handling — there is no
@@ -111,13 +114,32 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
           </section>
         )}
 
-        {/* Notes */}
-        {v.notes && (
+        {/* Phone / Contact — same tel: link pattern as BottomSheet/DesktopVenueWindow */}
+        {v.phone && (
+          <section aria-label={t("detail.contact", locale)}>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
+              {t("detail.contact", locale)}
+            </h2>
+            <a
+              href={`tel:${v.phone}`}
+              className="inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
+            >
+              <Phone size={15} className="text-[var(--color-sage-600)]" aria-hidden />
+              {v.phone}
+            </a>
+          </section>
+        )}
+
+        {/* Notes — same boilerplate guard as BottomSheet/DesktopVenueWindow
+            (src/lib/venueNotes.ts); without it Plentiful's auto-generated
+            "{name}. in Pueblo, CO. Phone: ..." filler leaked onto this page
+            even where the map card already hid it. */}
+        {displayNotes && (
           <section>
             <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
               {t("detail.about", locale)}
             </h2>
-            <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">{v.notes}</p>
+            <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">{displayNotes}</p>
           </section>
         )}
 

@@ -135,6 +135,16 @@ afterEach(() => {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * One macrotask tick. Under fake timers a raw setTimeout promise would never
+ * resolve, so advance the fake clock by 0 instead — this flushes pending
+ * microtasks without letting useDeferredMapLoad's 200ms fallback fire.
+ */
+async function tick() {
+  if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(0);
+  else await new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
+
 /** Render MapWrapper, flush the dynamic()/effect microtasks, settle. */
 async function renderMapWrapper(props: Partial<React.ComponentProps<typeof MapWrapper>> = {}) {
   let result!: ReturnType<typeof render>;
@@ -144,7 +154,7 @@ async function renderMapWrapper(props: Partial<React.ComponentProps<typeof MapWr
         <MapWrapper {...props} />
       </LocaleProvider>,
     );
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    await tick();
   });
   return result;
 }
@@ -154,6 +164,16 @@ const REAL_VENUE_ID = venues[0].id;
 // ─── Cold load, no deep link ──────────────────────────────────────────────────
 
 describe("MapWrapper — cold load with no deep link (#226)", () => {
+  // Fake timers so useDeferredMapLoad's real 200ms idle fallback (jsdom has no
+  // requestIdleCallback) can't fire mid-test under CI load and mount the map
+  // before these "not yet mounted" assertions run (#577, #526).
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   test("renders the ListView placeholder in the map's place", async () => {
     await renderMapWrapper();
     // ListView renders real venue cards — its "N places" summary line is a
@@ -172,7 +192,7 @@ describe("MapWrapper — cold load with no deep link (#226)", () => {
 
     await act(async () => {
       window.dispatchEvent(new Event("pointerdown"));
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      await tick();
     });
 
     expect(screen.getByTestId("map-canvas")).toBeTruthy();
@@ -184,7 +204,7 @@ describe("MapWrapper — cold load with no deep link (#226)", () => {
 
     await act(async () => {
       window.dispatchEvent(new Event("focusin"));
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      await tick();
     });
 
     expect(screen.getByTestId("map-canvas")).toBeTruthy();
@@ -216,6 +236,15 @@ describe("MapWrapper — cold load with a venue deep link bypasses the gate (#22
 // ─── No layout shift across the placeholder → live-map swap ──────────────────
 
 describe("MapWrapper — placeholder/map swap introduces no layout shift (#226)", () => {
+  // Same "not yet mounted" assertion as the cold-load block — same fake-timer
+  // guard against the 200ms idle fallback firing under CI load (#577).
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   test("the same fill-parent wrapper hosts both the placeholder and the live map", async () => {
     const { container } = await renderMapWrapper();
     const wrapper = container.querySelector(":scope > div");
@@ -225,7 +254,7 @@ describe("MapWrapper — placeholder/map swap introduces no layout shift (#226)"
 
     await act(async () => {
       window.dispatchEvent(new Event("pointerdown"));
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      await tick();
     });
 
     // Same wrapper node, same classes — only its children swapped.

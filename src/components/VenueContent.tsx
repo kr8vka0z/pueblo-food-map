@@ -122,9 +122,9 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
             </h2>
             <a
               href={`tel:${v.phone}`}
-              className="flex items-center gap-2.5 min-h-11 text-sm text-[var(--color-ink-700)] hover:text-[var(--color-sage-600)] transition-colors"
+              className="inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
             >
-              <Phone size={15} className="text-[var(--color-ink-400)]" aria-hidden />
+              <Phone size={15} className="text-[var(--color-sage-600)]" aria-hidden />
               {v.phone}
             </a>
           </section>

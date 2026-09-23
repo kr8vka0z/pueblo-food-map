@@ -72,12 +72,21 @@ describe("VenueContent — notes suppression", () => {
   });
 });
 
-describe("tap target — phone link floors to 44px (mobile review convention)", () => {
-  test("tel: link carries min-h-11 (Tailwind 44px), unlike BottomSheet/DesktopVenueWindow's own unfloored phone anchor", () => {
-    const src = readFileSync(
-      join(process.cwd(), "src/components/VenueContent.tsx"),
-      "utf-8",
+describe("phone link looks tappable (Kyle, 2026-09-23: option A, underlined green link)", () => {
+  test("tel: link is underlined, green, and floors to a 44px tap target", () => {
+    render(<VenueContent venue={{ ...BASE_VENUE, phone: "(719) 555-0100" }} />);
+    const cls = screen.getByRole("link", { name: /555-0100/ }).className.split(/\s+/);
+    expect(cls).toEqual(
+      expect.arrayContaining(["underline", "text-[var(--color-sage-700)]", "min-h-11"]),
     );
-    expect(src).toMatch(/flex items-center gap-2\.5 min-h-11 text-sm/);
+  });
+
+  test("the map card's phone link uses the same tappable styling", () => {
+    // BottomSheet only renders the number once expanded; checking its source
+    // keeps this one cheap and fails if the two drift apart.
+    const src = readFileSync(join(process.cwd(), "src/components/BottomSheet.tsx"), "utf-8");
+    const anchor = src.slice(src.indexOf("tel:${venue.phone}"), src.indexOf("tel:${venue.phone}") + 300);
+    expect(anchor).toContain(" underline ");
+    expect(anchor).toContain("min-h-11");
   });
 });

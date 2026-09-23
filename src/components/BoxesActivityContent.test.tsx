@@ -296,7 +296,9 @@ describe("BoxesActivityContent — Network numbers (slice 7)", () => {
     render(<BoxesActivityContent />);
 
     await screen.findByText(t("box.stats.boxCount", "en"));
-    expect(screen.getByText("7")).toBeDefined(); // boxCount
+    // The label renders before network-stats resolves, so wait for the
+    // number itself, not just the label (CI flake 2026-09-23, #584).
+    expect(await screen.findByText("7")).toBeDefined(); // boxCount
     expect(screen.getByText("5")).toBeDefined(); // sponsorCount
     expect(screen.getByText("0.7")).toBeDefined(); // avgSponsorsPerBox (5/7 -> one decimal)
 

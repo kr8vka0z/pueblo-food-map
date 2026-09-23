@@ -16,8 +16,6 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { t } from "@/lib/i18n";
 import VenueContent from "@/components/VenueContent";
@@ -79,14 +77,5 @@ describe("phone link looks tappable (Kyle, 2026-09-23: option A, underlined gree
     expect(cls).toEqual(
       expect.arrayContaining(["underline", "text-[var(--color-sage-700)]", "min-h-11"]),
     );
-  });
-
-  test("the map card's phone link uses the same tappable styling", () => {
-    // BottomSheet only renders the number once expanded; checking its source
-    // keeps this one cheap and fails if the two drift apart.
-    const src = readFileSync(join(process.cwd(), "src/components/BottomSheet.tsx"), "utf-8");
-    const anchor = src.slice(src.indexOf("tel:${venue.phone}"), src.indexOf("tel:${venue.phone}") + 300);
-    expect(anchor).toContain(" underline ");
-    expect(anchor).toContain("min-h-11");
   });
 });

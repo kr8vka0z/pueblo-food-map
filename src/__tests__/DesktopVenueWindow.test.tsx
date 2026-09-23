@@ -178,6 +178,17 @@ describe("DesktopVenueWindow — toggle interaction", () => {
   });
 });
 
+describe("DesktopVenueWindow — phone link looks tappable (option A, 2026-09-23)", () => {
+  test("expanded phone number is an underlined, green tel: link", () => {
+    renderWindow({ expanded: true, venue: makeVenue({ phone: "(719) 555-0164" }) });
+    const link = screen.getByRole("link", { name: /555-0164/ });
+    expect(link.getAttribute("href")).toBe("tel:(719) 555-0164");
+    expect(link.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(["underline", "text-[var(--color-sage-700)]"]),
+    );
+  });
+});
+
 // ─── Venue title in body (no position jump) ───────────────────────────────────
 
 describe("DesktopVenueWindow — venue title in body", () => {

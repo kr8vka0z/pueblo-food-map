@@ -383,11 +383,22 @@ const en: Record<string, string> = {
   "privacy.collect.body": "Pueblo Food Map collects the information you type into our forms (place reports, suggestions, and feedback). We use it to review what you sent and, if you gave an email address, to write back. Your IP address is checked to block spam when you send a form, and is never saved with what you sent.",
   "privacy.checkins.heading": "Blessing box check-ins",
   "privacy.checkins.body": "Checking in at a blessing box is anonymous. We do not ask for your name or email, and we do not save your IP address. A photo you add is reviewed before it shows, and location details hidden inside the photo file are removed.",
+  // New paragraph (#594) — the per-browser check-in rate-limit ID
+  // (src/lib/checkinClientToken.ts) was never disclosed on this page.
+  "privacy.checkins.body2": "Each check-in also uses a random ID your browser saves, so we can tell repeat check-ins apart without asking for your name or email. It isn't tied to who you are, and clearing your browser's site data starts a new one.",
   "privacy.alerts.heading": "Email alerts and adopting a box",
   "privacy.alerts.body1": "We keep your email address only if you ask for it: when you sign up for emails about a blessing box, or when you apply to adopt one. If you host a box, Pueblo Food Map staff may add your email, with your OK, so you hear when your box is empty or has a problem. We use these addresses only to send those emails. We never sell them, share them, or show them on the site.",
   "privacy.alerts.body2": "If you adopt a box, the name you give us (for example, a group or family name) is shown on that box's card. Your email is not.",
   "privacy.alerts.body3": "Every alert email has a stop link. One click stops the emails, with no login. To have your email address deleted completely, write to issues@pueblofoodmap.com.",
   "privacy.alerts.body4": "Our emails are delivered by a mail service called Resend, which handles your address only to deliver them.",
+  // New section (#594, security review finding #4) — states the 90-day
+  // retention period the daily cron (src/lib/emailRetention.ts) enforces.
+  "privacy.retention.heading": "How long we keep it",
+  "privacy.retention.body": "We remove old email addresses from our records automatically: 90 days after a place suggestion or report is submitted, a box-adoption application is turned down, or an alert subscription is stopped. This doesn't affect the copy already sent to our own inbox when you submitted a form, or an internal log admins use to track moderation decisions. An active alert subscription's email stays until you stop it.",
+  // New section (#594) — names the third parties the existing copy above
+  // described without naming (Turnstile) or didn't mention at all (Mapbox).
+  "privacy.other.heading": "Other services we use",
+  "privacy.other.body": "We use Mapbox to show the map. Loading it shares your IP address with Mapbox, and if you get walking directions, your location too. We use Cloudflare Turnstile on our forms and box check-ins to block spam; it checks some information about your device and browser.",
   "privacy.analytics": "We use Cloudflare Web Analytics to count visits and measure how quickly pages load. It sets no cookies and stores nothing on your device, it does not identify you by your IP address or your browser, and it does not follow you to other websites. It records things like which page was viewed, the site you arrived from, your browser and device type, your country, and how long the page took to load. We use no advertising pixels and no other analytics service.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
@@ -1251,11 +1262,16 @@ const es: Record<string, string> = {
   "privacy.collect.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). La usamos para revisar lo que enviaste y, si diste un correo electrónico, para responderte. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con lo que enviaste.", // [CHECK]
   "privacy.checkins.heading": "Registros en cajas de bendición", // [CHECK]
   "privacy.checkins.body": "Registrar tu visita a una caja de bendición es anónimo. No pedimos tu nombre ni tu correo, y no guardamos tu dirección IP. Una foto que agregues se revisa antes de publicarse, y los detalles de ubicación ocultos en el archivo de la foto se eliminan.", // [CHECK]
+  "privacy.checkins.body2": "Cada registro también usa un identificador aleatorio que tu navegador guarda, para distinguir registros repetidos sin pedirte tu nombre ni tu correo. No está vinculado a quién eres, y borrar los datos del sitio en tu navegador genera uno nuevo.", // [CHECK]
   "privacy.alerts.heading": "Alertas por correo y adopción de una caja", // [CHECK]
   "privacy.alerts.body1": "Guardamos tu correo electrónico solo si tú lo pides: cuando te suscribes a alertas de una caja de bendición, o cuando solicitas adoptar una. Si eres anfitrión de una caja, el personal de Pueblo Food Map puede agregar tu correo, con tu autorización, para avisarte cuando tu caja esté vacía o tenga un problema. Usamos estas direcciones solo para enviar esos correos. Nunca las vendemos, las compartimos, ni las mostramos en el sitio.", // [CHECK]
   "privacy.alerts.body2": "Si adoptas una caja, el nombre que nos das (por ejemplo, el de un grupo o una familia) se muestra en la tarjeta de esa caja. Tu correo no.", // [CHECK]
   "privacy.alerts.body3": "Cada correo de alerta tiene un enlace para detenerlo. Un clic detiene los correos, sin necesidad de iniciar sesión. Para que eliminemos tu correo por completo, escribe a issues@pueblofoodmap.com.", // [CHECK]
   "privacy.alerts.body4": "Nuestros correos se envían a través de un servicio de correo llamado Resend, que solo maneja tu dirección para entregarlos.", // [CHECK]
+  "privacy.retention.heading": "Cuánto tiempo lo guardamos", // [CHECK]
+  "privacy.retention.body": "Eliminamos automáticamente las direcciones de correo antiguas de nuestros registros: 90 días después de enviar una sugerencia o reporte de un lugar, de que se rechace una solicitud de adopción de caja, o de que canceles una alerta. Esto no afecta la copia que ya enviamos a nuestro propio correo cuando enviaste un formulario, ni un registro interno que el personal administrativo usa para dar seguimiento a decisiones de moderación. El correo de una alerta activa se mantiene hasta que la canceles.", // [CHECK]
+  "privacy.other.heading": "Otros servicios que usamos", // [CHECK]
+  "privacy.other.body": "Usamos Mapbox para mostrar el mapa. Cargarlo comparte tu dirección IP con Mapbox, y si pides indicaciones para caminar, también tu ubicación. Usamos Cloudflare Turnstile en nuestros formularios y en los registros de cajas para bloquear spam; revisa cierta información sobre tu dispositivo y navegador.", // [CHECK]
   "privacy.analytics": "Usamos Cloudflare Web Analytics para contar visitas y medir qué tan rápido cargan las páginas. No usa cookies ni guarda nada en tu dispositivo, no te identifica por tu dirección IP ni por tu navegador, y no te sigue a otros sitios web. Registra datos como qué página se vio, el sitio desde el que llegaste, tu tipo de navegador y dispositivo, tu país y cuánto tardó en cargar la página. No usamos píxeles de publicidad ni ningún otro servicio de análisis.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards

@@ -12,7 +12,12 @@ import { describe, test, expect, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
-import { runEmailRetentionCleanup, retentionCutoffIso, EMAIL_RETENTION_DAYS } from "@/lib/emailRetention";
+import {
+  runEmailRetentionCleanup,
+  retentionCutoffIso,
+  EMAIL_RETENTION_DAYS,
+  EmailRetentionPartialFailure,
+} from "@/lib/emailRetention";
 
 // D1Database's real shape is a thin promise-returning wrapper around
 // better-sqlite3's synchronous API — this fake matches the one surface
@@ -270,5 +275,25 @@ describe("runEmailRetentionCleanup — real SQLite", () => {
 
     expect((sqlite.prepare("SELECT email FROM box_adopters WHERE id = 1").get() as { email: string }).email).toBe("");
     expect(sqlite.prepare("SELECT * FROM alert_subscriptions WHERE id = 1").get()).toBeUndefined();
+  });
+
+  test("the thrown EmailRetentionPartialFailure carries the counts of the statements that DID succeed", async () => {
+    sqlite.exec("DROP TABLE public_submissions");
+    insertAdopter(sqlite, { id: 1, email: "adopter@example.com", status: "rejected", reviewedAt: OLD });
+    insertSubscription(sqlite, { id: 1, role: "giver", venueId: "box-a", email: "giver@example.com", unsubscribedAt: OLD });
+
+    let caught: unknown;
+    try {
+      await runEmailRetentionCleanup(db, NOW);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(EmailRetentionPartialFailure);
+    expect((caught as EmailRetentionPartialFailure).counts).toEqual({
+      submissionsBlanked: 0,
+      adoptersBlanked: 1,
+      subscriptionsDeleted: 1,
+    });
   });
 });

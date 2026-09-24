@@ -20,7 +20,7 @@
 // This file follows the exact same pattern for the three Workers runtime types a
 // scheduled()-handler signature needs — none of which is `Element` or collides with DOM.
 import type { ExecutionContext, ExportedHandler, ScheduledController } from "@cloudflare/workers-types/experimental";
-import { runEmailRetentionCleanup, shouldRunEmailRetention } from "./src/lib/emailRetention";
+import { runEmailRetentionCleanup, shouldRunEmailRetention, EmailRetentionPartialFailure } from "./src/lib/emailRetention";
 import { logEmailRetentionResult, logEmailRetentionFailure } from "./src/lib/logger";
 //
 // WHY `@ts-ignore` (not `@ts-expect-error`) on the imports below: .open-next/worker.js
@@ -83,7 +83,17 @@ export default {
       ctx.waitUntil(
         runEmailRetentionCleanup(env.ADMIN_DB)
           .then(logEmailRetentionResult)
-          .catch((err) => logEmailRetentionFailure(err instanceof Error ? err.message : String(err))),
+          .catch((err) => {
+            // A partial failure still carries the counts of whichever
+            // statements DID succeed (emailRetention.ts's own per-statement
+            // isolation) — log those too, or a real cleanup that mostly
+            // worked would show up in the logs as pure failure with no
+            // record of what it actually did.
+            if (err instanceof EmailRetentionPartialFailure) {
+              logEmailRetentionResult(err.counts);
+            }
+            logEmailRetentionFailure(err instanceof Error ? err.message : String(err));
+          }),
       );
     }
   },

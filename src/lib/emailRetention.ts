@@ -136,16 +136,37 @@ async function runOne(db: D1Database, sql: string, cutoff: string, errors: strin
 }
 
 /**
+ * Thrown by runEmailRetentionCleanup when at least one statement failed.
+ * Carries `counts` for the statements that DID succeed — without this,
+ * a partial failure (e.g. box_adopters and alert_subscriptions committed,
+ * public_submissions errored) would lose those counts entirely: the
+ * caller's failure log would show only an error string, with no record
+ * that real cleanup still happened that day. logEmailRetentionResult can
+ * still be called with `counts` on this path (custom-worker.ts does),
+ * same PII-free numbers-only shape as the success case.
+ */
+export class EmailRetentionPartialFailure extends Error {
+  constructor(
+    message: string,
+    public readonly counts: EmailRetentionCounts,
+  ) {
+    super(message);
+    this.name = "EmailRetentionPartialFailure";
+  }
+}
+
+/**
  * Runs all three cleanup statements against `db` and returns a PII-free
  * count of rows each one touched (logger.ts's PII rule — counts only,
  * never an id, email, or other row content). Sequential, not
  * `Promise.all` — this runs once a day, so there is no latency reason to
- * risk concurrent D1 statements against the same database. Throws (after
- * every statement has had its own independent attempt — see runOne above)
- * if any statement failed, so the caller's own failure log
- * (custom-worker.ts's logEmailRetentionFailure) still fires; counts
- * already committed by the other statements are not rolled back by this
- * throw — each is its own D1 commit.
+ * risk concurrent D1 statements against the same database. Throws
+ * EmailRetentionPartialFailure (after every statement has had its own
+ * independent attempt — see runOne above) if any statement failed, so the
+ * caller's own failure log (custom-worker.ts's logEmailRetentionFailure)
+ * still fires; counts already committed by the other statements are not
+ * rolled back by this throw — each is its own D1 commit, and the thrown
+ * error still carries them so they aren't lost from the log entirely.
  */
 export async function runEmailRetentionCleanup(
   db: D1Database,
@@ -158,9 +179,11 @@ export async function runEmailRetentionCleanup(
   const adoptersBlanked = await runOne(db, BLANK_ADOPTERS_SQL, cutoff, errors);
   const subscriptionsDeleted = await runOne(db, DELETE_SUBSCRIPTIONS_SQL, cutoff, errors);
 
+  const counts = { submissionsBlanked, adoptersBlanked, subscriptionsDeleted };
+
   if (errors.length > 0) {
-    throw new Error(`email retention cleanup: ${errors.join("; ")}`);
+    throw new EmailRetentionPartialFailure(`email retention cleanup: ${errors.join("; ")}`, counts);
   }
 
-  return { submissionsBlanked, adoptersBlanked, subscriptionsDeleted };
+  return counts;
 }

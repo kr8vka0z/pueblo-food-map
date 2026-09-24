@@ -111,6 +111,9 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
       role="dialog"
       aria-modal="true"
       aria-label={t("splash.dialogLabel", locale)}
+      // #590: point at the existing purpose paragraph below (id="splash-purpose")
+      // rather than adding new hidden copy — it already reads as a description.
+      aria-describedby="splash-purpose"
     >
       {/* ── Inner flex wrapper: centers content when it fits, lets it scroll naturally when tall ── */}
       <div className="flex min-h-full items-center justify-center">
@@ -138,6 +141,7 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
           {/* Purpose subtitle (replaces the former tagline; takes its size + prominence) */}
           <div className="flex flex-col gap-3">
             <p
+              id="splash-purpose"
               className="text-2xl md:text-3xl font-semibold leading-normal text-[var(--color-brand-navy)] max-w-md mx-auto splash-text-outline"
               data-testid="splash-purpose"
             >

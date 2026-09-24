@@ -141,6 +141,13 @@ export async function POST(req: NextRequest): Promise<Response> {
     // live. draftIds/editedPublishedIds partition by `status` at snapshot
     // time (fetchPublishSnapshot, publishVenues.ts) and can never overlap.
     publishedCount: snapshot.draftIds.length + snapshot.editedPublishedIds.length,
+    // #568 item 2: archivedIds (pending removals this publish is shipping)
+    // was NEVER in publishedCount above and had no field of its own either
+    // — a removals-only publish (0 new drafts, 0 edits, N archives) reported
+    // "0 places pushed" with no sign the N removals actually landed. Same
+    // `archivedCount` name promotePublishedDrafts already writes into the
+    // audit_log row's after_json (publishVenues.ts), not a new label.
+    archivedCount: snapshot.archivedIds.length,
     snapshotCount: validation.venues.length,
   });
 }

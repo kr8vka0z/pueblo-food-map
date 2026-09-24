@@ -105,6 +105,20 @@ export function logAdminAuthFailure(reason: AccessDeniedReason): void {
   console.warn(JSON.stringify({ event: "admin_auth_failure", reason }));
 }
 
+/**
+ * Emit a single-line JSON structured log entry when PATCH
+ * /api/admin/venues/[id] (#265, optimistic concurrency) receives an edit
+ * with no `expectedUpdatedAt` precondition — an old client or a script
+ * hitting the route directly. Not an error (the route still accepts the
+ * edit, falling back to a route-internal check — see that route's own
+ * header): this is visibility only, so a caller silently missing the real
+ * protection shows up in Workers Logs. `venueId` is a venue identifier, not
+ * PII, same as audit_log's own entity_id column.
+ */
+export function logAdminVenueEditMissingPrecondition(venueId: string): void {
+  console.warn(JSON.stringify({ event: "admin_venue_edit_missing_precondition", venueId }));
+}
+
 export type AdminAuthEvent = "login";
 
 /**

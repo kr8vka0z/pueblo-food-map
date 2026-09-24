@@ -11,7 +11,6 @@
  * here specifically so it's unit-testable (custom-worker.ts itself can
  * never be imported by vitest — see runScheduledTasks's own docstring).
  *
-
  * WHY 90 days: retention period Kyle picked for #594 — long enough to
  * review or follow up on a submission or a turned-down/stopped contact,
  * short enough that an old email address isn't kept indefinitely. See the

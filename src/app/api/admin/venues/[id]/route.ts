@@ -216,6 +216,35 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
+  // #568 item 1: an archived venue is refused outright, 409 not 422 — the
+  // submitted payload is perfectly valid, it's the ROW's state that
+  // conflicts with the request (same reasoning proposals/approve's own
+  // stale-row 409 uses, adminProposals.ts). The bug this guards against:
+  // this route always bumped `updated_at` on any successful edit, and
+  // summarizePublishChanges() (adminVenues.ts) reads `updated_at >
+  // published_at` on an archived row as "pending removal" — so editing an
+  // already-archived venue (fixing a typo, say) made the Publish bar show a
+  // false "1 removed" that only cleared on the next publish. Skipping just
+  // the `updated_at` bump instead was rejected: the UPDATE would still run,
+  // so the row's other fields (name/address/etc.) would silently change
+  // while its own `updated_at`/audit_log timestamp disagreed with the edit
+  // actually happening — a quieter bug than the one being fixed. There is
+  // also no restore/unarchive path today (archiving is deliberately
+  // one-way — see this file's own header on why `status` is never in
+  // VENUE_UPDATE_SQL), so a real edit request against an archived id is
+  // never anything but this stale-UI case: refusing outright, before any
+  // box-row read or write below, is correct, not just simpler.
+  if (existing.status === "archived") {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "archived",
+        message: "This venue is archived and can't be edited. Archiving is final — there is no restore/edit path today.",
+      },
+      { status: 409 },
+    );
+  }
+
   // Blessing Boxes slice 3: computeBoxEventWrites needs the box's pre-edit
   // removed_on to detect a null->set transition (the "removed" event) —
   // only fetched when this venue is CURRENTLY a box, since a plain venue

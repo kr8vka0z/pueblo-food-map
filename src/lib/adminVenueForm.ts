@@ -18,10 +18,10 @@
  * text inputs a fresh create form uses.
  */
 
-import type { AddVenueFormValues } from "@/components/AddVenueForm";
+import type { AddVenueFormValues, IrregularEntryDraft } from "@/components/AddVenueForm";
 import { DISPLAY_DAY_KEYS, type DayKey } from "@/lib/hours";
 import { categoryLabels } from "@/data/venues";
-import type { AdminVenueRow, VenueCategory, WeeklyHours } from "@/types/venue";
+import type { AdminVenueRow, IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
 import type { NewVenuePayload } from "@/lib/publicSubmissions";
 
 // Same technique adminVenueValidation.ts's VALID_CATEGORIES and
@@ -63,6 +63,35 @@ function hoursWeeklyJsonToDraft(json: string | null): Record<DayKey, string> {
 }
 
 /**
+ * `hours_irregular` JSON text (or null) -> a list of editable draft rows,
+ * mirroring hoursWeeklyJsonToDraft()'s own "malformed JSON degrades to
+ * empty, never throws" contract — a data problem in an existing row must
+ * never crash the edit page. `day_of_month`/`ordinal` are converted to
+ * strings (String(1) not "1") to match the select/input values
+ * IrregularEntryDraft's fields bind to.
+ */
+function hoursIrregularJsonToDraft(json: string | null): IrregularEntryDraft[] {
+  if (!json) return [];
+
+  let parsed: IrregularSchedule[];
+  try {
+    parsed = JSON.parse(json) as IrregularSchedule[];
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed.map((entry) => ({
+    recurrence: entry.recurrence,
+    ordinal: entry.ordinal !== undefined ? (String(entry.ordinal) as IrregularEntryDraft["ordinal"]) : "",
+    weekday: entry.weekday ?? "",
+    dayOfMonth: entry.day_of_month !== undefined ? String(entry.day_of_month) : "",
+    slots: (entry.slots ?? []).join(", "),
+    note: entry.note ?? "",
+  }));
+}
+
+/**
  * Maps a full `AdminVenueRow` to `Partial<AddVenueFormValues>` — the exact
  * shape AddVenueForm's `initialValues` prop already accepts, so the edit
  * page can pass this straight through with no adapter step in the page
@@ -77,6 +106,7 @@ export function mapVenueRowToFormValues(row: AdminVenueRow): Partial<AddVenueFor
     lat: String(row.lat),
     lng: String(row.lng),
     hours: hoursWeeklyJsonToDraft(row.hours_weekly),
+    hoursIrregular: hoursIrregularJsonToDraft(row.hours_irregular),
     acceptsSnap: triStateToFormValue(row.accepts_snap),
     acceptsWic: triStateToFormValue(row.accepts_wic),
     phone: row.phone ?? "",

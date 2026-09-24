@@ -77,7 +77,7 @@ async function authorizeEditRequest(headers: HeaderSource): Promise<AdminDbAcces
 // permanently excluded) and the workflow columns an edit never touches:
 // source_type, created_at, created_by, published_at, published_by.
 const VENUE_UPDATE_SQL = `UPDATE venues SET
-  name = ?, category = ?, lat = ?, lng = ?, address = ?, hours_weekly = ?,
+  name = ?, category = ?, lat = ?, lng = ?, address = ?, hours_weekly = ?, hours_irregular = ?,
   accepts_snap = ?, accepts_wic = ?, phone = ?, email = ?, url = ?, notes = ?,
   operator = ?, source = ?, last_verified = ?, outside_county = ?,
   updated_by = ?, updated_at = ?
@@ -131,6 +131,7 @@ function buildVenueUpdateValues(
     fields.lng,
     fields.address,
     fields.hoursWeeklyJson,
+    fields.hoursIrregularJson,
     fields.acceptsSnap,
     fields.acceptsWic,
     fields.phone,
@@ -169,6 +170,7 @@ function buildAfterRow(
     lng: fields.lng,
     address: fields.address,
     hours_weekly: fields.hoursWeeklyJson,
+    hours_irregular: fields.hoursIrregularJson,
     accepts_snap: fields.acceptsSnap,
     accepts_wic: fields.acceptsWic,
     phone: fields.phone,

@@ -22,8 +22,19 @@ export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * any input a caller's length guard already passed; it exists purely to
  * make the bound structural at the regex's own call site, clearing the
  * alert once here instead of at every call site.
+ *
+ * WHY `value: unknown` (#595): every current caller already narrows to a
+ * string before calling this (typeof/optionalString guards of their own),
+ * but report/submit/route.ts's optional `contactEmail` field only has a
+ * compile-time `string | undefined` type — the actual JSON body is never
+ * runtime-validated against it, so a client sending e.g. `contactEmail: 123`
+ * reached `value.slice()` with a number and 500'd instead of the intended
+ * 422. Guarding here once, in the shared function, fixes that caller (and
+ * hardens every future one) without duplicating a typeof check at each of
+ * the 6 call sites that already have their own.
  */
-export function isValidEmail(value: string): boolean {
+export function isValidEmail(value: unknown): boolean {
+  if (typeof value !== "string") return false;
   return EMAIL_RE.test(value.slice(0, FIELD_LIMITS.EMAIL));
 }
 

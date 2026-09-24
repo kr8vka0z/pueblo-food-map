@@ -1,4 +1,4 @@
--- migrations/0015_proposal_triage.sql
+-- migrations/0016_proposal_triage.sql
 --
 -- Issue #543: TypeSafe Jev triages each change_proposals row before a human
 -- sees it at /admin/flags — a calibrated-probability verdict (real change vs
@@ -10,7 +10,7 @@
 -- own header for the question set and lane rules, and AGENTS.md's
 -- "Automated venue-refresh pipeline" section for the design.
 --
--- Four nullable columns, additive only — every existing SELECT (`SELECT *`
+-- Part 1 — four nullable columns on change_proposals, additive only — every existing SELECT (`SELECT *`
 -- at src/app/admin/flags/page.tsx, every `SELECT id, source, ...` explicit
 -- list elsewhere) either already reads `*` and picks these up for free, or
 -- doesn't name them and is unaffected. NULL means "never triaged" (a
@@ -51,3 +51,23 @@ ALTER TABLE change_proposals ADD COLUMN triage_lane TEXT
 ALTER TABLE change_proposals ADD COLUMN triage_json  TEXT;
 ALTER TABLE change_proposals ADD COLUMN triage_model  TEXT;
 ALTER TABLE change_proposals ADD COLUMN triage_at     TEXT;
+
+-- Part 2 — venue_id_aliases: closes the rename LOOP, not just the rename
+-- gap. Plentiful ids embed the venue's name (0001's own id comment), so a
+-- renamed venue arrives as a brand-new upstream id. Approving a rename
+-- proposal (scripts/refresh/renamePairs.ts) updates the OLD venue row in
+-- place — same id, so /venue/<id> links, audit history and any pending
+-- link_health finding all keep pointing at it — and records the new
+-- upstream id here. refresh-ingest.ts maps every incoming record through
+-- this table BEFORE diffing, so next week's scrape of the new id matches
+-- the old row instead of proposing the same remove+add pair forever.
+-- Written only by applyApprovedProposal (src/lib/adminProposals.ts) on a
+-- human approval — never by the pipeline itself.
+CREATE TABLE IF NOT EXISTS venue_id_aliases (
+  source       TEXT NOT NULL,   -- change_proposals.source of the rename ('plentiful' | 'osm')
+  upstream_id  TEXT NOT NULL,   -- the id the scraper now emits
+  venue_id     TEXT NOT NULL,   -- the venues.id it maps to
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  created_by   TEXT NOT NULL,   -- approving admin's email
+  PRIMARY KEY (source, upstream_id)
+);

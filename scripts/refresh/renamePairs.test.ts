@@ -1,6 +1,14 @@
+// renamePairs.test.ts — candidate matching, the single rename proposal, id aliases, and the no-loop guarantee.
 import { describe, test, expect } from "vitest";
-import { haversineDistanceKm, normalizedPhoneTail, findRenamePairCandidates } from "./renamePairs";
-import type { CurrentVenueRow, ProposalDraft } from "./diffEngine";
+import type { Venue } from "@/types/venue";
+import {
+  applyIdAliases,
+  buildRenameProposal,
+  haversineDistanceKm,
+  normalizedPhoneTail,
+  findRenamePairCandidates,
+} from "./renamePairs";
+import { diffSource, type CurrentVenueRow, type ProposalDraft } from "./diffEngine";
 
 function currentRow(overrides: Partial<CurrentVenueRow> = {}): CurrentVenueRow {
   return {
@@ -158,5 +166,81 @@ describe("findRenamePairCandidates", () => {
       runId: "run-1",
     };
     expect(findRenamePairCandidates([rm, linkHealthUpdate], [removed])).toHaveLength(0);
+  });
+});
+
+describe("findRenamePairCandidates — global best-first assignment", () => {
+  test("a phone-only match on an earlier remove can't steal an add another remove sits 10m from", () => {
+    const farPhoneOnly = currentRow({ id: "plentiful-far", lat: 38.3, lng: -104.7 });
+    const near = currentRow({ id: "plentiful-near", phone: null });
+    const pairs = findRenamePairCandidates(
+      [removeProposal({ targetVenueId: "plentiful-far" }), removeProposal({ targetVenueId: "plentiful-near" }), addProposal()],
+      [farPhoneOnly, near],
+    );
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0].removeProposal.targetVenueId).toBe("plentiful-near");
+    expect(pairs[0].matchedBy).toBe("coordinates");
+  });
+});
+
+describe("buildRenameProposal", () => {
+  test("one update of the OLD id: changed source-owned fields + last_verified, rename meta names both ids", () => {
+    const [candidate] = findRenamePairCandidates([removeProposal(), addProposal()], [currentRow()]);
+    const p = buildRenameProposal(candidate, "2026-09-28");
+    expect(p).toMatchObject({ source: "plentiful", targetVenueId: "plentiful-old-name", changeType: "update" });
+    expect(p.proposedDiff.fields_changed).toEqual(["name", "lat", "lng", "last_verified"]);
+    expect(p.proposedDiff.before).toMatchObject({ name: "Old Name Pantry", last_verified: "2026-08-01" });
+    expect(p.proposedDiff.after).toMatchObject({ name: "New Name Pantry", last_verified: "2026-09-28" });
+    expect(p.proposedDiff.meta?.rename).toEqual({
+      from_id: "plentiful-old-name",
+      to_id: "plentiful-new-name",
+      matched_by: "coordinates",
+      distance_m: expect.any(Number),
+    });
+  });
+
+  test("honours the destructive-clear guard: a real phone is never proposed cleared to empty", () => {
+    const [candidate] = findRenamePairCandidates([removeProposal(), addProposal({}, { phone: "" })], [currentRow()]);
+    expect(buildRenameProposal(candidate, "2026-09-28").proposedDiff.fields_changed).not.toContain("phone");
+  });
+
+  test("hash differs per new upstream id, so rejecting one rename doesn't hide a different one", () => {
+    const [a] = findRenamePairCandidates([removeProposal(), addProposal()], [currentRow()]);
+    const [b] = findRenamePairCandidates([removeProposal(), addProposal({ targetVenueId: "plentiful-other" })], [currentRow()]);
+    expect(buildRenameProposal(a, "2026-09-28").diffHash).not.toBe(buildRenameProposal(b, "2026-09-28").diffHash);
+  });
+});
+
+describe("applyIdAliases", () => {
+  const venue = (id: string) => ({ id, name: "X", category: "pantry", lat: 38.25, lng: -104.6, address: "1 St" }) as Venue;
+  const alias = { source: "plentiful", upstream_id: "plentiful-new-name", venue_id: "plentiful-old-name" };
+
+  test("re-keys an aliased upstream id onto the approved venue id", () => {
+    const out = applyIdAliases("plentiful", [venue("plentiful-new-name")], [alias], new Set(["plentiful-old-name"]));
+    expect(out[0].id).toBe("plentiful-old-name");
+  });
+
+  test("ignores other sources' aliases and ids that are themselves live rows", () => {
+    expect(applyIdAliases("osm", [venue("plentiful-new-name")], [alias], new Set())[0].id).toBe("plentiful-new-name");
+    expect(applyIdAliases("plentiful", [venue("plentiful-new-name")], [alias], new Set(["plentiful-new-name"]))[0].id).toBe(
+      "plentiful-new-name",
+    );
+  });
+});
+
+describe("rename approval does not loop", () => {
+  test("after an approved rename (old row updated in place + alias), the next scrape proposes nothing new for it", () => {
+    const today = "2026-10-05";
+    // State after approval: old id kept, new details applied, verified today.
+    const approvedRow = currentRow({ name: "New Name Pantry", lat: 38.2545, lng: -104.6092, last_verified: today });
+    const scraped = { ...(addProposal().proposedDiff.after as Venue), last_verified: today };
+    const alias = { source: "plentiful", upstream_id: "plentiful-new-name", venue_id: "plentiful-old-name" };
+
+    const withoutAlias = diffSource({ source: "plentiful", currentRows: [approvedRow], incoming: [scraped], runId: "r", today });
+    expect(withoutAlias.proposals.map((p) => p.changeType).sort()).toEqual(["add", "remove"]);
+
+    const incoming = applyIdAliases("plentiful", [scraped], [alias], new Set([approvedRow.id]));
+    const withAlias = diffSource({ source: "plentiful", currentRows: [approvedRow], incoming, runId: "r", today });
+    expect(withAlias.proposals).toEqual([]);
   });
 });

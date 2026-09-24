@@ -1,106 +1,169 @@
 /**
- * triage.ts — TypeSafe Jev triage for the refresh pipeline (issue #543).
+ * triage.ts — TypeSafe Jev triage + rename pairing for the refresh pipeline
+ * (issue #543).
  *
- * WHY this exists: the review queue at /admin/flags gets every non-date-only
- * proposal a run produces, with no way to tell "probably nothing changed"
- * apart from "a human must decide" apart from "these two rows are actually
- * one renamed venue." Jev is a DECISION api (typed yes/no + choice questions
- * with calibrated probabilities, no text generation — atlas-kb note
- * "2026-09-19-typesafe-jev-use-cases.md") — one batched call per proposal
- * (or per rename PAIR, see renamePairs.ts) carrying the before/after record
- * and source, classifying it into a lane. Ported request/response shape from
- * the already-live client (`atlas-hooks/skillcheck.py`'s `ask()`/`judge()`,
- * verified against TypeSafe's docs 2026-09-19) — same
- * `POST https://api.typesafe.ai/v1/systemone`, Bearer key, batched
- * `{state, model, questions}` body, `answers[id].noul`/`.choice`/
- * `.probabilities` response shape.
+ * WHY this exists: /admin/flags gets every non-date-only proposal a run
+ * produces, with no way to tell "probably nothing changed" from "a human
+ * must decide" from "these two rows are one renamed venue." Weekly runs
+ * (#543) quadruple that queue. Jev is a DECISION api — typed yes/no and
+ * choice questions answered with calibrated probabilities, no generated
+ * text — so each proposal gets ONE batched call and a lane that is a
+ * sorting/filtering aid at /admin/flags.
  *
- * NON-NEGOTIABLE (issue #543's own words): "Jev never auto-applies anything
- * beyond what's already auto-applied today (date-only updates), unless the
- * issue explicitly specifies a narrow, safe auto-apply lane with a
- * confidence threshold." It does: a phone/url-only update where the before
- * and after values are the SAME once normalized (a formatting change, not a
- * real one) AND Jev's own noise verdict agrees — see
- * computeAutoApplyEligibility below. That lane only WRITES when the caller
- * passes `autoApplyEnabled: true` (scripts/refresh-ingest.ts, gated on the
- * `REFRESH_AI_AUTO_APPLY` env var, default unset/OFF) — see
- * scripts/refresh/proposalSql.ts's triage branch for the write path itself.
- * A Jev verdict can only ever move a proposal to a MORE cautious lane
- * (`needs_human`), never override or bypass a deterministic guard: every
- * guard in diffEngine.ts (destructive-clear, abnormal-drop, zero-record,
- * per-run cap) already ran, above this module, before any proposal reaches
- * here — see refresh-ingest.ts's call site.
+ * Request/response shape verified against https://docs.typesafe.ai/api.md
+ * (2026-09-24): `POST https://api.typesafe.ai/v1/systemone`, Bearer key,
+ * body `{state, model, questions}`; noul answers carry `noul` (0-1), choice
+ * answers carry `choice` + `probabilities` + `confidence`; the response's
+ * top-level `model` is the versioned id that actually answered (stored, not
+ * the request string). 429 = rate limit and 529 = overloaded, both
+ * "retry after a short delay".
  *
- * Dates stay in code (Jev's own docs: "weak at maths, counting and dates" —
- * atlas-kb note above): `last_verified` is never included in a question's
- * `state`, matching diffEngine.ts's own diff_hash exclusion of it.
+ * Non-negotiables (issue #543):
+ *   - Runs AFTER every deterministic guard (zero-record, abnormal-drop,
+ *     destructive-clear, per-run cap) in refresh-ingest.ts. A run that trips
+ *     one never reaches this module; a lane here can never undo a guard.
+ *   - Jev only ever moves work toward a human. The one write it can unlock
+ *     is the `auto_apply_candidate` lane, which also needs a deterministic
+ *     shape match (computeAutoApplyEligibility) AND the REFRESH_AI_AUTO_APPLY
+ *     flag, OFF by default — the issue's own order of work is "store triage,
+ *     change no behaviour" first. See proposalSql.ts for the write itself.
+ *   - Degrades, never fails the run: no key, a 5xx, a timeout or three
+ *     failures in a row → the rest of the run is written untriaged.
+ *   - Dates stay in code (docs' jaggedness page: weak at dates/maths):
+ *     `last_verified` is never sent. Public venue fields only, never PII.
  *
- * Model pinned to `jev-1.13.0`, not `jev-latest` (the atlas-kb note's own
- * warning: "jev-latest moves under you" — a silently different model would
- * shift the calibration a threshold was tuned against).
+ * Model pinned to `jev-1.13.0`, not `jev-latest` — the alias moves under
+ * you and would shift the probabilities the thresholds below were set on.
+ *
+ * Not asked (deliberate): the issue's "how risky is applying this
+ * unattended?" score. No lane depends on it — removes and adds are always
+ * human, and the only auto-apply shape is already pinned by a deterministic
+ * formatting check — so it would be recorded and never read.
  */
 
-import { reviewableDiffFields } from "@/lib/adminProposals";
+import { isDateOnlyUpdateProposal, reviewableDiffFields } from "@/lib/adminProposals";
 import type { Venue } from "@/types/venue";
-import type { ChangeType, CurrentVenueRow, ProposalDraft, ProposalSource } from "./diffEngine";
-import type { RenamePairCandidate } from "./renamePairs";
+import { rejectionKey, pendingKey, type CurrentVenueRow, type ProposalDraft } from "./diffEngine";
+import { buildRenameProposal, findRenamePairCandidates, type RenamePairCandidate } from "./renamePairs";
 
 export const JEV_MODEL = "jev-1.13.0";
 export const QUESTION_SET_VERSION = "v1";
 export const TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone";
+/** $0.042 per 1M input tokens, output free (docs.typesafe.ai/models.md, jev-1.13.0). */
+export const USD_PER_INPUT_TOKEN = 0.042 / 1_000_000;
 
-/** Mirrors the `change_proposals.triage_lane` CHECK constraint (migrations/0015). */
+/** Mirrors the `change_proposals.triage_lane` CHECK constraint (migrations/0016). */
 export type TriageLane = "likely_noise" | "needs_human" | "renamed_or_moved" | "auto_apply_candidate";
 
-// ─── TypeSafe request/response shapes (ported from atlas-hooks/skillcheck.py) ─
+// ─── TypeSafe request/response shapes (docs.typesafe.ai/api.md) ─────────────
 
-export interface JevQuestion {
-  type: "noul" | "choice" | "score";
-  instructions: string;
-  criteria?: Record<string, string>;
-}
+export type JevQuestion =
+  | { type: "noul"; instructions: string; criteria?: { true?: string; false?: string } }
+  | { type: "choice"; instructions: string; criteria: Record<string, string | null> };
 
 export interface JevAnswer {
+  type?: string;
   noul?: number;
   choice?: string;
   probabilities?: Record<string, number>;
   confidence?: number;
-  score?: number;
 }
 
 export interface JevResponse {
+  model?: string;
   answers?: Record<string, JevAnswer>;
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
-export interface AskJevOptions {
-  /** Injectable for tests — defaults to the global fetch (same convention as linkHealth.ts's checkUrl). */
+// ─── Session: one per run — owns the key, the breaker and the usage tally ───
+
+export interface TriageSessionOptions {
+  /** Absent/empty = triage off for the whole run; every proposal is written untriaged. */
+  apiKey?: string;
+  /** Injectable for tests — same convention as linkHealth.ts's checkUrl. */
   fetchImpl?: typeof fetch;
-  apiKey: string;
   model?: string;
   timeoutMs?: number;
+  /** Delay before the single retry on 429/529. Tests pass 0. */
+  retryDelayMs?: number;
+  /** Consecutive failed calls before Jev is switched off for the rest of the run. */
+  maxConsecutiveFailures?: number;
+  log?: (message: string) => void;
 }
 
-/** One batched POST /v1/systemone call — every question about one `state` runs in parallel server-side (docs: "extra questions are nearly free"), so callers batch, never loop. */
-export async function askJev(state: unknown, questions: Record<string, JevQuestion>, options: AskJevOptions): Promise<JevResponse> {
+export interface TriageSession {
+  readonly model: string;
+  /** false once the key is missing or the breaker has tripped. */
+  available(): boolean;
+  /** One batched call. Returns null on any failure — callers treat null as "untriaged", never as an error. */
+  ask(state: unknown, questions: Record<string, JevQuestion>): Promise<JevResponse | null>;
+  readonly stats: { calls: number; failures: number; inputTokens: number; disabledReason: string | null };
+}
+
+const RETRYABLE_STATUSES = new Set([429, 529]);
+
+export function createTriageSession(options: TriageSessionOptions): TriageSession {
   const fetchImpl = options.fetchImpl ?? fetch;
+  const model = options.model ?? JEV_MODEL;
   const timeoutMs = options.timeoutMs ?? 8_000;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetchImpl(TYPESAFE_URL, {
-      method: "POST",
-      signal: controller.signal,
-      headers: { Authorization: `Bearer ${options.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ state, model: options.model ?? JEV_MODEL, questions }),
-    });
-    if (!res.ok) {
-      throw new Error(`TypeSafe request failed: HTTP ${res.status}`);
+  const retryDelayMs = options.retryDelayMs ?? 1_500;
+  const maxFailures = options.maxConsecutiveFailures ?? 3;
+  const log = options.log ?? (() => {});
+  const stats = {
+    calls: 0,
+    failures: 0,
+    inputTokens: 0,
+    disabledReason: options.apiKey ? null : "no JEV_API_KEY set",
+  } as TriageSession["stats"];
+  let consecutiveFailures = 0;
+
+  async function post(body: string): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetchImpl(TYPESAFE_URL, {
+        method: "POST",
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${options.apiKey}`, "Content-Type": "application/json" },
+        body,
+      });
+    } finally {
+      clearTimeout(timer);
     }
-    return (await res.json()) as JevResponse;
-  } finally {
-    clearTimeout(timer);
   }
+
+  return {
+    model,
+    stats,
+    available: () => stats.disabledReason === null,
+    async ask(state, questions) {
+      if (stats.disabledReason !== null) return null;
+      stats.calls++;
+      const body = JSON.stringify({ state, model, questions });
+      try {
+        let res = await post(body);
+        if (RETRYABLE_STATUSES.has(res.status)) {
+          await new Promise((r) => setTimeout(r, retryDelayMs));
+          res = await post(body);
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as JevResponse;
+        stats.inputTokens += json.usage?.input_tokens ?? 0;
+        consecutiveFailures = 0;
+        return json;
+      } catch (err) {
+        stats.failures++;
+        consecutiveFailures++;
+        // Never log the request body or headers — the key rides in them.
+        log(`  jev: call failed (${err instanceof Error ? err.message : "unknown error"})`);
+        if (consecutiveFailures >= maxFailures) {
+          stats.disabledReason = `${consecutiveFailures} consecutive failures`;
+          log(`  jev: switched off for the rest of this run (${stats.disabledReason}) — remaining proposals are written untriaged`);
+        }
+        return null;
+      }
+    },
+  };
 }
 
 // ─── Question wording — exact phrasing matters for calibration (docs: "wording changes results a lot") ─
@@ -109,20 +172,20 @@ const NOISE_QUESTION_ID = "real_change";
 const NOISE_QUESTION: JevQuestion = {
   type: "noul",
   instructions:
-    "Compare the BEFORE and AFTER values for this public food-assistance venue's data field(s), given in `state`. " +
-    "Is this a genuine real-world change (the actual phone number, hours, or address changed), rather than scraper " +
-    "noise, a formatting difference, or a data artifact that doesn't reflect anything actually changing?",
+    "Compare `before` and `after` for this public food-assistance venue's changed field(s), listed in `fields_changed`. " +
+    "Is this a genuine real-world change (the actual phone number, hours, address, name or website changed), rather than " +
+    "scraper noise, a formatting difference, or a data artifact that doesn't reflect anything actually changing?",
 };
 
 const REMOVE_QUESTION_ID = "remove_reason";
 const REMOVE_QUESTION: JevQuestion = {
   type: "choice",
   instructions:
-    "A source that previously listed this public food-assistance venue (given in `state.before`) no longer lists " +
-    "it in today's scrape. What most likely explains this?",
+    "A source that previously listed this public food-assistance venue (given in `before`) no longer lists it in " +
+    "today's scrape. What most likely explains this?",
   criteria: {
     gone: "The venue has actually closed or stopped operating.",
-    temporarily_missing: "The venue is still open, but this scrape run missed it — a scrape gap, site hiccup, or a temporary listing removal.",
+    temporarily_missing: "The venue is still open, but this scrape missed it — a scrape gap, site hiccup, or a temporary listing removal.",
     renamed_or_moved: "The venue is still operating but now appears under a different name or at a different address in the source.",
     unclear: "There isn't enough information here to tell which of the above is true.",
   },
@@ -132,221 +195,276 @@ const RENAME_QUESTION_ID = "same_place";
 const RENAME_QUESTION: JevQuestion = {
   type: "noul",
   instructions:
-    "`state.before` describes a public food-assistance venue a source stopped listing. `state.after` describes a " +
-    "new venue the same source started listing, at a similar location or with a matching phone number. Are BEFORE " +
-    "and AFTER very likely the SAME real-world place, just listed under a different name, address text, or details " +
-    "— not two different places?",
+    "`before` describes a public food-assistance venue a source stopped listing. `after` describes a new venue the " +
+    "same source started listing, at a similar location or with a matching phone number. Are `before` and `after` " +
+    "the SAME real-world place, just listed under a different name, address text, or details — not two different places?",
 };
 
 // ─── State builders — public venue fields only, `last_verified` always stripped ─
 
-/** Fields a triage `state` may ever carry — mirrors diffEngine.ts's SOURCE_OWNED_FIELDS ∪ address/category/id, minus last_verified (dates stay in code). Public venue data only (issue #543's own non-negotiable) — never any admin-only or PII field. */
-const STATE_FIELDS: ReadonlyArray<keyof Venue> = ["id", "name", "category", "lat", "lng", "address", "phone", "url", "hours_weekly", "operator"];
+/** Public venue fields a `state` may carry. Never last_verified (dates stay in code), never admin-only columns. */
+const STATE_FIELDS: ReadonlyArray<keyof Venue> = ["name", "category", "lat", "lng", "address", "phone", "url", "hours_weekly", "operator"];
 
-function stripToStateFields(record: Partial<Venue> | null | undefined): Record<string, unknown> | null {
+function pickStateFields(record: object | null | undefined): Record<string, unknown> | null {
   if (!record) return null;
   const out: Record<string, unknown> = {};
   for (const field of STATE_FIELDS) {
-    if (field in record) out[field] = (record as Record<string, unknown>)[field];
+    if (field in record) out[field] = (record as Record<string, unknown>)[field] ?? null;
   }
   return out;
 }
 
-function currentRowToStateRecord(row: CurrentVenueRow): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const field of STATE_FIELDS) {
-    if (field === "hours_weekly") continue; // JSON-string D1 form — not needed for a rename/noise gut-check, and Jev is weak at structured comparison anyway
-    out[field] = (row as unknown as Record<string, unknown>)[field] ?? null;
-  }
-  return out;
-}
-
-// ─── Triage result — what gets stored in change_proposals.triage_* ─────────
+// ─── Result — what gets stored in change_proposals.triage_* ────────────────
 
 export interface TriageResult {
   lane: TriageLane;
-  model: string;
+  /** Versioned model that answered; null when the lane came from a rule with no Jev call (an add). */
+  model: string | null;
   questionSet: string;
-  /** Raw Jev answers, keyed by question id — "every AI decision is recorded with its question, its probability and its lane" (issue #543). */
+  /** Raw Jev answers keyed by question id — "every AI decision is recorded with its question, its probability and its lane" (#543). */
   answers: Record<string, JevAnswer>;
-  /** Set only for a rename-pair triage — the OTHER proposal this verdict also applies to. */
+  /** Rename pairs only: the upstream id the add side carried. */
   pairedWith?: string;
-  inputTokens?: number;
 }
 
-/** JSON shape written to change_proposals.triage_json — see migrations/0015's own column comment. */
+/** JSON written to change_proposals.triage_json. */
 export function serializeTriageResult(result: TriageResult): string {
   return JSON.stringify({
     question_set: result.questionSet,
+    method: result.model ? "jev" : "rule",
     answers: result.answers,
     ...(result.pairedWith ? { paired_with: result.pairedWith } : {}),
   });
 }
 
-// ─── Deterministic auto-apply shape check (the "narrow, safe auto-apply lane" the issue permits) ─
-
-const PHONE_DIGITS = /\D/g;
+// ─── Deterministic auto-apply shape (the issue's "reformatted phone, url scheme change") ─
 
 function normalizedPhone(value: unknown): string | null {
   if (typeof value !== "string" || value.length === 0) return null;
-  return value.replace(PHONE_DIGITS, "");
+  const digits = value.replace(/\D/g, "");
+  // Tolerate a leading US country code ("+1 719…" vs "719…") — same number.
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
 }
 
-/** Same host+path, tolerating an http->https scheme upgrade and a trailing slash — the shape a scraper's own formatting pass produces, not a real change of destination. */
+/** Same host+path+query, tolerating an http→https upgrade, a `www.` prefix and a trailing slash. */
 function normalizedUrl(value: unknown): string | null {
   if (typeof value !== "string" || value.length === 0) return null;
   try {
     const u = new URL(value);
-    return `${u.host}${u.pathname.replace(/\/$/, "")}${u.search}`;
+    return `${u.host.replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}${u.search}`;
   } catch {
-    return value.toLowerCase();
+    return null; // unparseable → never "the same", never auto-applied
   }
 }
 
 /**
- * True only for an `update` proposal whose SOLE reviewable field change
- * (excluding last_verified) is `phone` or `url`, AND the before/after
- * values normalize to the SAME thing — a formatting difference, never a
- * real change. This is the deterministic half of the auto-apply gate
- * (issue #543: "a narrow, safe auto-apply lane with a confidence
- * threshold" — narrow = this shape check; threshold = Jev's own noise
- * verdict, see classifyProposalLane). Never phone/url values that differ
- * once normalized — that IS a real change, and it stays human-reviewed
- * regardless of what Jev says.
+ * True only for an `update` whose SOLE reviewable change is `phone` or `url`
+ * AND whose before/after normalise to the same value — a formatting change,
+ * not a real one. The deterministic half of the auto-apply gate; values
+ * that differ once normalised are a real change and stay human-reviewed
+ * whatever Jev says. Never link_health (a dead-link finding clears the url).
  */
 export function computeAutoApplyEligibility(proposal: ProposalDraft): boolean {
-  if (proposal.changeType !== "update") return false;
+  if (proposal.changeType !== "update" || proposal.source === "link_health") return false;
+  if (proposal.proposedDiff.meta?.rename) return false;
   const fields = reviewableDiffFields(proposal.proposedDiff);
   if (fields.length !== 1) return false;
   const field = fields[0];
   if (field !== "phone" && field !== "url") return false;
-
   const before = (proposal.proposedDiff.before ?? {}) as Record<string, unknown>;
   const after = (proposal.proposedDiff.after ?? {}) as Record<string, unknown>;
   const normalize = field === "phone" ? normalizedPhone : normalizedUrl;
   const b = normalize(before[field]);
   const a = normalize(after[field]);
-  return b !== null && a !== null && b === a;
+  return b !== null && b === a;
 }
 
-// ─── Lane classification — Jev's verdict can only move a row to a MORE cautious lane ─
+// ─── Lane thresholds — Jev can only move a row toward a human ──────────────
 
-const LIKELY_NOISE_BELOW = 0.15; // real_change noul probability below this = Jev thinks it's noise
-const RENAME_CONFIRM_ABOVE = 0.7; // same_place noul probability above this = confirmed rename pair
-const AUTO_APPLY_NOISE_BELOW = 0.05; // stricter than LIKELY_NOISE_BELOW — the auto-apply lane needs Jev to be near-certain this is a formatting artifact, not just "probably"
+const LIKELY_NOISE_BELOW = 0.15; // real_change below this = Jev reads it as noise (a sort aid only)
+const AUTO_APPLY_NOISE_BELOW = 0.05; // stricter: the only lane that can ever write
+const RENAME_CONFIRM_ABOVE = 0.7; // same_place above this = confirmed rename pair
 
-/** Classifies a plain (non-remove, non-paired) update proposal from its `real_change` noul answer + the deterministic shape check. */
-export function classifyUpdateLane(proposal: ProposalDraft, realChangeAnswer: JevAnswer | undefined): TriageLane {
-  const p = realChangeAnswer?.noul;
-  const eligible = computeAutoApplyEligibility(proposal);
-  if (eligible && typeof p === "number" && p < AUTO_APPLY_NOISE_BELOW) return "auto_apply_candidate";
-  if (typeof p === "number" && p < LIKELY_NOISE_BELOW) return "likely_noise";
+export function classifyUpdateLane(proposal: ProposalDraft, realChange: JevAnswer | undefined): TriageLane {
+  const p = realChange?.noul;
+  if (typeof p !== "number") return "needs_human";
+  if (p < AUTO_APPLY_NOISE_BELOW && computeAutoApplyEligibility(proposal)) return "auto_apply_candidate";
+  if (p < LIKELY_NOISE_BELOW) return "likely_noise";
   return "needs_human";
 }
 
-/** Classifies an unpaired remove proposal from its `remove_reason` choice answer. Every branch still lands `needs_human` — archiving a venue is destructive and Jev's own non-negotiable ("a low probability sends work to a person; it never grants permission") means a remove is never auto-applied by this triage, whatever the verdict. */
-export function classifyRemoveLane(_answer: JevAnswer | undefined): TriageLane {
-  return "needs_human";
-}
-
-/** Classifies a confirmed rename pair from its `same_place` noul answer. Below the confirm threshold, the pair is NOT treated as a rename — both proposals fall back to their own individual classification (the caller's job; see refresh-ingest.ts's triage loop). */
 export function isRenameConfirmed(answer: JevAnswer | undefined): boolean {
   return typeof answer?.noul === "number" && answer.noul > RENAME_CONFIRM_ABOVE;
 }
 
-// ─── Per-proposal triage (unpaired) ────────────────────────────────────────
-
-export interface TriageProposalOptions extends AskJevOptions {}
+// ─── Per-proposal triage ───────────────────────────────────────────────────
 
 /**
- * Triages one proposal that isn't part of a confirmed rename pair. `add`
- * proposals are never sent to Jev — the issue's own lane design has no
- * question for "should a brand-new venue be queued," and one already always
- * is ("Queue for Kyle — anything real and consequential: a new venue...").
- * Skipping the call here is a real cost saving, not a gap: an unpaired add
- * always classifies `needs_human` with no Jev round trip.
+ * One proposal that is not part of a rename pair. Returns null (= write it
+ * untriaged) when Jev is off or the call failed.
+ *   - add: no Jev call — the issue's lane design always queues a new venue
+ *     for a human, so a call could not change the outcome. Lane needs_human.
+ *   - remove: `remove_reason` choice, sent the venue's FULL current row
+ *     (a remove proposal's own `before` is only {id, name}). Always
+ *     needs_human — archiving is destructive; the verdict is shown, not acted on.
+ *   - update: `real_change` noul → classifyUpdateLane.
  */
-export async function triageProposal(proposal: ProposalDraft, options: TriageProposalOptions): Promise<TriageResult> {
+export async function triageProposal(
+  proposal: ProposalDraft,
+  session: TriageSession,
+  currentRow?: CurrentVenueRow,
+): Promise<TriageResult | null> {
+  if (!session.available()) return null;
   if (proposal.changeType === "add") {
-    return { lane: "needs_human", model: options.model ?? JEV_MODEL, questionSet: QUESTION_SET_VERSION, answers: {} };
+    return { lane: "needs_human", model: null, questionSet: QUESTION_SET_VERSION, answers: {} };
   }
-
   if (proposal.changeType === "remove") {
-    const state = { source: proposal.source, before: stripToStateFields(proposal.proposedDiff.before) };
-    const resp = await askJev(state, { [REMOVE_QUESTION_ID]: REMOVE_QUESTION }, options);
-    const answers = resp.answers ?? {};
-    return {
-      lane: classifyRemoveLane(answers[REMOVE_QUESTION_ID]),
-      model: options.model ?? JEV_MODEL,
-      questionSet: QUESTION_SET_VERSION,
-      answers,
-      inputTokens: resp.usage?.input_tokens,
-    };
+    const state = { source: proposal.source, before: pickStateFields(currentRow ?? proposal.proposedDiff.before) };
+    const resp = await session.ask(state, { [REMOVE_QUESTION_ID]: REMOVE_QUESTION });
+    if (!resp) return null;
+    return { lane: "needs_human", model: resp.model ?? session.model, questionSet: QUESTION_SET_VERSION, answers: resp.answers ?? {} };
   }
-
-  // update
-  const state = buildUpdateState(proposal);
-  const resp = await askJev(state, { [NOISE_QUESTION_ID]: NOISE_QUESTION }, options);
+  const state = {
+    source: proposal.source,
+    fields_changed: reviewableDiffFields(proposal.proposedDiff),
+    before: pickStateFields(proposal.proposedDiff.before),
+    after: pickStateFields(proposal.proposedDiff.after),
+  };
+  const resp = await session.ask(state, { [NOISE_QUESTION_ID]: NOISE_QUESTION });
+  if (!resp) return null;
   const answers = resp.answers ?? {};
   return {
     lane: classifyUpdateLane(proposal, answers[NOISE_QUESTION_ID]),
-    model: options.model ?? JEV_MODEL,
+    model: resp.model ?? session.model,
     questionSet: QUESTION_SET_VERSION,
     answers,
-    inputTokens: resp.usage?.input_tokens,
   };
-}
-
-function buildUpdateState(proposal: ProposalDraft): { source: ProposalSource; change_type: ChangeType; before: unknown; after: unknown; fields_changed: string[] } {
-  return {
-    source: proposal.source,
-    change_type: proposal.changeType,
-    before: stripToStateFields(proposal.proposedDiff.before),
-    after: stripToStateFields(proposal.proposedDiff.after),
-    fields_changed: reviewableDiffFields(proposal.proposedDiff),
-  };
-}
-
-// ─── Rename-pair triage ─────────────────────────────────────────────────────
-
-export interface RenamePairTriageResult {
-  removeResult: TriageResult;
-  addResult: TriageResult;
-  confirmed: boolean;
 }
 
 /**
- * ONE Jev call per candidate pair (not two) — "batching is nearly free"
- * applies within a call, not across separate proposals, so a shared call
- * covering both the remove and the add is the cheaper, and more coherent,
- * shape: Jev sees BOTH records at once and answers a single "same place?"
- * question, rather than guessing from one side alone.
+ * Asks Jev whether a candidate remove+add pair is one place. Returns
+ * `{confirmed: null}` when Jev is off or the call failed — the caller then
+ * falls back to the plain distance/phone heuristic.
  */
-export async function triageRenamePair(candidate: RenamePairCandidate, options: TriageProposalOptions): Promise<RenamePairTriageResult> {
+export async function confirmRenamePair(
+  candidate: RenamePairCandidate,
+  session: TriageSession,
+): Promise<{ confirmed: boolean | null; result: TriageResult | null }> {
+  if (!session.available()) return { confirmed: null, result: null };
   const state = {
     source: candidate.removeProposal.source,
-    before: currentRowToStateRecord(candidate.removedRow),
-    after: stripToStateFields(candidate.addProposal.proposedDiff.after),
+    before: pickStateFields(candidate.removedRow),
+    after: pickStateFields(candidate.addProposal.proposedDiff.after),
   };
-  const resp = await askJev(state, { [RENAME_QUESTION_ID]: RENAME_QUESTION }, options);
+  const resp = await session.ask(state, { [RENAME_QUESTION_ID]: RENAME_QUESTION });
+  if (!resp) return { confirmed: null, result: null };
   const answers = resp.answers ?? {};
   const confirmed = isRenameConfirmed(answers[RENAME_QUESTION_ID]);
-  const lane: TriageLane = confirmed ? "renamed_or_moved" : "needs_human";
-
-  const shared = {
-    model: options.model ?? JEV_MODEL,
-    questionSet: QUESTION_SET_VERSION,
-    answers,
-    inputTokens: resp.usage?.input_tokens,
-  };
   return {
     confirmed,
-    removeResult: { ...shared, lane, pairedWith: candidate.addProposal.targetVenueId },
-    addResult: { ...shared, lane, pairedWith: candidate.removeProposal.targetVenueId },
+    result: {
+      lane: confirmed ? "renamed_or_moved" : "needs_human",
+      model: resp.model ?? session.model,
+      questionSet: QUESTION_SET_VERSION,
+      answers,
+      pairedWith: candidate.addProposal.targetVenueId,
+    },
   };
 }
 
-// ─── LLM text-rewrite hook (issue #543 step 3) — no producer wires to it yet ─
+// ─── The whole pass, as refresh-ingest.ts runs it ──────────────────────────
+
+/** Runs `fn` over `items` with at most `limit` in flight — keeps a ~100-proposal run to seconds without bursting Jev's rate limit. */
+export async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+export interface TriagePassInput {
+  proposals: ProposalDraft[];
+  /** Every current row the diff ran against, all sources — removes and pairs read the full row from here. */
+  currentRows: CurrentVenueRow[];
+  session: TriageSession;
+  rejectedKeys: ReadonlySet<string>;
+  today: string;
+  /** false when migration 0016 isn't on this database — no pairing (approving one needs venue_id_aliases), no triage columns. */
+  schemaReady: boolean;
+  concurrency?: number;
+}
+
+export interface TriagePassOutput {
+  /** Final write set: each paired remove+add replaced by ONE rename proposal. */
+  proposals: ProposalDraft[];
+  /** Triage per proposal (by object identity); absent = write untriaged. */
+  triage: Map<ProposalDraft, TriageResult>;
+  renamePairs: number;
+  /** Extra (source, target) keys whose older pending rows this run supersedes — a paired add's upstream id. */
+  extraSupersedeKeys: string[];
+}
+
+/**
+ * Pairing then triage, over proposals that already passed every guard.
+ * Date-only and link_health proposals pass straight through untouched.
+ * A candidate pair becomes one rename proposal when Jev confirms it, or —
+ * when Jev is off or its call failed — on the plain distance/phone match
+ * alone (a human still approves it). Jev answering "not the same place"
+ * leaves the remove and add separate. A rename a human already rejected
+ * is never re-paired (rejection memory, same key shape as diffEngine).
+ */
+export async function runTriagePass(input: TriagePassInput): Promise<TriagePassOutput> {
+  const { session, schemaReady, rejectedKeys, today } = input;
+  const concurrency = input.concurrency ?? 5;
+  const triage = new Map<ProposalDraft, TriageResult>();
+  if (!schemaReady) return { proposals: input.proposals, triage, renamePairs: 0, extraSupersedeKeys: [] };
+
+  const currentById = new Map(input.currentRows.map((r) => [r.id, r]));
+  const skip = (p: ProposalDraft) =>
+    p.source === "link_health" || isDateOnlyUpdateProposal({ change_type: p.changeType, source: p.source }, p.proposedDiff);
+
+  const candidates = findRenamePairCandidates(input.proposals.filter((p) => !skip(p)), input.currentRows).filter((c) => {
+    const rename = buildRenameProposal(c, today);
+    return !rejectedKeys.has(rejectionKey(rename.source, rename.targetVenueId, rename.diffHash));
+  });
+  const verdicts = await mapWithConcurrency(candidates, concurrency, (c) => confirmRenamePair(c, session));
+
+  const replaced = new Map<ProposalDraft, ProposalDraft | null>(); // remove → rename proposal, add → null (dropped)
+  const extraSupersedeKeys: string[] = [];
+  candidates.forEach((c, i) => {
+    const { confirmed, result } = verdicts[i];
+    if (confirmed === false) return; // Jev says two different places — keep remove + add separate
+    const rename = buildRenameProposal(c, today);
+    replaced.set(c.removeProposal, rename);
+    replaced.set(c.addProposal, null);
+    extraSupersedeKeys.push(pendingKey(c.addProposal.source, c.addProposal.targetVenueId));
+    if (result) triage.set(rename, result);
+  });
+
+  const out: ProposalDraft[] = [];
+  for (const p of input.proposals) {
+    if (!replaced.has(p)) out.push(p);
+    else if (replaced.get(p)) out.push(replaced.get(p)!);
+  }
+
+  const toTriage = out.filter((p) => !skip(p) && !triage.has(p) && !p.proposedDiff.meta?.rename);
+  const results = await mapWithConcurrency(toTriage, concurrency, (p) =>
+    triageProposal(p, session, p.changeType === "remove" ? currentById.get(p.targetVenueId) : undefined),
+  );
+  toTriage.forEach((p, i) => {
+    if (results[i]) triage.set(p, results[i]!);
+  });
+
+  return { proposals: out, triage, renamePairs: replaced.size / 2, extraSupersedeKeys };
+}
+
+// ─── LLM text-rewrite hook (issue #543 step 4) — OFF, no producer yet ─────
 
 export interface TextRewriteRequest {
   field: string;
@@ -355,19 +473,14 @@ export interface TextRewriteRequest {
 }
 
 /**
- * The hook point for issue #543's "LLM pass only where text must be
- * rewritten" — a small generative call for the few cases Jev cannot handle
- * (it never generates text). NOT wired to any real model in this slice:
- * scripts/scrape-plentiful.py's own parse-failure path already swallows an
- * unparseable hours string to `hours_weekly=None` before it ever reaches a
- * proposal (diffEngine.ts's isGuardedClear guard on top of that), so
- * nothing produced by this pipeline today actually NEEDS a rewrite — wiring
- * a real call here with no caller that can trigger it would be
- * unexercised, untestable code (ponytail rung 1: "does this need to be
- * built at all"). `noopTextRewriter` is the default; a future slice that
- * adds a real producer (e.g. a scraper change that preserves the
- * unparseable string instead of discarding it) swaps this for a real
- * Claude-backed implementation without touching any call site.
+ * Hook for the issue's "LLM pass only where text must be written" (Jev
+ * generates nothing). Deliberately not wired to a model: nothing this
+ * pipeline produces today needs text written — scrape-plentiful.py drops an
+ * unparseable hours string to null before it reaches a proposal (and
+ * diffEngine's destructive-clear guard keeps that from erasing real hours),
+ * and a rename proposal's own before/after already describes itself. A
+ * future producer swaps `noopTextRewriter` for a Claude-backed one whose
+ * output lands as a proposal, never a direct write.
  */
 export type TextRewriter = (request: TextRewriteRequest) => Promise<string | null>;
 

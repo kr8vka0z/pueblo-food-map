@@ -49,6 +49,11 @@ export interface ChangeProposalRow {
   reviewed_by: string | null;
   reviewed_at: string | null;
   applied_at: string | null;
+  // Migration 0016 (#543) — optional so pre-0016 fixtures and rows still type-check; NULL/absent = never triaged.
+  triage_lane?: string | null;
+  triage_json?: string | null;
+  triage_model?: string | null;
+  triage_at?: string | null;
 }
 
 /** Mirrors change_proposals.proposed_diff's one shape for every source (schema comment, migrations/0001; scripts/refresh/diffEngine.ts's own ProposedDiff). */
@@ -112,7 +117,38 @@ export function isDateOnlyUpdateProposal(
 ): boolean {
   if (row.change_type !== "update") return false;
   if (!DATE_ONLY_BULK_SOURCES.has(row.source)) return false;
+  // A rename with no field changes still carries a new upstream id that only
+  // an approval records (venue_id_aliases) — auto/bulk-applying it as a bare
+  // date bump would re-propose the same rename every run.
+  if (diff.meta?.rename) return false;
   return diff.fields_changed.length === 1 && diff.fields_changed[0] === "last_verified";
+}
+
+// ─── Triage lanes at /admin/flags (#543) ────────────────────────────────────
+
+/** The three lanes a reviewer filters/sorts by. */
+export type ReviewLane = "likely_noise" | "needs_human" | "likely_rename";
+
+/** Sort order for "needs a human first": what most needs eyes comes first, noise last. */
+export const REVIEW_LANE_ORDER: Record<ReviewLane, number> = { needs_human: 0, likely_rename: 1, likely_noise: 2 };
+
+/**
+ * Which lane a pending row shows under. A rename proposal is always "likely
+ * rename" — even untriaged (heuristic pairing when Jev was off). An
+ * `auto_apply_candidate` that wasn't applied (flag off) reads as noise, per
+ * migration 0016. NULL (untriaged: no key, Jev outage, pre-0016 row) is
+ * "needs a human" — never treated as safer than a triaged row.
+ */
+export function reviewLaneOf(row: Pick<ChangeProposalRow, "triage_lane">, diff: ProposedDiff | null): ReviewLane {
+  if (diff?.meta?.rename || row.triage_lane === "renamed_or_moved") return "likely_rename";
+  if (row.triage_lane === "likely_noise" || row.triage_lane === "auto_apply_candidate") return "likely_noise";
+  return "needs_human";
+}
+
+/** `meta.rename` on a rename proposal (scripts/refresh/renamePairs.ts's RenameMeta), or null. */
+export function renameMetaOf(diff: ProposedDiff | null): { from_id: string; to_id: string } | null {
+  const r = diff?.meta?.rename as { from_id?: unknown; to_id?: unknown } | undefined;
+  return r && typeof r.from_id === "string" && typeof r.to_id === "string" ? { from_id: r.from_id, to_id: r.to_id } : null;
 }
 
 // ─── Shared diff-field selection (admin dashboard build, NeedsDecisionPanel) ─
@@ -270,6 +306,10 @@ const AUDIT_INSERT_SQL =
 // caller checks after the batch runs, below.
 const APPROVE_PROPOSAL_SQL =
   "UPDATE change_proposals SET status = 'approved', reviewed_by = ?, reviewed_at = ?, applied_at = ? WHERE id = ? AND status = 'pending'";
+
+// Upsert: re-approving a rename to the same upstream id just repoints it.
+const ALIAS_UPSERT_SQL =
+  "INSERT OR REPLACE INTO venue_id_aliases (source, upstream_id, venue_id, created_at, created_by) VALUES (?, ?, ?, ?, ?)";
 
 const SUPERSEDE_PROPOSAL_SQL =
   "UPDATE change_proposals SET status = 'superseded', reviewed_at = ? WHERE id = ? AND status = 'pending'";
@@ -543,7 +583,17 @@ export async function applyApprovedProposal(
     .bind(identity.email, "venue", proposalRow.target_venue_id, auditAction, beforeJson, JSON.stringify(afterRowForAudit), timestamp);
   const approveProposal = db.prepare(APPROVE_PROPOSAL_SQL).bind(identity.email, timestamp, timestamp, proposalRow.id);
 
-  const results = await db.batch([venueStmt, insertAudit, approveProposal]);
+  // A rename proposal (#543) updates the OLD row in place above; recording
+  // the new upstream id here is what stops the next scrape from proposing
+  // the same remove+add pair again (refresh-ingest maps incoming ids through
+  // this table before diffing). Same batch, so it lands only with the update.
+  // Appended AFTER approveProposal so results[2] below is still that row.
+  const rename = changeType === "update" ? renameMetaOf(diff) : null;
+  const extra = rename
+    ? [db.prepare(ALIAS_UPSERT_SQL).bind(proposalRow.source, rename.to_id, proposalRow.target_venue_id, timestamp, identity.email)]
+    : [];
+
+  const results = await db.batch([venueStmt, insertAudit, approveProposal, ...extra]);
   const approveResult = results[2];
   if (approveResult.meta.changes === 0) {
     // Correctness requirement 1's belt: a true concurrent race (see this

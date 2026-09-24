@@ -57,7 +57,7 @@ Public forms send via Resend from the Worker at **runtime** (`process.env.RESEND
 
 - **`RESEND_API_KEY`** — key "Pueblo Food Map - Worker (sending)", sending-only, domain-scoped to `pueblofoodmap.com`. `wrangler secret put RESEND_API_KEY`.
 - **Admin key** "Atlas Admin (full access)" — management only (create/list/revoke keys), NEVER in the Worker or client code.
-- Local dev: `.env.local` holds an `op://` reference, run via `op run --env-file=.env.local -- npm run dev`. Also required locally: `TURNSTILE_SECRET_KEY` (submit routes throw without it) and `CHECKIN_RATE_LIMIT_SECRET` (a DEDICATED secret for the box check-in rate limiter — never reuse `TURNSTILE_SECRET_KEY`, or rotating one resets the other's open rate-limit buckets).
+- Local dev: `.env.local` holds an `op://` reference, run via `op run --env-file=.env.local -- npm run dev`. Also required locally: `TURNSTILE_SECRET_KEY` (submit routes throw without it) and `CHECKIN_RATE_LIMIT_SECRET` (a DEDICATED secret for the D1-backed rate limiter — never reuse `TURNSTILE_SECRET_KEY`, or rotating one resets the other's open rate-limit buckets). As of #587, `CHECKIN_RATE_LIMIT_SECRET` backs the box check-in rate limiter AND the three public submit forms' rate limiter (`src/lib/formRateLimit.ts`) — all three submit routes now also throw without it, same as `TURNSTILE_SECRET_KEY`.
 - **Rotate:** Resend dashboard → new sending-only key → update 1Password → `wrangler secret put RESEND_API_KEY` → verify a live form send → revoke old.
 - History: atlas-kb note "PFM AGENTS History — Hosting, Tokens and SEO".
 

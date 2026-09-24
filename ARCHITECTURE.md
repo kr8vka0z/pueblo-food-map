@@ -389,8 +389,13 @@ Each route handler (`src/app/*/submit/route.ts`) runs the same pipeline:
    the form; its response token is submitted with the form data.
 3. Honeypot check — a hidden `website` field; bots fill it, humans don't.
    Returns a fake `{ok: true}` to bots (silent drop, no signal).
-4. IP-based rate limit — in-process sliding window, 5 req/IP/hour.
-   Resets on Worker cold-start; sufficient for v1 volume.
+4. D1-backed rate limit (#587) — `src/lib/formRateLimit.ts`'s
+   `checkFormRateLimit()`, a thin wrapper over the Blessing Boxes check-in
+   path's shared D1 counter (`src/lib/checkinRateLimit.ts`). Two caps: 5
+   req/IP/hour, plus a site-wide cap per form (50/hour) — see
+   `formRateLimit.ts`'s own header for why a per-IP-only cap isn't enough on
+   Workers (many isolates, no shared in-process state) and for the exact
+   cap numbers' reasoning.
 5. Server-side field validation (mirrors client-side).
 6. Email via Resend to the appropriate `@pueblofoodmap.com` address.
 
@@ -416,10 +421,10 @@ populations that may distrust Google tracking.
 persisted. Contact emails go to Resend in the email body; the route handlers
 do not log them.
 
-**Note — rate limiter duplication:** the rate-limit code is currently
-duplicated across all three submit routes. A refactor to extract it to
-`src/lib/rateLimit.ts` is tracked separately; inline docs for those blocks
-should follow after that change lands.
+**Rate limiter, formerly duplicated (#587):** each route used to carry its
+own private in-process limiter instance. `src/lib/formRateLimit.ts` now owns
+the shared logic (both caps, one call per route) — no per-route duplication
+left to extract.
 
 ---
 
@@ -540,8 +545,10 @@ no exception — see AGENTS.md "Publish → static" for the exact skip list and
 why the carve-out can't be widened into a general gate bypass.
 
 **Route handlers as Workers:** Next.js route handlers (`submit/route.ts`)
-compile to Worker fetch handlers. The in-process rate-limit `Map` is in
-Worker memory — it resets on cold-start, which is acceptable for v1 volume.
+compile to Worker fetch handlers. As of #587 the submit routes' rate limit
+is D1-backed (`src/lib/formRateLimit.ts`), not in-process — Cloudflare runs
+many Worker isolates concurrently, so an in-process `Map` only ever saw a
+fraction of real traffic; see that file's header for the full reasoning.
 
 **Environment variables:** `NEXT_PUBLIC_*` vars are baked into the client
 bundle at build time — set them as **build variables** (Settings → Build →

@@ -25,7 +25,7 @@
 
 import { categoryLabels } from "@/data/venues";
 import { DISPLAY_DAY_KEYS } from "@/lib/hours";
-import { isValidEmail } from "@/lib/rateLimit";
+import { isValidEmail } from "@/lib/email";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import type { VenueCategory, WeeklyHours } from "@/types/venue";
 

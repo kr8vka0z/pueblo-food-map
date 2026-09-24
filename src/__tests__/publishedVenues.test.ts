@@ -45,15 +45,41 @@ describe("venues data-layer invariants", () => {
     expect(raw).toBe(serializePublishedVenuesFile(publishedVenues, { publishedAt }));
   });
 
-  test("venues applies the benefit-flag overlay on top of publishedVenues", () => {
+  test("venues applies the benefit-flag overlay on top of publishedVenues, NULL-guarded so an admin D1 edit wins (#597, #238)", () => {
     // venues.ts builds `venues` as publishedVenues.map(overlay); this pins that
     // wiring. Anchored to publishedVenues (not the seed spread) so it stays
     // valid after an admin publish regenerates published-venues.ts from D1.
+    // NULL-guarded per column, matching venues.ts's own logic: the overlay
+    // fills a field only when the published value is `undefined` (D1 NULL);
+    // an explicit non-undefined value (an admin edit that survived a
+    // publish) is never overwritten.
     const expected: Venue[] = publishedVenues.map((v) => {
       const f = benefitFlags[v.id];
-      return f ? { ...v, accepts_snap: f.snap, accepts_wic: f.wic } : v;
+      if (!f) return v;
+      return {
+        ...v,
+        accepts_snap: v.accepts_snap === undefined ? f.snap : v.accepts_snap,
+        accepts_wic: v.accepts_wic === undefined ? f.wic : v.accepts_wic,
+      };
     });
     expect(JSON.stringify(venues)).toBe(JSON.stringify(expected));
+  });
+
+  test("venues overlay lets an explicit D1 accepts_snap/accepts_wic value win over benefit-flags.ts (#238 'admin edits win')", () => {
+    // Direct behavioral proof, independent of the wiring-pins-itself test
+    // above (that test would pass even with a bug shared between venues.ts
+    // and its own re-implementation here). Picks a real overlay-covered id
+    // and asserts the NULL-guard both fills a genuinely-unset field and
+    // preserves an already-set one.
+    const overlayId = Object.keys(benefitFlags)[0];
+    const publishedRow = publishedVenues.find((v) => v.id === overlayId);
+    expect(publishedRow).toBeDefined();
+    // Today's published-venues.ts has no accepts_snap/accepts_wic for OSM
+    // rows yet (0014 hasn't landed on prod + been published) — this proves
+    // the overlay still fills in that case.
+    expect(publishedRow!.accepts_snap).toBeUndefined();
+    const resolved = venues.find((v) => v.id === overlayId);
+    expect(resolved!.accepts_snap).toBe(benefitFlags[overlayId].snap);
   });
 
   test("seed arrays total 106 records: 10 pfp + 60 osm + 36 plentiful", () => {

@@ -242,7 +242,7 @@ export function toTriState(value: boolean | undefined): number | null {
 // unchanged by this move — it now delegates to applyApprovedProposal()
 // instead of inlining this logic.
 
-/** Actor identity recorded on the venue mutation + audit row — the reviewing admin from the caller's OWN Better Auth session, never the pipeline's bot identity that generated the proposal. Narrowed to just the field this module needs, not the full AdminIdentity shape (cfAccess.ts) — keeps this file's D1-adjacent code from importing an auth type it only uses for one string field. */
+/** Actor identity recorded on the venue mutation + audit row — the reviewing admin from the caller's OWN Better Auth session, never the pipeline's bot identity that generated the proposal. Narrowed to just the field this module needs, not the full AdminIdentity shape (adminOrigin.ts) — keeps this file's D1-adjacent code from importing an auth type it only uses for one string field. */
 export interface ApprovingIdentity {
   email: string;
 }

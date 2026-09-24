@@ -14,7 +14,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { ADMIN_ORIGIN } from "@/lib/cfAccess";
+import { ADMIN_ORIGIN } from "@/lib/adminOrigin";
 import type { VenueRow } from "@/lib/publishVenues";
 
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";

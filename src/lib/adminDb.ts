@@ -29,7 +29,7 @@
  */
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import type { AdminIdentity, HeaderSource } from "./cfAccess";
+import type { AdminIdentity, HeaderSource } from "./adminOrigin";
 import { requireAdminSession } from "./adminSession";
 
 export interface AdminDbAccess {
@@ -40,7 +40,7 @@ export interface AdminDbAccess {
 /**
  * Verifies the caller holds a live, allowlisted Better Auth session, then
  * returns the ADMIN_DB binding alongside that session's identity. Throws
- * AccessDeniedError (from cfAccess.ts) on failure — callers must catch it
+ * AccessDeniedError (from adminOrigin.ts) on failure — callers must catch it
  * and produce a real denial response (see src/lib/adminAuthErrors.ts for the
  * shared redirect-vs-403 / 401-vs-403 handling used by every page and route
  * handler).

@@ -1,14 +1,16 @@
 /**
- * cfAccess.ts — CSRF defense + shared admin-auth types, post-Cloudflare-Access
- * cutover (auth/betterauth-sole-gate).
+ * adminOrigin.ts (formerly cfAccess.ts, renamed #596) — CSRF defense +
+ * shared admin-auth types, post-Cloudflare-Access cutover
+ * (auth/betterauth-sole-gate).
  *
- * WHY this file keeps its name despite no longer verifying a Cloudflare
- * Access JWT: `requireAdminOrigin()` (the CSRF check below), `AccessDeniedError`,
+ * `requireAdminOrigin()` (the CSRF check below), `AccessDeniedError`,
  * `AccessDeniedReason`, `AdminIdentity`, and `HeaderSource` are imported
  * project-wide (adminDb.ts, adminSession.ts, adminAuthErrors.ts, every
- * /api/admin/* route, every /admin/** page). Renaming the module is a bigger,
- * unrelated diff than this cutover's scope — the name is now a historical
- * label, not a description of what runs here.
+ * /api/admin/* route, every /admin/** page) — the exported names keep their
+ * `Access`-prefixed history (see below) since renaming THEM is a bigger,
+ * unrelated diff than #596's scope; only the file itself was renamed, since
+ * Cloudflare Access is gone and `requireAdminOrigin` (not access) is what
+ * this file's own name should describe now.
  *
  * WHAT USED TO LIVE HERE: `requireAccessIdentity()` verified the
  * `Cf-Access-Jwt-Assertion` header against Cloudflare's JWKS (jose's

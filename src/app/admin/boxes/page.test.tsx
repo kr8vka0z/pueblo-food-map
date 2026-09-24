@@ -16,7 +16,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { AccessDeniedError } from "@/lib/cfAccess";
+import { AccessDeniedError } from "@/lib/adminOrigin";
 
 const mockGetAdminDb = vi.fn();
 vi.mock("@/lib/adminDb", () => ({

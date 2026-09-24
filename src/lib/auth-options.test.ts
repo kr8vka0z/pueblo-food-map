@@ -6,7 +6,7 @@
  *
  * WHY `node` environment: better-sqlite3 is a native Node addon; jsdom's
  * vm-sandboxed realm has no compatible require() path for it (same class of
- * cross-realm issue documented in cfAccess.test.ts's own `node`-environment
+ * cross-realm issue documented in adminOrigin.test.ts's own `node`-environment
  * WHY comment, different underlying cause).
  *
  * WHY better-sqlite3 in-memory rather than a real D1Database or a fetched
@@ -74,7 +74,7 @@ describe("buildAuthOptions", () => {
     );
   });
 
-  test("baseURL allowedHosts covers every admin hostname cfAccess.ts defends", () => {
+  test("baseURL allowedHosts covers every admin hostname adminOrigin.ts defends", () => {
     const auth = betterAuth(buildAuthOptions(new Database(":memory:")));
     const baseURL = auth.options.baseURL;
 
@@ -82,7 +82,7 @@ describe("buildAuthOptions", () => {
       throw new Error("expected a dynamic baseURL config, got: " + String(baseURL));
     }
     expect(baseURL.protocol).toBe("https");
-    // ADMIN_ORIGINS (cfAccess.ts) includes https://pueblofoodmap.com — the
+    // ADMIN_ORIGINS (adminOrigin.ts) includes https://pueblofoodmap.com — the
     // apex admin now serves /admin from — and its bare host must be in the
     // allow-list Better Auth uses to construct correct absolute URLs there.
     expect(baseURL.allowedHosts).toContain("pueblofoodmap.com");

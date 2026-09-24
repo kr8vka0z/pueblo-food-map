@@ -12,7 +12,7 @@
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { AccessDeniedError, type HeaderSource } from "@/lib/cfAccess";
+import { AccessDeniedError, type HeaderSource } from "@/lib/adminOrigin";
 
 const mockGetSession = vi.fn();
 vi.mock("@/lib/auth", () => ({

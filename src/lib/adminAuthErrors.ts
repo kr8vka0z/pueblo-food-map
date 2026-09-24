@@ -11,8 +11,8 @@
  * returns 401 (Unauthorized — "log in and retry") rather than 403
  * (Forbidden — "you will never be let in"). Every OTHER AccessDeniedError
  * reason (currently just `"not_allowlisted"` and `"bad_origin"` — see
- * cfAccess.ts's `AccessDeniedReason`) still fails closed: forbidden()/403 on
- * pages, 403 on route handlers.
+ * adminOrigin.ts's `AccessDeniedReason`) still fails closed: forbidden()/403
+ * on pages, 403 on route handlers.
  *
  * WHY one shared function per surface instead of duplicating this branch
  * into every call site: five admin pages and seven /api/admin/* route
@@ -24,7 +24,7 @@
 
 import { redirect, forbidden } from "next/navigation";
 import { NextResponse } from "next/server";
-import { AccessDeniedError } from "./cfAccess";
+import { AccessDeniedError } from "./adminOrigin";
 import { logAdminAuthFailure } from "./logger";
 
 /**

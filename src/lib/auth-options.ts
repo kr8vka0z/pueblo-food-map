@@ -41,14 +41,14 @@ import { logAdminAuthEvent } from "@/lib/logger";
 
 /**
  * Every hostname this Worker answers admin traffic on (mirrors
- * cfAccess.ts's ADMIN_ORIGINS + the hostname list documented in that file's
+ * adminOrigin.ts's ADMIN_ORIGINS + the hostname list documented in that file's
  * header comment: the public apex — where admin now serves at the `/admin`
  * path, gated by Better Auth alone (magic link + passkey; Cloudflare Access
  * has been fully removed from this path) — the staging apex, and the bare
  * workers.dev fallback). Better Auth needs this to
  * construct correct absolute callback/redirect URLs regardless of which
  * hostname a request arrives on — the same multi-hostname reality
- * cfAccess.ts's in-app JWT re-verification exists to cover, for the same
+ * adminOrigin.ts's (formerly cfAccess.ts's) in-app JWT re-verification used to cover, for the same
  * underlying reason (Cloudflare Workers answer on more hostnames than a
  * single custom domain). The admin.pueblofoodmap.com /
  * dev.admin.pueblofoodmap.com subdomains are retired — admin is a path on

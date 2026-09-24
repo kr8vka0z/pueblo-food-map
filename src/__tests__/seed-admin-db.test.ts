@@ -128,9 +128,20 @@ describe("buildInsertSql", () => {
   test("required-only record: exact column order + NULLs for absent fields", () => {
     const sql = buildInsertSql({ venue: makeVenue(), sourceType: "pfp" }, seedTimestamp);
     expect(sql).toBe(
-      "INSERT INTO venues (id, name, category, lat, lng, address, hours_weekly, accepts_snap, accepts_wic, phone, email, url, notes, operator, source, last_verified, status, source_type, outside_county, created_by, updated_by, published_at, published_by) VALUES " +
-        "('test-id', 'Test Venue', 'pantry', 38.25, -104.6, '123 Test St', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'test', '2026-01-01', 'published', 'pfp', 0, 'seed@pueblofoodmap.com', 'seed@pueblofoodmap.com', '2026-07-01T00:00:00.000Z', 'seed@pueblofoodmap.com');",
+      "INSERT INTO venues (id, name, category, lat, lng, address, hours_weekly, accepts_snap, accepts_wic, phone, email, url, notes, operator, source, last_verified, status, source_type, outside_county, created_by, updated_by, published_at, published_by, created_at, updated_at) VALUES " +
+        "('test-id', 'Test Venue', 'pantry', 38.25, -104.6, '123 Test St', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'test', '2026-01-01', 'published', 'pfp', 0, 'seed@pueblofoodmap.com', 'seed@pueblofoodmap.com', '2026-07-01T00:00:00.000Z', 'seed@pueblofoodmap.com', '2026-07-01T00:00:00.000Z', '2026-07-01T00:00:00.000Z');",
     );
+  });
+
+  // #262 acceptance: "A fresh local re-seed produces zero rows where
+  // status='published' AND updated_at > published_at." All three timestamps
+  // come from the same seedTimestamp clock, so they must be byte-identical.
+  test("#262: created_at, updated_at, and published_at are stamped from one clock (never updated_at > published_at)", () => {
+    const sql = buildInsertSql({ venue: makeVenue(), sourceType: "pfp" }, seedTimestamp);
+    const quoted = `'${seedTimestamp}'`;
+    const occurrences = sql.split(quoted).length - 1;
+    // published_at, created_at, updated_at — exactly 3 uses of the same literal.
+    expect(occurrences).toBe(3);
   });
 
   test("explicit accepts_snap/accepts_wic seed as 1/0, not NULL", () => {

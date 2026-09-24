@@ -193,9 +193,11 @@ scripts/fetch-osm-grocery.py ┤→ scripts/ingest-osm-grocery.py ─┐
   only an explicit **source-owned field allowlist** — e.g. OSM's `address`,
   `operator`, and `hours_weekly` are excluded, because a plain re-run of
   `ingest-osm-grocery.py` never reproduces them (they were populated by a
-  one-off enrichment script, `scripts/scrub-osm-venues.ts`, outside any
-  repeatable pipeline); diffing them would propose wiping every real value
-  back to empty on every run. This was found by actually running the
+  one-off enrichment script, `scripts/scrub-osm-venues.ts` — deleted as
+  dead code by #596 once it had run its course; see commit `c1e4536`
+  /PR #102 for its history — outside any repeatable pipeline); diffing
+  them would propose wiping every real value back to empty on every run.
+  This was found by actually running the
   pipeline end-to-end against local D1, not by inspection — see the
   allowlist's own comment for the specifics.
 - **Every source-owned field genuinely unchanged still produces one

@@ -1,6 +1,12 @@
 /**
  * /api/public/blessing-boxes/[id]/photos — the public photo layer's write
- * (POST) and read (GET) paths (Blessing Boxes slice 5).
+ * (POST) path (Blessing Boxes slice 5).
+ *
+ * GET (every APPROVED photo for this box) was removed by #525 — its only
+ * caller was BoxPhotoGrid.tsx, orphaned when #511/PR #521 dropped the photo
+ * grid from the box history page. `/box/<id>/history`'s own approved-photo
+ * read still goes through `loadApprovedPhotosForVenue()` (src/lib/
+ * boxPhotos.ts) directly — see that page's own file, not this route.
  *
  * POST — upload a photo, multipart/form-data (a `photo` File field plus the
  * usual anti-abuse fields — see CHECKIN_KINDS-style guard order below).
@@ -48,23 +54,15 @@
  * Admin alert email mirrors the checkins route's own 'problem'-report
  * email (same Resend sending-key convention, same best-effort try/catch —
  * a Resend outage must never fail an otherwise-successful upload).
- *
- * GET — every APPROVED photo for this box, newest first, capped at
- * MAX_HISTORY_PHOTOS — feeds /box/<id>/history's "Photos" section. Same
- * public-route conventions as GET /api/public/blessing-boxes: no auth,
- * best-effort D1 read via respondWithEdgeCache() (a read failure degrades
- * to an empty list, never a 500, and is never itself cached — see that
- * helper's own header).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { resolveBoxTurnstileKey, verifyBoxTurnstile } from "@/lib/boxTurnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
-import { insertPendingPhoto, loadApprovedPhotosForVenue, MAX_HISTORY_PHOTOS, MAX_PHOTO_BYTES } from "@/lib/boxPhotos";
+import { insertPendingPhoto, MAX_PHOTO_BYTES } from "@/lib/boxPhotos";
 import { InvalidJpegError, readJpegDimensions, stripMetadataSegments, verifyJpegMagic } from "@/lib/jpegSegments";
 import { logFormFailure } from "@/lib/logger";
-import { respondWithEdgeCache, type BestEffortResult } from "@/lib/edgeCache";
 
 export const dynamic = "force-dynamic";
 
@@ -309,34 +307,4 @@ export async function POST(
   }
 
   return NextResponse.json({ ok: true, photoId });
-}
-
-async function loadApprovedPhotosBestEffort(
-  db: D1Database,
-  boxId: string,
-): Promise<BestEffortResult<{ photos: { id: number; createdAt: string }[] }>> {
-  try {
-    const photos = await loadApprovedPhotosForVenue(db, boxId, MAX_HISTORY_PHOTOS);
-    return { data: { photos }, degraded: false };
-  } catch (err) {
-    logFormFailure("checkin_photo", "db_write_failed", {
-      message: err instanceof Error ? err.message : "unknown error (box_photos list read)",
-    });
-    return { data: { photos: [] }, degraded: true };
-  }
-}
-
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<Response> {
-  const { id: boxId } = await params;
-  return respondWithEdgeCache(req, async () => {
-    try {
-      const { env } = getCloudflareContext();
-      return await loadApprovedPhotosBestEffort(env.ADMIN_DB, boxId);
-    } catch {
-      return { data: { photos: [] }, degraded: true };
-    }
-  });
 }

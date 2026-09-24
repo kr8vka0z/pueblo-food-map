@@ -57,7 +57,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
+import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
 import { computeBoxEventWrites, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";

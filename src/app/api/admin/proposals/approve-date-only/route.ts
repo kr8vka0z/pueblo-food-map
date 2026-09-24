@@ -58,7 +58,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
+import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { applyApprovedProposal, isDateOnlyUpdateProposal, parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
 import { D1_MAX_BOUND_PARAMS, chunkArray } from "@/lib/d1";

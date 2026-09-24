@@ -28,11 +28,17 @@ export { pfpVenues } from "@/data/pfp-venues";
 // opinion (`undefined`, the publish serializer's mapping for a NULL D1
 // column — publishVenues.ts).
 //
-// INTERIM STATE, not the final form: published-venues.ts won't actually
-// carry non-undefined accepts_snap/accepts_wic for the 49 venues this
-// overlay covers until 0014 lands on production and an admin clicks
-// Publish (AGENTS.md's promotion checklist) — until then this guard is a
-// no-op and behavior is unchanged from before. Once that publish happens,
+// INTERIM STATE, not the final form: published-venues.ts carries
+// non-undefined accepts_snap for only 2 of the 49 venues this overlay
+// covers today (osm-node-12599529644, osm-way-971896407 — both `true`,
+// coincidentally matching the overlay's own guess, accepts_wic still
+// undefined on both) — verified by direct comparison against
+// benefit-flags.ts, not assumed. So this guard is NOT a pure no-op: for
+// those 2 rows, 0014 will fill the still-NULL accepts_wic and bump
+// updated_at the moment it's applied (not deferred to "the next publish"),
+// even with zero new admin edits. For the other 47, the guard is inert
+// until 0014 lands on production AND an admin clicks Publish (AGENTS.md's
+// promotion checklist). Once that publish happens for all 49,
 // benefit-flags.ts, this overlay application, and scripts/match-benefits.py
 // all become dead weight and should be deleted (documented as the next
 // step in AGENTS.md's promotion checklist) — the same information then
@@ -40,10 +46,10 @@ export { pfpVenues } from "@/data/pfp-venues";
 //
 // Exported (not inlined into the .map() below) so venuesBenefitOverlay.test.ts
 // can exercise both branches — overlay fills an unset field, overlay never
-// overwrites an already-set one — directly with synthetic fixtures. Today's
-// real publishedVenues data only ever exercises the "fill" branch (see the
-// INTERIM STATE note above), so a real-data test alone can't prove the
-// "admin edits win" half of #238's acceptance criterion.
+// overwrites an already-set one — directly with synthetic fixtures, rather
+// than relying on the 2 real rows above (which only cover accepts_snap,
+// never accepts_wic, and could change out from under a real-data test on
+// the next publish).
 export function withBenefitFlagsOverlay(v: Venue, f: { snap: boolean; wic: boolean } | undefined): Venue {
   if (!f) return v;
   return {

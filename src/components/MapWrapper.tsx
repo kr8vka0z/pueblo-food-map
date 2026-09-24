@@ -1408,7 +1408,7 @@ export default function MapWrapper({
       }
     },
     // filteredVenues reference is stable between renders with same query/filters.
-    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap, mapUnavailable, boxIdSet, router],
+    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap, mapUnavailable, boxIdSet, router, setSelectedVenueId, setWindowExpanded],
   );
 
   // Select a venue from the Saved list (#132 9c). Clears active filters + search
@@ -1429,7 +1429,7 @@ export default function MapWrapper({
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [boxIdSet, handleClearAllFilters, isMobile, mapUnavailable, router, showVenueOnMap],
+    [boxIdSet, handleClearAllFilters, isMobile, mapUnavailable, router, showVenueOnMap, setSelectedVenueId, setWindowExpanded],
   );
 
   /** Called when user clicks/taps a result row inside the popover. */
@@ -1445,7 +1445,7 @@ export default function MapWrapper({
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     },
-    [boxIdSet, isMobile, mapUnavailable, router, showVenueOnMap],
+    [boxIdSet, isMobile, mapUnavailable, router, showVenueOnMap, setSelectedVenueId, setWindowExpanded],
   );
 
   // Select a venue from the list (#129) — switch back to the map, centered on it.
@@ -1462,7 +1462,7 @@ export default function MapWrapper({
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [boxIdSet, isMobile, mapUnavailable, router, showVenueOnMap],
+    [boxIdSet, isMobile, mapUnavailable, router, showVenueOnMap, setSelectedVenueId, setWindowExpanded],
   );
 
   // A box pin now opens the SAME in-map card every other venue uses

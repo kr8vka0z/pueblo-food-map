@@ -188,7 +188,7 @@ describe("/api/admin/blessing-boxes/[id]/host-alerts", () => {
     // existingHost fixture matches regardless of exact args passed to the
     // fake SELECT (it's keyed on venue only) — this test proves parseEmail
     // doesn't reject/mangle the value; the route-level normalization is
-    // covered directly by rateLimit.test.ts's normalizeEmail suite.
+    // covered directly by email.test.ts's normalizeEmail suite.
     expect(res.status).toBe(200);
     expect((await res.json()).result).toBe("already");
   });

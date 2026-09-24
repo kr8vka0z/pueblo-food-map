@@ -10,8 +10,10 @@
 
 A static, mobile-first civic web map of free and low-cost food resources in
 Pueblo County, Colorado. The audience is low-income and food-insecure
-residents, many of whom are Spanish-speaking. Venue data is served from
-static TypeScript modules committed to the repo — no backend database.
+residents, many of whom are Spanish-speaking. Venues are edited in a
+Cloudflare D1 database through the admin panel and published into a static
+TypeScript snapshot the build imports, so the public map makes no runtime
+venue fetch (blessing boxes are the one exception — read live from D1).
 Visual identity is codified in [DESIGN.md](DESIGN.md) (agent-facing token
 mirror and aesthetic guide; `globals.css @theme` is the canonical token source).
 
@@ -48,7 +50,7 @@ Shared utility components
   └── src/components/SiteFooter.tsx  (slim nav footer on utility pages: /about, /privacy, /suggest, /feedback)
 
 Next.js App Router (Cloudflare Worker, SSR)
-  └── src/app/layout.tsx      (reads pfm-locale cookie; wraps with LocaleProvider)
+  └── src/app/layout.tsx      (metadata, font preload; wraps with LocaleProvider — reads no cookie)
   └── src/app/page.tsx        (splash gate; mounts MapWrapper)
   └── src/app/about/page.tsx  (mission, vision, origin story, venue sourcing — #155)
   └── src/app/resources/page.tsx  (food help programs: 2-1-1, SNAP, WIC, Double Up,
@@ -61,12 +63,11 @@ Next.js App Router (Cloudflare Worker, SSR)
   └── DirectionButtons.tsx  (Walk / Bus / Drive buttons; Walk triggers in-app route + the WalkStepper step-through panel (#555, one turn at a time, Back/Next, "All turns" disclosure) + "Open in Google Maps" walk handoff; Bus/Drive open Google Maps)
 
 Data layer (static TS modules, no API calls at render time)
-  └── src/data/venues.ts          (aggregator — see "Data aggregator" below)
-  └── src/data/published-venues.ts    (the publish snapshot — see "Data aggregator" below)
-  └── src/data/pfp-venues.ts      (hand-curated PFP records; leaf module, see below)
-  └── src/data/grocery-osm.ts     (OSM Overpass, auto-generated)
-  └── src/data/pantries-plentiful.ts  (Plentiful directory, auto-generated)
-  └── src/data/benefit-flags.ts   (SNAP/WIC overlay, auto-generated)
+  └── src/data/venues.ts          (public venue list — see "Data aggregator" below)
+  └── src/data/published-venues.ts    (D1 snapshot written by admin Publish)
+  └── src/data/benefit-flags.ts   (SNAP/WIC overlay, interim — see below)
+  └── src/data/pfp-venues.ts, grocery-osm.ts, pantries-plentiful.ts
+        (source arrays; not read by the public map since the #237 cutover)
   └── src/types/venue.ts          (canonical Venue type)
 
 Lib
@@ -79,11 +80,8 @@ Lib
   └── src/lib/distance.ts         (Haversine distance)
   └── src/lib/searchVenues.ts     (text search over filtered venue list)
 
-Scripts (run locally; never imported by the app)
-  └── scripts/ingest-osm-grocery.py   (Overpass → grocery-osm.ts)
-  └── scripts/scrape-plentiful.py     (Plentiful → pantries-plentiful.ts)
-  └── scripts/match-benefits.py       (USDA FNS + CDPHE → benefit-flags.ts)
-  └── scripts/geocode-pfp.py          (Nominatim geocoder for PFP venues)
+Scripts (never imported by the app) — every one is listed, with run order,
+in scripts/README.md
 ```
 
 ---
@@ -91,56 +89,48 @@ Scripts (run locally; never imported by the app)
 ## Data aggregator pattern
 
 All venue data is served from a single export: `venues` in
-`src/data/venues.ts`. Components never import from `grocery-osm.ts` or
-`pantries-plentiful.ts` directly.
-
-The aggregator reads a single publish snapshot (`published-venues.ts`),
-then applies SNAP/WIC flags as a separate overlay:
+`src/data/venues.ts`. Components never import `published-venues.ts` or the
+source arrays directly.
 
 ```
-pfpVenues          (hand-curated, src/data/pfp-venues.ts)
-groceryOsmVenues   (auto-generated from OSM Overpass query)
-plentifulPantries  (auto-generated from Plentiful directory scrape)
-           ↓
-publishedVenues = [...pfpVenues, ...groceryOsmVenues, ...plentifulPantries]
-           (src/data/published-venues.ts)
-           ↓ .map()
-           + benefitFlags overlay (keyed by id; sourced from USDA FNS + CDPHE)
+Cloudflare D1 `venues` (status draft/published, category != blessing_box)
+           ↓  admin clicks Publish → POST /api/admin/publish
+           ↓  (src/lib/publishVenues.ts: snapshot, validate, commit via a
+           ↓   publish-bot PR, then promote drafts in D1)
+src/data/published-venues.ts   (literal Venue[] array + publishedAt)
+           ↓ .map(withBenefitFlagsOverlay)
+           + benefitFlags overlay (keyed by id; fills only fields D1 left unset)
            ↓
 export const venues: Venue[]   (src/data/venues.ts)
 ```
 
-**`published-venues.ts` is also the #237 admin publish target.** Today
-(pre-cutover) it's a one-time hand-authored snapshot of the same three
-source arrays, byte-identical to what `venues.ts` computed inline before
-this indirection existed (proved by `src/__tests__/publishedVenues.test.ts`).
-Once the Cloudflare D1 admin write path is live, this file's entire content
-is regenerated by `POST /api/admin/publish` from D1 instead — a literal
-`Venue[]` array, no longer an import of the three source arrays — and D1
-becomes the single source of truth for every venue. Either way, `venues.ts`
-reads it the exact same way: a build-time static ESM import, zero runtime
-fetch. See `AGENTS.md`'s "Publish → static" section for the operational
-detail (the commit/PR/auto-merge mechanism, the NB1 ordering guarantee) and
+**D1 is the source of truth; `published-venues.ts` is its build-time
+snapshot.** Since the #237 admin cutover the file is regenerated in full by
+every Publish (its own header says do not hand-edit). `venues.ts` reads it as
+a static ESM import, so the public map does no runtime venue fetch and the
+pages stay statically cacheable. The snapshot is ordered by `id`
+(`fetchPublishSnapshot`, `publishVenues.ts`). Publish mechanics and the
+commit-before-D1-write ordering: [AGENTS.md](AGENTS.md) "Admin panel — venue CRUD, publish, submissions", and
 `docs/admin/cloudflare-native-admin-spec.md` for the full design.
 
-**Why PFP first:** hand-curated venues carry richer metadata (notes,
-partnerships, operator field). Ordering PFP first means any future
-de-duplication pass will prefer the richer record.
+**The source arrays no longer feed the map.** `pfp-venues.ts` (10
+hand-curated Pueblo Food Project records), `grocery-osm.ts`, and
+`pantries-plentiful.ts` are still committed and still regenerated by the
+scrapers, but only `scripts/seed-admin-db.ts` (the one-time #237 D1 seed),
+tests, and the refresh pipeline's diff read them now — see "Automated
+venue-refresh pipeline" below.
 
-**Why `pfpVenues` lives in its own file (`pfp-venues.ts`), not inline in
-`venues.ts`:** `venues.ts` imports FROM `published-venues.ts`, and
-`published-venues.ts` needs `pfpVenues` — leaving that data defined inside
-`venues.ts` would make the two files import each other (a circular
-dependency that throws at module load, since `published-venues.ts` would
-read `pfpVenues` before `venues.ts`'s own top-level code reached its
-declaration). `venues.ts` still re-exports `pfpVenues` unchanged so nothing
-that imports it from there needs to change.
+**Benefit flags are an interim overlay.** SNAP/WIC acceptance used to live
+only in `benefit-flags.ts` so it survived scraper regeneration (#127).
+Migration `0014` copies it into D1, where it is admin-editable (#597); until
+that migration is on production and a Publish has run, the overlay fills
+only fields the snapshot leaves unset, so an admin's D1 value always wins.
+`venues.ts`'s header has the full interim-state explanation and the
+follow-up deletion plan (also in AGENTS.md's promotion checklist).
 
-**Why benefit flags are separate:** the auto-generated OSM and Plentiful data
-is regenerated periodically by re-running the scripts. Storing SNAP/WIC
-acceptance inline would lose the flags every time the data is regenerated.
-The `benefit-flags.ts` overlay survives regeneration because it is keyed by
-stable venue `id` and merged on top at aggregation time (see issue #127).
+**Blessing boxes bypass this entirely** — they are read live from D1 at
+request time (AGENTS.md "Blessing Boxes"), so an admin edit shows without a
+Publish.
 
 **Canonical type:** `src/types/venue.ts` defines the `Venue` interface and
 `VenueCategory` union. Every data source conforms to this type; there is no
@@ -150,9 +140,7 @@ source-specific type.
 
 ## Automated venue-refresh pipeline
 
-**The gap this closes:** `pfpVenues`, `groceryOsmVenues`, and
-`plentifulPantries` above are described as "auto-generated by re-running the
-scripts" — but since the #237 D1 cutover, re-running `scripts/scrape-plentiful.py`
+**The gap this closes:** since the #237 D1 cutover, re-running `scripts/scrape-plentiful.py`
 or `scripts/ingest-osm-grocery.py` only overwrites those two source `.ts`
 files, which nothing in the app reads anymore (`venues.ts` reads
 `published-venues.ts`, a D1 snapshot — see "Data aggregator pattern" above).
@@ -360,14 +348,35 @@ EN and ES dictionaries live in `src/lib/i18n.ts` as plain `Record<string, string
 objects. `t(key, locale, vars?)` looks up the ES dict first, falls back to EN
 if a key is missing.
 
-**Locale persistence:** `LocaleContext` (`src/lib/LocaleContext.tsx`) holds the
-active locale in React state and writes it to the `pfm-locale` cookie on
-change. `layout.tsx` reads the cookie server-side so the initial SSR render
-uses the user's preference — avoiding an EN flash for Spanish-language users.
+**Locale is client-side only.** `LocaleContext` (`src/lib/LocaleContext.tsx`)
+holds the active locale in React state and writes it to the `pfm-locale`
+cookie on change. No route reads that cookie on the server: `layout.tsx`
+renders `<LocaleProvider>` with no `initialLocale`, so every page renders
+(and is prerendered) in English, and the provider switches to the saved
+locale from `document.cookie` in an effect after hydration (#289). A Spanish
+visitor therefore sees English briefly on a hard page load. The reason is
+#287: a server-side `cookies()` read makes a route dynamic and loses the
+static edge caching these pages depend on (see AGENTS.md "Discoverability /
+SEO" for the outage that makes this constraint load-bearing).
 
-**`<title>` (#589):** Next.js Metadata renders `<title>` once, server-side,
-always in English (`buildPageMetadata`/`generateMetadata`, `src/lib/site.ts`)
-— the locale cookie above only ever affects a page's *body*. `useDocumentTitle`
+**Known bilingual limitation — what is and isn't localized.** This is the
+one place it's stated; code comments point here.
+
+| Surface | Language |
+|---|---|
+| Visible page body (every public page, incl. /about and /privacy) | Visitor's locale, via `useLocale()` in each page's client "Content" component (#289) |
+| `<title>` | Visitor's locale, corrected client-side after hydration (#589, #605, #610 — below); `/venue/[id]` deliberately keeps its English server title (#287) |
+| `<meta>` description, OpenGraph/Twitter tags | English always (#287) |
+| JSON-LD (venue schema, /about's FAQPage) | English always (#386) — built server-side with a hardcoded `"en"` |
+| URLs | One URL per page for both locales; no `/es` tree or `hreflang` (deferred, #164) |
+
+Crawlers therefore index English metadata. A separate `/es` route tree is the
+only way to change that, and it's an SEO decision, not a content one — the
+visible content is already bilingual.
+
+**`<title>` (#589; client-side fix #605, self-heal #610):** Next.js Metadata
+renders `<title>` once, server-side, always in English
+(`buildPageMetadata`/`generateMetadata`, `src/lib/site.ts`). `useDocumentTitle`
 (`src/lib/useDocumentTitle.ts`) is the separate client-side mechanism that
 corrects `<title>` for the current locale after hydration and on a live
 EN↔ES toggle; every localized page's "Content" component calls it with a
@@ -454,10 +463,9 @@ left to extract.
 The map renders via `mapbox-gl` v3 + `react-map-gl` v8 (import path
 `react-map-gl/mapbox`), using the `streets-v12` Mapbox hosted basemap style.
 
-**Why Mapbox over Leaflet:** the app was migrated from react-leaflet to
-react-map-gl / Mapbox GL JS (README: "Phase 2 complete (Mapbox migration)").
-The commit that performed this migration is not present in the current
-shallow git history. See open questions below.
+**Replaced Leaflet:** the app moved from react-leaflet to react-map-gl /
+Mapbox GL JS in May 2026 (#44–#48). The issues and commits record the swap,
+not the reason for it.
 
 **SSR exclusion and TBT reduction:** `mapbox-gl` calls `globalThis` and
 requires a WebGL canvas; it cannot run server-side. `MapWrapper.tsx` uses
@@ -547,9 +555,9 @@ The app is a Next.js App Router project compiled for Cloudflare Workers by
 the App Router output (server components, route handlers, edge runtime) into
 a Workers-compatible bundle.
 
-**Why Cloudflare Workers over Vercel:** the project migrated off Vercel to
-Cloudflare Workers Builds. The reason for this migration is not in the
-current shallow git history; see open questions below.
+**Replaced Vercel:** the project moved off Vercel to Cloudflare in May 2026
+(Vercel decommissioned in #42/#53). The issues and commits record the move,
+not the reason for it.
 
 **CI/CD:** deploys run through GitHub Actions, not Cloudflare Workers
 Builds — the dashboard connection was disconnected when
@@ -589,12 +597,11 @@ many Worker isolates concurrently, so an in-process `Map` only ever saw a
 fraction of real traffic; see that file's header for the full reasoning.
 
 **Environment variables:** `NEXT_PUBLIC_*` vars are baked into the client
-bundle at build time — set them as **build variables** (Settings → Build →
-Build variables) before triggering a build. Workers Builds has one shared
-build-variable set and a single `production` environment; there is no separate
-Preview environment (that's a Cloudflare Pages concept). Runtime secrets
-(`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`) are set separately under Settings
-→ Variables and Secrets.
+bundle at build time, so they are GitHub Actions repo secrets injected into
+the `deploy-prod.yml`/`deploy-dev.yml` build (not Cloudflare dashboard build
+variables — that was only true under Workers Builds). Runtime secrets
+(`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, …) are `wrangler secret put` on
+the Worker and read at request time.
 
 See [AGENTS.md](AGENTS.md) for deploy, rollback, env-var management, and
 Mapbox token management.
@@ -794,8 +801,8 @@ admin-only columns included, but is a deliberately separate type from
 shape, with `category` loosely typed as `string`). Unifying them would mean
 `src/types/venue.ts` — today a zero-import leaf module every data source
 conforms to — importing from a `lib/` module, risking the same circular
-import this codebase already hit once (see "Why `pfp-venues.ts` lives in
-its own file" above); a few duplicated field names is cheaper than that
+import this codebase already hit once (`src/data/pfp-venues.ts`'s header
+explains that one); a few duplicated field names is cheaper than that
 failure mode.
 
 **`/admin/boxes` (src/app/admin/boxes/page.tsx)** is the Blessing Boxes tab
@@ -976,8 +983,8 @@ resulting `{ newDrafts, editedSincePublish, archived }` to `PublishPanel`
 (src/components/PublishPanel.tsx, rendered above `VenueListView` so the
 admin sees "what will publish" before scrolling the list) as one typed
 prop. `PublishPanel` holds no auth of its own, same as `AddVenueForm` and
-`ArchiveVenueButton` — the page's Server Component owns the Cloudflare
-Access gate, and the route re-verifies identity + Origin itself.
+`ArchiveVenueButton` — the page's Server Component owns the Better Auth
+gate (`getAdminDb()`), and the route re-verifies the session + Origin itself.
 
 **Why `archived` only counts previously-published rows.** A venue can be
 archived from either `draft` or `published`. Only the latter is a real
@@ -1107,21 +1114,3 @@ deliberately lossy-but-safe: hours/contact/submitter email have no
 dedicated `AddVenueForm` fields, so they fold into the free-text notes
 field under a labeled separator rather than being silently dropped — the
 admin reads and edits notes before saving either way.
-
----
-
-## Open questions
-
-These could not be confirmed from the current git history or code comments.
-They need an answer from the author before they can be documented as facts.
-
-- **Why Mapbox over Leaflet (specific reason)?** The README notes "Phase 2 complete
-  (Mapbox migration)" but the migration commit is not in the shallow worktree
-  history. Likely reasons: vector tiles, smoother animations, better mobile
-  performance — but this should not be asserted without confirmation.
-
-- **Why Cloudflare Workers over Vercel (specific reason)?** The project
-  description notes a migration from Vercel, confirmed in the project memory
-  entry (2026-06-17), but the reason is not in the current code or visible
-  history. Possible reasons: cost, Workers-native Turnstile, edge runtime
-  semantics — unconfirmed.

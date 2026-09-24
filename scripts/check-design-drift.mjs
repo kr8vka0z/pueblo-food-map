@@ -341,7 +341,7 @@ function collectSourceFiles(dir, results = []) {
  * a brand-new file introducing `var(--color-ink-300)` for the first time
  * would pass silently, because the NAME was already exempt somewhere else —
  * the exemption has to be tied to the exact site captured at authoring time,
- * so it protects only the 20 original (file, token) pairs and nothing else
+ * so it protects only the 21 original (file, token) pairs and nothing else
  * with that name, in that file or any other.
  */
 function grandfatherKey(rel, varName) {

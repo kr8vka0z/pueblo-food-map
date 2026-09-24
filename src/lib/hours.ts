@@ -525,3 +525,43 @@ export function formatIrregularOccurrence(
   const timeLabel = parsed ? formatTime(Math.floor(parsed.open / 60), parsed.open % 60) : occurrence.slot;
   return `${dateLabel}, ${timeLabel}`;
 }
+
+/**
+ * Describes one IrregularSchedule entry as prose — "4th Tue of each month,
+ * 11am – 12pm" — for the venue detail views that list the RULE itself
+ * (BottomSheet/DesktopVenueWindow's HoursList, the static /venue/[id] page),
+ * as opposed to formatIrregularOccurrence()'s resolved next-DATE line above.
+ *
+ * `t` is injected (src/lib/i18n.ts's own `t()`, passed by the caller) rather
+ * than imported directly — keeps this file free of a hard i18n.ts dependency
+ * (matching formatSlot's own "English am/pm regardless of page locale"
+ * convention for the time portion, documented at that function) while still
+ * sharing ONE implementation across every caller instead of each duplicating
+ * this string assembly and risking the two drifting apart.
+ */
+export function describeIrregularSchedule(
+  entry: IrregularSchedule,
+  locale: "en" | "es",
+  t: (key: string, locale: "en" | "es", vars?: Record<string, string>) => string,
+): string {
+  const slotsLabel = entry.slots.length > 0 ? entry.slots.map(formatSlot).join(", ") : "";
+
+  let base: string;
+  if (entry.recurrence === "monthly_ordinal" && entry.weekday && entry.ordinal) {
+    const ordinalLabel = t(`hours.irregular.ordinal.${entry.ordinal}`, locale);
+    const weekdayLabel = t(`day.${entry.weekday}`, locale);
+    base = t("hours.irregular.monthlyOrdinal", locale, {
+      ordinal: ordinalLabel,
+      weekday: weekdayLabel,
+      slots: slotsLabel,
+    });
+  } else if (entry.recurrence === "monthly_date" && entry.day_of_month) {
+    base = t("hours.irregular.monthlyDate", locale, { day: String(entry.day_of_month), slots: slotsLabel });
+  } else {
+    // "other" (or a malformed computable-recurrence entry missing its own
+    // required field) — the note is the only thing left to show.
+    return entry.note ?? "";
+  }
+
+  return entry.note ? `${base} — ${entry.note}` : base;
+}

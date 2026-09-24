@@ -140,6 +140,48 @@ describe("buildVenueJsonLd", () => {
     expect("openingHoursSpecification" in ld).toBe(false);
   });
 
+  // #400: schema.org's OpeningHoursSpecification has no ordinal-monthly
+  // form — an irregular-only venue must never fake one (venueSchema.ts's
+  // own doc comment).
+  test("openingHoursSpecification absent for an irregular-only venue (no invented schema.org shape)", () => {
+    const venueWithoutHours = venues.find((v) => !v.hours_weekly)!;
+    const irregularOnly = {
+      ...venueWithoutHours,
+      hours_weekly: undefined,
+      hours_irregular: [
+        {
+          recurrence: "monthly_ordinal" as const,
+          ordinal: 4 as const,
+          weekday: "tue" as const,
+          slots: ["11:00-12:00"],
+        },
+      ],
+    };
+    const ld = buildVenueJsonLd(irregularOnly);
+    expect("openingHoursSpecification" in ld).toBe(false);
+  });
+
+  test("openingHoursSpecification carries only the weekly specs when both weekly and irregular are present", () => {
+    const venueWithHours = venues.find(
+      (v) => v.hours_weekly && Object.keys(v.hours_weekly).length > 0,
+    )!;
+    const both = {
+      ...venueWithHours,
+      hours_irregular: [
+        {
+          recurrence: "monthly_ordinal" as const,
+          ordinal: 4 as const,
+          weekday: "tue" as const,
+          slots: ["11:00-12:00"],
+        },
+      ],
+    };
+    const withoutIrregular = { ...venueWithHours, hours_irregular: undefined };
+    expect(buildVenueJsonLd(both)["openingHoursSpecification"]).toEqual(
+      buildVenueJsonLd(withoutIrregular)["openingHoursSpecification"],
+    );
+  });
+
   test("no null or undefined values in the object", () => {
     for (const venue of venues.slice(0, 10)) {
       const ld = buildVenueJsonLd(venue);

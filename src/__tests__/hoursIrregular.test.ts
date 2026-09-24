@@ -24,7 +24,9 @@ import {
   computeVenueOpenStatus,
   nextIrregularOccurrence,
   formatIrregularOccurrence,
+  describeIrregularSchedule,
 } from "@/lib/hours";
+import { t } from "@/lib/i18n";
 import type { IrregularSchedule } from "@/types/venue";
 
 /**
@@ -272,5 +274,37 @@ describe("formatIrregularOccurrence", () => {
     const label = formatIrregularOccurrence(occurrence!, "es");
     expect(label).toContain("oct");
     expect(label).toContain("11am"); // time stays English am/pm, matching formatSlot's existing convention
+  });
+});
+
+// ─── describeIrregularSchedule ──────────────────────────────────────────────
+
+describe("describeIrregularSchedule", () => {
+  test("monthly_ordinal reads as prose in English", () => {
+    expect(describeIrregularSchedule(fourthTuesday, "en", t)).toBe("4th Tue of each month, 11am – 12pm");
+  });
+
+  test("monthly_ordinal reads as prose in Spanish", () => {
+    expect(describeIrregularSchedule(fourthTuesday, "es", t)).toBe("4.º Mar de cada mes, 11am – 12pm");
+  });
+
+  test("monthly_date reads as prose", () => {
+    expect(describeIrregularSchedule(day31, "en", t)).toBe("The 31 of each month, 10am – 11am");
+  });
+
+  test("'other' recurrence falls back to the note alone", () => {
+    expect(describeIrregularSchedule(otherOnly, "en", t)).toBe("3rd weekend, call ahead");
+  });
+
+  test("appends a note after a computable schedule's prose", () => {
+    const withNote: IrregularSchedule = { ...fourthTuesday, note: "Enter through the side door" };
+    expect(describeIrregularSchedule(withNote, "en", t)).toBe(
+      "4th Tue of each month, 11am – 12pm — Enter through the side door",
+    );
+  });
+
+  test("'other' with no note returns an empty string, never throws", () => {
+    const bare: IrregularSchedule = { recurrence: "other", slots: [] };
+    expect(describeIrregularSchedule(bare, "en", t)).toBe("");
   });
 });

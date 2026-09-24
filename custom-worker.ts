@@ -20,8 +20,7 @@
 // This file follows the exact same pattern for the three Workers runtime types a
 // scheduled()-handler signature needs — none of which is `Element` or collides with DOM.
 import type { ExecutionContext, ExportedHandler, ScheduledController } from "@cloudflare/workers-types/experimental";
-import { runEmailRetentionCleanup, shouldRunEmailRetention, EmailRetentionPartialFailure } from "./src/lib/emailRetention";
-import { logEmailRetentionResult, logEmailRetentionFailure } from "./src/lib/logger";
+import { runScheduledTasks } from "./src/lib/emailRetention";
 //
 // WHY `@ts-ignore` (not `@ts-expect-error`) on the imports below: .open-next/worker.js
 // is produced by `opennextjs-cloudflare build` and does not exist in a fresh checkout —
@@ -62,40 +61,15 @@ export default {
   // and the reason it does a bare heartbeat too). The cron firing at all already proves
   // the worker is alive and scheduled; that IS the liveness signal. Pinging the success
   // URL unconditionally is the correct, simpler design.
+  // The ping (HC_PING_URL guard, prod-only secret, never gates anything else) and
+  // the #594 email retention cleanup (gated to one of the 288 daily cron ticks) both
+  // live in runScheduledTasks (src/lib/emailRetention.ts) — moved out of this file
+  // specifically so the branching itself is unit-testable. This file's own imports
+  // (.open-next/worker.js, generated build output) mean vitest can never import
+  // custom-worker.ts directly, so nothing here can carry test coverage; see
+  // emailRetention.ts's own header on runScheduledTasks for the full reasoning.
   async scheduled(event: ScheduledController, env: CloudflareEnv, ctx: ExecutionContext) {
-    // Guard: HC_PING_URL is a prod-only runtime secret (`wrangler secret put`, see
-    // wrangler.jsonc) — staging never gets it, and a missing value must never throw
-    // out of a cron handler, so bail out instead of fetching "undefined". This guard
-    // covers ONLY the ping — it must never gate the email-retention cleanup below,
-    // or a missing secret would silently stop retention from ever running too.
-    if (env.HC_PING_URL) {
-      ctx.waitUntil(fetch(env.HC_PING_URL).catch(() => {}));
-    }
-
-    // Email retention cleanup (#594) — rides this same 5-minute cron rather than a
-    // second trigger, gated to one of the 288 daily ticks (shouldRunEmailRetention)
-    // so D1 isn't hit 288x/day for a job that only needs to run once. Independent
-    // `ctx.waitUntil` from the ping above (not awaited before it, not chained after
-    // it) so a slow or failing cleanup can never delay or break the heartbeat the
-    // dead-man's-switch depends on — its own .catch logs and swallows, same as the
-    // ping's above.
-    if (shouldRunEmailRetention(event.scheduledTime)) {
-      ctx.waitUntil(
-        runEmailRetentionCleanup(env.ADMIN_DB)
-          .then(logEmailRetentionResult)
-          .catch((err) => {
-            // A partial failure still carries the counts of whichever
-            // statements DID succeed (emailRetention.ts's own per-statement
-            // isolation) — log those too, or a real cleanup that mostly
-            // worked would show up in the logs as pure failure with no
-            // record of what it actually did.
-            if (err instanceof EmailRetentionPartialFailure) {
-              logEmailRetentionResult(err.counts);
-            }
-            logEmailRetentionFailure(err instanceof Error ? err.message : String(err));
-          }),
-      );
-    }
+    runScheduledTasks(event, env, ctx);
   },
 } satisfies ExportedHandler<CloudflareEnv>;
 

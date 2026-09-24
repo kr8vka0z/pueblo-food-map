@@ -30,9 +30,9 @@ performance).
 4. **Weak-phone test loop** — any visible change gets checked against a low-end
    phone before it ships (see DESIGN.md "Low-end device guardrails" for the full
    target profile and budgets):
-   - Run the `device-sweep` skill (360px width plus a spread of real iOS/Android
-     sizes, flags JS errors and sideways scrolling), or check manually at 360px
-     wide with the browser toolbar visible.
+   - In Chrome DevTools device mode, check at 360×740 and 375×667 with the
+     browser toolbar visible: no console errors, no sideways scrolling, nothing
+     hidden behind the bottom bar.
    - In Chrome DevTools, throttle CPU to **4×** and network to **Slow 4G**, and
      re-check the interaction that changed.
 5. Open a pull request against `main`. CI runs lint, typecheck, tests, and

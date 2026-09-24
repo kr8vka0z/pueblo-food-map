@@ -188,8 +188,9 @@ button added to the home/map screen (below) must fit inside a documented safe zo
 
 **Touch targets:** minimum **48×48 CSS px**, with spacing so neighbouring controls
 aren't mis-tapped (WCAG 2.2 SC 2.5.8's 24×24 floor is the *compliance* minimum, not
-this project's target — see `~/.agents/skills/design/references/mobile.md` for the
-full spacing-exception math). A control smaller than 48×48 needs its tap area
+this project's target: 24px only passes if each target also has 24px of clear space
+around it, which a crowded map screen can't guarantee, and Android's Material and
+Apple's HIG both recommend ~48px / 44pt for thumbs). A control smaller than 48×48 needs its tap area
 enlarged with padding or an invisible `::before`/`::after` overlay — never shrink the
 visual size to hit the number.
 
@@ -263,8 +264,10 @@ here.
 
 **Weak-phone test loop** (added to the pre-ship checklist in `CONTRIBUTING.md`): every
 UI change gets checked at 360px width, CPU-throttled, and network-throttled before
-merge — the `device-sweep` skill (real iOS Safari + a spread of Android sizes) plus
-Chrome DevTools' 4× CPU slowdown and "Slow 4G" network presets locally.
+merge: Chrome DevTools device mode at 360×740 (and an iPhone SE-size 375×667),
+watching the console for errors and checking there's no sideways scroll, plus
+DevTools' 4× CPU slowdown and "Slow 4G" network presets. A real mid-range Android
+or iOS Safari check is better still when one is to hand.
 
 **Safe zones — adding a new control to the home/map screen:** measured at 360×740,
 default state (no venue selected):

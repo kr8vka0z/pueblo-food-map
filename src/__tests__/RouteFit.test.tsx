@@ -278,6 +278,10 @@ describe("#509 review gap — route-fit effect", () => {
     const walkButton = await screen.findByRole(
       "button",
       { name: new RegExp(`Walking directions to ${TEST_VENUE.name}`, "i") },
+      // #588: DesktopVenueWindow is next/dynamic-loaded now; this file's mocked
+      // next/dynamic resolves a real import() inside an effect, which can
+      // exceed findByRole's 1000ms default on a busy CI runner. Timing only.
+      { timeout: 5000 },
     );
     await user.click(walkButton);
 

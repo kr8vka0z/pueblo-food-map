@@ -25,7 +25,7 @@
  * accepts only typed parameters with no free-form string fields.
  */
 
-import type { AccessDeniedReason } from "./cfAccess";
+import type { AccessDeniedReason } from "./adminOrigin";
 // Type-only — erased at compile time, so this does not create a runtime
 // circular import even though emailRetention.ts itself imports
 // logEmailRetentionResult/logEmailRetentionFailure from this file.
@@ -94,8 +94,8 @@ export function logFormFailure(
 
 /**
  * Emit a single-line JSON structured log entry for an admin-surface auth
- * denial (Cloudflare Access JWT missing/invalid/misconfigured — see
- * src/lib/cfAccess.ts). `reason` is the same coarse, machine-readable
+ * denial (bad origin / no session / not allowlisted — see
+ * src/lib/adminOrigin.ts). `reason` is the same coarse, machine-readable
  * classification AccessDeniedError carries — never the token itself, never
  * a claim value. Logged at warn level: most denials are ordinary
  * unauthenticated traffic hitting an admin URL (high volume, low signal,

@@ -126,12 +126,21 @@ const INSERT_COLUMNS = [
   "accepts_snap", "accepts_wic", "phone", "email", "url", "notes", "operator",
   "source", "last_verified", "status", "source_type", "outside_county",
   "created_by", "updated_by", "published_at", "published_by",
+  "created_at", "updated_at",
 ] as const;
 
 /**
- * Builds one INSERT statement for a source record. `created_at`/`updated_at`
- * are intentionally omitted from the column list so the schema's own
- * `DEFAULT (strftime(...))` fills them (spec §7 step 3 mapping).
+ * Builds one INSERT statement for a source record.
+ *
+ * `created_at`/`updated_at`/`published_at` are ALL stamped from the same
+ * `seedTimestamp` (one JS `Date`, read once in `main()`), never left to the
+ * schema's own `DEFAULT (strftime('now'))` (#262). That default runs at SQL
+ * *execution* time, a second or two after this generator ran — so a `NOW()`
+ * `updated_at` ends up a beat AFTER the `published_at` this function writes,
+ * false-firing the admin "Unpublished changes" marker (`updated_at >
+ * published_at`) on every seeded `published` row. Stamping all three from
+ * one clock makes them identical, so `updated_at > published_at` is false
+ * for every freshly-seeded row, same as a real Publish would produce.
  */
 export function buildInsertSql(record: SourceRecord, seedTimestamp: string): string {
   const v = record.venue;
@@ -162,6 +171,8 @@ export function buildInsertSql(record: SourceRecord, seedTimestamp: string): str
     sqlText(SEED_ACTOR_EMAIL),
     sqlText(seedTimestamp),
     sqlText(SEED_ACTOR_EMAIL),
+    sqlText(seedTimestamp),
+    sqlText(seedTimestamp),
   ];
 
   return `INSERT INTO venues (${INSERT_COLUMNS.join(", ")}) VALUES (${values.join(", ")});`;

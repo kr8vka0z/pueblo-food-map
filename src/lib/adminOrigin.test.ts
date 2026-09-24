@@ -1,17 +1,18 @@
 // @vitest-environment node
 /**
  * Tests for requireAdminOrigin() — the CSRF defense that remains in
- * cfAccess.ts after the Better Auth sole-gate cutover
- * (auth/betterauth-sole-gate). This file used to test requireAccessIdentity()
- * (the removed Cloudflare Access JWT verifier) — see git history / cfAccess.ts's
- * own header for what used to live here and why it's gone. requireAdminOrigin()
- * is otherwise exercised end-to-end by every /api/admin/* route's own test
- * file (e.g. src/app/api/admin/venues/route.test.ts's "wrong/missing Origin"
- * case); these are its direct unit tests.
+ * adminOrigin.ts (renamed from cfAccess.ts, #596) after the Better Auth
+ * sole-gate cutover (auth/betterauth-sole-gate). This file used to test
+ * requireAccessIdentity() (the removed Cloudflare Access JWT verifier) —
+ * see git history / adminOrigin.ts's own header for what used to live here
+ * and why it's gone. requireAdminOrigin() is otherwise exercised
+ * end-to-end by every /api/admin/* route's own test file (e.g.
+ * src/app/api/admin/venues/route.test.ts's "wrong/missing Origin" case);
+ * these are its direct unit tests.
  */
 
 import { describe, expect, test } from "vitest";
-import { AccessDeniedError, requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
+import { AccessDeniedError, requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
 
 function headersWith(origin: string | null): HeaderSource {
   return { get: (name: string) => (name === "Origin" ? origin : null) };

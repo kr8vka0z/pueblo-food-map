@@ -31,7 +31,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
+import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { isValidEmail, normalizeEmail } from "@/lib/email";

@@ -193,9 +193,11 @@ scripts/fetch-osm-grocery.py ┤→ scripts/ingest-osm-grocery.py ─┐
   only an explicit **source-owned field allowlist** — e.g. OSM's `address`,
   `operator`, and `hours_weekly` are excluded, because a plain re-run of
   `ingest-osm-grocery.py` never reproduces them (they were populated by a
-  one-off enrichment script, `scripts/scrub-osm-venues.ts`, outside any
-  repeatable pipeline); diffing them would propose wiping every real value
-  back to empty on every run. This was found by actually running the
+  one-off enrichment script, `scripts/scrub-osm-venues.ts` — deleted as
+  dead code by #596 once it had run its course; see commit `c1e4536`
+  /PR #102 for its history — outside any repeatable pipeline); diffing
+  them would propose wiping every real value back to empty on every run.
+  This was found by actually running the
   pipeline end-to-end against local D1, not by inspection — see the
   allowlist's own comment for the specifics.
 - **Every source-owned field genuinely unchanged still produces one
@@ -369,7 +371,16 @@ always in English (`buildPageMetadata`/`generateMetadata`, `src/lib/site.ts`)
 (`src/lib/useDocumentTitle.ts`) is the separate client-side mechanism that
 corrects `<title>` for the current locale after hydration and on a live
 EN↔ES toggle; every localized page's "Content" component calls it with a
-`t()`-composed string.
+`t()`-composed string. A plain `document.title = ...` assignment isn't
+enough on a hard page load: this app's metadata resolves through Next's
+streaming-metadata Suspense boundary, whose chunk can arrive over a real
+network AFTER the hook's own effect and then overwrite `<title>`'s DOM node
+directly (bypassing the `document.title` setter) with the server's English
+value — a genuine timing race with no fixed order, not a one-time head
+start to win. `useDocumentTitle` self-heals instead: a `MutationObserver`
+on `document.head` reapplies the desired title whenever it drifts,
+disconnected on unmount so a later page that deliberately stays English
+(`/venue/[id]`) is never corrected by a stale observer.
 
 **Translation notes:**
 - Mexican / Latin American Spanish throughout (not Castilian).

@@ -13,7 +13,7 @@
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { AccessDeniedError } from "@/lib/cfAccess";
+import { AccessDeniedError } from "@/lib/adminOrigin";
 import type { PublicSubmissionRow } from "@/lib/publicSubmissions";
 import type { ReviewSubmission } from "@/components/SubmissionsReviewView";
 

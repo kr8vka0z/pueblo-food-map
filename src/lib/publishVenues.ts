@@ -4,7 +4,7 @@
  * "PUBLISH PATH", §5 step 5, §8 NB1).
  *
  * Kept separate from src/app/api/admin/publish/route.ts (same pattern as
- * cfAccess.ts/adminDb.ts vs. whoami/route.ts) so the validation, D1, and
+ * adminOrigin.ts/adminDb.ts vs. whoami/route.ts) so the validation, D1, and
  * GitHub-commit logic are unit-testable with plain fixtures and mocked
  * fetch/D1, without needing a live D1 binding or a real GitHub token.
  *

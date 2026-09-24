@@ -15,7 +15,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { AccessDeniedError } from "@/lib/cfAccess";
+import { AccessDeniedError } from "@/lib/adminOrigin";
 
 // Vitest hoists vi.mock() above this file's own imports, so route.ts (via
 // adminDb.ts) picks up the mocked @opennextjs/cloudflare with no dynamic

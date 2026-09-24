@@ -5,8 +5,13 @@
  * behavior that will be correct after the fix. Tests confirm:
  *   1. MapWrapper map-loading fallback renders ES text when locale=es
  *   2. LanguageToggle aria-label on the group uses i18n (EN and ES)
- *   3. CategoryChips group aria-label uses i18n (EN and ES)
- *   4. SuggestForm SNAP/WIC fieldset has a non-empty translated legend
+ *   3. SuggestForm SNAP/WIC fieldset has a non-empty translated legend
+ *
+ * Block 3 (CategoryChips group aria-label) was removed by #596 —
+ * CategoryChips.tsx was deleted as dead code (component built, never wired
+ * into MapWrapper; only this test and two source-scan tests imported it).
+ * Its i18n key `chips.filterByCategory` stays in src/lib/i18n.ts — #596
+ * left unused i18n keys to the mobile-performance issue that owns them.
  */
 
 import { describe, test, expect, vi } from "vitest";
@@ -76,54 +81,6 @@ describe("LanguageToggle group aria-label", () => {
 
   test("i18n key 'lang.toggle.label' ES value differs from EN", () => {
     expect(t("lang.toggle.label", "es")).not.toBe(t("lang.toggle.label", "en"));
-  });
-});
-
-// ─── 3. CategoryChips — group aria-label uses i18n ───────────────────────────
-
-import CategoryChips from "@/components/CategoryChips";
-
-const SAMPLE_COUNTS = { pantry: 10, grocery: 5 };
-
-describe("CategoryChips group aria-label", () => {
-  test("EN: group aria-label matches i18n key 'chips.filterByCategory'", () => {
-    const { container } = render(
-      <CategoryChips
-        selected={null}
-        counts={SAMPLE_COUNTS}
-        totalCount={15}
-        onToggle={vi.fn()}
-        locale="en"
-      />,
-    );
-    const group = container.querySelector("[role='group']");
-    expect(group).not.toBeNull();
-    expect(group!.getAttribute("aria-label")).toBe(t("chips.filterByCategory", "en"));
-  });
-
-  test("ES: group aria-label is in Spanish (not 'Filter by category')", () => {
-    const { container } = render(
-      <CategoryChips
-        selected={null}
-        counts={SAMPLE_COUNTS}
-        totalCount={15}
-        onToggle={vi.fn()}
-        locale="es"
-      />,
-    );
-    const group = container.querySelector("[role='group']");
-    expect(group).not.toBeNull();
-    const label = group!.getAttribute("aria-label") ?? "";
-    expect(label).not.toBe("Filter by category");
-    expect(label).toBe(t("chips.filterByCategory", "es"));
-  });
-
-  test("i18n key 'chips.filterByCategory' EN value is 'Filter by category'", () => {
-    expect(t("chips.filterByCategory", "en")).toBe("Filter by category");
-  });
-
-  test("i18n key 'chips.filterByCategory' ES value differs from EN", () => {
-    expect(t("chips.filterByCategory", "es")).not.toBe(t("chips.filterByCategory", "en"));
   });
 });
 

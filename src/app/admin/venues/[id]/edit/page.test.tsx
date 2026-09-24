@@ -20,7 +20,7 @@
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { AccessDeniedError } from "@/lib/cfAccess";
+import { AccessDeniedError } from "@/lib/adminOrigin";
 import type { AdminVenueRow } from "@/types/venue";
 import type { ClosurePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
 

@@ -271,6 +271,12 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
   const [values, setValues] = useState<AddVenueFormValues>(() => defaultValues(initialValues));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
+  // #568 item 1: a 409 (edit refused — the venue is archived,
+  // PATCH /api/admin/venues/[id]) carries a real, specific `message` the
+  // admin needs to see — the generic "Something went wrong, try again"
+  // below is actively misleading here, since retrying can never succeed.
+  // null for every other error path, which keeps that generic copy.
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [geocodeStatus, setGeocodeStatus] = useState<GeocodeStatus>("idle");
   const [geocodeMessage, setGeocodeMessage] = useState("");
   const [geocodeCandidates, setGeocodeCandidates] = useState<GeocodeMatch[]>([]);
@@ -347,6 +353,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
     }
 
     setErrors({});
+    setErrorMessage(null);
     setStatus("submitting");
 
     const body = {
@@ -428,6 +435,13 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
         return;
       }
 
+      if (res.status === 409) {
+        const data = (await res.json().catch(() => null)) as { message?: string } | null;
+        setErrorMessage(data?.message ?? "This venue can't be edited right now.");
+        setStatus("error");
+        return;
+      }
+
       setStatus("error");
     } catch {
       setStatus("error");
@@ -480,8 +494,14 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
     <form onSubmit={handleSubmit} noValidate className="max-w-2xl space-y-5">
       {status === "error" && (
         <div role="alert" className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3">
-          <p className="text-sm font-medium text-red-700">Something went wrong.</p>
-          <p className="text-sm text-red-600 mt-0.5">The venue was not saved. Try again.</p>
+          {errorMessage ? (
+            <p className="text-sm font-medium text-red-700">{errorMessage}</p>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-red-700">Something went wrong.</p>
+              <p className="text-sm text-red-600 mt-0.5">The venue was not saved. Try again.</p>
+            </>
+          )}
         </div>
       )}
 

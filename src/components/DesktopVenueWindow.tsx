@@ -548,7 +548,10 @@ export default function DesktopVenueWindow({
           rel="noopener noreferrer"
           className={
             "flex items-center justify-between gap-2 w-full px-3 py-2.5 " +
-            "rounded-[var(--radius-md)] border border-[var(--color-sage-300)] " +
+            // #534: --color-sage-300 undefined — sage-500 is DESIGN.md's
+            // own documented border for this chip shape (see BottomSheet's
+            // identical Plentiful-link fix).
+            "rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
             "bg-[var(--color-sage-50)] text-sm font-medium text-[var(--color-sage-700)] " +
             "hover:bg-[var(--color-sage-100)] transition-colors " +
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"

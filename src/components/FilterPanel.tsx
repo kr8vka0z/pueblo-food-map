@@ -98,7 +98,7 @@ function SwitchRow({
   return (
     <div className="flex items-center gap-3 px-5 py-2.5">
       {icon}
-      <span className="flex-1 text-sm font-medium text-[var(--color-ink-800)]">{label}</span>
+      <span className="flex-1 text-sm font-medium text-[var(--color-ink-700)]">{label}</span>
       {count !== undefined && (
         <span className="text-[var(--color-ink-400)] text-xs tabular-nums">{count}</span>
       )}
@@ -274,7 +274,7 @@ export default function FilterPanel({
       >
         {/* Header — title, Clear all (top, per #513), × close */}
         <div className="flex items-center gap-2 px-5 py-4 border-b border-[var(--color-bone-200)]">
-          <h2 id={TITLE_ID} className="flex-1 text-base font-semibold text-[var(--color-ink-800)]">
+          <h2 id={TITLE_ID} className="flex-1 text-base font-semibold text-[var(--color-ink-700)]">
             {t("filters.panel.title", locale)}
           </h2>
           <button
@@ -294,7 +294,7 @@ export default function FilterPanel({
             onClick={close}
             className={
               "flex items-center justify-center w-11 h-11 -m-1.5 rounded-full " +
-              "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-800)] " +
+              "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-700)] " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
               "transition-colors duration-100"
@@ -343,7 +343,7 @@ export default function FilterPanel({
                 key={cat}
                 className={
                   "flex items-center gap-3 px-5 py-2.5 cursor-pointer text-sm font-medium " +
-                  "text-[var(--color-ink-800)] hover:bg-[var(--color-bone-100)] transition-colors duration-100"
+                  "text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] transition-colors duration-100"
                 }
               >
                 <input

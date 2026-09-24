@@ -349,37 +349,14 @@ function grandfatherKey(rel, varName) {
 }
 
 // Pre-existing undefined-token usages found while building this check
-// (2026-09-19, PR for #528/#529) that are OUTSIDE those two issues' scope —
-// 15 files, none of them SearchBar.tsx or FilterPanel.tsx. Grandfathered so
-// this new check can ship without failing the build on bugs it didn't
-// introduce and wasn't asked to fix. Do NOT add to this list going forward:
-// a new violation — including a listed token name appearing in a NEW file,
-// or a second time in a file not listed for it — should fail the build.
-// Fix a token forward by defining it in globals.css or correcting the
-// usage, then delete its line here.
-const GRANDFATHERED_UNDEFINED_COLOR_TOKENS = new Set([
-  grandfatherKey('src/components/AboutContent.tsx', '--color-ink-800'),
-  grandfatherKey('src/components/AddVenueForm.tsx', '--color-ink-300'),
-  grandfatherKey('src/components/AdminLoginForm.tsx', '--color-ink-300'),
-  grandfatherKey('src/components/BottomSheet.tsx', '--color-sage-300'),
-  grandfatherKey('src/components/DesktopVenueWindow.tsx', '--color-sage-300'),
-  grandfatherKey('src/components/DirectionButtons.tsx', '--color-bone-400'),
-  grandfatherKey('src/components/DirectionButtons.tsx', '--color-sage-400'),
-  grandfatherKey('src/components/FeedbackForm.tsx', '--color-ink-300'),
-  grandfatherKey('src/components/FeedbackForm.tsx', '--color-ink-600'),
-  grandfatherKey('src/components/FilterPanel.tsx', '--color-ink-800'),
-  grandfatherKey('src/components/HamburgerMenu.tsx', '--color-ink-600'),
-  grandfatherKey('src/components/HamburgerMenu.tsx', '--color-ink-800'),
-  grandfatherKey('src/components/HamburgerMenuItem.tsx', '--color-ink-800'),
-  grandfatherKey('src/components/ReportForm.tsx', '--color-ink-300'),
-  grandfatherKey('src/components/ReportForm.tsx', '--color-ink-600'),
-  grandfatherKey('src/components/ReportVenueButton.tsx', '--color-ink-300'),
-  grandfatherKey('src/components/ReportVenueButton.tsx', '--color-ink-600'),
-  grandfatherKey('src/components/ResourcesContent.tsx', '--color-ink-800'),
-  grandfatherKey('src/components/SuggestForm.tsx', '--color-ink-300'),
-  grandfatherKey('src/components/SuggestForm.tsx', '--color-ink-600'),
-  grandfatherKey('src/components/VenuesDirectoryContent.tsx', '--color-ink-800'),
-]);
+// (2026-09-19, PR for #528/#529) were grandfathered here so this new check
+// could ship without failing the build on bugs it didn't introduce. #534
+// fixed all 21 (file, token) sites by mapping each to the nearest existing
+// DESIGN.md token — the list is intentionally empty now, not deleted, so a
+// future one-off grandfather (same rationale as #532) has a documented spot
+// to land instead of a raw `if` escape hatch. Do NOT re-add an entry for
+// convenience — only for a genuinely pre-existing bug this check surfaces.
+const GRANDFATHERED_UNDEFINED_COLOR_TOKENS = new Set([]);
 
 const definedColorVars = new Set(
   [...allCssVars.keys()].filter((v) => v.startsWith('--color-'))

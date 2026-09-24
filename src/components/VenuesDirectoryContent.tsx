@@ -55,7 +55,12 @@ export default function VenuesDirectoryContent({ groups }: VenuesDirectoryConten
             <section key={category} aria-labelledby={headingId}>
               <h2
                 id={headingId}
-                className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+                // #534: --color-ink-800 was never defined in globals.css
+                // @theme — DESIGN.md documents ink-700 as the token for
+                // "all body text and headings," which this section heading
+                // is; matches the identical heading pattern already fixed
+                // in AboutContent/ResourcesContent/HamburgerMenu/FilterPanel.
+                className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
               >
                 {t(`category.full.${category}`, locale)}
               </h2>

@@ -437,7 +437,9 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
   // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
   const inputBase =
     "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-    "bg-white placeholder:text-[var(--color-ink-300)] " +
+    // #534: --color-ink-300 undefined — DESIGN.md documents ink-400 as the
+    // placeholder-text token.
+    "bg-white placeholder:text-[var(--color-ink-400)] " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
     "focus-visible:border-[var(--color-sage-500)]";
   const inputBorder = (hasError: boolean) =>

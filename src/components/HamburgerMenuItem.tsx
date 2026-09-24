@@ -44,7 +44,11 @@ export default function HamburgerMenuItem({
 }: HamburgerMenuItemProps) {
   const itemClass =
     "flex items-center gap-2 w-full text-left px-5 py-3 text-sm font-medium " +
-    "text-[var(--color-ink-800)] " +
+    // #534: --color-ink-800 undefined in globals.css @theme — DESIGN.md
+    // documents ink-700 for general body/heading text; ink-900 (the hover
+    // state below) is reserved for venue-name headings elsewhere, reused
+    // here only as the existing darken-on-hover accent.
+    "text-[var(--color-ink-700)] " +
     "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset " +
     "focus-visible:ring-[var(--color-sage-500)] " +

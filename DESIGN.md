@@ -167,6 +167,149 @@ The live Mapbox map is the product. Every other surface is chrome that helps peo
 
 A pre-existing design sidecar (`docs/pueblo-food-map-v2-handoff.md`) documents per-screen navigation wires, state variants, accessibility posture, and the Penpot prototype link. This DESIGN.md consolidates the visual token layer and aesthetic constraints for ongoing builds. Where they overlap, the sidecar is authoritative on behavior; this file is authoritative on tokens and identity.
 
+## Low-end device guardrails (#233)
+
+Pueblo Food Map serves residents facing food insecurity — more likely to be on an
+average, older mid-range Android on a slower connection than a current flagship
+iPhone. Every UI change is reviewed against this profile before merge, and any new
+button added to the home/map screen (below) must fit inside a documented safe zone.
+
+**Target profile:**
+- **Device:** an average mid-range Android, ~2–3 years old — modest CPU/GPU, limited
+  RAM. Not the newest/largest iPhone.
+- **Viewport:** design and test at **360px wide** as the baseline, and verify at
+  short heights with the browser's own address/toolbar chrome showing (a real device
+  loses 80–140px of vertical space to it) — Chrome DevTools' "Moto G Power" preset
+  (360×740) or a manual 360×640 custom size both work; don't test only at a tall
+  360×800 that never happens with the URL bar visible.
+- **Network:** **Slow 4G** (Chrome DevTools network throttling preset — ~400 Kb/s
+  down, 400ms+ RTT). Treat this as the bar, not fast Wi-Fi.
+- **Input:** thumb on glass, one-handed use assumed.
+
+**Touch targets:** minimum **48×48 CSS px**, with spacing so neighbouring controls
+aren't mis-tapped (WCAG 2.2 SC 2.5.8's 24×24 floor is the *compliance* minimum, not
+this project's target: 24px only passes if each target also has 24px of clear space
+around it, which a crowded map screen can't guarantee, and Android's Material and
+Apple's HIG both recommend ~48px / 44pt for thumbs). A control smaller than 48×48 needs its tap area
+enlarged with padding or an invisible `::before`/`::after` overlay — never shrink the
+visual size to hit the number.
+
+**Thumb reach:** primary actions sit low and centre — this is why BottomNav (below)
+replaced the old top-left hamburger and the old `top: 72px` locate pill
+(docs/bottom-nav-spec.md §1). Nothing critical is pinned to the top corners. A new
+persistent control follows the same rule: bottom-centre or joins existing bottom
+chrome, never a lone top-corner icon.
+
+**Browser chrome and safe areas:** `#530` → `#536` → `#541` (all closed except #541,
+which is now the standing behaviour) is the project's own record of getting this
+wrong twice before measuring the real device. The settled facts, now encoded in
+`src/app/globals.css`:
+- A `position: fixed; bottom: 0` element **already sits fully visible above iOS
+  Safari's toolbar**, in both the expanded and collapsed states, in Safari and
+  Chrome — measured on a real iPhone via a throwaway `/viewport-check` diagnostic
+  page (#541). Do not add a `100vh - 100dvh` "toolbar reserve" on top of `bottom: 0`
+  — that was #530/#536's mistake, and it double-counted the toolbar, lifting
+  bottom-pinned chrome 40–74px too high and covering the Mapbox logo.
+  `env(safe-area-inset-bottom)` alone is correct and is all `--bottom-nav-clearance`
+  consumers use.
+  - Also true (unrelated to that reserve, `#530`): `env(safe-area-inset-bottom)`
+    itself reads 0 while the toolbar is expanded, so it is a real add-on, not a
+    substitute, and every bottom-pinned control needs it.
+- `100vh` sizes to the **largest** possible viewport (toolbar assumed collapsed);
+  `100svh` sizes to the **smallest** (toolbar assumed expanded) and never changes as
+  the toolbar animates. Anything pinned to the bottom of the screen (BottomNav,
+  BottomSheet's max-height) sizes against `--viewport-small` (`globals.css`, `100vh`
+  with an `100svh` override behind `@supports`), never a bare `vh` unit — one
+  fallback, in one place. The one documented exception is BottomSheet's route-strip
+  height, which has to match vaul's own `window.innerHeight`-based snap math via
+  `100dvh` instead (see that file's own comment).
+- `env(safe-area-inset-*)` requires
+  `<meta name="viewport" content="... viewport-fit=cover">` — without it the insets
+  read 0 and content sits under the notch/home-indicator silently.
+- Write a plain `vh` fallback line **before** an `svh`/`dvh` line — an unrecognised
+  unit drops the whole CSS declaration in older browsers.
+- Full narrative, including why the naive fix looked right in a screenshot and
+  wasn't: `src/app/globals.css` lines around `--viewport-small` and
+  `[data-bottom-nav]`'s own comment, plus this file's "Layout & Spacing" section
+  above (BottomNav entry) and docs/bottom-nav-spec.md §3.1/§9.
+
+**Legibility:** body text stays at the existing WCAG AAA floor (`ink-700` on
+`bone-50`, 7:1 — see Colors below); don't go lighter or smaller than the sizes in
+Typography. **Any text `<input>` needs a font-size of at least 16px** — iOS Safari
+zooms the whole page in on focus for anything smaller, an undocumented but
+consistent behaviour. SearchBar's input is already `text-base` (16px) on mobile,
+stepping down to `text-sm` only at `md:` and up (desktop, no zoom-on-focus risk) —
+match that pattern for any new mobile text input rather than reusing `sizeBase`
+(14px) below the `md:` breakpoint.
+
+**Page-weight budget:** measured 2026-09-24 against `dev.pueblofoodmap.com`'s `/`
+(splash + bottom nav, default state — the live Mapbox canvas loads lazily behind the
+splash, tracked by #226, so it is not yet on this critical path) — 360×740 viewport,
+mobile Chrome UA, Playwright + Chrome DevTools Protocol `Network.loadingFinished`
+`encodedDataLength` (real transferred/compressed bytes, not decoded body size),
+`networkidle` + 1.5s settle:
+
+| Metric | Current (2026-09-24) | Budget |
+|---|---|---|
+| Total transfer | 380 KB | **≤ 460 KB** |
+| JS transfer | 287 KB | **≤ 340 KB** |
+| Requests | 32 | — (not gated; a request-count spike alongside a byte spike is the real signal) |
+
+Budget is current + ~20% headroom — enough to not fire on every commit, tight enough
+to catch a real regression (an un-lazy-loaded dependency, an unminified vendor
+bundle). Re-measure the same way (same viewport/UA/host/settle time) before changing
+either number; a number nobody can reproduce the same way catches nothing. No CI gate
+enforces this yet — see this issue's tracker for that as a follow-up, not shipped
+here.
+
+**Weak-phone test loop** (added to the pre-ship checklist in `CONTRIBUTING.md`): every
+UI change gets checked at 360px width, CPU-throttled, and network-throttled before
+merge: Chrome DevTools device mode at 360×740 (and an iPhone SE-size 375×667),
+watching the console for errors and checking there's no sideways scroll, plus
+DevTools' 4× CPU slowdown and "Slow 4G" network presets. A real mid-range Android
+or iOS Safari check is better still when one is to hand.
+
+**Safe zones — adding a new control to the home/map screen:** measured at 360×740,
+default state (no venue selected):
+
+```
+y=0   ┌─────────────────────────────────────┐
+      │ SearchBar: 328×44 @ (16,16)          │  ← top, safe-area-inset-top aware
+      │   + Filters icon 44×44 @ (300,16)    │     (SearchBar.tsx: env(safe-area-inset-top))
+y=76  ├─────────────────────────────────────┤
+      │                                       │
+      │         live Mapbox canvas           │  ← DO NOT add floating buttons here.
+      │    (pan/zoom/pin-tap owns this area) │     The old top-center `LocateButton` at
+      │                                       │     `top: 72px` was retired for exactly
+      │                                       │     this reason (docs/bottom-nav-spec.md
+      │                                       │     §1/§6) — it sat outside the thumb
+      │                                       │     zone and competed with map gestures.
+y=665 ├─────────────────────────────────────┤
+      │ Mapbox credits (i + logo), lifted    │  ← ToS-required, not resizable (see
+      │ 8px above the pill (globals.css)     │     PR 2's audit note on the exception)
+      │ BottomNav pill: 5×64×64 @ y=665      │  ← full width already spoken for
+y=729 └─────────────────────────────────────┘  ← 12px + safe-area-inset-bottom below
+```
+
+- **No free real estate exists on the map canvas itself** below the search bar and
+  above the bottom nav — any floating button there repeats the mistake #6 in
+  bottom-nav-spec.md already reverted (LocateButton) and risks covering a pin or the
+  Mapbox attribution.
+- **The two zones that are actually free:** (1) inside the existing SearchBar row,
+  to the right of the Filters icon, if a control is genuinely search-related — same
+  pattern as the Filters button's own inline placement. The row is 44px tall, so the
+  control's visual stays 44px and its tap area must be extended to 48×48 with an
+  invisible `::before` overlay (the rule above), not by growing the bar; (2) inside BottomNav as a
+  6th labelled item, accepting narrower cells (the 5-item bar already narrowed
+  cells to ~57–67px when Boxes was added, #516 — measured then against the old 44px
+  floor; ~57px still clears the new 48px one down to ~320px viewports). A brand-new floating pill anywhere else on the map is a
+  **redesign**, not a guardrail-compliant addition — take it to Kyle with a mockup
+  first, the same way Boxes (#516) and the Filters control (#539) were approved.
+- A control that must sit on the map (e.g., a future zoom control) goes bottom-right,
+  stacked *above* the Mapbox credits with the same `--bottom-nav-clearance` +
+  breathing-room math the credits already use — never top-corner, never overlapping
+  the credits.
+
 ## Colors
 
 **Bone is the paper.** The entire app sits on `bone-50` (#FBFAF6), a warm cream with a faint yellow tint. The bone scale steps up through `bone-100` (chip resting state, hover fills), `bone-200` (card borders, subtle dividers), and `bone-300` (search bar border at rest). These are not grays — they are warm. Never introduce a neutral or cool gray.

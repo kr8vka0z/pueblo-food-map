@@ -20,6 +20,8 @@
 // This file follows the exact same pattern for the three Workers runtime types a
 // scheduled()-handler signature needs — none of which is `Element` or collides with DOM.
 import type { ExecutionContext, ExportedHandler, ScheduledController } from "@cloudflare/workers-types/experimental";
+import { runRefreshAlertsCheck, shouldRunRefreshAlertsCheck } from "./src/lib/refreshAlerts";
+import { logRefreshAlertsResult, logRefreshAlertsFailure } from "./src/lib/logger";
 //
 // WHY `@ts-ignore` (not `@ts-expect-error`) on the imports below: .open-next/worker.js
 // is produced by `opennextjs-cloudflare build` and does not exist in a fresh checkout —
@@ -60,12 +62,33 @@ export default {
   // and the reason it does a bare heartbeat too). The cron firing at all already proves
   // the worker is alive and scheduled; that IS the liveness signal. Pinging the success
   // URL unconditionally is the correct, simpler design.
-  async scheduled(_event: ScheduledController, env: CloudflareEnv, ctx: ExecutionContext) {
+  async scheduled(event: ScheduledController, env: CloudflareEnv, ctx: ExecutionContext) {
     // Guard: HC_PING_URL is a prod-only runtime secret (`wrangler secret put`, see
     // wrangler.jsonc) — staging never gets it, and a missing value must never throw
-    // out of a cron handler, so bail out instead of fetching "undefined".
-    if (!env.HC_PING_URL) return;
-    ctx.waitUntil(fetch(env.HC_PING_URL).catch(() => {}));
+    // out of a cron handler, so bail out of the PING only instead of fetching
+    // "undefined". NOT a hard early `return` (fix) — that would also silently skip
+    // the refresh-alerts check below if this secret were ever missing on prod. Same
+    // restructuring PR #616 (src/lib/emailRetention.ts) makes for the same reason,
+    // done independently here since these two additions landed on separate branches
+    // off the same base.
+    if (env.HC_PING_URL) {
+      ctx.waitUntil(fetch(env.HC_PING_URL).catch(() => {}));
+    }
+
+    // Refresh-pipeline alerts (#238 pending-age, #234 per-source staleness) — rides
+    // this same 5-minute cron, gated to one of the 288 daily ticks
+    // (shouldRunRefreshAlertsCheck) so D1 isn't queried 288x/day for a check that
+    // only needs to run once. Independent `ctx.waitUntil` — a slow or failing check
+    // must never delay or break the heartbeat ping above. See src/lib/refreshAlerts.ts
+    // for the full design (why no new migration, why env.RESEND_API_KEY rather than
+    // process.env, why this file avoids `@/` imports).
+    if (shouldRunRefreshAlertsCheck(event.scheduledTime)) {
+      ctx.waitUntil(
+        runRefreshAlertsCheck(env.ADMIN_DB, env.RESEND_API_KEY)
+          .then(logRefreshAlertsResult)
+          .catch((err) => logRefreshAlertsFailure(err instanceof Error ? err.message : String(err))),
+      );
+    }
   },
 } satisfies ExportedHandler<CloudflareEnv>;
 

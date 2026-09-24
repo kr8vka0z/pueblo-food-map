@@ -12,9 +12,14 @@
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 
 export default function NotFoundContent() {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — notfound.documentTitle
+  // matches not-found.tsx's metadata title exactly ("Page Not Found").
+  useDocumentTitle(pageDocumentTitle(t("notfound.documentTitle", locale)));
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)] items-center justify-center p-6 text-center">

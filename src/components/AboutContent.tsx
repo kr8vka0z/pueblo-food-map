@@ -19,6 +19,8 @@
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import { formatPublishedDate } from "@/lib/dataFreshness";
 import SiteFooter from "@/components/SiteFooter";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
@@ -36,6 +38,10 @@ interface AboutContentProps {
 
 export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: AboutContentProps) {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — SSR's English title
+  // (page.tsx's metadata) is what search engines and a first paint see; this
+  // only corrects it after hydration for an ES visitor.
+  useDocumentTitle(pageDocumentTitle(t("about.documentTitle", locale)));
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>

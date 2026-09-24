@@ -30,6 +30,8 @@
 import { useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import PageNav, { PAGE_NAV_CLEARANCE } from "@/components/PageNav";
 import SiteFooter from "@/components/SiteFooter";
 
@@ -55,6 +57,9 @@ async function stopByToken(token: string): Promise<AlertsStopResult> {
 
 export default function AlertsStopContent({ token }: { token: string }) {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — alerts.stop.heading's EN
+  // value ("Emails stopped") matches page.tsx's metadata title exactly.
+  useDocumentTitle(pageDocumentTitle(t("alerts.stop.heading", locale)));
   const [result, setResult] = useState<AlertsStopResult>(token ? "checking" : "invalid");
   const [undoState, setUndoState] = useState<UndoState>("idle");
   const startedRef = useRef(false);

@@ -11,12 +11,17 @@
 
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import SuggestForm from "@/components/SuggestForm";
 import SiteFooter from "@/components/SiteFooter";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
 export default function SuggestPageContent() {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — suggest.documentTitle
+  // matches page.tsx's metadata title exactly ("Suggest a Venue").
+  useDocumentTitle(pageDocumentTitle(t("suggest.documentTitle", locale)));
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>

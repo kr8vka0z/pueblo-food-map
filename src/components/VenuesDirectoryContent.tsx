@@ -14,6 +14,8 @@
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import SiteFooter from "@/components/SiteFooter";
 import { DISPLAY_DAY_KEYS, formatSlot } from "@/lib/hours";
 import type { Venue, VenueCategory } from "@/types/venue";
@@ -25,6 +27,9 @@ interface VenuesDirectoryContentProps {
 
 export default function VenuesDirectoryContent({ groups }: VenuesDirectoryContentProps) {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — venues.documentTitle
+  // matches page.tsx's metadata title exactly ("All Food Resources").
+  useDocumentTitle(pageDocumentTitle(t("venues.documentTitle", locale)));
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>

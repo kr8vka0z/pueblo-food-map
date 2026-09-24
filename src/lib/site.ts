@@ -30,6 +30,22 @@ export const OG_IMAGE = {
  * image. This returns the FULL openGraph/twitter (brand image included) with
  * per-page title/url + a self-canonical, so subpage previews keep the image.
  */
+/**
+ * Compose a client-side <title> matching the format layout.tsx's
+ * `title.template` ("%s · Pueblo Food Map") produces server-side.
+ *
+ * WHY it exists: useDocumentTitle (src/lib/useDocumentTitle.ts) patches
+ * <title> for the Spanish locale, which Next.js Metadata can't reach (the
+ * locale is a client cookie/toggle, not a route — #589). Most localized
+ * pages' SSR title is `${shortTitle} · Pueblo Food Map` via that template;
+ * this keeps the client-side ES title in the same shape rather than each
+ * "Content" component re-typing the separator. Keep in sync with
+ * layout.tsx's `title.template` if that literal ever changes.
+ */
+export function pageDocumentTitle(shortTitle: string): string {
+  return `${shortTitle} · ${SITE_NAME}`;
+}
+
 export function buildPageMetadata(opts: {
   title: string;
   description: string;

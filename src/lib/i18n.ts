@@ -9,6 +9,11 @@ export type Locale = "en" | "es";
 const en: Record<string, string> = {
   // App
   "app.name": "Pueblo Food Map",
+  // Homepage <title> (#589) — the ONE page whose SSR title isn't run through
+  // layout.tsx's "%s · Pueblo Food Map" template (it equals the layout
+  // default verbatim), so this holds the FULL string per locale rather than
+  // a short title + pageDocumentTitle() suffix like every other page.
+  "app.documentTitle": "Pueblo Food Map — Food Resources in Pueblo County, CO",
 
   // Top bar
   "topbar.locale.en": "EN",
@@ -180,6 +185,11 @@ const en: Record<string, string> = {
   // Suggest form (#71)
   "suggest.title": "Suggest a venue",
   "suggest.subtitle": "Know a food resource we're missing? Tell us about it.",
+  // <title> for /suggest (#589) — matches page.tsx's metadata title exactly
+  // ("Suggest a Venue"); kept distinct from suggest.title (the on-page h1,
+  // "Suggest a venue") since the two strings differ only in casing and a
+  // shared key would force one to drift to match the other.
+  "suggest.documentTitle": "Suggest a Venue",
   "suggest.venueName.label": "Venue name",
   "suggest.venueName.placeholder": "e.g. Eastside Food Pantry",
   "suggest.address.label": "Address",
@@ -226,6 +236,9 @@ const en: Record<string, string> = {
 
   // Feedback form (#116)
   "feedback.title": "Send us feedback",
+  // <title> for /feedback (#589) — matches page.tsx's metadata title
+  // exactly ("Send Feedback"); distinct from feedback.title, the on-page h1.
+  "feedback.documentTitle": "Send Feedback",
   "feedback.subtitle": "Compliments, bug reports, or feature ideas — we want to hear it.",
   "feedback.type.label": "Feedback type",
   "feedback.type.placeholder": "Select a type",
@@ -415,6 +428,9 @@ const en: Record<string, string> = {
 
   // About page (#155) — DRAFT copy pending final text from Kyle / Pueblo Food Project
   "about.heading": "About Pueblo Food Map",
+  // <title> for /about (#589) — matches page.tsx's metadata title exactly
+  // ("About"); distinct from about.heading, the longer on-page h1.
+  "about.documentTitle": "About",
   "about.mission.heading": "Our mission",
   "about.mission.body": "Pueblo Food Map puts every free and low-cost food resource in Pueblo County on one mobile-friendly map — so anyone, in any neighborhood, can find what they need in minutes.",
   "about.vision.heading": "Our vision",
@@ -437,6 +453,9 @@ const en: Record<string, string> = {
   // Venues directory (#PR4)
   "nav.venuesList": "Browse all venues",
   "venues.heading": "All food resources",
+  // <title> for /venues (#589) — matches page.tsx's metadata title exactly
+  // ("All Food Resources"); distinct from venues.heading, the on-page h1.
+  "venues.documentTitle": "All Food Resources",
   "venues.intro": "Every pantry, grocery store, community garden, farm, and meal site on the map — grouped by type, with addresses and hours.",
   "venues.noHours": "Hours not listed",
 
@@ -464,6 +483,10 @@ const en: Record<string, string> = {
 
   // 404 Not Found page (#288)
   "notfound.title": "Page not found",
+  // <title> for the 404 page (#589) — matches not-found.tsx's metadata
+  // title exactly ("Page Not Found"); distinct from notfound.title, the
+  // on-page h1, which uses sentence case instead.
+  "notfound.documentTitle": "Page Not Found",
   "notfound.body": "The page you are looking for doesn't exist or has been moved.",
   "notfound.backToMap": "Back to map",
 
@@ -803,6 +826,10 @@ const en: Record<string, string> = {
   // Activity log (/boxes/activity, slice 3) and nav entry
   "nav.boxActivity": "Blessing box activity",
   "activity.heading": "Blessing box activity",
+  // <title> for /boxes/activity (#589) — matches page.tsx's metadata title
+  // exactly ("Blessing Box Activity"); distinct from activity.heading, the
+  // on-page h1, which uses sentence case instead.
+  "activity.documentTitle": "Blessing Box Activity",
   "activity.intro": "Every fill, low report, empty report, and box change across the network, newest first.",
   "activity.empty": "No activity to show yet.",
   "activity.prevPage": "Previous",
@@ -870,6 +897,7 @@ const en: Record<string, string> = {
 const es: Record<string, string> = {
   // App
   "app.name": "Pueblo Food Map",
+  "app.documentTitle": "Pueblo Food Map — Recursos de alimentos en el Condado de Pueblo, CO",
 
   // Top bar
   "topbar.locale.en": "EN",
@@ -1027,6 +1055,7 @@ const es: Record<string, string> = {
   // Suggest form (#71)
   "suggest.title": "Sugerir un lugar",
   "suggest.subtitle": "¿Conoces un recurso alimentario que nos falta? Cuéntanos.",
+  "suggest.documentTitle": "Sugerir un lugar",
   "suggest.venueName.label": "Nombre del lugar",
   "suggest.venueName.placeholder": "p. ej. Despensa Eastside",
   "suggest.address.label": "Dirección",
@@ -1073,6 +1102,7 @@ const es: Record<string, string> = {
 
   // Feedback form (#116)
   "feedback.title": "Envíanos tu opinión",
+  "feedback.documentTitle": "Enviar comentarios",
   "feedback.subtitle": "Felicitaciones, reportes de problemas o ideas — queremos escucharte.",
   "feedback.type.label": "Tipo de comentario",
   "feedback.type.placeholder": "Selecciona un tipo",
@@ -1238,6 +1268,7 @@ const es: Record<string, string> = {
 
   // About page (#155) — BORRADOR de texto pendiente aprobación de Kyle / Pueblo Food Project
   "about.heading": "Acerca de Pueblo Food Map",
+  "about.documentTitle": "Acerca de",
   "about.mission.heading": "Nuestra misión",
   "about.mission.body": "Pueblo Food Map pone todos los recursos de alimentos gratuitos y de bajo costo del condado de Pueblo en un mapa fácil de usar en el celular, para que cualquier persona, en cualquier colonia, pueda encontrar lo que necesita en minutos.",
   "about.vision.heading": "Nuestra visión",
@@ -1260,6 +1291,7 @@ const es: Record<string, string> = {
   // Venues directory (#PR4)
   "nav.venuesList": "Ver todos los lugares",
   "venues.heading": "Todos los recursos alimentarios",
+  "venues.documentTitle": "Todos los recursos alimentarios",
   "venues.intro": "Cada despensa, supermercado, huerto comunitario, granja y comedor del mapa — agrupados por tipo, con direcciones y horarios.",
   "venues.noHours": "Horario no disponible",
 
@@ -1285,6 +1317,7 @@ const es: Record<string, string> = {
 
   // 404 Not Found page (#288)
   "notfound.title": "Página no encontrada",
+  "notfound.documentTitle": "Página no encontrada",
   "notfound.body": "La página que buscas no existe o se ha movido.",
   "notfound.backToMap": "Volver al mapa",
 
@@ -1516,6 +1549,7 @@ const es: Record<string, string> = {
   // Activity log (/boxes/activity, slice 3) and nav entry
   "nav.boxActivity": "Actividad de las cajas de bendiciones", // [CHECK]
   "activity.heading": "Actividad de las cajas de bendiciones", // [CHECK]
+  "activity.documentTitle": "Actividad de las cajas de bendiciones", // [CHECK]
   "activity.intro": "Cada surtido, aviso de poco, aviso de vacío y cambio de caja en toda la red, del más reciente al más antiguo.", // [CHECK]
   "activity.empty": "Todavía no hay actividad que mostrar.", // [CHECK]
   "activity.prevPage": "Anterior", // [CHECK]

@@ -42,6 +42,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { t } from '@/lib/i18n';
+import { useLocale } from '@/lib/LocaleContext';
+import { useDocumentTitle } from '@/lib/useDocumentTitle';
 
 // WHY dynamic + ssr:false: MapWrapper pulls in vaul, Radix UI, geolocation
 // hooks, and all venue UI. None of it is needed during SSR (this component
@@ -67,6 +70,13 @@ function readGate(): boolean {
 }
 
 export default function HomePageClient() {
+  const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — app.documentTitle holds the
+  // FULL title per locale (the one page whose SSR title, set in page.tsx,
+  // isn't run through layout.tsx's "%s · Pueblo Food Map" template — see
+  // that key's own comment in i18n.ts).
+  useDocumentTitle(t('app.documentTitle', locale));
+
   // null = not yet determined (SSR-safe: avoids flash of wrong content).
   // We initialize to null so the server renders nothing, then the client
   // effect determines the true value without a hydration mismatch.

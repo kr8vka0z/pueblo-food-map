@@ -26,6 +26,10 @@
  */
 
 import type { AccessDeniedReason } from "./cfAccess";
+// Type-only — erased at compile time, so this does not create a runtime
+// circular import even though emailRetention.ts itself imports
+// logEmailRetentionResult/logEmailRetentionFailure from this file.
+import type { EmailRetentionCounts } from "./emailRetention";
 
 export type FormName =
   | "suggest"
@@ -126,11 +130,7 @@ export function logAdminAuthEvent(event: AdminAuthEvent): void {
  * at console.log since a 0-row day is the expected common case, not a
  * failure.
  */
-export function logEmailRetentionResult(counts: {
-  submissionsBlanked: number;
-  adoptersBlanked: number;
-  subscriptionsDeleted: number;
-}): void {
+export function logEmailRetentionResult(counts: EmailRetentionCounts): void {
   console.log(JSON.stringify({ event: "email_retention_result", ...counts }));
 }
 

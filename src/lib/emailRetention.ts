@@ -228,7 +228,12 @@ export function runScheduledTasks(event: ScheduledController, env: CloudflareEnv
 
   if (shouldRunEmailRetention(event.scheduledTime)) {
     ctx.waitUntil(
-      runEmailRetentionCleanup(env.ADMIN_DB)
+      // event.scheduledTime (not the default `new Date()`) so the cutoff is
+      // pinned to when the cron was SCHEDULED, not whenever this handler
+      // actually got to run — matches retentionCutoffIso's own docstring
+      // ("computed from the cron's own scheduled time") and keeps a queue
+      // delay from ever shifting which rows count as 90+ days old.
+      runEmailRetentionCleanup(env.ADMIN_DB, new Date(event.scheduledTime))
         .then(logEmailRetentionResult)
         .catch((err) => {
           // A partial failure still carries the counts of whichever

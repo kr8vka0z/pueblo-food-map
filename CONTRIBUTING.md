@@ -27,7 +27,15 @@ performance).
    locally before opening a pull request. If your change touches UI or design
    tokens, also run `npm run design:drift` — `globals.css @theme` is the
    canonical token source; keep DESIGN.md in sync with any token changes.
-4. Open a pull request against `main`. CI runs lint, typecheck, tests, and
+4. **Weak-phone test loop** — any visible change gets checked against a low-end
+   phone before it ships (see DESIGN.md "Low-end device guardrails" for the full
+   target profile and budgets):
+   - Run the `device-sweep` skill (360px width plus a spread of real iOS/Android
+     sizes, flags JS errors and sideways scrolling), or check manually at 360px
+     wide with the browser toolbar visible.
+   - In Chrome DevTools, throttle CPU to **4×** and network to **Slow 4G**, and
+     re-check the interaction that changed.
+5. Open a pull request against `main`. CI runs lint, typecheck, tests, and
    build on every PR and must pass before merge — `main` is a protected
    branch and requires the CI status check.
 

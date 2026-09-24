@@ -12,7 +12,7 @@
 
 import { describe, test, expect, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
-import { writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, rmSync, rmdirSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,17 +31,30 @@ function runBannedCheck() {
   return spawnSync("node", [SCRIPT], { cwd: ROOT, encoding: "utf8" });
 }
 
+// Dirs this test itself creates (dir didn't exist before mkdirSync) — safe to
+// rmdir afterward. node_modules/.claude etc. already exist in a real
+// checkout and must never be touched.
+const dirsCreatedByTest = [];
+
 afterEach(() => {
   for (const p of PROBE_PATHS) {
     if (existsSync(p)) rmSync(p);
   }
   if (existsSync(SRC_PROBE)) rmSync(SRC_PROBE);
+  while (dirsCreatedByTest.length > 0) {
+    const dir = dirsCreatedByTest.pop();
+    if (existsSync(dir)) rmdirSync(dir); // fails loudly if non-empty — never force-deletes real content
+  }
 });
 
 describe("check-banned.mjs — build/output dirs are excluded (#248)", () => {
   test("a banned string dropped in each excluded dir does not fail the check", () => {
     for (const p of PROBE_PATHS) {
-      mkdirSync(dirname(p), { recursive: true });
+      const dir = dirname(p);
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+        dirsCreatedByTest.push(dir);
+      }
       writeFileSync(p, 'export const x = "Arial";\n'); // allow-banned: probe fixture, lives inside an excluded dir
     }
     const result = runBannedCheck();

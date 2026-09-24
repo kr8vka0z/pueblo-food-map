@@ -432,12 +432,12 @@ export async function applyApprovedProposal(
         lng: afterVenue.lng ?? existing.lng,
         address: afterVenue.address ?? existing.address,
         hours_weekly: toColumnValue("hours_weekly", afterVenue.hours_weekly) as string | null,
-        // #400: same "carries the field verbatim on an add/restore, not
-        // gated by SOURCE_OWNED_FIELDS" reasoning as hours_weekly above —
-        // an 'add' proposal's `after` is the full incoming venue, not an
-        // update's filtered field list. Falls back to `existing`'s stored
-        // value (not null) so restoring an archived venue never silently
-        // wipes a schedule the incoming record simply doesn't carry.
+        // #400: an 'add' proposal's `after` is the full incoming venue, not
+        // an update's filtered field list, so the field is carried as-is
+        // when present. Deliberately UNLIKE hours_weekly on the line above
+        // (which nulls when absent): falls back to `existing`'s stored value
+        // so restoring an archived venue never wipes a schedule the incoming
+        // record simply doesn't carry.
         hours_irregular: (afterVenue.hours_irregular !== undefined
           ? toColumnValue("hours_irregular", afterVenue.hours_irregular)
           : existing.hours_irregular) as string | null,

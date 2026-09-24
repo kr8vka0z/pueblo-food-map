@@ -35,7 +35,6 @@ import SearchBar from "./SearchBar";
 import BottomNav, { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
 import FilterPanel from "./FilterPanel";
 import BottomSheet from "./BottomSheet";
-import DesktopVenueWindow from "./DesktopVenueWindow";
 import EmptySearchPopover from "./EmptySearchPopover";
 import ViewSuggestion from "./ViewSuggestion";
 import SearchResultsPopover, {
@@ -75,6 +74,20 @@ import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuer
 const MapCanvas = dynamic(() => import("./Map"), {
   ssr: false,
   loading: () => <MapLoadingFallback />,
+});
+
+// perf(#588): DesktopVenueWindow only ever renders when `!isMobile &&
+// viewMode === "map" && selectedVenue` (see its JSX below) — on the mobile
+// viewport this whole app targets first, that condition is never true, so a
+// plain top-level import still shipped ~800 lines of desktop-only markup
+// (DesktopVenueWindow.tsx + VenuePopupHeader.tsx) into every mobile visitor's
+// synchronous MapWrapper chunk for code that never mounts. Same next/dynamic
+// pattern as MapCanvas above, minus a loading fallback: the JSX is already
+// conditionally rendered, so the fetch only fires when a desktop user
+// actually selects a venue (not on MapWrapper mount) — mobile visitors never
+// trigger the import at all.
+const DesktopVenueWindow = dynamic(() => import("./DesktopVenueWindow"), {
+  ssr: false,
 });
 
 /**

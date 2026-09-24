@@ -181,10 +181,22 @@ function optionalDate(value: unknown, field: string, errors: Record<string, stri
  */
 export function validateBoxFields(body: Record<string, unknown>, errors: Record<string, string>): ValidatedBoxFields {
   return {
-    hostName: optionalString(body.host_name, "host_name", errors),
-    hostNote: optionalString(body.host_note, "host_note", errors),
-    hostContact: optionalString(body.host_contact, "host_contact", errors),
-    mostNeeded: optionalString(body.most_needed, "most_needed", errors),
+    // Capped (#297 follow-up) — same threat model as the venue-level free-
+    // text fields above, arguably sharper here: boxes are LIVE (AGENTS.md
+    // "Boxes are LIVE, not published" — loadLiveBoxes() reads these columns
+    // straight off D1 at request time), so an oversized value reaches the
+    // public box card immediately, with no publish step to catch it first.
+    // host_name -> SUGGEST_VENUE_NAME (an org/person name, same length
+    // class as a venue name); host_note -> BOX_ADOPTER_NOTE (a short host
+    // blurb, same length class as an adopter note); host_contact ->
+    // SUGGEST_CONTACT (private field, but still free text reaching D1 —
+    // same constant phone/url reuse above); most_needed -> BOX_CHECKIN_NOTE
+    // (a short "what's needed" list, same length class as a check-in note —
+    // and the public "needs" field this mirrors already uses this same cap).
+    hostName: optionalStringCapped(body.host_name, "host_name", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors),
+    hostNote: optionalStringCapped(body.host_note, "host_note", FIELD_LIMITS.BOX_ADOPTER_NOTE, errors),
+    hostContact: optionalStringCapped(body.host_contact, "host_contact", FIELD_LIMITS.SUGGEST_CONTACT, errors),
+    mostNeeded: optionalStringCapped(body.most_needed, "most_needed", FIELD_LIMITS.BOX_CHECKIN_NOTE, errors),
     installedOn: optionalDate(body.installed_on, "installed_on", errors),
     removedOn: optionalDate(body.removed_on, "removed_on", errors),
   };

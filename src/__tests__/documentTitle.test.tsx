@@ -20,7 +20,9 @@
 import { describe, test, expect, vi } from "vitest";
 import { render, act } from "@testing-library/react";
 import React from "react";
-import { LocaleProvider } from "@/lib/LocaleContext";
+import { LocaleProvider, useLocale } from "@/lib/LocaleContext";
+import { t } from "@/lib/i18n";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 
@@ -136,7 +138,21 @@ vi.mock("next/dynamic", () => ({
   },
 }));
 
-vi.mock("@/components/MapWrapper", () => ({ default: () => <div data-testid="map-wrapper" /> }));
+// The real MapWrapper (mocked away below — Mapbox WebGL, per every other
+// MapWrapper*.test.tsx's own convention) is where the home page's
+// useDocumentTitle call actually lives, NOT HomePageClient.tsx — see
+// MapWrapper.tsx's own comment at that call for why (keeps the i18n
+// dictionary out of the route's blocking JS chunk on slow-4G phones,
+// #589's coordinator note). This sentinel mock reproduces that one real
+// line (real useDocumentTitle + real t()/useLocale, only the heavy map UI
+// stubbed) so this test still proves the actual wiring, not just the mock.
+vi.mock("@/components/MapWrapper", () => ({
+  default: function MockMapWrapper() {
+    const { locale } = useLocale();
+    useDocumentTitle(t("app.documentTitle", locale));
+    return <div data-testid="map-wrapper" />;
+  },
+}));
 vi.mock("@/components/SplashScreen", () => ({
   default: () => (
     <div role="dialog" aria-modal="true">

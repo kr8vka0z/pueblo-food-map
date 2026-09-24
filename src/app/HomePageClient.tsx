@@ -38,13 +38,20 @@
  * (hydration-safe), so ssr:false has no effect on server output — it only
  * moves parse/exec off the blocking initial JS load, reducing TBT on
  * throttled mobile.
+ *
+ * #589's useDocumentTitle call for '/' lives in MapWrapper.tsx, NOT here,
+ * on purpose: MapWrapper already imports the i18n dictionary and is
+ * unconditionally rendered whenever this component renders anything real,
+ * but it's one of the #202 dynamic()'d chunks above. Calling t()/i18n.ts
+ * directly from this file (the synchronous, always-blocking part of the
+ * route's JS) would pull the whole dictionary out of that deferred chunk
+ * and into the initial payload every low-end-phone visitor downloads
+ * before first paint — for one <title> string. See MapWrapper.tsx's own
+ * comment at its useDocumentTitle call.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { t } from '@/lib/i18n';
-import { useLocale } from '@/lib/LocaleContext';
-import { useDocumentTitle } from '@/lib/useDocumentTitle';
 
 // WHY dynamic + ssr:false: MapWrapper pulls in vaul, Radix UI, geolocation
 // hooks, and all venue UI. None of it is needed during SSR (this component
@@ -70,13 +77,6 @@ function readGate(): boolean {
 }
 
 export default function HomePageClient() {
-  const { locale } = useLocale();
-  // <title> follows locale client-side (#589) — app.documentTitle holds the
-  // FULL title per locale (the one page whose SSR title, set in page.tsx,
-  // isn't run through layout.tsx's "%s · Pueblo Food Map" template — see
-  // that key's own comment in i18n.ts).
-  useDocumentTitle(t('app.documentTitle', locale));
-
   // null = not yet determined (SSR-safe: avoids flash of wrong content).
   // We initialize to null so the server renders nothing, then the client
   // effect determines the true value without a hydration mismatch.

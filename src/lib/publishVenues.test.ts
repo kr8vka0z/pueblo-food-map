@@ -29,6 +29,8 @@ import {
   venuesToLiteralArray,
   serializePublishedVenuesFile,
   fetchPublishSnapshot,
+  fetchPendingDeadLinks,
+  stripDeadLinkUrls,
   promotePublishedDrafts,
   commitPublishedVenues,
   GitHubApiError,
@@ -474,6 +476,60 @@ describe("fetchPublishSnapshot", () => {
     expect(snapshot.archivedIds).toEqual(["pending-removal"]);
     // No archived row of any kind may leak into the published file's rows.
     expect(snapshot.rows.map((r) => r.id)).toEqual(["b"]);
+  });
+});
+
+// ─── Dead-link suppression (#234) ───────────────────────────────────────────
+
+describe("fetchPendingDeadLinks", () => {
+  function fakeProposalsDb(results: Array<{ target_venue_id: string; proposed_diff: string }>): D1Database {
+    return { prepare: () => ({ all: async () => ({ success: true, results, meta: {} }) }) } as unknown as D1Database;
+  }
+
+  test("extracts before.url from each pending link_health proposal", async () => {
+    const db = fakeProposalsDb([
+      {
+        target_venue_id: "v1",
+        proposed_diff: JSON.stringify({ before: { url: "https://dead.example/a" }, after: { url: null }, fields_changed: ["url"] }),
+      },
+    ]);
+    await expect(fetchPendingDeadLinks(db)).resolves.toEqual([{ targetVenueId: "v1", url: "https://dead.example/a" }]);
+  });
+
+  test("a malformed proposed_diff row is skipped, not thrown", async () => {
+    const db = fakeProposalsDb([{ target_venue_id: "v1", proposed_diff: "{not valid json" }]);
+    await expect(fetchPendingDeadLinks(db)).resolves.toEqual([]);
+  });
+
+  test("a row missing before.url is skipped", async () => {
+    const db = fakeProposalsDb([
+      { target_venue_id: "v1", proposed_diff: JSON.stringify({ before: null, after: null, fields_changed: [] }) },
+    ]);
+    await expect(fetchPendingDeadLinks(db)).resolves.toEqual([]);
+  });
+
+  test("no pending findings -> empty array", async () => {
+    await expect(fetchPendingDeadLinks(fakeProposalsDb([]))).resolves.toEqual([]);
+  });
+});
+
+describe("stripDeadLinkUrls", () => {
+  test("clears url only for a row whose url matches the exact flagged url", () => {
+    const rows = [makeRow({ id: "v1", url: "https://dead.example/a" }), makeRow({ id: "v2", url: "https://fine.example" })];
+    const stripped = stripDeadLinkUrls(rows, [{ targetVenueId: "v1", url: "https://dead.example/a" }]);
+    expect(stripped.find((r) => r.id === "v1")!.url).toBeNull();
+    expect(stripped.find((r) => r.id === "v2")!.url).toBe("https://fine.example");
+  });
+
+  test("leaves a venue untouched once its url no longer matches the flagged one (hand-edited to a new url before the finding was resolved)", () => {
+    const rows = [makeRow({ id: "v1", url: "https://fixed.example/now" })];
+    const stripped = stripDeadLinkUrls(rows, [{ targetVenueId: "v1", url: "https://dead.example/a" }]);
+    expect(stripped[0].url).toBe("https://fixed.example/now");
+  });
+
+  test("empty deadLinks list is a true no-op (same array reference)", () => {
+    const rows = [makeRow({ id: "v1" })];
+    expect(stripDeadLinkUrls(rows, [])).toBe(rows);
   });
 });
 

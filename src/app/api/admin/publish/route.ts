@@ -30,6 +30,8 @@ import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { logPublishResult } from "@/lib/logger";
 import {
   fetchPublishSnapshot,
+  fetchPendingDeadLinks,
+  stripDeadLinkUrls,
   validateSnapshot,
   serializePublishedVenuesFile,
   commitPublishedVenues,
@@ -84,8 +86,14 @@ export async function POST(req: NextRequest): Promise<Response> {
   // 1. snapshot
   const snapshot = await fetchPublishSnapshot(db);
 
+  // #234: suppress any venue url still under an open (pending) link-health
+  // dead-link finding — see stripDeadLinkUrls's own header for exactly
+  // when a url comes back.
+  const deadLinks = await fetchPendingDeadLinks(db);
+  const rowsForPublish = stripDeadLinkUrls(snapshot.rows, deadLinks);
+
   // 2/3. validate + strip admin-only columns
-  const validation = validateSnapshot(snapshot.rows);
+  const validation = validateSnapshot(rowsForPublish);
   if (!validation.ok) {
     return NextResponse.json({ ok: false, error: validation.error }, { status: 422 });
   }

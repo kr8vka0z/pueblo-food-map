@@ -200,6 +200,15 @@ export async function runRefreshAlertsCheck(
     );
   }
 
+  // Sequential, not Promise.all/allSettled — deliberate, not an oversight
+  // (CI reviewer nit, PR #624): if an earlier send succeeds and a later one
+  // throws (a transient Resend 500), this whole call rejects and the
+  // caller (custom-worker.ts) only logs one failure, with no record that
+  // some emails already went out. Bounded by the once-a-day gate either
+  // way — worst case is a duplicate pending-age email on the next tick, or
+  // a stale-source alert delayed up to 24h — so low enough impact that
+  // per-email failure isolation (email-retention's own runOne() pattern,
+  // src/lib/emailRetention.ts) isn't worth the extra complexity here.
   for (const s of staleSources) {
     await sendAlertEmail(
       resendApiKey,

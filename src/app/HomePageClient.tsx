@@ -48,6 +48,19 @@
  * and into the initial payload every low-end-phone visitor downloads
  * before first paint — for one <title> string. See MapWrapper.tsx's own
  * comment at its useDocumentTitle call.
+ *
+ * #588: MapWrapper's mapbox-gl load (already deferred by #226) is HELD
+ * (`holdMapLoad={splashShown}`) while the splash overlay is up for a
+ * first-time visitor — mapbox-gl's own parse/exec (~530ms at 4x CPU
+ * throttle) dominates mobile TBT/TTI, and #226's idle-callback used to fire
+ * it during the ~2s a visitor is still reading the splash (the map is inert
+ * underneath — nothing is waiting on it yet). A tap on either splash CTA
+ * still starts the load immediately regardless of the hold (window-level
+ * capture listeners see it — see useDeferredMapLoad's module doc), so real
+ * visitors don't wait any longer than before; only Lighthouse's synthetic
+ * never-interacts run, and a visitor who reads for a while before tapping,
+ * stop paying that cost early. Returning visitors (no splash) are
+ * unaffected — `splashShown` is `false` for them from the start.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -182,6 +195,7 @@ export default function HomePageClient() {
           onShowWelcome={showSplashAgain}
           initialVenueId={initialVenueId}
           initialBoxesFilter={initialBoxesFilter}
+          holdMapLoad={splashShown}
         />
       </main>
 

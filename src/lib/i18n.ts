@@ -347,6 +347,10 @@ const en: Record<string, string> = {
   "map.unavailableTitle": "Map unavailable",
   "map.unavailableBody": "The interactive map can't load on this device, so we're showing the list instead.",
 
+  // Offline fallback — the page opened with no connection, so Mapbox can't load (#130)
+  "map.offlineTitle": "Map needs a connection",
+  "map.offlineBody": "The list still works.",
+
   // LanguageToggle group aria-label (#i18n-leaks)
   "lang.toggle.label": "Language selection",
 
@@ -1220,6 +1224,10 @@ const es: Record<string, string> = {
   // Map unavailable fallback (#165)
   "map.unavailableTitle": "Mapa no disponible",
   "map.unavailableBody": "El mapa interactivo no se puede cargar en este dispositivo, así que mostramos la lista.",
+
+  // Offline fallback (#130)
+  "map.offlineTitle": "El mapa necesita conexión", // [CHECK]
+  "map.offlineBody": "La lista sigue funcionando.", // [CHECK]
 
   // LanguageToggle group aria-label (#i18n-leaks)
   "lang.toggle.label": "Selección de idioma",

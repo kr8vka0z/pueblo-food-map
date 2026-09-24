@@ -74,15 +74,17 @@ describe("DashboardPage (/admin) — publish-bot PR status banner (#598)", () =>
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  test("token present, an open publish-bot PR with a failing check -> the stuck-publish banner renders", async () => {
+  test("token present, an open publish-bot PR with a real merge conflict -> the stuck-publish banner renders", async () => {
     process.env.GITHUB_PUBLISH_TOKEN = "test-token";
     const mockFetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
       if (url.includes("/pulls?head=")) {
-        return jsonResponse([{ number: 99, html_url: "https://github.com/kr8vka0z/pueblo-food-map/pull/99", head: { sha: "sha-1" } }]);
+        return jsonResponse([
+          { number: 99, html_url: "https://github.com/kr8vka0z/pueblo-food-map/pull/99", created_at: new Date().toISOString() },
+        ]);
       }
-      if (url.includes("/check-runs")) {
-        return jsonResponse({ check_runs: [{ status: "completed", conclusion: "failure" }] });
+      if (/\/pulls\/\d+$/.test(url)) {
+        return jsonResponse({ mergeable_state: "dirty" });
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -91,6 +93,7 @@ describe("DashboardPage (/admin) — publish-bot PR status banner (#598)", () =>
     render(await DashboardPage());
 
     expect(await screen.findByText(/publish is stuck/i)).toBeDefined();
+    expect(screen.getByText(/merge conflict/i)).toBeDefined();
     expect(screen.getByRole("link", { name: /PR #99/ }).getAttribute("href")).toBe(
       "https://github.com/kr8vka0z/pueblo-food-map/pull/99",
     );

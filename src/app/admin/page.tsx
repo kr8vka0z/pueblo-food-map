@@ -191,7 +191,7 @@ export default async function DashboardPage() {
           <PublishBotStatusBanner
             prNumber={publishBotStatus.number}
             prUrl={publishBotStatus.htmlUrl}
-            checksState={publishBotStatus.checksState}
+            state={publishBotStatus.state}
           />
         )}
         {showPublishBar && <PublishPanel summary={publishSummary} reviewHref="/admin/places" />}

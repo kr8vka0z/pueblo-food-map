@@ -17,31 +17,44 @@
  * This banner is the fix that was chosen over rewiring the state machine
  * (not worth it — see publishVenues.ts's fetchPublishBotPrStatus for the
  * full reasoning): surface the truth read-only instead of hiding it.
+ *
+ * `state` (review finding, 2026-09-24): reworked from a Checks-API-derived
+ * pass/fail to a Pulls-API-derived `PublishBotPrState` — the
+ * `GITHUB_PUBLISH_TOKEN` fine-grained PAT this repo uses cannot read check
+ * runs at all (a structural PAT gap, not a missing scope), so the original
+ * "checks failed" verdict could never actually render. See
+ * fetchPublishBotPrStatus's own header (publishVenues.ts) for the full
+ * mergeable_state/age reasoning behind the three states below.
  */
 
-import type { PublishBotChecksState } from "@/lib/publishVenues";
+import type { PublishBotPrState } from "@/lib/publishVenues";
 
 export interface PublishBotStatusBannerProps {
   prNumber: number;
   prUrl: string;
-  checksState: PublishBotChecksState;
+  state: PublishBotPrState;
 }
 
-export default function PublishBotStatusBanner({ prNumber, prUrl, checksState }: PublishBotStatusBannerProps) {
-  const isFailing = checksState === "failing";
+const STUCK_COPY: Record<Exclude<PublishBotPrState, "in_progress">, string> = {
+  stuck_conflict: "Publish is stuck: merge conflict —",
+  stuck_checks: "Publish is stuck: checks failing or pending too long —",
+};
+
+export default function PublishBotStatusBanner({ prNumber, prUrl, state }: PublishBotStatusBannerProps) {
+  const isStuck = state !== "in_progress";
 
   return (
     <section
-      role={isFailing ? "alert" : undefined}
+      role={isStuck ? "alert" : undefined}
       className={`mb-3 rounded-[var(--radius-lg)] border px-4 py-3 text-sm sm:px-6 ${
-        isFailing
+        isStuck
           ? "border-[var(--color-danger)] bg-white text-[var(--color-danger)]"
           : "border-[var(--color-bone-200)] bg-white text-[var(--color-ink-700)]"
       }`}
     >
-      {isFailing ? (
+      {isStuck ? (
         <>
-          <strong className="font-semibold">Publish is stuck:</strong> checks failed on{" "}
+          <strong className="font-semibold">{STUCK_COPY[state]}</strong>{" "}
           <a
             href={prUrl}
             target="_blank"
@@ -50,11 +63,11 @@ export default function PublishBotStatusBanner({ prNumber, prUrl, checksState }:
           >
             PR #{prNumber}
           </a>
-          . The public map is still showing the OLD data. Fix the checks (or close the PR) and publish again.
+          . The public map is still showing the OLD data. Fix it (or close the PR) and publish again.
         </>
       ) : (
         <>
-          Publish in progress — waiting for checks on{" "}
+          Publish in progress — waiting on{" "}
           <a
             href={prUrl}
             target="_blank"

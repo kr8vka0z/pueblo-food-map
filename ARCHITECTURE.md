@@ -728,18 +728,28 @@ Rewiring the state machine to wait for the real merge was rejected — a
 publish would have to hold a request open across a multi-minute CI run for
 a case that's rare and self-healing on the next publish anyway. Instead the
 Dashboard reads the SAME open `publish-bot` PR read-only
-(`fetchPublishBotPrStatus`, publishVenues.ts) — GitHub's Checks API against
-the PR's head sha, not the legacy Status API, since this repo's CI is
-Actions-only — and renders `PublishBotStatusBanner` above the Publish bar
-whenever one is open: "Publish in progress" for pending/passing/unknown
-checks, "Publish is stuck: checks failed" with a link to the PR once any
-check-run fails. Fails soft on both axes named in the issue: skipped
-entirely when `GITHUB_PUBLISH_TOKEN` is unset (staging has none — same env
-var route.ts already treats as "not configured"), and any GitHub error
-(rate limit, network, or a checks-read permission gap the Contents/PRs-RW
-PAT may not carry) degrades to no banner / `checksState: "unknown"` rather
-than breaking the page, matching every other best-effort Dashboard read
-above.
+(`fetchPublishBotPrStatus`, publishVenues.ts) and renders
+`PublishBotStatusBanner` above the Publish bar whenever one is open.
+
+**Pulls API only, not Checks API (review finding, 2026-09-24).** The first
+version of this read hit GitHub's Checks API against the PR's head sha —
+that silently never worked, because `GITHUB_PUBLISH_TOKEN` is a
+FINE-GRAINED PAT (Contents RW + Pull requests RW, #260), and fine-grained
+PATs cannot read check runs at all — a structural gap in what that PAT type
+can authenticate for, not a missing scope to add. `mergeable_state` +
+`created_at` from `GET /pulls/{number}` need only "Pull requests: read,"
+which this token already has, so the banner now derives state from those
+instead: `mergeable_state === "dirty"` (a real merge conflict) is
+"Publish is stuck: merge conflict," regardless of the PR's age; a PR open
+more than 20 minutes with `mergeable_state` in blocked/unstable/behind is
+"Publish is stuck: checks failing or pending too long"; everything else
+(including `mergeable_state` still "unknown" while GitHub computes it,
+common right after a PR opens) is "Publish in progress." Fails soft on both
+axes named in the issue: skipped entirely when `GITHUB_PUBLISH_TOKEN` is
+unset (staging has none — same env var route.ts already treats as "not
+configured"), and any GitHub error on the single-PR detail read (rate
+limit, network, permissions) degrades to `state: "in_progress"` rather than
+breaking the page, matching every other best-effort Dashboard read above.
 
 **`/admin/places` (src/app/admin/places/page.tsx)** is the venue list —
 moved here unchanged from where `/admin` used to render it (#253's original

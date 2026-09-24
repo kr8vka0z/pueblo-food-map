@@ -811,30 +811,33 @@ export async function commitPublishedVenues(
 
 // ─── GitHub: read-only publish-bot PR status (#598) ────────────────────────
 
-export type PublishBotChecksState = "pending" | "passing" | "failing" | "unknown";
+export type PublishBotPrState = "in_progress" | "stuck_conflict" | "stuck_checks";
 
 export interface PublishBotPrStatus {
   number: number;
   htmlUrl: string;
-  checksState: PublishBotChecksState;
+  state: PublishBotPrState;
 }
 
-interface PullRequestWithHeadApiResponse {
+interface PullRequestListItemApiResponse {
   number: number;
   html_url: string;
-  head: { sha: string };
+  created_at: string;
 }
 
-interface CheckRunApiResponse {
-  status: string;
-  conclusion: string | null;
+interface PullRequestDetailApiResponse {
+  mergeable_state: string | null;
 }
 
-interface CheckRunsApiResponse {
-  check_runs: CheckRunApiResponse[];
-}
+// mergeable_state values (GitHub REST) this banner treats as "stuck," once
+// the PR has been open long enough that it isn't just normal in-flight CI
+// lag — see PUBLISH_STUCK_AGE_MINUTES below. "dirty" (a real merge
+// conflict) is checked separately and unconditionally, since a conflict
+// can never resolve itself by waiting.
+const STUCK_MERGEABLE_STATES = new Set(["blocked", "unstable", "behind"]);
 
-const FAILING_CHECK_CONCLUSIONS = new Set(["failure", "timed_out", "cancelled", "action_required"]);
+/** How long a publish-bot PR can sit with a non-clean mergeable_state before this reads as "stuck" rather than "still running" — a fresh PR's checks routinely take a few minutes. */
+const PUBLISH_STUCK_AGE_MINUTES = 20;
 
 /** A best-effort admin-Dashboard page-load read must never hang the page on a slow/unresponsive GitHub API. */
 const PUBLISH_STATUS_FETCH_TIMEOUT_MS = 3000;
@@ -849,77 +852,86 @@ const PUBLISH_STATUS_FETCH_TIMEOUT_MS = 3000;
  * publish would have to hold a request open across a multi-minute CI run —
  * NB1's own "GitHub succeeds THEN D1 writes" ordering above already exists
  * to keep D1 from lying about the GitHub side specifically) — instead, the
- * admin Dashboard reads this same open PR's live check status, read-only,
- * so an admin can SEE "stuck" instead of trusting a screen that can't tell
- * them.
+ * admin Dashboard reads this same open PR's own state, read-only, so an
+ * admin can SEE "stuck" instead of trusting a screen that can't tell them.
  *
- * Two read-only GitHub calls: the same PR-list query findOpenPublishPr
- * (above) already makes, but this needs `head.sha` too — a separate small
- * response type here rather than widening that mutation-path function's own
- * PullRequestSummary, which this read has no business touching — then that
- * head sha's Checks API run list (GitHub Actions reports check results
- * there, not the legacy Status API `commits/{sha}/status`; this repo's CI
- * is Actions-only, see .github/workflows/ci.yml).
+ * Pulls API ONLY (review finding, 2026-09-24): the first version of this
+ * function read GitHub's Checks API against the PR's head sha — that
+ * silently never worked, because a FINE-GRAINED PAT (this repo's
+ * `GITHUB_PUBLISH_TOKEN`, Contents RW + Pull requests RW, #260) cannot read
+ * check runs at all — not a missing scope to add, a structural gap in what
+ * fine-grained PATs can authenticate for (Kyle's own AGENTS.md note).
+ * `mergeable_state` + `created_at` from the Pulls API need only "Pull
+ * requests: read," which this token already has. Two calls: the same
+ * PR-list query findOrCreatePublishPr/findOpenPublishPr (above) already
+ * make (list items carry `created_at`/`html_url` but NOT `mergeable_state`
+ * — GitHub only computes/exposes that on the single-PR read), then
+ * `GET /pulls/{number}` for `mergeable_state`.
  *
  * Fails soft everywhere a Dashboard page load can't afford to wait or
  * error: the PR-list call throws (network/rate-limit/GitHub outage) — the
  * caller (admin/page.tsx) catches that and renders nothing, same as any
- * other best-effort Dashboard read. The check-runs call specifically
- * degrades to checksState "unknown" instead of throwing — a PAT scoped for
- * Contents/Pull-requests RW (this file's own header, #260) may not carry
- * the separate "Checks: read" permission GitHub's Checks API needs; rather
- * than lose the PR-presence signal entirely over that, an admin still sees
- * "publish in progress" with a working link to the PR, just without a
- * red/green verdict.
+ * other best-effort Dashboard read. The single-PR detail call specifically
+ * degrades to `state: "in_progress"` (i.e. `mergeable_state` treated as
+ * unknown/null) instead of throwing — a permissions or transient-error gap
+ * must never read as a false "stuck."
  *
- * checksState:
- *  - "failing": at least one check-run concluded failure/timed_out/
- *    cancelled/action_required — the case #598 exists to surface.
- *  - "pending": zero check-runs exist yet (checks haven't started
- *    reporting) or at least one is still queued/in_progress, with none
- *    failed (yet).
- *  - "unknown": the check-runs read itself failed (permissions/network/
- *    timeout) — read the same as "still in progress," never as a failure,
- *    so a permissions gap can't be mistaken for a red CI run.
- *  - "passing": every check-run is completed and none failed.
+ * state:
+ *  - "stuck_conflict": `mergeable_state === "dirty"` — a real merge
+ *    conflict, which can never resolve itself by waiting, so this fires
+ *    regardless of the PR's age.
+ *  - "stuck_checks": the PR has been open more than
+ *    PUBLISH_STUCK_AGE_MINUTES AND `mergeable_state` is one of
+ *    blocked/unstable/behind — i.e. still not mergeable well past the
+ *    window normal CI takes, the case #598 exists to surface.
+ *  - "in_progress": everything else — including `mergeable_state` still
+ *    "unknown" (GitHub hasn't finished computing it yet, common right after
+ *    a PR opens) and the detail read failing outright. A young PR with a
+ *    non-clean state reads as "in progress," not "stuck," until it clears
+ *    the age bar above.
  */
 export async function fetchPublishBotPrStatus(token: string): Promise<PublishBotPrStatus | null> {
-  const prRes = await githubGet(
+  const listRes = await githubGet(
     `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls?head=${GITHUB_OWNER}:${PUBLISH_BOT_BRANCH}&state=open`,
     token,
     AbortSignal.timeout(PUBLISH_STATUS_FETCH_TIMEOUT_MS),
   );
-  if (!prRes.ok) {
-    const text = await prRes.text().catch(() => "(unreadable)");
-    throw new GitHubApiError(`GitHub PR lookup failed: ${prRes.status} ${text}`, prRes.status, text);
+  if (!listRes.ok) {
+    const text = await listRes.text().catch(() => "(unreadable)");
+    throw new GitHubApiError(`GitHub PR lookup failed: ${listRes.status} ${text}`, listRes.status, text);
   }
-  const list = (await prRes.json()) as PullRequestWithHeadApiResponse[];
+  const list = (await listRes.json()) as PullRequestListItemApiResponse[];
   const pr = list[0];
   if (!pr) return null;
 
-  let checksState: PublishBotChecksState = "unknown";
+  let mergeableState: string | null = null;
   try {
-    const checksRes = await githubGet(
-      `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits/${pr.head.sha}/check-runs`,
+    const detailRes = await githubGet(
+      `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls/${pr.number}`,
       token,
       AbortSignal.timeout(PUBLISH_STATUS_FETCH_TIMEOUT_MS),
     );
-    if (checksRes.ok) {
-      const { check_runs: checkRuns } = (await checksRes.json()) as CheckRunsApiResponse;
-      if (checkRuns.some((c) => c.conclusion !== null && FAILING_CHECK_CONCLUSIONS.has(c.conclusion))) {
-        checksState = "failing";
-      } else if (checkRuns.length === 0 || checkRuns.some((c) => c.status !== "completed")) {
-        checksState = "pending";
-      } else {
-        checksState = "passing";
-      }
+    if (detailRes.ok) {
+      const detail = (await detailRes.json()) as PullRequestDetailApiResponse;
+      mergeableState = detail.mergeable_state ?? null;
     }
-    // non-2xx (e.g. 403 — missing Checks:read) falls through, leaving
-    // checksState "unknown" from its initializer above.
+    // non-2xx falls through, leaving mergeableState null (-> "in_progress").
   } catch {
-    // network/timeout on the checks read specifically — same "unknown",
+    // network/timeout on the detail read specifically — same fallback,
     // never thrown (see this function's own header on why).
   }
 
-  return { number: pr.number, htmlUrl: pr.html_url, checksState };
+  const ageMinutes = (Date.now() - new Date(pr.created_at).getTime()) / 60_000;
+  let state: PublishBotPrState = "in_progress";
+  if (mergeableState === "dirty") {
+    state = "stuck_conflict";
+  } else if (
+    mergeableState !== null &&
+    STUCK_MERGEABLE_STATES.has(mergeableState) &&
+    ageMinutes > PUBLISH_STUCK_AGE_MINUTES
+  ) {
+    state = "stuck_checks";
+  }
+
+  return { number: pr.number, htmlUrl: pr.html_url, state };
 }

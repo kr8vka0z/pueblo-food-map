@@ -5,6 +5,12 @@
  * fix/* branches); this covers ONLY the new read-only PR-status function,
  * not the rest of the module (see that file for the mutation-path
  * commitPublishedVenues coverage this mirrors the mocked-fetch style of).
+ *
+ * Pulls API only (review finding, 2026-09-24 — see fetchPublishBotPrStatus's
+ * own header): the fine-grained `GITHUB_PUBLISH_TOKEN` PAT can't read check
+ * runs at all, so the original Checks-API version of this function could
+ * never actually report a failure. `mergeable_state` + `created_at` from
+ * `GET /pulls/{number}` drive the three states instead.
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -15,14 +21,30 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 const PR_LIST_URL_FRAGMENT = "/pulls?head=";
-const CHECK_RUNS_URL_FRAGMENT = "/check-runs";
+const PR_URL = "https://github.com/kr8vka0z/pueblo-food-map/pull/42";
+
+/** A PR created well past the 20-minute "stuck" age bar. */
+const OLD_CREATED_AT = new Date(Date.now() - 30 * 60_000).toISOString();
+/** A PR just opened — inside the 20-minute grace window. */
+const FRESH_CREATED_AT = new Date().toISOString();
+
+function listResponse(overrides: { created_at?: string } = {}) {
+  return jsonResponse([
+    { number: 42, html_url: PR_URL, created_at: overrides.created_at ?? OLD_CREATED_AT },
+  ]);
+}
+
+/** `/pulls/{number}` single-PR detail endpoint — the only place `mergeable_state` is exposed. */
+function isDetailUrl(url: string): boolean {
+  return /\/pulls\/\d+$/.test(url);
+}
 
 describe("fetchPublishBotPrStatus", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  test("no open publish-bot PR -> null, never calls the checks endpoint", async () => {
+  test("no open publish-bot PR -> null, never calls the single-PR detail endpoint", async () => {
     const mockFetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
       if (url.includes(PR_LIST_URL_FRAGMENT)) return jsonResponse([]);
@@ -42,110 +64,110 @@ describe("fetchPublishBotPrStatus", () => {
     await expect(fetchPublishBotPrStatus("test-token")).rejects.toThrow(GitHubApiError);
   });
 
-  test("open PR, all checks completed and green -> checksState 'passing'", async () => {
+  test("mergeable_state 'dirty' -> state 'stuck_conflict', regardless of PR age", async () => {
     const mockFetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
-      if (url.includes(PR_LIST_URL_FRAGMENT)) {
-        return jsonResponse([{ number: 42, html_url: "https://github.com/kr8vka0z/pueblo-food-map/pull/42", head: { sha: "sha-1" } }]);
-      }
-      if (url.includes(CHECK_RUNS_URL_FRAGMENT)) {
-        return jsonResponse({ check_runs: [{ status: "completed", conclusion: "success" }, { status: "completed", conclusion: "neutral" }] });
-      }
+      if (url.includes(PR_LIST_URL_FRAGMENT)) return listResponse({ created_at: FRESH_CREATED_AT });
+      if (isDetailUrl(url)) return jsonResponse({ mergeable_state: "dirty" });
       throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", mockFetch);
 
     const status = await fetchPublishBotPrStatus("test-token");
-    expect(status).toEqual({ number: 42, htmlUrl: "https://github.com/kr8vka0z/pueblo-food-map/pull/42", checksState: "passing" });
+    expect(status).toEqual({ number: 42, htmlUrl: PR_URL, state: "stuck_conflict" });
   });
 
-  test("open PR, a check-run still in progress -> checksState 'pending'", async () => {
+  test("mergeable_state 'blocked' and PR older than 20 minutes -> state 'stuck_checks'", async () => {
     const mockFetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
-      if (url.includes(PR_LIST_URL_FRAGMENT)) {
-        return jsonResponse([{ number: 42, html_url: "https://github.com/kr8vka0z/pueblo-food-map/pull/42", head: { sha: "sha-1" } }]);
-      }
-      if (url.includes(CHECK_RUNS_URL_FRAGMENT)) {
-        return jsonResponse({ check_runs: [{ status: "in_progress", conclusion: null }] });
-      }
+      if (url.includes(PR_LIST_URL_FRAGMENT)) return listResponse({ created_at: OLD_CREATED_AT });
+      if (isDetailUrl(url)) return jsonResponse({ mergeable_state: "blocked" });
       throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", mockFetch);
 
     const status = await fetchPublishBotPrStatus("test-token");
-    expect(status?.checksState).toBe("pending");
+    expect(status?.state).toBe("stuck_checks");
   });
 
-  test("open PR, zero check-runs reported yet -> checksState 'pending', not 'unknown'", async () => {
+  test.each(["unstable", "behind"])(
+    "mergeable_state '%s' and PR older than 20 minutes -> state 'stuck_checks'",
+    async (mergeableState) => {
+      const mockFetch = vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes(PR_LIST_URL_FRAGMENT)) return listResponse({ created_at: OLD_CREATED_AT });
+        if (isDetailUrl(url)) return jsonResponse({ mergeable_state: mergeableState });
+        throw new Error(`Unexpected fetch: ${url}`);
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const status = await fetchPublishBotPrStatus("test-token");
+      expect(status?.state).toBe("stuck_checks");
+    },
+  );
+
+  test("mergeable_state 'blocked' but PR still within the 20-minute grace window -> state 'in_progress'", async () => {
     const mockFetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
-      if (url.includes(PR_LIST_URL_FRAGMENT)) {
-        return jsonResponse([{ number: 42, html_url: "https://github.com/kr8vka0z/pueblo-food-map/pull/42", head: { sha: "sha-1" } }]);
-      }
-      if (url.includes(CHECK_RUNS_URL_FRAGMENT)) {
-        return jsonResponse({ check_runs: [] });
-      }
+      if (url.includes(PR_LIST_URL_FRAGMENT)) return listResponse({ created_at: FRESH_CREATED_AT });
+      if (isDetailUrl(url)) return jsonResponse({ mergeable_state: "blocked" });
       throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", mockFetch);
 
     const status = await fetchPublishBotPrStatus("test-token");
-    expect(status?.checksState).toBe("pending");
+    expect(status?.state).toBe("in_progress");
   });
 
-  test("open PR, one check-run failed -> checksState 'failing' (the case #598 exists to surface)", async () => {
+  test("mergeable_state 'clean' -> state 'in_progress' (still open, not yet merged)", async () => {
     const mockFetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
-      if (url.includes(PR_LIST_URL_FRAGMENT)) {
-        return jsonResponse([{ number: 42, html_url: "https://github.com/kr8vka0z/pueblo-food-map/pull/42", head: { sha: "sha-1" } }]);
-      }
-      if (url.includes(CHECK_RUNS_URL_FRAGMENT)) {
-        return jsonResponse({
-          check_runs: [
-            { status: "completed", conclusion: "success" },
-            { status: "completed", conclusion: "failure" },
-          ],
-        });
-      }
+      if (url.includes(PR_LIST_URL_FRAGMENT)) return listResponse({ created_at: OLD_CREATED_AT });
+      if (isDetailUrl(url)) return jsonResponse({ mergeable_state: "clean" });
       throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", mockFetch);
 
     const status = await fetchPublishBotPrStatus("test-token");
-    expect(status?.checksState).toBe("failing");
+    expect(status?.state).toBe("in_progress");
   });
 
-  test("checks endpoint 403s (PAT missing Checks:read) -> checksState 'unknown', PR presence still returned, no throw", async () => {
+  test("mergeable_state still 'unknown' (GitHub hasn't computed it yet) -> state 'in_progress', not stuck", async () => {
     const mockFetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
-      if (url.includes(PR_LIST_URL_FRAGMENT)) {
-        return jsonResponse([{ number: 42, html_url: "https://github.com/kr8vka0z/pueblo-food-map/pull/42", head: { sha: "sha-1" } }]);
-      }
-      if (url.includes(CHECK_RUNS_URL_FRAGMENT)) {
-        return jsonResponse({ message: "Resource not accessible" }, 403);
-      }
+      if (url.includes(PR_LIST_URL_FRAGMENT)) return listResponse({ created_at: OLD_CREATED_AT });
+      if (isDetailUrl(url)) return jsonResponse({ mergeable_state: "unknown" });
       throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", mockFetch);
 
     const status = await fetchPublishBotPrStatus("test-token");
-    expect(status).toEqual({ number: 42, htmlUrl: "https://github.com/kr8vka0z/pueblo-food-map/pull/42", checksState: "unknown" });
+    expect(status?.state).toBe("in_progress");
   });
 
-  test("checks endpoint throws (network/timeout) -> checksState 'unknown', PR presence still returned, no throw", async () => {
+  test("single-PR detail call 403s (permissions gap) -> state 'in_progress', PR presence still returned, no throw", async () => {
     const mockFetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
-      if (url.includes(PR_LIST_URL_FRAGMENT)) {
-        return jsonResponse([{ number: 42, html_url: "https://github.com/kr8vka0z/pueblo-food-map/pull/42", head: { sha: "sha-1" } }]);
-      }
-      if (url.includes(CHECK_RUNS_URL_FRAGMENT)) {
-        throw new Error("network down");
-      }
+      if (url.includes(PR_LIST_URL_FRAGMENT)) return listResponse({ created_at: OLD_CREATED_AT });
+      if (isDetailUrl(url)) return jsonResponse({ message: "Resource not accessible" }, 403);
       throw new Error(`Unexpected fetch: ${url}`);
     });
     vi.stubGlobal("fetch", mockFetch);
 
     const status = await fetchPublishBotPrStatus("test-token");
-    expect(status).toEqual({ number: 42, htmlUrl: "https://github.com/kr8vka0z/pueblo-food-map/pull/42", checksState: "unknown" });
+    expect(status).toEqual({ number: 42, htmlUrl: PR_URL, state: "in_progress" });
+  });
+
+  test("single-PR detail call throws (network/timeout) -> state 'in_progress', PR presence still returned, no throw", async () => {
+    const mockFetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes(PR_LIST_URL_FRAGMENT)) return listResponse({ created_at: OLD_CREATED_AT });
+      if (isDetailUrl(url)) throw new Error("network down");
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const status = await fetchPublishBotPrStatus("test-token");
+    expect(status).toEqual({ number: 42, htmlUrl: PR_URL, state: "in_progress" });
   });
 });

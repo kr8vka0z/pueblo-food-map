@@ -336,7 +336,7 @@ y=729 └───────────────────────�
 
 Two fonts with clearly delineated roles, both self-hosted as variable woff2 files — no Google Fonts CDN at runtime.
 
-**Fraunces** (variable, weights 300–900) is the display serif. Reach for it exactly twice: the wordmark, and venue name headings inside the detail panels (BottomSheet `h2`, DesktopVenueWindow `h2`). It is NOT preloaded on the critical path — it loads via `font-display: swap` to avoid competing with Public Sans for LCP bandwidth. Do not use it for body copy, badges, buttons, labels, form inputs, or any text below the wordmark and venue name contexts.
+**Fraunces** (variable, weights 300–900) is the display serif. Reach for it for **display headings only**: the wordmark; venue names in the detail panels (BottomSheet / DesktopVenueWindow `h2`, `/venue/<id>`); page titles (`h1` on About, Resources, Privacy, Venues, Suggest, Report, Feedback, 404, box history/activity); and short card or confirmation titles (form thank-you headings, the location-denied banner, the Blessing Box check-in question). Always `font-normal` or `font-semibold`, `ink-900` (`brand-navy` for the wordmark and the location banner). It is NOT preloaded on the critical path — it loads via `font-display: swap` to avoid competing with Public Sans for LCP bandwidth. Do not use it for body copy, badges, buttons, labels, form inputs, section labels, or anything that isn't a heading.
 
 **Public Sans** (variable, weights 100–900) carries everything else: all body text, button labels, badge text, placeholder copy, section headers, hours, distance readouts, microcopy. It is humanist and legible at small sizes. Four stylistic alternates are active globally via `font-feature-settings: "cv02", "cv03", "cv04", "cv11"` — these produce cleaner numeral and letterform rendering without any visible style change for most readers.
 
@@ -486,7 +486,7 @@ Every state says what happened in plain words and offers a next step. Never a bl
 **Do:**
 - Use `bone-50` as the base background everywhere — the app has one paper color and it is warm cream.
 - Use sage for every interactive affordance: focus rings, selected marker ring, "Show details" link, active filter chip, hover on links inside detail cards.
-- Use Fraunces sparingly for the wordmark and venue name `h2` headings only. These are the display moments.
+- Use Fraunces for display headings only — the wordmark, venue names, page titles, and short card/confirmation titles (see Typography). Everything else is Public Sans.
 - Use Public Sans for all body text, buttons, badges, labels, placeholder copy, and section headers.
 - Preload only Public Sans (`/fonts/PublicSans-Variable.woff2`). Fraunces loads non-blocking via `font-display: swap`.
 - Target WCAG AAA (7:1) for body text. `ink-700` on `bone-50` is the floor; do not go lighter.

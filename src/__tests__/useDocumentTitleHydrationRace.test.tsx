@@ -37,15 +37,30 @@ function TitleSetter({ title }: { title: string }) {
 function simulateReactTitleStomp(text: string) {
   const titleEl = document.querySelector("title");
   if (!titleEl) throw new Error("no <title> element in document.head");
-  if (titleEl.firstChild) {
-    titleEl.firstChild.nodeValue = text;
-  } else {
-    titleEl.textContent = text;
-  }
+  titleEl.firstChild!.nodeValue = text;
 }
 
-// MutationObserver callbacks fire as a microtask after the mutation — flush
-// the microtask queue so the hook's own correction has run before asserting.
+/**
+ * Simulates the OTHER stomp shape the hook's own comment calls out: React
+ * replacing the <title> element outright (a fresh node, not a text edit) —
+ * this is why the observer watches `childList` on document.head, not just
+ * `characterData` on the existing node. Mirrors the real "adopt vs. create"
+ * branch in react-dom-client's Hoistable title-mount path: if the existing
+ * node is already claimed, a second title Fiber creates and inserts a new
+ * one rather than editing the old one's text.
+ */
+function simulateReactTitleNodeReplacement(text: string) {
+  const titleEl = document.querySelector("title");
+  if (!titleEl) throw new Error("no <title> element in document.head");
+  const replacement = document.createElement("title");
+  replacement.textContent = text;
+  titleEl.replaceWith(replacement);
+}
+
+// MutationObserver callbacks fire as a microtask after the mutation, but a
+// macrotask flush is a strict superset (it also drains any microtasks
+// queued first) — cheap insurance against a future browser/jsdom scheduling
+// change, not a claim that setTimeout itself is a microtask.
 function flushMicrotasks() {
   return new Promise<void>((resolve) => setTimeout(resolve, 0));
 }
@@ -75,6 +90,18 @@ describe("useDocumentTitle self-heals after a hydration-time title stomp (#589)"
     // the observer's correction doesn't re-trigger itself indefinitely.
     await flushMicrotasks();
     expect(document.title).toBe("Privacidad · Pueblo Food Map");
+  });
+
+  test("reverts a whole-node replacement of <title>, not just a text edit", async () => {
+    render(<TitleSetter title="Sugerir un lugar · Pueblo Food Map" />);
+    expect(document.title).toBe("Sugerir un lugar · Pueblo Food Map");
+
+    simulateReactTitleNodeReplacement("Suggest a place · Pueblo Food Map");
+    expect(document.title).toBe("Suggest a place · Pueblo Food Map"); // stomped, pre-heal
+
+    await flushMicrotasks();
+
+    expect(document.title).toBe("Sugerir un lugar · Pueblo Food Map");
   });
 
   test("stops correcting once the component unmounts", async () => {

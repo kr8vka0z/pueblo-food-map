@@ -149,7 +149,7 @@ describe("PATCH /api/admin/venues/[id] — optimistic concurrency (#265)", () =>
     // separate pre-fetched comparison in JS.
     expect(updateStmt.args).toContain("2025-06-01T00:00:00.000Z");
 
-    // D1 (real behavior, verified separately against sqlite3 — see route.ts's
+    // D1 (real behavior, verified against real SQLite in src/lib/adminVenueEditSql.sql.test.ts — see route.ts's
     // header) would report 0 rows matched here; this mock simulates exactly
     // that outcome for statement 0.
     expect(res.status).toBe(409);
@@ -159,7 +159,7 @@ describe("PATCH /api/admin/venues/[id] — optimistic concurrency (#265)", () =>
     expect(data.message).toBe("Someone else changed this place since you opened it. Reload to see their changes.");
   });
 
-  test("stale precondition -> the audit_log INSERT is SELECT-form, gated on WHERE EXISTS (venues.updated_at = the NEW timestamp) — proven not to insert when 0 rows matched, see route.ts header + sqlite3 verification", async () => {
+  test("stale precondition -> the audit_log INSERT is SELECT-form, gated on WHERE EXISTS (venues.updated_at = the NEW timestamp) — proven not to insert when 0 rows matched, see src/lib/adminVenueEditSql.sql.test.ts", async () => {
     const { db, batch } = makeFakeDb(makeExistingRow(), 0);
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
 

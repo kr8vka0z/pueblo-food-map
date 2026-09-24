@@ -22,15 +22,6 @@ export const OG_IMAGE = {
 } as const;
 
 /**
- * Build complete per-page metadata for a static content page.
- *
- * WHY: Next.js shallow-merges metadata — a child `openGraph`/`twitter` object
- * REPLACES the parent's entirely (it does not deep-merge; see Next docs
- * "Merging"). A subpage that set only {title,url} would drop the inherited OG
- * image. This returns the FULL openGraph/twitter (brand image included) with
- * per-page title/url + a self-canonical, so subpage previews keep the image.
- */
-/**
  * Compose a client-side <title> matching the format layout.tsx's
  * `title.template` ("%s · Pueblo Food Map") produces server-side.
  *
@@ -46,6 +37,15 @@ export function pageDocumentTitle(shortTitle: string): string {
   return `${shortTitle} · ${SITE_NAME}`;
 }
 
+/**
+ * Build complete per-page metadata for a static content page.
+ *
+ * WHY: Next.js shallow-merges metadata — a child `openGraph`/`twitter` object
+ * REPLACES the parent's entirely (it does not deep-merge; see Next docs
+ * "Merging"). A subpage that set only {title,url} would drop the inherited OG
+ * image. This returns the FULL openGraph/twitter (brand image included) with
+ * per-page title/url + a self-canonical, so subpage previews keep the image.
+ */
 export function buildPageMetadata(opts: {
   title: string;
   description: string;

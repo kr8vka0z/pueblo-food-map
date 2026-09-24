@@ -22,6 +22,7 @@ import { render, act } from "@testing-library/react";
 import React from "react";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import type { Venue } from "@/types/venue";
+import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 
 // ─── Shared mocks ──────────────────────────────────────────────────────────
 
@@ -67,6 +68,29 @@ const FIXTURE_VENUE: Venue = {
   address: "330 Lake Ave, Pueblo, CO 81004",
   source: "test",
   last_verified: "2026-01-01",
+};
+
+const FIXTURE_BOX: PublicBlessingBox = {
+  id: "test-box-1",
+  name: "Test Blessing Box",
+  category: "blessing_box",
+  lat: 38.27,
+  lng: -104.61,
+  address: "123 Test St, Pueblo, CO",
+  source: "manual",
+  last_verified: "2026-09-01T00:00:00.000Z",
+  box: {
+    hostName: null,
+    hostNote: null,
+    mostNeeded: null,
+    installedOn: "2026-01-01",
+    removedOn: null,
+    status: "stocked",
+    lastFilledAt: null,
+    recentCheckins: [],
+    latestPhoto: null,
+    adopters: [],
+  },
 };
 
 const FIXTURE_GROUPS = [
@@ -133,6 +157,7 @@ import AlertsConfirmContent from "@/components/AlertsConfirmContent";
 import AlertsStopContent from "@/components/AlertsStopContent";
 import ReportPageContent from "@/components/ReportPageContent";
 import NotFoundContent from "@/components/NotFoundContent";
+import BoxHistoryContent from "@/components/BoxHistoryContent";
 
 // Expected document.title in Spanish per page — the literal SSR title (see
 // each page.tsx's own `metadata`/`generateMetadata`, verified against a
@@ -152,6 +177,7 @@ const EXPECTED_ES = {
   alertsConfirm: "Confirma tu correo · Pueblo Food Map",
   alertsStop: "Correos detenidos · Pueblo Food Map",
   report: "Reportar un problema — RMSER Community Garden · Pueblo Food Map",
+  boxHistory: "Test Blessing Box — Historial · Pueblo Food Map",
   notFound: "Página no encontrada · Pueblo Food Map",
 } as const;
 
@@ -222,6 +248,11 @@ describe("document.title follows locale (#589)", () => {
   test("/report/[venueId]", () => {
     renderEs(<ReportPageContent venue={FIXTURE_VENUE} />);
     expect(document.title).toBe(EXPECTED_ES.report);
+  });
+
+  test("/box/[id]/history", () => {
+    renderEs(<BoxHistoryContent box={FIXTURE_BOX} />);
+    expect(document.title).toBe(EXPECTED_ES.boxHistory);
   });
 
   test("404 not-found", () => {

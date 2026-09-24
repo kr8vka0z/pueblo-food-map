@@ -53,11 +53,13 @@ import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@
 import { loadVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
+import { fetchPublishBotPrStatus, type PublishBotPrStatus } from "@/lib/publishVenues";
 import type { AdminNavCounts } from "@/lib/adminNavCounts";
 import type { AdminVenueRow } from "@/types/venue";
 import type { ClosurePayload, NewVenuePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
 import AdminNav from "@/components/AdminNav";
 import PublishPanel from "@/components/PublishPanel";
+import PublishBotStatusBanner from "@/components/PublishBotStatusBanner";
 import NeedsDecisionPanel from "@/components/NeedsDecisionPanel";
 import BoxHealthList from "@/components/BoxHealthList";
 import StalePlacesList from "@/components/StalePlacesList";
@@ -104,28 +106,49 @@ export default async function DashboardPage() {
   let photos: AdminBoxPhotoRow[];
   let adopters: AdminBoxAdopterRow[];
   let boxHealthEntries: Awaited<ReturnType<typeof loadBoxHealthEntries>>;
+  let publishBotStatus: PublishBotPrStatus | null;
 
   try {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
 
-    const [venuesResult, submissionsPreviewResult, submissionsTotalRow, proposalsPreviewResult, proposalsTotalRow, photosAll, adoptersAll, boxHealth] =
-      await Promise.all([
-        db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
-        db
-          .prepare("SELECT * FROM public_submissions WHERE status = 'pending' ORDER BY created_at DESC LIMIT ?")
-          .bind(DECISION_PREVIEW_LIMIT)
-          .all<PublicSubmissionRow>(),
-        db.prepare("SELECT COUNT(*) AS n FROM public_submissions WHERE status = 'pending'").first<{ n: number }>(),
-        db
-          .prepare("SELECT * FROM change_proposals WHERE status = 'pending' ORDER BY created_at DESC LIMIT ?")
-          .bind(DECISION_PREVIEW_LIMIT)
-          .all<ChangeProposalRow>(),
-        db.prepare("SELECT COUNT(*) AS n FROM change_proposals WHERE status = 'pending'").first<{ n: number }>(),
-        loadReviewQueue(db).catch(() => [] as AdminBoxPhotoRow[]),
-        loadPendingAdopters(db).catch(() => [] as AdminBoxAdopterRow[]),
-        loadBoxHealthEntries(db).catch(() => [] as Awaited<ReturnType<typeof loadBoxHealthEntries>>),
-      ]);
+    // #598: reads the SAME open publish-bot PR commitPublishedVenues()
+    // (publishVenues.ts) opens — deliberately gated behind getAdminDb()
+    // resolving first (this whole call sits inside the try below, after the
+    // auth line above), so an unauthenticated hit can never trigger a
+    // GitHub call. `GITHUB_PUBLISH_TOKEN` is absent on staging (this file's
+    // own header/AGENTS.md) — skipped entirely rather than fetched with an
+    // empty token, and `.catch(() => null)` matches every other best-effort
+    // Dashboard read above (one GitHub hiccup must never break the page).
+    const publishToken = process.env.GITHUB_PUBLISH_TOKEN;
+
+    const [
+      venuesResult,
+      submissionsPreviewResult,
+      submissionsTotalRow,
+      proposalsPreviewResult,
+      proposalsTotalRow,
+      photosAll,
+      adoptersAll,
+      boxHealth,
+      publishBotStatusResult,
+    ] = await Promise.all([
+      db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
+      db
+        .prepare("SELECT * FROM public_submissions WHERE status = 'pending' ORDER BY created_at DESC LIMIT ?")
+        .bind(DECISION_PREVIEW_LIMIT)
+        .all<PublicSubmissionRow>(),
+      db.prepare("SELECT COUNT(*) AS n FROM public_submissions WHERE status = 'pending'").first<{ n: number }>(),
+      db
+        .prepare("SELECT * FROM change_proposals WHERE status = 'pending' ORDER BY created_at DESC LIMIT ?")
+        .bind(DECISION_PREVIEW_LIMIT)
+        .all<ChangeProposalRow>(),
+      db.prepare("SELECT COUNT(*) AS n FROM change_proposals WHERE status = 'pending'").first<{ n: number }>(),
+      loadReviewQueue(db).catch(() => [] as AdminBoxPhotoRow[]),
+      loadPendingAdopters(db).catch(() => [] as AdminBoxAdopterRow[]),
+      loadBoxHealthEntries(db).catch(() => [] as Awaited<ReturnType<typeof loadBoxHealthEntries>>),
+      publishToken ? fetchPublishBotPrStatus(publishToken).catch(() => null) : Promise.resolve(null),
+    ]);
 
     venues = venuesResult.results;
     submissionRows = submissionsPreviewResult.results;
@@ -139,6 +162,7 @@ export default async function DashboardPage() {
     photos = photosAll;
     adopters = adoptersAll;
     boxHealthEntries = boxHealth;
+    publishBotStatus = publishBotStatusResult;
   } catch (err) {
     handlePageAuthError(err);
   }
@@ -160,6 +184,16 @@ export default async function DashboardPage() {
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={email} active="dashboard" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6">
+        {/* #598: independent of showPublishBar — after a publish, D1 is
+            already promoted (the Publish bar's own summary drops to zero),
+            exactly when this banner needs to show instead. */}
+        {publishBotStatus && (
+          <PublishBotStatusBanner
+            prNumber={publishBotStatus.number}
+            prUrl={publishBotStatus.htmlUrl}
+            state={publishBotStatus.state}
+          />
+        )}
         {showPublishBar && <PublishPanel summary={publishSummary} reviewHref="/admin/places" />}
 
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start">

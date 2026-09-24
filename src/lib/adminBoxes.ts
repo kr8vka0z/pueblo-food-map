@@ -53,11 +53,12 @@ export async function loadBoxHealthEntries(db: D1Database, now: Date = new Date(
   const venueIds = venues.map((v) => v.id);
   const [latestByVenue, adopterNamesByVenue] = await Promise.all([
     loadLatestCheckinPerBox(db),
-    // ponytail: same ~100-bound-param D1/SQLite ceiling boxPhotos.ts's own
-    // batched query already documents (AGENTS.md's D1 notes) — fine at
-    // Pueblo's real box count, not worth chunking here yet. Best-effort
-    // (degrades to no caretaker data) rather than throwing, matching the
-    // "one missing table must never break this panel" posture above.
+    // #568 item 7: loadApprovedAdopterNamesForVenues chunks past D1's
+    // 100-bound-param ceiling itself now (see that function's own header) —
+    // this call site no longer needs to reason about the limit at all.
+    // Best-effort (degrades to no caretaker data) rather than throwing,
+    // matching the "one missing table must never break this panel" posture
+    // above.
     loadApprovedAdopterNamesForVenues(db, venueIds).catch(() => new Map<string, string[]>()),
   ]);
 

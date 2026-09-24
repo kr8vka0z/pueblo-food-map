@@ -12,7 +12,11 @@
  * Component page, src/app/admin/page.tsx) and no mutation of its own — the
  * Edit link below only navigates to /admin/venues/[id]/edit
  * (src/app/admin/venues/[id]/edit/page.tsx), where AddVenueForm and
- * ArchiveVenueButton own the actual mutations.
+ * ArchiveVenueButton own the actual mutations. An archived row gets a
+ * muted "Archived" label instead of that link (#568 review finding,
+ * 2026-09-24) — PATCH /api/admin/venues/[id] refuses an archived-row edit
+ * with a 409, so a link that always dead-ends into that 409 isn't a real
+ * action worth offering.
  */
 
 import Link from "next/link";
@@ -184,15 +188,25 @@ export default function VenueListView({ venues }: VenueListViewProps) {
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/admin/venues/${venue.id}/edit`}
-                      className={
-                        "text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2 " +
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
-                      }
-                    >
-                      Edit
-                    </Link>
+                    {venue.status === "archived" ? (
+                      // #568 review finding (2026-09-24): PATCH /api/admin/venues/[id]
+                      // now refuses an archived-row edit with a 409 (see that
+                      // route's own header) — an Edit link that always 409s on
+                      // save is a dead end, not a real action, so this column
+                      // shows a plain muted label instead of a link for an
+                      // archived row.
+                      <span className="text-sm text-[var(--color-ink-400)]">Archived</span>
+                    ) : (
+                      <Link
+                        href={`/admin/venues/${venue.id}/edit`}
+                        className={
+                          "text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2 " +
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
+                        }
+                      >
+                        Edit
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))}

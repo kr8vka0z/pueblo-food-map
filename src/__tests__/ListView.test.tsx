@@ -11,6 +11,8 @@ import ListView from "@/components/ListView";
 import type { Venue } from "@/types/venue";
 import { publishedAt } from "@/data/published-venues";
 import { formatPublishedDate } from "@/lib/dataFreshness";
+import { OSM_COPYRIGHT_URL } from "@/lib/osmAttribution";
+import { t } from "@/lib/i18n";
 
 // ─── Fixture ─────────────────────────────────────────────────────────────────
 
@@ -109,6 +111,26 @@ describe("ListView — data freshness line", () => {
     render(<ListView venues={FIXTURE_VENUES} selectedVenueId={null} onSelect={vi.fn()} locale="es" />);
     const expected = formatPublishedDate(publishedAt, "es");
     expect(screen.getByText(new RegExp(`Datos del mapa actualizados el ${expected}`))).toBeDefined();
+  });
+});
+
+// ─── OSM attribution (#133 4.5) ────────────────────────────────────────────────
+
+describe("ListView — OSM attribution", () => {
+  test("renders an OpenStreetMap copyright link (list view covers Map.tsx's AttributionControl)", () => {
+    render(<ListView venues={FIXTURE_VENUES} selectedVenueId={null} onSelect={vi.fn()} />);
+    const link = screen.getByRole("link", { name: t("osm.attribution", "en") });
+    expect(link.getAttribute("href")).toBe(OSM_COPYRIGHT_URL);
+  });
+
+  test("shows the attribution link even when the filtered list is empty", () => {
+    render(<ListView venues={[]} selectedVenueId={null} onSelect={vi.fn()} />);
+    expect(screen.getByRole("link", { name: t("osm.attribution", "en") })).toBeDefined();
+  });
+
+  test("renders the ES translation", () => {
+    render(<ListView venues={FIXTURE_VENUES} selectedVenueId={null} onSelect={vi.fn()} locale="es" />);
+    expect(screen.getByRole("link", { name: t("osm.attribution", "es") })).toBeDefined();
   });
 });
 

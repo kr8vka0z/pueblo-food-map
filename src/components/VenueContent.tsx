@@ -24,6 +24,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
+import { OSM_COPYRIGHT_URL, isOsmSourced } from "@/lib/osmAttribution";
 
 interface VenueContentProps {
   venue: Venue;
@@ -181,6 +182,22 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
             <p className="text-xs text-[var(--color-ink-400)] mt-1">
               {t("detail.lastVerified", locale)}: {v.last_verified}
             </p>
+            {/* ODbL attribution (#133 4.5) — this page has no SiteFooter
+                (see file header: highest-risk page in the repo, minimal nav
+                only), so venues actually sourced from OSM get their own
+                credit line here rather than none at all. */}
+            {isOsmSourced(v.source) && (
+              <p className="text-xs text-[var(--color-ink-400)] mt-1">
+                <a
+                  href={OSM_COPYRIGHT_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center min-h-11 hover:text-[var(--color-ink-700)] transition-colors focus-visible:outline-none focus-visible:underline"
+                >
+                  {t("osm.attribution", locale)}
+                </a>
+              </p>
+            )}
           </section>
         )}
 

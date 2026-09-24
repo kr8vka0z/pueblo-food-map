@@ -278,7 +278,7 @@ describe("AddVenueForm — submissionId threading (#259)", () => {
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places"));
   });
 
-  test("edit mode ignores submissionId entirely: PATCH body omits it, redirect still goes to /admin", async () => {
+  test("edit mode ignores submissionId entirely: PATCH body omits it, redirect still goes to /admin/places", async () => {
     mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc" }) });
     const user = userEvent.setup();
     render(<AddVenueForm venueId="manual-abc" submissionId={42} />);

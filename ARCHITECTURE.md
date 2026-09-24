@@ -733,8 +733,13 @@ not cached.
 **Bust the cache:** bump `CACHE_VERSION` in `public/sw.js`. The new worker
 installs on visitors' next page load, takes over immediately (`skipWaiting` +
 `clients.claim`), and deletes every older `pfm-*` cache on activate. Ordinary
-deploys don't need a bump: shell pages are network-first, and new hashed
-assets are new URLs.
+deploys don't need a bump for correctness: shell pages are network-first,
+and new hashed assets are new URLs. Storage is another matter. A previous
+deploy's `/_next/static` entries are never evicted until the version bumps,
+so the cache grows by roughly one shell's worth of chunks per deploy a
+visitor sees. ponytail: bump `CACHE_VERSION` every few releases. The upgrade
+path is pruning `/_next/static` entries that the freshly fetched shell HTML
+no longer references.
 
 **Disable it:** set `KILL_SWITCH = true` in `public/sw.js` and deploy. On
 visitors' next page load the replacement worker deletes every `pfm-*` cache,

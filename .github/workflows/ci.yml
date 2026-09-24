@@ -172,13 +172,19 @@ jobs:
         # each workflow running its own `npm run build` (#292 — CI used to
         # build the app twice per PR). .next/cache is excluded: it only
         # speeds up a FUTURE `next build`, `next start` never reads it, and
-        # it's usually the bulk of .next's size.
+        # it's usually the bulk of .next's size. include-hidden-files is
+        # REQUIRED: upload-artifact treats any dot-prefixed path as hidden
+        # and silently uploads zero files without it -- .next itself is one
+        # (confirmed: the first version of this step without the flag
+        # uploaded an empty artifact and failed the lighthouse job's
+        # download step).
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nextjs-build
           path: |
             .next
             !.next/cache
+          include-hidden-files: true
           retention-days: 1
 
   # Was its own workflow (lighthouse.yml) with an independent `npm ci` +

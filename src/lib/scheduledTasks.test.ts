@@ -121,9 +121,11 @@ describe("runScheduledTasks", () => {
     runScheduledTasks(fakeEvent(ALERTS_SLOT), env, ctx);
     await settle();
 
-    // Ping fetch + zero alert-email fetches (nothing tripped) — only the
-    // heartbeat call, proving the HC ping fired independently of the
-    // refresh-alerts D1 reads.
+    // fetchMock: the HC.io ping call only — nothing tripped, so
+    // refreshAlerts never reaches its own sendAlertEmail fetch.
+    // calls(): counts db.prepare() — proves the refresh-alerts D1 reads
+    // (pending-age + staleness) actually ran, a separate signal from the
+    // ping.
     expect(fetchMock).toHaveBeenCalledWith("https://hc.example/ping");
     expect(calls()).toBeGreaterThan(0);
     expect(errorSpy).not.toHaveBeenCalled();
@@ -169,7 +171,7 @@ describe("runScheduledTasks", () => {
     expect(retentionCalls()).toBeGreaterThan(0);
   });
 
-  test("a retention failure never blocks the ping or the refresh-alerts check", async () => {
+  test("a retention failure never blocks the ping (retention slot — refresh-alerts is out of slot, not exercised here)", async () => {
     const fetchMock = vi.fn().mockResolvedValue(undefined);
     global.fetch = fetchMock as unknown as typeof fetch;
     const { ctx, settle } = fakeCtx();
@@ -178,7 +180,8 @@ describe("runScheduledTasks", () => {
 
     // Retention slot: only the ping and retention branches are live here
     // (refresh-alerts is out of slot), so this proves the ping survives a
-    // broken D1 binding.
+    // broken D1 binding. The refresh-alerts-vs-ping case has its own test
+    // below.
     runScheduledTasks(fakeEvent(RETENTION_SLOT), env, ctx);
     await settle();
 

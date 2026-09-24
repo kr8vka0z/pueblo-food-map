@@ -120,6 +120,32 @@ export function logAdminAuthEvent(event: AdminAuthEvent): void {
 }
 
 /**
+ * Emit a single-line JSON structured log entry for the daily email
+ * retention cleanup (#594, src/lib/emailRetention.ts). Counts only —
+ * matches this file's PII rule (no id, no email, no row content) — logged
+ * at console.log since a 0-row day is the expected common case, not a
+ * failure.
+ */
+export function logEmailRetentionResult(counts: {
+  submissionsBlanked: number;
+  adoptersBlanked: number;
+  subscriptionsDeleted: number;
+}): void {
+  console.log(JSON.stringify({ event: "email_retention_result", ...counts }));
+}
+
+/**
+ * Emit a single-line JSON structured log entry when the email retention
+ * cleanup throws. Error-level, same convention as send_failed above — this
+ * is the only signal a D1 outage or a bad statement broke the daily
+ * cleanup. `message` is the caught error's own message only, never a row
+ * value.
+ */
+export function logEmailRetentionFailure(message: string): void {
+  console.error(JSON.stringify({ event: "email_retention_failure", message }));
+}
+
+/**
  * Emit a single-line JSON structured log entry when the public live
  * blessing-boxes read (GET /api/public/blessing-boxes, /box/<id>,
  * sitemap.ts) fails to reach D1. Error-level: unlike a form's db_write_failed

@@ -48,7 +48,9 @@ Shared utility components
   └── src/components/SiteFooter.tsx  (slim nav footer on utility pages: /about, /privacy, /suggest, /feedback)
 
 Next.js App Router (Cloudflare Worker, SSR)
-  └── src/app/layout.tsx      (reads pfm-locale cookie; wraps with LocaleProvider)
+  └── src/app/layout.tsx      (reads pfm-locale cookie; wraps with LocaleProvider;
+        mounts ServiceWorkerRegister → public/sw.js, see "Offline / installable app")
+  └── src/app/manifest.ts     (/manifest.webmanifest — installable app, #130)
   └── src/app/page.tsx        (splash gate; mounts MapWrapper)
   └── src/app/about/page.tsx  (mission, vision, origin story, venue sourcing — #155)
   └── src/app/resources/page.tsx  (food help programs: 2-1-1, SNAP, WIC, Double Up,
@@ -684,6 +686,69 @@ auto-merge silently degrades into merge-on-open.
 including a security bump — now sits on `dev` until someone opens a promotion
 PR. It gets real staging exposure first, which is the point, but it is no
 longer self-delivering to production.
+
+---
+
+## Offline / installable app (#130)
+
+The map can be installed to a phone's home screen and keeps working with no
+connection — minus the map itself (Mapbox tiles are out of scope).
+
+**Pieces.**
+- `src/app/manifest.ts` → `/manifest.webmanifest` (name, `short_name` "Food
+  Map", `start_url` `/`, standalone, bone-50 colours tied to `layout.tsx`'s
+  `themeColor` by `manifest.test.ts`). Icons in `public/icons/` plus
+  `src/app/apple-icon.png` are PNGs drawn from the OG image's pin mark.
+- `public/sw.js` — hand-written service worker, no Workbox. Served as a plain
+  static file (never bundled); `public/_headers` sends `Cache-Control:
+  no-cache` so each deploy's copy reaches visitors.
+- `src/components/ServiceWorkerRegister.tsx` (mounted in `layout.tsx`) —
+  registers `/sw.js` in production builds only, after `load` and then browser
+  idle, so it never competes with first paint. In dev it unregisters any
+  worker left over from a local `next start`.
+- Offline notice — `useMapUI`'s map-unavailable fallback (#165) now carries a
+  reason. WebGL missing → "Map unavailable" (unchanged). WebGL fine but
+  `navigator.onLine` false at mount → list view with "Map needs a connection.
+  The list still works." Checked once on mount only: going offline mid-session
+  leaves a working map alone, and coming back online needs a reload.
+
+**What's cached** (one cache, `pfm-<CACHE_VERSION>`):
+
+| Request | Strategy |
+|---|---|
+| `/`, `/venues`, `/resources` — navigations only | Network-first; the cached copy is served only when the network fails. Keyed by path, so `/?venue=x` shares `/`'s entry. |
+| `/_next/static/*`, `/fonts/*`, `/icons/*`, `/manifest.webmanifest` | Stale-while-revalidate. The hashed `/_next/static` files are `immutable` in the HTTP cache, so the revalidate step is normally served from disk rather than the network. |
+| `/api/*`, `/admin*`, `/alerts*` (subscription token in `?t=`), `/box/*` (live D1), anything cross-origin (Mapbox, analytics, Turnstile), any non-GET, every other page | Never touched — straight to the network. |
+
+**Install-time precache.** On a first visit every request happens before the
+worker controls the page, so none of it passes through the worker. `install`
+therefore fetches the three shell pages itself and caches every
+`/_next/static` and `/fonts` URL their HTML references. The venue dataset is
+compiled into those pages and bundles (`src/data/published-venues.ts`), so
+the list and the in-map venue card work offline. Live blessing-box status
+(`/api/public/blessing-boxes`) does not — `useBoxVenues` already treats a
+failed fetch as "no boxes". `/venue/<id>` detail pages and other routes are
+not cached.
+
+**Bust the cache:** bump `CACHE_VERSION` in `public/sw.js`. The new worker
+installs on visitors' next page load, takes over immediately (`skipWaiting` +
+`clients.claim`), and deletes every older `pfm-*` cache on activate. Ordinary
+deploys don't need a bump: shell pages are network-first, and new hashed
+assets are new URLs.
+
+**Disable it:** set `KILL_SWITCH = true` in `public/sw.js` and deploy. On
+visitors' next page load the replacement worker deletes every `pfm-*` cache,
+answers no requests, and unregisters itself. Removing
+`<ServiceWorkerRegister />` alone is NOT enough — a worker that is already
+installed keeps running until something replaces it. To clear one browser
+by hand: DevTools → Application → Service workers → Unregister, then Storage
+→ Clear site data.
+
+**Verified** with Playwright Chromium against `npm run build && npm run
+start`: the manifest is valid (no installability errors), the worker is
+registered and controls the page, and after one online visit an offline
+reload of `/` shows the list with the offline notice and no page errors.
+The venue card opens, and `/venues` and `/resources` load offline.
 
 ---
 

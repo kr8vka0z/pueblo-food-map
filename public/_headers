@@ -6,3 +6,7 @@
 
 /og-image.png
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+# Service worker (#130): always revalidate so a new deploy (or the kill switch) reaches visitors.
+/sw.js
+  Cache-Control: no-cache

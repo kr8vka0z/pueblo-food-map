@@ -79,6 +79,21 @@ describe("BottomSheet Drawer.Content accessible description (#590 follow-up)", (
     expect(descriptionEl?.textContent).toContain("456 Elm St");
   });
 
+  test("swaps the OSM placeholder address for coordinates, same guard as the visible address line", () => {
+    render(
+      <BottomSheet
+        venue={makeVenue({ address: "Address not in OpenStreetMap", lat: 38.1, lng: -104.5 })}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+    const dialog = screen.getByRole("dialog");
+    const describedBy = dialog.getAttribute("aria-describedby") as string;
+    const descriptionEl = document.getElementById(describedBy);
+    expect(descriptionEl?.textContent).not.toContain("Address not in OpenStreetMap");
+    expect(descriptionEl?.textContent).toContain("38.1, -104.5");
+  });
+
   test("ES locale localizes the description via the existing category.full.* keys", () => {
     render(
       <BottomSheet

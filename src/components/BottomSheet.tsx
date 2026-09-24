@@ -381,10 +381,18 @@ export default function BottomSheet({
               real content, don't invent hidden copy. Rendered unconditionally
               (like Drawer.Title above) so every branch — box, ordinary venue,
               route-strip-only, no venue yet — has SOME description, never a
-              dangling reference. */}
+              dangling reference.
+              Same OSM placeholder guard as the visible address line below
+              (line ~666) and DesktopVenueWindow.tsx's own copy of it — a
+              screen reader must never hear the literal "Address not in
+              OpenStreetMap" string either. */}
           <Drawer.Description className="sr-only">
             {venue
-              ? `${t(`category.full.${venue.category}`, locale)}, ${venue.address}`
+              ? `${t(`category.full.${venue.category}`, locale)}, ${
+                  venue.address === "Address not in OpenStreetMap"
+                    ? `${venue.lat}, ${venue.lng}`
+                    : venue.address
+                }`
               : t("detail.venueDetailsPanel", locale)}
           </Drawer.Description>
 

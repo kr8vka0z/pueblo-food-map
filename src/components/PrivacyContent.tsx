@@ -20,10 +20,15 @@
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import SiteFooter from "@/components/SiteFooter";
 
 export default function PrivacyContent() {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — privacy.heading's EN value
+  // ("Privacy") matches page.tsx's metadata title exactly.
+  useDocumentTitle(pageDocumentTitle(t("privacy.heading", locale)));
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">

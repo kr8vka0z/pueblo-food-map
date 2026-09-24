@@ -48,6 +48,7 @@ import MapErrorBoundary from "./MapErrorBoundary";
 import { useGeolocation, type GeoState } from "@/lib/useGeolocation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { venues as allVenues } from "@/data/venues";
 import type { Venue } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
@@ -357,6 +358,21 @@ export default function MapWrapper({
 
   // ── Locale — from context ─────────────────────────────────────────────────────
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — app.documentTitle holds the
+  // FULL title per locale (the one page whose SSR title, set in page.tsx,
+  // isn't run through layout.tsx's "%s · Pueblo Food Map" template — see
+  // that key's own comment in i18n.ts). Called HERE rather than in
+  // HomePageClient.tsx (the component that actually mounts this one) on
+  // purpose: HomePageClient is the route's synchronous, always-blocking
+  // client bundle (#202 dynamic()-imports this file specifically to keep
+  // it out of that bundle on low-end/slow-4G phones); MapWrapper already
+  // pulls in the full i18n dictionary for its own UI, so putting the title
+  // call here costs nothing extra and keeps that dictionary out of the
+  // blocking chunk. MapWrapper is unconditionally rendered whenever
+  // HomePageClient renders anything real (splash is an overlay ON TOP of
+  // the always-mounted map, never a replacement for it — see that file's
+  // own header), so this fires exactly when the home page's title needs it.
+  useDocumentTitle(t("app.documentTitle", locale));
 
   // ── Geolocation — v2 hook ────────────────────────────────────────────────────
   const geo = useGeolocation();

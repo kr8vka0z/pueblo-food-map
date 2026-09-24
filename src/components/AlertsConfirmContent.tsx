@@ -18,6 +18,8 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import PageNav, { PAGE_NAV_CLEARANCE } from "@/components/PageNav";
 import SiteFooter from "@/components/SiteFooter";
 
@@ -25,6 +27,9 @@ type ConfirmState = "idle" | "confirming" | "success" | "invalid" | "error";
 
 export default function AlertsConfirmContent() {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — alerts.confirm.heading's EN
+  // value ("Confirm your email") matches page.tsx's metadata title exactly.
+  useDocumentTitle(pageDocumentTitle(t("alerts.confirm.heading", locale)));
   const searchParams = useSearchParams();
   const token = searchParams.get("t")?.trim() ?? "";
   const [state, setState] = useState<ConfirmState>(token ? "idle" : "invalid");

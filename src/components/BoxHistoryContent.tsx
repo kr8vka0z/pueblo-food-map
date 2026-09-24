@@ -56,6 +56,8 @@
 import { useMemo, useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import { useBoxActivity } from "@/lib/useBoxActivity";
 import { ACTIVITY_PAGE_SIZE_DEFAULT } from "@/lib/boxActivity";
 import { computeCheckinCounts, computePairAverages, filterByPeriod, type PeriodKey } from "@/lib/boxStats";
@@ -75,6 +77,10 @@ interface BoxHistoryContentProps {
 
 export default function BoxHistoryContent({ box, allCheckins = [], approvedPhotoCreatedAts = [] }: BoxHistoryContentProps) {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — box.history.link's EN value
+  // ("History") matches page.tsx generateMetadata's suffix exactly; box.name
+  // is a proper noun, not translated, same as the metadata itself.
+  useDocumentTitle(pageDocumentTitle(`${box.name} — ${t("box.history.link", locale)}`));
   const [page, setPage] = useState(1);
   const [statsPeriod, setStatsPeriod] = useState<PeriodKey>("30d");
 

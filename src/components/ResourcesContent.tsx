@@ -20,6 +20,8 @@
 import { Phone, MessageSquareText, ExternalLink, ChevronDown } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import SiteFooter from "@/components/SiteFooter";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
@@ -90,6 +92,9 @@ const ACTION_CLASS =
 
 export default function ResourcesContent() {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — resources.heading's EN
+  // value ("Food help programs") matches page.tsx's metadata title exactly.
+  useDocumentTitle(pageDocumentTitle(t("resources.heading", locale)));
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>

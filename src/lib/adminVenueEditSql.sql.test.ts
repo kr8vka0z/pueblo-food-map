@@ -20,6 +20,7 @@ import {
   BOX_DELETE_SQL,
   BOX_INSERT_SQL,
   BOX_EVENT_INSERT_SQL_GUARDED,
+  APPROVE_PROPOSAL_SQL,
 } from "@/lib/adminVenueEditSql";
 
 const MIGRATIONS = [
@@ -135,5 +136,35 @@ describe("admin venue edit SQL — optimistic concurrency against real SQLite (#
     expect(changes).toBe(1);
     expect(count(db, "SELECT COUNT(*) n FROM blessing_boxes WHERE venue_id = 'v2'")).toBe(1);
     expect(count(db, "SELECT COUNT(*) n FROM audit_log WHERE entity_id = 'v2'")).toBe(1);
+  });
+});
+
+describe("APPROVE_PROPOSAL_SQL — only marks a link-health proposal approved when the edit applied (#265)", () => {
+  function seedProposal(db: Database.Database, venueId: string) {
+    db.prepare(
+      `INSERT INTO change_proposals (id, source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, anomaly, status, created_at)
+       VALUES (7, 'link_health', ?, 'update', '{}', 'h', 'r1', 0, 'pending', ?)`,
+    ).run(venueId, OLD_TS);
+  }
+  function editAndApprove(db: Database.Database, expected: string) {
+    db.transaction(() => {
+      db.prepare(VENUE_UPDATE_SQL).run(...updateArgs("v1", expected));
+      db.prepare(APPROVE_PROPOSAL_SQL).run("admin@example.com", NEW_TS, NEW_TS, 7, "v1", "v1", NEW_TS);
+    })();
+    return (db.prepare("SELECT status FROM change_proposals WHERE id = 7").get() as { status: string }).status;
+  }
+
+  test("stale edit leaves the proposal pending", () => {
+    const db = buildDb();
+    seedVenue(db, "v1", "pantry");
+    seedProposal(db, "v1");
+    expect(editAndApprove(db, "2026-01-01T00:00:00.000Z")).toBe("pending");
+  });
+
+  test("applied edit marks it approved", () => {
+    const db = buildDb();
+    seedVenue(db, "v1", "pantry");
+    seedProposal(db, "v1");
+    expect(editAndApprove(db, OLD_TS)).toBe("approved");
   });
 });

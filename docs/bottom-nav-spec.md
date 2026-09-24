@@ -177,6 +177,13 @@ collapses into the fingers. `hand-helping` reads cleanly at 24px.
 **The decision:** a bar item is drawn active **only while its own panel is open**. In
 the ordinary map or list view, no item is highlighted.
 
+> **Amendment (2026-09-24, #545):** on mobile this is now unobservable for the Menu
+> item specifically — #542 unmounts the whole bar (Menu item included) while the
+> mobile Menu's full-height sheet is open, so there is no bar left to draw active. The
+> decision below still holds in full on desktop/tablet (the Menu opens as a dropdown
+> there and the bar stays visible/lit) and for every other item (Saved, Boxes,
+> Resources) on every width, since none of those hide the bar.
+
 **The rationale:** these are not four pages. Three of them open the same drawer at
 different scroll positions and one is a map action. Lighting one of them permanently
 would claim a "you are here" that is not true. When the drawer is open at the Saved

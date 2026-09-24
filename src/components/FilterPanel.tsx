@@ -30,7 +30,7 @@ import { categoryColors } from "@/data/venues";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
-import { useOverlayRegistration } from "@/lib/overlayRegistry";
+import { useOverlayEscape, useOverlayRegistration, useScrollLock } from "@/lib/overlayRegistry";
 import type { VenueCategory } from "@/types/venue";
 
 // Same order the old CategoryDropdown's BROWSE_CATEGORIES used (legend order,
@@ -161,18 +161,16 @@ export default function FilterPanel({
     returnFocusRef.current?.focus();
   }, [onClose]);
 
-  // ── Escape closes ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!open) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, close]);
+  // ── Escape closes (#527: only when this panel is the TOPMOST overlay —
+  // see overlayRegistry.ts's own header) ───────────────────────────────────
+  const handleEscape = useCallback(
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      close();
+    },
+    [close],
+  );
+  useOverlayEscape(open, handleEscape);
 
   // ── Focus trap + initial focus + body scroll lock ────────────────────────────
   // Recipe mirrors HamburgerMenu.tsx (see its own comments for the "why" of
@@ -180,6 +178,12 @@ export default function FilterPanel({
   useEffect(() => {
     if (!open || !panelRef.current) return;
 
+    // Unlike HamburgerMenu.tsx's own version of this capture (#545), no
+    // `!== document.body` guard is needed here: this panel's opener (the
+    // Filters button in SearchBar) is never unmounted while the panel is
+    // open — nothing hides SearchBar the way #542 hides BottomNav for the
+    // mobile Menu — so `document.activeElement` can't have already reset to
+    // `<body>` by the time this effect runs.
     if (document.activeElement instanceof HTMLElement) {
       returnFocusRef.current = document.activeElement;
     }
@@ -215,12 +219,11 @@ export default function FilterPanel({
     return () => document.removeEventListener("keydown", handleTab);
   }, [open]);
 
-  useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
+  // #527: shared, ref-counted with every other overlay that wants the lock
+  // (see overlayRegistry.ts's own header) — replaces this panel's own
+  // set/reset, which used to unlock scroll on close even while HamburgerMenu
+  // was still open and wanted it locked too.
+  useScrollLock(open);
 
   // ── Swipe left to close (issue #513) ─────────────────────────────────────────
   const handleTouchStart = useCallback((e: React.TouchEvent) => {

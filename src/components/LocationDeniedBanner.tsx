@@ -14,15 +14,21 @@
  * Accessibility:
  *   - role="alert" — aggressive screen reader announcement
  *   - Primary action receives focus on mount
- *   - Escape key dismisses the banner
+ *   - Escape key dismisses the banner — only while this banner is the
+ *     TOPMOST overlay (#527/#604 CI-review follow-up): this banner isn't
+ *     full-screen and nothing blocks opening Filters/the Menu on top of it,
+ *     so it shares the same "own independent document Escape listener"
+ *     failure mode #527 fixed for FilterPanel/HamburgerMenu/
+ *     DesktopVenueWindow/BottomSheet — see overlayRegistry.ts's header.
  *   - Close X has a 32×32 hitbox with aria-label="Dismiss"
  */
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { useOverlayEscape } from "@/lib/overlayRegistry";
 
 interface LocationDeniedBannerProps {
   /** Re-request geolocation. If denied again, the parent's useEffect re-triggers. */
@@ -47,16 +53,14 @@ export default function LocationDeniedBanner({
     retryRef.current?.focus();
   }, []);
 
-  // Escape key dismisses the banner.
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        onDismiss();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+  // Escape key dismisses the banner — only when it's the topmost overlay
+  // (#527/#604). Mounted only while visible (no `open` prop — MapWrapper.tsx
+  // conditionally renders this component entirely), so it registers
+  // unconditionally (`true`), same shape as DesktopVenueWindow.tsx.
+  const handleEscape = useCallback(() => {
+    onDismiss();
   }, [onDismiss]);
+  useOverlayEscape(true, handleEscape);
 
   return (
     /*

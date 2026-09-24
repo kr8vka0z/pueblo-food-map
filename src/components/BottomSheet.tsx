@@ -12,7 +12,17 @@
  * and a11y Dialog.Title — but WITHOUT snapPoints.
  *
  * Three dismissal paths:
- *   1. Escape key (vaul handles natively via onOpenChange)
+ *   1. Escape key (vaul handles natively via onOpenChange) — #527: gated on
+ *      `claimEscape()` inside `onEscapeKeyDown` below, so Escape with a
+ *      higher overlay open on top of this sheet (Filters, the Menu) no
+ *      longer ALSO closes the card underneath — see overlayRegistry.ts.
+ *      `claimEscape`, not a plain `isTopmostOverlay` check: real-browser
+ *      review of #604 found that a same-keydown microtask checkpoint between
+ *      listeners can pop the true topmost overlay off the stack (its own
+ *      close committing) BEFORE a lower listener for the SAME event runs —
+ *      `claimEscape` marks the Event object itself as spoken for, so a
+ *      later listener is rejected regardless of what the stack looks like
+ *      by then. See overlayRegistry.ts's own header on `claimEscape`.
  *   2. Tap on scrim (vaul handles by default)
  *   3. Explicit close X button
  *
@@ -56,6 +66,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { safeUrl } from "@/lib/safeUrl";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { isNativeDialogOpen } from "@/lib/dialogGuard";
+import { claimEscape, useOverlayStackId } from "@/lib/overlayRegistry";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
@@ -173,6 +184,13 @@ export default function BottomSheet({
   }
 
   const open = venue !== null;
+  // #527: registers this sheet into the shared overlay-escape stack (see
+  // overlayRegistry.ts's own header) so `onEscapeKeyDown` below can tell
+  // whether a higher overlay (Filters, the Menu) is open on top of it.
+  // Vaul/Radix routes Escape through this prop rather than a `document`
+  // listener this file could add itself — `useOverlayEscape` isn't usable
+  // here for that reason; `claimEscape` is called directly instead.
+  const overlayId = useOverlayStackId(open);
   const isBox = venue?.category === "blessing_box";
   const status = venue ? computeOpenStatus(venue.hours_weekly) : null;
   const displayNotes = venue ? getDisplayNotes(venue) : undefined;
@@ -347,6 +365,20 @@ export default function BottomSheet({
           // listener; nothing inside the photo dialog can out-race it).
           onEscapeKeyDown={(event) => {
             if (isNativeDialogOpen()) {
+              event.preventDefault();
+              return;
+            }
+            // #527/#604: a higher overlay (Filters, the Menu) is open on top
+            // of this sheet — block vaul's own dismiss so Escape doesn't
+            // close BOTH; the topmost overlay's own Escape handling (a
+            // separate, bubble-phase `document` listener — this prop is
+            // Radix's CAPTURE-phase interception point, see dialogGuard.ts's
+            // header) still runs for the same keydown and closes itself
+            // instead. `claimEscape`, not a bare `isTopmostOverlay` check —
+            // see overlayRegistry.ts's own header on why a plain topmost
+            // check isn't race-free across a single keydown's multiple
+            // listeners in a real browser.
+            if (!claimEscape(overlayId, event)) {
               event.preventDefault();
               return;
             }

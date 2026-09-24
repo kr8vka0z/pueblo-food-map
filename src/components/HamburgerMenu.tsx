@@ -42,7 +42,7 @@ import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuer
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
-import { useOverlayRegistration } from "@/lib/overlayRegistry";
+import { useOverlayEscape, useOverlayRegistration, useScrollLock } from "@/lib/overlayRegistry";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
@@ -103,22 +103,40 @@ export default function HamburgerMenu({
 
   const close = useCallback(() => {
     onClose();
-    returnFocusRef.current?.focus();
-  }, [onClose]);
-
-  // ── Keyboard: Escape closes ──────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!open) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close();
+    const capturedEl = returnFocusRef.current;
+    const targetView = view;
+    // #545: on mobile, BottomNav (and the item that opened this drawer)
+    // unmounts while the drawer is open and remounts as brand-new DOM nodes
+    // once it closes (the #542 registration below) — `capturedEl` can be a
+    // detached node by the time focus needs to move, and `.focus()` on a
+    // detached node silently no-ops, so focus fell to <body>. `queueMicrotask`
+    // defers this until AFTER the state update `onClose()` just scheduled has
+    // committed (same pattern as MapWrapper.tsx's route-clear effect, cited
+    // in BottomSheet.tsx's own header) — only then does `.isConnected`
+    // reliably tell a still-live trigger (the desktop dropdown variant; any
+    // caller whose opener never unmounts) apart from one BottomNav just
+    // rebuilt from scratch. In the rebuilt case, re-find the equivalent
+    // bottom-bar item by its stable data-testid (BottomNav.tsx's
+    // `data-testid="nav-${section}"`) instead of leaving focus stranded.
+    queueMicrotask(() => {
+      if (capturedEl && capturedEl.isConnected) {
+        capturedEl.focus();
+        return;
       }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, close]);
+      document.querySelector<HTMLElement>(`[data-testid="nav-${targetView}"]`)?.focus();
+    });
+  }, [onClose, view]);
+
+  // ── Keyboard: Escape closes only the TOPMOST overlay (#527) ─────────────────
+
+  const handleEscape = useCallback(
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      close();
+    },
+    [close],
+  );
+  useOverlayEscape(open, handleEscape);
 
   // ── Outside click closes ────────────────────────────────────────────────────
 
@@ -142,8 +160,23 @@ export default function HamburgerMenu({
   useEffect(() => {
     if (!open || !panelRef.current) return;
 
-    if (document.activeElement instanceof HTMLElement) {
+    // #545: on mobile, opening this drawer unmounts BottomNav (the #542
+    // registration below) — that unmount can land BEFORE this passive effect
+    // runs (the registration is a `useLayoutEffect`, which flushes ahead of
+    // any `useEffect` in the same commit), so the button that triggered the
+    // open is sometimes already gone from the DOM by the time this reads
+    // `document.activeElement`. A detached element's removal resets
+    // `activeElement` to `<body>` — excluding `<body>` here means `close()`
+    // below correctly falls back to re-finding the bottom-bar item instead
+    // of "capturing" `<body>` as if it were a real, focusable return target.
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
       returnFocusRef.current = document.activeElement;
+    } else {
+      // Nothing meaningful to capture (already reset to <body>) — clear any
+      // stale reference from a previous open rather than let `close()` below
+      // "successfully" focus a leftover element that has nothing to do with
+      // this open.
+      returnFocusRef.current = null;
     }
 
     // Move focus into the panel on open
@@ -192,14 +225,12 @@ export default function HamburgerMenu({
     return () => document.removeEventListener("keydown", handleTab);
   }, [open]);
 
-  // ── Prevent body scroll on mobile while panel is open ───────────────────────
-
-  useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
+  // ── Prevent body scroll while panel is open ──────────────────────────────────
+  // #527: shared, ref-counted with every other overlay that wants the lock
+  // (see overlayRegistry.ts's own header) — replaces this drawer's own
+  // set/reset, which used to unlock scroll on close even while FilterPanel
+  // was still open and wanted it locked too.
+  useScrollLock(open);
 
   // Switching views while open (Saved → Menu) starts the new view at the top.
   useEffect(() => {

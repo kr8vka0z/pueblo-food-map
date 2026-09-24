@@ -438,6 +438,27 @@ export async function promotePublishedDrafts(
   await db.batch(statements);
 }
 
+// ─── Environment guard: refuse Publish outside production (#591) ──────────
+
+/**
+ * True only on the production Worker. `BETTER_AUTH_RP_ID` is the app's
+ * existing staging-only signal (#318 passkey isolation) — set via
+ * `wrangler.jsonc`'s `env.staging.vars`, absent on production, read via the
+ * Cloudflare env BINDING (never `process.env` — a wrangler `var` isn't
+ * guaranteed to surface into `process.env` under OpenNext, see auth.ts).
+ * Reused here rather than hostname sniffing or a second staging-only var:
+ * it's the one config value that already tells staging and prod apart.
+ *
+ * ponytail: piggybacking on an auth-scoped var means removing/renaming
+ * `BETTER_AUTH_RP_ID` for auth reasons would silently reopen this guard too.
+ * If that coupling ever bites, promote to a dedicated `env.staging`-only
+ * flag (e.g. `IS_STAGING: "true"`) instead of reusing an auth var forever —
+ * see wrangler.jsonc's `BETTER_AUTH_RP_ID` comment for the paired note.
+ */
+export function isProductionWorker(env: Pick<CloudflareEnv, "BETTER_AUTH_RP_ID">): boolean {
+  return env.BETTER_AUTH_RP_ID === undefined;
+}
+
 // ─── GitHub: commit + branch + PR + auto-merge (spec §3.5 step 4) ─────────
 
 const GITHUB_API_BASE = "https://api.github.com";

@@ -370,6 +370,32 @@ export default function BottomSheet({
             {venue ? `${venue.name} ${t("detail.venueDetails", locale)}` : t("detail.venueDetailsPanel", locale)}
           </Drawer.Title>
 
+          {/* Drawer.Description (#590 follow-up): vaul's Drawer.Content forwards
+              straight to Radix's Dialog.Content, which logs "Missing
+              `Description` or `aria-describedby={undefined}` for {DialogContent}"
+              whenever one isn't wired via context — confirmed live (agent-browser
+              console) firing here, not on the splash, when a venue card opens.
+              Reuses the category badge's own existing copy (`category.full.*`,
+              already EN+ES, rendered visibly below at the badge) rather than
+              adding new strings — same principle as #590's splash fix: point at
+              real content, don't invent hidden copy. Rendered unconditionally
+              (like Drawer.Title above) so every branch — box, ordinary venue,
+              route-strip-only, no venue yet — has SOME description, never a
+              dangling reference.
+              Same OSM placeholder guard as the visible address line below
+              (line ~666) and DesktopVenueWindow.tsx's own copy of it — a
+              screen reader must never hear the literal "Address not in
+              OpenStreetMap" string either. */}
+          <Drawer.Description className="sr-only">
+            {venue
+              ? `${t(`category.full.${venue.category}`, locale)}, ${
+                  venue.address === "Address not in OpenStreetMap"
+                    ? `${venue.lat}, ${venue.lng}`
+                    : venue.address
+                }`
+              : t("detail.venueDetailsPanel", locale)}
+          </Drawer.Description>
+
           {/* Single scrollable body.
               No drag handle: the "Show details" button is the one expand
               affordance — a grabber bar wrongly implied swipe-to-expand (#122

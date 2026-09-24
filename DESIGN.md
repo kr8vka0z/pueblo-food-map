@@ -252,7 +252,7 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 ## Components
 
-**ButtonPrimary** (splash CTA): `orange` bg, `navy` text, `radius-md`, `px-6 py-4` mobile / `px-6 py-5` desktop. Hover: `brightness-105`. Active: `brightness-95`. Focus: 2px orange offset outline. Use for exactly one primary action per screen context.
+**ButtonPrimary** (splash CTA): `orange` bg, `navy` text, `radius-md`, `px-6 py-4` mobile / `px-6 py-5` desktop. Hover: `brightness-105`. Active: `brightness-95`. Focus: 2px orange offset outline. Use for exactly one primary action per screen context. **Exception (#600):** the Spanish CTA's longer label ("Encuentra comida cerca de mí") wrapped a lone word at 360-375px, so it drops to `px-4` below `sm` (regaining `px-6` at `sm`+) and adds `text-balance` so a forced 2-line wrap splits evenly. Vertical padding (tap-target height) is unchanged and matches the English button exactly.
 
 **TooltipChip** (marker hover popup): `bone-50` bg, 1px `sage-500` border, `radius-sm`, `px-2 py-1`, `pointer-events: none`, no popup arrow.
 

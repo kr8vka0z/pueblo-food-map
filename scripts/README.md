@@ -23,6 +23,11 @@ the named script UNMODIFIED:
 | 1c | `ingest-osm-grocery.py` | `data/raw/pueblo-grocery.json` + `public/data/pueblo-county-boundary.geojson` | `src/data/grocery-osm.ts` |
 | 2 | `refresh-ingest.ts` itself | current D1 `venues` rows + the freshly-regenerated files above | `change_proposals` rows (one exception: a pure "date-only" proposal auto-applies to `venues.last_verified`) |
 
+Step 2's diff/guardrail/link-health logic isn't inline in `refresh-ingest.ts`
+— it's the pure, unit-tested modules in `scripts/refresh/` (`diffEngine.ts`,
+`linkHealth.ts`, `proposalSql.ts`, `sqlChunks.ts`). None of those run
+standalone; `refresh-ingest.ts` is the only entry point that imports them.
+
 `fetch-osm-grocery.py` → `ingest-osm-grocery.py` is a fixed pair: the first
 is the only thing in this repo that actually talks to Overpass (its own
 header explains the gap it fills — `ingest-osm-grocery.py` only ever

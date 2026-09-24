@@ -178,6 +178,12 @@ export default function FilterPanel({
   useEffect(() => {
     if (!open || !panelRef.current) return;
 
+    // Unlike HamburgerMenu.tsx's own version of this capture (#545), no
+    // `!== document.body` guard is needed here: this panel's opener (the
+    // Filters button in SearchBar) is never unmounted while the panel is
+    // open — nothing hides SearchBar the way #542 hides BottomNav for the
+    // mobile Menu — so `document.activeElement` can't have already reset to
+    // `<body>` by the time this effect runs.
     if (document.activeElement instanceof HTMLElement) {
       returnFocusRef.current = document.activeElement;
     }

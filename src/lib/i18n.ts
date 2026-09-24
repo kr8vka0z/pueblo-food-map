@@ -464,6 +464,10 @@ const en: Record<string, string> = {
   // venue's own last_verified date.
   "freshness.updated": "Map data updated {date}",
 
+  // OSM attribution (#133 4.5) — ODbL credit for pages that show OSM-derived
+  // venue data without Mapbox's own attribution control (src/lib/osmAttribution.ts).
+  "osm.attribution": "Venue data includes © OpenStreetMap contributors",
+
   // About page FAQ + stats (#PR4)
   "about.stat.insecurity": "According to Feeding America's Map the Meal Gap (2023 data), about 1 in 6 Pueblo County residents — roughly 16.5% — faces food insecurity, including nearly 1 in 5 children.",
   "about.stat.count": "Pueblo Food Map currently maps {count} of the free and low-cost food resources that can help.",
@@ -1297,6 +1301,9 @@ const es: Record<string, string> = {
 
   // Map-wide data freshness (board review finding #2)
   "freshness.updated": "Datos del mapa actualizados el {date}",
+
+  // OSM attribution (#133 4.5)
+  "osm.attribution": "Los datos de los lugares incluyen © colaboradores de OpenStreetMap", // [CHECK]
 
   // About page FAQ + stats (#PR4)
   "about.stat.insecurity": "Según el estudio Map the Meal Gap de Feeding America (datos de 2023), aproximadamente 1 de cada 6 residentes del condado de Pueblo — cerca del 16.5% — vive con inseguridad alimentaria, incluyendo casi 1 de cada 5 niños.",

@@ -35,15 +35,15 @@ describe("next.config security headers (#593)", () => {
     expect(pp).toContain("usb=()");
   });
 
-  test("ships Content-Security-Policy-Report-Only, not an enforcing CSP", async () => {
+  test("ships an enforcing Content-Security-Policy, not report-only", async () => {
     const headers = await getGlobalHeaders();
-    expect(headers["Content-Security-Policy-Report-Only"]).toBeDefined();
-    expect(headers["Content-Security-Policy"]).toBeUndefined();
+    expect(headers["Content-Security-Policy"]).toBeDefined();
+    expect(headers["Content-Security-Policy-Report-Only"]).toBeUndefined();
   });
 
   test("CSP allows Mapbox styles/tiles/directions and its blob: worker", async () => {
     const headers = await getGlobalHeaders();
-    const csp = headers["Content-Security-Policy-Report-Only"];
+    const csp = headers["Content-Security-Policy"];
     expect(csp).toContain("https://api.mapbox.com");
     expect(csp).toContain("https://*.tiles.mapbox.com");
     expect(csp).toContain("https://events.mapbox.com");
@@ -52,21 +52,21 @@ describe("next.config security headers (#593)", () => {
 
   test("CSP allows the Turnstile widget script and its challenge iframe", async () => {
     const headers = await getGlobalHeaders();
-    const csp = headers["Content-Security-Policy-Report-Only"];
+    const csp = headers["Content-Security-Policy"];
     expect(csp).toMatch(/script-src[^;]*https:\/\/challenges\.cloudflare\.com/);
     expect(csp).toMatch(/frame-src[^;]*https:\/\/challenges\.cloudflare\.com/);
   });
 
   test("CSP allows the Cloudflare Web Analytics beacon script and its report endpoint", async () => {
     const headers = await getGlobalHeaders();
-    const csp = headers["Content-Security-Policy-Report-Only"];
+    const csp = headers["Content-Security-Policy"];
     expect(csp).toMatch(/script-src[^;]*https:\/\/static\.cloudflareinsights\.com/);
     expect(csp).toContain("https://cloudflareinsights.com");
   });
 
   test("CSP defaults to self and denies framing/plugins", async () => {
     const headers = await getGlobalHeaders();
-    const csp = headers["Content-Security-Policy-Report-Only"];
+    const csp = headers["Content-Security-Policy"];
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");
@@ -76,7 +76,7 @@ describe("next.config security headers (#593)", () => {
 
   test("CSP reports violations to the same-origin sink (report-only is unverifiable without one)", async () => {
     const headers = await getGlobalHeaders();
-    const csp = headers["Content-Security-Policy-Report-Only"];
+    const csp = headers["Content-Security-Policy"];
     expect(csp).toContain("report-uri /api/csp-report");
   });
 });

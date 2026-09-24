@@ -40,9 +40,10 @@ import type { NextConfig } from "next";
 // block it from working if that ever changes. Everything else this app has
 // no use for is denied outright: microphone, payment, usb.
 //
-// Content-Security-Policy-Report-Only (#593): report-only first, per the
-// issue — tighten against real violations, then flip to enforcing in a
-// follow-up once dev has run clean for a while. No nonce: this app's static
+// Content-Security-Policy (#593): shipped report-only first, ran clean on
+// dev (zero violations across /, venue card, filters, /resources, /suggest
+// with Turnstile, /venues, /admin/login), then flipped to enforcing.
+// Violations still post to /api/csp-report via report-uri. No nonce: this app's static
 // rendering depends on NOT using proxy.ts (Next 16 proxy.ts fails the build
 // on this OpenNext/Cloudflare stack — see the "Footgun" note on `/` above),
 // and Next's own CSP guide requires proxy-generated nonces to force every
@@ -58,7 +59,7 @@ import type { NextConfig } from "next";
 // ~40 components using a React `style={{...}}` prop (renders as an inline
 // HTML `style=""` attribute, which CSP style-src does govern) plus
 // mapbox-gl's own inline-styled DOM nodes.
-const CSP_REPORT_ONLY = [
+const CSP = [
   "default-src 'self'",
   // static.cloudflareinsights.com: the Web Analytics beacon (#592).
   // challenges.cloudflare.com: Turnstile's widget script (6 public forms —
@@ -102,7 +103,7 @@ const securityHeaders = [
     key: "Permissions-Policy",
     value: "geolocation=(self), camera=(self), microphone=(), payment=(), usb=()",
   },
-  { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
+  { key: "Content-Security-Policy", value: CSP },
 ];
 
 const nextConfig: NextConfig = {

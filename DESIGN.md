@@ -359,7 +359,19 @@ The Mapbox canvas fills the entire viewport — there is no persistent sidebar. 
 
 Together these occupy less than 10% of the 1440×900 desktop viewport at default state. When a venue is selected, the BottomSheet (mobile) or DesktopVenueWindow (desktop) appears — still leaving the bulk of the map exposed.
 
-Body: `background: bone-50`, `color: ink-700`, `font: Public Sans`. No max-width container on the root — the map bleeds to all edges. Content pages (suggest, report, privacy) use standard centered column widths.
+Body: `background: bone-50`, `color: ink-700`, `font: Public Sans`. No max-width container on the root — the map bleeds to all edges. Content pages (About, Resources, Privacy, Suggest, Report, Feedback, Venues, a venue's `/venue/<id>`, box history/activity) use one centred column: `max-w-lg` (512px) with `px-4` gutters — the footer uses the same column. Admin editing forms widen to `max-w-2xl` (672px).
+
+**Breakpoints** (Tailwind defaults, used as-is):
+
+| Width | Name | What changes |
+|---|---|---|
+| < 360px | `min-[360px]` | BottomNav labels drop from 12px to 11px below it (5 items don't fit at 320px otherwise) |
+| 640px | `sm` | Minor padding/type steps on content pages and admin |
+| 768px | `md` | **Phone → tablet/desktop**: BottomSheet becomes DesktopVenueWindow, the full-sheet Menu becomes a 280px dropdown, search bar goes 520px centred, inputs drop from 16px to 14px text (`MOBILE_QUERY`, `src/lib/useMediaQuery.ts`) |
+| 1024px | `lg` | Admin dashboard and boxes columns, the proposals review layout |
+| 1536px | `2xl` | **Bottom nav bar → floating centred pill** (`BELOW_2XL_QUERY`); Mapbox credits stop lifting above the bar |
+
+Design and test at 360px and 375px first (see Low-end device guardrails); 320px must not clip.
 
 ## Elevation
 
@@ -422,6 +434,35 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 **VenueMarker**: Lucide `MapPin` SVG filled with category accent color, `stroke: #FFFFFF`, `strokeWidth: 1.5`, `filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25))`. Default 28px / selected 36px. Selected state: an outer SVG `circle` with `sage-500` stroke (4px, no fill) wrapping the pin. Hover: `scale(1.15)` inline transform.
 
 **BottomNav**: see docs/bottom-nav-spec.md for geometry and stacking order (the fade band that spec once described was deleted with the bottom-nav rework — `.nav-fade-band` no longer exists in globals.css).
+
+**Menu** (`HamburgerMenu`, opened from BottomNav's Menu): below `md` a full-height sheet from the right, `80vw` capped at 384px, over the Menu backdrop (see Layering), with the bottom nav unmounted while it's open; `md` and up a 280px dropdown from the top-right corner. Rows (`HamburgerMenuItem`): `px-5 py-3`, `text-sm font-medium ink-700`, `bone-100` hover, a trailing `ink-400` chevron or external-link icon, inset sage focus ring. First item is the sponsor card: `sage-100` fill, `sage-500` border (`sage-700` on hover), `radius-lg`, an 11px uppercase `ink-500` "Sponsored by" over `text-base font-semibold sage-700` "Pueblo Food Project", opening in a new tab. The same drawer also renders the Saved view (see Loading, empty and error states).
+
+**LanguageToggle** (EN / ES): a segmented pill — `bone-100` fill, `bone-300` border, `radius-full`; each segment `px-3 text-xs font-semibold`; the active one `ink-700` fill with `bone-50` text, the other `ink-500` (`ink-700` on hover). It lives in the Menu, never on the map.
+
+**Icon buttons** (`FavoriteButton`, `ShareButton` in a card header): 44×44 hit area (`w-11 h-11`, pulled in with `-m-1` so the glyph aligns), `radius-md`, `bone-100` hover, sage focus ring, a 20px glyph. Favourite is a Lucide `Star`: outline `ink-400`, filled `clay-500` when saved (`aria-pressed`). Share is `Share2` in `ink-400` (`ink-700` hover); it uses the native share sheet, and where that's missing it copies the link and swaps to a `Check` for 2 seconds.
+
+**HoursList**: a `<dl>`, one row per day, the day in a fixed-width column (`ink-500`), times in `ink-700`. Today is `font-semibold sage-700` with `aria-current="date"` and a sr-only ", today", marked by a 3px `sage-500` left rule (see Known deviations).
+
+**DirectionButtons** (a venue card's Walk / Bus / Drive row, `radius-md`, `text-sm font-semibold`): **Walk** draws the route in-app, so it is the filled primary (`sage-600`, `sage-700` hover); while a walking route is showing it switches to a pressed state (`sage-100` fill, `sage-700` text, `sage-600` border). **Bus** and **Drive** hand off to an external maps app, so they're secondary: `bone-50` fill, `ink-700` text, `bone-300` border (`bone-100` fill / `ink-400` border on hover). The walking stepper's Back/Next are 48×48 filled `sage-600` squares (`bone-200` / `ink-400` when disabled) — a comfortable target while walking.
+
+**PhotoViewer** (tap a Blessing Box photo): a native `<dialog>` opened with `showModal()`, full-viewport on a `rgba(0,0,0,0.92)` scrim — the one black surface, because it shows photos. Image `object-contain`, max height `100dvh − 6rem`; caption `text-sm bone-100` below; a 44px round close button top-right on `rgba(255,255,255,0.12)`. Escape and focus return come from the browser.
+
+**SplashScreen** (first visit): the full-screen `z-[9000]` layer over the live map, on the frosted scrim (see Map Chrome). Centred column, max 820px: the `wordmark` at `text-4xl`/`md:text-6xl` in `brand-navy`, a `text-2xl md:text-3xl font-semibold brand-navy` purpose line, `text-base md:text-lg ink-500` microcopy, then the orange/navy ButtonPrimary CTAs. All text carries the `splash-text-outline` white halo.
+
+**SiteFooter** (content pages only, never the map): a `bone-200` top rule, the `max-w-lg` column, `text-xs ink-400` links wrapping with `gap-x-6 gap-y-2`, each at least 44px tall.
+
+**Known deviations** — the code differs from the rules above in three places; fix them when you're in the file rather than copying them:
+- `HoursList` marks today with a coloured left rule, which Do's and Don'ts bans ("no colored border stripes"). A `sage-50` row fill would say the same thing.
+- `HoursList` sets times in `font-mono`, beyond Typography's "mono only for raw coordinates". Public Sans' tabular numerals (`tabular-nums`) would keep the columns aligned.
+- The Menu panel is `white` with black `rgba(0,0,0,…)` shadows and, as a dropdown, an 8px radius — not `bone-50`, the warm `elevation-*` shadows, or a radius token.
+
+## Iconography
+
+- **Lucide** (`lucide-react`) is the one icon set — about 30 glyphs in use. The most common: `X` (close), `Phone`, `ExternalLink`, `Clock`, `Star` (saved), `MapPin`, `List`/`Map` (view switch), `CircleHelp` (Help), `ChevronUp`/`ChevronDown`, `Search`, `Menu`, `Locate`/`LocateFixed` (Near me), `Loader2` (busy), `Share2`/`Check`, `History`, `Flag` (report).
+- **Two hand-drawn exceptions**: BottomNav's `BoxHeartIcon` (Boxes) and SearchBar's `FilterIcon` (three bars). Draw a new icon only when Lucide has nothing close, and match its 24px grid and 2px round-cap stroke.
+- **Sizes**: 14px inline with `text-sm` (the most common), 16px in the search bar and small controls, 18px in card rows, 20px for card-header icon buttons and the Filters control, 24px for BottomNav items, 28px for empty-state icons. Keep Lucide's default 2px stroke; only map pins use 1.5px.
+- **Colour** comes from `currentColor`: an icon takes the colour of the text it sits with — `ink-400` for quiet chrome (magnifier, chevrons, share), `sage-600`/`sage-700` inside links, `clay-500` for the saved star.
+- **Always paired or labelled**: decorative icons get `aria-hidden`; an icon-only button gets an i18n'd `aria-label` (and `title`). No emoji as icons, anywhere.
 
 ## Forms
 

@@ -146,14 +146,60 @@ export function isTopmostOverlay(id: string): boolean {
   return overlayStack.length > 0 && overlayStack[overlayStack.length - 1] === id;
 }
 
+// PR #604 review (real-browser hole `isTopmostOverlay` alone doesn't close):
+// a single Escape keydown can be seen by MULTIPLE listeners across capture
+// and bubble phase (BottomSheet's Escape handling is a capture-phase
+// listener — Radix's DismissableLayer, see dialogGuard.ts's header — while
+// FilterPanel/HamburgerMenu/DesktopVenueWindow are bubble-phase, via
+// `useOverlayEscape` below). Per the WHATWG HTML event-dispatch algorithm, a
+// microtask checkpoint runs after EACH individual listener invocation
+// ("clean up after running script"), not just once dispatch finishes — so if
+// the FIRST listener to run (the true topmost, e.g. a capture-phase
+// BottomSheet) closes its overlay, and that close synchronously commits
+// (React's automatic batching flushes via a microtask for updates
+// originating outside its own synthetic event system), `overlayStack`'s
+// cleanup effect pops that id BEFORE the next listener for the SAME keydown
+// runs — so a bubble-phase overlay underneath, no longer merely
+// `isTopmostOverlay`-false, now reads as topmost too and ALSO closes.
+// jsdom's `dispatchEvent` doesn't insert that checkpoint between listeners
+// (confirmed against jsdom's dispatch implementation), which is why this
+// never reproduced under the original `isTopmostOverlay`-only tests — see
+// overlayStack.test.ts's "real DOM dispatch ordering" describe block, which
+// forces the same observable stack-pop-mid-dispatch directly instead of
+// relying on jsdom to reproduce the browser's microtask timing.
+//
+// Fixed by claiming the Event OBJECT itself, once, module-wide: whichever
+// listener is first to see itself as topmost AND find the event unclaimed
+// wins outright, and every other listener for that SAME event — regardless
+// of what the stack looks like by the time it runs — is rejected. A
+// WeakSet (not a boolean flag) keys by the event instance so unrelated later
+// keydowns aren't affected and nothing needs manual clearing/GC.
+const claimedEscapes = new WeakSet<Event>();
+
+/**
+ * Claims `event` for `id`, exactly once. Returns true only if `id` is
+ * currently topmost AND no earlier listener has already claimed this SAME
+ * event object — a caller that loses the claim must `preventDefault()` and
+ * do nothing (not act on `defaultPrevented` itself: BottomSheet's own
+ * preventDefault-when-not-topmost would otherwise make the real topmost
+ * overlay's later check see `defaultPrevented` and wrongly skip too — see
+ * BottomSheet.tsx's `onEscapeKeyDown`).
+ */
+export function claimEscape(id: string, event: Event): boolean {
+  if (claimedEscapes.has(event)) return false;
+  if (!isTopmostOverlay(id)) return false;
+  claimedEscapes.add(event);
+  return true;
+}
+
 /**
  * Escape closes only the TOPMOST overlay (#527). Registers via
  * `useOverlayStackId`, then a bubble-phase `document` keydown listener that
- * calls `onEscape` ONLY while this instance is topmost — so a second
- * overlay opened on top of a first (Filters over a selected venue card, the
- * Menu over a card, etc.) no longer also closes the one underneath, since
- * every overlay used to run its own Escape handler with nothing to stop the
- * other ones from reacting to the same keydown.
+ * calls `onEscape` ONLY when `claimEscape` succeeds for this instance — so a
+ * second overlay opened on top of a first (Filters over a selected venue
+ * card, the Menu over a card, etc.) no longer also closes the one
+ * underneath, since every overlay used to run its own Escape handler with
+ * nothing to stop the other ones from reacting to the same keydown.
  *
  * `onEscape` should be stable (`useCallback`) — it's an effect dependency,
  * so an inline arrow function would tear the listener down and re-add it
@@ -165,7 +211,7 @@ export function useOverlayEscape(isOpen: boolean, onEscape: (event: KeyboardEven
     if (!isOpen) return;
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
-      if (!isTopmostOverlay(id)) return;
+      if (!claimEscape(id, event)) return;
       onEscape(event);
     }
     document.addEventListener("keydown", handleKeyDown);

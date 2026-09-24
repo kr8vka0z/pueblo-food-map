@@ -407,10 +407,12 @@ queue") — before the step-6 email. The insert is wrapped in its own
 try/catch: a D1 failure is logged (`db_write_failed`) and does NOT block
 the email or change the route's response, so the email stays the
 pipeline's authoritative success signal exactly as it was before this
-table existed. `/feedback/submit` is deliberately untouched and still ends
-at step 6 — the queue exists only for the two flows whose submissions
-describe map data an admin might act on (a new venue, a reported closure);
-general feedback has no such action to queue.
+table existed. `/feedback/submit` is deliberately untouched BY THE QUEUE
+and still ends at step 6 — the queue exists only for the two flows whose
+submissions describe map data an admin might act on (a new venue, a
+reported closure); general feedback has no such action to queue. (As of
+#587, `/feedback/submit` DOES reach D1 for step 4's rate-limit check — see
+above — just never for a `public_submissions` row.)
 
 **Why Turnstile over reCAPTCHA:** the app runs on Cloudflare Workers.
 Turnstile is a first-party Cloudflare product with a simpler integration

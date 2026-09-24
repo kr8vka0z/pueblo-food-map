@@ -10,10 +10,11 @@
  * the real traffic. D1 is one shared store every isolate reads and writes,
  * so the count is real regardless of which isolate handles which request —
  * same reasoning Better Auth's own `rateLimit` table (migrations/0004) uses
- * for the admin sign-in path. As of #587 this file backs FOUR callers: the
- * check-in path below, and the three public submit forms via
- * src/lib/formRateLimit.ts's thin wrapper (report/suggest/feedback) — see
- * that file's own header for the form-specific scopes/caps.
+ * for the admin sign-in path. This file backs every Blessing Boxes public
+ * write path (check-ins, photos, photo flags, adopt, alerts, needs) plus,
+ * as of #587, the three public submit forms via src/lib/formRateLimit.ts's
+ * thin wrapper (report/suggest/feedback) — see that file's own header for
+ * the form-specific scopes/caps.
  *
  * WHY a NEW table (migrations/0007's box_checkin_rate_limit) rather than
  * reusing that `rateLimit` table: its shape (`id`/`key`/`count`/
@@ -34,10 +35,13 @@
  * anonymity class this app's planned F7 phone-local tally already uses
  * (Build Plan). Losing or clearing it just resets a rate-limit window,
  * nothing more — there is nothing here an attacker or a data export could
- * ever tie to a person. The three public submit forms' per-IP cap (#587,
- * src/lib/formRateLimit.ts) is the one caller that DOES pass something
- * identifying as `id` (the submitter's IP) — see "WHY the key is HMAC'd"
- * immediately below for why that never becomes a stored raw value either.
+ * ever tie to a person. Two caller groups DO pass something identifying as
+ * `id` rather than an opaque token: the adopt/alerts routes' email-flood
+ * scopes (already true before #587 — an alert recipient email, normalized
+ * via src/lib/email.ts's normalizeEmail before use as a key), and, as of
+ * #587, the three public submit forms' per-IP cap (src/lib/formRateLimit.ts,
+ * the submitter's IP) — see "WHY the key is HMAC'd" immediately below for
+ * why neither ever becomes a stored raw value.
  *
  * WHY the key is HMAC'd rather than storing the box id / client token /
  * form-submitter IP directly: composing the row's key from a server secret
@@ -87,7 +91,7 @@ export async function hmacHex(secret: string, message: string): Promise<string> 
 export interface RateLimitScope {
   /** A short label distinguishing this cap from any other sharing the same table, e.g. "box" or "visitor-box". */
   scope: string;
-  /** The thing being capped — a box id, a client-token+box-id pair, or (form-report/-suggest/-feedback scopes only) a submitter IP. Whatever is passed here only ever enters the HMAC below (see file header, "WHY the key is HMAC'd") — this table never stores it raw. */
+  /** The thing being capped — a box id, a client-token+box-id pair, an alert email, or (form-report/-suggest/-feedback scopes) a submitter IP. Whatever is passed here only ever enters the HMAC below (see file header, "WHY the key is HMAC'd") — this table never stores it raw. */
   id: string;
 }
 

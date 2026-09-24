@@ -369,7 +369,16 @@ always in English (`buildPageMetadata`/`generateMetadata`, `src/lib/site.ts`)
 (`src/lib/useDocumentTitle.ts`) is the separate client-side mechanism that
 corrects `<title>` for the current locale after hydration and on a live
 EN↔ES toggle; every localized page's "Content" component calls it with a
-`t()`-composed string.
+`t()`-composed string. A plain `document.title = ...` assignment isn't
+enough on a hard page load: this app's metadata resolves through Next's
+streaming-metadata Suspense boundary, whose chunk can arrive over a real
+network AFTER the hook's own effect and then overwrite `<title>`'s DOM node
+directly (bypassing the `document.title` setter) with the server's English
+value — a genuine timing race with no fixed order, not a one-time head
+start to win. `useDocumentTitle` self-heals instead: a `MutationObserver`
+on `document.head` reapplies the desired title whenever it drifts,
+disconnected on unmount so a later page that deliberately stays English
+(`/venue/[id]`) is never corrected by a stale observer.
 
 **Translation notes:**
 - Mexican / Latin American Spanish throughout (not Castilian).

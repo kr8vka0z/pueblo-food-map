@@ -287,8 +287,8 @@ y=76  ├───────────────────────�
 y=665 ├─────────────────────────────────────┤
       │ Mapbox credits (i + logo), lifted    │  ← ToS-required, not resizable (see
       │ 8px above the pill (globals.css)     │     PR 2's audit note on the exception)
-      │ BottomNav pill: 5×64×62 @ y=665      │  ← full width already spoken for
-y=727 └─────────────────────────────────────┘  ← 12px + safe-area-inset-bottom below
+      │ BottomNav pill: 5×64×64 @ y=665      │  ← full width already spoken for
+y=729 └─────────────────────────────────────┘  ← 12px + safe-area-inset-bottom below
 ```
 
 - **No free real estate exists on the map canvas itself** below the search bar and
@@ -297,7 +297,9 @@ y=727 └───────────────────────�
   Mapbox attribution.
 - **The two zones that are actually free:** (1) inside the existing SearchBar row,
   to the right of the Filters icon, if a control is genuinely search-related — same
-  pattern as the Filters button's own inline placement; (2) inside BottomNav as a
+  pattern as the Filters button's own inline placement. The row is 44px tall, so the
+  control's visual stays 44px and its tap area must be extended to 48×48 with an
+  invisible `::before` overlay (the rule above), not by growing the bar; (2) inside BottomNav as a
   6th labelled item, accepting narrower cells (the 5-item bar already narrowed
   cells to ~57–67px when Boxes was added, #516 — measured then against the old 44px
   floor; ~57px still clears the new 48px one down to ~320px viewports). A brand-new floating pill anywhere else on the map is a

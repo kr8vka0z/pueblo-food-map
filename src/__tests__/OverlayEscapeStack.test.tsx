@@ -22,6 +22,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import FilterPanel from "@/components/FilterPanel";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
+import LocationDeniedBanner from "@/components/LocationDeniedBanner";
 import type { Venue } from "@/types/venue";
 
 function stubMatchMedia(matches: boolean) {
@@ -192,6 +193,39 @@ describe("#527 — Escape closes only the topmost overlay; scroll lock is shared
     // Filters is gone — the window is topmost again, Escape now closes it.
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  // CI review follow-up on PR #604: LocationDeniedBanner ran its own
+  // ungated document Escape listener — the same failure mode #527 fixed for
+  // the other four overlays, reachable since the banner isn't full-screen
+  // and nothing blocks opening Filters on top of it.
+  test("LocationDeniedBanner open, Filters opened on top: Escape closes Filters only, banner stays open", async () => {
+    const onDismiss = vi.fn();
+
+    function Harness() {
+      const [filterOpen, setFilterOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setFilterOpen((o) => !o)}>
+            Toggle filters
+          </button>
+          <LocationDeniedBanner onRetry={() => {}} onDismiss={onDismiss} locale="en" />
+          <FilterPanel {...FILTER_PANEL_STATIC_PROPS} open={filterOpen} onClose={() => setFilterOpen(false)} />
+        </>
+      );
+    }
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Toggle filters" }));
+    await waitFor(() => expect(screen.getByRole("dialog", { name: /filters/i })).toBeDefined());
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /filters/i })).toBeNull());
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    // Filters is gone — the banner is topmost again, Escape now dismisses it.
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -106,8 +106,9 @@ describe("MapWrapper box selection (map-first rework)", () => {
 
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
-    // The card itself is mocked out in this file; MapWrapperNoWebGLBoxCard.test.tsx
-    // proves it opens with check-in/adopt/address.
+    // The card itself is mocked out in this file. The card opening is proven in
+    // MapWrapperNoWebGLBoxCard.test.tsx (mobile + box) and
+    // MapWrapperNoWebGLDesktopCard.test.tsx (desktop + regular venue).
   });
 
   test("#524: pressing Enter on a box search result while the map is unavailable opens its card — no navigation", async () => {
@@ -127,8 +128,9 @@ describe("MapWrapper box selection (map-first rework)", () => {
 
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
-    // The card itself is mocked out in this file; MapWrapperNoWebGLBoxCard.test.tsx
-    // proves it opens with check-in/adopt/address.
+    // The card itself is mocked out in this file. The card opening is proven in
+    // MapWrapperNoWebGLBoxCard.test.tsx (mobile + box) and
+    // MapWrapperNoWebGLDesktopCard.test.tsx (desktop + regular venue).
   });
 
   test("#524: ?venue=<boxId> deep link with the map unavailable opens its card — no navigation", async () => {
@@ -143,7 +145,8 @@ describe("MapWrapper box selection (map-first rework)", () => {
 
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
-    // The card itself is mocked out in this file; MapWrapperNoWebGLBoxCard.test.tsx
-    // proves it opens with check-in/adopt/address.
+    // The card itself is mocked out in this file. The card opening is proven in
+    // MapWrapperNoWebGLBoxCard.test.tsx (mobile + box) and
+    // MapWrapperNoWebGLDesktopCard.test.tsx (desktop + regular venue).
   });
 });

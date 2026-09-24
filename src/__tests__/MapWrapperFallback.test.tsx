@@ -73,8 +73,9 @@ describe("MapWrapper WebGL fallback navigation (#285)", () => {
 
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
-    // The card itself is mocked out in this file; MapWrapperNoWebGLBoxCard.test.tsx
-    // proves it opens with check-in/adopt/address.
+    // The card itself is mocked out in this file. The card opening is proven in
+    // MapWrapperNoWebGLBoxCard.test.tsx (mobile + box) and
+    // MapWrapperNoWebGLDesktopCard.test.tsx (desktop + regular venue).
   });
 });
 
@@ -93,7 +94,8 @@ describe("MapWrapper WebGL fallback deep link (review item 4 — #165 x #132)", 
     expect(screen.getByText(/map unavailable/i)).toBeTruthy();
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
-    // The card itself is mocked out in this file; MapWrapperNoWebGLBoxCard.test.tsx
-    // proves it opens with check-in/adopt/address.
+    // The card itself is mocked out in this file. The card opening is proven in
+    // MapWrapperNoWebGLBoxCard.test.tsx (mobile + box) and
+    // MapWrapperNoWebGLDesktopCard.test.tsx (desktop + regular venue).
   });
 });

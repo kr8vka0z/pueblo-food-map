@@ -26,6 +26,10 @@
  */
 
 import type { AccessDeniedReason } from "./adminOrigin";
+// Type-only — erased at compile time, so this does not create a runtime
+// circular import even though emailRetention.ts itself imports
+// logEmailRetentionResult/logEmailRetentionFailure from this file.
+import type { EmailRetentionCounts } from "./emailRetention";
 
 export type FormName =
   | "suggest"
@@ -117,6 +121,28 @@ export type AdminAuthEvent = "login";
  */
 export function logAdminAuthEvent(event: AdminAuthEvent): void {
   console.log(JSON.stringify({ event: "admin_auth_event", type: event }));
+}
+
+/**
+ * Emit a single-line JSON structured log entry for the daily email
+ * retention cleanup (#594, src/lib/emailRetention.ts). Counts only —
+ * matches this file's PII rule (no id, no email, no row content) — logged
+ * at console.log since a 0-row day is the expected common case, not a
+ * failure.
+ */
+export function logEmailRetentionResult(counts: EmailRetentionCounts): void {
+  console.log(JSON.stringify({ event: "email_retention_result", ...counts }));
+}
+
+/**
+ * Emit a single-line JSON structured log entry when the email retention
+ * cleanup throws. Error-level, same convention as send_failed above — this
+ * is the only signal a D1 outage or a bad statement broke the daily
+ * cleanup. `message` is the caught error's own message only, never a row
+ * value.
+ */
+export function logEmailRetentionFailure(message: string): void {
+  console.error(JSON.stringify({ event: "email_retention_failure", message }));
 }
 
 /**

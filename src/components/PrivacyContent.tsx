@@ -15,6 +15,14 @@
  * alerts and adopting a box" (privacy.alerts.*, new, 4 paragraphs) — each
  * paragraph its own i18n key, per the task's own instruction. The analytics
  * paragraph (privacy.analytics) is unchanged and kept last.
+ *
+ * #594 (2026-09-23 security review, finding #4): added a second check-ins
+ * paragraph (the per-browser check-in ID, privacy.checkins.body2) and two
+ * new sections — "How long we keep it" (privacy.retention.*, the 90-day
+ * email cleanup src/lib/emailRetention.ts runs) and "Other services we
+ * use" (privacy.other.*, naming Mapbox and Cloudflare Turnstile) — both
+ * placed after the existing, previously-signed-off sections and still
+ * before the unchanged analytics paragraph.
  */
 
 import Link from "next/link";
@@ -68,6 +76,9 @@ export default function PrivacyContent() {
         <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
           {t("privacy.checkins.body", locale)}
         </p>
+        <p className="text-sm text-[var(--color-ink-700)] leading-relaxed mt-2">
+          {t("privacy.checkins.body2", locale)}
+        </p>
 
         <h2 className="text-lg font-medium text-[var(--color-ink-900)] mt-6 mb-2">
           {t("privacy.alerts.heading", locale)}
@@ -83,6 +94,20 @@ export default function PrivacyContent() {
         </p>
         <p className="text-sm text-[var(--color-ink-700)] leading-relaxed mt-2">
           {t("privacy.alerts.body4", locale)}
+        </p>
+
+        <h2 className="text-lg font-medium text-[var(--color-ink-900)] mt-6 mb-2">
+          {t("privacy.retention.heading", locale)}
+        </h2>
+        <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+          {t("privacy.retention.body", locale)}
+        </p>
+
+        <h2 className="text-lg font-medium text-[var(--color-ink-900)] mt-6 mb-2">
+          {t("privacy.other.heading", locale)}
+        </h2>
+        <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+          {t("privacy.other.body", locale)}
         </p>
 
         {/*

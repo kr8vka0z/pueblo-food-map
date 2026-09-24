@@ -7,8 +7,11 @@
  * WHY needed at all: locale is a client-side cookie/toggle (LocaleContext),
  * not a route — LanguageToggle flips `locale` via React state with no
  * navigation, and Next.js Metadata's server-rendered <title> is always
- * English (AGENTS.md "Known bilingual limitation", #287). Call it from a
- * localized page's "Content" component with the fully composed title for the
+ * English (`buildPageMetadata`/`generateMetadata`, src/lib/site.ts — no
+ * route reads the locale cookie server-side, so metadata can't localize
+ * without going dynamic; see ARCHITECTURE.md's i18n model section, "<title>
+ * (#589)", for the full picture). Call it from a localized page's "Content"
+ * component with the fully composed title for the
  * CURRENT locale (build it with `t(key, locale)`, `pageDocumentTitle()` from
  * @/lib/site for the common "<Title> · Pueblo Food Map" suffix, or a literal
  * for pages outside that pattern) — the effect re-applies whenever that
@@ -63,8 +66,9 @@ export function useDocumentTitle(title: string): void {
     // that case. Disconnected on unmount/title-change so a page that
     // legitimately wants a different (or no) locale-driven title later —
     // e.g. client-navigating to /venue/[id], which deliberately stays
-    // English (#287) — never gets corrected by a stale observer left
-    // running from the PREVIOUS page's title.
+    // English (its title is a proper venue name, nothing to translate —
+    // src/app/venue/[id]/page.tsx) — never gets corrected by a stale
+    // observer left running from the PREVIOUS page's title.
     const observer = new MutationObserver(() => {
       if (document.title !== title) {
         document.title = title;

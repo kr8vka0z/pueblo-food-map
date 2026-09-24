@@ -70,10 +70,14 @@ describe("Spanish CTA wrap fix (#600)", () => {
   test("Spanish CTA has less horizontal padding than English below sm (more room for the longer label)", () => {
     renderSplash("en");
     const esCta = screen.getByRole("button", { name: /encuentra comida/i });
-    // Base (mobile) horizontal padding class must differ from the shared
+    // Base (mobile) horizontal padding class must be px-4, not the shared
     // px-6 used at rest by both buttons in the old markup — regains px-6
-    // at sm and above so desktop is unaffected.
-    expect(esCta.className).not.toMatch(/(?<!sm:)px-6(?!\S)/);
-    expect(esCta.className).toContain("sm:px-6");
+    // at sm and above so desktop is unaffected. Split into individual class
+    // tokens (rather than regex) so this can't be fooled by another
+    // sm:-prefixed utility elsewhere in the string repeating "px-6".
+    const classes = esCta.className.split(" ");
+    expect(classes).toContain("px-4");
+    expect(classes).not.toContain("px-6");
+    expect(classes).toContain("sm:px-6");
   });
 });

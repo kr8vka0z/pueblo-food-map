@@ -461,7 +461,7 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 - **Lucide** (`lucide-react`) is the one icon set — about 30 glyphs in use. The most common: `X` (close), `Phone`, `ExternalLink`, `Clock`, `Star` (saved), `MapPin`, `List`/`Map` (view switch), `CircleHelp` (Help), `ChevronUp`/`ChevronDown`, `Search`, `Menu`, `Locate`/`LocateFixed` (Near me), `Loader2` (busy), `Share2`/`Check`, `History`, `Flag` (report).
 - **Two hand-drawn exceptions**: BottomNav's `BoxHeartIcon` (Boxes) and SearchBar's `FilterIcon` (three bars, drawn at a slightly heavier 2.2px stroke to hold up at 20px). Draw a new icon only when Lucide has nothing close, and match its 24px grid and 2px round-cap stroke.
-- **Sizes**: 14px inline with `text-sm` (the most common), 16px in the search bar and small controls, 18px in card rows, 20px for card-header icon buttons and the Filters control, 24px for BottomNav items, 28px for empty-state icons. Keep Lucide's default 2px stroke; only map pins use 1.5px.
+- **Sizes**: 14px inline with `text-sm` (the most common), 16px in the search bar and small controls, 18px in card rows, 20px for mobile card-header icon buttons and the Filters control (18px in the desktop card header), 24px for BottomNav items, 28px for empty-state icons. Keep Lucide's default 2px stroke; only map pins use 1.5px.
 - **Colour** comes from `currentColor`: an icon takes the colour of the text it sits with — `ink-400` for quiet chrome (magnifier, chevrons, share), `sage-600`/`sage-700` inside links, `clay-500` for the saved star.
 - **Always paired or labelled**: decorative icons get `aria-hidden`; an icon-only button gets an i18n'd `aria-label` (and `title`). No emoji as icons, anywhere.
 

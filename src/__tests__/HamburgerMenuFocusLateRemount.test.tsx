@@ -7,7 +7,7 @@
  * <body>. This harness brings the nav item back only after a delay and
  * proves focus still lands on it.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import HamburgerMenu from "@/components/HamburgerMenu";
@@ -15,20 +15,20 @@ import HamburgerMenu from "@/components/HamburgerMenu";
 function LateNavHarness() {
   const [open, setOpen] = useState(false);
   const [navVisible, setNavVisible] = useState(true);
-  useEffect(() => {
-    if (open) {
-      setNavVisible(false);
-      return;
-    }
+  const openMenu = () => {
+    setOpen(true);
+    setNavVisible(false);
+  };
+  const closeMenu = () => {
+    setOpen(false);
     // Bring the nav back two frames-plus after close, like a slow commit.
-    const t = setTimeout(() => setNavVisible(true), 40);
-    return () => clearTimeout(t);
-  }, [open]);
+    setTimeout(() => setNavVisible(true), 40);
+  };
   return (
     <>
-      <HamburgerMenu locale="en" open={open} onClose={() => setOpen(false)} view="top" />
+      <HamburgerMenu locale="en" open={open} onClose={closeMenu} view="top" />
       {navVisible && (
-        <button data-testid="nav-top" onClick={() => setOpen(true)}>
+        <button data-testid="nav-top" onClick={openMenu}>
           Menu
         </button>
       )}

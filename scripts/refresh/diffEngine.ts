@@ -71,7 +71,9 @@ export interface CurrentVenueRow {
  * dedicated field), and only ever dumps `opening_hours` into that same
  * `notes` text, never into structured `hours_weekly`. Both fields DO appear
  * populated in today's committed `grocery-osm.ts` — but only because a
- * one-off script (`scripts/scrub-osm-venues.ts`) parsed them out of `notes`
+ * one-off script (`scripts/scrub-osm-venues.ts`, deleted as dead code by
+ * #596 once it had run its course — see ARCHITECTURE.md's own citation,
+ * commit `c1e4536`/PR #102, for its history) parsed them out of `notes`
  * by hand, once, outside this repeatable pipeline (matches the exact
  * "address" enrichment gap the design doc's §6.3 NB2 fix already names —
  * this is the same gap, just two more fields it didn't call out). Diffing

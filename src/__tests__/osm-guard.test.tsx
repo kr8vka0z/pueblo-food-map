@@ -41,9 +41,12 @@ vi.mock("vaul", async () => {
   const Title = ({ children, ...rest }: { children: React.ReactNode; [k: string]: unknown }) => (
     <h2 {...rest}>{children}</h2>
   );
+  const Description = ({ children, ...rest }: { children: React.ReactNode; [k: string]: unknown }) => (
+    <p {...rest}>{children}</p>
+  );
 
   return {
-    Drawer: { Root, Portal, Content, Title },
+    Drawer: { Root, Portal, Content, Title, Description },
   };
 });
 

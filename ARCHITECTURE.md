@@ -363,6 +363,14 @@ active locale in React state and writes it to the `pfm-locale` cookie on
 change. `layout.tsx` reads the cookie server-side so the initial SSR render
 uses the user's preference — avoiding an EN flash for Spanish-language users.
 
+**`<title>` (#589):** Next.js Metadata renders `<title>` once, server-side,
+always in English (`buildPageMetadata`/`generateMetadata`, `src/lib/site.ts`)
+— the locale cookie above only ever affects a page's *body*. `useDocumentTitle`
+(`src/lib/useDocumentTitle.ts`) is the separate client-side mechanism that
+corrects `<title>` for the current locale after hydration and on a live
+EN↔ES toggle; every localized page's "Content" component calls it with a
+`t()`-composed string.
+
 **Translation notes:**
 - Mexican / Latin American Spanish throughout (not Castilian).
 - US government program names (SNAP, WIC) are not translated.

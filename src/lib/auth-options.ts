@@ -273,6 +273,32 @@ export function buildAuthOptions(
     // auth-options.test.ts asserts the exact resolved name/attributes via
     // better-auth's own `getCookies()` helper; a true end-to-end browser
     // check still happens at Kyle's live preview (Phase 3 report).
+    //
+    // #595 security review — `useSecureCookies: false` above suppresses
+    // Secure on EVERY Better Auth cookie, not just session_token (verified
+    // in createCookieGetter, node_modules/better-auth/dist/cookies/
+    // index.mjs: `secure: !!secureCookiePrefix`, and secureCookiePrefix is
+    // derived from useSecureCookies for the whole cookie jar). The
+    // `session_token` override above already restores it by hand for the
+    // session cookie; the entries below do the identical restoration for
+    // every OTHER cookie this config can emit: `session_data`/`account_data`
+    // (session cookie-cache, unused today since `session.cookieCache` is
+    // unset — added anyway so enabling that cache later doesn't silently
+    // regress this fix), `dont_remember` (Better Auth's native
+    // remember-me opt-out cookie), and `better-auth-passkey` — the
+    // passkey plugin's own WebAuthn challenge cookie, whose NAME is
+    // `opts.advanced.webAuthnChallengeCookie` (default
+    // "better-auth-passkey", @better-auth/passkey/dist/index.mjs) and which
+    // is looked up in this exact `advanced.cookies` map by that name
+    // (`ctx.context.createAuthCookie(...)` is the same `createCookieGetter`
+    // function keyed off `options.advanced.cookies[cookieName]` — verified
+    // in create-context.mjs's `createAuthCookie: createCookieGetter(options)`).
+    // No dev/localhost carve-out: the session_token override above has
+    // none either (Secure is unconditional there), and this app has no
+    // existing localhost-vs-prod branch for cookie attributes to mirror —
+    // local admin login already only works over the CF preview/staging
+    // https origins, not plain http://localhost, so an unconditional
+    // Secure flag changes nothing about that.
     advanced: {
       useSecureCookies: false,
       cookies: {
@@ -280,6 +306,10 @@ export function buildAuthOptions(
           name: "__Host-session_token",
           attributes: { secure: true },
         },
+        session_data: { attributes: { secure: true } },
+        account_data: { attributes: { secure: true } },
+        dont_remember: { attributes: { secure: true } },
+        "better-auth-passkey": { attributes: { secure: true } },
       },
     },
     plugins: [

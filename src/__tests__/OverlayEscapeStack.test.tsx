@@ -275,7 +275,24 @@ vi.mock("vaul", () => {
       {children}
     </h2>
   );
-  return { Drawer: { Root: DrawerRoot, Portal: DrawerPortal, Content: DrawerContent, Title: DrawerTitle } };
+  // #601: BottomSheet.tsx now also renders Drawer.Description (Radix's
+  // missing-Description a11y warning fix) — omitting it from this mock would
+  // make `Drawer.Description` undefined, crashing the render with "element
+  // type is invalid" the moment BottomSheet.tsx's real JSX reaches it.
+  const DrawerDescription = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <p data-testid="vaul-description" className={className}>
+      {children}
+    </p>
+  );
+  return {
+    Drawer: {
+      Root: DrawerRoot,
+      Portal: DrawerPortal,
+      Content: DrawerContent,
+      Title: DrawerTitle,
+      Description: DrawerDescription,
+    },
+  };
 });
 
 import BottomSheet from "@/components/BottomSheet";

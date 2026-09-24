@@ -48,7 +48,7 @@ describe("PageNav", () => {
     expect(document.getElementById("hamburger-panel")).toBeNull();
     fireEvent.click(screen.getByTestId("nav-top"));
     expect(document.getElementById("hamburger-panel")).not.toBeNull();
-    expect(screen.getByText("Suggest a venue")).toBeDefined();
+    expect(screen.getByText("Suggest a place")).toBeDefined();
     fireEvent.click(screen.getByTestId("nav-top"));
     expect(document.getElementById("hamburger-panel")).toBeNull();
   });

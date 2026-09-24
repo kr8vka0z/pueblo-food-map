@@ -322,7 +322,7 @@ export default function HamburgerMenu({
           style={{
             position: "fixed",
             inset: 0,
-            backgroundColor: "rgba(0,0,0,0.4)",
+            backgroundColor: "rgba(26,24,23,0.4)",
             zIndex: 1001,
           }}
           onClick={close}

@@ -91,7 +91,7 @@ function mockError(error = "send_failed") {
 // caller of this shared helper needs a valid email to reach the submit network
 // call — fixing it once here (root cause) instead of patching each call site.
 async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
-  const nameInput = screen.getByLabelText(/Venue name/i);
+  const nameInput = screen.getByLabelText(/Place name/i);
   await user.type(nameInput, "Test Food Pantry");
 
   const addressInput = screen.getByLabelText(/Address/i);
@@ -123,7 +123,7 @@ async function fillRequiredFieldsEs(user: ReturnType<typeof userEvent.setup>) {
 describe("SuggestForm — rendering", () => {
   test("renders venue name input", () => {
     renderForm();
-    expect(screen.getByLabelText(/Venue name/i)).toBeDefined();
+    expect(screen.getByLabelText(/Place name/i)).toBeDefined();
   });
 
   test("renders address input", () => {
@@ -203,7 +203,7 @@ describe("SuggestForm — client validation", () => {
     await waitForSubmitEnabled("suggest");
     await user.click(screen.getByRole("button", { name: /Submit suggestion/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Please enter a venue name/i)).toBeDefined();
+      expect(screen.getByText(/Please enter a place name/i)).toBeDefined();
     });
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -212,7 +212,7 @@ describe("SuggestForm — client validation", () => {
     const user = userEvent.setup();
     renderForm();
     // Fill name only
-    await user.type(screen.getByLabelText(/Venue name/i), "Test Pantry");
+    await user.type(screen.getByLabelText(/Place name/i), "Test Pantry");
     await waitForSubmitEnabled("suggest");
     await user.click(screen.getByRole("button", { name: /Submit suggestion/i }));
     await waitFor(() => {
@@ -224,7 +224,7 @@ describe("SuggestForm — client validation", () => {
   test("shows category error when category not selected", async () => {
     const user = userEvent.setup();
     renderForm();
-    await user.type(screen.getByLabelText(/Venue name/i), "Test Pantry");
+    await user.type(screen.getByLabelText(/Place name/i), "Test Pantry");
     await user.type(screen.getByLabelText(/Address/i), "123 Main St");
     await waitForSubmitEnabled("suggest");
     await user.click(screen.getByRole("button", { name: /Submit suggestion/i }));
@@ -271,7 +271,7 @@ describe("SuggestForm — client validation", () => {
   test("shows email error when email is empty (field is required, #232)", async () => {
     const user = userEvent.setup();
     renderForm();
-    await user.type(screen.getByLabelText(/Venue name/i), "Test Pantry");
+    await user.type(screen.getByLabelText(/Place name/i), "Test Pantry");
     await user.type(screen.getByLabelText(/Address/i), "123 Main St");
     const categorySelect = screen.getByLabelText(/Category/i) as HTMLSelectElement;
     await user.selectOptions(categorySelect, "pantry");
@@ -291,7 +291,7 @@ describe("SuggestForm — submit flow", () => {
     const user = userEvent.setup();
     renderForm();
 
-    await user.type(screen.getByLabelText(/Venue name/i), "Eastside Pantry");
+    await user.type(screen.getByLabelText(/Place name/i), "Eastside Pantry");
     await user.type(screen.getByLabelText(/Address/i), "456 Oak Ave, Pueblo, CO");
     const categorySelect = screen.getByLabelText(/Category/i) as HTMLSelectElement;
     await user.selectOptions(categorySelect, "pantry");

@@ -715,6 +715,32 @@ two side panels, `BoxHealthList` ("Boxes that need help") and
 `StalePlacesList` ("Places due for a check" — published venues whose
 `last_verified` is over 12 months old, oldest first).
 
+**Publish is "PR opened and auto-merge armed," not "merged" (#598).**
+`POST /api/admin/publish` promotes D1 rows to `status='published'` once its
+GitHub commit/PR/auto-merge sequence succeeds (`commitPublishedVenues`,
+src/lib/publishVenues.ts — see "Automated venue-refresh pipeline"'s sibling
+publish flow above for the NB1 ordering) — that is a real success signal for
+the PR existing and being armed to merge, but it is NOT the same as the PR
+having actually merged. If that PR's CI then goes red, D1 already says
+"published" while the live site still serves the OLD
+`src/data/published-venues.ts` until the next publish happens to repair it.
+Rewiring the state machine to wait for the real merge was rejected — a
+publish would have to hold a request open across a multi-minute CI run for
+a case that's rare and self-healing on the next publish anyway. Instead the
+Dashboard reads the SAME open `publish-bot` PR read-only
+(`fetchPublishBotPrStatus`, publishVenues.ts) — GitHub's Checks API against
+the PR's head sha, not the legacy Status API, since this repo's CI is
+Actions-only — and renders `PublishBotStatusBanner` above the Publish bar
+whenever one is open: "Publish in progress" for pending/passing/unknown
+checks, "Publish is stuck: checks failed" with a link to the PR once any
+check-run fails. Fails soft on both axes named in the issue: skipped
+entirely when `GITHUB_PUBLISH_TOKEN` is unset (staging has none — same env
+var route.ts already treats as "not configured"), and any GitHub error
+(rate limit, network, or a checks-read permission gap the Contents/PRs-RW
+PAT may not carry) degrades to no banner / `checksState: "unknown"` rather
+than breaking the page, matching every other best-effort Dashboard read
+above.
+
 **`/admin/places` (src/app/admin/places/page.tsx)** is the venue list —
 moved here unchanged from where `/admin` used to render it (#253's original
 build). It

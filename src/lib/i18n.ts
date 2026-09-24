@@ -382,7 +382,7 @@ const en: Record<string, string> = {
   // New section (#594, security review finding #4) — states the 90-day
   // retention period the daily cron (src/lib/emailRetention.ts) enforces.
   "privacy.retention.heading": "How long we keep it",
-  "privacy.retention.body": "We remove old email addresses automatically. An email on a place suggestion or report, a turned-down box-adoption application, or a stopped alert subscription is deleted 90 days after that happens. An active alert subscription's email stays until you stop it.",
+  "privacy.retention.body": "We remove old email addresses from our database automatically: 90 days after a place suggestion or report is submitted, a box-adoption application is turned down, or an alert subscription is stopped. This doesn't affect the copy already sent to our own inbox when you submitted a form. An active alert subscription's email stays until you stop it.",
   // New section (#594) — names the third parties the existing copy above
   // described without naming (Turnstile) or didn't mention at all (Mapbox).
   "privacy.other.heading": "Other services we use",
@@ -1241,7 +1241,7 @@ const es: Record<string, string> = {
   "privacy.alerts.body3": "Cada correo de alerta tiene un enlace para detenerlo. Un clic detiene los correos, sin necesidad de iniciar sesión. Para que eliminemos tu correo por completo, escribe a issues@pueblofoodmap.com.", // [CHECK]
   "privacy.alerts.body4": "Nuestros correos se envían a través de un servicio de correo llamado Resend, que solo maneja tu dirección para entregarlos.", // [CHECK]
   "privacy.retention.heading": "Cuánto tiempo lo guardamos", // [CHECK]
-  "privacy.retention.body": "Eliminamos automáticamente las direcciones de correo antiguas. Un correo en una sugerencia o reporte de un lugar, en una solicitud de adopción de caja rechazada, o en una alerta cancelada, se elimina 90 días después de eso. El correo de una alerta activa se mantiene hasta que la canceles.", // [CHECK]
+  "privacy.retention.body": "Eliminamos automáticamente las direcciones de correo antiguas de nuestra base de datos: 90 días después de enviar una sugerencia o reporte de un lugar, de que se rechace una solicitud de adopción de caja, o de que canceles una alerta. Esto no afecta la copia que ya enviamos a nuestro propio correo cuando enviaste un formulario. El correo de una alerta activa se mantiene hasta que la canceles.", // [CHECK]
   "privacy.other.heading": "Otros servicios que usamos", // [CHECK]
   "privacy.other.body": "Usamos Mapbox para mostrar el mapa. Cargarlo comparte tu dirección IP con Mapbox, y si pides indicaciones para caminar, también tu ubicación. Usamos Cloudflare Turnstile en nuestros formularios y en los registros de cajas para bloquear spam; revisa cierta información sobre tu dispositivo y navegador.", // [CHECK]
   "privacy.analytics": "Usamos Cloudflare Web Analytics para contar visitas y medir qué tan rápido cargan las páginas. No usa cookies ni guarda nada en tu dispositivo, no te identifica por tu dirección IP ni por tu navegador, y no te sigue a otros sitios web. Registra datos como qué página se vio, el sitio desde el que llegaste, tu tipo de navegador y dispositivo, tu país y cuánto tardó en cargar la página. No usamos píxeles de publicidad ni ningún otro servicio de análisis.",

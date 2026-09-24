@@ -18,11 +18,15 @@
  * is an exact match (never `.endsWith`) so a hostname that merely contains
  * the production domain can't smuggle itself onto the allowlist.
  *
- * WHY `strategy="lazyOnload"` (next/script): the audience is low-end phones
- * on slow connections — this defers the beacon fetch to browser idle time,
- * after everything the visitor actually came for has loaded. See
- * node_modules/next/dist/docs/01-app/03-api-reference/02-components/script.md
- * ("lazyOnload" section).
+ * WHY `strategy="lazyOnload"` (next/script), no `defer` prop: the audience
+ * is low-end phones on slow connections — lazyOnload defers the beacon
+ * fetch to browser idle time, after everything the visitor actually came
+ * for has loaded. See node_modules/next/dist/docs/01-app/03-api-reference/
+ * 02-components/script.md ("lazyOnload" section). No `defer` attribute:
+ * lazyOnload scripts are inserted into the DOM programmatically (not
+ * present in the parsed HTML), and per the HTML spec `defer` only affects
+ * scripts the parser encounters directly — it's a no-op on a
+ * dynamically-inserted one, so adding it here would just be dead weight.
  *
  * WHY a client component rendering null until an effect confirms the
  * hostname, rather than deciding at render time: `layout.tsx` (its mount
@@ -67,7 +71,6 @@ export default function CloudflareAnalytics() {
     <Script
       src="https://static.cloudflareinsights.com/beacon.min.js"
       strategy="lazyOnload"
-      defer
       data-cf-beacon={JSON.stringify({ token: BEACON_TOKEN })}
     />
   );

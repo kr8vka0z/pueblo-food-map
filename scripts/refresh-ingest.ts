@@ -267,8 +267,11 @@ async function scrapeOsm(): Promise<Venue[]> {
 
 // ─── D1 row shape for current venues ────────────────────────────────────────
 
+// hours_irregular (#400) needs migrations/0015 applied to the target D1
+// first — against a database without it this SELECT fails loudly, which is
+// the right failure (see AGENTS.md's promotion checklist).
 const CURRENT_ROW_COLUMNS =
-  "id, name, category, lat, lng, address, hours_weekly, phone, url, operator, last_verified";
+  "id, name, category, lat, lng, address, hours_weekly, hours_irregular, phone, url, operator, last_verified";
 
 function loadCurrentRows(dbMode: DbMode, sourceType: RefreshSource): CurrentVenueRow[] {
   const sql = `SELECT ${CURRENT_ROW_COLUMNS} FROM venues WHERE source_type = '${sourceType}' AND status IN ('draft','published')`;

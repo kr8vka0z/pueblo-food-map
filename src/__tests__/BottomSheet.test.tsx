@@ -119,8 +119,11 @@ describe("BottomSheet — summary always visible (collapsed)", () => {
     // an aria-hidden dot child, so use getByText with exact:false to match
     // elements whose text content includes the label.
     // #590: the sr-only Drawer.Description reuses the same category copy,
-    // so the label can legitimately match twice.
-    expect(screen.getAllByText(/Food pantry/i).length).toBeGreaterThan(0);
+    // so exclude that match and require exactly one visible badge.
+    const visible = screen
+      .getAllByText(/Food pantry/i)
+      .filter((el) => !el.closest('[data-testid="vaul-description"]'));
+    expect(visible).toHaveLength(1);
   });
 });
 

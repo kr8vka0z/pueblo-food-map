@@ -89,11 +89,19 @@ export interface EmailRetentionCounts {
 // json_remove is a no-op for a path absent on a given row, so one
 // statement safely covers both public_submissions `kind`s ('new_venue'
 // payloads carry submitterEmail, 'closure' payloads carry contactEmail —
-// migrations/0002's own header).
+// migrations/0002's own header). `json_valid` guards a single malformed
+// `payload` row: an UPDATE is one statement, so json_remove throwing on
+// ANY matched row aborts the whole statement — rolling back the column
+// blank for every other, well-formed row in the same run, not just the
+// bad one. Falling back to `payload` unchanged for that one row means the
+// column still gets blanked (the primary target) even when the redundant
+// payload copy can't be safely touched.
 const BLANK_SUBMISSIONS_SQL = `
   UPDATE public_submissions
   SET submitter_email = NULL,
-      payload = json_remove(payload, '$.submitterEmail', '$.contactEmail')
+      payload = CASE WHEN json_valid(payload)
+                      THEN json_remove(payload, '$.submitterEmail', '$.contactEmail')
+                      ELSE payload END
   WHERE submitter_email IS NOT NULL AND created_at < ?
 `;
 
@@ -109,25 +117,50 @@ const DELETE_SUBSCRIPTIONS_SQL = `
 `;
 
 /**
+ * Runs one statement and returns its row count, or 0 + a pushed error
+ * message on failure — never throws. Each of the three tables' cleanup is
+ * isolated this way (see runEmailRetentionCleanup below) so a failure in
+ * one (a D1 blip, an unexpected constraint) can't also skip the other two
+ * for the day — this job only gets one shot at each table per 24h
+ * (shouldRunEmailRetention), so losing all three to one table's problem
+ * would be a much larger miss than losing one.
+ */
+async function runOne(db: D1Database, sql: string, cutoff: string, errors: string[]): Promise<number> {
+  try {
+    const result = await db.prepare(sql).bind(cutoff).run();
+    return result.meta?.changes ?? 0;
+  } catch (err) {
+    errors.push(err instanceof Error ? err.message : String(err));
+    return 0;
+  }
+}
+
+/**
  * Runs all three cleanup statements against `db` and returns a PII-free
  * count of rows each one touched (logger.ts's PII rule — counts only,
  * never an id, email, or other row content). Sequential, not
  * `Promise.all` — this runs once a day, so there is no latency reason to
- * risk concurrent D1 statements against the same database.
+ * risk concurrent D1 statements against the same database. Throws (after
+ * every statement has had its own independent attempt — see runOne above)
+ * if any statement failed, so the caller's own failure log
+ * (custom-worker.ts's logEmailRetentionFailure) still fires; counts
+ * already committed by the other statements are not rolled back by this
+ * throw — each is its own D1 commit.
  */
 export async function runEmailRetentionCleanup(
   db: D1Database,
   now: Date = new Date(),
 ): Promise<EmailRetentionCounts> {
   const cutoff = retentionCutoffIso(now);
+  const errors: string[] = [];
 
-  const submissions = await db.prepare(BLANK_SUBMISSIONS_SQL).bind(cutoff).run();
-  const adopters = await db.prepare(BLANK_ADOPTERS_SQL).bind(cutoff).run();
-  const subscriptions = await db.prepare(DELETE_SUBSCRIPTIONS_SQL).bind(cutoff).run();
+  const submissionsBlanked = await runOne(db, BLANK_SUBMISSIONS_SQL, cutoff, errors);
+  const adoptersBlanked = await runOne(db, BLANK_ADOPTERS_SQL, cutoff, errors);
+  const subscriptionsDeleted = await runOne(db, DELETE_SUBSCRIPTIONS_SQL, cutoff, errors);
 
-  return {
-    submissionsBlanked: submissions.meta?.changes ?? 0,
-    adoptersBlanked: adopters.meta?.changes ?? 0,
-    subscriptionsDeleted: subscriptions.meta?.changes ?? 0,
-  };
+  if (errors.length > 0) {
+    throw new Error(`email retention cleanup: ${errors.join("; ")}`);
+  }
+
+  return { submissionsBlanked, adoptersBlanked, subscriptionsDeleted };
 }

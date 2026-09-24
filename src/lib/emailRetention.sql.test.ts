@@ -217,4 +217,58 @@ describe("runEmailRetentionCleanup — real SQLite", () => {
     expect(counts.subscriptionsDeleted).toBe(0);
     expect(sqlite.prepare("SELECT COUNT(*) as n FROM alert_subscriptions").get()).toEqual({ n: 2 });
   });
+
+  // A single-statement UPDATE aborts entirely if json_remove throws on ANY
+  // matched row (SQLite has no per-row error recovery within one
+  // statement) — the json_valid guard in BLANK_SUBMISSIONS_SQL exists
+  // specifically to stop one malformed row from rolling back every other
+  // row's column blank in the same run.
+  test("a malformed payload still gets submitter_email blanked (payload itself left alone), and does not block the well-formed row beside it", async () => {
+    insertSubmission(sqlite, {
+      id: 5,
+      kind: "new_venue",
+      email: "clean@example.com",
+      createdAt: OLD,
+      payload: { venueName: "Clean Place", submitterEmail: "clean@example.com" },
+    });
+    // Bypasses insertSubmission's JSON.stringify to write a genuinely
+    // malformed payload column directly.
+    sqlite
+      .prepare(
+        `INSERT INTO public_submissions (id, kind, payload, submitter_email, status, created_at)
+         VALUES (6, 'new_venue', 'not valid json', 'broken@example.com', 'pending', ?)`,
+      )
+      .run(OLD);
+
+    const counts = await runEmailRetentionCleanup(db, NOW);
+
+    expect(counts.submissionsBlanked).toBe(2);
+    const clean = sqlite.prepare("SELECT submitter_email, payload FROM public_submissions WHERE id = 5").get() as {
+      submitter_email: string | null;
+      payload: string;
+    };
+    expect(clean.submitter_email).toBeNull();
+    expect(JSON.parse(clean.payload)).toEqual({ venueName: "Clean Place" });
+
+    const broken = sqlite.prepare("SELECT submitter_email, payload FROM public_submissions WHERE id = 6").get() as {
+      submitter_email: string | null;
+      payload: string;
+    };
+    expect(broken.submitter_email).toBeNull(); // primary target still cleared
+    expect(broken.payload).toBe("not valid json"); // left alone — can't safely touch it
+  });
+
+  test("a failure in one table's statement does not block the other two", async () => {
+    // box_adopters and alert_subscriptions have real, valid old rows.
+    // Deliberately break the SUBMISSIONS table (drop it) so its statement
+    // throws — the other two tables' cleanup must still run and commit.
+    sqlite.exec("DROP TABLE public_submissions");
+    insertAdopter(sqlite, { id: 1, email: "adopter@example.com", status: "rejected", reviewedAt: OLD });
+    insertSubscription(sqlite, { id: 1, role: "giver", venueId: "box-a", email: "giver@example.com", unsubscribedAt: OLD });
+
+    await expect(runEmailRetentionCleanup(db, NOW)).rejects.toThrow(/email retention cleanup/);
+
+    expect((sqlite.prepare("SELECT email FROM box_adopters WHERE id = 1").get() as { email: string }).email).toBe("");
+    expect(sqlite.prepare("SELECT * FROM alert_subscriptions WHERE id = 1").get()).toBeUndefined();
+  });
 });

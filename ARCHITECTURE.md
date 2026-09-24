@@ -344,8 +344,9 @@ if a key is missing.
 **Locale is client-side only.** `LocaleContext` (`src/lib/LocaleContext.tsx`)
 holds the active locale in React state and writes it to the `pfm-locale`
 cookie on change. No route reads that cookie on the server: `layout.tsx`
-renders `<LocaleProvider>` with no `initialLocale`, so every page renders
-(and is prerendered) in English, and the provider switches to the saved
+renders `<LocaleProvider>` with no `initialLocale`, so every page's first
+render is English (the static public pages are prerendered that way), and
+the provider switches to the saved
 locale from `document.cookie` in an effect after hydration (#289). A Spanish
 visitor therefore sees English briefly on a hard page load. The reason is
 #287: a server-side `cookies()` read makes a route dynamic and loses the

@@ -16,6 +16,8 @@
 import { describe, test, expect, vi, afterEach } from "vitest";
 import type { ExecutionContext, ScheduledController } from "@cloudflare/workers-types/experimental";
 import { runScheduledTasks } from "@/lib/scheduledTasks";
+import { shouldRunEmailRetention } from "@/lib/emailRetention";
+import { shouldRunRefreshAlertsCheck } from "@/lib/refreshAlerts";
 
 function fakeCtx() {
   const pending: Promise<unknown>[] = [];
@@ -118,12 +120,16 @@ describe("runScheduledTasks", () => {
     expect(calls()).toBe(0);
   });
 
-  test("the two daily slots never collide — 09:00 runs retention only, 09:30 runs refresh-alerts only", () => {
-    // Boundary ownership already proven per-file (emailRetention.test.ts's
-    // shouldRunEmailRetention suite, refreshAlerts.test.ts's
-    // shouldRunRefreshAlertsCheck suite) — this just asserts the two
-    // constants this orchestrator depends on stay distinct.
-    expect(RETENTION_SLOT).not.toBe(ALERTS_SLOT);
+  test("the two daily slots never collide — the real gate functions, not local literals", () => {
+    // CI review Nit: asserting RETENTION_SLOT !== ALERTS_SLOT alone would
+    // stay green even if emailRetention.ts's RETENTION_RUN_HOUR_UTC and
+    // refreshAlerts.ts's ALERT_RUN_HOUR_UTC/ALERT_RUN_MINUTE_UTC were
+    // changed to genuinely collide, since those constants aren't exported
+    // and this test never touches them. Calling each PRODUCTION gate
+    // function against the OTHER job's slot is what actually catches that
+    // regression.
+    expect(shouldRunEmailRetention(ALERTS_SLOT)).toBe(false);
+    expect(shouldRunRefreshAlertsCheck(RETENTION_SLOT)).toBe(false);
   });
 
   test("skips both daily jobs when HC_PING_URL is unset, but still runs them — the exact coupling this file guards against", async () => {

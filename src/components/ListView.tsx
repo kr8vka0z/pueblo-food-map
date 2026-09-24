@@ -5,6 +5,7 @@ import type { Venue } from "@/types/venue";
 import { t, type Locale } from "@/lib/i18n";
 import { publishedAt } from "@/data/published-venues";
 import { formatPublishedDate } from "@/lib/dataFreshness";
+import { OSM_COPYRIGHT_URL } from "@/lib/osmAttribution";
 import VenueCard from "@/components/VenueCard";
 import { useLocale } from "@/lib/LocaleContext";
 
@@ -42,6 +43,18 @@ export default function ListView({
       <p className="shrink-0 px-4 pb-1 text-xs text-[var(--color-ink-400)]">
         {t("freshness.updated", locale, { date: formatPublishedDate(publishedAt, locale) })}
       </p>
+      {/* ODbL attribution (#133 4.5) — this view is `absolute inset-0`
+          (above), so it fully covers Map.tsx's Mapbox AttributionControl
+          (which itself renders "© OpenStreetMap" per streets-v12) while
+          list mode is showing OSM-derived venue data. */}
+      <a
+        href={OSM_COPYRIGHT_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="shrink-0 inline-flex items-center min-h-11 px-4 text-xs text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)] transition-colors focus-visible:outline-none focus-visible:underline"
+      >
+        {t("osm.attribution", locale)}
+      </a>
       {notice ? <div className="shrink-0">{notice}</div> : null}
       {/* Below 2xl the bottom nav bar sits over the list's last row; the extra
           bottom padding lets the final card scroll fully clear of it

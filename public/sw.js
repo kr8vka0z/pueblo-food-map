@@ -36,9 +36,11 @@ const SHELL_PAGES = ["/", "/venues", "/resources"];
 const NEVER_CACHE_PREFIXES = ["/api", "/admin", "/alerts", "/box/"];
 const STATIC_PREFIXES = ["/_next/static/", "/fonts/", "/icons/"];
 
-// Matches /_next/static/... in HTML attributes and in the RSC payload Next
-// inlines as escaped JSON strings (stops at the escaping backslash).
-const STATIC_ASSET_RE = /\/_next\/static\/[^"'\s)\\<>]+/g;
+// Matches /_next/static/... and /fonts/... in HTML attributes and in the RSC
+// payload Next inlines as escaped JSON strings (stops at the escaping
+// backslash). /fonts/ catches layout.tsx's Public Sans preload — without it
+// the offline page falls back to a system font.
+const STATIC_ASSET_RE = /\/(?:_next\/static|fonts)\/[^"'\s)\\<>]+/g;
 
 /**
  * Decide how a request is handled. Pure, so it's unit-tested
@@ -61,7 +63,7 @@ function classifyRequest(request, origin) {
   return "bypass";
 }
 
-/** Every /_next/static URL referenced by a page's HTML, deduped. */
+/** Every /_next/static and /fonts URL referenced by a page's HTML, deduped. */
 function extractStaticAssets(html) {
   return new Set(html.match(STATIC_ASSET_RE) || []);
 }

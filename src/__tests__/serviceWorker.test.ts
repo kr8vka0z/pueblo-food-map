@@ -100,10 +100,11 @@ describe("sw.js classifyRequest (#130)", () => {
 });
 
 describe("sw.js extractStaticAssets (#130)", () => {
-  test("pulls every /_next/static URL out of page HTML, including RSC-escaped ones, deduped", () => {
+  test("pulls every /_next/static and /fonts URL out of page HTML, including RSC-escaped ones, deduped", () => {
     const { context } = loadSw();
     const html = `
       <link rel="stylesheet" href="/_next/static/css/a1.css"/>
+      <link rel="preload" href="/fonts/PublicSans-Variable.woff2" as="font"/>
       <script src="/_next/static/chunks/main-b2.js" async=""></script>
       <link rel="preload" as="script" href="/_next/static/chunks/main-b2.js"/>
       <script>self.__next_f.push([1,"2:I[\\"/_next/static/chunks/c3.js\\",\\"x\\"]"])</script>
@@ -112,6 +113,7 @@ describe("sw.js extractStaticAssets (#130)", () => {
       "/_next/static/chunks/c3.js",
       "/_next/static/chunks/main-b2.js",
       "/_next/static/css/a1.css",
+      "/fonts/PublicSans-Variable.woff2",
     ]);
   });
 });

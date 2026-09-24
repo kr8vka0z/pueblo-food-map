@@ -6,11 +6,14 @@
  * submit, suggest/submit, feedback/submit): Content-Type/JSON parse ->
  * Turnstile -> honeypot -> rate limit -> field validation -> write. See
  * AGENTS.md's public-submissions section and src/lib/turnstile.ts /
- * src/lib/rateLimit.ts for the established shape this route reuses.
+ * src/lib/formRateLimit.ts for the established shape this route reuses
+ * (as of #587, the three public forms also moved onto this file's own
+ * checkAndIncrement, via formRateLimit.ts's thin per-form wrapper).
  *
- * WHY a stronger rate limit than the other three forms' 5/hr in-process
- * limiter: check-ins are a feature people are expected to use DAILY
- * (Discovery §1), unlike an occasional closure report — see
+ * WHY a stronger PER-BOX/PER-VISITOR rate limit than the three forms' own
+ * caps (both now D1-backed as of #587, formerly this route's in-process
+ * limiter comparison point): check-ins are a feature people are expected to
+ * use DAILY (Discovery §1), unlike an occasional closure report — see
  * src/lib/checkinRateLimit.ts's own header for the full D1-shared-counter
  * reasoning. Two independent caps, both keyed off non-identifying values
  * (never an IP — see that file's header): MAX_PER_BOX_PER_HOUR guards the

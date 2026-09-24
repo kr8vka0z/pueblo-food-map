@@ -423,6 +423,20 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **BottomNav**: see docs/bottom-nav-spec.md for geometry and stacking order (the fade band that spec once described was deleted with the bottom-nav rework — `.nav-fade-band` no longer exists in globals.css).
 
+## Forms
+
+Every form (Suggest, Feedback, Report, AdoptBox, BoxAlertSignup, AdminLogin, AddVenue) shares one field vocabulary. Copy it; don't restyle per form.
+
+- **Label**: `text-sm font-medium`, `ink-700`, `mb-1`, always a real `<label htmlFor>`. Required fields append a `danger` `*` (`aria-hidden` — the requirement is also stated in the field's error text).
+- **Input / textarea / select**: `w-full`, `radius-md`, 1px `bone-300` border, `px-3 py-2`, white fill (`bg-white` — the one place white sits on the `bone-50` page, so the field reads as a fillable surface), `ink-900` text, `ink-400` placeholder. **`text-base` on mobile, `md:text-sm` up** — iOS Safari zooms the page when a focused field is under 16px. Focus: border and 2px ring both `sage-500`.
+- **Field error**: border → `danger`; message below at `mt-1 text-xs`, `danger`, `role="alert"`, wired with `aria-invalid` + `aria-describedby`. Always words, never only the red border.
+- **Form-level error banner** (a failed submit): `radius-md`, 1px `danger` border, white fill, `px-4 py-3`, `role="alert"`; a `text-sm font-medium` title plus an optional `text-sm` body, both `danger`. Same treatment as the admin `PublishBotStatusBanner`. A recovery action inside it (e.g. AddVenueForm's conflict "Reload") is a `danger`-outlined white button, `bone-100` hover, sage focus ring, `min-h-12`.
+- **Non-blocking guidance is not an error**: "didn't work, here's what to try" (AddVenueForm's geocode no-match) uses `clay-700`, calm confirmation uses `sage-600`. Reserve `danger` for things that block submission.
+- **Submit**: full-width `h-11` (the box-card forms: `min-h-[44px] flex-1`), `radius-md`, `sage-500` fill, `bone-50` `font-semibold` label, `sage-600` hover, sage focus ring with 2px offset. Disabled while submitting or before Turnstile returns a token: `opacity-60`, `cursor-not-allowed`, label switches to a progress verb ("Sending…").
+- **Success**: the form is replaced (not appended to) by a centred `role="status" aria-live="polite"` block — `text-xl font-semibold ink-900` title, `text-sm ink-700` body, and a single sage "Back to map" button.
+- **Layout**: fields stack with `space-y-5`; admin forms cap at `max-w-2xl`.
+- **Never Tailwind's `red-*`** (or any stock palette) for errors — `danger` is the only error red. `npm run lint` (`scripts/check-banned.mjs`) rejects stock chromatic palettes.
+
 ## Do's and Don'ts
 
 **Do:**
@@ -443,7 +457,7 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 - Don't use yellow (`#FFD166`) for anything other than support/classification badges.
 - Don't use Fraunces for body text, button labels, form inputs, or any running text at 16px or smaller. Its variable weight range is seductive, but it is a display serif built for headlines.
 - Don't add a sidebar. The v1 360px categories rail + 280px detail panel were removed in v2. A sidebar competes with the map for viewport space and violates the chrome budget.
-- Don't use unmodified Tailwind palette tokens (`gray-500`, `blue-50`, `blue-500`, etc.). Every color in this system is a custom token that overrides the Tailwind defaults.
+- Don't use unmodified Tailwind palette tokens (`gray-500`, `blue-50`, `red-600`, etc.). Every color in this system is a custom token that overrides the Tailwind defaults — errors use `danger`, never `red-*`. `npm run lint` enforces this.
 - Don't add decorative imagery. The v2 design handoff budget is ~5 KB for all images (favicon + inline SVG pins). No hero images, no stock photos, no illustrations.
 - Don't add a dark mode. `color-scheme: light` is explicit in `:root`. The bone palette has no dark-mode counterpart.
 - Don't treat `clay` (warm accent, `#C2410C`) as unused or reserved — it is the established informational-emphasis accent, already in use for the SNAP badge (VenueCard), the map's SNAP chip (MapWrapper), the favorited-heart fill (FavoriteButton), the location-denied banner (LocationDeniedBanner), the admin "Unpublished changes" marker (VenueListView), and a blessing box's unsponsored "needs a sponsor" band (BoxCardBody). Reach for it only for that same warm-attention/informational role, never as a third action color alongside sage.

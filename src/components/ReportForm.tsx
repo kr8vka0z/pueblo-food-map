@@ -241,9 +241,9 @@ export default function ReportForm({
     "focus-visible:border-[var(--color-sage-500)]";
 
   const inputBorder = (hasError: boolean) =>
-    hasError ? "border-red-500" : "border-[var(--color-bone-300)]";
+    hasError ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]";
 
-  const errorClass = "mt-1 text-xs text-red-600";
+  const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
   const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
 
   return (
@@ -259,10 +259,10 @@ export default function ReportForm({
       {status === "error" && (
         <div
           role="alert"
-          className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3"
+          className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3"
         >
-          <p className="text-sm font-medium text-red-700">{t("report.error.title", locale)}</p>
-          <p className="text-sm text-red-600 mt-0.5">{t("report.error.body", locale)}</p>
+          <p className="text-sm font-medium text-[var(--color-danger)]">{t("report.error.title", locale)}</p>
+          <p className="text-sm text-[var(--color-danger)] mt-0.5">{t("report.error.body", locale)}</p>
         </div>
       )}
 
@@ -270,7 +270,7 @@ export default function ReportForm({
       <div>
         <label htmlFor="report-issue-type" className={labelClass}>
           {t("report.issueType.label", locale)}{" "}
-          <span aria-hidden className="text-red-500">*</span>
+          <span aria-hidden className="text-[var(--color-danger)]">*</span>
         </label>
         <select
           id="report-issue-type"
@@ -304,7 +304,7 @@ export default function ReportForm({
       <div>
         <label htmlFor="report-description" className={labelClass}>
           {t("report.description.label", locale)}{" "}
-          <span aria-hidden className="text-red-500">*</span>
+          <span aria-hidden className="text-[var(--color-danger)]">*</span>
         </label>
         <textarea
           id="report-description"
@@ -404,7 +404,7 @@ export default function ReportForm({
         {turnstileError && (
           <p
             role="alert"
-            className="mt-1 text-xs text-red-600"
+            className="mt-1 text-xs text-[var(--color-danger)]"
           >
             {t("form.turnstile.error", locale)}
           </p>

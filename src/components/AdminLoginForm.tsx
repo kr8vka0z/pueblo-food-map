@@ -67,7 +67,7 @@ const inputBase =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:border-[var(--color-sage-500)]";
 const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
-const errorClass = "mt-1 text-xs text-red-600";
+const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
 const primaryButtonClass =
   "w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
   "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-600)] " +
@@ -257,7 +257,7 @@ export default function AdminLoginForm() {
             aria-describedby={fieldError ? "admin-login-email-error" : undefined}
             className={`${inputBase} ${
               fieldError
-                ? "border-red-500"
+                ? "border-[var(--color-danger)]"
                 : "border-[var(--color-bone-300)]"
             } mb-1`}
             placeholder="you@example.com"

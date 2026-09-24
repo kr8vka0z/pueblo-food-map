@@ -24,6 +24,9 @@ const PATTERNS = [
   { name: 'Tailwind zinc palette',      re: /\bzinc-(50|100|200|300|400|500|600|700|800|900)\b/ },
   { name: 'Tailwind neutral palette',   re: /\bneutral-(50|100|200|300|400|500|600|700|800|900)\b/ },
   { name: 'Tailwind stone palette',     re: /\bstone-(50|100|200|300|400|500|600|700|800|900)\b/ },
+  // Chromatic palettes too: form errors had drifted to stock red-500/600/700
+  // instead of the `danger` token. Every color here is a custom @theme token.
+  { name: 'Tailwind chromatic palette', re: /\b(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|indigo|violet|purple|fuchsia|pink|rose)-(50|100|200|300|400|500|600|700|800|900|950)\b/ },
 ];
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '').replace(/^\/([A-Z]:)/, '$1');

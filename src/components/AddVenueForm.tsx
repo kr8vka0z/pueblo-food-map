@@ -497,8 +497,8 @@ export default function AddVenueForm({
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
     "focus-visible:border-[var(--color-sage-500)]";
   const inputBorder = (hasError: boolean) =>
-    hasError ? "border-red-500" : "border-[var(--color-bone-300)]";
-  const errorClass = "mt-1 text-xs text-red-600";
+    hasError ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]";
+  const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
   const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
   // Secondary (bordered, sage-text) action — visually lower weight than the
   // primary sage-filled submit button below, but still sage per DESIGN.md
@@ -524,7 +524,7 @@ export default function AddVenueForm({
     error: "text-[var(--color-clay-700)]",
   };
   const requiredMark = (
-    <span aria-hidden className="text-red-500">
+    <span aria-hidden className="text-[var(--color-danger)]">
       {" "}
       *
     </span>
@@ -533,13 +533,13 @@ export default function AddVenueForm({
   return (
     <form onSubmit={handleSubmit} noValidate className="max-w-2xl space-y-5">
       {status === "error" && (
-        <div role="alert" className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3">
+        <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3">
           {errorMessage ? (
-            <p className="text-sm font-medium text-red-700">{errorMessage}</p>
+            <p className="text-sm font-medium text-[var(--color-danger)]">{errorMessage}</p>
           ) : (
             <>
-              <p className="text-sm font-medium text-red-700">Something went wrong.</p>
-              <p className="text-sm text-red-600 mt-0.5">The venue was not saved. Try again.</p>
+              <p className="text-sm font-medium text-[var(--color-danger)]">Something went wrong.</p>
+              <p className="text-sm text-[var(--color-danger)] mt-0.5">The venue was not saved. Try again.</p>
             </>
           )}
           {/* #265: a real reload, not router.refresh() — the admin needs the
@@ -553,7 +553,7 @@ export default function AddVenueForm({
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-2 inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-red-300 bg-white px-4 text-sm font-medium text-red-700 transition-colors duration-150 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+              className="mt-2 inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 text-sm font-medium text-[var(--color-danger)] transition-colors duration-150 hover:bg-[var(--color-bone-100)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
             >
               Reload
             </button>

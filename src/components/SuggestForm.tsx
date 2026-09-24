@@ -252,9 +252,9 @@ export default function SuggestForm() {
     "focus-visible:border-[var(--color-sage-500)]";
 
   const inputBorder = (hasError: boolean) =>
-    hasError ? "border-red-500" : "border-[var(--color-bone-300)]";
+    hasError ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]";
 
-  const errorClass = "mt-1 text-xs text-red-600";
+  const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
   const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
 
   return (
@@ -270,10 +270,10 @@ export default function SuggestForm() {
       {status === "error" && (
         <div
           role="alert"
-          className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3"
+          className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3"
         >
-          <p className="text-sm font-medium text-red-700">{t("suggest.error.title", locale)}</p>
-          <p className="text-sm text-red-600 mt-0.5">{t("suggest.error.body", locale)}</p>
+          <p className="text-sm font-medium text-[var(--color-danger)]">{t("suggest.error.title", locale)}</p>
+          <p className="text-sm text-[var(--color-danger)] mt-0.5">{t("suggest.error.body", locale)}</p>
         </div>
       )}
 
@@ -281,7 +281,7 @@ export default function SuggestForm() {
       <div>
         <label htmlFor="suggest-name" className={labelClass}>
           {t("suggest.venueName.label", locale)}{" "}
-          <span aria-hidden className="text-red-500">*</span>
+          <span aria-hidden className="text-[var(--color-danger)]">*</span>
         </label>
         <input
           type="text"
@@ -311,7 +311,7 @@ export default function SuggestForm() {
       <div>
         <label htmlFor="suggest-address" className={labelClass}>
           {t("suggest.address.label", locale)}{" "}
-          <span aria-hidden className="text-red-500">*</span>
+          <span aria-hidden className="text-[var(--color-danger)]">*</span>
         </label>
         <input
           type="text"
@@ -341,7 +341,7 @@ export default function SuggestForm() {
       <div>
         <label htmlFor="suggest-category" className={labelClass}>
           {t("suggest.category.label", locale)}{" "}
-          <span aria-hidden className="text-red-500">*</span>
+          <span aria-hidden className="text-[var(--color-danger)]">*</span>
         </label>
         <select
           id="suggest-category"
@@ -461,7 +461,7 @@ export default function SuggestForm() {
       <div>
         <label htmlFor="suggest-email" className={labelClass}>
           {t("suggest.submitterEmail.label", locale)}{" "}
-          <span aria-hidden className="text-red-500">*</span>
+          <span aria-hidden className="text-[var(--color-danger)]">*</span>
         </label>
         <input
           type="email"
@@ -534,7 +534,7 @@ export default function SuggestForm() {
         {turnstileError && (
           <p
             role="alert"
-            className="mt-1 text-xs text-red-600"
+            className="mt-1 text-xs text-[var(--color-danger)]"
           >
             {t("form.turnstile.error", locale)}
           </p>

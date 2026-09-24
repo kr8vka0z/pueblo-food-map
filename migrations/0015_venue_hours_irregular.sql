@@ -1,0 +1,45 @@
+-- migrations/0015_venue_hours_irregular.sql
+--
+-- #400: gives non-weekly opening schedules (e.g. "4th Tuesday of each
+-- month, 11:00 AM - 12:00 PM" — the real shape 3 of the 35 live Pueblo
+-- Plentiful pantries use, measured 2026-09-02) a structured field of their
+-- own. Adds ONE nullable column, `hours_irregular`, to the existing
+-- `venues` table: JSON-encoded IrregularSchedule[] (src/types/venue.ts),
+-- ALONGSIDE `hours_weekly`, never replacing it — a venue (e.g. Lynn Gardens
+-- Baptist Church) can legitimately have both a weekly recurrence and a
+-- separate monthly special. NULL means "no irregular schedule entered,"
+-- same "no signal" convention every other nullable column in this schema
+-- uses.
+--
+-- WHY a JSON column, not a new table: this is the exact shape hours_weekly
+-- itself already uses (JSON text in one column, parsed at read time) — an
+-- irregular schedule is 0-12 small structured entries per venue, not a
+-- relation that benefits from its own table/joins/indexes.
+--
+-- WHY no CHECK constraint on the JSON shape: same reasoning
+-- migrations/0001's own header gives for hours_weekly — SQLite has no JSON
+-- Schema CHECK primitive, so shape validation lives in application code
+-- (src/lib/adminVenueValidation.ts's validateIrregularSchedule, reused by
+-- src/lib/publishVenues.ts's validateAndMapRow before a row ever reaches
+-- the public map).
+--
+-- Column addition only — no data backfill, no Publish triggered by this
+-- migration alone (see AGENTS.md's promotion checklist: an admin must
+-- still click Publish once a real schedule is entered/approved for it to
+-- reach the public snapshot).
+--
+-- Applied to STAGING (pueblo-food-map-admin-staging) and local dev only for
+-- this slice — production is a later, explicit, Kyle-gated step, same
+-- convention as every migration since 0001 (see AGENTS.md "promotion
+-- checklist").
+--
+-- NOT IDEMPOTENT — SQLite's ALTER TABLE ... ADD COLUMN has no IF NOT
+-- EXISTS form (same limitation 0011/0012/0014's own headers document).
+-- Running this file twice against the same database fails on the second
+-- run with "duplicate column name: hours_irregular". This migration must
+-- run EXACTLY ONCE per database, and only ever via
+-- `wrangler d1 migrations apply` (tracked) — never `d1 execute --file`
+-- outside that ledger, unless first confirming via
+-- `PRAGMA table_info(venues);` that the column doesn't already exist.
+
+ALTER TABLE venues ADD COLUMN hours_irregular TEXT;

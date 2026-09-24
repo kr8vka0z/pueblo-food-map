@@ -14,8 +14,8 @@
  * pieces. See src/app/api/admin/publish/route.ts for the sequencing.
  */
 
-import { validateHoursWeekly } from "@/lib/adminVenueValidation";
-import type { Venue, VenueCategory, WeeklyHours } from "@/types/venue";
+import { validateHoursWeekly, validateIrregularSchedule } from "@/lib/adminVenueValidation";
+import type { IrregularSchedule, Venue, VenueCategory, WeeklyHours } from "@/types/venue";
 
 // ─── D1 row shape ───────────────────────────────────────────────────────────
 // Mirrors migrations/0001_init_admin_schema.sql's `venues` table exactly —
@@ -30,6 +30,7 @@ export interface VenueRow {
   lng: number;
   address: string;
   hours_weekly: string | null;
+  hours_irregular: string | null;
   accepts_snap: number | null;
   accepts_wic: number | null;
   phone: string | null;
@@ -153,6 +154,28 @@ export function validateAndMapRow(row: VenueRow): RowValidationResult {
       : undefined;
   }
 
+  // Same JSON-parse + shape-check + omit-when-empty pattern as hours_weekly
+  // above, reusing validateIrregularSchedule (adminVenueValidation.ts) so
+  // this validator and the admin form's own POST validation can never drift
+  // apart on what a valid IrregularSchedule[] looks like (#400).
+  let hoursIrregular: IrregularSchedule[] | undefined;
+  if (row.hours_irregular !== null && row.hours_irregular !== undefined) {
+    let parsedIrregular: unknown;
+    try {
+      parsedIrregular = JSON.parse(row.hours_irregular);
+    } catch {
+      return { ok: false, error: { id: row.id, reason: "hours_irregular is not valid JSON" } };
+    }
+    const irregularShapeErrors: Record<string, string> = {};
+    const cleanedIrregularJson = validateIrregularSchedule(parsedIrregular, irregularShapeErrors);
+    if (irregularShapeErrors.hours_irregular) {
+      return { ok: false, error: { id: row.id, reason: irregularShapeErrors.hours_irregular } };
+    }
+    hoursIrregular = cleanedIrregularJson !== null
+      ? (JSON.parse(cleanedIrregularJson) as IrregularSchedule[])
+      : undefined;
+  }
+
   const venue: Venue = {
     id: row.id,
     name: row.name,
@@ -161,6 +184,7 @@ export function validateAndMapRow(row: VenueRow): RowValidationResult {
     lng: row.lng,
     address: row.address,
     ...(hoursWeekly !== undefined ? { hours_weekly: hoursWeekly } : {}),
+    ...(hoursIrregular !== undefined ? { hours_irregular: hoursIrregular } : {}),
     ...(row.accepts_snap !== null ? { accepts_snap: row.accepts_snap === 1 } : {}),
     ...(row.accepts_wic !== null ? { accepts_wic: row.accepts_wic === 1 } : {}),
     ...(row.phone != null ? { phone: row.phone } : {}),

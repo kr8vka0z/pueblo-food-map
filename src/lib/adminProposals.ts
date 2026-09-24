@@ -211,9 +211,13 @@ export function checkStaleApply(
 
 // ─── Applying an approved proposal's field diff (spec §6.7) ────────────────
 
-/** D1 storage form of one Venue field's value — hours_weekly is JSON text in `venues`, a parsed object in `Venue`/ProposedDiff. */
+/** D1 storage form of one Venue field's value — hours_weekly/hours_irregular are JSON text in `venues`, a parsed object/array in `Venue`/ProposedDiff. */
 export function toColumnValue(field: keyof Venue, value: unknown): unknown {
-  if (field === "hours_weekly") {
+  // hours_irregular (#400) is JSON TEXT in `venues`, same as hours_weekly —
+  // shares its exact already-stringified-vs-not handling below, for the
+  // same reason (a proposal's proposed_diff can carry either the parsed
+  // shape or D1's own JSON-string form depending on where it originated).
+  if (field === "hours_weekly" || field === "hours_irregular") {
     if (value === null || value === undefined) return null;
     // The refresh pipeline's proposed_diff already carries hours_weekly as D1's JSON
     // text (diffEngine's CurrentVenueRow shape) — stringifying that again stored a
@@ -290,6 +294,7 @@ const APPLIABLE_VENUE_FIELDS = new Set<keyof Venue>([
   "phone",
   "url",
   "hours_weekly",
+  "hours_irregular", // #400 — wired into SOURCE_OWNED_FIELDS.plentiful (scripts/refresh/diffEngine.ts)
   "operator",
   "last_verified",
 ]);
@@ -406,6 +411,15 @@ export async function applyApprovedProposal(
         lng: afterVenue.lng ?? existing.lng,
         address: afterVenue.address ?? existing.address,
         hours_weekly: toColumnValue("hours_weekly", afterVenue.hours_weekly) as string | null,
+        // #400: same "carries the field verbatim on an add/restore, not
+        // gated by SOURCE_OWNED_FIELDS" reasoning as hours_weekly above —
+        // an 'add' proposal's `after` is the full incoming venue, not an
+        // update's filtered field list. Falls back to `existing`'s stored
+        // value (not null) so restoring an archived venue never silently
+        // wipes a schedule the incoming record simply doesn't carry.
+        hours_irregular: (afterVenue.hours_irregular !== undefined
+          ? toColumnValue("hours_irregular", afterVenue.hours_irregular)
+          : existing.hours_irregular) as string | null,
         accepts_snap: toTriState(afterVenue.accepts_snap),
         accepts_wic: toTriState(afterVenue.accepts_wic),
         phone: (afterVenue.phone ?? null) as string | null,
@@ -422,7 +436,7 @@ export async function applyApprovedProposal(
       };
       venueStmt = db
         .prepare(
-          `UPDATE venues SET name = ?, category = ?, lat = ?, lng = ?, address = ?, hours_weekly = ?,
+          `UPDATE venues SET name = ?, category = ?, lat = ?, lng = ?, address = ?, hours_weekly = ?, hours_irregular = ?,
            accepts_snap = ?, accepts_wic = ?, phone = ?, email = ?, url = ?, notes = ?, operator = ?,
            source = ?, last_verified = ?, status = 'draft', source_type = ?, updated_by = ?, updated_at = ?
            WHERE id = ?`,
@@ -434,6 +448,7 @@ export async function applyApprovedProposal(
           afterRow.lng,
           afterRow.address,
           afterRow.hours_weekly,
+          afterRow.hours_irregular,
           afterRow.accepts_snap,
           afterRow.accepts_wic,
           afterRow.phone,
@@ -460,6 +475,7 @@ export async function applyApprovedProposal(
         lng: afterVenue.lng ?? 0,
         address: afterVenue.address ?? "",
         hours_weekly: toColumnValue("hours_weekly", afterVenue.hours_weekly) as string | null,
+        hours_irregular: toColumnValue("hours_irregular", afterVenue.hours_irregular) as string | null,
         accepts_snap: toTriState(afterVenue.accepts_snap),
         accepts_wic: toTriState(afterVenue.accepts_wic),
         phone: (afterVenue.phone ?? null) as string | null,
@@ -481,10 +497,10 @@ export async function applyApprovedProposal(
       };
       venueStmt = db
         .prepare(
-          `INSERT INTO venues (id, name, category, lat, lng, address, hours_weekly, accepts_snap, accepts_wic,
+          `INSERT INTO venues (id, name, category, lat, lng, address, hours_weekly, hours_irregular, accepts_snap, accepts_wic,
            phone, email, url, notes, operator, source, last_verified, status, source_type, outside_county,
            created_by, updated_by, published_at, published_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           newRow.id,
@@ -494,6 +510,7 @@ export async function applyApprovedProposal(
           newRow.lng,
           newRow.address,
           newRow.hours_weekly,
+          newRow.hours_irregular,
           newRow.accepts_snap,
           newRow.accepts_wic,
           newRow.phone,

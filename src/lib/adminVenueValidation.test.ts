@@ -39,6 +39,7 @@ describe("validateCreateVenuePayload — happy path", () => {
       lng: -104.6,
       address: "123 Test St, Pueblo, CO",
       hoursWeeklyJson: null,
+      hoursIrregularJson: null,
       acceptsSnap: null,
       acceptsWic: null,
       phone: null,

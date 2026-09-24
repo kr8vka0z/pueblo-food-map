@@ -22,6 +22,7 @@ function makeRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
     lng: -104.6,
     address: "123 Test St, Pueblo, CO",
     hours_weekly: null,
+    hours_irregular: null,
     accepts_snap: null,
     accepts_wic: null,
     phone: null,

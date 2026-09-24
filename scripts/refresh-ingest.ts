@@ -50,7 +50,7 @@
  *
  * One opt-in exception on top (#543), OFF unless the env var
  * REFRESH_AI_AUTO_APPLY=true: a phone/url change that is formatting-only
- * once normalised AND that Jev scores under 5% "real change" is applied the
+ * once normalised AND that Jev scores over 90% "same value" is applied the
  * same way, under actor `refresh-pipeline-ai` (proposalSql.ts).
  *
  * WHY shell out to `wrangler d1 execute` instead of a D1Database binding:

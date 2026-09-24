@@ -187,7 +187,8 @@ const pct = (p: number) => `${Math.round(p * 100)}%`;
  */
 export function triageSummary(row: Pick<ChangeProposalRow, "triage_json">): string | null {
   if (!row.triage_json) return null;
-  let parsed: { answers?: Record<string, { noul?: number; choice?: string; probabilities?: Record<string, number> }> };
+  type Answer = { noul?: number; choice?: string; probabilities?: Record<string, number> };
+  let parsed: { answers?: Record<string, Answer> };
   try {
     parsed = JSON.parse(row.triage_json);
   } catch {
@@ -195,7 +196,8 @@ export function triageSummary(row: Pick<ChangeProposalRow, "triage_json">): stri
   }
   const a = parsed.answers ?? {};
   if (typeof a.same_place?.noul === "number") return `Jev: ${pct(a.same_place.noul)} likely the same place under a new listing.`;
-  if (typeof a.real_change?.noul === "number") return `Jev: ${pct(a.real_change.noul)} likely a real-world change (not formatting noise).`;
+  if (typeof a.same_value?.noul === "number")
+    return `Jev: ${pct(a.same_value.noul)} likely the same value, only written differently.`;
   const reason = a.remove_reason;
   if (reason?.choice) {
     const p = reason.probabilities?.[reason.choice];

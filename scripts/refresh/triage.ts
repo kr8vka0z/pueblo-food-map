@@ -168,13 +168,18 @@ export function createTriageSession(options: TriageSessionOptions): TriageSessio
 
 // ─── Question wording — exact phrasing matters for calibration (docs: "wording changes results a lot") ─
 
-const NOISE_QUESTION_ID = "real_change";
+// WHY this wording (measured on real Jev, 2026-09-24): the first draft asked
+// "is this a genuine real-world change?" and scored formatting-only edits
+// 0.10-0.62 against real edits 0.57-0.69 — no usable gap. Asking the narrow
+// inverse, "same value written differently?", scored 5 formatting-only
+// cases 0.70-0.95 and 5 real changes 0.02-0.08.
+const NOISE_QUESTION_ID = "same_value";
 const NOISE_QUESTION: JevQuestion = {
   type: "noul",
   instructions:
-    "Compare `before` and `after` for this public food-assistance venue's changed field(s), listed in `fields_changed`. " +
-    "Is this a genuine real-world change (the actual phone number, hours, address, name or website changed), rather than " +
-    "scraper noise, a formatting difference, or a data artifact that doesn't reflect anything actually changing?",
+    "For each field named in `fields_changed`, do `before` and `after` hold the SAME real-world value, written differently " +
+    "(punctuation, spacing, capitalization, country code, http vs https, www, trailing slash, time format)? " +
+    "Answer no if any value actually differs or was added or removed.",
 };
 
 const REMOVE_QUESTION_ID = "remove_reason";
@@ -281,15 +286,17 @@ export function computeAutoApplyEligibility(proposal: ProposalDraft): boolean {
 
 // ─── Lane thresholds — Jev can only move a row toward a human ──────────────
 
-const LIKELY_NOISE_BELOW = 0.15; // real_change below this = Jev reads it as noise (a sort aid only)
-const AUTO_APPLY_NOISE_BELOW = 0.05; // stricter: the only lane that can ever write
+// Set from the 2026-09-24 measurement above (formatting-only 0.70-0.95,
+// real 0.02-0.08); re-check if JEV_MODEL moves.
+const LIKELY_NOISE_ABOVE = 0.8; // same_value above this = Jev reads it as formatting noise (a sort aid only)
+const AUTO_APPLY_NOISE_ABOVE = 0.9; // stricter: the only lane that can ever write
 const RENAME_CONFIRM_ABOVE = 0.7; // same_place above this = confirmed rename pair
 
-export function classifyUpdateLane(proposal: ProposalDraft, realChange: JevAnswer | undefined): TriageLane {
-  const p = realChange?.noul;
+export function classifyUpdateLane(proposal: ProposalDraft, sameValue: JevAnswer | undefined): TriageLane {
+  const p = sameValue?.noul;
   if (typeof p !== "number") return "needs_human";
-  if (p < AUTO_APPLY_NOISE_BELOW && computeAutoApplyEligibility(proposal)) return "auto_apply_candidate";
-  if (p < LIKELY_NOISE_BELOW) return "likely_noise";
+  if (p > AUTO_APPLY_NOISE_ABOVE && computeAutoApplyEligibility(proposal)) return "auto_apply_candidate";
+  if (p > LIKELY_NOISE_ABOVE) return "likely_noise";
   return "needs_human";
 }
 
@@ -307,7 +314,7 @@ export function isRenameConfirmed(answer: JevAnswer | undefined): boolean {
  *   - remove: `remove_reason` choice, sent the venue's FULL current row
  *     (a remove proposal's own `before` is only {id, name}). Always
  *     needs_human — archiving is destructive; the verdict is shown, not acted on.
- *   - update: `real_change` noul → classifyUpdateLane.
+ *   - update: `same_value` noul → classifyUpdateLane.
  */
 export async function triageProposal(
   proposal: ProposalDraft,

@@ -184,13 +184,15 @@ describe("computeAutoApplyEligibility", () => {
 describe("classifyUpdateLane", () => {
   const reformat = update("phone", "719-555-0100", "(719) 555-0100");
   const real = update("phone", "719-555-0100", "719-555-0199");
+  // noul = same_value: high means "same value, only formatted differently".
   test("auto_apply_candidate needs BOTH the shape match and near-certain noise", () => {
-    expect(classifyUpdateLane(reformat, { noul: 0.01 })).toBe("auto_apply_candidate");
-    expect(classifyUpdateLane(real, { noul: 0.01 })).toBe("likely_noise");
-    expect(classifyUpdateLane(reformat, { noul: 0.1 })).toBe("likely_noise");
+    expect(classifyUpdateLane(reformat, { noul: 0.95 })).toBe("auto_apply_candidate");
+    expect(classifyUpdateLane(real, { noul: 0.95 })).toBe("likely_noise");
+    expect(classifyUpdateLane(reformat, { noul: 0.85 })).toBe("likely_noise");
   });
   test("real change or a missing answer → needs_human", () => {
-    expect(classifyUpdateLane(real, { noul: 0.9 })).toBe("needs_human");
+    expect(classifyUpdateLane(real, { noul: 0.05 })).toBe("needs_human");
+    expect(classifyUpdateLane(reformat, { noul: 0.7 })).toBe("needs_human");
     expect(classifyUpdateLane(real, undefined)).toBe("needs_human");
   });
 });
@@ -214,7 +216,7 @@ describe("triageProposal", () => {
   });
 
   test("stores the model that actually answered, from the response", async () => {
-    const result = await triageProposal(update("phone", "1", "2"), session(jevFetch({ real_change: { noul: 0.9 } }, "jev-1.14.0")));
+    const result = await triageProposal(update("phone", "1", "2"), session(jevFetch({ same_value: { noul: 0.1 } }, "jev-1.14.0")));
     expect(result?.model).toBe("jev-1.14.0");
   });
 

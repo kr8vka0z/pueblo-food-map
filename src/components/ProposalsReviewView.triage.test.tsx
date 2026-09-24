@@ -55,11 +55,11 @@ const renameDiff: ProposedDiff = {
 const queue = [
   proposal(
     1,
-    { triage_lane: "likely_noise", triage_json: JSON.stringify({ answers: { real_change: { noul: 0.04 } } }) },
+    { triage_lane: "likely_noise", triage_json: JSON.stringify({ answers: { same_value: { noul: 0.96 } } }) },
     phoneDiff,
     "2026-09-28T06:03:00.000Z",
   ),
-  proposal(2, { triage_lane: "needs_human", triage_json: JSON.stringify({ answers: { real_change: { noul: 0.92 } } }) }, realDiff, "2026-09-28T06:02:00.000Z"),
+  proposal(2, { triage_lane: "needs_human", triage_json: JSON.stringify({ answers: { same_value: { noul: 0.04 } } }) }, realDiff, "2026-09-28T06:02:00.000Z"),
   proposal(3, { source: "plentiful", target_venue_id: "plentiful-old-name" }, renameDiff, "2026-09-28T06:01:00.000Z"),
 ];
 
@@ -70,7 +70,7 @@ describe("ProposalsReviewView triage lanes", () => {
     render(<ProposalsReviewView proposals={queue} venueLookup={{}} />);
     const [noise, real] = screen.getAllByRole("listitem");
     expect(within(noise).getByText("Likely noise")).toBeTruthy();
-    expect(within(noise).getByText(/4% likely a real-world change/)).toBeTruthy();
+    expect(within(noise).getByText(/96% likely the same value/)).toBeTruthy();
     expect(within(real).getByText("Needs a human")).toBeTruthy();
   });
 

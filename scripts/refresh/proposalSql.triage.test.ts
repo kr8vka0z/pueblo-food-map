@@ -30,7 +30,7 @@ const autoCandidate: TriageResult = {
   lane: "auto_apply_candidate",
   model: "jev-1.13.0",
   questionSet: "v1",
-  answers: { real_change: { noul: 0.01 } },
+  answers: { same_value: { noul: 0.97 } },
 };
 
 describe("buildProposalWriteStatements with triage", () => {
@@ -44,7 +44,7 @@ describe("buildProposalWriteStatements with triage", () => {
     expect(statements[0]).toContain("'likely_noise'");
     expect(statements[0]).toContain("'jev-1.13.0'");
     expect(statements[0]).toContain(`'${NOW}'`);
-    expect(statements[0]).toContain('"real_change":{"noul":0.01}');
+    expect(statements[0]).toContain('"same_value":{"noul":0.97}');
   });
 
   test("untriaged (no key / outage) writes the exact pre-#543 INSERT", () => {

@@ -476,13 +476,21 @@ export function nextIrregularOccurrence(
       const day = resolveEntryDayInMonth(schedule, year, month);
       if (day !== null) {
         const dateKey = year * 10000 + month * 100 + day;
-        // Today counts only if the earliest slot hasn't started yet — a
-        // slot already open or already passed today is "now," not "next";
+        // Today counts only via a slot that hasn't started yet — a slot
+        // already open or already passed today is "now," not "next";
         // computeVenueOpenStatus/computeIrregularOpenStatus own the "is it
         // open right now" answer, this function is strictly upcoming starts.
-        const isUpcoming = dateKey > todayKey || (dateKey === todayKey && firstSlotOpen >= denverNow.minutes);
-        if (isUpcoming) {
-          const candidate: IrregularOccurrence = { year, month, day, schedule, slot: firstSlot };
+        // Every slot is checked, not just the earliest: between two same-day
+        // slots the later one is still upcoming today, and skipping to next
+        // month would contradict the "Opens at" badge shown beside it.
+        const slot =
+          dateKey > todayKey
+            ? firstSlot
+            : dateKey === todayKey
+              ? sortedSlots.find((s) => (parseSlot(s)?.open ?? -1) >= denverNow.minutes)
+              : undefined;
+        if (slot !== undefined) {
+          const candidate: IrregularOccurrence = { year, month, day, schedule, slot };
           if (best === null || compareOccurrenceDate(candidate, best) < 0) best = candidate;
           break; // this schedule's own next occurrence is found — move to the next schedule
         }

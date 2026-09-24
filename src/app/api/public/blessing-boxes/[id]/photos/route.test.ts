@@ -31,7 +31,7 @@ vi.mock("@opennextjs/cloudflare", () => ({
 
 const mockFetch = vi.fn();
 
-import { GET, POST } from "@/app/api/public/blessing-boxes/[id]/photos/route";
+import { POST } from "@/app/api/public/blessing-boxes/[id]/photos/route";
 
 const BOX_ID = "plentiful-blessing-box-216-w-routt-plentiful-1454";
 const URL_BASE = `https://pueblofoodmap.com/api/public/blessing-boxes/${BOX_ID}/photos`;
@@ -441,39 +441,7 @@ describe("POST /api/public/blessing-boxes/[id]/photos", () => {
   });
 });
 
-describe("GET /api/public/blessing-boxes/[id]/photos", () => {
-  afterEach(() => {
-    vi.clearAllMocks();
-    delete (globalThis as { caches?: unknown }).caches;
-  });
-
-  function callGet(id: string = BOX_ID) {
-    return GET(new NextRequest(URL_BASE), { params: Promise.resolve({ id }) });
-  }
-
-  test("returns approved photos, newest first, as provided by the query", async () => {
-    const { db } = makeFakeDb({
-      approvedPhotos: [
-        { id: 2, created_at: "2026-09-18T10:00:00.000Z" },
-        { id: 1, created_at: "2026-09-17T10:00:00.000Z" },
-      ],
-    });
-    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
-    const res = await callGet();
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.photos).toEqual([
-      { id: 2, createdAt: "2026-09-18T10:00:00.000Z" },
-      { id: 1, createdAt: "2026-09-17T10:00:00.000Z" },
-    ]);
-  });
-
-  test("a D1 failure degrades to an empty list, not a 500", async () => {
-    mockGetCloudflareContext.mockImplementation(() => {
-      throw new Error("boom");
-    });
-    const res = await callGet();
-    expect(res.status).toBe(200);
-    expect((await res.json()).photos).toEqual([]);
-  });
-});
+// GET /api/public/blessing-boxes/[id]/photos was removed by #525 — its only
+// caller was BoxPhotoGrid.tsx (deleted, orphaned by #511/PR #521 dropping
+// the photo grid from the box history page). The route's coverage moved
+// with it; POST (upload) above is the only handler this file still exports.

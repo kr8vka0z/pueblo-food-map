@@ -52,7 +52,7 @@ afterEach(() => {
 });
 
 describe("MapWrapper WebGL fallback navigation (#285)", () => {
-  test("when WebGL is unavailable, selecting a venue card navigates to /venue/[id]", async () => {
+  test("#524: when WebGL is unavailable, selecting a venue opens its card over the list — no navigation", async () => {
     const user = userEvent.setup();
     await act(async () => {
       render(
@@ -71,12 +71,15 @@ describe("MapWrapper WebGL fallback navigation (#285)", () => {
     const venueButton = screen.getByRole("button", { name: new RegExp(targetVenue.name, "i") });
     await user.click(venueButton);
 
-    expect(mockPush).toHaveBeenCalledWith(`/venue/${targetVenue.id}`);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+    // The card itself is mocked out in this file; MapWrapperNoWebGLBoxCard.test.tsx
+    // proves it opens with check-in/adopt/address.
   });
 });
 
 describe("MapWrapper WebGL fallback deep link (review item 4 — #165 x #132)", () => {
-  test("?venue=<id> with the map unavailable replaces to /venue/[id] instead of selecting nothing", async () => {
+  test("#524: ?venue=<id> with the map unavailable opens that venue's card instead of selecting nothing", async () => {
     const targetVenue = venues[0];
     await act(async () => {
       render(
@@ -88,6 +91,9 @@ describe("MapWrapper WebGL fallback deep link (review item 4 — #165 x #132)", 
     });
 
     expect(screen.getByText(/map unavailable/i)).toBeTruthy();
-    expect(mockReplace).toHaveBeenCalledWith(`/venue/${encodeURIComponent(targetVenue.id)}`);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+    // The card itself is mocked out in this file; MapWrapperNoWebGLBoxCard.test.tsx
+    // proves it opens with check-in/adopt/address.
   });
 });

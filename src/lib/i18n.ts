@@ -9,10 +9,8 @@ export type Locale = "en" | "es";
 const en: Record<string, string> = {
   // App
   "app.name": "Pueblo Food Map",
-  "app.tagline": "Food resources in Pueblo County, CO",
 
   // Top bar
-  "topbar.locate": "Show my location on the map",
   "topbar.locale.en": "EN",
   "topbar.locale.es": "ES",
 
@@ -42,15 +40,10 @@ const en: Record<string, string> = {
   "category.full.meal_site": "Meal Site",
   "category.full.blessing_box": "Blessing Box",
 
-  // Category rail section headers
-  "rail.categories": "Categories",
-  "rail.filters": "Filters",
-
   // Filters
   "filter.openNow": "Open now",
   "filter.snap": "Accepts SNAP",
   "filter.wic": "Accepts WIC",
-  "filter.walkingDistance": "Walking distance",
 
   // Filters button + side panel (#513) — Favorites filter removed (Saved in
   // the bottom bar covers it); the single-category dropdown became this
@@ -66,18 +59,9 @@ const en: Record<string, string> = {
 
   // Bottom sheet / list
   "sheet.places": "{count} places near you",
-  "sheet.viewList": "View list",
   "sheet.sortedBy": "Sorted by distance",
 
-  // Location status
-  "location.loading": "Detecting your location…",
-  "location.granted": "Sorted by distance from your location",
-  "location.denied": "Showing distance from downtown Pueblo",
-  "location.unavailable": "Showing distance from downtown Pueblo",
-  "location.fallback": "Showing distance from downtown Pueblo",
-
   // Venue detail
-  "detail.back": "Back",
   "detail.close": "Close",
   "detail.getDirections": "Get directions",
   // "View on the map" CTA on /venue/[id] — was a hardcoded English string
@@ -92,15 +76,10 @@ const en: Record<string, string> = {
   "detail.acceptsWic": "Accepts WIC",
   "detail.plentifulLink": "See hours, eligibility & what to bring on Plentiful",
   "detail.today": "Today",
-  "detail.closedToday": "Closed today",
-  "detail.seeFullDetails": "See full details →",
   "detail.showDetails": "Show details",
   "detail.hideDetails": "Hide details",
-  "detail.collapseToSummary": "Collapse to quick summary",
   "detail.venueDetailsPanel": "Venue details panel",
   "detail.venueDetails": "venue details",
-  "detail.dragToExpand": "Drag to expand or close venue details",
-  "detail.expandDetails": "Expand details for {name}",
 
   // Badges
   "badge.openNow": "Open now",
@@ -136,27 +115,13 @@ const en: Record<string, string> = {
 
   // Sponsor credit (#69)
 
-  // Legend (#72)
-  "legend.button_label": "Map legend",
-
   // Operator attribution (#63)
   "operator.operated_by": "Operated by",
 
   // Splash page (#68, #100)
-  "splash.tagline": "Find food close to home — pantries, gardens, grocery, and more.",
   "splash.purpose": "A free, community-built map of food resources across Pueblo County.",
   "splash.cta.primary": "Find food near me",
   "splash.microcopy": "We only use your location to show food nearby. Nothing is saved.",
-
-  // Splash categories (#68) — kept in sync with CATEGORIES array in SplashScreen.tsx
-  "splash.cat.pantry": "Food pantry",
-  "splash.cat.grocery": "Grocery store",
-  "splash.cat.convenience": "Convenience store",
-  "splash.cat.farm": "Farm",
-  "splash.cat.garden": "Community garden",
-  "splash.cat.edible_landscape": "Edible landscape",
-  "splash.cat.meal_site": "Meal site",
-  "splash.cat.blessing_box": "Blessing box",
 
   // Location denied banner (#68)
   "banner.title": "Location turned off",
@@ -170,7 +135,6 @@ const en: Record<string, string> = {
   // Search typeahead (#67)
   "typeahead.matchCount": "{count} venues match",
   "typeahead.moreMatches": "+{count} more matches",
-  "typeahead.noMatch": "No venues match",
 
   // Location control (#108)
   "locate.locating": "Locating…",
@@ -383,7 +347,6 @@ const en: Record<string, string> = {
   // and on the /privacy page. One sentence that fits below an email input.
   "privacy.emailDisclosure": "Your email is used only to follow up on your submission. It is never sold or shared.",
   "privacy.linkLabel": "Privacy",
-  "privacy.pageTitle": "Privacy — Pueblo Food Map",
   "privacy.heading": "Privacy",
   // Rewrite (slice 6, Blessing Boxes adopt-a-box + alerts): the old, single
   // un-headed "privacy.body" paragraph is REPLACED by "What we collect"
@@ -651,7 +614,6 @@ const en: Record<string, string> = {
 
   // Photo DISPLAY (card slot + history grid) and "Report this photo"
   // (ReportPhotoButton.tsx) — separate from the upload-picker keys above.
-  "box.photo.heading": "Photo",
   // Card redesign (2026-09-19): repurposed as the small caption chip on the
   // photo's bottom-right corner ("Photo · {time}") — was "Shared {time}" as
   // a caption line below the image, a layout this key's only caller no
@@ -672,7 +634,6 @@ const en: Record<string, string> = {
   "box.photo.reportError": "That didn't go through. Please try again.",
   "box.photo.morePhotos": "Show more photos",
   "box.photo.none": "No photos yet",
-  "box.photo.galleryHeading": "Photos",
 
   // "box.recentCheckin.heading"/"box.recentCheckin.none" deleted (card
   // redesign, 2026-09-19) — the standalone "Most recent check-in" line is
@@ -680,7 +641,6 @@ const en: Record<string, string> = {
   // the full timeline still lives at /box/<id>/history via the link below.
   // "History" link on the card -> /box/<id>/history (map-first rework)
   "box.history.link": "History",
-  "box.history.subheading": "Full history for this box",
   // /box/<id>/history page (map-first rework scope addition, 2026-09-18) —
   // reuses BoxActivityList/useBoxActivity filtered to one box, so it needs
   // no new heading/empty-state keys of its own. "box.history.back" (its own
@@ -910,10 +870,8 @@ const en: Record<string, string> = {
 const es: Record<string, string> = {
   // App
   "app.name": "Pueblo Food Map",
-  "app.tagline": "Recursos de alimentos en el Condado de Pueblo, CO",
 
   // Top bar
-  "topbar.locate": "Mostrar mi ubicación en el mapa",
   "topbar.locale.en": "EN",
   "topbar.locale.es": "ES",
 
@@ -943,15 +901,10 @@ const es: Record<string, string> = {
   "category.full.meal_site": "Comedor comunitario",
   "category.full.blessing_box": "Caja de bendiciones", // [CHECK]
 
-  // Category rail section headers
-  "rail.categories": "Categorías",
-  "rail.filters": "Filtros",
-
   // Filters
   "filter.openNow": "Abierto ahora",
   "filter.snap": "Acepta SNAP",
   "filter.wic": "Acepta WIC",
-  "filter.walkingDistance": "Distancia caminando",
 
   // Filters button + side panel (#513)
   "filters.button.label": "Filtros",
@@ -965,18 +918,9 @@ const es: Record<string, string> = {
 
   // Bottom sheet / list
   "sheet.places": "{count} lugares cerca de ti",
-  "sheet.viewList": "Ver lista",
   "sheet.sortedBy": "Ordenado por distancia",
 
-  // Location status
-  "location.loading": "Detectando tu ubicación…",
-  "location.granted": "Ordenado por distancia desde tu ubicación",
-  "location.denied": "Mostrando distancia desde el centro de Pueblo",
-  "location.unavailable": "Mostrando distancia desde el centro de Pueblo",
-  "location.fallback": "Mostrando distancia desde el centro de Pueblo",
-
   // Venue detail
-  "detail.back": "Atrás",
   "detail.close": "Cerrar",
   "detail.getDirections": "Cómo llegar",
   "detail.viewOnMap": "Ver en el mapa",
@@ -989,15 +933,10 @@ const es: Record<string, string> = {
   "detail.acceptsWic": "Acepta WIC",
   "detail.plentifulLink": "Ver horarios, elegibilidad y qué llevar en Plentiful",
   "detail.today": "Hoy",
-  "detail.closedToday": "Cerrado hoy",
-  "detail.seeFullDetails": "Ver detalles completos →",
   "detail.showDetails": "Ver detalles",
   "detail.hideDetails": "Ocultar detalles",
-  "detail.collapseToSummary": "Contraer al resumen",
   "detail.venueDetailsPanel": "Panel de detalles del lugar",
   "detail.venueDetails": "detalles del lugar",
-  "detail.dragToExpand": "Arrastrar para expandir o cerrar detalles",
-  "detail.expandDetails": "Expandir detalles de {name}",
 
   // Badges
   "badge.openNow": "Abierto ahora",
@@ -1033,27 +972,13 @@ const es: Record<string, string> = {
 
   // Sponsor credit (#69)
 
-  // Legend (#72)
-  "legend.button_label": "Leyenda del mapa",
-
   // Operator attribution (#63)
   "operator.operated_by": "Operado por",
 
   // Splash page (#68, #100)
-  "splash.tagline": "Encuentra alimentos cerca de casa — despensas, huertos, supermercados y más.",
   "splash.purpose": "Un mapa comunitario y gratuito de recursos alimentarios en el condado de Pueblo.",
   "splash.cta.primary": "Encuentra comida cerca de mí",
   "splash.microcopy": "Solo usamos tu ubicación para mostrar alimentos cercanos. Nada se guarda.",
-
-  // Splash categories (#68)
-  "splash.cat.pantry": "Despensa de alimentos",
-  "splash.cat.grocery": "Supermercado",
-  "splash.cat.convenience": "Tienda de conveniencia",
-  "splash.cat.farm": "Granja",
-  "splash.cat.garden": "Huerto comunitario",
-  "splash.cat.edible_landscape": "Paisaje comestible", // [CHECK]
-  "splash.cat.meal_site": "Comedor comunitario",
-  "splash.cat.blessing_box": "Caja de bendiciones", // [CHECK]
 
   // Location denied banner (#68)
   "banner.title": "Ubicación desactivada",
@@ -1067,7 +992,6 @@ const es: Record<string, string> = {
   // Search typeahead (#67)
   "typeahead.matchCount": "{count} lugares coinciden",
   "typeahead.moreMatches": "+{count} más resultados",
-  "typeahead.noMatch": "Ningún lugar coincide",
 
   // Location control (#108)
   "locate.locating": "Localizando…",
@@ -1264,7 +1188,6 @@ const es: Record<string, string> = {
   // Privacy disclosure (#160 1.7)
   "privacy.emailDisclosure": "Tu correo solo se usa para darte seguimiento. Nunca lo vendemos ni compartimos.",
   "privacy.linkLabel": "Privacidad",
-  "privacy.pageTitle": "Privacidad — Pueblo Food Map",
   "privacy.heading": "Privacidad",
   "privacy.collect.heading": "Qué recopilamos", // [CHECK]
   "privacy.collect.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). La usamos para revisar lo que enviaste y, si diste un correo electrónico, para responderte. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con lo que enviaste.", // [CHECK]
@@ -1471,7 +1394,6 @@ const es: Record<string, string> = {
   "box.photo.success": "¡Gracias! Tu foto fue enviada para revisión.", // [CHECK]
   "box.photo.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
 
-  "box.photo.heading": "Foto", // [CHECK]
   "box.photo.caption": "Foto · {time}", // [CHECK]
   "box.photo.altText": "Foto de {name}, compartida {time}", // [CHECK]
   "box.photo.viewFullSize": "Ver foto en tamaño completo", // [CHECK]
@@ -1483,10 +1405,8 @@ const es: Record<string, string> = {
   "box.photo.reportError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
   "box.photo.morePhotos": "Mostrar más fotos", // [CHECK]
   "box.photo.none": "Aún no hay fotos", // [CHECK]
-  "box.photo.galleryHeading": "Fotos", // [CHECK]
 
   "box.history.link": "Historial", // [CHECK]
-  "box.history.subheading": "Historial completo de esta caja", // [CHECK]
 
   "box.stats.perBoxHeading": "Números de esta caja", // [CHECK]
   "box.stats.networkHeading": "Números de la red", // [CHECK]

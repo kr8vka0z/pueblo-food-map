@@ -575,8 +575,12 @@ function githubHeaders(token: string, extra?: Record<string, string>): HeadersIn
   };
 }
 
-async function githubGet(path: string, token: string): Promise<Response> {
-  return fetch(`${GITHUB_API_BASE}${path}`, { headers: githubHeaders(token) });
+// `signal` is optional (existing callers below never pass one — the publish
+// mutation flow is already a bounded, user-initiated request) — added for
+// fetchPublishBotPrStatus (#598), a best-effort admin Dashboard page-load
+// read that must never hang the page on a slow/unresponsive GitHub API.
+async function githubGet(path: string, token: string, signal?: AbortSignal): Promise<Response> {
+  return fetch(`${GITHUB_API_BASE}${path}`, { headers: githubHeaders(token), signal });
 }
 
 async function githubJson<T>(method: string, path: string, token: string, body: unknown): Promise<T> {
@@ -803,4 +807,119 @@ export async function commitPublishedVenues(
   await enableAutoMerge(pr.nodeId, token);
 
   return { prUrl: pr.htmlUrl, prNumber: pr.number, reused };
+}
+
+// ─── GitHub: read-only publish-bot PR status (#598) ────────────────────────
+
+export type PublishBotChecksState = "pending" | "passing" | "failing" | "unknown";
+
+export interface PublishBotPrStatus {
+  number: number;
+  htmlUrl: string;
+  checksState: PublishBotChecksState;
+}
+
+interface PullRequestWithHeadApiResponse {
+  number: number;
+  html_url: string;
+  head: { sha: string };
+}
+
+interface CheckRunApiResponse {
+  status: string;
+  conclusion: string | null;
+}
+
+interface CheckRunsApiResponse {
+  check_runs: CheckRunApiResponse[];
+}
+
+const FAILING_CHECK_CONCLUSIONS = new Set(["failure", "timed_out", "cancelled", "action_required"]);
+
+/** A best-effort admin-Dashboard page-load read must never hang the page on a slow/unresponsive GitHub API. */
+const PUBLISH_STATUS_FETCH_TIMEOUT_MS = 3000;
+
+/**
+ * Issue #598: publish marks a venue "published" in D1 the moment the
+ * publish-bot PR is opened and auto-merge is armed (commitPublishedVenues,
+ * above) — NOT once that PR's checks pass and it actually merges. If the
+ * PR's CI goes red, D1 already says "published" while the live site still
+ * serves the OLD published-venues.ts until the next publish repairs it.
+ * Rewiring the state machine to wait for the real merge isn't worth it (a
+ * publish would have to hold a request open across a multi-minute CI run —
+ * NB1's own "GitHub succeeds THEN D1 writes" ordering above already exists
+ * to keep D1 from lying about the GitHub side specifically) — instead, the
+ * admin Dashboard reads this same open PR's live check status, read-only,
+ * so an admin can SEE "stuck" instead of trusting a screen that can't tell
+ * them.
+ *
+ * Two read-only GitHub calls: the same PR-list query findOpenPublishPr
+ * (above) already makes, but this needs `head.sha` too — a separate small
+ * response type here rather than widening that mutation-path function's own
+ * PullRequestSummary, which this read has no business touching — then that
+ * head sha's Checks API run list (GitHub Actions reports check results
+ * there, not the legacy Status API `commits/{sha}/status`; this repo's CI
+ * is Actions-only, see .github/workflows/ci.yml).
+ *
+ * Fails soft everywhere a Dashboard page load can't afford to wait or
+ * error: the PR-list call throws (network/rate-limit/GitHub outage) — the
+ * caller (admin/page.tsx) catches that and renders nothing, same as any
+ * other best-effort Dashboard read. The check-runs call specifically
+ * degrades to checksState "unknown" instead of throwing — a PAT scoped for
+ * Contents/Pull-requests RW (this file's own header, #260) may not carry
+ * the separate "Checks: read" permission GitHub's Checks API needs; rather
+ * than lose the PR-presence signal entirely over that, an admin still sees
+ * "publish in progress" with a working link to the PR, just without a
+ * red/green verdict.
+ *
+ * checksState:
+ *  - "failing": at least one check-run concluded failure/timed_out/
+ *    cancelled/action_required — the case #598 exists to surface.
+ *  - "pending": zero check-runs exist yet (checks haven't started
+ *    reporting) or at least one is still queued/in_progress, with none
+ *    failed (yet).
+ *  - "unknown": the check-runs read itself failed (permissions/network/
+ *    timeout) — read the same as "still in progress," never as a failure,
+ *    so a permissions gap can't be mistaken for a red CI run.
+ *  - "passing": every check-run is completed and none failed.
+ */
+export async function fetchPublishBotPrStatus(token: string): Promise<PublishBotPrStatus | null> {
+  const prRes = await githubGet(
+    `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls?head=${GITHUB_OWNER}:${PUBLISH_BOT_BRANCH}&state=open`,
+    token,
+    AbortSignal.timeout(PUBLISH_STATUS_FETCH_TIMEOUT_MS),
+  );
+  if (!prRes.ok) {
+    const text = await prRes.text().catch(() => "(unreadable)");
+    throw new GitHubApiError(`GitHub PR lookup failed: ${prRes.status} ${text}`, prRes.status, text);
+  }
+  const list = (await prRes.json()) as PullRequestWithHeadApiResponse[];
+  const pr = list[0];
+  if (!pr) return null;
+
+  let checksState: PublishBotChecksState = "unknown";
+  try {
+    const checksRes = await githubGet(
+      `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits/${pr.head.sha}/check-runs`,
+      token,
+      AbortSignal.timeout(PUBLISH_STATUS_FETCH_TIMEOUT_MS),
+    );
+    if (checksRes.ok) {
+      const { check_runs: checkRuns } = (await checksRes.json()) as CheckRunsApiResponse;
+      if (checkRuns.some((c) => c.conclusion !== null && FAILING_CHECK_CONCLUSIONS.has(c.conclusion))) {
+        checksState = "failing";
+      } else if (checkRuns.length === 0 || checkRuns.some((c) => c.status !== "completed")) {
+        checksState = "pending";
+      } else {
+        checksState = "passing";
+      }
+    }
+    // non-2xx (e.g. 403 — missing Checks:read) falls through, leaving
+    // checksState "unknown" from its initializer above.
+  } catch {
+    // network/timeout on the checks read specifically — same "unknown",
+    // never thrown (see this function's own header on why).
+  }
+
+  return { number: pr.number, htmlUrl: pr.html_url, checksState };
 }

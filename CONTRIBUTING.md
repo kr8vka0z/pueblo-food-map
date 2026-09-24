@@ -21,7 +21,7 @@ performance).
 
 ### Submitting a code change
 
-1. Fork the repository and create a feature branch from `main`.
+1. Fork the repository and create a feature branch from `dev`.
 2. Make your change with focused commits — see [Commit messages](#commit-messages).
 3. Run `npm run lint`, `npm run typecheck`, `npm run test:ci`, and `npm run build`
    locally before opening a pull request. If your change touches UI or design
@@ -35,9 +35,10 @@ performance).
      hidden behind the bottom bar.
    - In Chrome DevTools, throttle CPU to **4×** and network to **Slow 4G**, and
      re-check the interaction that changed.
-5. Open a pull request against `main`. CI runs lint, typecheck, tests, and
-   build on every PR and must pass before merge — `main` is a protected
-   branch and requires the CI status check.
+5. Open a pull request against `dev` (never `main`). CI runs lint,
+   typecheck, tests, and build on every PR and must pass before merge.
+   `dev` deploys to staging (`dev.pueblofoodmap.com`); maintainers promote
+   `dev` to `main` (production) separately.
 
 CodeRabbit reviews pull requests into `main` and `dev` (see
 `.coderabbit.yaml`; drafts, Dependabot, the release bot, and

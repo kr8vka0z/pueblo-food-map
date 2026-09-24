@@ -437,6 +437,50 @@ Every form (Suggest, Feedback, Report, AdoptBox, BoxAlertSignup, AdminLogin, Add
 - **Layout**: fields stack with `space-y-5`; admin forms cap at `max-w-2xl`.
 - **Never Tailwind's `red-*`** (or any stock palette) for errors — `danger` is the only error red. `npm run lint` (`scripts/check-banned.mjs`) rejects stock chromatic palettes.
 
+## Layering (z-index)
+
+One ladder for everything that floats. A new floating element joins an existing rung — never invent a new arbitrary value — and gets added to this table in the same PR.
+
+| z | What | Where |
+|---|---|---|
+| 2 | Mapbox's own control corners (attribution, logo) — set by `mapbox-gl.css`, sitting on the map canvas | `Map.tsx` |
+| 700 | List view (replaces the map in list mode) | `ListView.tsx`, `MapWrapper.tsx` |
+| 800 | Mobile venue card | `BottomSheet.tsx`, `DirectionButtons.tsx` |
+| 900 | Desktop venue window; walking-route strip | `DesktopVenueWindow.tsx`, `RouteStrip.tsx` |
+| 999 | Search popovers — results, no-matches, ViewSuggestion | `SearchResultsPopover.tsx`, `EmptySearchPopover.tsx`, `ViewSuggestion.tsx` |
+| 1000 | Persistent chrome: search bar, wordmark map button, BottomNav at `2xl`+ | `SearchBar.tsx`, `Wordmark.tsx`, `BottomNav.tsx` |
+| 1001 | Menu backdrop; outside-county notice pill | `HamburgerMenu.tsx`, `MapWrapper.tsx` |
+| 1002 | Menu panel | `HamburgerMenu.tsx` |
+| 1003 | BottomNav below `2xl` — above the Menu so its own button can close it (on mobile the full-sheet Menu unmounts the nav instead, `overlayRegistry.ts`) | `BottomNav.tsx` |
+| 1004 / 1005 | Filter panel backdrop / panel | `FilterPanel.tsx` |
+| 1100 | Location-denied banner | `LocationDeniedBanner.tsx` |
+| 9000 | Splash screen (blocks the whole map until dismissed) | `SplashScreen.tsx` |
+| top layer | Photo viewer — native `<dialog>` + `showModal()`, above every z-index by spec | `PhotoViewer.tsx` |
+
+Backdrops are `rgba(26,24,23,0.4)` (warm ink, FilterPanel) — `HamburgerMenu`'s `rgba(0,0,0,0.4)` is the one black holdover.
+
+## Loading, empty and error states
+
+Every state says what happened in plain words and offers a next step. Never a blank screen, never a dead end.
+
+- **Loading**: text, not a skeleton — `text-sm ink-400` on `bone-100`, `motion-safe:animate-pulse`, copy ends in a real ellipsis ("Loading map…"). A spinner only inside the control that triggered the wait (BottomNav's Near me: Lucide `Loader2`, `animate-spin motion-reduce:animate-none`).
+- **Empty**: a centred column — a 28px Lucide icon in `ink-400`, a `text-base font-semibold ink-700` title that names what's missing ("No saved places yet"), and a `text-sm ink-700` line saying how to fill it ("Tap the star on any place to save it."). Empty search is the compact popover version: `text-sm font-semibold` "No matches for "{query}"", an `ink-400` hint, and category chips as the way out.
+- **Degraded, not failed**: when something can't work, fall back and say so. The map failing to load (`MapErrorBoundary` renders nothing) switches to the list with a `bone-100` / `bone-300`-bottom-border notice ("Map unavailable — …showing the list instead"). Location denied shows `LocationDeniedBanner` with Try again / Dismiss. Outside the county shows a dismissible `clay-100` / `clay-700` pill, `elevation-2`.
+- **Blocking errors**: `danger`, only when the user must act before continuing — see Forms. Warm guidance that doesn't block uses clay, never `danger`.
+- **Not found**: centred white card (`bone-200` border, `radius-lg`), `text-3xl ink-900` title, `ink-500` body, one "Back to map" action.
+- **Confirmations**: the result replaces the thing that caused it (a form becomes its thank-you block) — see Forms › Success.
+
+## Voice and copy
+
+- **Plain, warm, second person.** Talk to one neighbour: "Tap the star on any place to save it." No marketing voice, no jargon ("SNAP" and "WIC" are fine — they're what people call them).
+- **Sentence case** for buttons, headings and labels ("Show details", "Back to map"). Title Case only for proper nouns and the category names as they appear in data ("Food Pantry", "Blessing Box").
+- **Say "place(s)" in public copy.** Newer UI says places ("Show 12 places", "No saved places yet"); older strings still say "venue" (the Suggest/Report forms, `search.aria`). Use "place" in anything new and convert old strings when you're already editing them. Admin copy may say "venue".
+- **Numbers**: digits, not words ("Show 12 places", "Step 3 of 9"); counts after a middle dot in chips ("Food pantry · 48"); distance to one decimal under 10 miles ("0.4 mi"), whole miles above (`formatMiles`).
+- **Punctuation**: real ellipsis `…`, never `...`. Straight apostrophes (`'`) — the one curly `’` in `banner.body` is a stray. Exclamation marks only on a thank-you ("Thank you!").
+- **Errors** say what went wrong and what to do next, with a fallback when there is one ("…try again, or email us at suggestions@pueblofoodmap.com.").
+- **Every string ships in English and Spanish** (`src/lib/i18n.ts`). Spanish uses informal **tú** ("Toca la estrella…", "Intenta de nuevo"), not usted. Spanish often runs noticeably longer than English: controls must wrap or truncate cleanly at 320px rather than clip (#601 fixed the splash CTA wrapping on narrow phones).
+- **Accessible names are copy too** — `aria-label`s go through `i18n.ts` like visible text, and describe the action ("Close menu"), not the element ("X button").
+
 ## Do's and Don'ts
 
 **Do:**

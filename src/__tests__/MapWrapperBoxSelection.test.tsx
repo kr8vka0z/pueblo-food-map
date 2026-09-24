@@ -89,7 +89,7 @@ afterEach(() => {
 });
 
 describe("MapWrapper box selection (map-first rework)", () => {
-  test("selecting a box card while the map is unavailable routes to /box/<id>/history, not /venue/<id> or /box/<id>", async () => {
+  test("#524: selecting a box card while the map is unavailable opens its card in place — no navigation", async () => {
     const user = userEvent.setup();
     await act(async () => {
       render(
@@ -104,12 +104,14 @@ describe("MapWrapper box selection (map-first rework)", () => {
     const boxButton = await screen.findByRole("button", { name: new RegExp(TEST_BOX.name, "i") });
     await user.click(boxButton);
 
-    expect(mockPush).toHaveBeenCalledWith(`/box/${TEST_BOX.id}/history`);
-    expect(mockPush).not.toHaveBeenCalledWith(`/venue/${TEST_BOX.id}`);
-    expect(mockPush).not.toHaveBeenCalledWith(`/box/${TEST_BOX.id}`);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+    // The card itself is mocked out in this file. The card opening is proven in
+    // MapWrapperNoWebGLBoxCard.test.tsx (mobile + box) and
+    // MapWrapperNoWebGLDesktopCard.test.tsx (desktop + regular venue).
   });
 
-  test("pressing Enter on a box search result while the map is unavailable routes to /box/<id>/history (review fix, 2026-09-18: this path used to silently do nothing)", async () => {
+  test("#524: pressing Enter on a box search result while the map is unavailable opens its card — no navigation", async () => {
     const user = userEvent.setup();
     await act(async () => {
       render(
@@ -124,11 +126,14 @@ describe("MapWrapper box selection (map-first rework)", () => {
     await user.type(searchInput, "Test Blessing");
     await user.keyboard("{ArrowDown}{Enter}");
 
-    expect(mockPush).toHaveBeenCalledWith(`/box/${TEST_BOX.id}/history`);
-    expect(mockPush).not.toHaveBeenCalledWith(`/venue/${TEST_BOX.id}`);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+    // The card itself is mocked out in this file. The card opening is proven in
+    // MapWrapperNoWebGLBoxCard.test.tsx (mobile + box) and
+    // MapWrapperNoWebGLDesktopCard.test.tsx (desktop + regular venue).
   });
 
-  test("?venue=<boxId> deep link with the map unavailable replaces to /box/<id>/history", async () => {
+  test("#524: ?venue=<boxId> deep link with the map unavailable opens its card — no navigation", async () => {
     await act(async () => {
       render(
         <LocaleProvider>
@@ -138,6 +143,10 @@ describe("MapWrapper box selection (map-first rework)", () => {
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
     });
 
-    expect(mockReplace).toHaveBeenCalledWith(`/box/${encodeURIComponent(TEST_BOX.id)}/history`);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+    // The card itself is mocked out in this file. The card opening is proven in
+    // MapWrapperNoWebGLBoxCard.test.tsx (mobile + box) and
+    // MapWrapperNoWebGLDesktopCard.test.tsx (desktop + regular venue).
   });
 });

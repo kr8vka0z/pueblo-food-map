@@ -30,6 +30,11 @@
  *     - Clips bottom edge → place above marker
  *     - Combined clip (right + above also clips top) → clamp vertically
  *   Recomputes on Leaflet 'move' + 'zoom' events.
+ *   #524: when `mapboxMap` is null (no-WebGL fallback — Map.tsx never
+ *   mounts, so there is no marker to anchor to), the position effect below
+ *   no-ops and this window centers on screen instead (see the render's
+ *   `mapboxMap ? ... : ...` style branch) rather than sitting pinned at its
+ *   unset {left:0, top:0} default.
  *
  * Keyboard:
  *   Escape dismisses. Tab cycles within. Close X (Escape equivalent).
@@ -649,13 +654,27 @@ export default function DesktopVenueWindow({
         "focus:outline-none " +
         "transition-[width,height] duration-150"
       }
-      style={{
-        left: position.left,
-        top: position.top,
-        width: windowW,
-        height: "auto",
-        maxHeight: "calc(100% - 24px)",
-      }}
+      style={
+        mapboxMap
+          ? {
+              left: position.left,
+              top: position.top,
+              width: windowW,
+              height: "auto",
+              maxHeight: "calc(100% - 24px)",
+            }
+          : {
+              // #524: no map to anchor a marker position to (position stays
+              // its unused {left:0, top:0} default) — center on screen
+              // instead of pinning to the corner.
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+              width: windowW,
+              height: "auto",
+              maxHeight: "calc(100% - 24px)",
+            }
+      }
     >
       {/* Persistent header bar — always visible in both states. A box has no
           Show/Hide toggle (historyHref swaps that slot for a History link —

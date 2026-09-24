@@ -91,6 +91,28 @@ function optionalString(value: unknown, field: string, errors: Record<string, st
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/**
+ * Same as optionalString, plus a length cap (#297) — an authenticated admin
+ * write, or approved-submission text folded into notes, could otherwise
+ * store an arbitrarily long string that ships into the public
+ * published-venues.ts bundle, same class of gap the public form routes
+ * already close for their own fields via FIELD_LIMITS.
+ */
+function optionalStringCapped(
+  value: unknown,
+  field: string,
+  max: number,
+  errors: Record<string, string>,
+): string | null {
+  const s = optionalString(value, field, errors);
+  if (s === null) return null;
+  if (s.length > max) {
+    errors[field] = `Must be ${max} characters or fewer.`;
+    return null;
+  }
+  return s;
+}
+
 /** Matches the D1 tri-state convention (migrations/0001_init_admin_schema.sql): NULL=unknown, 0=no, 1=yes. */
 function validateTriState(value: unknown, field: string, errors: Record<string, string>): TriState {
   if (value === undefined || value === null) return null;
@@ -159,10 +181,22 @@ function optionalDate(value: unknown, field: string, errors: Record<string, stri
  */
 export function validateBoxFields(body: Record<string, unknown>, errors: Record<string, string>): ValidatedBoxFields {
   return {
-    hostName: optionalString(body.host_name, "host_name", errors),
-    hostNote: optionalString(body.host_note, "host_note", errors),
-    hostContact: optionalString(body.host_contact, "host_contact", errors),
-    mostNeeded: optionalString(body.most_needed, "most_needed", errors),
+    // Capped (#297 follow-up) — same threat model as the venue-level free-
+    // text fields above, arguably sharper here: boxes are LIVE (AGENTS.md
+    // "Boxes are LIVE, not published" — loadLiveBoxes() reads these columns
+    // straight off D1 at request time), so an oversized value reaches the
+    // public box card immediately, with no publish step to catch it first.
+    // host_name -> SUGGEST_VENUE_NAME (an org/person name, same length
+    // class as a venue name); host_note -> BOX_ADOPTER_NOTE (a short host
+    // blurb, same length class as an adopter note); host_contact ->
+    // SUGGEST_CONTACT (private field, but still free text reaching D1 —
+    // same constant phone/url reuse above); most_needed -> BOX_CHECKIN_NOTE
+    // (a short "what's needed" list, same length class as a check-in note —
+    // and the public "needs" field this mirrors already uses this same cap).
+    hostName: optionalStringCapped(body.host_name, "host_name", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors),
+    hostNote: optionalStringCapped(body.host_note, "host_note", FIELD_LIMITS.BOX_ADOPTER_NOTE, errors),
+    hostContact: optionalStringCapped(body.host_contact, "host_contact", FIELD_LIMITS.SUGGEST_CONTACT, errors),
+    mostNeeded: optionalStringCapped(body.most_needed, "most_needed", FIELD_LIMITS.BOX_CHECKIN_NOTE, errors),
     installedOn: optionalDate(body.installed_on, "installed_on", errors),
     removedOn: optionalDate(body.removed_on, "removed_on", errors),
   };
@@ -182,7 +216,11 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
   const errors: Record<string, string> = {};
 
   const name = typeof b.name === "string" ? b.name.trim() : "";
-  if (!name) errors.name = "Name is required.";
+  if (!name) {
+    errors.name = "Name is required.";
+  } else if (name.length > FIELD_LIMITS.SUGGEST_VENUE_NAME) {
+    errors.name = `Name must be ${FIELD_LIMITS.SUGGEST_VENUE_NAME} characters or fewer.`;
+  }
 
   const category = typeof b.category === "string" ? (b.category as VenueCategory) : undefined;
   if (!category || !VALID_CATEGORIES.has(category)) {
@@ -201,10 +239,18 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
   if (!lngValid) errors.lng = "Longitude must be a number between -180 and 180.";
 
   const address = typeof b.address === "string" ? b.address.trim() : "";
-  if (!address) errors.address = "Address is required.";
+  if (!address) {
+    errors.address = "Address is required.";
+  } else if (address.length > FIELD_LIMITS.SUGGEST_ADDRESS) {
+    errors.address = `Address must be ${FIELD_LIMITS.SUGGEST_ADDRESS} characters or fewer.`;
+  }
 
   const source = typeof b.source === "string" ? b.source.trim() : "";
-  if (!source) errors.source = "Source is required.";
+  if (!source) {
+    errors.source = "Source is required.";
+  } else if (source.length > FIELD_LIMITS.ADMIN_VENUE_SOURCE) {
+    errors.source = `Source must be ${FIELD_LIMITS.ADMIN_VENUE_SOURCE} characters or fewer.`;
+  }
 
   const lastVerified = typeof b.last_verified === "string" ? b.last_verified.trim() : "";
   if (!lastVerified || Number.isNaN(Date.parse(lastVerified))) {
@@ -215,7 +261,7 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
   const acceptsSnap = validateTriState(b.accepts_snap, "accepts_snap", errors);
   const acceptsWic = validateTriState(b.accepts_wic, "accepts_wic", errors);
 
-  const phone = optionalString(b.phone, "phone", errors);
+  const phone = optionalStringCapped(b.phone, "phone", FIELD_LIMITS.SUGGEST_CONTACT, errors);
   const email = optionalString(b.email, "email", errors);
   // Cap length BEFORE the regex: the underlying EMAIL_RE (src/lib/email.ts)
   // backtracks polynomially, so running it on unbounded input is a ReDoS
@@ -232,9 +278,9 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
   } else if (email && !isValidEmail(email)) {
     errors.email = "Enter a valid email address.";
   }
-  const url = optionalString(b.url, "url", errors);
-  const notes = optionalString(b.notes, "notes", errors);
-  const operator = optionalString(b.operator, "operator", errors);
+  const url = optionalStringCapped(b.url, "url", FIELD_LIMITS.SUGGEST_CONTACT, errors);
+  const notes = optionalStringCapped(b.notes, "notes", FIELD_LIMITS.SUGGEST_NOTES, errors);
+  const operator = optionalStringCapped(b.operator, "operator", FIELD_LIMITS.SUGGEST_VENUE_NAME, errors);
 
   let outsideCounty: 0 | 1 = 0;
   if (b.outside_county === true || b.outside_county === 1) {

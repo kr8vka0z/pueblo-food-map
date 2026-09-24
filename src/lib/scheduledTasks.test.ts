@@ -35,26 +35,41 @@ function fakeEvent(scheduledTime: number): ScheduledController {
 
 /**
  * One fake D1 binding shared by both jobs — emailRetention's three
- * UPDATE/DELETE statements (`.bind().run()`) and refreshAlerts' two SELECTs
- * (`.bind().first()` for pending-age, `.bind().all()` for staleness).
- * Benign "nothing to report" results by default so refreshAlerts never
- * needs a RESEND_API_KEY to resolve cleanly. `calls()` counts every
- * `.prepare()` — enough to prove a job's SQL ran or didn't without
- * re-proving what it does (that's each feature's own .sql.test.ts).
+ * UPDATE/DELETE statements (`.prepare().bind().run()`) and refreshAlerts'
+ * two SELECTs (`.prepare().bind().first()` for pending-age,
+ * `.prepare().all()` for staleness — checkSourceStaleness calls `.all()`
+ * directly on the prepared statement, no `.bind()`, since
+ * SOURCE_STALENESS_SQL takes no placeholder — so `.first`/`.all`/`.run`
+ * are exposed at BOTH the unbound and bound level, matching D1's real
+ * PreparedStatement shape). Benign "nothing to report" results by default
+ * so refreshAlerts never needs a RESEND_API_KEY to resolve cleanly — NOTE
+ * `all()` returns a recent `last` timestamp for both sources, not an empty
+ * array: refreshAlerts.ts's own checkSourceStaleness treats `last === null`
+ * (a source with NO row at all) as "alert immediately," so an empty result
+ * set is NOT the benign case here and would wrongly trigger a real Resend
+ * send attempt. `calls()` counts every `.prepare()` — enough to prove a
+ * job's SQL ran or didn't without re-proving what it does (that's each
+ * feature's own .sql.test.ts).
  */
 function fakeDb(opts: { throwOnPrepare?: boolean } = {}) {
   let calls = 0;
+  const recentIso = new Date().toISOString();
   const db = {
     prepare: () => {
       calls++;
       if (opts.throwOnPrepare) throw new Error("boom");
-      return {
-        bind: () => ({
-          run: async () => ({ meta: { changes: 0 } }),
-          first: async () => ({ n: 0, oldest: null }),
-          all: async () => ({ results: [] }),
+      const statement = {
+        run: async () => ({ meta: { changes: 0 } }),
+        first: async () => ({ n: 0, oldest: null }),
+        all: async () => ({
+          results: [
+            { source: "plentiful", last: recentIso },
+            { source: "osm", last: recentIso },
+          ],
         }),
+        bind: () => statement,
       };
+      return statement;
     },
   } as unknown as D1Database;
   return { db, calls: () => calls };
@@ -85,9 +100,16 @@ describe("runScheduledTasks", () => {
     expect(calls()).toBeGreaterThan(0);
   });
 
-  test("pings HC.io and runs refresh-alerts at the 09:30 UTC slot", async () => {
+  test("pings HC.io and runs refresh-alerts cleanly at the 09:30 UTC slot", async () => {
     const fetchMock = vi.fn().mockResolvedValue(undefined);
     global.fetch = fetchMock as unknown as typeof fetch;
+    // A caught refresh-alerts failure logs via console.error
+    // (logRefreshAlertsFailure) — asserting this was NEVER called is what
+    // actually proves the check ran successfully, not just that
+    // .prepare() was invoked before silently failing (which a broken fake
+    // D1 shape could produce just as easily, per the CI review's own
+    // point about the "slots never collide" test being too weak).
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { ctx, settle } = fakeCtx();
     const { db, calls } = fakeDb();
     const env = {
@@ -104,6 +126,7 @@ describe("runScheduledTasks", () => {
     // refresh-alerts D1 reads.
     expect(fetchMock).toHaveBeenCalledWith("https://hc.example/ping");
     expect(calls()).toBeGreaterThan(0);
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   test("neither daily job runs outside its own slot, but the ping always fires", async () => {

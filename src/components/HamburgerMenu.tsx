@@ -343,7 +343,7 @@ export default function HamburgerMenu({
           {/* Close button (X) — visible at top of panel */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-bone-200)]">
             <span
-              className="text-base font-semibold text-[var(--color-ink-800)]"
+              className="text-base font-semibold text-[var(--color-ink-700)]"
               aria-hidden="true"
             >
               {t(view === "saved" ? "menu.saved.heading" : "menu.title", locale)}
@@ -358,7 +358,7 @@ export default function HamburgerMenu({
                 // (mobile review #11).
                 "flex items-center justify-center w-11 h-11 -m-1.5 rounded-full " +
                 "text-[var(--color-ink-500)] " +
-                "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-800)] " +
+                "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-700)] " +
                 PRESS_FEEDBACK + " " +
                 "focus-visible:outline-none focus-visible:ring-2 " +
                 "focus-visible:ring-[var(--color-sage-500)] " +
@@ -384,7 +384,7 @@ export default function HamburgerMenu({
                       }}
                       className={
                         "flex items-center gap-2.5 w-full text-left px-5 py-2.5 text-sm font-medium " +
-                        "text-[var(--color-ink-800)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
+                        "text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
                         "transition-colors duration-100"
                       }
@@ -407,10 +407,14 @@ export default function HamburgerMenu({
             ) : (
               <div className="flex flex-col items-center text-center gap-2 px-6 py-10">
                 <Star size={28} aria-hidden className="text-[var(--color-ink-400)]" />
-                <p className="text-base font-semibold text-[var(--color-ink-800)]">
+                <p className="text-base font-semibold text-[var(--color-ink-700)]">
                   {t("menu.saved.emptyTitle", locale)}
                 </p>
-                <p className="text-sm text-[var(--color-ink-600)] leading-relaxed">
+                {/* #534: --color-ink-600 undefined in globals.css @theme —
+                    mapped to ink-700, DESIGN.md's documented body-text token
+                    (same reasoning as FeedbackForm/ReportForm/SuggestForm's
+                    identical success/empty-state body copy below a heading). */}
+                <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
                   {t("menu.saved.emptyBody", locale)}
                 </p>
               </div>
@@ -533,7 +537,7 @@ export default function HamburgerMenu({
               <div
                 className="flex items-center justify-between px-5 py-3 border-t border-[var(--color-bone-200)]"
               >
-                <span className="text-sm font-medium text-[var(--color-ink-800)]">
+                <span className="text-sm font-medium text-[var(--color-ink-700)]">
                   {t("menu.language", locale)}
                 </span>
                 <LanguageToggle />

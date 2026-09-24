@@ -219,7 +219,9 @@ export default function SuggestForm() {
         >
           {t("suggest.success.title", locale)}
         </h2>
-        <p className="text-sm text-[var(--color-ink-600)] mb-6 leading-relaxed">
+        {/* #534: --color-ink-600 undefined — mapped to ink-700, DESIGN.md's
+            documented body-text token (see FeedbackForm's identical fix). */}
+        <p className="text-sm text-[var(--color-ink-700)] mb-6 leading-relaxed">
           {t("suggest.success.body", locale)}
         </p>
         <Link
@@ -243,7 +245,9 @@ export default function SuggestForm() {
   // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
   const inputBase =
     "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-    "bg-white placeholder:text-[var(--color-ink-300)] " +
+    // #534: --color-ink-300 undefined — DESIGN.md documents ink-400 as the
+    // placeholder-text token.
+    "bg-white placeholder:text-[var(--color-ink-400)] " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
     "focus-visible:border-[var(--color-sage-500)]";
 
@@ -566,7 +570,9 @@ export default function SuggestForm() {
           onClick={() => setStatus("idle")}
           className={
             "w-full h-11 rounded-[var(--radius-md)] " +
-            "border border-[var(--color-ink-300)] text-[var(--color-ink-700)] " +
+            // #534: --color-ink-300 undefined — bone-300 is the app's
+            // resting-border token (see FeedbackForm's identical fix).
+            "border border-[var(--color-bone-300)] text-[var(--color-ink-700)] " +
             "text-base font-medium transition-colors duration-150 " +
             "hover:bg-[var(--color-bone-100)] " +
             "focus-visible:outline-none focus-visible:ring-2 " +

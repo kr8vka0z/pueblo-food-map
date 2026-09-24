@@ -131,7 +131,7 @@ export default function ResourcesContent() {
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
                 }
               >
-                <h2 id={`resource-${key}`} className="flex-1 min-w-0 text-base font-semibold text-[var(--color-ink-800)]">
+                <h2 id={`resource-${key}`} className="flex-1 min-w-0 text-base font-semibold text-[var(--color-ink-700)]">
                   {t(`resources.${key}.name`, locale)}
                 </h2>
                 <ChevronDown

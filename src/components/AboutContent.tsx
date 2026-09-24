@@ -69,7 +69,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         <section aria-labelledby="mission-heading">
           <h2
             id="mission-heading"
-            className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+            className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
           >
             {t("about.mission.heading", locale)}
           </h2>
@@ -96,7 +96,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         <section aria-labelledby="vision-heading">
           <h2
             id="vision-heading"
-            className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+            className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
           >
             {t("about.vision.heading", locale)}
           </h2>
@@ -109,7 +109,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         <section aria-labelledby="origin-heading">
           <h2
             id="origin-heading"
-            className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+            className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
           >
             {t("about.origin.heading", locale)}
           </h2>
@@ -122,7 +122,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         <section aria-labelledby="how-we-source-heading">
           <h2
             id="how-we-source-heading"
-            className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+            className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
           >
             {t("about.howWeSource.heading", locale)}
           </h2>
@@ -134,13 +134,13 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         {/* FAQ — approved copy (PR4 S8); the JSON-LD above mirrors this text
             verbatim only in English (#386) */}
         <section aria-labelledby="faq-heading">
-          <h2 id="faq-heading" className="text-lg font-semibold text-[var(--color-ink-800)] mb-3">
+          <h2 id="faq-heading" className="text-lg font-semibold text-[var(--color-ink-700)] mb-3">
             {t("about.faq.heading", locale)}
           </h2>
           <div className="space-y-5">
             {FAQ_NUMS.map((n) => (
               <div key={n}>
-                <h3 className="text-base font-semibold text-[var(--color-ink-800)] mb-1">
+                <h3 className="text-base font-semibold text-[var(--color-ink-700)] mb-1">
                   {t(`about.faq.q${n}`, locale)}
                 </h3>
                 <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
@@ -155,7 +155,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         <section aria-labelledby="suggest-heading" className="pt-2">
           <h2
             id="suggest-heading"
-            className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+            className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
           >
             {t("about.suggest.heading", locale)}
           </h2>

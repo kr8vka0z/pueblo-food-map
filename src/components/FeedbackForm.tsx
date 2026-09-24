@@ -193,7 +193,11 @@ export default function FeedbackForm() {
         >
           {t("feedback.success.title", locale)}
         </h2>
-        <p className="text-sm text-[var(--color-ink-600)] mb-6 leading-relaxed">
+        {/* #534: --color-ink-600 undefined in globals.css @theme — mapped to
+            ink-700, DESIGN.md's documented body-text token (this is a plain
+            success-message paragraph, not the "secondary metadata"
+            role ink-500 is reserved for). */}
+        <p className="text-sm text-[var(--color-ink-700)] mb-6 leading-relaxed">
           {t("feedback.success.body", locale)}
         </p>
         <Link
@@ -217,7 +221,10 @@ export default function FeedbackForm() {
   // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
   const inputBase =
     "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-    "bg-white placeholder:text-[var(--color-ink-300)] " +
+    // #534: --color-ink-300 undefined in globals.css @theme — DESIGN.md
+    // names ink-400 explicitly as "placeholder text, icon fills, and
+    // section headers," so that's the documented replacement, not a guess.
+    "bg-white placeholder:text-[var(--color-ink-400)] " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
     "focus-visible:border-[var(--color-sage-500)]";
 
@@ -424,7 +431,12 @@ export default function FeedbackForm() {
           onClick={() => setStatus("idle")}
           className={
             "w-full h-11 rounded-[var(--radius-md)] " +
-            "border border-[var(--color-ink-300)] text-[var(--color-ink-700)] " +
+            // #534: --color-ink-300 undefined — bone-300 is the app's
+            // documented resting-border token (DESIGN.md: "bone-300 —
+            // search bar border at rest"); borders live in the bone family
+            // here, text in the ink family, matching inputBorder() above
+            // in this same file.
+            "border border-[var(--color-bone-300)] text-[var(--color-ink-700)] " +
             "text-base font-medium transition-colors duration-150 " +
             "hover:bg-[var(--color-bone-100)] " +
             "focus-visible:outline-none focus-visible:ring-2 " +

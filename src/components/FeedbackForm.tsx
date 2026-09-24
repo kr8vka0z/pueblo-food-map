@@ -204,9 +204,9 @@ export default function FeedbackForm() {
           href="/"
           className={
             "inline-flex items-center justify-center px-5 h-10 rounded-[var(--radius-md)] " +
-            "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
+            "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
             "text-sm font-semibold transition-colors duration-150 " +
-            "hover:bg-[var(--color-sage-600)] focus-visible:outline-none " +
+            "hover:bg-[var(--color-sage-700)] focus-visible:outline-none " +
             "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
           }
         >
@@ -408,9 +408,9 @@ export default function FeedbackForm() {
         disabled={status === "submitting" || !turnstileToken}
         className={
           "w-full h-11 rounded-[var(--radius-md)] " +
-          "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
+          "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
           "text-base font-semibold transition-colors duration-150 " +
-          "hover:bg-[var(--color-sage-600)] " +
+          "hover:bg-[var(--color-sage-700)] " +
           "focus-visible:outline-none focus-visible:ring-2 " +
           "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
           "disabled:opacity-60 disabled:cursor-not-allowed"

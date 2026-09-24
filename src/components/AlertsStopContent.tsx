@@ -153,7 +153,7 @@ export default function AlertsStopContent({ token }: { token: string }) {
             <form action={`/api/public/alerts/stop?t=${encodeURIComponent(token)}`} method="post" className="mt-6">
               <button
                 type="submit"
-                className="min-h-[44px] px-4 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] text-sm font-semibold"
+                className="min-h-[44px] px-4 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold"
               >
                 {t("alerts.stop.noscriptButton", locale)}
               </button>

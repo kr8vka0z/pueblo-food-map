@@ -19,9 +19,9 @@
  * established this pattern in this codebase (no modal dependency exists
  * here, and none is needed for one confirm dialog).
  *
- * Button treatment: filled sage-500/sage-600-hover, bone-50 text — the same
- * classes as "Add place" (src/app/admin/page.tsx) and AddVenueForm's submit
- * button. That IS the strongest CTA tier this design system offers for the
+ * Button treatment: filled sage-600/sage-700-hover, bone-50 text — the
+ * app-wide filled primary button (DESIGN.md Forms > Submit), same classes as
+ * AddVenueForm's submit button. That IS the strongest CTA tier this design system offers for the
  * admin surface: DESIGN.md reserves brand-orange ("ButtonPrimary") for
  * exactly two public-map elements (splash CTA, LocateButton pill) with an
  * explicit Don't against using it anywhere else, while sage is documented
@@ -87,8 +87,8 @@ type PublishState =
 
 const primaryButtonClass =
   "inline-flex items-center justify-center rounded-[var(--radius-md)] " +
-  "bg-[var(--color-sage-500)] px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] " +
-  "transition-colors duration-150 hover:bg-[var(--color-sage-600)] " +
+  "bg-[var(--color-sage-600)] px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] " +
+  "transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
 

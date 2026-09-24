@@ -923,7 +923,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
                     "disabled:opacity-60 disabled:cursor-not-allowed " +
                     (selected
-                      ? "border-[var(--color-sage-500)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)]"
+                      ? "border-[var(--color-sage-600)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)]"
                       : "border-[var(--color-bone-300)] bg-white text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]")
                   }
                 >
@@ -957,8 +957,8 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
               aria-disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
               className={
-                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-                "text-sm font-semibold hover:bg-[var(--color-sage-600)] disabled:opacity-60 disabled:cursor-not-allowed " +
+                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+                "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
               }
             >
@@ -1026,8 +1026,8 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               disabled={busy}
               aria-disabled={busy}
               className={
-                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-                "text-sm font-semibold hover:bg-[var(--color-sage-600)] disabled:opacity-60 disabled:cursor-not-allowed " +
+                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+                "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
               }
             >
@@ -1062,8 +1062,8 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               disabled={!standalonePhoto.blob || busy || photoSubmitState === "submitting"}
               aria-disabled={!standalonePhoto.blob || busy || photoSubmitState === "submitting"}
               className={
-                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-                "text-sm font-semibold hover:bg-[var(--color-sage-600)] disabled:opacity-60 disabled:cursor-not-allowed " +
+                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+                "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
               }
             >

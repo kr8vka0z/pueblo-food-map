@@ -69,8 +69,8 @@ const inputBase =
 const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
 const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
 const primaryButtonClass =
-  "w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-  "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-600)] " +
+  "w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+  "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed";
 const secondaryButtonClass =

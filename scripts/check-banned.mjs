@@ -27,6 +27,11 @@ const PATTERNS = [
   // Chromatic palettes too: form errors had drifted to stock red-500/600/700
   // instead of the `danger` token. Every color here is a custom @theme token.
   { name: 'Tailwind chromatic palette', re: /\b(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|indigo|violet|purple|fuchsia|pink|rose)-(50|100|200|300|400|500|600|700|800|900|950)\b/ },
+  // sage-500 behind text: bone-50 on it is 4.2:1, under WCAG AA. Filled
+  // buttons use sage-600 (DESIGN.md Forms > Submit). Only non-text marks may
+  // use it as a fill — listed in allowFiles.
+  { name: 'sage-500 fill (fails AA behind text)', re: /\bbg-\[var\(--color-sage-500\)\]/,
+    allowFiles: ['src/components/BoxReportsChart.tsx', 'src/components/BoxHealthList.tsx'] },
 ];
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '').replace(/^\/([A-Z]:)/, '$1');
@@ -63,9 +68,10 @@ for (const filePath of walk(ROOT)) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (/\/\/\s*allow-banned:/i.test(line)) continue;
-    for (const { name, re } of PATTERNS) {
+    for (const { name, re, allowFiles } of PATTERNS) {
       if (re.test(line)) {
         const rel = relative(ROOT, filePath).replace(/\\/g, '/');
+        if (allowFiles?.includes(rel)) continue;
         console.error(`BANNED [${name}]  ${rel}:${i + 1}  →  ${line.trim()}`);
         violations++;
       }

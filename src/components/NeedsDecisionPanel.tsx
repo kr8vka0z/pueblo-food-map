@@ -63,9 +63,9 @@ const rowClass =
   "flex flex-col gap-2 border-b border-[var(--color-bone-100)] py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between";
 
 const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-500)] " +
+  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
   "px-3 py-1.5 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-600)] focus-visible:outline-none focus-visible:ring-2 " +
+  "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 

@@ -11,8 +11,8 @@
 // WHY a scoped named-type import for ExecutionContext/ExportedHandler/ScheduledController
 // (not a bare `wrangler types` full-runtime include, and not `.wrangler`'s own generated
 // runtime.d.ts, which is itself gitignored build output — absent in a fresh checkout, so
-// relying on it would only work by local-cache accident, not in CI): AGENTS.md's "Typing
-// ADMIN_DB" section documents why this app never enables wrangler's full runtime type set
+// relying on it would only work by local-cache accident, not in CI): AGENTS.md's "Don't run
+// bare `wrangler types`" bullet documents why this app never enables wrangler's full runtime type set
 // (`wrangler types` default) — it collides Cloudflare's HTMLRewriter `Element` with
 // lib.dom's `Element` and corrupts DOM types project-wide. cloudflare-env.d.ts already
 // works around this by importing only the one runtime type it needs (`D1Database`) from

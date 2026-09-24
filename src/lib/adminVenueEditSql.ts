@@ -58,7 +58,7 @@ export const BOX_EVENT_INSERT_SQL_GUARDED = `INSERT INTO box_events (venue_id, k
 
 // ponytail: AND status = 'pending' is a deliberate idempotency ceiling, not
 // an oversight — same shape as public_submissions' own approve statements
-// (see this file's header + AGENTS.md "Public submissions queue"). A
+// (see this file's header + ARCHITECTURE.md "Admin panel"). A
 // double-approve affects 0 rows here and is silently a no-op on the
 // proposal side. #265 adds a second guard (AND EXISTS ...) so a STALE edit
 // can't mark the proposal approved for a fix that was never actually

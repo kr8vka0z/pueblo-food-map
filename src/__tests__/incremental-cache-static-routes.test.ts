@@ -5,8 +5,8 @@
  * while those routes were statically generated with `dynamicParams =
  * false` (PR #351). A "dummy" cache never persists prerendered HTML, so a
  * cache miss on a static + dynamicParams=false route throws
- * NoFallbackError and renders not-found.tsx — see AGENTS.md's "Per-venue
- * pages" section and the WHY comment in open-next.config.ts for the full
+ * NoFallbackError and renders not-found.tsx — see AGENTS.md's
+ * "Discoverability / SEO" footgun and the WHY comment in open-next.config.ts for the full
  * trace. No test in this repo had ever exercised the OpenNext/workerd
  * runtime, so nothing caught the regression for 10 days across 19 deploys.
  *

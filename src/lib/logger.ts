@@ -157,6 +157,28 @@ export function logBlessingBoxesReadFailure(message: string): void {
   console.error(JSON.stringify({ event: "blessing_boxes_read_failure", message }));
 }
 
+/**
+ * Emit a single-line JSON structured log entry for the daily refresh-
+ * pipeline alert check (#238 pending-age, #234 per-source staleness —
+ * src/lib/refreshAlerts.ts). Counts/source names only — matches this
+ * file's PII rule — logged at console.log since "nothing tripped" is the
+ * expected common case, not a failure.
+ */
+export function logRefreshAlertsResult(result: { pendingAgeAlertSent: boolean; staleSourcesAlerted: string[] }): void {
+  console.log(JSON.stringify({ event: "refresh_alerts_result", ...result }));
+}
+
+/**
+ * Emit a single-line JSON structured log entry when the refresh-alerts
+ * check throws — a broken D1 read, or a real alert condition tripped with
+ * no RESEND_API_KEY configured (src/lib/refreshAlerts.ts's own guard).
+ * Error-level: this is the only signal that the alert itself failed to
+ * fire when it should have.
+ */
+export function logRefreshAlertsFailure(message: string): void {
+  console.error(JSON.stringify({ event: "refresh_alerts_failure", message }));
+}
+
 export type PublishOutcome = "success" | "failure";
 
 interface PublishResultDetail {

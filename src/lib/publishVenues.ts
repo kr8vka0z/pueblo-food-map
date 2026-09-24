@@ -175,6 +175,70 @@ export function validateAndMapRow(row: VenueRow): RowValidationResult {
   return { ok: true, venue };
 }
 
+// ─── Dead-link suppression (#234) ───────────────────────────────────────────
+// "Hide known-dead links": while link-health has flagged a venue's url as
+// dead and the finding is still open (a pending `change_proposals` row,
+// source='link_health'), the public snapshot must not carry that url —
+// see stripDeadLinkUrls below for the actual suppression and route.ts for
+// where it's wired between fetchPublishSnapshot and validateSnapshot.
+
+export interface PendingDeadLink {
+  targetVenueId: string;
+  /** The exact url the finding flagged — buildLinkHealthProposal (scripts/refresh/diffEngine.ts) always writes `before.url` as the checked, now-dead url. */
+  url: string;
+}
+
+/**
+ * Reads every OPEN (still 'pending') link_health finding. Kept separate
+ * from fetchPublishSnapshot's own venues query — a malformed
+ * `proposed_diff` here degrades to "this one venue's url stays visible"
+ * (same per-row-degrades posture src/lib/adminProposals.ts's
+ * parseProposalRow uses), rather than risking the whole venue snapshot
+ * read if this query's shape is ever wrong.
+ */
+export async function fetchPendingDeadLinks(db: D1Database): Promise<PendingDeadLink[]> {
+  const result = await db
+    .prepare("SELECT target_venue_id, proposed_diff FROM change_proposals WHERE source = 'link_health' AND status = 'pending'")
+    .all<{ target_venue_id: string; proposed_diff: string }>();
+
+  const links: PendingDeadLink[] = [];
+  for (const row of result.results) {
+    try {
+      const diff = JSON.parse(row.proposed_diff) as { before?: { url?: unknown } | null };
+      const url = diff.before?.url;
+      if (typeof url === "string" && url.length > 0) {
+        links.push({ targetVenueId: row.target_venue_id, url });
+      }
+    } catch {
+      // Malformed JSON — skip this one finding rather than throwing the
+      // whole publish.
+    }
+  }
+  return links;
+}
+
+/**
+ * Suppresses a venue's `url` from the published snapshot while its
+ * matching link_health finding is still pending admin review (#234: "the
+ * public card must not render that link until an admin resolves it" —
+ * resolving means PATCH /api/admin/venues/[id] with `proposalId`, which
+ * flips the proposal to 'approved', or a plain reject via
+ * POST /api/admin/proposals/[id]/reject; either way the proposal leaves
+ * 'pending' and the NEXT publish's `deadLinks` no longer names this
+ * venue). Compares against the EXACT flagged url (not just "this venue id
+ * has ANY open finding") so a venue an admin hand-edited to a NEW url —
+ * without yet touching the stale pending proposal — republishes
+ * immediately instead of waiting on that proposal's own resolution.
+ */
+export function stripDeadLinkUrls(rows: VenueRow[], deadLinks: PendingDeadLink[]): VenueRow[] {
+  if (deadLinks.length === 0) return rows;
+  const deadUrlByVenueId = new Map(deadLinks.map((d) => [d.targetVenueId, d.url]));
+  return rows.map((row) => {
+    const deadUrl = deadUrlByVenueId.get(row.id);
+    return deadUrl !== undefined && row.url === deadUrl ? { ...row, url: null } : row;
+  });
+}
+
 export type ValidateSnapshotResult =
   | { ok: true; venues: Venue[] }
   | { ok: false; error: string };

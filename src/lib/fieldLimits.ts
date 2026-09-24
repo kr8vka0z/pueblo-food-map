@@ -38,4 +38,15 @@ export const FIELD_LIMITS = {
 
   // Shared
   EMAIL: 254, // RFC 5321 maximum
+
+  // Admin venue form (#297) — name/address/notes/operator/phone/url reuse
+  // an existing public-form constant for the same semantic field rather
+  // than a second, separately-maintained copy of the same value:
+  // name -> SUGGEST_VENUE_NAME, address -> SUGGEST_ADDRESS, notes ->
+  // SUGGEST_NOTES, operator -> SUGGEST_VENUE_NAME (an org name, same
+  // length class as a venue name), phone/url -> SUGGEST_CONTACT (the
+  // suggest form's own combined "phone / email / URL" field). `source` (a
+  // provenance citation, e.g. "OpenStreetMap (node/4041375052)") has no
+  // public-form equivalent — new constant, sized like SUGGEST_ADDRESS.
+  ADMIN_VENUE_SOURCE: 300,
 } as const;

@@ -49,6 +49,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { categoryLabels } from "@/data/venues";
 import { DISPLAY_DAY_KEYS, type DayKey } from "@/lib/hours";
+import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import type { VenueCategory, WeeklyHours } from "@/types/venue";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -495,6 +496,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           id="venue-name"
           value={values.name}
           onChange={(e) => setField("name", e.target.value)}
+          maxLength={FIELD_LIMITS.SUGGEST_VENUE_NAME}
           aria-required="true"
           aria-invalid={errors.name ? "true" : undefined}
           aria-describedby={errors.name ? "venue-name-error" : undefined}
@@ -553,6 +555,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
               value={values.hostName}
               onChange={(e) => setField("hostName", e.target.value)}
               placeholder="e.g. First Baptist Church"
+              maxLength={FIELD_LIMITS.SUGGEST_VENUE_NAME}
               className={`${inputBase} border-[var(--color-bone-300)]`}
             />
           </div>
@@ -567,6 +570,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
               value={values.hostNote}
               onChange={(e) => setField("hostNote", e.target.value)}
               placeholder="Shown on the box's public page"
+              maxLength={FIELD_LIMITS.BOX_ADOPTER_NOTE}
               className={`${inputBase} border-[var(--color-bone-300)] resize-y min-h-[56px]`}
             />
           </div>
@@ -582,6 +586,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
               value={values.hostContact}
               onChange={(e) => setField("hostContact", e.target.value)}
               placeholder="Phone or email, for admin use only"
+              maxLength={FIELD_LIMITS.SUGGEST_CONTACT}
               className={`${inputBase} border-[var(--color-bone-300)]`}
             />
           </div>
@@ -596,6 +601,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
               value={values.mostNeeded}
               onChange={(e) => setField("mostNeeded", e.target.value)}
               placeholder="e.g. canned protein, diapers, no glass"
+              maxLength={FIELD_LIMITS.BOX_CHECKIN_NOTE}
               className={`${inputBase} border-[var(--color-bone-300)]`}
             />
           </div>
@@ -639,6 +645,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           id="venue-address"
           value={values.address}
           onChange={(e) => setField("address", e.target.value)}
+          maxLength={FIELD_LIMITS.SUGGEST_ADDRESS}
           aria-required="true"
           aria-invalid={errors.address ? "true" : undefined}
           aria-describedby={errors.address ? "venue-address-error" : undefined}
@@ -858,6 +865,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           id="venue-phone"
           value={values.phone}
           onChange={(e) => setField("phone", e.target.value)}
+          maxLength={FIELD_LIMITS.SUGGEST_CONTACT}
           className={`${inputBase} border-[var(--color-bone-300)]`}
         />
       </div>
@@ -875,6 +883,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           autoComplete="email"
           autoCapitalize="off"
           autoCorrect="off"
+          maxLength={FIELD_LIMITS.EMAIL}
           aria-invalid={errors.email ? "true" : undefined}
           aria-describedby={errors.email ? "venue-email-error" : undefined}
           className={`${inputBase} ${inputBorder(!!errors.email)}`}
@@ -896,6 +905,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           id="venue-url"
           value={values.url}
           onChange={(e) => setField("url", e.target.value)}
+          maxLength={FIELD_LIMITS.SUGGEST_CONTACT}
           className={`${inputBase} border-[var(--color-bone-300)]`}
         />
       </div>
@@ -910,6 +920,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           id="venue-operator"
           value={values.operator}
           onChange={(e) => setField("operator", e.target.value)}
+          maxLength={FIELD_LIMITS.SUGGEST_VENUE_NAME}
           className={`${inputBase} border-[var(--color-bone-300)]`}
         />
       </div>
@@ -924,6 +935,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           rows={3}
           value={values.notes}
           onChange={(e) => setField("notes", e.target.value)}
+          maxLength={FIELD_LIMITS.SUGGEST_NOTES}
           className={`${inputBase} border-[var(--color-bone-300)] resize-y min-h-[72px]`}
         />
       </div>
@@ -938,6 +950,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
           id="venue-source"
           value={values.source}
           onChange={(e) => setField("source", e.target.value)}
+          maxLength={FIELD_LIMITS.ADMIN_VENUE_SOURCE}
           // Last single-line field — "Outside Pueblo County" below is a checkbox.
           enterKeyHint="done"
           aria-required="true"

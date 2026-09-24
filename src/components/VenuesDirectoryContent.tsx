@@ -6,7 +6,7 @@
  * Extracted from src/app/venues/page.tsx so the directory's headings and
  * per-venue hours text read the visitor's locale via useLocale() (#289),
  * while the page itself stays a server-rendered, crawlable Server Component
- * (no cookies() read — AGENTS.md "Known bilingual limitation", #287). The
+ * (no cookies() read — ARCHITECTURE.md "Known bilingual limitation", #287). The
  * grouped-by-category data is computed server-side by groupVenuesByCategory
  * (still exported from page.tsx, pure and locale-independent) and passed in.
  */

@@ -6,7 +6,7 @@
  * Extracted from src/app/feedback/page.tsx so the page's text (and
  * FeedbackForm, which now reads useLocale() itself — #289) reflects the
  * visitor's locale while the page stays a static Server Component (no
- * cookies() read — AGENTS.md "Known bilingual limitation", #287).
+ * cookies() read — ARCHITECTURE.md "Known bilingual limitation", #287).
  */
 
 import { t } from "@/lib/i18n";

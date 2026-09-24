@@ -3,7 +3,7 @@
  *
  * The locale is a client cookie/toggle (LocaleContext), not a route, so
  * Next.js Metadata's server-rendered <title> can only ever be English
- * (AGENTS.md "Known bilingual limitation", #287) — a Spanish visitor got a
+ * (ARCHITECTURE.md "Known bilingual limitation", #287) — a Spanish visitor got a
  * fully-localized page body under a stubbornly-English tab title. This file
  * proves the client-side fix (useDocumentTitle, src/lib/useDocumentTitle.ts)
  * for every page whose body is actually localized: rendering each page's

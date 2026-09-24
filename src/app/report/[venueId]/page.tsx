@@ -6,7 +6,7 @@
  * visitor's locale via useLocale() (#289) and renders the ReportForm with
  * venue context pre-filled. generateStaticParams + dynamicParams = false are
  * unchanged by this extraction: no cookies()/dynamic API is introduced, so
- * this route stays fully static (AGENTS.md "Known bilingual limitation",
+ * this route stays fully static (ARCHITECTURE.md "Known bilingual limitation",
  * #287).
  *
  * If venueId doesn't match any venue, renders a graceful not-found message

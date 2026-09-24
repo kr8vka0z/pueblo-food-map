@@ -16,19 +16,44 @@ export { pfpVenues } from "@/data/pfp-venues";
 // (published-venues.ts — see that file's header for what it is and how it's
 // regenerated). SNAP/WIC benefit flags are applied as a runtime overlay from
 // benefit-flags.ts (keyed by id) so they survive regeneration of the
-// auto-generated OSM / Plentiful data (#127). This overlay is intentionally
-// BYTE-IDENTICAL to its behavior before the #237 checkpoint d
-// published-venues.ts extraction (proved by
-// src/__tests__/publishedVenues.test.ts) — the NULL-guard fix that lets an
-// admin's explicit D1 edit win over this overlay (spec §7 step 1, "NB4") is
-// Phase 2 work, once accepts_snap/accepts_wic are actually admin-editable in
-// D1. Doing that guard now, before Phase 2 ships, would be a behavior change
-// with nothing yet able to set a competing value — explicitly out of scope
-// here.
-export const venues: Venue[] = publishedVenues.map((v) => {
-  const f = benefitFlags[v.id];
-  return f ? { ...v, accepts_snap: f.snap, accepts_wic: f.wic } : v;
-});
+// auto-generated OSM / Plentiful data (#127).
+//
+// NULL-GUARDED, not unconditional (#597; spec §7 step 1, "NB4"; Kyle's
+// product decision, confirmed #238: "admin edits win"). D1's
+// accepts_snap/accepts_wic are now admin-editable (AddVenueForm.tsx,
+// adminVenueValidation.ts) and migrations/0014 copies this overlay's values
+// into D1 where D1 was NULL — so an explicit D1 value (including one an
+// admin later sets to correct a wrong overlay guess) must win, and the
+// overlay may only fill in where the published snapshot still has no
+// opinion (`undefined`, the publish serializer's mapping for a NULL D1
+// column — publishVenues.ts).
+//
+// INTERIM STATE, not the final form: published-venues.ts won't actually
+// carry non-undefined accepts_snap/accepts_wic for the 49 venues this
+// overlay covers until 0014 lands on production and an admin clicks
+// Publish (AGENTS.md's promotion checklist) — until then this guard is a
+// no-op and behavior is unchanged from before. Once that publish happens,
+// benefit-flags.ts, this overlay application, and scripts/match-benefits.py
+// all become dead weight and should be deleted (documented as the next
+// step in AGENTS.md's promotion checklist) — the same information then
+// lives in D1, as a permanently admin-editable field.
+//
+// Exported (not inlined into the .map() below) so venuesBenefitOverlay.test.ts
+// can exercise both branches — overlay fills an unset field, overlay never
+// overwrites an already-set one — directly with synthetic fixtures. Today's
+// real publishedVenues data only ever exercises the "fill" branch (see the
+// INTERIM STATE note above), so a real-data test alone can't prove the
+// "admin edits win" half of #238's acceptance criterion.
+export function withBenefitFlagsOverlay(v: Venue, f: { snap: boolean; wic: boolean } | undefined): Venue {
+  if (!f) return v;
+  return {
+    ...v,
+    accepts_snap: v.accepts_snap === undefined ? f.snap : v.accepts_snap,
+    accepts_wic: v.accepts_wic === undefined ? f.wic : v.accepts_wic,
+  };
+}
+
+export const venues: Venue[] = publishedVenues.map((v) => withBenefitFlagsOverlay(v, benefitFlags[v.id]));
 
 export const categoryLabels: Record<Venue["category"], string> = {
   pantry: "Food Pantry",

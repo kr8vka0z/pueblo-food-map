@@ -35,7 +35,7 @@
  *   Escape dismisses. Tab cycles within. Close X (Escape equivalent).
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
@@ -70,6 +70,7 @@ import ReportVenueButton from "@/components/ReportVenueButton";
 import HoursList from "@/components/HoursList";
 import BoxCardBody from "@/components/BoxCardBody";
 import { isNativeDialogOpen } from "@/lib/dialogGuard";
+import { useOverlayEscape } from "@/lib/overlayRegistry";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -272,30 +273,34 @@ export default function DesktopVenueWindow({
 
   // ── Keyboard handling ────────────────────────────────────────────────────
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      // #508 fix pass: Escape while a box's PhotoViewer is open must close
-      // ONLY the photo, not this whole window — see dialogGuard.ts's own
-      // header. This handler is a plain bubble-phase document listener
-      // (registered below, no `{capture: true}`), so unlike the vaul/Radix
-      // case (see BottomSheet.tsx's own comment) checking the guard
-      // directly here is enough; there is no ordering race to work around.
-      if (isNativeDialogOpen()) return;
-      // A box's check-in panel (BoxCardBody -> BoxCheckinPanel) has a note
-      // textarea living inside this window. Without this guard, Escape while
-      // typing a note both loses focus AND closes the whole card — the
-      // browser's own "Escape clears an input" behavior competing with this
-      // window's own Escape-to-dismiss. Only global-dismiss when focus is on
-      // the window shell itself, not on a form control inside it.
-      const active = document.activeElement;
-      const typing = active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
-      if (typing && windowRef.current?.contains(active)) return;
-      onClose();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+  // #527: this window is mounted only while a venue is selected — i.e.
+  // always "open" for the life of the instance — so it registers into the
+  // shared overlay-escape stack unconditionally (`true`). `useOverlayEscape`
+  // only invokes the callback below while this window is the TOPMOST
+  // overlay, so pressing Escape with e.g. the Filters panel or the Menu open
+  // on top of a selected venue no longer also closes this window — see
+  // overlayRegistry.ts's own header.
+  const handleEscape = useCallback(() => {
+    // #508 fix pass: Escape while a box's PhotoViewer is open must close
+    // ONLY the photo, not this whole window — see dialogGuard.ts's own
+    // header. This handler used to be a plain bubble-phase document
+    // listener (no `{capture: true}`), so unlike the vaul/Radix case (see
+    // BottomSheet.tsx's own comment) checking the guard directly here is
+    // enough; there is no ordering race to work around. `useOverlayEscape`
+    // preserves that same bubble-phase dispatch.
+    if (isNativeDialogOpen()) return;
+    // A box's check-in panel (BoxCardBody -> BoxCheckinPanel) has a note
+    // textarea living inside this window. Without this guard, Escape while
+    // typing a note both loses focus AND closes the whole card — the
+    // browser's own "Escape clears an input" behavior competing with this
+    // window's own Escape-to-dismiss. Only global-dismiss when focus is on
+    // the window shell itself, not on a form control inside it.
+    const active = document.activeElement;
+    const typing = active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+    if (typing && windowRef.current?.contains(active)) return;
+    onClose();
   }, [onClose]);
+  useOverlayEscape(true, handleEscape);
 
   // Focus the window when it mounts so keyboard users can tab inside
   useEffect(() => {

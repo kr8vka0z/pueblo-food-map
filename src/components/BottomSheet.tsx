@@ -12,7 +12,10 @@
  * and a11y Dialog.Title — but WITHOUT snapPoints.
  *
  * Three dismissal paths:
- *   1. Escape key (vaul handles natively via onOpenChange)
+ *   1. Escape key (vaul handles natively via onOpenChange) — #527: gated on
+ *      `isTopmostOverlay()` inside `onEscapeKeyDown` below, so Escape with a
+ *      higher overlay open on top of this sheet (Filters, the Menu) no
+ *      longer ALSO closes the card underneath — see overlayRegistry.ts.
  *   2. Tap on scrim (vaul handles by default)
  *   3. Explicit close X button
  *
@@ -56,6 +59,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { safeUrl } from "@/lib/safeUrl";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { isNativeDialogOpen } from "@/lib/dialogGuard";
+import { isTopmostOverlay, useOverlayStackId } from "@/lib/overlayRegistry";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
@@ -173,6 +177,13 @@ export default function BottomSheet({
   }
 
   const open = venue !== null;
+  // #527: registers this sheet into the shared overlay-escape stack (see
+  // overlayRegistry.ts's own header) so `onEscapeKeyDown` below can tell
+  // whether a higher overlay (Filters, the Menu) is open on top of it.
+  // Vaul/Radix routes Escape through this prop rather than a `document`
+  // listener this file could add itself — `useOverlayEscape` isn't usable
+  // here for that reason; `isTopmostOverlay` is checked directly instead.
+  const overlayId = useOverlayStackId(open);
   const isBox = venue?.category === "blessing_box";
   const status = venue ? computeOpenStatus(venue.hours_weekly) : null;
   const displayNotes = venue ? getDisplayNotes(venue) : undefined;
@@ -347,6 +358,16 @@ export default function BottomSheet({
           // listener; nothing inside the photo dialog can out-race it).
           onEscapeKeyDown={(event) => {
             if (isNativeDialogOpen()) {
+              event.preventDefault();
+              return;
+            }
+            // #527: a higher overlay (Filters, the Menu) is open on top of
+            // this sheet — block vaul's own dismiss so Escape doesn't close
+            // BOTH; the topmost overlay's own Escape handling (a separate,
+            // bubble-phase `document` listener — this prop is Radix's
+            // CAPTURE-phase interception point, see dialogGuard.ts's header)
+            // still runs for the same keydown and closes itself instead.
+            if (!isTopmostOverlay(overlayId)) {
               event.preventDefault();
               return;
             }

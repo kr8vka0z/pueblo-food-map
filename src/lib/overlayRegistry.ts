@@ -23,16 +23,32 @@
  * added twice is still one entry, and deleting an id that's already gone is a
  * no-op.
  *
- * Deliberately NOT built yet (issue #542's own "don't build this now, just
- * don't block it"): absorbing the duplicated `document.body.style.overflow`
- * locks (HamburgerMenu.tsx/FilterPanel.tsx each own a copy) and the Escape-
- * ordering problem in #527. Both fit naturally on top of this same registry
- * later — a `useOverlayRegistration` call already knows exactly when its
- * overlay is the topmost/only one open — but neither is needed to satisfy
- * #542's acceptance criteria, so neither is here.
+ * #542 deliberately left two things out ("don't build this now, just don't
+ * block it"): absorbing the duplicated `document.body.style.overflow` locks
+ * (HamburgerMenu.tsx/FilterPanel.tsx each owned a copy) and the Escape-
+ * ordering problem — closing every open overlay instead of just the
+ * top-most one. #527 built both ON TOP of this file, per that plan:
+ *
+ *   - `useOverlayStackId`/`isTopmostOverlay` — a SEPARATE ordered stack
+ *     (`overlayStack`, an array, not the Set above) from `openOverlayIds`.
+ *     The Set only ever needed a count; Escape-ordering needs to know WHICH
+ *     overlay opened most recently, which a Set (unordered) can't answer.
+ *   - `useOverlayEscape` — the common case built on those two: register,
+ *     then a bubble-phase `document` keydown listener that calls its
+ *     `onEscape` ONLY while this instance is topmost. Covers every overlay
+ *     that owns a plain `document.addEventListener` Escape handler
+ *     (FilterPanel, HamburgerMenu, DesktopVenueWindow). BottomSheet.tsx is
+ *     the one exception — vaul/Radix routes Escape through `Drawer.Content`'s
+ *     own `onEscapeKeyDown` prop, not a listener this file could intercept
+ *     (see dialogGuard.ts's header for why), so it calls
+ *     `useOverlayStackId`/`isTopmostOverlay` directly instead of this hook.
+ *   - `useScrollLock` — a module-level `scrollLockCount`, incremented while
+ *     `isLocked` and decremented on release; `document.body.style.overflow`
+ *     only clears once the count reaches zero, so closing one of two
+ *     locking overlays no longer unlocks scroll out from under the other.
  */
 
-import { useId, useLayoutEffect, useSyncExternalStore } from "react";
+import { useEffect, useId, useLayoutEffect, useSyncExternalStore } from "react";
 
 const openOverlayIds = new Set<string>();
 const listeners = new Set<() => void>();
@@ -95,4 +111,89 @@ export function useOverlayRegistration(isOpen: boolean): void {
 /** True while at least one registered overlay is open — BottomNav's hide signal. */
 export function useAnyOverlayOpen(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+// ─── Escape ordering + shared scroll lock (#527) ───────────────────────────
+
+// Ordered (not a Set): last element is the most-recently-opened overlay
+// still on the stack, i.e. the one Escape should act on.
+const overlayStack: string[] = [];
+
+/**
+ * Registers this overlay's stable id in stack order while `isOpen`, and
+ * returns that id. Most callers want `useOverlayEscape` below instead — this
+ * lower-level hook exists for BottomSheet.tsx, which can't add its own
+ * `document` keydown listener (vaul/Radix's Escape handling has to be
+ * intercepted through `Drawer.Content`'s `onEscapeKeyDown` prop instead —
+ * see dialogGuard.ts) and so calls `isTopmostOverlay(id)` itself from
+ * inside that callback.
+ */
+export function useOverlayStackId(isOpen: boolean): string {
+  const id = useId();
+  useEffect(() => {
+    if (!isOpen) return;
+    overlayStack.push(id);
+    return () => {
+      const idx = overlayStack.indexOf(id);
+      if (idx !== -1) overlayStack.splice(idx, 1);
+    };
+  }, [isOpen, id]);
+  return id;
+}
+
+/** True while `id` is the most-recently-opened overlay still on the stack. */
+export function isTopmostOverlay(id: string): boolean {
+  return overlayStack.length > 0 && overlayStack[overlayStack.length - 1] === id;
+}
+
+/**
+ * Escape closes only the TOPMOST overlay (#527). Registers via
+ * `useOverlayStackId`, then a bubble-phase `document` keydown listener that
+ * calls `onEscape` ONLY while this instance is topmost — so a second
+ * overlay opened on top of a first (Filters over a selected venue card, the
+ * Menu over a card, etc.) no longer also closes the one underneath, since
+ * every overlay used to run its own Escape handler with nothing to stop the
+ * other ones from reacting to the same keydown.
+ *
+ * `onEscape` should be stable (`useCallback`) — it's an effect dependency,
+ * so an inline arrow function would tear the listener down and re-add it
+ * every render.
+ */
+export function useOverlayEscape(isOpen: boolean, onEscape: (event: KeyboardEvent) => void): void {
+  const id = useOverlayStackId(isOpen);
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (!isTopmostOverlay(id)) return;
+      onEscape(event);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, id, onEscape]);
+}
+
+// Ref-counted, not a boolean: two overlays can each want the lock at once
+// (Filters open over the Menu, etc.) — the old per-component
+// `document.body.style.overflow = open ? "hidden" : ""` had each overlay
+// stomp the other's lock on its own close.
+let scrollLockCount = 0;
+
+/**
+ * Shared body-scroll lock (#527). `isLocked` increments/decrements a module
+ * counter instead of writing `document.body.style.overflow` directly —
+ * `overflow` only clears once every locker has released it, so closing one
+ * of two overlays that both want the lock leaves the other's scroll still
+ * locked.
+ */
+export function useScrollLock(isLocked: boolean): void {
+  useEffect(() => {
+    if (!isLocked) return;
+    scrollLockCount++;
+    document.body.style.overflow = "hidden";
+    return () => {
+      scrollLockCount = Math.max(0, scrollLockCount - 1);
+      if (scrollLockCount === 0) document.body.style.overflow = "";
+    };
+  }, [isLocked]);
 }

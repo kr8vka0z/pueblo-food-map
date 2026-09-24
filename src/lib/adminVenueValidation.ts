@@ -25,7 +25,7 @@
 
 import { categoryLabels } from "@/data/venues";
 import { DISPLAY_DAY_KEYS } from "@/lib/hours";
-import { isValidEmail } from "@/lib/rateLimit";
+import { isValidEmail } from "@/lib/email";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import type { VenueCategory, WeeklyHours } from "@/types/venue";
 
@@ -217,11 +217,11 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
 
   const phone = optionalString(b.phone, "phone", errors);
   const email = optionalString(b.email, "email", errors);
-  // Cap length BEFORE the regex: the underlying EMAIL_RE (src/lib/rateLimit.ts)
+  // Cap length BEFORE the regex: the underlying EMAIL_RE (src/lib/email.ts)
   // backtracks polynomially, so running it on unbounded input is a ReDoS
   // vector even behind admin auth (a self-inflicted Worker-CPU DoS). Bounding
   // to the RFC 5321 max first keeps the regex on <=254 chars — the same guard
-  // the public form routes already apply. isValidEmail() (src/lib/rateLimit.ts)
+  // the public form routes already apply. isValidEmail() (src/lib/email.ts)
   // re-applies its own identical .slice(0, FIELD_LIMITS.EMAIL) bound at its
   // call site (a no-op here, since this length guard already rejected
   // anything longer than the cap) — reused rather than re-inlining the same

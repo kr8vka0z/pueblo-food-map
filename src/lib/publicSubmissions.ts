@@ -7,8 +7,8 @@
  * in one function (rather than the same INSERT string copy-pasted into two
  * route files) so the column list/order can't silently drift between the
  * two call sites — same reasoning as this app's other per-concern shared
- * helpers (rateLimit.ts, turnstile.ts, fieldLimits.ts) that both routes
- * already import.
+ * helpers (email.ts, turnstile.ts, fieldLimits.ts, formRateLimit.ts) that
+ * both routes already import.
  *
  * WHY callers pass a D1Database directly instead of this module calling
  * getAdminDb(): getAdminDb() (src/lib/adminDb.ts) gates on a verified

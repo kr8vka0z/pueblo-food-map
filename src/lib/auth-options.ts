@@ -134,9 +134,12 @@ export function buildAuthOptions(
     },
     // #318 Phase 4 item 1 — D1-backed rate limit on the magic-link REQUEST
     // endpoint. REUSES Better Auth's own native `rateLimit` engine rather
-    // than hand-rolling a limiter — src/lib/rateLimit.ts's in-process Map
-    // limiter is untouched (it covers the three PUBLIC forms only, a
-    // separate unauthenticated attack surface with no session/D1 concept).
+    // than hand-rolling a limiter — this is a SEPARATE D1 table/mechanism
+    // from the three public forms' own D1-backed limiter (src/lib/
+    // formRateLimit.ts, #587): different attack surface (unauthenticated
+    // magic-link requests vs. public form spam), different table (Better
+    // Auth's own `rateLimit` model vs. box_checkin_rate_limit), no reason to
+    // share one.
     //
     // WHY `enabled` is explicit rather than left to the library default:
     // verified in the installed source
@@ -182,9 +185,10 @@ export function buildAuthOptions(
     // after the library's built-in `/sign-in*` special rule and after any
     // plugin-contributed rule — so this exact-string entry reliably
     // overrides the plugin's shorter window rather than racing it. 3600s/5
-    // mirrors src/lib/rateLimit.ts's own public-form threshold
-    // (`RATE_LIMIT_MAX = 5`, 1h window) for a consistent posture across
-    // every request-a-link surface this app exposes.
+    // mirrors src/lib/formRateLimit.ts's own public-form per-IP threshold
+    // (`MAX_PER_IP_PER_HOUR = 5`, 1h window; formerly src/lib/rateLimit.ts's
+    // `RATE_LIMIT_MAX` before #587) for a consistent posture across every
+    // request-a-link surface this app exposes.
     //
     // NOT a landmine for adminAuthAllowlistPlugin.test.ts's real
     // magic-link integration tests: verified in

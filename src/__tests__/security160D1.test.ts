@@ -1,5 +1,18 @@
 /**
- * Security hardening tests — issue #160
+ * Security hardening tests — issue #160 (superseded by #587's D1 rate limit)
+ *
+ * Supersedes the old security160.test.ts: its "1.2" and "1.3" blocks call
+ * report/suggest/feedback's POST handler past the honeypot check without
+ * mocking @opennextjs/cloudflare, @/lib/formRateLimit, or stubbing
+ * CHECKIN_RATE_LIMIT_SECRET — all now required before those routes reach
+ * validation (#587's D1-backed rate limit runs before field validation,
+ * same order as before). checkFormRateLimit is mocked to always allow (same
+ * convention as reportSubmitD1/suggestSubmitD1/feedbackSubmitD1.test.ts) —
+ * this file's own job is #160's payload/CR-LF/venueId behavior, not rate
+ * limiting (that's formRateLimit.test.ts's job). This file is otherwise
+ * byte-for-byte identical to the original except for the added mocks/stub,
+ * needed in the "1.2" and "1.3" blocks only ("1.1" throws before reaching
+ * the rate limiter; "1.4" doesn't touch a route at all).
  *
  * Covers the behaviours added in each sub-item:
  *   1.1  Missing TURNSTILE_SECRET_KEY throws (all 3 routes)
@@ -9,11 +22,32 @@
  *        osm-guard.test.tsx for existing venue.url; new safeUrl util tested here)
  *
  * Pattern: vi.resetModules() + dynamic import per describe block so each
- * block gets a fresh module with its own rate-limit store.
+ * block gets a fresh module.
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
+
+// #587: report/suggest/feedback now fetch getCloudflareContext().env.ADMIN_DB
+// for the D1-backed rate-limit check before validation — needed only by the
+// "1.2"/"1.3" blocks below (which pass the honeypot check), harmless for
+// "1.1" (throws earlier on a missing Turnstile secret) and "1.4" (doesn't
+// call a route at all).
+const mockGetCloudflareContext = vi.fn();
+vi.mock("@opennextjs/cloudflare", () => ({
+  getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
+}));
+
+const mockCheckFormRateLimit = vi.fn();
+vi.mock("@/lib/formRateLimit", () => ({
+  checkFormRateLimit: (...args: unknown[]) => mockCheckFormRateLimit(...args),
+}));
+
+function makeFakeD1() {
+  const bind = () => ({ run: async () => ({ success: true, results: [], meta: {} }) });
+  const prepare = () => ({ bind });
+  return { prepare } as unknown as D1Database;
+}
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -106,6 +140,13 @@ describe("1.1 — throw on missing TURNSTILE_SECRET_KEY", () => {
 // ─── 1.2 Over-cap payloads rejected ──────────────────────────────────────────
 
 describe("1.2 — over-cap inputs rejected server-side", () => {
+  beforeEach(() => {
+    mockGetCloudflareContext.mockReset();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeD1() } });
+    mockCheckFormRateLimit.mockReset();
+    mockCheckFormRateLimit.mockResolvedValue(true);
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
@@ -116,6 +157,7 @@ describe("1.2 — over-cap inputs rejected server-side", () => {
     vi.resetModules();
     vi.stubEnv("RESEND_API_KEY", "test_key");
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret");
+    vi.stubEnv("CHECKIN_RATE_LIMIT_SECRET", "test-rate-limit-secret");
     const { POST } = await import("@/app/report/submit/route");
     vi.stubGlobal("fetch", mockTurnstileOk());
 
@@ -139,6 +181,7 @@ describe("1.2 — over-cap inputs rejected server-side", () => {
     vi.resetModules();
     vi.stubEnv("RESEND_API_KEY", "test_key");
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret");
+    vi.stubEnv("CHECKIN_RATE_LIMIT_SECRET", "test-rate-limit-secret");
     const { POST } = await import("@/app/suggest/submit/route");
     vi.stubGlobal("fetch", mockTurnstileOk());
 
@@ -160,6 +203,7 @@ describe("1.2 — over-cap inputs rejected server-side", () => {
     vi.resetModules();
     vi.stubEnv("RESEND_API_KEY", "test_key");
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret");
+    vi.stubEnv("CHECKIN_RATE_LIMIT_SECRET", "test-rate-limit-secret");
     const { POST } = await import("@/app/feedback/submit/route");
     vi.stubGlobal("fetch", mockTurnstileOk());
 
@@ -187,6 +231,11 @@ describe("1.3 — CR/LF stripped; unknown venueId rejected in report route", () 
     vi.resetModules();
     vi.stubEnv("RESEND_API_KEY", "test_key");
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret");
+    vi.stubEnv("CHECKIN_RATE_LIMIT_SECRET", "test-rate-limit-secret");
+    mockGetCloudflareContext.mockReset();
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeD1() } });
+    mockCheckFormRateLimit.mockReset();
+    mockCheckFormRateLimit.mockResolvedValue(true);
     const mod = await import("@/app/report/submit/route");
     POST = mod.POST;
   });

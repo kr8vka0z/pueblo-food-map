@@ -2,18 +2,19 @@
  * checkinRateLimit.ts — D1-backed shared-counter rate limit for the public
  * blessing-box check-in write path (Blessing Boxes slice 2).
  *
- * WHY not src/lib/rateLimit.ts's in-process limiter: that file's own header
- * says its store "resets when the Worker cold-starts" and is "good enough
- * for v1 spam deterrence" on the three low-frequency contact forms —
- * explicitly not strong enough for a feature people are expected to use
- * daily (Discovery §1's own finding: "Fine for forms; too weak for a
- * feature people use daily"). Cloudflare runs many Worker isolates
- * concurrently; an in-process Map is per-isolate, so a flood spread across
- * isolates sails past a cap that only ever sees a fraction of the real
- * traffic. D1 is one shared store every isolate reads and writes, so the
- * count is real regardless of which isolate handles which request — same
- * reasoning Better Auth's own `rateLimit` table (migrations/0004) uses for
- * the admin sign-in path.
+ * WHY not an in-process limiter (a plain module-level Map, which is what
+ * this file originally replaced for the check-in path, and what the three
+ * public submit forms used until #587): Cloudflare runs many Worker
+ * isolates concurrently; an in-process Map is per-isolate, so a flood
+ * spread across isolates sails past a cap that only ever sees a fraction of
+ * the real traffic. D1 is one shared store every isolate reads and writes,
+ * so the count is real regardless of which isolate handles which request —
+ * same reasoning Better Auth's own `rateLimit` table (migrations/0004) uses
+ * for the admin sign-in path. This file backs every Blessing Boxes public
+ * write path (check-ins, photos, photo flags, adopt, alerts, needs) plus,
+ * as of #587, the three public submit forms via src/lib/formRateLimit.ts's
+ * thin wrapper (report/suggest/feedback) — see that file's own header for
+ * the form-specific scopes/caps.
  *
  * WHY a NEW table (migrations/0007's box_checkin_rate_limit) rather than
  * reusing that `rateLimit` table: its shape (`id`/`key`/`count`/
@@ -24,21 +25,30 @@
  * hiding in a future `bun update`. A small table with this file's own shape
  * costs nothing extra and can't drift out from under it.
  *
- * WHY no IP is ever written here: the Build Plan's PII rule for check-ins
- * ("no IP address — ever") extends to the write PATH that protects
- * check-ins, not only the check-in row itself. The per-box cap keys off the
- * box id (already public). The per-visitor cap instead keys off a random,
- * non-identifying token the BROWSER generates once and keeps in
- * localStorage (src/lib/checkinClientToken.ts) — an opaque anti-abuse
- * counter, not a real-world identifier, the same anonymity class this app's
- * planned F7 phone-local tally already uses (Build Plan). Losing or
- * clearing it just resets a rate-limit window, nothing more — there is
- * nothing here an attacker or a data export could ever tie to a person.
+ * WHY no raw box id, client token, OR IP is ever written here: the Build
+ * Plan's PII rule for check-ins ("no IP address — ever") extends to the
+ * write PATH that protects check-ins, not only the check-in row itself. The
+ * per-box cap keys off the box id (already public). The per-visitor cap
+ * instead keys off a random, non-identifying token the BROWSER generates
+ * once and keeps in localStorage (src/lib/checkinClientToken.ts) — an
+ * opaque anti-abuse counter, not a real-world identifier, the same
+ * anonymity class this app's planned F7 phone-local tally already uses
+ * (Build Plan). Losing or clearing it just resets a rate-limit window,
+ * nothing more — there is nothing here an attacker or a data export could
+ * ever tie to a person. Two caller groups DO pass something identifying as
+ * `id` rather than an opaque token: the adopt/alerts routes' email-flood
+ * scopes (already true before #587 — an alert recipient email, normalized
+ * via src/lib/email.ts's normalizeEmail before use as a key), and, as of
+ * #587, the three public submit forms' per-IP cap (src/lib/formRateLimit.ts,
+ * the submitter's IP) — see "WHY the key is HMAC'd" immediately below for
+ * why neither ever becomes a stored raw value.
  *
- * WHY the key is HMAC'd rather than storing the box id / client token
- * directly: composing the row's key from a server secret means a leaked D1
- * export shows only opaque hashes, never a raw client token or box id an
- * attacker could correlate across rows.
+ * WHY the key is HMAC'd rather than storing the box id / client token /
+ * form-submitter IP directly: composing the row's key from a server secret
+ * means a leaked D1 export shows only opaque hashes, never a raw client
+ * token, box id, or IP an attacker could correlate across rows — the IP (or
+ * box id, or client token) enters the HMAC and nothing else; it is never
+ * itself a column value.
  *
  * WHY a DEDICATED `CHECKIN_RATE_LIMIT_SECRET` rather than reusing
  * `TURNSTILE_SECRET_KEY` (2026-09-17 review correction — the original
@@ -81,7 +91,7 @@ export async function hmacHex(secret: string, message: string): Promise<string> 
 export interface RateLimitScope {
   /** A short label distinguishing this cap from any other sharing the same table, e.g. "box" or "visitor-box". */
   scope: string;
-  /** The thing being capped — a box id, or a client-token+box-id pair. Never a raw IP (see file header). */
+  /** The thing being capped — a box id, a client-token+box-id pair, an alert email, or (form-report/-suggest/-feedback scopes) a submitter IP. Whatever is passed here only ever enters the HMAC below (see file header, "WHY the key is HMAC'd") — this table never stores it raw. */
   id: string;
 }
 

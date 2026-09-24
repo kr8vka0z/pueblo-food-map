@@ -1,14 +1,11 @@
 /**
- * Tests for src/lib/rateLimit.ts's isValidEmail (#269).
- *
- * checkRateLimit itself is exercised indirectly through the three submit
- * routes' own test suites (reportSubmit.test.ts etc.) via their POST
- * handlers — this file covers only the pure email helper, which has no
- * existing direct test coverage of its own.
+ * Tests for src/lib/email.ts's isValidEmail/normalizeEmail (#269, moved
+ * here from the now-deleted src/lib/rateLimit.ts by #587 — content is
+ * unchanged from rateLimit.test.ts, only the import path moved).
  */
 
 import { describe, test, expect } from "vitest";
-import { isValidEmail, normalizeEmail } from "@/lib/rateLimit";
+import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 
 describe("isValidEmail", () => {

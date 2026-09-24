@@ -42,7 +42,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { resolveBoxTurnstileKey, verifyBoxTurnstile } from "@/lib/boxTurnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
-import { isValidEmail, normalizeEmail } from "@/lib/rateLimit";
+import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
 import { logFormFailure } from "@/lib/logger";
 import { insertAdopterApplication, sendAdopterConfirmEmail } from "@/lib/boxAdopters";

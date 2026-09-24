@@ -186,8 +186,8 @@ const en: Record<string, string> = {
   "suggest.title": "Suggest a place",
   "suggest.subtitle": "Know a food resource we're missing? Tell us about it.",
   // <title> for /suggest (#589) — matches page.tsx's metadata title exactly
-  // ("Suggest a Venue"); kept distinct from suggest.title (the on-page h1,
-  // "Suggest a venue") since the two strings differ only in casing and a
+  // ("Suggest a Place"); kept distinct from suggest.title (the on-page h1,
+  // "Suggest a place") since the two strings differ only in casing and a
   // shared key would force one to drift to match the other.
   "suggest.documentTitle": "Suggest a Place",
   "suggest.venueName.label": "Place name",

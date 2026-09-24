@@ -170,14 +170,21 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
               {t('splash.cta.primary', 'en')}
             </button>
 
-            {/* Spanish entry — also switches the whole site to Spanish */}
+            {/* Spanish entry — also switches the whole site to Spanish.
+                #600: "Encuentra comida cerca de mí" wrapped "mí" alone onto
+                its own line at 360-375px. text-balance re-picks the wrap
+                point so a forced 2-line break splits evenly instead of
+                greedily (no lone trailing word); px-4 below `sm` frees a
+                little more width first so it's less likely to wrap at all.
+                py-4/md:py-5 (tap-target height) is untouched and identical
+                to the English button above. */}
             <button
               type="button"
               lang="es"
               onClick={() => handleCtaClick('es')}
               className={[
-                'w-full rounded-[var(--radius-md)] px-6 py-4 md:py-5',
-                'text-lg md:text-xl font-semibold leading-none',
+                'w-full rounded-[var(--radius-md)] px-4 sm:px-6 py-4 md:py-5',
+                'text-lg md:text-xl font-semibold leading-none text-balance',
                 'bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)]',
                 'hover:brightness-105 active:brightness-95',
                 'transition-[filter] duration-150',

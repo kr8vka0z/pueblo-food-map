@@ -109,22 +109,23 @@ export default function HamburgerMenu({
     // unmounts while the drawer is open and remounts as brand-new DOM nodes
     // once it closes (the #542 registration below) — `capturedEl` can be a
     // detached node by the time focus needs to move, and `.focus()` on a
-    // detached node silently no-ops, so focus fell to <body>. `queueMicrotask`
-    // defers this until AFTER the state update `onClose()` just scheduled has
-    // committed (same pattern as MapWrapper.tsx's route-clear effect, cited
-    // in BottomSheet.tsx's own header) — only then does `.isConnected`
-    // reliably tell a still-live trigger (the desktop dropdown variant; any
-    // caller whose opener never unmounts) apart from one BottomNav just
-    // rebuilt from scratch. In the rebuilt case, re-find the equivalent
-    // bottom-bar item by its stable data-testid (BottomNav.tsx's
-    // `data-testid="nav-${section}"`) instead of leaving focus stranded.
-    queueMicrotask(() => {
+    // detached node silently no-ops, so focus fell to <body>. A still-live
+    // trigger (the desktop dropdown variant) is focused directly; otherwise
+    // re-find the rebuilt bottom-bar item by its stable data-testid
+    // (BottomNav.tsx's `data-testid="nav-${section}"`). React doesn't
+    // promise BottomNav has remounted by the next microtask — on a slow
+    // phone the commit can land a frame or more later — so retry once per
+    // animation frame, up to ~10 frames, instead of giving up after one try.
+    const restoreFocus = (framesLeft: number) => {
       if (capturedEl && capturedEl.isConnected) {
         capturedEl.focus();
         return;
       }
-      document.querySelector<HTMLElement>(`[data-testid="nav-${targetView}"]`)?.focus();
-    });
+      const rebuilt = document.querySelector<HTMLElement>(`[data-testid="nav-${targetView}"]`);
+      if (rebuilt) rebuilt.focus();
+      else if (framesLeft > 0) requestAnimationFrame(() => restoreFocus(framesLeft - 1));
+    };
+    queueMicrotask(() => restoreFocus(10));
   }, [onClose, view]);
 
   // ── Keyboard: Escape closes only the TOPMOST overlay (#527) ─────────────────

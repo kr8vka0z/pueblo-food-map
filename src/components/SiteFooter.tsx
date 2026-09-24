@@ -15,6 +15,7 @@
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { OSM_COPYRIGHT_URL } from "@/lib/osmAttribution";
 
 export default function SiteFooter() {
   const { locale } = useLocale();
@@ -58,6 +59,23 @@ export default function SiteFooter() {
         >
           {t("footer.suggest", locale)}
         </Link>
+        {/* ODbL attribution (#133 4.5) — this footer covers /venues, /about
+            and every other SiteFooter page that lists venue data without
+            Mapbox's own AttributionControl. min-h-11 matches this repo's
+            established inline-text-link touch target (DESIGN.md, "Venue
+            phone link"). */}
+        <a
+          href={OSM_COPYRIGHT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={
+            "inline-flex items-center min-h-11 " +
+            "hover:text-[var(--color-ink-700)] transition-colors " +
+            "focus-visible:outline-none focus-visible:underline"
+          }
+        >
+          {t("osm.attribution", locale)}
+        </a>
       </div>
     </footer>
   );

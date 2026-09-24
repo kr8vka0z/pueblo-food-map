@@ -337,7 +337,18 @@ export async function applyApprovedProposal(
 
   const parsed = parseProposalRow(proposalRow);
   if (parsed.parseError) {
-    return { ok: false, status: 422, error: "corrupted_proposal" };
+    // #568 item 3: no `message` here used to mean both review surfaces
+    // (NeedsDecisionPanel.tsx's ApproveButton, ProposalsReviewView.tsx)
+    // fell back to their own generic "Try again"/"Something went wrong" —
+    // for a corrupted row, retrying can never succeed, so that copy was
+    // actively misleading. Fixed at the shared source both surfaces
+    // already read `body.message` from, not duplicated in either.
+    return {
+      ok: false,
+      status: 422,
+      error: "corrupted_proposal",
+      message: "This proposal's stored data is corrupted and can't be read. Reject it instead.",
+    };
   }
   const { diff } = parsed;
   const changeType = proposalRow.change_type as ProposalChangeType;
@@ -379,7 +390,17 @@ export async function applyApprovedProposal(
     const existing = currentRow!;
     const fields = diff.fields_changed.filter((f) => APPLIABLE_VENUE_FIELDS.has(f as keyof Venue));
     if (fields.length === 0) {
-      return { ok: false, status: 422, error: "nothing_to_apply" };
+      // #568 item 3 (see corrupted_proposal's own comment above for the
+      // shared "no message -> both surfaces show 'Try again'" root cause):
+      // every field this proposal names is outside APPLIABLE_VENUE_FIELDS
+      // (freshness-only, or a field this route doesn't apply), so there is
+      // nothing here to retry either.
+      return {
+        ok: false,
+        status: 422,
+        error: "nothing_to_apply",
+        message: "This proposal has no applicable field changes to apply. Reject it instead.",
+      };
     }
     const setClauses = fields.map((f) => `${f} = ?`);
     const values = fields.map((f) => toColumnValue(f as keyof Venue, (after as Record<string, unknown>)[f]));

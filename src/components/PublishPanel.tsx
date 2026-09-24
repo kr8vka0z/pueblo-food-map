@@ -64,6 +64,11 @@ interface PublishSuccessBody {
   prNumber: number;
   reused: boolean;
   publishedCount: number;
+  // #568 item 2: optional, not required — a defensive read against any
+  // older/mocked response shape that predates this field (route.ts always
+  // sends it now, but this component shouldn't crash on a response that
+  // doesn't), defaulting to 0 wherever it's read below.
+  archivedCount?: number;
   snapshotCount: number;
 }
 
@@ -77,7 +82,7 @@ type PublishResponseBody = PublishSuccessBody | PublishErrorBody;
 type PublishState =
   | { status: "idle" }
   | { status: "submitting" }
-  | { status: "success"; prUrl: string; publishedCount: number }
+  | { status: "success"; prUrl: string; publishedCount: number; archivedCount: number }
   | { status: "error"; message: string };
 
 const primaryButtonClass =
@@ -89,6 +94,19 @@ const primaryButtonClass =
 
 function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * #568 item 2: a removals-only publish (0 new/edited, N archived) used to
+ * read "Published — 0 places pushed" — technically not wrong, but it looks
+ * like the publish did nothing when it actually shipped N removals. Always
+ * naming the pushed count and only appending the removed clause when it's
+ * non-zero keeps the common "N new/edited" case unchanged while making a
+ * removal visible whenever one happened.
+ */
+function publishSuccessMessage(publishedCount: number, archivedCount: number): string {
+  const pushed = `${pluralize(publishedCount, "place")} pushed`;
+  return archivedCount > 0 ? `${pushed}, ${pluralize(archivedCount, "place")} removed` : pushed;
 }
 
 function buildConfirmMessage({ newDrafts, editedSincePublish, archived }: PublishChangeSummary): string {
@@ -147,7 +165,12 @@ export default function PublishPanel({ summary, reviewHref }: PublishPanelProps)
       const body = (await res.json().catch(() => null)) as PublishResponseBody | null;
 
       if (res.status === 200 && body?.ok) {
-        setState({ status: "success", prUrl: body.prUrl, publishedCount: body.publishedCount });
+        setState({
+          status: "success",
+          prUrl: body.prUrl,
+          publishedCount: body.publishedCount,
+          archivedCount: body.archivedCount ?? 0,
+        });
         router.refresh();
         return;
       }
@@ -199,7 +222,7 @@ export default function PublishPanel({ summary, reviewHref }: PublishPanelProps)
 
       {state.status === "success" && (
         <p aria-live="polite" className="mt-3 text-sm text-[var(--color-sage-700)]">
-          Published — {pluralize(state.publishedCount, "place")} pushed to the public map. A{" "}
+          Published — {publishSuccessMessage(state.publishedCount, state.archivedCount)} to the public map. A{" "}
           <a
             href={state.prUrl}
             target="_blank"

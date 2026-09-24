@@ -504,6 +504,23 @@ map gets the same early trigger a mouse/touch user does; the idle/timeout
 fallback also guarantees eventual load with zero interaction at all, so no
 user is ever gated behind a pointer-only path.
 
+**Held behind the splash (#588).** `useDeferredMapLoad`'s optional `hold`
+argument suppresses only the idle/timeout branch above — the interaction
+listeners stay attached regardless — while HomePageClient's welcome splash is
+covering a first-time visitor's screen (`holdMapLoad={splashShown}` on
+`MapWrapper`). Without it, the idle callback fired mapbox-gl's ~530ms
+(4x-throttle) parse/exec while the visitor was still reading the splash
+(inert, nothing waiting on the map yet) — exactly what Lighthouse's
+synthetic, never-interacts mobile run also pays, inflating TBT/TTI. A real
+tap on either splash CTA reaches the window-capture interaction listeners
+regardless of the splash's DOM position (a sibling of the inert map
+container, not a descendant), starting the load immediately, in parallel
+with the geolocation request that same tap kicks off — not serialized behind
+the splash's actual dismiss, which itself waits on geolocation to resolve
+(up to 8s) and would defeat that overlap. `hold`'s true→false edge (the
+splash's real dismiss) is also an unconditional trigger, covering dismissal
+paths that don't dispatch a pointer/key event at all.
+
 **Deep-link exception — eager, never deferred.** A shared venue link
 (`?venue=<id>`, or `/venue/<id>`'s "View on the map" CTA which lands on
 `/#venue=<id>`) must open on that pin immediately, not after an idle
@@ -714,6 +731,42 @@ than a single click links out instead of growing an inline form here), and
 two side panels, `BoxHealthList` ("Boxes that need help") and
 `StalePlacesList` ("Places due for a check" — published venues whose
 `last_verified` is over 12 months old, oldest first).
+
+**Publish is "PR opened and auto-merge armed," not "merged" (#598).**
+`POST /api/admin/publish` promotes D1 rows to `status='published'` once its
+GitHub commit/PR/auto-merge sequence succeeds (`commitPublishedVenues`,
+src/lib/publishVenues.ts — see "Automated venue-refresh pipeline"'s sibling
+publish flow above for the NB1 ordering) — that is a real success signal for
+the PR existing and being armed to merge, but it is NOT the same as the PR
+having actually merged. If that PR's CI then goes red, D1 already says
+"published" while the live site still serves the OLD
+`src/data/published-venues.ts` until the next publish happens to repair it.
+Rewiring the state machine to wait for the real merge was rejected — a
+publish would have to hold a request open across a multi-minute CI run for
+a case that's rare and self-healing on the next publish anyway. Instead the
+Dashboard reads the SAME open `publish-bot` PR read-only
+(`fetchPublishBotPrStatus`, publishVenues.ts) and renders
+`PublishBotStatusBanner` above the Publish bar whenever one is open.
+
+**Pulls API only, not Checks API (review finding, 2026-09-24).** The first
+version of this read hit GitHub's Checks API against the PR's head sha —
+that silently never worked, because `GITHUB_PUBLISH_TOKEN` is a
+FINE-GRAINED PAT (Contents RW + Pull requests RW, #260), and fine-grained
+PATs cannot read check runs at all — a structural gap in what that PAT type
+can authenticate for, not a missing scope to add. `mergeable_state` +
+`created_at` from `GET /pulls/{number}` need only "Pull requests: read,"
+which this token already has, so the banner now derives state from those
+instead: `mergeable_state === "dirty"` (a real merge conflict) is
+"Publish is stuck: merge conflict," regardless of the PR's age; a PR open
+more than 20 minutes with `mergeable_state` in blocked/unstable/behind is
+"Publish is stuck: checks failing or pending too long"; everything else
+(including `mergeable_state` still "unknown" while GitHub computes it,
+common right after a PR opens) is "Publish in progress." Fails soft on both
+axes named in the issue: skipped entirely when `GITHUB_PUBLISH_TOKEN` is
+unset (staging has none — same env var route.ts already treats as "not
+configured"), and any GitHub error on the single-PR detail read (rate
+limit, network, permissions) degrades to `state: "in_progress"` rather than
+breaking the page, matching every other best-effort Dashboard read above.
 
 **`/admin/places` (src/app/admin/places/page.tsx)** is the venue list —
 moved here unchanged from where `/admin` used to render it (#253's original

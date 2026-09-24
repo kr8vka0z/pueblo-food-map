@@ -153,6 +153,34 @@ export function logRefreshAlertsFailure(message: string): void {
   console.error(JSON.stringify({ event: "refresh_alerts_failure", message }));
 }
 
+interface CspViolationDetail {
+  /** e.g. "script-src" — which directive the browser enforced. */
+  violatedDirective?: string;
+  /** The resource the browser blocked — a script/style/connect URL, or "inline"/"eval". */
+  blockedUri?: string;
+  /** The page the violation fired on — query string already stripped by the
+   *  caller (see src/app/api/csp-report/route.ts's PII note: /alerts/confirm
+   *  and /alerts/stop carry a live subscription token in `?t=`). */
+  documentUri?: string;
+}
+
+/**
+ * Emit a single-line JSON structured log entry for a Content-Security-Policy
+ * violation report (#593's Content-Security-Policy-Report-Only, POSTed to
+ * src/app/api/csp-report/route.ts by the browser itself). Warn-level, same
+ * reasoning as turnstile_failed above: while the policy is report-only this
+ * is expected, high-volume noise while the allowlist is tuned, not an
+ * incident — but it must still be visible in Workers Logs, or "dev ran
+ * quiet for a while" before flipping to enforcing is never actually true.
+ */
+export function logCspViolation(detail: CspViolationDetail): void {
+  const entry: Record<string, unknown> = { event: "csp_violation_report" };
+  if (detail.violatedDirective !== undefined) entry.violatedDirective = detail.violatedDirective;
+  if (detail.blockedUri !== undefined) entry.blockedUri = detail.blockedUri;
+  if (detail.documentUri !== undefined) entry.documentUri = detail.documentUri;
+  console.warn(JSON.stringify(entry));
+}
+
 export type PublishOutcome = "success" | "failure";
 
 interface PublishResultDetail {

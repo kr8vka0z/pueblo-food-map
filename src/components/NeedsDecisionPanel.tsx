@@ -107,10 +107,15 @@ type RejectState = "idle" | "submitting" | "error";
  * permanently deletes the stored R2 object, see box-photos/[id]/reject's own
  * header). Every call site below supplies its own wording.
  *
- * A 404/409 response means this row was already handled elsewhere (approved,
+ * A 404 response means this row was already handled elsewhere (approved,
  * rejected, or deleted) between page load and click — a stale card, not a
  * real failure — so it refreshes the same as success rather than showing a
- * "Try again" that would just repeat the same 404/409 (review finding).
+ * "Try again" that would just repeat the same 404 (review finding). 409 is
+ * NOT in that list (#568 item 4, dead-code finding): every reject route this
+ * panel calls (submissions, proposals, box-photos, box-adopters) returns 404
+ * for a stale row and never returns 409 at all — verified against all four
+ * route.ts files, not assumed — so a 409 here can only mean a real,
+ * unexpected failure and should show "Try again" like any other non-200.
  */
 function RejectButton({ path, confirmMessage, onDone }: { path: string; confirmMessage: string; onDone: () => void }) {
   const [state, setState] = useState<RejectState>("idle");
@@ -124,7 +129,7 @@ function RejectButton({ path, confirmMessage, onDone }: { path: string; confirmM
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: null }),
       });
-      if (res.status === 200 || res.status === 404 || res.status === 409) {
+      if (res.status === 200 || res.status === 404) {
         onDone();
         return;
       }

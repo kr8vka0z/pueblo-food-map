@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Full history, not the default shallow clone -- the data-only
           # detection step below diffs base...head by SHA, which needs both
@@ -74,7 +74,7 @@ jobs:
           echo "data_only=$data_only" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # 22 to match .node-version and the deploy workflows, so all three
           # share one node_modules cache (native modules are per-Node-version).
@@ -157,3 +157,88 @@ jobs:
         # regenerated data file still statically generates every venue page
         # (opennext/Next static export, #336).
         run: npm run build
+        env:
+          # Real map token so the Lighthouse job below (which reuses THIS
+          # build, #292) renders the map instead of an "unauthorized" blank
+          # — matches what the old standalone lighthouse.yml set on its own,
+          # now-removed build step. Same URL-restricted public token both
+          # deploys use; localhost:3000 (where Lighthouse serves it) is on
+          # its Mapbox allowlist. Falls back to empty (map blank,
+          # accessibility still measured) if the secret is ever removed.
+          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
+
+      - name: Upload build output
+        # Shares this one build with the lighthouse job below instead of
+        # each workflow running its own `npm run build` (#292 — CI used to
+        # build the app twice per PR). .next/cache is excluded: it only
+        # speeds up a FUTURE `next build`, `next start` never reads it, and
+        # it's usually the bulk of .next's size.
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nextjs-build
+          path: |
+            .next
+            !.next/cache
+          retention-days: 1
+
+  # Was its own workflow (lighthouse.yml) with an independent `npm ci` +
+  # `npm run build` of the same commit — doubling the build portion of every
+  # PR's CI minutes (#292). Now a dependent job that reuses the `ci` job's
+  # build artifact instead. Trade-off, deliberate: as a dependent job this
+  # only runs when `ci` succeeds (a plain independent workflow would still
+  # build-and-measure even if, say, lint failed elsewhere) — accepted
+  # because there's no build artifact to audit if `ci` never produces one,
+  # and because it removes the double build the issue exists to fix. Stays
+  # non-required/advisory exactly as before: this repo's `dev`/`main`
+  # rulesets list "Lint, typecheck, build", "SAST Code Analysis (Semgrep)",
+  # "Secret Leak Scan (TruffleHog)", "Dependency CVE Audit" as required
+  # contexts — "lighthouse" was never one of them and still isn't.
+  lighthouse:
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        # 22, not the old lighthouse.yml's 20 — the build artifact below was
+        # produced under Node 22 (the `ci` job, matching .node-version), so
+        # `next start` needs a matching node_modules install rather than the
+        # pre-existing 20 pin the standalone workflow happened to carry.
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build output
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nextjs-build
+          path: .next
+
+      - name: Start the app and wait until it responds
+        run: |
+          npm run start &
+          # Poll the local server; fail loudly after ~60s instead of letting
+          # Lighthouse hit a dead port and report a misleading 404/error.
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/ >/dev/null; then
+              echo "app ready after $((i * 2))s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error title=App never started::localhost:3000 did not respond within 60s"
+          exit 1
+
+      - name: Run Lighthouse
+        uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # v12
+        with:
+          urls: http://localhost:3000/
+          configPath: ./.lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true

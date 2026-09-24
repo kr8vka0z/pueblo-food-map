@@ -86,6 +86,11 @@
       // "pueblofoodmap.com" default. Giving staging its own rpID means a
       // passkey registered on dev.pueblofoodmap.com can never authenticate
       // against production, and vice-versa.
+      // #591: also the ONLY signal src/lib/publishVenues.ts's
+      // isProductionWorker() reads to refuse a staging Publish click before
+      // any GitHub call — removing or renaming this var re-opens that guard
+      // too. See that function's own comment for the coupling and upgrade
+      // path if it ever needs to be decoupled from auth.
       "vars": {
         "BETTER_AUTH_RP_ID": "dev.pueblofoodmap.com"
       },

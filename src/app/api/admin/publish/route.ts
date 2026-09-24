@@ -23,6 +23,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
 import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
@@ -33,6 +34,7 @@ import {
   serializePublishedVenuesFile,
   commitPublishedVenues,
   promotePublishedDrafts,
+  isProductionWorker,
 } from "@/lib/publishVenues";
 
 /**
@@ -54,6 +56,16 @@ export async function POST(req: NextRequest): Promise<Response> {
     return adminAuthErrorResponse(err);
   }
   const { db, identity } = access;
+
+  // #591: refuse to run unless this is the production Worker — a Publish
+  // click on staging must never be able to auto-merge staging's test venue
+  // data into production, so this check runs BEFORE any GitHub call (and
+  // before the token check below, so staging gets this honest answer
+  // regardless of whether GITHUB_PUBLISH_TOKEN happens to be set there).
+  const { env } = await getCloudflareContext({ async: true });
+  if (!isProductionWorker(env)) {
+    return NextResponse.json({ ok: false, error: "publish_not_production" }, { status: 403 });
+  }
 
   const token = process.env.GITHUB_PUBLISH_TOKEN;
   if (!token) {

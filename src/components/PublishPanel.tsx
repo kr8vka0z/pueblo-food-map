@@ -110,6 +110,12 @@ function friendlyErrorMessage(status: number, error?: string): string {
   if (error === "publish_not_configured") {
     return "The publish key isn't set up yet, so this can't publish. (Setup is tracked separately.)";
   }
+  // #591: staging refused the publish before any GitHub call — checked
+  // ahead of the generic 403/401 "session expired" branch below (same
+  // status code, different meaning) so this admin sees the real reason.
+  if (error === "publish_not_production") {
+    return "Publish only runs on the live production site. This is staging, so nothing was sent to GitHub.";
+  }
   if (error === "github_commit_failed") {
     return "Couldn't reach GitHub to publish. Nothing was changed — try again in a moment.";
   }

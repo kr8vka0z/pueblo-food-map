@@ -6,7 +6,7 @@
  *
  * Presentational + self-contained: owns all field state, client-side
  * validation, and the fetch call to the venues API. No auth/D1 in scope
- * here — the Cloudflare Access gate lives in the parent Server Component
+ * here — the Better Auth gate (getAdminDb()) lives in the parent Server Component
  * (src/app/admin/venues/new/page.tsx or .../[id]/edit/page.tsx, same
  * pattern as AGENTS.md "Admin authentication"). This mirrors SuggestForm.tsx's
  * own form/route split; this component imitates SuggestForm's

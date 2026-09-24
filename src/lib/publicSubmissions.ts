@@ -11,8 +11,8 @@
  * both routes already import.
  *
  * WHY callers pass a D1Database directly instead of this module calling
- * getAdminDb(): getAdminDb() (src/lib/adminDb.ts) gates on a verified
- * Cloudflare Access identity — correct for AUTHENTICATED /admin/** routes,
+ * getAdminDb(): getAdminDb() (src/lib/adminDb.ts) gates on a live admin
+ * Better Auth session — correct for AUTHENTICATED /admin/** routes,
  * but /suggest/submit and /report/submit are PUBLIC, unauthenticated
  * routes. Callers fetch the binding themselves via
  * getCloudflareContext().env.ADMIN_DB and pass it in.

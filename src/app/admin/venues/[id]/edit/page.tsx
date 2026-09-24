@@ -1,13 +1,13 @@
 /**
- * /admin/venues/[id]/edit — Cloudflare Access-gated "Edit a venue" page,
+ * /admin/venues/[id]/edit — admin-gated "Edit a venue" page,
  * plus the "Remove from map" (archive) action (#255); `?submission=<id>`
  * closure-report review context added #270; `?proposal=<id>` link_health
  * review context added #390.
  *
  * Same auth chain as /admin and /admin/venues/new (AGENTS.md "Admin
- * authentication"): getAdminDb() verifies the caller's Cloudflare Access
- * identity before this page renders anything, failing closed via Next's
- * forbidden() control-flow function on AccessDeniedError. Unlike the create
+ * authentication"): getAdminDb() verifies the caller's Better Auth session
+ * before this page renders anything, failing closed on AccessDeniedError
+ * (handlePageAuthError: login redirect or Next's forbidden()). Unlike the create
  * page, this one DOES have something to SELECT — the existing venue row —
  * so getAdminDb() here serves both the auth gate AND the read, same shape
  * as /admin's own list query. A missing/unknown id calls Next's notFound()

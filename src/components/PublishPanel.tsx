@@ -13,7 +13,7 @@
  *
  * Auth split matches every other admin mutation surface (AddVenueForm,
  * ArchiveVenueButton): this component holds none. The page's Server
- * Component owns the Cloudflare Access gate; POST /api/admin/publish
+ * Component owns the Better Auth gate (getAdminDb()); POST /api/admin/publish
  * (src/app/api/admin/publish/route.ts) re-verifies identity + Origin
  * itself. The confirm step is a native window.confirm() — ArchiveVenueButton
  * established this pattern in this codebase (no modal dependency exists
@@ -140,8 +140,8 @@ function friendlyErrorMessage(status: number, error?: string): string {
   if (status === 422) {
     return `Couldn't publish: something in a venue's data didn't pass validation.${error ? ` (${error})` : ""}`;
   }
-  // 403 = Cloudflare Access / origin denied; 401 = no valid Better Auth session
-  // (the dual-auth gate's no_session response for /api/admin/* handlers). Both
+  // 403 = origin denied or email not allowlisted; 401 = no valid Better Auth
+  // session (no_session, see adminAuthErrors.ts). Both
   // mean "sign in again," so they share this message.
   if (status === 403 || status === 401) {
     return "Your session expired — reload and sign in again.";

@@ -41,10 +41,9 @@
  * (mirrors adminAuthAllowlistPlugin.ts's identical-response guarantee on
  * the server side).
  *
- * No route gating here — this page renders for anyone, pre-auth (Phase
- * 2 scope; see AGENTS.md's Better Auth section for the phase breakdown).
- * "Continue to admin" links to /admin, which Cloudflare Access still
- * fully gates on its own, unrelated to anything on this page.
+ * No route gating here — this page renders for anyone, pre-auth.
+ * "Continue to admin" links to /admin, which getAdminDb() gates on the
+ * Better Auth session this form creates (AGENTS.md "Admin authentication").
  */
 
 import { useEffect, useState } from "react";

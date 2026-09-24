@@ -504,6 +504,23 @@ map gets the same early trigger a mouse/touch user does; the idle/timeout
 fallback also guarantees eventual load with zero interaction at all, so no
 user is ever gated behind a pointer-only path.
 
+**Held behind the splash (#588).** `useDeferredMapLoad`'s optional `hold`
+argument suppresses only the idle/timeout branch above — the interaction
+listeners stay attached regardless — while HomePageClient's welcome splash is
+covering a first-time visitor's screen (`holdMapLoad={splashShown}` on
+`MapWrapper`). Without it, the idle callback fired mapbox-gl's ~530ms
+(4x-throttle) parse/exec while the visitor was still reading the splash
+(inert, nothing waiting on the map yet) — exactly what Lighthouse's
+synthetic, never-interacts mobile run also pays, inflating TBT/TTI. A real
+tap on either splash CTA reaches the window-capture interaction listeners
+regardless of the splash's DOM position (a sibling of the inert map
+container, not a descendant), starting the load immediately, in parallel
+with the geolocation request that same tap kicks off — not serialized behind
+the splash's actual dismiss, which itself waits on geolocation to resolve
+(up to 8s) and would defeat that overlap. `hold`'s true→false edge (the
+splash's real dismiss) is also an unconditional trigger, covering dismissal
+paths that don't dispatch a pointer/key event at all.
+
 **Deep-link exception — eager, never deferred.** A shared venue link
 (`?venue=<id>`, or `/venue/<id>`'s "View on the map" CTA which lands on
 `/#venue=<id>`) must open on that pin immediately, not after an idle

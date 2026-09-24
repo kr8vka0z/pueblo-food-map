@@ -360,6 +360,15 @@ interface MapWrapperProps {
    * uses for auto-locate below.
    */
   initialBoxesFilter?: boolean;
+  /**
+   * Splash gate (#588): true while HomePageClient is showing the welcome
+   * splash to a first-time visitor. Passed straight through to
+   * useDeferredMapLoad's `hold` param — see that hook's module doc. Defaults
+   * to false (today's unconditional idle-deferred load) for every other
+   * caller: deep links, returning visitors, and every existing test in this
+   * file that doesn't pass it.
+   */
+  holdMapLoad?: boolean;
 }
 
 export default function MapWrapper({
@@ -367,6 +376,7 @@ export default function MapWrapper({
   onShowWelcome,
   initialVenueId,
   initialBoxesFilter = false,
+  holdMapLoad = false,
 }: MapWrapperProps) {
   const router = useRouter();
 
@@ -409,7 +419,7 @@ export default function MapWrapper({
     setMapboxMap,
   } = useMapUI();
 
-  // ── Deferred map load (#226) ─────────────────────────────────────────────────
+  // ── Deferred map load (#226, held behind the splash by #588) ────────────────
   // Perf: mapbox-gl is a large WebGL payload that used to fire the instant
   // MapWrapper mounted (the dynamic import factory runs on first render of
   // <MapCanvas>, not on interaction) — it dominated the mobile Lighthouse
@@ -418,8 +428,11 @@ export default function MapWrapper({
   // hook doc for the idle/interaction triggers that fire otherwise. While
   // false, the render below shows ListView in the map's place instead of
   // mounting <MapCanvas> — same absolute-fill box, so there is no layout shift
-  // when the swap happens.
-  const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId));
+  // when the swap happens. holdMapLoad (#588) suppresses only the automatic
+  // idle/timeout trigger while a first-time visitor's splash is up — see
+  // useDeferredMapLoad's module doc for why the interaction listeners stay
+  // live regardless (a real splash-CTA tap still starts the load right away).
+  const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId), holdMapLoad);
 
   // ── Location-denied banner (PR 7) ────────────────────────────────────────────
   // Shows only when the user ACTIVELY re-taps locate (not on initial mount when

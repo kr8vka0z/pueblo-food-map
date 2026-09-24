@@ -279,7 +279,7 @@ y=0   ┌───────────────────────�
 y=76  ├─────────────────────────────────────┤
       │                                       │
       │         live Mapbox canvas           │  ← DO NOT add floating buttons here.
-      │    (pan/zoom/pin-tap owns this area) │     The old top-right `LocateButton` at
+      │    (pan/zoom/pin-tap owns this area) │     The old top-center `LocateButton` at
       │                                       │     `top: 72px` was retired for exactly
       │                                       │     this reason (docs/bottom-nav-spec.md
       │                                       │     §1/§6) — it sat outside the thumb
@@ -299,8 +299,8 @@ y=727 └───────────────────────�
   to the right of the Filters icon, if a control is genuinely search-related — same
   pattern as the Filters button's own inline placement; (2) inside BottomNav as a
   6th labelled item, accepting narrower cells (the 5-item bar already narrowed
-  cells to ~57–67px when Boxes was added, #516 — still clear of the 48px floor down
-  to ~320px viewports). A brand-new floating pill anywhere else on the map is a
+  cells to ~57–67px when Boxes was added, #516 — measured then against the old 44px
+  floor; ~57px still clears the new 48px one down to ~320px viewports). A brand-new floating pill anywhere else on the map is a
   **redesign**, not a guardrail-compliant addition — take it to Kyle with a mockup
   first, the same way Boxes (#516) and the Filters control (#539) were approved.
 - A control that must sit on the map (e.g., a future zoom control) goes bottom-right,

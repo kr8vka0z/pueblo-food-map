@@ -53,6 +53,12 @@
  * approval), plus renders the dead URL + last-seen HTTP status in a banner
  * so the admin has context before editing.
  *
+ * #265: passes `venue.updated_at` straight through to AddVenueForm's
+ * `expectedUpdatedAt` prop — the optimistic-concurrency precondition PATCH
+ * /api/admin/venues/[id] checks on save (see that route's + AddVenueForm's
+ * own headers). This SELECT above is the ONLY place that value is read, so
+ * it's always exactly what PATCH itself will re-check against.
+ *
  * Blessing Boxes slice 2: when `venue.category === 'blessing_box'`,
  * resolveBoxCheckins() loads every check-in for this box (visible, hidden,
  * and 'problem' reports alike — see loadAllCheckinsForBox's own header) and
@@ -273,6 +279,7 @@ export default async function EditVenuePage({
           venueId={venue.id}
           initialValues={mapVenueRowToFormValues(venue)}
           proposalId={linkHealthContext?.proposalId}
+          expectedUpdatedAt={venue.updated_at}
         />
 
         {venue.category === "blessing_box" && (

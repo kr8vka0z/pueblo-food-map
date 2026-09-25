@@ -587,7 +587,10 @@ connection — minus the map itself (Mapbox tiles are out of scope).
 |---|---|
 | `/`, `/venues`, `/resources` — navigations only | Network-first; the cached copy is served only when the network fails. Keyed by path, so `/?venue=x` shares `/`'s entry. |
 | `/_next/static/*`, `/fonts/*`, `/icons/*`, `/manifest.webmanifest` | Stale-while-revalidate. The hashed `/_next/static` files are `immutable` in the HTTP cache, so the revalidate step is normally served from disk rather than the network. |
-| `/api/*`, `/admin*`, `/alerts*` (subscription token in `?t=`), `/box/*` (live D1), anything cross-origin (Mapbox, analytics, Turnstile), any non-GET, every other page | Never touched — straight to the network. |
+| Any other same-origin page navigation (e.g. `/about`, `/venue/<id>`) | Network-only — never cached itself. On a network failure it falls back to the precached `/` shell rather than the browser's own offline error page (below), never to the requested page's real content. |
+| `/api/*`, `/admin*`, `/alerts*` (subscription token in `?t=`), `/box/*` (live D1), anything cross-origin (Mapbox, analytics, Turnstile), any non-GET | Never touched, never falls back — straight to the network. |
+
+**Same-session offline navigation (#130 follow-up).** A `next/link` tap (BottomNav's "Help", the Menu drawer's links) is a client-side transition, not a page load: Next fetches an RSC payload first, which the router itself falls back to a real browser navigation for when that fetch fails (its own console warning: "Failed to fetch RSC payload ... Falling back to browser navigation"). That fallback navigation used to have nowhere to land when the target page was never visited/cached offline (e.g. tapping "About" for the first time with no connection) — the browser showed its native offline error page instead of the app. Fixed by giving every other same-origin navigation a shell-fallback (table above): the visitor lands on the cached `/` map shell — a working app, not a dead end — rather than the target page's real content, since that was never fetched. `src/__tests__/serviceWorkerShellFallback.test.ts` covers the new classification and fallback function.
 
 **Install-time precache.** On a first visit every request happens before the
 worker controls the page, so none of it passes through the worker. `install`

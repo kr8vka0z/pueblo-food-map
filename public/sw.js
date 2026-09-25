@@ -18,8 +18,17 @@
  *     first visit's requests all happen BEFORE this worker controls the page.
  *   - static assets: stale-while-revalidate.
  *   - the three shell pages: network-first, cache fallback when offline.
+ *   - every OTHER public page (e.g. /about, /venue/<id>) — never cached
+ *     itself, but a failed offline navigation falls back to the precached
+ *     "/" shell rather than the browser's native offline error page (#130
+ *     follow-up: a same-session tap on a BottomNav link — next/link, not a
+ *     hard reload — fails its RSC-payload fetch offline, Next falls back to
+ *     a real browser navigation per its own console warning, and THAT
+ *     navigation had nowhere to land before this). The client router still
+ *     works once "/" is showing (all its JS is cached), so this is a
+ *     recoverable landing, not a dead end.
  *   - everything else (API, admin, auth, alert tokens, live boxes, Mapbox,
- *     analytics, any other page) passes straight through, never cached.
+ *     analytics) passes straight through, never cached, never falls back.
  *
  * Bust every cache: bump CACHE_VERSION. Disable the worker for everyone:
  * set KILL_SWITCH = true and deploy (it clears its caches and unregisters).
@@ -47,7 +56,7 @@ const STATIC_ASSET_RE = /\/(?:_next\/static|fonts)\/[^"'\s)\\<>]+/g;
  * (src/__tests__/serviceWorker.test.ts).
  * @param {{url: string, method: string, mode: string}} request
  * @param {string} origin this site's origin
- * @returns {"static" | "page" | "bypass"}
+ * @returns {"static" | "page" | "shell-fallback" | "bypass"}
  */
 function classifyRequest(request, origin) {
   if (request.method !== "GET") return "bypass";
@@ -59,7 +68,12 @@ function classifyRequest(request, origin) {
   if (path === "/manifest.webmanifest") return "static";
   // Navigations only: client-side route changes fetch `?_rsc=` payloads for
   // the same paths, which vary by request header and must not be stored.
-  if (request.mode === "navigate" && SHELL_PAGES.includes(path)) return "page";
+  if (request.mode === "navigate") {
+    if (SHELL_PAGES.includes(path)) return "page";
+    // Any other public page (never cached itself — see file header) still
+    // gets a rescue landing if the network fails while offline.
+    return "shell-fallback";
+  }
   return "bypass";
 }
 
@@ -132,6 +146,25 @@ async function networkFirst(request) {
   }
 }
 
+// #130 follow-up: a navigation to a page outside SHELL_PAGES (e.g. /about,
+// /venue/<id>) that was never visited/cached has nothing of its own to
+// serve offline. Falling back to the precached "/" shell — rather than
+// letting the request reject and the browser show its native offline error
+// page — keeps the visitor inside a working app (bottom nav, cached JS)
+// instead of a dead end. Deliberately does NOT cache the fetched response
+// itself: that would make every page a visitor has ever opened a 4th+
+// permanent shell page with no eviction, unlike the 3 fixed SHELL_PAGES.
+async function networkOnlyWithShellFallback(request) {
+  try {
+    return await fetch(request);
+  } catch (err) {
+    const cache = await caches.open(CACHE_NAME);
+    const shellFallback = await cache.match("/");
+    if (shellFallback) return shellFallback;
+    throw err;
+  }
+}
+
 self.addEventListener("install", (event) => {
   self.skipWaiting();
   if (!KILL_SWITCH) event.waitUntil(precacheShell());
@@ -157,4 +190,5 @@ self.addEventListener("fetch", (event) => {
   const kind = classifyRequest(event.request, self.location.origin);
   if (kind === "static") event.respondWith(staleWhileRevalidate(event));
   else if (kind === "page") event.respondWith(networkFirst(event.request));
+  else if (kind === "shell-fallback") event.respondWith(networkOnlyWithShellFallback(event.request));
 });

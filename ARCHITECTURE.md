@@ -51,7 +51,9 @@ Browser
               blessing_box filter, #516; docs/bottom-nav-spec.md)
 
 Next.js App Router (Cloudflare Worker)
-  └── src/app/layout.tsx      (metadata, font preload; wraps with LocaleProvider — reads no cookie)
+  └── src/app/layout.tsx      (metadata, font preload; wraps with LocaleProvider — reads no cookie;
+        mounts ServiceWorkerRegister → public/sw.js, see "Offline / installable app", #130)
+  └── src/app/manifest.ts     (/manifest.webmanifest — installable app, #130)
   └── src/app/page.tsx        (Server Component: venue-index JSON-LD, metadata;
         mounts HomePageClient.tsx — splash gate + MapWrapper)
   └── src/app/about, privacy, resources, venues, venue/[id], box/[id] …
@@ -64,7 +66,6 @@ Next.js App Router (Cloudflare Worker)
 Data layer (static TS modules, no API calls at render time)
   └── src/data/venues.ts          (public venue list — see "Data aggregator" below)
   └── src/data/published-venues.ts    (D1 snapshot written by admin Publish)
-  └── src/data/benefit-flags.ts   (SNAP/WIC overlay, interim — see below)
   └── src/data/pfp-venues.ts, grocery-osm.ts, pantries-plentiful.ts
         (source arrays; not read by the public map since the #237 cutover)
   └── src/types/venue.ts          (canonical Venue type)
@@ -96,10 +97,8 @@ Cloudflare D1 `venues` (status draft/published, category != blessing_box)
            ↓  (src/lib/publishVenues.ts: snapshot, validate, commit via a
            ↓   publish-bot PR, then promote drafts in D1)
 src/data/published-venues.ts   (literal Venue[] array + publishedAt)
-           ↓ .map(withBenefitFlagsOverlay)
-           + benefitFlags overlay (keyed by id; fills only fields D1 left unset)
            ↓
-export const venues: Venue[]   (src/data/venues.ts)
+export const venues: Venue[]   (src/data/venues.ts — re-exported directly)
 ```
 
 **D1 is the source of truth; `published-venues.ts` is its build-time
@@ -117,13 +116,13 @@ hand-curated Pueblo Food Project records; `grocery-osm.ts` and
 them now; the refresh pipeline reads the two scraper outputs to diff
 against D1 — see "Automated venue-refresh pipeline" below.
 
-**Benefit flags are an interim overlay.** SNAP/WIC acceptance used to live
-only in `benefit-flags.ts` so it survived scraper regeneration (#127).
-Migration `0014` copies it into D1, where it is admin-editable (#597); until
-that migration is on production and a Publish has run, the overlay fills
-only fields the snapshot leaves unset, so an admin's D1 value always wins.
-`venues.ts`'s header has the full interim-state explanation and the
-follow-up deletion plan (also in AGENTS.md's promotion checklist).
+**SNAP/WIC acceptance is a plain D1 field, admin-editable, no overlay.**
+It used to live only in a static `benefit-flags.ts` file applied as a
+runtime overlay so it survived scraper regeneration (#127). Migration
+`0014` copied those matches into D1's `accepts_snap`/`accepts_wic` columns
+(filling only NULLs), production got the migration and a Publish on
+2026-09-25, and the overlay was deleted as dead code (#597) — D1 is now the
+sole, permanently admin-editable source for both fields.
 
 **Blessing boxes bypass this entirely** — see "Blessing Boxes" below.
 
@@ -154,7 +153,7 @@ scripts/fetch-osm-grocery.py ┤→ scripts/ingest-osm-grocery.py ─┐
                                                     (status='pending')
 ```
 
-Runs monthly in CI (`refresh-proposals.yml`); run order and local use:
+Runs weekly in CI (`refresh-proposals.yml`, cron changed monthly→weekly in #543); run order and local use:
 `scripts/README.md`; schedule, credentials and chunked-write gotchas:
 AGENTS.md "Automated venue-refresh pipeline".
 
@@ -168,6 +167,13 @@ AGENTS.md "Automated venue-refresh pipeline".
   in commit `c1e4536`/PR #102), so a plain re-run never reproduces them and
   diffing would propose wiping them. Found by running the pipeline end to
   end against local D1; the allowlist's own comment has the specifics.
+  **Plentiful owns `hours_irregular` too, since #400** — the scraper emits
+  "Once a month" + "4th Tuesday" as a structured `monthly_ordinal` entry (an
+  unparseable non-weekly row becomes a prose `other` entry) instead of a
+  sentence in `notes`. It's in `DESTRUCTIVE_CLEAR_GUARD` alongside
+  `hours_weekly`/`phone` (a scrape that loses a schedule never proposes
+  clearing it) and normalized for equality (sorted keys, slots and entries)
+  so a re-scrape of an unchanged schedule proposes nothing.
 - **Freshness:** a venue whose source-owned fields are unchanged still gets a
   `last_verified` refresh (unless already stamped today). That exact
   "date-only" shape **auto-applies** (Kyle, 2026-09-15): `proposalSql.ts`'s
@@ -175,7 +181,28 @@ AGENTS.md "Automated venue-refresh pipeline".
   an `audit_log` row, and an already-`approved` proposal row. It uses the
   same `isDateOnlyUpdateProposal()` predicate as `/admin/flags`' bulk-approve
   (`src/lib/adminProposals.ts`), so the two can't disagree on what counts.
-  Every other shape is only ever a pending proposal.
+  Every other shape is only ever a pending proposal, with one opt-in
+  exception — see "Jev triage + rename pairing" below.
+- **Jev triage + rename pairing (#543)** — `scripts/refresh/triage.ts` +
+  `renamePairs.ts`, run only after every guardrail above. Each non-date-only,
+  non-`link_health` proposal gets one batched call to Jev (an LLM triage
+  service), which stores a lane on the row (`triage_lane`, migration `0016`):
+  updates classify as likely-noise vs. needs-a-human; removes always stay
+  needs-a-human; adds get no call. Degrades to untriaged (never fails) on a
+  missing key, a 5xx/timeout, or 3 failures in a row. A same-source
+  remove+add pair within 100m or matching phone becomes one rename proposal
+  instead of two (`buildRenameProposal`); approving it writes
+  `venue_id_aliases` so the next run maps the old id forward and the pair
+  never re-proposes. **The one exception to "every other shape is only ever
+  a pending proposal" above:** `proposalSql.ts`'s
+  `buildAiAutoApplyStatements`, gated by `REFRESH_AI_AUTO_APPLY` (off by
+  default), writes a `venues` mutation directly from the ingestion job
+  itself — actor `refresh-pipeline-ai`, full `audit_log` row — when a
+  phone/url change is formatting-only once normalized AND Jev scores it
+  "same value" > 0.9. This re-check is deterministic and independent of
+  Jev's score, so a miscalibrated triage answer alone can't trigger a write.
+  Operational detail (secrets, cost logging, the `0016` schemaReady probe):
+  AGENTS.md "Automated venue-refresh pipeline".
 - **`linkHealth.ts`** checks each stored `url` (HEAD, falling back to GET)
   and proposes clearing it only on 404/410 — never on 403 (often a bot-block
   of the checker), 429, 5xx or timeout, which are logged only.
@@ -186,8 +213,10 @@ AGENTS.md "Automated venue-refresh pipeline".
   runs unattended, and writing nothing beats half-writing.
 - **Review:** `/admin/flags` (`src/app/admin/flags/page.tsx`,
   `ProposalsReviewView.tsx`, `api/admin/proposals/[id]/{approve,reject}`,
-  #390, plus bulk `approve-date-only`) is the only code path that turns a
-  real-change proposal into a `venues` mutation. How it handles the
+  #390, plus bulk `approve-date-only`) is the only HUMAN-facing code path
+  that turns a real-change proposal into a `venues` mutation — the
+  ingestion job's own opt-in auto-apply lane (#543, above) is the one
+  machine exception. How it handles the
   supersede race, stale applies and rejection memory: atlas-kb "PFM AGENTS
   History — Venue-Refresh Pipeline", "Change-proposal review queue (#390)".
   Auto-supersede (§6.10a) and rejection memory (§6.10b) stay the ingestion
@@ -526,6 +555,77 @@ variables — that was only true under Workers Builds). Runtime secrets
 (`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, …) are `wrangler secret put` on
 the Worker and read at request time. Full list: AGENTS.md "Promotion
 checklist".
+
+---
+
+## Offline / installable app (#130)
+
+The map can be installed to a phone's home screen and keeps working with no
+connection — minus the map itself (Mapbox tiles are out of scope).
+
+**Pieces.**
+- `src/app/manifest.ts` → `/manifest.webmanifest` (name, `short_name` "Food
+  Map", `start_url` `/`, standalone, bone-50 colours tied to `layout.tsx`'s
+  `themeColor` by `manifest.test.ts`). Icons in `public/icons/` plus
+  `src/app/apple-icon.png` are PNGs drawn from the OG image's pin mark.
+- `public/sw.js` — hand-written service worker, no Workbox. Served as a plain
+  static file (never bundled); `public/_headers` sends `Cache-Control:
+  no-cache` so each deploy's copy reaches visitors.
+- `src/components/ServiceWorkerRegister.tsx` (mounted in `layout.tsx`) —
+  registers `/sw.js` in production builds only, after `load` and then browser
+  idle, so it never competes with first paint. In dev it unregisters any
+  worker left over from a local `next start`.
+- Offline notice — `useMapUI`'s map-unavailable fallback (#165) now carries a
+  reason. WebGL missing → "Map unavailable" (unchanged). WebGL fine but
+  `navigator.onLine` false at mount → list view with "Map needs a connection.
+  The list still works." Checked once on mount only: going offline mid-session
+  leaves a working map alone, and coming back online needs a reload.
+
+**What's cached** (one cache, `pfm-<CACHE_VERSION>`):
+
+| Request | Strategy |
+|---|---|
+| `/`, `/venues`, `/resources` — navigations only | Network-first; the cached copy is served only when the network fails. Keyed by path, so `/?venue=x` shares `/`'s entry. |
+| `/_next/static/*`, `/fonts/*`, `/icons/*`, `/manifest.webmanifest` | Stale-while-revalidate. The hashed `/_next/static` files are `immutable` in the HTTP cache, so the revalidate step is normally served from disk rather than the network. |
+| Any other same-origin page navigation (e.g. `/about`, `/venue/<id>`) | Network-only — never cached itself. On a network failure it falls back to the precached `/` shell rather than the browser's own offline error page (below), never to the requested page's real content. |
+| `/api/*`, `/admin*`, `/alerts*` (subscription token in `?t=`), `/box/*` (live D1), anything cross-origin (Mapbox, analytics, Turnstile), any non-GET | Never touched, never falls back — straight to the network. |
+
+**Same-session offline navigation (#130 follow-up).** A `next/link` tap (BottomNav's "Help", the Menu drawer's links) is a client-side transition, not a page load: Next fetches an RSC payload first, which the router itself falls back to a real browser navigation for when that fetch fails (its own console warning: "Failed to fetch RSC payload ... Falling back to browser navigation"). That fallback navigation used to have nowhere to land when the target page was never visited/cached offline (e.g. tapping "About" for the first time with no connection) — the browser showed its native offline error page instead of the app. Fixed by giving every other same-origin navigation a shell-fallback (table above): the visitor lands on the cached `/` map shell — a working app, not a dead end — rather than the target page's real content, since that was never fetched. `src/__tests__/serviceWorkerShellFallback.test.ts` covers the new classification and fallback function.
+
+**Install-time precache.** On a first visit every request happens before the
+worker controls the page, so none of it passes through the worker. `install`
+therefore fetches the three shell pages itself and caches every
+`/_next/static` and `/fonts` URL their HTML references. The venue dataset is
+compiled into those pages and bundles (`src/data/published-venues.ts`), so
+the list and the in-map venue card work offline. Live blessing-box status
+(`/api/public/blessing-boxes`) does not — `useBoxVenues` already treats a
+failed fetch as "no boxes". `/venue/<id>` detail pages and other routes are
+not cached.
+
+**Bust the cache:** bump `CACHE_VERSION` in `public/sw.js`. The new worker
+installs on visitors' next page load, takes over immediately (`skipWaiting` +
+`clients.claim`), and deletes every older `pfm-*` cache on activate. Ordinary
+deploys don't need a bump for correctness: shell pages are network-first,
+and new hashed assets are new URLs. Storage is another matter. A previous
+deploy's `/_next/static` entries are never evicted until the version bumps,
+so the cache grows by roughly one shell's worth of chunks per deploy a
+visitor sees. ponytail: bump `CACHE_VERSION` every few releases. The upgrade
+path is pruning `/_next/static` entries that the freshly fetched shell HTML
+no longer references.
+
+**Disable it:** set `KILL_SWITCH = true` in `public/sw.js` and deploy. On
+visitors' next page load the replacement worker deletes every `pfm-*` cache,
+answers no requests, and unregisters itself. Removing
+`<ServiceWorkerRegister />` alone is NOT enough — a worker that is already
+installed keeps running until something replaces it. To clear one browser
+by hand: DevTools → Application → Service workers → Unregister, then Storage
+→ Clear site data.
+
+**Verified** with Playwright Chromium against `npm run build && npm run
+start`: the manifest is valid (no installability errors), the worker is
+registered and controls the page, and after one online visit an offline
+reload of `/` shows the list with the offline notice and no page errors.
+The venue card opens, and `/venues` and `/resources` load offline.
 
 ---
 

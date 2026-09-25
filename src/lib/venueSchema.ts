@@ -115,6 +115,15 @@ export function buildVenueJsonLd(venue: Venue): Record<string, unknown> {
   // Only include openingHoursSpecification when hours_weekly exists and yields
   // at least one parseable slot — omit rather than an empty array, same
   // omit-when-empty convention as telephone above.
+  //
+  // #400: venue.hours_irregular (monthly-ordinal etc. schedules) is
+  // DELIBERATELY never read here. schema.org's OpeningHoursSpecification has
+  // no ordinal-monthly form (no "4th Tuesday of the month" construct) —
+  // inventing one (e.g. abusing validFrom/validThrough to fake a recurring
+  // monthly window) would emit non-standard structured data search engines
+  // either ignore or mis-parse, worse than omitting it. An irregular-only
+  // venue's JSON-LD simply has no openingHoursSpecification at all, same as
+  // any other venue with no computable weekly schedule.
   if (venue.hours_weekly) {
     const hoursWeekly = venue.hours_weekly;
     const specs = DISPLAY_DAY_KEYS.flatMap((day) =>

@@ -9,9 +9,9 @@ the product-level story (why the pipeline exists, what it fixed) is in
 [`README.md`](../README.md)'s "Data sources" section. Read those, not this
 file, for the *why* — this file is only the *what runs when*.
 
-## Data pipeline — automated monthly (`refresh-proposals.yml`)
+## Data pipeline — automated weekly (`refresh-proposals.yml`)
 
-**Runs in CI**, monthly cron (`0 6 1 * *` UTC) + manual `workflow_dispatch`,
+**Runs in CI**, weekly cron (`0 6 * * 1` UTC, Mondays — changed from monthly in #543) + manual `workflow_dispatch`,
 orchestrated by `refresh-ingest.ts` — never run directly by a person in
 production (`--db-mode remote` writes real D1). Order, each step re-running
 the named script UNMODIFIED:
@@ -66,12 +66,11 @@ python3 scripts/test_fetch_osm_grocery.py           # Overpass partial-result gu
 ## Data pipeline — by hand only, never run in CI
 
 Not wired into `refresh-proposals.yml` — each is a one-off or an
-infrequent re-run someone triggers deliberately, not part of the monthly
+infrequent re-run someone triggers deliberately, not part of the weekly
 automated diff:
 
 | Script | Purpose | When to re-run |
 |---|---|---|
-| `match-benefits.py` | Matches OSM grocery/convenience venues against USDA SNAP + CDPHE WIC data by proximity/name → `accepts_snap`/`accepts_wic` flags | When the USDA/CDPHE source files in `data/raw/` are refreshed by hand (see the script's own header for the ArcGIS query URLs) |
 | `geocode-pfp.py` | Geocodes the 10 hand-curated Pueblo Food Project venues against Nominatim | Only if a PFP address changes — last run 2026-05-14 |
 | `geocode-osm-missing.py` | Reverse-geocodes OSM venues missing an address (Nominatim, falling back to Mapbox, then raw coordinates) | After an OSM ingest leaves new venues with no address |
 

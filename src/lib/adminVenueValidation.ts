@@ -27,7 +27,7 @@ import { categoryLabels } from "@/data/venues";
 import { DISPLAY_DAY_KEYS } from "@/lib/hours";
 import { isValidEmail } from "@/lib/email";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
-import type { VenueCategory, WeeklyHours } from "@/types/venue";
+import type { IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
 
 // Reuses the category labels map's own keys as the enum source of truth
 // (same technique VenueListView.tsx's ALL_CATEGORIES already uses) instead
@@ -35,6 +35,9 @@ import type { VenueCategory, WeeklyHours } from "@/types/venue";
 // VenueCategory union, publishVenues.ts's VALID_CATEGORIES, and this one).
 const VALID_CATEGORIES = new Set(Object.keys(categoryLabels) as VenueCategory[]);
 const VALID_DAY_KEYS: ReadonlySet<string> = new Set(DISPLAY_DAY_KEYS);
+const VALID_RECURRENCES: ReadonlySet<string> = new Set(["monthly_ordinal", "monthly_date", "other"]);
+/** Defense-in-depth size cap (#400) — same "ships into the public bundle" threat model as FIELD_LIMITS.IRREGULAR_SCHEDULE_NOTE; no real venue needs more than a handful of monthly specials. */
+const MAX_IRREGULAR_SCHEDULES = 12;
 
 export type TriState = 0 | 1 | null;
 
@@ -63,6 +66,8 @@ export interface ValidatedVenueFields {
   address: string;
   /** Pre-serialized JSON text for the `hours_weekly` TEXT column, or null. */
   hoursWeeklyJson: string | null;
+  /** Pre-serialized JSON text for the `hours_irregular` TEXT column, or null (#400). */
+  hoursIrregularJson: string | null;
   acceptsSnap: TriState;
   acceptsWic: TriState;
   phone: string | null;
@@ -157,6 +162,120 @@ export function validateHoursWeekly(value: unknown, errors: Record<string, strin
   }
 
   return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
+}
+
+/**
+ * Validates the optional hours_irregular array against the
+ * IrregularSchedule[] shape (src/types/venue.ts) and serializes it to the
+ * JSON text the `hours_irregular` TEXT column stores. An empty array maps
+ * to `null` — same "no schedule entered" signal validateHoursWeekly's own
+ * empty-object case produces above, so publishVenues.ts's validateAndMapRow
+ * never sees a spurious `[]`.
+ *
+ * Every entry's `recurrence` decides which OTHER fields are required:
+ * "monthly_ordinal" needs weekday + ordinal + >=1 slot; "monthly_date"
+ * needs day_of_month (1-31) + >=1 slot; "other" needs a non-empty `note`
+ * (its slots may be empty — it has no computable date for src/lib/hours.ts
+ * to hang a slot check on, so a time range there would be unverifiable
+ * prose anyway). `note` is optional on every recurrence and, when present,
+ * capped at FIELD_LIMITS.IRREGULAR_SCHEDULE_NOTE — same "ships into the
+ * public bundle" threat model as every other admin free-text field (#297).
+ *
+ * Exported for the same reuse reason as validateHoursWeekly above:
+ * publishVenues.ts's validateAndMapRow shape-checks a D1 row's
+ * hours_irregular the same way this route already does.
+ */
+export function validateIrregularSchedule(value: unknown, errors: Record<string, string>): string | null {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value)) {
+    errors.hours_irregular = "Irregular schedule must be a list.";
+    return null;
+  }
+  if (value.length === 0) return null;
+  if (value.length > MAX_IRREGULAR_SCHEDULES) {
+    errors.hours_irregular = `No more than ${MAX_IRREGULAR_SCHEDULES} irregular schedule entries.`;
+    return null;
+  }
+
+  const cleaned: IrregularSchedule[] = [];
+  for (let i = 0; i < value.length; i++) {
+    const raw = value[i];
+    const label = `Irregular schedule entry ${i + 1}`;
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      errors.hours_irregular = `${label} must be an object.`;
+      return null;
+    }
+    const entry = raw as Record<string, unknown>;
+
+    const recurrence = entry.recurrence;
+    if (typeof recurrence !== "string" || !VALID_RECURRENCES.has(recurrence)) {
+      errors.hours_irregular = `${label} has an invalid recurrence.`;
+      return null;
+    }
+
+    const slotsRaw = entry.slots;
+    if (!Array.isArray(slotsRaw) || slotsRaw.some((s) => typeof s !== "string" || s.trim().length === 0)) {
+      errors.hours_irregular = `${label}'s slots must be a list of time ranges.`;
+      return null;
+    }
+    const slots = slotsRaw.map((s) => (s as string).trim());
+
+    const cleanEntry: IrregularSchedule = { recurrence: recurrence as IrregularSchedule["recurrence"], slots };
+
+    if (recurrence === "monthly_ordinal") {
+      const weekday = entry.weekday;
+      if (typeof weekday !== "string" || !VALID_DAY_KEYS.has(weekday)) {
+        errors.hours_irregular = `${label} needs a valid weekday.`;
+        return null;
+      }
+      const ordinal = entry.ordinal;
+      if (ordinal !== 1 && ordinal !== 2 && ordinal !== 3 && ordinal !== 4 && ordinal !== 5 && ordinal !== "last") {
+        errors.hours_irregular = `${label} needs a valid ordinal (1st-5th or last).`;
+        return null;
+      }
+      if (slots.length === 0) {
+        errors.hours_irregular = `${label} needs at least one time range.`;
+        return null;
+      }
+      cleanEntry.weekday = weekday as IrregularSchedule["weekday"];
+      cleanEntry.ordinal = ordinal;
+    } else if (recurrence === "monthly_date") {
+      const dayOfMonth = entry.day_of_month;
+      if (typeof dayOfMonth !== "number" || !Number.isInteger(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) {
+        errors.hours_irregular = `${label} needs a day of month between 1 and 31.`;
+        return null;
+      }
+      if (slots.length === 0) {
+        errors.hours_irregular = `${label} needs at least one time range.`;
+        return null;
+      }
+      cleanEntry.day_of_month = dayOfMonth;
+    } else {
+      // "other" — the note is the only required content (no computable date).
+      const note = typeof entry.note === "string" ? entry.note.trim() : "";
+      if (!note) {
+        errors.hours_irregular = `${label} needs a note describing the schedule.`;
+        return null;
+      }
+    }
+
+    if (entry.note !== undefined) {
+      if (typeof entry.note !== "string") {
+        errors.hours_irregular = `${label}'s note must be text.`;
+        return null;
+      }
+      const trimmedNote = entry.note.trim();
+      if (trimmedNote.length > FIELD_LIMITS.IRREGULAR_SCHEDULE_NOTE) {
+        errors.hours_irregular = `${label}'s note must be ${FIELD_LIMITS.IRREGULAR_SCHEDULE_NOTE} characters or fewer.`;
+        return null;
+      }
+      if (trimmedNote.length > 0) cleanEntry.note = trimmedNote;
+    }
+
+    cleaned.push(cleanEntry);
+  }
+
+  return cleaned.length > 0 ? JSON.stringify(cleaned) : null;
 }
 
 /** Optional ISO date string: undefined/null/blank -> null; unparseable -> a field error. */
@@ -258,6 +377,7 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
   }
 
   const hoursWeeklyJson = validateHoursWeekly(b.hours_weekly, errors);
+  const hoursIrregularJson = validateIrregularSchedule(b.hours_irregular, errors);
   const acceptsSnap = validateTriState(b.accepts_snap, "accepts_snap", errors);
   const acceptsWic = validateTriState(b.accepts_wic, "accepts_wic", errors);
 
@@ -307,6 +427,7 @@ export function validateCreateVenuePayload(body: unknown): ValidateCreateVenueRe
       lng: lng as number,
       address,
       hoursWeeklyJson,
+      hoursIrregularJson,
       acceptsSnap,
       acceptsWic,
       phone,

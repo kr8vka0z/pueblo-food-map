@@ -58,6 +58,11 @@ describe("next.config security headers (#593)", () => {
   });
 
   test("CSP allows the Cloudflare Web Analytics beacon script and its report endpoint", async () => {
+    // The app no longer loads this script itself (#647 — Cloudflare's edge
+    // auto_install injects it into every real-browser HTML response, and
+    // the app-side loader was deleted to stop double-counting page views).
+    // The CSP still needs to allow it: the browser enforces this header
+    // against whatever script tag ends up in the response, injected or not.
     const headers = await getGlobalHeaders();
     const csp = headers["Content-Security-Policy"];
     expect(csp).toMatch(/script-src[^;]*https:\/\/static\.cloudflareinsights\.com/);

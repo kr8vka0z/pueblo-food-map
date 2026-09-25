@@ -165,6 +165,13 @@ AGENTS.md "Automated venue-refresh pipeline".
   in commit `c1e4536`/PR #102), so a plain re-run never reproduces them and
   diffing would propose wiping them. Found by running the pipeline end to
   end against local D1; the allowlist's own comment has the specifics.
+  **Plentiful owns `hours_irregular` too, since #400** — the scraper emits
+  "Once a month" + "4th Tuesday" as a structured `monthly_ordinal` entry (an
+  unparseable non-weekly row becomes a prose `other` entry) instead of a
+  sentence in `notes`. It's in `DESTRUCTIVE_CLEAR_GUARD` alongside
+  `hours_weekly`/`phone` (a scrape that loses a schedule never proposes
+  clearing it) and normalized for equality (sorted keys, slots and entries)
+  so a re-scrape of an unchanged schedule proposes nothing.
 - **Freshness:** a venue whose source-owned fields are unchanged still gets a
   `last_verified` refresh (unless already stamped today). That exact
   "date-only" shape **auto-applies** (Kyle, 2026-09-15): `proposalSql.ts`'s

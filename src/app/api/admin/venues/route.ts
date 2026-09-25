@@ -47,7 +47,7 @@ async function authorizeCreateRequest(headers: HeaderSource): Promise<AdminDbAcc
 // DEFAULT (strftime(...)) fills them, matching that script's established
 // convention (migrations/0001_init_admin_schema.sql).
 const VENUES_INSERT_COLUMNS = [
-  "id", "name", "category", "lat", "lng", "address", "hours_weekly",
+  "id", "name", "category", "lat", "lng", "address", "hours_weekly", "hours_irregular",
   "accepts_snap", "accepts_wic", "phone", "email", "url", "notes", "operator",
   "source", "last_verified", "status", "source_type", "outside_county",
   "created_by", "updated_by", "published_at", "published_by",
@@ -75,6 +75,7 @@ function buildVenueInsertValues(id: string, fields: ValidatedVenueFields, actorE
     fields.lng,
     fields.address,
     fields.hoursWeeklyJson,
+    fields.hoursIrregularJson,
     fields.acceptsSnap,
     fields.acceptsWic,
     fields.phone,
@@ -161,6 +162,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     lng: fields.lng,
     address: fields.address,
     hours_weekly: fields.hoursWeeklyJson,
+    hours_irregular: fields.hoursIrregularJson,
     accepts_snap: fields.acceptsSnap,
     accepts_wic: fields.acceptsWic,
     phone: fields.phone,

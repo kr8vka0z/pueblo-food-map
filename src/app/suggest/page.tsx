@@ -15,7 +15,7 @@ import { buildPageMetadata } from "@/lib/site";
 import SuggestPageContent from "@/components/SuggestPageContent";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Suggest a Venue",
+  title: "Suggest a Place",
   description:
     "Know a food pantry, community garden, or other food resource missing from the map? Suggest it for Pueblo Food Map.",
   path: "/suggest",

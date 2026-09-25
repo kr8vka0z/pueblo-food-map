@@ -85,9 +85,9 @@ export default function AlertsConfirmContent() {
               onClick={handleConfirm}
               disabled={state === "confirming"}
               className={
-                "mt-6 min-h-[44px] px-6 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] " +
+                "mt-6 min-h-[44px] px-6 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
                 "text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-                "hover:bg-[var(--color-sage-600)] focus-visible:outline-none focus-visible:ring-2 " +
+                "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
                 "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
                 "disabled:opacity-50 disabled:cursor-not-allowed"
               }

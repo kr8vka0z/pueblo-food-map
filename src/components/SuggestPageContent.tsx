@@ -20,7 +20,7 @@ import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 export default function SuggestPageContent() {
   const { locale } = useLocale();
   // <title> follows locale client-side (#589) — suggest.documentTitle
-  // matches page.tsx's metadata title exactly ("Suggest a Venue").
+  // matches page.tsx's metadata title exactly ("Suggest a Place").
   useDocumentTitle(pageDocumentTitle(t("suggest.documentTitle", locale)));
 
   return (

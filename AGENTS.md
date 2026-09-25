@@ -2,6 +2,8 @@
 
 > **Start here for structural understanding:** [README.md](README.md) (human entry point) and [ARCHITECTURE.md](ARCHITECTURE.md) (mental model: data aggregator, refresh pipeline, scheduled jobs, MapWrapper state machine, i18n + the bilingual limitation, forms, hosting, Blessing Boxes, admin panel). This file covers operational details only — tokens, deploy, rollback, env vars, and runtime gotchas for AI coders.
 >
+> **Opening pull requests?** Kyle's standing preference: the **fewest logical PRs**. Group related work (code + its tests + its docs, a mechanical change applied everywhere) into one PR; split only when a change needs its own review, staging check, or independent rollback (e.g. a visual code change vs. a docs-only change, anything touching migrations/auth). PRs target `dev`, never `main`.
+>
 > **Reviewing a pull request?** Read [REVIEW.md](REVIEW.md) first and report Blocker / Important / Nit the way it defines them. Repo rules go in `REVIEW.md`, never in the CI reviewer's workflow file: `claude-code-action` refuses to run unless `.github/workflows/claude-code-review.yml` is byte-identical to the copy on `main`, so an edit to it on `dev` silently switches reviews off until the next promotion.
 
 **Deeper history for every section below** (superseded designs, phase-by-phase build narration, incident write-ups) was moved out on 2026-09-19 to keep this file small — it reloads on every turn of every session. Pointers say where.

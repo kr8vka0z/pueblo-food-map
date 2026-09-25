@@ -233,9 +233,9 @@ describe("SearchResultsPopover — live region", () => {
     expect(status.textContent).toContain(`${MAX_VISIBLE + 2}`);
   });
 
-  test("EN: live region says 'venues match'", () => {
+  test("EN: live region says 'places match'", () => {
     renderPopover([makePantry("v0"), makePantry("v1")], { locale: "en" });
-    expect(screen.getByRole("status").textContent).toMatch(/venues match/i);
+    expect(screen.getByRole("status").textContent).toMatch(/places match/i);
   });
 
   test("ES: live region says 'lugares coinciden'", () => {

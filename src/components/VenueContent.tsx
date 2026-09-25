@@ -22,7 +22,7 @@ import { Phone } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import type { Venue } from "@/types/venue";
-import { DISPLAY_DAY_KEYS, formatSlot } from "@/lib/hours";
+import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
 import { OSM_COPYRIGHT_URL, isOsmSourced } from "@/lib/osmAttribution";
 
@@ -89,29 +89,53 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
           </div>
         )}
 
-        {/* Hours */}
-        {v.hours_weekly && (
+        {/* Hours (weekly + monthly, #400) — this page is STATIC (prerendered
+            at build time; see this component's own header on the 2026-08-24
+            outage) and must never depend on `new Date()`, so unlike
+            VenueCard/BottomSheet/DesktopVenueWindow this renders each
+            irregular entry's RULE as prose only ("4th Tue of each month,
+            11am – 12pm") — no live open/closed badge, no "Next: ..." date
+            line (both would go stale the instant the build finishes and
+            mismatch on client hydrate). Those stay on the client-rendered
+            map card, where a fresh `new Date()` read is safe. */}
+        {(v.hours_weekly || v.hours_irregular) && (
           <section aria-label={t("detail.hours", locale)}>
             <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
               {t("detail.hours", locale)}
             </h2>
-            <dl className="space-y-1">
-              {DISPLAY_DAY_KEYS.map((day) => {
-                const slots = v.hours_weekly![day];
-                return (
-                  <div key={day} className="flex gap-4 text-sm pl-1">
-                    <dt className="w-8 shrink-0 text-[var(--color-ink-500)]">
-                      {t(`day.${day}`, locale)}
-                    </dt>
-                    <dd className="font-mono text-[var(--color-ink-700)]">
-                      {slots && slots.length > 0
-                        ? slots.map(formatSlot).join(", ")
-                        : t("hours.closed", locale)}
-                    </dd>
-                  </div>
-                );
-              })}
-            </dl>
+            {v.hours_weekly && (
+              <dl className="space-y-1">
+                {DISPLAY_DAY_KEYS.map((day) => {
+                  const slots = v.hours_weekly![day];
+                  return (
+                    <div key={day} className="flex gap-4 text-sm pl-1">
+                      <dt className="w-8 shrink-0 text-[var(--color-ink-500)]">
+                        {t(`day.${day}`, locale)}
+                      </dt>
+                      <dd className="font-mono text-[var(--color-ink-700)]">
+                        {slots && slots.length > 0
+                          ? slots.map(formatSlot).join(", ")
+                          : t("hours.closed", locale)}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            )}
+            {v.hours_irregular && v.hours_irregular.length > 0 && (
+              <div className={v.hours_weekly ? "mt-2" : undefined}>
+                <p className="text-xs font-semibold text-[var(--color-ink-500)] mb-1">
+                  {t("hours.irregular.heading", locale)}
+                </p>
+                <ul className="space-y-0.5">
+                  {v.hours_irregular.map((entry, i) => (
+                    <li key={i} className="text-sm text-[var(--color-ink-700)]">
+                      {describeIrregularSchedule(entry, locale, t)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
         )}
 

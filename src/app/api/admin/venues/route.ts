@@ -10,8 +10,8 @@
  * Every write is DRAFT-only: status='draft', source_type='manual'
  * (identical convention to §5's "manually-created venue gets
  * source_type='manual'"). Nothing here touches the public map — that only
- * happens via a later, explicit POST /api/admin/publish (AGENTS.md
- * "Publish -> static").
+ * happens via a later, explicit POST /api/admin/publish (ARCHITECTURE.md
+ * "Admin panel").
  *
  * #259 review-queue extension: an optional `submissionId` in the request
  * body (present only when this create was reached by approving a
@@ -19,8 +19,8 @@
  * THIRD statement to the same atomic `db.batch()` below, flipping that
  * submission row to `status='approved'`. Riding the existing batch (rather
  * than a second, separate write) is what guarantees the new venue and its
- * originating submission's approval commit together — see AGENTS.md
- * "Public submissions review queue (#259)".
+ * originating submission's approval commit together — see ARCHITECTURE.md
+ * "Admin panel".
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -47,7 +47,7 @@ async function authorizeCreateRequest(headers: HeaderSource): Promise<AdminDbAcc
 // DEFAULT (strftime(...)) fills them, matching that script's established
 // convention (migrations/0001_init_admin_schema.sql).
 const VENUES_INSERT_COLUMNS = [
-  "id", "name", "category", "lat", "lng", "address", "hours_weekly",
+  "id", "name", "category", "lat", "lng", "address", "hours_weekly", "hours_irregular",
   "accepts_snap", "accepts_wic", "phone", "email", "url", "notes", "operator",
   "source", "last_verified", "status", "source_type", "outside_county",
   "created_by", "updated_by", "published_at", "published_by",
@@ -75,6 +75,7 @@ function buildVenueInsertValues(id: string, fields: ValidatedVenueFields, actorE
     fields.lng,
     fields.address,
     fields.hoursWeeklyJson,
+    fields.hoursIrregularJson,
     fields.acceptsSnap,
     fields.acceptsWic,
     fields.phone,
@@ -161,6 +162,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     lng: fields.lng,
     address: fields.address,
     hours_weekly: fields.hoursWeeklyJson,
+    hours_irregular: fields.hoursIrregularJson,
     accepts_snap: fields.acceptsSnap,
     accepts_wic: fields.acceptsWic,
     phone: fields.phone,

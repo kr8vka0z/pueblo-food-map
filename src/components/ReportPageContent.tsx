@@ -7,7 +7,7 @@
  * ReportForm, which now reads useLocale() itself — #289) reflects the
  * visitor's locale while the page stays statically generated
  * (generateStaticParams + dynamicParams = false, unchanged by this
- * extraction — no cookies() read, AGENTS.md "Known bilingual limitation",
+ * extraction — no cookies() read, ARCHITECTURE.md "Known bilingual limitation",
  * #287).
  */
 

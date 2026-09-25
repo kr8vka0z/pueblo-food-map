@@ -13,7 +13,6 @@ reviews:
     - "!src/data/published-venues.ts"
     - "!src/data/grocery-osm.ts"
     - "!src/data/pantries-plentiful.ts"
-    - "!src/data/benefit-flags.ts"
 
   auto_review:
     enabled: true

@@ -6,7 +6,7 @@
  * Extracted from src/app/suggest/page.tsx so the page's text (and SuggestForm,
  * which now reads useLocale() itself — #289) reflects the visitor's locale
  * while the page stays a static Server Component (no cookies() read —
- * AGENTS.md "Known bilingual limitation", #287).
+ * ARCHITECTURE.md "Known bilingual limitation", #287).
  */
 
 import { t } from "@/lib/i18n";
@@ -20,7 +20,7 @@ import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 export default function SuggestPageContent() {
   const { locale } = useLocale();
   // <title> follows locale client-side (#589) — suggest.documentTitle
-  // matches page.tsx's metadata title exactly ("Suggest a Venue").
+  // matches page.tsx's metadata title exactly ("Suggest a Place").
   useDocumentTitle(pageDocumentTitle(t("suggest.documentTitle", locale)));
 
   return (

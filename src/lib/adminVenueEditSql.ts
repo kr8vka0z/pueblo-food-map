@@ -12,8 +12,10 @@
 // #265: `AND updated_at = ?` is the optimistic-concurrency precondition —
 // see this file's own header. The last bound param is the expected value,
 // NOT the new one (that's already bound as `updated_at = ?` above it).
+// #400: hours_irregular sits right after hours_weekly, matching
+// buildVenueUpdateValues()'s bind order in the route file.
 export const VENUE_UPDATE_SQL = `UPDATE venues SET
-  name = ?, category = ?, lat = ?, lng = ?, address = ?, hours_weekly = ?,
+  name = ?, category = ?, lat = ?, lng = ?, address = ?, hours_weekly = ?, hours_irregular = ?,
   accepts_snap = ?, accepts_wic = ?, phone = ?, email = ?, url = ?, notes = ?,
   operator = ?, source = ?, last_verified = ?, outside_county = ?,
   updated_by = ?, updated_at = ?
@@ -58,7 +60,7 @@ export const BOX_EVENT_INSERT_SQL_GUARDED = `INSERT INTO box_events (venue_id, k
 
 // ponytail: AND status = 'pending' is a deliberate idempotency ceiling, not
 // an oversight — same shape as public_submissions' own approve statements
-// (see this file's header + AGENTS.md "Public submissions queue"). A
+// (see this file's header + ARCHITECTURE.md "Admin panel"). A
 // double-approve affects 0 rows here and is silently a no-op on the
 // proposal side. #265 adds a second guard (AND EXISTS ...) so a STALE edit
 // can't mark the proposal approved for a fix that was never actually

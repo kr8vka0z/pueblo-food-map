@@ -11,14 +11,14 @@
  * both routes already import.
  *
  * WHY callers pass a D1Database directly instead of this module calling
- * getAdminDb(): getAdminDb() (src/lib/adminDb.ts) gates on a verified
- * Cloudflare Access identity — correct for AUTHENTICATED /admin/** routes,
+ * getAdminDb(): getAdminDb() (src/lib/adminDb.ts) gates on a live admin
+ * Better Auth session — correct for AUTHENTICATED /admin/** routes,
  * but /suggest/submit and /report/submit are PUBLIC, unauthenticated
  * routes. Callers fetch the binding themselves via
  * getCloudflareContext().env.ADMIN_DB and pass it in.
  *
  * WHY this function never catches its own errors: a D1 outage must not
- * block the caller's email send (AGENTS.md "Public submissions queue"), but
+ * block the caller's email send (ARCHITECTURE.md "Form-route triad"), but
  * that policy belongs to the two route handlers, not to this shared
  * primitive — each route wraps its own call in try/catch and logs via
  * logFormFailure(form, "db_write_failed", ...) so the failure is attributed

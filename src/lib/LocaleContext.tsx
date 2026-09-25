@@ -3,11 +3,14 @@
 /**
  * LocaleContext — global locale state for EN/ES toggle.
  *
- * - LocaleProvider reads the `pfm-locale` cookie on first render (SSR-safe:
- *   the cookie value is passed as a prop from the server layout).
+ * - LocaleProvider starts at "en" and, after hydration, switches to the
+ *   saved `pfm-locale` cookie read from document.cookie (#289). layout.tsx
+ *   passes no initialLocale: no route reads the cookie server-side, so
+ *   pages stay static (#287) — see ARCHITECTURE.md "Known bilingual
+ *   limitation".
  * - useLocale() hook returns { locale, setLocale } for any client component.
  * - setLocale writes the `pfm-locale` cookie so the choice persists across
- *   sessions and is available on the initial server render.
+ *   sessions.
  *
  * Cookie spec:
  *   name:    pfm-locale
@@ -70,9 +73,9 @@ const LocaleContext = createContext<LocaleContextValue>({
 
 interface LocaleProviderProps {
   /**
-   * Initial locale value — pass the cookie value read server-side in layout.tsx
-   * so the initial SSR render matches the user's stored preference.
-   * Defaults to "en" when no cookie is set.
+   * Optional initial locale. layout.tsx does not pass it (a server-side
+   * cookie read would make routes dynamic, #287); when absent the provider
+   * starts at "en" and applies the saved cookie client-side on mount.
    */
   initialLocale?: Locale;
   children: React.ReactNode;

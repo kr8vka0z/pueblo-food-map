@@ -1,7 +1,10 @@
 "use client";
 
 /**
- * HoursList — shared weekly hours table with today-row highlighting.
+ * HoursList — shared weekly hours table with today-row highlighting, plus
+ * (#400) an optional monthly-schedule section below it so a venue with both
+ * (e.g. Lynn Gardens Baptist Church) shows weekly AND monthly together, in
+ * one place, rather than each caller assembling the two separately.
  *
  * Used by BottomSheet (compact=false, text-sm) and DesktopVenueWindow
  * (compact=true, text-xs). Both need identical logic: today row border,
@@ -11,13 +14,16 @@
  * source of truth; BottomSheet's inline duplicate was removed in #166 8.2.
  */
 
-import { todayKey, DISPLAY_DAY_KEYS, formatSlot } from "@/lib/hours";
+import { todayKey, DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
-import type { WeeklyHours } from "@/types/venue";
+import type { IrregularSchedule, WeeklyHours } from "@/types/venue";
 
 interface HoursListProps {
-  hours_weekly: WeeklyHours;
+  /** Optional (#400) — a venue can carry ONLY hours_irregular (no weekly table at all). */
+  hours_weekly?: WeeklyHours;
+  /** Non-weekly schedules (#400) — rendered as a "Monthly" section below the weekly table when present. */
+  hours_irregular?: IrregularSchedule[];
   /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
   /**
@@ -27,13 +33,15 @@ interface HoursListProps {
   compact?: boolean;
 }
 
-export default function HoursList({ hours_weekly, locale: localeProp, compact = false }: HoursListProps) {
+export default function HoursList({ hours_weekly, hours_irregular, locale: localeProp, compact = false }: HoursListProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
   const today = todayKey();
   const textSize = compact ? "text-xs" : "text-sm";
 
   return (
+    <>
+    {hours_weekly && (
     <dl className="space-y-1">
       {DISPLAY_DAY_KEYS.map((day) => {
         const slots = hours_weekly[day];
@@ -79,5 +87,23 @@ export default function HoursList({ hours_weekly, locale: localeProp, compact = 
         );
       })}
     </dl>
+    )}
+    {hours_irregular && hours_irregular.length > 0 && (
+      <div className="mt-2">
+        <p
+          className={`${textSize} font-semibold text-[var(--color-ink-500)] mb-1`}
+        >
+          {t("hours.irregular.heading", locale)}
+        </p>
+        <ul className="space-y-0.5">
+          {hours_irregular.map((entry, i) => (
+            <li key={i} className={`${textSize} text-[var(--color-ink-700)]`}>
+              {describeIrregularSchedule(entry, locale, t)}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+    </>
   );
 }

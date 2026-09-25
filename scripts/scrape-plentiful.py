@@ -276,33 +276,44 @@ def _expand_weekday_spec(day_spec: str) -> list[str]:
     return []
 
 
-def _render_recurrence_note(freq: Optional[str], day_spec: str, time_range: str) -> str:
+_ORDINAL_WORDS = {"1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5, "last": "last"}
+_MONTHLY_ORDINAL_RE = re.compile(
+    r"^(1st|2nd|3rd|4th|5th|last)\s+(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$",
+    re.IGNORECASE,
+)
+# Mirrors FIELD_LIMITS.IRREGULAR_SCHEDULE_NOTE (src/lib/fieldLimits.ts) —
+# publish's validateIrregularSchedule rejects a longer note, which would
+# block the whole Publish on one scraped string.
+_IRREGULAR_NOTE_MAX = 280
+
+
+def _parse_monthly_ordinals(day_spec: str) -> Optional[list[tuple]]:
     """
-    Renders a NON-weekly recurrence (e.g. "Once a month" / "4th Tuesday") as
-    an English sentence for the `notes` field. hours_weekly only models a
-    Monday-Sunday weekly grid (src/lib/hours.ts's WeeklyHours shape) — a
-    monthly/ordinal recurrence has no structured home there, so it must
-    survive in prose instead of being silently dropped (task requirement,
-    2026-09-02 Plentiful format-change fix).
-
-    ponytail: a multi-day cell ("2nd Thursday, 4th Thursday") is rendered as
-    a literal comma list, not "2nd and 4th Thursday" — correct English
-    list-joining is more code than this note's one reader (a human
-    reviewing an admin change-proposal) needs.
+    "4th Tuesday" -> [(4, "tue")]; "2nd Thursday, 4th Thursday" -> two
+    pairs; "Last Friday" -> [("last", "fri")]. Returns None if ANY
+    comma-part isn't that exact shape — the caller then keeps the whole row
+    as a prose "other" entry rather than half-parsing it (a wrong structured
+    date ships a wrong "open today" to someone deciding whether to drive).
     """
-    # En dash between times to match this app's other hand-written notes
-    # prose (e.g. AGENTS.md's own examples) — hours_weekly's stored slot
-    # strings keep the plain hyphen Plentiful renders (src/lib/hours.ts's
-    # parseSlot() expects that exact " - " separator); this en-dash version
-    # is prose-only and never round-trips back into hours_weekly.
-    pretty_time = time_range.replace(" - ", " – ")
-    if freq == "Once a month":
-        return f"Open the {day_spec} of each month, {pretty_time}."
-    freq_label = freq or "On a recurring schedule"
-    return f"{freq_label}: {day_spec}, {pretty_time}."
+    pairs: list[tuple] = []
+    for part in (p.strip() for p in day_spec.split(",")):
+        m = _MONTHLY_ORDINAL_RE.match(part)
+        if not m:
+            return None
+        ordinal = _ORDINAL_WORDS[m.group(1).lower()]
+        weekday = _WEEKDAY_NAME_TO_KEY[m.group(2).capitalize()]
+        pairs.append((ordinal, weekday))
+    return pairs
 
 
-def _parse_hours_card(soup: BeautifulSoup) -> tuple[Optional[dict], list[str]]:
+def _other_recurrence_note(freq: Optional[str], day_spec: str) -> str:
+    """Prose for a recurrence the structured shape can't express (e.g. an
+    unseen "Every other week" freq) — becomes an IrregularSchedule "other"
+    entry's `note`. The time range lives in that entry's `slots`, not here."""
+    return f"{freq or 'On a recurring schedule'}: {day_spec}"[:_IRREGULAR_NOTE_MAX]
+
+
+def _parse_hours_card(soup: BeautifulSoup) -> tuple[Optional[dict], list[dict]]:
     """
     Parses the detail page's "Hours" card, current as of 2026-09-02.
 
@@ -325,18 +336,23 @@ def _parse_hours_card(soup: BeautifulSoup) -> tuple[Optional[dict], list[str]]:
     Of the 35 pages measured: 27 have no "Hours" card at all (a real fact,
     not a parse failure — those venues just haven't told Plentiful their
     hours), 4 are "Every week" (this function's `hours_weekly` return), 3
-    are "Once a month" + an ordinal weekday ("4th Tuesday") — captured as a
-    `recurrence_notes` sentence instead, since WeeklyHours has no slot for
-    "the 4th Tuesday" — and 1 has an empty `<table class="hours-table">`
+    are "Once a month" + an ordinal weekday ("4th Tuesday") — captured as
+    structured `hours_irregular` entries (#400), since WeeklyHours has no
+    slot for "the 4th Tuesday" — and 1 has an empty `<table class="hours-table">`
     with no rows at all (the card exists but carries nothing, same as "no
     hours" for parsing purposes). See scripts/fixtures/plentiful/*.html for
     real captured samples of every shape and --self-check below, which
     proves this function against them without a live fetch.
 
-    Returns (hours_weekly, recurrence_notes) — hours_weekly is None when no
+    Returns (hours_weekly, hours_irregular) — hours_weekly is None when no
     "Every week" row was found (matches _infer_weekly_hours's old contract);
-    recurrence_notes is a list of English sentences for every non-weekly row
-    found (empty list when there are none).
+    hours_irregular is a list of IrregularSchedule-shaped dicts
+    (src/types/venue.ts) for every non-weekly row (empty list when none).
+    "Once a month" + "Nth Weekday" becomes `monthly_ordinal`; any other
+    non-weekly row becomes `other` with a prose `note`, so it still reaches
+    a human instead of being dropped. Slots keep Plentiful's own
+    "11:00 AM - 12:00 PM" form — the same form hours_weekly stores, and the
+    " - " separator src/lib/hours.ts's parseSlot() reads.
     """
     hours_h2 = next((h2 for h2 in soup.find_all("h2") if h2.get_text(strip=True) == "Hours"), None)
     if hours_h2 is None:
@@ -346,7 +362,10 @@ def _parse_hours_card(soup: BeautifulSoup) -> tuple[Optional[dict], list[str]]:
         return None, []
 
     dow_times: dict[str, set[str]] = defaultdict(set)
-    recurrence_notes: list[str] = []
+    # Keyed on everything but slots, so two rows naming the same day merge
+    # their time ranges — same dedupe dow_times gives the weekly grid.
+    # Insertion-ordered: output follows page order.
+    irregular_slots: dict[tuple, set[str]] = {}
     current_freq: Optional[str] = None
 
     for child in card.find_all(["p", "table"], recursive=False):
@@ -366,14 +385,31 @@ def _parse_hours_card(soup: BeautifulSoup) -> tuple[Optional[dict], list[str]]:
                 if current_freq == "Every week":
                     for day_key in _expand_weekday_spec(day_spec):
                         dow_times[day_key].add(time_range)
+                    continue
+                pairs = _parse_monthly_ordinals(day_spec) if current_freq == "Once a month" else None
+                if pairs:
+                    for ordinal, weekday in pairs:
+                        irregular_slots.setdefault(("monthly_ordinal", ordinal, weekday, None), set()).add(time_range)
                 else:
-                    recurrence_notes.append(_render_recurrence_note(current_freq, day_spec, time_range))
+                    note = _other_recurrence_note(current_freq, day_spec)
+                    irregular_slots.setdefault(("other", None, None, note), set()).add(time_range)
 
     hours_weekly: Optional[dict] = None
     if dow_times:
         hours_weekly = {day: sorted(dow_times[day]) for day in _DOW_NAMES if day in dow_times}
 
-    return hours_weekly, recurrence_notes
+    hours_irregular: list[dict] = []
+    for (recurrence, ordinal, weekday, note), slots in irregular_slots.items():
+        entry: dict = {"recurrence": recurrence}
+        if ordinal is not None:
+            entry["ordinal"] = ordinal
+            entry["weekday"] = weekday
+        entry["slots"] = sorted(slots)
+        if note is not None:
+            entry["note"] = note
+        hours_irregular.append(entry)
+
+    return hours_weekly, hours_irregular
 
 
 def _infer_weekly_hours(html: str) -> Optional[dict]:
@@ -390,7 +426,7 @@ def parse_detail(html: str) -> dict:
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(separator=" ").lower()
 
-    hours_weekly, recurrence_notes = _parse_hours_card(soup)
+    hours_weekly, hours_irregular = _parse_hours_card(soup)
     # Whether THIS page's Hours card actually yielded any schedule data —
     # weekly or non-weekly. Distinct from hours_weekly being None: most
     # Pueblo venues (27/35, measured 2026-09-02) legitimately have no Hours
@@ -398,7 +434,7 @@ def parse_detail(html: str) -> dict:
     # guard below tallies this signal, not hours_weekly alone, so it can
     # tell "this venue hasn't told Plentiful its hours" apart from "the
     # parser stopped understanding Plentiful's markup."
-    schedule_found = hours_weekly is not None or len(recurrence_notes) > 0
+    schedule_found = hours_weekly is not None or len(hours_irregular) > 0
 
     # SNAP / WIC: look for mentions in page text
     accepts_snap: Optional[bool] = None
@@ -428,17 +464,12 @@ def parse_detail(html: str) -> dict:
                     notes = (notes or "") + s.strip() + "."
                     break
 
-    # A non-weekly recurrence (e.g. "Once a month") has no home in
-    # hours_weekly's Monday-Sunday grid — fold it into notes instead of
-    # dropping it, so a human reviewing this venue's admin change-proposal
-    # still sees when it's actually open. Appended, never replacing an
-    # eligibility sentence found above, so both survive.
-    if recurrence_notes:
-        extra = " ".join(recurrence_notes)
-        notes = f"{notes} {extra}".strip() if notes else extra
-
+    # Non-weekly schedules go to hours_irregular, NOT notes (#400): notes is
+    # deliberately not source-owned (scripts/refresh/diffEngine.ts), so a
+    # schedule folded into it never reached a venue already on the map.
     return {
         "hours_weekly": hours_weekly,
+        "hours_irregular": hours_irregular,
         "accepts_snap": accepts_snap,
         "accepts_wic": accepts_wic,
         "notes": notes,
@@ -579,6 +610,26 @@ def emit_hours_weekly(hw: dict) -> str:
     return "".join(lines)
 
 
+def emit_hours_irregular(entries: list[dict]) -> str:
+    """Render an IrregularSchedule[] as a TS literal. Fixed key order, so a
+    re-run emits byte-identical output and a refresh "add" proposal's hash
+    (computeDiffHash, scripts/refresh/diffEngine.ts) stays stable."""
+    rendered = []
+    for e in entries:
+        parts = [f"recurrence: {ts_str(e['recurrence'])}"]
+        if "ordinal" in e:
+            parts.append(f"ordinal: {ts_literal(e['ordinal'])}")
+        if "weekday" in e:
+            parts.append(f"weekday: {ts_str(e['weekday'])}")
+        if "day_of_month" in e:
+            parts.append(f"day_of_month: {e['day_of_month']}")
+        parts.append("slots: [" + ", ".join(ts_str(s) for s in e["slots"]) + "]")
+        if "note" in e:
+            parts.append(f"note: {ts_str(e['note'])}")
+        rendered.append("{ " + ", ".join(parts) + " }")
+    return "[" + ", ".join(rendered) + "]"
+
+
 def generate_ts(kept: list[dict], dropped_count: int, geocode_null_count: int) -> str:
     today = LAST_VERIFIED
     lines: list[str] = []
@@ -608,6 +659,8 @@ def generate_ts(kept: list[dict], dropped_count: int, geocode_null_count: int) -
         lines.append(f"    address: {ts_str(v['address'])},")
         if v.get("hours_weekly"):
             lines.append(f"    hours_weekly: {emit_hours_weekly(v['hours_weekly'])},")
+        if v.get("hours_irregular"):
+            lines.append(f"    hours_irregular: {emit_hours_irregular(v['hours_irregular'])},")
         if v.get("accepts_snap") is True:
             lines.append("    accepts_snap: true,")
         if v.get("accepts_wic") is True:
@@ -657,14 +710,16 @@ def _self_check() -> int:
     """
     checked = 0
 
-    def check(label: str, fixture: str, expect_hours: Optional[dict], expect_notes: list[str]) -> None:
+    def check(label: str, fixture: str, expect_hours: Optional[dict], expect_irregular: list[dict]) -> None:
         nonlocal checked
         soup = _load_fixture(fixture)
-        hours, notes = _parse_hours_card(soup)
+        hours, irregular = _parse_hours_card(soup)
         assert hours == expect_hours, f"{label}: expected hours_weekly={expect_hours!r}, got {hours!r}"
-        assert notes == expect_notes, f"{label}: expected recurrence_notes={expect_notes!r}, got {notes!r}"
+        assert irregular == expect_irregular, f"{label}: expected hours_irregular={expect_irregular!r}, got {irregular!r}"
         checked += 1
         print(f"  OK  {label}")
+
+    fourth_tue = {"recurrence": "monthly_ordinal", "ordinal": 4, "weekday": "tue", "slots": ["11:00 AM - 12:00 PM"]}
 
     check("weekly (single day)", "weekly.html", {"mon": ["4:00 PM - 6:00 PM"]}, [])
     check(
@@ -673,17 +728,17 @@ def _self_check() -> int:
         {d: ["8:00 AM - 4:30 PM"] for d in ("mon", "tue", "wed", "thu", "fri")},
         [],
     )
+    check("monthly (ordinal weekday, no weekly row)", "monthly.html", None, [fourth_tue])
+    # Lynn Gardens Baptist Church's real page: weekly AND monthly together,
+    # and a multi-day monthly cell that must split into two entries.
     check(
-        "monthly (ordinal weekday, no weekly row)",
-        "monthly.html",
-        None,
-        ["Open the 4th Tuesday of each month, 11:00 AM – 12:00 PM."],
-    )
-    check(
-        "monthly special + weekly recurrence together",
+        "monthly special + weekly recurrence together (Lynn Gardens)",
         "weekly_and_monthly.html",
         {"thu": ["11:00 AM - 12:45 PM"]},
-        ["Open the 2nd Thursday, 4th Thursday of each month, 11:00 AM – 12:45 PM."],
+        [
+            {"recurrence": "monthly_ordinal", "ordinal": 2, "weekday": "thu", "slots": ["11:00 AM - 12:45 PM"]},
+            {"recurrence": "monthly_ordinal", "ordinal": 4, "weekday": "thu", "slots": ["11:00 AM - 12:45 PM"]},
+        ],
     )
     check("no Hours card at all", "no_hours_section.html", None, [])
     check("Hours card present but empty (no schedule-freq/table rows)", "empty_hours_heading.html", None, [])
@@ -708,11 +763,59 @@ def _self_check() -> int:
     # prove a code-level guard).
     monthly_html = (FIXTURES_DIR / "monthly.html").read_text(encoding="utf-8")
     monthly_detail = parse_detail(monthly_html)
-    assert monthly_detail["notes"] == "Open the 4th Tuesday of each month, 11:00 AM – 12:00 PM.", (
-        f"parse_detail(monthly.html) notes: got {monthly_detail['notes']!r}"
+    assert monthly_detail["hours_irregular"] == [fourth_tue], (
+        f"parse_detail(monthly.html) hours_irregular: got {monthly_detail['hours_irregular']!r}"
+    )
+    # #400: the schedule no longer leaks into notes as prose.
+    assert monthly_detail["notes"] is None, f"parse_detail(monthly.html) notes: got {monthly_detail['notes']!r}"
+    assert monthly_detail["schedule_found"] is True, "parse_detail(monthly.html): monthly-only must count as schedule_found"
+    checked += 1
+    print("  OK  parse_detail() monthly -> hours_irregular, not notes (monthly.html)")
+
+    # Shapes not in any captured fixture (synthetic, inline): "Last <day>",
+    # an unparseable monthly cell and an unknown freq both fall back to a
+    # prose "other" entry instead of being dropped or half-parsed.
+    def card(freq: str, day: str, time_range: str = "9:00 AM - 10:00 AM") -> BeautifulSoup:
+        return BeautifulSoup(
+            f'<div class="card"><h2>Hours</h2><p class="schedule-freq">{freq}</p>'
+            f'<table class="hours-table"><tr><td>{day}</td><td>{time_range}</td></tr></table></div>',
+            "html.parser",
+        )
+
+    _, last_fri = _parse_hours_card(card("Once a month", "Last Friday"))
+    assert last_fri == [{"recurrence": "monthly_ordinal", "ordinal": "last", "weekday": "fri", "slots": ["9:00 AM - 10:00 AM"]}], (
+        f"Last Friday: got {last_fri!r}"
+    )
+    _, mixed = _parse_hours_card(card("Once a month", "2nd Tuesday, 15th"))
+    assert mixed == [{"recurrence": "other", "slots": ["9:00 AM - 10:00 AM"], "note": "Once a month: 2nd Tuesday, 15th"}], (
+        f"unparseable monthly cell: got {mixed!r}"
+    )
+    _, biweekly = _parse_hours_card(card("Every other week", "Monday"))
+    assert biweekly == [{"recurrence": "other", "slots": ["9:00 AM - 10:00 AM"], "note": "Every other week: Monday"}], (
+        f"unknown freq: got {biweekly!r}"
     )
     checked += 1
-    print("  OK  parse_detail() recurrence-only notes (monthly.html)")
+    print("  OK  'Last <day>' + prose 'other' fallbacks (synthetic)")
+
+    # Codegen: the TS literal the refresh pipeline imports back.
+    ts = generate_ts(
+        [{
+            "id": "plentiful-x", "name": "X", "category": "pantry", "lat": 38.2, "lng": -104.6,
+            "address": "1 Main St, Pueblo, CO", "url": "https://example.org/x",
+            "hours_weekly": {"thu": ["11:00 AM - 12:45 PM"]},
+            "hours_irregular": [fourth_tue, {"recurrence": "other", "slots": [], "note": "Call ahead"}],
+        }],
+        0,
+        0,
+    )
+    expect_line = (
+        '    hours_irregular: [{ recurrence: "monthly_ordinal", ordinal: 4, weekday: "tue", '
+        'slots: ["11:00 AM - 12:00 PM"] }, { recurrence: "other", slots: [], note: "Call ahead" }],'
+    )
+    assert expect_line in ts.splitlines(), f"generate_ts hours_irregular line missing:\n{ts}"
+    assert 'ordinal: "last"' in emit_hours_irregular([last_fri[0]]), "ordinal 'last' must emit as a string literal"
+    checked += 1
+    print("  OK  generate_ts() emits hours_irregular")
 
     # No preceding heading text in the body — get_text(separator=" ") joins
     # sibling elements with no punctuation between them, so a heading right
@@ -796,7 +899,7 @@ def main() -> int:
     detail_pages_with_schedule = 0
 
     for i, entry in enumerate(unique_entries):
-        detail_data: dict = {"hours_weekly": None, "accepts_snap": None, "accepts_wic": None, "notes": None}
+        detail_data: dict = {"hours_weekly": None, "hours_irregular": [], "accepts_snap": None, "accepts_wic": None, "notes": None}
 
         if not args.skip_details:
             if i > 0:
@@ -839,6 +942,7 @@ def main() -> int:
             **entry,
             "category": category,
             "hours_weekly": detail_data.get("hours_weekly"),
+            "hours_irregular": detail_data.get("hours_irregular") or [],
             "accepts_snap": detail_data.get("accepts_snap"),
             "accepts_wic": detail_data.get("accepts_wic"),
             "notes": detail_data.get("notes"),

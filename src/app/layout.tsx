@@ -5,7 +5,6 @@ import { preload } from "react-dom";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { SITE_URL, SITE_NAME, OG_IMAGE } from "@/lib/site";
 import { buildWebSiteJsonLd, serializeJsonLd } from "@/lib/venueSchema";
-import CloudflareAnalytics from "@/components/CloudflareAnalytics";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const DESCRIPTION =
@@ -95,7 +94,6 @@ export default function RootLayout({
         <LocaleProvider>
           {children}
         </LocaleProvider>
-        <CloudflareAnalytics />
         <ServiceWorkerRegister />
       </body>
     </html>

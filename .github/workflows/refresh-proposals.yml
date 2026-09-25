@@ -17,7 +17,8 @@
 # straight to `venues.last_verified` instead of waiting on a human click —
 # see scripts/refresh-ingest.ts's file header and scripts/refresh/proposalSql.ts
 # for the exact scope. Every other proposal shape still only ever writes a
-# `change_proposals` row. scripts/refresh-ingest.ts (the orchestrator) and
+# `change_proposals` row (a second, Jev-gated lane exists behind
+# REFRESH_AI_AUTO_APPLY, set "false" below — #543). scripts/refresh-ingest.ts (the orchestrator) and
 # scripts/refresh/*.ts (the pure diff/guardrail/link-health logic,
 # unit-tested in scripts/refresh/*.test.ts) are the actual implementation;
 # this file is just the schedule + credentials wrapper around them.
@@ -45,20 +46,23 @@ on:
   # and this job now runs on its own least-privilege CLOUDFLARE_D1_TOKEN
   # (#403) instead of the deploy token. The first watched production run
   # (2026-09-07, run 34107550551, 107 proposals) tripped no guardrail.
-  # 06:00 UTC on the 1st is outside any US business day, so an admin never
-  # opens a queue the same run is still writing. One combined monthly run
-  # for both sources is still this slice's deliberate simplification over
-  # docs/admin/cloudflare-native-admin-spec.md §6.2's separate per-source
-  # cadences; see scripts/refresh-ingest.ts's file header.
+  # WEEKLY since #543 (was monthly): the cost of a run is review labour, not
+  # money, and Jev triage + rename pairing (scripts/refresh/triage.ts) now
+  # sort the queue so four runs a month don't mean four times the clicking.
+  # Nominatim only geocodes genuinely new venues, so the politeness maths is
+  # unchanged. 06:00 UTC Monday is outside any US business day, so an admin
+  # never opens a queue the same run is still writing. One combined run for
+  # both sources is still the deliberate simplification over
+  # docs/admin/cloudflare-native-admin-spec.md §6.2's per-source cadences.
   schedule:
-    - cron: "0 6 1 * *" # 06:00 UTC on the 1st
+    - cron: "0 6 * * 1" # 06:00 UTC every Monday
   # `schedule` only fires from the default branch (main) — this file must
   # be promoted to main for the cron to exist, same trap #375 closed for
   # Dependabot's target-branch.
   #
   # Recovery hatch / manual verification — same rationale as deploy-prod.yml's
   # workflow_dispatch: lets this run be triggered by hand from the Actions
-  # tab without waiting for the 1st of the month.
+  # tab without waiting for Monday.
   workflow_dispatch:
 
 permissions:
@@ -124,3 +128,12 @@ jobs:
       # "run whatever's newest from npm" is never an acceptable fallback
       # here, only a loud failure is.
       - run: npx --no-install tsx scripts/refresh-ingest.ts --db-mode remote
+        env:
+          # TypeSafe Jev triage (#543), scoped to this one step so npm/pip
+          # install scripts never see it. Optional: unset or failing =
+          # proposals are written untriaged, never a failed run.
+          JEV_API_KEY: ${{ secrets.JEV_API_KEY }}
+          # The Jev-gated auto-apply lane (formatting-only phone/url fixes)
+          # stays OFF until a watched run's triage has been checked against
+          # Kyle's own decisions (#543's order of work). "true" enables it.
+          REFRESH_AI_AUTO_APPLY: "false"

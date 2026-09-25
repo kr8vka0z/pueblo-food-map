@@ -9,10 +9,9 @@
  * one. Cached per-isolate so a warm Worker instance reuses one betterAuth()
  * instance across requests instead of rebuilding it every call.
  *
- * Phase 1 scope: this module only needs to construct and expose a working
- * betterAuth instance/handler. It is NOT mounted behind route gating yet —
- * Cloudflare Access continues to gate /admin/** unmodified (see AGENTS.md
- * "Admin authentication (Cloudflare Access)"). Route gating is Phase 3.
+ * Scope: this module only constructs and exposes the betterAuth
+ * instance/handler. Route gating lives in getAdminDb() / adminSession.ts;
+ * Better Auth is the sole admin gate (AGENTS.md "Admin authentication").
  */
 
 import { betterAuth } from "better-auth";

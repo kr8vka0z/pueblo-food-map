@@ -30,6 +30,7 @@ function row(overrides: Partial<CurrentVenueRow> = {}): CurrentVenueRow {
     lng: -104.6,
     address: "123 Main St, Pueblo, CO",
     hours_weekly: null,
+    hours_irregular: null,
     phone: null,
     url: null,
     operator: null,

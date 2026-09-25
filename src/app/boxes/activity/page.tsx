@@ -3,7 +3,7 @@
  * slice 3, Discovery stories D1/D2).
  *
  * Static server shell + English `metadata` export, same split as /venues'
- * page.tsx: crawler metadata stays static/English (AGENTS.md "Known
+ * page.tsx: crawler metadata stays static/English (ARCHITECTURE.md "Known
  * bilingual limitation", #287), the actual live/localized content is a
  * client component (BoxesActivityContent) that fetches
  * GET /api/public/blessing-boxes/activity itself — this route never reads

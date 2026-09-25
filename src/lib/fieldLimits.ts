@@ -49,4 +49,11 @@ export const FIELD_LIMITS = {
   // provenance citation, e.g. "OpenStreetMap (node/4041375052)") has no
   // public-form equivalent — new constant, sized like SUGGEST_ADDRESS.
   ADMIN_VENUE_SOURCE: 300,
+
+  // Irregular schedule note (#400) — one IrregularSchedule.note free-text
+  // field. Same length class as a check-in note: a one-line aside ("3rd
+  // weekend, call ahead"), not a description — and, like every admin
+  // free-text field above (#297), this ships into the public
+  // published-venues.ts bundle on Publish, so it gets the same cap.
+  IRREGULAR_SCHEDULE_NOTE: 280,
 } as const;

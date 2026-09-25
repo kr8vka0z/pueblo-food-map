@@ -1,8 +1,15 @@
 # Architecture — Pueblo Food Map
 
 > Reader: human engineers and AI coders who need the mental model before
-> touching code. For operational tasks (token management, deploy, rollback)
-> see [AGENTS.md](AGENTS.md).
+> touching code. For operational tasks (tokens, secrets, deploy, rollback,
+> migrations) see [AGENTS.md](AGENTS.md).
+
+This file describes the current design only. Build narratives, superseded
+designs and incident write-ups that used to live here were moved on
+2026-09-24 to the atlas-kb note "PFM ARCHITECTURE History — 2026-09-24
+Trim" (alongside the "PFM AGENTS History — …" notes). Most source files also
+carry a header comment with the detailed WHY; this file links to them rather
+than repeating them.
 
 ---
 
@@ -10,8 +17,10 @@
 
 A static, mobile-first civic web map of free and low-cost food resources in
 Pueblo County, Colorado. The audience is low-income and food-insecure
-residents, many of whom are Spanish-speaking. Venue data is served from
-static TypeScript modules committed to the repo — no backend database.
+residents, many of whom are Spanish-speaking. Venues are edited in a
+Cloudflare D1 database through the admin panel and published into a static
+TypeScript snapshot the build imports, so the public map makes no runtime
+venue fetch (blessing boxes are the one exception — read live from D1).
 Visual identity is codified in [DESIGN.md](DESIGN.md) (agent-facing token
 mirror and aesthetic guide; `globals.css @theme` is the canonical token source).
 
@@ -25,67 +34,53 @@ Browser
   └── MapWrapper   (all state + interaction logic)
         ├── Map.tsx          (Mapbox GL canvas; SSR-skipped via dynamic import)
         ├── VenueMarker.tsx  (Lucide MapPin button inside each Mapbox Marker)
-        ├── BottomSheet.tsx  (mobile: vaul v2 bottom sheet)
+        ├── BottomSheet.tsx  (mobile: vaul bottom sheet)
         ├── DesktopVenueWindow.tsx  (desktop: marker-anchored detail panel)
+        ├── DirectionButtons.tsx  (Walk: in-app route + WalkStepper, #555;
+        │     Bus/Drive: Google Maps deep links)
         ├── SearchBar / ViewSuggestion / SearchResultsPopover / FilterPanel
-        │     (SearchBar hosts the Filters button that opens FilterPanel — a
-        │     left side panel with multi-category checkboxes + Open now/
-        │     SNAP/WIC switches, #513, replacing the old search-focus
-        │     CategoryDropdown. Map/List switching is NOT a standing control
-        │     in the bar, #514 — an empty focused bar drops down
-        │     ViewSuggestion offering the other view; a typed one adds a "See
-        │     all N matches as a list" row to SearchResultsPopover; a third
-        │     way in is the Menu's "List view"/"Map view" line)
-        ├── HamburgerMenu    (the drawer: List view/Map view line, saved
-        │     places, links, language; controlled — opened by BottomNav at
-        │     a section)
+        │     (Filters button opens FilterPanel — categories + Open now/SNAP/
+        │     WIC, #513. No standing Map/List control, #514: an empty focused
+        │     bar offers the other view, a typed one adds "See all N matches
+        │     as a list", and the Menu has a List/Map line)
+        ├── HamburgerMenu    (drawer: List/Map line, saved places, links,
+        │     language; opened by BottomNav at a section)
         ├── ListView         (full-screen nearest-first list, map mode off)
-        └── BottomNav        (Near me · Saved · Boxes · Help · Menu — bar below 2xl (1536px),
-              pill floating bottom-centre at 2xl+; Boxes toggles the blessing_box
-              category filter, #516; docs/bottom-nav-spec.md)
+        └── BottomNav        (Near me · Saved · Boxes · Help · Menu — bar below
+              2xl (1536px), floating pill at 2xl+; Boxes toggles the
+              blessing_box filter, #516; docs/bottom-nav-spec.md)
 
-Shared utility components
-  └── src/components/SiteFooter.tsx  (slim nav footer on utility pages: /about, /privacy, /suggest, /feedback)
-
-Next.js App Router (Cloudflare Worker, SSR)
-  └── src/app/layout.tsx      (reads pfm-locale cookie; wraps with LocaleProvider;
-        mounts ServiceWorkerRegister → public/sw.js, see "Offline / installable app")
+Next.js App Router (Cloudflare Worker)
+  └── src/app/layout.tsx      (metadata, font preload; wraps with LocaleProvider — reads no cookie;
+        mounts ServiceWorkerRegister → public/sw.js, see "Offline / installable app", #130)
   └── src/app/manifest.ts     (/manifest.webmanifest — installable app, #130)
-  └── src/app/page.tsx        (splash gate; mounts MapWrapper)
-  └── src/app/about/page.tsx  (mission, vision, origin story, venue sourcing — #155)
-  └── src/app/resources/page.tsx  (food help programs: 2-1-1, SNAP, WIC, Double Up,
-        hotline, Everyday Eats — what each is and how to get it; BottomNav's Help
-        item, renamed from "Resources" #516 — page title unchanged)
-  └── src/app/report/[venueId]/page.tsx + submit/route.ts
-  └── src/app/suggest/page.tsx + submit/route.ts
-  └── src/app/feedback/page.tsx + submit/route.ts
-
-  └── DirectionButtons.tsx  (Walk / Bus / Drive buttons; Walk triggers in-app route + the WalkStepper step-through panel (#555, one turn at a time, Back/Next, "All turns" disclosure) + "Open in Google Maps" walk handoff; Bus/Drive open Google Maps)
+  └── src/app/page.tsx        (Server Component: venue-index JSON-LD, metadata;
+        mounts HomePageClient.tsx — splash gate + MapWrapper)
+  └── src/app/about, privacy, resources, venues, venue/[id], box/[id] …
+        (public pages; each localized body is a client "Content" component)
+  └── src/app/api/public/**   (unauthenticated box reads and writes)
+  └── src/app/report/[venueId], suggest, feedback  (+ submit/route.ts each)
+  └── src/app/admin/**, src/app/api/admin/**  (admin panel — see "Admin panel")
+  └── SiteFooter.tsx (slim nav footer on the utility pages)
 
 Data layer (static TS modules, no API calls at render time)
-  └── src/data/venues.ts          (aggregator — see "Data aggregator" below)
-  └── src/data/published-venues.ts    (the publish snapshot — see "Data aggregator" below)
-  └── src/data/pfp-venues.ts      (hand-curated PFP records; leaf module, see below)
-  └── src/data/grocery-osm.ts     (OSM Overpass, auto-generated)
-  └── src/data/pantries-plentiful.ts  (Plentiful directory, auto-generated)
-  └── src/data/benefit-flags.ts   (SNAP/WIC overlay, auto-generated)
+  └── src/data/venues.ts          (public venue list — see "Data aggregator" below)
+  └── src/data/published-venues.ts    (D1 snapshot written by admin Publish)
+  └── src/data/pfp-venues.ts, grocery-osm.ts, pantries-plentiful.ts
+        (source arrays; not read by the public map since the #237 cutover)
   └── src/types/venue.ts          (canonical Venue type)
 
-Lib
-  └── src/lib/i18n.ts             (EN/ES dictionaries + t() shim)
-  └── src/lib/LocaleContext.tsx   (React context; cookie persistence)
-  └── src/lib/hours.ts            (open-status logic)
-  └── src/lib/parseOsmHours.ts    (OSM opening_hours string → WeeklyHours)
-  └── src/lib/turnstile.ts        (Cloudflare Turnstile server-side verify)
-  └── src/lib/favorites.ts        (localStorage favorites store)
-  └── src/lib/distance.ts         (Haversine distance)
-  └── src/lib/searchVenues.ts     (text search over filtered venue list)
+Lib (selected)
+  └── src/lib/i18n.ts, LocaleContext.tsx, useDocumentTitle.ts  (i18n)
+  └── src/lib/hours.ts, parseOsmHours.ts   (open-status logic)
+  └── src/lib/favorites.ts, distance.ts, searchVenues.ts
+  └── src/lib/turnstile.ts, formRateLimit.ts  (form protection)
+  └── src/lib/adminDb.ts, adminSession.ts, adminOrigin.ts  (admin gate)
+  └── src/lib/publishVenues.ts    (Publish engine)
+  └── src/lib/blessingBoxes.ts    (live box reads)
 
-Scripts (run locally; never imported by the app)
-  └── scripts/ingest-osm-grocery.py   (Overpass → grocery-osm.ts)
-  └── scripts/scrape-plentiful.py     (Plentiful → pantries-plentiful.ts)
-  └── scripts/match-benefits.py       (USDA FNS + CDPHE → benefit-flags.ts)
-  └── scripts/geocode-pfp.py          (Nominatim geocoder for PFP venues)
+Scripts (never imported by the app) — every one is listed, with run order,
+in scripts/README.md
 ```
 
 ---
@@ -93,56 +88,43 @@ Scripts (run locally; never imported by the app)
 ## Data aggregator pattern
 
 All venue data is served from a single export: `venues` in
-`src/data/venues.ts`. Components never import from `grocery-osm.ts` or
-`pantries-plentiful.ts` directly.
-
-The aggregator reads a single publish snapshot (`published-venues.ts`),
-then applies SNAP/WIC flags as a separate overlay:
+`src/data/venues.ts`. Components never import `published-venues.ts` or the
+source arrays directly.
 
 ```
-pfpVenues          (hand-curated, src/data/pfp-venues.ts)
-groceryOsmVenues   (auto-generated from OSM Overpass query)
-plentifulPantries  (auto-generated from Plentiful directory scrape)
+Cloudflare D1 `venues` (status draft/published, category != blessing_box)
+           ↓  admin clicks Publish → POST /api/admin/publish
+           ↓  (src/lib/publishVenues.ts: snapshot, validate, commit via a
+           ↓   publish-bot PR, then promote drafts in D1)
+src/data/published-venues.ts   (literal Venue[] array + publishedAt)
            ↓
-publishedVenues = [...pfpVenues, ...groceryOsmVenues, ...plentifulPantries]
-           (src/data/published-venues.ts)
-           ↓ .map()
-           + benefitFlags overlay (keyed by id; sourced from USDA FNS + CDPHE)
-           ↓
-export const venues: Venue[]   (src/data/venues.ts)
+export const venues: Venue[]   (src/data/venues.ts — re-exported directly)
 ```
 
-**`published-venues.ts` is also the #237 admin publish target.** Today
-(pre-cutover) it's a one-time hand-authored snapshot of the same three
-source arrays, byte-identical to what `venues.ts` computed inline before
-this indirection existed (proved by `src/__tests__/publishedVenues.test.ts`).
-Once the Cloudflare D1 admin write path is live, this file's entire content
-is regenerated by `POST /api/admin/publish` from D1 instead — a literal
-`Venue[]` array, no longer an import of the three source arrays — and D1
-becomes the single source of truth for every venue. Either way, `venues.ts`
-reads it the exact same way: a build-time static ESM import, zero runtime
-fetch. See `AGENTS.md`'s "Publish → static" section for the operational
-detail (the commit/PR/auto-merge mechanism, the NB1 ordering guarantee) and
-`docs/admin/cloudflare-native-admin-spec.md` for the full design.
+**D1 is the source of truth; `published-venues.ts` is its build-time
+snapshot.** Since the #237 admin cutover the file is regenerated in full by
+every Publish (its own header says do not hand-edit). `venues.ts` reads it as
+a static ESM import, so the public map does no runtime venue fetch and the
+pages stay statically cacheable. The snapshot is ordered by `id`
+(`fetchPublishSnapshot`, `publishVenues.ts`). How Publish works: "Admin
+panel" below.
 
-**Why PFP first:** hand-curated venues carry richer metadata (notes,
-partnerships, operator field). Ordering PFP first means any future
-de-duplication pass will prefer the richer record.
+**The source arrays no longer feed the map.** `pfp-venues.ts` holds the 10
+hand-curated Pueblo Food Project records; `grocery-osm.ts` and
+`pantries-plentiful.ts` are still regenerated by the scrapers. Only
+`scripts/seed-admin-db.ts` (the one-time #237 D1 seed) and tests import
+them now; the refresh pipeline reads the two scraper outputs to diff
+against D1 — see "Automated venue-refresh pipeline" below.
 
-**Why `pfpVenues` lives in its own file (`pfp-venues.ts`), not inline in
-`venues.ts`:** `venues.ts` imports FROM `published-venues.ts`, and
-`published-venues.ts` needs `pfpVenues` — leaving that data defined inside
-`venues.ts` would make the two files import each other (a circular
-dependency that throws at module load, since `published-venues.ts` would
-read `pfpVenues` before `venues.ts`'s own top-level code reached its
-declaration). `venues.ts` still re-exports `pfpVenues` unchanged so nothing
-that imports it from there needs to change.
+**SNAP/WIC acceptance is a plain D1 field, admin-editable, no overlay.**
+It used to live only in a static `benefit-flags.ts` file applied as a
+runtime overlay so it survived scraper regeneration (#127). Migration
+`0014` copied those matches into D1's `accepts_snap`/`accepts_wic` columns
+(filling only NULLs), production got the migration and a Publish on
+2026-09-25, and the overlay was deleted as dead code (#597) — D1 is now the
+sole, permanently admin-editable source for both fields.
 
-**Why benefit flags are separate:** the auto-generated OSM and Plentiful data
-is regenerated periodically by re-running the scripts. Storing SNAP/WIC
-acceptance inline would lose the flags every time the data is regenerated.
-The `benefit-flags.ts` overlay survives regeneration because it is keyed by
-stable venue `id` and merged on top at aggregation time (see issue #127).
+**Blessing boxes bypass this entirely** — see "Blessing Boxes" below.
 
 **Canonical type:** `src/types/venue.ts` defines the `Venue` interface and
 `VenueCategory` union. Every data source conforms to this type; there is no
@@ -152,23 +134,13 @@ source-specific type.
 
 ## Automated venue-refresh pipeline
 
-**The gap this closes:** `pfpVenues`, `groceryOsmVenues`, and
-`plentifulPantries` above are described as "auto-generated by re-running the
-scripts" — but since the #237 D1 cutover, re-running `scripts/scrape-plentiful.py`
-or `scripts/ingest-osm-grocery.py` only overwrites those two source `.ts`
-files, which nothing in the app reads anymore (`venues.ts` reads
-`published-venues.ts`, a D1 snapshot — see "Data aggregator pattern" above).
-The scrapers kept working; their output just stopped mattering. The only
-remaining path to change a live venue was a human hand-editing it in
-`/admin`, which is why every `last_verified` in `published-venues.ts` sat at
-2026-05 for four months.
-
-**The fix is a proposal pipeline, not a direct feed.** `change_proposals`
-(`migrations/0001_init_admin_schema.sql`) already existed in the schema for
-exactly this — `docs/admin/cloudflare-native-admin-spec.md` §6 designed a
-full auto-refresh + review-queue system before any of it was built. What
-ships here is the ingestion half of that design, scoped down in a few
-specific ways (documented inline where they diverge, not silently):
+**Why it exists:** after the #237 cutover, re-running the scrapers only
+rewrote source `.ts` files nothing reads, so the only way to change a live
+venue was a hand edit in `/admin` — every `last_verified` sat at 2026-05 for
+four months. The fix is a **proposal pipeline, not a direct feed**: it
+implements the ingestion half of the auto-refresh design in
+`docs/admin/cloudflare-native-admin-spec.md` §6, writing into the
+`change_proposals` table (`migrations/0001_init_admin_schema.sql`).
 
 ```
 scripts/scrape-plentiful.py ─┐
@@ -181,84 +153,113 @@ scripts/fetch-osm-grocery.py ┤→ scripts/ingest-osm-grocery.py ─┐
                                                     (status='pending')
 ```
 
-- **`scripts/fetch-osm-grocery.py` is new** — `scripts/ingest-osm-grocery.py`
-  has never itself talked to the Overpass API; it only converts an
-  already-downloaded `data/raw/pueblo-grocery.json`, and the query that
-  originally produced that file was never committed (its own header points
-  at a `scripts/README.md` that doesn't exist). This fetcher supplies that
-  missing, previously-manual step; `ingest-osm-grocery.py` itself is reused
-  completely unmodified.
-- **`scripts/refresh/diffEngine.ts`** is pure (no D1/network I/O — see its
-  own file header) and unit-tested (`scripts/refresh/diffEngine.test.ts`).
-  It diffs each source's freshly-scraped records against D1's current
-  `status IN ('draft','published')` rows for that `source_type`, comparing
-  only an explicit **source-owned field allowlist** — e.g. OSM's `address`,
-  `operator`, and `hours_weekly` are excluded, because a plain re-run of
-  `ingest-osm-grocery.py` never reproduces them (they were populated by a
-  one-off enrichment script, `scripts/scrub-osm-venues.ts` — deleted as
-  dead code by #596 once it had run its course; see commit `c1e4536`
-  /PR #102 for its history — outside any repeatable pipeline); diffing
-  them would propose wiping every real value back to empty on every run.
-  This was found by actually running the
-  pipeline end-to-end against local D1, not by inspection — see the
-  allowlist's own comment for the specifics.
-- **Every source-owned field genuinely unchanged still produces one
-  `last_verified`-refresh proposal** (unless it's already stamped today) —
-  this is the mechanism that actually fixes the staleness problem: a human
-  approving these proposals used to be what moves `last_verified` forward
-  across the whole map. **Amended, Kyle, 2026-09-15:** a proposal that is
-  EXACTLY this shape (nothing else changed) now auto-applies straight to
-  `venues.last_verified` instead of waiting for that click — see
-  `scripts/refresh/proposalSql.ts` and AGENTS.md's "Automated venue-refresh
-  pipeline" section. Any other proposal is unaffected — still never a
-  direct `venues` write.
-- **`scripts/refresh/linkHealth.ts`** checks every venue's stored `url`
-  (HEAD, falling back to GET) and proposes clearing only a 404/410 — not
-  403 (often a bot-block on the checker's own request), 429, any 5xx, or a
-  timeout, all of which are logged but never proposed. Verified live
-  against issue #235's canary URL: as of this pipeline shipping, that
-  specific link is no longer dead (Plentiful's page now returns 200) — the
-  canary doesn't currently reproduce, which is a fact about the world
-  changing, not a gap in the checker (a synthetic dead URL seeded into
-  local D1 during verification did trigger a proposal correctly; see the PR
-  description for the full local-run results, including several links this
-  pass found broken for real).
-- **Guardrails (stricter than §6 doc's, and deliberately so):** a per-source
-  zero-record guard and a 20%-active-rows-missing-with-a-floor-of-5
-  "abnormal drop" guard each abort **that source's** writes entirely — the
-  original design still writes flagged removal proposals for a human to
-  see; this pipeline runs unattended with no review UI live yet (a later
-  slice), so writing nothing is safer than half-writing for nobody to
-  catch. A combined 150-proposal per-run cap aborts the ENTIRE run (writes
-  nothing at all) if tripped. Any abort exits non-zero — a red Actions run,
-  never a silent no-op.
-- **One bounded exception to the "ingestion never writes `venues`"
-  guarantee (Kyle, 2026-09-15):** `scripts/refresh/proposalSql.ts`'s
-  `buildProposalWriteStatements()` writes a `venues.last_verified` UPDATE +
-  an `audit_log` row + an already-`'approved'` `change_proposals` row for
-  exactly one shape — a date-only freshness confirmation (`change_type`
-  `'update'`, source `osm`/`plentiful`, `fields_changed` EXACTLY
-  `["last_verified"]`) — reusing the SAME `isDateOnlyUpdateProposal()`
-  predicate the `/admin/flags` bulk-approve button uses (`src/lib/adminProposals.ts`),
-  so the two can't silently diverge on what counts. Every OTHER shape (a
-  real field change, an add, a remove, any link_health finding) still only
-  ever writes a plain pending `change_proposals` row — applying THAT kind
-  of approved proposal to `venues` is the review UI's job (§6.7 of the
-  design doc) — now built, `/admin/flags`
-  (`src/app/admin/flags/page.tsx` + `src/components/ProposalsReviewView.tsx`
-  + `src/app/api/admin/proposals/[id]/{approve,reject}`, #390, plus the
-  bulk `src/app/api/admin/proposals/approve-date-only` added on top of the
-  same engine — see AGENTS.md's "Bulk-approve date-only updates"). It's the
-  ONLY code path that constructs a `venues` mutation FROM a REAL-CHANGE
-  `change_proposals` row. See AGENTS.md's "Change-proposal review queue
-  (#390)" for how it satisfies the supersede-race, stale-apply, and
-  rejection-memory correctness requirements. Auto-supersede (§6.10a) and
-  rejection memory (§6.10b) remain concerns of *this* ingestion job,
-  unchanged by that slice.
+Runs weekly in CI (`refresh-proposals.yml`, cron changed monthly→weekly in #543); run order and local use:
+`scripts/README.md`; schedule, credentials and chunked-write gotchas:
+AGENTS.md "Automated venue-refresh pipeline".
 
-See `AGENTS.md`'s "Automated venue-refresh pipeline" section for the
-operational detail (schedule, credentials, local testing, the exact
-production-migration/secret checklist).
+- **`fetch-osm-grocery.py`** is the only thing that talks to Overpass;
+  `ingest-osm-grocery.py` only converts its download and is reused unmodified.
+- **`diffEngine.ts`** is pure and unit-tested. It diffs each source's fresh
+  records against D1's `draft`/`published` rows for that `source_type`,
+  comparing only a **source-owned field allowlist**. OSM's `address`,
+  `operator` and `hours_weekly` are excluded: they came from a one-off
+  enrichment script (`scripts/scrub-osm-venues.ts`, deleted in #596; history
+  in commit `c1e4536`/PR #102), so a plain re-run never reproduces them and
+  diffing would propose wiping them. Found by running the pipeline end to
+  end against local D1; the allowlist's own comment has the specifics.
+  **Plentiful owns `hours_irregular` too, since #400** — the scraper emits
+  "Once a month" + "4th Tuesday" as a structured `monthly_ordinal` entry (an
+  unparseable non-weekly row becomes a prose `other` entry) instead of a
+  sentence in `notes`. It's in `DESTRUCTIVE_CLEAR_GUARD` alongside
+  `hours_weekly`/`phone` (a scrape that loses a schedule never proposes
+  clearing it) and normalized for equality (sorted keys, slots and entries)
+  so a re-scrape of an unchanged schedule proposes nothing.
+- **Freshness:** a venue whose source-owned fields are unchanged still gets a
+  `last_verified` refresh (unless already stamped today). That exact
+  "date-only" shape **auto-applies** (Kyle, 2026-09-15): `proposalSql.ts`'s
+  `buildProposalWriteStatements()` writes the `venues.last_verified` UPDATE,
+  an `audit_log` row, and an already-`approved` proposal row. It uses the
+  same `isDateOnlyUpdateProposal()` predicate as `/admin/flags`' bulk-approve
+  (`src/lib/adminProposals.ts`), so the two can't disagree on what counts.
+  Every other shape is only ever a pending proposal, with one opt-in
+  exception — see "Jev triage + rename pairing" below.
+- **Jev triage + rename pairing (#543)** — `scripts/refresh/triage.ts` +
+  `renamePairs.ts`, run only after every guardrail above. Each non-date-only,
+  non-`link_health` proposal gets one batched call to Jev (an LLM triage
+  service), which stores a lane on the row (`triage_lane`, migration `0016`):
+  updates classify as likely-noise vs. needs-a-human; removes always stay
+  needs-a-human; adds get no call. Degrades to untriaged (never fails) on a
+  missing key, a 5xx/timeout, or 3 failures in a row. A same-source
+  remove+add pair within 100m or matching phone becomes one rename proposal
+  instead of two (`buildRenameProposal`); approving it writes
+  `venue_id_aliases` so the next run maps the old id forward and the pair
+  never re-proposes. **The one exception to "every other shape is only ever
+  a pending proposal" above:** `proposalSql.ts`'s
+  `buildAiAutoApplyStatements`, gated by `REFRESH_AI_AUTO_APPLY` (off by
+  default), writes a `venues` mutation directly from the ingestion job
+  itself — actor `refresh-pipeline-ai`, full `audit_log` row — when a
+  phone/url change is formatting-only once normalized AND Jev scores it
+  "same value" > 0.9. This re-check is deterministic and independent of
+  Jev's score, so a miscalibrated triage answer alone can't trigger a write.
+  Operational detail (secrets, cost logging, the `0016` schemaReady probe):
+  AGENTS.md "Automated venue-refresh pipeline".
+- **`linkHealth.ts`** checks each stored `url` (HEAD, falling back to GET)
+  and proposes clearing it only on 404/410 — never on 403 (often a bot-block
+  of the checker), 429, 5xx or timeout, which are logged only.
+- **Guardrails, all fail loud (non-zero exit):** per-source zero-record
+  abort; per-source abnormal-drop abort (≥ max(5, 20%) of active rows
+  missing); a 150-proposal cap that aborts the whole run. Stricter than §6,
+  which writes flagged removal proposals instead — chosen because the job
+  runs unattended, and writing nothing beats half-writing.
+- **Review:** `/admin/flags` (`src/app/admin/flags/page.tsx`,
+  `ProposalsReviewView.tsx`, `api/admin/proposals/[id]/{approve,reject}`,
+  #390, plus bulk `approve-date-only`) is the only HUMAN-facing code path
+  that turns a real-change proposal into a `venues` mutation — the
+  ingestion job's own opt-in auto-apply lane (#543, above) is the one
+  machine exception. How it handles the
+  supersede race, stale applies and rejection memory: atlas-kb "PFM AGENTS
+  History — Venue-Refresh Pipeline", "Change-proposal review queue (#390)".
+  Auto-supersede (§6.10a) and rejection memory (§6.10b) stay the ingestion
+  job's concern.
+- **Hiding a known-dead link (#234):** while a `link_health` finding is still
+  `pending`, Publish (`fetchPendingDeadLinks` + `stripDeadLinkUrls`,
+  `publishVenues.ts`) drops that exact flagged `url` from the snapshot, which
+  covers the card, `/venue/<id>` and JSON-LD with no client JS. It compares
+  the venue's *current* `url` to the flagged one, so a hand-fixed URL
+  republishes at once. Ceiling: a pending finding alone doesn't light the
+  Publish bar (`summarizePublishChanges` counts only venue-row changes), so
+  hiding waits for the next Publish for any reason.
+- **Alerts (#238 pending-age, #234 per-source staleness)** —
+  `src/lib/refreshAlerts.ts`, run daily from the scheduled jobs below:
+  emails `issues@pueblofoodmap.com` when a proposal has been `pending` over
+  14 days, or a source has written no proposal in 40 days. Every successful
+  run writes at least one row per source, so `MAX(created_at)` stands in for
+  "last completed run" with no extra table; the file header has that
+  reasoning and its `ponytail:` ceiling.
+
+---
+
+## Scheduled jobs
+
+`custom-worker.ts` wraps the OpenNext fetch handler and adds `scheduled()`,
+driven by one prod-only 5-minute cron. All the branching lives in
+`src/lib/scheduledTasks.ts`'s `runScheduledTasks` (testable, unlike
+`custom-worker.ts`, which imports build output — see that file's header):
+
+- **Heartbeat** — pings Healthchecks.io every tick (a dead-man's switch:
+  Healthchecks.io alerts when the pings stop).
+- **Email retention (#594, 09:00 UTC daily)** — `src/lib/emailRetention.ts`
+  blanks the email on `public_submissions` rows and rejected `box_adopters`
+  rows after 90 days (rows kept), and deletes `alert_subscriptions` rows
+  unsubscribed over 90 days (deleted, not blanked — the file header explains
+  the UNIQUE-constraint and resubscribe risks).
+- **Refresh alerts (09:30 UTC daily)** — see above; a separate slot so the
+  two daily jobs never collide.
+
+Each daily job checks its own time gate on every tick and runs once a day,
+so D1 isn't queried 288 times a day. Each job has its own `ctx.waitUntil`,
+so a slow or failing job never delays the ping or the other job. Each daily job has a real-SQLite
+`.sql.test.ts` as its pre-production proof, because staging has no cron.
 
 ---
 
@@ -276,33 +277,41 @@ Key state atoms and their roles:
 | `viewport` | `'located' \| 'pueblo-center'` | Splash exit mode; determines initial map center |
 | `viewMode` | `'map' \| 'list'` | Map canvas vs. full-screen list |
 | `query` | `string` | Text search input |
-| `selectedCategories` | `Set<VenueCategory> \| null` | Multi-select category filter, checked in FilterPanel (#513); drives the category-autozoom effect |
-| `filterOpenNow / filterSnap / filterWic` | `boolean` | Boolean filter toggles, shown as "Show only" switches in FilterPanel. Favorites was a 4th toggle here; removed by #513 — Saved in the bottom bar already covers it |
-| `filterPanelOpen` | `boolean` | Whether the FilterPanel side panel is open (#513) |
-| `isDrifted` | `boolean` | True when user-location dot has left the visible viewport — shows "Re-center" button |
-| `isLocating` | `boolean` | True while a geo request is in-flight — shows spinner on BottomNav's "Near me" |
+| `selectedCategories` | `Set<VenueCategory> \| null` | Multi-select category filter (FilterPanel, #513); drives the category-autozoom effect |
+| `filterOpenNow / filterSnap / filterWic` | `boolean` | FilterPanel's "Show only" switches (Saved in the bottom bar replaced the old favorites toggle, #513) |
+| `filterPanelOpen` | `boolean` | Whether FilterPanel is open (#513) |
+| `isDrifted` | `boolean` | User-location dot has left the viewport — shows "Re-center" |
+| `isLocating` | `boolean` | Geo request in flight — spinner on BottomNav's "Near me" |
 | `bannerVisible` | `boolean` | Location-denied banner after an active re-tap |
-| `outsideCountyVisible` | `boolean` | Toast when resolved position is outside Pueblo County |
+| `outsideCountyVisible` | `boolean` | Toast when the position is outside Pueblo County |
 | `isPopoverOpen / activeIndex` | `boolean / number` | Typeahead popover ARIA state |
 | `windowExpanded` | `boolean` | Desktop venue window expanded state |
-| `mapboxMap` | `mapboxgl.Map \| null` | Map instance; received via `onMapReady` callback from Map.tsx |
-| `walkingRoute` | `WalkingRouteGeoJSON \| null` | Active walking route GeoJSON (Mapbox Directions API) — passed to Map.tsx as a prop |
-| `walkingRouteInfo` | `WalkingRouteInfo \| null` | Distance + time text for the route info pill overlay |
-| `walkingRouteSteps` | `WalkStep[] \| null` | Turn-by-turn steps from Mapbox (pre-localized via `language=` param); threaded to DirectionButtons/RouteStrip for the `WalkStepper` step-through panel (#555) |
-| `walkingRouteVenueId` | `string \| null` | Which venue the current route targets; used to auto-clear when selection changes |
-| `walkReqSeq` | `ref<number>` | Monotonic sequence counter for in-flight walk fetches. Incremented at the start of each `handleWalkRoute` call (non-toggle path), and on every explicit clear (toggle-off, `handleClearWalkingRoute`). On resolution the fetch's captured `seq` snapshot is compared to the current counter; if they differ the result is discarded (latest-REQUEST-wins, not latest-resolve-wins). Keys on a monotonic int rather than `venue.id` so same-venue double-taps with a changed `userLocation` are also caught. NOT bumped in the `selectedVenueId`-change effect — the render-gate on the Map `walkingRoute` prop (`walkingRouteVenueId === selectedVenueId ? walkingRoute : null`) is the safety net for selection-switch races, preserving the seq so a same-task select+walk-for-new-venue can succeed |
-| `walkAwaitingVenueIdRef` | `ref<string \| null>` | Set by `handleWalkRoute` (#207) when Walk is tapped and `userLocation` is `null` — the venue whose Walk tap is waiting on a just-triggered geolocation request. Consumed (nulled) by the resume effect the first time `geo.state` resolves out of `"prompt"` (and out of the `{granted, position:null}` transient — see that effect's WHY comment) |
-| `walkLocationHintVenueId` | `string \| null` | Which venue's Walk tap resulted in a denied/unavailable geolocation request (#207) — render-gated on `selectedVenueId`, same pattern as `walkingRouteVenueId`, and threaded to `DirectionButtons` as `showLocationHint` |
-| `activeStepIndex` | `number` | Which turn the step-through stepper (`WalkStepper`, #555) is showing — one source of truth shared by the phone RouteStrip sheet, the full card's own readout, and desktop's `DesktopVenueWindow`. Reset to 0 on every new route fetch, venue switch, and clear |
-| `focusPoint` / `focusRequestId` | `{lng, lat} \| null` / `number` | The stepper's camera target and its own monotonic "fire again" counter (#555) — same idiom as `recenterRequestId` below, but a SEPARATE pair, because bumping `recenterRequestId` on a stepper tap would also re-fire the user-location flyTo and fight the turn-focus one. `Map.tsx`'s third camera effect (`focusPoint`/`focusRequestId` props) flies to zoom 17 on every id change, even a repeated coordinate |
+| `mapboxMap` | `mapboxgl.Map \| null` | Map instance, from Map.tsx's `onMapReady` |
+| `walkingRoute` / `walkingRouteInfo` | GeoJSON / info | Active walking route (Mapbox Directions API) and its distance/time pill |
+| `walkingRouteSteps` | `WalkStep[] \| null` | Turn-by-turn steps (pre-localized via `language=`), threaded to the `WalkStepper` (#555) |
+| `walkingRouteVenueId` | `string \| null` | Venue the route targets; the Map prop is render-gated on it matching `selectedVenueId` |
+| `walkReqSeq` | `ref<number>` | Monotonic counter for in-flight walk fetches: bumped per request and per explicit clear; a result whose captured seq is stale is discarded (latest-*request*-wins, so a same-venue double tap with a moved `userLocation` is caught too). Not bumped on selection change — the render gate above covers that race |
+| `walkAwaitingVenueIdRef` | `ref<string \| null>` | Venue whose Walk tap is waiting on a just-triggered location request (#207) |
+| `walkLocationHintVenueId` | `string \| null` | Venue whose Walk tap hit a denied/unavailable location (#207) — shows the "share your location" hint |
+| `activeStepIndex` | `number` | Turn the stepper shows — one source of truth for the phone RouteStrip, the full card and `DesktopVenueWindow`; reset on every new route, venue switch and clear |
+| `focusPoint` / `focusRequestId` | `{lng, lat} \| null` / `number` | The stepper's camera target and its own "fire again" counter (#555) — separate from `recenterRequestId` so a step tap doesn't also re-fire the user-location flyTo |
 
-**Walking route step parsing:**
-`parseWalkSteps(route)` is an exported pure function in `MapWrapper.tsx`. It converts the raw Mapbox Directions API legs/steps array to `WalkStep[]`, with defensive optional-chaining on `maneuver?.instruction` so a malformed step is dropped (not thrown). **#555:** it also drops any step whose `maneuver.location` is missing or malformed (not a 2-element number tuple) — the stepper flies the map's camera to that coordinate on every arrow tap, so a locationless step would crash that lookup rather than just rendering a blank line. `WalkStep` additionally carries `location: [lng, lat]`, and optional `maneuverType`/`maneuverModifier` (Mapbox's `maneuver.type`/`.modifier`) that `WalkStepper`'s turn glyph reads. Exported for unit testing without mounting MapWrapper (mirrors `buildWalkingRouteUrl` pattern).
+**Walking directions.** `parseWalkSteps(route)` (exported, pure) turns the
+Directions API legs into `WalkStep[]`, dropping any step with no instruction
+or a malformed `maneuver.location` — the stepper flies the camera to that
+coordinate, so a locationless step would crash it. `WalkStepper`
+(`DirectionButtons.tsx`, #555) shows one turn at a time with Back/Next
+(disabled at the ends, never hidden) and reuses `WalkStepsList` for its
+"All turns" disclosure. `MapWrapper.handleStepChange` is the one place a step
+change lands: it sets `activeStepIndex`, moves the camera via
+`focusPoint`/`focusRequestId`, and calls `requestStepLocationRefresh`, which
+re-reads the user's position without bumping `recenterRequestId` (that would
+start a competing flyTo).
 
-**Step-through directions (#555):** `WalkStepper` (`DirectionButtons.tsx`) shows one turn at a time — "Step N of M", the instruction with a turn glyph, a distance/arrival line, a "Then: `<next>`" peek, and Back/Next buttons (disabled at the ends, never hidden). It reuses `WalkStepsList` for its own "All turns" disclosure rather than a second list. `MapWrapper.handleStepChange` is the single place a Back/Next tap (or an "All turns" row click) lands: it updates `activeStepIndex`, sets `focusPoint`/bumps `focusRequestId` to fly the camera to that step's own coordinate, and calls `requestStepLocationRefresh` — a `handleLocateRequest`-like wrapper that re-asks the browser for the user's position (so the "you are here" dot stays current while walking) WITHOUT bumping `recenterRequestId`, which would otherwise fight the turn-focus camera move with a second, competing flyTo.
-
-**Walk-without-location (#207):**
-`handleWalkRoute` never falls back to `PUEBLO_CENTER` as a walking-route origin — a route drawn from downtown when the user is elsewhere is misleading (Bus/Drive are unaffected: their Google Maps deeplinks omit `origin` entirely and let Google use the device's own location). Instead, when `userLocation` is `null`:
+**Walk without a location (#207).** Walk never uses `PUEBLO_CENTER` as the
+origin — a route from downtown would mislead (Bus/Drive deep links omit
+`origin` and let Google use the device's location). When `userLocation` is
+null:
 
 ```
 Walk tapped, userLocation === null
@@ -314,7 +323,11 @@ Walk tapped, userLocation === null
       stale (venue no longer selected) → noop, nothing drawn or shown
 ```
 
-`decideWalkResume` is an exported pure function (same testable-without-mounting pattern as `parseWalkSteps`) — it owns only the post-resolution decision; the effect itself additionally waits out the transient `{granted, position:null}` state (Permissions API `onchange` can fire fractionally before `getCurrentPosition`'s own success callback) so a real grant is never mistaken for a denial. `fetchWalkingRoute` takes `origin` as an explicit parameter (not read from `userLocation`) precisely so the resume effect can call it with a just-resolved `geo.state.position` without waiting on a re-render.
+`decideWalkResume` is exported and pure. The effect also waits out the
+transient `{granted, position:null}` state (the Permissions API can fire
+before `getCurrentPosition` succeeds) so a real grant isn't read as a denial.
+`fetchWalkingRoute` takes `origin` as a parameter so the effect can pass the
+just-resolved position without waiting for a re-render.
 
 **Filtering pipeline** (computed in `useMemo`, run on every state change):
 
@@ -340,19 +353,14 @@ User taps "Near me" (BottomNav)
     → shows outsideCountyVisible if position is outside PUEBLO_COUNTY_BBOX
 ```
 
-**Splash → auto-locate:**
-`SplashScreen` and `MapWrapper` run separate `useGeolocation` instances.
-When the user picks "Find food near me" on the splash, the map starts with
-no position. A `useEffect` on `viewport === 'located'` runs `handleLocateRequest`
-once on mount so the map centers on the user without a second tap (see issue
-#141 and the comment at `autoLocateDoneRef`).
+**Splash → auto-locate:** `SplashScreen` and `MapWrapper` run separate
+`useGeolocation` instances. After "Find food near me", a `useEffect` on
+`viewport === 'located'` runs `handleLocateRequest` once so the map centers
+on the user without a second tap (#141; see `autoLocateDoneRef`).
 
-**Drift detection:**
-`handleMoveEnd` (called from `Map.tsx` `onMoveEnd` prop after each camera
-move) checks whether the user-location dot is inside the current viewport
-bounds, shrunk by `DRIFT_PAD_DEG` on every edge. The 0.002° buffer (~220 m)
-prevents the "Re-center" button from flickering when the dot is exactly at
-the edge.
+**Drift detection:** `handleMoveEnd` checks whether the user-location dot is
+inside the viewport shrunk by `DRIFT_PAD_DEG` (0.002°, ~220 m) on every
+edge, so "Re-center" doesn't flicker when the dot sits on the edge.
 
 ---
 
@@ -362,27 +370,45 @@ EN and ES dictionaries live in `src/lib/i18n.ts` as plain `Record<string, string
 objects. `t(key, locale, vars?)` looks up the ES dict first, falls back to EN
 if a key is missing.
 
-**Locale persistence:** `LocaleContext` (`src/lib/LocaleContext.tsx`) holds the
-active locale in React state and writes it to the `pfm-locale` cookie on
-change. `layout.tsx` reads the cookie server-side so the initial SSR render
-uses the user's preference — avoiding an EN flash for Spanish-language users.
+**Locale is client-side only.** `LocaleContext` (`src/lib/LocaleContext.tsx`)
+holds the active locale in React state and writes it to the `pfm-locale`
+cookie on change. No route reads that cookie on the server: `layout.tsx`
+renders `<LocaleProvider>` with no `initialLocale`, so every page's first
+render is English (the static public pages are prerendered that way), and
+the provider switches to the saved
+locale from `document.cookie` in an effect after hydration (#289). A Spanish
+visitor therefore sees English briefly on a hard page load. The reason is
+#287: a server-side `cookies()` read makes a route dynamic and loses the
+static edge caching these pages depend on (see AGENTS.md "Discoverability /
+SEO" for the outage that makes this constraint load-bearing).
 
-**`<title>` (#589):** Next.js Metadata renders `<title>` once, server-side,
-always in English (`buildPageMetadata`/`generateMetadata`, `src/lib/site.ts`)
-— the locale cookie above only ever affects a page's *body*. `useDocumentTitle`
-(`src/lib/useDocumentTitle.ts`) is the separate client-side mechanism that
-corrects `<title>` for the current locale after hydration and on a live
-EN↔ES toggle; every localized page's "Content" component calls it with a
-`t()`-composed string. A plain `document.title = ...` assignment isn't
-enough on a hard page load: this app's metadata resolves through Next's
-streaming-metadata Suspense boundary, whose chunk can arrive over a real
-network AFTER the hook's own effect and then overwrite `<title>`'s DOM node
-directly (bypassing the `document.title` setter) with the server's English
-value — a genuine timing race with no fixed order, not a one-time head
-start to win. `useDocumentTitle` self-heals instead: a `MutationObserver`
-on `document.head` reapplies the desired title whenever it drifts,
-disconnected on unmount so a later page that deliberately stays English
-(`/venue/[id]`) is never corrected by a stale observer.
+**Known bilingual limitation — what is and isn't localized.** This is the
+one place it's stated; code comments point here.
+
+| Surface | Language |
+|---|---|
+| Visible page body (every public page, incl. /about and /privacy) | Visitor's locale, via `useLocale()` in each page's client "Content" component (#289) |
+| `<title>` | Visitor's locale, corrected client-side after hydration (#589, #605, #610 — below); `/venue/[id]` deliberately keeps its English server title (#287) |
+| `<meta>` description, OpenGraph/Twitter tags | English always (#287) |
+| JSON-LD (venue schema, /about's FAQPage) | English always (#386) — built server-side with a hardcoded `"en"` |
+| URLs | One URL per page for both locales; no `/es` tree or `hreflang` (deferred, #164) |
+
+Crawlers therefore index English metadata. A separate `/es` route tree is the
+only way to change that, and it's an SEO decision, not a content one — the
+visible content is already bilingual.
+
+**`<title>` (#589; client-side fix #605, self-heal #610):** Next.js Metadata
+renders `<title>` once, server-side, always in English
+(`buildPageMetadata`/`generateMetadata`, `src/lib/site.ts`). `useDocumentTitle`
+(`src/lib/useDocumentTitle.ts`) corrects it for the current locale after
+hydration and on a live EN↔ES toggle; every localized page's "Content"
+component calls it with a `t()`-composed string. A plain
+`document.title = ...` isn't enough on a hard load: Next's streaming-metadata
+Suspense chunk can arrive after the hook's effect and overwrite `<title>`'s
+DOM node directly (bypassing the setter) — a real timing race, not a fixed
+order. So the hook self-heals with a `MutationObserver` on `document.head`,
+disconnected on unmount so a page that stays English (`/venue/[id]`) is
+never corrected by a stale observer. The hook's header has the full trace.
 
 **Translation notes:**
 - Mexican / Latin American Spanish throughout (not Castilian).
@@ -412,28 +438,21 @@ Each route handler (`src/app/*/submit/route.ts`) runs the same pipeline:
    Returns a fake `{ok: true}` to bots (silent drop, no signal).
 4. D1-backed rate limit (#587) — `src/lib/formRateLimit.ts`'s
    `checkFormRateLimit()`, a thin wrapper over the Blessing Boxes check-in
-   path's shared D1 counter (`src/lib/checkinRateLimit.ts`). Two caps: 5
-   req/IP/hour, plus a site-wide cap per form (50/hour) — see
-   `formRateLimit.ts`'s own header for why a per-IP-only cap isn't enough on
-   Workers (many isolates, no shared in-process state) and for the exact
-   cap numbers' reasoning.
+   path's shared D1 counter (`src/lib/checkinRateLimit.ts`): 5 req/IP/hour
+   plus a site-wide 50/hour per form. D1, not an in-process `Map`, because
+   Workers run many isolates with no shared memory; the file header has the
+   cap reasoning.
 5. Server-side field validation (mirrors client-side).
 6. Email via Resend to the appropriate `@pueblofoodmap.com` address.
 
-**#258 — `/suggest/submit` and `/report/submit` only, NOT `/feedback/submit`:**
-after step 5 passes, these two routes also insert one pending row into the
-`public_submissions` D1 table — a durable, admin-reviewable record
-(`migrations/0002_public_submissions.sql`; AGENTS.md "Public submissions
-queue") — before the step-6 email. The insert is wrapped in its own
-try/catch: a D1 failure is logged (`db_write_failed`) and does NOT block
-the email or change the route's response, so the email stays the
-pipeline's authoritative success signal exactly as it was before this
-table existed. `/feedback/submit` is deliberately untouched BY THE QUEUE
-and still ends at step 6 — the queue exists only for the two flows whose
-submissions describe map data an admin might act on (a new venue, a
-reported closure); general feedback has no such action to queue. (As of
-#587, `/feedback/submit` DOES reach D1 for step 4's rate-limit check — see
-above — just never for a `public_submissions` row.)
+**`/suggest/submit` and `/report/submit` also queue (#258):** after step 5
+they insert one pending `public_submissions` row
+(`migrations/0002_public_submissions.sql`) before the email — the record an
+admin reviews at `/admin/submissions`. The insert has its own try/catch: a D1
+failure is logged (`db_write_failed`) and never blocks the email or changes
+the response, so the email stays the authoritative success signal.
+`/feedback/submit` never queues — general feedback has nothing for an admin
+to act on (it does reach D1, for step 4 only).
 
 **Why Turnstile over reCAPTCHA:** the app runs on Cloudflare Workers.
 Turnstile is a first-party Cloudflare product with a simpler integration
@@ -444,96 +463,44 @@ populations that may distrust Google tracking.
 persisted. Contact emails go to Resend in the email body; the route handlers
 do not log them.
 
-**Rate limiter, formerly duplicated (#587):** each route used to carry its
-own private in-process limiter instance. `src/lib/formRateLimit.ts` now owns
-the shared logic (both caps, one call per route) — no per-route duplication
-left to extract.
-
 ---
 
 ## Map library — Mapbox GL JS via react-map-gl
 
 The map renders via `mapbox-gl` v3 + `react-map-gl` v8 (import path
 `react-map-gl/mapbox`), using the `streets-v12` Mapbox hosted basemap style.
+It replaced react-leaflet in May 2026 (#44–#48); the issues and commits
+record the swap, not the reason.
 
-**Why Mapbox over Leaflet:** the app was migrated from react-leaflet to
-react-map-gl / Mapbox GL JS (README: "Phase 2 complete (Mapbox migration)").
-The commit that performed this migration is not present in the current
-shallow git history. See open questions below.
+**Loading is deliberately staged,** because mapbox-gl dominated mobile
+performance:
 
-**SSR exclusion and TBT reduction:** `mapbox-gl` calls `globalThis` and
-requires a WebGL canvas; it cannot run server-side. `MapWrapper.tsx` uses
-`next/dynamic` with `ssr: false` to load `Map.tsx` only on the client. This
-dynamic import must stay in a Client Component (`"use client"`) — `ssr: false`
-is silently ignored in Server Components per the Next.js lazy-loading docs.
-
-**Page-level code-splitting (#202):** `page.tsx` also dynamically imports
-`MapWrapper` and `SplashScreen` (both with `ssr: false`). WHY: the page
-returns `null` during SSR (hydration-safe), so `ssr: false` has no effect on
-server output — it moves ~200KB of synchronous client JS (vaul bottom sheet,
-Radix UI, geolocation hooks, venue data) from the blocking initial parse/exec
-window into async chunks, reducing TBT on throttled mobile. Mapbox GL JS
-(1.7MB) was already async via the nested dynamic in MapWrapper; this change
-eliminates the remaining sync JS that dominated TBT after Mapbox.
-
-**Deferred interactive-map load (#226):** being code-split (#202, above) was
-not enough on its own. `next/dynamic`'s factory (`() => import("./Map")`)
-fires the instant React first *renders* the resulting component — not when
-`dynamic()` is merely declared at module scope (confirmed against this
-version's own lazy-loading doc: conditionally rendering a dynamic component
-is the documented way to defer its import). MapWrapper used to render
-`<MapCanvas>` unconditionally (gated only by the #165 WebGL probe below,
-which starts optimistic), so the mapbox-gl chunk fetch — and the WebGL/tile
-work that follows — began the instant MapWrapper mounted, dominating the
-mobile Lighthouse performance audit (`.lighthouserc.json`'s
-`performance: "warn"` comment has the measured history).
-
-`useDeferredMapLoad` (`src/lib/useDeferredMapLoad.ts`) now gates whether
-`<MapCanvas>` is rendered at all. Until its returned flag is true, MapWrapper
-renders `ListView` in the map's place instead — reusing the existing
-component rather than a new skeleton, so the placeholder is already fully
-interactive (tapping a venue card both selects it and counts as the
-interaction that loads the map). Both `ListView` and `Map.tsx`'s own root
-fill the same `absolute inset-0` / 100%-of-parent box, whose own size is
-flex/viewport-driven (never content-driven) — so the swap introduces no
-layout shift. The flag flips true on whichever fires first: `requestIdleCallback`
-(bounded by a timeout so a permanently busy main thread can't starve it
-forever), a `setTimeout` fallback for browsers without `requestIdleCallback`
-(Safari), or the user's first interaction — pointerdown, touchstart, scroll,
-keydown, or focusin. keydown/focusin are included alongside the pointer/touch
-events specifically so a keyboard or assistive-tech user tabbing toward the
-map gets the same early trigger a mouse/touch user does; the idle/timeout
-fallback also guarantees eventual load with zero interaction at all, so no
-user is ever gated behind a pointer-only path.
-
-**Held behind the splash (#588).** `useDeferredMapLoad`'s optional `hold`
-argument suppresses only the idle/timeout branch above — the interaction
-listeners stay attached regardless — while HomePageClient's welcome splash is
-covering a first-time visitor's screen (`holdMapLoad={splashShown}` on
-`MapWrapper`). Without it, the idle callback fired mapbox-gl's ~530ms
-(4x-throttle) parse/exec while the visitor was still reading the splash
-(inert, nothing waiting on the map yet) — exactly what Lighthouse's
-synthetic, never-interacts mobile run also pays, inflating TBT/TTI. A real
-tap on either splash CTA reaches the window-capture interaction listeners
-regardless of the splash's DOM position (a sibling of the inert map
-container, not a descendant), starting the load immediately, in parallel
-with the geolocation request that same tap kicks off — not serialized behind
-the splash's actual dismiss, which itself waits on geolocation to resolve
-(up to 8s) and would defeat that overlap. `hold`'s true→false edge (the
-splash's real dismiss) is also an unconditional trigger, covering dismissal
-paths that don't dispatch a pointer/key event at all.
-
-**Deep-link exception — eager, never deferred.** A shared venue link
-(`?venue=<id>`, or `/venue/<id>`'s "View on the map" CTA which lands on
-`/#venue=<id>`) must open on that pin immediately, not after an idle
-deadline. `page.tsx` parses both forms into `initialVenueId` exactly as
-before #226 (unchanged). MapWrapper passes `Boolean(initialVenueId)` as
-`useDeferredMapLoad`'s `eager` argument, which seeds the trigger flag
-already-true on mount whenever a deep link is present, so `<MapCanvas>` (and
-its `import("./Map")`) fires on the very first render — same as pre-#226
-behavior, for that one case only. The existing deep-link effect (#132,
-unchanged) still waits on `mapboxMap` before calling `setSelectedVenueId`, so
-the venue still opens once the now-eagerly-loaded map reports ready.
+- **Client-only.** `mapbox-gl` needs `globalThis` and a WebGL canvas, so
+  `MapWrapper.tsx` loads `Map.tsx` with `next/dynamic` + `ssr: false`. That
+  must stay in a Client Component — `ssr: false` is silently ignored in
+  Server Components.
+- **Code-split (#202).** `HomePageClient.tsx` also dynamic-imports
+  `MapWrapper` and `SplashScreen`, moving ~200KB of synchronous JS (vaul,
+  Radix, geolocation hooks, venue data) out of the blocking parse window to
+  cut TBT on throttled phones.
+- **Deferred (#226).** `next/dynamic` fetches its chunk the moment the
+  component first *renders*, so `useDeferredMapLoad`
+  (`src/lib/useDeferredMapLoad.ts`) gates whether `<MapCanvas>` renders at
+  all. Until then MapWrapper shows `ListView` in the same box (already
+  interactive, no layout shift). The map loads on whichever comes first:
+  idle time (`requestIdleCallback` with a timeout, or a `setTimeout`
+  fallback for Safari) or the first pointerdown/touchstart/scroll/keydown/
+  focusin — keyboard events included so assistive-tech users get the same
+  early trigger.
+- **Held behind the splash (#588).** While the first-visit splash covers the
+  screen, the `hold` argument suppresses only the idle branch, so mapbox-gl's
+  ~530ms parse doesn't run while nobody can see the map (and Lighthouse's
+  never-interacting run stops paying for it). A tap on a splash CTA still
+  starts the load at once, in parallel with the geolocation request;
+  releasing `hold` is itself a trigger.
+- **Deep links load eagerly.** `?venue=<id>` or `/#venue=<id>` passes
+  `eager`, so the map loads on first render; the #132 deep-link effect then
+  waits for `mapboxMap` before selecting the venue.
 
 **Token scopes:** the public token (`pk.*`, `NEXT_PUBLIC_MAPBOX_TOKEN`) needs
 only `styles:read`, `fonts:read`, `tilesets:read`. Narrowing the scope
@@ -545,147 +512,49 @@ See [AGENTS.md](AGENTS.md) for rotation procedure and URL restrictions.
 ## Hosting — Cloudflare Workers via OpenNext
 
 The app is a Next.js App Router project compiled for Cloudflare Workers by
-`@opennextjs/cloudflare`. The adapter (`open-next.config.ts`) translates
-the App Router output (server components, route handlers, edge runtime) into
-a Workers-compatible bundle.
+`@opennextjs/cloudflare` (`open-next.config.ts`). It moved off Vercel in May
+2026 (#42/#53); the reason isn't recorded.
 
-**Why Cloudflare Workers over Vercel:** the project migrated off Vercel to
-Cloudflare Workers Builds. The reason for this migration is not in the
-current shallow git history; see open questions below.
+**Deploys run through GitHub Actions only.** Workers Builds is disconnected
+(`deploy-prod.yml`'s header explains why the two must never run together).
+Push to `main` → `deploy-prod.yml` deploys the top-level `wrangler.jsonc`
+Worker (`pueblo-food-map`, pueblofoodmap.com); push to `dev` →
+`deploy-dev.yml` deploys the staging Worker at dev.pueblofoodmap.com. Only
+`deploy-prod.yml` has a `workflow_dispatch` recovery trigger.
 
-**CI/CD:** deploys run through GitHub Actions, not Cloudflare Workers
-Builds — the dashboard connection was disconnected when
-[`.github/workflows/deploy-prod.yml`](.github/workflows/deploy-prod.yml)
-merged (its file header explains why the two must never run together).
-Push to `main` → `deploy-prod.yml` builds via `opennextjs-cloudflare` and
-deploys the top-level `wrangler.jsonc` config (prod worker
-`pueblo-food-map`, route pueblofoodmap.com). Push to `dev` →
-[`deploy-dev.yml`](.github/workflows/deploy-dev.yml) deploys the staging
-worker at dev.pueblofoodmap.com. Neither workflow has a
-`workflow_dispatch:` trigger, so there is no manual "re-run" button — a
-deploy only happens as a side effect of a push landing on that branch (see
-"Gap: Dependabot auto-merge can strand commits undeployed" below for why
-that matters). Separately, `.github/workflows/ci.yml` runs
-`lint → design:lint → design:drift → typecheck → test:ci → npm audit
-→ build` on every PR and push to `main` — that's the correctness gate, and
-it's a required check on both `main` and `dev`. `deploy-prod.yml`/
-`deploy-dev.yml` re-run only the fast part (lint, design:drift, typecheck),
-not the full test suite, since nothing reaches either branch without that
-required check passing (changed 2026-09-23: the re-run cost ~3 min per
-deploy and let flaky tests block already-green changes).
+**CI is the gate.** `ci.yml` runs `lint → design:lint → design:drift →
+typecheck → test:ci → npm audit → build` on every PR into `main`/`dev` and
+every push to `main`, and is a required check on both branches. The deploy
+workflows re-run only lint, design:drift and typecheck, since nothing
+reaches either branch without that check (changed 2026-09-23: the full
+re-run cost ~3 min per deploy and let flaky tests block green changes).
 
-**One scoped exception:** a `publish-bot` PR whose full diff (merge-base of
-base/head, not a raw two-dot diff) touches EXACTLY
-`src/data/published-venues.ts` — the file the admin Publish action
-regenerates from D1 (see AGENTS.md "Publish → static" for the full flow) —
-skips `lint`, `design:lint`, `design:drift`, `test:ci` (replaced by a
-narrower published-data/venue-shape test subset), and `npm audit`.
-`typecheck` and `build` still run unconditionally, on every publish PR, with
-no exception — see AGENTS.md "Publish → static" for the exact skip list and
-why the carve-out can't be widened into a general gate bypass.
+**One scoped exception:** a `publish-bot` PR whose merge-base diff touches
+*exactly* `src/data/published-venues.ts` skips lint, design:lint,
+design:drift, the full test suite (replaced by a published-data/venue-shape
+subset) and `npm audit`; typecheck and build always run. The diff check, not
+the branch name, is the safety property — see `ci.yml`'s "Detect data-only
+publish-bot PR" step comment.
 
-**Route handlers as Workers:** Next.js route handlers (`submit/route.ts`)
-compile to Worker fetch handlers. As of #587 the submit routes' rate limit
-is D1-backed (`src/lib/formRateLimit.ts`), not in-process — Cloudflare runs
-many Worker isolates concurrently, so an in-process `Map` only ever saw a
-fraction of real traffic; see that file's header for the full reasoning.
+**`GITHUB_TOKEN` pushes don't trigger workflows.** GitHub won't start a
+workflow for a push made with `GITHUB_TOKEN`, so a workflow that merges into
+`main` that way lands a commit that never deploys, with no red signal.
+That's why Dependabot targets `dev` (#375) and its auto-merge uses a GitHub
+App token (`RELEASE_PLEASE_APP_*` secrets, named for a retired workflow), and
+why Publish uses the `GITHUB_PUBLISH_TOKEN` PAT. Auto-merge only waits for CI
+because the `dev` ruleset requires the same checks as `main` (delete that
+ruleset and auto-merge silently becomes merge-on-open). A consequence: a
+dependency bump, security bumps included, waits on `dev` until the next
+promotion. Any new workflow that pushes to `main` must avoid `GITHUB_TOKEN`. Incident history:
+atlas-kb "PFM ARCHITECTURE History — 2026-09-24 Trim".
 
 **Environment variables:** `NEXT_PUBLIC_*` vars are baked into the client
-bundle at build time — set them as **build variables** (Settings → Build →
-Build variables) before triggering a build. Workers Builds has one shared
-build-variable set and a single `production` environment; there is no separate
-Preview environment (that's a Cloudflare Pages concept). Runtime secrets
-(`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`) are set separately under Settings
-→ Variables and Secrets.
-
-See [AGENTS.md](AGENTS.md) for deploy, rollback, env-var management, and
-Mapbox token management.
-
-**Superseded 2026-09-02 (#375): Dependabot no longer merges into `main` at
-all.** `dependabot.yml` now sets `target-branch: dev`, so dependency PRs open
-against `dev`, auto-merge there, and reach production only through a normal
-`dev` → `main` promotion PR — an ordinary human-token merge that always fires
-Deploy Prod. The strand-on-`main` scenario described below therefore no longer
-has a path to occur through Dependabot.
-
-**The underlying GitHub rule has not changed, so this history stays.** Any
-future workflow that pushes to `main` with `GITHUB_TOKEN` reintroduces the
-identical silent failure. Read this before adding one.
-
-**Fixed 2026-08-28: Dependabot auto-merge used to strand commits undeployed.**
-
-Previously, [`dependabot-auto-merge.yml`](.github/workflows/dependabot-auto-merge.yml)
-auto-merged patch/minor Dependabot PRs using `secrets.GITHUB_TOKEN`. GitHub
-deliberately does not start new workflow runs for pushes made with
-`GITHUB_TOKEN` (a recursion guard, so an auto-merge can't trigger another
-workflow that triggers another merge). But `deploy-prod.yml` fires on
-`push: branches: [main]` — so when Dependabot's PR auto-merges, the commit
-lands on `main` and **no deploy runs**. Production keeps serving the
-previous build with no red signal anywhere: the failure mode is an
-*absent* workflow run, not a failed one, so there's nothing to page on.
-
-Observed instance: PR #361 (Next 16.3.2 → 16.3.3) auto-merged at 16:23 UTC
-on 2026-08-28 as commit `6ce2737`, while the newest Deploy Prod run was
-still `12d438a` from 16:17. It cleared itself when a later PR was merged
-by hand — any human-token push carries stranded commits along on the next
-deploy — but that's incidental, not a fix.
-
-Detect a stranded commit: compare `main`'s tip against the last Deploy
-Prod run's `headSha`.
-```bash
-gh api repos/kr8vka0z/pueblo-food-map/commits/main -q .sha
-gh run list --repo kr8vka0z/pueblo-food-map --workflow "Deploy Prod" \
-  --limit 1 --json headSha,conclusion
-```
-A mismatch means commits are sitting on `main` undeployed.
-
-Why the admin Publish flow doesn't have this problem: `publishVenues.ts`
-(the commit/PR logic behind `POST /api/admin/publish`) authenticates its
-GitHub calls with the `GITHUB_PUBLISH_TOKEN` fine-grained PAT (provisioned
-under #260), not `GITHUB_TOKEN` — a PAT-authored push isn't covered by the
-recursion guard, so it deploys normally.
-
-**The fix applied.** `dependabot-auto-merge.yml` mints a short-lived
-installation token from a GitHub App (`actions/create-github-app-token`,
-`RELEASE_PLEASE_APP_*` secrets — named for the release-please workflow that
-originally provisioned the App; that workflow was retired 2026-09-23 in favor
-of continuous deploy-on-push, but the App and its secrets still back this
-job) and enables auto-merge with that instead of `GITHUB_TOKEN`. An App token
-is not covered by the recursion guard, so the resulting push to `main` starts
-Deploy Prod normally.
-
-That swap forced a second change: on a plain `pull_request` event a Dependabot
-PR is handed the *Dependabot* secret store, which does not contain
-`RELEASE_PLEASE_APP_*`, so the App credentials would arrive empty. The
-workflow therefore runs on `pull_request_target`, which executes in the
-base-repo context and can read Actions secrets. `pull_request_target` is
-normally avoided because it pairs elevated secrets with untrusted PR code —
-that risk does not apply here, because the workflow never checks the PR out.
-It only reads Dependabot metadata and calls the `gh` CLI against the PR URL.
-
-`deploy-prod.yml` also gained a `workflow_dispatch:` trigger as a recovery
-hatch. Before that, a commit which reached `main` without firing a deploy
-could only be rescued by pushing another commit; now `main` can be deployed
-as-is from the Actions tab.
-
-**Verified end to end 2026-09-02** (it had sat unverified since the swap).
-Minutes after `target-branch: dev` landed on `main`, Dependabot re-ran and
-opened PRs #380 and #381 against `dev`. Both waited for the full required-check
-set (`Lint, typecheck, build` took 3m54s) and only then auto-merged, ~5 minutes
-after opening, and the merges fired Deploy Dev. So the App-token swap works and
-the auto-merge genuinely gates on CI.
-
-**What actually makes it wait is the branch ruleset, not the workflow.**
-`gh pr merge --auto` only defers when the base branch has required status
-checks; on a branch with none it merges the instant auto-merge is enabled. The
-`dev` ruleset added in #375 requires the same four checks `main` does, which is
-why the runs above were allowed to finish. Delete that ruleset and Dependabot
-auto-merge silently degrades into merge-on-open.
-
-**One consequence of the `dev` target to keep in mind:** a dependency bump —
-including a security bump — now sits on `dev` until someone opens a promotion
-PR. It gets real staging exposure first, which is the point, but it is no
-longer self-delivering to production.
+bundle at build time, so they are GitHub Actions repo secrets injected into
+the `deploy-prod.yml`/`deploy-dev.yml` build (not Cloudflare dashboard build
+variables — that was only true under Workers Builds). Runtime secrets
+(`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, …) are `wrangler secret put` on
+the Worker and read at request time. Full list: AGENTS.md "Promotion
+checklist".
 
 ---
 
@@ -760,7 +629,7 @@ The venue card opens, and `/venues` and `/resources` load offline.
 ## Splash gate and first-visit flow
 
 ```
-page.tsx mounts
+HomePageClient.tsx mounts
   → reads localStorage key 'pfm.splash.seen.v2'
   → if not set:  show SplashScreen overlay (z-9000) above the live map
   → if set:      skip to interactive map
@@ -782,416 +651,166 @@ parallel. While the splash is visible, `main` receives `inert` and
 
 ---
 
-## Admin — dashboard, venue list, and Blessing Boxes tab (#253, admin dashboard build)
+## Blessing Boxes
 
-**`/admin` (src/app/admin/page.tsx)** is the Dashboard — the admin landing
-page since the admin dashboard build (approved mockup Direction A). It is a
-Better-Auth-gated Server Component (see AGENTS.md "Admin authentication"
-for the auth chain) that `Promise.all`s several independent, mostly
-best-effort D1 reads: preview rows + counts for public submissions and
-change proposals, the full pending-photo and pending-adopter queues, and
-`loadBoxHealthEntries()` (src/lib/adminBoxes.ts). It renders the shared
-`AdminNav` header, a conditional `PublishPanel` (shown only when unpublished
-changes exist — the exact same component and Publish action `/admin/places`
-uses, via an added `reviewHref` prop rather than a second publish path),
-`NeedsDecisionPanel` (the to-do queue, grouped Suggestions / Data refresh /
-Blessing boxes, each capped to a few preview rows with a link to its full
-queue — "correctness over inline convenience": any decision needing more
-than a single click links out instead of growing an inline form here), and
-two side panels, `BoxHealthList` ("Boxes that need help") and
-`StalePlacesList` ("Places due for a check" — published venues whose
-`last_verified` is over 12 months old, oldest first).
+Full design: atlas-kb `projects/Pueblo Food Map/Blessing Boxes Build Plan.md`.
 
-**Publish is "PR opened and auto-merge armed," not "merged" (#598).**
-`POST /api/admin/publish` promotes D1 rows to `status='published'` once its
-GitHub commit/PR/auto-merge sequence succeeds (`commitPublishedVenues`,
-src/lib/publishVenues.ts — see "Automated venue-refresh pipeline"'s sibling
-publish flow above for the NB1 ordering) — that is a real success signal for
-the PR existing and being armed to merge, but it is NOT the same as the PR
-having actually merged. If that PR's CI then goes red, D1 already says
-"published" while the live site still serves the OLD
-`src/data/published-venues.ts` until the next publish happens to repair it.
-Rewiring the state machine to wait for the real merge was rejected — a
-publish would have to hold a request open across a multi-minute CI run for
-a case that's rare and self-healing on the next publish anyway. Instead the
-Dashboard reads the SAME open `publish-bot` PR read-only
-(`fetchPublishBotPrStatus`, publishVenues.ts) and renders
-`PublishBotStatusBanner` above the Publish bar whenever one is open.
+- **Boxes are live, not published.** A box is a `venues` row with
+  `category: 'blessing_box'` plus a `blessing_boxes` row. The Publish
+  snapshot excludes them; the public map reads them at request time from
+  `GET /api/public/blessing-boxes` (`loadLiveBoxes()`,
+  `src/lib/blessingBoxes.ts`, 60s edge cache), so an admin edit shows
+  without a Publish.
+- **Every interaction (check-in, photo, adopt) lives in the on-map venue
+  card**, never a separate page — REVIEW.md's standing rules own that rule
+  (the one exception, `/box/<id>/history`, is a read-only log).
+- **Alerts** (`src/lib/boxAlerts.ts`, roles `host`/`adopter`/`giver` in one
+  `alert_subscriptions` table): empty/problem → host + adopters; empty/low →
+  givers; filled → everyone subscribed. 6h cooldown per subscription, except
+  filled (good news skips it, capped at 1/subscription/hour instead).
+  Dispatch runs in `ctx.waitUntil`, never blocking the check-in; a Resend
+  outage degrades to a console warning.
 
-**Pulls API only, not Checks API (review finding, 2026-09-24).** The first
-version of this read hit GitHub's Checks API against the PR's head sha —
-that silently never worked, because `GITHUB_PUBLISH_TOKEN` is a
-FINE-GRAINED PAT (Contents RW + Pull requests RW, #260), and fine-grained
-PATs cannot read check runs at all — a structural gap in what that PAT type
-can authenticate for, not a missing scope to add. `mergeable_state` +
-`created_at` from `GET /pulls/{number}` need only "Pull requests: read,"
-which this token already has, so the banner now derives state from those
-instead: `mergeable_state === "dirty"` (a real merge conflict) is
-"Publish is stuck: merge conflict," regardless of the PR's age; a PR open
-more than 20 minutes with `mergeable_state` in blocked/unstable/behind is
-"Publish is stuck: checks failing or pending too long"; everything else
-(including `mergeable_state` still "unknown" while GitHub computes it,
-common right after a PR opens) is "Publish in progress." Fails soft on both
-axes named in the issue: skipped entirely when `GITHUB_PUBLISH_TOKEN` is
-unset (staging has none — same env var route.ts already treats as "not
-configured"), and any GitHub error on the single-PR detail read (rate
-limit, network, permissions) degrades to `state: "in_progress"` rather than
-breaking the page, matching every other best-effort Dashboard read above.
-
-**`/admin/places` (src/app/admin/places/page.tsx)** is the venue list —
-moved here unchanged from where `/admin` used to render it (#253's original
-build). It
-fetches every `venues` row — draft, published, and archived — via
-`getAdminDb()` (src/lib/adminDb.ts, the single D1 choke point) and renders
-them through `VenueListView` (src/components/VenueListView.tsx), a Client
-Component that owns search (name/address, case-insensitive) and status/
-category filter state entirely client-side — the dataset is comfortably
-small (low hundreds of rows), well under where server-side filtering would
-earn its complexity. A row is
-flagged "Unpublished changes" (`hasUnpublishedChanges()`,
-src/lib/adminVenues.ts) when it's a draft, or when a published row has been
-edited since its last publish (`updated_at > published_at`) — so an admin
-can see at a glance what a Publish click would actually change.
-
-This page itself is still read-only — it only SELECTs, so it has no
-`requireAdminOrigin()` CSRF check (that guard only applies to mutating
-`/api/admin/*` routes) — but since #254 (next section) it links to
-`/admin/venues/new`, the admin's first mutation path.
-
-**`AdminVenueRow`** (src/types/venue.ts) mirrors the full D1 `venues` row,
-admin-only columns included, but is a deliberately separate type from
-`src/lib/publishVenues.ts`'s `VenueRow` (the pre-validation publish-pipeline
-shape, with `category` loosely typed as `string`). Unifying them would mean
-`src/types/venue.ts` — today a zero-import leaf module every data source
-conforms to — importing from a `lib/` module, risking the same circular
-import this codebase already hit once (see "Why `pfp-venues.ts` lives in
-its own file" above); a few duplicated field names is cheaper than that
-failure mode.
-
-**`/admin/boxes` (src/app/admin/boxes/page.tsx)** is the Blessing Boxes tab
-(approved mockup Direction B). It calls the same
-`loadBoxHealthEntries()` (src/lib/adminBoxes.ts) the Dashboard's side panel
-uses — one pure status function (`computeBoxHealth`, src/lib/boxHealth.ts)
-feeding both screens means they can never disagree about whether a given
-box needs help. The tab adds what the Dashboard deliberately leaves out:
-`AdminBoxesMap` (src/components/AdminBoxesMap.tsx, a small dedicated
-`react-map-gl` component — not the public map's much larger `Map.tsx`) with
-pins colored by status, "Needs help now" / "Gone quiet" lists
-(`BoxHealthList`, shared with the Dashboard via a `variant` prop),
-`BoxReportsChart` (plain-div stacked bars, no charting library, 8-week
-window bucketed by `bucketCheckinsByWeek()` in src/lib/adminDashboard.ts),
-and `AllBoxesTable` (every box, including ones removed from service —
-`blessing_boxes.removed_on` is a display flag here too, same as the public
-map's `mapRowToPublicBox`, never a query filter). "Places due for a check"
-does not appear on this tab — that panel is Dashboard-only by design.
+Migrations, R2 buckets and dedicated secrets: AGENTS.md "Blessing Boxes".
 
 ---
 
-## Admin — venue creation (#254)
+## Admin panel
 
-Adding a venue is split the same way the rest of the admin is: a
-Server-Component page owns the auth gate, a Client Component owns the
-form, and a route handler owns the authoritative write.
+Design spec: `docs/admin/cloudflare-native-admin-spec.md`. Per-slice build
+narratives (#253–#259, #390): atlas-kb "PFM AGENTS History — Admin Auth"
+and "PFM ARCHITECTURE History — 2026-09-24 Trim".
 
-- **`/admin/venues/new`** (src/app/admin/venues/new/page.tsx) — re-verifies
-  the Better Auth session via `getAdminDb()` (same fail-closed `forbidden()`
-  pattern as `/admin`) purely for the gate and the signed-in-email header;
-  it has nothing to `SELECT`. Renders `AddVenueForm`.
-- **`AddVenueForm`** (src/components/AddVenueForm.tsx) — presentational and
-  self-contained: owns all field state, a lightweight client-side
-  `validateClient()` (fast feedback, not authoritative), and the `fetch`
-  call to `POST /api/admin/venues`. It takes no D1/auth props, so it's
-  renderable standalone with an optional `initialValues` prop for a
-  sample-data preview. On a `201` response it calls `router.push("/admin")`
-  + `router.refresh()`; on a `422` it renders the server's field errors
-  inline (same field-name keys both layers use, so no remapping step is
-  needed between client and server error shapes).
-- **`POST /api/admin/venues`** (src/app/api/admin/venues/route.ts) — the
-  authoritative boundary. Auth mirrors `/api/admin/publish`: `getAdminDb()`
-  then `requireAdminOrigin()`, both throwing `AccessDeniedError` into one
-  403 shape. Validation (`src/lib/adminVenueValidation.ts`) re-checks every
-  field regardless of what the client already checked, because SQLite's own
-  CHECK constraints (migrations/0001_init_admin_schema.sql) only cover the
-  `category`/`status`/`source_type` enums — lat/lng bounds, a parseable
-  `last_verified` date, and the `hours_weekly` JSON shape have no DB-level
-  backstop otherwise. On success, one atomic `db.batch()` inserts the new
-  `venues` row (`status='draft'`, `source_type='manual'`,
-  `id = manual-${crypto.randomUUID()}`) and one `audit_log` row
-  (`action='create'`) together — matching the same "write + its own audit
-  row, atomically" shape `promotePublishedDrafts()` already uses for
-  Publish (previous section), just for a single record instead of a bulk
-  promotion.
+### The shape every admin surface follows
 
-A venue created this way is a plain draft — identical in every respect to
-one seeded by `scripts/seed-admin-db.ts` or one that will exist once the
-change-proposal approval queue (docs/admin/cloudflare-native-admin-spec.md
-§6) ships. It reaches the public map only via the existing Publish flow.
+- **Auth:** Better Auth is the sole gate (magic link + passkey, one-email
+  allowlist). **`getAdminDb()` (`src/lib/adminDb.ts`) is the only way to
+  reach the `ADMIN_DB` binding** and calls `requireAdminSession()` first, so
+  no page or route — including a client-side navigation a layout guard would
+  miss — reads admin data without a live session. Mutating `/api/admin/*`
+  routes also call `requireAdminOrigin()` (CSRF, `src/lib/adminOrigin.ts`).
+  Failures map to a login redirect / 401 (no session) or 403 via
+  `src/lib/adminAuthErrors.ts`. Cookie, allowlist and rate-limit gotchas:
+  AGENTS.md "Admin authentication".
+- **Server Component page owns the gate and the reads; a Client Component
+  owns the form; a route handler owns the authoritative write.** Client
+  components (`AddVenueForm`, `ArchiveVenueButton`, `PublishPanel`) hold no
+  auth.
+- **Every mutation is one atomic `db.batch()`: the write plus its own
+  `audit_log` row**, plus any dependent write (e.g. approving the
+  submission that prompted it). They land together or not at all.
+- **Nothing is deleted.** Archive sets `status='archived'`; the row and its
+  audit history stay.
+- **Destructive actions confirm with native `window.confirm()`** — no modal
+  dependency exists or is needed.
+- **Public (unauthenticated) routes that touch D1** — the suggest/report
+  queue, `/api/public/**` box routes — read `getCloudflareContext().env.ADMIN_DB`
+  directly, never `getAdminDb()`.
+- Every page except `/admin/login` shares one header (`AdminNav`) with
+  pending-count pills.
 
-**Address → coordinates (`GET /api/admin/geocode`).** Before submitting,
-`AddVenueForm` can call `GET /api/admin/geocode?q=<address>`
-(src/app/api/admin/geocode/route.ts) to auto-fill lat/lng from the
-Address field instead of requiring the admin to hand-type coordinates.
-This route is read-only (`getAdminDb()` for auth, no `requireAdminOrigin()`
-— same shape as `GET /api/admin/whoami`) and calls the free US Census
-Bureau geocoder server-side (never Mapbox — Census needs no key to provision
-or leak, keeping the admin's server-side geocoding off the public Mapbox
-token entirely).
-It has no effect on `POST /api/admin/venues` itself: lat/lng arrive in the
-same request body either way, hand-typed or geocode-filled, so the create
-route's validation and atomic `db.batch()` are unchanged by this addition.
+### Surfaces
 
----
-
-## Admin — venue edit & archive (#255)
-
-Slice 2 of the admin Phase 2 build (previous section is slice 1). Edit and
-archive are two independent mutations, each with its own route, sharing the
-same auth pattern as create:
-
-- **`PATCH /api/admin/venues/[id]`** (src/app/api/admin/venues/[id]/route.ts)
-  — full-field edit. Reuses `validateCreateVenuePayload()`
-  (src/lib/adminVenueValidation.ts) exactly as-is: an edit submits the
-  identical full field set a create does, because it is the same form
-  component (below) in a different mode, so there is nothing a dedicated
-  edit validator would check differently. On success, one atomic
-  `db.batch()` runs an `UPDATE` and writes an `audit_log` row
-  (`action='update'`, `before_json`/`after_json` = the row before/after).
-  `status` (and `source_type`/`created_at`/`created_by`/`published_at`/
-  `published_by`) never appears in the UPDATE's column list — this is a
-  structural guarantee, not a runtime check, that editing a `published`
-  venue cannot change its status: there is no code path in this file that
-  touches that column at all. Unlike create's INSERT (where
-  `created_at`/`updated_at` are DB-assigned defaults this process never
-  observes exactly), an UPDATE has no such default — SQLite only applies a
-  column `DEFAULT` on `INSERT` — so `updated_at` is computed once in JS and
-  reused identically for the SQL bind, the audit row's timestamp, and
-  `after_json`, guaranteeing all three agree exactly.
-- **`POST /api/admin/venues/[id]/archive`** (src/app/api/admin/venues/[id]/archive/route.ts)
-  — "Remove from map." A dedicated action route (same "verb-shaped action"
-  convention as `POST /api/admin/publish`) rather than a `status` field on
-  the PATCH body — keeping it separate means the edit route above never has
-  to reason about status transitions. Sets `status='archived'` via an
-  `UPDATE` (never `DELETE FROM venues` — the row and its audit history are
-  retained) and writes an `audit_log` row (`action='archive'`). An archived
-  row simply stops matching `fetchPublishSnapshot()`'s `WHERE status IN
-  ('draft','published')` (previous "Publish → static" section), so it drops
-  off the public map on the next Publish without the row ever being
-  destroyed. Idempotent by design: archiving an already-archived row still
-  succeeds and still writes an audit row, rather than special-casing a
-  no-op.
-
-**`AddVenueForm` gained an edit mode instead of being forked.** An optional
-`venueId` prop is the switch: absent -> create (`POST /api/admin/venues`,
-button reads "Add venue"); present -> edit (`PATCH
-/api/admin/venues/<venueId>`, button reads "Save changes"). Every field,
-all client-side validation, and the post-success `router.push("/admin")` +
-`router.refresh()` are shared between both modes — the two submit paths
-differ only in endpoint, HTTP method, and the status code that counts as
-success (201 vs. 200).
-
-**The edit page** (`/admin/venues/[id]/edit`,
-src/app/admin/venues/[id]/edit/page.tsx) is the same
-Server-Component-auth-gate shape as `/admin/venues/new`, but also has a row
-to `SELECT` by id — `getAdminDb()` serves both the auth check and the read
-in one call, same as `/admin`'s list query. An id with no matching row
-calls Next's `notFound()` (same convention `/venue/[id]/page.tsx` already
-established for the public side). `src/lib/adminVenueForm.ts`'s
-`mapVenueRowToFormValues()` is the inverse of the form's own internal
-`buildHoursWeekly()`: it converts a stored `AdminVenueRow` (tri-state
-integers, JSON-text `hours_weekly`, nullable text columns) into the
-`Partial<AddVenueFormValues>` shape `initialValues` already accepted before
-#255. It is a deliberately plain, framework-free function — not exported
-from `AddVenueForm.tsx` itself — because that file is a `"use client"`
-module and a Server Component page cannot safely import and call runtime
-code from one; keeping the mapper in its own `lib/` module is what lets the
-Server Component page call it directly (and lets it be unit-tested without
-mounting anything, same rationale as `adminVenueValidation.ts` and
-`adminVenues.ts`).
-
-Below the form, a "Danger zone" section renders `ArchiveVenueButton`
-(src/components/ArchiveVenueButton.tsx) — a small Client Component kept
-separate from `AddVenueForm` for the same reason the form itself wasn't
-forked: archive-only UI has no reason to live inside the shared create/edit
-form. It gates the archive call behind a native `window.confirm()` dialog
-(no new dependency; this codebase has no existing modal/dialog component to
-reuse — vaul's `Drawer` is scoped to the public map's mobile `BottomSheet`,
-an unrelated concern) and, on a `200`, redirects to `/admin` the same way
-the form does. Its button reaches for the `--color-danger` design token
-(defined in `globals.css` `@theme` / mirrored in `DESIGN.md` since #237
-checkpoint c, but unused by any component until now) rather than a literal
-Tailwind red utility — this is the app's one genuinely destructive admin
-action, and DESIGN.md's semantic-color set already had a token reserved for
-exactly this role.
-
-**`VenueListView` gained a per-row `Edit` link** to `/admin/venues/<id>/edit`
-— a plain sage text link matching the "Back to venue list" link style
-already used on the create/edit pages. The list itself still issues no
-mutation of its own and remains read-only.
-
----
-
-## Admin — publish button (#256)
-
-Slice 3 of the admin Phase 2 build (previous section is slice 2). Where
-#254/#255 each added a mutation route plus its own page, #256 adds no new
-route or page — it wires a UI onto the publish engine that already existed
-(`POST /api/admin/publish`, "Publish → static" section above), following
-the same Server-Component-data / Client-Component-action split as every
-other admin surface.
-
-**Split:** `/admin` (src/app/admin/page.tsx) computes
-`summarizePublishChanges(venues)` (src/lib/adminVenues.ts) from the rows it
-already `SELECT *`s for `VenueListView` — no second query — and passes the
-resulting `{ newDrafts, editedSincePublish, archived }` to `PublishPanel`
-(src/components/PublishPanel.tsx, rendered above `VenueListView` so the
-admin sees "what will publish" before scrolling the list) as one typed
-prop. `PublishPanel` holds no auth of its own, same as `AddVenueForm` and
-`ArchiveVenueButton` — the page's Server Component owns the Cloudflare
-Access gate, and the route re-verifies identity + Origin itself.
-
-**Why `archived` only counts previously-published rows.** A venue can be
-archived from either `draft` or `published`. Only the latter is a real
-subtraction from the live public map — a drafted-then-archived venue was
-never live, so publishing after archiving it changes nothing about what
-the public map shows. `summarizePublishChanges` therefore gates the
-`archived` bucket on `published_at !== null`, deliberately narrower than
-`hasUnpublishedChanges`'s own second branch (src/lib/adminVenues.ts, #253),
-which isn't status-gated at all — the two functions answer different
-questions (`hasUnpublishedChanges`: "does this ONE row have a pending
-change worth flagging in the table," including an archived-since-live row;
-`summarizePublishChanges`: "put this row in exactly one of three
-publish-outcome buckets, un-double-counted").
-
-**Confirm gate, then one `fetch`.** `PublishPanel` is a small state machine
-(`idle -> submitting -> success | error`) gated by a native
-`window.confirm()` — the same pattern `ArchiveVenueButton` established for
-#255, still with no modal dependency in this codebase. Only a confirmed
-click calls `fetch("/api/admin/publish", { method: "POST" })`; the response
-is mapped to exactly one of five friendly states (success, not-configured,
-GitHub-commit-failed, validation-failed, session-expired) or a generic
-retry message for anything else (a non-matching status or a network-level
-throw) — see AGENTS.md's "Admin publish button" section for the full
-status -> message table. A successful publish calls `router.refresh()`:
-D1's promotion already happened server-side by the time the `200` arrives
-(NB1 ordering, "Publish → static" section above), so refreshing brings the
-panel's own counts back toward zero immediately rather than showing a
-stale non-zero summary right after a publish that already succeeded.
-
-**Why sage, not orange, for the Publish button.** DESIGN.md scopes
-brand-orange to exactly two elements, both on the *public* map (the splash
-CTA, and formerly the LocateButton pill), with an explicit Don't against reuse
-elsewhere — extending it to a third, admin-only context would break that
-rule. Filled sage-500/sage-600-hover is already this admin surface's
-established primary-action treatment (`AddVenueForm`'s submit button,
-`/admin`'s "Add place" link); `PublishPanel` reuses it rather than
-inventing a new tier, since it is already the strongest CTA treatment this
-design system offers outside the reserved public-map orange.
-
-**The one backend change this slice needed.** Before #256, a missing
-`GITHUB_PUBLISH_TOKEN` made `POST /api/admin/publish` `throw`, which
-surfaces to any caller as an opaque `500` with no body — `PublishPanel`
-couldn't tell "not configured yet" (expected, pending #260) apart from a
-real crash. The route now returns
-`{ ok: false, error: "publish_not_configured" }` at `503` from the exact
-same guard location (after auth, before the snapshot) — the
-snapshot/validate/serialize/commit/promote sequence and the NB1
-commit-before-D1-write ordering are byte-for-byte unchanged.
-
----
-
-## Admin — review queue (#259)
-
-`public_submissions` (#258, previous "Public submissions queue" section in
-AGENTS.md) went from write-only to read+actionable: `/admin/submissions`
-(src/app/admin/submissions/page.tsx) reads every `pending` row, newest
-first, and renders it as a card
-(src/components/SubmissionsReviewView.tsx) an admin can approve or reject.
-
-**Mental model: this slice adds ONE new mutation and re-shapes TWO existing
-ones, rather than inventing a parallel "approve a submission" pipeline.**
-`POST /api/admin/venues` and `POST /api/admin/venues/[id]/archive` each
-gained an optional `submissionId` field that appends a third statement —
-flipping the originating `public_submissions` row to `status='approved'`
-— to the SAME atomic `db.batch()` that already does the venue insert or
-the archive `UPDATE`. That's the load-bearing design choice: a venue
-mutation and its originating submission's approval either land together in
-one transaction or neither lands at all, with no separate D1 round trip
-that could succeed on one side and fail on the other. The one truly new
-route, `POST /api/admin/submissions/[id]/reject`, is a standalone `UPDATE`
-with no venue-side counterpart and no `audit_log` row — a reject changes
-nothing about `venues`, so there is nothing for that table's audit trail to
-describe.
-
-**Both approve paths are now two-step hand-offs (#270 changed closure to
-match new_venue).** A `new_venue` card's "Review & approve" is a plain link
-to `/admin/venues/new?submission=<id>` — that page fetches and parses the
-still-pending row itself, maps it (`src/lib/adminVenueForm.ts`'s
-`mapSubmissionPayloadToFormValues()`, the inverse-shaped sibling of
-`mapVenueRowToFormValues()` from the "venue edit" section above) to
-`AddVenueForm`'s `initialValues`, and threads the submission id through as
-its new `submissionId` prop. The admin still reviews/edits every field and
-clicks "Add venue" themselves; approval only commits when that POST fires.
-A `closure` card's "Review & approve" is now the SAME shape of hand-off: a
-plain link to `/admin/venues/<target_venue_id>/edit?submission=<id>`
-(`target_venue_id`, a real column on the submission row itself, not
-something inside the parsed JSON payload, so this link still works even on
-a row whose payload failed to parse). That edit page cross-checks the
-submission's `target_venue_id` against the venue actually being edited
-before accepting it — new_venue has no existing venue to cross-check
-against, so this guard has no new_venue equivalent — and, once accepted,
-shows a clay-accented banner with the report's details and threads the id
-through as `ArchiveVenueButton`'s new optional `submissionId` prop. The
-admin can fix the venue's details, remove it (archiving POSTs the existing
-archive route with `{ submissionId }`, gated by the same native
-`window.confirm()` convention `ArchiveVenueButton` established at #255,
-then redirects to `/admin/submissions` instead of `/admin`), or simply
-leave it pending and reject the report from the queue instead if it turns
-out to be wrong. Originally closure approve was one click straight to
-archive; changed because a closure report can mean "the hours changed,"
-not only "this place is gone."
-
-**Per-row parse isolation, not a whole-query try/catch.** `payload` is one
-opaque JSON TEXT column carrying two different shapes depending on `kind`
-(`NewVenuePayload` vs. `ClosurePayload`, both in
-src/lib/publicSubmissions.ts, added alongside that file's existing
-`PublicSubmissionInsert`/`insertPublicSubmission` — same module, since it
-already owns this queue's write shape). The review-queue page parses each
-row independently (`parseSubmissionRow`) so one malformed row degrades to
-that single card's own "couldn't read details" state
-(`SubmissionsReviewView`'s `parseError` branch — still offers Reject, since
-rejecting needs only the row's id) rather than withholding the whole queue
-behind one bad row.
-
-**Category reconciliation is a mapper concern, not a schema one.** The
-public suggest form's category (`VenueCategoryKey`,
-src/lib/suggestTypes.ts) and the venues table's `VenueCategory`
-(src/types/venue.ts) are two independently-maintained 7-value enums that
-happen to match key-for-key today, with no shared import enforcing that.
-`mapSubmissionPayloadToFormValues()` checks the incoming value against the
-real `VenueCategory` set and falls back to `""` (the form's own
-unselected-category state) on anything it doesn't recognize, so a future
-drift between the two enums degrades to "the admin picks the category by
-hand," never a broken pre-fill or a create that fails
-`validateCreateVenuePayload()`. The same function's notes prefill is
-deliberately lossy-but-safe: hours/contact/submitter email have no
-dedicated `AddVenueForm` fields, so they fold into the free-text notes
-field under a labeled separator rather than being silently dropped — the
-admin reads and edits notes before saving either way.
-
----
-
-## Open questions
-
-These could not be confirmed from the current git history or code comments.
-They need an answer from the author before they can be documented as facts.
-
-- **Why Mapbox over Leaflet (specific reason)?** The README notes "Phase 2 complete
-  (Mapbox migration)" but the migration commit is not in the shallow worktree
-  history. Likely reasons: vector tiles, smoother animations, better mobile
-  performance — but this should not be asserted without confirmation.
-
-- **Why Cloudflare Workers over Vercel (specific reason)?** The project
-  description notes a migration from Vercel, confirmed in the project memory
-  entry (2026-06-17), but the reason is not in the current code or visible
-  history. Possible reasons: cost, Workers-native Turnstile, edge runtime
-  semantics — unconfirmed.
+- **`/admin` — Dashboard** (`src/app/admin/page.tsx`). A to-do landing page
+  that `Promise.all`s several best-effort D1 reads: a `PublishPanel` (only
+  when unpublished changes exist — the same component and action
+  `/admin/places` uses), `NeedsDecisionPanel` (Suggestions / Data refresh /
+  Blessing boxes — capped previews that link out to each full queue; any
+  decision needing more than one click links out rather than growing an
+  inline form), and two side panels: `BoxHealthList` ("Boxes that need
+  help") and `StalePlacesList` ("Places due for a check" — published venues
+  with `last_verified` over 12 months old, oldest first).
+- **`/admin/places` — venue list** (`VenueListView`). All `venues` rows —
+  draft, published, archived — filtered and searched entirely client-side
+  (low hundreds of rows). A row is flagged "Unpublished changes"
+  (`hasUnpublishedChanges()`, `src/lib/adminVenues.ts`) when it's a draft or
+  was edited since its last publish (`updated_at > published_at`). Read-only
+  itself; each row links to its edit page.
+- **`/admin/venues/new` and `/admin/venues/[id]/edit`** — one form,
+  `AddVenueForm`, in two modes (an optional `venueId` switches create →
+  edit; same fields, validation and redirect). `POST /api/admin/venues`
+  inserts a `status='draft'`, `source_type='manual'`,
+  `id = manual-${crypto.randomUUID()}` row; `PATCH /api/admin/venues/[id]`
+  updates it; `POST /api/admin/venues/[id]/archive` ("Remove from map",
+  `ArchiveVenueButton`, the one `--color-danger` action) archives it.
+  - **The server re-validates every field** (`adminVenueValidation.ts`, the
+    same validator for create and edit) because SQLite CHECK constraints
+    cover only the enums — not lat/lng bounds, the `last_verified` date or
+    the `hours_weekly` JSON shape.
+  - **Edit can never change `status`** (or `source_type`, `created_*`,
+    `published_*`): those columns are absent from the UPDATE — a structural
+    guarantee, not a runtime check. `updated_at` is computed once in JS and
+    reused for the UPDATE, the audit row and `after_json`, so all three
+    agree.
+  - **Optimistic concurrency (#265).** PATCH and archive bind the row's
+    last-known `updated_at` into `WHERE id = ? AND updated_at = ?` (from the
+    form for PATCH, read fresh in-route for archive). A second admin's
+    concurrent save gets a 409 instead of a silent overwrite, and every
+    dependent write in the batch is `WHERE EXISTS`-gated on that same
+    precondition.
+  - Archive is idempotent — archiving an archived row still succeeds and
+    still writes an audit row. An archived row drops out of the next
+    Publish snapshot.
+  - `mapVenueRowToFormValues()` (`src/lib/adminVenueForm.ts`) turns a stored
+    row into form values; it's outside the `"use client"` form file so the
+    Server Component page can call it.
+  - **Address → coordinates:** `GET /api/admin/geocode` calls the free US
+    Census geocoder server-side (never Mapbox — no key to provision or
+    leak). It only fills lat/lng in the form; the create route is unchanged.
+  - `AdminVenueRow` and `publishVenues.ts`'s `VenueRow` are deliberately
+    separate types (circular-import risk — see `src/types/venue.ts`).
+- **Publish** (`PublishPanel` → `POST /api/admin/publish`,
+  `src/lib/publishVenues.ts`). The panel shows
+  `summarizePublishChanges()`'s three buckets (`newDrafts`,
+  `editedSincePublish`, `archived` — `archived` counts only rows that were
+  published, since archiving a never-live draft changes nothing public),
+  confirms, then maps the response to one of five messages or a generic
+  retry. The route snapshots `draft`+`published` rows, validates, commits
+  `published-venues.ts` to the `publish-bot` branch, opens/reuses its
+  auto-merging PR, and **only then** promotes drafts in D1 — the reverse
+  order could mark rows published when the file never shipped. It refuses
+  on staging (`isProductionWorker()`, #591) and returns
+  `503 publish_not_configured` when `GITHUB_PUBLISH_TOKEN` is unset. The
+  button is sage, not brand orange: DESIGN.md reserves orange for the public
+  map.
+  - **"Published" means "PR open and armed," not "merged" (#598).** If that
+    PR's CI then fails, D1 says published while the live site serves the old
+    file until the next Publish repairs it. Waiting for the real merge was
+    rejected (it would hold a request open across a multi-minute CI run for
+    a rare, self-healing case). Instead the Dashboard reads the open
+    `publish-bot` PR (`fetchPublishBotPrStatus`, `publishVenues.ts`) and
+    shows `PublishBotStatusBanner` (in progress / stuck on a merge conflict /
+    stuck on checks after 20 minutes). It reads `mergeable_state` from the
+    Pulls API, not the Checks API, because a fine-grained PAT can't read
+    check runs at all. It fails soft: skipped with no token (staging), and
+    any GitHub error reads as "in progress".
+- **`/admin/submissions` — public submissions queue (#259).** Reads every
+  pending `public_submissions` row, newest first, as cards
+  (`SubmissionsReviewView`). Approving reuses the venue routes rather than a
+  parallel pipeline: a `new_venue` card links to
+  `/admin/venues/new?submission=<id>` (prefilled by
+  `mapSubmissionPayloadToFormValues()`), and a `closure` card links to
+  `/admin/venues/<target_venue_id>/edit?submission=<id>` (#270 — a closure
+  report can mean "hours changed," not only "gone"). The edit page
+  cross-checks the submission's `target_venue_id` before accepting it. The
+  optional `submissionId` then rides the create or archive route's own
+  `db.batch()`, so the venue change and the approval land together.
+  Reject is its own route with no `audit_log` row (it changes no venue).
+  Each row's JSON `payload` is parsed on its own (`parseSubmissionRow`), so
+  one bad row degrades to a still-rejectable "couldn't read details" card.
+  The payload mapper's category fallback and notes folding are explained in
+  `src/lib/adminVenueForm.ts`.
+- **`/admin/flags` — refresh proposals (#390).** See "Automated
+  venue-refresh pipeline" above.
+- **`/admin/boxes` — Blessing Boxes tab.** `AdminBoxesMap` (a small
+  dedicated `react-map-gl` component, not the public `Map.tsx`) with pins
+  colored by status, "Needs help now" / "Gone quiet" lists, an 8-week
+  `BoxReportsChart` (plain divs, no chart library;
+  `bucketCheckinsByWeek()`), and `AllBoxesTable` (including removed boxes —
+  `removed_on` is a display flag, never a query filter). It and the
+  Dashboard's side panel share `loadBoxHealthEntries()`
+  (`src/lib/adminBoxes.ts`) and one status function (`computeBoxHealth`,
+  `src/lib/boxHealth.ts`), so they can't disagree about a box. "Places due
+  for a check" is Dashboard-only.
+- **`/admin/box-photos`, `/admin/box-adopters`** — the photo and
+  adoption-request queues the Dashboard's Blessing boxes group links to.

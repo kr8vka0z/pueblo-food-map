@@ -4,6 +4,8 @@
 >
 > **Opening pull requests?** Kyle's standing preference: the **fewest logical PRs**. Group related work (code + its tests + its docs, a mechanical change applied everywhere) into one PR; split only when a change needs its own review, staging check, or independent rollback (e.g. a visual code change vs. a docs-only change, anything touching migrations/auth). PRs target `dev`, never `main`.
 >
+> **Filing, triaging, or picking up issues?** Read the project board's README first: `gh project view 1 --owner kr8vka0z --format json --jq .readme` ([board](https://github.com/users/kr8vka0z/projects/1)). It defines the Status/Priority/Size fields and labels (`agent-ready`, `needs-kyle`, `backlog`); the board's Priority field wins over any `priority:` label.
+>
 > **Reviewing a pull request?** Read [REVIEW.md](REVIEW.md) first and report Blocker / Important / Nit the way it defines them. Repo rules go in `REVIEW.md`, never in the CI reviewer's workflow file: `claude-code-action` refuses to run unless `.github/workflows/claude-code-review.yml` is byte-identical to the copy on `main`, so an edit to it on `dev` silently switches reviews off until the next promotion.
 
 **Deeper history for every section below** (superseded designs, phase-by-phase build narration, incident write-ups) was moved out on 2026-09-19 to keep this file small — it reloads on every turn of every session. Pointers say where.

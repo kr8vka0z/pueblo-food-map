@@ -68,18 +68,19 @@ describe("venues data-layer invariants", () => {
   test("venues overlay lets an explicit D1 accepts_snap/accepts_wic value win over benefit-flags.ts (#238 'admin edits win')", () => {
     // Direct behavioral proof, independent of the wiring-pins-itself test
     // above (that test would pass even with a bug shared between venues.ts
-    // and its own re-implementation here). Picks a real overlay-covered id
-    // and asserts the NULL-guard both fills a genuinely-unset field and
-    // preserves an already-set one.
-    const overlayId = Object.keys(benefitFlags)[0];
-    const publishedRow = publishedVenues.find((v) => v.id === overlayId);
-    expect(publishedRow).toBeDefined();
-    // Today's published-venues.ts has no accepts_snap/accepts_wic for OSM
-    // rows yet (0014 hasn't landed on prod + been published) — this proves
-    // the overlay still fills in that case.
-    expect(publishedRow!.accepts_snap).toBeUndefined();
-    const resolved = venues.find((v) => v.id === overlayId);
-    expect(resolved!.accepts_snap).toBe(benefitFlags[overlayId].snap);
+    // and its own re-implementation here). Walks every overlay-covered id and
+    // asserts the NULL-guard per field: a published value wins, an unset one
+    // is filled from benefit-flags.ts. Written to hold in either snapshot
+    // state: before 0014 was published every field was unset, and after the
+    // 2026-09-25 publish nearly all are set. Pinning one state broke that
+    // publish's data-only PR.
+    for (const [id, flags] of Object.entries(benefitFlags)) {
+      const publishedRow = publishedVenues.find((v) => v.id === id);
+      if (!publishedRow) continue;
+      const resolved = venues.find((v) => v.id === id)!;
+      expect(resolved.accepts_snap).toBe(publishedRow.accepts_snap ?? flags.snap);
+      expect(resolved.accepts_wic).toBe(publishedRow.accepts_wic ?? flags.wic);
+    }
   });
 
   test("seed arrays total 106 records: 10 pfp + 60 osm + 36 plentiful", () => {

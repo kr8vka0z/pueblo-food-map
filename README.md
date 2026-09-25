@@ -67,7 +67,6 @@ src/
   data/            Static venue data (committed TypeScript modules)
     venues.ts        Public venue list — single import for all components
     published-venues.ts  Snapshot of D1 venues, written by admin Publish (do not edit by hand)
-    benefit-flags.ts SNAP/WIC overlay (interim, see venues.ts header)
     grocery-osm.ts, pantries-plentiful.ts, pfp-venues.ts
                      Scraper/hand-curated source arrays — not read by the public
                      map since the #237 D1 cutover (seed script, tests, refresh diff)
@@ -147,7 +146,7 @@ CI enforces this automatically (blocking gate).
 | Gardens + landscapes | Pueblo Food Project CGSP page | Manual |
 | Pantries + meal sites | Plentiful public directory (`directory.plentiful.org/colorado/pueblo`) | Automated (see below) |
 | Grocery / convenience / farms | OpenStreetMap Overpass API | Automated (see below) |
-| SNAP / WIC flags | USDA FNS + CDPHE public data | Re-run `scripts/match-benefits.py` |
+| SNAP / WIC flags | USDA FNS + CDPHE public data (matched into D1 by migration `0014`, #597) | Admin-editable in D1 directly |
 
 PFP garden coordinates geocoded against Nominatim (OpenStreetMap) on
 2026-05-14 via `scripts/geocode-pfp.py` — audit trail in

@@ -66,6 +66,7 @@ export function useMapUI() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       handleMapError("webgl");
     } else if (!navigator.onLine) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       handleMapError("offline");
     }
   }, [handleMapError]);

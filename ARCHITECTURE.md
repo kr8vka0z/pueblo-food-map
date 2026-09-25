@@ -64,7 +64,6 @@ Next.js App Router (Cloudflare Worker)
 Data layer (static TS modules, no API calls at render time)
   └── src/data/venues.ts          (public venue list — see "Data aggregator" below)
   └── src/data/published-venues.ts    (D1 snapshot written by admin Publish)
-  └── src/data/benefit-flags.ts   (SNAP/WIC overlay, interim — see below)
   └── src/data/pfp-venues.ts, grocery-osm.ts, pantries-plentiful.ts
         (source arrays; not read by the public map since the #237 cutover)
   └── src/types/venue.ts          (canonical Venue type)
@@ -96,10 +95,8 @@ Cloudflare D1 `venues` (status draft/published, category != blessing_box)
            ↓  (src/lib/publishVenues.ts: snapshot, validate, commit via a
            ↓   publish-bot PR, then promote drafts in D1)
 src/data/published-venues.ts   (literal Venue[] array + publishedAt)
-           ↓ .map(withBenefitFlagsOverlay)
-           + benefitFlags overlay (keyed by id; fills only fields D1 left unset)
            ↓
-export const venues: Venue[]   (src/data/venues.ts)
+export const venues: Venue[]   (src/data/venues.ts — re-exported directly)
 ```
 
 **D1 is the source of truth; `published-venues.ts` is its build-time
@@ -117,13 +114,13 @@ hand-curated Pueblo Food Project records; `grocery-osm.ts` and
 them now; the refresh pipeline reads the two scraper outputs to diff
 against D1 — see "Automated venue-refresh pipeline" below.
 
-**Benefit flags are an interim overlay.** SNAP/WIC acceptance used to live
-only in `benefit-flags.ts` so it survived scraper regeneration (#127).
-Migration `0014` copies it into D1, where it is admin-editable (#597); until
-that migration is on production and a Publish has run, the overlay fills
-only fields the snapshot leaves unset, so an admin's D1 value always wins.
-`venues.ts`'s header has the full interim-state explanation and the
-follow-up deletion plan (also in AGENTS.md's promotion checklist).
+**SNAP/WIC acceptance is a plain D1 field, admin-editable, no overlay.**
+It used to live only in a static `benefit-flags.ts` file applied as a
+runtime overlay so it survived scraper regeneration (#127). Migration
+`0014` copied those matches into D1's `accepts_snap`/`accepts_wic` columns
+(filling only NULLs), production got the migration and a Publish on
+2026-09-25, and the overlay was deleted as dead code (#597) — D1 is now the
+sole, permanently admin-editable source for both fields.
 
 **Blessing boxes bypass this entirely** — see "Blessing Boxes" below.
 

@@ -1064,8 +1064,9 @@ creates in [§13](#13-tradeoffs-risks--open-questions).
    `status='draft'`, same audit row, just with the reviewing admin as
    `created_by` instead of a form-filling admin.
 2. **Edit.** `PATCH /api/admin/venues/[id]` — "Save" updates the row in place
-   (status untouched if already `published`; `#180` decision log #3 accepts
-   last-write-wins, no optimistic locking in v1) and writes an `audit_log`
+   (status untouched if already `published`; `#180` decision log #3 accepted
+   last-write-wins in v1 — **superseded 2026-09-24 by #265**: the PATCH now carries an
+   `updated_at` precondition and returns 409 on a concurrent edit) and writes an `audit_log`
    row (`action='update'`) with `before_json`/`after_json` diffs, same
    transaction. If a pending `change_proposals` row targets the same venue
    and field(s) this edit touches, that proposal is superseded — its
@@ -1126,8 +1127,8 @@ D1 since. "The live map keeps showing the published version while a draft is
 edited" is therefore automatically true: the public site is static and
 doesn't change until Publish runs, full stop. The two-table model was
 considered and rejected as unnecessary complexity for a single-admin-role tool
-that has already accepted last-write-wins (`#180` decision log #3) — it would
-be the correct upgrade if/when this ever needs true multi-editor concurrency.
+that had accepted last-write-wins (`#180` decision log #3) — the upgrade this
+note anticipated shipped in #265 (2026-09-24): optimistic locking on `updated_at`.
 This same one-row model is also what lets an approved change-proposal apply
 as an ordinary field update with **zero new status semantics** — approving is
 just another way an admin-authorized write reaches the same row (§6.7).
@@ -2152,7 +2153,7 @@ this section exists so a side-by-side review doesn't have to hunt for gaps.
 | Admin can create/edit/hide via UI; full field set; category enum-limited; manual + map-pin coordinates (`#180` AC1-4) | `/admin/venues` list + form over the D1 table, now covering all 108 venues; category `<select>` sourced from the existing `VenueCategory` union; coordinate entry via numeric fields + a Mapbox click-to-pin picker (already a dependency) |
 | Publish explicit + separate from Save; ~10-minute go-live (`#180` AC6/AC7) | Save = D1 write only; Publish = separate action → snapshot → commit → deploy. **Corrected from v1.0 (I5):** ~10 minutes is the honest floor (two serial Workers Builds on one concurrent slot), not a number the mechanism typically beats (§3.5, §8) |
 | Audit fields for create/update/publish (`#180` AC8) | `created_by/at`, `updated_by/at`, `published_by/at` columns + full before/after JSON in `audit_log` (§4). Also covers changes applied via an approved proposal — the reviewing admin, not a bot identity, is the recorded actor (§6.7) |
-| Last write wins in concurrent edits (`#180` decision log 3) | Same — no optimistic locking in v1, matching the accepted simplification (§5 design note). Explicitly extended in this revision to publish granularity too — a successful publish ships every draft/approved change captured in that publish's snapshot at once, stated plainly rather than left implicit (§5 step 5, I6; NB1 fixed the snapshot-vs-commit ordering underneath this) |
+| Last write wins in concurrent edits (`#180` decision log 3) | **Superseded by #265 (2026-09-24):** edit and archive now use an `updated_at` optimistic-locking precondition (409 on conflict). Originally: no optimistic locking in v1, matching the accepted simplification (§5 design note). Explicitly extended in this revision to publish granularity too — a successful publish ships every draft/approved change captured in that publish's snapshot at once, stated plainly rather than left implicit (§5 step 5, I6; NB1 fixed the snapshot-vs-commit ordering underneath this) |
 | Seed all current records w/ stable IDs; seed report; preview/prod separation; validation checklist; stakeholder sign-off (`#181` AC1-5) | **Corrected from v1.0 (B1):** the seed script now ingests all 108 current records across all three sources (source-native ids, collision-free by construction though not claimed stable under a Plentiful rename — §4, Important-1), not just the 10 PFP records; prints a count/mismatch report per source plus a name/lat-lng similarity check for likely duplicates (§7 step 3); separate `-preview` D1 database; burn-in diff; sign-off checklist (§7) |
 | Full initial seed; phased overlay cutover; no dedicated backup system in v1 (`#181` decision log) | **Corrected from v1.0 (B1):** v1.0's "Same approach" claim here was a stretch — it only ever seeded 10 of 108 records, so "full initial seed" was approximate at best. This revision's 108-record seed makes the claim accurate rather than approximate. `wrangler d1 export` remains the free, built-in v1 backup mechanism (§7 step 8) |
 | *(New in this revision — no Ray's-plan equivalent exists yet)* | Automated refresh proposes changes instead of writing directly; a human approves/rejects every one; sanity guardrails and link-health checks are built into the same queue (§6). This is new ground `#178`-`#181` don't cover — it comes from unifying `#133`/`#234` into this proposal (§1) |

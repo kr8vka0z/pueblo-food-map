@@ -75,4 +75,18 @@ describe("check-banned.mjs — build/output dirs are excluded (#248)", () => {
     expect(result.stderr).toContain("BANNED [Arial font]");
     expect(result.stderr).toContain("__checkBannedProbe.ts");
   });
+
+  test("a stock Tailwind chromatic class fails the check — errors use `danger`", () => {
+    writeFileSync(SRC_PROBE, 'export const x = "text-red-600";\n'); // allow-banned: probe fixture, this test asserts the checker still flags it
+    const result = runBannedCheck();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("BANNED [Tailwind chromatic palette]");
+  });
+
+  test("a sage-500 fill in a component fails the check — filled buttons use sage-600 (AA)", () => {
+    writeFileSync(SRC_PROBE, 'export const x = "bg-[var(--color-sage-500)] text-[var(--color-bone-50)]";\n'); // allow-banned: probe fixture, this test asserts the checker still flags it
+    const result = runBannedCheck();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("BANNED [sage-500 fill (fails AA behind text)]");
+  });
 });

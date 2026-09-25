@@ -154,7 +154,8 @@ export interface StaleApplyResult {
  * `venues` row for target_venue_id and re-checks it against
  * proposed_diff.before — but scoped to what that proposal actually
  * asserts, not the whole row." The narrow per-type scope is load-bearing,
- * not a simplification — see AGENTS.md's "#235 reconciliation" note (also
+ * not a simplification — see the "#235 reconciliation" note (atlas-kb
+ * "PFM AGENTS History — Venue-Refresh Pipeline"; also
  * quoted in the spec) for the concrete case a whole-row check would
  * misfire on: two independent proposals from different sources can
  * legitimately target the same venue at once (a link_health url-clear and

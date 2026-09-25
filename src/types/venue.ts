@@ -84,8 +84,8 @@ export interface Venue {
 // pipeline. This file has zero imports today (every data source in this
 // app conforms to it, never the reverse) — importing VenueRow from a
 // lib/ module here would risk a circular import the moment that module
-// ever imports something from this one (see ARCHITECTURE.md's note on why
-// pfp-venues.ts had to move out of venues.ts for the same reason). A few
+// ever imports something from this one (see src/data/pfp-venues.ts's header
+// on why it had to move out of venues.ts for the same reason). A few
 // duplicated field names is cheaper than that failure mode.
 
 /** Mirrors the `venues.status` CHECK constraint (migrations/0001_init_admin_schema.sql). */

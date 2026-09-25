@@ -1,6 +1,6 @@
 /**
  * PageNav — navigation on the pages the Menu opens (About, Suggest, Feedback,
- * Browse all venues, Food help programs).
+ * Browse all places, Food help programs).
  *
  * WHY the bottom nav lives here too: these pages used to offer only "Back to
  * map", which closed the Menu, so reaching a second Menu item meant reopening

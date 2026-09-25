@@ -6,7 +6,7 @@
  *
  * Presentational + self-contained: owns all field state, client-side
  * validation, and the fetch call to the venues API. No auth/D1 in scope
- * here — the Cloudflare Access gate lives in the parent Server Component
+ * here — the Better Auth gate (getAdminDb()) lives in the parent Server Component
  * (src/app/admin/venues/new/page.tsx or .../[id]/edit/page.tsx, same
  * pattern as AGENTS.md "Admin authentication"). This mirrors SuggestForm.tsx's
  * own form/route split; this component imitates SuggestForm's
@@ -43,6 +43,15 @@
  * row (source='link_health') atomically with the venue update — wired by
  * src/app/admin/venues/[id]/edit/page.tsx when opened as `?proposal=<id>`.
  * On success that path redirects back to /admin/flags instead of /admin.
+ *
+ * #265: `expectedUpdatedAt` (EDIT mode only) is the optimistic-concurrency
+ * precondition — the row's `updated_at` as the edit page's own server-side
+ * read saw it, sent back verbatim with every PATCH. A 409 with
+ * `error: "conflict"` means another admin saved this venue first; the error
+ * banner below shows the server's message plus a Reload button, and
+ * deliberately does NOT reset `values` — the admin's unsaved edits stay on
+ * screen so they can copy them out before reloading to see the other
+ * admin's version.
  */
 
 import { useState } from "react";
@@ -159,6 +168,18 @@ export interface AddVenueFormProps {
    * `status='approved'` in the SAME atomic batch as the venue update.
    */
   proposalId?: number;
+  /**
+   * #265 (optimistic concurrency): the row's `updated_at` as read by the
+   * edit page's own server-side SELECT, at the moment this form loaded.
+   * EDIT MODE ONLY — ignored in create mode (there is no existing row yet).
+   * Sent back verbatim (byte-for-byte, no Date round-trip) as
+   * `expectedUpdatedAt` in the PATCH body; PATCH /api/admin/venues/<id>
+   * binds it into its UPDATE's `WHERE ... AND updated_at = ?` precondition
+   * (see that route's own header) and rejects with 409 if another admin's
+   * save landed first. Wired by src/app/admin/venues/[id]/edit/page.tsx
+   * from the same `venue` row mapVenueRowToFormValues() already reads.
+   */
+  expectedUpdatedAt?: string;
 }
 
 type FieldErrorKey =
@@ -335,7 +356,13 @@ function validateClient(values: AddVenueFormValues): FieldErrors {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function AddVenueForm({ initialValues, venueId, submissionId, proposalId }: AddVenueFormProps) {
+export default function AddVenueForm({
+  initialValues,
+  venueId,
+  submissionId,
+  proposalId,
+  expectedUpdatedAt,
+}: AddVenueFormProps) {
   const router = useRouter();
   const isEditMode = venueId !== undefined;
   const [values, setValues] = useState<AddVenueFormValues>(() => defaultValues(initialValues));
@@ -347,6 +374,13 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
   // below is actively misleading here, since retrying can never succeed.
   // null for every other error path, which keeps that generic copy.
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // #265: PATCH's own `error` code string (e.g. "conflict"), read from the
+  // same 409 body errorMessage above already parses — kept as a SEPARATE
+  // field rather than string-matching errorMessage's prose, so the Reload
+  // button below renders only for the optimistic-concurrency case, never
+  // for #568's "archived" 409 (where reloading can't help; there's no
+  // restore/edit path) or any other error.
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [geocodeStatus, setGeocodeStatus] = useState<GeocodeStatus>("idle");
   const [geocodeMessage, setGeocodeMessage] = useState("");
   const [geocodeCandidates, setGeocodeCandidates] = useState<GeocodeMatch[]>([]);
@@ -442,6 +476,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
 
     setErrors({});
     setErrorMessage(null);
+    setErrorCode(null);
     setStatus("submitting");
 
     const body = {
@@ -484,6 +519,9 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
       // #390: mirror image — only ever sent on an edit reached from the
       // flags queue's link_health hand-off.
       ...(isEditMode && proposalId != null ? { proposalId } : {}),
+      // #265: the optimistic-concurrency precondition — see this prop's own
+      // doc comment above. Edit mode only; sent verbatim, no reformatting.
+      ...(isEditMode && expectedUpdatedAt != null ? { expectedUpdatedAt } : {}),
     };
 
     // Create POSTs /api/admin/venues (201 on success); edit PATCHes
@@ -525,8 +563,9 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
       }
 
       if (res.status === 409) {
-        const data = (await res.json().catch(() => null)) as { message?: string } | null;
+        const data = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
         setErrorMessage(data?.message ?? "This venue can't be edited right now.");
+        setErrorCode(data?.error ?? null);
         setStatus("error");
         return;
       }
@@ -546,8 +585,8 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
     "focus-visible:border-[var(--color-sage-500)]";
   const inputBorder = (hasError: boolean) =>
-    hasError ? "border-red-500" : "border-[var(--color-bone-300)]";
-  const errorClass = "mt-1 text-xs text-red-600";
+    hasError ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]";
+  const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
   const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
   // Secondary (bordered, sage-text) action — visually lower weight than the
   // primary sage-filled submit button below, but still sage per DESIGN.md
@@ -573,7 +612,7 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
     error: "text-[var(--color-clay-700)]",
   };
   const requiredMark = (
-    <span aria-hidden className="text-red-500">
+    <span aria-hidden className="text-[var(--color-danger)]">
       {" "}
       *
     </span>
@@ -582,14 +621,30 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
   return (
     <form onSubmit={handleSubmit} noValidate className="max-w-2xl space-y-5">
       {status === "error" && (
-        <div role="alert" className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3">
+        <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3">
           {errorMessage ? (
-            <p className="text-sm font-medium text-red-700">{errorMessage}</p>
+            <p className="text-sm font-medium text-[var(--color-danger)]">{errorMessage}</p>
           ) : (
             <>
-              <p className="text-sm font-medium text-red-700">Something went wrong.</p>
-              <p className="text-sm text-red-600 mt-0.5">The venue was not saved. Try again.</p>
+              <p className="text-sm font-medium text-[var(--color-danger)]">Something went wrong.</p>
+              <p className="text-sm text-[var(--color-danger)] mt-0.5">The venue was not saved. Try again.</p>
             </>
+          )}
+          {/* #265: a real reload, not router.refresh() — the admin needs the
+              CURRENT venue row + a fresh expectedUpdatedAt from the server
+              component, not just a client re-render. The form (and every
+              field this admin typed) stays mounted and visible until they
+              actually click this — nothing here clears `values` — so
+              they can copy their unsaved changes out first. min-h-12 (48px)
+              per RULES.md's touch-target floor. */}
+          {errorCode === "conflict" && (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-2 inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 text-sm font-medium text-[var(--color-danger)] transition-colors duration-150 hover:bg-[var(--color-bone-100)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
+            >
+              Reload
+            </button>
           )}
         </div>
       )}
@@ -1211,8 +1266,8 @@ export default function AddVenueForm({ initialValues, venueId, submissionId, pro
         type="submit"
         disabled={status === "submitting"}
         className={
-          "w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-          "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-600)] " +
+          "w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+          "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
           "focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
         }

@@ -3,7 +3,7 @@
  * SNAP, WIC, Double Up Food Bucks, the Food Resource Hotline, Everyday Eats).
  *
  * Static server component with an English `metadata` export, same pattern as
- * /about (AGENTS.md "Known bilingual limitation", #287): the visible body is
+ * /about (ARCHITECTURE.md "Known bilingual limitation", #287): the visible body is
  * ResourcesContent, a client component that reads the visitor's locale, so
  * this route never reads cookies() and stays fully static.
  */

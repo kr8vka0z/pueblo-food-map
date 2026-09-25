@@ -21,7 +21,7 @@ const en: Record<string, string> = {
 
   // Search
   "search.placeholder": "Search",
-  "search.aria": "Search venues",
+  "search.aria": "Search places",
   "search.shortcut": "⌘K",
 
   // Category labels
@@ -83,8 +83,8 @@ const en: Record<string, string> = {
   "detail.today": "Today",
   "detail.showDetails": "Show details",
   "detail.hideDetails": "Hide details",
-  "detail.venueDetailsPanel": "Venue details panel",
-  "detail.venueDetails": "venue details",
+  "detail.venueDetailsPanel": "Place details panel",
+  "detail.venueDetails": "place details",
 
   // Badges
   "badge.openNow": "Open now",
@@ -128,7 +128,7 @@ const en: Record<string, string> = {
   "empty.clear": "Clear filters",
   "empty.noMatches": "No matches for \"{query}\"",
   "empty.tryCategoryInstead": "Try a category instead:",
-  "empty.showCategoryAria": "Show {label} venues",
+  "empty.showCategoryAria": "Show {label} places",
 
   // Sponsor credit (#69)
 
@@ -142,7 +142,7 @@ const en: Record<string, string> = {
 
   // Location denied banner (#68)
   "banner.title": "Location turned off",
-  "banner.body": "We can’t show food near you without your location. You can still browse the Pueblo map below, or try again.",
+  "banner.body": "We can't show food near you without your location. You can still browse the Pueblo map below, or try again.",
   "banner.retry": "Try again",
   "banner.dismiss": "Browse Pueblo map",
 
@@ -150,7 +150,7 @@ const en: Record<string, string> = {
   "wordmark.ariaLabel": "Pueblo Food Map — reset map view",
 
   // Search typeahead (#67)
-  "typeahead.matchCount": "{count} venues match",
+  "typeahead.matchCount": "{count} places match",
   "typeahead.moreMatches": "+{count} more matches",
 
   // Location control (#108)
@@ -183,7 +183,7 @@ const en: Record<string, string> = {
   "menu.open": "Open menu",
   "menu.close": "Close menu",
   "menu.title": "Pueblo Food Map",
-  "menu.suggest": "Suggest a venue",
+  "menu.suggest": "Suggest a place",
   "menu.sponsoredBy": "Sponsored by",
   "menu.showWelcome": "Show welcome screen",
   "menu.language": "Language / Idioma",
@@ -195,14 +195,14 @@ const en: Record<string, string> = {
   "menu.mapView": "Map view",
 
   // Suggest form (#71)
-  "suggest.title": "Suggest a venue",
+  "suggest.title": "Suggest a place",
   "suggest.subtitle": "Know a food resource we're missing? Tell us about it.",
   // <title> for /suggest (#589) — matches page.tsx's metadata title exactly
-  // ("Suggest a Venue"); kept distinct from suggest.title (the on-page h1,
-  // "Suggest a venue") since the two strings differ only in casing and a
+  // ("Suggest a Place"); kept distinct from suggest.title (the on-page h1,
+  // "Suggest a place") since the two strings differ only in casing and a
   // shared key would force one to drift to match the other.
-  "suggest.documentTitle": "Suggest a Venue",
-  "suggest.venueName.label": "Venue name",
+  "suggest.documentTitle": "Suggest a Place",
+  "suggest.venueName.label": "Place name",
   "suggest.venueName.placeholder": "e.g. Eastside Food Pantry",
   "suggest.address.label": "Address",
   "suggest.address.placeholder": "123 Main St, Pueblo, CO",
@@ -232,11 +232,11 @@ const en: Record<string, string> = {
   "suggest.fallback": "Or email us at suggestions@pueblofoodmap.com",
   "suggest.backToMap": "Back to map",
   "suggest.success.title": "Thank you!",
-  "suggest.success.body": "Your suggestion has been submitted. We review all suggestions and will add verified venues to the map.",
+  "suggest.success.body": "Your suggestion has been submitted. We review all suggestions and will add verified places to the map.",
   "suggest.error.title": "Something went wrong",
   "suggest.error.body": "Your suggestion couldn't be sent. Please try again, or email us directly at suggestions@pueblofoodmap.com.",
   "suggest.error.retry": "Try again",
-  "suggest.validation.nameRequired": "Please enter a venue name.",
+  "suggest.validation.nameRequired": "Please enter a place name.",
   "suggest.validation.addressRequired": "Please enter an address.",
   "suggest.validation.categoryRequired": "Please select a category.",
   "suggest.validation.emailRequired": "Please enter your email address.",
@@ -300,16 +300,16 @@ const en: Record<string, string> = {
   "viewSuggestion.seeMatchesAsList": "See all {count} matches as a list",
 
   // Report form (#70)
-  "report.button": "Report an issue with this venue",
+  "report.button": "Report an issue with this place",
   "report.title": "Report an issue",
   "report.subtitle": "Help us keep this information accurate.",
-  "report.venueLabel": "Venue",
+  "report.venueLabel": "Place",
   "report.issueType.label": "What's wrong?",
   "report.issueType.placeholder": "Select an issue type",
   "report.issueType.location": "Location is wrong (wrong address or pin position)",
   "report.issueType.hours": "Hours are wrong or out of date",
   "report.issueType.contact": "Contact info (phone / email / URL) is wrong",
-  "report.issueType.closed": "Venue has closed permanently",
+  "report.issueType.closed": "Place has closed permanently",
   "report.issueType.snapwic": "SNAP / WIC acceptance is wrong",
   "report.issueType.other": "Other",
   "report.description.label": "Description",
@@ -460,21 +460,21 @@ const en: Record<string, string> = {
   "about.vision.body": "A Pueblo County where no one goes hungry because they couldn't find the resources already available in their community.",
   "about.origin.heading": "How it started",
   "about.origin.body": "Finding food assistance in Pueblo meant juggling separate tools — the Pueblo Food Project site, Plentiful, FoodFinder, Pueblo Transit, and 211. Pueblo Food Map consolidates those sources into a single, bilingual map that works on any smartphone, no app install required.",
-  "about.howWeSource.heading": "How venues are added",
-  "about.howWeSource.body": "Venue data comes from Pueblo Food Project, OpenStreetMap, Plentiful's public directory, and USDA benefit data. All listings are reviewed before going live. If you know of a resource we're missing, please suggest it.",
+  "about.howWeSource.heading": "How places are added",
+  "about.howWeSource.body": "Place data comes from Pueblo Food Project, OpenStreetMap, Plentiful's public directory, and USDA benefit data. All listings are reviewed before going live. If you know of a resource we're missing, please suggest it.",
   "about.suggest.heading": "Know something we're missing?",
   "about.suggest.body": "If you know of a food pantry, community garden, or other resource that isn't on the map yet, let us know.",
-  "about.suggest.cta": "Suggest a venue",
+  "about.suggest.cta": "Suggest a place",
 
   // Nav and footer shared strings (#155)
   "nav.about": "About this map",
   "footer.backToMap": "Back to map",
   "footer.about": "About",
   "footer.privacy": "Privacy",
-  "footer.suggest": "Suggest a venue",
+  "footer.suggest": "Suggest a place",
 
   // Venues directory (#PR4)
-  "nav.venuesList": "Browse all venues",
+  "nav.venuesList": "Browse all places",
   "venues.heading": "All food resources",
   // <title> for /venues (#589) — matches page.tsx's metadata title exactly
   // ("All Food Resources"); distinct from venues.heading, the on-page h1.
@@ -489,7 +489,7 @@ const en: Record<string, string> = {
 
   // OSM attribution (#133 4.5) — ODbL credit for pages that show OSM-derived
   // venue data without Mapbox's own attribution control (src/lib/osmAttribution.ts).
-  "osm.attribution": "Venue data includes © OpenStreetMap contributors",
+  "osm.attribution": "Place data includes © OpenStreetMap contributors",
 
   // About page FAQ + stats (#PR4)
   "about.stat.insecurity": "According to Feeding America's Map the Meal Gap (2023 data), about 1 in 6 Pueblo County residents — roughly 16.5% — faces food insecurity, including nearly 1 in 5 children.",

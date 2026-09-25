@@ -5,6 +5,7 @@ import { preload } from "react-dom";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { SITE_URL, SITE_NAME, OG_IMAGE } from "@/lib/site";
 import { buildWebSiteJsonLd, serializeJsonLd } from "@/lib/venueSchema";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const DESCRIPTION =
   "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores — with walking and bus directions via Pueblo Transit.";
@@ -93,6 +94,7 @@ export default function RootLayout({
         <LocaleProvider>
           {children}
         </LocaleProvider>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

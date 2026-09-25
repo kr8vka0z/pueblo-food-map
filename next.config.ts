@@ -61,7 +61,12 @@ import type { NextConfig } from "next";
 // mapbox-gl's own inline-styled DOM nodes.
 const CSP = [
   "default-src 'self'",
-  // static.cloudflareinsights.com: the Web Analytics beacon (#592).
+  // static.cloudflareinsights.com: the Web Analytics beacon, injected at
+  // Cloudflare's edge (auto_install, #647) — this app no longer loads it
+  // itself (the old app-side loader double-counted page views alongside
+  // edge injection; see #592/#615's now-superseded investigation and #647).
+  // The CSP still needs to allow it: edge injection rewrites the HTML
+  // response, but the browser still executes this app's own CSP header.
   // challenges.cloudflare.com: Turnstile's widget script (6 public forms —
   // SuggestForm, ReportForm, FeedbackForm, AdoptBoxForm, BoxAlertSignupForm,
   // BoxCheckinPanel).
@@ -74,7 +79,7 @@ const CSP = [
   // *.tiles.mapbox.com: vector tile fetches. events.mapbox.com: mapbox-gl's
   // own telemetry pings — blocking it doesn't break the map, but it would
   // spam this report with noise otherwise. cloudflareinsights.com: the
-  // beacon's own reporting endpoint (script host above is
+  // edge-injected beacon's own reporting endpoint (script host above is
   // static.cloudflareinsights.com — a different subdomain).
   "connect-src 'self' https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com https://cloudflareinsights.com",
   // mapbox-gl runs its tile/data processing in a Web Worker built from a blob: URL.

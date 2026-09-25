@@ -1,13 +1,13 @@
 /**
- * adminSession.ts — Better Auth session gate, layered ON TOP OF Cloudflare
- * Access (Phase 3 dual-auth, #316-ish "Better Auth Phase 3"). Cloudflare
- * Access (adminOrigin.ts, formerly cfAccess.ts) proves the request carries Cloudflare's own signed
- * edge assertion; this module additionally proves the caller holds a real
- * Better Auth session for an allowlisted admin. getAdminDb() (adminDb.ts)
- * requires BOTH — see that file's header — so reaching ADMIN_DB now needs a
- * valid CF Access JWT AND a valid Better Auth session, never either alone.
- * This is strictly additive to the Phase 2 CF-Access-only gate: nothing here
- * relaxes requireAccessIdentity()'s own checks.
+ * adminSession.ts — the admin identity gate: proves the caller holds a live
+ * Better Auth session for an allowlisted admin. Since the Better Auth
+ * sole-gate cutover (on production since promotion #551), this is the ONLY
+ * identity check — Cloudflare Access and its JWT verifier
+ * (requireAccessIdentity(), formerly in cfAccess.ts, now adminOrigin.ts) are
+ * gone. getAdminDb() (adminDb.ts) calls requireAdminSession() before handing
+ * back ADMIN_DB; see that file's header and AGENTS.md "Admin
+ * authentication". (This module began as "Better Auth Phase 3", layered
+ * on top of Cloudflare Access; that dual gate no longer exists.)
  *
  * WHY re-check the allowlist here even though adminAuthAllowlistPlugin.ts
  * (auth-options.ts) already blocks a non-allowlisted email from ever signing

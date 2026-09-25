@@ -151,7 +151,7 @@ scripts/fetch-osm-grocery.py ┤→ scripts/ingest-osm-grocery.py ─┐
                                                     (status='pending')
 ```
 
-Runs monthly in CI (`refresh-proposals.yml`); run order and local use:
+Runs weekly in CI (`refresh-proposals.yml`, cron changed monthly→weekly in #543); run order and local use:
 `scripts/README.md`; schedule, credentials and chunked-write gotchas:
 AGENTS.md "Automated venue-refresh pipeline".
 
@@ -179,7 +179,28 @@ AGENTS.md "Automated venue-refresh pipeline".
   an `audit_log` row, and an already-`approved` proposal row. It uses the
   same `isDateOnlyUpdateProposal()` predicate as `/admin/flags`' bulk-approve
   (`src/lib/adminProposals.ts`), so the two can't disagree on what counts.
-  Every other shape is only ever a pending proposal.
+  Every other shape is only ever a pending proposal, with one opt-in
+  exception — see "Jev triage + rename pairing" below.
+- **Jev triage + rename pairing (#543)** — `scripts/refresh/triage.ts` +
+  `renamePairs.ts`, run only after every guardrail above. Each non-date-only,
+  non-`link_health` proposal gets one batched call to Jev (an LLM triage
+  service), which stores a lane on the row (`triage_lane`, migration `0016`):
+  updates classify as likely-noise vs. needs-a-human; removes always stay
+  needs-a-human; adds get no call. Degrades to untriaged (never fails) on a
+  missing key, a 5xx/timeout, or 3 failures in a row. A same-source
+  remove+add pair within 100m or matching phone becomes one rename proposal
+  instead of two (`buildRenameProposal`); approving it writes
+  `venue_id_aliases` so the next run maps the old id forward and the pair
+  never re-proposes. **The one exception to "every other shape is only ever
+  a pending proposal" above:** `proposalSql.ts`'s
+  `buildAiAutoApplyStatements`, gated by `REFRESH_AI_AUTO_APPLY` (off by
+  default), writes a `venues` mutation directly from the ingestion job
+  itself — actor `refresh-pipeline-ai`, full `audit_log` row — when a
+  phone/url change is formatting-only once normalized AND Jev scores it
+  "same value" > 0.9. This re-check is deterministic and independent of
+  Jev's score, so a miscalibrated triage answer alone can't trigger a write.
+  Operational detail (secrets, cost logging, the `0016` schemaReady probe):
+  AGENTS.md "Automated venue-refresh pipeline".
 - **`linkHealth.ts`** checks each stored `url` (HEAD, falling back to GET)
   and proposes clearing it only on 404/410 — never on 403 (often a bot-block
   of the checker), 429, 5xx or timeout, which are logged only.
@@ -190,8 +211,10 @@ AGENTS.md "Automated venue-refresh pipeline".
   runs unattended, and writing nothing beats half-writing.
 - **Review:** `/admin/flags` (`src/app/admin/flags/page.tsx`,
   `ProposalsReviewView.tsx`, `api/admin/proposals/[id]/{approve,reject}`,
-  #390, plus bulk `approve-date-only`) is the only code path that turns a
-  real-change proposal into a `venues` mutation. How it handles the
+  #390, plus bulk `approve-date-only`) is the only HUMAN-facing code path
+  that turns a real-change proposal into a `venues` mutation — the
+  ingestion job's own opt-in auto-apply lane (#543, above) is the one
+  machine exception. How it handles the
   supersede race, stale applies and rejection memory: atlas-kb "PFM AGENTS
   History — Venue-Refresh Pipeline", "Change-proposal review queue (#390)".
   Auto-supersede (§6.10a) and rejection memory (§6.10b) stay the ingestion

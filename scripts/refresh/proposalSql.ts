@@ -26,9 +26,10 @@
  * silently diverge on what "date-only" means.
  */
 
-import { isDateOnlyUpdateProposal } from "@/lib/adminProposals";
+import { isDateOnlyUpdateProposal, reviewableDiffFields } from "@/lib/adminProposals";
 import type { Venue } from "@/types/venue";
 import type { ProposalDraft } from "./diffEngine";
+import { computeAutoApplyEligibility, serializeTriageResult, type TriageResult } from "./triage";
 
 export interface ProposalWriteStatements {
   /** true = this proposal auto-applied to `venues` this run (date-only); false = it was written as a normal pending row for a human to review. */
@@ -37,6 +38,31 @@ export interface ProposalWriteStatements {
 }
 
 const AUTO_APPLY_ACTOR = "refresh-pipeline";
+/** Distinct actor for the Jev-gated lane, so audit_log shows which writes the AI unlocked (#543). */
+const AI_AUTO_APPLY_ACTOR = "refresh-pipeline-ai";
+
+export interface ProposalWriteOptions {
+  /** Jev's verdict for this proposal (scripts/refresh/triage.ts); absent = written untriaged, triage_* columns left NULL. */
+  triage?: TriageResult | null;
+  /**
+   * REFRESH_AI_AUTO_APPLY (default OFF). When on, an `auto_apply_candidate`
+   * that ALSO re-passes the deterministic formatting-only check is applied
+   * like a date-only bump, under AI_AUTO_APPLY_ACTOR. Off → it is written
+   * as a normal pending row with its lane stored.
+   */
+  aiAutoApply?: boolean;
+}
+
+type SqlText = (value: string | null | undefined) => string;
+
+/** Column list + values for the four triage columns (migration 0016), or empty when untriaged. */
+function triageColumns(triage: TriageResult | null | undefined, now: string, sqlText: SqlText) {
+  if (!triage) return { cols: "", vals: [] as string[] };
+  return {
+    cols: ", triage_lane, triage_json, triage_model, triage_at",
+    vals: [sqlText(triage.lane), sqlText(serializeTriageResult(triage)), sqlText(triage.model), sqlText(now)],
+  };
+}
 
 /**
  * `sqlText` is passed in rather than imported — matches refresh-ingest.ts's
@@ -48,8 +74,14 @@ const AUTO_APPLY_ACTOR = "refresh-pipeline";
 export function buildProposalWriteStatements(
   proposal: ProposalDraft,
   now: string,
-  sqlText: (value: string | null | undefined) => string,
+  sqlText: SqlText,
+  options: ProposalWriteOptions = {},
 ): ProposalWriteStatements {
+  const tri = triageColumns(options.triage, now, sqlText);
+  if (options.aiAutoApply && options.triage?.lane === "auto_apply_candidate" && computeAutoApplyEligibility(proposal)) {
+    return { autoApplied: true, statements: buildAiAutoApplyStatements(proposal, now, sqlText, tri) };
+  }
+
   const dateOnly = isDateOnlyUpdateProposal(
     { change_type: proposal.changeType, source: proposal.source },
     proposal.proposedDiff,
@@ -59,7 +91,7 @@ export function buildProposalWriteStatements(
     return {
       autoApplied: false,
       statements: [
-        "INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id) VALUES (" +
+        `INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id${tri.cols}) VALUES (` +
           [
             sqlText(proposal.source),
             sqlText(proposal.targetVenueId),
@@ -67,6 +99,7 @@ export function buildProposalWriteStatements(
             sqlText(JSON.stringify(proposal.proposedDiff)),
             sqlText(proposal.diffHash),
             sqlText(proposal.runId),
+            ...tri.vals,
           ].join(", ") +
           ");",
       ],
@@ -115,4 +148,54 @@ export function buildProposalWriteStatements(
   ];
 
   return { autoApplied: true, statements };
+}
+
+/**
+ * The Jev-gated lane's write (only with REFRESH_AI_AUTO_APPLY on): same
+ * three-statement shape as the date-only branch — venues UPDATE, audit_log,
+ * an already-approved proposal row carrying Jev's verdict — so it stays
+ * reversible through audit_log exactly like a human Approve. The caller
+ * re-checked computeAutoApplyEligibility, so the one field is phone or url:
+ * a plain TEXT column, no hours JSON handling needed.
+ */
+function buildAiAutoApplyStatements(
+  proposal: ProposalDraft,
+  now: string,
+  sqlText: SqlText,
+  tri: { cols: string; vals: string[] },
+): string[] {
+  const field = reviewableDiffFields(proposal.proposedDiff)[0] as "phone" | "url";
+  const before = (proposal.proposedDiff.before ?? {}) as Partial<Venue>;
+  const after = (proposal.proposedDiff.after ?? {}) as Partial<Venue>;
+  const newValue = (after[field] ?? null) as string | null;
+  const newLastVerified = after.last_verified ?? null;
+  return [
+    `UPDATE venues SET ${field} = ${sqlText(newValue)}, last_verified = ${sqlText(newLastVerified)}, updated_by = ${sqlText(AI_AUTO_APPLY_ACTOR)}, updated_at = ${sqlText(now)} WHERE id = ${sqlText(proposal.targetVenueId)};`,
+    "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (" +
+      [
+        sqlText(AI_AUTO_APPLY_ACTOR),
+        sqlText("venue"),
+        sqlText(proposal.targetVenueId),
+        sqlText("update"),
+        sqlText(JSON.stringify({ [field]: before[field] ?? null, last_verified: before.last_verified ?? null })),
+        sqlText(JSON.stringify({ [field]: newValue, last_verified: newLastVerified })),
+        sqlText(now),
+      ].join(", ") +
+      ");",
+    `INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, status, reviewed_by, reviewed_at, applied_at${tri.cols}) VALUES (` +
+      [
+        sqlText(proposal.source),
+        sqlText(proposal.targetVenueId),
+        sqlText(proposal.changeType),
+        sqlText(JSON.stringify(proposal.proposedDiff)),
+        sqlText(proposal.diffHash),
+        sqlText(proposal.runId),
+        sqlText("approved"),
+        sqlText(AI_AUTO_APPLY_ACTOR),
+        sqlText(now),
+        sqlText(now),
+        ...tri.vals,
+      ].join(", ") +
+      ");",
+  ];
 }

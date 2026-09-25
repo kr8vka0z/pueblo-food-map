@@ -311,7 +311,9 @@ const DESTRUCTIVE_CLEAR_GUARD: Partial<Record<RefreshSource, ReadonlyArray<keyof
   plentiful: ["hours_weekly", "hours_irregular", "phone"],
 };
 
-function isGuardedClear(source: RefreshSource, field: keyof Venue, currentValue: unknown, incomingValue: unknown): boolean {
+// Exported for scripts/refresh/renamePairs.ts's rename proposal, which must
+// honour the same guard as a plain update.
+export function isGuardedClear(source: RefreshSource, field: keyof Venue, currentValue: unknown, incomingValue: unknown): boolean {
   if (!DESTRUCTIVE_CLEAR_GUARD[source]?.includes(field)) return false;
   return !isEmptyFieldValue(currentValue) && isEmptyFieldValue(incomingValue);
 }

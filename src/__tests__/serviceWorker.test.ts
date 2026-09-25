@@ -92,9 +92,12 @@ describe("sw.js classifyRequest (#130)", () => {
     expect(classify(`${ORIGIN}/_next/static/chunks/a.js`, { method: "HEAD" })).toBe("bypass");
   });
 
-  test("other same-origin pages and the worker script itself are left to the network", () => {
-    expect(classify(`${ORIGIN}/about`, { mode: "navigate" })).toBe("bypass");
-    expect(classify(`${ORIGIN}/venue/some-pantry`, { mode: "navigate" })).toBe("bypass");
+  test("other same-origin pages are shell-fallback; the worker script itself stays bypass", () => {
+    expect(classify(`${ORIGIN}/about`, { mode: "navigate" })).toBe("shell-fallback");
+    expect(classify(`${ORIGIN}/venue/some-pantry`, { mode: "navigate" })).toBe("shell-fallback");
+    // Private paths still bypass before the navigation rule is reached.
+    expect(classify(`${ORIGIN}/admin`, { mode: "navigate" })).toBe("bypass");
+    expect(classify(`${ORIGIN}/alerts/some-token`, { mode: "navigate" })).toBe("bypass");
     expect(classify(`${ORIGIN}/sw.js`)).toBe("bypass");
   });
 });

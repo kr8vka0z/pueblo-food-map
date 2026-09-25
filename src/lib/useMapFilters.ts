@@ -16,7 +16,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
-import { computeOpenStatus } from "@/lib/hours";
+import { computeVenueOpenStatus } from "@/lib/hours";
 import { searchVenues } from "@/lib/searchVenues";
 import { useFavorites } from "@/lib/favorites";
 import type { Venue, VenueCategory } from "@/types/venue";
@@ -92,7 +92,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
   const openNowCount = useMemo(
     () =>
       venuesWithDistance.filter(
-        (v) => computeOpenStatus(v.hours_weekly, new Date()).state === "open",
+        (v) => computeVenueOpenStatus(v, new Date()).state === "open",
       ).length,
     [venuesWithDistance],
   );
@@ -122,7 +122,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
           if (!selectedCategories.has(v.category)) return false;
         }
         if (filterOpenNow) {
-          const status = computeOpenStatus(v.hours_weekly, now);
+          const status = computeVenueOpenStatus(v, now);
           // "no_hours" survives the filter deliberately (board review finding
           // #1): 74 of 107 venues have no hours_weekly data, so treating
           // "unknown" the same as "closed" hid 25 of 35 food pantries behind
@@ -147,8 +147,8 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
         // MapWrapper when geolocation is unavailable — never NaN/undefined),
         // so no special-casing is needed for a missing-distance case.
         if (filterOpenNow) {
-          const aOpen = computeOpenStatus(a.hours_weekly, now).state === "open";
-          const bOpen = computeOpenStatus(b.hours_weekly, now).state === "open";
+          const aOpen = computeVenueOpenStatus(a, now).state === "open";
+          const bOpen = computeVenueOpenStatus(b, now).state === "open";
           if (aOpen !== bOpen) return aOpen ? -1 : 1;
         }
         return a.distanceMiles - b.distanceMiles;

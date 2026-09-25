@@ -76,6 +76,7 @@ function makeVenueFor(id: number, overrides: Partial<AdminVenueRow> = {}): Admin
     lng: -104.6,
     address: "1 Test St, Pueblo, CO",
     hours_weekly: null,
+    hours_irregular: null,
     accepts_snap: null,
     accepts_wic: null,
     phone: null,

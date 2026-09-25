@@ -13,15 +13,15 @@
  *
  * Auth split matches every other admin mutation surface (AddVenueForm,
  * ArchiveVenueButton): this component holds none. The page's Server
- * Component owns the Cloudflare Access gate; POST /api/admin/publish
+ * Component owns the Better Auth gate (getAdminDb()); POST /api/admin/publish
  * (src/app/api/admin/publish/route.ts) re-verifies identity + Origin
  * itself. The confirm step is a native window.confirm() — ArchiveVenueButton
  * established this pattern in this codebase (no modal dependency exists
  * here, and none is needed for one confirm dialog).
  *
- * Button treatment: filled sage-500/sage-600-hover, bone-50 text — the same
- * classes as "Add place" (src/app/admin/page.tsx) and AddVenueForm's submit
- * button. That IS the strongest CTA tier this design system offers for the
+ * Button treatment: filled sage-600/sage-700-hover, bone-50 text — the
+ * app-wide filled primary button (DESIGN.md Forms > Submit), same classes as
+ * AddVenueForm's submit button. That IS the strongest CTA tier this design system offers for the
  * admin surface: DESIGN.md reserves brand-orange ("ButtonPrimary") for
  * exactly two public-map elements (splash CTA, LocateButton pill) with an
  * explicit Don't against using it anywhere else, while sage is documented
@@ -87,8 +87,8 @@ type PublishState =
 
 const primaryButtonClass =
   "inline-flex items-center justify-center rounded-[var(--radius-md)] " +
-  "bg-[var(--color-sage-500)] px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] " +
-  "transition-colors duration-150 hover:bg-[var(--color-sage-600)] " +
+  "bg-[var(--color-sage-600)] px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] " +
+  "transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
 
@@ -140,8 +140,8 @@ function friendlyErrorMessage(status: number, error?: string): string {
   if (status === 422) {
     return `Couldn't publish: something in a venue's data didn't pass validation.${error ? ` (${error})` : ""}`;
   }
-  // 403 = Cloudflare Access / origin denied; 401 = no valid Better Auth session
-  // (the dual-auth gate's no_session response for /api/admin/* handlers). Both
+  // 403 = origin denied or email not allowlisted; 401 = no valid Better Auth
+  // session (no_session, see adminAuthErrors.ts). Both
   // mean "sign in again," so they share this message.
   if (status === 403 || status === 401) {
     return "Your session expired — reload and sign in again.";

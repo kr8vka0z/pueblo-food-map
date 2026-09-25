@@ -5,7 +5,7 @@
  *
  * Extracted from src/app/privacy/page.tsx so the page's text reads the
  * visitor's locale via useLocale() (#289) while the page itself stays a
- * static Server Component (no cookies() read — AGENTS.md "Known bilingual
+ * static Server Component (no cookies() read — ARCHITECTURE.md "Known bilingual
  * limitation", #287).
  *
  * Rewritten for Blessing Boxes slice 6 (adopt-a-box + email alerts): the

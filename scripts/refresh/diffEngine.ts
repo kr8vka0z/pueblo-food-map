@@ -25,7 +25,7 @@
  */
 
 import { createHash } from "node:crypto";
-import type { Venue, WeeklyHours } from "@/types/venue";
+import type { IrregularSchedule, Venue, WeeklyHours } from "@/types/venue";
 
 export type RefreshSource = "osm" | "plentiful";
 export type ProposalSource = RefreshSource | "link_health";
@@ -40,6 +40,7 @@ export interface CurrentVenueRow {
   lng: number;
   address: string;
   hours_weekly: string | null; // JSON string, matches D1 storage — not a parsed object
+  hours_irregular: string | null; // JSON IrregularSchedule[] text (#400, migrations/0015) — same storage convention as hours_weekly
   phone: string | null;
   url: string | null;
   operator: string | null;
@@ -83,7 +84,7 @@ export interface CurrentVenueRow {
  */
 export const SOURCE_OWNED_FIELDS: Record<RefreshSource, ReadonlyArray<keyof Venue>> = {
   osm: ["name", "category", "lat", "lng", "phone", "url"],
-  plentiful: ["name", "category", "lat", "lng", "address", "phone", "url", "hours_weekly"],
+  plentiful: ["name", "category", "lat", "lng", "address", "phone", "url", "hours_weekly", "hours_irregular"],
 };
 
 // ─── Guardrails ─────────────────────────────────────────────────────────────
@@ -238,6 +239,32 @@ function normalizeHours(value: string | WeeklyHours | undefined | null): string 
   return JSON.stringify(stable);
 }
 
+/**
+ * Normalizes an IrregularSchedule[] (array OR its JSON-string D1 form) for
+ * equality (#400). Stricter than normalizeHours above: every entry's keys
+ * are sorted, its slots are sorted, and the entries themselves are sorted —
+ * the scraper emits entries in page order and an admin-entered or approved
+ * row may carry any key order, so without this a re-scrape of an unchanged
+ * monthly schedule would propose a noise update every run. An empty list
+ * normalizes to "" (same as absent), so the destructive-clear guard below
+ * treats `[]` from a scraper hiccup exactly like a missing value.
+ */
+function normalizeIrregular(value: string | IrregularSchedule[] | undefined | null): string {
+  if (value === null || value === undefined || value === "") return "";
+  const parsed = typeof value === "string" ? (JSON.parse(value) as IrregularSchedule[]) : value;
+  if (!Array.isArray(parsed) || parsed.length === 0) return "";
+  const entries = parsed.map((entry) => {
+    const record = entry as unknown as Record<string, unknown>;
+    const stable: Record<string, unknown> = {};
+    for (const key of Object.keys(record).sort()) {
+      if (record[key] === undefined) continue;
+      stable[key] = key === "slots" ? [...(record[key] as string[])].sort() : record[key];
+    }
+    return JSON.stringify(stable);
+  });
+  return `[${entries.sort().join(",")}]`;
+}
+
 // Exported (WHY, #390): src/lib/adminProposals.ts's stale-apply guard (§6.10c)
 // needs to re-compare a fresh D1 row against a proposal's `before` snapshot
 // using EXACTLY this same equality semantics (same hours_weekly
@@ -245,11 +272,13 @@ function normalizeHours(value: string | WeeklyHours | undefined | null): string 
 // route would let the two comparisons silently drift apart over time.
 export function currentFieldValue(row: CurrentVenueRow, field: keyof Venue): unknown {
   if (field === "hours_weekly") return normalizeHours(row.hours_weekly);
+  if (field === "hours_irregular") return normalizeIrregular(row.hours_irregular);
   return (row as unknown as Record<string, unknown>)[field] ?? null;
 }
 
 function incomingFieldValue(venue: Venue, field: keyof Venue): unknown {
   if (field === "hours_weekly") return normalizeHours(venue.hours_weekly);
+  if (field === "hours_irregular") return normalizeIrregular(venue.hours_irregular);
   return (venue as unknown as Record<string, unknown>)[field] ?? null;
 }
 
@@ -273,9 +302,13 @@ function isEmptyFieldValue(v: unknown): boolean {
  * when the card layout doesn't match. Either turns one transient upstream
  * 5xx into a proposal to erase real hours a person needs to know when to
  * show up, or a real contact number — worse than doing nothing.
+ * `hours_irregular` (#400) comes out of the same detail-page parse as
+ * `hours_weekly`, so the same swallowed HTTP error empties it the same way —
+ * and a monthly pantry is exactly the venue where a missing schedule costs
+ * someone a wasted trip.
  */
 const DESTRUCTIVE_CLEAR_GUARD: Partial<Record<RefreshSource, ReadonlyArray<keyof Venue>>> = {
-  plentiful: ["hours_weekly", "phone"],
+  plentiful: ["hours_weekly", "hours_irregular", "phone"],
 };
 
 // Exported for scripts/refresh/renamePairs.ts's rename proposal, which must

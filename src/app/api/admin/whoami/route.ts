@@ -1,6 +1,7 @@
 /**
- * GET /api/admin/whoami — probe route proving the Cloudflare Access +
- * getAdminDb() auth chain at the route-handler layer (#237 checkpoint c).
+ * GET /api/admin/whoami — probe route proving the getAdminDb() auth chain
+ * (Better Auth session + allowlist) at the route-handler layer (#237
+ * checkpoint c).
  *
  * A route handler gets a fresh Request on every call, so — unlike a Server
  * Component page under a layout — there's no client-navigation gap to worry

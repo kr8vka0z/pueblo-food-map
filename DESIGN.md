@@ -167,6 +167,149 @@ The live Mapbox map is the product. Every other surface is chrome that helps peo
 
 A pre-existing design sidecar (`docs/pueblo-food-map-v2-handoff.md`) documents per-screen navigation wires, state variants, accessibility posture, and the Penpot prototype link. This DESIGN.md consolidates the visual token layer and aesthetic constraints for ongoing builds. Where they overlap, the sidecar is authoritative on behavior; this file is authoritative on tokens and identity.
 
+## Low-end device guardrails (#233)
+
+Pueblo Food Map serves residents facing food insecurity — more likely to be on an
+average, older mid-range Android on a slower connection than a current flagship
+iPhone. Every UI change is reviewed against this profile before merge, and any new
+button added to the home/map screen (below) must fit inside a documented safe zone.
+
+**Target profile:**
+- **Device:** an average mid-range Android, ~2–3 years old — modest CPU/GPU, limited
+  RAM. Not the newest/largest iPhone.
+- **Viewport:** design and test at **360px wide** as the baseline, and verify at
+  short heights with the browser's own address/toolbar chrome showing (a real device
+  loses 80–140px of vertical space to it) — Chrome DevTools' "Moto G Power" preset
+  (360×740) or a manual 360×640 custom size both work; don't test only at a tall
+  360×800 that never happens with the URL bar visible.
+- **Network:** **Slow 4G** (Chrome DevTools network throttling preset — ~400 Kb/s
+  down, 400ms+ RTT). Treat this as the bar, not fast Wi-Fi.
+- **Input:** thumb on glass, one-handed use assumed.
+
+**Touch targets:** minimum **48×48 CSS px**, with spacing so neighbouring controls
+aren't mis-tapped (WCAG 2.2 SC 2.5.8's 24×24 floor is the *compliance* minimum, not
+this project's target: 24px only passes if each target also has 24px of clear space
+around it, which a crowded map screen can't guarantee, and Android's Material and
+Apple's HIG both recommend ~48px / 44pt for thumbs). A control smaller than 48×48 needs its tap area
+enlarged with padding or an invisible `::before`/`::after` overlay — never shrink the
+visual size to hit the number.
+
+**Thumb reach:** primary actions sit low and centre — this is why BottomNav (below)
+replaced the old top-left hamburger and the old `top: 72px` locate pill
+(docs/bottom-nav-spec.md §1). Nothing critical is pinned to the top corners. A new
+persistent control follows the same rule: bottom-centre or joins existing bottom
+chrome, never a lone top-corner icon.
+
+**Browser chrome and safe areas:** `#530` → `#536` → `#541` (all closed except #541,
+which is now the standing behaviour) is the project's own record of getting this
+wrong twice before measuring the real device. The settled facts, now encoded in
+`src/app/globals.css`:
+- A `position: fixed; bottom: 0` element **already sits fully visible above iOS
+  Safari's toolbar**, in both the expanded and collapsed states, in Safari and
+  Chrome — measured on a real iPhone via a throwaway `/viewport-check` diagnostic
+  page (#541). Do not add a `100vh - 100dvh` "toolbar reserve" on top of `bottom: 0`
+  — that was #530/#536's mistake, and it double-counted the toolbar, lifting
+  bottom-pinned chrome 40–74px too high and covering the Mapbox logo.
+  `env(safe-area-inset-bottom)` alone is correct and is all `--bottom-nav-clearance`
+  consumers use.
+  - Also true (unrelated to that reserve, `#530`): `env(safe-area-inset-bottom)`
+    itself reads 0 while the toolbar is expanded, so it is a real add-on, not a
+    substitute, and every bottom-pinned control needs it.
+- `100vh` sizes to the **largest** possible viewport (toolbar assumed collapsed);
+  `100svh` sizes to the **smallest** (toolbar assumed expanded) and never changes as
+  the toolbar animates. Anything pinned to the bottom of the screen (BottomNav,
+  BottomSheet's max-height) sizes against `--viewport-small` (`globals.css`, `100vh`
+  with an `100svh` override behind `@supports`), never a bare `vh` unit — one
+  fallback, in one place. The one documented exception is BottomSheet's route-strip
+  height, which has to match vaul's own `window.innerHeight`-based snap math via
+  `100dvh` instead (see that file's own comment).
+- `env(safe-area-inset-*)` requires
+  `<meta name="viewport" content="... viewport-fit=cover">` — without it the insets
+  read 0 and content sits under the notch/home-indicator silently.
+- Write a plain `vh` fallback line **before** an `svh`/`dvh` line — an unrecognised
+  unit drops the whole CSS declaration in older browsers.
+- Full narrative, including why the naive fix looked right in a screenshot and
+  wasn't: `src/app/globals.css` lines around `--viewport-small` and
+  `[data-bottom-nav]`'s own comment, plus this file's "Layout & Spacing" section
+  above (BottomNav entry) and docs/bottom-nav-spec.md §3.1/§9.
+
+**Legibility:** body text stays at the existing WCAG AAA floor (`ink-700` on
+`bone-50`, 7:1 — see Colors below); don't go lighter or smaller than the sizes in
+Typography. **Any text `<input>` needs a font-size of at least 16px** — iOS Safari
+zooms the whole page in on focus for anything smaller, an undocumented but
+consistent behaviour. SearchBar's input is already `text-base` (16px) on mobile,
+stepping down to `text-sm` only at `md:` and up (desktop, no zoom-on-focus risk) —
+match that pattern for any new mobile text input rather than reusing `sizeBase`
+(14px) below the `md:` breakpoint.
+
+**Page-weight budget:** measured 2026-09-24 against `dev.pueblofoodmap.com`'s `/`
+(splash + bottom nav, default state — the live Mapbox canvas loads lazily behind the
+splash, tracked by #226, so it is not yet on this critical path) — 360×740 viewport,
+mobile Chrome UA, Playwright + Chrome DevTools Protocol `Network.loadingFinished`
+`encodedDataLength` (real transferred/compressed bytes, not decoded body size),
+`networkidle` + 1.5s settle:
+
+| Metric | Current (2026-09-24) | Budget |
+|---|---|---|
+| Total transfer | 380 KB | **≤ 460 KB** |
+| JS transfer | 287 KB | **≤ 340 KB** |
+| Requests | 32 | — (not gated; a request-count spike alongside a byte spike is the real signal) |
+
+Budget is current + ~20% headroom — enough to not fire on every commit, tight enough
+to catch a real regression (an un-lazy-loaded dependency, an unminified vendor
+bundle). Re-measure the same way (same viewport/UA/host/settle time) before changing
+either number; a number nobody can reproduce the same way catches nothing. No CI gate
+enforces this yet — see this issue's tracker for that as a follow-up, not shipped
+here.
+
+**Weak-phone test loop** (added to the pre-ship checklist in `CONTRIBUTING.md`): every
+UI change gets checked at 360px width, CPU-throttled, and network-throttled before
+merge: Chrome DevTools device mode at 360×740 (and an iPhone SE-size 375×667),
+watching the console for errors and checking there's no sideways scroll, plus
+DevTools' 4× CPU slowdown and "Slow 4G" network presets. A real mid-range Android
+or iOS Safari check is better still when one is to hand.
+
+**Safe zones — adding a new control to the home/map screen:** measured at 360×740,
+default state (no venue selected):
+
+```
+y=0   ┌─────────────────────────────────────┐
+      │ SearchBar: 328×44 @ (16,16)          │  ← top, safe-area-inset-top aware
+      │   + Filters icon 44×44 @ (300,16)    │     (SearchBar.tsx: env(safe-area-inset-top))
+y=76  ├─────────────────────────────────────┤
+      │                                       │
+      │         live Mapbox canvas           │  ← DO NOT add floating buttons here.
+      │    (pan/zoom/pin-tap owns this area) │     The old top-center `LocateButton` at
+      │                                       │     `top: 72px` was retired for exactly
+      │                                       │     this reason (docs/bottom-nav-spec.md
+      │                                       │     §1/§6) — it sat outside the thumb
+      │                                       │     zone and competed with map gestures.
+y=665 ├─────────────────────────────────────┤
+      │ Mapbox credits (i + logo), lifted    │  ← ToS-required, not resizable (see
+      │ 8px above the pill (globals.css)     │     PR 2's audit note on the exception)
+      │ BottomNav pill: 5×64×64 @ y=665      │  ← full width already spoken for
+y=729 └─────────────────────────────────────┘  ← 12px + safe-area-inset-bottom below
+```
+
+- **No free real estate exists on the map canvas itself** below the search bar and
+  above the bottom nav — any floating button there repeats the mistake #6 in
+  bottom-nav-spec.md already reverted (LocateButton) and risks covering a pin or the
+  Mapbox attribution.
+- **The two zones that are actually free:** (1) inside the existing SearchBar row,
+  to the right of the Filters icon, if a control is genuinely search-related — same
+  pattern as the Filters button's own inline placement. The row is 44px tall, so the
+  control's visual stays 44px and its tap area must be extended to 48×48 with an
+  invisible `::before` overlay (the rule above), not by growing the bar; (2) inside BottomNav as a
+  6th labelled item, accepting narrower cells (the 5-item bar already narrowed
+  cells to ~57–67px when Boxes was added, #516 — measured then against the old 44px
+  floor; ~57px still clears the new 48px one down to ~320px viewports). A brand-new floating pill anywhere else on the map is a
+  **redesign**, not a guardrail-compliant addition — take it to Kyle with a mockup
+  first, the same way Boxes (#516) and the Filters control (#539) were approved.
+- A control that must sit on the map (e.g., a future zoom control) goes bottom-right,
+  stacked *above* the Mapbox credits with the same `--bottom-nav-clearance` +
+  breathing-room math the credits already use — never top-corner, never overlapping
+  the credits.
+
 ## Colors
 
 **Bone is the paper.** The entire app sits on `bone-50` (#FBFAF6), a warm cream with a faint yellow tint. The bone scale steps up through `bone-100` (chip resting state, hover fills), `bone-200` (card borders, subtle dividers), and `bone-300` (search bar border at rest). These are not grays — they are warm. Never introduce a neutral or cool gray.
@@ -193,7 +336,7 @@ A pre-existing design sidecar (`docs/pueblo-food-map-v2-handoff.md`) documents p
 
 Two fonts with clearly delineated roles, both self-hosted as variable woff2 files — no Google Fonts CDN at runtime.
 
-**Fraunces** (variable, weights 300–900) is the display serif. Reach for it exactly twice: the wordmark, and venue name headings inside the detail panels (BottomSheet `h2`, DesktopVenueWindow `h2`). It is NOT preloaded on the critical path — it loads via `font-display: swap` to avoid competing with Public Sans for LCP bandwidth. Do not use it for body copy, badges, buttons, labels, form inputs, or any text below the wordmark and venue name contexts.
+**Fraunces** (variable, weights 300–900) is the display serif. Reach for it for **display headings only**: the wordmark; venue names in the detail panels (BottomSheet / DesktopVenueWindow `h2`, `/venue/<id>`); page titles (`h1` on About, Resources, Privacy, Venues, Suggest, Report, Feedback, 404, box history/activity); short card or confirmation titles (form thank-you headings, the location-denied banner, the Blessing Box check-in question); and admin page and section titles (`AdminNav`'s `h1`, the login and forbidden pages, each admin page's `h2`s — these use the `.wordmark` utility, so they carry its 0.04em tracking too). Always `font-normal` or `font-semibold`, `ink-900` (`brand-navy` for the wordmark and the location banner). It is NOT preloaded on the critical path — it loads via `font-display: swap` to avoid competing with Public Sans for LCP bandwidth. Do not use it for body copy, badges, buttons, labels, form inputs, section labels, or anything that isn't a heading.
 
 **Public Sans** (variable, weights 100–900) carries everything else: all body text, button labels, badge text, placeholder copy, section headers, hours, distance readouts, microcopy. It is humanist and legible at small sizes. Four stylistic alternates are active globally via `font-feature-settings: "cv02", "cv03", "cv04", "cv11"` — these produce cleaner numeral and letterform rendering without any visible style change for most readers.
 
@@ -216,7 +359,19 @@ The Mapbox canvas fills the entire viewport — there is no persistent sidebar. 
 
 Together these occupy less than 10% of the 1440×900 desktop viewport at default state. When a venue is selected, the BottomSheet (mobile) or DesktopVenueWindow (desktop) appears — still leaving the bulk of the map exposed.
 
-Body: `background: bone-50`, `color: ink-700`, `font: Public Sans`. No max-width container on the root — the map bleeds to all edges. Content pages (suggest, report, privacy) use standard centered column widths.
+Body: `background: bone-50`, `color: ink-700`, `font: Public Sans`. No max-width container on the root — the map bleeds to all edges. Content pages (About, Resources, Privacy, Suggest, Report, Feedback, Venues, a venue's `/venue/<id>`, a box's `/box/<id>/history`, `/boxes/activity`) use one centred column: `max-w-lg` (512px) with `px-4` gutters — the footer uses the same column. Admin editing forms widen to `max-w-2xl` (672px).
+
+**Breakpoints** (Tailwind defaults, used as-is):
+
+| Width | Name | What changes |
+|---|---|---|
+| < 360px | `min-[360px]` | BottomNav labels drop from 12px to 11px below it (5 items don't fit at 320px otherwise) |
+| 640px | `sm` | Minor padding/type steps on content pages and admin |
+| 768px | `md` | **Phone → tablet/desktop**: BottomSheet becomes DesktopVenueWindow, the full-sheet Menu becomes a 280px dropdown, search bar goes 520px centred, inputs drop from 16px to 14px text (`MOBILE_QUERY`, `src/lib/useMediaQuery.ts`) |
+| 1024px | `lg` | Admin dashboard and boxes columns, the proposals review layout |
+| 1536px | `2xl` | **Bottom nav bar → floating centred pill** (`BELOW_2XL_QUERY`); Mapbox credits stop lifting above the bar |
+
+Design and test at 360px and 375px first (see Low-end device guardrails); 320px must not clip.
 
 ## Elevation
 
@@ -280,12 +435,100 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **BottomNav**: see docs/bottom-nav-spec.md for geometry and stacking order (the fade band that spec once described was deleted with the bottom-nav rework — `.nav-fade-band` no longer exists in globals.css).
 
+**Menu** (`HamburgerMenu`, opened from BottomNav's Menu): below `md` a full-height sheet from the right, `80vw` capped at 384px, over the Menu backdrop (see Layering), with the bottom nav unmounted while it's open; `md` and up a 280px dropdown from the top-right corner. Rows (`HamburgerMenuItem`): `px-5 py-3` (≈44px tall — see Known deviations), `text-sm font-medium ink-700`, `bone-100` hover, inset sage focus ring, and a trailing 14px `ink-400` icon naming the destination (`List`/`Map` view switch, `RotateCcw` replay intro, `MapPinPlus` suggest, `MessageSquare` feedback, `Info` about, `List` browse all places — the one icon used twice, `History` box activity, `HandHelping` help). First item is the sponsor card: `sage-100` fill, `sage-500` border (`sage-700` on hover), `radius-lg`, an 11px uppercase `ink-500` "Sponsored by" over `text-base font-semibold sage-700` "Pueblo Food Project", opening in a new tab. The same drawer also renders the Saved view (see Loading, empty and error states).
+
+**LanguageToggle** (EN / ES): a segmented pill — `bone-100` fill, `bone-300` border, `radius-full`; each segment `px-3 text-xs font-semibold`; the active one `ink-700` fill with `bone-50` text, the other `ink-500` (`ink-700` on hover). It lives in the Menu, never on the map.
+
+**Icon buttons** (`FavoriteButton`, `ShareButton` in a card header): 44×44 hit area (under the 48px floor — see Known deviations) (`w-11 h-11`, pulled in with `-m-1` so the glyph aligns), `radius-md`, `bone-100` hover, sage focus ring, a 20px glyph (18px in DesktopVenueWindow's more compact header). Favourite is a Lucide `Star`: outline `ink-400`, filled `clay-500` when saved (`aria-pressed`). Share is `Share2` in `ink-400` (`ink-700` hover); it uses the native share sheet, and where that's missing it copies the link and swaps to a `Check` for 2 seconds.
+
+**HoursList**: a `<dl>`, one row per day, the day in a fixed-width column (`ink-500`), times in `ink-700`. Today is `font-semibold sage-700` with `aria-current="date"` and a sr-only ", today", marked by a 3px `sage-500` left rule (see Known deviations).
+
+**DirectionButtons** (a venue card's Walk / Bus / Drive row, `radius-md`, `text-sm font-semibold`): **Walk** draws the route in-app, so it is the filled primary (`sage-600`, `sage-700` hover); while a walking route is showing it switches to a pressed state (`sage-100` fill, `sage-700` text, `sage-600` border). **Bus** and **Drive** hand off to an external maps app, so they're secondary: `bone-50` fill, `ink-700` text, `bone-300` border (`bone-100` fill / `ink-400` border on hover). The walking stepper's Back/Next are 48×48 filled `sage-600` squares (`bone-200` / `ink-400` when disabled) — a comfortable target while walking.
+
+**PhotoViewer** (tap a Blessing Box photo): a native `<dialog>` opened with `showModal()`, full-viewport on a `rgba(0,0,0,0.92)` scrim — the one black surface, because it shows photos. Image `object-contain`, max height `100dvh − 6rem`; caption `text-sm bone-100` below; a 44px round close button top-right on `rgba(255,255,255,0.12)`. Escape closes it natively; focus return is restored explicitly by the component (`previouslyFocusedRef`), not left to the browser.
+
+**SplashScreen** (first visit): the full-screen `z-[9000]` layer over the live map, on the frosted scrim (see Map Chrome). Centred column, max 820px: the `wordmark` at `text-4xl`/`md:text-6xl` in `brand-navy`, a `text-2xl md:text-3xl font-semibold brand-navy` purpose line, `text-base md:text-lg ink-500` microcopy, then the orange/navy ButtonPrimary CTAs. The wordmark and purpose line carry the `splash-text-outline` white halo, the microcopy the thinner `splash-text-outline-sm`; the CTA labels get none (they sit on solid orange).
+
+**SiteFooter** (content pages only, never the map): a `bone-200` top rule, the `max-w-lg` column, `text-xs ink-400` links (Back to map, About, Privacy, Suggest) wrapping with `gap-x-6 gap-y-2`, then the OSM attribution link at `min-h-11` (44px).
+
+**Known deviations** — the code differs from the rules above in four places; fix them when you're in the file rather than copying them:
+- `HoursList` marks today with a coloured left rule, which Do's and Don'ts bans ("no colored border stripes"). A `sage-50` row fill would say the same thing.
+- `HoursList` sets times in `font-mono`, beyond Typography's "mono only for raw coordinates". Public Sans' tabular numerals (`tabular-nums`) would keep the columns aligned.
+- The Menu panel is `white` with black `rgba(0,0,0,…)` shadows and, as a dropdown, an 8px radius — not `bone-50`, the warm `elevation-*` shadows, or a radius token.
+- **Below the 48×48 touch-target floor** (Low-end device guardrails — the floor rose from 44px to 48px in #233/#632, and these predate it): the card-header icon buttons (44×44), Menu rows (`py-3` + `text-sm` ≈ 44px tall), `SiteFooter`'s OSM link (`min-h-11`, 44px) and its four internal links (bare `text-xs` lines, ~16px). Fix per that rule — extend the tap area to 48×48 with padding or an invisible `::before` overlay, never by shrinking the visual.
+
+## Iconography
+
+- **Lucide** (`lucide-react`) is the one icon set — about 30 glyphs in use. The most common: `X` (close), `Phone`, `ExternalLink`, `Clock`, `Star` (saved), `MapPin`, `List`/`Map` (view switch), `CircleHelp` (Help), `ChevronUp`/`ChevronDown`, `Search`, `Menu`, `Locate`/`LocateFixed` (Near me), `Loader2` (busy), `Share2`/`Check`, `History`, `Flag` (report).
+- **Two hand-drawn exceptions**: BottomNav's `BoxHeartIcon` (Boxes) and SearchBar's `FilterIcon` (three bars, drawn at a slightly heavier 2.2px stroke to hold up at 20px). Draw a new icon only when Lucide has nothing close, and match its 24px grid and 2px round-cap stroke.
+- **Sizes**: 14px inline with `text-sm` (the most common), 16px in the search bar and small controls, 18px in card rows, 20px for mobile card-header icon buttons and the Filters control (18px in the desktop card header), 24px for BottomNav items, 28px for empty-state icons. Keep Lucide's default 2px stroke; only map pins use 1.5px.
+- **Colour** comes from `currentColor`: an icon takes the colour of the text it sits with — `ink-400` for quiet chrome (magnifier, chevrons, share), `sage-600`/`sage-700` inside links, `clay-500` for the saved star.
+- **Always paired or labelled**: decorative icons get `aria-hidden`; an icon-only button gets an i18n'd `aria-label` (and `title`). No emoji as icons, anywhere.
+
+## Forms
+
+Every form (Suggest, Feedback, Report, AdoptBox, BoxAlertSignup, AdminLogin, AddVenue) shares one field vocabulary. Copy it; don't restyle per form.
+
+- **Label**: `text-sm font-medium`, `ink-700`, `mb-1`, always a real `<label htmlFor>`. Required fields append a `danger` `*` (`aria-hidden` — the requirement is also stated in the field's error text).
+- **Input / textarea / select**: `w-full`, `radius-md`, 1px `bone-300` border, `px-3 py-2`, white fill (`bg-white` — the one place white sits on the `bone-50` page, so the field reads as a fillable surface), `ink-900` text, `ink-400` placeholder. **`text-base` on mobile, `md:text-sm` up** — iOS Safari zooms the page when a focused field is under 16px. Focus: border and 2px ring both `sage-500`.
+- **Field error**: border → `danger`; message below at `mt-1 text-xs`, `danger`, `role="alert"`, wired with `aria-invalid` + `aria-describedby`. Always words, never only the red border.
+- **Form-level error banner** (a failed submit): `radius-md`, 1px `danger` border, white fill, `px-4 py-3`, `role="alert"`; a `text-sm font-medium` title plus an optional `text-sm` body, both `danger`. Same treatment as the admin `PublishBotStatusBanner`. A recovery action inside it (e.g. AddVenueForm's conflict "Reload") is a `danger`-outlined white button, `bone-100` hover, sage focus ring, `min-h-12`.
+- **Non-blocking guidance is not an error**: "didn't work, here's what to try" (AddVenueForm's geocode no-match) uses `clay-700`, calm confirmation uses `sage-600`. Reserve `danger` for things that block submission.
+- **Submit**: full-width `h-11` (the box-card forms: `min-h-[44px] flex-1`), `radius-md`, `sage-600` fill, `bone-50` `font-semibold` label (7.0:1), `sage-700` hover, `sage-500` focus ring with 2px offset. This is the app-wide **filled primary button** — forms, admin approve/publish, directions, box check-in, RouteStrip's Steps all use it. Never `sage-500` as a fill behind text: `bone-50` on it is 4.2:1, under AA (`npm run lint` rejects `bg-[var(--color-sage-500)]` outside the two non-text marks). Disabled while submitting or before Turnstile returns a token: `opacity-60`, `cursor-not-allowed`, label switches to a progress verb ("Sending…").
+- **Success**: the form is replaced (not appended to) by a centred `role="status" aria-live="polite"` block — `text-xl font-semibold ink-900` title, `text-sm ink-700` body, and a single sage "Back to map" button.
+- **Layout**: fields stack with `space-y-5`; admin forms cap at `max-w-2xl`.
+- **Never Tailwind's `red-*`** (or any stock palette) for errors — `danger` is the only error red. `npm run lint` (`scripts/check-banned.mjs`) rejects stock chromatic palettes.
+
+## Layering (z-index)
+
+One ladder for everything that floats. A new floating element joins an existing rung — never invent a new arbitrary value — and gets added to this table in the same PR.
+
+| z | What | Where |
+|---|---|---|
+| 2 | Mapbox's own control corners (attribution, logo) — set by `mapbox-gl.css`, sitting on the map canvas | `Map.tsx` |
+| 700 | List view (replaces the map in list mode) | `ListView.tsx`, `MapWrapper.tsx` |
+| 800 | Mobile venue card | `BottomSheet.tsx`, `DirectionButtons.tsx` |
+| 900 | Desktop venue window; walking-route strip | `DesktopVenueWindow.tsx`, `RouteStrip.tsx` |
+| 999 | Search popovers — results, no-matches, ViewSuggestion | `SearchResultsPopover.tsx`, `EmptySearchPopover.tsx`, `ViewSuggestion.tsx` |
+| 1000 | Persistent chrome: search bar, wordmark map button, BottomNav at `2xl`+ | `SearchBar.tsx`, `Wordmark.tsx`, `BottomNav.tsx` |
+| 1001 | Menu backdrop; outside-county notice pill | `HamburgerMenu.tsx`, `MapWrapper.tsx` |
+| 1002 | Menu panel | `HamburgerMenu.tsx` |
+| 1003 | BottomNav below `2xl` — above the Menu so its own button can close it (on mobile the full-sheet Menu unmounts the nav instead, `overlayRegistry.ts`) | `BottomNav.tsx` |
+| 1004 / 1005 | Filter panel backdrop / panel | `FilterPanel.tsx` |
+| 1100 | Location-denied banner | `LocationDeniedBanner.tsx` |
+| 9000 | Splash screen (blocks the whole map until dismissed) | `SplashScreen.tsx` |
+| top layer | Photo viewer — native `<dialog>` + `showModal()`, above every z-index by spec | `PhotoViewer.tsx` |
+
+Backdrops are `rgba(26,24,23,0.4)` (warm ink) — FilterPanel and HamburgerMenu both; never black.
+
+## Loading, empty and error states
+
+Every state says what happened in plain words and offers a next step. Never a blank screen, never a dead end.
+
+- **Loading**: text, not a skeleton — `text-sm ink-400` on `bone-100`, `motion-safe:animate-pulse`, copy ends in a real ellipsis ("Loading map…"). A spinner only inside the control that triggered the wait (BottomNav's Near me: Lucide `Loader2`, `animate-spin motion-reduce:animate-none`).
+- **Empty**: a centred column — a 28px Lucide icon in `ink-400`, a `text-base font-semibold ink-700` title that names what's missing ("No saved places yet"), and a `text-sm ink-700` line saying how to fill it ("Tap the star on any place to save it."). Empty search is the compact popover version: `text-sm font-semibold` "No matches for "{query}"", an `ink-400` hint, and category chips as the way out.
+- **Degraded, not failed**: when something can't work, fall back and say so. The map failing to load (`MapErrorBoundary` renders nothing) switches to the list with a `bone-100` / `bone-300`-bottom-border notice ("Map unavailable — …showing the list instead"). Location denied shows `LocationDeniedBanner` with Try again / Dismiss. Outside the county shows a dismissible `clay-100` / `clay-700` pill, `elevation-2`.
+- **Blocking errors**: `danger`, only when the user must act before continuing — see Forms. Warm guidance that doesn't block uses clay, never `danger`.
+- **Not found**: centred white card (`bone-200` border, `radius-lg`), `text-3xl ink-900` title, `ink-500` body, one "Back to map" action.
+- **Confirmations**: the result replaces the thing that caused it (a form becomes its thank-you block) — see Forms › Success.
+
+## Voice and copy
+
+- **Plain, warm, second person.** Talk to one neighbour: "Tap the star on any place to save it." No marketing voice, no jargon ("SNAP" and "WIC" are fine — they're what people call them).
+- **Sentence case** for buttons, headings and labels ("Show details", "Back to map"). Title Case only for proper nouns and the category names as they appear in data ("Food Pantry", "Blessing Box").
+- **Say "place(s)" in public copy.** All public English copy says "place" ("Suggest a place", "Browse all places", "Show 12 places"); Spanish says "lugar". Admin copy may say "venue"; i18n keys and code identifiers keep `venue`.
+- **Numbers**: digits, not words ("Show 12 places", "Step 3 of 9"); counts after a middle dot in chips ("Food pantry · 48"); distance to one decimal under 10 miles ("0.4 mi"), whole miles above (`formatMiles`).
+- **Punctuation**: real ellipsis `…`, never `...`. Straight apostrophes (`'`), never curly. Exclamation marks only on a thank-you ("Thank you!").
+- **Errors** say what went wrong and what to do next, with a fallback when there is one ("…try again, or email us at suggestions@pueblofoodmap.com.").
+- **Every string ships in English and Spanish** (`src/lib/i18n.ts`). Spanish uses informal **tú** ("Toca la estrella…", "Intenta de nuevo"), not usted. Spanish often runs noticeably longer than English: controls must wrap or truncate cleanly at 320px rather than clip (#601 fixed the splash CTA wrapping on narrow phones).
+- **Accessible names are copy too** — `aria-label`s go through `i18n.ts` like visible text, and describe the action ("Close menu"), not the element ("X button").
+
 ## Do's and Don'ts
 
 **Do:**
 - Use `bone-50` as the base background everywhere — the app has one paper color and it is warm cream.
 - Use sage for every interactive affordance: focus rings, selected marker ring, "Show details" link, active filter chip, hover on links inside detail cards.
-- Use Fraunces sparingly for the wordmark and venue name `h2` headings only. These are the display moments.
+- Use Fraunces for display headings only — the wordmark, venue names, page titles (public and admin), and short card/confirmation titles (see Typography). Everything else is Public Sans.
 - Use Public Sans for all body text, buttons, badges, labels, placeholder copy, and section headers.
 - Preload only Public Sans (`/fonts/PublicSans-Variable.woff2`). Fraunces loads non-blocking via `font-display: swap`.
 - Target WCAG AAA (7:1) for body text. `ink-700` on `bone-50` is the floor; do not go lighter.
@@ -300,7 +543,7 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 - Don't use yellow (`#FFD166`) for anything other than support/classification badges.
 - Don't use Fraunces for body text, button labels, form inputs, or any running text at 16px or smaller. Its variable weight range is seductive, but it is a display serif built for headlines.
 - Don't add a sidebar. The v1 360px categories rail + 280px detail panel were removed in v2. A sidebar competes with the map for viewport space and violates the chrome budget.
-- Don't use unmodified Tailwind palette tokens (`gray-500`, `blue-50`, `blue-500`, etc.). Every color in this system is a custom token that overrides the Tailwind defaults.
+- Don't use unmodified Tailwind palette tokens (`gray-500`, `blue-50`, `red-600`, etc.). Every color in this system is a custom token that overrides the Tailwind defaults — errors use `danger`, never `red-*`. `npm run lint` enforces this.
 - Don't add decorative imagery. The v2 design handoff budget is ~5 KB for all images (favicon + inline SVG pins). No hero images, no stock photos, no illustrations.
 - Don't add a dark mode. `color-scheme: light` is explicit in `:root`. The bone palette has no dark-mode counterpart.
 - Don't treat `clay` (warm accent, `#C2410C`) as unused or reserved — it is the established informational-emphasis accent, already in use for the SNAP badge (VenueCard), the map's SNAP chip (MapWrapper), the favorited-heart fill (FavoriteButton), the location-denied banner (LocationDeniedBanner), the admin "Unpublished changes" marker (VenueListView), and a blessing box's unsponsored "needs a sponsor" band (BoxCardBody). Reach for it only for that same warm-attention/informational role, never as a third action color alongside sage.

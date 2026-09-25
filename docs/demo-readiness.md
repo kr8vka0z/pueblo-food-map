@@ -1,5 +1,9 @@
 # Pueblo Food Map v2 — Demo Readiness Checklist
 
+> **Historical — kept for reference.** A one-off checklist for the 2026-06-09
+> demo. It describes the app as it was then; don't use it as a current
+> runbook. Current operations: [AGENTS.md](../AGENTS.md).
+
 **Demo:** 2026-06-09 with Pueblo Food Project team
 **Prod URL:** https://pueblofoodmap.com
 **v2 shipped:** PRs #26, #27, #28, #30, #31, #32, #33, #34 (all merged to main)

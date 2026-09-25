@@ -213,9 +213,9 @@ const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
 };
 
 const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-500)] " +
+  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
   "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-600)] focus-visible:outline-none focus-visible:ring-2 " +
+  "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 

@@ -1,19 +1,16 @@
 /**
- * GET|POST|... /api/auth/* — Better Auth's own route handler (#314 Phase
- * 1). Mounts the engine so it boots on the Worker runtime; does NOT gate
- * anything yet.
+ * GET|POST|... /api/auth/* — Better Auth's own route handler (added #314
+ * Phase 1). Serves sign-in, session, and passkey endpoints for the admin
+ * login; the admin gate itself is getAdminDb() (src/lib/adminDb.ts).
  *
  * WHY no auth check here, unlike every other route under src/app/api/admin/**:
  * this endpoint IS the auth system itself (sign-in, session, passkey
  * ceremonies, etc. — endpoints an unauthenticated visitor must be able to
  * reach to sign in at all). It is intentionally NOT gated by
- * requireAccessIdentity()/getAdminDb() — those exist to protect this app's
- * OWN admin data behind Cloudflare Access, a separate concern from Better
- * Auth's own endpoints. Cloudflare Access still gates the real admin UI
- * (/admin/**, /api/admin/**) completely unmodified through this phase —
- * this route exists alongside it, unused by anything yet. Wiring Better
- * Auth into the actual sign-in flow / replacing Access is Phase 3+ (see
- * AGENTS.md's Better Auth section for the phase breakdown).
+ * getAdminDb() — that protects this app's OWN admin data (/admin/**,
+ * /api/admin/**) and requires the very session these endpoints create.
+ * Cloudflare Access, which gated the admin UI when this route was added,
+ * is gone (AGENTS.md "Admin authentication").
  *
  * toNextJsHandler() accepts either a static `{ handler }` object or a plain
  * async function — used here as a function so getAuth()'s lazy

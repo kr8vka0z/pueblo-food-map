@@ -57,6 +57,7 @@ function makeExistingRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow 
     lng: -104.5,
     address: "Old Address",
     hours_weekly: null,
+    hours_irregular: null,
     accepts_snap: null,
     accepts_wic: null,
     phone: null,
@@ -368,17 +369,17 @@ describe("PATCH /api/admin/venues/[id]", () => {
       expect(stmts).toHaveLength(6);
       const [updateStmt, deleteStmt, insertStmt, renamedStmt, movedStmt, auditStmt] = stmts;
       expect(updateStmt.sql).toContain("UPDATE venues SET");
-      expect(deleteStmt.sql).toBe("DELETE FROM blessing_boxes WHERE venue_id = ?");
-      expect(deleteStmt.args).toEqual([VENUE_ID]);
+      expect(deleteStmt.sql).toMatch(/^DELETE FROM blessing_boxes WHERE venue_id = \? AND EXISTS/); // #265 precondition
+      expect(deleteStmt.args[0]).toBe(VENUE_ID);
       expect(insertStmt.sql).toContain("INSERT INTO blessing_boxes");
       expect(insertStmt.args).toContain("New Host");
       expect(insertStmt.args).toContain("new@example.org");
 
-      expect(renamedStmt.sql).toBe("INSERT INTO box_events (venue_id, kind, detail, created_at) VALUES (?, ?, ?, ?)");
+      expect(renamedStmt.sql).toMatch(/^INSERT INTO box_events \(venue_id, kind, detail, created_at\)\s+SELECT \?, \?, \?, \?\s+WHERE EXISTS/); // #265 precondition
       expect(renamedStmt.args[1]).toBe("renamed");
       expect(renamedStmt.args[2]).toBe("Old Name → Eastside Pantry");
 
-      expect(movedStmt.sql).toBe("INSERT INTO box_events (venue_id, kind, detail, created_at) VALUES (?, ?, ?, ?)");
+      expect(movedStmt.sql).toMatch(/^INSERT INTO box_events \(venue_id, kind, detail, created_at\)\s+SELECT \?, \?, \?, \?\s+WHERE EXISTS/); // #265 precondition
       expect(movedStmt.args[1]).toBe("moved");
       expect(movedStmt.args[2]).toBe("Old Address → 123 Test St, Pueblo, CO");
 
@@ -435,7 +436,7 @@ describe("PATCH /api/admin/venues/[id]", () => {
       const stmts = batch.mock.calls[0][0] as BoundStatement[];
       expect(stmts).toHaveLength(3);
       const [, deleteStmt, auditStmt] = stmts;
-      expect(deleteStmt.sql).toBe("DELETE FROM blessing_boxes WHERE venue_id = ?");
+      expect(deleteStmt.sql).toMatch(/^DELETE FROM blessing_boxes WHERE venue_id = \? AND EXISTS/); // #265 precondition
       expect(auditStmt.sql).toContain("INSERT INTO audit_log");
       expect(stmts.some((s) => s.sql.includes("box_events"))).toBe(false);
     });
@@ -456,10 +457,10 @@ describe("PATCH /api/admin/venues/[id]", () => {
       const stmts = batch.mock.calls[0][0] as BoundStatement[];
       expect(stmts).toHaveLength(5);
       const [, deleteStmt, insertStmt, eventStmt] = stmts;
-      expect(deleteStmt.sql).toBe("DELETE FROM blessing_boxes WHERE venue_id = ?");
+      expect(deleteStmt.sql).toMatch(/^DELETE FROM blessing_boxes WHERE venue_id = \? AND EXISTS/); // #265 precondition
       expect(insertStmt.sql).toContain("INSERT INTO blessing_boxes");
       expect(insertStmt.args).toContain("First Host");
-      expect(eventStmt.sql).toBe("INSERT INTO box_events (venue_id, kind, detail, created_at) VALUES (?, ?, ?, ?)");
+      expect(eventStmt.sql).toMatch(/^INSERT INTO box_events \(venue_id, kind, detail, created_at\)\s+SELECT \?, \?, \?, \?\s+WHERE EXISTS/); // #265 precondition
       expect(eventStmt.args[1]).toBe("added");
       expect(eventStmt.args[2]).toBeNull();
     });

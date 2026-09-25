@@ -182,7 +182,7 @@ function d1Query<T>(dbMode: DbMode, sql: string): T[] {
  * the SAME database that also holds Better Auth sessions, the auth
  * rate-limit table, and public_submissions — a brief outage here logs the
  * admin out and silently drops any public form submission landing in that
- * window (best-effort insert, see AGENTS.md "Public submissions queue").
+ * window (best-effort insert, see ARCHITECTURE.md "Form-route triad").
  * `--command` instead takes the OTHER branch of that same `executeRemotely`
  * function: no `input.file`, so it posts straight to D1's REST `/query`
  * endpoint (`d1ApiPost(..., "query", { sql })`) — the identical live-query
@@ -278,8 +278,11 @@ async function scrapeOsm(): Promise<Venue[]> {
 
 // ─── D1 row shape for current venues ────────────────────────────────────────
 
+// hours_irregular (#400) needs migrations/0015 applied to the target D1
+// first — against a database without it this SELECT fails loudly, which is
+// the right failure (see AGENTS.md's promotion checklist).
 const CURRENT_ROW_COLUMNS =
-  "id, name, category, lat, lng, address, hours_weekly, phone, url, operator, last_verified";
+  "id, name, category, lat, lng, address, hours_weekly, hours_irregular, phone, url, operator, last_verified";
 
 function loadCurrentRows(dbMode: DbMode, sourceType: RefreshSource): CurrentVenueRow[] {
   const sql = `SELECT ${CURRENT_ROW_COLUMNS} FROM venues WHERE source_type = '${sourceType}' AND status IN ('draft','published')`;

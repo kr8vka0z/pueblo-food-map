@@ -1,6 +1,20 @@
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
 
+// This app serves one physical city (Pueblo, CO, America/Denver) and every
+// weekly-hours call site is client-only ("use client" — BottomSheet,
+// DesktopVenueWindow, VenueCard, useMapFilters), so computeOpenStatus()'s
+// use of the ambient process clock (now.getDay()/getHours(), src/lib/hours.ts)
+// is correct for a real visitor's own browser. It's wrong on a CI runner,
+// which defaults to UTC: hoursIrregular.test.ts's "weekly open takes
+// priority" case (mixing weekly + Denver-forced irregular hours) is the
+// first test to depend on that ambient TZ matching Denver, and has failed
+// on every GitHub Actions run since #400 landed it (commit a7d5f4c) while
+// passing locally on a Denver-TZ Mac. Pinning here, not per-test, since any
+// future weekly-hours test would hit the same gap. Node >=13 honors a
+// runtime process.env.TZ write; this must run before any test file does.
+process.env.TZ = "America/Denver";
+
 // jsdom (pinned version, see package.json) ships an empty HTMLDialogElement
 // implementation — no showModal()/close(), just the plain HTMLElement it
 // extends (verified against node_modules/jsdom/lib/jsdom/living/nodes/

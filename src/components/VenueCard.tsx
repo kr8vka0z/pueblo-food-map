@@ -4,7 +4,7 @@ import { Clock, CircleHelp } from "lucide-react";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
-import { computeOpenStatus } from "@/lib/hours";
+import { computeVenueOpenStatus, nextIrregularOccurrence, formatIrregularOccurrence } from "@/lib/hours";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 
@@ -23,8 +23,15 @@ export default function VenueCard({
   locale = "en",
   headingLevel = 3,
 }: VenueCardProps) {
-  const status = computeOpenStatus(venue.hours_weekly);
+  const status = computeVenueOpenStatus(venue);
   const dotColor = categoryColors[venue.category];
+  // #400: the most useful fact for an audience with little gas money to
+  // spend driving to a monthly pantry on the wrong week — shown regardless
+  // of the badge above (even while "open," knowing the NEXT date still
+  // matters for planning a future visit).
+  const nextOccurrence = venue.hours_irregular
+    ? nextIrregularOccurrence(venue.hours_irregular)
+    : null;
 
   const Heading = `h${headingLevel}` as "h2" | "h3";
 
@@ -94,6 +101,16 @@ export default function VenueCard({
               <Badge variant="snap">{t("badge.wic", locale)}</Badge>
             )}
           </span>
+
+          {/* #400: monthly-schedule next-occurrence line — the single most
+              useful fact for this audience (a wrong-week drive costs real
+              gas money). Own line below the badge row, not another badge —
+              it's a date, not a status. */}
+          {nextOccurrence && (
+            <span className="block text-xs text-[var(--color-ink-500)] mt-1">
+              {t("hours.irregular.next", locale, { when: formatIrregularOccurrence(nextOccurrence, locale) })}
+            </span>
+          )}
         </span>
 
         {/* Distance */}

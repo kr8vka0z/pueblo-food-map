@@ -154,7 +154,7 @@ scripts/fetch-osm-grocery.py ┤→ scripts/ingest-osm-grocery.py ─┐
                                                     (status='pending')
 ```
 
-Runs monthly in CI (`refresh-proposals.yml`); run order and local use:
+Runs weekly in CI (`refresh-proposals.yml`, cron changed monthly→weekly in #543); run order and local use:
 `scripts/README.md`; schedule, credentials and chunked-write gotchas:
 AGENTS.md "Automated venue-refresh pipeline".
 

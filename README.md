@@ -165,7 +165,7 @@ editing it by hand in the admin panel (`/admin/places`).
 
 **The real refresh path (as of #133/#234's automated pipeline):**
 [`.github/workflows/refresh-proposals.yml`](.github/workflows/refresh-proposals.yml)
-runs monthly (and on manual dispatch), re-scrapes Plentiful and OSM, diffs
+runs weekly (and on manual dispatch), re-scrapes Plentiful and OSM, diffs
 the result against D1's current venues, and writes one `change_proposals`
 row per detected difference — including a link-health pass that flags dead
 outbound `url`s. It writes to `venues` in exactly one bounded case: a

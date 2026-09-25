@@ -71,7 +71,6 @@ automated diff:
 
 | Script | Purpose | When to re-run |
 |---|---|---|
-| `match-benefits.py` | Matches OSM grocery/convenience venues against USDA SNAP + CDPHE WIC data by proximity/name → `accepts_snap`/`accepts_wic` flags | When the USDA/CDPHE source files in `data/raw/` are refreshed by hand (see the script's own header for the ArcGIS query URLs) |
 | `geocode-pfp.py` | Geocodes the 10 hand-curated Pueblo Food Project venues against Nominatim | Only if a PFP address changes — last run 2026-05-14 |
 | `geocode-osm-missing.py` | Reverse-geocodes OSM venues missing an address (Nominatim, falling back to Mapbox, then raw coordinates) | After an OSM ingest leaves new venues with no address |
 

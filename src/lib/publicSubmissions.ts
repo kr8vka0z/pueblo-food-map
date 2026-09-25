@@ -18,7 +18,7 @@
  * getCloudflareContext().env.ADMIN_DB and pass it in.
  *
  * WHY this function never catches its own errors: a D1 outage must not
- * block the caller's email send (AGENTS.md "Public submissions queue"), but
+ * block the caller's email send (ARCHITECTURE.md "Form-route triad"), but
  * that policy belongs to the two route handlers, not to this shared
  * primitive — each route wraps its own call in try/catch and logs via
  * logFormFailure(form, "db_write_failed", ...) so the failure is attributed

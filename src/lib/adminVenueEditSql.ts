@@ -12,8 +12,10 @@
 // #265: `AND updated_at = ?` is the optimistic-concurrency precondition —
 // see this file's own header. The last bound param is the expected value,
 // NOT the new one (that's already bound as `updated_at = ?` above it).
+// #400: hours_irregular sits right after hours_weekly, matching
+// buildVenueUpdateValues()'s bind order in the route file.
 export const VENUE_UPDATE_SQL = `UPDATE venues SET
-  name = ?, category = ?, lat = ?, lng = ?, address = ?, hours_weekly = ?,
+  name = ?, category = ?, lat = ?, lng = ?, address = ?, hours_weekly = ?, hours_irregular = ?,
   accepts_snap = ?, accepts_wic = ?, phone = ?, email = ?, url = ?, notes = ?,
   operator = ?, source = ?, last_verified = ?, outside_county = ?,
   updated_by = ?, updated_at = ?

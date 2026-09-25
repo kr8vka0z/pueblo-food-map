@@ -59,12 +59,31 @@ import { useRouter } from "next/navigation";
 import { categoryLabels } from "@/data/venues";
 import { DISPLAY_DAY_KEYS, type DayKey } from "@/lib/hours";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
-import type { VenueCategory, WeeklyHours } from "@/types/venue";
+import type { IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 type TriStateValue = "" | "1" | "0";
 type HoursDraft = Record<DayKey, string>;
+
+/**
+ * One editable row of the "Monthly / irregular schedule" fieldset (#400).
+ * Every field is a plain string/select value (form-draft shape, same
+ * "loose strings, validated server-side" convention HoursDraft already
+ * uses above) — buildHoursIrregular() below converts a list of these into
+ * the IrregularSchedule[] the POST/PATCH body sends. `recurrence` starts
+ * blank (not defaulted to "monthly_ordinal") so an admin must actively
+ * pick a kind rather than silently submitting a half-filled ordinal row.
+ */
+export interface IrregularEntryDraft {
+  recurrence: "" | IrregularSchedule["recurrence"];
+  ordinal: "" | "1" | "2" | "3" | "4" | "5" | "last";
+  weekday: "" | DayKey;
+  dayOfMonth: string;
+  /** Comma-separated time ranges — same convention as HoursDraft's per-day field. */
+  slots: string;
+  note: string;
+}
 
 /**
  * Shape returned by GET /api/admin/geocode (src/app/api/admin/geocode/route.ts).
@@ -89,6 +108,8 @@ export interface AddVenueFormValues {
   lat: string;
   lng: string;
   hours: HoursDraft;
+  /** Non-weekly (monthly-ordinal etc.) schedules (#400) — always ALONGSIDE `hours`, never a replacement. */
+  hoursIrregular: IrregularEntryDraft[];
   acceptsSnap: TriStateValue;
   acceptsWic: TriStateValue;
   phone: string;
@@ -170,6 +191,7 @@ type FieldErrorKey =
   | "lng"
   | "source"
   | "hours_weekly"
+  | "hours_irregular"
   | "accepts_snap"
   | "accepts_wic"
   | "phone"
@@ -231,6 +253,7 @@ function defaultValues(initialValues?: Partial<AddVenueFormValues>): AddVenueFor
     lat: "",
     lng: "",
     hours: emptyHoursDraft(),
+    hoursIrregular: [],
     acceptsSnap: "",
     acceptsWic: "",
     phone: "",
@@ -261,6 +284,52 @@ function buildHoursWeekly(hours: HoursDraft): WeeklyHours | undefined {
     if (slots.length > 0) result[day] = slots;
   }
   return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function emptyIrregularDraft(): IrregularEntryDraft {
+  return { recurrence: "", ordinal: "", weekday: "", dayOfMonth: "", slots: "", note: "" };
+}
+
+/**
+ * IrregularEntryDraft[] -> IrregularSchedule[], or undefined if every row is
+ * incomplete/blank. Incomplete rows (a recurrence picked but a required
+ * field left blank) are silently skipped, not surfaced as a client error —
+ * same "server is the authoritative trust boundary" split this form's own
+ * header documents for validateClient() vs. adminVenueValidation.ts; a
+ * half-filled row here just doesn't make it into the payload, and the
+ * server's own `errors.hours_irregular` message (rendered below the
+ * fieldset) covers any shape it still rejects.
+ */
+function buildHoursIrregular(drafts: IrregularEntryDraft[]): IrregularSchedule[] | undefined {
+  const result: IrregularSchedule[] = [];
+  for (const d of drafts) {
+    const slots = d.slots
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    const note = d.note.trim();
+
+    if (d.recurrence === "monthly_ordinal") {
+      if (!d.weekday || !d.ordinal || slots.length === 0) continue;
+      const ordinal = d.ordinal === "last" ? "last" : (Number(d.ordinal) as 1 | 2 | 3 | 4 | 5);
+      result.push({
+        recurrence: "monthly_ordinal",
+        ordinal,
+        weekday: d.weekday,
+        slots,
+        ...(note ? { note } : {}),
+      });
+    } else if (d.recurrence === "monthly_date") {
+      const dayOfMonth = Number(d.dayOfMonth);
+      if (!dayOfMonth || slots.length === 0) continue;
+      result.push({ recurrence: "monthly_date", day_of_month: dayOfMonth, slots, ...(note ? { note } : {}) });
+    } else if (d.recurrence === "other") {
+      if (!note) continue;
+      result.push({ recurrence: "other", slots, note });
+    }
+    // d.recurrence === "" (no kind picked yet) — skipped, same as above.
+  }
+  return result.length > 0 ? result : undefined;
 }
 
 function validateClient(values: AddVenueFormValues): FieldErrors {
@@ -322,6 +391,24 @@ export default function AddVenueForm({
 
   function setHourDay(day: DayKey, value: string) {
     setValues((prev) => ({ ...prev, hours: { ...prev.hours, [day]: value } }));
+  }
+
+  // ── Irregular schedule row editing (#400) ────────────────────────────────
+  function addIrregularRow() {
+    setValues((prev) => ({ ...prev, hoursIrregular: [...prev.hoursIrregular, emptyIrregularDraft()] }));
+  }
+  function removeIrregularRow(index: number) {
+    setValues((prev) => ({ ...prev, hoursIrregular: prev.hoursIrregular.filter((_, i) => i !== index) }));
+  }
+  function setIrregularField<K extends keyof IrregularEntryDraft>(
+    index: number,
+    key: K,
+    value: IrregularEntryDraft[K],
+  ) {
+    setValues((prev) => ({
+      ...prev,
+      hoursIrregular: prev.hoursIrregular.map((row, i) => (i === index ? { ...row, [key]: value } : row)),
+    }));
   }
 
   /** Sets lat/lng from a chosen geocode match and clears any stale lat/lng field errors. */
@@ -401,6 +488,7 @@ export default function AddVenueForm({
       source: values.source.trim(),
       last_verified: values.lastVerified,
       hours_weekly: buildHoursWeekly(values.hours),
+      hours_irregular: buildHoursIrregular(values.hoursIrregular),
       accepts_snap: values.acceptsSnap === "" ? null : Number(values.acceptsSnap),
       accepts_wic: values.acceptsWic === "" ? null : Number(values.acceptsWic),
       phone: values.phone.trim() || undefined,
@@ -892,6 +980,125 @@ export default function AddVenueForm({
         {errors.hours_weekly && (
           <p role="alert" className={errorClass}>
             {errors.hours_weekly}
+          </p>
+        )}
+      </fieldset>
+
+      {/* Monthly / irregular schedule (#400) — kept lean per the weekly
+          fieldset's own precedent above: a repeatable row of plain
+          selects/inputs, not a calendar picker. Stored ALONGSIDE hours_weekly,
+          never replacing it — a venue (e.g. Lynn Gardens Baptist Church) can
+          have both. */}
+      <fieldset className="space-y-3">
+        <legend className={labelClass.replace("mb-1", "mb-2")}>
+          Monthly schedule <span className="font-normal text-[var(--color-ink-400)]">(optional)</span>
+        </legend>
+        <p className="text-xs text-[var(--color-ink-400)] mb-2">
+          For a schedule hours_weekly can&apos;t express, e.g. &quot;4th Tuesday of each month.&quot;
+        </p>
+        {values.hoursIrregular.map((row, i) => (
+          <div key={i} className="rounded-[var(--radius-md)] border border-[var(--color-bone-300)] p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <label htmlFor={`irregular-recurrence-${i}`} className="text-xs text-[var(--color-ink-500)]">
+                Schedule {i + 1}
+              </label>
+              <button
+                type="button"
+                onClick={() => removeIrregularRow(i)}
+                className="text-xs font-medium text-[var(--color-clay-700)] hover:underline"
+              >
+                Remove
+              </button>
+            </div>
+            <select
+              id={`irregular-recurrence-${i}`}
+              value={row.recurrence}
+              onChange={(e) => setIrregularField(i, "recurrence", e.target.value as IrregularEntryDraft["recurrence"])}
+              className={`${inputBase} border-[var(--color-bone-300)]`}
+            >
+              <option value="">Select a kind…</option>
+              <option value="monthly_ordinal">A specific weekday each month (e.g. 4th Tuesday)</option>
+              <option value="monthly_date">A fixed day of the month (e.g. the 15th)</option>
+              <option value="other">Other (describe in the note)</option>
+            </select>
+
+            {row.recurrence === "monthly_ordinal" && (
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  aria-label={`Schedule ${i + 1} ordinal`}
+                  value={row.ordinal}
+                  onChange={(e) => setIrregularField(i, "ordinal", e.target.value as IrregularEntryDraft["ordinal"])}
+                  className={`${inputBase} border-[var(--color-bone-300)]`}
+                >
+                  <option value="">1st, 2nd…</option>
+                  <option value="1">1st</option>
+                  <option value="2">2nd</option>
+                  <option value="3">3rd</option>
+                  <option value="4">4th</option>
+                  <option value="5">5th</option>
+                  <option value="last">Last</option>
+                </select>
+                <select
+                  aria-label={`Schedule ${i + 1} weekday`}
+                  value={row.weekday}
+                  onChange={(e) => setIrregularField(i, "weekday", e.target.value as IrregularEntryDraft["weekday"])}
+                  className={`${inputBase} border-[var(--color-bone-300)]`}
+                >
+                  <option value="">Weekday…</option>
+                  {DISPLAY_DAY_KEYS.map((day) => (
+                    <option key={day} value={day}>
+                      {DAY_LABELS[day]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {row.recurrence === "monthly_date" && (
+              <input
+                type="number"
+                min={1}
+                max={31}
+                aria-label={`Schedule ${i + 1} day of month`}
+                value={row.dayOfMonth}
+                onChange={(e) => setIrregularField(i, "dayOfMonth", e.target.value)}
+                placeholder="Day of month (1-31)"
+                className={`${inputBase} border-[var(--color-bone-300)]`}
+              />
+            )}
+
+            {(row.recurrence === "monthly_ordinal" || row.recurrence === "monthly_date") && (
+              <input
+                type="text"
+                aria-label={`Schedule ${i + 1} time ranges`}
+                value={row.slots}
+                onChange={(e) => setIrregularField(i, "slots", e.target.value)}
+                placeholder="11:00 AM - 12:00 PM"
+                className={`${inputBase} border-[var(--color-bone-300)]`}
+              />
+            )}
+
+            <textarea
+              aria-label={`Schedule ${i + 1} note`}
+              rows={2}
+              value={row.note}
+              onChange={(e) => setIrregularField(i, "note", e.target.value)}
+              maxLength={FIELD_LIMITS.IRREGULAR_SCHEDULE_NOTE}
+              placeholder={
+                row.recurrence === "other"
+                  ? "Describe the schedule, e.g. \"3rd weekend, call ahead\""
+                  : "Note (optional)"
+              }
+              className={`${inputBase} border-[var(--color-bone-300)] resize-y min-h-[56px]`}
+            />
+          </div>
+        ))}
+        <button type="button" onClick={addIrregularRow} className={secondaryButtonClass}>
+          + Add monthly schedule
+        </button>
+        {errors.hours_irregular && (
+          <p role="alert" className={errorClass}>
+            {errors.hours_irregular}
           </p>
         )}
       </fieldset>

@@ -36,6 +36,7 @@ function makeExistingRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow 
     lng: -104.5,
     address: "Old Address",
     hours_weekly: null,
+    hours_irregular: null,
     accepts_snap: null,
     accepts_wic: null,
     phone: null,

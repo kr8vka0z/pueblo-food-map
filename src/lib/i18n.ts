@@ -111,6 +111,18 @@ const en: Record<string, string> = {
   // Closed
   "hours.closed": "Closed",
 
+  // Irregular (monthly-ordinal etc.) schedules (#400)
+  "hours.irregular.next": "Next: {when}",
+  "hours.irregular.monthlyOrdinal": "{ordinal} {weekday} of each month, {slots}",
+  "hours.irregular.monthlyDate": "The {day} of each month, {slots}",
+  "hours.irregular.heading": "Monthly",
+  "hours.irregular.ordinal.1": "1st",
+  "hours.irregular.ordinal.2": "2nd",
+  "hours.irregular.ordinal.3": "3rd",
+  "hours.irregular.ordinal.4": "4th",
+  "hours.irregular.ordinal.5": "5th",
+  "hours.irregular.ordinal.last": "Last",
+
   // Empty state (PR 3)
   "empty.title": "No places match your filters.",
   "empty.clear": "Clear filters",
@@ -1005,6 +1017,18 @@ const es: Record<string, string> = {
 
   // Closed
   "hours.closed": "Cerrado",
+
+  // Irregular (monthly-ordinal etc.) schedules (#400)
+  "hours.irregular.next": "Próximo: {when}", // [CHECK]
+  "hours.irregular.monthlyOrdinal": "{ordinal} {weekday} de cada mes, {slots}", // [CHECK]
+  "hours.irregular.monthlyDate": "El día {day} de cada mes, {slots}", // [CHECK]
+  "hours.irregular.heading": "Mensual", // [CHECK]
+  "hours.irregular.ordinal.1": "1.º", // [CHECK]
+  "hours.irregular.ordinal.2": "2.º", // [CHECK]
+  "hours.irregular.ordinal.3": "3.º", // [CHECK]
+  "hours.irregular.ordinal.4": "4.º", // [CHECK]
+  "hours.irregular.ordinal.5": "5.º", // [CHECK]
+  "hours.irregular.ordinal.last": "Último", // [CHECK]
 
   // Empty state (PR 3)
   "empty.title": "Ningún lugar coincide con tus filtros.",

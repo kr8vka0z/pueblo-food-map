@@ -55,9 +55,12 @@ function seedVenue(db: Database.Database, id: string, category: string) {
 }
 
 function updateArgs(id: string, expectedUpdatedAt: string) {
-  // Same order as VENUE_UPDATE_SQL's placeholders.
+  // Same order as VENUE_UPDATE_SQL's placeholders. #400 inserted
+  // hours_irregular right after hours_weekly — keep this array's shape in
+  // sync with that column list or every value after it silently binds to
+  // the wrong column.
   return [
-    "New Name", "blessing_box", 38.25, -104.6, "New Address", null,
+    "New Name", "blessing_box", 38.25, -104.6, "New Address", null, null,
     null, null, null, null, null, null,
     null, "test", "2026-09-24", 0,
     "admin@example.com", NEW_TS,

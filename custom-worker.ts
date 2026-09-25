@@ -11,8 +11,8 @@
 // WHY a scoped named-type import for ExecutionContext/ExportedHandler/ScheduledController
 // (not a bare `wrangler types` full-runtime include, and not `.wrangler`'s own generated
 // runtime.d.ts, which is itself gitignored build output — absent in a fresh checkout, so
-// relying on it would only work by local-cache accident, not in CI): AGENTS.md's "Typing
-// ADMIN_DB" section documents why this app never enables wrangler's full runtime type set
+// relying on it would only work by local-cache accident, not in CI): AGENTS.md's "Don't run
+// bare `wrangler types`" bullet documents why this app never enables wrangler's full runtime type set
 // (`wrangler types` default) — it collides Cloudflare's HTMLRewriter `Element` with
 // lib.dom's `Element` and corrupts DOM types project-wide. cloudflare-env.d.ts already
 // works around this by importing only the one runtime type it needs (`D1Database`) from
@@ -20,6 +20,7 @@
 // This file follows the exact same pattern for the three Workers runtime types a
 // scheduled()-handler signature needs — none of which is `Element` or collides with DOM.
 import type { ExecutionContext, ExportedHandler, ScheduledController } from "@cloudflare/workers-types/experimental";
+import { runScheduledTasks } from "./src/lib/scheduledTasks";
 //
 // WHY `@ts-ignore` (not `@ts-expect-error`) on the imports below: .open-next/worker.js
 // is produced by `opennextjs-cloudflare build` and does not exist in a fresh checkout —
@@ -60,12 +61,15 @@ export default {
   // and the reason it does a bare heartbeat too). The cron firing at all already proves
   // the worker is alive and scheduled; that IS the liveness signal. Pinging the success
   // URL unconditionally is the correct, simpler design.
-  async scheduled(_event: ScheduledController, env: CloudflareEnv, ctx: ExecutionContext) {
-    // Guard: HC_PING_URL is a prod-only runtime secret (`wrangler secret put`, see
-    // wrangler.jsonc) — staging never gets it, and a missing value must never throw
-    // out of a cron handler, so bail out instead of fetching "undefined".
-    if (!env.HC_PING_URL) return;
-    ctx.waitUntil(fetch(env.HC_PING_URL).catch(() => {}));
+  // The ping (HC_PING_URL guard, prod-only secret, never gates anything else) and
+  // every daily-gated job riding this same cron (#594 email retention, #238/#234
+  // refresh-pipeline alerts) all live in runScheduledTasks (src/lib/scheduledTasks.ts)
+  // — moved out of this file specifically so the branching itself is unit-testable.
+  // This file's own imports (.open-next/worker.js, generated build output) mean
+  // vitest can never import custom-worker.ts directly, so nothing here can carry
+  // test coverage; see scheduledTasks.ts's own header for the full reasoning.
+  async scheduled(event: ScheduledController, env: CloudflareEnv, ctx: ExecutionContext) {
+    runScheduledTasks(event, env, ctx);
   },
 } satisfies ExportedHandler<CloudflareEnv>;
 

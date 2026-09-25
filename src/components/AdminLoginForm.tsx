@@ -41,10 +41,9 @@
  * (mirrors adminAuthAllowlistPlugin.ts's identical-response guarantee on
  * the server side).
  *
- * No route gating here — this page renders for anyone, pre-auth (Phase
- * 2 scope; see AGENTS.md's Better Auth section for the phase breakdown).
- * "Continue to admin" links to /admin, which Cloudflare Access still
- * fully gates on its own, unrelated to anything on this page.
+ * No route gating here — this page renders for anyone, pre-auth.
+ * "Continue to admin" links to /admin, which getAdminDb() gates on the
+ * Better Auth session this form creates (AGENTS.md "Admin authentication").
  */
 
 import { useEffect, useState } from "react";
@@ -61,14 +60,16 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
 const inputBase =
   "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-  "bg-white placeholder:text-[var(--color-ink-300)] " +
+  // #534: --color-ink-300 undefined — DESIGN.md documents ink-400 as the
+  // placeholder-text token.
+  "bg-white placeholder:text-[var(--color-ink-400)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:border-[var(--color-sage-500)]";
 const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
-const errorClass = "mt-1 text-xs text-red-600";
+const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
 const primaryButtonClass =
-  "w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
-  "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-600)] " +
+  "w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+  "text-base font-semibold transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed";
 const secondaryButtonClass =
@@ -255,7 +256,7 @@ export default function AdminLoginForm() {
             aria-describedby={fieldError ? "admin-login-email-error" : undefined}
             className={`${inputBase} ${
               fieldError
-                ? "border-red-500"
+                ? "border-[var(--color-danger)]"
                 : "border-[var(--color-bone-300)]"
             } mb-1`}
             placeholder="you@example.com"

@@ -154,7 +154,8 @@ export interface StaleApplyResult {
  * `venues` row for target_venue_id and re-checks it against
  * proposed_diff.before — but scoped to what that proposal actually
  * asserts, not the whole row." The narrow per-type scope is load-bearing,
- * not a simplification — see AGENTS.md's "#235 reconciliation" note (also
+ * not a simplification — see the "#235 reconciliation" note (atlas-kb
+ * "PFM AGENTS History — Venue-Refresh Pipeline"; also
  * quoted in the spec) for the concrete case a whole-row check would
  * misfire on: two independent proposals from different sources can
  * legitimately target the same venue at once (a link_health url-clear and
@@ -242,7 +243,7 @@ export function toTriState(value: boolean | undefined): number | null {
 // unchanged by this move — it now delegates to applyApprovedProposal()
 // instead of inlining this logic.
 
-/** Actor identity recorded on the venue mutation + audit row — the reviewing admin from the caller's OWN Better Auth session, never the pipeline's bot identity that generated the proposal. Narrowed to just the field this module needs, not the full AdminIdentity shape (cfAccess.ts) — keeps this file's D1-adjacent code from importing an auth type it only uses for one string field. */
+/** Actor identity recorded on the venue mutation + audit row — the reviewing admin from the caller's OWN Better Auth session, never the pipeline's bot identity that generated the proposal. Narrowed to just the field this module needs, not the full AdminIdentity shape (adminOrigin.ts) — keeps this file's D1-adjacent code from importing an auth type it only uses for one string field. */
 export interface ApprovingIdentity {
   email: string;
 }
@@ -332,7 +333,18 @@ export async function applyApprovedProposal(
 
   const parsed = parseProposalRow(proposalRow);
   if (parsed.parseError) {
-    return { ok: false, status: 422, error: "corrupted_proposal" };
+    // #568 item 3: no `message` here used to mean both review surfaces
+    // (NeedsDecisionPanel.tsx's ApproveButton, ProposalsReviewView.tsx)
+    // fell back to their own generic "Try again"/"Something went wrong" —
+    // for a corrupted row, retrying can never succeed, so that copy was
+    // actively misleading. Fixed at the shared source both surfaces
+    // already read `body.message` from, not duplicated in either.
+    return {
+      ok: false,
+      status: 422,
+      error: "corrupted_proposal",
+      message: "This proposal's stored data is corrupted and can't be read. Reject it instead.",
+    };
   }
   const { diff } = parsed;
   const changeType = proposalRow.change_type as ProposalChangeType;
@@ -374,7 +386,17 @@ export async function applyApprovedProposal(
     const existing = currentRow!;
     const fields = diff.fields_changed.filter((f) => APPLIABLE_VENUE_FIELDS.has(f as keyof Venue));
     if (fields.length === 0) {
-      return { ok: false, status: 422, error: "nothing_to_apply" };
+      // #568 item 3 (see corrupted_proposal's own comment above for the
+      // shared "no message -> both surfaces show 'Try again'" root cause):
+      // every field this proposal names is outside APPLIABLE_VENUE_FIELDS
+      // (freshness-only, or a field this route doesn't apply), so there is
+      // nothing here to retry either.
+      return {
+        ok: false,
+        status: 422,
+        error: "nothing_to_apply",
+        message: "This proposal has no applicable field changes to apply. Reject it instead.",
+      };
     }
     const setClauses = fields.map((f) => `${f} = ?`);
     const values = fields.map((f) => toColumnValue(f as keyof Venue, (after as Record<string, unknown>)[f]));

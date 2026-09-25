@@ -13,7 +13,7 @@
  */
 
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { AccessDeniedError } from "@/lib/cfAccess";
+import { AccessDeniedError } from "@/lib/adminOrigin";
 
 // Vitest hoists vi.mock() calls above other top-level code (including this
 // module's own imports below), so getAdminDb() below picks up the mocked

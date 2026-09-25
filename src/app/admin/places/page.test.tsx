@@ -12,16 +12,16 @@
  * src/lib/adminDb.ts) or drop the try/catch's fail-closed handling and
  * nothing would fail red. This test calls the async Server Component
  * directly (`await PlacesPage()`) and mocks only getAdminDb, next/headers,
- * next/navigation's forbidden(), and the logger — cfAccess.ts's real
+ * next/navigation's forbidden(), and the logger — adminOrigin.ts's real
  * AccessDeniedError is imported unmocked so `err instanceof
  * AccessDeniedError` inside the page still resolves true. Real JWT/D1
- * plumbing stays covered by adminDb.test.ts and cfAccess.test.ts; this file
- * only proves the page wires those pieces together correctly.
+ * plumbing stays covered by adminDb.test.ts and adminOrigin.test.ts; this
+ * file only proves the page wires those pieces together correctly.
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { AccessDeniedError } from "@/lib/cfAccess";
+import { AccessDeniedError } from "@/lib/adminOrigin";
 import type { AdminVenueRow } from "@/types/venue";
 
 // Per-file vi.mock style matches src/app/api/admin/publish/route.test.ts and

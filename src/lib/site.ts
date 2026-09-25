@@ -22,6 +22,22 @@ export const OG_IMAGE = {
 } as const;
 
 /**
+ * Compose a client-side <title> matching the format layout.tsx's
+ * `title.template` ("%s · Pueblo Food Map") produces server-side.
+ *
+ * WHY it exists: useDocumentTitle (src/lib/useDocumentTitle.ts) patches
+ * <title> for the Spanish locale, which Next.js Metadata can't reach (the
+ * locale is a client cookie/toggle, not a route — #589). Most localized
+ * pages' SSR title is `${shortTitle} · Pueblo Food Map` via that template;
+ * this keeps the client-side ES title in the same shape rather than each
+ * "Content" component re-typing the separator. Keep in sync with
+ * layout.tsx's `title.template` if that literal ever changes.
+ */
+export function pageDocumentTitle(shortTitle: string): string {
+  return `${shortTitle} · ${SITE_NAME}`;
+}
+
+/**
  * Build complete per-page metadata for a static content page.
  *
  * WHY: Next.js shallow-merges metadata — a child `openGraph`/`twitter` object

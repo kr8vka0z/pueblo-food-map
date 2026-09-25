@@ -8,7 +8,7 @@
  *
  * Covers:
  *   1. Panel is absent while closed.
- *   2. Panel has role="menu" and contains "Suggest a venue" link.
+ *   2. Panel has role="menu" and contains "Suggest a place" link.
  *   3. Closes on X button click / outside click / Escape; panel unmounts.
  *   4. Focus returns to the opener after Escape / X-button close.
  *   5. ES locale: labels show Spanish strings.
@@ -104,12 +104,12 @@ describe("HamburgerMenu — open state", () => {
     });
   });
 
-  test("panel contains 'Suggest a venue' link", async () => {
+  test("panel contains 'Suggest a place' link", async () => {
     const user = userEvent.setup();
     renderMenu();
     await user.click(screen.getByRole("button", { name: /Open menu/i }));
     await waitFor(() => {
-      const link = screen.getByRole("link", { name: /Suggest a venue/i });
+      const link = screen.getByRole("link", { name: /Suggest a place/i });
       expect(link).toBeDefined();
       expect((link as HTMLAnchorElement).href).toContain("/suggest");
     });
@@ -378,7 +378,7 @@ describe("HamburgerMenu — Saved view", () => {
     expect(screen.getByText("No saved places yet")).toBeDefined();
     expect(screen.getByText(/Tap the star on any place/)).toBeDefined();
     expect(screen.queryByRole("menu")).toBeNull();
-    expect(screen.queryByRole("link", { name: /Suggest a venue/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Suggest a place/i })).toBeNull();
   });
 
   test("with saved places, Saved lists them and nothing else", () => {
@@ -410,7 +410,7 @@ describe("HamburgerMenu — Saved view", () => {
 
   test("the Menu view no longer lists saved places", () => {
     render(<HamburgerMenu locale="en" open onClose={vi.fn()} savedVenues={savedVenueFixtures} />);
-    expect(screen.getByRole("link", { name: /Suggest a venue/i })).toBeDefined();
+    expect(screen.getByRole("link", { name: /Suggest a place/i })).toBeDefined();
     expect(screen.queryByText("Eastside Food Pantry")).toBeNull();
   });
 });

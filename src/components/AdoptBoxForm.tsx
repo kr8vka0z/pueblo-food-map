@@ -300,7 +300,7 @@ export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: Ad
           type="submit"
           disabled={busy}
           aria-disabled={busy}
-          className="min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-600)] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          className="min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
         >
           {busy ? t("box.adopt.submitting", locale) : t("box.adopt.submit", locale)}
         </button>

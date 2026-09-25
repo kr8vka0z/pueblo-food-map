@@ -53,14 +53,66 @@
  * edit itself still always succeeds — same accepted idempotency-ceiling
  * shape as public_submissions' own `AND status = 'pending'` clause
  * (ponytail: below).
+ *
+ * #265: optimistic concurrency. Two admins editing the same venue used to
+ * be silent last-write-wins — whoever's PATCH committed second overwrote
+ * the first admin's changes with its own stale field set. `expectedUpdatedAt`
+ * (the row's `updated_at` as AddVenueForm last saw it — that component's
+ * own header) rides the PATCH body and becomes VENUE_UPDATE_SQL's
+ * `AND updated_at = ?` precondition: the WHERE clause IS the check, atomic
+ * with the write itself, never a separate SELECT-then-UPDATE that could
+ * race against a concurrent writer in between. `results[0].meta.changes`
+ * (index 0 is always updateVenue — see the batch array below) tells the
+ * caller whether it matched; 0 means someone else's write landed first, and
+ * the route returns 409 rather than silently discarding it.
+ *
+ * A missing/non-string `expectedUpdatedAt` (an old client, or a script
+ * hitting this route directly) is accepted for backward compatibility
+ * rather than rejected — resolveExpectedUpdatedAt() below falls back to
+ * `existing.updated_at` (the value THIS request's own SELECT just read),
+ * which still closes the narrow SELECT->UPDATE race within this one
+ * request, just not the full user-editing-window race the feature exists
+ * for. Logged (logAdminVenueEditMissingPrecondition, src/lib/logger.ts) so
+ * a caller silently skipping the real protection is visible in Workers Logs.
+ *
+ * EVERY dependent write in the batch — the box row delete/insert, its
+ * box_events lifecycle rows, the audit_log insert, and the optional
+ * proposal-approve — is ALSO conditioned on the update having actually
+ * applied, via `WHERE EXISTS (SELECT 1 FROM venues WHERE id = ? AND
+ * updated_at = ?)` bound to the NEW updatedAt. Without this, a rejected
+ * (stale) edit would still half-apply: the box delete+reinsert would land
+ * using the stale editor's submitted box fields, box_events would log a
+ * lifecycle event for an edit that never happened, and a proposal could get
+ * marked approved for a fix that was never actually written — strictly
+ * worse than today's silent overwrite. WHY EXISTS-against-venues rather
+ * than SQLite's `changes()`: `changes()` reflects only the IMMEDIATELY
+ * PRECEDING statement in the batch, and the box statements sit between the
+ * UPDATE and the audit insert in this array — chaining changes() through
+ * them would misread a legitimate 0-row box DELETE (the "becoming a box for
+ * the first time" case, nothing to delete yet) as a failed precondition.
+ * Re-checking the actual post-UPDATE state of `venues` is position-
+ * independent: true iff the UPDATE actually wrote `updatedAt`, regardless
+ * of how many statements run in between. Proven against real SQLite in
+ * src/lib/adminVenueEditSql.sql.test.ts (statements run in one transaction,
+ * as D1's batch() does). Relies on D1 always populating meta.changes for an
+ * UPDATE: an undefined value would skip the 409 path — not handled by design.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
+import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
-import { computeBoxEventWrites, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";
+import { computeBoxEventWrites } from "@/lib/boxEvents";
+import { logAdminVenueEditMissingPrecondition } from "@/lib/logger";
+import {
+  VENUE_UPDATE_SQL,
+  AUDIT_INSERT_SQL,
+  BOX_DELETE_SQL,
+  BOX_INSERT_SQL,
+  BOX_EVENT_INSERT_SQL_GUARDED,
+  APPROVE_PROPOSAL_SQL,
+} from "@/lib/adminVenueEditSql";
 import type { AdminVenueRow } from "@/types/venue";
 
 /**
@@ -73,44 +125,6 @@ async function authorizeEditRequest(headers: HeaderSource): Promise<AdminDbAcces
   return access;
 }
 
-// Every editable column except `status` (see file header for why status is
-// permanently excluded) and the workflow columns an edit never touches:
-// source_type, created_at, created_by, published_at, published_by.
-const VENUE_UPDATE_SQL = `UPDATE venues SET
-  name = ?, category = ?, lat = ?, lng = ?, address = ?, hours_weekly = ?,
-  accepts_snap = ?, accepts_wic = ?, phone = ?, email = ?, url = ?, notes = ?,
-  operator = ?, source = ?, last_verified = ?, outside_county = ?,
-  updated_by = ?, updated_at = ?
-  WHERE id = ?`;
-
-const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
-
-// Blessing Boxes slice 1: an edit keeps the invariant "a blessing_boxes row
-// exists iff venues.category = 'blessing_box'". DELETE-then-INSERT (rather
-// than SQLite's ON CONFLICT upsert syntax) covers both the ordinary
-// box-edit case and the "admin changed this venue's category AWAY FROM
-// blessing_box" cleanup case in the same two statements — but ONLY when the
-// edit actually touches a box, either direction (see needsBoxTouch below).
-// Every ordinary non-box edit must add zero statements to the batch — the
-// pre-existing #255/#390 tests assert an exact 2/3-statement shape for
-// pantry/garden/etc. edits, and a box row that never existed has nothing to
-// delete.
-const BOX_DELETE_SQL = "DELETE FROM blessing_boxes WHERE venue_id = ?";
-const BOX_INSERT_SQL =
-  "INSERT INTO blessing_boxes (venue_id, host_name, host_note, host_contact, most_needed, installed_on, removed_on) VALUES (?, ?, ?, ?, ?, ?, ?)";
-
-// ponytail: AND status = 'pending' is a deliberate idempotency ceiling, not
-// an oversight — same shape as public_submissions' own approve statements
-// (see this file's header + AGENTS.md "Public submissions queue"). A
-// double-approve affects 0 rows here and is silently a no-op on the
-// proposal side, while the venue edit itself still always succeeds. If
-// that ever needs to be surfaced instead of swallowed, the upgrade path is
-// reading D1Result.meta.changes back to the client, same as
-// POST /api/admin/proposals/[id]/approve already does for its own strict
-// check.
-const APPROVE_PROPOSAL_SQL =
-  "UPDATE change_proposals SET status = 'approved', reviewed_by = ?, reviewed_at = ?, applied_at = ? WHERE id = ? AND status = 'pending' AND source = 'link_health' AND target_venue_id = ?";
 
 /** Mirrors readOptionalSubmissionId's convention in the sibling create/archive routes. */
 function readOptionalProposalId(body: unknown): number | null {
@@ -118,11 +132,27 @@ function readOptionalProposalId(body: unknown): number | null {
   return typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : null;
 }
 
+/**
+ * #265: resolves the optimistic-concurrency precondition — see this file's
+ * own header for the full reasoning. A present, non-empty string is used
+ * as-is; anything else (missing, wrong type, empty) falls back to
+ * `existing.updated_at` (the value THIS request's own SELECT just read)
+ * and logs it, since that's a caller skipping the real protection, not an
+ * error worth rejecting the edit over.
+ */
+function resolveExpectedUpdatedAt(body: unknown, existing: AdminVenueRow): string {
+  const raw = (body as { expectedUpdatedAt?: unknown })?.expectedUpdatedAt;
+  if (typeof raw === "string" && raw.length > 0) return raw;
+  logAdminVenueEditMissingPrecondition(existing.id);
+  return existing.updated_at;
+}
+
 function buildVenueUpdateValues(
   id: string,
   fields: ValidatedVenueFields,
   actorEmail: string,
   updatedAt: string,
+  expectedUpdatedAt: string,
 ): unknown[] {
   return [
     fields.name,
@@ -144,6 +174,7 @@ function buildVenueUpdateValues(
     actorEmail,
     updatedAt,
     id,
+    expectedUpdatedAt,
   ];
 }
 
@@ -216,6 +247,35 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
+  // #568 item 1: an archived venue is refused outright, 409 not 422 — the
+  // submitted payload is perfectly valid, it's the ROW's state that
+  // conflicts with the request (same reasoning proposals/approve's own
+  // stale-row 409 uses, adminProposals.ts). The bug this guards against:
+  // this route always bumped `updated_at` on any successful edit, and
+  // summarizePublishChanges() (adminVenues.ts) reads `updated_at >
+  // published_at` on an archived row as "pending removal" — so editing an
+  // already-archived venue (fixing a typo, say) made the Publish bar show a
+  // false "1 removed" that only cleared on the next publish. Skipping just
+  // the `updated_at` bump instead was rejected: the UPDATE would still run,
+  // so the row's other fields (name/address/etc.) would silently change
+  // while its own `updated_at`/audit_log timestamp disagreed with the edit
+  // actually happening — a quieter bug than the one being fixed. There is
+  // also no restore/unarchive path today (archiving is deliberately
+  // one-way — see this file's own header on why `status` is never in
+  // VENUE_UPDATE_SQL), so a real edit request against an archived id is
+  // never anything but this stale-UI case: refusing outright, before any
+  // box-row read or write below, is correct, not just simpler.
+  if (existing.status === "archived") {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "archived",
+        message: "This venue is archived and can't be edited. Archiving is final — there is no restore/edit path today.",
+      },
+      { status: 409 },
+    );
+  }
+
   // Blessing Boxes slice 3: computeBoxEventWrites needs the box's pre-edit
   // removed_on to detect a null->set transition (the "removed" event) —
   // only fetched when this venue is CURRENTLY a box, since a plain venue
@@ -226,11 +286,18 @@ export async function PATCH(
       : null;
 
   const updatedAt = new Date().toISOString();
+  const expectedUpdatedAt = resolveExpectedUpdatedAt(body, existing);
   const afterRow = buildAfterRow(existing, fields, identity.email, updatedAt);
 
   const updateVenue = db
     .prepare(VENUE_UPDATE_SQL)
-    .bind(...buildVenueUpdateValues(id, fields, identity.email, updatedAt));
+    .bind(...buildVenueUpdateValues(id, fields, identity.email, updatedAt, expectedUpdatedAt));
+
+  // #265: every dependent statement below binds this SAME pair
+  // (id, updatedAt) as its own WHERE EXISTS guard — see this file's own
+  // header for why that's the correct, position-independent check rather
+  // than chaining SQLite's changes().
+  const dependentGuardArgs = [id, updatedAt] as const;
 
   // Only touch blessing_boxes when this edit is relevant to it: the venue
   // is (still or newly) a box, OR it WAS a box and is being edited away
@@ -238,12 +305,21 @@ export async function PATCH(
   // entirely, preserving the plain 2-statement (or 3 with a proposal)
   // batch shape every pre-existing edit test asserts.
   const needsBoxTouch = fields.box !== null || existing.category === "blessing_box";
-  const deleteBox = needsBoxTouch ? db.prepare(BOX_DELETE_SQL).bind(id) : null;
+  const deleteBox = needsBoxTouch ? db.prepare(BOX_DELETE_SQL).bind(id, ...dependentGuardArgs) : null;
   const insertBox =
     fields.box !== null
       ? db
           .prepare(BOX_INSERT_SQL)
-          .bind(id, fields.box.hostName, fields.box.hostNote, fields.box.hostContact, fields.box.mostNeeded, fields.box.installedOn, fields.box.removedOn)
+          .bind(
+            id,
+            fields.box.hostName,
+            fields.box.hostNote,
+            fields.box.hostContact,
+            fields.box.mostNeeded,
+            fields.box.installedOn,
+            fields.box.removedOn,
+            ...dependentGuardArgs,
+          )
       : null;
   // Blessing Boxes slice 3: zero, one, or several box_events rows, computed
   // by diffing the pre-edit row against this save (renamed/moved/removed —
@@ -255,7 +331,7 @@ export async function PATCH(
   const insertBoxEvents = computeBoxEventWrites(
     { category: existing.category, name: existing.name, address: existing.address, removedOn: existingBoxRow?.removed_on ?? null },
     { name: fields.name, address: fields.address, box: fields.box },
-  ).map((e) => db.prepare(BOX_EVENT_INSERT_SQL).bind(id, e.kind, e.detail, updatedAt));
+  ).map((e) => db.prepare(BOX_EVENT_INSERT_SQL_GUARDED).bind(id, e.kind, e.detail, updatedAt, ...dependentGuardArgs));
   const insertAudit = db
     .prepare(AUDIT_INSERT_SQL)
     .bind(
@@ -269,17 +345,19 @@ export async function PATCH(
       // create route's own after_json.
       JSON.stringify(fields.box !== null ? { ...afterRow, box: fields.box } : afterRow),
       updatedAt,
+      ...dependentGuardArgs,
     );
   const approveProposal =
     proposalId !== null
-      ? db.prepare(APPROVE_PROPOSAL_SQL).bind(identity.email, updatedAt, updatedAt, proposalId, id)
+      ? db.prepare(APPROVE_PROPOSAL_SQL).bind(identity.email, updatedAt, updatedAt, proposalId, id, ...dependentGuardArgs)
       : null;
 
   // Atomic: the update, the box row delete+reinsert (only when relevant —
   // see needsBoxTouch above), its box_events lifecycle row(s) (if any), its
   // own audit trail, and (when present) the originating link_health
-  // proposal's approval either all land or none do.
-  await db.batch([
+  // proposal's approval either all land or none do. updateVenue MUST stay
+  // statement index 0 — the 409 check below reads results[0].
+  const results = await db.batch([
     updateVenue,
     ...(deleteBox !== null ? [deleteBox] : []),
     ...(insertBox !== null ? [insertBox] : []),
@@ -287,6 +365,22 @@ export async function PATCH(
     insertAudit,
     ...(approveProposal !== null ? [approveProposal] : []),
   ]);
+
+  // #265: the WHERE id = ? AND updated_at = ? precondition is the
+  // concurrency check itself — a 0-row match means another admin's write
+  // landed first. Strict === 0 (not a falsy check): D1's own meta.changes
+  // is the authoritative signal here, and this must never mistake a
+  // missing/undefined meta shape for a real conflict.
+  if (results[0].meta.changes === 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "conflict",
+        message: "Someone else changed this place since you opened it. Reload to see their changes.",
+      },
+      { status: 409 },
+    );
+  }
 
   return NextResponse.json({ ok: true, id });
 }

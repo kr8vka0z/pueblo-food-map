@@ -1,0 +1,207 @@
+/**
+ * Unit tests for scheduledTasks.ts's runScheduledTasks — the
+ * scheduled()-handler wiring custom-worker.ts itself can never carry test
+ * coverage for (it imports `.open-next/worker.js`, build output vitest
+ * cannot resolve). Each individual job's own gate boundaries and SQL are
+ * proven elsewhere (emailRetention.test.ts/.sql.test.ts,
+ * refreshAlerts.test.ts/.sql.test.ts) — this file only proves the THREE
+ * branches here (ping, retention, refresh-alerts) are correctly
+ * independent of each other, which is the exact class of bug this repo's
+ * own history has already produced twice: the original
+ * `if (!env.HC_PING_URL) return` (PR #616 self-review) would have also
+ * skipped retention, and PR #624 made the same restructuring fix
+ * independently for refresh-alerts before the two branches merged.
+ */
+
+import { describe, test, expect, vi, afterEach } from "vitest";
+import type { ExecutionContext, ScheduledController } from "@cloudflare/workers-types/experimental";
+import { runScheduledTasks } from "@/lib/scheduledTasks";
+import { shouldRunEmailRetention } from "@/lib/emailRetention";
+import { shouldRunRefreshAlertsCheck } from "@/lib/refreshAlerts";
+
+function fakeCtx() {
+  const pending: Promise<unknown>[] = [];
+  const ctx = {
+    waitUntil: (p: Promise<unknown>) => {
+      pending.push(p);
+    },
+  } as unknown as ExecutionContext;
+  return { ctx, settle: () => Promise.allSettled(pending) };
+}
+
+function fakeEvent(scheduledTime: number): ScheduledController {
+  return { scheduledTime, cron: "*/5 * * * *", noRetry: () => {} };
+}
+
+/**
+ * One fake D1 binding shared by both jobs — emailRetention's three
+ * UPDATE/DELETE statements (`.prepare().bind().run()`) and refreshAlerts'
+ * two SELECTs (`.prepare().bind().first()` for pending-age,
+ * `.prepare().all()` for staleness — checkSourceStaleness calls `.all()`
+ * directly on the prepared statement, no `.bind()`, since
+ * SOURCE_STALENESS_SQL takes no placeholder — so `.first`/`.all`/`.run`
+ * are exposed at BOTH the unbound and bound level, matching D1's real
+ * PreparedStatement shape). Benign "nothing to report" results by default
+ * so refreshAlerts never needs a RESEND_API_KEY to resolve cleanly — NOTE
+ * `all()` returns a recent `last` timestamp for both sources, not an empty
+ * array: refreshAlerts.ts's own checkSourceStaleness treats `last === null`
+ * (a source with NO row at all) as "alert immediately," so an empty result
+ * set is NOT the benign case here and would wrongly trigger a real Resend
+ * send attempt. `calls()` counts every `.prepare()` — enough to prove a
+ * job's SQL ran or didn't without re-proving what it does (that's each
+ * feature's own .sql.test.ts).
+ */
+function fakeDb(opts: { throwOnPrepare?: boolean } = {}) {
+  let calls = 0;
+  const recentIso = new Date().toISOString();
+  const db = {
+    prepare: () => {
+      calls++;
+      if (opts.throwOnPrepare) throw new Error("boom");
+      const statement = {
+        run: async () => ({ meta: { changes: 0 } }),
+        first: async () => ({ n: 0, oldest: null }),
+        all: async () => ({
+          results: [
+            { source: "plentiful", last: recentIso },
+            { source: "osm", last: recentIso },
+          ],
+        }),
+        bind: () => statement,
+      };
+      return statement;
+    },
+  } as unknown as D1Database;
+  return { db, calls: () => calls };
+}
+
+const RETENTION_SLOT = Date.UTC(2026, 8, 24, 9, 0);
+const ALERTS_SLOT = Date.UTC(2026, 8, 24, 9, 30);
+const NO_SLOT = Date.UTC(2026, 8, 24, 10, 0);
+
+const originalFetch = global.fetch;
+afterEach(() => {
+  global.fetch = originalFetch;
+  vi.restoreAllMocks();
+});
+
+describe("runScheduledTasks", () => {
+  test("pings HC.io and runs retention at the 09:00 UTC slot", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(undefined);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { ctx, settle } = fakeCtx();
+    const { db, calls } = fakeDb();
+    const env = { HC_PING_URL: "https://hc.example/ping", ADMIN_DB: db } as unknown as CloudflareEnv;
+
+    runScheduledTasks(fakeEvent(RETENTION_SLOT), env, ctx);
+    await settle();
+
+    expect(fetchMock).toHaveBeenCalledWith("https://hc.example/ping");
+    expect(calls()).toBeGreaterThan(0);
+  });
+
+  test("pings HC.io and runs refresh-alerts cleanly at the 09:30 UTC slot", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(undefined);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    // A caught refresh-alerts failure logs via console.error
+    // (logRefreshAlertsFailure) — asserting this was NEVER called is what
+    // actually proves the check ran successfully, not just that
+    // .prepare() was invoked before silently failing (which a broken fake
+    // D1 shape could produce just as easily, per the CI review's own
+    // point about the "slots never collide" test being too weak).
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { ctx, settle } = fakeCtx();
+    const { db, calls } = fakeDb();
+    const env = {
+      HC_PING_URL: "https://hc.example/ping",
+      ADMIN_DB: db,
+      RESEND_API_KEY: "re_test",
+    } as unknown as CloudflareEnv;
+
+    runScheduledTasks(fakeEvent(ALERTS_SLOT), env, ctx);
+    await settle();
+
+    // fetchMock: the HC.io ping call only — nothing tripped, so
+    // refreshAlerts never reaches its own sendAlertEmail fetch.
+    // calls(): counts db.prepare() — proves the refresh-alerts D1 reads
+    // (pending-age + staleness) actually ran, a separate signal from the
+    // ping.
+    expect(fetchMock).toHaveBeenCalledWith("https://hc.example/ping");
+    expect(calls()).toBeGreaterThan(0);
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  test("neither daily job runs outside its own slot, but the ping always fires", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(undefined);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { ctx, settle } = fakeCtx();
+    const { db, calls } = fakeDb();
+    const env = { HC_PING_URL: "https://hc.example/ping", ADMIN_DB: db } as unknown as CloudflareEnv;
+
+    runScheduledTasks(fakeEvent(NO_SLOT), env, ctx);
+    await settle();
+
+    expect(fetchMock).toHaveBeenCalledWith("https://hc.example/ping");
+    expect(calls()).toBe(0);
+  });
+
+  test("the two daily slots never collide — the real gate functions, not local literals", () => {
+    // CI review Nit: asserting RETENTION_SLOT !== ALERTS_SLOT alone would
+    // stay green even if emailRetention.ts's RETENTION_RUN_HOUR_UTC and
+    // refreshAlerts.ts's ALERT_RUN_HOUR_UTC/ALERT_RUN_MINUTE_UTC were
+    // changed to genuinely collide, since those constants aren't exported
+    // and this test never touches them. Calling each PRODUCTION gate
+    // function against the OTHER job's slot is what actually catches that
+    // regression.
+    expect(shouldRunEmailRetention(ALERTS_SLOT)).toBe(false);
+    expect(shouldRunRefreshAlertsCheck(RETENTION_SLOT)).toBe(false);
+  });
+
+  test("skips both daily jobs when HC_PING_URL is unset, but still runs them — the exact coupling this file guards against", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(undefined);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { ctx, settle } = fakeCtx();
+    const { db: retentionDb, calls: retentionCalls } = fakeDb();
+    const envRetention = { ADMIN_DB: retentionDb } as unknown as CloudflareEnv; // no HC_PING_URL — matches staging
+
+    runScheduledTasks(fakeEvent(RETENTION_SLOT), envRetention, ctx);
+    await settle();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(retentionCalls()).toBeGreaterThan(0);
+  });
+
+  test("a retention failure never blocks the ping (retention slot — refresh-alerts is out of slot, not exercised here)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(undefined);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { ctx, settle } = fakeCtx();
+    const { db } = fakeDb({ throwOnPrepare: true });
+    const env = { HC_PING_URL: "https://hc.example/ping", ADMIN_DB: db } as unknown as CloudflareEnv;
+
+    // Retention slot: only the ping and retention branches are live here
+    // (refresh-alerts is out of slot), so this proves the ping survives a
+    // broken D1 binding. The refresh-alerts-vs-ping case has its own test
+    // below.
+    runScheduledTasks(fakeEvent(RETENTION_SLOT), env, ctx);
+    await settle();
+
+    expect(fetchMock).toHaveBeenCalledWith("https://hc.example/ping");
+  });
+
+  test("a refresh-alerts failure never blocks the ping", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(undefined);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { ctx, settle } = fakeCtx();
+    const { db } = fakeDb({ throwOnPrepare: true });
+    const env = {
+      HC_PING_URL: "https://hc.example/ping",
+      ADMIN_DB: db,
+      RESEND_API_KEY: "re_test",
+    } as unknown as CloudflareEnv;
+
+    runScheduledTasks(fakeEvent(ALERTS_SLOT), env, ctx);
+    await settle();
+
+    expect(fetchMock).toHaveBeenCalledWith("https://hc.example/ping");
+  });
+});

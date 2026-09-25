@@ -10,8 +10,8 @@
 # --env) — the repo's documented manual deploy path (AGENTS.md "Build and
 # preview locally"). A functional superset of Workers Builds' bare
 # `npx wrangler deploy` (adds OpenNext's cache-populate step). Gated by
-# the same `predeploy` suite ci.yml runs (lint, design:drift, typecheck,
-# test) — a red build must never reach production. Mirrors deploy-dev.yml's
+# lint, design:drift and typecheck here; the full test suite already ran as
+# the PR's required ci.yml check (2026-09-23). Mirrors deploy-dev.yml's
 # structure and pinned-action SHAs (matches the pattern proven in
 # ToastHoster's deploy-prod.yml/deploy-dev.yml) so prod and dev stay easy to
 # diff against each other.
@@ -77,15 +77,24 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # 22, not ci.yml's 20: wrangler >=4.x refuses to run on Node <22
+          # 22 (same as ci.yml, shared cache): wrangler >=4.x refuses to run on Node <22
           # (hard version check at startup, observed in run 29660459443).
           # Matches ToastHoster's deploy workflows.
           node-version: 22
           cache: npm
-      - run: npm ci
-      # Same gate deploy-dev.yml and ci.yml run — a broken build must never
-      # reach production either.
-      - run: npm run predeploy
+      # Reuse node_modules when the lockfile is unchanged (see ci.yml).
+      - id: nm-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
+      - if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci
+      # Fast gate only. The full test suite is NOT re-run here: nothing lands
+      # on `main` without a PR whose required "Lint, typecheck, build" check
+      # (ci.yml, full suite) passed — ruleset 17480895. Re-running it cost ~3
+      # min per deploy and let a flaky test block an already-green change.
+      - run: npm run lint && npm run design:drift && npm run typecheck
       # No --env: resolves the top-level wrangler.jsonc config (prod worker
       # `pueblo-food-map`, route pueblofoodmap.com). Do not add --env here.
       # Raw CLI, not `npm run deploy`: npm auto-fires the `predeploy` script

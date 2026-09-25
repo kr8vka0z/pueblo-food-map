@@ -20,7 +20,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { AccessDeniedError, ADMIN_ORIGIN } from "@/lib/cfAccess";
+import { AccessDeniedError, ADMIN_ORIGIN } from "@/lib/adminOrigin";
 import type { VenueRow } from "@/lib/publishVenues";
 
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
@@ -76,7 +76,13 @@ function makeRow(overrides: Partial<VenueRow> = {}): VenueRow {
   };
 }
 
-function makeFakeDb(seedRows: VenueRow[]) {
+// `deadLinkRows` (#234) — seeds fetchPendingDeadLinks' own separate
+// `change_proposals` query. Discriminated by SQL text (not a second seed
+// array indexed positionally) since fetchPublishSnapshot's venues query
+// and fetchPendingDeadLinks' change_proposals query both call `.all()` on
+// the same fake — matches the SQL-sniffing convention
+// publishVenues.test.ts's own makeFakeDb uses for the identical reason.
+function makeFakeDb(seedRows: VenueRow[], deadLinkRows: Array<{ target_venue_id: string; proposed_diff: string }> = []) {
   const boundStatements: { sql: string; args: unknown[] }[] = [];
   const batch = vi.fn(async (stmts: unknown[]) =>
     stmts.map(() => ({ success: true, results: [], meta: {} })),
@@ -88,7 +94,11 @@ function makeFakeDb(seedRows: VenueRow[]) {
           boundStatements.push({ sql, args });
           return stmt;
         },
-        all: async () => ({ success: true, results: seedRows, meta: {} }),
+        all: async () => ({
+          success: true,
+          results: sql.includes("change_proposals") ? deadLinkRows : seedRows,
+          meta: {},
+        }),
       };
       return stmt;
     },
@@ -229,6 +239,42 @@ describe("POST /api/admin/publish", () => {
     expect(data.snapshotCount).toBe(3);
 
     expect(batch).toHaveBeenCalledTimes(1);
+  });
+
+  // #234, end to end through the route: a venue with a still-OPEN
+  // link_health dead-link finding must ship with its url stripped from the
+  // committed published-venues.ts, without waiting on that finding to be
+  // resolved first.
+  test("#234: a venue under a pending link_health finding is committed with its url stripped", async () => {
+    const { db } = makeFakeDb(
+      [makeRow({ id: "venue-a", status: "draft", url: "https://dead.example/a" })],
+      [
+        {
+          target_venue_id: "venue-a",
+          proposed_diff: JSON.stringify({
+            before: { url: "https://dead.example/a" },
+            after: { url: null },
+            fields_changed: ["url"],
+          }),
+        },
+      ],
+    );
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+    const githubMock = makeGithubFetchMock();
+    vi.stubGlobal("fetch", githubMock);
+
+    const res = await POST(makeRequest({ origin: ADMIN_ORIGIN }));
+    expect(res.status).toBe(200);
+
+    const commitCall = githubMock.mock.calls.find(
+      ([input, init]) =>
+        String(input).includes("/contents/") && (init?.method ?? "").toUpperCase() === "PUT",
+    );
+    expect(commitCall).toBeDefined();
+    const commitBody = JSON.parse((commitCall![1] as RequestInit).body as string) as { content: string };
+    const fileText = Buffer.from(commitBody.content, "base64").toString("utf-8");
+    expect(fileText).not.toContain("dead.example");
+    expect(fileText).toContain("venue-a");
   });
 
   // #284 regression, end to end through the route: editing an ALREADY-

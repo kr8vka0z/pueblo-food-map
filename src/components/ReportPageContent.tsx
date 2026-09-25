@@ -7,13 +7,15 @@
  * ReportForm, which now reads useLocale() itself — #289) reflects the
  * visitor's locale while the page stays statically generated
  * (generateStaticParams + dynamicParams = false, unchanged by this
- * extraction — no cookies() read, AGENTS.md "Known bilingual limitation",
+ * extraction — no cookies() read, ARCHITECTURE.md "Known bilingual limitation",
  * #287).
  */
 
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import ReportForm from "@/components/ReportForm";
 import type { Venue } from "@/types/venue";
 
@@ -23,6 +25,10 @@ interface ReportPageContentProps {
 
 export default function ReportPageContent({ venue }: ReportPageContentProps) {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — report.title's EN value
+  // ("Report an issue") matches page.tsx generateMetadata's prefix exactly;
+  // venue.name is a proper noun, not translated, same as the metadata itself.
+  useDocumentTitle(pageDocumentTitle(`${t("report.title", locale)} — ${venue.name}`));
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">

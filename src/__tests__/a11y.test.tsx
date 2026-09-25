@@ -166,7 +166,10 @@ vi.mock("vaul", () => {
   const DrawerTitle = ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <h2 data-testid="vaul-title" className={className}>{children}</h2>
   );
-  return { Drawer: { Root: DrawerRoot, Portal: DrawerPortal, Content: DrawerContent, Title: DrawerTitle } };
+  const DrawerDescription = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <p data-testid="vaul-description" className={className}>{children}</p>
+  );
+  return { Drawer: { Root: DrawerRoot, Portal: DrawerPortal, Content: DrawerContent, Title: DrawerTitle, Description: DrawerDescription } };
 });
 
 import BottomSheet from "@/components/BottomSheet";

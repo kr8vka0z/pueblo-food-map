@@ -5,7 +5,7 @@
  *
  * Extracted from src/app/about/page.tsx so the visible mission/FAQ copy
  * reads the visitor's locale via useLocale() (#289), while the page itself
- * stays a static Server Component (no cookies() read — AGENTS.md "Known
+ * stays a static Server Component (no cookies() read — ARCHITECTURE.md "Known
  * bilingual limitation", #287).
  *
  * The FAQPage JSON-LD is built server-side, ALWAYS in English (#386 — every
@@ -19,6 +19,8 @@
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import { formatPublishedDate } from "@/lib/dataFreshness";
 import SiteFooter from "@/components/SiteFooter";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
@@ -36,6 +38,10 @@ interface AboutContentProps {
 
 export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: AboutContentProps) {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — SSR's English title
+  // (page.tsx's metadata) is what search engines and a first paint see; this
+  // only corrects it after hydration for an ES visitor.
+  useDocumentTitle(pageDocumentTitle(t("about.documentTitle", locale)));
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
@@ -63,7 +69,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         <section aria-labelledby="mission-heading">
           <h2
             id="mission-heading"
-            className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+            className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
           >
             {t("about.mission.heading", locale)}
           </h2>
@@ -90,7 +96,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         <section aria-labelledby="vision-heading">
           <h2
             id="vision-heading"
-            className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+            className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
           >
             {t("about.vision.heading", locale)}
           </h2>
@@ -103,7 +109,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         <section aria-labelledby="origin-heading">
           <h2
             id="origin-heading"
-            className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+            className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
           >
             {t("about.origin.heading", locale)}
           </h2>
@@ -116,7 +122,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         <section aria-labelledby="how-we-source-heading">
           <h2
             id="how-we-source-heading"
-            className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+            className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
           >
             {t("about.howWeSource.heading", locale)}
           </h2>
@@ -128,13 +134,13 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         {/* FAQ — approved copy (PR4 S8); the JSON-LD above mirrors this text
             verbatim only in English (#386) */}
         <section aria-labelledby="faq-heading">
-          <h2 id="faq-heading" className="text-lg font-semibold text-[var(--color-ink-800)] mb-3">
+          <h2 id="faq-heading" className="text-lg font-semibold text-[var(--color-ink-700)] mb-3">
             {t("about.faq.heading", locale)}
           </h2>
           <div className="space-y-5">
             {FAQ_NUMS.map((n) => (
               <div key={n}>
-                <h3 className="text-base font-semibold text-[var(--color-ink-800)] mb-1">
+                <h3 className="text-base font-semibold text-[var(--color-ink-700)] mb-1">
                   {t(`about.faq.q${n}`, locale)}
                 </h3>
                 <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
@@ -149,7 +155,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         <section aria-labelledby="suggest-heading" className="pt-2">
           <h2
             id="suggest-heading"
-            className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+            className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
           >
             {t("about.suggest.heading", locale)}
           </h2>

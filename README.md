@@ -21,12 +21,12 @@ any smartphone browser; no app install required.
 
 ## Local development
 
-Requirements: Node.js 20 LTS or later.
+Requirements: Node.js 22 (see `.node-version`).
 
 ```bash
 git clone https://github.com/kr8vka0z/pueblo-food-map.git
 cd pueblo-food-map
-cp .env.local.example .env.local   # fill in NEXT_PUBLIC_MAPBOX_TOKEN
+cp .env.example .env.local   # fill in NEXT_PUBLIC_MAPBOX_TOKEN
 npm install
 npm run dev
 ```
@@ -44,7 +44,7 @@ Open <http://localhost:3000>. Hot-reloads on save (Turbopack).
 | `npm run test` | Unit tests (vitest, watch mode) |
 | `npm run test:ci` | Unit tests, CI mode (single run) |
 | `npm run preview` | OpenNext build + local Worker emulator at :8788 |
-| `npm run deploy` | OpenNext build + wrangler deploy to production |
+| `npm run deploy` | Manual OpenNext build + `wrangler deploy` of the production Worker — don't use it; deploys go only through CI (see below) |
 | `npm run design:lint` | design.md CLI lint on DESIGN.md (report-only) |
 | `npm run design:drift` | Token parity check: globals.css vs DESIGN.md (blocking) |
 
@@ -59,16 +59,18 @@ conventions.
 src/
   app/             Next.js App Router pages and API route handlers
     page.tsx         Root page (splash gate + map)
-    layout.tsx       Root layout (locale cookie read; LocaleProvider)
+    layout.tsx       Root layout (metadata, font preload, LocaleProvider)
     report/          Venue issue-report form + POST handler
     suggest/         Suggest-a-venue form + POST handler
     feedback/        General feedback form + POST handler
   components/      React components (map canvas, bottom sheet, search, etc.)
   data/            Static venue data (committed TypeScript modules)
-    venues.ts        Aggregated venue list — single import for all components
-    grocery-osm.ts   Auto-generated from OSM Overpass (do not edit by hand)
-    pantries-plentiful.ts  Auto-generated from Plentiful directory
-    benefit-flags.ts Auto-generated SNAP/WIC overlay
+    venues.ts        Public venue list — single import for all components
+    published-venues.ts  Snapshot of D1 venues, written by admin Publish (do not edit by hand)
+    benefit-flags.ts SNAP/WIC overlay (interim, see venues.ts header)
+    grocery-osm.ts, pantries-plentiful.ts, pfp-venues.ts
+                     Scraper/hand-curated source arrays — not read by the public
+                     map since the #237 D1 cutover (seed script, tests, refresh diff)
     pueblo-bbox.ts   Pueblo County geographic constants
   lib/             Shared utilities (i18n, hours, favorites, distance, etc.)
   types/
@@ -77,11 +79,8 @@ src/
 data/
   raw/             Raw source files (OSM JSON, PFP geocodes, etc.)
 
-scripts/           One-off ingestion scripts (run locally; not imported by app)
-  ingest-osm-grocery.py   Overpass → src/data/grocery-osm.ts
-  scrape-plentiful.py     Plentiful → src/data/pantries-plentiful.ts
-  match-benefits.py       USDA FNS + CDPHE → src/data/benefit-flags.ts
-  geocode-pfp.py          Nominatim geocoder for PFP venues
+scripts/           Data pipeline, seed, and lint scripts (never imported by the app)
+                   — every script is listed in scripts/README.md
 ```
 
 ---
@@ -101,8 +100,8 @@ scripts/           One-off ingestion scripts (run locally; not imported by app)
 
 ## Deploy and infrastructure
 
-- **CI:** `lint → typecheck → test (with coverage) → audit → build` on every
-  PR and push to `main`
+- **CI:** `lint → design:lint → design:drift → typecheck → test → audit →
+  build` on every PR into `main` or `dev`, and every push to `main`
   ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 - **AI review:** CodeRabbit reviews human-authored pull requests targeting
   `dev` or `main` using the low-noise settings in [`.coderabbit.yaml`](.coderabbit.yaml).
@@ -172,9 +171,8 @@ row per detected difference — including a link-health pass that flags dead
 outbound `url`s. It writes to `venues` in exactly one bounded case: a
 "date-only" proposal (nothing changed but the last-checked date) auto-
 applies rather than waiting on a click (Kyle, 2026-09-15). Every other
-proposal still needs a human to review and approve before it reaches the
-public map (that review UI is a separate, later piece of work — see
-`docs/admin/cloudflare-native-admin-spec.md` §6). See
+proposal still needs a human to review and approve it at `/admin/flags`
+before it reaches the public map. See
 `scripts/refresh-ingest.ts`'s own file header for the full mechanism, and
 AGENTS.md's "Automated venue-refresh pipeline" section for operational
 detail (guardrails, credentials, local testing).
@@ -191,4 +189,3 @@ Care & Share Food Bank of Southern Colorado, and other source organizations.
 - Pueblo Food Project — primary stakeholder and PFP garden/landscape data
 - OpenStreetMap contributors — base tiles and grocery data
 - Plentiful — pantry and meal-site directory data
-- Pueblo Transit / Trillium Solutions — GTFS feed (directions, future)

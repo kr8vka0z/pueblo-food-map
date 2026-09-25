@@ -30,9 +30,30 @@
  * miss scrolling inside a nested overflow container (e.g. the ListView
  * placeholder's own scrollable list). Capture is harmless for the other
  * event types, which bubble normally and are also seen in the capture phase.
+ *
+ * `hold` param (#588): while true, the idle-callback/setTimeout branch above
+ * is skipped entirely — no automatic trigger fires on its own. This is for
+ * the splash-screen gate: MapWrapper is mounted (and this hook's effect
+ * runs) the instant the page loads, whether or not a first-time visitor has
+ * read the splash yet, so the un-held idle timer used to start mapbox-gl's
+ * download during the ~2s a visitor is still reading — the exact cost
+ * Lighthouse's synthetic (never-interacts) mobile run also pays, showing up
+ * as TBT/TTI. The interaction listeners stay attached regardless of `hold`:
+ * a real tap on the splash's own CTA fires pointerdown on `window` (capture
+ * phase sees every dispatched event, independent of `inert`/DOM subtree —
+ * the splash renders as a sibling of the inert map container, not a
+ * descendant of it) and starts the load right then, in parallel with the
+ * geolocation request that same tap kicks off — not serialized behind
+ * SplashScreen's actual dismiss, which itself waits on geolocation to
+ * resolve (up to the 8s getCurrentPosition timeout) and would defeat the
+ * overlap. `hold` flipping true→false (the splash's real dismiss) is ALSO
+ * an unconditional trigger — belt-and-suspenders for a dismissal that
+ * reaches here without a real pointer/key DOM event (a script-driven
+ * `.click()` or some assistive-tech activation paths don't dispatch
+ * pointerdown/keydown at all).
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** Idle-callback budget — bounds worst-case deferral on a busy main thread. */
 export const IDLE_TIMEOUT_MS = 2000;
@@ -49,8 +70,19 @@ const INTERACTION_EVENTS = [
   "focusin",
 ] as const;
 
-export function useDeferredMapLoad(eager: boolean): boolean {
+export function useDeferredMapLoad(eager: boolean, hold: boolean = false): boolean {
   const [triggered, setTriggered] = useState(eager);
+
+  // Detect hold's true→false edge (splash dismissed) and force-trigger —
+  // see module doc's "belt-and-suspenders" note above. A ref (not state)
+  // since it only needs to survive across renders, never itself render.
+  const prevHoldRef = useRef(hold);
+  useEffect(() => {
+    if (prevHoldRef.current && !hold) {
+      setTriggered(true);
+    }
+    prevHoldRef.current = hold;
+  }, [hold]);
 
   useEffect(() => {
     if (triggered) return;
@@ -66,12 +98,16 @@ export function useDeferredMapLoad(eager: boolean): boolean {
       setTriggered(true);
     };
 
+    // While held (splash up, #588): skip the automatic idle/timeout branch
+    // — see module doc — but still attach the interaction listeners below.
     let idleHandle: number | null = null;
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-    if (typeof window.requestIdleCallback === "function") {
-      idleHandle = window.requestIdleCallback(trigger, { timeout: IDLE_TIMEOUT_MS });
-    } else {
-      timeoutHandle = setTimeout(trigger, FALLBACK_DELAY_MS);
+    if (!hold) {
+      if (typeof window.requestIdleCallback === "function") {
+        idleHandle = window.requestIdleCallback(trigger, { timeout: IDLE_TIMEOUT_MS });
+      } else {
+        timeoutHandle = setTimeout(trigger, FALLBACK_DELAY_MS);
+      }
     }
 
     for (const type of INTERACTION_EVENTS) {
@@ -85,7 +121,7 @@ export function useDeferredMapLoad(eager: boolean): boolean {
         window.removeEventListener(type, trigger, { capture: true });
       }
     };
-  }, [triggered]);
+  }, [triggered, hold]);
 
   return triggered;
 }

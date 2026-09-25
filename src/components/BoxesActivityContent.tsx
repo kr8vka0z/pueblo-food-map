@@ -38,6 +38,8 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import { useBoxActivity } from "@/lib/useBoxActivity";
 import { useBoxVenues } from "@/lib/useBoxVenues";
 import { useBoxNetworkStats } from "@/lib/useBoxNetworkStats";
@@ -70,6 +72,9 @@ const SELECT_CLASS =
 
 export default function BoxesActivityContent() {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — activity.documentTitle
+  // matches page.tsx's metadata title exactly ("Blessing Box Activity").
+  useDocumentTitle(pageDocumentTitle(t("activity.documentTitle", locale)));
   const boxVenues = useBoxVenues();
   const searchParams = useSearchParams();
 

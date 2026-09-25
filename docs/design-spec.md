@@ -1,5 +1,13 @@
 # Pueblo Food Access Map — Design Specification
 
+> **SUPERSEDED — historical, do not build from this.** This is the 2026-05-13
+> pre-implementation proposal. The shipped design system is
+> [DESIGN.md](../DESIGN.md) (tokens mirrored from `src/app/globals.css`
+> `@theme`). Two facts below are now wrong: the UI font is **Public Sans**, not
+> Inter (Inter is on the banned list, `scripts/check-banned.mjs`), and the map
+> is **Mapbox GL JS via react-map-gl**, not Leaflet/react-leaflet (swapped in
+> #44–#48). Kept for the design rationale only.
+
 **Status:** v1.0 — proposed, not yet implemented.
 **Author:** Atlas (Claude Opus 4.7), 2026-05-13.
 **Scope:** Full redesign for production v1, targeting the 2026-06-09 PFP team meeting demo.

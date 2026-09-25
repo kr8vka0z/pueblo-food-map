@@ -30,7 +30,7 @@
  *   - Menu items: role="menuitem" (delegated to HamburgerMenuItem).
  *   - Mobile backdrop: aria-hidden="true" (decorative overlay).
  *
- * v1 items: "Suggest a venue" → /suggest
+ * v1 items: "Suggest a place" → /suggest
  */
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
@@ -42,7 +42,7 @@ import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuer
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
-import { useOverlayRegistration } from "@/lib/overlayRegistry";
+import { useOverlayEscape, useOverlayRegistration, useScrollLock } from "@/lib/overlayRegistry";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
@@ -103,22 +103,41 @@ export default function HamburgerMenu({
 
   const close = useCallback(() => {
     onClose();
-    returnFocusRef.current?.focus();
-  }, [onClose]);
-
-  // ── Keyboard: Escape closes ──────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!open) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close();
+    const capturedEl = returnFocusRef.current;
+    const targetView = view;
+    // #545: on mobile, BottomNav (and the item that opened this drawer)
+    // unmounts while the drawer is open and remounts as brand-new DOM nodes
+    // once it closes (the #542 registration below) — `capturedEl` can be a
+    // detached node by the time focus needs to move, and `.focus()` on a
+    // detached node silently no-ops, so focus fell to <body>. A still-live
+    // trigger (the desktop dropdown variant) is focused directly; otherwise
+    // re-find the rebuilt bottom-bar item by its stable data-testid
+    // (BottomNav.tsx's `data-testid="nav-${section}"`). React doesn't
+    // promise BottomNav has remounted by the next microtask — on a slow
+    // phone the commit can land a frame or more later — so retry once per
+    // animation frame, up to ~10 frames, instead of giving up after one try.
+    const restoreFocus = (framesLeft: number) => {
+      if (capturedEl && capturedEl.isConnected) {
+        capturedEl.focus();
+        return;
       }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, close]);
+      const rebuilt = document.querySelector<HTMLElement>(`[data-testid="nav-${targetView}"]`);
+      if (rebuilt) rebuilt.focus();
+      else if (framesLeft > 0) requestAnimationFrame(() => restoreFocus(framesLeft - 1));
+    };
+    queueMicrotask(() => restoreFocus(10));
+  }, [onClose, view]);
+
+  // ── Keyboard: Escape closes only the TOPMOST overlay (#527) ─────────────────
+
+  const handleEscape = useCallback(
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      close();
+    },
+    [close],
+  );
+  useOverlayEscape(open, handleEscape);
 
   // ── Outside click closes ────────────────────────────────────────────────────
 
@@ -142,8 +161,23 @@ export default function HamburgerMenu({
   useEffect(() => {
     if (!open || !panelRef.current) return;
 
-    if (document.activeElement instanceof HTMLElement) {
+    // #545: on mobile, opening this drawer unmounts BottomNav (the #542
+    // registration below) — that unmount can land BEFORE this passive effect
+    // runs (the registration is a `useLayoutEffect`, which flushes ahead of
+    // any `useEffect` in the same commit), so the button that triggered the
+    // open is sometimes already gone from the DOM by the time this reads
+    // `document.activeElement`. A detached element's removal resets
+    // `activeElement` to `<body>` — excluding `<body>` here means `close()`
+    // below correctly falls back to re-finding the bottom-bar item instead
+    // of "capturing" `<body>` as if it were a real, focusable return target.
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
       returnFocusRef.current = document.activeElement;
+    } else {
+      // Nothing meaningful to capture (already reset to <body>) — clear any
+      // stale reference from a previous open rather than let `close()` below
+      // "successfully" focus a leftover element that has nothing to do with
+      // this open.
+      returnFocusRef.current = null;
     }
 
     // Move focus into the panel on open
@@ -192,14 +226,12 @@ export default function HamburgerMenu({
     return () => document.removeEventListener("keydown", handleTab);
   }, [open]);
 
-  // ── Prevent body scroll on mobile while panel is open ───────────────────────
-
-  useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
+  // ── Prevent body scroll while panel is open ──────────────────────────────────
+  // #527: shared, ref-counted with every other overlay that wants the lock
+  // (see overlayRegistry.ts's own header) — replaces this drawer's own
+  // set/reset, which used to unlock scroll on close even while FilterPanel
+  // was still open and wanted it locked too.
+  useScrollLock(open);
 
   // Switching views while open (Saved → Menu) starts the new view at the top.
   useEffect(() => {
@@ -290,7 +322,7 @@ export default function HamburgerMenu({
           style={{
             position: "fixed",
             inset: 0,
-            backgroundColor: "rgba(0,0,0,0.4)",
+            backgroundColor: "rgba(26,24,23,0.4)",
             zIndex: 1001,
           }}
           onClick={close}
@@ -312,7 +344,7 @@ export default function HamburgerMenu({
           {/* Close button (X) — visible at top of panel */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-bone-200)]">
             <span
-              className="text-base font-semibold text-[var(--color-ink-800)]"
+              className="text-base font-semibold text-[var(--color-ink-700)]"
               aria-hidden="true"
             >
               {t(view === "saved" ? "menu.saved.heading" : "menu.title", locale)}
@@ -327,7 +359,7 @@ export default function HamburgerMenu({
                 // (mobile review #11).
                 "flex items-center justify-center w-11 h-11 -m-1.5 rounded-full " +
                 "text-[var(--color-ink-500)] " +
-                "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-800)] " +
+                "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-700)] " +
                 PRESS_FEEDBACK + " " +
                 "focus-visible:outline-none focus-visible:ring-2 " +
                 "focus-visible:ring-[var(--color-sage-500)] " +
@@ -353,7 +385,7 @@ export default function HamburgerMenu({
                       }}
                       className={
                         "flex items-center gap-2.5 w-full text-left px-5 py-2.5 text-sm font-medium " +
-                        "text-[var(--color-ink-800)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
+                        "text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
                         "transition-colors duration-100"
                       }
@@ -376,10 +408,14 @@ export default function HamburgerMenu({
             ) : (
               <div className="flex flex-col items-center text-center gap-2 px-6 py-10">
                 <Star size={28} aria-hidden className="text-[var(--color-ink-400)]" />
-                <p className="text-base font-semibold text-[var(--color-ink-800)]">
+                <p className="text-base font-semibold text-[var(--color-ink-700)]">
                   {t("menu.saved.emptyTitle", locale)}
                 </p>
-                <p className="text-sm text-[var(--color-ink-600)] leading-relaxed">
+                {/* #534: --color-ink-600 undefined in globals.css @theme —
+                    mapped to ink-700, DESIGN.md's documented body-text token
+                    (same reasoning as FeedbackForm/ReportForm/SuggestForm's
+                    identical success/empty-state body copy below a heading). */}
+                <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
                   {t("menu.saved.emptyBody", locale)}
                 </p>
               </div>
@@ -442,7 +478,7 @@ export default function HamburgerMenu({
                     icon={<RotateCcw size={14} />}
                   />
                 )}
-                {/* Suggest a venue (#71). onClick={close}: a next/link to the
+                {/* Suggest a place (#71). onClick={close}: a next/link to the
                     page you're already on doesn't navigate, so without this
                     tapping a link item while on that same route left the
                     drawer open with body scroll locked (review item 2). */}
@@ -466,7 +502,7 @@ export default function HamburgerMenu({
                   onClick={close}
                   icon={<Info size={14} />}
                 />
-                {/* Browse all venues (#PR4) — internal link to the full directory */}
+                {/* Browse all places (#PR4) — internal link to the full directory */}
                 <HamburgerMenuItem
                   label={t("nav.venuesList", locale)}
                   href="/venues"
@@ -502,7 +538,7 @@ export default function HamburgerMenu({
               <div
                 className="flex items-center justify-between px-5 py-3 border-t border-[var(--color-bone-200)]"
               >
-                <span className="text-sm font-medium text-[var(--color-ink-800)]">
+                <span className="text-sm font-medium text-[var(--color-ink-700)]">
                   {t("menu.language", locale)}
                 </span>
                 <LanguageToggle />

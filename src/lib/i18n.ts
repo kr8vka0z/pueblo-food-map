@@ -9,16 +9,19 @@ export type Locale = "en" | "es";
 const en: Record<string, string> = {
   // App
   "app.name": "Pueblo Food Map",
-  "app.tagline": "Food resources in Pueblo County, CO",
+  // Homepage <title> (#589) — the ONE page whose SSR title isn't run through
+  // layout.tsx's "%s · Pueblo Food Map" template (it equals the layout
+  // default verbatim), so this holds the FULL string per locale rather than
+  // a short title + pageDocumentTitle() suffix like every other page.
+  "app.documentTitle": "Pueblo Food Map — Food Resources in Pueblo County, CO",
 
   // Top bar
-  "topbar.locate": "Show my location on the map",
   "topbar.locale.en": "EN",
   "topbar.locale.es": "ES",
 
   // Search
   "search.placeholder": "Search",
-  "search.aria": "Search venues",
+  "search.aria": "Search places",
   "search.shortcut": "⌘K",
 
   // Category labels
@@ -42,15 +45,10 @@ const en: Record<string, string> = {
   "category.full.meal_site": "Meal Site",
   "category.full.blessing_box": "Blessing Box",
 
-  // Category rail section headers
-  "rail.categories": "Categories",
-  "rail.filters": "Filters",
-
   // Filters
   "filter.openNow": "Open now",
   "filter.snap": "Accepts SNAP",
   "filter.wic": "Accepts WIC",
-  "filter.walkingDistance": "Walking distance",
 
   // Filters button + side panel (#513) — Favorites filter removed (Saved in
   // the bottom bar covers it); the single-category dropdown became this
@@ -66,18 +64,9 @@ const en: Record<string, string> = {
 
   // Bottom sheet / list
   "sheet.places": "{count} places near you",
-  "sheet.viewList": "View list",
   "sheet.sortedBy": "Sorted by distance",
 
-  // Location status
-  "location.loading": "Detecting your location…",
-  "location.granted": "Sorted by distance from your location",
-  "location.denied": "Showing distance from downtown Pueblo",
-  "location.unavailable": "Showing distance from downtown Pueblo",
-  "location.fallback": "Showing distance from downtown Pueblo",
-
   // Venue detail
-  "detail.back": "Back",
   "detail.close": "Close",
   "detail.getDirections": "Get directions",
   // "View on the map" CTA on /venue/[id] — was a hardcoded English string
@@ -92,15 +81,10 @@ const en: Record<string, string> = {
   "detail.acceptsWic": "Accepts WIC",
   "detail.plentifulLink": "See hours, eligibility & what to bring on Plentiful",
   "detail.today": "Today",
-  "detail.closedToday": "Closed today",
-  "detail.seeFullDetails": "See full details →",
   "detail.showDetails": "Show details",
   "detail.hideDetails": "Hide details",
-  "detail.collapseToSummary": "Collapse to quick summary",
-  "detail.venueDetailsPanel": "Venue details panel",
-  "detail.venueDetails": "venue details",
-  "detail.dragToExpand": "Drag to expand or close venue details",
-  "detail.expandDetails": "Expand details for {name}",
+  "detail.venueDetailsPanel": "Place details panel",
+  "detail.venueDetails": "place details",
 
   // Badges
   "badge.openNow": "Open now",
@@ -132,35 +116,21 @@ const en: Record<string, string> = {
   "empty.clear": "Clear filters",
   "empty.noMatches": "No matches for \"{query}\"",
   "empty.tryCategoryInstead": "Try a category instead:",
-  "empty.showCategoryAria": "Show {label} venues",
+  "empty.showCategoryAria": "Show {label} places",
 
   // Sponsor credit (#69)
-
-  // Legend (#72)
-  "legend.button_label": "Map legend",
 
   // Operator attribution (#63)
   "operator.operated_by": "Operated by",
 
   // Splash page (#68, #100)
-  "splash.tagline": "Find food close to home — pantries, gardens, grocery, and more.",
   "splash.purpose": "A free, community-built map of food resources across Pueblo County.",
   "splash.cta.primary": "Find food near me",
   "splash.microcopy": "We only use your location to show food nearby. Nothing is saved.",
 
-  // Splash categories (#68) — kept in sync with CATEGORIES array in SplashScreen.tsx
-  "splash.cat.pantry": "Food pantry",
-  "splash.cat.grocery": "Grocery store",
-  "splash.cat.convenience": "Convenience store",
-  "splash.cat.farm": "Farm",
-  "splash.cat.garden": "Community garden",
-  "splash.cat.edible_landscape": "Edible landscape",
-  "splash.cat.meal_site": "Meal site",
-  "splash.cat.blessing_box": "Blessing box",
-
   // Location denied banner (#68)
   "banner.title": "Location turned off",
-  "banner.body": "We can’t show food near you without your location. You can still browse the Pueblo map below, or try again.",
+  "banner.body": "We can't show food near you without your location. You can still browse the Pueblo map below, or try again.",
   "banner.retry": "Try again",
   "banner.dismiss": "Browse Pueblo map",
 
@@ -168,9 +138,8 @@ const en: Record<string, string> = {
   "wordmark.ariaLabel": "Pueblo Food Map — reset map view",
 
   // Search typeahead (#67)
-  "typeahead.matchCount": "{count} venues match",
+  "typeahead.matchCount": "{count} places match",
   "typeahead.moreMatches": "+{count} more matches",
-  "typeahead.noMatch": "No venues match",
 
   // Location control (#108)
   "locate.locating": "Locating…",
@@ -202,7 +171,7 @@ const en: Record<string, string> = {
   "menu.open": "Open menu",
   "menu.close": "Close menu",
   "menu.title": "Pueblo Food Map",
-  "menu.suggest": "Suggest a venue",
+  "menu.suggest": "Suggest a place",
   "menu.sponsoredBy": "Sponsored by",
   "menu.showWelcome": "Show welcome screen",
   "menu.language": "Language / Idioma",
@@ -214,9 +183,14 @@ const en: Record<string, string> = {
   "menu.mapView": "Map view",
 
   // Suggest form (#71)
-  "suggest.title": "Suggest a venue",
+  "suggest.title": "Suggest a place",
   "suggest.subtitle": "Know a food resource we're missing? Tell us about it.",
-  "suggest.venueName.label": "Venue name",
+  // <title> for /suggest (#589) — matches page.tsx's metadata title exactly
+  // ("Suggest a Place"); kept distinct from suggest.title (the on-page h1,
+  // "Suggest a place") since the two strings differ only in casing and a
+  // shared key would force one to drift to match the other.
+  "suggest.documentTitle": "Suggest a Place",
+  "suggest.venueName.label": "Place name",
   "suggest.venueName.placeholder": "e.g. Eastside Food Pantry",
   "suggest.address.label": "Address",
   "suggest.address.placeholder": "123 Main St, Pueblo, CO",
@@ -246,11 +220,11 @@ const en: Record<string, string> = {
   "suggest.fallback": "Or email us at suggestions@pueblofoodmap.com",
   "suggest.backToMap": "Back to map",
   "suggest.success.title": "Thank you!",
-  "suggest.success.body": "Your suggestion has been submitted. We review all suggestions and will add verified venues to the map.",
+  "suggest.success.body": "Your suggestion has been submitted. We review all suggestions and will add verified places to the map.",
   "suggest.error.title": "Something went wrong",
   "suggest.error.body": "Your suggestion couldn't be sent. Please try again, or email us directly at suggestions@pueblofoodmap.com.",
   "suggest.error.retry": "Try again",
-  "suggest.validation.nameRequired": "Please enter a venue name.",
+  "suggest.validation.nameRequired": "Please enter a place name.",
   "suggest.validation.addressRequired": "Please enter an address.",
   "suggest.validation.categoryRequired": "Please select a category.",
   "suggest.validation.emailRequired": "Please enter your email address.",
@@ -262,6 +236,9 @@ const en: Record<string, string> = {
 
   // Feedback form (#116)
   "feedback.title": "Send us feedback",
+  // <title> for /feedback (#589) — matches page.tsx's metadata title
+  // exactly ("Send Feedback"); distinct from feedback.title, the on-page h1.
+  "feedback.documentTitle": "Send Feedback",
   "feedback.subtitle": "Compliments, bug reports, or feature ideas — we want to hear it.",
   "feedback.type.label": "Feedback type",
   "feedback.type.placeholder": "Select a type",
@@ -311,16 +288,16 @@ const en: Record<string, string> = {
   "viewSuggestion.seeMatchesAsList": "See all {count} matches as a list",
 
   // Report form (#70)
-  "report.button": "Report an issue with this venue",
+  "report.button": "Report an issue with this place",
   "report.title": "Report an issue",
   "report.subtitle": "Help us keep this information accurate.",
-  "report.venueLabel": "Venue",
+  "report.venueLabel": "Place",
   "report.issueType.label": "What's wrong?",
   "report.issueType.placeholder": "Select an issue type",
   "report.issueType.location": "Location is wrong (wrong address or pin position)",
   "report.issueType.hours": "Hours are wrong or out of date",
   "report.issueType.contact": "Contact info (phone / email / URL) is wrong",
-  "report.issueType.closed": "Venue has closed permanently",
+  "report.issueType.closed": "Place has closed permanently",
   "report.issueType.snapwic": "SNAP / WIC acceptance is wrong",
   "report.issueType.other": "Other",
   "report.description.label": "Description",
@@ -383,7 +360,6 @@ const en: Record<string, string> = {
   // and on the /privacy page. One sentence that fits below an email input.
   "privacy.emailDisclosure": "Your email is used only to follow up on your submission. It is never sold or shared.",
   "privacy.linkLabel": "Privacy",
-  "privacy.pageTitle": "Privacy — Pueblo Food Map",
   "privacy.heading": "Privacy",
   // Rewrite (slice 6, Blessing Boxes adopt-a-box + alerts): the old, single
   // un-headed "privacy.body" paragraph is REPLACED by "What we collect"
@@ -395,11 +371,22 @@ const en: Record<string, string> = {
   "privacy.collect.body": "Pueblo Food Map collects the information you type into our forms (place reports, suggestions, and feedback). We use it to review what you sent and, if you gave an email address, to write back. Your IP address is checked to block spam when you send a form, and is never saved with what you sent.",
   "privacy.checkins.heading": "Blessing box check-ins",
   "privacy.checkins.body": "Checking in at a blessing box is anonymous. We do not ask for your name or email, and we do not save your IP address. A photo you add is reviewed before it shows, and location details hidden inside the photo file are removed.",
+  // New paragraph (#594) — the per-browser check-in rate-limit ID
+  // (src/lib/checkinClientToken.ts) was never disclosed on this page.
+  "privacy.checkins.body2": "Each check-in also uses a random ID your browser saves, so we can tell repeat check-ins apart without asking for your name or email. It isn't tied to who you are, and clearing your browser's site data starts a new one.",
   "privacy.alerts.heading": "Email alerts and adopting a box",
   "privacy.alerts.body1": "We keep your email address only if you ask for it: when you sign up for emails about a blessing box, or when you apply to adopt one. If you host a box, Pueblo Food Map staff may add your email, with your OK, so you hear when your box is empty or has a problem. We use these addresses only to send those emails. We never sell them, share them, or show them on the site.",
   "privacy.alerts.body2": "If you adopt a box, the name you give us (for example, a group or family name) is shown on that box's card. Your email is not.",
   "privacy.alerts.body3": "Every alert email has a stop link. One click stops the emails, with no login. To have your email address deleted completely, write to issues@pueblofoodmap.com.",
   "privacy.alerts.body4": "Our emails are delivered by a mail service called Resend, which handles your address only to deliver them.",
+  // New section (#594, security review finding #4) — states the 90-day
+  // retention period the daily cron (src/lib/emailRetention.ts) enforces.
+  "privacy.retention.heading": "How long we keep it",
+  "privacy.retention.body": "We remove old email addresses from our records automatically: 90 days after a place suggestion or report is submitted, a box-adoption application is turned down, or an alert subscription is stopped. This doesn't affect the copy already sent to our own inbox when you submitted a form, or an internal log admins use to track moderation decisions. An active alert subscription's email stays until you stop it.",
+  // New section (#594) — names the third parties the existing copy above
+  // described without naming (Turnstile) or didn't mention at all (Mapbox).
+  "privacy.other.heading": "Other services we use",
+  "privacy.other.body": "We use Mapbox to show the map. Loading it shares your IP address with Mapbox, and if you get walking directions, your location too. We use Cloudflare Turnstile on our forms and box check-ins to block spam; it checks some information about your device and browser.",
   "privacy.analytics": "We use Cloudflare Web Analytics to count visits and measure how quickly pages load. It sets no cookies and stores nothing on your device, it does not identify you by your IP address or your browser, and it does not follow you to other websites. It records things like which page was viewed, the site you arrived from, your browser and device type, your country, and how long the page took to load. We use no advertising pixels and no other analytics service.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
@@ -452,28 +439,34 @@ const en: Record<string, string> = {
 
   // About page (#155) — DRAFT copy pending final text from Kyle / Pueblo Food Project
   "about.heading": "About Pueblo Food Map",
+  // <title> for /about (#589) — matches page.tsx's metadata title exactly
+  // ("About"); distinct from about.heading, the longer on-page h1.
+  "about.documentTitle": "About",
   "about.mission.heading": "Our mission",
   "about.mission.body": "Pueblo Food Map puts every free and low-cost food resource in Pueblo County on one mobile-friendly map — so anyone, in any neighborhood, can find what they need in minutes.",
   "about.vision.heading": "Our vision",
   "about.vision.body": "A Pueblo County where no one goes hungry because they couldn't find the resources already available in their community.",
   "about.origin.heading": "How it started",
   "about.origin.body": "Finding food assistance in Pueblo meant juggling separate tools — the Pueblo Food Project site, Plentiful, FoodFinder, Pueblo Transit, and 211. Pueblo Food Map consolidates those sources into a single, bilingual map that works on any smartphone, no app install required.",
-  "about.howWeSource.heading": "How venues are added",
-  "about.howWeSource.body": "Venue data comes from Pueblo Food Project, OpenStreetMap, Plentiful's public directory, and USDA benefit data. All listings are reviewed before going live. If you know of a resource we're missing, please suggest it.",
+  "about.howWeSource.heading": "How places are added",
+  "about.howWeSource.body": "Place data comes from Pueblo Food Project, OpenStreetMap, Plentiful's public directory, and USDA benefit data. All listings are reviewed before going live. If you know of a resource we're missing, please suggest it.",
   "about.suggest.heading": "Know something we're missing?",
   "about.suggest.body": "If you know of a food pantry, community garden, or other resource that isn't on the map yet, let us know.",
-  "about.suggest.cta": "Suggest a venue",
+  "about.suggest.cta": "Suggest a place",
 
   // Nav and footer shared strings (#155)
   "nav.about": "About this map",
   "footer.backToMap": "Back to map",
   "footer.about": "About",
   "footer.privacy": "Privacy",
-  "footer.suggest": "Suggest a venue",
+  "footer.suggest": "Suggest a place",
 
   // Venues directory (#PR4)
-  "nav.venuesList": "Browse all venues",
+  "nav.venuesList": "Browse all places",
   "venues.heading": "All food resources",
+  // <title> for /venues (#589) — matches page.tsx's metadata title exactly
+  // ("All Food Resources"); distinct from venues.heading, the on-page h1.
+  "venues.documentTitle": "All Food Resources",
   "venues.intro": "Every pantry, grocery store, community garden, farm, and meal site on the map — grouped by type, with addresses and hours.",
   "venues.noHours": "Hours not listed",
 
@@ -481,6 +474,10 @@ const en: Record<string, string> = {
   // and /about so users can judge how current the whole map is, not just one
   // venue's own last_verified date.
   "freshness.updated": "Map data updated {date}",
+
+  // OSM attribution (#133 4.5) — ODbL credit for pages that show OSM-derived
+  // venue data without Mapbox's own attribution control (src/lib/osmAttribution.ts).
+  "osm.attribution": "Place data includes © OpenStreetMap contributors",
 
   // About page FAQ + stats (#PR4)
   "about.stat.insecurity": "According to Feeding America's Map the Meal Gap (2023 data), about 1 in 6 Pueblo County residents — roughly 16.5% — faces food insecurity, including nearly 1 in 5 children.",
@@ -501,6 +498,10 @@ const en: Record<string, string> = {
 
   // 404 Not Found page (#288)
   "notfound.title": "Page not found",
+  // <title> for the 404 page (#589) — matches not-found.tsx's metadata
+  // title exactly ("Page Not Found"); distinct from notfound.title, the
+  // on-page h1, which uses sentence case instead.
+  "notfound.documentTitle": "Page Not Found",
   "notfound.body": "The page you are looking for doesn't exist or has been moved.",
   "notfound.backToMap": "Back to map",
 
@@ -651,7 +652,6 @@ const en: Record<string, string> = {
 
   // Photo DISPLAY (card slot + history grid) and "Report this photo"
   // (ReportPhotoButton.tsx) — separate from the upload-picker keys above.
-  "box.photo.heading": "Photo",
   // Card redesign (2026-09-19): repurposed as the small caption chip on the
   // photo's bottom-right corner ("Photo · {time}") — was "Shared {time}" as
   // a caption line below the image, a layout this key's only caller no
@@ -672,7 +672,6 @@ const en: Record<string, string> = {
   "box.photo.reportError": "That didn't go through. Please try again.",
   "box.photo.morePhotos": "Show more photos",
   "box.photo.none": "No photos yet",
-  "box.photo.galleryHeading": "Photos",
 
   // "box.recentCheckin.heading"/"box.recentCheckin.none" deleted (card
   // redesign, 2026-09-19) — the standalone "Most recent check-in" line is
@@ -680,7 +679,6 @@ const en: Record<string, string> = {
   // the full timeline still lives at /box/<id>/history via the link below.
   // "History" link on the card -> /box/<id>/history (map-first rework)
   "box.history.link": "History",
-  "box.history.subheading": "Full history for this box",
   // /box/<id>/history page (map-first rework scope addition, 2026-09-18) —
   // reuses BoxActivityList/useBoxActivity filtered to one box, so it needs
   // no new heading/empty-state keys of its own. "box.history.back" (its own
@@ -843,6 +841,10 @@ const en: Record<string, string> = {
   // Activity log (/boxes/activity, slice 3) and nav entry
   "nav.boxActivity": "Blessing box activity",
   "activity.heading": "Blessing box activity",
+  // <title> for /boxes/activity (#589) — matches page.tsx's metadata title
+  // exactly ("Blessing Box Activity"); distinct from activity.heading, the
+  // on-page h1, which uses sentence case instead.
+  "activity.documentTitle": "Blessing Box Activity",
   "activity.intro": "Every fill, low report, empty report, and box change across the network, newest first.",
   "activity.empty": "No activity to show yet.",
   "activity.prevPage": "Previous",
@@ -910,10 +912,9 @@ const en: Record<string, string> = {
 const es: Record<string, string> = {
   // App
   "app.name": "Pueblo Food Map",
-  "app.tagline": "Recursos de alimentos en el Condado de Pueblo, CO",
+  "app.documentTitle": "Pueblo Food Map — Recursos de alimentos en el Condado de Pueblo, CO",
 
   // Top bar
-  "topbar.locate": "Mostrar mi ubicación en el mapa",
   "topbar.locale.en": "EN",
   "topbar.locale.es": "ES",
 
@@ -943,15 +944,10 @@ const es: Record<string, string> = {
   "category.full.meal_site": "Comedor comunitario",
   "category.full.blessing_box": "Caja de bendiciones", // [CHECK]
 
-  // Category rail section headers
-  "rail.categories": "Categorías",
-  "rail.filters": "Filtros",
-
   // Filters
   "filter.openNow": "Abierto ahora",
   "filter.snap": "Acepta SNAP",
   "filter.wic": "Acepta WIC",
-  "filter.walkingDistance": "Distancia caminando",
 
   // Filters button + side panel (#513)
   "filters.button.label": "Filtros",
@@ -965,18 +961,9 @@ const es: Record<string, string> = {
 
   // Bottom sheet / list
   "sheet.places": "{count} lugares cerca de ti",
-  "sheet.viewList": "Ver lista",
   "sheet.sortedBy": "Ordenado por distancia",
 
-  // Location status
-  "location.loading": "Detectando tu ubicación…",
-  "location.granted": "Ordenado por distancia desde tu ubicación",
-  "location.denied": "Mostrando distancia desde el centro de Pueblo",
-  "location.unavailable": "Mostrando distancia desde el centro de Pueblo",
-  "location.fallback": "Mostrando distancia desde el centro de Pueblo",
-
   // Venue detail
-  "detail.back": "Atrás",
   "detail.close": "Cerrar",
   "detail.getDirections": "Cómo llegar",
   "detail.viewOnMap": "Ver en el mapa",
@@ -989,15 +976,10 @@ const es: Record<string, string> = {
   "detail.acceptsWic": "Acepta WIC",
   "detail.plentifulLink": "Ver horarios, elegibilidad y qué llevar en Plentiful",
   "detail.today": "Hoy",
-  "detail.closedToday": "Cerrado hoy",
-  "detail.seeFullDetails": "Ver detalles completos →",
   "detail.showDetails": "Ver detalles",
   "detail.hideDetails": "Ocultar detalles",
-  "detail.collapseToSummary": "Contraer al resumen",
   "detail.venueDetailsPanel": "Panel de detalles del lugar",
   "detail.venueDetails": "detalles del lugar",
-  "detail.dragToExpand": "Arrastrar para expandir o cerrar detalles",
-  "detail.expandDetails": "Expandir detalles de {name}",
 
   // Badges
   "badge.openNow": "Abierto ahora",
@@ -1033,27 +1015,13 @@ const es: Record<string, string> = {
 
   // Sponsor credit (#69)
 
-  // Legend (#72)
-  "legend.button_label": "Leyenda del mapa",
-
   // Operator attribution (#63)
   "operator.operated_by": "Operado por",
 
   // Splash page (#68, #100)
-  "splash.tagline": "Encuentra alimentos cerca de casa — despensas, huertos, supermercados y más.",
   "splash.purpose": "Un mapa comunitario y gratuito de recursos alimentarios en el condado de Pueblo.",
   "splash.cta.primary": "Encuentra comida cerca de mí",
   "splash.microcopy": "Solo usamos tu ubicación para mostrar alimentos cercanos. Nada se guarda.",
-
-  // Splash categories (#68)
-  "splash.cat.pantry": "Despensa de alimentos",
-  "splash.cat.grocery": "Supermercado",
-  "splash.cat.convenience": "Tienda de conveniencia",
-  "splash.cat.farm": "Granja",
-  "splash.cat.garden": "Huerto comunitario",
-  "splash.cat.edible_landscape": "Paisaje comestible", // [CHECK]
-  "splash.cat.meal_site": "Comedor comunitario",
-  "splash.cat.blessing_box": "Caja de bendiciones", // [CHECK]
 
   // Location denied banner (#68)
   "banner.title": "Ubicación desactivada",
@@ -1067,7 +1035,6 @@ const es: Record<string, string> = {
   // Search typeahead (#67)
   "typeahead.matchCount": "{count} lugares coinciden",
   "typeahead.moreMatches": "+{count} más resultados",
-  "typeahead.noMatch": "Ningún lugar coincide",
 
   // Location control (#108)
   "locate.locating": "Localizando…",
@@ -1103,6 +1070,7 @@ const es: Record<string, string> = {
   // Suggest form (#71)
   "suggest.title": "Sugerir un lugar",
   "suggest.subtitle": "¿Conoces un recurso alimentario que nos falta? Cuéntanos.",
+  "suggest.documentTitle": "Sugerir un lugar",
   "suggest.venueName.label": "Nombre del lugar",
   "suggest.venueName.placeholder": "p. ej. Despensa Eastside",
   "suggest.address.label": "Dirección",
@@ -1149,6 +1117,7 @@ const es: Record<string, string> = {
 
   // Feedback form (#116)
   "feedback.title": "Envíanos tu opinión",
+  "feedback.documentTitle": "Enviar comentarios",
   "feedback.subtitle": "Felicitaciones, reportes de problemas o ideas — queremos escucharte.",
   "feedback.type.label": "Tipo de comentario",
   "feedback.type.placeholder": "Selecciona un tipo",
@@ -1264,17 +1233,21 @@ const es: Record<string, string> = {
   // Privacy disclosure (#160 1.7)
   "privacy.emailDisclosure": "Tu correo solo se usa para darte seguimiento. Nunca lo vendemos ni compartimos.",
   "privacy.linkLabel": "Privacidad",
-  "privacy.pageTitle": "Privacidad — Pueblo Food Map",
   "privacy.heading": "Privacidad",
   "privacy.collect.heading": "Qué recopilamos", // [CHECK]
   "privacy.collect.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). La usamos para revisar lo que enviaste y, si diste un correo electrónico, para responderte. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con lo que enviaste.", // [CHECK]
   "privacy.checkins.heading": "Registros en cajas de bendición", // [CHECK]
   "privacy.checkins.body": "Registrar tu visita a una caja de bendición es anónimo. No pedimos tu nombre ni tu correo, y no guardamos tu dirección IP. Una foto que agregues se revisa antes de publicarse, y los detalles de ubicación ocultos en el archivo de la foto se eliminan.", // [CHECK]
+  "privacy.checkins.body2": "Cada registro también usa un identificador aleatorio que tu navegador guarda, para distinguir registros repetidos sin pedirte tu nombre ni tu correo. No está vinculado a quién eres, y borrar los datos del sitio en tu navegador genera uno nuevo.", // [CHECK]
   "privacy.alerts.heading": "Alertas por correo y adopción de una caja", // [CHECK]
   "privacy.alerts.body1": "Guardamos tu correo electrónico solo si tú lo pides: cuando te suscribes a alertas de una caja de bendición, o cuando solicitas adoptar una. Si eres anfitrión de una caja, el personal de Pueblo Food Map puede agregar tu correo, con tu autorización, para avisarte cuando tu caja esté vacía o tenga un problema. Usamos estas direcciones solo para enviar esos correos. Nunca las vendemos, las compartimos, ni las mostramos en el sitio.", // [CHECK]
   "privacy.alerts.body2": "Si adoptas una caja, el nombre que nos das (por ejemplo, el de un grupo o una familia) se muestra en la tarjeta de esa caja. Tu correo no.", // [CHECK]
   "privacy.alerts.body3": "Cada correo de alerta tiene un enlace para detenerlo. Un clic detiene los correos, sin necesidad de iniciar sesión. Para que eliminemos tu correo por completo, escribe a issues@pueblofoodmap.com.", // [CHECK]
   "privacy.alerts.body4": "Nuestros correos se envían a través de un servicio de correo llamado Resend, que solo maneja tu dirección para entregarlos.", // [CHECK]
+  "privacy.retention.heading": "Cuánto tiempo lo guardamos", // [CHECK]
+  "privacy.retention.body": "Eliminamos automáticamente las direcciones de correo antiguas de nuestros registros: 90 días después de enviar una sugerencia o reporte de un lugar, de que se rechace una solicitud de adopción de caja, o de que canceles una alerta. Esto no afecta la copia que ya enviamos a nuestro propio correo cuando enviaste un formulario, ni un registro interno que el personal administrativo usa para dar seguimiento a decisiones de moderación. El correo de una alerta activa se mantiene hasta que la canceles.", // [CHECK]
+  "privacy.other.heading": "Otros servicios que usamos", // [CHECK]
+  "privacy.other.body": "Usamos Mapbox para mostrar el mapa. Cargarlo comparte tu dirección IP con Mapbox, y si pides indicaciones para caminar, también tu ubicación. Usamos Cloudflare Turnstile en nuestros formularios y en los registros de cajas para bloquear spam; revisa cierta información sobre tu dispositivo y navegador.", // [CHECK]
   "privacy.analytics": "Usamos Cloudflare Web Analytics para contar visitas y medir qué tan rápido cargan las páginas. No usa cookies ni guarda nada en tu dispositivo, no te identifica por tu dirección IP ni por tu navegador, y no te sigue a otros sitios web. Registra datos como qué página se vio, el sitio desde el que llegaste, tu tipo de navegador y dispositivo, tu país y cuánto tardó en cargar la página. No usamos píxeles de publicidad ni ningún otro servicio de análisis.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
@@ -1315,6 +1288,7 @@ const es: Record<string, string> = {
 
   // About page (#155) — BORRADOR de texto pendiente aprobación de Kyle / Pueblo Food Project
   "about.heading": "Acerca de Pueblo Food Map",
+  "about.documentTitle": "Acerca de",
   "about.mission.heading": "Nuestra misión",
   "about.mission.body": "Pueblo Food Map pone todos los recursos de alimentos gratuitos y de bajo costo del condado de Pueblo en un mapa fácil de usar en el celular, para que cualquier persona, en cualquier colonia, pueda encontrar lo que necesita en minutos.",
   "about.vision.heading": "Nuestra visión",
@@ -1337,11 +1311,15 @@ const es: Record<string, string> = {
   // Venues directory (#PR4)
   "nav.venuesList": "Ver todos los lugares",
   "venues.heading": "Todos los recursos alimentarios",
+  "venues.documentTitle": "Todos los recursos alimentarios",
   "venues.intro": "Cada despensa, supermercado, huerto comunitario, granja y comedor del mapa — agrupados por tipo, con direcciones y horarios.",
   "venues.noHours": "Horario no disponible",
 
   // Map-wide data freshness (board review finding #2)
   "freshness.updated": "Datos del mapa actualizados el {date}",
+
+  // OSM attribution (#133 4.5)
+  "osm.attribution": "Los datos de los lugares incluyen © colaboradores de OpenStreetMap", // [CHECK]
 
   // About page FAQ + stats (#PR4)
   "about.stat.insecurity": "Según el estudio Map the Meal Gap de Feeding America (datos de 2023), aproximadamente 1 de cada 6 residentes del condado de Pueblo — cerca del 16.5% — vive con inseguridad alimentaria, incluyendo casi 1 de cada 5 niños.",
@@ -1362,6 +1340,7 @@ const es: Record<string, string> = {
 
   // 404 Not Found page (#288)
   "notfound.title": "Página no encontrada",
+  "notfound.documentTitle": "Página no encontrada",
   "notfound.body": "La página que buscas no existe o se ha movido.",
   "notfound.backToMap": "Volver al mapa",
 
@@ -1471,7 +1450,6 @@ const es: Record<string, string> = {
   "box.photo.success": "¡Gracias! Tu foto fue enviada para revisión.", // [CHECK]
   "box.photo.error": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
 
-  "box.photo.heading": "Foto", // [CHECK]
   "box.photo.caption": "Foto · {time}", // [CHECK]
   "box.photo.altText": "Foto de {name}, compartida {time}", // [CHECK]
   "box.photo.viewFullSize": "Ver foto en tamaño completo", // [CHECK]
@@ -1483,10 +1461,8 @@ const es: Record<string, string> = {
   "box.photo.reportError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
   "box.photo.morePhotos": "Mostrar más fotos", // [CHECK]
   "box.photo.none": "Aún no hay fotos", // [CHECK]
-  "box.photo.galleryHeading": "Fotos", // [CHECK]
 
   "box.history.link": "Historial", // [CHECK]
-  "box.history.subheading": "Historial completo de esta caja", // [CHECK]
 
   "box.stats.perBoxHeading": "Números de esta caja", // [CHECK]
   "box.stats.networkHeading": "Números de la red", // [CHECK]
@@ -1596,6 +1572,7 @@ const es: Record<string, string> = {
   // Activity log (/boxes/activity, slice 3) and nav entry
   "nav.boxActivity": "Actividad de las cajas de bendiciones", // [CHECK]
   "activity.heading": "Actividad de las cajas de bendiciones", // [CHECK]
+  "activity.documentTitle": "Actividad de las cajas de bendiciones", // [CHECK]
   "activity.intro": "Cada surtido, aviso de poco, aviso de vacío y cambio de caja en toda la red, del más reciente al más antiguo.", // [CHECK]
   "activity.empty": "Todavía no hay actividad que mostrar.", // [CHECK]
   "activity.prevPage": "Anterior", // [CHECK]

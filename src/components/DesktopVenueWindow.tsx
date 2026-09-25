@@ -30,12 +30,17 @@
  *     - Clips bottom edge → place above marker
  *     - Combined clip (right + above also clips top) → clamp vertically
  *   Recomputes on Leaflet 'move' + 'zoom' events.
+ *   #524: when `mapboxMap` is null (no-WebGL fallback — Map.tsx never
+ *   mounts, so there is no marker to anchor to), the position effect below
+ *   no-ops and this window centers on screen instead (see the render's
+ *   `mapboxMap ? ... : ...` style branch) rather than sitting pinned at its
+ *   unset {left:0, top:0} default.
  *
  * Keyboard:
  *   Escape dismisses. Tab cycles within. Close X (Escape equivalent).
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
@@ -70,6 +75,7 @@ import ReportVenueButton from "@/components/ReportVenueButton";
 import HoursList from "@/components/HoursList";
 import BoxCardBody from "@/components/BoxCardBody";
 import { isNativeDialogOpen } from "@/lib/dialogGuard";
+import { useOverlayEscape } from "@/lib/overlayRegistry";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -272,30 +278,34 @@ export default function DesktopVenueWindow({
 
   // ── Keyboard handling ────────────────────────────────────────────────────
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      // #508 fix pass: Escape while a box's PhotoViewer is open must close
-      // ONLY the photo, not this whole window — see dialogGuard.ts's own
-      // header. This handler is a plain bubble-phase document listener
-      // (registered below, no `{capture: true}`), so unlike the vaul/Radix
-      // case (see BottomSheet.tsx's own comment) checking the guard
-      // directly here is enough; there is no ordering race to work around.
-      if (isNativeDialogOpen()) return;
-      // A box's check-in panel (BoxCardBody -> BoxCheckinPanel) has a note
-      // textarea living inside this window. Without this guard, Escape while
-      // typing a note both loses focus AND closes the whole card — the
-      // browser's own "Escape clears an input" behavior competing with this
-      // window's own Escape-to-dismiss. Only global-dismiss when focus is on
-      // the window shell itself, not on a form control inside it.
-      const active = document.activeElement;
-      const typing = active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
-      if (typing && windowRef.current?.contains(active)) return;
-      onClose();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+  // #527: this window is mounted only while a venue is selected — i.e.
+  // always "open" for the life of the instance — so it registers into the
+  // shared overlay-escape stack unconditionally (`true`). `useOverlayEscape`
+  // only invokes the callback below while this window is the TOPMOST
+  // overlay, so pressing Escape with e.g. the Filters panel or the Menu open
+  // on top of a selected venue no longer also closes this window — see
+  // overlayRegistry.ts's own header.
+  const handleEscape = useCallback(() => {
+    // #508 fix pass: Escape while a box's PhotoViewer is open must close
+    // ONLY the photo, not this whole window — see dialogGuard.ts's own
+    // header. This handler used to be a plain bubble-phase document
+    // listener (no `{capture: true}`), so unlike the vaul/Radix case (see
+    // BottomSheet.tsx's own comment) checking the guard directly here is
+    // enough; there is no ordering race to work around. `useOverlayEscape`
+    // preserves that same bubble-phase dispatch.
+    if (isNativeDialogOpen()) return;
+    // A box's check-in panel (BoxCardBody -> BoxCheckinPanel) has a note
+    // textarea living inside this window. Without this guard, Escape while
+    // typing a note both loses focus AND closes the whole card — the
+    // browser's own "Escape clears an input" behavior competing with this
+    // window's own Escape-to-dismiss. Only global-dismiss when focus is on
+    // the window shell itself, not on a form control inside it.
+    const active = document.activeElement;
+    const typing = active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+    if (typing && windowRef.current?.contains(active)) return;
+    onClose();
   }, [onClose]);
+  useOverlayEscape(true, handleEscape);
 
   // Focus the window when it mounts so keyboard users can tab inside
   useEffect(() => {
@@ -543,7 +553,10 @@ export default function DesktopVenueWindow({
           rel="noopener noreferrer"
           className={
             "flex items-center justify-between gap-2 w-full px-3 py-2.5 " +
-            "rounded-[var(--radius-md)] border border-[var(--color-sage-300)] " +
+            // #534: --color-sage-300 undefined — sage-500 is DESIGN.md's
+            // own documented border for this chip shape (see BottomSheet's
+            // identical Plentiful-link fix).
+            "rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
             "bg-[var(--color-sage-50)] text-sm font-medium text-[var(--color-sage-700)] " +
             "hover:bg-[var(--color-sage-100)] transition-colors " +
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
@@ -641,13 +654,27 @@ export default function DesktopVenueWindow({
         "focus:outline-none " +
         "transition-[width,height] duration-150"
       }
-      style={{
-        left: position.left,
-        top: position.top,
-        width: windowW,
-        height: "auto",
-        maxHeight: "calc(100% - 24px)",
-      }}
+      style={
+        mapboxMap
+          ? {
+              left: position.left,
+              top: position.top,
+              width: windowW,
+              height: "auto",
+              maxHeight: "calc(100% - 24px)",
+            }
+          : {
+              // #524: no map to anchor a marker position to (position stays
+              // its unused {left:0, top:0} default) — center on screen
+              // instead of pinning to the corner.
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+              width: windowW,
+              height: "auto",
+              maxHeight: "calc(100% - 24px)",
+            }
+      }
     >
       {/* Persistent header bar — always visible in both states. A box has no
           Show/Hide toggle (historyHref swaps that slot for a History link —

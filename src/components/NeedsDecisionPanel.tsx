@@ -63,9 +63,9 @@ const rowClass =
   "flex flex-col gap-2 border-b border-[var(--color-bone-100)] py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between";
 
 const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-500)] " +
+  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
   "px-3 py-1.5 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-600)] focus-visible:outline-none focus-visible:ring-2 " +
+  "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
@@ -107,10 +107,15 @@ type RejectState = "idle" | "submitting" | "error";
  * permanently deletes the stored R2 object, see box-photos/[id]/reject's own
  * header). Every call site below supplies its own wording.
  *
- * A 404/409 response means this row was already handled elsewhere (approved,
+ * A 404 response means this row was already handled elsewhere (approved,
  * rejected, or deleted) between page load and click — a stale card, not a
  * real failure — so it refreshes the same as success rather than showing a
- * "Try again" that would just repeat the same 404/409 (review finding).
+ * "Try again" that would just repeat the same 404 (review finding). 409 is
+ * NOT in that list (#568 item 4, dead-code finding): every reject route this
+ * panel calls (submissions, proposals, box-photos, box-adopters) returns 404
+ * for a stale row and never returns 409 at all — verified against all four
+ * route.ts files, not assumed — so a 409 here can only mean a real,
+ * unexpected failure and should show "Try again" like any other non-200.
  */
 function RejectButton({ path, confirmMessage, onDone }: { path: string; confirmMessage: string; onDone: () => void }) {
   const [state, setState] = useState<RejectState>("idle");
@@ -124,7 +129,7 @@ function RejectButton({ path, confirmMessage, onDone }: { path: string; confirmM
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: null }),
       });
-      if (res.status === 200 || res.status === 404 || res.status === 409) {
+      if (res.status === 200 || res.status === 404) {
         onDone();
         return;
       }

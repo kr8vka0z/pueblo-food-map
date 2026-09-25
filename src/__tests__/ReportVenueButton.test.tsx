@@ -25,7 +25,7 @@ describe("ReportVenueButton", () => {
 
   test("displays EN label by default", () => {
     render(<ReportVenueButton venueId="garden-rmser" />);
-    expect(screen.getByText(/Report an issue with this venue/i)).toBeDefined();
+    expect(screen.getByText(/Report an issue with this place/i)).toBeDefined();
   });
 
   test("displays ES label when locale='es'", () => {

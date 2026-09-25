@@ -10,8 +10,8 @@
  * Every write is DRAFT-only: status='draft', source_type='manual'
  * (identical convention to §5's "manually-created venue gets
  * source_type='manual'"). Nothing here touches the public map — that only
- * happens via a later, explicit POST /api/admin/publish (AGENTS.md
- * "Publish -> static").
+ * happens via a later, explicit POST /api/admin/publish (ARCHITECTURE.md
+ * "Admin panel").
  *
  * #259 review-queue extension: an optional `submissionId` in the request
  * body (present only when this create was reached by approving a
@@ -19,13 +19,13 @@
  * THIRD statement to the same atomic `db.batch()` below, flipping that
  * submission row to `status='approved'`. Riding the existing batch (rather
  * than a second, separate write) is what guarantees the new venue and its
- * originating submission's approval commit together — see AGENTS.md
- * "Public submissions review queue (#259)".
+ * originating submission's approval commit together — see ARCHITECTURE.md
+ * "Admin panel".
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
+import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
 import { boxEventsForCreate, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";

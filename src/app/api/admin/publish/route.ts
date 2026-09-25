@@ -23,16 +23,20 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/cfAccess";
+import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { logPublishResult } from "@/lib/logger";
 import {
   fetchPublishSnapshot,
+  fetchPendingDeadLinks,
+  stripDeadLinkUrls,
   validateSnapshot,
   serializePublishedVenuesFile,
   commitPublishedVenues,
   promotePublishedDrafts,
+  isProductionWorker,
 } from "@/lib/publishVenues";
 
 /**
@@ -55,6 +59,16 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
   const { db, identity } = access;
 
+  // #591: refuse to run unless this is the production Worker — a Publish
+  // click on staging must never be able to auto-merge staging's test venue
+  // data into production, so this check runs BEFORE any GitHub call (and
+  // before the token check below, so staging gets this honest answer
+  // regardless of whether GITHUB_PUBLISH_TOKEN happens to be set there).
+  const { env } = await getCloudflareContext({ async: true });
+  if (!isProductionWorker(env)) {
+    return NextResponse.json({ ok: false, error: "publish_not_production" }, { status: 403 });
+  }
+
   const token = process.env.GITHUB_PUBLISH_TOKEN;
   if (!token) {
     // #256 AC5: a thrown Error here surfaces to the client as a bare 500 with
@@ -72,8 +86,14 @@ export async function POST(req: NextRequest): Promise<Response> {
   // 1. snapshot
   const snapshot = await fetchPublishSnapshot(db);
 
+  // #234: suppress any venue url still under an open (pending) link-health
+  // dead-link finding — see stripDeadLinkUrls's own header for exactly
+  // when a url comes back.
+  const deadLinks = await fetchPendingDeadLinks(db);
+  const rowsForPublish = stripDeadLinkUrls(snapshot.rows, deadLinks);
+
   // 2/3. validate + strip admin-only columns
-  const validation = validateSnapshot(snapshot.rows);
+  const validation = validateSnapshot(rowsForPublish);
   if (!validation.ok) {
     return NextResponse.json({ ok: false, error: validation.error }, { status: 422 });
   }
@@ -121,6 +141,13 @@ export async function POST(req: NextRequest): Promise<Response> {
     // live. draftIds/editedPublishedIds partition by `status` at snapshot
     // time (fetchPublishSnapshot, publishVenues.ts) and can never overlap.
     publishedCount: snapshot.draftIds.length + snapshot.editedPublishedIds.length,
+    // #568 item 2: archivedIds (pending removals this publish is shipping)
+    // was NEVER in publishedCount above and had no field of its own either
+    // — a removals-only publish (0 new drafts, 0 edits, N archives) reported
+    // "0 places pushed" with no sign the N removals actually landed. Same
+    // `archivedCount` name promotePublishedDrafts already writes into the
+    // audit_log row's after_json (publishVenues.ts), not a new label.
+    archivedCount: snapshot.archivedIds.length,
     snapshotCount: validation.venues.length,
   });
 }

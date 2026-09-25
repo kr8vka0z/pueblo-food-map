@@ -25,7 +25,11 @@
  * accepts only typed parameters with no free-form string fields.
  */
 
-import type { AccessDeniedReason } from "./cfAccess";
+import type { AccessDeniedReason } from "./adminOrigin";
+// Type-only — erased at compile time, so this does not create a runtime
+// circular import even though emailRetention.ts itself imports
+// logEmailRetentionResult/logEmailRetentionFailure from this file.
+import type { EmailRetentionCounts } from "./emailRetention";
 
 export type FormName =
   | "suggest"
@@ -90,8 +94,8 @@ export function logFormFailure(
 
 /**
  * Emit a single-line JSON structured log entry for an admin-surface auth
- * denial (Cloudflare Access JWT missing/invalid/misconfigured — see
- * src/lib/cfAccess.ts). `reason` is the same coarse, machine-readable
+ * denial (bad origin / no session / not allowlisted — see
+ * src/lib/adminOrigin.ts). `reason` is the same coarse, machine-readable
  * classification AccessDeniedError carries — never the token itself, never
  * a claim value. Logged at warn level: most denials are ordinary
  * unauthenticated traffic hitting an admin URL (high volume, low signal,
@@ -99,6 +103,20 @@ export function logFormFailure(
  */
 export function logAdminAuthFailure(reason: AccessDeniedReason): void {
   console.warn(JSON.stringify({ event: "admin_auth_failure", reason }));
+}
+
+/**
+ * Emit a single-line JSON structured log entry when PATCH
+ * /api/admin/venues/[id] (#265, optimistic concurrency) receives an edit
+ * with no `expectedUpdatedAt` precondition — an old client or a script
+ * hitting the route directly. Not an error (the route still accepts the
+ * edit, falling back to a route-internal check — see that route's own
+ * header): this is visibility only, so a caller silently missing the real
+ * protection shows up in Workers Logs. `venueId` is a venue identifier, not
+ * PII, same as audit_log's own entity_id column.
+ */
+export function logAdminVenueEditMissingPrecondition(venueId: string): void {
+  console.warn(JSON.stringify({ event: "admin_venue_edit_missing_precondition", venueId }));
 }
 
 export type AdminAuthEvent = "login";
@@ -120,6 +138,28 @@ export function logAdminAuthEvent(event: AdminAuthEvent): void {
 }
 
 /**
+ * Emit a single-line JSON structured log entry for the daily email
+ * retention cleanup (#594, src/lib/emailRetention.ts). Counts only —
+ * matches this file's PII rule (no id, no email, no row content) — logged
+ * at console.log since a 0-row day is the expected common case, not a
+ * failure.
+ */
+export function logEmailRetentionResult(counts: EmailRetentionCounts): void {
+  console.log(JSON.stringify({ event: "email_retention_result", ...counts }));
+}
+
+/**
+ * Emit a single-line JSON structured log entry when the email retention
+ * cleanup throws. Error-level, same convention as send_failed above — this
+ * is the only signal a D1 outage or a bad statement broke the daily
+ * cleanup. `message` is the caught error's own message only, never a row
+ * value.
+ */
+export function logEmailRetentionFailure(message: string): void {
+  console.error(JSON.stringify({ event: "email_retention_failure", message }));
+}
+
+/**
  * Emit a single-line JSON structured log entry when the public live
  * blessing-boxes read (GET /api/public/blessing-boxes, /box/<id>,
  * sitemap.ts) fails to reach D1. Error-level: unlike a form's db_write_failed
@@ -129,6 +169,56 @@ export function logAdminAuthEvent(event: AdminAuthEvent): void {
  */
 export function logBlessingBoxesReadFailure(message: string): void {
   console.error(JSON.stringify({ event: "blessing_boxes_read_failure", message }));
+}
+
+/**
+ * Emit a single-line JSON structured log entry for the daily refresh-
+ * pipeline alert check (#238 pending-age, #234 per-source staleness —
+ * src/lib/refreshAlerts.ts). Counts/source names only — matches this
+ * file's PII rule — logged at console.log since "nothing tripped" is the
+ * expected common case, not a failure.
+ */
+export function logRefreshAlertsResult(result: { pendingAgeAlertSent: boolean; staleSourcesAlerted: string[] }): void {
+  console.log(JSON.stringify({ event: "refresh_alerts_result", ...result }));
+}
+
+/**
+ * Emit a single-line JSON structured log entry when the refresh-alerts
+ * check throws — a broken D1 read, or a real alert condition tripped with
+ * no RESEND_API_KEY configured (src/lib/refreshAlerts.ts's own guard).
+ * Error-level: this is the only signal that the alert itself failed to
+ * fire when it should have.
+ */
+export function logRefreshAlertsFailure(message: string): void {
+  console.error(JSON.stringify({ event: "refresh_alerts_failure", message }));
+}
+
+interface CspViolationDetail {
+  /** e.g. "script-src" — which directive the browser enforced. */
+  violatedDirective?: string;
+  /** The resource the browser blocked — a script/style/connect URL, or "inline"/"eval". */
+  blockedUri?: string;
+  /** The page the violation fired on — query string already stripped by the
+   *  caller (see src/app/api/csp-report/route.ts's PII note: /alerts/confirm
+   *  and /alerts/stop carry a live subscription token in `?t=`). */
+  documentUri?: string;
+}
+
+/**
+ * Emit a single-line JSON structured log entry for a Content-Security-Policy
+ * violation report (#593's Content-Security-Policy-Report-Only, POSTed to
+ * src/app/api/csp-report/route.ts by the browser itself). Warn-level, same
+ * reasoning as turnstile_failed above: while the policy is report-only this
+ * is expected, high-volume noise while the allowlist is tuned, not an
+ * incident — but it must still be visible in Workers Logs, or "dev ran
+ * quiet for a while" before flipping to enforcing is never actually true.
+ */
+export function logCspViolation(detail: CspViolationDetail): void {
+  const entry: Record<string, unknown> = { event: "csp_violation_report" };
+  if (detail.violatedDirective !== undefined) entry.violatedDirective = detail.violatedDirective;
+  if (detail.blockedUri !== undefined) entry.blockedUri = detail.blockedUri;
+  if (detail.documentUri !== undefined) entry.documentUri = detail.documentUri;
+  console.warn(JSON.stringify(entry));
 }
 
 export type PublishOutcome = "success" | "failure";

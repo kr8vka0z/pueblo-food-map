@@ -12,7 +12,17 @@
  * and a11y Dialog.Title — but WITHOUT snapPoints.
  *
  * Three dismissal paths:
- *   1. Escape key (vaul handles natively via onOpenChange)
+ *   1. Escape key (vaul handles natively via onOpenChange) — #527: gated on
+ *      `claimEscape()` inside `onEscapeKeyDown` below, so Escape with a
+ *      higher overlay open on top of this sheet (Filters, the Menu) no
+ *      longer ALSO closes the card underneath — see overlayRegistry.ts.
+ *      `claimEscape`, not a plain `isTopmostOverlay` check: real-browser
+ *      review of #604 found that a same-keydown microtask checkpoint between
+ *      listeners can pop the true topmost overlay off the stack (its own
+ *      close committing) BEFORE a lower listener for the SAME event runs —
+ *      `claimEscape` marks the Event object itself as spoken for, so a
+ *      later listener is rejected regardless of what the stack looks like
+ *      by then. See overlayRegistry.ts's own header on `claimEscape`.
  *   2. Tap on scrim (vaul handles by default)
  *   3. Explicit close X button
  *
@@ -56,6 +66,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { safeUrl } from "@/lib/safeUrl";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { isNativeDialogOpen } from "@/lib/dialogGuard";
+import { claimEscape, useOverlayStackId } from "@/lib/overlayRegistry";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
@@ -173,6 +184,13 @@ export default function BottomSheet({
   }
 
   const open = venue !== null;
+  // #527: registers this sheet into the shared overlay-escape stack (see
+  // overlayRegistry.ts's own header) so `onEscapeKeyDown` below can tell
+  // whether a higher overlay (Filters, the Menu) is open on top of it.
+  // Vaul/Radix routes Escape through this prop rather than a `document`
+  // listener this file could add itself — `useOverlayEscape` isn't usable
+  // here for that reason; `claimEscape` is called directly instead.
+  const overlayId = useOverlayStackId(open);
   const isBox = venue?.category === "blessing_box";
   const status = venue ? computeOpenStatus(venue.hours_weekly) : null;
   const displayNotes = venue ? getDisplayNotes(venue) : undefined;
@@ -350,6 +368,20 @@ export default function BottomSheet({
               event.preventDefault();
               return;
             }
+            // #527/#604: a higher overlay (Filters, the Menu) is open on top
+            // of this sheet — block vaul's own dismiss so Escape doesn't
+            // close BOTH; the topmost overlay's own Escape handling (a
+            // separate, bubble-phase `document` listener — this prop is
+            // Radix's CAPTURE-phase interception point, see dialogGuard.ts's
+            // header) still runs for the same keydown and closes itself
+            // instead. `claimEscape`, not a bare `isTopmostOverlay` check —
+            // see overlayRegistry.ts's own header on why a plain topmost
+            // check isn't race-free across a single keydown's multiple
+            // listeners in a real browser.
+            if (!claimEscape(overlayId, event)) {
+              event.preventDefault();
+              return;
+            }
             // #509: dismissible={false} while a route is active means vaul's
             // own onOpenChange short-circuits Escape (and scrim-tap) before
             // it ever reaches handleOpenChange above — silently blocking
@@ -369,6 +401,32 @@ export default function BottomSheet({
           <Drawer.Title className="sr-only">
             {venue ? `${venue.name} ${t("detail.venueDetails", locale)}` : t("detail.venueDetailsPanel", locale)}
           </Drawer.Title>
+
+          {/* Drawer.Description (#590 follow-up): vaul's Drawer.Content forwards
+              straight to Radix's Dialog.Content, which logs "Missing
+              `Description` or `aria-describedby={undefined}` for {DialogContent}"
+              whenever one isn't wired via context — confirmed live (agent-browser
+              console) firing here, not on the splash, when a venue card opens.
+              Reuses the category badge's own existing copy (`category.full.*`,
+              already EN+ES, rendered visibly below at the badge) rather than
+              adding new strings — same principle as #590's splash fix: point at
+              real content, don't invent hidden copy. Rendered unconditionally
+              (like Drawer.Title above) so every branch — box, ordinary venue,
+              route-strip-only, no venue yet — has SOME description, never a
+              dangling reference.
+              Same OSM placeholder guard as the visible address line below
+              (line ~666) and DesktopVenueWindow.tsx's own copy of it — a
+              screen reader must never hear the literal "Address not in
+              OpenStreetMap" string either. */}
+          <Drawer.Description className="sr-only">
+            {venue
+              ? `${t(`category.full.${venue.category}`, locale)}, ${
+                  venue.address === "Address not in OpenStreetMap"
+                    ? `${venue.lat}, ${venue.lng}`
+                    : venue.address
+                }`
+              : t("detail.venueDetailsPanel", locale)}
+          </Drawer.Description>
 
           {/* Single scrollable body.
               No drag handle: the "Show details" button is the one expand
@@ -711,7 +769,12 @@ export default function BottomSheet({
                           rel="noopener noreferrer"
                           className={
                             "flex items-center justify-between gap-2 w-full px-4 py-3 " +
-                            "rounded-[var(--radius-md)] border border-[var(--color-sage-300)] " +
+                            // #534: --color-sage-300 undefined in
+                            // globals.css @theme — sage-500 is DESIGN.md's
+                            // own documented border for this exact chip
+                            // shape (TooltipChip: "bone-50 bg, 1px sage-500
+                            // border"), 3.8:1 against the sage-50 fill below.
+                            "rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
                             "bg-[var(--color-sage-50)] text-sm font-medium text-[var(--color-sage-700)] " +
                             "hover:bg-[var(--color-sage-100)] transition-colors " +
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"

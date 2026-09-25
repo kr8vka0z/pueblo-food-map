@@ -26,7 +26,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
 import type { WalkingRouteGeoJSON, WalkingRouteInfo, WalkStep } from "@/components/Map";
 import { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import dynamic from "next/dynamic";
@@ -35,7 +34,6 @@ import SearchBar from "./SearchBar";
 import BottomNav, { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
 import FilterPanel from "./FilterPanel";
 import BottomSheet from "./BottomSheet";
-import DesktopVenueWindow from "./DesktopVenueWindow";
 import EmptySearchPopover from "./EmptySearchPopover";
 import ViewSuggestion from "./ViewSuggestion";
 import SearchResultsPopover, {
@@ -48,6 +46,7 @@ import MapErrorBoundary from "./MapErrorBoundary";
 import { useGeolocation, type GeoState } from "@/lib/useGeolocation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { venues as allVenues } from "@/data/venues";
 import type { Venue } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
@@ -74,6 +73,21 @@ import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuer
 const MapCanvas = dynamic(() => import("./Map"), {
   ssr: false,
   loading: () => <MapLoadingFallback />,
+});
+
+// perf(#588): DesktopVenueWindow only ever renders when `!isMobile &&
+// viewMode === "map" && selectedVenue` (see its JSX below) — on the mobile
+// viewport this whole app targets first, that condition is never true, so a
+// plain top-level import still shipped ~800 lines of desktop-only markup
+// (DesktopVenueWindow.tsx + VenuePopupHeader.tsx) into every mobile visitor's
+// synchronous MapWrapper chunk for code that never mounts. Same next/dynamic
+// pattern as MapCanvas above, minus a loading fallback (see the
+// desktopWindowPrefetched effect below, near `isMobile`, for why): the JSX is
+// already conditionally rendered, so the fetch only fires when a desktop
+// user actually selects a venue (not on MapWrapper mount) — mobile visitors
+// never trigger the import at all.
+const DesktopVenueWindow = dynamic(() => import("./DesktopVenueWindow"), {
+  ssr: false,
 });
 
 /**
@@ -345,6 +359,15 @@ interface MapWrapperProps {
    * uses for auto-locate below.
    */
   initialBoxesFilter?: boolean;
+  /**
+   * Splash gate (#588): true while HomePageClient is showing the welcome
+   * splash to a first-time visitor. Passed straight through to
+   * useDeferredMapLoad's `hold` param — see that hook's module doc. Defaults
+   * to false (today's unconditional idle-deferred load) for every other
+   * caller: deep links, returning visitors, and every existing test in this
+   * file that doesn't pass it.
+   */
+  holdMapLoad?: boolean;
 }
 
 export default function MapWrapper({
@@ -352,11 +375,25 @@ export default function MapWrapper({
   onShowWelcome,
   initialVenueId,
   initialBoxesFilter = false,
+  holdMapLoad = false,
 }: MapWrapperProps) {
-  const router = useRouter();
-
   // ── Locale — from context ─────────────────────────────────────────────────────
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — app.documentTitle holds the
+  // FULL title per locale (the one page whose SSR title, set in page.tsx,
+  // isn't run through layout.tsx's "%s · Pueblo Food Map" template — see
+  // that key's own comment in i18n.ts). Called HERE rather than in
+  // HomePageClient.tsx (the component that actually mounts this one) on
+  // purpose: HomePageClient is the route's synchronous, always-blocking
+  // client bundle (#202 dynamic()-imports this file specifically to keep
+  // it out of that bundle on low-end/slow-4G phones); MapWrapper already
+  // pulls in the full i18n dictionary for its own UI, so putting the title
+  // call here costs nothing extra and keeps that dictionary out of the
+  // blocking chunk. MapWrapper is unconditionally rendered whenever
+  // HomePageClient renders anything real (splash is an overlay ON TOP of
+  // the always-mounted map, never a replacement for it — see that file's
+  // own header), so this fires exactly when the home page's title needs it.
+  useDocumentTitle(t("app.documentTitle", locale));
 
   // ── Geolocation — v2 hook ────────────────────────────────────────────────────
   const geo = useGeolocation();
@@ -379,7 +416,7 @@ export default function MapWrapper({
     setMapboxMap,
   } = useMapUI();
 
-  // ── Deferred map load (#226) ─────────────────────────────────────────────────
+  // ── Deferred map load (#226, held behind the splash by #588) ────────────────
   // Perf: mapbox-gl is a large WebGL payload that used to fire the instant
   // MapWrapper mounted (the dynamic import factory runs on first render of
   // <MapCanvas>, not on interaction) — it dominated the mobile Lighthouse
@@ -388,8 +425,11 @@ export default function MapWrapper({
   // hook doc for the idle/interaction triggers that fire otherwise. While
   // false, the render below shows ListView in the map's place instead of
   // mounting <MapCanvas> — same absolute-fill box, so there is no layout shift
-  // when the swap happens.
-  const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId));
+  // when the swap happens. holdMapLoad (#588) suppresses only the automatic
+  // idle/timeout trigger while a first-time visitor's splash is up — see
+  // useDeferredMapLoad's module doc for why the interaction listeners stay
+  // live regardless (a real splash-CTA tap still starts the load right away).
+  const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId), holdMapLoad);
 
   // ── Location-denied banner (PR 7) ────────────────────────────────────────────
   // Shows only when the user ACTIVELY re-taps locate (not on initial mount when
@@ -759,11 +799,11 @@ export default function MapWrapper({
   // not useBoxVenues' second fetch of the same endpoint — see toVenue's own
   // header in useBoxVenues.ts) and merged into the same filter/count/marker
   // pipeline every other venue flows through (useMapFilters' own header
-  // explains why). boxIdSet lets every selection handler below tell "this
-  // id is a box" apart from an ordinary venue with one Set lookup — a box
-  // click now opens the SAME in-map card every other venue uses (just with
-  // BoxCardBody content), not a separate page, so boxIdSet is only needed
-  // where mapUnavailable still routes to a standalone page (below).
+  // explains why). boxIdSet lets the mapUnavailable deep-link effect below
+  // tell "this id is a box" apart from an unknown id with one Set lookup —
+  // a box click (map or list, mapUnavailable or not) opens the SAME in-map
+  // card every other venue uses (just with BoxCardBody content), never a
+  // separate page (#524).
   // boxesById/boxOverrides let the open card show the box's full record
   // (status, host note, most-needed, check-ins) that the plain Venue shape
   // doesn't carry, and stay current after a check-in without a refetch.
@@ -933,6 +973,24 @@ export default function MapWrapper({
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const isBelow2xl = useMediaQuery(BELOW_2XL_QUERY);
 
+  // perf(#588) — warm DesktopVenueWindow's chunk as soon as desktop layout is
+  // known, well before any venue is selected. Reviewer note on the code-split
+  // above: the dynamic() call has no `loading` fallback (unlike MapCanvas's
+  // MapLoadingFallback) because DesktopVenueWindow is marker-anchored — its
+  // on-screen position comes from mapboxMap.project() inside the component
+  // itself, so a static placeholder can't honestly stand in for it without
+  // duplicating that positioning logic. Prefetching here instead means the
+  // module is normally already cached by the time a user actually clicks a
+  // pin (search, pan, hover — every desktop session does several other
+  // things first), so the "click does nothing for a beat" gap the reviewer
+  // flagged is rare in practice rather than eliminated outright.
+  const desktopWindowPrefetched = useRef(false);
+  useEffect(() => {
+    if (isMobile || desktopWindowPrefetched.current) return;
+    desktopWindowPrefetched.current = true;
+    void import("./DesktopVenueWindow");
+  }, [isMobile]);
+
   // ── Drawer (HamburgerMenu) — opened from BottomNav at a section (spec §7) ────
   const [menuSection, setMenuSection] = useState<MenuSection | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
@@ -1041,11 +1099,13 @@ export default function MapWrapper({
   // map can't mount, Map.tsx never renders, so mapboxMap stays null forever
   // and the effect above never fires — a shared `/?venue=<id>` link silently
   // selected nothing (PageNav's saved-venue links reuse this same query
-  // param). Route straight to the venue/box detail page instead, mirroring
-  // the mapUnavailable branches in handleSelect*/handleSelectSavedVenue
-  // below. Shares deepLinkDoneRef so whichever branch resolves first (map
-  // ready vs. map unavailable — mutually exclusive in practice) wins, never
-  // both.
+  // param). #524 fix: this used to router.replace to the venue/box detail
+  // page instead (losing check-in/adopt/address for a box); it now just
+  // selects the id directly, same as the mapboxMap-ready branch above — the
+  // render guards below open BottomSheet/DesktopVenueWindow on
+  // selectedVenueId whenever mapUnavailable, regardless of viewMode. Shares
+  // deepLinkDoneRef so whichever branch resolves first (map ready vs. map
+  // unavailable — mutually exclusive in practice) wins, never both.
   //
   // WHY this waits on liveBoxesLoading (2026-09-18 fix, found by
   // MapWrapperBoxSelection.test.tsx): mapUnavailable can flip true in the
@@ -1062,14 +1122,9 @@ export default function MapWrapper({
       deepLinkDoneRef.current = true;
       return;
     }
-    if (allVenues.some((v) => v.id === initialVenueId)) {
+    if (allVenues.some((v) => v.id === initialVenueId) || boxIdSet.has(initialVenueId)) {
       deepLinkDoneRef.current = true;
-      router.replace(`/venue/${encodeURIComponent(initialVenueId)}`);
-      return;
-    }
-    if (boxIdSet.has(initialVenueId)) {
-      deepLinkDoneRef.current = true;
-      router.replace(`/box/${encodeURIComponent(initialVenueId)}/history`);
+      setSelectedVenueId(initialVenueId);
       return;
     }
     if (liveBoxesLoading) return; // could still resolve to a box — wait
@@ -1319,25 +1374,17 @@ export default function MapWrapper({
         if (popoverVisible && activeIndex >= 0 && activeIndex < filteredVenues.length) {
           e.preventDefault();
           const venue = filteredVenues[activeIndex];
-          // mapUnavailable branch added (fix, 2026-09-18): unlike a map pin
-          // tap (handleSelectVenueFromMap, correctly branch-free — no pins
-          // exist to tap when Map.tsx never renders), SearchBar itself is
-          // rendered unconditionally, mapUnavailable or not (see its render
-          // call below) — so this Enter path stays reachable even when the
-          // map can't mount. Without this branch, setSelectedVenueId alone
-          // did nothing visible: showVenueOnMap() no-ops while mapUnavailable
-          // (useMapUI.ts), and both card components (BottomSheet/
-          // DesktopVenueWindow) only render when viewMode === "map" — so a
-          // keyboard Enter on a box result silently went nowhere. Same
-          // box-vs-venue redirect the other three selection handlers already
-          // use (handleSelectSavedVenue/handleSelectVenueFromPopover/
+          // #524 fix: this used to branch on mapUnavailable and router.push
+          // to /venue/<id> (or a box's /box/<id>/history), because
+          // showVenueOnMap() no-ops while mapUnavailable (useMapUI.ts) and
+          // BottomSheet/DesktopVenueWindow used to only render when
+          // viewMode === "map" — so a keyboard Enter on a box result reached
+          // a read-only page with no check-in/adopt/address. The render
+          // guards below now also open on mapUnavailable (not just
+          // viewMode === "map"), so plain selection is enough here too — no
+          // more box-vs-venue branch, same as the other three selection
+          // handlers (handleSelectSavedVenue/handleSelectVenueFromPopover/
           // handleSelectFromList).
-          if (mapUnavailable) {
-            router.push(boxIdSet.has(venue.id) ? `/box/${venue.id}/history` : `/venue/${venue.id}`);
-            setIsPopoverOpen(false);
-            setActiveIndex(-1);
-            return;
-          }
           setSelectedVenueId(venue.id);
           showVenueOnMap();
           if (!isMobile) setWindowExpanded(false);
@@ -1347,7 +1394,7 @@ export default function MapWrapper({
       }
     },
     // filteredVenues reference is stable between renders with same query/filters.
-    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap, mapUnavailable, boxIdSet, router],
+    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap, setSelectedVenueId, setWindowExpanded],
   );
 
   // Select a venue from the Saved list (#132 9c). Clears active filters + search
@@ -1358,50 +1405,39 @@ export default function MapWrapper({
     (venueId: string) => {
       handleClearAllFilters();
       setSelectedVenueId(venueId);
-      if (mapUnavailable) {
-        // A box has no /venue/<id> page (that route is static, restricted
-        // to allVenues' build-time id set) — send it to its own history
-        // page instead, the one standalone page a box still has.
-        router.push(boxIdSet.has(venueId) ? `/box/${venueId}/history` : `/venue/${venueId}`);
-        return;
-      }
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [boxIdSet, handleClearAllFilters, isMobile, mapUnavailable, router, showVenueOnMap],
+    [handleClearAllFilters, isMobile, showVenueOnMap, setSelectedVenueId, setWindowExpanded],
   );
 
   /** Called when user clicks/taps a result row inside the popover. */
   const handleSelectVenueFromPopover = useCallback(
     (venueId: string) => {
       setSelectedVenueId(venueId);
-      if (mapUnavailable) {
-        router.push(boxIdSet.has(venueId) ? `/box/${venueId}/history` : `/venue/${venueId}`);
-        return;
-      }
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     },
-    [boxIdSet, isMobile, mapUnavailable, router, showVenueOnMap],
+    [isMobile, showVenueOnMap, setSelectedVenueId, setWindowExpanded],
   );
 
-  // Select a venue from the list (#129) — switch back to the map, centered on it.
-  // When mapUnavailable (#165 / #285), navigating to /venue/[id] (or a box's
-  // /box/<id>/history — the one standalone page a box still has) reaches
-  // full details.
+  // Select a venue from the list (#129) — switch back to the map, centered on
+  // it. #524 fix: when mapUnavailable, this used to navigate to /venue/[id]
+  // (or a box's read-only /box/<id>/history), stranding that visitor with no
+  // check-in/adopt/address. showVenueOnMap() no-ops while mapUnavailable
+  // (useMapUI.ts) so viewMode stays "list" — selecting a venue here now just
+  // opens the same BottomSheet/DesktopVenueWindow card ON TOP of the list
+  // (the render guards below key off mapUnavailable too, not only
+  // viewMode === "map").
   const handleSelectFromList = useCallback(
     (venueId: string) => {
       setSelectedVenueId(venueId);
-      if (mapUnavailable) {
-        router.push(boxIdSet.has(venueId) ? `/box/${venueId}/history` : `/venue/${venueId}`);
-        return;
-      }
       showVenueOnMap();
       if (!isMobile) setWindowExpanded(false);
     },
-    [boxIdSet, isMobile, mapUnavailable, router, showVenueOnMap],
+    [isMobile, showVenueOnMap, setSelectedVenueId, setWindowExpanded],
   );
 
   // A box pin now opens the SAME in-map card every other venue uses
@@ -1500,8 +1536,12 @@ export default function MapWrapper({
   // null` term (not two branches for strip vs. card) so there is nothing for
   // "Show card"/"Clear route" to desync — the registration only ever depends
   // on whether a venue is selected, never on which of the two views is
-  // showing, so switching between them can't flicker the bar.
-  const venueSheetOpen = isMobile && viewMode === "map" && selectedVenue !== null;
+  // showing, so switching between them can't flicker the bar. #524: also
+  // true when mapUnavailable — BottomSheet now opens over the list in that
+  // case too (see its own render guard below), so the nav must step aside
+  // there as well.
+  const venueSheetOpen =
+    isMobile && (viewMode === "map" || mapUnavailable) && selectedVenue !== null;
   // #542: feeds the same shared registry every other full-surface overlay
   // uses — BottomNav hides itself (overlayRegistry.ts) instead of this
   // component wrapping <BottomNav/> in a `{!venueSheetOpen && ...}` JSX
@@ -1766,8 +1806,13 @@ export default function MapWrapper({
         />
       )}
 
-      {/* BottomSheet — mobile only (vaul v2, venue-centric API). Map mode only (#129). */}
-      {isMobile && viewMode === "map" && (
+      {/* BottomSheet — mobile only (vaul v2, venue-centric API). Map mode
+          (#129), OR mapUnavailable (#524) — the card then opens on top of
+          the list itself, with no map behind it; BottomSheet.tsx's own
+          `open = venue !== null` already renders a closed drawer for a null
+          selection, so this is safe to mount whenever mapUnavailable
+          regardless of whether a venue is currently selected. */}
+      {isMobile && (viewMode === "map" || mapUnavailable) && (
         <BottomSheet
           key={selectedVenueId ?? "empty"}
           venue={selectedVenue}
@@ -1797,8 +1842,12 @@ export default function MapWrapper({
         />
       )}
 
-      {/* DesktopVenueWindow — marker-anchored, desktop only. Map mode only (#129). */}
-      {!isMobile && viewMode === "map" && selectedVenue && (
+      {/* DesktopVenueWindow — marker-anchored, desktop only. Map mode
+          (#129), OR mapUnavailable (#524) — opens over the list with
+          mapboxMap null; DesktopVenueWindow's own position effect no-ops on
+          a null map (see its header comment) and falls back to centering
+          on screen instead of marker-anchoring. */}
+      {!isMobile && (viewMode === "map" || mapUnavailable) && selectedVenue && (
         <DesktopVenueWindow
           key={selectedVenueId}
           venue={selectedVenue}

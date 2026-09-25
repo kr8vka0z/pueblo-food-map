@@ -21,7 +21,7 @@
  * read-only table of every venues row (draft + published + archived).
  * This page itself still performs no mutation and issues no non-GET
  * request, so it has no requireAdminOrigin() CSRF check here — that guard
- * exists only for non-GET /api/admin/* mutations (src/lib/cfAccess.ts).
+ * exists only for non-GET /api/admin/* mutations (src/lib/adminOrigin.ts).
  *
  * summarizePublishChanges() (src/lib/adminVenues.ts) computes PublishPanel's
  * new/edited/archived counts from the SAME rows already SELECTed for

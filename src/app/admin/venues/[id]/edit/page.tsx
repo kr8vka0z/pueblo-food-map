@@ -1,13 +1,13 @@
 /**
- * /admin/venues/[id]/edit — Cloudflare Access-gated "Edit a venue" page,
+ * /admin/venues/[id]/edit — admin-gated "Edit a venue" page,
  * plus the "Remove from map" (archive) action (#255); `?submission=<id>`
  * closure-report review context added #270; `?proposal=<id>` link_health
  * review context added #390.
  *
  * Same auth chain as /admin and /admin/venues/new (AGENTS.md "Admin
- * authentication"): getAdminDb() verifies the caller's Cloudflare Access
- * identity before this page renders anything, failing closed via Next's
- * forbidden() control-flow function on AccessDeniedError. Unlike the create
+ * authentication"): getAdminDb() verifies the caller's Better Auth session
+ * before this page renders anything, failing closed on AccessDeniedError
+ * (handlePageAuthError: login redirect or Next's forbidden()). Unlike the create
  * page, this one DOES have something to SELECT — the existing venue row —
  * so getAdminDb() here serves both the auth gate AND the read, same shape
  * as /admin's own list query. A missing/unknown id calls Next's notFound()
@@ -52,6 +52,12 @@
  * `proposalId` prop (that component's header explains the PATCH-time
  * approval), plus renders the dead URL + last-seen HTTP status in a banner
  * so the admin has context before editing.
+ *
+ * #265: passes `venue.updated_at` straight through to AddVenueForm's
+ * `expectedUpdatedAt` prop — the optimistic-concurrency precondition PATCH
+ * /api/admin/venues/[id] checks on save (see that route's + AddVenueForm's
+ * own headers). This SELECT above is the ONLY place that value is read, so
+ * it's always exactly what PATCH itself will re-check against.
  *
  * Blessing Boxes slice 2: when `venue.category === 'blessing_box'`,
  * resolveBoxCheckins() loads every check-in for this box (visible, hidden,
@@ -273,6 +279,7 @@ export default async function EditVenuePage({
           venueId={venue.id}
           initialValues={mapVenueRowToFormValues(venue)}
           proposalId={linkHealthContext?.proposalId}
+          expectedUpdatedAt={venue.updated_at}
         />
 
         {venue.category === "blessing_box" && (

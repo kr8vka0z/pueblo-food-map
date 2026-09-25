@@ -41,14 +41,14 @@ import { logAdminAuthEvent } from "@/lib/logger";
 
 /**
  * Every hostname this Worker answers admin traffic on (mirrors
- * cfAccess.ts's ADMIN_ORIGINS + the hostname list documented in that file's
+ * adminOrigin.ts's ADMIN_ORIGINS + the hostname list documented in that file's
  * header comment: the public apex — where admin now serves at the `/admin`
  * path, gated by Better Auth alone (magic link + passkey; Cloudflare Access
  * has been fully removed from this path) — the staging apex, and the bare
  * workers.dev fallback). Better Auth needs this to
  * construct correct absolute callback/redirect URLs regardless of which
  * hostname a request arrives on — the same multi-hostname reality
- * cfAccess.ts's in-app JWT re-verification exists to cover, for the same
+ * adminOrigin.ts's (formerly cfAccess.ts's) in-app JWT re-verification used to cover, for the same
  * underlying reason (Cloudflare Workers answer on more hostnames than a
  * single custom domain). The admin.pueblofoodmap.com /
  * dev.admin.pueblofoodmap.com subdomains are retired — admin is a path on
@@ -134,9 +134,12 @@ export function buildAuthOptions(
     },
     // #318 Phase 4 item 1 — D1-backed rate limit on the magic-link REQUEST
     // endpoint. REUSES Better Auth's own native `rateLimit` engine rather
-    // than hand-rolling a limiter — src/lib/rateLimit.ts's in-process Map
-    // limiter is untouched (it covers the three PUBLIC forms only, a
-    // separate unauthenticated attack surface with no session/D1 concept).
+    // than hand-rolling a limiter — this is a SEPARATE D1 table/mechanism
+    // from the three public forms' own D1-backed limiter (src/lib/
+    // formRateLimit.ts, #587): different attack surface (unauthenticated
+    // magic-link requests vs. public form spam), different table (Better
+    // Auth's own `rateLimit` model vs. box_checkin_rate_limit), no reason to
+    // share one.
     //
     // WHY `enabled` is explicit rather than left to the library default:
     // verified in the installed source
@@ -182,9 +185,10 @@ export function buildAuthOptions(
     // after the library's built-in `/sign-in*` special rule and after any
     // plugin-contributed rule — so this exact-string entry reliably
     // overrides the plugin's shorter window rather than racing it. 3600s/5
-    // mirrors src/lib/rateLimit.ts's own public-form threshold
-    // (`RATE_LIMIT_MAX = 5`, 1h window) for a consistent posture across
-    // every request-a-link surface this app exposes.
+    // mirrors src/lib/formRateLimit.ts's own public-form per-IP threshold
+    // (`MAX_PER_IP_PER_HOUR = 5`, 1h window; formerly src/lib/rateLimit.ts's
+    // `RATE_LIMIT_MAX` before #587) for a consistent posture across every
+    // request-a-link surface this app exposes.
     //
     // NOT a landmine for adminAuthAllowlistPlugin.test.ts's real
     // magic-link integration tests: verified in
@@ -269,6 +273,32 @@ export function buildAuthOptions(
     // auth-options.test.ts asserts the exact resolved name/attributes via
     // better-auth's own `getCookies()` helper; a true end-to-end browser
     // check still happens at Kyle's live preview (Phase 3 report).
+    //
+    // #595 security review — `useSecureCookies: false` above suppresses
+    // Secure on EVERY Better Auth cookie, not just session_token (verified
+    // in createCookieGetter, node_modules/better-auth/dist/cookies/
+    // index.mjs: `secure: !!secureCookiePrefix`, and secureCookiePrefix is
+    // derived from useSecureCookies for the whole cookie jar). The
+    // `session_token` override above already restores it by hand for the
+    // session cookie; the entries below do the identical restoration for
+    // every OTHER cookie this config can emit: `session_data`/`account_data`
+    // (session cookie-cache, unused today since `session.cookieCache` is
+    // unset — added anyway so enabling that cache later doesn't silently
+    // regress this fix), `dont_remember` (Better Auth's native
+    // remember-me opt-out cookie), and `better-auth-passkey` — the
+    // passkey plugin's own WebAuthn challenge cookie, whose NAME is
+    // `opts.advanced.webAuthnChallengeCookie` (default
+    // "better-auth-passkey", @better-auth/passkey/dist/index.mjs) and which
+    // is looked up in this exact `advanced.cookies` map by that name
+    // (`ctx.context.createAuthCookie(...)` is the same `createCookieGetter`
+    // function keyed off `options.advanced.cookies[cookieName]` — verified
+    // in create-context.mjs's `createAuthCookie: createCookieGetter(options)`).
+    // No dev/localhost carve-out: the session_token override above has
+    // none either (Secure is unconditional there), and this app has no
+    // existing localhost-vs-prod branch for cookie attributes to mirror —
+    // local admin login already only works over the CF preview/staging
+    // https origins, not plain http://localhost, so an unconditional
+    // Secure flag changes nothing about that.
     advanced: {
       useSecureCookies: false,
       cookies: {
@@ -276,6 +306,10 @@ export function buildAuthOptions(
           name: "__Host-session_token",
           attributes: { secure: true },
         },
+        session_data: { attributes: { secure: true } },
+        account_data: { attributes: { secure: true } },
+        dont_remember: { attributes: { secure: true } },
+        "better-auth-passkey": { attributes: { secure: true } },
       },
     },
     plugins: [

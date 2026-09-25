@@ -6,15 +6,20 @@
  * Extracted from src/app/not-found.tsx so the page's text can read the
  * visitor's locale via useLocale() (#289) without forcing not-found.tsx to
  * read a cookie server-side — see that file's header comment for the
- * static-caching rationale (AGENTS.md "Known bilingual limitation", #287).
+ * static-caching rationale (ARCHITECTURE.md "Known bilingual limitation", #287).
  */
 
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 
 export default function NotFoundContent() {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — notfound.documentTitle
+  // matches not-found.tsx's metadata title exactly ("Page Not Found").
+  useDocumentTitle(pageDocumentTitle(t("notfound.documentTitle", locale)));
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)] items-center justify-center p-6 text-center">

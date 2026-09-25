@@ -4,7 +4,7 @@
  * "PUBLISH PATH", §5 step 5, §8 NB1).
  *
  * Kept separate from src/app/api/admin/publish/route.ts (same pattern as
- * cfAccess.ts/adminDb.ts vs. whoami/route.ts) so the validation, D1, and
+ * adminOrigin.ts/adminDb.ts vs. whoami/route.ts) so the validation, D1, and
  * GitHub-commit logic are unit-testable with plain fixtures and mocked
  * fetch/D1, without needing a live D1 binding or a real GitHub token.
  *
@@ -173,6 +173,70 @@ export function validateAndMapRow(row: VenueRow): RowValidationResult {
   };
 
   return { ok: true, venue };
+}
+
+// ─── Dead-link suppression (#234) ───────────────────────────────────────────
+// "Hide known-dead links": while link-health has flagged a venue's url as
+// dead and the finding is still open (a pending `change_proposals` row,
+// source='link_health'), the public snapshot must not carry that url —
+// see stripDeadLinkUrls below for the actual suppression and route.ts for
+// where it's wired between fetchPublishSnapshot and validateSnapshot.
+
+export interface PendingDeadLink {
+  targetVenueId: string;
+  /** The exact url the finding flagged — buildLinkHealthProposal (scripts/refresh/diffEngine.ts) always writes `before.url` as the checked, now-dead url. */
+  url: string;
+}
+
+/**
+ * Reads every OPEN (still 'pending') link_health finding. Kept separate
+ * from fetchPublishSnapshot's own venues query — a malformed
+ * `proposed_diff` here degrades to "this one venue's url stays visible"
+ * (same per-row-degrades posture src/lib/adminProposals.ts's
+ * parseProposalRow uses), rather than risking the whole venue snapshot
+ * read if this query's shape is ever wrong.
+ */
+export async function fetchPendingDeadLinks(db: D1Database): Promise<PendingDeadLink[]> {
+  const result = await db
+    .prepare("SELECT target_venue_id, proposed_diff FROM change_proposals WHERE source = 'link_health' AND status = 'pending'")
+    .all<{ target_venue_id: string; proposed_diff: string }>();
+
+  const links: PendingDeadLink[] = [];
+  for (const row of result.results) {
+    try {
+      const diff = JSON.parse(row.proposed_diff) as { before?: { url?: unknown } | null };
+      const url = diff.before?.url;
+      if (typeof url === "string" && url.length > 0) {
+        links.push({ targetVenueId: row.target_venue_id, url });
+      }
+    } catch {
+      // Malformed JSON — skip this one finding rather than throwing the
+      // whole publish.
+    }
+  }
+  return links;
+}
+
+/**
+ * Suppresses a venue's `url` from the published snapshot while its
+ * matching link_health finding is still pending admin review (#234: "the
+ * public card must not render that link until an admin resolves it" —
+ * resolving means PATCH /api/admin/venues/[id] with `proposalId`, which
+ * flips the proposal to 'approved', or a plain reject via
+ * POST /api/admin/proposals/[id]/reject; either way the proposal leaves
+ * 'pending' and the NEXT publish's `deadLinks` no longer names this
+ * venue). Compares against the EXACT flagged url (not just "this venue id
+ * has ANY open finding") so a venue an admin hand-edited to a NEW url —
+ * without yet touching the stale pending proposal — republishes
+ * immediately instead of waiting on that proposal's own resolution.
+ */
+export function stripDeadLinkUrls(rows: VenueRow[], deadLinks: PendingDeadLink[]): VenueRow[] {
+  if (deadLinks.length === 0) return rows;
+  const deadUrlByVenueId = new Map(deadLinks.map((d) => [d.targetVenueId, d.url]));
+  return rows.map((row) => {
+    const deadUrl = deadUrlByVenueId.get(row.id);
+    return deadUrl !== undefined && row.url === deadUrl ? { ...row, url: null } : row;
+  });
 }
 
 export type ValidateSnapshotResult =
@@ -438,6 +502,27 @@ export async function promotePublishedDrafts(
   await db.batch(statements);
 }
 
+// ─── Environment guard: refuse Publish outside production (#591) ──────────
+
+/**
+ * True only on the production Worker. `BETTER_AUTH_RP_ID` is the app's
+ * existing staging-only signal (#318 passkey isolation) — set via
+ * `wrangler.jsonc`'s `env.staging.vars`, absent on production, read via the
+ * Cloudflare env BINDING (never `process.env` — a wrangler `var` isn't
+ * guaranteed to surface into `process.env` under OpenNext, see auth.ts).
+ * Reused here rather than hostname sniffing or a second staging-only var:
+ * it's the one config value that already tells staging and prod apart.
+ *
+ * ponytail: piggybacking on an auth-scoped var means removing/renaming
+ * `BETTER_AUTH_RP_ID` for auth reasons would silently reopen this guard too.
+ * If that coupling ever bites, promote to a dedicated `env.staging`-only
+ * flag (e.g. `IS_STAGING: "true"`) instead of reusing an auth var forever —
+ * see wrangler.jsonc's `BETTER_AUTH_RP_ID` comment for the paired note.
+ */
+export function isProductionWorker(env: Pick<CloudflareEnv, "BETTER_AUTH_RP_ID">): boolean {
+  return env.BETTER_AUTH_RP_ID === undefined;
+}
+
 // ─── GitHub: commit + branch + PR + auto-merge (spec §3.5 step 4) ─────────
 
 const GITHUB_API_BASE = "https://api.github.com";
@@ -490,8 +575,12 @@ function githubHeaders(token: string, extra?: Record<string, string>): HeadersIn
   };
 }
 
-async function githubGet(path: string, token: string): Promise<Response> {
-  return fetch(`${GITHUB_API_BASE}${path}`, { headers: githubHeaders(token) });
+// `signal` is optional (existing callers below never pass one — the publish
+// mutation flow is already a bounded, user-initiated request) — added for
+// fetchPublishBotPrStatus (#598), a best-effort admin Dashboard page-load
+// read that must never hang the page on a slow/unresponsive GitHub API.
+async function githubGet(path: string, token: string, signal?: AbortSignal): Promise<Response> {
+  return fetch(`${GITHUB_API_BASE}${path}`, { headers: githubHeaders(token), signal });
 }
 
 async function githubJson<T>(method: string, path: string, token: string, body: unknown): Promise<T> {
@@ -718,4 +807,131 @@ export async function commitPublishedVenues(
   await enableAutoMerge(pr.nodeId, token);
 
   return { prUrl: pr.htmlUrl, prNumber: pr.number, reused };
+}
+
+// ─── GitHub: read-only publish-bot PR status (#598) ────────────────────────
+
+export type PublishBotPrState = "in_progress" | "stuck_conflict" | "stuck_checks";
+
+export interface PublishBotPrStatus {
+  number: number;
+  htmlUrl: string;
+  state: PublishBotPrState;
+}
+
+interface PullRequestListItemApiResponse {
+  number: number;
+  html_url: string;
+  created_at: string;
+}
+
+interface PullRequestDetailApiResponse {
+  mergeable_state: string | null;
+}
+
+// mergeable_state values (GitHub REST) this banner treats as "stuck," once
+// the PR has been open long enough that it isn't just normal in-flight CI
+// lag — see PUBLISH_STUCK_AGE_MINUTES below. "dirty" (a real merge
+// conflict) is checked separately and unconditionally, since a conflict
+// can never resolve itself by waiting.
+const STUCK_MERGEABLE_STATES = new Set(["blocked", "unstable", "behind"]);
+
+/** How long a publish-bot PR can sit with a non-clean mergeable_state before this reads as "stuck" rather than "still running" — a fresh PR's checks routinely take a few minutes. */
+const PUBLISH_STUCK_AGE_MINUTES = 20;
+
+/** A best-effort admin-Dashboard page-load read must never hang the page on a slow/unresponsive GitHub API. */
+const PUBLISH_STATUS_FETCH_TIMEOUT_MS = 3000;
+
+/**
+ * Issue #598: publish marks a venue "published" in D1 the moment the
+ * publish-bot PR is opened and auto-merge is armed (commitPublishedVenues,
+ * above) — NOT once that PR's checks pass and it actually merges. If the
+ * PR's CI goes red, D1 already says "published" while the live site still
+ * serves the OLD published-venues.ts until the next publish repairs it.
+ * Rewiring the state machine to wait for the real merge isn't worth it (a
+ * publish would have to hold a request open across a multi-minute CI run —
+ * NB1's own "GitHub succeeds THEN D1 writes" ordering above already exists
+ * to keep D1 from lying about the GitHub side specifically) — instead, the
+ * admin Dashboard reads this same open PR's own state, read-only, so an
+ * admin can SEE "stuck" instead of trusting a screen that can't tell them.
+ *
+ * Pulls API ONLY (review finding, 2026-09-24): the first version of this
+ * function read GitHub's Checks API against the PR's head sha — that
+ * silently never worked, because a FINE-GRAINED PAT (this repo's
+ * `GITHUB_PUBLISH_TOKEN`, Contents RW + Pull requests RW, #260) cannot read
+ * check runs at all — not a missing scope to add, a structural gap in what
+ * fine-grained PATs can authenticate for (Kyle's own AGENTS.md note).
+ * `mergeable_state` + `created_at` from the Pulls API need only "Pull
+ * requests: read," which this token already has. Two calls: the same
+ * PR-list query findOrCreatePublishPr/findOpenPublishPr (above) already
+ * make (list items carry `created_at`/`html_url` but NOT `mergeable_state`
+ * — GitHub only computes/exposes that on the single-PR read), then
+ * `GET /pulls/{number}` for `mergeable_state`.
+ *
+ * Fails soft everywhere a Dashboard page load can't afford to wait or
+ * error: the PR-list call throws (network/rate-limit/GitHub outage) — the
+ * caller (admin/page.tsx) catches that and renders nothing, same as any
+ * other best-effort Dashboard read. The single-PR detail call specifically
+ * degrades to `state: "in_progress"` (i.e. `mergeable_state` treated as
+ * unknown/null) instead of throwing — a permissions or transient-error gap
+ * must never read as a false "stuck."
+ *
+ * state:
+ *  - "stuck_conflict": `mergeable_state === "dirty"` — a real merge
+ *    conflict, which can never resolve itself by waiting, so this fires
+ *    regardless of the PR's age.
+ *  - "stuck_checks": the PR has been open more than
+ *    PUBLISH_STUCK_AGE_MINUTES AND `mergeable_state` is one of
+ *    blocked/unstable/behind — i.e. still not mergeable well past the
+ *    window normal CI takes, the case #598 exists to surface.
+ *  - "in_progress": everything else — including `mergeable_state` still
+ *    "unknown" (GitHub hasn't finished computing it yet, common right after
+ *    a PR opens) and the detail read failing outright. A young PR with a
+ *    non-clean state reads as "in progress," not "stuck," until it clears
+ *    the age bar above.
+ */
+export async function fetchPublishBotPrStatus(token: string): Promise<PublishBotPrStatus | null> {
+  const listRes = await githubGet(
+    `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls?head=${GITHUB_OWNER}:${PUBLISH_BOT_BRANCH}&state=open`,
+    token,
+    AbortSignal.timeout(PUBLISH_STATUS_FETCH_TIMEOUT_MS),
+  );
+  if (!listRes.ok) {
+    const text = await listRes.text().catch(() => "(unreadable)");
+    throw new GitHubApiError(`GitHub PR lookup failed: ${listRes.status} ${text}`, listRes.status, text);
+  }
+  const list = (await listRes.json()) as PullRequestListItemApiResponse[];
+  const pr = list[0];
+  if (!pr) return null;
+
+  let mergeableState: string | null = null;
+  try {
+    const detailRes = await githubGet(
+      `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls/${pr.number}`,
+      token,
+      AbortSignal.timeout(PUBLISH_STATUS_FETCH_TIMEOUT_MS),
+    );
+    if (detailRes.ok) {
+      const detail = (await detailRes.json()) as PullRequestDetailApiResponse;
+      mergeableState = detail.mergeable_state ?? null;
+    }
+    // non-2xx falls through, leaving mergeableState null (-> "in_progress").
+  } catch {
+    // network/timeout on the detail read specifically — same fallback,
+    // never thrown (see this function's own header on why).
+  }
+
+  const ageMinutes = (Date.now() - new Date(pr.created_at).getTime()) / 60_000;
+  let state: PublishBotPrState = "in_progress";
+  if (mergeableState === "dirty") {
+    state = "stuck_conflict";
+  } else if (
+    mergeableState !== null &&
+    STUCK_MERGEABLE_STATES.has(mergeableState) &&
+    ageMinutes > PUBLISH_STUCK_AGE_MINUTES
+  ) {
+    state = "stuck_checks";
+  }
+
+  return { number: pr.number, htmlUrl: pr.html_url, state };
 }

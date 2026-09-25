@@ -13,15 +13,15 @@
  *
  * Auth split matches every other admin mutation surface (AddVenueForm,
  * ArchiveVenueButton): this component holds none. The page's Server
- * Component owns the Cloudflare Access gate; POST /api/admin/publish
+ * Component owns the Better Auth gate (getAdminDb()); POST /api/admin/publish
  * (src/app/api/admin/publish/route.ts) re-verifies identity + Origin
  * itself. The confirm step is a native window.confirm() — ArchiveVenueButton
  * established this pattern in this codebase (no modal dependency exists
  * here, and none is needed for one confirm dialog).
  *
- * Button treatment: filled sage-500/sage-600-hover, bone-50 text — the same
- * classes as "Add place" (src/app/admin/page.tsx) and AddVenueForm's submit
- * button. That IS the strongest CTA tier this design system offers for the
+ * Button treatment: filled sage-600/sage-700-hover, bone-50 text — the
+ * app-wide filled primary button (DESIGN.md Forms > Submit), same classes as
+ * AddVenueForm's submit button. That IS the strongest CTA tier this design system offers for the
  * admin surface: DESIGN.md reserves brand-orange ("ButtonPrimary") for
  * exactly two public-map elements (splash CTA, LocateButton pill) with an
  * explicit Don't against using it anywhere else, while sage is documented
@@ -64,6 +64,11 @@ interface PublishSuccessBody {
   prNumber: number;
   reused: boolean;
   publishedCount: number;
+  // #568 item 2: optional, not required — a defensive read against any
+  // older/mocked response shape that predates this field (route.ts always
+  // sends it now, but this component shouldn't crash on a response that
+  // doesn't), defaulting to 0 wherever it's read below.
+  archivedCount?: number;
   snapshotCount: number;
 }
 
@@ -77,18 +82,31 @@ type PublishResponseBody = PublishSuccessBody | PublishErrorBody;
 type PublishState =
   | { status: "idle" }
   | { status: "submitting" }
-  | { status: "success"; prUrl: string; publishedCount: number }
+  | { status: "success"; prUrl: string; publishedCount: number; archivedCount: number }
   | { status: "error"; message: string };
 
 const primaryButtonClass =
   "inline-flex items-center justify-center rounded-[var(--radius-md)] " +
-  "bg-[var(--color-sage-500)] px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] " +
-  "transition-colors duration-150 hover:bg-[var(--color-sage-600)] " +
+  "bg-[var(--color-sage-600)] px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] " +
+  "transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
 
 function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * #568 item 2: a removals-only publish (0 new/edited, N archived) used to
+ * read "Published — 0 places pushed" — technically not wrong, but it looks
+ * like the publish did nothing when it actually shipped N removals. Always
+ * naming the pushed count and only appending the removed clause when it's
+ * non-zero keeps the common "N new/edited" case unchanged while making a
+ * removal visible whenever one happened.
+ */
+function publishSuccessMessage(publishedCount: number, archivedCount: number): string {
+  const pushed = `${pluralize(publishedCount, "place")} pushed`;
+  return archivedCount > 0 ? `${pushed}, ${pluralize(archivedCount, "place")} removed` : pushed;
 }
 
 function buildConfirmMessage({ newDrafts, editedSincePublish, archived }: PublishChangeSummary): string {
@@ -110,14 +128,20 @@ function friendlyErrorMessage(status: number, error?: string): string {
   if (error === "publish_not_configured") {
     return "The publish key isn't set up yet, so this can't publish. (Setup is tracked separately.)";
   }
+  // #591: staging refused the publish before any GitHub call — checked
+  // ahead of the generic 403/401 "session expired" branch below (same
+  // status code, different meaning) so this admin sees the real reason.
+  if (error === "publish_not_production") {
+    return "Publish only runs on the live production site. This is staging, so nothing was sent to GitHub.";
+  }
   if (error === "github_commit_failed") {
     return "Couldn't reach GitHub to publish. Nothing was changed — try again in a moment.";
   }
   if (status === 422) {
     return `Couldn't publish: something in a venue's data didn't pass validation.${error ? ` (${error})` : ""}`;
   }
-  // 403 = Cloudflare Access / origin denied; 401 = no valid Better Auth session
-  // (the dual-auth gate's no_session response for /api/admin/* handlers). Both
+  // 403 = origin denied or email not allowlisted; 401 = no valid Better Auth
+  // session (no_session, see adminAuthErrors.ts). Both
   // mean "sign in again," so they share this message.
   if (status === 403 || status === 401) {
     return "Your session expired — reload and sign in again.";
@@ -141,7 +165,12 @@ export default function PublishPanel({ summary, reviewHref }: PublishPanelProps)
       const body = (await res.json().catch(() => null)) as PublishResponseBody | null;
 
       if (res.status === 200 && body?.ok) {
-        setState({ status: "success", prUrl: body.prUrl, publishedCount: body.publishedCount });
+        setState({
+          status: "success",
+          prUrl: body.prUrl,
+          publishedCount: body.publishedCount,
+          archivedCount: body.archivedCount ?? 0,
+        });
         router.refresh();
         return;
       }
@@ -193,7 +222,7 @@ export default function PublishPanel({ summary, reviewHref }: PublishPanelProps)
 
       {state.status === "success" && (
         <p aria-live="polite" className="mt-3 text-sm text-[var(--color-sage-700)]">
-          Published — {pluralize(state.publishedCount, "place")} pushed to the public map. A{" "}
+          Published — {publishSuccessMessage(state.publishedCount, state.archivedCount)} to the public map. A{" "}
           <a
             href={state.prUrl}
             target="_blank"

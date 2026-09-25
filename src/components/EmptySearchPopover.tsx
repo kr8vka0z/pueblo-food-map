@@ -15,7 +15,7 @@
  *
  * Accessibility:
  *   - role="status" so screen readers announce the empty-result message.
- *   - Each chip is a <button aria-label="Show <category> venues">.
+ *   - Each chip is a <button aria-label="Show <category> places">.
  */
 
 import { CATEGORY_OPTIONS } from "@/lib/searchVenues";

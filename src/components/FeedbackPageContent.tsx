@@ -6,17 +6,22 @@
  * Extracted from src/app/feedback/page.tsx so the page's text (and
  * FeedbackForm, which now reads useLocale() itself — #289) reflects the
  * visitor's locale while the page stays a static Server Component (no
- * cookies() read — AGENTS.md "Known bilingual limitation", #287).
+ * cookies() read — ARCHITECTURE.md "Known bilingual limitation", #287).
  */
 
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import FeedbackForm from "@/components/FeedbackForm";
 import SiteFooter from "@/components/SiteFooter";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
 export default function FeedbackPageContent() {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — feedback.documentTitle
+  // matches page.tsx's metadata title exactly ("Send Feedback").
+  useDocumentTitle(pageDocumentTitle(t("feedback.documentTitle", locale)));
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>

@@ -15,7 +15,7 @@
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { AccessDeniedError } from "@/lib/cfAccess";
+import { AccessDeniedError } from "@/lib/adminOrigin";
 import type { ChangeProposalRow, ParsedProposal } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/app/admin/flags/page";
 

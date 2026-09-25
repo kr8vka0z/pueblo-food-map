@@ -6,7 +6,7 @@
  * Extracted from src/app/venues/page.tsx so the directory's headings and
  * per-venue hours text read the visitor's locale via useLocale() (#289),
  * while the page itself stays a server-rendered, crawlable Server Component
- * (no cookies() read — AGENTS.md "Known bilingual limitation", #287). The
+ * (no cookies() read — ARCHITECTURE.md "Known bilingual limitation", #287). The
  * grouped-by-category data is computed server-side by groupVenuesByCategory
  * (still exported from page.tsx, pure and locale-independent) and passed in.
  */
@@ -14,6 +14,8 @@
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { pageDocumentTitle } from "@/lib/site";
 import SiteFooter from "@/components/SiteFooter";
 import { DISPLAY_DAY_KEYS, formatSlot } from "@/lib/hours";
 import type { Venue, VenueCategory } from "@/types/venue";
@@ -25,6 +27,9 @@ interface VenuesDirectoryContentProps {
 
 export default function VenuesDirectoryContent({ groups }: VenuesDirectoryContentProps) {
   const { locale } = useLocale();
+  // <title> follows locale client-side (#589) — venues.documentTitle
+  // matches page.tsx's metadata title exactly ("All Food Resources").
+  useDocumentTitle(pageDocumentTitle(t("venues.documentTitle", locale)));
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
@@ -50,7 +55,12 @@ export default function VenuesDirectoryContent({ groups }: VenuesDirectoryConten
             <section key={category} aria-labelledby={headingId}>
               <h2
                 id={headingId}
-                className="text-lg font-semibold text-[var(--color-ink-800)] mb-2"
+                // #534: --color-ink-800 was never defined in globals.css
+                // @theme — DESIGN.md documents ink-700 as the token for
+                // "all body text and headings," which this section heading
+                // is; matches the identical heading pattern already fixed
+                // in AboutContent/ResourcesContent/HamburgerMenu/FilterPanel.
+                className="text-lg font-semibold text-[var(--color-ink-700)] mb-2"
               >
                 {t(`category.full.${category}`, locale)}
               </h2>

@@ -270,9 +270,9 @@ function TurnGlyph({
 // walking-while-glancing-at-the-phone use case this stepper is built for.
 const stepNavClass =
   "flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-md)] " +
-  "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
+  "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
   "disabled:bg-[var(--color-bone-200)] disabled:text-[var(--color-ink-400)] " +
-  "hover:enabled:bg-[var(--color-sage-600)] " +
+  "hover:enabled:bg-[var(--color-sage-700)] " +
   PRESS_FEEDBACK + " " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-1";
 
@@ -639,18 +639,27 @@ const baseClass =
   PRESS_FEEDBACK + " " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-1";
 
+// #534: --color-sage-400 undefined in globals.css @theme — sage-600 is
+// DESIGN.md's documented "primary/active" color, matching this button's
+// own active-route semantics (5.2:1 border contrast against the sage-100
+// fill vs. 3.1:1 for sage-500, safer for outdoor phone use).
 const walkActiveClass =
   baseClass +
-  " bg-[var(--color-sage-100)] text-[var(--color-sage-700)] border border-[var(--color-sage-400)]";
+  " bg-[var(--color-sage-100)] text-[var(--color-sage-700)] border border-[var(--color-sage-600)]";
 
 const walkInactiveClass =
   baseClass +
-  " bg-[var(--color-sage-500)] text-[var(--color-bone-50)] hover:bg-[var(--color-sage-600)]";
+  " bg-[var(--color-sage-600)] text-[var(--color-bone-50)] hover:bg-[var(--color-sage-700)]";
 
+// #534: --color-bone-400 undefined — the bone scale stops at bone-300, so a
+// hover-darkened border steps into the ink family instead, reusing the same
+// hover:border-ink-400 darken-on-hover pattern ReportVenueButton.tsx already
+// uses for an identical rest-bone/hover-darker border (5.2:1 against the
+// bone-100 hover fill, DESIGN.md's own measured number for ink-400).
 const externalClass =
   baseClass +
   " bg-[var(--color-bone-50)] text-[var(--color-ink-700)] border border-[var(--color-bone-300)] " +
-  "hover:bg-[var(--color-bone-100)] hover:border-[var(--color-bone-400)]";
+  "hover:bg-[var(--color-bone-100)] hover:border-[var(--color-ink-400)]";
 
 // ─── DirectionButtons ─────────────────────────────────────────────────────────
 

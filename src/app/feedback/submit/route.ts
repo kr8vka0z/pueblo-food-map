@@ -5,8 +5,12 @@
  *   1. Validate Content-Type + JSON shape.
  *   2. Cloudflare Turnstile token verification (rejects bots before further processing).
  *   3. Honeypot check (spam bots fill hidden fields; legit users don't).
- *   4. IP-based rate limit: max 5 submissions per IP per hour (in-process
- *      Map — resets on Worker restart; sufficient for v1 spam deterrence).
+ *   4. D1-backed rate limit (#587): 5/hour per IP AND a site-wide cap per
+ *      hour, both via src/lib/formRateLimit.ts's checkFormRateLimit — see
+ *      that file's header for why (the old in-process Map was per-isolate
+ *      and rarely actually applied on Workers). Unlike report/suggest, this
+ *      route has no other D1 use (no public_submissions row for feedback),
+ *      so this is the ONLY reason it now needs the ADMIN_DB binding.
  *   5. Server-side field validation (mirrors client validation).
  *   6. Send email via Resend to feedback@pueblofoodmap.com.
  *   7. Return JSON {ok: true} or {ok: false, error: string}.
@@ -17,9 +21,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { FEEDBACK_TYPES, type FeedbackTypeKey } from "@/lib/feedbackTypes";
 import { verifyTurnstileToken } from "@/lib/turnstile";
-import { createRateLimiter, isValidEmail } from "@/lib/rateLimit";
+import { isValidEmail } from "@/lib/email";
+import { checkFormRateLimit } from "@/lib/formRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
 
@@ -27,11 +33,6 @@ import { logFormFailure } from "@/lib/logger";
 function stripLineBreaks(s: string): string {
   return s.replace(/[\r\n]/g, " ");
 }
-
-// ─── Rate limiter ─────────────────────────────────────────────────────────────
-// Private in-process sliding window for this route (own 5/hr-per-IP bucket).
-
-export const checkRateLimit = createRateLimiter();
 
 // ─── Email sender ─────────────────────────────────────────────────────────────
 
@@ -162,8 +163,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true });
   }
 
-  // IP-based rate limit
-  if (!checkRateLimit(ip)) {
+  // D1-backed rate limit (#587) — same convention as report/suggest and
+  // checkins/route.ts. Fails CLOSED (503) if the Cloudflare context itself
+  // can't be resolved — same posture checkAndIncrement already takes
+  // internally on a D1 error, so a partial D1 outage can't silently let a
+  // flood through this guard.
+  let db: D1Database;
+  try {
+    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
+  } catch {
+    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
+  }
+  const rateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
+  if (!rateLimitSecret) {
+    throw new Error("CHECKIN_RATE_LIMIT_SECRET not configured");
+  }
+  if (!(await checkFormRateLimit(db, rateLimitSecret, "feedback", ip))) {
     return NextResponse.json(
       { ok: false, error: "rate_limit" },
       { status: 429 },

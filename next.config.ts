@@ -14,17 +14,96 @@ import type { NextConfig } from "next";
 //   within pueblofoodmap.com (so server logs retain path context) but only
 //   the origin to external sites, reducing leakage of URL parameters.
 //
-// Full CSP is deferred — see issue #160 item 1.5 comment.
-//
 // poweredByHeader: false (below) drops the `X-Powered-By: Next.js` response
 // header for the same reason as the headers above — one less signal telling
 // an attacker which framework/version this app runs, in case a future
 // framework CVE targets Next.js specifically. Issue #164 quick win (S7a).
+//
+// Strict-Transport-Security is deliberately NOT set here (#593) — the
+// pueblofoodmap.com Cloudflare zone already sends its own
+// `strict-transport-security: max-age=15552000` (verified 2026-09-24,
+// `curl -sI https://pueblofoodmap.com/`). Adding a second, differently-valued
+// HSTS header from the app risks two conflicting headers reaching the
+// browser rather than one authoritative value; the zone's is edge-level and
+// applies before this Worker is even invoked, so it's the right layer to own
+// this. If the zone's max-age/includeSubDomains value ever needs to change,
+// that's a Cloudflare dashboard edit, not a code change here.
+//
+// Permissions-Policy (#593): geolocation=(self) backs the existing "find
+// food near me" flow (src/components/MapWrapper.tsx's geolocation button);
+// camera=(self) is future-proofing for the box-photo upload
+// (src/components/BoxCheckinPanel.tsx's PhotoPickerField) — that input is a
+// plain `<input type="file" accept="image/*">` with NO `capture` attribute
+// (deliberately, so a visitor can pick from their library, not just the
+// camera — see that component's own header), so it never actually triggers
+// a getUserMedia() camera-permission prompt today, but nothing here should
+// block it from working if that ever changes. Everything else this app has
+// no use for is denied outright: microphone, payment, usb.
+//
+// Content-Security-Policy (#593): shipped report-only first, ran clean on
+// dev (zero violations across /, venue card, filters, /resources, /suggest
+// with Turnstile, /venues, /admin/login), then flipped to enforcing.
+// Violations still post to /api/csp-report via report-uri. No nonce: this app's static
+// rendering depends on NOT using proxy.ts (Next 16 proxy.ts fails the build
+// on this OpenNext/Cloudflare stack — see the "Footgun" note on `/` above),
+// and Next's own CSP guide requires proxy-generated nonces to force every
+// page into dynamic rendering — incompatible with this app's static +
+// dynamicParams=false pages (the 10-day outage footgun this file already
+// documents). So this follows Next's documented "Without Nonces" approach
+// (node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md)
+// instead: a static header, `'unsafe-inline'` on script-src/style-src.
+// `'unsafe-inline'` on script-src is for Next's own inline RSC-hydration
+// payloads (`self.__next_f.push(...)`), not the app's `<script
+// type="application/ld+json">` JSON-LD blocks — those aren't parsed as JS
+// and aren't governed by script-src at all. style-src needs it for the
+// ~40 components using a React `style={{...}}` prop (renders as an inline
+// HTML `style=""` attribute, which CSP style-src does govern) plus
+// mapbox-gl's own inline-styled DOM nodes.
+const CSP = [
+  "default-src 'self'",
+  // static.cloudflareinsights.com: the Web Analytics beacon (#592).
+  // challenges.cloudflare.com: Turnstile's widget script (6 public forms —
+  // SuggestForm, ReportForm, FeedbackForm, AdoptBoxForm, BoxAlertSignupForm,
+  // BoxCheckinPanel).
+  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://challenges.cloudflare.com",
+  "style-src 'self' 'unsafe-inline'",
+  // data:/blob: — mapbox-gl draws tiles/sprites through canvas & blob URLs.
+  "img-src 'self' data: blob: https://api.mapbox.com https://*.tiles.mapbox.com",
+  "font-src 'self'",
+  // api.mapbox.com: styles/directions API (MapWrapper.tsx's walking directions).
+  // *.tiles.mapbox.com: vector tile fetches. events.mapbox.com: mapbox-gl's
+  // own telemetry pings — blocking it doesn't break the map, but it would
+  // spam this report with noise otherwise. cloudflareinsights.com: the
+  // beacon's own reporting endpoint (script host above is
+  // static.cloudflareinsights.com — a different subdomain).
+  "connect-src 'self' https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com https://cloudflareinsights.com",
+  // mapbox-gl runs its tile/data processing in a Web Worker built from a blob: URL.
+  "worker-src 'self' blob:",
+  "child-src blob:",
+  // Turnstile renders its challenge widget in an iframe.
+  "frame-src https://challenges.cloudflare.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  // Without this, a real violation only ever shows up in that one visitor's
+  // own devtools console — Workers Logs never sees it, and "dev ran clean
+  // for a while" (the plan for flipping to enforcing) would be unverifiable.
+  // `report-uri` (not the newer `report-to`) because it needs no companion
+  // `Report-To` header and every browser this CSP already targets supports
+  // it — see src/app/api/csp-report/route.ts for the sink.
+  "report-uri /api/csp-report",
+].join("; ");
 
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "geolocation=(self), camera=(self), microphone=(), payment=(), usb=()",
+  },
+  { key: "Content-Security-Policy", value: CSP },
 ];
 
 const nextConfig: NextConfig = {

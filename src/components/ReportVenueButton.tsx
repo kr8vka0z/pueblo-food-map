@@ -26,7 +26,14 @@ export default function ReportVenueButton({
       href={`/report/${venueId}`}
       className={
         "flex items-center justify-center gap-1.5 w-full h-9 rounded-[var(--radius-md)] " +
-        "border border-[var(--color-ink-300)] text-[var(--color-ink-600)] " +
+        // #534: --color-ink-300/--color-ink-600 undefined in globals.css
+        // @theme. Border: bone-300 is the app's documented resting-border
+        // token (DESIGN.md: "bone-300 — search bar border at rest"),
+        // darkening to the already-defined ink-400 on hover below — same
+        // rest/hover pattern as FeedbackForm's retry button. Text: ink-500
+        // ("secondary metadata") matches this button's own doc comment
+        // above — "intentionally lower visual weight" than a primary action.
+        "border border-[var(--color-bone-300)] text-[var(--color-ink-500)] " +
         "text-sm font-medium transition-colors duration-150 " +
         "hover:bg-[var(--color-bone-100)] hover:border-[var(--color-ink-400)] " +
         "focus-visible:outline-none focus-visible:ring-2 " +

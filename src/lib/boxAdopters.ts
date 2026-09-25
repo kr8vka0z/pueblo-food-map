@@ -20,6 +20,7 @@
  */
 
 import { isWithinConfirmWindow, randomHexToken } from "@/lib/alertTokens";
+import { D1_MAX_BOUND_PARAMS, chunkArray } from "@/lib/d1";
 import { composeEmail, sendResendEmail } from "@/lib/emailSend";
 import type { Locale } from "@/lib/i18n";
 
@@ -130,10 +131,19 @@ export async function loadAdopterByConfirmToken(db: D1Database, token: string): 
 }
 
 /**
- * Batched "every approved adopter name per box" for the public list endpoint
- * and /box/<id> — one query for every box, not N+1, mirroring boxPhotos.ts's
+ * Batched "every approved adopter name per box" for the public list endpoint,
+ * /box/<id>, and the admin Dashboard's box-health panel (adminBoxes.ts) — one
+ * or more queries for every box, not N+1, mirroring boxPhotos.ts's
  * loadLatestApprovedPhotosForVenues. Empty input returns an empty map
  * without touching D1.
+ *
+ * D1_MAX_BOUND_PARAMS-chunked (#568 item 7 — one bound parameter per venue
+ * id used to be a single unbatched `IN (...)`, which throws past D1's
+ * 100-bound-param ceiling; same fix/helper adminVenueLookup.ts's
+ * loadVenueLookup already applies, extracted to src/lib/d1.ts precisely so
+ * a second call site like this one reuses it instead of re-deriving the
+ * limit). Fine at Pueblo's real box count today (well under 100 boxes), but
+ * no longer silently drops caretaker names once it isn't.
  */
 export async function loadApprovedAdopterNamesForVenues(
   db: D1Database,
@@ -142,15 +152,17 @@ export async function loadApprovedAdopterNamesForVenues(
   const byVenue = new Map<string, string[]>();
   if (venueIds.length === 0) return byVenue;
 
-  const result = await db
-    .prepare(selectApprovedAdopterNamesForVenuesSql(venueIds.length))
-    .bind(...venueIds)
-    .all<{ venue_id: string; display_name: string }>();
+  for (const batch of chunkArray(venueIds, D1_MAX_BOUND_PARAMS)) {
+    const result = await db
+      .prepare(selectApprovedAdopterNamesForVenuesSql(batch.length))
+      .bind(...batch)
+      .all<{ venue_id: string; display_name: string }>();
 
-  for (const row of result.results ?? []) {
-    const existing = byVenue.get(row.venue_id);
-    if (existing) existing.push(row.display_name);
-    else byVenue.set(row.venue_id, [row.display_name]);
+    for (const row of result.results ?? []) {
+      const existing = byVenue.get(row.venue_id);
+      if (existing) existing.push(row.display_name);
+      else byVenue.set(row.venue_id, [row.display_name]);
+    }
   }
   return byVenue;
 }

@@ -193,16 +193,20 @@ export default function FeedbackForm() {
         >
           {t("feedback.success.title", locale)}
         </h2>
-        <p className="text-sm text-[var(--color-ink-600)] mb-6 leading-relaxed">
+        {/* #534: --color-ink-600 undefined in globals.css @theme — mapped to
+            ink-700, DESIGN.md's documented body-text token (this is a plain
+            success-message paragraph, not the "secondary metadata"
+            role ink-500 is reserved for). */}
+        <p className="text-sm text-[var(--color-ink-700)] mb-6 leading-relaxed">
           {t("feedback.success.body", locale)}
         </p>
         <Link
           href="/"
           className={
             "inline-flex items-center justify-center px-5 h-10 rounded-[var(--radius-md)] " +
-            "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
+            "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
             "text-sm font-semibold transition-colors duration-150 " +
-            "hover:bg-[var(--color-sage-600)] focus-visible:outline-none " +
+            "hover:bg-[var(--color-sage-700)] focus-visible:outline-none " +
             "focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
           }
         >
@@ -217,14 +221,17 @@ export default function FeedbackForm() {
   // text-base on mobile: iOS Safari auto-zooms on focusing a field under 16px.
   const inputBase =
     "w-full rounded-[var(--radius-md)] border px-3 py-2 text-base md:text-sm text-[var(--color-ink-900)] " +
-    "bg-white placeholder:text-[var(--color-ink-300)] " +
+    // #534: --color-ink-300 undefined in globals.css @theme — DESIGN.md
+    // names ink-400 explicitly as "placeholder text, icon fills, and
+    // section headers," so that's the documented replacement, not a guess.
+    "bg-white placeholder:text-[var(--color-ink-400)] " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
     "focus-visible:border-[var(--color-sage-500)]";
 
   const inputBorder = (hasError: boolean) =>
-    hasError ? "border-red-500" : "border-[var(--color-bone-300)]";
+    hasError ? "border-[var(--color-danger)]" : "border-[var(--color-bone-300)]";
 
-  const errorClass = "mt-1 text-xs text-red-600";
+  const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
   const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
 
   return (
@@ -240,10 +247,10 @@ export default function FeedbackForm() {
       {status === "error" && (
         <div
           role="alert"
-          className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3"
+          className="rounded-[var(--radius-md)] border border-[var(--color-danger)] bg-white px-4 py-3"
         >
-          <p className="text-sm font-medium text-red-700">{t("feedback.error.title", locale)}</p>
-          <p className="text-sm text-red-600 mt-0.5">{t("feedback.error.body", locale)}</p>
+          <p className="text-sm font-medium text-[var(--color-danger)]">{t("feedback.error.title", locale)}</p>
+          <p className="text-sm text-[var(--color-danger)] mt-0.5">{t("feedback.error.body", locale)}</p>
         </div>
       )}
 
@@ -251,7 +258,7 @@ export default function FeedbackForm() {
       <div>
         <label htmlFor="feedback-type" className={labelClass}>
           {t("feedback.type.label", locale)}{" "}
-          <span aria-hidden className="text-red-500">*</span>
+          <span aria-hidden className="text-[var(--color-danger)]">*</span>
         </label>
         <select
           id="feedback-type"
@@ -285,7 +292,7 @@ export default function FeedbackForm() {
       <div>
         <label htmlFor="feedback-message" className={labelClass}>
           {t("feedback.message.label", locale)}{" "}
-          <span aria-hidden className="text-red-500">*</span>
+          <span aria-hidden className="text-[var(--color-danger)]">*</span>
         </label>
         <textarea
           id="feedback-message"
@@ -315,7 +322,7 @@ export default function FeedbackForm() {
       <div>
         <label htmlFor="feedback-email" className={labelClass}>
           {t("feedback.email.label", locale)}{" "}
-          <span aria-hidden className="text-red-500">*</span>
+          <span aria-hidden className="text-[var(--color-danger)]">*</span>
         </label>
         <input
           type="email"
@@ -388,7 +395,7 @@ export default function FeedbackForm() {
         {turnstileError && (
           <p
             role="alert"
-            className="mt-1 text-xs text-red-600"
+            className="mt-1 text-xs text-[var(--color-danger)]"
           >
             {t("form.turnstile.error", locale)}
           </p>
@@ -401,9 +408,9 @@ export default function FeedbackForm() {
         disabled={status === "submitting" || !turnstileToken}
         className={
           "w-full h-11 rounded-[var(--radius-md)] " +
-          "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
+          "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
           "text-base font-semibold transition-colors duration-150 " +
-          "hover:bg-[var(--color-sage-600)] " +
+          "hover:bg-[var(--color-sage-700)] " +
           "focus-visible:outline-none focus-visible:ring-2 " +
           "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
           "disabled:opacity-60 disabled:cursor-not-allowed"
@@ -424,7 +431,12 @@ export default function FeedbackForm() {
           onClick={() => setStatus("idle")}
           className={
             "w-full h-11 rounded-[var(--radius-md)] " +
-            "border border-[var(--color-ink-300)] text-[var(--color-ink-700)] " +
+            // #534: --color-ink-300 undefined — bone-300 is the app's
+            // documented resting-border token (DESIGN.md: "bone-300 —
+            // search bar border at rest"); borders live in the bone family
+            // here, text in the ink family, matching inputBorder() above
+            // in this same file.
+            "border border-[var(--color-bone-300)] text-[var(--color-ink-700)] " +
             "text-base font-medium transition-colors duration-150 " +
             "hover:bg-[var(--color-bone-100)] " +
             "focus-visible:outline-none focus-visible:ring-2 " +

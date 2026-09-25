@@ -64,6 +64,9 @@ vi.mock("vaul", () => {
   const DrawerTitle = ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <h2 data-testid="vaul-title" className={className}>{children}</h2>
   );
+  const DrawerDescription = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <p data-testid="vaul-description" className={className}>{children}</p>
+  );
 
   return {
     Drawer: {
@@ -71,6 +74,7 @@ vi.mock("vaul", () => {
       Portal: DrawerPortal,
       Content: DrawerContent,
       Title: DrawerTitle,
+      Description: DrawerDescription,
     },
   };
 });
@@ -114,7 +118,12 @@ describe("BottomSheet — summary always visible (collapsed)", () => {
     // categoryLabels["pantry"] === "Food pantry". The badge span also contains
     // an aria-hidden dot child, so use getByText with exact:false to match
     // elements whose text content includes the label.
-    expect(screen.getByText(/Food pantry/i)).toBeDefined();
+    // #590: the sr-only Drawer.Description reuses the same category copy,
+    // so exclude that match and require exactly one visible badge.
+    const visible = screen
+      .getAllByText(/Food pantry/i)
+      .filter((el) => !el.closest('[data-testid="vaul-description"]'));
+    expect(visible).toHaveLength(1);
   });
 });
 

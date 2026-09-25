@@ -457,7 +457,7 @@ One ladder for everything that floats. A new floating element joins an existing 
 | 9000 | Splash screen (blocks the whole map until dismissed) | `SplashScreen.tsx` |
 | top layer | Photo viewer — native `<dialog>` + `showModal()`, above every z-index by spec | `PhotoViewer.tsx` |
 
-Backdrops are `rgba(26,24,23,0.4)` (warm ink, FilterPanel) — `HamburgerMenu`'s `rgba(0,0,0,0.4)` is the one black holdover.
+Backdrops are `rgba(26,24,23,0.4)` (warm ink) — FilterPanel and HamburgerMenu both; never black.
 
 ## Loading, empty and error states
 
@@ -474,9 +474,9 @@ Every state says what happened in plain words and offers a next step. Never a bl
 
 - **Plain, warm, second person.** Talk to one neighbour: "Tap the star on any place to save it." No marketing voice, no jargon ("SNAP" and "WIC" are fine — they're what people call them).
 - **Sentence case** for buttons, headings and labels ("Show details", "Back to map"). Title Case only for proper nouns and the category names as they appear in data ("Food Pantry", "Blessing Box").
-- **Say "place(s)" in public copy.** Newer UI says places ("Show 12 places", "No saved places yet"); older strings still say "venue" (the Suggest/Report forms, `search.aria`). Use "place" in anything new and convert old strings when you're already editing them. Admin copy may say "venue".
+- **Say "place(s)" in public copy.** All public English copy says "place" ("Suggest a place", "Browse all places", "Show 12 places"); Spanish says "lugar". Admin copy may say "venue"; i18n keys and code identifiers keep `venue`.
 - **Numbers**: digits, not words ("Show 12 places", "Step 3 of 9"); counts after a middle dot in chips ("Food pantry · 48"); distance to one decimal under 10 miles ("0.4 mi"), whole miles above (`formatMiles`).
-- **Punctuation**: real ellipsis `…`, never `...`. Straight apostrophes (`'`) — the one curly `’` in `banner.body` is a stray. Exclamation marks only on a thank-you ("Thank you!").
+- **Punctuation**: real ellipsis `…`, never `...`. Straight apostrophes (`'`), never curly. Exclamation marks only on a thank-you ("Thank you!").
 - **Errors** say what went wrong and what to do next, with a fallback when there is one ("…try again, or email us at suggestions@pueblofoodmap.com.").
 - **Every string ships in English and Spanish** (`src/lib/i18n.ts`). Spanish uses informal **tú** ("Toca la estrella…", "Intenta de nuevo"), not usted. Spanish often runs noticeably longer than English: controls must wrap or truncate cleanly at 320px rather than clip (#601 fixed the splash CTA wrapping on narrow phones).
 - **Accessible names are copy too** — `aria-label`s go through `i18n.ts` like visible text, and describe the action ("Close menu"), not the element ("X button").

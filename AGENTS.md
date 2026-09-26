@@ -91,6 +91,7 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
 - Job logic lives in `src/lib/scheduledTasks.ts`, never in `custom-worker.ts`, which vitest can't import.
 - `/api/health` deliberately calls nothing external.
 - **Logs:** filter Cloudflare Workers Logs on `event: "form_submit_failure"` or `event: "csp_violation_report"`. Both are PII-free by construction. `POST /api/csp-report` is unauthenticated per the CSP spec but rate-limited (100/hr per IP, 1000/hr site-wide) and always returns 204.
+- **Web Analytics:** the beacon comes only from Cloudflare's edge injection on the zone (no app code; see the CSP comment in `next.config.ts`). dev.pueblofoodmap.com is excluded by a zone Configuration Rule (host `dev.pueblofoodmap.com` → Disable RUM, #652), so no beacon on dev is correct. Web Analytics' own host rules can't do this: the free plan allows one, and narrowing it didn't stop dev visits being recorded. Check beacons with a browser user-agent plus `Accept: text/html`; bare `curl` never shows one.
 
 ## Code gotchas
 

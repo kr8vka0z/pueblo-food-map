@@ -12,17 +12,18 @@
  * docs/admin/cloudflare-native-admin-spec.md §7 step 3, the acceptance spec
  * this script implements.
  *
- * WHY raw arrays, not venues.ts's combined `venues` export: that export
- * bakes in the benefit-flags.ts SNAP/WIC overlay at import time (its
- * `.map()` at the bottom of venues.ts unconditionally lets a matched flag
- * win). D1's accepts_snap/accepts_wic must hold only genuinely
- * source-authored values so the tri-state NULL = "no opinion yet" is
- * meaningful — benefit-flags.ts stays a separately-refreshable overlay
- * (spec §7 step 1, the "NB4" fix) that only ever fills a NULL, and only
- * ever wins once an admin can edit D1 directly. Seeding the overlay's
- * guesses as if they were explicit source values would make every one of
- * those fields look admin-set on day one and permanently block the overlay
- * from ever applying again.
+ * WHY raw arrays, not venues.ts's combined `venues` export (historical, at
+ * the time this ran): venues.ts's export then baked in a runtime
+ * benefit-flags.ts SNAP/WIC overlay, and D1's accepts_snap/accepts_wic
+ * needed to hold only genuinely source-authored values so the tri-state
+ * NULL = "no opinion yet" was meaningful — the overlay (spec §7 step 1, the
+ * "NB4" fix) only ever filled a NULL, and only ever won once an admin could
+ * edit D1 directly. Seeding the overlay's guesses as if they were explicit
+ * source values would have made every one of those fields look admin-set on
+ * day one and permanently blocked the overlay from ever applying again.
+ * That overlay was deleted in #597 once migration 0014 copied its matches
+ * into D1 and a Publish shipped them — D1 is now the sole SNAP/WIC source,
+ * but this script is a one-time historical seed and is unaffected either way.
  *
  * RUN — one-time, by a human with `wrangler d1 execute` access. NOT part of
  * CI and not imported by app code.

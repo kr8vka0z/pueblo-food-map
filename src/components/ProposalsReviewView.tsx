@@ -109,6 +109,14 @@
  * "Approved N. Skipped K." summary, so it survives that refresh instead of
  * disappearing the instant approved cards stop matching `status =
  * 'pending'`.
+ *
+ * Triage lanes (#543): each card carries its lane badge (reviewLaneOf —
+ * Likely noise / Needs a human / Likely rename) plus Jev's reading in one
+ * plain sentence; a lane filter row and a "Needs a human first" sort appear
+ * only once more than one lane is present. A lane is a sorting aid, never a
+ * gate: every action on the card behaves exactly as before. A rename
+ * proposal (meta.rename) names the new listing and approves as "Approve
+ * rename" — an update of this same venue id.
  */
 
 import { useMemo, useState } from "react";
@@ -120,8 +128,21 @@ import { formatSlot } from "@/lib/hours";
 import { safeUrl } from "@/lib/safeUrl";
 import VenueCard from "@/components/VenueCard";
 import type { Venue, VenueCategory, WeeklyHours } from "@/types/venue";
-import { isDateOnlyUpdateProposal, reviewableDiffFields } from "@/lib/adminProposals";
-import type { ParsedProposal, ProposalChangeType, ProposalSourceValue, ProposedDiff } from "@/lib/adminProposals";
+import {
+  isDateOnlyUpdateProposal,
+  renameMetaOf,
+  reviewableDiffFields,
+  reviewLaneOf,
+  REVIEW_LANE_ORDER,
+} from "@/lib/adminProposals";
+import type {
+  ChangeProposalRow,
+  ParsedProposal,
+  ProposalChangeType,
+  ProposalSourceValue,
+  ProposedDiff,
+  ReviewLane,
+} from "@/lib/adminProposals";
 import type { VenueLookup } from "@/app/admin/flags/page";
 
 export interface ProposalsReviewViewProps {
@@ -144,6 +165,47 @@ export const SOURCE_BADGE: Record<ProposalSourceValue, { label: string; classNam
   link_health: { label: "Broken link", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
 };
 
+// Triage lanes (#543) — existing badge colour pairs only, no new tokens.
+const LANE_BADGE: Record<ReviewLane, { label: string; className: string }> = {
+  needs_human: { label: "Needs a human", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
+  likely_rename: { label: "Likely rename", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
+  likely_noise: { label: "Likely noise", className: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]" },
+};
+
+const REMOVE_REASON_LABEL: Record<string, string> = {
+  gone: "closed",
+  temporarily_missing: "a scrape gap, still open",
+  renamed_or_moved: "renamed or moved",
+  unclear: "unclear",
+};
+
+const pct = (p: number) => `${Math.round(p * 100)}%`;
+
+/**
+ * One plain sentence from the stored Jev answers (triage_json), or null
+ * when the row was never triaged. Exported for tests.
+ */
+export function triageSummary(row: Pick<ChangeProposalRow, "triage_json">): string | null {
+  if (!row.triage_json) return null;
+  type Answer = { noul?: number; choice?: string; probabilities?: Record<string, number> };
+  let parsed: { answers?: Record<string, Answer> };
+  try {
+    parsed = JSON.parse(row.triage_json);
+  } catch {
+    return null;
+  }
+  const a = parsed.answers ?? {};
+  if (typeof a.same_place?.noul === "number") return `Jev: ${pct(a.same_place.noul)} likely the same place under a new listing.`;
+  if (typeof a.same_value?.noul === "number")
+    return `Jev: ${pct(a.same_value.noul)} likely the same value, only written differently.`;
+  const reason = a.remove_reason;
+  if (reason?.choice) {
+    const p = reason.probabilities?.[reason.choice];
+    return `Jev's best guess: ${REMOVE_REASON_LABEL[reason.choice] ?? reason.choice}${typeof p === "number" ? ` (${pct(p)})` : ""}.`;
+  }
+  return null;
+}
+
 const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
   add: "New venue",
   update: "Field update",
@@ -151,9 +213,9 @@ const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
 };
 
 const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-500)] " +
+  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
   "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
-  "hover:bg-[var(--color-sage-600)] focus-visible:outline-none focus-visible:ring-2 " +
+  "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
@@ -250,6 +312,17 @@ export default function ProposalsReviewView({ proposals, venueLookup }: Proposal
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [changeTypeFilter, setChangeTypeFilter] = useState<ChangeTypeFilter>("all");
   const [bulkState, setBulkState] = useState<BulkApproveState>({ status: "idle" });
+  const [laneFilter, setLaneFilter] = useState<"all" | ReviewLane>("all");
+  const [laneSort, setLaneSort] = useState(false);
+
+  const laneOf = (p: ParsedProposal) => reviewLaneOf(p.row, p.parseError ? null : p.diff);
+  const presentLanes = useMemo(
+    () =>
+      (Object.keys(REVIEW_LANE_ORDER) as ReviewLane[]).filter((lane) =>
+        proposals.some((p) => reviewLaneOf(p.row, p.parseError ? null : p.diff) === lane),
+      ),
+    [proposals],
+  );
 
   const presentSources = useMemo(
     () => [...new Set(proposals.map((p) => p.row.source))] as ProposalSourceValue[],
@@ -263,8 +336,11 @@ export default function ProposalsReviewView({ proposals, venueLookup }: Proposal
   const filtered = proposals.filter((p) => {
     if (sourceFilter !== "all" && p.row.source !== sourceFilter) return false;
     if (changeTypeFilter !== "all" && p.row.change_type !== changeTypeFilter) return false;
+    if (laneFilter !== "all" && laneOf(p) !== laneFilter) return false;
     return true;
   });
+  // Stable sort: within a lane, the server's newest-first order is kept.
+  if (laneSort) filtered.sort((a, b) => REVIEW_LANE_ORDER[laneOf(a)] - REVIEW_LANE_ORDER[laneOf(b)]);
 
   // Same predicate the server re-validates against (src/lib/adminProposals.ts)
   // — scoped to `filtered`, the currently VISIBLE subset, not the whole queue.
@@ -360,6 +436,25 @@ export default function ProposalsReviewView({ proposals, venueLookup }: Proposal
         </div>
       )}
 
+      {/* Triage lanes (#543) — only once more than one lane is present, so an
+          all-untriaged queue looks exactly as it did before triage existed. */}
+      {presentLanes.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setLaneFilter("all")} className={filterChipClass(laneFilter === "all")}>
+            All lanes
+          </button>
+          {presentLanes.map((lane) => (
+            <button key={lane} type="button" onClick={() => setLaneFilter(lane)} className={filterChipClass(laneFilter === lane)}>
+              {LANE_BADGE[lane].label}
+            </button>
+          ))}
+          <span className="mx-1 h-4 w-px bg-[var(--color-bone-300)]" aria-hidden />
+          <button type="button" aria-pressed={laneSort} onClick={() => setLaneSort((v) => !v)} className={filterChipClass(laneSort)}>
+            Needs a human first
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-[var(--color-ink-500)]">
           {filtered.length} of {proposals.length} pending {proposals.length === 1 ? "proposal" : "proposals"}
@@ -427,6 +522,10 @@ function ProposalCard({
   const beforeName = !proposal.parseError && typeof proposal.diff.before?.name === "string" ? proposal.diff.before.name : undefined;
   const venueName = targetVenue?.name ?? afterName ?? beforeName ?? row.target_venue_id;
   const isRestore = changeType === "add" && targetVenue?.status === "archived";
+  const lane = reviewLaneOf(row, proposal.parseError ? null : proposal.diff);
+  const laneBadge = LANE_BADGE[lane];
+  const summary = triageSummary(row);
+  const rename = proposal.parseError ? null : renameMetaOf(proposal.diff);
 
   async function postAction(path: "approve" | "reject", body?: unknown) {
     return fetch(`/api/admin/proposals/${row.id}/${path}`, {
@@ -481,7 +580,10 @@ function ProposalCard({
             {sourceBadge.label}
           </span>
           <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-[var(--color-bone-100)] text-[var(--color-ink-500)]">
-            {isRestore ? "Restore" : CHANGE_TYPE_LABEL[changeType] ?? changeType}
+            {isRestore ? "Restore" : rename ? "Rename / move" : CHANGE_TYPE_LABEL[changeType] ?? changeType}
+          </span>
+          <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${laneBadge.className}`}>
+            {laneBadge.label}
           </span>
         </div>
         {/* created_at + run_id — a reviewer working a real queue needs to know
@@ -508,6 +610,13 @@ function ProposalCard({
             <p className="text-xs text-[var(--color-ink-500)]">{targetVenue.address}</p>
           )}
           <p className="text-xs text-[var(--color-ink-400)]">{row.target_venue_id}</p>
+          {rename && (
+            <p className="mt-2 text-sm text-[var(--color-ink-700)]">
+              {sourceBadge.label} stopped listing this place and started listing <span className="break-all">{rename.to_id}</span> at
+              the same spot or phone. Approving updates this venue in place — same page and link — with the new details below.
+            </p>
+          )}
+          {summary && <p className="mt-2 text-xs text-[var(--color-ink-500)]">{summary}</p>}
 
           {proposal.parseError ? (
             <p className="mt-2 text-sm text-[var(--color-clay-700)]">
@@ -545,7 +654,7 @@ function ProposalCard({
             disabled={approveState.status === "submitting"}
             className={primaryButtonClass}
           >
-            {approveState.status === "submitting" ? "Applying…" : "Approve"}
+            {approveState.status === "submitting" ? "Applying…" : rename ? "Approve rename" : "Approve"}
           </button>
         )}
         {!proposal.parseError && changeType === "remove" && (

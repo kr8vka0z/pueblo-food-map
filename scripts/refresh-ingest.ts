@@ -3,7 +3,7 @@
  * (fixes: venue data hadn't been re-verified since 2026-05 because the
  * scrapers wrote committed .ts files nothing read — see README.md "Data
  * sources" and .github/workflows/refresh-proposals.yml's header for the
- * end-to-end picture). Run by that workflow (monthly cron + manual
+ * end-to-end picture). Run by that workflow (weekly cron + manual
  * dispatch); safe to run locally too, see usage below.
  *
  * What this does, in order:
@@ -17,7 +17,11 @@
  *   4. Runs the outbound link-health pass (scripts/refresh/linkHealth.ts)
  *      over every venue with a stored url.
  *   5. If the combined total exceeds the per-run cap, aborts and writes
- *      NOTHING. Otherwise writes every surviving proposal as one batch of
+ *      NOTHING. Otherwise pairs likely renames (a remove + an add at the
+ *      same spot or phone → one update of the old id) and has TypeSafe Jev
+ *      triage each proposal into a review lane (scripts/refresh/triage.ts,
+ *      #543 — `JEV_API_KEY`; absent or failing = written untriaged). Then
+ *      writes every surviving proposal as one batch of
  *      SQL statements — `wrangler d1 execute --local --file` locally
  *      (Miniflare's real db.batch()), or `wrangler d1 execute --remote
  *      --command` in production (D1's REST /query endpoint, itself
@@ -43,6 +47,11 @@
  * writes a pending `change_proposals` row; a human approving one of THOSE
  * (a separate, later slice, /admin/flags) is the only other path that
  * mutates `venues` from this pipeline's output.
+ *
+ * One opt-in exception on top (#543), OFF unless the env var
+ * REFRESH_AI_AUTO_APPLY=true: a phone/url change that is formatting-only
+ * once normalised AND that Jev scores over 90% "same value" is applied the
+ * same way, under actor `refresh-pipeline-ai` (proposalSql.ts).
  *
  * WHY shell out to `wrangler d1 execute` instead of a D1Database binding:
  * this runs as a plain Node process (GitHub Actions runner or a local
@@ -77,7 +86,9 @@ import {
 } from "./refresh/diffEngine";
 import { checkUrl } from "./refresh/linkHealth";
 import { buildProposalWriteStatements } from "./refresh/proposalSql";
+import { applyIdAliases, type IdAliasRow } from "./refresh/renamePairs";
 import { chunkSqlStatements } from "./refresh/sqlChunks";
+import { createTriageSession, runTriagePass, USD_PER_INPUT_TOKEN } from "./refresh/triage";
 
 const REPO_ROOT = join(__dirname, "..");
 // wrangler.jsonc's two D1 bindings, keyed by --db-mode. `local` and `remote`
@@ -171,7 +182,7 @@ function d1Query<T>(dbMode: DbMode, sql: string): T[] {
  * the SAME database that also holds Better Auth sessions, the auth
  * rate-limit table, and public_submissions — a brief outage here logs the
  * admin out and silently drops any public form submission landing in that
- * window (best-effort insert, see AGENTS.md "Public submissions queue").
+ * window (best-effort insert, see ARCHITECTURE.md "Form-route triad").
  * `--command` instead takes the OTHER branch of that same `executeRemotely`
  * function: no `input.file`, so it posts straight to D1's REST `/query`
  * endpoint (`d1ApiPost(..., "query", { sql })`) — the identical live-query
@@ -267,8 +278,11 @@ async function scrapeOsm(): Promise<Venue[]> {
 
 // ─── D1 row shape for current venues ────────────────────────────────────────
 
+// hours_irregular (#400) needs migrations/0015 applied to the target D1
+// first — against a database without it this SELECT fails loudly, which is
+// the right failure (see AGENTS.md's promotion checklist).
 const CURRENT_ROW_COLUMNS =
-  "id, name, category, lat, lng, address, hours_weekly, phone, url, operator, last_verified";
+  "id, name, category, lat, lng, address, hours_weekly, hours_irregular, phone, url, operator, last_verified";
 
 function loadCurrentRows(dbMode: DbMode, sourceType: RefreshSource): CurrentVenueRow[] {
   const sql = `SELECT ${CURRENT_ROW_COLUMNS} FROM venues WHERE source_type = '${sourceType}' AND status IN ('draft','published')`;
@@ -351,6 +365,24 @@ async function main(): Promise<void> {
     if (dropped > 0) console.log(`  ${source}: dropped ${dropped} scraped record(s) that failed schema validation`);
   }
 
+  // Migration 0016 (#543) — triage columns + venue_id_aliases. Probed rather
+  // than assumed so a database that hasn't had it applied yet still gets a
+  // normal, untriaged run instead of a failed one (the promotion checklist
+  // applies it first, but a missed step must not break the weekly job).
+  const schemaReady =
+    d1Query<{ name: string }>(dbMode, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'venue_id_aliases'").length > 0;
+  if (!schemaReady) console.log("\nmigration 0016 not applied to this database — skipping rename pairing and Jev triage.");
+
+  // Approved renames: map each new upstream id back onto the venue it was
+  // approved as, BEFORE diffing — otherwise the renamed venue reappears as
+  // the same remove+add pair every run.
+  if (schemaReady) {
+    const aliases = d1Query<IdAliasRow>(dbMode, "SELECT source, upstream_id, venue_id FROM venue_id_aliases");
+    for (const source of ["plentiful", "osm"] as const) {
+      incomingByType[source] = applyIdAliases(source, incomingByType[source], aliases, new Set(currentByType[source].map((r) => r.id)));
+    }
+  }
+
   // Blessing boxes are live, not managed by this pipeline — strip them from
   // both sides of every source's diff before it ever runs (see
   // excludeBlessingBoxes's own header for why both sides matter).
@@ -421,14 +453,41 @@ async function main(): Promise<void> {
     return;
   }
 
+  // ── 5b: rename pairing + Jev triage (#543) — only AFTER every guard above
+  // passed; a run that tripped one already returned or will fail below.
+  // Never throws: no key or a Jev outage just leaves proposals untriaged.
+  const session = createTriageSession({ apiKey: process.env.JEV_API_KEY, log: (m) => console.log(m) });
+  const aiAutoApply = process.env.REFRESH_AI_AUTO_APPLY === "true";
+  const triagePass = await runTriagePass({
+    proposals: allProposals,
+    currentRows: [...currentByType.plentiful, ...currentByType.osm],
+    session,
+    rejectedKeys,
+    today,
+    schemaReady,
+  });
+  allProposals = triagePass.proposals;
+  const laneCounts: Record<string, number> = {};
+  for (const t of triagePass.triage.values()) laneCounts[t.lane] = (laneCounts[t.lane] ?? 0) + 1;
+  console.log(
+    `\ntriage: ${session.available() ? "on" : `off (${session.stats.disabledReason})`}  ` +
+      `renamePairs=${triagePass.renamePairs}  triaged=${triagePass.triage.size}  lanes=${JSON.stringify(laneCounts)}  ` +
+      `jevCalls=${session.stats.calls} failures=${session.stats.failures} inputTokens=${session.stats.inputTokens} ` +
+      `cost=$${(session.stats.inputTokens * USD_PER_INPUT_TOKEN).toFixed(6)}  aiAutoApply=${aiAutoApply}`,
+  );
+
   if (allProposals.length === 0) {
     console.log("Nothing to write this run.");
   } else {
     // Auto-supersede (§6.10a): any still-pending proposal from an EARLIER
     // run for the same (source, target_venue_id) is superseded by this
     // run's fresher view — a machine-vs-machine event, not a human
-    // rejection, hence 'superseded' not 'rejected'.
-    const freshKeys = new Set(allProposals.map((p) => pendingKey(p.source, p.targetVenueId)));
+    // rejection, hence 'superseded' not 'rejected'. A rename also supersedes
+    // an older pending add for its new upstream id (extraSupersedeKeys).
+    const freshKeys = new Set([
+      ...allProposals.map((p) => pendingKey(p.source, p.targetVenueId)),
+      ...triagePass.extraSupersedeKeys,
+    ]);
     const toSupersede = pendingRows.filter((r) => freshKeys.has(pendingKey(r.source as RefreshSource, r.target_venue_id)));
 
     const statements: string[] = [];
@@ -448,7 +507,7 @@ async function main(): Promise<void> {
     // check.
     let autoAppliedCount = 0;
     for (const p of allProposals) {
-      const built = buildProposalWriteStatements(p, now, sqlText);
+      const built = buildProposalWriteStatements(p, now, sqlText, { triage: triagePass.triage.get(p), aiAutoApply });
       if (built.autoApplied) autoAppliedCount++;
       statements.push(...built.statements);
     }
@@ -462,7 +521,7 @@ async function main(): Promise<void> {
 
     console.log(
       `Writing ${allProposals.length - autoAppliedCount} proposal(s) for review + ` +
-        `auto-applying ${autoAppliedCount} date-only freshness bump(s) + ` +
+        `auto-applying ${autoAppliedCount} (date-only freshness bumps${aiAutoApply ? " + AI formatting fixes" : ""}) + ` +
         `superseding ${toSupersede.length} stale pending row(s)...`,
     );
     d1ApplyFile(dbMode, sqlFile);

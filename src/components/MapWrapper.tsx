@@ -408,6 +408,7 @@ export default function MapWrapper({
     viewMode,
     setViewMode,
     mapUnavailable,
+    mapUnavailableReason,
     handleMapError,
     showVenueOnMap,
     windowExpanded,
@@ -1599,10 +1600,14 @@ export default function MapWrapper({
                 className="w-full px-4 py-3 flex items-start gap-3 bg-[var(--color-bone-100)] border-b border-[var(--color-bone-300)] text-[var(--color-ink-700)]"
               >
                 <span className="flex-1">
+                  {/* Offline (#130) gets its own copy: the map will work
+                      again with a connection, unlike a no-WebGL device. */}
                   <strong className="block text-sm font-semibold mb-0.5">
-                    {t("map.unavailableTitle", locale)}
+                    {t(mapUnavailableReason === "offline" ? "map.offlineTitle" : "map.unavailableTitle", locale)}
                   </strong>
-                  <span className="text-sm">{t("map.unavailableBody", locale)}</span>
+                  <span className="text-sm">
+                    {t(mapUnavailableReason === "offline" ? "map.offlineBody" : "map.unavailableBody", locale)}
+                  </span>
                 </span>
               </div>
             ) : undefined

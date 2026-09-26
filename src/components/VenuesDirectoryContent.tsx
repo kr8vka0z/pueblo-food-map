@@ -6,7 +6,7 @@
  * Extracted from src/app/venues/page.tsx so the directory's headings and
  * per-venue hours text read the visitor's locale via useLocale() (#289),
  * while the page itself stays a server-rendered, crawlable Server Component
- * (no cookies() read — AGENTS.md "Known bilingual limitation", #287). The
+ * (no cookies() read — ARCHITECTURE.md "Known bilingual limitation", #287). The
  * grouped-by-category data is computed server-side by groupVenuesByCategory
  * (still exported from page.tsx, pure and locale-independent) and passed in.
  */
@@ -17,7 +17,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { pageDocumentTitle } from "@/lib/site";
 import SiteFooter from "@/components/SiteFooter";
-import { DISPLAY_DAY_KEYS, formatSlot } from "@/lib/hours";
+import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
 import type { Venue, VenueCategory } from "@/types/venue";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
@@ -72,8 +72,20 @@ export default function VenuesDirectoryContent({ groups }: VenuesDirectoryConten
                     (day) =>
                       `${t(`day.${day}`, locale)} ${v.hours_weekly![day]!.map(formatSlot).join(", ")}`,
                   );
+                  // #400: a venue with ONLY hours_irregular (no weekly days)
+                  // used to fall straight to "No hours listed" — inaccurate
+                  // now that a real schedule exists for it. Falls back to the
+                  // irregular entries' prose description before "no hours."
+                  const irregularText = (v.hours_irregular ?? [])
+                    .map((entry) => describeIrregularSchedule(entry, locale, t))
+                    .filter((s) => s.length > 0)
+                    .join(" · ");
                   const hoursText =
-                    openDays.length > 0 ? openDays.join(" · ") : t("venues.noHours", locale);
+                    openDays.length > 0
+                      ? openDays.join(" · ")
+                      : irregularText.length > 0
+                        ? irregularText
+                        : t("venues.noHours", locale);
 
                   return (
                     <li key={v.id}>

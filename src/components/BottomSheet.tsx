@@ -59,7 +59,7 @@ import { X, ChevronUp, ChevronDown, MapPin, Phone, Clock, CircleHelp, ExternalLi
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
-import { computeOpenStatus } from "@/lib/hours";
+import { computeVenueOpenStatus, nextIrregularOccurrence, formatIrregularOccurrence } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
@@ -192,7 +192,8 @@ export default function BottomSheet({
   // here for that reason; `claimEscape` is called directly instead.
   const overlayId = useOverlayStackId(open);
   const isBox = venue?.category === "blessing_box";
-  const status = venue ? computeOpenStatus(venue.hours_weekly) : null;
+  const status = venue ? computeVenueOpenStatus(venue) : null;
+  const nextOccurrence = venue?.hours_irregular ? nextIrregularOccurrence(venue.hours_irregular) : null;
   const displayNotes = venue ? getDisplayNotes(venue) : undefined;
   const showStrip = isWalkRouteActive && !cardRevealed;
 
@@ -630,6 +631,12 @@ export default function BottomSheet({
                     </span>
                   )}
                 </div>
+                {/* #400: monthly-schedule next-occurrence — see VenueCard's own comment. */}
+                {!isBox && nextOccurrence && (
+                  <p className="text-sm text-[var(--color-ink-500)]">
+                    {t("hours.irregular.next", locale, { when: formatIrregularOccurrence(nextOccurrence, locale) })}
+                  </p>
+                )}
 
                 {/* Notes (2 lines max) — suppressed for OSM artifacts and
                     Plentiful's auto-generated boilerplate (src/lib/venueNotes.ts).
@@ -741,14 +748,15 @@ export default function BottomSheet({
                         </div>
                       )}
 
-                      {/* Full weekly hours table — today highlighted + aria-current */}
-                      {venue.hours_weekly && (
+                      {/* Full weekly + monthly hours (#400) — today highlighted + aria-current */}
+                      {(venue.hours_weekly || venue.hours_irregular) && (
                         <section aria-label={t("detail.hours", locale)}>
                           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
                             {t("detail.hours", locale)}
                           </h3>
                           <HoursList
                             hours_weekly={venue.hours_weekly}
+                            hours_irregular={venue.hours_irregular}
                             compact={false}
                           />
                         </section>

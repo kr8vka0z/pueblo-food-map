@@ -24,6 +24,9 @@ import type mapboxgl from "mapbox-gl";
  */
 export type ViewMode = "map" | "list";
 
+/** Why the map is replaced by the list fallback (see mapUnavailableReason). */
+export type MapUnavailableReason = "webgl" | "offline";
+
 export function useMapUI() {
   // ── Selected venue ────────────────────────────────────────────────────────────
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
@@ -35,20 +38,35 @@ export function useMapUI() {
   // Starts false so server + first client render both assume WebGL is available
   // (no hydration mismatch). A useEffect below flips it client-side only when
   // WebGL is genuinely absent.
-  const [mapUnavailable, setMapUnavailable] = useState(false);
+  //
+  // The reason only picks the notice copy (MapWrapper): "webgl" = this device
+  // can't draw the map at all; "offline" (#130) = the page opened with no
+  // connection (e.g. served by public/sw.js's cache), so Mapbox's style and
+  // tiles can't load — the list works because venue data is in the bundle.
+  const [mapUnavailableReason, setMapUnavailableReason] = useState<MapUnavailableReason | null>(null);
+  const mapUnavailable = mapUnavailableReason !== null;
 
-  const handleMapError = useCallback(() => {
-    setMapUnavailable(true);
+  const handleMapError = useCallback((reason: MapUnavailableReason = "webgl") => {
+    setMapUnavailableReason(reason);
     setViewMode("list");
   }, []);
 
   useEffect(() => {
+    // Intentional post-hydration, client-only correction: WebGL and
+    // connectivity can only be probed on the client, so we flip to the list
+    // fallback here. Synchronous (not deferred) so the suppressed map never
+    // gets an extra render frame. WebGL is checked first: it's permanent, so
+    // its message stays right after the connection comes back.
+    //
+    // ponytail: mount-time check only. Going offline mid-session is left
+    // alone (Map.tsx's onError comment: a blip must not nuke a working map),
+    // and coming back online doesn't re-enable the map until a reload.
+    // Upgrade path: an `online` listener that clears an "offline" reason.
     if (!isWebGLAvailable()) {
-      // Intentional post-hydration, client-only correction: WebGL can only be
-      // probed on the client, so we flip to the list fallback here. Synchronous
-      // (not deferred) so the suppressed map never gets an extra render frame.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      handleMapError();
+      handleMapError("webgl");
+    } else if (!navigator.onLine) {
+      handleMapError("offline");
     }
   }, [handleMapError]);
 
@@ -71,6 +89,7 @@ export function useMapUI() {
     viewMode,
     setViewMode,
     mapUnavailable,
+    mapUnavailableReason,
     handleMapError,
     showVenueOnMap,
     windowExpanded,

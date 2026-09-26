@@ -30,7 +30,7 @@
  *   - Menu items: role="menuitem" (delegated to HamburgerMenuItem).
  *   - Mobile backdrop: aria-hidden="true" (decorative overlay).
  *
- * v1 items: "Suggest a venue" → /suggest
+ * v1 items: "Suggest a place" → /suggest
  */
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
@@ -322,7 +322,7 @@ export default function HamburgerMenu({
           style={{
             position: "fixed",
             inset: 0,
-            backgroundColor: "rgba(0,0,0,0.4)",
+            backgroundColor: "rgba(26,24,23,0.4)",
             zIndex: 1001,
           }}
           onClick={close}
@@ -478,7 +478,7 @@ export default function HamburgerMenu({
                     icon={<RotateCcw size={14} />}
                   />
                 )}
-                {/* Suggest a venue (#71). onClick={close}: a next/link to the
+                {/* Suggest a place (#71). onClick={close}: a next/link to the
                     page you're already on doesn't navigate, so without this
                     tapping a link item while on that same route left the
                     drawer open with body scroll locked (review item 2). */}
@@ -502,7 +502,7 @@ export default function HamburgerMenu({
                   onClick={close}
                   icon={<Info size={14} />}
                 />
-                {/* Browse all venues (#PR4) — internal link to the full directory */}
+                {/* Browse all places (#PR4) — internal link to the full directory */}
                 <HamburgerMenuItem
                   label={t("nav.venuesList", locale)}
                   href="/venues"

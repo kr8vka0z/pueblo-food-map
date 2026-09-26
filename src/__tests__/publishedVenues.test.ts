@@ -3,21 +3,20 @@
  *
  * published-venues.ts is regenerated from Cloudflare D1 on every publish, so
  * this file no longer pins its exact contents (that was a one-time #237
- * extraction proof, now discharged). What it still guards: the benefit-flag
- * overlay wiring in venues.ts, the seed-array split, the pfpVenues re-export
- * matching its leaf module, and the untouched category maps.
+ * extraction proof, now discharged). What it still guards: that venues.ts
+ * exposes publishedVenues unchanged (#597 — the old benefit-flag overlay is
+ * gone, D1 is the sole SNAP/WIC source), the seed-array split, the pfpVenues
+ * re-export matching its leaf module, and the untouched category maps.
  */
 
 import { describe, test, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Venue } from "@/types/venue";
 import { venues, pfpVenues, categoryLabels, categoryColors, categoryIcon } from "@/data/venues";
 import { publishedVenues, publishedAt } from "@/data/published-venues";
 import { serializePublishedVenuesFile } from "@/lib/publishVenues";
 import { groceryOsmVenues } from "@/data/grocery-osm";
 import { plentifulPantries } from "@/data/pantries-plentiful";
-import { benefitFlags } from "@/data/benefit-flags";
 
 describe("venues data-layer invariants", () => {
   // The data_only carve-out (ci.yml / weekly-security-audit.yml #336) skips
@@ -45,41 +44,19 @@ describe("venues data-layer invariants", () => {
     expect(raw).toBe(serializePublishedVenuesFile(publishedVenues, { publishedAt }));
   });
 
-  test("venues applies the benefit-flag overlay on top of publishedVenues, NULL-guarded so an admin D1 edit wins (#597, #238)", () => {
-    // venues.ts builds `venues` as publishedVenues.map(overlay); this pins that
-    // wiring. Anchored to publishedVenues (not the seed spread) so it stays
-    // valid after an admin publish regenerates published-venues.ts from D1.
-    // NULL-guarded per column, matching venues.ts's own logic: the overlay
-    // fills a field only when the published value is `undefined` (D1 NULL);
-    // an explicit non-undefined value (an admin edit that survived a
-    // publish) is never overwritten.
-    const expected: Venue[] = publishedVenues.map((v) => {
-      const f = benefitFlags[v.id];
-      if (!f) return v;
-      return {
-        ...v,
-        accepts_snap: v.accepts_snap === undefined ? f.snap : v.accepts_snap,
-        accepts_wic: v.accepts_wic === undefined ? f.wic : v.accepts_wic,
-      };
-    });
-    expect(JSON.stringify(venues)).toBe(JSON.stringify(expected));
-  });
-
-  test("venues overlay lets an explicit D1 accepts_snap/accepts_wic value win over benefit-flags.ts (#238 'admin edits win')", () => {
-    // Direct behavioral proof, independent of the wiring-pins-itself test
-    // above (that test would pass even with a bug shared between venues.ts
-    // and its own re-implementation here). Picks a real overlay-covered id
-    // and asserts the NULL-guard both fills a genuinely-unset field and
-    // preserves an already-set one.
-    const overlayId = Object.keys(benefitFlags)[0];
-    const publishedRow = publishedVenues.find((v) => v.id === overlayId);
-    expect(publishedRow).toBeDefined();
-    // Today's published-venues.ts has no accepts_snap/accepts_wic for OSM
-    // rows yet (0014 hasn't landed on prod + been published) — this proves
-    // the overlay still fills in that case.
-    expect(publishedRow!.accepts_snap).toBeUndefined();
-    const resolved = venues.find((v) => v.id === overlayId);
-    expect(resolved!.accepts_snap).toBe(benefitFlags[overlayId].snap);
+  test("venues is publishedVenues directly — no runtime overlay, D1 is the sole SNAP/WIC source (#597)", () => {
+    // The old benefit-flags.ts overlay is deleted; venues.ts now just
+    // re-exports publishedVenues. Pins that wiring (identity, not a copy) so
+    // a future edit can't silently reintroduce a transform here, and that
+    // SNAP/WIC fields on `venues` always equal published-venues.ts's own —
+    // no separate flag source left to drift out of sync.
+    expect(venues).toBe(publishedVenues);
+    expect(venues.filter((v) => v.accepts_snap).length).toBe(
+      publishedVenues.filter((v) => v.accepts_snap).length,
+    );
+    expect(venues.filter((v) => v.accepts_wic).length).toBe(
+      publishedVenues.filter((v) => v.accepts_wic).length,
+    );
   });
 
   test("seed arrays total 106 records: 10 pfp + 60 osm + 36 plentiful", () => {

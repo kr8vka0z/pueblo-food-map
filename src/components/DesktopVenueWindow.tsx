@@ -66,7 +66,7 @@ interface MapboxMap {
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
-import { computeOpenStatus } from "@/lib/hours";
+import { computeVenueOpenStatus, nextIrregularOccurrence, formatIrregularOccurrence } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
@@ -224,7 +224,8 @@ export default function DesktopVenueWindow({
   const windowW = expanded || isBox ? WINDOW_EXPANDED_W : WINDOW_QUICK_W;
   const windowH = expanded || isBox ? WINDOW_EXPANDED_H : WINDOW_QUICK_H;
 
-  const status = computeOpenStatus(venue.hours_weekly);
+  const status = computeVenueOpenStatus(venue);
+  const nextOccurrence = venue.hours_irregular ? nextIrregularOccurrence(venue.hours_irregular) : null;
   const displayNotes = getDisplayNotes(venue);
 
   // ── Position computation ─────────────────────────────────────────────────
@@ -410,6 +411,12 @@ export default function DesktopVenueWindow({
           </span>
         )}
       </div>
+      {/* #400: monthly-schedule next-occurrence — see VenueCard's own comment. */}
+      {nextOccurrence && (
+        <p className="text-xs text-[var(--color-ink-500)]">
+          {t("hours.irregular.next", locale, { when: formatIrregularOccurrence(nextOccurrence, locale) })}
+        </p>
+      )}
 
       {/* Notes (2 lines max) — suppressed for OSM artifacts and Plentiful's
           auto-generated boilerplate (src/lib/venueNotes.ts) */}
@@ -504,14 +511,15 @@ export default function DesktopVenueWindow({
         </div>
       )}
 
-      {/* Hours table */}
-      {venue.hours_weekly && (
+      {/* Hours table (weekly + monthly, #400) */}
+      {(venue.hours_weekly || venue.hours_irregular) && (
         <section aria-label={t("detail.hours", locale)}>
           <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
             {t("detail.hours", locale)}
           </h3>
           <HoursList
             hours_weekly={venue.hours_weekly}
+            hours_irregular={venue.hours_irregular}
             compact={true}
           />
         </section>

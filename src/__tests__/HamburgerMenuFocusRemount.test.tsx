@@ -12,12 +12,21 @@
  */
 import { useState } from "react";
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import BottomNav, { type MenuSection } from "@/components/BottomNav";
 import type { GeoState } from "@/lib/useGeolocation";
 
 const GEO_IDLE: GeoState = { permission: "prompt", position: null };
+
+// useMediaQuery syncs `isMobile` on a setTimeout(0) after mount, so a click
+// fired straight after render() opens the DESKTOP Menu (which never hides
+// BottomNav) — the source of this file's intermittent CI failure. Let that
+// timer fire first, as it always has by the time a real user can tap.
+async function renderSettled() {
+  render(<MapPageHarness />);
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+}
 
 function MapPageHarness() {
   const [openSection, setOpenSection] = useState<MenuSection | null>(null);
@@ -61,7 +70,7 @@ beforeEach(() => {
 
 describe("#545 — focus after the mobile Menu closes and BottomNav remounts", () => {
   test("Escape: focus lands back on the (rebuilt) Menu nav item, not <body>", async () => {
-    render(<MapPageHarness />);
+    await renderSettled();
 
     fireEvent.click(screen.getByTestId("nav-top"));
     await waitFor(() => expect(screen.getByRole("menu")).toBeDefined());
@@ -78,7 +87,7 @@ describe("#545 — focus after the mobile Menu closes and BottomNav remounts", (
   });
 
   test("X-button close: focus lands back on the (rebuilt) Menu nav item, not <body>", async () => {
-    render(<MapPageHarness />);
+    await renderSettled();
 
     fireEvent.click(screen.getByTestId("nav-top"));
     await waitFor(() => expect(screen.getByRole("menu")).toBeDefined());
@@ -93,7 +102,7 @@ describe("#545 — focus after the mobile Menu closes and BottomNav remounts", (
   });
 
   test("Saved view: focus lands back on the rebuilt nav-saved item", async () => {
-    render(<MapPageHarness />);
+    await renderSettled();
 
     fireEvent.click(screen.getByTestId("nav-saved"));
     await waitFor(() => expect(screen.getByRole("button", { name: /close menu/i })).toBeDefined());

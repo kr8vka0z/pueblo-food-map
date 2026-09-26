@@ -125,7 +125,6 @@ async function authorizeEditRequest(headers: HeaderSource): Promise<AdminDbAcces
   return access;
 }
 
-
 /** Mirrors readOptionalSubmissionId's convention in the sibling create/archive routes. */
 function readOptionalProposalId(body: unknown): number | null {
   const raw = (body as { proposalId?: unknown })?.proposalId;
@@ -161,6 +160,7 @@ function buildVenueUpdateValues(
     fields.lng,
     fields.address,
     fields.hoursWeeklyJson,
+    fields.hoursIrregularJson,
     fields.acceptsSnap,
     fields.acceptsWic,
     fields.phone,
@@ -200,6 +200,7 @@ function buildAfterRow(
     lng: fields.lng,
     address: fields.address,
     hours_weekly: fields.hoursWeeklyJson,
+    hours_irregular: fields.hoursIrregularJson,
     accepts_snap: fields.acceptsSnap,
     accepts_wic: fields.acceptsWic,
     phone: fields.phone,

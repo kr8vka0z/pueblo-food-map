@@ -11,7 +11,7 @@ import staticAssetsIncrementalCache from "@opennextjs/cloudflare/overrides/incre
 // — acceptable here because nothing in src/ calls revalidate/unstable_cache/
 // cacheTag; the publish flow already redeploys on every data change.
 // Outage: pueblofoodmap.com 404s on 218/230 public URLs, 2026-08-24 to
-// 2026-09-02 (10 days, 19 deploys). See AGENTS.md "Per-venue pages".
+// 2026-09-02 (10 days, 19 deploys). See AGENTS.md "Discoverability / SEO".
 export default defineCloudflareConfig({
   incrementalCache: staticAssetsIncrementalCache,
 });

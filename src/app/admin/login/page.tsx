@@ -2,7 +2,7 @@
  * /admin/login — Better Auth login page (#315 Phase 2).
  *
  * Pre-auth entry point: unlike every other page under /admin/**, this one
- * does NOT call getAdminDb() / verify Cloudflare Access — an unauthenticated
+ * does NOT call getAdminDb() — an unauthenticated
  * visitor must be able to reach it at all. No metadata export, matching
  * every other admin page's convention (robots.ts already disallows /admin/
  * entirely — see AGENTS.md's Discoverability section — so no page under

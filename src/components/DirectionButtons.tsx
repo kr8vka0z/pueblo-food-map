@@ -270,9 +270,9 @@ function TurnGlyph({
 // walking-while-glancing-at-the-phone use case this stepper is built for.
 const stepNavClass =
   "flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-md)] " +
-  "bg-[var(--color-sage-500)] text-[var(--color-bone-50)] " +
+  "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
   "disabled:bg-[var(--color-bone-200)] disabled:text-[var(--color-ink-400)] " +
-  "hover:enabled:bg-[var(--color-sage-600)] " +
+  "hover:enabled:bg-[var(--color-sage-700)] " +
   PRESS_FEEDBACK + " " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-1";
 
@@ -650,7 +650,7 @@ const walkActiveClass =
 
 const walkInactiveClass =
   baseClass +
-  " bg-[var(--color-sage-500)] text-[var(--color-bone-50)] hover:bg-[var(--color-sage-600)]";
+  " bg-[var(--color-sage-600)] text-[var(--color-bone-50)] hover:bg-[var(--color-sage-700)]";
 
 // #534: --color-bone-400 undefined — the bone scale stops at bone-300, so a
 // hover-darkened border steps into the ink family instead, reusing the same

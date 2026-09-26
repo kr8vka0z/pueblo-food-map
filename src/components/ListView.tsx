@@ -67,7 +67,7 @@ export default function ListView({
               <button
                 type="button"
                 onClick={onClearFilters}
-                className="px-4 h-12 rounded-[var(--radius-md)] bg-[var(--color-sage-500)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-600)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
+                className="px-4 h-12 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
               >
                 {t("empty.clear", locale)}
               </button>

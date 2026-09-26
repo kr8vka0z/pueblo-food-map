@@ -20,6 +20,35 @@ export type WeeklyHours = Partial<
   Record<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun", string[]>
 >;
 
+export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+/**
+ * Non-weekly recurrences `hours_weekly` cannot express (#400) — e.g. "4th
+ * Tuesday of each month, 11:00 AM – 12:00 PM," the real shape 3 of the 35
+ * live Pueblo Plentiful pantries use. Stored in the `hours_irregular` JSON
+ * column ALONGSIDE `hours_weekly` (migrations/0015_venue_hours_irregular.sql)
+ * — never replacing it: a venue (e.g. Lynn Gardens Baptist Church) can
+ * legitimately have both a weekly recurrence and a separate monthly special.
+ *
+ * `slots` reuses `hours_weekly`'s own slot-string format (parsed/formatted
+ * by src/lib/hours.ts's shared parseSlot/formatSlot) so both schedule kinds
+ * render through identical time-formatting code — no second time parser.
+ */
+export interface IrregularSchedule {
+  /** "monthly_ordinal": e.g. 4th Tuesday. "monthly_date": a fixed day-of-month. "other": prose-only via `note`. */
+  recurrence: "monthly_ordinal" | "monthly_date" | "other";
+  /** Required (and only meaningful) when recurrence === "monthly_ordinal". "last" covers a month's final occurrence of `weekday`, whatever date that lands on. */
+  ordinal?: 1 | 2 | 3 | 4 | 5 | "last";
+  /** Required when recurrence === "monthly_ordinal". */
+  weekday?: DayKey;
+  /** Required (and only meaningful) when recurrence === "monthly_date". 1-31; a value past the month's real length is skipped for that month (see src/lib/hours.ts). */
+  day_of_month?: number;
+  /** Same format as WeeklyHours' per-day slot arrays, e.g. ["11:00-12:00"]. */
+  slots: string[];
+  /** Free-text fallback, required for recurrence === "other" (e.g. "3rd weekend, call ahead"); optional annotation otherwise. */
+  note?: string;
+}
+
 export interface Venue {
   id: string;
   name: string;
@@ -28,6 +57,8 @@ export interface Venue {
   lng: number;
   address: string;
   hours_weekly?: WeeklyHours;
+  /** Non-weekly schedules (monthly-ordinal, etc.) — see IrregularSchedule's own doc comment. Always ALONGSIDE hours_weekly, never a replacement. */
+  hours_irregular?: IrregularSchedule[];
   accepts_snap?: boolean;
   accepts_wic?: boolean;
   phone?: string;
@@ -53,8 +84,8 @@ export interface Venue {
 // pipeline. This file has zero imports today (every data source in this
 // app conforms to it, never the reverse) — importing VenueRow from a
 // lib/ module here would risk a circular import the moment that module
-// ever imports something from this one (see ARCHITECTURE.md's note on why
-// pfp-venues.ts had to move out of venues.ts for the same reason). A few
+// ever imports something from this one (see src/data/pfp-venues.ts's header
+// on why it had to move out of venues.ts for the same reason). A few
 // duplicated field names is cheaper than that failure mode.
 
 /** Mirrors the `venues.status` CHECK constraint (migrations/0001_init_admin_schema.sql). */
@@ -78,6 +109,8 @@ export interface AdminVenueRow {
   lng: number;
   address: string;
   hours_weekly: string | null;
+  /** JSON-encoded IrregularSchedule[] (nullable) — migrations/0015_venue_hours_irregular.sql. */
+  hours_irregular: string | null;
   accepts_snap: number | null;
   accepts_wic: number | null;
   phone: string | null;

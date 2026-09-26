@@ -274,9 +274,10 @@ default state (no venue selected):
 
 ```
 y=0   ┌─────────────────────────────────────┐
-      │ SearchBar: 328×44 @ (16,16)          │  ← top, safe-area-inset-top aware
-      │   + Filters icon 44×44 @ (300,16)    │     (SearchBar.tsx: env(safe-area-inset-top))
-y=76  ├─────────────────────────────────────┤
+      │ SearchBar: 328×48 @ (16,16)          │  ← top, safe-area-inset-top aware
+      │   + Filters icon 44×44 @ (300,18),   │     (SearchBar.tsx: env(safe-area-inset-top))
+      │     48×48 tap area via ::before      │
+y=80  ├─────────────────────────────────────┤
       │                                       │
       │         live Mapbox canvas           │  ← DO NOT add floating buttons here.
       │    (pan/zoom/pin-tap owns this area) │     The old top-center `LocateButton` at
@@ -297,9 +298,11 @@ y=729 └───────────────────────�
   Mapbox attribution.
 - **The two zones that are actually free:** (1) inside the existing SearchBar row,
   to the right of the Filters icon, if a control is genuinely search-related — same
-  pattern as the Filters button's own inline placement. The row is 44px tall, so the
-  control's visual stays 44px and its tap area must be extended to 48×48 with an
-  invisible `::before` overlay (the rule above), not by growing the bar; (2) inside BottomNav as a
+  pattern as the Filters button's own inline placement. The row is 48px tall on
+  phones (the #233 audit grew the `<input>` from 44 — an input can't carry a
+  `::before` overlay, so the bar itself had to reach the floor); keep the new
+  control's visual at 44px like Filters and extend its tap area to 48×48 with an
+  invisible `::before` overlay (the rule above), not by growing the bar further; (2) inside BottomNav as a
   6th labelled item, accepting narrower cells (the 5-item bar already narrowed
   cells to ~57–67px when Boxes was added, #516 — measured then against the old 44px
   floor; ~57px still clears the new 48px one down to ~320px viewports). A brand-new floating pill anywhere else on the map is a
@@ -351,7 +354,7 @@ Section headers in detail cards (hours, contact, about) are 10–11px uppercase 
 The spacing scale is a 4px base grid: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 px. Most inter-element gaps and component padding land on 16px or 24px.
 
 The Mapbox canvas fills the entire viewport — there is no persistent sidebar. Persistent chrome at default state:
-- Search bar: floating pill, full-width minus 16px margins mobile / 520px centered desktop, 44px tall mobile / 52px desktop, nothing on its right end (#514 removed the inline Map/List switch that used to live there — see ViewSuggestion below)
+- Search bar: floating pill, full-width minus 16px margins mobile / 520px centered desktop, 48px tall mobile (44 before the #233 touch-target audit) / 52px desktop, nothing on its right end (#514 removed the inline Map/List switch that used to live there — see ViewSuggestion below)
 - BottomNav (docs/bottom-nav-spec.md): Near me · Saved · Boxes · Help · Menu (Help — renamed from Resources, #516 — links to the `/resources` page; Boxes toggles the blessing_box category filter, raspberry `--color-cat-blessing` when on; Saved opens the drawer showing only saved places — or a "No saved places yet" empty state — and Menu opens it showing the menu). Below `2xl` (1536px) a 64px floating `bone-50` pill, 12px in from the sides and `calc(env(safe-area-inset-bottom) + 12px)` up from the bottom (globals.css — #541: measured on a real iPhone, a `position: fixed; bottom: 0` element already clears the browser toolbar in Safari and Chrome, collapsed or expanded, so no toolbar reserve is added on top; #530/#536's `100vh - 100dvh` reserve did, and lifted the pill 40-74px too high), `bone-300` border, full radius — matching the search bar (icon above a 12px/700 label, `ink-500` / `brand-navy` when its panel is open); at `2xl`+ a white pill floating bottom-centre, 24px up
 - Mapbox credits: bottom-right, one row — compact "i" then the logo at 65×20 (the smallest size Mapbox's attribution guide lists) — lifted 8px above the pill below `2xl`, derived from the pill's own real position (`env(safe-area-inset-bottom)` + `--bottom-nav-clearance` + 8px, #541) so the logo/"i" are never covered regardless of toolbar state
 - Sponsor credit: not on the map. "Sponsored by Pueblo Food Project" is a sage card at the top of the Menu drawer, linking to pueblofoodproject.org in a new tab (no splash credit since 2026-09-16)
@@ -403,7 +406,7 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **SnapWicPill** (benefit indicator): `sage-100` bg, `sage-700` text, `rounded` (sm radius), `px-2 py-0.5 text-xs font-medium`. Calm, not urgent — sage reads "civic info," not "alert."
 
-**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. The magnifier (plain Lucide `Search` icon, `ink-400`, 16px mobile / 18px desktop) sits at the left, always. The **Filters control** (#539, mockup C — supersedes #513/#528/#529's round bordered button with a corner-overlapping badge) sits at the right end, inline with the bar rather than looking like a separate button: no background, no border, just the three-bar icon (`ink-500` at rest, `sage-600` when one or more filters are on, 20px) with a 1px `bone-200` hairline divider on its left (inset 12px top/bottom) marking it off from the input. When filters are on, an `orange`/`navy` count pill (min 19×19, fully rounded, 11px bold — see the orange-usage exception above) appears BESIDE the icon in normal flow, never overlapping it. 44px tall; its own padding keeps the tap area at least 44px wide in every state. The input reserves right padding sized for the widest (count-present) state so typed text never reflows when a filter toggles; with no `filtersButton` prop at all, the bar ends in plain `pr-4` typing room (#514 removed the inline Map/List `ViewToggle` that used to occupy that space).
+**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. The magnifier (plain Lucide `Search` icon, `ink-400`, 16px mobile / 18px desktop) sits at the left, always. The **Filters control** (#539, mockup C — supersedes #513/#528/#529's round bordered button with a corner-overlapping badge) sits at the right end, inline with the bar rather than looking like a separate button: no background, no border, just the three-bar icon (`ink-500` at rest, `sage-600` when one or more filters are on, 20px) with a 1px `bone-200` hairline divider on its left (inset 12px top/bottom) marking it off from the input. When filters are on, an `orange`/`navy` count pill (min 19×19, fully rounded, 11px bold — see the orange-usage exception above) appears BESIDE the icon in normal flow, never overlapping it. 44px tall; its own padding keeps the box at least 44px wide in every state, and a 2px-all-round invisible `::before` overlay takes the tap area to 48×48 (#233). The input reserves right padding sized for the widest (count-present) state so typed text never reflows when a filter toggles; with no `filtersButton` prop at all, the bar ends in plain `pr-4` typing room (#514 removed the inline Map/List `ViewToggle` that used to occupy that space).
 
 **FilterPanel** (#513, replaces the old search-focus CategoryDropdown): `bone-50` full-height side panel sliding in from the left, `85vw` capped at `360px`, opened by SearchBar's Filters button — not tied to search focus. Header: title, `sage-600` "Clear all" text button, `×` close (`ink-500`, `bone-100` hover). Body: "Show only" section with three `role="switch"` rows (`sage-600` track when on, `bone-300` off) for Open now/SNAP/WIC, then "Kind of place" — 8 checkboxes, each with a 10px category-accent dot, allowing several at once. Footer: the one `orange`/`navy` "Show N places" button — a live count, and the panel's only close-and-commit action (checking a box already applies live; this just closes). Backdrop `rgba(26,24,23,0.4)`. Closes via ×, Escape, backdrop tap, or swipe-left. Same layout at every width (no separate desktop treatment).
 

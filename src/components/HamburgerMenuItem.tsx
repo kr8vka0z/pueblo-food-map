@@ -43,7 +43,8 @@ export default function HamburgerMenuItem({
   icon,
 }: HamburgerMenuItemProps) {
   const itemClass =
-    "flex items-center gap-2 w-full text-left px-5 py-3 text-sm font-medium " +
+    // min-h-12: #233's 48px floor (py-3 alone gave 44).
+    "flex items-center gap-2 w-full min-h-12 text-left px-5 py-3 text-sm font-medium " +
     // #534: --color-ink-800 undefined in globals.css @theme — DESIGN.md
     // documents ink-700 for general body/heading text; ink-900 (the hover
     // state below) is reserved for venue-name headings elsewhere, reused

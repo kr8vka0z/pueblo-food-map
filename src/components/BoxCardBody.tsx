@@ -368,7 +368,8 @@ export default function BoxCardBody({
             >
               {t("category.full.blessing_box", locale)}
             </span>
-            {actions && <div className="flex shrink-0 items-center gap-0.5">{actions}</div>}
+            {/* gap-4 keeps 8px between the actions' 48px hit areas (#233). */}
+            {actions && <div className="flex shrink-0 items-center gap-4">{actions}</div>}
           </div>
           <NameTag
             id={nameId}

@@ -113,6 +113,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Dev-only: lets `next dev` accept hot-reload requests from Kyle's Mac's
+  // private tailnet address, so a local change can be checked on his iPhone
+  // over https (`tailscale serve --bg 3000`) — https is what lets "find food
+  // near me" ask for location. Next blocks dev resources from unlisted hosts;
+  // this setting does nothing in production builds.
+  allowedDevOrigins: ["kyles-macbook-air.tail433d07.ts.net"],
   // Required for next/navigation's forbidden() (used by src/app/admin/page.tsx,
   // #237 checkpoint c) — still an experimental API on this Next version; the
   // flag opts in per next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/authInterrupts.md.

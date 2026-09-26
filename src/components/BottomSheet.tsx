@@ -787,7 +787,9 @@ export default function BottomSheet({
                           target="_blank"
                           rel="noopener noreferrer"
                           className={
-                            "flex items-center justify-between gap-2 w-full px-4 py-3 " +
+                            // min-h-12: one line of text + py-3 is 46px on
+                            // wide phones; #233's floor is 48 (#659).
+                            "flex items-center justify-between gap-2 w-full min-h-12 px-4 py-3 " +
                             // #534: --color-sage-300 undefined in
                             // globals.css @theme — sage-500 is DESIGN.md's
                             // own documented border for this exact chip

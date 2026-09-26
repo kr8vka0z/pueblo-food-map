@@ -273,6 +273,18 @@ describe("Venue card controls", () => {
       expect.arrayContaining(["relative", "before:absolute", "before:inset-x-0", "before:-inset-y-0.5"]),
     );
   });
+
+  test("BottomSheet Plentiful link is at least 48px tall even on one line", async () => {
+    const user = userEvent.setup();
+    render(
+      <BottomSheet
+        venue={makeVenue({ source: "plentiful", url: "https://pantry.plentifulapp.com/p/1" })}
+        onClose={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /Show details/ }));
+    expect(classes(screen.getByRole("link", { name: /on Plentiful/ }))).toContain("min-h-12");
+  });
 });
 
 describe("Share/Save rows elsewhere keep 8px between the enlarged hit areas", () => {

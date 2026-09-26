@@ -68,3 +68,7 @@ scripts/generated/
 # Local ops secret-reference map -- keeps op:// paths out of this public repo
 OPS-SECRETS.local.md
 *.local.md
+
+# Scratch Playwright measuring harness (#233/#659) -- never committed, see
+# the touch-target audit PR description for how it was driven.
+/.audit-233/

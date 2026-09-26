@@ -274,9 +274,10 @@ default state (no venue selected):
 
 ```
 y=0   ┌─────────────────────────────────────┐
-      │ SearchBar: 328×44 @ (16,16)          │  ← top, safe-area-inset-top aware
-      │   + Filters icon 44×44 @ (300,16)    │     (SearchBar.tsx: env(safe-area-inset-top))
-y=76  ├─────────────────────────────────────┤
+      │ SearchBar: 328×48 @ (16,16)          │  ← top, safe-area-inset-top aware
+      │   + Filters icon 44×44 @ (300,18),   │     (SearchBar.tsx: env(safe-area-inset-top))
+      │     48×48 tap area via ::before      │
+y=80  ├─────────────────────────────────────┤
       │                                       │
       │         live Mapbox canvas           │  ← DO NOT add floating buttons here.
       │    (pan/zoom/pin-tap owns this area) │     The old top-center `LocateButton` at
@@ -297,9 +298,11 @@ y=729 └───────────────────────�
   Mapbox attribution.
 - **The two zones that are actually free:** (1) inside the existing SearchBar row,
   to the right of the Filters icon, if a control is genuinely search-related — same
-  pattern as the Filters button's own inline placement. The row is 44px tall, so the
-  control's visual stays 44px and its tap area must be extended to 48×48 with an
-  invisible `::before` overlay (the rule above), not by growing the bar; (2) inside BottomNav as a
+  pattern as the Filters button's own inline placement. The row is 48px tall on
+  phones (the #233 audit grew the `<input>` from 44 — an input can't carry a
+  `::before` overlay, so the bar itself had to reach the floor); keep the new
+  control's visual at 44px like Filters and extend its tap area to 48×48 with an
+  invisible `::before` overlay (the rule above), not by growing the bar further; (2) inside BottomNav as a
   6th labelled item, accepting narrower cells (the 5-item bar already narrowed
   cells to ~57–67px when Boxes was added, #516 — measured then against the old 44px
   floor; ~57px still clears the new 48px one down to ~320px viewports). A brand-new floating pill anywhere else on the map is a
@@ -351,7 +354,7 @@ Section headers in detail cards (hours, contact, about) are 10–11px uppercase 
 The spacing scale is a 4px base grid: 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 px. Most inter-element gaps and component padding land on 16px or 24px.
 
 The Mapbox canvas fills the entire viewport — there is no persistent sidebar. Persistent chrome at default state:
-- Search bar: floating pill, full-width minus 16px margins mobile / 520px centered desktop, 44px tall mobile / 52px desktop, nothing on its right end (#514 removed the inline Map/List switch that used to live there — see ViewSuggestion below)
+- Search bar: floating pill, full-width minus 16px margins mobile / 520px centered desktop, 48px tall mobile (44 before the #233 touch-target audit) / 52px desktop, nothing on its right end (#514 removed the inline Map/List switch that used to live there — see ViewSuggestion below)
 - BottomNav (docs/bottom-nav-spec.md): Near me · Saved · Boxes · Help · Menu (Help — renamed from Resources, #516 — links to the `/resources` page; Boxes toggles the blessing_box category filter, raspberry `--color-cat-blessing` when on; Saved opens the drawer showing only saved places — or a "No saved places yet" empty state — and Menu opens it showing the menu). Below `2xl` (1536px) a 64px floating `bone-50` pill, 12px in from the sides and `calc(env(safe-area-inset-bottom) + 12px)` up from the bottom (globals.css — #541: measured on a real iPhone, a `position: fixed; bottom: 0` element already clears the browser toolbar in Safari and Chrome, collapsed or expanded, so no toolbar reserve is added on top; #530/#536's `100vh - 100dvh` reserve did, and lifted the pill 40-74px too high), `bone-300` border, full radius — matching the search bar (icon above a 12px/700 label, `ink-500` / `brand-navy` when its panel is open); at `2xl`+ a white pill floating bottom-centre, 24px up
 - Mapbox credits: bottom-right, one row — compact "i" then the logo at 65×20 (the smallest size Mapbox's attribution guide lists) — lifted 8px above the pill below `2xl`, derived from the pill's own real position (`env(safe-area-inset-bottom)` + `--bottom-nav-clearance` + 8px, #541) so the logo/"i" are never covered regardless of toolbar state
 - Sponsor credit: not on the map. "Sponsored by Pueblo Food Project" is a sage card at the top of the Menu drawer, linking to pueblofoodproject.org in a new tab (no splash credit since 2026-09-16)
@@ -415,7 +418,7 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **SnapWicPill** (benefit indicator): `sage-100` bg, `sage-700` text, `rounded` (sm radius), `px-2 py-0.5 text-xs font-medium`. Calm, not urgent — sage reads "civic info," not "alert."
 
-**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. The magnifier (plain Lucide `Search` icon, `ink-400`, 16px mobile / 18px desktop) sits at the left, always. The **Filters control** (#539, mockup C — supersedes #513/#528/#529's round bordered button with a corner-overlapping badge) sits at the right end, inline with the bar rather than looking like a separate button: no background, no border, just the three-bar icon (`ink-500` at rest, `sage-600` when one or more filters are on, 20px) with a 1px `bone-200` hairline divider on its left (inset 12px top/bottom) marking it off from the input. When filters are on, an `orange`/`navy` count pill (min 19×19, fully rounded, 11px bold — see the orange-usage exception above) appears BESIDE the icon in normal flow, never overlapping it. 44px tall; its own padding keeps the tap area at least 44px wide in every state. The input reserves right padding sized for the widest (count-present) state so typed text never reflows when a filter toggles; with no `filtersButton` prop at all, the bar ends in plain `pr-4` typing room (#514 removed the inline Map/List `ViewToggle` that used to occupy that space).
+**SearchBar**: `bone-50` bg, `bone-300` border at rest, `rounded-full` (pill), `elevation-1`. On focus: border → `sage-500`, ring → `rgba(74,132,102,0.15)`. The magnifier (plain Lucide `Search` icon, `ink-400`, 16px mobile / 18px desktop) sits at the left, always. The **Filters control** (#539, mockup C — supersedes #513/#528/#529's round bordered button with a corner-overlapping badge) sits at the right end, inline with the bar rather than looking like a separate button: no background, no border, just the three-bar icon (`ink-500` at rest, `sage-600` when one or more filters are on, 20px) with a 1px `bone-200` hairline divider on its left (inset 12px top/bottom) marking it off from the input. When filters are on, an `orange`/`navy` count pill (min 19×19, fully rounded, 11px bold — see the orange-usage exception above) appears BESIDE the icon in normal flow, never overlapping it. 44px tall; its own padding keeps the box at least 44px wide in every state, and a 2px-all-round invisible `::before` overlay takes the tap area to 48×48 (#233). The input reserves right padding sized for the widest (count-present) state so typed text never reflows when a filter toggles; with no `filtersButton` prop at all, the bar ends in plain `pr-4` typing room (#514 removed the inline Map/List `ViewToggle` that used to occupy that space).
 
 **FilterPanel** (#513, replaces the old search-focus CategoryDropdown): `bone-50` full-height side panel sliding in from the left, `85vw` capped at `360px`, opened by SearchBar's Filters button — not tied to search focus. Header: title, `sage-600` "Clear all" text button, `×` close (`ink-500`, `bone-100` hover). Body: "Show only" section with three `role="switch"` rows (`sage-600` track when on, `bone-300` off) for Open now/SNAP/WIC, then "Kind of place" — 8 checkboxes, each with a 10px category-accent dot, allowing several at once. Footer: the one `orange`/`navy` "Show N places" button — a live count, and the panel's only close-and-commit action (checking a box already applies live; this just closes). Backdrop `rgba(26,24,23,0.4)`. Closes via ×, Escape, backdrop tap, or swipe-left. Same layout at every width (no separate desktop treatment).
 
@@ -435,11 +438,11 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **BottomNav**: see docs/bottom-nav-spec.md for geometry and stacking order (the fade band that spec once described was deleted with the bottom-nav rework — `.nav-fade-band` no longer exists in globals.css).
 
-**Menu** (`HamburgerMenu`, opened from BottomNav's Menu): below `md` a full-height sheet from the right, `80vw` capped at 384px, over the Menu backdrop (see Layering), with the bottom nav unmounted while it's open; `md` and up a 280px dropdown from the top-right corner. Rows (`HamburgerMenuItem`): `px-5 py-3` (≈44px tall — see Known deviations), `text-sm font-medium ink-700`, `bone-100` hover, inset sage focus ring, and a trailing 14px `ink-400` icon naming the destination (`List`/`Map` view switch, `RotateCcw` replay intro, `MapPinPlus` suggest, `MessageSquare` feedback, `Info` about, `List` browse all places — the one icon used twice, `History` box activity, `HandHelping` help). First item is the sponsor card: `sage-100` fill, `sage-500` border (`sage-700` on hover), `radius-lg`, an 11px uppercase `ink-500` "Sponsored by" over `text-base font-semibold sage-700` "Pueblo Food Project", opening in a new tab. The same drawer also renders the Saved view (see Loading, empty and error states).
+**Menu** (`HamburgerMenu`, opened from BottomNav's Menu): below `md` a full-height sheet from the right, `80vw` capped at 384px, over the Menu backdrop (see Layering), with the bottom nav unmounted while it's open; `md` and up a 280px dropdown from the top-right corner. Rows (`HamburgerMenuItem`): `px-5 py-3 min-h-12` (48px tall, #233 — was `py-3` alone, ≈44px), `text-sm font-medium ink-700`, `bone-100` hover, inset sage focus ring, and a trailing 14px `ink-400` icon naming the destination (`List`/`Map` view switch, `RotateCcw` replay intro, `MapPinPlus` suggest, `MessageSquare` feedback, `Info` about, `List` browse all places — the one icon used twice, `History` box activity, `HandHelping` help). First item is the sponsor card: `sage-100` fill, `sage-500` border (`sage-700` on hover), `radius-lg`, an 11px uppercase `ink-500` "Sponsored by" over `text-base font-semibold sage-700` "Pueblo Food Project", opening in a new tab. The same drawer also renders the Saved view (see Loading, empty and error states).
 
 **LanguageToggle** (EN / ES): a segmented pill — `bone-100` fill, `bone-300` border, `radius-full`; each segment `px-3 text-xs font-semibold`; the active one `ink-700` fill with `bone-50` text, the other `ink-500` (`ink-700` on hover). It lives in the Menu, never on the map.
 
-**Icon buttons** (`FavoriteButton`, `ShareButton` in a card header): 44×44 hit area (under the 48px floor — see Known deviations) (`w-11 h-11`, pulled in with `-m-1` so the glyph aligns), `radius-md`, `bone-100` hover, sage focus ring, a 20px glyph (18px in DesktopVenueWindow's more compact header). Favourite is a Lucide `Star`: outline `ink-400`, filled `clay-500` when saved (`aria-pressed`). Share is `Share2` in `ink-400` (`ink-700` hover); it uses the native share sheet, and where that's missing it copies the link and swaps to a `Check` for 2 seconds.
+**Icon buttons** (`FavoriteButton`, `ShareButton` in a card header): 48×48 hit area (#233 — was 44×44/`w-11 h-11`) (`w-12 h-12`, pulled in with `-m-1` so the glyph aligns; callers space these `gap-4` so the `-m-1` overlap still leaves 8px between hit areas), `radius-md`, `bone-100` hover, sage focus ring, a 20px glyph (18px in DesktopVenueWindow's more compact header). Favourite is a Lucide `Star`: outline `ink-400`, filled `clay-500` when saved (`aria-pressed`). Share is `Share2` in `ink-400` (`ink-700` hover); it uses the native share sheet, and where that's missing it copies the link and swaps to a `Check` for 2 seconds.
 
 **HoursList**: a `<dl>`, one row per day, the day in a fixed-width column (`ink-500`), times in `ink-700`. Today is `font-semibold sage-700` with `aria-current="date"` and a sr-only ", today", marked by a 3px `sage-500` left rule (see Known deviations).
 
@@ -451,11 +454,14 @@ Splash scrim: a frosted translucent overlay — `rgba(182, 172, 139, 0.25)` (bon
 
 **SiteFooter** (content pages only, never the map): a `bone-200` top rule, the `max-w-lg` column, `text-xs ink-400` links (Back to map, About, Privacy, Suggest) wrapping with `gap-x-6 gap-y-2`, then the OSM attribution link at `min-h-11` (44px).
 
-**Known deviations** — the code differs from the rules above in four places; fix them when you're in the file rather than copying them:
+**Known deviations** — the code differs from the rules above in three places; fix them when you're in the file rather than copying them:
 - `HoursList` marks today with a coloured left rule, which Do's and Don'ts bans ("no colored border stripes"). A `sage-50` row fill would say the same thing.
 - `HoursList` sets times in `font-mono`, beyond Typography's "mono only for raw coordinates". Public Sans' tabular numerals (`tabular-nums`) would keep the columns aligned.
 - The Menu panel is `white` with black `rgba(0,0,0,…)` shadows and, as a dropdown, an 8px radius — not `bone-50`, the warm `elevation-*` shadows, or a radius token.
-- **Below the 48×48 touch-target floor** (Low-end device guardrails — the floor rose from 44px to 48px in #233/#632, and these predate it): the card-header icon buttons (44×44), Menu rows (`py-3` + `text-sm` ≈ 44px tall), `SiteFooter`'s OSM link (`min-h-11`, 44px) and its four internal links (bare `text-xs` lines, ~16px). Fix per that rule — extend the tap area to 48×48 with padding or an invisible `::before` overlay, never by shrinking the visual.
+
+The #659 home/map touch-target audit (#233) brought every control on `/` up to the 48×48 floor — card-header icon buttons, Menu rows, LanguageToggle, FilterPanel, BottomSheet, ListView and the SearchBar/Filters control are all covered now (see each component's own note above and `touchTargets.test.tsx`). Two things it deliberately left alone:
+- `SiteFooter` (content pages only — never `/`, so outside that audit's scope): its OSM link (`min-h-11`, 44px) and its four internal links (bare `text-xs` lines, ~16px) still sit below the floor.
+- `DesktopVenueWindow`'s own chrome (its Close button, Show/Hide details toggle, phone link) — unlike the mobile `BottomSheet` it wraps, these weren't touched; desktop is pointer-first, but they're worth a pass if this card ever needs to feel finger-friendly on a touchscreen laptop.
 
 ## Iconography
 

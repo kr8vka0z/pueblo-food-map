@@ -96,7 +96,10 @@ function SwitchRow({
   onClick: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 px-5 py-2.5">
+    // #233: the row is the switch's hit area — `relative` here (not on the
+    // switch) makes the switch's `before:inset-0` overlay span the full
+    // 48px row, so a thumb on the label toggles it like the checkbox rows.
+    <div className="relative flex items-center gap-3 px-5 py-2.5 min-h-12">
       {icon}
       <span className="flex-1 text-sm font-medium text-[var(--color-ink-700)]">{label}</span>
       {count !== undefined && (
@@ -109,7 +112,8 @@ function SwitchRow({
         aria-label={label}
         onClick={onClick}
         className={
-          "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-150 " +
+          "inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-150 " +
+          "before:absolute before:inset-0 " +
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
           (checked ? "bg-[var(--color-sage-600)]" : "bg-[var(--color-bone-300)]")
         }
@@ -273,7 +277,9 @@ export default function FilterPanel({
         }}
       >
         {/* Header — title, Clear all (top, per #513), × close */}
-        <div className="flex items-center gap-2 px-5 py-4 border-b border-[var(--color-bone-200)]">
+        {/* gap-4 (not 2): the × box's -m-2 eats 8px of it, leaving the 8px
+            between Clear all's and ×'s hit areas the #233 guardrail asks for. */}
+        <div className="flex items-center gap-4 px-5 py-4 border-b border-[var(--color-bone-200)]">
           <h2 id={TITLE_ID} className="flex-1 text-base font-semibold text-[var(--color-ink-700)]">
             {t("filters.panel.title", locale)}
           </h2>
@@ -281,6 +287,9 @@ export default function FilterPanel({
             type="button"
             onClick={onClearAll}
             className={
+              // #233: 20px-tall text button → 48px via an invisible overlay
+              // reaching into the header's own 16px padding.
+              "relative before:absolute before:inset-x-0 before:-inset-y-3.5 " +
               "text-sm font-semibold text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded " +
               PRESS_FEEDBACK
@@ -293,7 +302,7 @@ export default function FilterPanel({
             aria-label={t("filters.panel.close", locale)}
             onClick={close}
             className={
-              "flex items-center justify-center w-11 h-11 -m-1.5 rounded-full " +
+              "flex items-center justify-center w-12 h-12 -m-2 rounded-full " +
               "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-700)] " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
@@ -305,7 +314,13 @@ export default function FilterPanel({
         </div>
 
         {/* Scrollable middle — Show only switches, Kind of place checkboxes */}
-        <div className="flex-1 overflow-y-auto py-2">
+        {/* pt-2 only (#233): growing every row to the 48px floor made this
+            content ~16px taller than the panel's available height, and the
+            old py-2 + divider's my-2 clipped the last "Kind of place" row's
+            bottom against the footer — invisible (same bg) but ate 8px of
+            its hit area. Trimming this and the divider below reclaims that
+            16px so nothing clips. */}
+        <div className="flex-1 overflow-y-auto pt-2">
           <div className="px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
             {t("filters.panel.showOnly", locale)}
           </div>
@@ -331,7 +346,7 @@ export default function FilterPanel({
             onClick={onToggleWic}
           />
 
-          <div className="border-t border-[var(--color-bone-200)] mx-5 my-2" aria-hidden="true" />
+          <div className="border-t border-[var(--color-bone-200)] mx-5 my-1" aria-hidden="true" />
 
           <div className="px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
             {t("filters.panel.kindOfPlace", locale)}
@@ -342,7 +357,7 @@ export default function FilterPanel({
               <label
                 key={cat}
                 className={
-                  "flex items-center gap-3 px-5 py-2.5 cursor-pointer text-sm font-medium " +
+                  "flex items-center gap-3 px-5 py-2.5 min-h-12 cursor-pointer text-sm font-medium " +
                   "text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] transition-colors duration-100"
                 }
               >
@@ -372,7 +387,7 @@ export default function FilterPanel({
             type="button"
             onClick={close}
             className={
-              "w-full h-11 rounded-[var(--radius-md)] font-semibold text-sm " +
+              "w-full h-12 rounded-[var(--radius-md)] font-semibold text-sm " +
               // #529: --color-orange/--color-navy don't exist — DESIGN.md's
               // orange exception is --color-brand-orange/--color-brand-navy.
               "bg-[var(--color-brand-orange)] text-[var(--color-brand-navy)] " +

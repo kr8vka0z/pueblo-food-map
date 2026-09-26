@@ -634,7 +634,8 @@ export function WalkRouteStatus({
 // Bus / Drive: bone outline (secondary — opens external app).
 
 const baseClass =
-  "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[var(--radius-md)] " +
+  // min-h-12: #233's 48px floor (py-2.5 alone gave 42).
+  "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-12 rounded-[var(--radius-md)] " +
   "text-sm font-semibold transition-colors duration-150 " +
   PRESS_FEEDBACK + " " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-1";

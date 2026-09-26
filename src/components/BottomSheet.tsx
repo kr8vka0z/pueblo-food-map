@@ -508,8 +508,9 @@ export default function BottomSheet({
                           onClick={onClose}
                           aria-label={t("detail.close", locale)}
                           className={
-                            "flex items-center justify-center w-11 h-11 " +
-                            "-mt-1.5 -mb-1.5 -ml-1.5 -mr-[10px] rounded-md " +
+                            // Same 48px box/margins as the venue header's × below (#233).
+                            "flex items-center justify-center w-12 h-12 " +
+                            "-mt-2 -mb-2 -ml-1 -mr-3 rounded-md " +
                             "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
                             PRESS_FEEDBACK + " " +
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
@@ -528,7 +529,9 @@ export default function BottomSheet({
               ) : (
               <div className="flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3">
                 {/* Header row: title + close */}
-                <div className="flex items-start gap-2">
+                {/* gap-4: Share/Save (-m-1) and × (-ml-1) each give back 4px
+                    of it, leaving 8px between their 48px hit areas (#233). */}
+                <div className="flex items-start gap-4">
                   <h2
                     className="flex-1 text-xl font-normal text-[var(--color-ink-900)] leading-tight"
                     style={{ fontFamily: "var(--font-display)" }}
@@ -542,13 +545,14 @@ export default function BottomSheet({
                     onClick={onClose}
                     aria-label={t("detail.close", locale)}
                     className={
-                      // 32px -> 44px hit area: box grows via width/height, negative
-                      // margin on every side cancels the growth for flex-flow
-                      // purposes (the -mr-1 that existed before is folded into the
-                      // new -mr value), so the row's layout and the icon's visible
-                      // position are unchanged (mobile review #11).
-                      "flex items-center justify-center w-11 h-11 " +
-                      "-mt-1.5 -mb-1.5 -ml-1.5 -mr-[10px] rounded-md " +
+                      // 32px -> 48px hit area (#233; 44 before, mobile review
+                      // #11): box grows via width/height, negative margins
+                      // cancel the growth vertically and on the right (the
+                      // icon stays 12px in from the content edge, as before).
+                      // Only -ml-1 on the left, so the row's gap-4 still
+                      // leaves 8px to Save's hit area.
+                      "flex items-center justify-center w-12 h-12 " +
+                      "-mt-2 -mb-2 -ml-1 -mr-3 rounded-md " +
                       "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
                       PRESS_FEEDBACK + " " +
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
@@ -681,6 +685,12 @@ export default function BottomSheet({
                   className={
                     // ~20px tall -> real padding growth (mobile review #8: this is
                     // the ONLY way to expand the sheet). Type size/color untouched.
+                    // #233: 32px box → 48px hit area via an invisible overlay,
+                    // lopsided on purpose: only 4px up (the direction buttons
+                    // sit 12px above, so 8px stays clear) and 12px down into
+                    // the sheet's bottom padding / the non-interactive
+                    // address row. Nothing moves.
+                    "relative before:absolute before:inset-x-0 before:-top-1 before:-bottom-3 " +
                     "flex items-center gap-1.5 py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
                     "hover:text-[var(--color-sage-700)] " +
                     PRESS_FEEDBACK + " " +
@@ -760,7 +770,8 @@ export default function BottomSheet({
                           </h3>
                           <a
                             href={`tel:${venue.phone}`}
-                            className="inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
+                            // before:* — 2px overlay up/down takes the 44px link to 48 (#233).
+                            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
                           >
                             <Phone size={15} className="text-[var(--color-sage-600)]" aria-hidden />
                             {venue.phone}

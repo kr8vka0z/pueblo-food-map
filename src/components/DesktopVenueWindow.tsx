@@ -345,7 +345,9 @@ export default function DesktopVenueWindow({
           </p>
         )}
       </div>
-      <div className="flex items-center gap-0.5 shrink-0">
+      {/* gap-4: Share/Save are 48px boxes with -m-1, so this leaves 8px
+          between their hit areas (#233). */}
+      <div className="flex items-center gap-4 shrink-0">
         <ShareButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} isBox={isBox} />
         <FavoriteButton venueId={venue.id} venueName={venue.name} locale={locale} size={18} />
       </div>

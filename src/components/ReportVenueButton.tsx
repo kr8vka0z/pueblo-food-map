@@ -26,6 +26,10 @@ export default function ReportVenueButton({
       href={`/report/${venueId}`}
       className={
         "flex items-center justify-center gap-1.5 w-full h-9 rounded-[var(--radius-md)] " +
+        // #233: keeps the lighter 36px look of a secondary action; an
+        // invisible overlay makes the tap area 48px. 7px, not 6: an absolute
+        // ::before resolves against the padding box, 34px inside the border.
+        "relative before:absolute before:inset-x-0 before:-inset-y-[7px] " +
         // #534: --color-ink-300/--color-ink-600 undefined in globals.css
         // @theme. Border: bone-300 is the app's documented resting-border
         // token (DESIGN.md: "bone-300 — search bar border at rest"),

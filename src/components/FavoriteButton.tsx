@@ -36,10 +36,11 @@ export default function FavoriteButton({
       title={label}
       onClick={() => toggleFavorite(venueId)}
       className={
-        // 36px -> 44px hit area; negative margin cancels the growth so rows
-        // this sits in (BottomSheet/DesktopVenueWindow headers) don't shift
-        // (mobile review #12).
-        "shrink-0 flex items-center justify-center w-11 h-11 -m-1 rounded-md transition-colors " +
+        // 48px hit area (#233's floor; was 44, mobile review #12); negative
+        // margin cancels part of the growth in the header rows this sits in
+        // (BottomSheet/DesktopVenueWindow/BoxCardBody), which space it gap-4
+        // so neighbouring hit areas stay 8px apart.
+        "shrink-0 flex items-center justify-center w-12 h-12 -m-1 rounded-md transition-colors " +
         "hover:bg-[var(--color-bone-100)] " +
         PRESS_FEEDBACK + " " +
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"

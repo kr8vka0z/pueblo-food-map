@@ -314,7 +314,13 @@ export default function FilterPanel({
         </div>
 
         {/* Scrollable middle — Show only switches, Kind of place checkboxes */}
-        <div className="flex-1 overflow-y-auto py-2">
+        {/* pt-2 only (#233): growing every row to the 48px floor made this
+            content ~16px taller than the panel's available height, and the
+            old py-2 + divider's my-2 clipped the last "Kind of place" row's
+            bottom against the footer — invisible (same bg) but ate 8px of
+            its hit area. Trimming this and the divider below reclaims that
+            16px so nothing clips. */}
+        <div className="flex-1 overflow-y-auto pt-2">
           <div className="px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
             {t("filters.panel.showOnly", locale)}
           </div>
@@ -340,7 +346,7 @@ export default function FilterPanel({
             onClick={onToggleWic}
           />
 
-          <div className="border-t border-[var(--color-bone-200)] mx-5 my-2" aria-hidden="true" />
+          <div className="border-t border-[var(--color-bone-200)] mx-5 my-1" aria-hidden="true" />
 
           <div className="px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
             {t("filters.panel.kindOfPlace", locale)}

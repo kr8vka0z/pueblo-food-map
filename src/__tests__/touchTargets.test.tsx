@@ -150,6 +150,13 @@ describe("FilterPanel", () => {
     render(<FilterPanel {...filterProps} />);
     expect(classes(screen.getByRole("button", { name: /Show 3 places/ }))).toContain("h-12");
   });
+
+  test("the scroll container doesn't reserve py-2 (#233: growing every row to 48px made the panel ~16px taller than its available height; keeping py-2 here clipped the last Kind-of-place row's bottom 8px against the footer)", () => {
+    render(<FilterPanel {...filterProps} />);
+    const scroller = screen.getByRole("checkbox", { name: /Food Pantry/ }).closest("label")?.parentElement;
+    expect(classes(scroller)).toContain("pt-2");
+    expect(classes(scroller)).not.toContain("py-2");
+  });
 });
 
 describe("HamburgerMenu", () => {

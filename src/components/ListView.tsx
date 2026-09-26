@@ -51,7 +51,7 @@ export default function ListView({
         href={OSM_COPYRIGHT_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="shrink-0 inline-flex items-center min-h-11 px-4 text-xs text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)] transition-colors focus-visible:outline-none focus-visible:underline"
+        className="shrink-0 inline-flex items-center min-h-12 px-4 text-xs text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)] transition-colors focus-visible:outline-none focus-visible:underline"
       >
         {t("osm.attribution", locale)}
       </a>
@@ -67,7 +67,7 @@ export default function ListView({
               <button
                 type="button"
                 onClick={onClearFilters}
-                className="px-4 h-10 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
+                className="px-4 h-12 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
               >
                 {t("empty.clear", locale)}
               </button>

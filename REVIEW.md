@@ -30,8 +30,8 @@ rationale in [ARCHITECTURE.md](ARCHITECTURE.md).
   card — never a separate page.** The one exception is `/box/<id>/history`, a read-only
   chronological log, not an interaction. Check-in wording is exactly **"I used this box"**.
 - **D1 migrations reach the target database before the code that needs them.** The
-  promotion checklist in AGENTS.md (search "promotion checklist") lists which migrations
-  are outstanding. Never rebuild a table other tables reference — no safe way to do that
+  promotion checklist in AGENTS.md (search "promotion checklist") shows how to list the
+  outstanding ones. Never rebuild a table other tables reference — no safe way to do that
   without cascading deletes.
 - **After a squash promotion, `main` is true-merged back into `dev`.** Compare branches
   with `git diff --stat origin/dev origin/main` — never a commit count

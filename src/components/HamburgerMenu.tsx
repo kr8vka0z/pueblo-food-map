@@ -354,10 +354,10 @@ export default function HamburgerMenu({
               aria-label={closeLabel}
               onClick={close}
               className={
-                // 32px -> 44px hit area, negative margin cancels the growth so
-                // the header row's layout and the icon's position don't move
-                // (mobile review #11).
-                "flex items-center justify-center w-11 h-11 -m-1.5 rounded-full " +
+                // 32px -> 48px hit area (#233's floor; was 44, mobile review
+                // #11), negative margin cancels the growth so the header
+                // row's layout and the icon's position don't move.
+                "flex items-center justify-center w-12 h-12 -m-2 rounded-full " +
                 "text-[var(--color-ink-500)] " +
                 "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-700)] " +
                 PRESS_FEEDBACK + " " +
@@ -384,7 +384,7 @@ export default function HamburgerMenu({
                         onSelectVenue?.(v.id);
                       }}
                       className={
-                        "flex items-center gap-2.5 w-full text-left px-5 py-2.5 text-sm font-medium " +
+                        "flex items-center gap-2.5 w-full min-h-12 text-left px-5 py-2.5 text-sm font-medium " +
                         "text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
                         "transition-colors duration-100"

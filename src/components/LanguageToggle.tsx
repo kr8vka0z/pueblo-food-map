@@ -33,7 +33,10 @@ export default function LanguageToggle() {
     <div
       role="group"
       aria-label={t("lang.toggle.label", locale)}
-      className="flex items-center rounded-full border border-[var(--color-bone-300)] bg-[var(--color-bone-100)] overflow-hidden"
+      // No overflow-hidden (#233): it would clip the segments' ::before tap
+      // overlays below. Each segment rounds its own outer end instead, which
+      // draws the same pill.
+      className="flex items-center rounded-full border border-[var(--color-bone-300)] bg-[var(--color-bone-100)]"
       style={{ height: 28 }}
     >
       {(["en", "es"] as Locale[]).map((l) => {
@@ -46,7 +49,13 @@ export default function LanguageToggle() {
             aria-pressed={active}
             aria-label={`Language: ${SR_LABELS[l]}`}
             className={
-              "px-3 text-xs font-semibold transition-colors duration-150 h-full " +
+              "relative px-3 text-xs font-semibold transition-colors duration-150 h-full " +
+              "first:rounded-l-full last:rounded-r-full " +
+              // #233: 26px-tall segments → 48px hit areas. 11px up/down, and
+              // 10px outward only (EN left, ES right) so each clears 48 wide
+              // while the two still meet at the divider rather than overlap.
+              "before:absolute before:inset-x-0 before:-inset-y-[11px] " +
+              "first:before:-left-2.5 last:before:-right-2.5 " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset " +
               "focus-visible:ring-[var(--color-sage-500)] " +

@@ -63,9 +63,10 @@ export default function ShareButton({
       title={label}
       onClick={handleClick}
       className={
-        // 36px -> 44px hit area; same negative-margin technique as FavoriteButton
-        // (mobile review #12).
-        "shrink-0 flex items-center justify-center w-11 h-11 -m-1 rounded-md transition-colors " +
+        // 48px hit area (#233's floor); same negative-margin technique as
+        // FavoriteButton (mobile review #12). Callers space these with gap-4
+        // so the -m-1 overlap still leaves 8px between neighbouring hit areas.
+        "shrink-0 flex items-center justify-center w-12 h-12 -m-1 rounded-md transition-colors " +
         "hover:bg-[var(--color-bone-100)] " +
         "text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)] " +
         PRESS_FEEDBACK + " " +

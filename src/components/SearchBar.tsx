@@ -211,6 +211,9 @@ export default function SearchBar({
             className={
               "absolute right-0 top-1/2 -translate-y-1/2 " +
               "flex items-center gap-1.5 h-11 pl-2.5 pr-3.5 " +
+              // #233: invisible 2px-all-round overlay takes the 44×44 box to
+              // the 48×48 floor without moving the icon or the divider.
+              "before:absolute before:-inset-0.5 " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 " +
               "focus-visible:ring-[var(--color-sage-500)] " +
@@ -259,7 +262,9 @@ export default function SearchBar({
           enterKeyHint="search"
           {...comboboxAttrs}
           className={
-            "w-full h-11 md:h-[52px] " +
+            // 48px on phones — DESIGN.md's low-end-device touch floor (#233);
+            // an <input> can't carry a ::before overlay, so the bar itself grew.
+            "w-full h-12 md:h-[52px] " +
             // Left reservation is now fixed regardless of filtersButton
             // (#528) — the magnifier is always shown, unlike before when the
             // Filters button replaced it in this spot.

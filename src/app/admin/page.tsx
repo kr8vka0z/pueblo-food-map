@@ -33,14 +33,22 @@
  * when"). It is NOT inside the same try/catch as the D1 reads below,
  * deliberately: a Cloudflare hiccup must never fail the whole page closed.
  *
- * BoxHealthEntry's `caretaker` field is read here ONLY for the (unrelated)
- * needs-help count via rankNeedsHelp — this page never renders a
- * caretaker/sponsor name itself, so it doesn't touch the field #671/#678 are
- * renaming to `sponsors: string[]` in parallel.
+ * BoxHealthEntry is read here ONLY for its `health` status (rankNeedsHelp's
+ * count) — this page never renders a sponsor name itself, so it never
+ * touches the `sponsors: string[]` field #671/#678 introduced.
+ *
+ * STAGING: same "never mislead with test-only D1 data" posture #673 gave
+ * /admin/places — isProductionWorker() gates the Publish bar exactly like
+ * that page (staging can never actually Publish), so the Dashboard would
+ * otherwise show a live "waiting to publish" count that can never be
+ * cleared. The rest of the Dashboard (Visitors, Blessing boxes, Map data
+ * health) still renders on staging; only the Publish bar itself is swapped
+ * for the same "Test site" banner.
  */
 
 import Link from "next/link";
 import { headers } from "next/headers";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { summarizePublishChanges } from "@/lib/adminVenues";
@@ -49,7 +57,7 @@ import { loadBoxHealthEntries } from "@/lib/adminBoxes";
 import { selectStalePlaces } from "@/lib/adminDashboard";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
-import { fetchPublishBotPrStatus, type PublishBotPrStatus } from "@/lib/publishVenues";
+import { fetchPublishBotPrStatus, isProductionWorker, type PublishBotPrStatus } from "@/lib/publishVenues";
 import {
   filterByPeriod,
   filterByPreviousPeriod,
@@ -191,6 +199,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // file's own header for why this call sits outside the try/catch.
   const visitors = await loadVisitorsAnalytics(period, now);
 
+  // Same "staging can never Publish" gate /admin/places uses (#673 pt.6) —
+  // a live "waiting to publish" bar on staging would show test-only D1 data
+  // that can never actually be cleared by a Publish click there.
+  const { env } = await getCloudflareContext({ async: true });
+  const isStaging = !isProductionWorker(env);
+
   const navCounts: AdminNavCounts = {
     submissions: submissionsTotal,
     proposals: proposalsTotal,
@@ -199,7 +213,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   };
 
   const publishSummary = summarizePublishChanges(venues);
-  const showPublishBar = publishSummary.newDrafts > 0 || publishSummary.editedSincePublish > 0 || publishSummary.archived > 0;
+  const showPublishBar = !isStaging && (publishSummary.newDrafts > 0 || publishSummary.editedSincePublish > 0 || publishSummary.archived > 0);
   const waitingToPublishCount = publishSummary.newDrafts + publishSummary.editedSincePublish + publishSummary.archived;
 
   const needsHelpBoxes = rankNeedsHelp(boxHealthEntries); // unlimited — same predicate #671's own "Needs help" filter will use
@@ -267,7 +281,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             state={publishBotStatus.state}
           />
         )}
-        {showPublishBar && <PublishPanel summary={publishSummary} reviewHref="/admin/places" />}
+        {isStaging ? (
+          // Same copy as /admin/places' own staging banner (#673 pt.6) —
+          // one consistent message wherever an admin might expect a Publish
+          // panel on this test site.
+          <p className="rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
+            Test site: publishing is turned off here.
+          </p>
+        ) : (
+          showPublishBar && <PublishPanel summary={publishSummary} reviewHref="/admin/places" />
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="wordmark text-xl text-[var(--color-ink-900)]">Hi {email.split("@")[0]}</h1>

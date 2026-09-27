@@ -18,6 +18,15 @@ vi.mock("@/lib/adminDb", () => ({
   getAdminDb: (...args: unknown[]) => mockGetAdminDb(...args),
 }));
 
+// #680: the page now also calls getCloudflareContext() directly (staging
+// gate on the Publish bar, same as /admin/places' own #673 pattern) —
+// production (BETTER_AUTH_RP_ID undefined) in every test here, same default
+// page.test.tsx uses.
+const mockGetCloudflareContext = vi.fn();
+vi.mock("@opennextjs/cloudflare", () => ({
+  getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
+}));
+
 vi.mock("next/headers", () => ({
   headers: vi.fn(async () => ({ get: () => null })),
 }));
@@ -53,6 +62,7 @@ describe("DashboardPage (/admin) — publish-bot PR status banner (#598)", () =>
 
   beforeEach(() => {
     mockGetAdminDb.mockResolvedValue({ db: makeFakeDb(), identity: { email: "admin@example.com" } });
+    mockGetCloudflareContext.mockResolvedValue({ env: { BETTER_AUTH_RP_ID: undefined } });
   });
 
   afterEach(() => {
@@ -106,7 +116,11 @@ describe("DashboardPage (/admin) — publish-bot PR status banner (#598)", () =>
 
     render(await DashboardPage({ searchParams: Promise.resolve({}) }));
 
-    expect(await screen.findByText("admin@example.com")).toBeDefined();
+    // #680: the page's own header greeting is now "Hi <name>" (issue #680's
+    // Layout item 1), not the raw signed-in email AdminNav used to be the
+    // only place showing — AdminNav still renders the full email in its
+    // header, which this asserts instead.
+    expect(await screen.findByText(/Hi admin/)).toBeDefined();
     expect(screen.queryByText(/publish in progress/i)).toBeNull();
     expect(screen.queryByText(/publish is stuck/i)).toBeNull();
   });

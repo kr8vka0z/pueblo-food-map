@@ -36,7 +36,7 @@ export default function BarList({ items, emptyMessage }: BarListProps) {
           </span>
           <span className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-bone-100)]">
             <span
-              className="block h-full rounded-full bg-[var(--color-sage-500)]"
+              className="block h-full rounded-full bg-[var(--color-sage-600)]"
               style={{ width: `${Math.max((item.value / max) * 100, item.value > 0 ? 4 : 0)}%` }}
             />
           </span>

@@ -39,6 +39,16 @@ vi.mock("@/lib/adminDb", () => ({
   getAdminDb: (...args: unknown[]) => mockGetAdminDb(...args),
 }));
 
+// Same mock shape as /admin/places' own page.test.tsx (#673) — this page
+// now also calls getCloudflareContext() directly, to gate the Publish bar
+// on isProductionWorker(). BETTER_AUTH_RP_ID undefined = production, same
+// default that file uses; the dedicated staging behavior is unit-tested at
+// isProductionWorker()'s own call sites, not re-proven here.
+const mockGetCloudflareContext = vi.fn();
+vi.mock("@opennextjs/cloudflare", () => ({
+  getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
+}));
+
 vi.mock("next/headers", () => ({
   headers: vi.fn(async () => ({ get: () => null })),
 }));
@@ -80,10 +90,11 @@ describe("DashboardPage (/admin) — auth guard", () => {
 
   test("success: renders the greeting and every #680 section's empty state, forbidden() not called", async () => {
     mockGetAdminDb.mockResolvedValue({ db: makeFakeDb(), identity: { email: "admin@example.com" } });
+    mockGetCloudflareContext.mockResolvedValue({ env: { BETTER_AUTH_RP_ID: undefined } });
 
     render(await DashboardPage(noSearchParams()));
 
-    expect(screen.getByText(/Hi admin@example\.com/)).toBeDefined();
+    expect(screen.getByText("Hi admin")).toBeDefined();
     expect(screen.getByText("Visitors")).toBeDefined();
     expect(screen.getByText("Visitor numbers are unavailable right now.")).toBeDefined();
     expect(screen.getByText("Blessing boxes")).toBeDefined();
@@ -99,12 +110,14 @@ describe("DashboardPage (/admin) — auth guard", () => {
 
   test("an explicit ?period= is honored; an unrecognized one falls back to 30 days", async () => {
     mockGetAdminDb.mockResolvedValue({ db: makeFakeDb(), identity: { email: "admin@example.com" } });
+    mockGetCloudflareContext.mockResolvedValue({ env: { BETTER_AUTH_RP_ID: undefined } });
 
-    render(await DashboardPage({ searchParams: Promise.resolve({ period: "7d" }) }));
+    const first = render(await DashboardPage({ searchParams: Promise.resolve({ period: "7d" }) }));
     expect(screen.getByRole("link", { name: "7 days" }).getAttribute("aria-current")).toBe("page");
+    first.unmount();
 
     render(await DashboardPage({ searchParams: Promise.resolve({ period: "not-a-real-period" }) }));
-    expect(screen.getAllByRole("link", { name: "30 days" })[0].getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "30 days" }).getAttribute("aria-current")).toBe("page");
   });
 
   test("access denied -> fails closed: forbidden() fires and the denial is logged", async () => {

@@ -1,11 +1,16 @@
 /**
  * /admin/boxes — the Blessing Boxes tab (admin dashboard build, approved
  * mockup Direction B "boxes first"). Everything blessing-boxes-specific
- * that doesn't belong on the Dashboard's general to-do list: a status map,
- * "Needs help now" / "Gone quiet" lists, an 8-week reports chart, and the
- * full box table. "Places due for a check" deliberately does NOT appear
- * here (task spec: Dashboard-only — boxes are excluded from that panel's
- * own query in the first place, see src/lib/adminDashboard.ts).
+ * that doesn't belong on the Dashboard's general to-do list: an 8-week
+ * reports chart and the full box table (status filters, search, Sponsor
+ * filter, sort — src/components/AllBoxesTable.tsx). #678 removed the
+ * status map + color key that used to sit above the chart (the table's own
+ * status filter + "Needs attention first" default sort already carries that
+ * "does this need attention" information, and #671 removed this tab's old
+ * "Needs help now" / "Gone quiet" lists for the same reason). "Places due
+ * for a check" deliberately does NOT appear here (task spec: Dashboard-only
+ * — boxes are excluded from that panel's own query in the first place, see
+ * src/lib/adminDashboard.ts).
  *
  * Same Better Auth chain as every other admin page (AGENTS.md "Admin
  * authentication"): getAdminDb() verifies identity before this page renders
@@ -26,7 +31,6 @@ import { headers } from "next/headers";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { loadBoxHealthEntries } from "@/lib/adminBoxes";
-import { rankNeedsHelp, rankQuiet, activeBoxes } from "@/lib/boxHealth";
 import { bucketCheckinsByWeek } from "@/lib/adminDashboard";
 import { loadRecentCheckinsAllBoxes } from "@/lib/blessingBoxes";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
@@ -34,8 +38,6 @@ import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters"
 import { loadAdminNavCounts, type AdminNavCounts } from "@/lib/adminNavCounts";
 import AdminNav from "@/components/AdminNav";
 import BoxesWaitingChips from "@/components/BoxesWaitingChips";
-import BoxHealthList from "@/components/BoxHealthList";
-import AdminBoxesMap from "@/components/AdminBoxesMap";
 import BoxReportsChart from "@/components/BoxReportsChart";
 import AllBoxesTable from "@/components/AllBoxesTable";
 
@@ -77,12 +79,6 @@ export default async function BoxesPage() {
   }
 
   const inServiceCount = boxHealthEntries.filter((e) => e.removedOn === null).length;
-  const needsHelp = rankNeedsHelp(boxHealthEntries);
-  const quiet = rankQuiet(boxHealthEntries);
-  // The map is a "does this need attention" surface same as the two lists
-  // above — a removed box has nothing to check on (item 2 fix). AllBoxesTable
-  // below still gets the FULL boxHealthEntries, unfiltered.
-  const activeBoxHealthEntries = activeBoxes(boxHealthEntries);
   const weeklyBuckets = bucketCheckinsByWeek(
     recentCheckins.map((c) => ({ kind: c.kind, createdAt: c.created_at })),
     now,
@@ -95,28 +91,7 @@ export default async function BoxesPage() {
       <div className="px-4 py-6 sm:px-6">
         <BoxesWaitingChips photosCount={photos.length} adoptersCount={adopters.length} />
 
-        <section className="elevation-1 mb-6 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
-          <h2 className="wordmark text-lg text-[var(--color-ink-900)]">Blessing boxes — {inServiceCount} in service</h2>
-          <div className="mt-3 flex flex-col gap-6 lg:flex-row lg:items-start">
-            <div className="min-w-0 flex-1">
-              <AdminBoxesMap entries={activeBoxHealthEntries} />
-            </div>
-            <div className="flex w-full flex-col gap-5 lg:w-[320px] lg:flex-none">
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--color-ink-700)]">Needs help now</h3>
-                <div className="mt-2">
-                  <BoxHealthList entries={needsHelp} variant="needs-help" emptyMessage="Every box is doing fine." />
-                </div>
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--color-ink-700)]">Gone quiet</h3>
-                <div className="mt-2">
-                  <BoxHealthList entries={quiet} variant="quiet" emptyMessage="Every box has reported in recently." />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        <h2 className="wordmark mb-4 text-lg text-[var(--color-ink-900)]">Blessing boxes — {inServiceCount} in service</h2>
 
         <section className="elevation-1 mb-6 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
           <h2 className="wordmark text-lg text-[var(--color-ink-900)]">Box reports, last 8 weeks</h2>

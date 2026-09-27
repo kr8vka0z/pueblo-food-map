@@ -1,8 +1,10 @@
 /**
  * boxHealth.ts — the ADMIN triage read of a blessing box's status, used by
  * the /admin Dashboard's "Boxes that need help" panel and the /admin/boxes
- * tab (map pins, "Needs help now" / "Gone quiet" lists, the all-boxes
- * table). Deliberately a SEPARATE function from blessingBoxes.ts's
+ * tab's all-boxes table (status filter counts, "Needs attention first"
+ * sort — #671 removed that tab's dedicated "Needs help now" / "Gone quiet"
+ * lists and status map in favor of the table's own filters). Deliberately a
+ * SEPARATE function from blessingBoxes.ts's
  * computeBoxStatus(): that one is the PUBLIC map's contract (7-day fade
  * window, 'took'/'problem' never set a status, an out-of-service override)
  * and must not be bent to fit an admin-only display rule — see that
@@ -84,8 +86,18 @@ export interface BoxHealthEntry {
   lat: number;
   lng: number;
   health: BoxHealth;
-  /** First approved adopter's display name, or null — "no caretaker" is a display-layer decision, not this module's. */
-  caretaker: string | null;
+  /**
+   * Every approved adopter's display name, in the order boxAdopters.ts
+   * returns them — renamed from `caretaker` (#671: "caretaker" appeared
+   * nowhere else in the product; the public card and the admin adoption
+   * queue both already say "sponsor"). Kept as the FULL list, not just the
+   * first name, so AllBoxesTable's Sponsor column can render the same
+   * "A" / "A, B" / "A, B, +N more" format the public card's sponsor band
+   * uses — a single name was enough for the old "Cared for by X" one-liner
+   * but not for that format. "Needs a sponsor" (empty array) is a
+   * display-layer decision, not this module's.
+   */
+  sponsors: string[];
   /**
    * `blessing_boxes.removed_on` — same "box no longer in service" meaning
    * blessingBoxes.ts's own mapRowToPublicBox already gives it (a display
@@ -101,9 +113,9 @@ export interface BoxHealthEntry {
 /**
  * Boxes still in service — `removed_on` is a display flag on
  * BoxHealthEntry, not a query filter (see that field's own doc comment), so
- * every "needs attention" surface (Dashboard's help panel, both Boxes-tab
- * lists, the Boxes-tab map — see src/app/admin/boxes/page.tsx) filters it
- * out HERE, in one shared place, rather than each caller re-deriving the
+ * every "needs attention" surface (Dashboard's help panel — see
+ * src/app/admin/page.tsx) filters it out HERE, in one shared place, rather
+ * than each caller re-deriving the
  * same `removedOn === null` check. A removed box is out of service; nobody
  * needs to go check on it or see it flagged "gone quiet." It still appears
  * in AllBoxesTable (src/components/AllBoxesTable.tsx), marked removed — that
@@ -132,24 +144,8 @@ export function rankNeedsHelp(entries: BoxHealthEntry[], limit?: number): BoxHea
   return typeof limit === "number" ? needing.slice(0, limit) : needing;
 }
 
-/**
- * Boxes nobody has reported on in 30+ days, longest-quiet first. A box that
- * has NEVER had a check-in (`daysSinceLastReport === null`) sorts ahead of
- * every numeric age — it is the least-known of the two, not the
- * "freshest" quiet box, which a naive numeric sort (treating null as 0)
- * would produce. Removed boxes are excluded (activeBoxes) — see that
- * function's own header.
- */
-export function rankQuiet(entries: BoxHealthEntry[], limit?: number): BoxHealthEntry[] {
-  const quiet = activeBoxes(entries)
-    .filter((e) => e.health.status === "quiet")
-    .sort((a, b) => {
-      const ad = a.health.daysSinceLastReport;
-      const bd = b.health.daysSinceLastReport;
-      if (ad === null && bd === null) return 0;
-      if (ad === null) return -1;
-      if (bd === null) return 1;
-      return bd - ad;
-    });
-  return typeof limit === "number" ? quiet.slice(0, limit) : quiet;
-}
+// rankQuiet (the old "Gone quiet" list's ranking) was removed here in #671 —
+// the Boxes tab's own "Quiet" status filter + "Needs attention first" sort
+// (src/components/AllBoxesTable.tsx) replaced that dedicated list, and
+// nothing else called this function (unlike rankNeedsHelp, which the
+// Dashboard's "Boxes that need help" panel still uses).

@@ -71,6 +71,11 @@ jobs:
       NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
       NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY }}
+      # #485 (PostHog analytics) — same reasoning as deploy-dev.yml: the
+      # secret POSTHOG_PROJECT_KEY doesn't exist yet, resolves empty, and
+      # analytics.ts's initAnalytics() no-ops on an empty key, so this build
+      # succeeds today and starts sending once Kyle adds the secret.
+      NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
     steps:
       # Same pinned-SHA third-party actions as deploy-dev.yml — a mutable
       # tag could be repointed to malicious code; a SHA cannot.

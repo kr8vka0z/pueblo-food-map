@@ -305,11 +305,33 @@ function makeBox(overrides: Partial<PublicBlessingBox["box"]> = {}): PublicBless
 }
 
 describe("BottomSheet — blessing box card (map-first rework)", () => {
-  test("renders BoxCardBody content, and the SAME grab bar #666 gives ordinary venues (for consistency; toggling it does nothing yet — #667 wires up a box's own detail section)", () => {
+  test("renders BoxCardBody content, with the SAME grab bar #666 gives ordinary venues (#667 supersedes 'box cards get no toggle')", () => {
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
     // BoxCardBody's status badge is present — proves the box branch rendered.
     expect(screen.getByTestId("box-status-badge")).toBeDefined();
+    // #667 supersedes #666's original "box cards get the bar only, no
+    // preview" line — a box now gets the full bar + preview mechanics too.
     expect(screen.getByRole("button", { name: /show details/i })).toBeDefined();
+  });
+
+  test("tapping the grab bar expands the box card's below-the-fold section (#667)", async () => {
+    const user = userEvent.setup();
+    render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
+    const bar = screen.getByRole("button", { name: /show details/i });
+    expect(bar.getAttribute("aria-expanded")).toBe("false");
+    await user.click(bar);
+    expect(bar.getAttribute("aria-expanded")).toBe("true");
+    // The below-the-fold wrapper is the exact node aria-controls names.
+    const wrapper = document.getElementById(bar.getAttribute("aria-controls")!);
+    expect(wrapper?.className).not.toContain("overflow-hidden");
+  });
+
+  test("the box's below-the-fold wrapper (sponsor band, footer) sits inside the grab bar's aria-controls target", () => {
+    render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
+    const bar = screen.getByRole("button", { name: /show details/i });
+    const wrapper = document.getElementById(bar.getAttribute("aria-controls")!);
+    expect(wrapper?.textContent).toMatch(/needs a sponsor/i);
+    expect(screen.getByRole("link", { name: "History" }).closest(`#${wrapper?.id}`)).not.toBeNull();
   });
 
   test("hours-today badge and notes paragraph are skipped for a box", () => {

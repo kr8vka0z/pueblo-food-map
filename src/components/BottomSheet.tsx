@@ -25,10 +25,11 @@
  * but visually clipped by CSS jsdom can't compute, so the collapsed tests
  * assert `aria-expanded` instead — see that file's own note.
  *
- * A blessing-box card gets the SAME bar for consistency, but has no detail
- * section of its own to peek at yet — swipe-up/tap toggle `expanded`, which
- * `BoxCardBody` doesn't read, so nothing visibly changes (#667 gives boxes
- * their own reordered layout wired to this same state — see that issue).
+ * A blessing-box card gets the SAME bar + swipe mechanics, but its own
+ * reordered layout (#667 supersedes #666's "box cards get the bar only"
+ * line) — `layout="sheet"` on `BoxCardBody` below, see that component's own
+ * header for the split between its always-visible first view and its
+ * clipped below-the-fold section (photo/sponsor/footer).
  *
  * vaul is kept as the drawer container for drag-to-dismiss, scrim, Escape,
  * and a11y Dialog.Title — but WITHOUT snapPoints (route-strip mode, #509
@@ -595,6 +596,17 @@ export default function BottomSheet({
                     onCheckinSuccess={onCheckinSuccess}
                     className="pb-[max(1rem,env(safe-area-inset-bottom))]"
                     photoRadiusClassName="rounded-t-[var(--radius-xl)]"
+                    // #667: the mobile-only reordered layout — name/status/
+                    // address/most-needed/host-note/check-in first, photo +
+                    // sponsor band + footer clipped below the fold. `expanded`
+                    // is THIS component's own grab-bar state (single source
+                    // of truth); `onRequestExpand` is the preview's own tap-
+                    // to-expand affordance (#666 accessibility section:
+                    // "tapping the cut-off preview also expands").
+                    layout="sheet"
+                    expanded={expanded}
+                    onRequestExpand={() => setExpandedState(true)}
+                    detailSectionId={DETAIL_SECTION_ID}
                     onWalkRoute={onWalkRoute ? () => onWalkRoute(box) : undefined}
                     isWalkRouteActive={isWalkRouteActive}
                     onClearWalkRoute={onClearWalkRoute}

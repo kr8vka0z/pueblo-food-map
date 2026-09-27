@@ -74,6 +74,17 @@ interface BottomNavProps {
   navRef?: RefObject<HTMLElement | null>;
   /** On /resources itself (PageNav): Resources shows as the current item. */
   onResourcesPage?: boolean;
+  /**
+   * Extra clearance (px) from the desktop side panel (#682) — shifts the bar
+   * left so it re-centers in the map area left of the panel while it's open.
+   * Applied as a CSS custom property (`--panel-right-inset`) rather than a
+   * Tailwind class, since its value is a runtime number: below `2xl` it
+   * widens the bar's own right offset (the bar is a near-full-width pill);
+   * at `2xl`+ it shifts the centered pill's `left` percentage instead (its
+   * `translate-x` stays a fixed -50%). Always 0 on mobile — MapWrapper only
+   * passes a nonzero value on desktop, when the panel is actually open.
+   */
+  rightInset?: number;
 }
 
 /**
@@ -167,6 +178,7 @@ export default function BottomNav({
   onBoxesToggle,
   navRef,
   onResourcesPage = false,
+  rightInset = 0,
 }: BottomNavProps) {
   // #542: single choke point for "hide the bar while a full-surface overlay
   // is open" — every overlay (Menu on mobile, Filters, PhotoViewer, the
@@ -217,12 +229,22 @@ export default function BottomNav({
       // the reasoning (a stable gap derived from the large/small viewport
       // difference, no env(safe-area-inset-bottom) term — see that file).
       data-bottom-nav=""
+      // #682: `--panel-right-inset` drives both breakpoints' shift below via
+      // arbitrary-value `calc()` — a plain number prop, so it can't be a
+      // static Tailwind class. `right`/`left` (not `transform`), so this
+      // combines cleanly with the FIXED `2xl:-translate-x-1/2` below instead
+      // of fighting over the one `transform` property inline styles would.
+      style={{ ["--panel-right-inset" as string]: `${rightInset}px` }}
       className={
         // Below 2xl: a 64px pill floating 12px in from the sides — same
         // fill, border and radius as the search bar, with a slightly
         // stronger shadow because it sits over the busiest part of the map.
         // Cells stay ~90px wide at 393px, well past the 44px tap floor.
-        "fixed left-3 right-3 z-[1003] " +
+        // right (not right-3): widens by --panel-right-inset while the
+        // desktop panel is open, so the bar's own right edge stays clear of
+        // it (see rightInset's own doc comment above).
+        "fixed left-3 right-[calc(0.75rem+var(--panel-right-inset,0px))] z-[1003] " +
+        "transition-[right] duration-300 " +
         "h-16 px-1.5 " +
         "bg-[var(--color-bone-50)] border border-[var(--color-bone-300)] rounded-[var(--radius-full)] " +
         "shadow-[0_4px_16px_rgba(26,24,23,0.14),0_0_0_1px_rgba(26,24,23,0.04)] " +
@@ -233,8 +255,12 @@ export default function BottomNav({
         // Overrides globals.css's below-2xl `[data-bottom-nav]` bottom rule
         // outright (that rule is scoped to `@media (width < 96rem)`, so it
         // simply doesn't match here — no specificity fight, no reset needed).
+        // left shifts by half the panel inset (not the transform) so the
+        // pill re-centers in the map area left of the panel — see this
+        // element's own style comment above.
         "2xl:right-auto 2xl:z-[1000] " +
-        "2xl:bottom-6 2xl:left-1/2 2xl:-translate-x-1/2 " +
+        "2xl:bottom-6 2xl:left-[calc(50%-var(--panel-right-inset,0px)/2)] 2xl:-translate-x-1/2 " +
+        "2xl:transition-[left] 2xl:duration-300 " +
         "2xl:h-[52px] 2xl:px-1 2xl:shadow-none 2xl:elevation-1"
       }
     >

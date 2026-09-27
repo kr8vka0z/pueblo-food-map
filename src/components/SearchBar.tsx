@@ -115,6 +115,16 @@ interface SearchBarProps {
     onClick: () => void;
     ariaLabel: string;
   };
+
+  /**
+   * Extra right padding (px) on the bar's centering container, so the bar
+   * re-centers in the map area left of the desktop side panel while it's
+   * open (#682). Animated via the `transition-[padding]` class below;
+   * `prefers-reduced-motion` zeroes that transition globally (globals.css).
+   * Always 0 on mobile/tablet — MapWrapper only passes a nonzero value on
+   * desktop, when the panel is actually open.
+   */
+  rightInset?: number;
 }
 
 export default function SearchBar({
@@ -131,6 +141,7 @@ export default function SearchBar({
   onBlur,
   onKeyDownExtra,
   filtersButton,
+  rightInset = 0,
 }: SearchBarProps) {
   const handleKey = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -162,8 +173,12 @@ export default function SearchBar({
   return (
     <div
       // top clears the notch/Dynamic Island; side gutter lives on the inner div below.
-      className="absolute top-[max(1rem,env(safe-area-inset-top))] left-0 right-0 flex justify-center"
-      style={{ zIndex: 1000, pointerEvents: "none" }}
+      // paddingRight (#682): shrinks the flex-center box on the right only,
+      // which re-centers the bar in the map area left of the desktop side
+      // panel without touching the mobile/tablet layout (rightInset is
+      // always 0 there).
+      className="absolute top-[max(1rem,env(safe-area-inset-top))] left-0 right-0 flex justify-center transition-[padding] duration-300"
+      style={{ zIndex: 1000, pointerEvents: "none", paddingRight: rightInset }}
       aria-hidden={false}
     >
       <div

@@ -50,6 +50,9 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { venues as allVenues } from "@/data/venues";
 import type { Venue } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
+import DesktopSidePanel, {
+  DESKTOP_PANEL_RIGHT_CLEARANCE_PX,
+} from "./DesktopSidePanel";
 import ListView from "./ListView";
 import { useOverlayRegistration } from "@/lib/overlayRegistry";
 import {
@@ -1035,17 +1038,25 @@ export default function MapWrapper({
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const isBelow2xl = useMediaQuery(BELOW_2XL_QUERY);
 
+  // #682 — whether the desktop side panel is currently open, kept in a ref
+  // (declared here, before `selectedVenue` exists) so the category fit-bounds
+  // effect further down — which runs before `selectedVenue` is computed in
+  // source order — can read its CURRENT value without becoming a dependency.
+  // The boolean itself is computed and synced into this ref near
+  // `venueSheetOpen` below, once `selectedVenue` is available.
+  const desktopPanelOpenRef = useRef(false);
+
   // perf(#588) — warm DesktopVenueWindow's chunk as soon as desktop layout is
   // known, well before any venue is selected. Reviewer note on the code-split
   // above: the dynamic() call has no `loading` fallback (unlike MapCanvas's
-  // MapLoadingFallback) because DesktopVenueWindow is marker-anchored — its
-  // on-screen position comes from mapboxMap.project() inside the component
-  // itself, so a static placeholder can't honestly stand in for it without
-  // duplicating that positioning logic. Prefetching here instead means the
-  // module is normally already cached by the time a user actually clicks a
-  // pin (search, pan, hover — every desktop session does several other
-  // things first), so the "click does nothing for a beat" gap the reviewer
-  // flagged is rare in practice rather than eliminated outright.
+  // MapLoadingFallback) because DesktopSidePanel (the fixed shell it renders
+  // inside, #682) already has a fixed size/position with no content-derived
+  // measurement — a placeholder would just be an empty panel flash, not worth
+  // a dedicated loading component. Prefetching here instead means the module
+  // is normally already cached by the time a user actually clicks a pin
+  // (search, pan, hover — every desktop session does several other things
+  // first), so the "click does nothing for a beat" gap the reviewer flagged
+  // is rare in practice rather than eliminated outright.
   const desktopWindowPrefetched = useRef(false);
   useEffect(() => {
     if (isMobile || desktopWindowPrefetched.current) return;
@@ -1277,6 +1288,14 @@ export default function MapWrapper({
     const fitPadding = {
       ...basePadding,
       bottom: basePadding.bottom + (isBelow2xl ? BOTTOM_NAV_HEIGHT_PX : 24 + 52),
+      // #682 — an open desktop side panel is also chrome fitted pins must
+      // clear. Added explicitly (not via mapboxMap.setPadding) because
+      // Mapbox's fitBounds REPLACES rather than merges an explicit padding
+      // object with the map's persistent padding (see mapbox-gl's own
+      // `_extendPadding`) — a persistent setPadding call would be silently
+      // ignored by every fitBounds call here, which all pass their own
+      // padding object already.
+      right: basePadding.right + (desktopPanelOpenRef.current ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0),
     };
 
     if (categoriesKey === null) {
@@ -1682,6 +1701,69 @@ export default function MapWrapper({
   // conditional, which was the "fifth ad-hoc boolean" #542 called out.
   useOverlayRegistration(venueSheetOpen);
 
+  // ── Desktop side panel (#682) — replaces the marker-anchored window ──────────
+  // Same "is a venue selected on a map-ish view" condition as venueSheetOpen
+  // above, mirrored for desktop instead of mobile — kept as its own boolean
+  // (not `!venueSheetOpen`) since the two are NOT simply each other's inverse
+  // once a Saved/Menu panel view exists (a later slice; see DESIGN.md).
+  const desktopPanelOpen =
+    !isMobile && (viewMode === "map" || mapUnavailable) && selectedVenue !== null;
+
+  // Synced into the ref declared near `isMobile` above, not read as a direct
+  // dependency of the fit-bounds effect: that effect deliberately excludes
+  // isMobile/isBelow2xl too (see its own trailing comment — "the padding
+  // that was current when the category was selected, not re-zoom on
+  // resize"). Reading whatever the panel's state happens to be AT FIT TIME
+  // follows the same rule without forcing that effect to re-run every time
+  // the panel opens or closes.
+  useEffect(() => {
+    desktopPanelOpenRef.current = desktopPanelOpen;
+  }, [desktopPanelOpen]);
+
+  // Pan the selected pin clear of the panel (#682) — the panel's fixed
+  // position/size means a pin near the right edge would otherwise render
+  // under it. `panBy` shifts the camera in screen pixels (not degrees), so
+  // this works regardless of zoom level; a positive x offset moves the
+  // camera's on-screen reference point right, which is the documented Mapbox
+  // way to make map CONTENT appear to shift left (revealing more on the
+  // right) — see the Mapbox GL JS `panBy` example ("panBy([-100, 0])...
+  // appears to move 100 pixels to the right"). Only pans when the pin is
+  // ACTUALLY hidden (positive overflow) — never recenters a pin that's
+  // already clear, so this never fights a fresh fitBounds/flyTo the same
+  // selection just triggered elsewhere.
+  useEffect(() => {
+    if (isMobile || !mapboxMap || !selectedVenue) return;
+    // `project`/`panBy` guard: real mapboxgl.Map always has both, but
+    // `isMobile` starts `false` (useMediaQuery's SSR-safe default) and only
+    // flips true via a deferred setTimeout — a lint-rule artifact (setState
+    // can't run synchronously in an effect body), never an issue in a real
+    // browser, where a user can't click anything before that timeout fires.
+    // A test that pre-selects a venue via `initialVenueId` (a synchronous
+    // prop, no real user delay) CAN hit this effect on that same first tick,
+    // before isMobile has synced — with a minimal test map mock that only
+    // stubs the methods ITS OWN scenario needs (fitBounds/flyTo/jumpTo, not
+    // project/panBy, since every other desktop-only code path is already
+    // gated by the JSX `!isMobile` render conditional, which this effect —
+    // deliberately independent of what actually renders — is not).
+    if (
+      typeof mapboxMap.project !== "function" ||
+      typeof mapboxMap.getContainer !== "function" ||
+      typeof mapboxMap.panBy !== "function"
+    ) {
+      return;
+    }
+    const pt = mapboxMap.project([selectedVenue.lng, selectedVenue.lat]);
+    const container = mapboxMap.getContainer();
+    const visibleRight = container.offsetWidth - DESKTOP_PANEL_RIGHT_CLEARANCE_PX;
+    const overflow = pt.x - visibleRight;
+    if (overflow <= 0) return;
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    mapboxMap.panBy([overflow, 0], { duration: reducedMotion ? 0 : 300 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVenueId, mapboxMap, isMobile]);
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -1775,6 +1857,7 @@ export default function MapWrapper({
           onFocus={handleSearchFocus}
           onBlur={handleSearchBlur}
           onKeyDownExtra={handleSearchKeyDown}
+          rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
           filtersButton={{
             count: activeFilterCount,
             onClick: () => setFilterPanelOpen(true),
@@ -1980,53 +2063,56 @@ export default function MapWrapper({
         />
       )}
 
-      {/* DesktopVenueWindow — marker-anchored, desktop only. Map mode
-          (#129), OR mapUnavailable (#524) — opens over the list with
-          mapboxMap null; DesktopVenueWindow's own position effect no-ops on
-          a null map (see its header comment) and falls back to centering
-          on screen instead of marker-anchoring. */}
-      {!isMobile && (viewMode === "map" || mapUnavailable) && selectedVenue && (
-        <DesktopVenueWindow
-          key={selectedVenueId}
-          venue={selectedVenue}
-          box={getBoxById(selectedVenueId)}
-          onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
-          expanded={windowExpanded}
-          mapboxMap={mapboxMap}
-          onExpand={() => setWindowExpanded(true)}
-          onCollapse={() => setWindowExpanded(false)}
-          onClose={() => {
-            setSelectedVenueId(null);
-            setWindowExpanded(false);
-          }}
-          onWalkRoute={handleWalkRoute}
-          isWalkRouteActive={
-            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
-          }
-          onClearWalkRoute={handleClearWalkingRoute}
-          walkRouteInfo={
-            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
-              ? walkingRouteInfo
-              : null
-          }
-          walkRouteSteps={
-            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
-              ? walkingRouteSteps
-              : null
-          }
-          activeStepIndex={activeStepIndex}
-          onStepChange={handleStepChange}
-          showWalkLocationHint={
-            selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
-          }
-        />
-      )}
+      {/* DesktopSidePanel (#682) — fixed right-hand shell, replaces the old
+          marker-anchored window. Map mode (#129), OR mapUnavailable (#524) —
+          opens with mapboxMap null; the panel itself doesn't need a map (see
+          DesktopSidePanel's header), and MapWrapper's pan-on-select effect
+          above already no-ops without one. */}
+      <DesktopSidePanel open={desktopPanelOpen}>
+        {selectedVenue && (
+          <DesktopVenueWindow
+            key={selectedVenueId}
+            venue={selectedVenue}
+            box={getBoxById(selectedVenueId)}
+            onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
+            expanded={windowExpanded}
+            onExpand={() => setWindowExpanded(true)}
+            onCollapse={() => setWindowExpanded(false)}
+            onClose={() => {
+              setSelectedVenueId(null);
+              setWindowExpanded(false);
+            }}
+            onWalkRoute={handleWalkRoute}
+            isWalkRouteActive={
+              selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+            }
+            onClearWalkRoute={handleClearWalkingRoute}
+            walkRouteInfo={
+              selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+                ? walkingRouteInfo
+                : null
+            }
+            walkRouteSteps={
+              selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+                ? walkingRouteSteps
+                : null
+            }
+            activeStepIndex={activeStepIndex}
+            onStepChange={handleStepChange}
+            showWalkLocationHint={
+              selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
+            }
+          />
+        )}
+      </DesktopSidePanel>
 
       {/* BottomNav — LAST in DOM order so keyboard users reach the map and the
           search first (spec §12). Rendered unconditionally: it hides ITSELF
           (overlayRegistry.ts) whenever venueSheetOpen or any other
           full-surface overlay is open (#542) — see the useOverlayRegistration
-          call above for venueSheetOpen's own registration. */}
+          call above for venueSheetOpen's own registration. `rightInset`
+          (#682) shifts it left, clear of the desktop side panel — see
+          BottomNav's own header for why the shift is a CSS var, not a class. */}
       <BottomNav
         locale={locale}
         openSection={menuSection}
@@ -2038,6 +2124,7 @@ export default function MapWrapper({
         boxesActive={selectedCategories?.has("blessing_box") ?? false}
         onBoxesToggle={handleBoxesToggle}
         navRef={navRef}
+        rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
       />
     </div>
   );

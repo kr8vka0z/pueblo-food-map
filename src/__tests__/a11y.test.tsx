@@ -252,8 +252,9 @@ describe("HamburgerMenu a11y", () => {
 });
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
-// mapboxMap is optional for structural rendering; pass null to skip positioning.
-// Tests both collapsed and expanded states.
+// #682: DesktopVenueWindow no longer takes a mapboxMap prop (position is
+// owned by DesktopSidePanel now) — nothing to pass here for structural
+// rendering. Tests both collapsed and expanded states.
 
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
 
@@ -263,7 +264,6 @@ describe("DesktopVenueWindow a11y", () => {
       <DesktopVenueWindow
         venue={makeVenue()}
         expanded={false}
-        mapboxMap={null}
         onExpand={() => {}}
         onCollapse={() => {}}
         onClose={() => {}}
@@ -281,7 +281,6 @@ describe("DesktopVenueWindow a11y", () => {
       <DesktopVenueWindow
         venue={makeVenue({ accepts_snap: true, accepts_wic: true })}
         expanded={true}
-        mapboxMap={null}
         onExpand={() => {}}
         onCollapse={() => {}}
         onClose={() => {}}

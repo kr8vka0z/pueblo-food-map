@@ -67,13 +67,6 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: nu
 }
 
 /** Minimal mapboxgl.Map stub for DesktopVenueWindow position logic. */
-const mockMapboxMap = {
-  project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
-  getContainer: vi.fn().mockReturnValue({ offsetWidth: 1000, offsetHeight: 800 }),
-  on: vi.fn().mockReturnThis(),
-  off: vi.fn().mockReturnThis(),
-};
-
 // ─── DesktopVenueWindow — quick view ─────────────────────────────────────────
 
 describe("DesktopVenueWindow — operator attribution (quick view)", () => {
@@ -83,7 +76,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -100,7 +92,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -122,7 +113,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -139,7 +129,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -161,7 +150,6 @@ describe("DesktopVenueWindow — operator attribution (expanded view)", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={true}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -178,7 +166,6 @@ describe("DesktopVenueWindow — operator attribution (expanded view)", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={true}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}

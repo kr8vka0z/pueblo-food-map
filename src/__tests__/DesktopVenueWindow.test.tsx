@@ -16,17 +16,15 @@
  *  12. ES locale: "Show details" → "Ver detalles", "Hide details" → "Ocultar detalles".
  *  13. aria-expanded on toggle button reflects expanded state.
  *
- * Mock strategy:
- *   DesktopVenueWindow requires a mapboxMap instance to compute position.
- *   We pass a minimal stub (project → {x:0,y:0}; getContainer → offsetWidth/Height 1000;
- *   on/off are no-ops) so position is deterministic and the component renders without errors.
+ * #682: DesktopVenueWindow no longer takes a mapboxMap prop or computes its
+ * own position (edge-flip removed — it now renders inside DesktopSidePanel,
+ * which owns position/size) — no map stub needed to render it.
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
-import { BOTTOM_NAV_HEIGHT_PX } from "@/components/BottomNav";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import { track, EVENTS } from "@/lib/analytics";
@@ -59,15 +57,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// ─── Minimal mapboxgl.Map stub ────────────────────────────────────────────────
-
-const mockMapboxMap = {
-  project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
-  getContainer: vi.fn().mockReturnValue({ offsetWidth: 1000, offsetHeight: 800 }),
-  on: vi.fn().mockReturnThis(),
-  off: vi.fn().mockReturnThis(),
-};
-
 // ─── Shared fixture ───────────────────────────────────────────────────────────
 
 function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: number } {
@@ -97,7 +86,6 @@ function renderWindow(
   const props = {
     venue: makeVenue(),
     expanded: false,
-    mapboxMap: mockMapboxMap,
     onExpand: vi.fn(),
     onCollapse: vi.fn(),
     onClose: vi.fn(),
@@ -337,49 +325,6 @@ describe("DesktopVenueWindow — ES locale strings", () => {
   });
 });
 
-// ─── Bottom nav clearance (review item 7a) ────────────────────────────────────
-// BOTTOM_NAV_HEIGHT_PX (76) covers the bottom of the map container at every
-// breakpoint this component renders at (desktop, >=768px) — the bar itself
-// below 2xl, the floating pill's 24px offset + 52px height at 2xl+ — so the
-// position math must treat that band as already occupied, not part of the
-// space a collapsed/expanded window can clip against.
-
-describe("DesktopVenueWindow — bottom nav clearance", () => {
-  test("a window whose default placement would land in the nav band is shifted clear of it", async () => {
-    // Container is 800 tall; the marker sits 4px inside the nav's 76px band
-    // (nav covers y in [724, 800]). The default "top-right of marker" anchor
-    // (window bottom == marker y, collapsed height 220) would render the
-    // window's bottom at 728 — 4px into the nav — if containerH weren't
-    // corrected for the nav's footprint first.
-    const markerY = 800 - BOTTOM_NAV_HEIGHT_PX + 4;
-    const customMap = {
-      project: vi.fn().mockReturnValue({ x: 0, y: markerY }),
-      getContainer: vi.fn().mockReturnValue({ offsetWidth: 1000, offsetHeight: 800 }),
-      on: vi.fn().mockReturnThis(),
-      off: vi.fn().mockReturnThis(),
-    };
-    const venue = makeVenue();
-    render(
-      <DesktopVenueWindow
-        venue={venue}
-        expanded={false}
-        mapboxMap={customMap}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
-        onClose={vi.fn()}
-        locale="en"
-      />,
-    );
-
-    const dialog = screen.getByRole("dialog");
-    await waitFor(() => expect(dialog.style.top).not.toBe(""));
-
-    const top = Number(dialog.style.top.replace("px", ""));
-    const collapsedHeight = 220; // WINDOW_QUICK_H — jsdom renders offsetHeight 0, so the fallback constant applies
-    expect(top + collapsedHeight).toBeLessThanOrEqual(800 - BOTTOM_NAV_HEIGHT_PX);
-  });
-});
-
 // ─── Blessing box (map-first rework, 2026-09-18) ───────────────────────────
 
 function makeBoxVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: number } {
@@ -424,7 +369,6 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         venue={makeBoxVenue()}
         box={makeBox()}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -448,7 +392,6 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         venue={makeBoxVenue()}
         box={makeBox()}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -464,7 +407,6 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         venue={makeBoxVenue()}
         box={makeBox()}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -481,7 +423,6 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         venue={makeBoxVenue({ phone: "(719) 555-0199", address: "999 Should Not Show St" })}
         box={makeBox()}
         expanded={true}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -499,7 +440,6 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         venue={makeBoxVenue()}
         box={null}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -515,7 +455,6 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         venue={makeBoxVenue()}
         box={makeBox()}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -536,7 +475,6 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         venue={makeBoxVenue()}
         box={makeBox()}
         expanded={true}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={onClose}
@@ -558,7 +496,6 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         venue={makeBoxVenue()}
         box={makeBox()}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -574,7 +511,6 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         venue={makeBoxVenue()}
         box={makeBox()}
         expanded={true}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}

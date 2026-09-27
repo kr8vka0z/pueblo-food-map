@@ -36,13 +36,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const mockMapboxMap = {
-  project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
-  getContainer: vi.fn().mockReturnValue({ offsetWidth: 1000, offsetHeight: 800 }),
-  on: vi.fn().mockReturnThis(),
-  off: vi.fn().mockReturnThis(),
-};
-
 function makeBoxVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: number } {
   return {
     id: "test-box-1",
@@ -98,7 +91,6 @@ describe("DesktopVenueWindow — Escape closes only the open PhotoViewer, not th
         venue={makeBoxVenue()}
         box={makeBox()}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={onClose}
@@ -124,7 +116,6 @@ describe("DesktopVenueWindow — Escape closes only the open PhotoViewer, not th
         venue={makeBoxVenue()}
         box={makeBox()}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={onClose}

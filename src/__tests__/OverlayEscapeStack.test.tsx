@@ -143,12 +143,6 @@ describe("#527 — Escape closes only the topmost overlay; scroll lock is shared
   });
 
   test("DesktopVenueWindow open, Filters opened on top: Escape closes Filters only, window stays open", async () => {
-    const mockMapboxMap = {
-      project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
-      getContainer: vi.fn().mockReturnValue({ offsetWidth: 1000, offsetHeight: 800 }),
-      on: vi.fn().mockReturnThis(),
-      off: vi.fn().mockReturnThis(),
-    };
     const venue: Venue & { distanceMiles?: number } = {
       id: "test-venue-527",
       name: "Test Venue 527",
@@ -171,7 +165,6 @@ describe("#527 — Escape closes only the topmost overlay; scroll lock is shared
           <DesktopVenueWindow
             venue={venue}
             expanded={false}
-            mapboxMap={mockMapboxMap}
             onExpand={() => {}}
             onCollapse={() => {}}
             onClose={onClose}

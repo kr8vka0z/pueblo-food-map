@@ -13,13 +13,20 @@
  * renderHook() without any Mapbox or vaul setup.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { venues as allVenues } from "@/data/venues";
 import { haversineMiles } from "@/lib/distance";
 import { computeVenueOpenStatus } from "@/lib/hours";
 import { searchVenues } from "@/lib/searchVenues";
 import { useFavorites } from "@/lib/favorites";
+import { track, EVENTS } from "@/lib/analytics";
 import type { Venue, VenueCategory } from "@/types/venue";
+
+// #485 PR 2: how long a typed search must sit still before it counts as
+// "one search" — long enough that a normal typing cadence collapses to a
+// single event, short enough that Kyle sees a result within the same
+// session. Named so a future tune doesn't require re-deriving the number.
+const SEARCH_TRACK_DEBOUNCE_MS = 600;
 
 /** Lat/lng origin — user position or Pueblo center fallback. */
 export interface LatLng {
@@ -163,6 +170,31 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     filterWic,
     query,
   ]);
+
+  // ── search_used analytics (#485 PR 2) ────────────────────────────────────────
+  //
+  // Debounced on `query` ALONE (not filteredVenues): a filter toggle that
+  // lands after the debounce already fired must not re-send the same search
+  // as a second event — the dashboard's "top searches" would double-count a
+  // search followed by an unrelated SNAP/WIC toggle. `filteredVenuesRef`
+  // reads the CURRENT result count at fire time without adding it as an
+  // effect dependency, since it changes on every render (new Haversine
+  // objects, `origin` drift) for reasons unrelated to the search itself.
+  const filteredVenuesRef = useRef(filteredVenues);
+  useEffect(() => {
+    filteredVenuesRef.current = filteredVenues;
+  }, [filteredVenues]);
+
+  useEffect(() => {
+    if (query.trim() === "") return;
+    const timer = setTimeout(() => {
+      void track(EVENTS.SEARCH_USED, {
+        results: filteredVenuesRef.current.length,
+        term: query,
+      });
+    }, SEARCH_TRACK_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   // ── anyFilterActive ──────────────────────────────────────────────────────────
   const anyFilterActive =

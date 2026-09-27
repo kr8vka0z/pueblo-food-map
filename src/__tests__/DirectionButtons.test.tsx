@@ -23,6 +23,13 @@ import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DirectionButtons from "@/components/DirectionButtons";
 import type { Venue } from "@/types/venue";
+import { track, EVENTS } from "@/lib/analytics";
+
+// #485 PR 2: mock the whole module so EVENTS keeps its real allowlist values.
+vi.mock("@/lib/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics")>()),
+  track: vi.fn(),
+}));
 
 function makeVenue(overrides: Partial<Venue> = {}): Venue {
   return {
@@ -887,5 +894,58 @@ describe("DirectionButtons — location-needed hint (#207)", () => {
     expect(walkBtn.disabled).toBe(false);
     await user.click(walkBtn);
     expect(onWalk).toHaveBeenCalledWith(venue);
+  });
+});
+
+// ─── Analytics (#485 PR 2) ───────────────────────────────────────────────────
+
+describe("DirectionButtons — analytics", () => {
+  test("clicking Walk (to start a route) fires directions_clicked mode=walk", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue();
+    render(<DirectionButtons venue={venue} onWalk={vi.fn()} locale="en" />);
+    await user.click(screen.getByRole("button", { name: /walk/i }));
+    expect(track).toHaveBeenCalledWith(EVENTS.DIRECTIONS_CLICKED, {
+      mode: "walk",
+      venueId: venue.id,
+    });
+  });
+
+  test("clicking Walk to CLEAR an active route does NOT fire directions_clicked", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue();
+    render(
+      <DirectionButtons
+        venue={venue}
+        onWalk={vi.fn()}
+        locale="en"
+        isRouteActive={true}
+        onClearRoute={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /clear/i }));
+    expect(track).not.toHaveBeenCalled();
+  });
+
+  test("clicking Bus fires directions_clicked mode=bus", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue();
+    render(<DirectionButtons venue={venue} onWalk={vi.fn()} locale="en" />);
+    await user.click(screen.getByRole("link", { name: /bus/i }));
+    expect(track).toHaveBeenCalledWith(EVENTS.DIRECTIONS_CLICKED, {
+      mode: "bus",
+      venueId: venue.id,
+    });
+  });
+
+  test("clicking Drive fires directions_clicked mode=drive", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue();
+    render(<DirectionButtons venue={venue} onWalk={vi.fn()} locale="en" />);
+    await user.click(screen.getByRole("link", { name: /drive/i }));
+    expect(track).toHaveBeenCalledWith(EVENTS.DIRECTIONS_CLICKED, {
+      mode: "drive",
+      venueId: venue.id,
+    });
   });
 });

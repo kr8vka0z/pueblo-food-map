@@ -31,6 +31,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { useOverlayEscape, useOverlayRegistration, useScrollLock } from "@/lib/overlayRegistry";
+import { track, EVENTS } from "@/lib/analytics";
 import type { VenueCategory } from "@/types/venue";
 
 // Same order the old CategoryDropdown's BROWSE_CATEGORIES used (legend order,
@@ -329,21 +330,32 @@ export default function FilterPanel({
             label={t("filter.openNow", locale)}
             count={openNowCount}
             checked={filterOpenNow}
-            onClick={onToggleOpenNow}
+            onClick={() => {
+              // #485 PR 2: `on` is the state AFTER this toggle — the current
+              // prop value is still the pre-click state at click time.
+              void track(EVENTS.FILTER_TOGGLED, { filter: "open_now", on: !filterOpenNow });
+              onToggleOpenNow();
+            }}
           />
           <SwitchRow
             icon={<CreditCard aria-hidden size={14} className="text-[var(--color-ink-500)] shrink-0" />}
             label={t("filter.snap", locale)}
             count={snapCount}
             checked={filterSnap}
-            onClick={onToggleSnap}
+            onClick={() => {
+              void track(EVENTS.FILTER_TOGGLED, { filter: "snap", on: !filterSnap });
+              onToggleSnap();
+            }}
           />
           <SwitchRow
             icon={<Apple aria-hidden size={14} className="text-[var(--color-ink-500)] shrink-0" />}
             label={t("filter.wic", locale)}
             count={wicCount}
             checked={filterWic}
-            onClick={onToggleWic}
+            onClick={() => {
+              void track(EVENTS.FILTER_TOGGLED, { filter: "wic", on: !filterWic });
+              onToggleWic();
+            }}
           />
 
           <div className="border-t border-[var(--color-bone-200)] mx-5 my-1" aria-hidden="true" />
@@ -364,7 +376,10 @@ export default function FilterPanel({
                 <input
                   type="checkbox"
                   checked={checked}
-                  onChange={() => onToggleCategory(cat)}
+                  onChange={() => {
+                    void track(EVENTS.FILTER_TOGGLED, { filter: cat, on: !checked });
+                    onToggleCategory(cat);
+                  }}
                   className={
                     "h-4 w-4 rounded border-[var(--color-bone-300)] text-[var(--color-sage-600)] " +
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"

@@ -52,6 +52,13 @@
  * No Tab trap, no outside-click-to-close: `aria-modal="false"`, same as the
  * DesktopVenueWindow this replaces (which never had either either) — a
  * deliberate, non-modal panel, not a dialog overlay.
+ *
+ * `react-hooks/refs` on the `children(handleClose)` render call below is a
+ * false positive: `handleClose` closes over `triggerRef`/`onClose` but only
+ * DEREFERENCES the ref when actually invoked (a click or Escape), never
+ * during this render — the rule can't tell "invoked now" from "passed as a
+ * value for later" and flags every ref-closing callback threaded through a
+ * render prop.
  */
 
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
@@ -167,14 +174,7 @@ function DesktopSidePanelShell({
         width: DESKTOP_PANEL_WIDTH_PX,
       }}
     >
-      {/* eslint-disable-next-line react-hooks/refs -- `handleClose` closes
-          over `triggerRef`/`onClose`, but only DEREFERENCES the ref when
-          actually invoked (a click or the Escape handler above), never
-          during this render — the flagged line just passes the function
-          value down, the same render-prop shape any `onClose` callback
-          uses. The rule's static check can't tell "invoked now" from
-          "passed as a value for later," so it flags every ref-closing
-          callback threaded through a render prop. */}
+      {/* eslint-disable-next-line react-hooks/refs -- false positive, see file header. */}
       {children(handleClose)}
     </div>
   );

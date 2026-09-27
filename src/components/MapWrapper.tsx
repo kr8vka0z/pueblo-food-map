@@ -1118,13 +1118,26 @@ export default function MapWrapper({
   // goes back to the list rather than closing outright, matching the "←
   // Saved" link's own destination — same transition, so they share this
   // one callback instead of two near-identical ones.
+  //
+  // Fix (PR #688 review, Important item 1): going back to Saved is NOT a
+  // real close — it must NOT deselect the venue or drop its walking route,
+  // since the map-side state (pin highlight, route) has nothing to do with
+  // which view the PANEL happens to be showing. The branch is read from
+  // `sidePanelView` directly, BEFORE calling setSidePanelView, rather than
+  // inside that call's updater function — a setState updater must be a
+  // pure function of its own previous value only; reaching outside it to
+  // conditionally fire OTHER setState calls (setSelectedVenueId,
+  // setWindowExpanded) from inside one is the same class of bug React's
+  // "no setState in a render/updater body" rule exists to catch, even
+  // though this specific case wouldn't have triggered that lint rule.
   const closeDesktopPanel = useCallback(() => {
-    setSidePanelView((current) =>
-      current?.kind === "venue" && current.from === "saved" ? { kind: "saved" } : null,
-    );
-    setSelectedVenueId(null);
-    setWindowExpanded(false);
-  }, [setSelectedVenueId, setWindowExpanded]);
+    const isBackToSaved = sidePanelView?.kind === "venue" && sidePanelView.from === "saved";
+    setSidePanelView(isBackToSaved ? { kind: "saved" } : null);
+    if (!isBackToSaved) {
+      setSelectedVenueId(null);
+      setWindowExpanded(false);
+    }
+  }, [sidePanelView, setSelectedVenueId, setWindowExpanded]);
 
   // Single choke point for "a venue got selected" on desktop (#682 8b,
   // coordinator: "MapWrapper owns one desktop sidePanelView union ...

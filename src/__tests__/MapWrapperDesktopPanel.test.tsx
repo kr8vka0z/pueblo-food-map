@@ -354,4 +354,115 @@ describe("MapWrapper desktop side panel — Saved/Menu views (#682 8b)", () => {
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
   });
+
+  // PR #688 review, Important item 1: closeDesktopPanel used to clear
+  // selectedVenueId/windowExpanded unconditionally, including the "← Saved"
+  // branch — deselecting the pin (and dropping any walking route) just from
+  // navigating back to the list. Proxy for "is this venue still selected":
+  // VenueMarker renders a sage (#4A8466) ring <circle> around the pin ONLY
+  // when selected (VenueMarker.tsx) — the plain MapPin glyph ALSO has its
+  // own decorative circle (the icon's "eye") in both states, so match on
+  // the ring's specific stroke color, not just circle presence.
+  function getMarkerButton(venueName: string): HTMLElement {
+    // VenueMarker's aria-label is "<name>, <category>[, <distance>]" — match
+    // on that exact prefix, not a bare substring: the venue card open at the
+    // same time has its OWN buttons whose aria-label also CONTAINS the name
+    // (Share/Favorite, e.g. "Remove La Familia Community Garden from saved").
+    const escaped = venueName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return screen.getByRole("button", { name: new RegExp(`^${escaped},`) });
+  }
+
+  function markerIsSelected(venueName: string): boolean {
+    return getMarkerButton(venueName).querySelector('circle[stroke="#4A8466"]') !== null;
+  }
+
+  test("'← Saved' keeps the venue selected (marker stays highlighted); a real close deselects it", async () => {
+    addFavorite(SAVED_VENUE.id);
+    const user = userEvent.setup();
+    await renderMapWrapper();
+    fireMapReady(400);
+    const initialDialog = await screen.findByRole("dialog", { name: new RegExp(TEST_VENUE.name, "i") });
+    await user.click(within(initialDialog).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
+
+    expect(markerIsSelected(SAVED_VENUE.name)).toBe(false);
+
+    await user.click(screen.getByTestId("nav-saved"));
+    await screen.findByText("Saved places");
+    await user.click(screen.getByText(SAVED_VENUE.name));
+    const dialog = await screen.findByRole("dialog", { name: new RegExp(SAVED_VENUE.name, "i") });
+    expect(markerIsSelected(SAVED_VENUE.name)).toBe(true);
+
+    // "← Saved" — NOT a real close. The venue must stay selected.
+    await user.click(within(dialog).getByRole("button", { name: "← Saved" }));
+    await screen.findByText("Saved places");
+    expect(markerIsSelected(SAVED_VENUE.name)).toBe(true);
+
+    // A venue opened from Saved always routes ✕/Escape back to Saved, never
+    // a full close (item 4: "← Saved returns to the list") — so to prove a
+    // REAL close still deselects, open the SAME venue via its own pin
+    // instead (from=undefined), then close it with ✕.
+    await user.click(getMarkerButton(SAVED_VENUE.name));
+    const pinOpenedDialog = await screen.findByRole("dialog", { name: new RegExp(SAVED_VENUE.name, "i") });
+    await user.click(within(pinOpenedDialog).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
+    expect(markerIsSelected(SAVED_VENUE.name)).toBe(false);
+  });
+
+  // PR #688 review, Important item 3: focus management through the full
+  // Saved -> venue -> back -> close round trip.
+  test("focus returns to the Saved bar button after Saved -> row -> '← Saved' -> ✕ close", async () => {
+    addFavorite(SAVED_VENUE.id);
+    const user = userEvent.setup();
+    await renderMapWrapper();
+    fireMapReady(400);
+    const initialDialog = await screen.findByRole("dialog", { name: new RegExp(TEST_VENUE.name, "i") });
+    await user.click(within(initialDialog).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
+
+    const savedNavButton = screen.getByTestId("nav-saved");
+    await user.click(savedNavButton);
+    await screen.findByText("Saved places");
+
+    await user.click(screen.getByText(SAVED_VENUE.name));
+    const dialog = await screen.findByRole("dialog", { name: new RegExp(SAVED_VENUE.name, "i") });
+
+    await user.click(within(dialog).getByRole("button", { name: "← Saved" }));
+    const savedHeading = await screen.findByText("Saved places");
+
+    // Back at the Saved list — its OWN header carries a ✕ too (every
+    // HamburgerMenuContent view does), independent of any venue card. A
+    // venue-from-saved's ✕ always goes back to Saved (item 4), never a full
+    // close, so THIS is the ✕ that actually closes the panel here.
+    const savedPanel = savedHeading.closest('[data-testid="desktop-side-panel"]') as HTMLElement;
+    await user.click(within(savedPanel).getByRole("button", { name: /close/i }));
+
+    await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(savedNavButton));
+  });
+
+  test("focus returns to the pin that opened a venue card while Menu was showing (Menu -> venue -> close)", async () => {
+    const user = userEvent.setup();
+    await renderMapWrapper();
+    fireMapReady(400);
+    const initialDialog = await screen.findByRole("dialog", { name: new RegExp(TEST_VENUE.name, "i") });
+    await user.click(within(initialDialog).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
+
+    await user.click(screen.getByTestId("nav-top"));
+    await screen.findByRole("menu");
+
+    // Selecting a venue via its own pin is an OUTSIDE click — it recaptures
+    // the return-focus trigger away from the Menu bar item, same as opening
+    // fresh (see DesktopSidePanel's own header on the capture-effect guard).
+    const otherVenue = allRealVenues[2];
+    const pinButton = getMarkerButton(otherVenue.name);
+    await user.click(pinButton);
+
+    const venueDialog = await screen.findByRole("dialog", { name: new RegExp(otherVenue.name, "i") });
+    await user.click(within(venueDialog).getByRole("button", { name: /close/i }));
+
+    await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(pinButton));
+  });
 });

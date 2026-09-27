@@ -82,9 +82,17 @@
   // Worker secret — see AGENTS.md's Secrets table). Read via the Cloudflare
   // env binding at request time, never process.env (named environments
   // don't populate wrangler `var`s into process.env under OpenNext).
+  // #681 (admin Dashboard "What people do on the map") — PostHog project id
+  // for the Query API (src/lib/posthogQuery.ts). A plain var, not a secret,
+  // same call as CF_ANALYTICS_ACCOUNT_ID above (an identifier, not a
+  // credential — the read-scoped key, POSTHOG_PERSONAL_API_KEY, IS a Worker
+  // secret; see AGENTS.md's Secrets table). One project serves prod AND
+  // staging (both post events through the same /ingest proxy to the same
+  // PostHog project, #485), so the id is identical in both places below.
   "vars": {
     "ANALYTICS_EXCLUDED_IPS": "66.33.12.72,2607:3640:121:e110::/64",
-    "CF_ANALYTICS_ACCOUNT_ID": "8878836432b8b59274b8d0c711901d20"
+    "CF_ANALYTICS_ACCOUNT_ID": "8878836432b8b59274b8d0c711901d20",
+    "POSTHOG_PROJECT_ID": "630731"
   },
   // Staging (#223 step 1): repo-config only, NOT yet wired to a deploy pipeline
   // or DNS route. Named environments do not inherit bindings (assets,
@@ -124,7 +132,11 @@
         // Dashboard still reads the PRODUCTION site tag (#680's own "Staging
         // can point at the same site tag or show 'unavailable'"), since
         // dev.pueblofoodmap.com has no RUM beacon of its own (#652).
-        "CF_ANALYTICS_ACCOUNT_ID": "8878836432b8b59274b8d0c711901d20"
+        "CF_ANALYTICS_ACCOUNT_ID": "8878836432b8b59274b8d0c711901d20",
+        // Same PostHog project as prod (#681) — see the top-level
+        // POSTHOG_PROJECT_ID comment. posthogQuery.ts itself still scopes
+        // every query to the production `$host`, same as cfAnalytics.ts.
+        "POSTHOG_PROJECT_ID": "630731"
       },
       "assets": {
         "directory": ".open-next/assets",

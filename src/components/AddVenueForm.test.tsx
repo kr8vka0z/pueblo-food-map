@@ -255,7 +255,7 @@ describe("AddVenueForm — submissionId threading (#259)", () => {
     expect(body.submissionId).toBeUndefined();
   });
 
-  test("a successful create WITH submissionId redirects to /admin/submissions (back to the queue), not /admin", async () => {
+  test("a successful create WITH submissionId redirects to /admin/places?show=review&from=public (#675: back to Places' review filter, /admin/submissions is now a redirect), not /admin", async () => {
     mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
     const user = userEvent.setup();
     render(<AddVenueForm submissionId={42} />);
@@ -263,7 +263,7 @@ describe("AddVenueForm — submissionId threading (#259)", () => {
 
     await user.click(screen.getByRole("button", { name: /Add venue/i }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/submissions"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places?show=review&from=public"));
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 

@@ -15,9 +15,11 @@
  * the auth gate, the (#259) optional submission lookup below, and page
  * chrome.
  *
- * #259: when opened from the review queue's "Review & approve" link
- * (/admin/submissions -> SubmissionsReviewView), the URL carries
- * `?submission=<id>`. A valid, still-pending, kind="new_venue" row is
+ * #259: when opened from a "new_venue" submission card's "Review & approve"
+ * link (#675: that card now lives in the Places tab's "Suggested new place"
+ * row / SuggestionsBox, not a standalone /admin/submissions queue —
+ * SubmissionCard.tsx), the URL carries `?submission=<id>`. A valid,
+ * still-pending, kind="new_venue" row is
  * fetched and mapped (src/lib/adminVenueForm.ts's
  * mapSubmissionPayloadToFormValues) to AddVenueForm's `initialValues`, with
  * that row's own id threaded through as `submissionId` so the eventual

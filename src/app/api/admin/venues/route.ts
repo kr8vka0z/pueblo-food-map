@@ -15,8 +15,9 @@
  *
  * #259 review-queue extension: an optional `submissionId` in the request
  * body (present only when this create was reached by approving a
- * `public_submissions` "new_venue" card at /admin/submissions) appends a
- * THIRD statement to the same atomic `db.batch()` below, flipping that
+ * `public_submissions` "new_venue" card — #675: now a "Suggested new place"
+ * row on the Places tab, not a standalone /admin/submissions queue)
+ * appends a THIRD statement to the same atomic `db.batch()` below, flipping that
  * submission row to `status='approved'`. Riding the existing batch (rather
  * than a second, separate write) is what guarantees the new venue and its
  * originating submission's approval commit together — see ARCHITECTURE.md

@@ -293,6 +293,21 @@ describe("ProposalCard — reject (every kind)", () => {
     await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
   });
 
+  test("#675 fix: confirming reject sends the typed reason in the body, not an empty {}", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true }) });
+    const user = userEvent.setup();
+    render(<ProposalCard proposal={makeUpdateProposal()} />);
+
+    await user.click(screen.getByRole("button", { name: /^Reject$/i }));
+    await user.type(screen.getByLabelText(/reason/i), "Duplicate of an existing venue.");
+    await user.click(screen.getByRole("button", { name: /Confirm reject/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/admin/proposals/1/reject");
+    expect(JSON.parse(init.body as string)).toEqual({ reason: "Duplicate of an existing venue." });
+  });
+
   test("a failed reject shows an inline error, no refresh", async () => {
     mockFetch.mockResolvedValueOnce({ status: 404, json: async () => ({ ok: false, error: "stale" }) });
     const user = userEvent.setup();

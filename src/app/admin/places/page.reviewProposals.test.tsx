@@ -91,7 +91,11 @@ function makeFakeDb(venueRows: AdminVenueRow[], proposalRows: ChangeProposalRow[
     prepare: (sql: string) => ({
       all: async () => ({
         success: true,
-        results: sql.includes("FROM change_proposals") ? proposalRows : venueRows,
+        // #675: this page now also queries public_submissions — always
+        // empty here, since this file covers change_proposals grouping
+        // only (public_submissions grouping has its own test file,
+        // page.reviewSubmissions.test.tsx).
+        results: sql.includes("FROM change_proposals") ? proposalRows : sql.includes("FROM public_submissions") ? [] : venueRows,
         meta: {},
       }),
     }),
@@ -111,7 +115,7 @@ describe("PlacesPage — folding Data refresh in (#674)", () => {
 
     render(await PlacesPage());
 
-    expect(screen.getByText("1 to review · 1 from the data refresh")).toBeDefined();
+    expect(screen.getByText("1 to review · 1 from the data refresh, 0 from the public")).toBeDefined();
     expect(screen.queryByText("Suggested new place")).toBeNull();
   });
 
@@ -138,7 +142,7 @@ describe("PlacesPage — folding Data refresh in (#674)", () => {
     render(await PlacesPage());
 
     expect(screen.getByRole("link", { name: "Northside Pantry" }).getAttribute("href")).toBe("/admin/venues/new?proposal=2");
-    expect(screen.getByText("1 to review · 1 from the data refresh")).toBeDefined();
+    expect(screen.getByText("1 to review · 1 from the data refresh, 0 from the public")).toBeDefined();
   });
 
   test("no pending proposals -> no ToReviewSummaryBox at all", async () => {

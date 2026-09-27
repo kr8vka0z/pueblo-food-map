@@ -1,44 +1,40 @@
 "use client";
 
 /**
- * SubmissionsReviewView — the admin review queue's card list (#259, all five
- * ACs). Rendered by src/app/admin/submissions/page.tsx, which owns the auth
- * gate and the `SELECT ... WHERE status = 'pending' ORDER BY created_at DESC`
- * read; this component is presentational + interactive only, same
- * Server-Component-data / Client-Component-action split as VenueListView and
- * PublishPanel.
+ * SubmissionCard — one `public_submissions` row's review card (#675, "fold
+ * the Review queue into Places"). Extracted from the now-deleted
+ * SubmissionsReviewView.tsx (#259) — that component owned both this card
+ * AND the standalone /admin/submissions queue's list/empty-state chrome;
+ * the queue itself is gone (redirects to /admin/places?show=review&from=public),
+ * but the SAME card renders in two places now: the venue edit page's
+ * "Suggestions to review" box (SuggestionsBox.tsx, generalized to dispatch
+ * on ReviewItem's `kind`) and nowhere else — a `new_venue` submission's own
+ * "Suggested new place" row on the Places tab links straight to
+ * /admin/venues/new?submission=<id> (VenueListView.tsx), the same handoff
+ * this card's own "Review & approve" link already used, so it never needed
+ * its own card there.
  *
- * Cards, not a dense table (unlike VenueListView): a submission carries far
- * more per-row detail than a venue's list columns (full address, hours,
- * contact, notes, or a closure's description) — a table would either clip
- * that detail or force horizontal scroll — where VenueListView's dense
- * tabular comparison genuinely suits a large row count, a handful of
- * pending submissions read better as review cards.
+ * Actions differ by kind, per the issue's own spec — a report ISN'T a
+ * ready-made change the way a `change_proposals` row is, so there's no
+ * one-click Approve:
+ *   - "closure" (every ISSUE_TYPES value, not just an actual closure —
+ *     migrations/0002's `kind` column predates the report form's issue-type
+ *     picker and was never renamed): **Mark done** (POST
+ *     .../submissions/<id>/done — the admin already fixed the venue's
+ *     fields via AddVenueForm's own save, or removed it via
+ *     ArchiveVenueButton's existing `?submission=` archive-and-resolve
+ *     path, a SEPARATE action this card doesn't render) or **Reject**
+ *     (optional reason).
+ *   - "new_venue": a plain navigation Link to
+ *     /admin/venues/new?submission=<id> (unchanged from #259/#270 — the
+ *     actual approve happens inside POST /api/admin/venues's existing
+ *     atomic batch, see that route's header) plus the same Reject.
  *
- * Approve is a plain navigation Link for BOTH kinds (#270 made closure
- * match new_venue) — reusing existing routes rather than inventing new
- * ones, and nothing to POST from this component for either approve path:
- *   - new_venue "Review & approve" hands off to
- *     /admin/venues/new?submission=<id>, where the actual approve happens
- *     inside POST /api/admin/venues's existing atomic batch (see that
- *     route's header).
- *   - closure "Review & approve" hands off to
- *     /admin/venues/<targetVenueId>/edit?submission=<id> — that page shows
- *     the report's details and lets the admin verify/fix the venue (or
- *     remove it) before approving; the actual approve happens inside
- *     POST /api/admin/venues/<id>/archive's existing atomic batch when
- *     ArchiveVenueButton is used from that context (see that route's and
- *     ArchiveVenueButton's headers). Originally a one-click confirm+archive
- *     button; changed because a closure report can mean "the hours
- *     changed," not only "this place is gone" — the admin should get the
- *     same edit-before-approve review new_venue already gets.
- *   - Reject (either kind) is the one write this slice adds:
- *     POST /api/admin/submissions/<id>/reject.
- *
- * On any successful action, router.refresh() re-runs the Server Component's
- * `WHERE status = 'pending'` query — the acted-on card simply stops
- * matching and disappears from the next render; this component holds no
- * local copy of the list to reconcile.
+ * Public submissions can point at a place that's since been removed
+ * (issue's own "Risks" note) — this card renders identically either way; it
+ * has no opinion on the target venue's current status, only on `submission`
+ * itself. The caller (edit page / Places tab) decides which row to render
+ * it under.
  */
 
 import { useState } from "react";
@@ -47,52 +43,25 @@ import { useRouter } from "next/navigation";
 import { categoryLabels } from "@/data/venues";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import type { VenueCategory } from "@/types/venue";
-import type {
-  ClosurePayload,
-  NewVenuePayload,
-  PublicSubmissionKind,
-} from "@/lib/publicSubmissions";
+import type { ClosurePayload, NewVenuePayload, ReviewSubmission } from "@/lib/publicSubmissions";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-interface ReviewSubmissionBase {
-  id: number;
-  createdAt: string;
-  /** submitter_email column — present regardless of payload-parse success. */
-  submitterEmail: string | null;
-  /** target_venue_id column — populated for "closure", null for "new_venue"; a
-   *  real column (not inside the JSON payload), so the closure approve action
-   *  works even on a row whose payload failed to parse. */
-  targetVenueId: string | null;
+export interface SubmissionCardProps {
+  submission: ReviewSubmission;
 }
 
-/**
- * Discriminated on `parseError` first, then `kind` — a row whose stored
- * `payload` JSON failed to parse (src/app/admin/submissions/page.tsx wraps
- * that per-row) degrades to the `parseError: true` arm regardless of kind,
- * carrying no payload at all rather than a guessed/partial one.
- */
-export type ReviewSubmission =
-  | (ReviewSubmissionBase & { kind: "new_venue"; parseError: false; payload: NewVenuePayload })
-  | (ReviewSubmissionBase & { kind: "closure"; parseError: false; payload: ClosurePayload })
-  | (ReviewSubmissionBase & { kind: PublicSubmissionKind; parseError: true; payload: null });
-
-export interface SubmissionsReviewViewProps {
-  submissions: ReviewSubmission[];
-}
-
-// ─── Shared styling (reuses existing DESIGN.md tokens — no new ones) ───────
+// ─── Shared styling (reuses existing DESIGN.md tokens — no new ones,
+// duplicated per-file same as ProposalCard.tsx's own copy) ─────────────────
 
 const cardClass =
   "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5";
 
-const KIND_BADGE: Record<PublicSubmissionKind, { label: string; className: string }> = {
-  // sage-100/700: this codebase's established "calm, not urgent" badge
-  // pairing (DESIGN.md; VenueCard's SNAP/WIC badges use the same pairing).
+// sage-100/700: this codebase's established "calm, not urgent" badge
+// pairing (DESIGN.md; VenueCard's SNAP/WIC badges use the same pairing).
+const KIND_BADGE: Record<ReviewSubmission["kind"], { label: string; className: string }> = {
   new_venue: { label: "New place", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   // clay-100/700: the established informational-emphasis pairing (DESIGN.md;
   // VenueListView's "Unpublished changes" marker, VenueCard's SNAP badge).
-  closure: { label: "Closure report", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
+  closure: { label: "Public report", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
 };
 
 const primaryButtonClass =
@@ -136,40 +105,30 @@ function yesNo(value: boolean): string {
   return value ? "Yes" : "No";
 }
 
-// ─── Component ──────────────────────────────────────────────────────────────
-
-export default function SubmissionsReviewView({ submissions }: SubmissionsReviewViewProps) {
-  if (submissions.length === 0) {
-    return (
-      <div className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-16 text-center">
-        <p className="text-sm font-semibold text-[var(--color-ink-700)]">No submissions to review</p>
-        <p className="mt-1 text-sm text-[var(--color-ink-500)]">
-          New suggestions and closure reports will show up here.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <ul className="flex flex-col gap-4">
-      {submissions.map((submission) => (
-        <li key={submission.id}>
-          <SubmissionCard submission={submission} />
-        </li>
-      ))}
-    </ul>
-  );
+/**
+ * A short, human line for VenueListView's "To review" cell — mirrors
+ * summarizeProposalForRow's own role in that file exactly, just for a
+ * `public_submissions` row instead of a `change_proposals` one. Exported
+ * (not local to VenueListView.tsx) for the same reuse reason ProposalCard.tsx's
+ * SOURCE_BADGE/fieldLabel are: the one place that knows how to summarize a
+ * submission for a table row is this file, which already owns its full
+ * detail rendering.
+ */
+export function summarizeSubmissionForRow(submission: ReviewSubmission): string {
+  if (submission.parseError) return "Public report — couldn't read details";
+  if (submission.kind === "new_venue") return "Suggested new place";
+  const issueLabel = ISSUE_TYPES[submission.payload.issueType as IssueTypeKey] ?? submission.payload.issueType;
+  return `"${issueLabel}"`;
 }
-
-// ─── One card + its own local action state ─────────────────────────────────
 
 type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };
 
-function SubmissionCard({ submission }: { submission: ReviewSubmission }) {
+export default function SubmissionCard({ submission }: SubmissionCardProps) {
   const router = useRouter();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [rejectState, setRejectState] = useState<ActionState>({ status: "idle" });
+  const [doneState, setDoneState] = useState<ActionState>({ status: "idle" });
 
   const badge = KIND_BADGE[submission.kind];
   const reasonFieldId = `reject-reason-${submission.id}`;
@@ -189,6 +148,20 @@ function SubmissionCard({ submission }: { submission: ReviewSubmission }) {
       setRejectState({ status: "error", message: "Something went wrong. This wasn't rejected. Try again." });
     } catch {
       setRejectState({ status: "error", message: "Something went wrong. This wasn't rejected. Try again." });
+    }
+  }
+
+  async function handleMarkDone() {
+    setDoneState({ status: "submitting" });
+    try {
+      const res = await fetch(`/api/admin/submissions/${submission.id}/done`, { method: "POST" });
+      if (res.status === 200) {
+        router.refresh();
+        return;
+      }
+      setDoneState({ status: "error", message: "Something went wrong. This wasn't marked done. Try again." });
+    } catch {
+      setDoneState({ status: "error", message: "Something went wrong. This wasn't marked done. Try again." });
     }
   }
 
@@ -223,18 +196,15 @@ function SubmissionCard({ submission }: { submission: ReviewSubmission }) {
             Review &amp; approve
           </Link>
         )}
-        {submission.kind === "closure" && submission.targetVenueId && (
-          // No `!submission.parseError` gate here (unlike new_venue above):
-          // target_venue_id is a real column, independent of the parsed
-          // payload, so a row whose JSON failed to parse can still be
-          // reviewed on the edit page — same reasoning the parseError
-          // branch below still offers Reject.
-          <Link
-            href={`/admin/venues/${submission.targetVenueId}/edit?submission=${submission.id}`}
+        {submission.kind === "closure" && (
+          <button
+            type="button"
+            onClick={handleMarkDone}
+            disabled={doneState.status === "submitting"}
             className={primaryButtonClass}
           >
-            Review &amp; approve
-          </Link>
+            {doneState.status === "submitting" ? "Marking done…" : "Mark done"}
+          </button>
         )}
         {!rejectOpen && (
           <button type="button" onClick={() => setRejectOpen(true)} className={secondaryButtonClass}>
@@ -242,6 +212,12 @@ function SubmissionCard({ submission }: { submission: ReviewSubmission }) {
           </button>
         )}
       </div>
+
+      {doneState.status === "error" && (
+        <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
+          {doneState.message}
+        </p>
+      )}
 
       {rejectOpen && (
         <div className="mt-4 border-t border-[var(--color-bone-200)] pt-4">

@@ -26,7 +26,7 @@
 import Link from "next/link";
 import type { AdminNavCounts } from "@/lib/adminNavCounts";
 
-export type AdminActiveTab = "dashboard" | "boxes" | "places" | "submissions";
+export type AdminActiveTab = "dashboard" | "boxes" | "places";
 
 export interface AdminNavProps {
   email: string;
@@ -55,16 +55,18 @@ interface NavItem {
 // from "Adoption requests" — public-facing copy says "sponsor," never
 // "adopt.") #674 folded the "Data refresh" tab into Places — that item and
 // its own /admin/flags link are gone, and the pending-proposal count pill
-// it used to carry (`proposals`) now shows on Places instead. #677 folds
-// "Photo review" and "Sponsor requests" into Blessing Boxes the same way —
-// both items and their /admin/box-photos, /admin/box-adopters links are
-// gone (now redirects), and their combined count pill moves to Blessing
-// Boxes.
+// it used to carry (`proposals`) now shows on Places instead. #675 folds
+// "Review queue" into Places the SAME way — that item and its own
+// /admin/submissions link are gone (now a redirect), and its own
+// pending-count pill (`submissions`) joins `proposals` on the Places link
+// instead of getting its own item back. #677 folds "Photo review" and
+// "Sponsor requests" into Blessing Boxes the same way — both items and
+// their /admin/box-photos, /admin/box-adopters links are gone (now
+// redirects), and their combined count pill moves to Blessing Boxes.
 const NAV_ITEMS: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/admin" },
   { key: "boxes", label: "Blessing Boxes", href: "/admin/boxes", countKeys: ["photos", "adopters"] },
-  { key: "places", label: "Places", href: "/admin/places", countKeys: ["proposals"] },
-  { key: "submissions", label: "Review queue", href: "/admin/submissions", countKeys: ["submissions"] },
+  { key: "places", label: "Places", href: "/admin/places", countKeys: ["proposals", "submissions"] },
 ];
 
 // Class order deliberately keeps "text-sm" apart from a contiguous

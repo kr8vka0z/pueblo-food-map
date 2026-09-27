@@ -61,6 +61,19 @@
  * EVERY pending change_proposals row targeting this venue as its own card —
  * see resolvePendingProposals() below and SuggestionsBox.tsx's own header.
  *
+ * #675 ("fold the Review queue into Places"): resolvePendingSubmissions()
+ * below adds every pending `public_submissions` "closure" row targeting
+ * this venue to the SAME box, as its own ReviewItem — a "new_venue"
+ * submission never targets an existing venue (target_venue_id is NULL for
+ * that kind) so it can never appear here; it keeps its own
+ * /admin/venues/new?submission=<id> hand-off unchanged (VenueListView.tsx's
+ * "Suggested new place" row). `?submission=<id>` still separately resolves
+ * a CLOSURE-REPORT BANNER + ArchiveVenueButton's submissionId (see
+ * resolveClosureReportContext below, unchanged) — that is the
+ * remove-and-resolve path for a report that says the place is really gone;
+ * this box is for reading every OPEN report/proposal on the page, whether
+ * or not one of them happens to be the one `?submission=` names.
+ *
  * #265: passes `venue.updated_at` straight through to AddVenueForm's
  * `expectedUpdatedAt` prop — the optimistic-concurrency precondition PATCH
  * /api/admin/venues/[id] checks on save (see that route's + AddVenueForm's
@@ -118,6 +131,7 @@ import BoxReviewBox from "@/components/BoxReviewBox";
 import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
+import { parseSubmissionRow, type ReviewItem } from "@/lib/publicSubmissions";
 import { loadAllCheckinsForBox, type AdminCheckinRow } from "@/lib/blessingBoxes";
 import { loadHostSubscriptions } from "@/lib/boxAlerts";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
@@ -141,7 +155,7 @@ interface ClosureReportContext {
    *  match this context was accepted on) is a real column independent of
    *  that payload, so the submissionId itself is still good; only the
    *  banner's descriptive text degrades to generic copy. Same
-   *  parseError-tolerant reasoning as SubmissionsReviewView's closure
+   *  parseError-tolerant reasoning as SubmissionCard's closure
    *  card. */
   detail: { issueLabel: string; description: string } | null;
 }
@@ -301,6 +315,29 @@ async function resolvePendingProposals(db: D1Database, venueId: string): Promise
 }
 
 /**
+ * #675: every PENDING `public_submissions` "closure" row targeting this
+ * venue, newest first — same query shape and degrade-to-empty posture as
+ * resolvePendingProposals() above (a D1 failure here must never take down
+ * the rest of the edit page). `kind = 'closure'` only: a "new_venue" row's
+ * target_venue_id is always NULL (migrations/0002's own schema comment), so
+ * it could never match this WHERE clause anyway — the filter is explicit
+ * here for readability, not because it changes what rows come back.
+ */
+async function resolvePendingSubmissions(db: D1Database, venueId: string) {
+  try {
+    const result = await db
+      .prepare(
+        "SELECT * FROM public_submissions WHERE target_venue_id = ? AND status = 'pending' AND kind = 'closure' ORDER BY created_at DESC",
+      )
+      .bind(venueId)
+      .all<PublicSubmissionRow>();
+    return result.results.map(parseSubmissionRow);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Resolves the "Waiting to publish" box's data for `venue`, or null when it
  * shouldn't render at all — see this file's own header for the full
  * reasoning. Only ever called for a place whose status is already known to
@@ -374,6 +411,7 @@ export default async function EditVenuePage({
   let boxReviewAdopters: AdminBoxAdopterRow[] = [];
   let waitingToPublish: WaitingToPublishChange[] = [];
   let pendingProposals: ParsedProposal[] = [];
+  let suggestionItems: ReviewItem[] = [];
   let suggestionsVenue: VenueLookup | null = null;
   let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
 
@@ -399,7 +437,15 @@ export default async function EditVenuePage({
       // when there's actually something to show it to — the common case
       // (an unedited place) skips this entirely.
       pendingProposals = await resolvePendingProposals(db, id);
-      if (pendingProposals.length > 0) {
+      // #675: every pending closure report targeting this venue joins the
+      // SAME "Suggestions to review" box as the proposals above — one
+      // ReviewItem[] the box dispatches on by `kind`, see SuggestionsBox.tsx.
+      const pendingSubmissions = await resolvePendingSubmissions(db, id);
+      suggestionItems = [
+        ...pendingProposals.map((proposal): ReviewItem => ({ kind: "proposal", proposal })),
+        ...pendingSubmissions.map((submission): ReviewItem => ({ kind: "submission", submission })),
+      ];
+      if (suggestionItems.length > 0) {
         const lookup = await loadVenueLookup(db, [id]);
         suggestionsVenue = lookup[id] ?? null;
       }
@@ -430,8 +476,8 @@ export default async function EditVenuePage({
         {venue.category === "blessing_box" && (
           <BoxReviewBox photos={boxReviewPhotos} adopters={boxReviewAdopters} />
         )}
-        {pendingProposals.length > 0 && suggestionsVenue && (
-          <SuggestionsBox proposals={pendingProposals} venue={suggestionsVenue} />
+        {suggestionItems.length > 0 && suggestionsVenue && (
+          <SuggestionsBox items={suggestionItems} venue={suggestionsVenue} />
         )}
         <WaitingToPublishBox changes={waitingToPublish} />
         {closureContext && (
@@ -442,8 +488,8 @@ export default async function EditVenuePage({
                 ? `${closureContext.detail.issueLabel} — ${closureContext.detail.description}`
                 : "A closure report was submitted for this venue."}
             </p>
-            <Link href="/admin/submissions" className="mt-2 inline-block font-medium underline underline-offset-2">
-              Back to review queue
+            <Link href="/admin/places?show=review&from=public" className="mt-2 inline-block font-medium underline underline-offset-2">
+              Back to Places
             </Link>
           </div>
         )}

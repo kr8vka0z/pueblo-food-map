@@ -54,6 +54,22 @@
  * pre-selects the "To review" chip (passed down as a plain boolean prop,
  * never parsed client-side — see VenueListView's own header).
  *
+ * #675 ("fold the Review queue into Places"): this page ALSO loads every
+ * pending `public_submissions` row (the same query the now-retired
+ * /admin/submissions/page.tsx used to run) and groups it the SAME way as
+ * proposals above, into the SAME `ReviewItem[]` shape VenueListView and
+ * SuggestionsBox both already dispatch on: a "closure" row's
+ * target_venue_id always matches a `venues` row (venues are archived, never
+ * deleted — see migrations/0002_public_submissions.sql's own comment on why
+ * that column isn't a FOREIGN KEY), including an archived one, so a report
+ * against a place that's since been removed shows on that place's own
+ * "Removed" row rather than being silently dropped. A "new_venue" row has
+ * no target_venue_id at all and becomes its own "Suggested new place" row,
+ * same shape as a genuinely-new `add` proposal. `?from=public` mirrors
+ * `?show=review`'s own pre-select convention, pointed at the source filter
+ * this time (VenueListView's own header covers why it's a plain prop, never
+ * parsed client-side).
+ *
 
  * On AccessDeniedError this delegates to handlePageAuthError()
  * (src/lib/adminAuthErrors.ts): a missing Better Auth session redirects to
@@ -78,6 +94,7 @@ import { isProductionWorker } from "@/lib/publishVenues";
 import { publishedVenues } from "@/data/published-venues";
 import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
 import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
+import { parseSubmissionRow, type PublicSubmissionRow, type ReviewItem, type ReviewSubmission } from "@/lib/publicSubmissions";
 import VenueListView from "@/components/VenueListView";
 import ToReviewSummaryBox from "@/components/ToReviewSummaryBox";
 import PublishPanel from "@/components/PublishPanel";
@@ -85,33 +102,40 @@ import AdminNav from "@/components/AdminNav";
 import type { AdminVenueRow } from "@/types/venue";
 
 /**
- * Groups every pending proposal by whether its target already exists among
- * `venues` (any status — an archived match is a restore, still attached to
- * that row) or not (a genuinely-new `add`, its own "Suggested new place"
- * row). See this file's own header for the full reasoning.
+ * Groups every pending review item (a `change_proposals` row OR a
+ * `public_submissions` row, both already normalized to `ReviewItem`) by
+ * whether its target already exists among `venues` (any status — an
+ * archived match is either a restore proposal or a report against a
+ * since-removed place, both still attached to that row) or not (a
+ * genuinely-new `add` proposal, or a "new_venue" submission — neither has an
+ * existing row to attach to, so both become their own "Suggested new place"
+ * row). See this file's own header for the full #674/#675 reasoning.
  */
-function groupProposalsByTarget(
-  proposals: ParsedProposal[],
+function groupItemsByTarget(
+  items: ReviewItem[],
   venues: AdminVenueRow[],
-): { proposalsByVenueId: Record<string, ParsedProposal[]>; addProposals: ParsedProposal[] } {
+): { itemsByVenueId: Record<string, ReviewItem[]>; addItems: ReviewItem[] } {
   const venueIds = new Set(venues.map((v) => v.id));
-  const proposalsByVenueId: Record<string, ParsedProposal[]> = {};
-  const addProposals: ParsedProposal[] = [];
-  for (const proposal of proposals) {
-    const targetId = proposal.row.target_venue_id;
-    if (venueIds.has(targetId)) {
-      (proposalsByVenueId[targetId] ??= []).push(proposal);
+  const itemsByVenueId: Record<string, ReviewItem[]> = {};
+  const addItems: ReviewItem[] = [];
+  for (const item of items) {
+    const targetId = item.kind === "proposal" ? item.proposal.row.target_venue_id : item.submission.targetVenueId;
+    if (targetId && venueIds.has(targetId)) {
+      (itemsByVenueId[targetId] ??= []).push(item);
     } else {
-      addProposals.push(proposal);
+      addItems.push(item);
     }
   }
-  return { proposalsByVenueId, addProposals };
+  return { itemsByVenueId, addItems };
 }
 
-export default async function PlacesPage({ searchParams }: { searchParams?: Promise<{ show?: string }> } = {}) {
+export default async function PlacesPage({
+  searchParams,
+}: { searchParams?: Promise<{ show?: string; from?: string }> } = {}) {
   let email: string;
   let venues: AdminVenueRow[];
   let proposals: ParsedProposal[] = [];
+  let submissions: ReviewSubmission[] = [];
   let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
 
   try {
@@ -127,6 +151,12 @@ export default async function PlacesPage({ searchParams }: { searchParams?: Prom
       .prepare("SELECT * FROM change_proposals WHERE status = 'pending' ORDER BY created_at DESC")
       .all<ChangeProposalRow>();
     proposals = proposalsResult.results.map(parseProposalRow);
+    // #675: same query the now-retired /admin/submissions/page.tsx used to
+    // run before that queue folded into this page.
+    const submissionsResult = await db
+      .prepare("SELECT * FROM public_submissions WHERE status = 'pending' ORDER BY created_at DESC")
+      .all<PublicSubmissionRow>();
+    submissions = submissionsResult.results.map(parseSubmissionRow);
     navCounts = await loadAdminNavCounts(db);
   } catch (err) {
     handlePageAuthError(err);
@@ -141,16 +171,19 @@ export default async function PlacesPage({ searchParams }: { searchParams?: Prom
     statusByVenueId[venue.id] = displayStatusOf(venue, publishedById.get(venue.id), { isStaging });
   }
 
-  const { proposalsByVenueId, addProposals } = groupProposalsByTarget(proposals, venues);
-  const reviewRowCount =
-    Object.values(proposalsByVenueId).filter((p) => p.length > 0).length + addProposals.length;
-  const { show } = searchParams ? await searchParams : {};
+  const items: ReviewItem[] = [
+    ...proposals.map((proposal): ReviewItem => ({ kind: "proposal", proposal })),
+    ...submissions.map((submission): ReviewItem => ({ kind: "submission", submission })),
+  ];
+  const { itemsByVenueId, addItems } = groupItemsByTarget(items, venues);
+  const reviewRowCount = Object.values(itemsByVenueId).filter((i) => i.length > 0).length + addItems.length;
+  const { show, from } = searchParams ? await searchParams : {};
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={email} active="places" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6">
-        <ToReviewSummaryBox reviewRowCount={reviewRowCount} proposals={proposals} />
+        <ToReviewSummaryBox reviewRowCount={reviewRowCount} proposals={proposals} submissionCount={submissions.length} />
         {isStaging ? (
           // #673 pt.6: staging can never Publish (isProductionWorker() is
           // false there) — a Publish panel that always no-ops, next to
@@ -165,9 +198,10 @@ export default async function PlacesPage({ searchParams }: { searchParams?: Prom
         <VenueListView
           venues={venues}
           statusByVenueId={statusByVenueId}
-          proposalsByVenueId={proposalsByVenueId}
-          addProposals={addProposals}
+          itemsByVenueId={itemsByVenueId}
+          addItems={addItems}
           initialShowReview={show === "review"}
+          initialSourceFilter={from === "public" ? "public" : undefined}
         />
       </div>
     </main>

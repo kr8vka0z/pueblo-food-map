@@ -453,7 +453,8 @@ Each route handler (`src/app/*/submit/route.ts`) runs the same pipeline:
 **`/suggest/submit` and `/report/submit` also queue (#258):** after step 5
 they insert one pending `public_submissions` row
 (`migrations/0002_public_submissions.sql`) before the email — the record an
-admin reviews at `/admin/submissions`. The insert has its own try/catch: a D1
+admin reviews on the Places tab (#675 folded the standalone
+`/admin/submissions` queue in; see "Admin panel" below). The insert has its own try/catch: a D1
 failure is logged (`db_write_failed`) and never blocks the email or changes
 the response, so the email stays the authoritative success signal.
 `/feedback/submit` never queues — general feedback has nothing for an admin
@@ -823,21 +824,32 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
     Pulls API, not the Checks API, because a fine-grained PAT can't read
     check runs at all. It fails soft: skipped with no token (staging), and
     any GitHub error reads as "in progress".
-- **`/admin/submissions` — public submissions queue (#259).** Reads every
-  pending `public_submissions` row, newest first, as cards
-  (`SubmissionsReviewView`). Approving reuses the venue routes rather than a
-  parallel pipeline: a `new_venue` card links to
+- **Public submissions queue (#259) — folded into the Places tab by #675.**
+  `/admin/submissions` now just redirects to
+  `/admin/places?show=review&from=public`. The Places page reads every
+  pending `public_submissions` row, newest first, groups a `closure` report
+  onto its reported venue's own row (any status, including archived — a
+  report against a since-removed place still shows) and a `new_venue`
+  suggestion as its own "Suggested new place" row, both tagged "Public" —
+  see "Refresh proposals" below for the parallel `change_proposals`
+  mechanism this mirrors. Both source's items render on the venue edit
+  page's "Suggestions to review" box (`SuggestionsBox`, now a discriminated
+  `ReviewItem[]` — a `change_proposals` item renders `ProposalCard`, a
+  `public_submissions` item renders `SubmissionCard`). A closure card's
+  actions are **Mark done** (`POST /api/admin/submissions/<id>/done` — the
+  admin already fixed the venue via a save or an archive elsewhere; writes
+  one `audit_log` row) and Reject (its own route, no `audit_log` row — it
+  changes no venue). A `new_venue` card still links to
   `/admin/venues/new?submission=<id>` (prefilled by
-  `mapSubmissionPayloadToFormValues()`), and a `closure` card links to
-  `/admin/venues/<target_venue_id>/edit?submission=<id>` (#270 — a closure
-  report can mean "hours changed," not only "gone"). The edit page
-  cross-checks the submission's `target_venue_id` before accepting it. The
-  optional `submissionId` then rides the create or archive route's own
-  `db.batch()`, so the venue change and the approval land together.
-  Reject is its own route with no `audit_log` row (it changes no venue).
-  Each row's JSON `payload` is parsed on its own (`parseSubmissionRow`), so
-  one bad row degrades to a still-rejectable "couldn't read details" card.
-  The payload mapper's category fallback and notes folding are explained in
+  `mapSubmissionPayloadToFormValues()`); the optional `submissionId` rides
+  the create route's own `db.batch()` so the venue insert and the approval
+  land together. A `closure` report that says the place is really gone
+  still uses the pre-existing `?submission=<id>` edit-page banner +
+  `ArchiveVenueButton` remove-and-resolve batch (#270), unchanged. Each row's
+  JSON `payload` is parsed on its own (`parseSubmissionRow`,
+  `src/lib/publicSubmissions.ts`), so one bad row degrades to a
+  still-rejectable "couldn't read details" card. The payload mapper's
+  category fallback and notes folding are explained in
   `src/lib/adminVenueForm.ts`.
 - **Refresh proposals (#390) — folded into the Places tab by #674.**
   `/admin/flags` now just redirects to `/admin/places?show=review`. See

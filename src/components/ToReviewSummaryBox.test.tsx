@@ -81,19 +81,19 @@ function makeUpdateProposal(): ParsedProposal {
 
 describe("ToReviewSummaryBox — summary line", () => {
   test("renders nothing when nothing is pending", () => {
-    const { container } = render(<ToReviewSummaryBox reviewRowCount={0} proposals={[]} />);
+    const { container } = render(<ToReviewSummaryBox reviewRowCount={0} proposals={[]} submissionCount={0} />);
     expect(container.firstChild).toBeNull();
   });
 
-  test("shows the row count and the raw proposal count", () => {
-    render(<ToReviewSummaryBox reviewRowCount={2} proposals={[makeUpdateProposal(), makeDateOnlyProposal()]} />);
-    expect(screen.getByText("2 to review · 2 from the data refresh")).toBeDefined();
+  test("shows the row count, the raw proposal count, and the raw submission count", () => {
+    render(<ToReviewSummaryBox reviewRowCount={2} proposals={[makeUpdateProposal(), makeDateOnlyProposal()]} submissionCount={3} />);
+    expect(screen.getByText("2 to review · 2 from the data refresh, 3 from the public")).toBeDefined();
   });
 });
 
 describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
   test("no button when nothing pending is date-only", () => {
-    render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeUpdateProposal()]} />);
+    render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeUpdateProposal()]} submissionCount={0} />);
     expect(screen.queryByRole("button", { name: /Approve all/i })).toBeNull();
   });
 
@@ -106,6 +106,7 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
           makeDateOnlyProposal({ row: { ...makeDateOnlyProposal().row, id: 21 } }),
           makeUpdateProposal(),
         ]}
+        submissionCount={0}
       />,
     );
     expect(screen.getByRole("button", { name: "Approve all 2 date-only updates" })).toBeDefined();
@@ -114,7 +115,7 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
   test("declining the confirm dialog never calls fetch", async () => {
     confirmSpy.mockReturnValue(false);
     const user = userEvent.setup();
-    render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} />);
+    render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} submissionCount={0} />);
 
     await user.click(screen.getByRole("button", { name: /Approve all/i }));
     expect(confirmSpy).toHaveBeenCalledTimes(1);
@@ -129,6 +130,7 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
       <ToReviewSummaryBox
         reviewRowCount={1}
         proposals={[makeDateOnlyProposal({ row: { ...makeDateOnlyProposal().row, id: 42 } })]}
+        submissionCount={0}
       />,
     );
 
@@ -147,7 +149,7 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
   test("a failed request shows an inline error and never refreshes", async () => {
     mockFetch.mockResolvedValueOnce({ status: 500, json: async () => ({ ok: false }) });
     const user = userEvent.setup();
-    render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} />);
+    render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} submissionCount={0} />);
 
     await user.click(screen.getByRole("button", { name: /Approve all/i }));
 
@@ -158,7 +160,7 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
   test("a too_many_ids response shows the specific message, not the generic one", async () => {
     mockFetch.mockResolvedValueOnce({ status: 400, json: async () => ({ ok: false, error: "too_many_ids" }) });
     const user = userEvent.setup();
-    render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} />);
+    render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} submissionCount={0} />);
 
     await user.click(screen.getByRole("button", { name: /Approve all/i }));
 
@@ -170,7 +172,7 @@ describe("ToReviewSummaryBox — bulk approve date-only updates", () => {
   test("the result line is aria-live=\"polite\"", async () => {
     mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ approved: 1, skipped: [] }) });
     const user = userEvent.setup();
-    render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} />);
+    render(<ToReviewSummaryBox reviewRowCount={1} proposals={[makeDateOnlyProposal()]} submissionCount={0} />);
 
     await user.click(screen.getByRole("button", { name: /Approve all/i }));
     await waitFor(() => {

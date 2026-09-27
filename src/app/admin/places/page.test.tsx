@@ -107,18 +107,24 @@ function makeVenueRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
 
 /**
  * Matches the page's real call chain: db.prepare(sql).all<AdminVenueRow>()
- * for the venues query, and (#674) a second .all() for the pending
- * change_proposals query — dispatches on SQL text so the two never cross
- * wires (a fake that returned `seedRows` for either query used to work
- * before #674 added the second one; every test below either doesn't care
- * about proposals at all, or passes them explicitly).
+ * for the venues query, (#674) a second .all() for the pending
+ * change_proposals query, and (#675) a third for the pending
+ * public_submissions query — dispatches on SQL text so none of the three
+ * ever cross wires (a fake that returned `seedRows` for any of them used to
+ * work before each addition added its own query; every test below either
+ * doesn't care about proposals/submissions at all, or passes them
+ * explicitly).
  */
-function makeFakeDb(seedRows: AdminVenueRow[], proposalRows: unknown[] = []) {
+function makeFakeDb(seedRows: AdminVenueRow[], proposalRows: unknown[] = [], submissionRows: unknown[] = []) {
   return {
     prepare: (sql: string) => ({
       all: async () => ({
         success: true,
-        results: sql.includes("FROM change_proposals") ? proposalRows : seedRows,
+        results: sql.includes("FROM change_proposals")
+          ? proposalRows
+          : sql.includes("FROM public_submissions")
+            ? submissionRows
+            : seedRows,
         meta: {},
       }),
     }),
@@ -148,14 +154,13 @@ describe("PlacesPage — auth guard", () => {
     expect(screen.getByText("Eastside Pantry")).toBeDefined();
     expect(screen.getByText("Main Street Grocery")).toBeDefined();
     // Shared AdminNav (admin dashboard build) renders the nav row now —
-    // "Places" is the active tab, and the review queue is still one click
-    // away from here. #674 folded the old "Data refresh" nav item into
-    // Places itself — there is no separate link for it any more.
+    // "Places" is the active tab. #674 folded the old "Data refresh" nav
+    // item into Places itself, and #675 folded "Review queue" the same
+    // way — there is no separate link for either any more.
     const placesLink = screen.getByRole("link", { name: /^Places/ });
     expect(placesLink.getAttribute("aria-current")).toBe("page");
-    const reviewQueueLink = screen.getByRole("link", { name: "Review queue" });
-    expect(reviewQueueLink.getAttribute("href")).toBe("/admin/submissions");
     expect(screen.queryByRole("link", { name: /Data refresh/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Review queue" })).toBeNull();
     expect(forbidden).not.toHaveBeenCalled();
   });
 

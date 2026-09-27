@@ -16,13 +16,15 @@
  * else on the new Places tab a bulk action across every pending proposal
  * would make sense. Judgment call, not spec'd.
  *
- * `reviewRowCount` (places with something to review) and `proposals.length`
- * (raw pending-proposal count) are reported separately rather than
- * collapsed into one number: a place can carry more than one pending
- * proposal, so the two can legitimately differ, and #675 (folding the
- * public Review queue's own items in too) will need that distinction to
- * stay meaningful once "from the data refresh" needs to be true for only
- * SOME of the total.
+ * `reviewRowCount` (places with something to review), `proposals.length`
+ * (raw pending-proposal count, "from the data refresh"), and
+ * `submissionCount` (raw pending-public-submission count, "from the
+ * public" — #675) are reported separately rather than collapsed into one
+ * number: a place can carry more than one pending item, and the two source
+ * counts can legitimately overlap on the SAME row (e.g. a data-refresh
+ * update proposal and a public closure report both targeting one venue), so
+ * summing them would double-count that row while still under-counting the
+ * two sources' own totals.
  *
  * Renders nothing when there's nothing pending — same "hide when empty"
  * convention WaitingToPublishBox already follows on this same page.
@@ -34,10 +36,12 @@ import { isDateOnlyUpdateProposal } from "@/lib/adminProposals";
 import type { ParsedProposal } from "@/lib/adminProposals";
 
 export interface ToReviewSummaryBoxProps {
-  /** Places rows (existing venues + "Suggested new place" rows) with at least one pending proposal. */
+  /** Places rows (existing venues + "Suggested new place" rows) with at least one pending item (a proposal, a submission, or both). */
   reviewRowCount: number;
   /** Every pending proposal across the whole Places tab — scopes the bulk-approve button (see this file's own header on why this is the full set, not whichever chip/filter is currently active). */
   proposals: ParsedProposal[];
+  /** #675: every pending public_submissions row's own count ("from the public"). */
+  submissionCount: number;
 }
 
 const cardClass =
@@ -57,7 +61,7 @@ type BulkApproveState =
   | { status: "done"; approved: number; skipped: number }
   | { status: "error"; message: string };
 
-export default function ToReviewSummaryBox({ reviewRowCount, proposals }: ToReviewSummaryBoxProps) {
+export default function ToReviewSummaryBox({ reviewRowCount, proposals, submissionCount }: ToReviewSummaryBoxProps) {
   const router = useRouter();
   const [bulkState, setBulkState] = useState<BulkApproveState>({ status: "idle" });
 
@@ -115,7 +119,7 @@ export default function ToReviewSummaryBox({ reviewRowCount, proposals }: ToRevi
     <div className={cardClass}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-[var(--color-ink-700)]">
-          {reviewRowCount} to review · {proposals.length} from the data refresh
+          {reviewRowCount} to review · {proposals.length} from the data refresh, {submissionCount} from the public
         </p>
         {dateOnlyIds.length > 0 && (
           <button

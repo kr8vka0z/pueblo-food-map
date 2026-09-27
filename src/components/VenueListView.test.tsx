@@ -14,6 +14,7 @@ import VenueListView from "@/components/VenueListView";
 import type { AdminVenueRow } from "@/types/venue";
 import type { AdminDisplayStatus } from "@/lib/adminVenues";
 import type { ParsedProposal } from "@/lib/adminProposals";
+import type { ReviewItem } from "@/lib/publicSubmissions";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -137,6 +138,10 @@ function makeAddProposal(overrides: Partial<ParsedProposal> = {}): ParsedProposa
   } as ParsedProposal;
 }
 
+function wrapProposal(proposal: ParsedProposal): ReviewItem {
+  return { kind: "proposal", proposal };
+}
+
 describe("VenueListView — quick-filter chips (#674)", () => {
   test("shows a count next to each chip, and 'All places' matches everything", () => {
     const venues = [makeVenue({ id: "manual-abc", name: "Eastside Pantry" }), makeVenue({ id: "manual-xyz", name: "Westside Grocery" })];
@@ -144,7 +149,7 @@ describe("VenueListView — quick-filter chips (#674)", () => {
       <VenueListView
         venues={venues}
         statusByVenueId={{ "manual-abc": "draft", "manual-xyz": "live" }}
-        proposalsByVenueId={{ "manual-abc": [makeUpdateProposal()] }}
+        itemsByVenueId={{ "manual-abc": [makeUpdateProposal()].map(wrapProposal) }}
       />,
     );
 
@@ -161,7 +166,7 @@ describe("VenueListView — quick-filter chips (#674)", () => {
       <VenueListView
         venues={venues}
         statusByVenueId={makeStatusMap(venues)}
-        proposalsByVenueId={{ "manual-abc": [makeUpdateProposal()] }}
+        itemsByVenueId={{ "manual-abc": [makeUpdateProposal()].map(wrapProposal) }}
       />,
     );
 
@@ -177,7 +182,7 @@ describe("VenueListView — quick-filter chips (#674)", () => {
       <VenueListView
         venues={venues}
         statusByVenueId={makeStatusMap(venues)}
-        proposalsByVenueId={{ "manual-abc": [makeUpdateProposal()] }}
+        itemsByVenueId={{ "manual-abc": [makeUpdateProposal()].map(wrapProposal) }}
         initialShowReview
       />,
     );
@@ -194,7 +199,7 @@ describe("VenueListView — To review column", () => {
       <VenueListView
         venues={venues}
         statusByVenueId={makeStatusMap(venues)}
-        proposalsByVenueId={{ "manual-abc": [makeUpdateProposal()] }}
+        itemsByVenueId={{ "manual-abc": [makeUpdateProposal()].map(wrapProposal) }}
       />,
     );
 
@@ -218,7 +223,7 @@ describe("VenueListView — default sort puts something-to-review rows first", (
       <VenueListView
         venues={venues}
         statusByVenueId={makeStatusMap(venues)}
-        proposalsByVenueId={{ "manual-z": [makeUpdateProposal({ row: { ...makeUpdateProposal().row, target_venue_id: "manual-z" } })] }}
+        itemsByVenueId={{ "manual-z": [makeUpdateProposal({ row: { ...makeUpdateProposal().row, target_venue_id: "manual-z" } })].map(wrapProposal) }}
       />,
     );
 
@@ -234,7 +239,7 @@ describe("VenueListView — 'Suggested new place' rows (#674)", () => {
       <VenueListView
         venues={venues}
         statusByVenueId={makeStatusMap(venues)}
-        addProposals={[makeAddProposal()]}
+        addItems={[wrapProposal(makeAddProposal())]}
       />,
     );
 
@@ -251,7 +256,7 @@ describe("VenueListView — 'Suggested new place' rows (#674)", () => {
       <VenueListView
         venues={venues}
         statusByVenueId={makeStatusMap(venues)}
-        addProposals={[makeAddProposal()]}
+        addItems={[wrapProposal(makeAddProposal())]}
       />,
     );
 
@@ -273,7 +278,7 @@ describe("VenueListView — an archived venue's name stays a link when it has a 
       <VenueListView
         venues={venues}
         statusByVenueId={{ "manual-abc": "removed" }}
-        proposalsByVenueId={{ "manual-abc": [makeAddProposal({ row: { ...makeAddProposal().row, target_venue_id: "manual-abc" } })] }}
+        itemsByVenueId={{ "manual-abc": [makeAddProposal({ row: { ...makeAddProposal().row, target_venue_id: "manual-abc" } })].map(wrapProposal) }}
       />,
     );
     expect(screen.getByRole("link", { name: "Eastside Pantry" })).toBeDefined();
@@ -287,7 +292,7 @@ describe("VenueListView — source/lane filters (moved from /admin/flags)", () =
       <VenueListView
         venues={venues}
         statusByVenueId={makeStatusMap(venues)}
-        proposalsByVenueId={{ "manual-abc": [makeUpdateProposal()] }}
+        itemsByVenueId={{ "manual-abc": [makeUpdateProposal()].map(wrapProposal) }}
       />,
     );
     expect(screen.queryByRole("button", { name: "All sources" })).toBeNull();
@@ -303,9 +308,9 @@ describe("VenueListView — source/lane filters (moved from /admin/flags)", () =
       <VenueListView
         venues={venues}
         statusByVenueId={makeStatusMap(venues)}
-        proposalsByVenueId={{
-          "manual-abc": [makeUpdateProposal({ row: { ...makeUpdateProposal().row, source: "osm" } })],
-          "manual-xyz": [makeUpdateProposal({ row: { ...makeUpdateProposal().row, source: "plentiful", target_venue_id: "manual-xyz" } })],
+        itemsByVenueId={{
+          "manual-abc": [makeUpdateProposal({ row: { ...makeUpdateProposal().row, source: "osm" } })].map(wrapProposal),
+          "manual-xyz": [makeUpdateProposal({ row: { ...makeUpdateProposal().row, source: "plentiful", target_venue_id: "manual-xyz" } })].map(wrapProposal),
         }}
       />,
     );
@@ -314,5 +319,154 @@ describe("VenueListView — source/lane filters (moved from /admin/flags)", () =
 
     expect(screen.getByRole("link", { name: "Eastside Pantry" })).toBeDefined();
     expect(screen.queryByRole("link", { name: "Westside Grocery" })).toBeNull();
+  });
+});
+
+// ─── #675: folding the public Review queue into Places ─────────────────────
+
+function makeClosureSubmissionItem(overrides: Partial<ReviewItem & { kind: "submission" }> = {}): ReviewItem {
+  return {
+    kind: "submission",
+    submission: {
+      id: 9,
+      kind: "closure",
+      createdAt: "2026-09-01T12:00:00.000Z",
+      submitterEmail: "reporter@example.com",
+      targetVenueId: "manual-abc",
+      parseError: false,
+      payload: {
+        venueId: "manual-abc",
+        venueName: "Eastside Pantry",
+        venueAddress: "123 Test St, Pueblo, CO",
+        issueType: "hours",
+        description: "Hours are wrong.",
+        contactEmail: "reporter@example.com",
+      },
+    },
+    ...overrides,
+  } as ReviewItem;
+}
+
+function makeNewVenueSubmissionItem(): ReviewItem {
+  return {
+    kind: "submission",
+    submission: {
+      id: 5,
+      kind: "new_venue",
+      createdAt: "2026-09-01T12:00:00.000Z",
+      submitterEmail: "suggester@example.com",
+      targetVenueId: null,
+      parseError: false,
+      payload: {
+        venueName: "Northside Pantry",
+        address: "900 Elm St, Pueblo, CO",
+        category: "pantry",
+        acceptsSnap: true,
+        acceptsWic: false,
+        submitterEmail: "suggester@example.com",
+      },
+    },
+  } as ReviewItem;
+}
+
+describe("VenueListView — public submissions in the To review column (#675)", () => {
+  test("a venue with a pending public report shows 'Public: <issue label>' and a Public tag", () => {
+    const venues = [makeVenue({ id: "manual-abc" })];
+    render(
+      <VenueListView
+        venues={venues}
+        statusByVenueId={makeStatusMap(venues)}
+        itemsByVenueId={{ "manual-abc": [makeClosureSubmissionItem()] }}
+      />,
+    );
+
+    expect(screen.getByText(/Public: "Hours are wrong or out of date"/)).toBeDefined();
+    expect(screen.getByText("Public")).toBeDefined();
+  });
+
+  test("a report against an archived (Removed) venue still shows on that venue's row", () => {
+    const venues = [makeVenue({ id: "manual-abc", status: "archived" })];
+    render(
+      <VenueListView
+        venues={venues}
+        statusByVenueId={{ "manual-abc": "removed" }}
+        itemsByVenueId={{ "manual-abc": [makeClosureSubmissionItem()] }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Eastside Pantry" })).toBeDefined();
+    expect(screen.getByText(/Public: "Hours are wrong or out of date"/)).toBeDefined();
+  });
+});
+
+describe("VenueListView — a new_venue submission renders its own 'Suggested new place' row, tagged Public (#675)", () => {
+  test("links to the new-venue form via ?submission=<id>, and shows a Public tag alongside 'Suggested new place'", () => {
+    const venues = [makeVenue({ id: "manual-abc" })];
+    render(
+      <VenueListView
+        venues={venues}
+        statusByVenueId={makeStatusMap(venues)}
+        addItems={[makeNewVenueSubmissionItem()]}
+      />,
+    );
+
+    const link = screen.getByRole("link", { name: "Northside Pantry" });
+    expect(link.getAttribute("href")).toBe("/admin/venues/new?submission=5");
+    expect(screen.getAllByText("Suggested new place").length).toBeGreaterThanOrEqual(1);
+    // "Public" appears twice — the row-status badge AND the To review
+    // column's own item tag (both correct, same reasoning as the
+    // "Suggested new place" double-render above).
+    expect(screen.getAllByText("Public").length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("VenueListView — source filter gains 'The public' (#675)", () => {
+  test("filtering by 'The public' shows only rows with a pending submission", async () => {
+    const venues = [
+      makeVenue({ id: "manual-abc", name: "Eastside Pantry" }),
+      makeVenue({ id: "manual-xyz", name: "Westside Grocery" }),
+    ];
+    const user = userEvent.setup();
+    render(
+      <VenueListView
+        venues={venues}
+        statusByVenueId={makeStatusMap(venues)}
+        itemsByVenueId={{
+          "manual-abc": [wrapProposal(makeUpdateProposal({ row: { ...makeUpdateProposal().row, source: "osm" } }))],
+          "manual-xyz": [
+            {
+              kind: "submission",
+              submission: { ...(makeClosureSubmissionItem() as Extract<ReviewItem, { kind: "submission" }>).submission, targetVenueId: "manual-xyz" },
+            },
+          ],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "The public" }));
+
+    expect(screen.getByRole("link", { name: "Westside Grocery" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: "Eastside Pantry" })).toBeNull();
+  });
+
+  test("?from=public pre-selects 'The public' source filter chip", () => {
+    const venues = [
+      makeVenue({ id: "manual-abc", name: "Eastside Pantry" }),
+      makeVenue({ id: "manual-xyz", name: "Westside Grocery" }),
+    ];
+    render(
+      <VenueListView
+        venues={venues}
+        statusByVenueId={makeStatusMap(venues)}
+        itemsByVenueId={{
+          "manual-abc": [wrapProposal(makeUpdateProposal({ row: { ...makeUpdateProposal().row, source: "osm" } }))],
+          "manual-xyz": [makeClosureSubmissionItem()],
+        }}
+        initialSourceFilter="public"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Westside Grocery" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: "Eastside Pantry" })).toBeNull();
   });
 });

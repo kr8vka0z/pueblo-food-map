@@ -272,7 +272,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       key: "review",
       label: "Places to review",
       count: submissionsTotal + proposalsTotal,
-      href: "/admin/submissions",
+      href: "/admin/places?show=review",
       detail: `${submissionsTotal} review queue, ${proposalsTotal} data refresh`,
     },
     {
@@ -588,7 +588,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             {latestRefresh ? (
               <>
                 Last data refresh {new Date(latestRefresh.createdAt).toLocaleDateString()} — {latestRefresh.suggestedCount} suggested changes.{" "}
-                <Link href="/admin/flags" className="font-medium text-[var(--color-sage-700)] underline underline-offset-2">
+                <Link href="/admin/places?show=review" className="font-medium text-[var(--color-sage-700)] underline underline-offset-2">
                   Review →
                 </Link>
               </>

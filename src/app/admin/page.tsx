@@ -265,8 +265,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const needsHelpBoxes = rankNeedsHelp(boxHealthEntries); // unlimited — same predicate #671's own "Needs help" filter will use
 
   // ─── "Needs you" strip (#680 Layout item 2) ────────────────────────────
-  // Cards 1 and 3 are TEMPORARY combined-count fallbacks until #674/#675
-  // and #677 land — see this file's own header.
+  // Card 1 is a TEMPORARY combined-count fallback until #675 lands (folding
+  // the public Review queue into Places too) — see this file's own header.
+  // Card 3's own combined-count fallback ended with #677 (Photo review +
+  // Sponsor requests folded into the Blessing Boxes tab) — its href now
+  // points at that tab's own "To review" filter instead of the retired
+  // /admin/box-photos queue.
   const needsCards: NeedsCardData[] = [
     {
       key: "review",
@@ -285,7 +289,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       key: "box-content",
       label: "Box photos & sponsor requests",
       count: photos.length + adopters.length,
-      href: "/admin/box-photos",
+      href: "/admin/boxes?show=review",
       detail: `${photos.length} photos, ${adopters.length} sponsor requests`,
     },
     {

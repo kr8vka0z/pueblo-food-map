@@ -272,7 +272,7 @@ export async function sendAdopterConfirmedAdminEmail(
     `Email: ${adopter.email}`,
     `Note: ${adopter.note ?? "(none)"}`,
     ``,
-    `Review it at https://pueblofoodmap.com/admin/box-adopters`,
+    `Review it at https://pueblofoodmap.com/admin/boxes?show=review`,
   ];
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",

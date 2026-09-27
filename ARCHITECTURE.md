@@ -852,5 +852,10 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   (`src/lib/adminBoxes.ts`) and one status function (`computeBoxHealth`,
   `src/lib/boxHealth.ts`), so they can't disagree about a box. "Places due
   for a check" is Dashboard-only.
-- **`/admin/box-photos`, `/admin/box-adopters`** — the photo and
-  adoption-request queues the Dashboard's Blessing boxes group links to.
+- **Photo review and sponsor requests — folded into the Blessing Boxes tab
+  by #677.** `/admin/box-photos` and `/admin/box-adopters` now just
+  redirect to `/admin/boxes?show=review`. Every pending/flagged photo and
+  pending sponsor request shows on its box's own row in `AllBoxesTable`'s
+  "To review" column, with a `BoxesToReviewBox` summary above the table, and
+  resolves from that box's own edit page (`BoxReviewBox.tsx`, using the same
+  `PhotoReviewCard`/`SponsorRequestCard` components).

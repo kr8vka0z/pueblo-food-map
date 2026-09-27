@@ -3,6 +3,11 @@
  * (src/components/AdminNav.tsx). Fixture props only, no D1/auth — this
  * component takes everything it needs as props.
  *
+ * #675 ("fold the Review queue into Places"): "Review queue" is gone from
+ * this nav too — its own pending-count pill (`submissions`) now joins
+ * `proposals` on the Places link instead of getting its own item back
+ * (same pattern #674 already established for "Data refresh").
+ *
  * #677 ("fold Photo review and Sponsor requests into the Blessing Boxes
  * tab"): "Photo review" and "Sponsor requests" are gone from this nav —
  * their queues folded into Blessing Boxes, whose own pill now carries their
@@ -21,11 +26,13 @@ describe("AdminNav", () => {
 
     expect(screen.getByText("Pueblo Food Map Admin")).toBeDefined();
     expect(screen.getByText("admin@example.com")).toBeDefined();
-    for (const label of ["Dashboard", "Blessing Boxes", "Places", "Review queue"]) {
+    for (const label of ["Dashboard", "Blessing Boxes", "Places"]) {
       expect(screen.getByRole("link", { name: new RegExp(`^${label}`) })).toBeDefined();
     }
     // #674: "Data refresh" is gone — folded into Places.
     expect(screen.queryByRole("link", { name: /Data refresh/ })).toBeNull();
+    // #675: "Review queue" is gone — folded into Places too.
+    expect(screen.queryByRole("link", { name: /Review queue/ })).toBeNull();
     // #677: "Photo review" / "Sponsor requests" are gone — folded into Blessing Boxes.
     expect(screen.queryByRole("link", { name: /Photo review/ })).toBeNull();
     expect(screen.queryByRole("link", { name: /Sponsor requests/ })).toBeNull();
@@ -41,19 +48,16 @@ describe("AdminNav", () => {
     expect(dashboardLink.getAttribute("aria-current")).toBeNull();
   });
 
-  test("shows a pending-count pill only when a queue's count is non-zero", () => {
+  test("shows a pending-count pill only when a queue's count is non-zero, and Places' pill is the COMBINED proposals+submissions count (#674, #675)", () => {
     render(
       <AdminNav
         email="a@b.com"
-        active="submissions"
+        active="places"
         counts={{ submissions: 3, proposals: 7, photos: 0, adopters: 0 }}
       />,
     );
 
-    expect(screen.getByRole("link", { name: /Review queue/ }).textContent).toContain("3");
-    // #674: the "proposals" count (formerly Data refresh's own pill) now
-    // shows on Places.
-    expect(screen.getByRole("link", { name: /^Places/ }).textContent).toContain("7");
+    expect(screen.getByRole("link", { name: /^Places/ }).textContent).toContain("10");
     // Zero photos AND zero adopters -> Blessing Boxes renders with no pill at all.
     expect(screen.getByRole("link", { name: "Blessing Boxes" }).textContent).toBe("Blessing Boxes");
   });
@@ -77,7 +81,6 @@ describe("AdminNav", () => {
       Dashboard: "/admin",
       "Blessing Boxes": "/admin/boxes",
       Places: "/admin/places",
-      "Review queue": "/admin/submissions",
     };
     for (const [label, href] of Object.entries(hrefByLabel)) {
       expect(screen.getByRole("link", { name: new RegExp(`^${label}`) }).getAttribute("href")).toBe(href);

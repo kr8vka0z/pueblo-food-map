@@ -261,7 +261,11 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
   async function handleConfirmReject() {
     setRejectState({ status: "submitting" });
     try {
-      const res = await postAction("reject");
+      // #675 fix: this used to post an empty {} body, silently dropping the
+      // reason typed into the textarea just above — SubmissionCard.tsx's own
+      // reject already sends { reason }; this card fell out of sync when it
+      // was extracted from the old /admin/flags queue.
+      const res = await postAction("reject", { reason });
       if (res.status === 200) {
         router.refresh();
         return;

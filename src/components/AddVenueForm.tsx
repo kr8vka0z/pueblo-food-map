@@ -34,8 +34,10 @@
  * src/app/admin/venues/new/page.tsx when opened as `?submission=<id>`, with
  * initialValues supplied by src/lib/adminVenueForm.ts's
  * mapSubmissionPayloadToFormValues(). On success that path redirects back
- * to /admin/submissions instead of /admin, so the admin lands back on the
- * queue rather than the plain venue list.
+ * to /admin/places?show=review&from=public (#675: /admin/submissions itself
+ * is now a redirect, not a real page) instead of plain /admin/places, so
+ * the admin lands back on the "To review" + "The public" filtered list
+ * rather than the unfiltered venue list.
  *
  * #390/#674: an optional `proposalId` prop rides along in the body of
  * WHICHEVER mode this render is in (unlike `submissionId`, which is
@@ -575,17 +577,19 @@ export default function AddVenueForm({
       });
 
       if (res.status === successStatus) {
-        // #259/#390/#674: a create that approved a submission returns to the
-        // review queue; either mode approving a change_proposals row
-        // returns to the Places tab's "To review" filter (#674 folded
-        // /admin/flags into Places) — so the admin picks up the next
-        // pending item in either case, rather than the plain venue list.
+        // #259/#390/#674/#675: a create that approved a submission returns
+        // to the Places tab's "To review" + "The public" filters
+        // (/admin/submissions is now a redirect there, #675); either mode
+        // approving a change_proposals row returns to the Places tab's
+        // plain "To review" filter (#674 folded /admin/flags into Places) —
+        // so the admin picks up the next pending item in either case,
+        // rather than the plain venue list.
         // Default target is /admin/places (moved from /admin, admin
         // dashboard build — /admin is now the Dashboard, a different
         // screen; a venue-edit flow should land back on the venue list, not
         // the to-do list).
         let redirectTo = "/admin/places";
-        if (!isEditMode && submissionId != null) redirectTo = "/admin/submissions";
+        if (!isEditMode && submissionId != null) redirectTo = "/admin/places?show=review&from=public";
         else if (proposalId != null) redirectTo = "/admin/places?show=review";
         router.push(redirectTo);
         router.refresh();

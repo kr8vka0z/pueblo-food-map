@@ -74,9 +74,9 @@ export type ParsedProposal =
 /**
  * Parses one D1 row's `proposed_diff` JSON, degrading to `parseError: true`
  * on any bad JSON rather than throwing — same per-row defensive pattern
- * src/app/admin/submissions/page.tsx's parseSubmissionRow already
- * established: one malformed row must degrade to that single card's own
- * error state, never blank the whole queue or 500 the page.
+ * src/lib/publicSubmissions.ts's parseSubmissionRow already established: one
+ * malformed row must degrade to that single card's own error state, never
+ * blank the whole queue or 500 the page.
  */
 export function parseProposalRow(row: ChangeProposalRow): ParsedProposal {
   try {

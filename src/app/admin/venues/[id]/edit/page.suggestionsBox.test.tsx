@@ -1,18 +1,20 @@
 /**
- * page.suggestionsBox.test.tsx (#674) — new file rather than adding to
- * page.test.tsx (an existing test file), same rationale
- * page.waitingToPublish.test.tsx already established for this page: covers
- * ONLY the new "Suggestions to review" box's D1 wiring
- * (resolvePendingProposals — the change_proposals SELECT, and the
- * VenueLookup fetch it gates on having something to show). ProposalCard's
- * own rendering/actions are covered in ProposalCard.test.tsx; this file
- * only proves the page loads the right rows and passes them through.
+ * page.suggestionsBox.test.tsx (#674; extended #675 for public submissions)
+ * — new file rather than adding to page.test.tsx (an existing test file),
+ * same rationale page.waitingToPublish.test.tsx already established for
+ * this page: covers ONLY the "Suggestions to review" box's D1 wiring
+ * (resolvePendingProposals/resolvePendingSubmissions — the change_proposals
+ * and public_submissions SELECTs, and the VenueLookup fetch either gates on
+ * having something to show). ProposalCard's/SubmissionCard's own
+ * rendering/actions are covered in their own test files; this file only
+ * proves the page loads the right rows and passes them through.
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { AdminVenueRow } from "@/types/venue";
 import type { ChangeProposalRow } from "@/lib/adminProposals";
+import type { PublicSubmissionRow } from "@/lib/publicSubmissions";
 
 const mockGetAdminDb = vi.fn();
 vi.mock("@/lib/adminDb", () => ({
@@ -94,13 +96,42 @@ function makePendingProposalRow(overrides: Partial<ChangeProposalRow> = {}): Cha
   };
 }
 
+function makePendingSubmissionRow(overrides: Partial<PublicSubmissionRow> = {}): PublicSubmissionRow {
+  return {
+    id: 99,
+    kind: "closure",
+    payload: JSON.stringify({
+      venueId: "manual-abc",
+      venueName: "Eastside Pantry",
+      venueAddress: "123 Test St, Pueblo, CO",
+      issueType: "hours",
+      description: "Hours are wrong.",
+      contactEmail: null,
+    }),
+    target_venue_id: "manual-abc",
+    submitter_email: null,
+    status: "pending",
+    created_at: "2026-09-02T12:00:00.000Z",
+    reviewed_by: null,
+    reviewed_at: null,
+    review_reason: null,
+    ...overrides,
+  };
+}
+
 /**
  * Dispatches on SQL text: venues SELECT (.first), the "pending proposals for
- * this venue" SELECT (.all, WHERE ... status = 'pending'), the venueLookup
- * SELECT (.all, id IN (...)) — same "one fake, branch on SQL text" pattern
+ * this venue" SELECT (.all, WHERE change_proposals ... status = 'pending'),
+ * the "pending public reports for this venue" SELECT (.all, WHERE
+ * public_submissions ... status = 'pending'), the venueLookup SELECT (.all,
+ * id IN (...)) — same "one fake, branch on SQL text" pattern
  * page.waitingToPublish.test.tsx already established for this page.
  */
-function makeDb(venueRow: AdminVenueRow | null, pendingProposalRows: ChangeProposalRow[] = []) {
+function makeDb(
+  venueRow: AdminVenueRow | null,
+  pendingProposalRows: ChangeProposalRow[] = [],
+  pendingSubmissionRows: PublicSubmissionRow[] = [],
+) {
   return {
     prepare: (sql: string) => ({
       bind: (...args: unknown[]) => ({
@@ -108,6 +139,9 @@ function makeDb(venueRow: AdminVenueRow | null, pendingProposalRows: ChangePropo
         all: async () => {
           if (sql.includes("FROM change_proposals") && sql.includes("status = 'pending'")) {
             return { results: pendingProposalRows };
+          }
+          if (sql.includes("FROM public_submissions") && sql.includes("status = 'pending'")) {
+            return { results: pendingSubmissionRows };
           }
           if (sql.includes("FROM venues WHERE id IN")) {
             return {
@@ -157,6 +191,41 @@ describe("EditVenuePage — Suggestions to review box (#674)", () => {
 
     expect(screen.getByText("Suggestions to review (2)")).toBeDefined();
     expect(screen.getAllByTestId("proposal-detail")).toHaveLength(2);
+  });
+
+  test("a pending public report for this venue joins the SAME box, rendering a Mark done card (#675)", async () => {
+    mockGetAdminDb.mockResolvedValue({
+      db: makeDb(makeRow(), [], [makePendingSubmissionRow({ id: 9 })]),
+      identity: { email: "admin@example.com" },
+    });
+
+    render(
+      await EditVenuePage({
+        params: Promise.resolve({ id: "manual-abc" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(screen.getByText("Suggestions to review (1)")).toBeDefined();
+    expect(screen.getByRole("button", { name: /Mark done/i })).toBeDefined();
+  });
+
+  test("a proposal AND a public report both target this venue -> both cards render under one combined count", async () => {
+    mockGetAdminDb.mockResolvedValue({
+      db: makeDb(makeRow(), [makePendingProposalRow({ id: 1 })], [makePendingSubmissionRow({ id: 9 })]),
+      identity: { email: "admin@example.com" },
+    });
+
+    render(
+      await EditVenuePage({
+        params: Promise.resolve({ id: "manual-abc" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(screen.getByText("Suggestions to review (2)")).toBeDefined();
+    expect(screen.getAllByTestId("proposal-detail")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /Mark done/i })).toBeDefined();
   });
 
   test("a D1 failure resolving proposals degrades to no box rather than crashing the page", async () => {

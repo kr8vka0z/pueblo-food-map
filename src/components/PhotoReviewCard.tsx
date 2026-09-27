@@ -1,53 +1,54 @@
 "use client";
 
 /**
- * BoxPhotosReviewView — the photo moderation queue's card list (Blessing
- * Boxes slice 5). Rendered by src/app/admin/box-photos/page.tsx, which owns
- * the auth gate and the `loadReviewQueue()` read; this component is
- * presentational + interactive only, same split as SubmissionsReviewView
- * (whose card shell, button classes, and "Confirm reject with an optional
- * reason" flow this component reuses near-verbatim — same admin-surface
- * visual language, no new tokens invented).
+ * PhotoReviewCard — one box photo's moderation card: a preview, a status
+ * badge, and Approve/Reject (pending) or Keep photo/Remove photo (flagged),
+ * with an optional reject/remove reason (issue #677, "fold Photo review and
+ * Sponsor requests into the Blessing Boxes tab").
  *
- * Each photo's bytes come from GET /api/admin/box-photos/[id]/preview (NOT
- * the public serve route — that one is approved-only and would 404 every
- * pending/flagged row this queue exists to show).
+ * Extracted from BoxPhotosReviewView.tsx's inner BoxPhotoCard — same card
+ * shell, button classes and reject-reason flow (verbatim, including the
+ * fetch call that actually sends `{ reason }`, unlike ProposalCard.tsx's
+ * postAction() which drops it — see that file's own header on why not to
+ * repeat that bug). Now renders in TWO places: this tab's own review views
+ * (until #677 removes them) and, going forward, the box edit page's
+ * "Things to review" box (BoxReviewBox.tsx) — a large preview there (this
+ * component's own default size already meets both call sites' needs, see
+ * this file's own size comment below).
  *
- * On Approve/Reject, router.refresh() re-runs the Server Component's
- * loadReviewQueue() — the acted-on card stops matching (no longer pending
- * or flagged) and disappears from the next render, same "no local list
- * copy to reconcile" convention SubmissionsReviewView established.
+ * On Approve/Reject, router.refresh() re-runs the caller's Server
+ * Component read — the acted-on card stops matching (no longer pending or
+ * flagged) and disappears from the next render, same "no local list copy to
+ * reconcile" convention every other admin queue in this app already uses.
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminBoxPhotoRow } from "@/lib/boxPhotos";
 
-export interface BoxPhotosReviewViewProps {
-  photos: AdminBoxPhotoRow[];
+export interface PhotoReviewCardProps {
+  photo: AdminBoxPhotoRow;
 }
-
-// ─── Shared styling (reuses SubmissionsReviewView's exact classes) ─────────
 
 const cardClass =
   "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5";
 
 const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
+  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
   "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
   "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
 const secondaryButtonClass =
-  "inline-flex items-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
+  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
   "px-3 py-1.5 text-sm font-medium text-[var(--color-ink-700)] bg-transparent " +
   "transition-colors duration-150 hover:bg-[var(--color-bone-100)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
 const dangerButtonClass =
-  "inline-flex items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] " +
+  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] " +
   "px-3 py-1.5 text-sm font-medium text-[var(--color-danger)] bg-transparent " +
   "transition-colors duration-150 hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 " +
@@ -61,41 +62,15 @@ function formatSubmittedAt(iso: string): string {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-// ─── Component ──────────────────────────────────────────────────────────────
-
-export default function BoxPhotosReviewView({ photos }: BoxPhotosReviewViewProps) {
-  if (photos.length === 0) {
-    return (
-      <div className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-16 text-center">
-        <p className="text-sm font-semibold text-[var(--color-ink-700)]">No photos to review</p>
-        <p className="mt-1 text-sm text-[var(--color-ink-500)]">
-          New uploads and reported photos will show up here.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <ul className="flex flex-col gap-4">
-      {photos.map((photo) => (
-        <li key={photo.id}>
-          <BoxPhotoCard photo={photo} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-// ─── One card + its own local action state ─────────────────────────────────
-
 type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };
 
-function BoxPhotoCard({ photo }: { photo: AdminBoxPhotoRow }) {
+export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
   const router = useRouter();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [state, setState] = useState<ActionState>({ status: "idle" });
 
+  const isFlagged = photo.status === "flagged";
   const reasonFieldId = `photo-reject-reason-${photo.id}`;
   const genericErrorMessage = "Something went wrong. Try again.";
 
@@ -136,14 +111,14 @@ function BoxPhotoCard({ photo }: { photo: AdminBoxPhotoRow }) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           {/* clay-100/700: this codebase's established "informational emphasis" badge pairing — same as SubmissionsReviewView's closure-report badge. */}
-          {photo.status === "flagged" && (
+          {isFlagged && (
             <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-[var(--color-clay-100)] text-[var(--color-clay-700)]">
-              Reported ({photo.flag_count}×)
+              Photo reported ({photo.flag_count}×)
             </span>
           )}
           {photo.status === "pending" && (
             <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-              New upload
+              New photo
             </span>
           )}
         </div>
@@ -155,7 +130,11 @@ function BoxPhotoCard({ photo }: { photo: AdminBoxPhotoRow }) {
         <img
           src={`/api/admin/box-photos/${photo.id}/preview`}
           alt={`Photo submitted for ${photo.venue_name}`}
-          className="h-48 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-200)] object-cover sm:h-32 sm:w-32 sm:flex-none"
+          // #677 Risk: this preview is what the admin judges the photo BY —
+          // wide enough to actually see on desktop (>=180px), full width on
+          // phones (same "preview must be big enough to judge" spec as the
+          // box edit page's own card, which reuses this exact component).
+          className="h-56 w-full rounded-[var(--radius-md)] border border-[var(--color-bone-200)] object-cover sm:h-48 sm:w-48 sm:flex-none"
         />
         <div className="space-y-1">
           <p className="text-base font-semibold text-[var(--color-ink-700)]">{photo.venue_name}</p>
@@ -164,6 +143,9 @@ function BoxPhotoCard({ photo }: { photo: AdminBoxPhotoRow }) {
               <span className={fieldLabelClass}>Attached to check-in: </span>
               {photo.checkin_kind}
             </p>
+          )}
+          {isFlagged && (
+            <p className="text-sm text-[var(--color-ink-500)]">Hidden from the public card until you decide.</p>
           )}
         </div>
       </div>
@@ -175,7 +157,7 @@ function BoxPhotoCard({ photo }: { photo: AdminBoxPhotoRow }) {
           disabled={state.status === "submitting"}
           className={primaryButtonClass}
         >
-          {state.status === "submitting" ? "Approving…" : "Approve"}
+          {state.status === "submitting" ? "Approving…" : isFlagged ? "Keep photo" : "Approve"}
         </button>
         {!rejectOpen && (
           <button
@@ -184,7 +166,7 @@ function BoxPhotoCard({ photo }: { photo: AdminBoxPhotoRow }) {
             disabled={state.status === "submitting"}
             className={secondaryButtonClass}
           >
-            Reject
+            {isFlagged ? "Remove photo" : "Reject"}
           </button>
         )}
       </div>
@@ -213,7 +195,7 @@ function BoxPhotoCard({ photo }: { photo: AdminBoxPhotoRow }) {
               disabled={state.status === "submitting"}
               className={dangerButtonClass}
             >
-              {state.status === "submitting" ? "Rejecting…" : "Confirm reject"}
+              {state.status === "submitting" ? "Saving…" : `Confirm ${isFlagged ? "remove" : "reject"}`}
             </button>
             <button
               type="button"

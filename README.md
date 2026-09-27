@@ -170,8 +170,10 @@ row per detected difference — including a link-health pass that flags dead
 outbound `url`s. It writes to `venues` in exactly one bounded case: a
 "date-only" proposal (nothing changed but the last-checked date) auto-
 applies rather than waiting on a click (Kyle, 2026-09-15). Every other
-proposal still needs a human to review and approve it at `/admin/flags`
-before it reaches the public map. See
+proposal still needs a human to review and approve it from the Places tab's
+"To review" filter (`/admin/places?show=review` — folded in from the
+retired standalone `/admin/flags` queue by #674) before it reaches the
+public map. See
 `scripts/refresh-ingest.ts`'s own file header for the full mechanism, and
 AGENTS.md's "Automated venue-refresh pipeline" section for operational
 detail (guardrails, credentials, local testing).

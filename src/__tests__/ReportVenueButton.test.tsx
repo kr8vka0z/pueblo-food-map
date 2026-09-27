@@ -8,9 +8,17 @@
  *   4. Link is keyboard-accessible (role=link).
  */
 
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import ReportVenueButton from "@/components/ReportVenueButton";
+import { track, EVENTS } from "@/lib/analytics";
+
+// #485 PR 2: mock the whole module so EVENTS keeps its real allowlist values.
+vi.mock("@/lib/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics")>()),
+  track: vi.fn(),
+}));
 
 describe("ReportVenueButton", () => {
   test("renders a link to /report/[venueId]", () => {
@@ -39,5 +47,14 @@ describe("ReportVenueButton", () => {
     render(<ReportVenueButton venueId="test-id" />);
     const link = screen.getByRole("link");
     expect(link).toBeDefined();
+  });
+
+  test("clicking the link fires report_opened", async () => {
+    const user = userEvent.setup();
+    render(<ReportVenueButton venueId="garden-rmser" />);
+    await user.click(screen.getByRole("link"));
+    expect(track).toHaveBeenCalledWith(EVENTS.REPORT_OPENED, {
+      venueId: "garden-rmser",
+    });
   });
 });

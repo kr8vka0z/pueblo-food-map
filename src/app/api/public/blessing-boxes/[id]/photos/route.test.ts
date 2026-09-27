@@ -420,7 +420,9 @@ describe("POST /api/public/blessing-boxes/[id]/photos", () => {
     expect(url).toBe("https://api.resend.com/emails");
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.to).toEqual(["issues@pueblofoodmap.com"]);
-    expect(body.text).toContain("/admin/box-photos");
+    // #677: /admin/box-photos now redirects — this alert links straight at
+    // the Blessing Boxes tab's own "To review" filter instead.
+    expect(body.text).toContain("/admin/boxes?show=review");
   });
 
   test("a failed alert email does not fail the upload itself", async () => {

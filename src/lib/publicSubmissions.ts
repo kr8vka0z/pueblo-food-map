@@ -25,6 +25,8 @@
  * to the right form.
  */
 
+import type { ParsedProposal } from "@/lib/adminProposals";
+
 export type PublicSubmissionKind = "new_venue" | "closure";
 
 export interface PublicSubmissionInsert {
@@ -37,11 +39,13 @@ export interface PublicSubmissionInsert {
   submitterEmail: string | null;
 }
 
-// ─── Review queue shapes (#259) ─────────────────────────────────────────────
+// ─── Review queue shapes (#259; consumed by Places + the edit page since #675) ─
 // Added alongside the write-path types above (same file — this module
 // already owns the queue's write shape, so its read/payload shapes belong
-// here too rather than in a third module) for the admin review screen
-// (src/app/admin/submissions/page.tsx) to consume.
+// here too rather than in a third module). Originally read only by the now-
+// retired /admin/submissions/page.tsx; #675 folded that queue into the
+// Places tab and the venue edit page's "Suggestions to review" box, both of
+// which import ReviewSubmission/parseSubmissionRow (below) directly.
 
 /** One full row of the D1 `public_submissions` table (migrations/0002_public_submissions.sql). */
 export interface PublicSubmissionRow {
@@ -89,6 +93,83 @@ export interface ClosurePayload {
   issueType: string;
   description: string;
   contactEmail?: string;
+}
+
+// ─── Review-surface shapes (#675, "fold the Review queue into Places") ─────
+// Moved here from the now-deleted SubmissionsReviewView.tsx / retired
+// /admin/submissions/page.tsx: both the Places tab (src/app/admin/places/page.tsx)
+// and the venue edit page (src/app/admin/venues/[id]/edit/page.tsx) now parse
+// `public_submissions` rows, so the shared read/payload shape belongs in this
+// module (which already owns the write-path types above) rather than in
+// either page or a component.
+
+interface ReviewSubmissionBase {
+  id: number;
+  createdAt: string;
+  /** submitter_email column — present regardless of payload-parse success. */
+  submitterEmail: string | null;
+  /** target_venue_id column — populated for "closure", null for "new_venue"; a
+   *  real column (not inside the JSON payload), so the closure approve action
+   *  works even on a row whose payload failed to parse. */
+  targetVenueId: string | null;
+}
+
+/**
+ * Discriminated on `parseError` first, then `kind` — a row whose stored
+ * `payload` JSON failed to parse (parseSubmissionRow below wraps that per
+ * row) degrades to the `parseError: true` arm regardless of kind, carrying
+ * no payload at all rather than a guessed/partial one.
+ */
+export type ReviewSubmission =
+  | (ReviewSubmissionBase & { kind: "new_venue"; parseError: false; payload: NewVenuePayload })
+  | (ReviewSubmissionBase & { kind: "closure"; parseError: false; payload: ClosurePayload })
+  | (ReviewSubmissionBase & { kind: PublicSubmissionKind; parseError: true; payload: null });
+
+/**
+ * Parses one D1 row into ReviewSubmission, degrading to `parseError: true`
+ * on any bad JSON rather than throwing — one malformed row must degrade to
+ * that single card's own error state, never blank the whole queue or 500
+ * the page (same per-row defensive pattern SubmissionCard.tsx's parseError
+ * branch renders).
+ */
+export function parseSubmissionRow(row: PublicSubmissionRow): ReviewSubmission {
+  const base = {
+    id: row.id,
+    createdAt: row.created_at,
+    submitterEmail: row.submitter_email,
+    targetVenueId: row.target_venue_id,
+  };
+
+  try {
+    if (row.kind === "new_venue") {
+      return { ...base, kind: "new_venue", parseError: false, payload: JSON.parse(row.payload) as NewVenuePayload };
+    }
+    return { ...base, kind: "closure", parseError: false, payload: JSON.parse(row.payload) as ClosurePayload };
+  } catch {
+    return { ...base, kind: row.kind, parseError: true, payload: null };
+  }
+}
+
+/**
+ * ReviewItem — the discriminated union both the Places tab (VenueListView's
+ * "To review" cell + summary counts) and the edit page's SuggestionsBox
+ * dispatch on (#675). Two independent review sources — the automated
+ * refresh's `change_proposals` and the public's `public_submissions` — used
+ * to render on two entirely separate screens (Data refresh, /admin/flags;
+ * Review queue, /admin/submissions); #674 folded the first into Places and
+ * this box, #675 folds the second in the SAME way, so a caller that already
+ * has a mixed list of "things to review" for one venue can render it without
+ * knowing which table each one came from. `ParsedProposal` is imported from
+ * adminProposals.ts (that module owns change_proposals parsing); this file
+ * already owns `ReviewSubmission` above.
+ */
+export type ReviewItem =
+  | { kind: "proposal"; proposal: ParsedProposal }
+  | { kind: "submission"; submission: ReviewSubmission };
+
+/** A stable React key across both item kinds — a proposal id and a submission id are independent sequences, so a bare numeric id could collide between them. */
+export function reviewItemKey(item: ReviewItem): string {
+  return item.kind === "proposal" ? `proposal-${item.proposal.row.id}` : `submission-${item.submission.id}`;
 }
 
 // `status` is intentionally absent from both the column list and the bound

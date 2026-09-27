@@ -179,8 +179,10 @@ AGENTS.md "Automated venue-refresh pipeline".
   "date-only" shape **auto-applies** (Kyle, 2026-09-15): `proposalSql.ts`'s
   `buildProposalWriteStatements()` writes the `venues.last_verified` UPDATE,
   an `audit_log` row, and an already-`approved` proposal row. It uses the
-  same `isDateOnlyUpdateProposal()` predicate as `/admin/flags`' bulk-approve
-  (`src/lib/adminProposals.ts`), so the two can't disagree on what counts.
+  same `isDateOnlyUpdateProposal()` predicate as the Places tab's
+  `ToReviewSummaryBox`'s bulk-approve (`src/lib/adminProposals.ts` — #674
+  folded the standalone `/admin/flags` queue that used to own this button
+  into Places), so the two can't disagree on what counts.
   Every other shape is only ever a pending proposal, with one opt-in
   exception — see "Jev triage + rename pairing" below.
 - **Jev triage + rename pairing (#543)** — `scripts/refresh/triage.ts` +
@@ -211,12 +213,15 @@ AGENTS.md "Automated venue-refresh pipeline".
   missing); a 150-proposal cap that aborts the whole run. Stricter than §6,
   which writes flagged removal proposals instead — chosen because the job
   runs unattended, and writing nothing beats half-writing.
-- **Review:** `/admin/flags` (`src/app/admin/flags/page.tsx`,
-  `ProposalsReviewView.tsx`, `api/admin/proposals/[id]/{approve,reject}`,
-  #390, plus bulk `approve-date-only`) is the only HUMAN-facing code path
-  that turns a real-change proposal into a `venues` mutation — the
-  ingestion job's own opt-in auto-apply lane (#543, above) is the one
-  machine exception. How it handles the
+- **Review:** the Places tab (`src/app/admin/places/page.tsx`,
+  `VenueListView.tsx`'s "To review" column, `ProposalCard.tsx`,
+  `api/admin/proposals/[id]/{approve,reject}`, #390, plus bulk
+  `approve-date-only`) — originally a standalone `/admin/flags` queue
+  (`ProposalsReviewView.tsx`), folded into Places by #674, which now
+  redirects there — is the only HUMAN-facing code path that turns a
+  real-change proposal into a `venues` mutation — the ingestion job's own
+  opt-in auto-apply lane (#543, above) is the one machine exception. How it
+  handles the
   supersede race, stale applies and rejection memory: atlas-kb "PFM AGENTS
   History — Venue-Refresh Pipeline", "Change-proposal review queue (#390)".
   Auto-supersede (§6.10a) and rejection memory (§6.10b) stay the ingestion
@@ -448,7 +453,8 @@ Each route handler (`src/app/*/submit/route.ts`) runs the same pipeline:
 **`/suggest/submit` and `/report/submit` also queue (#258):** after step 5
 they insert one pending `public_submissions` row
 (`migrations/0002_public_submissions.sql`) before the email — the record an
-admin reviews at `/admin/submissions`. The insert has its own try/catch: a D1
+admin reviews on the Places tab (#675 folded the standalone
+`/admin/submissions` queue in; see "Admin panel" below). The insert has its own try/catch: a D1
 failure is logged (`db_write_failed`) and never blocks the email or changes
 the response, so the email stays the authoritative success signal.
 `/feedback/submit` never queues — general feedback has nothing for an admin
@@ -714,21 +720,52 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
 
 ### Surfaces
 
-- **`/admin` — Dashboard** (`src/app/admin/page.tsx`). A to-do landing page
-  that `Promise.all`s several best-effort D1 reads: a `PublishPanel` (only
-  when unpublished changes exist — the same component and action
-  `/admin/places` uses), `NeedsDecisionPanel` (Suggestions / Data refresh /
-  Blessing boxes — capped previews that link out to each full queue; any
-  decision needing more than one click links out rather than growing an
-  inline form), and two side panels: `BoxHealthList` ("Boxes that need
-  help") and `StalePlacesList` ("Places due for a check" — published venues
-  with `last_verified` over 12 months old, oldest first).
+- **`/admin` — Dashboard** (`src/app/admin/page.tsx`, overhauled #680). A
+  greeting + a 7/30/90-day period switch (`?period=`, server-rendered
+  `<Link>`s, no client JS) that every period-scoped number on the page
+  reads from and compares against the previous period of the same length
+  (`src/lib/boxStats.ts`'s `filterByPeriod`/`filterByPreviousPeriod`;
+  `src/lib/cfAnalytics.ts`'s equivalent split for Cloudflare's numbers).
+  Below that: a `PublishPanel` (only when unpublished changes exist and this
+  isn't staging — same "Test site" banner gate `/admin/places` uses), a
+  `DashboardNeedsStrip` (four link cards: places to review, waiting to
+  publish, box photos & sponsor requests, boxes empty or low — two of the
+  four are temporary combined-count fallbacks until #674/#675 and #677 fold
+  their own queues into other tabs), a **Visitors** section reading
+  Cloudflare's GraphQL Analytics API server-side (`cfAnalytics.ts` — the
+  ONLY source of unique-visitor numbers in this app; PostHog is
+  memory-only and counts every page load as a new visitor — AGENTS.md's
+  "PostHog" section), a **Blessing boxes** numbers section reusing
+  `boxStats.ts` (the
+  same math the public Boxes page uses), and a **Map data health** section
+  (published-place counts, `StalePlacesList`'s data at a 90-day/3-month
+  threshold, the latest automated data-refresh run, and box problem-report
+  counts). `KpiCard`/`BarList`/`DailyBars` render every number as plain
+  SVG/CSS — no chart library. A Cloudflare API failure or missing token
+  degrades ONLY the Visitors section to "unavailable right now"; every
+  other section renders from D1 regardless.
 - **`/admin/places` — venue list** (`VenueListView`). All `venues` rows —
   draft, published, archived — filtered and searched entirely client-side
-  (low hundreds of rows). A row is flagged "Unpublished changes"
-  (`hasUnpublishedChanges()`, `src/lib/adminVenues.ts`) when it's a draft or
-  was edited since its last publish (`updated_at > published_at`). Read-only
-  itself; each row links to its edit page.
+  (low hundreds of rows). Each row shows ONE status (#673, replacing an old
+  status column + a separate, frequently-disagreeing "Unpublished changes"
+  column): **Draft** / **Live** / **Live · edits waiting** / **Removed**,
+  computed by `displayStatusOf()` (`src/lib/adminVenues.ts`) from the row
+  plus its matching `src/data/published-venues.ts` entry (what the public
+  map is actually serving) — a diff on any field EXCEPT `last_verified`
+  (a "last checked" bump alone never flags a place), never true for a
+  blessing box (boxes are live without publishing) or on staging (which can
+  never Publish — `isProductionWorker()`, `publishVenues.ts`). A status key
+  above the table explains all four in plain language. Read-only itself;
+  each row's NAME is the link to its edit page (#672) — an archived row's
+  name stays plain text (editing an archived venue 409s). A "Live · edits
+  waiting" place's edit page shows a "Waiting to publish" box: every
+  differing field's on-map-now → after-publish values, and who changed it
+  (`diffPublishedFields()` / `attributeFieldChange()`, same file — the
+  latter reads `audit_log` since the last publish, correlating an approved
+  `change_proposals` row's `applied_at` to name a Data Refresh approval
+  distinctly from a plain hand-edit). On staging, a banner replaces the
+  Publish panel outright ("Test site: publishing is turned off here") and no
+  place can ever read "edits waiting."
 - **`/admin/venues/new` and `/admin/venues/[id]/edit`** — one form,
   `AddVenueForm`, in two modes (an optional `venueId` switches create →
   edit; same fields, validation and redirect). `POST /api/admin/venues`
@@ -787,24 +824,36 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
     Pulls API, not the Checks API, because a fine-grained PAT can't read
     check runs at all. It fails soft: skipped with no token (staging), and
     any GitHub error reads as "in progress".
-- **`/admin/submissions` — public submissions queue (#259).** Reads every
-  pending `public_submissions` row, newest first, as cards
-  (`SubmissionsReviewView`). Approving reuses the venue routes rather than a
-  parallel pipeline: a `new_venue` card links to
+- **Public submissions queue (#259) — folded into the Places tab by #675.**
+  `/admin/submissions` now just redirects to
+  `/admin/places?show=review&from=public`. The Places page reads every
+  pending `public_submissions` row, newest first, groups a `closure` report
+  onto its reported venue's own row (any status, including archived — a
+  report against a since-removed place still shows) and a `new_venue`
+  suggestion as its own "Suggested new place" row, both tagged "Public" —
+  see "Refresh proposals" below for the parallel `change_proposals`
+  mechanism this mirrors. Both source's items render on the venue edit
+  page's "Suggestions to review" box (`SuggestionsBox`, now a discriminated
+  `ReviewItem[]` — a `change_proposals` item renders `ProposalCard`, a
+  `public_submissions` item renders `SubmissionCard`). A closure card's
+  actions are **Mark done** (`POST /api/admin/submissions/<id>/done` — the
+  admin already fixed the venue via a save or an archive elsewhere; writes
+  one `audit_log` row) and Reject (its own route, no `audit_log` row — it
+  changes no venue). A `new_venue` card still links to
   `/admin/venues/new?submission=<id>` (prefilled by
-  `mapSubmissionPayloadToFormValues()`), and a `closure` card links to
-  `/admin/venues/<target_venue_id>/edit?submission=<id>` (#270 — a closure
-  report can mean "hours changed," not only "gone"). The edit page
-  cross-checks the submission's `target_venue_id` before accepting it. The
-  optional `submissionId` then rides the create or archive route's own
-  `db.batch()`, so the venue change and the approval land together.
-  Reject is its own route with no `audit_log` row (it changes no venue).
-  Each row's JSON `payload` is parsed on its own (`parseSubmissionRow`), so
-  one bad row degrades to a still-rejectable "couldn't read details" card.
-  The payload mapper's category fallback and notes folding are explained in
+  `mapSubmissionPayloadToFormValues()`); the optional `submissionId` rides
+  the create route's own `db.batch()` so the venue insert and the approval
+  land together. A `closure` report that says the place is really gone
+  still uses the pre-existing `?submission=<id>` edit-page banner +
+  `ArchiveVenueButton` remove-and-resolve batch (#270), unchanged. Each row's
+  JSON `payload` is parsed on its own (`parseSubmissionRow`,
+  `src/lib/publicSubmissions.ts`), so one bad row degrades to a
+  still-rejectable "couldn't read details" card. The payload mapper's
+  category fallback and notes folding are explained in
   `src/lib/adminVenueForm.ts`.
-- **`/admin/flags` — refresh proposals (#390).** See "Automated
-  venue-refresh pipeline" above.
+- **Refresh proposals (#390) — folded into the Places tab by #674.**
+  `/admin/flags` now just redirects to `/admin/places?show=review`. See
+  "Automated venue-refresh pipeline" above.
 - **`/admin/boxes` — Blessing Boxes tab.** `AdminBoxesMap` (a small
   dedicated `react-map-gl` component, not the public `Map.tsx`) with pins
   colored by status, "Needs help now" / "Gone quiet" lists, an 8-week
@@ -815,5 +864,10 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   (`src/lib/adminBoxes.ts`) and one status function (`computeBoxHealth`,
   `src/lib/boxHealth.ts`), so they can't disagree about a box. "Places due
   for a check" is Dashboard-only.
-- **`/admin/box-photos`, `/admin/box-adopters`** — the photo and
-  adoption-request queues the Dashboard's Blessing boxes group links to.
+- **Photo review and sponsor requests — folded into the Blessing Boxes tab
+  by #677.** `/admin/box-photos` and `/admin/box-adopters` now just
+  redirect to `/admin/boxes?show=review`. Every pending/flagged photo and
+  pending sponsor request shows on its box's own row in `AllBoxesTable`'s
+  "To review" column, with a `BoxesToReviewBox` summary above the table, and
+  resolves from that box's own edit page (`BoxReviewBox.tsx`, using the same
+  `PhotoReviewCard`/`SponsorRequestCard` components).

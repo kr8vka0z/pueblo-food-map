@@ -34,15 +34,29 @@
  * src/app/admin/venues/new/page.tsx when opened as `?submission=<id>`, with
  * initialValues supplied by src/lib/adminVenueForm.ts's
  * mapSubmissionPayloadToFormValues(). On success that path redirects back
- * to /admin/submissions instead of /admin, so the admin lands back on the
- * queue rather than the plain venue list.
+ * to /admin/places?show=review&from=public (#675: /admin/submissions itself
+ * is now a redirect, not a real page) instead of plain /admin/places, so
+ * the admin lands back on the "To review" + "The public" filtered list
+ * rather than the unfiltered venue list.
  *
- * #390: an optional `proposalId` prop (EDIT mode only — the mirror image of
- * `submissionId` above, which is create-mode-only) rides along in the
- * PATCH body so the edit route can approve the originating `change_proposals`
- * row (source='link_health') atomically with the venue update — wired by
- * src/app/admin/venues/[id]/edit/page.tsx when opened as `?proposal=<id>`.
- * On success that path redirects back to /admin/flags instead of /admin.
+ * #390/#674: an optional `proposalId` prop rides along in the body of
+ * WHICHEVER mode this render is in (unlike `submissionId`, which is
+ * create-only) so that mode's route can approve the originating
+ * `change_proposals` row atomically with the venue write:
+ *   - EDIT mode (#390): PATCH .../<venueId> approves a `link_health`
+ *     proposal — wired by src/app/admin/venues/[id]/edit/page.tsx when
+ *     opened as `?proposal=<id>`.
+ *   - CREATE mode (#674): POST /api/admin/venues approves a genuinely-new
+ *     `add` proposal, using ITS OWN id/source as the new venue's id/
+ *     source_type rather than a fresh manual-<uuid> — wired by
+ *     src/app/admin/venues/new/page.tsx when opened as `?proposal=<id>`,
+ *     initialValues supplied by src/lib/adminVenueForm.ts's
+ *     mapAddProposalToFormValues(). Never sent alongside `submissionId` —
+ *     the two hand-offs (public submission vs. change-proposal) are
+ *     mutually exclusive create paths.
+ * On success either path redirects back to /admin/places?show=review (the
+ * Places tab's "To review" filter — /admin/flags was folded into Places by
+ * #674) instead of /admin/places.
  *
  * #265: `expectedUpdatedAt` (EDIT mode only) is the optimistic-concurrency
  * precondition — the row's `updated_at` as the edit page's own server-side
@@ -54,9 +68,10 @@
  * admin's version.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { categoryLabels } from "@/data/venues";
+import StaticLocationMap from "@/components/StaticLocationMap";
 import { DISPLAY_DAY_KEYS, type DayKey } from "@/lib/hours";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import type { IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
@@ -385,6 +400,28 @@ export default function AddVenueForm({
   const [geocodeMessage, setGeocodeMessage] = useState("");
   const [geocodeCandidates, setGeocodeCandidates] = useState<GeocodeMatch[]>([]);
 
+  // #678: the Location section's static map redraws on a debounced copy of
+  // lat/lng, not on every keystroke — typing "38.2" then "7" would otherwise
+  // fire a wasted Mapbox image request for the intermediate "38.2" value.
+  // 400ms mirrors a typical typing-pause debounce; short enough that "Find
+  // location from address" (which sets both fields at once) still feels
+  // immediate.
+  const [debouncedCoords, setDebouncedCoords] = useState<{ lat: number | null; lng: number | null }>({
+    lat: null,
+    lng: null,
+  });
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const lat = Number(values.lat);
+      const lng = Number(values.lng);
+      setDebouncedCoords({
+        lat: values.lat.trim() !== "" && Number.isFinite(lat) ? lat : null,
+        lng: values.lng.trim() !== "" && Number.isFinite(lng) ? lng : null,
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [values.lat, values.lng]);
+
   function setField<K extends keyof AddVenueFormValues>(key: K, value: AddVenueFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
@@ -516,9 +553,9 @@ export default function AddVenueForm({
       // queue — never in edit mode (submissionId is meaningless there; see
       // this prop's own doc comment above).
       ...(!isEditMode && submissionId != null ? { submissionId } : {}),
-      // #390: mirror image — only ever sent on an edit reached from the
-      // flags queue's link_health hand-off.
-      ...(isEditMode && proposalId != null ? { proposalId } : {}),
+      // #390/#674: sent in WHICHEVER mode this render is in — see this
+      // prop's own doc comment above for why it's no longer edit-only.
+      ...(proposalId != null ? { proposalId } : {}),
       // #265: the optimistic-concurrency precondition — see this prop's own
       // doc comment above. Edit mode only; sent verbatim, no reformatting.
       ...(isEditMode && expectedUpdatedAt != null ? { expectedUpdatedAt } : {}),
@@ -540,16 +577,20 @@ export default function AddVenueForm({
       });
 
       if (res.status === successStatus) {
-        // #259/#390: a create that approved a submission returns to the
-        // review queue; an edit that approved a proposal returns to the
-        // flags queue — so the admin picks up the next pending card in
-        // either case, rather than the plain venue list. Default target is
-        // /admin/places (moved from /admin, admin dashboard build — /admin
-        // is now the Dashboard, a different screen; a venue-edit flow
-        // should land back on the venue list, not the to-do list).
+        // #259/#390/#674/#675: a create that approved a submission returns
+        // to the Places tab's "To review" + "The public" filters
+        // (/admin/submissions is now a redirect there, #675); either mode
+        // approving a change_proposals row returns to the Places tab's
+        // plain "To review" filter (#674 folded /admin/flags into Places) —
+        // so the admin picks up the next pending item in either case,
+        // rather than the plain venue list.
+        // Default target is /admin/places (moved from /admin, admin
+        // dashboard build — /admin is now the Dashboard, a different
+        // screen; a venue-edit flow should land back on the venue list, not
+        // the to-do list).
         let redirectTo = "/admin/places";
-        if (!isEditMode && submissionId != null) redirectTo = "/admin/submissions";
-        else if (isEditMode && proposalId != null) redirectTo = "/admin/flags";
+        if (!isEditMode && submissionId != null) redirectTo = "/admin/places?show=review&from=public";
+        else if (proposalId != null) redirectTo = "/admin/places?show=review";
         router.push(redirectTo);
         router.refresh();
         return;
@@ -798,71 +839,157 @@ export default function AddVenueForm({
         </fieldset>
       )}
 
-      {/* Address */}
-      <div>
-        <label htmlFor="venue-address" className={labelClass}>
-          Address{requiredMark}
-        </label>
-        <input
-          type="text"
-          id="venue-address"
-          value={values.address}
-          onChange={(e) => setField("address", e.target.value)}
-          maxLength={FIELD_LIMITS.SUGGEST_ADDRESS}
-          aria-required="true"
-          aria-invalid={errors.address ? "true" : undefined}
-          aria-describedby={errors.address ? "venue-address-error" : undefined}
-          className={`${inputBase} ${inputBorder(!!errors.address)}`}
-        />
-        {errors.address && (
-          <p id="venue-address-error" role="alert" className={errorClass}>
-            {errors.address}
-          </p>
-        )}
-      </div>
+      {/* Location (#678): address, "Find location from address", and
+          lat/lng on the left; a static reference map on the right, fed by
+          the DEBOUNCED coordinates above (never raw values.lat/lng — see
+          that state's own comment) so it redraws after typing or after
+          "Find location from address" sets both fields at once. */}
+      <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] p-4">
+        <legend className={labelClass.replace("mb-1", "mb-2 px-1")}>Location</legend>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1 space-y-4">
+            {/* Address */}
+            <div>
+              <label htmlFor="venue-address" className={labelClass}>
+                Address{requiredMark}
+              </label>
+              <input
+                type="text"
+                id="venue-address"
+                value={values.address}
+                onChange={(e) => setField("address", e.target.value)}
+                maxLength={FIELD_LIMITS.SUGGEST_ADDRESS}
+                aria-required="true"
+                aria-invalid={errors.address ? "true" : undefined}
+                aria-describedby={errors.address ? "venue-address-error" : undefined}
+                className={`${inputBase} ${inputBorder(!!errors.address)}`}
+              />
+              {errors.address && (
+                <p id="venue-address-error" role="alert" className={errorClass}>
+                  {errors.address}
+                </p>
+              )}
+            </div>
 
-      {/* Find location from address (US Census geocoder — see
-          src/app/api/admin/geocode/route.ts for why Census, not Mapbox) */}
-      <div>
-        <button
-          type="button"
-          onClick={handleGeocode}
-          disabled={!values.address.trim() || geocodeStatus === "loading"}
-          className={secondaryButtonClass}
-        >
-          {geocodeStatus === "loading" ? "Looking up…" : "Find location from address"}
-        </button>
-        {geocodeMessage && (
-          <p aria-live="polite" className={`mt-2 text-sm ${geocodeToneClass[geocodeStatus]}`}>
-            {geocodeMessage}
-          </p>
-        )}
-        {geocodeCandidates.length > 0 && (
-          <div className="mt-2 space-y-1.5">
-            <p id="geocode-candidates-label" className="text-xs font-medium text-[var(--color-ink-500)]">
-              Choose the correct address:
-            </p>
-            <ul aria-labelledby="geocode-candidates-label" className="space-y-1.5">
-              {geocodeCandidates.map((match, i) => (
-                <li key={`${match.lat}-${match.lng}-${i}`}>
-                  <button
-                    type="button"
-                    onClick={() => applyGeocodeMatch(match)}
-                    className={
-                      "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
-                      "px-3 py-2 text-left text-sm text-[var(--color-ink-700)] " +
-                      "transition-colors duration-150 hover:bg-[var(--color-sage-50)] hover:border-[var(--color-sage-500)] " +
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-                    }
-                  >
-                    {match.matchedAddress}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {/* Find location from address (US Census geocoder — see
+                src/app/api/admin/geocode/route.ts for why Census, not Mapbox) */}
+            <div>
+              <button
+                type="button"
+                onClick={handleGeocode}
+                disabled={!values.address.trim() || geocodeStatus === "loading"}
+                className={secondaryButtonClass}
+              >
+                {geocodeStatus === "loading" ? "Looking up…" : "Find location from address"}
+              </button>
+              {geocodeMessage && (
+                <p aria-live="polite" className={`mt-2 text-sm ${geocodeToneClass[geocodeStatus]}`}>
+                  {geocodeMessage}
+                </p>
+              )}
+              {geocodeCandidates.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  <p id="geocode-candidates-label" className="text-xs font-medium text-[var(--color-ink-500)]">
+                    Choose the correct address:
+                  </p>
+                  <ul aria-labelledby="geocode-candidates-label" className="space-y-1.5">
+                    {geocodeCandidates.map((match, i) => (
+                      <li key={`${match.lat}-${match.lng}-${i}`}>
+                        <button
+                          type="button"
+                          onClick={() => applyGeocodeMatch(match)}
+                          className={
+                            "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
+                            "px-3 py-2 text-left text-sm text-[var(--color-ink-700)] " +
+                            "transition-colors duration-150 hover:bg-[var(--color-sage-50)] hover:border-[var(--color-sage-500)] " +
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                          }
+                        >
+                          {match.matchedAddress}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Latitude / Longitude */}
+            {/* ponytail: number inputs, auto-fillable via "Find location from
+                address" above but still hand-editable — the precise source of
+                truth and the fallback when geocoding finds no match or is down.
+                A map-click picker (drop a pin, read lat/lng from the click) is
+                the next upgrade if geocoding ever proves too imprecise (e.g. a
+                venue set back from its mailing address); no ceiling here beyond
+                that remaining UX gap. */}
+            {/* WHY these stay type="number" rather than the usual mobile-friendly
+                type="text" + inputMode="decimal" swap: every longitude in Pueblo
+                County is NEGATIVE (~-104.6), and inputMode="decimal" renders a
+                keypad of digits and a decimal separator with no minus key, which
+                would make longitude unenterable on a phone — the opposite of the
+                intended fix. type="number" keeps a numeric keyboard that still
+                offers a sign. The one genuine hazard of type="number" is that a
+                wheel scroll over a FOCUSED field silently edits its value, and
+                these two write straight to the public map's coordinates, so the
+                onWheel handlers below blur the field instead. If this is ever
+                revisited, verify the minus key on a real iPhone first. */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="venue-lat" className={labelClass}>
+                  Latitude{requiredMark}
+                </label>
+                <input
+                  type="number"
+                  id="venue-lat"
+                  step="any"
+                  value={values.lat}
+                  onChange={(e) => setField("lat", e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  aria-required="true"
+                  aria-invalid={errors.lat ? "true" : undefined}
+                  aria-describedby={errors.lat ? "venue-lat-error" : undefined}
+                  className={`${inputBase} ${inputBorder(!!errors.lat)}`}
+                />
+                {errors.lat && (
+                  <p id="venue-lat-error" role="alert" className={errorClass}>
+                    {errors.lat}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="venue-lng" className={labelClass}>
+                  Longitude{requiredMark}
+                </label>
+                <input
+                  type="number"
+                  id="venue-lng"
+                  step="any"
+                  value={values.lng}
+                  onChange={(e) => setField("lng", e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  aria-required="true"
+                  aria-invalid={errors.lng ? "true" : undefined}
+                  aria-describedby={errors.lng ? "venue-lng-error" : undefined}
+                  className={`${inputBase} ${inputBorder(!!errors.lng)}`}
+                />
+                {errors.lng && (
+                  <p id="venue-lng-error" role="alert" className={errorClass}>
+                    {errors.lng}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+
+          <StaticLocationMap
+            lat={debouncedCoords.lat}
+            lng={debouncedCoords.lng}
+            category={values.category}
+            name={values.name}
+            address={values.address}
+          />
+        </div>
+      </fieldset>
 
       {/* Last verified */}
       <div>
@@ -884,72 +1011,6 @@ export default function AddVenueForm({
             {errors.last_verified}
           </p>
         )}
-      </div>
-
-      {/* Latitude / Longitude */}
-      {/* ponytail: number inputs, auto-fillable via "Find location from
-          address" above but still hand-editable — the precise source of
-          truth and the fallback when geocoding finds no match or is down.
-          A map-click picker (drop a pin, read lat/lng from the click) is
-          the next upgrade if geocoding ever proves too imprecise (e.g. a
-          venue set back from its mailing address); no ceiling here beyond
-          that remaining UX gap. */}
-      {/* WHY these stay type="number" rather than the usual mobile-friendly
-          type="text" + inputMode="decimal" swap: every longitude in Pueblo
-          County is NEGATIVE (~-104.6), and inputMode="decimal" renders a
-          keypad of digits and a decimal separator with no minus key, which
-          would make longitude unenterable on a phone — the opposite of the
-          intended fix. type="number" keeps a numeric keyboard that still
-          offers a sign. The one genuine hazard of type="number" is that a
-          wheel scroll over a FOCUSED field silently edits its value, and
-          these two write straight to the public map's coordinates, so the
-          onWheel handlers below blur the field instead. If this is ever
-          revisited, verify the minus key on a real iPhone first. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="venue-lat" className={labelClass}>
-            Latitude{requiredMark}
-          </label>
-          <input
-            type="number"
-            id="venue-lat"
-            step="any"
-            value={values.lat}
-            onChange={(e) => setField("lat", e.target.value)}
-            onWheel={(e) => e.currentTarget.blur()}
-            aria-required="true"
-            aria-invalid={errors.lat ? "true" : undefined}
-            aria-describedby={errors.lat ? "venue-lat-error" : undefined}
-            className={`${inputBase} ${inputBorder(!!errors.lat)}`}
-          />
-          {errors.lat && (
-            <p id="venue-lat-error" role="alert" className={errorClass}>
-              {errors.lat}
-            </p>
-          )}
-        </div>
-        <div>
-          <label htmlFor="venue-lng" className={labelClass}>
-            Longitude{requiredMark}
-          </label>
-          <input
-            type="number"
-            id="venue-lng"
-            step="any"
-            value={values.lng}
-            onChange={(e) => setField("lng", e.target.value)}
-            onWheel={(e) => e.currentTarget.blur()}
-            aria-required="true"
-            aria-invalid={errors.lng ? "true" : undefined}
-            aria-describedby={errors.lng ? "venue-lng-error" : undefined}
-            className={`${inputBase} ${inputBorder(!!errors.lng)}`}
-          />
-          {errors.lng && (
-            <p id="venue-lng-error" role="alert" className={errorClass}>
-              {errors.lng}
-            </p>
-          )}
-        </div>
       </div>
 
       {/* Hours — basic per-day text, not a scheduler (kept lean per #254) */}

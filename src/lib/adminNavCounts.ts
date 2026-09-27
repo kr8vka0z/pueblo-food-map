@@ -1,7 +1,10 @@
 /**
  * adminNavCounts.ts — the four pending-review counts shown as nav badges on
- * every admin page's shared header (AdminNav): review-queue submissions,
- * data-refresh proposals, box photos, box adopters. Two of the four counts
+ * every admin page's shared header (AdminNav): public-submission reports,
+ * data-refresh proposals, box photos, box adopters. `submissions` and
+ * `proposals` both show on the Places nav item now (#675 folded the
+ * standalone Review queue into Places, joining #674's own Data refresh
+ * fold-in — see AdminNav.tsx's own NAV_ITEMS comment). Two of the four counts
  * (countPendingReview / countPendingAdopters) already existed in
  * boxPhotos.ts / boxAdopters.ts; this file adds the other two and bundles
  * all four into one Promise.all so every admin page fetches its header

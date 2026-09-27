@@ -33,11 +33,13 @@
  * sent as a JSON body `{ submissionId }` — the archive route already
  * accepts this optional field and, in the SAME atomic batch as the status
  * flip, marks that closure submission approved (see that route's header;
- * same technique SubmissionsReviewView's closure card used before #270
- * moved that action to this edit-page flow). Redirecting back to the
- * review queue (rather than the venue list) afterward completes that loop.
- * When absent, every part of this component behaves exactly as before
- * #270 — this is additive, not a fork.
+ * same technique the review queue's old closure card used before #270
+ * moved that action to this edit-page flow). Redirecting back to Places'
+ * "To review" + "The public" filters (rather than the venue list)
+ * afterward completes that loop — #675 folded the standalone review queue
+ * (/admin/submissions) into Places, so that's where "the next pending
+ * item" now lives. When absent, every part of this component behaves
+ * exactly as before #270 — this is additive, not a fork.
  */
 
 import { useState } from "react";
@@ -90,9 +92,9 @@ export default function ArchiveVenueButton({
       );
       if (res.status === 200) {
         // Default target is /admin/places (moved from /admin, admin
-        // dashboard build) — an archive that didn't come from the review
-        // queue should return to the venue list, not the Dashboard.
-        router.push(submissionId != null ? "/admin/submissions" : "/admin/places");
+        // dashboard build) — an archive that didn't come from a public
+        // report should return to the venue list, not the Dashboard.
+        router.push(submissionId != null ? "/admin/places?show=review&from=public" : "/admin/places");
         router.refresh();
         return;
       }

@@ -118,7 +118,7 @@ async function sendNewPhotoEmail(boxId: string, boxName: string): Promise<void> 
         `Box: ${boxName}`,
         `Box ID: ${boxId}`,
         ``,
-        `Review it at https://pueblofoodmap.com/admin/box-photos`,
+        `Review it at https://pueblofoodmap.com/admin/boxes?show=review`,
       ].join("\n"),
     }),
   });

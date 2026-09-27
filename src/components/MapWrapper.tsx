@@ -63,6 +63,7 @@ import { toVenue } from "@/lib/useBoxVenues";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 import { useMapUI, type ViewMode } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
+import { track, EVENTS } from "@/lib/analytics";
 import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
@@ -1390,6 +1391,31 @@ export default function MapWrapper({
     [filteredVenues, venuesWithDistance, selectedVenueId],
   );
 
+  // ── venue_opened analytics (#485 PR 2) ───────────────────────────────────────
+  //
+  // ONE choke point for every selection path (map pin, list row, search
+  // result, deep link — five separate setSelectedVenueId call sites) rather
+  // than instrumenting each: fires on the id actually CHANGING, keyed off a
+  // ref rather than selectedVenueId itself, because venuesWithDistance gets
+  // a new object identity on every `origin` change (a fresh geolocation fix)
+  // — without the ref, that alone would re-fire this effect for the SAME
+  // open venue. Also covers the async-boxes case: selectedVenue is null on
+  // the render where selectedVenueId is set but boxVenues hasn't loaded yet,
+  // so this only fires once selectedVenue itself resolves to a real object.
+  const lastTrackedVenueIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedVenue === null) {
+      lastTrackedVenueIdRef.current = null;
+      return;
+    }
+    if (lastTrackedVenueIdRef.current === selectedVenue.id) return;
+    lastTrackedVenueIdRef.current = selectedVenue.id;
+    void track(EVENTS.VENUE_OPENED, {
+      category: selectedVenue.category,
+      venueId: selectedVenue.id,
+    });
+  }, [selectedVenue]);
+
   // ── Typeahead popover handlers (issue #67) ───────────────────────────────────
   // These come after filteredVenues / isMobile are declared so closures are valid.
 
@@ -1626,6 +1652,10 @@ export default function MapWrapper({
   // a fly-to-your-location is invisible there — so it returns to the map first
   // (a no-op when the map can't mount; the location still re-sorts the list).
   const handleNearMe = useCallback(() => {
+    // #485 PR 2: fired ONLY here, not inside handleLocateRequest — that
+    // function is shared with the Walk-without-location path (#207), which
+    // isn't a "Near me" tap and must not be misattributed as one.
+    void track(EVENTS.NEAR_ME_CLICKED, {});
     handleViewModeChange("map");
     handleLocateRequest();
   }, [handleViewModeChange, handleLocateRequest]);

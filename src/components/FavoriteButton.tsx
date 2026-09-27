@@ -4,6 +4,7 @@ import { Star } from "lucide-react";
 import { useIsFavorite, toggleFavorite } from "@/lib/favorites";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { track, EVENTS } from "@/lib/analytics";
 
 interface FavoriteButtonProps {
   venueId: string;
@@ -34,7 +35,13 @@ export default function FavoriteButton({
       aria-pressed={favorited}
       aria-label={label}
       title={label}
-      onClick={() => toggleFavorite(venueId)}
+      onClick={() => {
+        // #485 PR 2: only ADDING is tracked — removing isn't in the allowlist's
+        // intent ("favorite_added"), and the dashboard wants "most saved," not
+        // a churn signal.
+        if (!favorited) void track(EVENTS.FAVORITE_ADDED, { venueId });
+        toggleFavorite(venueId);
+      }}
       className={
         // 48px hit area (#233's floor; was 44, mobile review #12); negative
         // margin cancels part of the growth in the header rows this sits in

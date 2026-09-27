@@ -1,20 +1,22 @@
 /**
  * Regression test for the #568 review finding (2026-09-24) — new file
  * because src/components/VenueListView.test.tsx is an existing test file
- * (write-guarded on fix/* branches); this covers ONLY the archived-row
- * Edit-link swap, not the rest of the component (see that file for the
- * baseline #255 Edit-affordance coverage this mirrors the fixture of).
+ * (write-guarded on fix/* branches); this covers ONLY the archived row's
+ * name-vs-link swap, not the rest of the component (see that file for the
+ * baseline #255/#672 name-link coverage this mirrors the fixture of).
  *
- * PATCH /api/admin/venues/[id] now refuses an archived-row edit with a 409
- * (src/app/api/admin/venues/[id]/route.ts) — an Edit link that always
- * dead-ends into that 409 isn't a real action, so an archived row shows a
- * muted "Archived" label instead.
+ * PATCH /api/admin/venues/[id] refuses an archived-row edit with a 409
+ * (src/app/api/admin/venues/[id]/route.ts) — a name link that always
+ * dead-ends into that 409 isn't a real action, so an archived row's name
+ * stays plain text instead. #672 moved this from a separate Actions column
+ * onto the name cell itself (the Actions column no longer exists).
  */
 
 import { describe, test, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import VenueListView from "@/components/VenueListView";
 import type { AdminVenueRow } from "@/types/venue";
+import type { AdminDisplayStatus } from "@/lib/adminVenues";
 
 function makeVenue(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
   return {
@@ -48,27 +50,29 @@ function makeVenue(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
   };
 }
 
-describe("VenueListView — archived row's Edit column", () => {
-  test("an archived row shows a muted 'Archived' label, not an Edit link", () => {
-    render(<VenueListView venues={[makeVenue({ id: "archived-1", status: "archived" })]} />);
+function makeStatusMap(venues: AdminVenueRow[]): Record<string, AdminDisplayStatus> {
+  return Object.fromEntries(venues.map((v) => [v.id, v.status === "archived" ? "removed" : "draft"]));
+}
 
-    expect(screen.queryByRole("link", { name: /Edit/i })).toBeNull();
-    expect(screen.getByText("Archived")).toBeDefined();
+describe("VenueListView — archived row's name", () => {
+  test("an archived row's name is plain text, not a link", () => {
+    const venues = [makeVenue({ id: "archived-1", status: "archived" })];
+    render(<VenueListView venues={venues} statusByVenueId={makeStatusMap(venues)} />);
+
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText("Eastside Pantry")).toBeDefined();
   });
 
-  test("a draft/published row alongside an archived row still gets its own Edit link", () => {
-    render(
-      <VenueListView
-        venues={[
-          makeVenue({ id: "draft-1", status: "draft" }),
-          makeVenue({ id: "archived-1", name: "Closed Site", status: "archived" }),
-        ]}
-      />,
-    );
+  test("a draft/published row alongside an archived row still gets its own name link", () => {
+    const venues = [
+      makeVenue({ id: "draft-1", status: "draft" }),
+      makeVenue({ id: "archived-1", name: "Closed Site", status: "archived" }),
+    ];
+    render(<VenueListView venues={venues} statusByVenueId={makeStatusMap(venues)} />);
 
-    const links = screen.getAllByRole("link", { name: /Edit/i });
+    const links = screen.getAllByRole("link");
     expect(links).toHaveLength(1);
     expect(links[0]).toHaveAttribute("href", "/admin/venues/draft-1/edit");
-    expect(screen.getByText("Archived")).toBeDefined();
+    expect(screen.getByText("Closed Site")).toBeDefined();
   });
 });

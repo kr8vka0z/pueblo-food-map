@@ -1839,7 +1839,10 @@ export default function MapWrapper({
   // already clear, so this never fights a fresh fitBounds/flyTo the same
   // selection just triggered elsewhere.
   useEffect(() => {
-    if (isMobile || !mapboxMap || !selectedVenue) return;
+    // Gate on the panel actually being open (#688 review), not just on a
+    // selection existing: a future path that selects without showing the map
+    // must never pan a hidden map.
+    if (isMobile || !mapboxMap || !selectedVenue || !desktopPanelOpen) return;
     // `project`/`panBy` guard: real mapboxgl.Map always has both, but
     // `isMobile` starts `false` (useMediaQuery's SSR-safe default) and only
     // flips true via a deferred setTimeout — a lint-rule artifact (setState
@@ -1869,7 +1872,7 @@ export default function MapWrapper({
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     mapboxMap.panBy([overflow, 0], { duration: reducedMotion ? 0 : 300 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedVenueId, mapboxMap, isMobile]);
+  }, [selectedVenueId, mapboxMap, isMobile, desktopPanelOpen]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 

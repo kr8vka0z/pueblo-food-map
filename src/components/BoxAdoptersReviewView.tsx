@@ -59,7 +59,7 @@ export default function BoxAdoptersReviewView({ adopters }: BoxAdoptersReviewVie
   if (adopters.length === 0) {
     return (
       <div className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-16 text-center">
-        <p className="text-sm font-semibold text-[var(--color-ink-700)]">No adoption requests to review</p>
+        <p className="text-sm font-semibold text-[var(--color-ink-700)]">No sponsor requests to review</p>
         <p className="mt-1 text-sm text-[var(--color-ink-500)]">New applications will show up here.</p>
       </div>
     );
@@ -167,7 +167,7 @@ function BoxAdopterCard({ adopter }: { adopter: AdminBoxAdopterRow }) {
           disabled={state.status === "submitting"}
           className={primaryButtonClass}
         >
-          {state.status === "submitting" ? "Approving…" : "Approve"}
+          {state.status === "submitting" ? "Approving…" : "Approve sponsor"}
         </button>
         {!rejectOpen && (
           <button
@@ -176,7 +176,7 @@ function BoxAdopterCard({ adopter }: { adopter: AdminBoxAdopterRow }) {
             disabled={state.status === "submitting"}
             className={secondaryButtonClass}
           >
-            {adopter.status === "approved" ? "Remove" : "Reject"}
+            {adopter.status === "approved" ? "Remove" : "Decline"}
           </button>
         )}
       </div>
@@ -205,7 +205,7 @@ function BoxAdopterCard({ adopter }: { adopter: AdminBoxAdopterRow }) {
               disabled={state.status === "submitting"}
               className={dangerButtonClass}
             >
-              {state.status === "submitting" ? "Saving…" : `Confirm ${adopter.status === "approved" ? "remove" : "reject"}`}
+              {state.status === "submitting" ? "Saving…" : `Confirm ${adopter.status === "approved" ? "remove" : "decline"}`}
             </button>
             <button
               type="button"

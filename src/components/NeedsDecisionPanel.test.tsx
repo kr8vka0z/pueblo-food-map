@@ -145,7 +145,7 @@ describe("NeedsDecisionPanel — empty state", () => {
     render(<NeedsDecisionPanel {...emptyProps()} />);
     expect(
       screen.getByText(
-        "Nothing waiting on you. New suggestions, data changes, box photos and adoption requests show up here as they come in.",
+        "Nothing waiting on you. New suggestions, data changes, box photos and sponsor requests show up here as they come in.",
       ),
     ).toBeDefined();
   });
@@ -365,7 +365,7 @@ describe("NeedsDecisionPanel — blessing boxes group", () => {
     );
 
     expect(screen.getByText(/Awaiting confirmation/)).toBeDefined();
-    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await userEvent.click(screen.getByRole("button", { name: "Approve sponsor" }));
 
     expect(await screen.findByText("Not confirmed yet")).toBeDefined();
     expect(mockRefresh).not.toHaveBeenCalled();

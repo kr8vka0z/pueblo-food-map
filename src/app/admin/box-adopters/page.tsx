@@ -33,7 +33,7 @@ export default async function BoxAdoptersPage() {
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={email} active="box-adopters" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6">
-        <h2 className="wordmark mb-4 text-xl text-[var(--color-ink-900)]">Adoption requests</h2>
+        <h2 className="wordmark mb-4 text-xl text-[var(--color-ink-900)]">Sponsor requests</h2>
         <BoxAdoptersReviewView adopters={adopters} />
       </div>
     </main>

@@ -1,41 +1,20 @@
 /**
- * /admin/box-adopters — the adopt-a-box moderation queue (Blessing Boxes
- * slice 6). Same Server-Component-auth-gate / Client-Component-interaction
- * split as /admin/box-photos (getAdminDb() -> handlePageAuthError() on
- * failure); this page only SELECTs (loadPendingAdopters()), so — like every
- * other read-only admin page — it carries no requireAdminOrigin() CSRF check
- * of its own; that guard lives on the approve/reject mutation routes.
+ * /admin/box-adopters — retired (#677, "fold Photo review and Sponsor
+ * requests into the Blessing Boxes tab"). The sponsor-request moderation
+ * queue this page used to render (BoxAdoptersReviewView.tsx, now deleted)
+ * is folded into the Blessing Boxes tab: every pending request shows on its
+ * box's own row (the "To review" column, AllBoxesTable.tsx) and resolves
+ * from that box's own edit page (BoxReviewBox.tsx).
+ *
+ * Kept as a redirect rather than deleted outright — same reasoning
+ * /admin/box-photos/page.tsx's own header gives (which mirrors
+ * /admin/flags/page.tsx): bookmarks/muscle-memory, and a plain Server
+ * Component `redirect()` at a non-root path is safe. No auth gate of its
+ * own — this route does no D1 read; the redirect target enforces its own.
  */
 
-import { headers } from "next/headers";
-import { getAdminDb } from "@/lib/adminDb";
-import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
-import { loadPendingAdopters } from "@/lib/boxAdopters";
-import AdminNav from "@/components/AdminNav";
-import BoxAdoptersReviewView from "@/components/BoxAdoptersReviewView";
+import { redirect } from "next/navigation";
 
-export default async function BoxAdoptersPage() {
-  let email: string;
-  let adopters: Awaited<ReturnType<typeof loadPendingAdopters>>;
-  let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
-
-  try {
-    const { db, identity } = await getAdminDb(await headers());
-    email = identity.email;
-    adopters = await loadPendingAdopters(db);
-    navCounts = await loadAdminNavCounts(db);
-  } catch (err) {
-    handlePageAuthError(err);
-  }
-
-  return (
-    <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="box-adopters" counts={navCounts} />
-      <div className="px-4 py-6 sm:px-6">
-        <h2 className="wordmark mb-4 text-xl text-[var(--color-ink-900)]">Sponsor requests</h2>
-        <BoxAdoptersReviewView adopters={adopters} />
-      </div>
-    </main>
-  );
+export default function BoxAdoptersPage(): never {
+  redirect("/admin/boxes?show=review");
 }

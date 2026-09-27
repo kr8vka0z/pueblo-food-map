@@ -35,7 +35,14 @@
  * entire history regardless of which period is selected on screen.
  */
 
-import type { CheckinKind, CheckinStatusInput } from "@/lib/blessingBoxes";
+import {
+  NEED_KEY_SET,
+  SELECT_NEEDED_FROM_VISITORS_SQL,
+  type CheckinKind,
+  type CheckinStatusInput,
+  type NeedCountRow,
+  type NeedKey,
+} from "@/lib/blessingBoxes";
 
 // ─── Period picker ──────────────────────────────────────────────────────────
 
@@ -54,6 +61,30 @@ export function filterByPeriod<T extends { created_at: string }>(items: readonly
   const start = periodStartMs(period, now);
   if (start === null) return [...items];
   return items.filter((i) => new Date(i.created_at).getTime() >= start);
+}
+
+/**
+ * The admin Dashboard's period switch (#680) shows "the change vs the
+ * previous period of the same length" next to EVERY period-scoped number on
+ * the page, not just Cloudflare's — this is the D1-side half of that rule.
+ * `[now-2N, now-N)` — half-open so a check-in exactly on the current
+ * period's own start boundary is counted once, by filterByPeriod, never
+ * twice. `"all"` has no "previous all-time" to compare against, so it's
+ * excluded from this function's own type rather than silently returning
+ * everything or nothing.
+ */
+export function filterByPreviousPeriod<T extends { created_at: string }>(
+  items: readonly T[],
+  period: Exclude<PeriodKey, "all">,
+  now: Date,
+): T[] {
+  const days = PERIOD_DAYS[period];
+  const currentStart = now.getTime() - days * MS_PER_DAY;
+  const previousStart = currentStart - days * MS_PER_DAY;
+  return items.filter((i) => {
+    const t = new Date(i.created_at).getTime();
+    return t >= previousStart && t < currentStart;
+  });
 }
 
 // ─── Public-safe check-in filtering ─────────────────────────────────────────
@@ -548,4 +579,95 @@ export interface NetworkOverview {
 export function computeNetworkOverview(boxCount: number, sponsorCount: number): NetworkOverview {
   const avgSponsorsPerBox = boxCount === 0 ? "0" : (sponsorCount / boxCount).toFixed(1);
   return { boxCount, sponsorCount, avgSponsorsPerBox };
+}
+
+// ─── Network-wide "most needed" (admin Dashboard, #680) ────────────────────
+// Reuses blessingBoxes.ts's own SELECT_NEEDED_FROM_VISITORS_SQL (migration
+// 0012) rather than a second copy of that json_each query — it already
+// returns every (venue, key) aggregate network-wide with a single `cutoff`
+// bind param; this file only adds the NETWORK-total ranking on top, which
+// blessingBoxes.ts's own computeNeededFromVisitorsMap doesn't do (that one
+// is deliberately PER-BOX, for the public box card).
+
+export interface NetworkNeedTotal {
+  key: NeedKey;
+  count: number;
+}
+
+/**
+ * Sums every box's pick count per key across the whole network and ranks
+ * the top `limit` — unlike computeNeededFromVisitorsMap's per-box floor
+ * (NEEDED_FROM_VISITORS_MIN_COUNT), no floor is applied here: a network
+ * total of 1 is still real signal at Dashboard scale, whereas a single
+ * visitor's pick heading a single box's own public card would overstate
+ * that one box's need (see blessingBoxes.ts's own reasoning for its floor).
+ */
+export function rankNetworkMostNeeded(rows: readonly NeedCountRow[], limit = 4): NetworkNeedTotal[] {
+  const totals = new Map<NeedKey, number>();
+  for (const row of rows) {
+    if (!NEED_KEY_SET.has(row.key)) continue; // defensive: same "unknown/legacy key dropped" posture as computeNeededFromVisitorsMap
+    const key = row.key as NeedKey;
+    totals.set(key, (totals.get(key) ?? 0) + row.n);
+  }
+  return [...totals.entries()]
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+    .slice(0, limit);
+}
+
+/** Best-effort, same "one missing/broken table must never break the Dashboard" posture as loadNetworkStatsData's own photos/sponsor reads above. `cutoffIso` is the caller's own period start (the Dashboard's period switch applies here too, unlike the public box card's fixed 30-day window). */
+export async function loadNetworkNeedRows(db: D1Database, cutoffIso: string): Promise<NeedCountRow[]> {
+  try {
+    const result = await db.prepare(SELECT_NEEDED_FROM_VISITORS_SQL).bind(cutoffIso).all<NeedCountRow>();
+    return result.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ─── Problem reports (admin Dashboard "Map data health", #680) ────────────
+// `box_checkins.kind = 'problem'` rows are admin-only (blessingBoxes.ts's
+// own header) — the ONE kind of "public problem report" this schema has (no
+// separate reports table exists; public_submissions only covers
+// 'new_venue'/'closure'). "Fixed" reads as `visibility = 'hidden'`: an admin
+// hides a problem check-in from BoxCheckinsAdminPanel once it's been dealt
+// with (the only admin action that table exposes on a problem row) — "open"
+// is everything still `visible`.
+
+export interface ProblemReportRow {
+  visibility: "visible" | "hidden";
+  created_at: string;
+}
+
+const SELECT_PROBLEM_REPORTS_SQL = `
+  SELECT c.visibility, c.created_at
+  FROM box_checkins c
+  JOIN venues v ON v.id = c.venue_id AND v.category = 'blessing_box' AND v.status != 'archived'
+  WHERE c.kind = 'problem'
+`;
+
+/** Best-effort — same posture as every other network-wide box read in this file. */
+export async function loadProblemReports(db: D1Database): Promise<ProblemReportRow[]> {
+  try {
+    const result = await db.prepare(SELECT_PROBLEM_REPORTS_SQL).all<ProblemReportRow>();
+    return result.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export interface ProblemReportCounts {
+  open: number;
+  fixed: number;
+}
+
+/** Pure — scopes to `period` first (created_at, same rule as every other period-scoped count on the Dashboard), then splits by visibility. */
+export function computeProblemReportCounts(rows: readonly ProblemReportRow[], period: PeriodKey, now: Date): ProblemReportCounts {
+  let open = 0;
+  let fixed = 0;
+  for (const r of filterByPeriod(rows, period, now)) {
+    if (r.visibility === "hidden") fixed++;
+    else open++;
+  }
+  return { open, fixed };
 }

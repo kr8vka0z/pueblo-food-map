@@ -17,6 +17,14 @@
  * AccessDeniedError` inside the page still resolves true. Real JWT/D1
  * plumbing stays covered by adminDb.test.ts and adminOrigin.test.ts; this
  * file only proves the page wires those pieces together correctly.
+ *
+ * #673: the page also calls getCloudflareContext() directly now (to read
+ * BETTER_AUTH_RP_ID for isProductionWorker()/isStaging), independent of the
+ * getAdminDb mock above — same mock shape as
+ * src/app/api/admin/publish/route.test.ts. Defaults to production
+ * (BETTER_AUTH_RP_ID undefined) in every test below; the dedicated staging
+ * banner + status-hiding behavior has its own test file
+ * (page.staging.test.tsx).
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -30,6 +38,11 @@ import type { AdminVenueRow } from "@/types/venue";
 const mockGetAdminDb = vi.fn();
 vi.mock("@/lib/adminDb", () => ({
   getAdminDb: (...args: unknown[]) => mockGetAdminDb(...args),
+}));
+
+const mockGetCloudflareContext = vi.fn();
+vi.mock("@opennextjs/cloudflare", () => ({
+  getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 
 // Value is irrelevant -- getAdminDb is mocked, so the page never actually
@@ -92,11 +105,28 @@ function makeVenueRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
   };
 }
 
-/** Matches the page's real call chain: db.prepare(sql).all<AdminVenueRow>(). */
-function makeFakeDb(seedRows: AdminVenueRow[]) {
+/**
+ * Matches the page's real call chain: db.prepare(sql).all<AdminVenueRow>()
+ * for the venues query, (#674) a second .all() for the pending
+ * change_proposals query, and (#675) a third for the pending
+ * public_submissions query — dispatches on SQL text so none of the three
+ * ever cross wires (a fake that returned `seedRows` for any of them used to
+ * work before each addition added its own query; every test below either
+ * doesn't care about proposals/submissions at all, or passes them
+ * explicitly).
+ */
+function makeFakeDb(seedRows: AdminVenueRow[], proposalRows: unknown[] = [], submissionRows: unknown[] = []) {
   return {
-    prepare: () => ({
-      all: async () => ({ success: true, results: seedRows, meta: {} }),
+    prepare: (sql: string) => ({
+      all: async () => ({
+        success: true,
+        results: sql.includes("FROM change_proposals")
+          ? proposalRows
+          : sql.includes("FROM public_submissions")
+            ? submissionRows
+            : seedRows,
+        meta: {},
+      }),
     }),
   } as unknown as D1Database;
 }
@@ -115,6 +145,8 @@ describe("PlacesPage — auth guard", () => {
       db: makeFakeDb(venues),
       identity: { email: "admin@example.com" },
     });
+    // Production (BETTER_AUTH_RP_ID unset) — see this file's own header.
+    mockGetCloudflareContext.mockResolvedValue({ env: { BETTER_AUTH_RP_ID: undefined } });
 
     render(await PlacesPage());
 
@@ -122,14 +154,13 @@ describe("PlacesPage — auth guard", () => {
     expect(screen.getByText("Eastside Pantry")).toBeDefined();
     expect(screen.getByText("Main Street Grocery")).toBeDefined();
     // Shared AdminNav (admin dashboard build) renders the nav row now —
-    // "Places" is the active tab, and the review/data-refresh queues are
-    // still one click away from here.
-    const placesLink = screen.getByRole("link", { name: "Places" });
+    // "Places" is the active tab. #674 folded the old "Data refresh" nav
+    // item into Places itself, and #675 folded "Review queue" the same
+    // way — there is no separate link for either any more.
+    const placesLink = screen.getByRole("link", { name: /^Places/ });
     expect(placesLink.getAttribute("aria-current")).toBe("page");
-    const reviewQueueLink = screen.getByRole("link", { name: "Review queue" });
-    expect(reviewQueueLink.getAttribute("href")).toBe("/admin/submissions");
-    const flagsQueueLink = screen.getByRole("link", { name: "Data refresh" });
-    expect(flagsQueueLink.getAttribute("href")).toBe("/admin/flags");
+    expect(screen.queryByRole("link", { name: /Data refresh/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Review queue" })).toBeNull();
     expect(forbidden).not.toHaveBeenCalled();
   });
 

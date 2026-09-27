@@ -120,7 +120,7 @@ describe("ArchiveVenueButton — already archived", () => {
 });
 
 describe("ArchiveVenueButton — optional submissionId (#270)", () => {
-  test("with submissionId: the archive POST body includes {submissionId}, success redirects to /admin/submissions", async () => {
+  test("with submissionId: the archive POST body includes {submissionId}, success redirects to /admin/places?show=review&from=public (#675)", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc", status: "archived" }) });
     const user = userEvent.setup();
@@ -136,7 +136,7 @@ describe("ArchiveVenueButton — optional submissionId (#270)", () => {
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toEqual({ submissionId: 9 });
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/submissions"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places?show=review&from=public"));
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 

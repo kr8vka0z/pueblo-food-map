@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, test } from "vitest";
-import { computeBoxHealth, rankNeedsHelp, rankQuiet, activeBoxes, type BoxHealthCheckin, type BoxHealthEntry } from "@/lib/boxHealth";
+import { computeBoxHealth, rankNeedsHelp, activeBoxes, type BoxHealthCheckin, type BoxHealthEntry } from "@/lib/boxHealth";
 
 const NOW = new Date("2026-09-21T12:00:00.000Z");
 
@@ -78,7 +78,7 @@ function entry(overrides: Partial<BoxHealthEntry>): BoxHealthEntry {
     lat: 38.25,
     lng: -104.6,
     health: { status: "quiet", latest: null, daysSinceLastReport: null },
-    caretaker: null,
+    sponsors: [],
     removedOn: null,
     ...overrides,
   };
@@ -134,33 +134,5 @@ describe("rankNeedsHelp", () => {
       }),
     );
     expect(rankNeedsHelp(entries, 2)).toHaveLength(2);
-  });
-});
-
-describe("rankQuiet", () => {
-  test("filters to quiet only, longest-quiet first, never-reported sorts first", () => {
-    const neverReported = entry({ venueId: "never", health: { status: "quiet", latest: null, daysSinceLastReport: null } });
-    const quiet41 = entry({ venueId: "q41", health: { status: "quiet", latest: checkin({}), daysSinceLastReport: 41 } });
-    const quiet33 = entry({ venueId: "q33", health: { status: "quiet", latest: checkin({}), daysSinceLastReport: 33 } });
-    const ok = entry({ venueId: "ok", health: { status: "ok", latest: checkin({}), daysSinceLastReport: 1 } });
-
-    const result = rankQuiet([quiet33, ok, quiet41, neverReported]);
-    expect(result.map((e) => e.venueId)).toEqual(["never", "q41", "q33"]);
-  });
-
-  // Item 2 regression: same exclusion as rankNeedsHelp — a removed box
-  // reading "quiet" isn't a monitoring gap worth surfacing.
-  test("excludes a removed box even when its status is quiet", () => {
-    const removedQuiet = entry({ venueId: "removed-quiet", removedOn: "2026-08-01T00:00:00.000Z", health: { status: "quiet", latest: null, daysSinceLastReport: null } });
-    const activeQuiet = entry({ venueId: "active-quiet", removedOn: null, health: { status: "quiet", latest: null, daysSinceLastReport: null } });
-    const result = rankQuiet([removedQuiet, activeQuiet]);
-    expect(result.map((e) => e.venueId)).toEqual(["active-quiet"]);
-  });
-
-  test("respects an optional limit", () => {
-    const entries = Array.from({ length: 5 }, (_, i) =>
-      entry({ venueId: `v${i}`, health: { status: "quiet", latest: checkin({}), daysSinceLastReport: i } }),
-    );
-    expect(rankQuiet(entries, 3)).toHaveLength(3);
   });
 });

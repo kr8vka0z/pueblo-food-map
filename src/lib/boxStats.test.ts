@@ -8,6 +8,7 @@
 import { describe, test, expect } from "vitest";
 import {
   filterByPeriod,
+  filterByPreviousPeriod,
   computeCheckinCounts,
   computePairAverages,
   computeNetworkPairAverages,
@@ -19,10 +20,13 @@ import {
   computeMilestones,
   periodStartMs,
   loadNetworkStatsData,
+  rankNetworkMostNeeded,
+  computeProblemReportCounts,
   type NetworkStatsCheckin,
   type NeedLoveBox,
+  type ProblemReportRow,
 } from "@/lib/boxStats";
-import type { CheckinStatusInput } from "@/lib/blessingBoxes";
+import type { CheckinStatusInput, NeedCountRow } from "@/lib/blessingBoxes";
 
 function ci(overrides: Partial<CheckinStatusInput> = {}): CheckinStatusInput {
   return { kind: "filled", visibility: "visible", created_at: "2026-09-01T00:00:00.000Z", ...overrides };
@@ -568,5 +572,75 @@ describe("loadNetworkStatsData", () => {
     } as unknown as D1Database;
     await loadNetworkStatsData(db);
     expect(capturedSql).toContain("visibility = 'visible'");
+  });
+});
+
+describe("filterByPreviousPeriod", () => {
+  const now = new Date("2026-09-26T00:00:00.000Z");
+
+  test("keeps items in [now-2N, now-N), excludes the current period and anything older", () => {
+    const items = [
+      ci({ created_at: "2026-08-01T00:00:00.000Z" }), // older than previous 7d window
+      ci({ created_at: "2026-09-13T12:00:00.000Z" }), // previous 7d window (Sep 12-19)
+      ci({ created_at: "2026-09-20T00:00:00.000Z" }), // current period start — excluded (belongs to current)
+      ci({ created_at: "2026-09-24T00:00:00.000Z" }), // current period — excluded
+    ];
+    const result = filterByPreviousPeriod(items, "7d", now);
+    expect(result).toHaveLength(1);
+    expect(result[0].created_at).toBe("2026-09-13T12:00:00.000Z");
+  });
+
+  test("empty input -> empty output", () => {
+    expect(filterByPreviousPeriod([], "30d", now)).toEqual([]);
+  });
+});
+
+describe("rankNetworkMostNeeded", () => {
+  function need(overrides: Partial<NeedCountRow> = {}): NeedCountRow {
+    return { venue_id: "v1", key: "bread", n: 1, last_at: "2026-09-01T00:00:00.000Z", ...overrides };
+  }
+
+  test("sums a key's count ACROSS every box, ranks desc, caps at limit", () => {
+    const rows = [
+      need({ venue_id: "v1", key: "bread", n: 3 }),
+      need({ venue_id: "v2", key: "bread", n: 2 }),
+      need({ venue_id: "v1", key: "diapers", n: 10 }),
+      need({ venue_id: "v3", key: "hygiene", n: 1 }),
+    ];
+    expect(rankNetworkMostNeeded(rows, 2)).toEqual([
+      { key: "diapers", count: 10 },
+      { key: "bread", count: 5 },
+    ]);
+  });
+
+  test("an unknown/legacy key is dropped, never surfaced", () => {
+    const rows = [need({ key: "retired_key_from_2025" })];
+    expect(rankNetworkMostNeeded(rows)).toEqual([]);
+  });
+
+  test("no floor applied — a single network-wide pick still ranks (unlike the per-box public card)", () => {
+    expect(rankNetworkMostNeeded([need({ key: "pet_food", n: 1 })])).toEqual([{ key: "pet_food", count: 1 }]);
+  });
+});
+
+describe("computeProblemReportCounts", () => {
+  const now = new Date("2026-09-26T00:00:00.000Z");
+
+  function report(overrides: Partial<ProblemReportRow> = {}): ProblemReportRow {
+    return { visibility: "visible", created_at: "2026-09-24T00:00:00.000Z", ...overrides };
+  }
+
+  test("visible = open, hidden = fixed, scoped to the period", () => {
+    const rows = [
+      report({ visibility: "visible" }),
+      report({ visibility: "visible" }),
+      report({ visibility: "hidden" }),
+      report({ visibility: "visible", created_at: "2026-01-01T00:00:00.000Z" }), // outside 30d window
+    ];
+    expect(computeProblemReportCounts(rows, "30d", now)).toEqual({ open: 2, fixed: 1 });
+  });
+
+  test("no reports -> {open:0, fixed:0}, never undefined", () => {
+    expect(computeProblemReportCounts([], "7d", now)).toEqual({ open: 0, fixed: 0 });
   });
 });

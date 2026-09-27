@@ -16,6 +16,16 @@
  * requires it (mirrors the real Next.js contract; unlike
  * new/page.tsx, this page has no pre-existing no-arg test call to keep
  * working, so there was no reason to make it optional here).
+ *
+ * #673: the page now also calls getCloudflareContext() (to compute
+ * isStaging for displayStatusOf, same as /admin/places's page.test.tsx)
+ * for any venue it finds — mocked below to production
+ * (BETTER_AUTH_RP_ID undefined) since none of these fixtures use
+ * status: "published", so displayStatusOf never reaches the
+ * live_edits_waiting branch that would need it — the audit_log/
+ * change_proposals queries that branch adds are covered separately in
+ * page.waitingToPublish.test.tsx (new file — see that file's own header
+ * for why).
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -27,6 +37,12 @@ import type { ClosurePayload, PublicSubmissionRow } from "@/lib/publicSubmission
 const mockGetAdminDb = vi.fn();
 vi.mock("@/lib/adminDb", () => ({
   getAdminDb: (...args: unknown[]) => mockGetAdminDb(...args),
+}));
+
+const mockGetCloudflareContext = vi.fn();
+mockGetCloudflareContext.mockResolvedValue({ env: { BETTER_AUTH_RP_ID: undefined } });
+vi.mock("@opennextjs/cloudflare", () => ({
+  getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 
 vi.mock("next/headers", () => ({

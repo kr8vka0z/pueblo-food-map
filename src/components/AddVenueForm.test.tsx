@@ -255,7 +255,7 @@ describe("AddVenueForm — submissionId threading (#259)", () => {
     expect(body.submissionId).toBeUndefined();
   });
 
-  test("a successful create WITH submissionId redirects to /admin/submissions (back to the queue), not /admin", async () => {
+  test("a successful create WITH submissionId redirects to /admin/places?show=review&from=public (#675: back to Places' review filter, /admin/submissions is now a redirect), not /admin", async () => {
     mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ id: "manual-abc" }) });
     const user = userEvent.setup();
     render(<AddVenueForm submissionId={42} />);
@@ -263,7 +263,7 @@ describe("AddVenueForm — submissionId threading (#259)", () => {
 
     await user.click(screen.getByRole("button", { name: /Add venue/i }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/submissions"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places?show=review&from=public"));
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
@@ -294,7 +294,7 @@ describe("AddVenueForm — submissionId threading (#259)", () => {
   });
 });
 
-describe("AddVenueForm — proposalId threading (/admin/flags, #390)", () => {
+describe("AddVenueForm — proposalId threading (#390 edit / #674 create)", () => {
   test("edit mode + proposalId -> PATCH body includes proposalId", async () => {
     mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc" }) });
     const user = userEvent.setup();
@@ -323,8 +323,14 @@ describe("AddVenueForm — proposalId threading (/admin/flags, #390)", () => {
     expect(body.proposalId).toBeUndefined();
   });
 
-  test("create mode ignores proposalId entirely: POST body omits it", async () => {
-    mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ ok: true, id: "manual-new" }) });
+  // #674 changed this from "create mode ignores proposalId" to "create mode
+  // sends it too" — the issue's own acceptance criteria: "`add` proposals
+  // open /admin/venues/new?proposal=<id> prefilled... saving approves it as
+  // a Draft" requires POST /api/admin/venues to receive proposalId so it
+  // can approve the originating change_proposals row atomically (see that
+  // route's own header).
+  test("create mode + proposalId -> POST body includes proposalId (#674)", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ ok: true, id: "osm-node-new" }) });
     const user = userEvent.setup();
     render(<AddVenueForm proposalId={748} />);
     await fillRequiredFields(user);
@@ -334,10 +340,13 @@ describe("AddVenueForm — proposalId threading (/admin/flags, #390)", () => {
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(init.body as string);
-    expect(body.proposalId).toBeUndefined();
+    expect(body.proposalId).toBe(748);
   });
 
-  test("a successful edit WITH proposalId redirects to /admin/flags, not /admin", async () => {
+  // #674: "The Data refresh tab and /admin/flags go away" — either mode's
+  // proposal-approving success now lands on the Places tab's "To review"
+  // filter instead of the retired /admin/flags queue.
+  test("a successful edit WITH proposalId redirects to /admin/places?show=review, not /admin/flags", async () => {
     mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true, id: "manual-abc" }) });
     const user = userEvent.setup();
     render(<AddVenueForm venueId="manual-abc" proposalId={748} />);
@@ -345,7 +354,18 @@ describe("AddVenueForm — proposalId threading (/admin/flags, #390)", () => {
 
     await user.click(screen.getByRole("button", { name: /Save changes/i }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/flags"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places?show=review"));
+  });
+
+  test("a successful create WITH proposalId redirects to /admin/places?show=review (#674)", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 201, json: async () => ({ ok: true, id: "osm-node-new" }) });
+    const user = userEvent.setup();
+    render(<AddVenueForm proposalId={748} />);
+    await fillRequiredFields(user);
+
+    await user.click(screen.getByRole("button", { name: /Add venue/i }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/admin/places?show=review"));
   });
 });
 

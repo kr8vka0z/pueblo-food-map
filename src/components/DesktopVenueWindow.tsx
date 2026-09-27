@@ -45,6 +45,7 @@ import { MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import { safeUrl } from "@/lib/safeUrl";
+import { track, EVENTS } from "@/lib/analytics";
 import { BOTTOM_NAV_HEIGHT_PX } from "@/components/BottomNav";
 import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 
@@ -533,6 +534,7 @@ export default function DesktopVenueWindow({
           </h3>
           <a
             href={`tel:${venue.phone}`}
+            onClick={() => void track(EVENTS.CALL_CLICKED, { venueId: venue.id })}
             className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
           >
             <Phone size={13} className="text-[var(--color-sage-600)]" aria-hidden />
@@ -561,6 +563,7 @@ export default function DesktopVenueWindow({
           href={safeUrl(venue.url)!}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => void track(EVENTS.WEBSITE_CLICKED, { venueId: venue.id })}
           className={
             "flex items-center justify-between gap-2 w-full px-3 py-2.5 " +
             // #534: --color-sage-300 undefined — sage-500 is DESIGN.md's

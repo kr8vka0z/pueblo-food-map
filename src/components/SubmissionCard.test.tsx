@@ -1,31 +1,25 @@
 /**
- * SubmissionsReviewView tests (#259).
+ * SubmissionCard tests (#675, "fold the Review queue into Places") — moved
+ * and adapted from the now-deleted SubmissionsReviewView.test.tsx (#259).
+ * That file's own empty-state/list-shell tests are gone with the component
+ * they covered (SuggestionsBox.test.tsx covers the box's own "renders one
+ * card per item" contract); everything about ONE card's own rendering and
+ * actions moves here.
  *
- * Covers all five acceptance criteria at the component layer:
- *   - AC1: empty state when there's nothing pending; otherwise every
- *     submission renders as a card with kind + submitted details.
- *   - AC2: a new_venue card's "Review & approve" is a real link to
- *     /admin/venues/new?submission=<id> (the actual create-and-approve
- *     happens on that page/route, covered by their own test files).
- *   - AC3/AC5: the shared Reject flow (both kinds) — reveal reason textarea,
- *     POST /api/admin/submissions/<id>/reject, refresh on success, inline
- *     error on failure.
- *   - AC4 (updated #270): a closure card's "Review & approve" is a real
- *     link to /admin/venues/<target_venue_id>/edit?submission=<id> —
- *     edit-before-approve, matching new_venue's own hand-off shape; the
- *     actual archive-and-approve happens on that page via
- *     ArchiveVenueButton, covered by its own test file. Originally a
- *     one-click confirm+archive; changed because a closure report can mean
- *     "the hours changed," not only "this place is gone."
- *
- * next/navigation's useRouter is mocked module-wide, same pattern as
- * ArchiveVenueButton.test.tsx / AddVenueForm.test.tsx.
+ * Kind-specific action change from the original (#270) behavior: a closure
+ * card used to be a plain navigation Link to the venue's edit page
+ * ("Review & approve") — now this card renders DIRECTLY INSIDE that edit
+ * page's own "Suggestions to review" box (SuggestionsBox.tsx), so there is
+ * nowhere left to navigate TO; its actions are inline **Mark done** (POST
+ * .../done) and Reject instead. A new_venue card is unchanged — still a
+ * plain Link to /admin/venues/new?submission=<id>, since that hand-off
+ * genuinely leaves this page for the prefilled create form.
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReviewSubmission } from "@/components/SubmissionsReviewView";
+import type { ReviewSubmission } from "@/lib/publicSubmissions";
 
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
@@ -33,7 +27,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
 }));
 
-import SubmissionsReviewView from "@/components/SubmissionsReviewView";
+import SubmissionCard from "@/components/SubmissionCard";
 
 const mockFetch = vi.fn();
 
@@ -92,17 +86,9 @@ function makeClosureSubmission(overrides: Partial<ReviewSubmission> = {}): Revie
   } as ReviewSubmission;
 }
 
-describe("SubmissionsReviewView — empty state (AC1)", () => {
-  test("renders a calm empty-state panel when there are no pending submissions", () => {
-    render(<SubmissionsReviewView submissions={[]} />);
-    expect(screen.getByText(/No submissions to review/i)).toBeDefined();
-    expect(screen.queryByRole("link", { name: /Review & approve/i })).toBeNull();
-  });
-});
-
-describe("SubmissionsReviewView — new_venue card (AC1, AC2)", () => {
+describe("SubmissionCard — new_venue (AC1, AC2)", () => {
   test("renders the kind badge, submitted details, and every payload field", () => {
-    render(<SubmissionsReviewView submissions={[makeNewVenueSubmission()]} />);
+    render(<SubmissionCard submission={makeNewVenueSubmission()} />);
 
     expect(screen.getByText(/New place/i)).toBeDefined();
     expect(screen.getByText("Eastside Pantry")).toBeDefined();
@@ -114,46 +100,67 @@ describe("SubmissionsReviewView — new_venue card (AC1, AC2)", () => {
     expect(screen.getByText(/suggester@example\.com/)).toBeDefined();
   });
 
-  test("'Review & approve' is a real link to /admin/venues/new?submission=<id>", () => {
-    render(<SubmissionsReviewView submissions={[makeNewVenueSubmission({ id: 7 })]} />);
+  test("'Review & approve' is a real link to /admin/venues/new?submission=<id>, no Mark done button", () => {
+    render(<SubmissionCard submission={makeNewVenueSubmission({ id: 7 })} />);
 
     const link = screen.getByRole("link", { name: /Review & approve/i });
     expect(link.getAttribute("href")).toBe("/admin/venues/new?submission=7");
+    expect(screen.queryByRole("button", { name: /Mark done/i })).toBeNull();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 
-describe("SubmissionsReviewView — closure card (AC1, AC4)", () => {
+describe("SubmissionCard — closure (AC1, AC4)", () => {
   test("renders the kind badge and every payload field", () => {
-    render(<SubmissionsReviewView submissions={[makeClosureSubmission()]} />);
+    render(<SubmissionCard submission={makeClosureSubmission()} />);
 
-    expect(screen.getByText(/Closure report/i)).toBeDefined();
+    expect(screen.getByText(/Public report/i)).toBeDefined();
     expect(screen.getByText("Main Street Grocery")).toBeDefined();
     expect(screen.getByText(/456 Main Ave, Pueblo, CO/)).toBeDefined();
     expect(screen.getByText(/This store shut down last month\./)).toBeDefined();
     // Renders twice by design: once in the card's "submitted by" metadata
     // line (submitter_email column) and once in the labeled "Reporter
-    // contact" detail row (payload.contactEmail) — realistically the same
-    // value (report/submit/route.ts derives submitterEmail FROM
-    // contactEmail), so getAllByText, not getByText, is the correct query.
+    // contact" detail row (payload.contactEmail).
     expect(screen.getAllByText(/reporter@example\.com/).length).toBeGreaterThanOrEqual(1);
   });
 
-  test("'Review & approve' is a real link to /admin/venues/<target_venue_id>/edit?submission=<id> (#270)", () => {
-    render(
-      <SubmissionsReviewView
-        submissions={[makeClosureSubmission({ id: 9, targetVenueId: "manual-existing-1" })]}
-      />,
-    );
+  test("renders a Mark done button, no navigation link (#675: the card lives directly on the edit page now)", () => {
+    render(<SubmissionCard submission={makeClosureSubmission({ id: 9 })} />);
 
-    const link = screen.getByRole("link", { name: /Review & approve/i });
-    expect(link.getAttribute("href")).toBe("/admin/venues/manual-existing-1/edit?submission=9");
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Mark done/i })).toBeDefined();
+    expect(screen.queryByRole("link", { name: /Review & approve/i })).toBeNull();
+  });
+
+  test("clicking Mark done POSTs .../done with no body, then refreshes", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true }) });
+    const user = userEvent.setup();
+    render(<SubmissionCard submission={makeClosureSubmission({ id: 9 })} />);
+
+    await user.click(screen.getByRole("button", { name: /Mark done/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit | undefined];
+    expect(url).toBe("/api/admin/submissions/9/done");
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBeUndefined();
+
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+  });
+
+  test("a non-200 Mark done response shows an inline error and does not refresh", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 404, json: async () => ({ ok: false }) });
+    const user = userEvent.setup();
+    render(<SubmissionCard submission={makeClosureSubmission()} />);
+
+    await user.click(screen.getByRole("button", { name: /Mark done/i }));
+
+    expect(await screen.findByRole("alert")).toBeDefined();
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 });
 
-describe("SubmissionsReviewView — closure parseError still allows approve (#270)", () => {
-  test("a parseError closure row with a target_venue_id still renders the Review & approve link (target_venue_id is a real column, not from the unparseable payload)", () => {
+describe("SubmissionCard — closure parseError still allows Mark done + Reject (#270/#675)", () => {
+  test("a parseError closure row still renders Mark done and Reject (target_venue_id is a real column, not from the unparseable payload)", () => {
     const broken: ReviewSubmission = {
       id: 12,
       kind: "closure",
@@ -163,17 +170,17 @@ describe("SubmissionsReviewView — closure parseError still allows approve (#27
       parseError: true,
       payload: null,
     };
-    render(<SubmissionsReviewView submissions={[broken]} />);
+    render(<SubmissionCard submission={broken} />);
 
-    const link = screen.getByRole("link", { name: /Review & approve/i });
-    expect(link.getAttribute("href")).toBe("/admin/venues/manual-existing-2/edit?submission=12");
+    expect(screen.getByRole("button", { name: /Mark done/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /^Reject$/i })).toBeDefined();
   });
 });
 
-describe("SubmissionsReviewView — reject flow, shared by both kinds (AC3, AC5)", () => {
+describe("SubmissionCard — reject flow, shared by both kinds (AC3, AC5)", () => {
   test("clicking Reject reveals a labeled, optional reason textarea", async () => {
     const user = userEvent.setup();
-    render(<SubmissionsReviewView submissions={[makeNewVenueSubmission()]} />);
+    render(<SubmissionCard submission={makeNewVenueSubmission()} />);
 
     expect(screen.queryByLabelText(/reason/i)).toBeNull();
     await user.click(screen.getByRole("button", { name: /^Reject$/i }));
@@ -184,7 +191,7 @@ describe("SubmissionsReviewView — reject flow, shared by both kinds (AC3, AC5)
   test("confirming reject POSTs the reject route with the typed reason, then refreshes", async () => {
     mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true }) });
     const user = userEvent.setup();
-    render(<SubmissionsReviewView submissions={[makeNewVenueSubmission({ id: 5 })]} />);
+    render(<SubmissionCard submission={makeNewVenueSubmission({ id: 5 })} />);
 
     await user.click(screen.getByRole("button", { name: /^Reject$/i }));
     await user.type(screen.getByLabelText(/reason/i), "Duplicate of an existing venue.");
@@ -202,7 +209,7 @@ describe("SubmissionsReviewView — reject flow, shared by both kinds (AC3, AC5)
   test("confirming reject with no reason typed still POSTs (reason is optional)", async () => {
     mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true }) });
     const user = userEvent.setup();
-    render(<SubmissionsReviewView submissions={[makeClosureSubmission({ id: 9 })]} />);
+    render(<SubmissionCard submission={makeClosureSubmission({ id: 9 })} />);
 
     await user.click(screen.getByRole("button", { name: /^Reject$/i }));
     await user.click(screen.getByRole("button", { name: /Confirm reject/i }));
@@ -215,7 +222,7 @@ describe("SubmissionsReviewView — reject flow, shared by both kinds (AC3, AC5)
   test("a non-200 reject response shows an inline error and does not refresh", async () => {
     mockFetch.mockResolvedValueOnce({ status: 404, json: async () => ({ ok: false, error: "Not found" }) });
     const user = userEvent.setup();
-    render(<SubmissionsReviewView submissions={[makeNewVenueSubmission()]} />);
+    render(<SubmissionCard submission={makeNewVenueSubmission()} />);
 
     await user.click(screen.getByRole("button", { name: /^Reject$/i }));
     await user.click(screen.getByRole("button", { name: /Confirm reject/i }));
@@ -227,7 +234,7 @@ describe("SubmissionsReviewView — reject flow, shared by both kinds (AC3, AC5)
   test("a network-level reject failure shows an inline error", async () => {
     mockFetch.mockRejectedValueOnce(new Error("network down"));
     const user = userEvent.setup();
-    render(<SubmissionsReviewView submissions={[makeClosureSubmission()]} />);
+    render(<SubmissionCard submission={makeClosureSubmission()} />);
 
     await user.click(screen.getByRole("button", { name: /^Reject$/i }));
     await user.click(screen.getByRole("button", { name: /Confirm reject/i }));
@@ -236,8 +243,8 @@ describe("SubmissionsReviewView — reject flow, shared by both kinds (AC3, AC5)
   });
 });
 
-describe("SubmissionsReviewView — malformed payload degrades gracefully", () => {
-  test("a parseError row shows a 'couldn't read details' message, still offers Reject, no approve action", () => {
+describe("SubmissionCard — malformed payload degrades gracefully", () => {
+  test("a parseError new_venue row shows a 'couldn't read details' message, still offers Reject, no approve action", () => {
     const broken: ReviewSubmission = {
       id: 11,
       kind: "new_venue",
@@ -247,34 +254,10 @@ describe("SubmissionsReviewView — malformed payload degrades gracefully", () =
       parseError: true,
       payload: null,
     };
-    render(<SubmissionsReviewView submissions={[broken]} />);
+    render(<SubmissionCard submission={broken} />);
 
     expect(screen.getByText(/couldn't read details/i)).toBeDefined();
     expect(screen.queryByRole("link", { name: /Review & approve/i })).toBeNull();
     expect(screen.getByRole("button", { name: /^Reject$/i })).toBeDefined();
-  });
-});
-
-describe("SubmissionsReviewView — multiple cards render independently", () => {
-  test("two cards each get their own working Reject flow without cross-talk", async () => {
-    mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ ok: true }) });
-    const user = userEvent.setup();
-    render(
-      <SubmissionsReviewView
-        submissions={[makeNewVenueSubmission({ id: 1 }), makeClosureSubmission({ id: 2 })]}
-      />,
-    );
-
-    const rejectButtons = screen.getAllByRole("button", { name: /^Reject$/i });
-    expect(rejectButtons).toHaveLength(2);
-
-    await user.click(rejectButtons[0]!);
-    // Only the first card's textarea should appear.
-    expect(screen.getAllByLabelText(/reason/i)).toHaveLength(1);
-
-    await user.click(screen.getByRole("button", { name: /Confirm reject/i }));
-    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
-    const [url] = mockFetch.mock.calls[0] as [string];
-    expect(url).toBe("/api/admin/submissions/1/reject");
   });
 });

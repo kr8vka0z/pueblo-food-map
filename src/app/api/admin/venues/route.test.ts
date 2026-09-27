@@ -46,13 +46,31 @@ interface BoundStatement {
   args: unknown[];
 }
 
-/** Fake D1: batch() is a spy; prepare().bind() returns an inspectable {sql, args} record. */
-function makeFakeDb() {
+/**
+ * Fake D1: batch() is a spy; prepare().bind() returns an inspectable
+ * {sql, args} record that ALSO answers .first() — needed for #674's
+ * proposalId flow, which SELECTs the pending proposal and then checks
+ * whether target_venue_id already exists before the create batch runs.
+ * `.first()` branches on the SQL text (change_proposals vs. venues) rather
+ * than call order, since resolveAddProposalTarget always issues both
+ * SELECTs in a fixed sequence — every existing zero-arg call site is
+ * unaffected (`.first()` is simply never invoked when no proposalId is
+ * sent).
+ */
+function makeFakeDb(opts: { proposalRow?: unknown; existingVenueRow?: unknown } = {}) {
   const batch = vi.fn(async (stmts: BoundStatement[]) =>
     stmts.map(() => ({ success: true, results: [], meta: {} })),
   );
   const prepare = (sql: string) => ({
-    bind: (...args: unknown[]): BoundStatement => ({ sql, args }),
+    bind: (...args: unknown[]) => ({
+      sql,
+      args,
+      first: async <T,>(): Promise<T | null> => {
+        if (sql.includes("FROM change_proposals")) return (opts.proposalRow ?? null) as T | null;
+        if (sql.includes("FROM venues")) return (opts.existingVenueRow ?? null) as T | null;
+        return null;
+      },
+    }) as unknown as BoundStatement & { first: () => Promise<unknown> },
   });
   return { db: { prepare, batch } as unknown as D1Database, batch };
 }
@@ -237,6 +255,78 @@ describe("POST /api/admin/venues", () => {
       const stmts = batch.mock.calls[0][0] as BoundStatement[];
       expect(stmts).toHaveLength(2);
     }
+  });
+
+  // ── #674: proposalId — "add proposals open /admin/venues/new?proposal=<id>
+  // ... saving approves it as a Draft" ─────────────────────────────────────
+  describe("proposalId (#674)", () => {
+    test("valid pending 'add' proposal, target free -> uses the proposal's OWN id/source as the venue's id/source_type, approves the proposal in the same batch", async () => {
+      const { db, batch } = makeFakeDb({ proposalRow: { target_venue_id: "osm-node-new", source: "osm" } });
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await POST(makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ proposalId: 77 }) }));
+      expect(res.status).toBe(201);
+      const data = (await res.json()) as { id: string };
+      // NOT a manual-<uuid> — the scraper's own id, so the next refresh run
+      // recognises this venue already exists (see route.ts's own header).
+      expect(data.id).toBe("osm-node-new");
+
+      expect(batch).toHaveBeenCalledTimes(1);
+      const stmts = batch.mock.calls[0][0] as BoundStatement[];
+      expect(stmts).toHaveLength(3);
+      const [venueStmt, auditStmt, approveStmt] = stmts;
+      expect(venueStmt.args).toContain("osm-node-new");
+      expect(venueStmt.args).toContain("osm"); // source_type, not "manual"
+      expect(venueStmt.args).not.toContain("manual");
+      const afterJson = JSON.parse(auditStmt.args[5] as string);
+      expect(afterJson.source_type).toBe("osm");
+
+      expect(approveStmt.sql).toContain("UPDATE change_proposals");
+      expect(approveStmt.sql).toContain("status = 'approved'");
+      expect(approveStmt.sql).toContain("change_type = 'add'");
+      expect(approveStmt.args).toContain(ADMIN_EMAIL);
+      expect(approveStmt.args).toContain(77);
+    });
+
+    test("no matching pending 'add' proposal -> 409 stale, D1 batch never called", async () => {
+      const { db, batch } = makeFakeDb({ proposalRow: null });
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await POST(makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ proposalId: 77 }) }));
+      expect(res.status).toBe(409);
+      const data = (await res.json()) as { ok: boolean; error: string; message: string };
+      expect(data.ok).toBe(false);
+      expect(data.error).toBe("stale");
+      expect(data.message).toBeTruthy();
+      expect(batch).not.toHaveBeenCalled();
+    });
+
+    test("target_venue_id already exists (duplicate or restore) -> 409 stale, D1 batch never called", async () => {
+      const { db, batch } = makeFakeDb({
+        proposalRow: { target_venue_id: "osm-node-new", source: "osm" },
+        existingVenueRow: { id: "osm-node-new" },
+      });
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      const res = await POST(makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ proposalId: 77 }) }));
+      expect(res.status).toBe(409);
+      expect(batch).not.toHaveBeenCalled();
+    });
+
+    test("proposalId is ignored when not a positive integer — plain manual create, still 2 statements", async () => {
+      const { db, batch } = makeFakeDb();
+      mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+      for (const badProposalId of ["77", 0, -1, 1.5]) {
+        batch.mockClear();
+        const res = await POST(makeRequest({ origin: ADMIN_ORIGIN, body: validPayload({ proposalId: badProposalId }) }));
+        expect(res.status).toBe(201);
+        const data = (await res.json()) as { id: string };
+        expect(data.id).toMatch(/^manual-/);
+        const stmts = batch.mock.calls[0][0] as BoundStatement[];
+        expect(stmts).toHaveLength(2);
+      }
+    });
   });
 
   test("optional fields (hours_weekly, tri-state, contact info) are bound correctly when provided", async () => {

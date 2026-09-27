@@ -41,17 +41,38 @@
  * be awaited (same convention as /venue/[id]/page.tsx and
  * /admin/venues/new/page.tsx).
  *
- * #390: `?proposal=<id>` is the /admin/flags queue's link_health hand-off —
- * that queue's card intentionally has no Approve button for a link_health
- * proposal (a dead-URL observation isn't safe to blindly apply; see
- * src/components/ProposalsReviewView.tsx's own header), only a "Review &
- * fix link" navigation link here. resolveLinkHealthProposalContext() below
- * mirrors resolveClosureReportContext() exactly — same match-against-THIS-
- * venue check, same "any failure degrades to the plain page" shape — and
- * when accepted threads the proposal id through as AddVenueForm's new
- * `proposalId` prop (that component's header explains the PATCH-time
- * approval), plus renders the dead URL + last-seen HTTP status in a banner
- * so the admin has context before editing.
+ * #390: `?proposal=<id>` is a link_health hand-off (originally from the now-
+ * folded-into-Places /admin/flags queue, #674) — a link_health proposal
+ * intentionally has no Approve button on its ProposalCard (a dead-URL
+ * observation isn't safe to blindly apply; see ProposalCard.tsx's own
+ * header), only a "Review & fix link" navigation link. That card is one of
+ * potentially several this page's own SuggestionsBox renders below (#674:
+ * every pending proposal targeting this venue, not just a link_health one);
+ * resolveLinkHealthProposalContext() below is a SEPARATE, narrower resolver
+ * that only powers the banner + AddVenueForm's `proposalId` prop for the
+ * ONE proposal `?proposal=` names — mirrors resolveClosureReportContext()
+ * exactly — same match-against-THIS-venue check, same "any failure degrades
+ * to the plain page" shape — and when accepted threads the proposal id
+ * through as AddVenueForm's `proposalId` prop (that component's header
+ * explains the PATCH-time approval), plus renders the dead URL + last-seen
+ * HTTP status in a banner so the admin has context before editing.
+ *
+ * #674: SuggestionsBox (rendered below, right under the page title) shows
+ * EVERY pending change_proposals row targeting this venue as its own card —
+ * see resolvePendingProposals() below and SuggestionsBox.tsx's own header.
+ *
+ * #675 ("fold the Review queue into Places"): resolvePendingSubmissions()
+ * below adds every pending `public_submissions` "closure" row targeting
+ * this venue to the SAME box, as its own ReviewItem — a "new_venue"
+ * submission never targets an existing venue (target_venue_id is NULL for
+ * that kind) so it can never appear here; it keeps its own
+ * /admin/venues/new?submission=<id> hand-off unchanged (VenueListView.tsx's
+ * "Suggested new place" row). `?submission=<id>` still separately resolves
+ * a CLOSURE-REPORT BANNER + ArchiveVenueButton's submissionId (see
+ * resolveClosureReportContext below, unchanged) — that is the
+ * remove-and-resolve path for a report that says the place is really gone;
+ * this box is for reading every OPEN report/proposal on the page, whether
+ * or not one of them happens to be the one `?submission=` names.
  *
  * #265: passes `venue.updated_at` straight through to AddVenueForm's
  * `expectedUpdatedAt` prop — the optimistic-concurrency precondition PATCH
@@ -67,11 +88,35 @@
  * admin data. Wrapped in the same try/catch-degrades-to-empty shape as
  * resolveClosureReportContext()/resolveLinkHealthProposalContext() above —
  * a D1 read failure here must never take down the whole edit page.
+ *
+ * #677: for the same `blessing_box` check, resolveBoxReviewItems() loads
+ * this box's own pending/flagged photos and pending sponsor requests, shown
+ * right under the title in BoxReviewBox.tsx's "Things to review" box — the
+ * on-page home for what used to live only on the now-folded-away
+ * /admin/box-photos and /admin/box-adopters tabs. See that resolver's own
+ * header for why this reuses the tab's existing loaders rather than a new
+ * query.
+ *
+ * #673 pt.3: resolveWaitingToPublishChanges() renders the "Waiting to
+ * publish" box (WaitingToPublishBox.tsx) right under the page title for a
+ * place displayStatusOf() (src/lib/adminVenues.ts) reads as
+ * `live_edits_waiting` — never for a draft, an unedited live place, an
+ * archived place, a blessing box, or (on staging) anything at all, since
+ * those are exactly the states that function returns for. Field-level
+ * diffs come from diffPublishedFields() (compares this D1 row against its
+ * src/data/published-venues.ts entry); "who changed it" comes from
+ * attributeFieldChange() reading audit_log + change_proposals — see both
+ * functions' own headers in adminVenues.ts for the exact rules. Same
+ * degrade-to-empty shape as the other resolvers on this page: any D1
+ * failure here must never take down the rest of the edit page, so it falls
+ * back to naming the venue's own `updated_by` for every field rather than
+ * throwing.
  */
 
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
@@ -80,11 +125,27 @@ import AddVenueForm from "@/components/AddVenueForm";
 import ArchiveVenueButton from "@/components/ArchiveVenueButton";
 import BoxCheckinsAdminPanel from "@/components/BoxCheckinsAdminPanel";
 import HostAlertsAdminPanel from "@/components/HostAlertsAdminPanel";
+import WaitingToPublishBox, { type WaitingToPublishChange } from "@/components/WaitingToPublishBox";
+import SuggestionsBox from "@/components/SuggestionsBox";
+import BoxReviewBox from "@/components/BoxReviewBox";
 import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
-import { parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
+import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
+import { parseSubmissionRow, type ReviewItem } from "@/lib/publicSubmissions";
 import { loadAllCheckinsForBox, type AdminCheckinRow } from "@/lib/blessingBoxes";
 import { loadHostSubscriptions } from "@/lib/boxAlerts";
+import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
+import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
+import { loadVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
+import {
+  displayStatusOf,
+  diffPublishedFields,
+  attributeFieldChange,
+  type VenueAuditEntry,
+  type ApprovedProposalMark,
+} from "@/lib/adminVenues";
+import { isProductionWorker } from "@/lib/publishVenues";
+import { publishedVenues } from "@/data/published-venues";
 import type { AdminVenueRow } from "@/types/venue";
 import type { ClosurePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
 
@@ -94,7 +155,7 @@ interface ClosureReportContext {
    *  match this context was accepted on) is a real column independent of
    *  that payload, so the submissionId itself is still good; only the
    *  banner's descriptive text degrades to generic copy. Same
-   *  parseError-tolerant reasoning as SubmissionsReviewView's closure
+   *  parseError-tolerant reasoning as SubmissionCard's closure
    *  card. */
   detail: { issueLabel: string; description: string } | null;
 }
@@ -205,6 +266,133 @@ async function resolveHostAlerts(db: D1Database, venueId: string): Promise<{ id:
   }
 }
 
+/**
+ * #677: this box's own pending/flagged photos and pending sponsor requests,
+ * for the "Things to review" box (BoxReviewBox.tsx). Reuses the SAME
+ * loaders the /admin/boxes tab's summary and column read
+ * (loadReviewQueue/loadPendingAdopters), filtered client-side to this one
+ * venue — no new SQL, same "ponytail" reasoning as adminBoxes.ts's own
+ * D1_MAX_BOUND_PARAMS note: this app's real box/queue volume never
+ * approaches the size where "filter the full queue in memory" would cost
+ * anything over a dedicated WHERE clause, so a second dedicated query isn't
+ * worth adding. Same degrade-to-empty shape as this file's other optional
+ * resolvers — a D1 failure here must never take down the rest of the edit
+ * page.
+ */
+async function resolveBoxReviewItems(
+  db: D1Database,
+  venueId: string,
+): Promise<{ photos: AdminBoxPhotoRow[]; adopters: AdminBoxAdopterRow[] }> {
+  try {
+    const [allPhotos, allAdopters] = await Promise.all([loadReviewQueue(db), loadPendingAdopters(db)]);
+    return {
+      photos: allPhotos.filter((p) => p.venue_id === venueId),
+      adopters: allAdopters.filter((a) => a.venue_id === venueId),
+    };
+  } catch {
+    return { photos: [], adopters: [] };
+  }
+}
+
+/**
+ * #674: every PENDING `change_proposals` row targeting this venue, newest
+ * first — the SuggestionsBox at the top of this page. Same degrade-to-empty
+ * shape as this file's other optional resolvers (resolveBoxCheckins,
+ * resolveHostAlerts above) — a D1 failure here must never take down the
+ * rest of the edit page, and a plain [] is exactly what SuggestionsBox
+ * already renders nothing for.
+ */
+async function resolvePendingProposals(db: D1Database, venueId: string): Promise<ParsedProposal[]> {
+  try {
+    const result = await db
+      .prepare("SELECT * FROM change_proposals WHERE target_venue_id = ? AND status = 'pending' ORDER BY created_at DESC")
+      .bind(venueId)
+      .all<ChangeProposalRow>();
+    return result.results.map(parseProposalRow);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * #675: every PENDING `public_submissions` "closure" row targeting this
+ * venue, newest first — same query shape and degrade-to-empty posture as
+ * resolvePendingProposals() above (a D1 failure here must never take down
+ * the rest of the edit page). `kind = 'closure'` only: a "new_venue" row's
+ * target_venue_id is always NULL (migrations/0002's own schema comment), so
+ * it could never match this WHERE clause anyway — the filter is explicit
+ * here for readability, not because it changes what rows come back.
+ */
+async function resolvePendingSubmissions(db: D1Database, venueId: string) {
+  try {
+    const result = await db
+      .prepare(
+        "SELECT * FROM public_submissions WHERE target_venue_id = ? AND status = 'pending' AND kind = 'closure' ORDER BY created_at DESC",
+      )
+      .bind(venueId)
+      .all<PublicSubmissionRow>();
+    return result.results.map(parseSubmissionRow);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Resolves the "Waiting to publish" box's data for `venue`, or null when it
+ * shouldn't render at all — see this file's own header for the full
+ * reasoning. Only ever called for a place whose status is already known to
+ * be `live_edits_waiting` (the caller checks first), so a null return here
+ * means "the diff came back empty" (shouldn't happen, but never worth a
+ * crash) rather than "this place doesn't qualify."
+ */
+async function resolveWaitingToPublishChanges(
+  db: D1Database,
+  venue: AdminVenueRow,
+  viewerEmail: string,
+): Promise<WaitingToPublishChange[]> {
+  const publishedById = new Map(publishedVenues.map((v) => [v.id, v]));
+  const diffs = diffPublishedFields(venue, publishedById.get(venue.id));
+  if (diffs.length === 0) return [];
+
+  try {
+    const [auditResult, proposalsResult] = await Promise.all([
+      db
+        .prepare(
+          "SELECT actor_email, before_json, after_json, timestamp FROM audit_log " +
+            "WHERE entity = 'venue' AND entity_id = ? AND timestamp > ? ORDER BY timestamp DESC",
+        )
+        .bind(venue.id, venue.published_at ?? "")
+        .all<VenueAuditEntry>(),
+      // reviewed_by is the approving admin's email (adminProposals.ts's
+      // APPROVE_PROPOSAL_SQL) — aliased to actor_email so this reads as the
+      // same shape attributeFieldChange() expects.
+      db
+        .prepare(
+          "SELECT reviewed_by AS actor_email, applied_at FROM change_proposals " +
+            "WHERE target_venue_id = ? AND status = 'approved' AND applied_at IS NOT NULL",
+        )
+        .bind(venue.id)
+        .all<{ actor_email: string | null; applied_at: string }>(),
+    ]);
+
+    const auditEntries = auditResult.results;
+    const approvedMarks: ApprovedProposalMark[] = proposalsResult.results.filter(
+      (mark): mark is ApprovedProposalMark => mark.actor_email !== null,
+    );
+
+    return diffs.map((diff) => ({
+      ...diff,
+      who: attributeFieldChange(diff.field, auditEntries, approvedMarks, viewerEmail, venue.updated_by),
+    }));
+  } catch {
+    // A D1 read failure here must never crash the edit page — fall back to
+    // naming the venue row's own updated_by for every field rather than
+    // throwing (same degrade-to-generic shape as this file's other
+    // resolvers, just with a non-empty fallback instead of null/[]).
+    return diffs.map((diff) => ({ ...diff, who: venue.updated_by }));
+  }
+}
+
 export default async function EditVenuePage({
   params,
   searchParams,
@@ -219,6 +407,12 @@ export default async function EditVenuePage({
   let linkHealthContext: LinkHealthProposalContext | null = null;
   let boxCheckins: AdminCheckinRow[] = [];
   let hostAlerts: { id: number; email: string }[] = [];
+  let boxReviewPhotos: AdminBoxPhotoRow[] = [];
+  let boxReviewAdopters: AdminBoxAdopterRow[] = [];
+  let waitingToPublish: WaitingToPublishChange[] = [];
+  let pendingProposals: ParsedProposal[] = [];
+  let suggestionItems: ReviewItem[] = [];
+  let suggestionsVenue: VenueLookup | null = null;
   let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
 
   try {
@@ -232,6 +426,39 @@ export default async function EditVenuePage({
       if (venue.category === "blessing_box") {
         boxCheckins = await resolveBoxCheckins(db, id);
         hostAlerts = await resolveHostAlerts(db, id);
+        const reviewItems = await resolveBoxReviewItems(db, id);
+        boxReviewPhotos = reviewItems.photos;
+        boxReviewAdopters = reviewItems.adopters;
+      }
+      // #674: "Suggestions to review" box — every pending change_proposals
+      // row targeting this venue (an archived venue can have one too: a
+      // restore, ProposalCard.tsx's own `isRestore` branch). Only bothers
+      // loading the venue's VenueLookup context (a second, tiny SELECT)
+      // when there's actually something to show it to — the common case
+      // (an unedited place) skips this entirely.
+      pendingProposals = await resolvePendingProposals(db, id);
+      // #675: every pending closure report targeting this venue joins the
+      // SAME "Suggestions to review" box as the proposals above — one
+      // ReviewItem[] the box dispatches on by `kind`, see SuggestionsBox.tsx.
+      const pendingSubmissions = await resolvePendingSubmissions(db, id);
+      suggestionItems = [
+        ...pendingProposals.map((proposal): ReviewItem => ({ kind: "proposal", proposal })),
+        ...pendingSubmissions.map((submission): ReviewItem => ({ kind: "submission", submission })),
+      ];
+      if (suggestionItems.length > 0) {
+        const lookup = await loadVenueLookup(db, [id]);
+        suggestionsVenue = lookup[id] ?? null;
+      }
+      // #673 pt.3: only fetch/compute the diff for a place actually waiting
+      // — displayStatusOf() is the single source of truth for that (never a
+      // box, a draft, an unedited live place, or — on staging — anything at
+      // all), same rule the Places tab's own status badge uses.
+      const { env } = await getCloudflareContext({ async: true });
+      const isStaging = !isProductionWorker(env);
+      const publishedById = new Map(publishedVenues.map((v) => [v.id, v]));
+      const status = displayStatusOf(venue, publishedById.get(venue.id), { isStaging });
+      if (status === "live_edits_waiting") {
+        waitingToPublish = await resolveWaitingToPublishChanges(db, venue, identity.email);
       }
     }
     navCounts = await loadAdminNavCounts(db);
@@ -246,6 +473,13 @@ export default async function EditVenuePage({
       <AdminNav email={email} active="places" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6 space-y-6">
         <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Edit {venue.name}</h2>
+        {venue.category === "blessing_box" && (
+          <BoxReviewBox photos={boxReviewPhotos} adopters={boxReviewAdopters} />
+        )}
+        {suggestionItems.length > 0 && suggestionsVenue && (
+          <SuggestionsBox items={suggestionItems} venue={suggestionsVenue} />
+        )}
+        <WaitingToPublishBox changes={waitingToPublish} />
         {closureContext && (
           <div className="max-w-2xl rounded-[var(--radius-lg)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
             <p className="font-semibold">Reviewing a closure report</p>
@@ -254,8 +488,8 @@ export default async function EditVenuePage({
                 ? `${closureContext.detail.issueLabel} — ${closureContext.detail.description}`
                 : "A closure report was submitted for this venue."}
             </p>
-            <Link href="/admin/submissions" className="mt-2 inline-block font-medium underline underline-offset-2">
-              Back to review queue
+            <Link href="/admin/places?show=review&from=public" className="mt-2 inline-block font-medium underline underline-offset-2">
+              Back to Places
             </Link>
           </div>
         )}
@@ -270,8 +504,8 @@ export default async function EditVenuePage({
                 : "The automated refresh flagged this venue's link as unreachable."}{" "}
               Update or remove the URL below, then save.
             </p>
-            <Link href="/admin/flags" className="mt-2 inline-block font-medium underline underline-offset-2">
-              Back to data refresh queue
+            <Link href="/admin/places?show=review" className="mt-2 inline-block font-medium underline underline-offset-2">
+              Back to Places
             </Link>
           </div>
         )}

@@ -4,12 +4,14 @@
  * migrations in adminBoxHealthQueries.sql.test.ts, and the status math is
  * already proven in boxHealth.test.ts — this file only covers the mapping/
  * degrade wiring specific to this module: fast-exit on zero boxes, mapping
- * a latest check-in + caretaker onto each venue, and degrading to "no
- * caretaker data" when the adopter-names read fails).
+ * a latest check-in + sponsor names onto each venue, and degrading to "no
+ * sponsor data" when the adopter-names read fails).
  */
 
 import { describe, expect, test } from "vitest";
-import { loadBoxHealthEntries } from "@/lib/adminBoxes";
+import { loadBoxHealthEntries, groupBoxReviewItems } from "@/lib/adminBoxes";
+import type { AdminBoxPhotoRow } from "@/lib/boxPhotos";
+import type { AdminBoxAdopterRow } from "@/lib/boxAdopters";
 
 interface FakeBoxVenueRow {
   id: string;
@@ -25,6 +27,7 @@ function makeFakeDb(opts: {
   venues: FakeBoxVenueRow[];
   latestCheckins?: { venue_id: string; kind: string; note: string | null; created_at: string }[];
   adopterNamesFails?: boolean;
+  adopterNameRows?: { venue_id: string; display_name: string }[];
 }) {
   return {
     prepare: (sql: string) => ({
@@ -32,7 +35,7 @@ function makeFakeDb(opts: {
         all: async () => {
           if (sql.includes("box_adopters")) {
             if (opts.adopterNamesFails) throw new Error("adopter read failed");
-            return { results: [], meta: {} };
+            return { results: opts.adopterNameRows ?? [], meta: {} };
           }
           return { results: [], meta: {} };
         },
@@ -72,7 +75,7 @@ describe("loadBoxHealthEntries", () => {
     expect(entries[0].venueId).toBe("box-1");
     expect(entries[0].health.status).toBe("empty");
     expect(entries[0].health.latest?.note).toBe("bare");
-    expect(entries[0].caretaker).toBeNull();
+    expect(entries[0].sponsors).toEqual([]);
   });
 
   test("a box with no check-in row reads as 'quiet' with a null latest report", async () => {
@@ -86,7 +89,7 @@ describe("loadBoxHealthEntries", () => {
     expect(entries[0].health.latest).toBeNull();
   });
 
-  test("adopter-name read failure degrades to caretaker: null, never throws", async () => {
+  test("adopter-name read failure degrades to sponsors: [], never throws", async () => {
     const db = makeFakeDb({
       venues: [{ id: "box-3", name: "Blessing Box - Main", address: "2 Main St", lat: 38.2, lng: -104.5 }],
       adopterNamesFails: true,
@@ -94,7 +97,23 @@ describe("loadBoxHealthEntries", () => {
 
     const entries = await loadBoxHealthEntries(db, new Date("2026-09-20T00:00:00.000Z"));
 
-    expect(entries[0].caretaker).toBeNull();
+    expect(entries[0].sponsors).toEqual([]);
+  });
+
+  // #671: the Sponsor column needs the FULL adopter list, not just the
+  // first name, to render the public card's "A, B, +N more" format.
+  test("passes every approved adopter name through, not just the first", async () => {
+    const db = makeFakeDb({
+      venues: [{ id: "box-5", name: "Blessing Box - Sunny", address: "5 Sunny St", lat: 38.2, lng: -104.5 }],
+      adopterNameRows: [
+        { venue_id: "box-5", display_name: "Jamie R." },
+        { venue_id: "box-5", display_name: "Sam T." },
+      ],
+    });
+
+    const entries = await loadBoxHealthEntries(db, new Date("2026-09-20T00:00:00.000Z"));
+
+    expect(entries[0].sponsors).toEqual(["Jamie R.", "Sam T."]);
   });
 
   test("passes blessing_boxes.removed_on straight through as removedOn", async () => {
@@ -105,5 +124,76 @@ describe("loadBoxHealthEntries", () => {
     const entries = await loadBoxHealthEntries(db, new Date("2026-09-20T00:00:00.000Z"));
 
     expect(entries[0].removedOn).toBe("2026-08-01");
+  });
+});
+
+function photoRow(overrides: Partial<AdminBoxPhotoRow> = {}): AdminBoxPhotoRow {
+  return {
+    id: 1,
+    venue_id: "box-1",
+    venue_name: "Box 1",
+    checkin_id: null,
+    checkin_kind: null,
+    status: "pending",
+    flag_count: 0,
+    created_at: "2026-09-18T15:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function adopterRow(overrides: Partial<AdminBoxAdopterRow> = {}): AdminBoxAdopterRow {
+  return {
+    id: 1,
+    venue_id: "box-1",
+    venue_name: "Box 1",
+    display_name: "The Martinez Family",
+    email: "martinez@example.com",
+    note: null,
+    status: "pending",
+    email_confirmed_at: "2026-09-18T15:00:00.000Z",
+    created_at: "2026-09-18T14:00:00.000Z",
+    ...overrides,
+  };
+}
+
+describe("groupBoxReviewItems", () => {
+  test("empty inputs -> empty map", () => {
+    expect(groupBoxReviewItems([], [])).toEqual({});
+  });
+
+  test("groups a pending photo and a sponsor request under their own venue ids", () => {
+    const result = groupBoxReviewItems(
+      [photoRow({ id: 5, venue_id: "box-1", status: "pending" })],
+      [adopterRow({ id: 9, venue_id: "box-2", display_name: "The Lee Family" })],
+    );
+    expect(result["box-1"]).toEqual({ photo: { id: 5, status: "pending", flagCount: 0 } });
+    expect(result["box-2"]).toEqual({ sponsorRequest: { displayName: "The Lee Family" } });
+  });
+
+  test("a venue with both a photo and a sponsor request gets both under one entry", () => {
+    const result = groupBoxReviewItems(
+      [photoRow({ id: 5, venue_id: "box-1" })],
+      [adopterRow({ id: 9, venue_id: "box-1", display_name: "The Lee Family" })],
+    );
+    expect(result["box-1"]).toEqual({
+      photo: { id: 5, status: "pending", flagCount: 0 },
+      sponsorRequest: { displayName: "The Lee Family" },
+    });
+  });
+
+  test("a flagged photo wins over a pending one for the same venue, regardless of array order", () => {
+    const result = groupBoxReviewItems(
+      [
+        photoRow({ id: 1, venue_id: "box-1", status: "pending" }),
+        photoRow({ id: 2, venue_id: "box-1", status: "flagged", flag_count: 3 }),
+      ],
+      [],
+    );
+    expect(result["box-1"]).toEqual({ photo: { id: 2, status: "flagged", flagCount: 3 } });
+  });
+
+  test("a venue with no review items has no entry in the map", () => {
+    const result = groupBoxReviewItems([photoRow({ venue_id: "box-1" })], []);
+    expect(result["box-2"]).toBeUndefined();
   });
 });

@@ -1,13 +1,15 @@
 /**
  * POST /api/admin/proposals/approve-date-only — bulk-approve the
  * "confirmed still present, nothing else changed" shape of `update`
- * proposal in one click, instead of one Approve click per card
- * (/admin/flags — see src/components/ProposalsReviewView.tsx's own header
- * for the button this route serves). The first real venue-refresh pipeline
- * run wrote 107 proposals; 89 were exactly this shape.
+ * proposal in one click, instead of one Approve click per card. Originally
+ * the /admin/flags queue's own button (ProposalsReviewView.tsx); #674
+ * folded that queue into Places, and src/components/ToReviewSummaryBox.tsx
+ * is this route's caller now — same button, same route, new home. The
+ * first real venue-refresh pipeline run wrote 107 proposals; 89 were
+ * exactly this shape.
  *
  * Body: `{ ids: number[] }` — the client sends the EXACT ids it is showing
- * as date-only (ProposalsReviewView's own filtered-list computation, via
+ * as date-only (ToReviewSummaryBox's own filtered-list computation, via
  * src/lib/adminProposals.ts's isDateOnlyUpdateProposal). Nothing about that
  * client-side list is trusted, though: every id is re-validated fresh
  * against D1 below before anything is applied — a stale page, a crafted id,

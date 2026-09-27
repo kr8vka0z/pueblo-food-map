@@ -19,6 +19,15 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ShareButton from "@/components/ShareButton";
 import * as shareMod from "@/lib/share";
+import { track, EVENTS } from "@/lib/analytics";
+
+// #485 PR 2: named track() calls — mock the whole module so EVENTS stays the
+// real allowlist (a bare `{ track: vi.fn() }` factory would leave EVENTS
+// undefined and the component's EVENTS.SHARE_CLICKED reference would throw).
+vi.mock("@/lib/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics")>()),
+  track: vi.fn(),
+}));
 
 // ─── Test: native share sheet ─────────────────────────────────────────────────
 
@@ -88,5 +97,22 @@ describe("ShareButton — clipboard fallback (shareVenue returns 'copied')", () 
     expect(spy).toHaveBeenCalledTimes(1);
     const callArg = spy.mock.calls[0][0];
     expect(callArg.venueId).toBe("v1");
+  });
+});
+
+// ─── Test: analytics (#485 PR 2) ────────────────────────────────────────────
+
+describe("ShareButton — analytics", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test("clicking the button fires share_clicked", async () => {
+    vi.spyOn(shareMod, "shareVenue").mockResolvedValue("shared");
+    const user = userEvent.setup();
+    render(<ShareButton venueId="v1" venueName="Test Pantry" locale="en" />);
+    await user.click(screen.getByRole("button", { name: /share test pantry/i }));
+
+    expect(track).toHaveBeenCalledWith(EVENTS.SHARE_CLICKED, { venueId: "v1" });
   });
 });

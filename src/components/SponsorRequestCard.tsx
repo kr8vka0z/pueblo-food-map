@@ -1,47 +1,51 @@
 "use client";
 
 /**
- * BoxAdoptersReviewView — the adopt-a-box moderation queue's card list
- * (Blessing Boxes slice 6). Rendered by src/app/admin/box-adopters/page.tsx,
- * which owns the auth gate and the loadPendingAdopters() read; this
- * component is presentational + interactive only — same split, same card
- * shell, and near-verbatim reuse of the button/reject-reason classes as
- * BoxPhotosReviewView.tsx (see that file's own header for the shared
- * admin-surface visual language this reuses rather than reinventing).
+ * SponsorRequestCard — one box-adoption application's moderation card: the
+ * applicant's public name, private email, note and sent date, plus Approve
+ * sponsor/Decline (or Remove, for an already-approved sponsor) with an
+ * optional reason (issue #677, "fold Photo review and Sponsor requests into
+ * the Blessing Boxes tab").
  *
- * On Approve/Reject, router.refresh() re-runs the Server Component's
- * loadPendingAdopters() — the acted-on card stops matching (no longer
- * pending) and disappears from the next render, same "no local list copy to
- * reconcile" convention every other admin queue in this app already uses.
+ * Extracted from BoxAdoptersReviewView.tsx's inner BoxAdopterCard — same
+ * card shell, button classes and reject-reason flow (verbatim, including
+ * the fetch call that actually sends `{ reason }`, unlike
+ * ProposalCard.tsx's postAction() which drops it). Now renders in TWO
+ * places: this tab's own review view (until #677 removes it) and, going
+ * forward, the box edit page's "Things to review" box (BoxReviewBox.tsx).
+ *
+ * On Approve/Reject, router.refresh() re-runs the caller's Server
+ * Component read — same "no local list copy to reconcile" convention every
+ * other admin queue in this app already uses.
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminBoxAdopterRow } from "@/lib/boxAdopters";
 
-export interface BoxAdoptersReviewViewProps {
-  adopters: AdminBoxAdopterRow[];
+export interface SponsorRequestCardProps {
+  adopter: AdminBoxAdopterRow;
 }
 
 const cardClass =
   "elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5";
 
 const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
+  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] " +
   "px-4 py-2 text-sm font-semibold text-[var(--color-bone-50)] transition-colors duration-150 " +
   "hover:bg-[var(--color-sage-700)] focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
 const secondaryButtonClass =
-  "inline-flex items-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
+  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-bone-300)] " +
   "px-3 py-1.5 text-sm font-medium text-[var(--color-ink-700)] bg-transparent " +
   "transition-colors duration-150 hover:bg-[var(--color-bone-100)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
 const dangerButtonClass =
-  "inline-flex items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] " +
+  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] " +
   "px-3 py-1.5 text-sm font-medium text-[var(--color-danger)] bg-transparent " +
   "transition-colors duration-150 hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 " +
@@ -55,30 +59,9 @@ function formatSubmittedAt(iso: string): string {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-export default function BoxAdoptersReviewView({ adopters }: BoxAdoptersReviewViewProps) {
-  if (adopters.length === 0) {
-    return (
-      <div className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-16 text-center">
-        <p className="text-sm font-semibold text-[var(--color-ink-700)]">No sponsor requests to review</p>
-        <p className="mt-1 text-sm text-[var(--color-ink-500)]">New applications will show up here.</p>
-      </div>
-    );
-  }
-
-  return (
-    <ul className="flex flex-col gap-4">
-      {adopters.map((adopter) => (
-        <li key={adopter.id}>
-          <BoxAdopterCard adopter={adopter} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };
 
-function BoxAdopterCard({ adopter }: { adopter: AdminBoxAdopterRow }) {
+export default function SponsorRequestCard({ adopter }: SponsorRequestCardProps) {
   const router = useRouter();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -158,6 +141,12 @@ function BoxAdopterCard({ adopter }: { adopter: AdminBoxAdopterRow }) {
             {adopter.note}
           </p>
         )}
+        {/* #677 spec: the box edit page and this tab both need this line so
+            "Approve" reads as a real public-facing consequence, not just a
+            status flip. */}
+        <p className="text-sm text-[var(--color-ink-500)]">
+          Approving adds them to &ldquo;Sponsored by …&rdquo; on the public card.
+        </p>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

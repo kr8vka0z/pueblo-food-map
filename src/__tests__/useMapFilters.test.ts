@@ -29,12 +29,20 @@ import { venues as allVenues } from "@/data/venues";
 import { __resetFavoritesForTests, addFavorite } from "@/lib/favorites";
 import { computeOpenStatus } from "@/lib/hours";
 import type { Venue } from "@/types/venue";
+import { track, EVENTS } from "@/lib/analytics";
+
+// #485 PR 2: mock the whole module so EVENTS keeps its real allowlist values.
+vi.mock("@/lib/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics")>()),
+  track: vi.fn(),
+}));
 
 // Pueblo center — same default as MapWrapper
 const PUEBLO_CENTER = { lat: 38.2667, lng: -104.6167 };
 
 beforeEach(() => {
   __resetFavoritesForTests();
+  vi.mocked(track).mockClear();
   // Make sure open-hours tests control time deterministically
   vi.useFakeTimers({ now: new Date("2026-06-21T14:00:00-06:00") }); // Saturday 2pm MDT
 });
@@ -482,5 +490,67 @@ describe("useMapFilters — blessing boxes via extraVenues", () => {
   test("an empty extraVenues array (default) behaves exactly like no boxes fetched yet", () => {
     const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER, []));
     expect(result.current.filteredVenues.length).toBe(allVenues.length);
+  });
+});
+
+// ── Analytics: debounced search_used (#485 PR 2) ────────────────────────────
+//
+// One typed search = one event, not one per keystroke — debounced on `query`
+// alone so a filter toggle after the debounce settles doesn't re-fire it.
+
+describe("useMapFilters — search_used analytics", () => {
+  test("typing a query and letting the debounce settle fires exactly one search_used", () => {
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
+    act(() => {
+      result.current.setQuery("pan");
+    });
+    act(() => {
+      result.current.setQuery("pant");
+    });
+    act(() => {
+      result.current.setQuery("pantry");
+    });
+    expect(track).not.toHaveBeenCalled(); // still debouncing
+
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledWith(EVENTS.SEARCH_USED, {
+      results: result.current.filteredVenues.length,
+      term: "pantry",
+    });
+  });
+
+  test("clearing the query back to empty does not fire search_used", () => {
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
+    act(() => {
+      result.current.setQuery("");
+    });
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(track).not.toHaveBeenCalled();
+  });
+
+  test("a filter toggle after the debounce settles does not re-fire search_used", () => {
+    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
+    act(() => {
+      result.current.setQuery("pantry");
+    });
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(track).toHaveBeenCalledTimes(1);
+    vi.mocked(track).mockClear();
+
+    act(() => {
+      result.current.setFilterSnap(true);
+    });
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(track).not.toHaveBeenCalled();
   });
 });

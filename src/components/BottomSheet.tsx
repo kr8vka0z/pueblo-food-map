@@ -90,6 +90,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { safeUrl } from "@/lib/safeUrl";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { isNativeDialogOpen } from "@/lib/dialogGuard";
+import { track, EVENTS } from "@/lib/analytics";
 import { claimEscape, useOverlayStackId } from "@/lib/overlayRegistry";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import FavoriteButton from "@/components/FavoriteButton";
@@ -984,6 +985,7 @@ export default function BottomSheet({
                       </h3>
                       <a
                         href={`tel:${venue.phone}`}
+                        onClick={() => void track(EVENTS.CALL_CLICKED, { venueId: venue.id })}
                         // before:* — 2px overlay up/down takes the 44px link to 48 (#233).
                         className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
                       >
@@ -1000,6 +1002,7 @@ export default function BottomSheet({
                       href={safeUrl(venue.url)!}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => void track(EVENTS.WEBSITE_CLICKED, { venueId: venue.id })}
                       className={
                         // min-h-12: one line of text + py-3 is 46px on
                         // wide phones; #233's floor is 48 (#659).

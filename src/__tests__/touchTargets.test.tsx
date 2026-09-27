@@ -258,10 +258,15 @@ describe("Venue card controls", () => {
     expect(classes(close.parentElement)).toContain("gap-4");
   });
 
-  test("BottomSheet Show details overlay grows it to 48px without moving anything", () => {
+  // #666 replaced the ~20px text-link "Show details" button (which needed
+  // an invisible before:* overlay hack to reach 48px) with a real 48×48
+  // grab-bar button — no overlay hack needed since the hit area IS the
+  // button now. This test's own assertion is what's superseded, per #666's
+  // body: "The grab bar is a real <button> with a 48×48px tap area".
+  test("BottomSheet grab bar is a real 48x48 button, no overlay hack needed", () => {
     render(<BottomSheet venue={makeVenue()} onClose={vi.fn()} />);
     expect(classes(screen.getByRole("button", { name: /Show details/ }))).toEqual(
-      expect.arrayContaining(["relative", "before:absolute", "before:inset-x-0", "before:-top-1", "before:-bottom-3"]),
+      expect.arrayContaining(["h-12", "w-12"]),
     );
   });
 

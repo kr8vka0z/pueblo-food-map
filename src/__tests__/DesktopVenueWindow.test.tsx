@@ -29,6 +29,13 @@ import DesktopVenueWindow from "@/components/DesktopVenueWindow";
 import { BOTTOM_NAV_HEIGHT_PX } from "@/components/BottomNav";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+import { track, EVENTS } from "@/lib/analytics";
+
+// #485 PR 2: mock the whole module so EVENTS keeps its real allowlist values.
+vi.mock("@/lib/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics")>()),
+  track: vi.fn(),
+}));
 
 // BoxCardBody (rendered for a box venue) renders BoxCheckinPanel directly,
 // which mounts a Turnstile widget — same stub convention as
@@ -576,5 +583,25 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
     );
 
     expect(screen.getByRole("textbox")).toHaveValue("Left extra cans");
+  });
+});
+
+// ─── Analytics (#485 PR 2) ───────────────────────────────────────────────────
+
+describe("DesktopVenueWindow — analytics", () => {
+  test("clicking the phone number fires call_clicked", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue({ phone: "(719) 555-0164" });
+    renderWindow({ expanded: true, venue });
+    await user.click(screen.getByRole("link", { name: /555-0164/ }));
+    expect(track).toHaveBeenCalledWith(EVENTS.CALL_CLICKED, { venueId: venue.id });
+  });
+
+  test("clicking the Plentiful website link fires website_clicked", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue({ source: "plentiful", url: "https://example.com/pantry" });
+    renderWindow({ expanded: true, venue });
+    await user.click(screen.getByRole("link", { name: /plentiful/i }));
+    expect(track).toHaveBeenCalledWith(EVENTS.WEBSITE_CLICKED, { venueId: venue.id });
   });
 });

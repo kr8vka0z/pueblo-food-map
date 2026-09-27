@@ -18,6 +18,13 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import FilterPanel from "@/components/FilterPanel";
 import type { VenueCategory } from "@/types/venue";
+import { track, EVENTS } from "@/lib/analytics";
+
+// #485 PR 2: mock the whole module so EVENTS keeps its real allowlist values.
+vi.mock("@/lib/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics")>()),
+  track: vi.fn(),
+}));
 
 const ALL_CATEGORIES: VenueCategory[] = [
   "pantry",
@@ -241,5 +248,56 @@ describe("FilterPanel — ES locale", () => {
     render(<FilterPanel {...baseProps({ locale: "es" })} />);
     expect(screen.getByText("Filtros")).toBeDefined();
     expect(screen.getByText("Despensa de alimentos")).toBeDefined();
+  });
+});
+
+// ─── Analytics (#485 PR 2) ───────────────────────────────────────────────────
+
+describe("FilterPanel — analytics", () => {
+  test("turning Open now ON fires filter_toggled with on=true", () => {
+    render(<FilterPanel {...baseProps({ filterOpenNow: false })} />);
+    fireEvent.click(screen.getByRole("switch", { name: /open now/i }));
+    expect(track).toHaveBeenCalledWith(EVENTS.FILTER_TOGGLED, {
+      filter: "open_now",
+      on: true,
+    });
+  });
+
+  test("turning SNAP OFF fires filter_toggled with on=false", () => {
+    render(<FilterPanel {...baseProps({ filterSnap: true })} />);
+    fireEvent.click(screen.getByRole("switch", { name: /accepts snap/i }));
+    expect(track).toHaveBeenCalledWith(EVENTS.FILTER_TOGGLED, {
+      filter: "snap",
+      on: false,
+    });
+  });
+
+  test("turning WIC ON fires filter_toggled with on=true", () => {
+    render(<FilterPanel {...baseProps({ filterWic: false })} />);
+    fireEvent.click(screen.getByRole("switch", { name: /accepts wic/i }));
+    expect(track).toHaveBeenCalledWith(EVENTS.FILTER_TOGGLED, {
+      filter: "wic",
+      on: true,
+    });
+  });
+
+  test("checking a category fires filter_toggled with on=true", () => {
+    render(<FilterPanel {...baseProps({ selectedCategories: null })} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /food pantry/i }));
+    expect(track).toHaveBeenCalledWith(EVENTS.FILTER_TOGGLED, {
+      filter: "pantry",
+      on: true,
+    });
+  });
+
+  test("unchecking a category fires filter_toggled with on=false", () => {
+    render(
+      <FilterPanel {...baseProps({ selectedCategories: new Set(["pantry"]) })} />,
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: /food pantry/i }));
+    expect(track).toHaveBeenCalledWith(EVENTS.FILTER_TOGGLED, {
+      filter: "pantry",
+      on: false,
+    });
   });
 });

@@ -15,6 +15,7 @@
 import { useLocale } from "@/lib/LocaleContext";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { track, EVENTS } from "@/lib/analytics";
 
 const LABELS: Record<Locale, string> = {
   en: "EN",
@@ -45,7 +46,12 @@ export default function LanguageToggle() {
           <button
             key={l}
             type="button"
-            onClick={() => setLocale(l)}
+            onClick={() => {
+              // #485 PR 2: only an ACTUAL switch counts — tapping the
+              // already-active pill is a no-op tap, not a language change.
+              if (l !== locale) void track(EVENTS.LOCALE_SWITCHED, { to: l });
+              setLocale(l);
+            }}
             aria-pressed={active}
             aria-label={`Language: ${SR_LABELS[l]}`}
             className={

@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { Flag } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
+import { track, EVENTS } from "@/lib/analytics";
 
 interface ReportVenueButtonProps {
   venueId: string;
@@ -24,6 +25,7 @@ export default function ReportVenueButton({
   return (
     <Link
       href={`/report/${venueId}`}
+      onClick={() => void track(EVENTS.REPORT_OPENED, { venueId })}
       className={
         "flex items-center justify-center gap-1.5 w-full h-9 rounded-[var(--radius-md)] " +
         // #233: keeps the lighter 36px look of a secondary action; an

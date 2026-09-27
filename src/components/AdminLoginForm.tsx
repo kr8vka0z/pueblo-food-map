@@ -50,6 +50,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/authClient";
+import { markInternalDevice } from "@/lib/analytics";
 
 type FormStatus = "idle" | "sending" | "sent" | "error";
 type PasskeySignInStatus = "idle" | "authenticating" | "error";
@@ -106,6 +107,19 @@ export default function AdminLoginForm() {
       router.replace("/admin");
     }
   }, [sessionPending, session, passkeysPending, hasPasskey, router]);
+
+  // #485 (analytics admin opt-out): flag this browser as Kyle's own the
+  // instant a real admin session exists — covers every sign-in path (magic
+  // link, passkey, and the first-time passkey-register redirect below,
+  // which itself lands here on the next render since it also flips
+  // `session` truthy). analytics.ts's initAnalytics() checks this flag
+  // before it ever calls posthog.init(), so it's set as early as possible,
+  // independent of whether this device already has a passkey.
+  useEffect(() => {
+    if (!sessionPending && session) {
+      markInternalDevice();
+    }
+  }, [sessionPending, session]);
 
   async function handleMagicLinkSubmit(e: React.FormEvent) {
     e.preventDefault();

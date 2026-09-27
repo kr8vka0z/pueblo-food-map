@@ -219,6 +219,18 @@ describe("AdminLoginForm — signed-in: returning admin who already has a passke
       screen.queryByRole("link", { name: /continue to admin/i }),
     ).toBeNull();
   });
+
+  // #485 core: the admin sign-in success path is the one place every
+  // sign-in route (magic link, passkey, first-time register) converges,
+  // so it's what marks this browser opted out of analytics.
+  test("flags this device internal for analytics (pfm_internal) once signed in", async () => {
+    window.localStorage.clear();
+    render(<AdminLoginForm />);
+
+    await waitFor(() =>
+      expect(window.localStorage.getItem("pfm_internal")).toBe("1"),
+    );
+  });
 });
 
 describe("AdminLoginForm — signed-in: passkey list still pending", () => {

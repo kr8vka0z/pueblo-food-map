@@ -48,7 +48,7 @@ function makeAdopter(overrides: Partial<AdminBoxAdopterRow> = {}): AdminBoxAdopt
 describe("BoxAdoptersReviewView", () => {
   test("empty state when there's nothing to review", () => {
     render(<BoxAdoptersReviewView adopters={[]} />);
-    expect(screen.getByText("No adoption requests to review")).toBeInTheDocument();
+    expect(screen.getByText("No sponsor requests to review")).toBeInTheDocument();
   });
 
   test("renders a confirmed card: box, name, email, and 'Email confirmed' badge", () => {
@@ -74,7 +74,7 @@ describe("BoxAdoptersReviewView", () => {
     mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     render(<BoxAdoptersReviewView adopters={[makeAdopter()]} />);
 
-    await user.click(screen.getByRole("button", { name: "Approve" }));
+    await user.click(screen.getByRole("button", { name: "Approve sponsor" }));
 
     await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
     expect(mockFetch).toHaveBeenCalledWith("/api/admin/box-adopters/7/approve", { method: "POST" });
@@ -85,7 +85,7 @@ describe("BoxAdoptersReviewView", () => {
     mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: "unconfirmed" }), { status: 409 }));
     render(<BoxAdoptersReviewView adopters={[makeAdopter({ email_confirmed_at: null })]} />);
 
-    await user.click(screen.getByRole("button", { name: "Approve" }));
+    await user.click(screen.getByRole("button", { name: "Approve sponsor" }));
 
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent("This applicant hasn't confirmed their email yet"),
@@ -98,9 +98,9 @@ describe("BoxAdoptersReviewView", () => {
     mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     render(<BoxAdoptersReviewView adopters={[makeAdopter()]} />);
 
-    await user.click(screen.getByRole("button", { name: "Reject" }));
+    await user.click(screen.getByRole("button", { name: "Decline" }));
     await user.type(screen.getByLabelText(/Reason/), "Never responded");
-    await user.click(screen.getByRole("button", { name: "Confirm reject" }));
+    await user.click(screen.getByRole("button", { name: "Confirm decline" }));
 
     await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -108,17 +108,17 @@ describe("BoxAdoptersReviewView", () => {
     expect(JSON.parse(init.body as string)).toEqual({ reason: "Never responded" });
   });
 
-  test("an already-approved adopter's action buttons read Remove, not Reject", async () => {
+  test("an already-approved adopter's action buttons read Remove, not Decline", async () => {
     render(<BoxAdoptersReviewView adopters={[makeAdopter({ status: "approved" })]} />);
     expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Decline" })).not.toBeInTheDocument();
   });
 
   test("Reject: Cancel closes the form without submitting", async () => {
     const user = userEvent.setup();
     render(<BoxAdoptersReviewView adopters={[makeAdopter()]} />);
 
-    await user.click(screen.getByRole("button", { name: "Reject" }));
+    await user.click(screen.getByRole("button", { name: "Decline" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByLabelText(/Reason/)).not.toBeInTheDocument();

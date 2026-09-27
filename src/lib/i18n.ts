@@ -381,8 +381,9 @@ const en: Record<string, string> = {
   // un-headed "privacy.body" paragraph is REPLACED by "What we collect"
   // below (privacy.collect.*), plus two new headed sections — one paragraph
   // per i18n key, per the task's own instruction ("not overloading
-  // privacy.body"). privacy.analytics (below) is unchanged wording, kept
-  // last, per the task's own "keep the analytics paragraph unchanged."
+  // privacy.body"). privacy.analytics (below) was unchanged wording at the
+  // time this comment was written; it was rewritten again for #485 (PostHog
+  // added alongside Cloudflare Web Analytics — see that key's own comment).
   "privacy.collect.heading": "What we collect",
   "privacy.collect.body": "Pueblo Food Map collects the information you type into our forms (place reports, suggestions, and feedback). We use it to review what you sent and, if you gave an email address, to write back. Your IP address is checked to block spam when you send a form, and is never saved with what you sent.",
   "privacy.checkins.heading": "Blessing box check-ins",
@@ -390,20 +391,32 @@ const en: Record<string, string> = {
   // New paragraph (#594) — the per-browser check-in rate-limit ID
   // (src/lib/checkinClientToken.ts) was never disclosed on this page.
   "privacy.checkins.body2": "Each check-in also uses a random ID your browser saves, so we can tell repeat check-ins apart without asking for your name or email. It isn't tied to who you are, and clearing your browser's site data starts a new one.",
-  "privacy.alerts.heading": "Email alerts and adopting a box",
-  "privacy.alerts.body1": "We keep your email address only if you ask for it: when you sign up for emails about a blessing box, or when you apply to adopt one. If you host a box, Pueblo Food Map staff may add your email, with your OK, so you hear when your box is empty or has a problem. We use these addresses only to send those emails. We never sell them, share them, or show them on the site.",
-  "privacy.alerts.body2": "If you adopt a box, the name you give us (for example, a group or family name) is shown on that box's card. Your email is not.",
+  "privacy.alerts.heading": "Email alerts and sponsoring a box",
+  "privacy.alerts.body1": "We keep your email address only if you ask for it: when you sign up for emails about a blessing box, or when you apply to sponsor one. If you host a box, Pueblo Food Map staff may add your email, with your OK, so you hear when your box is empty or has a problem. We use these addresses only to send those emails. We never sell them, share them, or show them on the site.",
+  "privacy.alerts.body2": "If you sponsor a box, the name you give us (for example, a group or family name) is shown on that box's card. Your email is not.",
   "privacy.alerts.body3": "Every alert email has a stop link. One click stops the emails, with no login. To have your email address deleted completely, write to issues@pueblofoodmap.com.",
   "privacy.alerts.body4": "Our emails are delivered by a mail service called Resend, which handles your address only to deliver them.",
   // New section (#594, security review finding #4) — states the 90-day
   // retention period the daily cron (src/lib/emailRetention.ts) enforces.
   "privacy.retention.heading": "How long we keep it",
-  "privacy.retention.body": "We remove old email addresses from our records automatically: 90 days after a place suggestion or report is submitted, a box-adoption application is turned down, or an alert subscription is stopped. This doesn't affect the copy already sent to our own inbox when you submitted a form, or an internal log admins use to track moderation decisions. An active alert subscription's email stays until you stop it.",
+  "privacy.retention.body": "We remove old email addresses from our records automatically: 90 days after a place suggestion or report is submitted, a box-sponsorship application is turned down, or an alert subscription is stopped. This doesn't affect the copy already sent to our own inbox when you submitted a form, or an internal log admins use to track moderation decisions. An active alert subscription's email stays until you stop it.",
   // New section (#594) — names the third parties the existing copy above
   // described without naming (Turnstile) or didn't mention at all (Mapbox).
   "privacy.other.heading": "Other services we use",
   "privacy.other.body": "We use Mapbox to show the map. Loading it shares your IP address with Mapbox, and if you get walking directions, your location too. We use Cloudflare Turnstile on our forms and box check-ins to block spam; it checks some information about your device and browser.",
-  "privacy.analytics": "We use Cloudflare Web Analytics to count visits and measure how quickly pages load. It sets no cookies and stores nothing on your device, it does not identify you by your IP address or your browser, and it does not follow you to other websites. It records things like which page was viewed, the site you arrived from, your browser and device type, your country, and how long the page took to load. We use no advertising pixels and no other analytics service.",
+  // Rewritten (#485, PostHog analytics core): PostHog joins Cloudflare Web
+  // Analytics (which stays on as an independent visit count — AGENTS.md
+  // "Observability"). PostHog's memory-only persistence (analytics.ts) and
+  // "Discard client IP data" project setting keep two of this page's
+  // promises (no cookies/nothing stored, IP discarded); this paragraph is
+  // rewritten to also disclose the new
+  // named taps/search tracking (#485 comment, 2026-09-26) truthfully.
+  // Session replay (screen-recording of how a page was used) was turned
+  // back ON (Kyle, 2026-09-26, reversing the issue's original "replay OFF")
+  // after seeing the #681 admin dashboard mockup — this paragraph discloses
+  // it, and that everything typed is hidden from it (analytics.ts's
+  // session_recording.maskAllInputs).
+  "privacy.analytics": "We use PostHog and Cloudflare Web Analytics to see how people use the map: which pages are viewed, taps on the map and its filters, the words people search for (only searches used often are ever looked at, never a single search — this helps us find places we're missing), and a recording of on-screen activity to help us improve the site. Anything you type is always hidden from that recording. Neither service sets a cookie or stores anything on your device, and your exact IP address is thrown away before it's used for anything. We never see what you type into a form, your exact location, or who you are.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
   "directions.walk": "Walk",
@@ -760,7 +773,7 @@ const en: Record<string, string> = {
   // instant adoption. Also the form's own <h3> heading (AdoptBoxForm.tsx
   // reuses this same key for both the collapsed link and the expanded
   // heading), so both read consistently.
-  "box.adopt.linkLabel": "Apply to adopt this box",
+  "box.adopt.linkLabel": "Apply to sponsor this box",
   "box.adopt.displayNameLabel": "Your name (shown publicly, e.g. a group or family name)",
   "box.adopt.displayNamePlaceholder": "e.g. The Martinez Family",
   "box.adopt.emailLabel": "Your email (kept private)",
@@ -833,8 +846,8 @@ const en: Record<string, string> = {
   "email.alert.filled.line2": "Thanks for keeping an eye on it. You'll hear from us again when it needs filling.",
   "email.alert.line2": "See the box's page for details: {url}",
   "email.stopLine": "Don't want these emails anymore? Stop them any time, no login needed: {stopUrl}",
-  "email.adoptConfirm.subject": "Confirm your application to adopt {box}",
-  "email.adoptConfirm.line1": "Thanks for applying to adopt {box}. Please confirm your email to finish your application.",
+  "email.adoptConfirm.subject": "Confirm your application to sponsor {box}",
+  "email.adoptConfirm.line1": "Thanks for applying to sponsor {box}. Please confirm your email to finish your application.",
   "email.adoptConfirm.line2": "An admin will review your application once you've confirmed.",
   "email.adoptConfirm.cta": "Confirm your email: {url}",
   // 2026-09-18 security review, item 7: an "if you didn't ask for this"
@@ -842,8 +855,8 @@ const en: Record<string, string> = {
   // address in by mistake (or on purpose), and this line tells them
   // exactly what happens if they do nothing (nothing).
   "email.adoptConfirm.disclaimer": "If you didn't ask for this, you can ignore this email. We won't write again unless someone confirms.",
-  "email.adoptApproved.subject": "You're approved to adopt {box}",
-  "email.adoptApproved.line1": "Good news — your application to adopt {box} as \"{displayName}\" has been approved.",
+  "email.adoptApproved.subject": "You're approved to sponsor {box}",
+  "email.adoptApproved.line1": "Good news — your application to sponsor {box} as \"{displayName}\" has been approved.",
   "email.adoptApproved.line2": "Your name will now show on the box's card, and you'll get an email if it's reported empty or has a problem.",
   "email.alertConfirm.subject": "Confirm your alerts for {box}",
   "email.alertConfirm.line1": "Please confirm you'd like email alerts for {box}.",
@@ -1271,16 +1284,16 @@ const es: Record<string, string> = {
   "privacy.checkins.heading": "Registros en cajas de bendición", // [CHECK]
   "privacy.checkins.body": "Registrar tu visita a una caja de bendición es anónimo. No pedimos tu nombre ni tu correo, y no guardamos tu dirección IP. Una foto que agregues se revisa antes de publicarse, y los detalles de ubicación ocultos en el archivo de la foto se eliminan.", // [CHECK]
   "privacy.checkins.body2": "Cada registro también usa un identificador aleatorio que tu navegador guarda, para distinguir registros repetidos sin pedirte tu nombre ni tu correo. No está vinculado a quién eres, y borrar los datos del sitio en tu navegador genera uno nuevo.", // [CHECK]
-  "privacy.alerts.heading": "Alertas por correo y adopción de una caja", // [CHECK]
-  "privacy.alerts.body1": "Guardamos tu correo electrónico solo si tú lo pides: cuando te suscribes a alertas de una caja de bendición, o cuando solicitas adoptar una. Si eres anfitrión de una caja, el personal de Pueblo Food Map puede agregar tu correo, con tu autorización, para avisarte cuando tu caja esté vacía o tenga un problema. Usamos estas direcciones solo para enviar esos correos. Nunca las vendemos, las compartimos, ni las mostramos en el sitio.", // [CHECK]
-  "privacy.alerts.body2": "Si adoptas una caja, el nombre que nos das (por ejemplo, el de un grupo o una familia) se muestra en la tarjeta de esa caja. Tu correo no.", // [CHECK]
+  "privacy.alerts.heading": "Alertas por correo y patrocinio de una caja", // [CHECK]
+  "privacy.alerts.body1": "Guardamos tu correo electrónico solo si tú lo pides: cuando te suscribes a alertas de una caja de bendición, o cuando solicitas patrocinar una. Si eres anfitrión de una caja, el personal de Pueblo Food Map puede agregar tu correo, con tu autorización, para avisarte cuando tu caja esté vacía o tenga un problema. Usamos estas direcciones solo para enviar esos correos. Nunca las vendemos, las compartimos, ni las mostramos en el sitio.", // [CHECK]
+  "privacy.alerts.body2": "Si patrocinas una caja, el nombre que nos das (por ejemplo, el de un grupo o una familia) se muestra en la tarjeta de esa caja. Tu correo no.", // [CHECK]
   "privacy.alerts.body3": "Cada correo de alerta tiene un enlace para detenerlo. Un clic detiene los correos, sin necesidad de iniciar sesión. Para que eliminemos tu correo por completo, escribe a issues@pueblofoodmap.com.", // [CHECK]
   "privacy.alerts.body4": "Nuestros correos se envían a través de un servicio de correo llamado Resend, que solo maneja tu dirección para entregarlos.", // [CHECK]
   "privacy.retention.heading": "Cuánto tiempo lo guardamos", // [CHECK]
-  "privacy.retention.body": "Eliminamos automáticamente las direcciones de correo antiguas de nuestros registros: 90 días después de enviar una sugerencia o reporte de un lugar, de que se rechace una solicitud de adopción de caja, o de que canceles una alerta. Esto no afecta la copia que ya enviamos a nuestro propio correo cuando enviaste un formulario, ni un registro interno que el personal administrativo usa para dar seguimiento a decisiones de moderación. El correo de una alerta activa se mantiene hasta que la canceles.", // [CHECK]
+  "privacy.retention.body": "Eliminamos automáticamente las direcciones de correo antiguas de nuestros registros: 90 días después de enviar una sugerencia o reporte de un lugar, de que se rechace una solicitud de patrocinio de caja, o de que canceles una alerta. Esto no afecta la copia que ya enviamos a nuestro propio correo cuando enviaste un formulario, ni un registro interno que el personal administrativo usa para dar seguimiento a decisiones de moderación. El correo de una alerta activa se mantiene hasta que la canceles.", // [CHECK]
   "privacy.other.heading": "Otros servicios que usamos", // [CHECK]
   "privacy.other.body": "Usamos Mapbox para mostrar el mapa. Cargarlo comparte tu dirección IP con Mapbox, y si pides indicaciones para caminar, también tu ubicación. Usamos Cloudflare Turnstile en nuestros formularios y en los registros de cajas para bloquear spam; revisa cierta información sobre tu dispositivo y navegador.", // [CHECK]
-  "privacy.analytics": "Usamos Cloudflare Web Analytics para contar visitas y medir qué tan rápido cargan las páginas. No usa cookies ni guarda nada en tu dispositivo, no te identifica por tu dirección IP ni por tu navegador, y no te sigue a otros sitios web. Registra datos como qué página se vio, el sitio desde el que llegaste, tu tipo de navegador y dispositivo, tu país y cuánto tardó en cargar la página. No usamos píxeles de publicidad ni ningún otro servicio de análisis.",
+  "privacy.analytics": "Usamos PostHog y Cloudflare Web Analytics para ver cómo la gente usa el mapa: qué páginas se ven, los toques en el mapa y sus filtros, las palabras que la gente busca (solo se revisan las búsquedas usadas con frecuencia, nunca una búsqueda individual, esto nos ayuda a encontrar lugares que nos faltan), y una grabación de la actividad en pantalla para ayudarnos a mejorar el sitio. Lo que escribas siempre queda oculto en esa grabación. Ningún servicio usa cookies ni guarda nada en tu dispositivo, y tu dirección IP exacta se descarta antes de usarse para cualquier cosa. Nunca vemos lo que escribes en un formulario, tu ubicación exacta, ni quién eres.", // [CHECK]
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
   "directions.walk": "Caminar",
@@ -1532,7 +1545,7 @@ const es: Record<string, string> = {
   "box.stats.milestone.uses": "Los vecinos han usado las cajas de bendiciones de Pueblo {threshold}+ veces", // [CHECK]
 
   "box.alerts.emailDisclosure": "Guardamos tu correo solo para enviarte estos mensajes. Cada correo de alerta trae un enlace para dejar de recibirlos.", // [CHECK]
-  "box.adopt.linkLabel": "Solicitar adoptar esta caja", // [CHECK]
+  "box.adopt.linkLabel": "Solicitar ser patrocinador de esta caja", // [CHECK]
   "box.adopt.displayNameLabel": "Tu nombre (se muestra públicamente, por ejemplo el de un grupo o familia)", // [CHECK]
   "box.adopt.displayNamePlaceholder": "ej. La Familia Martínez", // [CHECK]
   "box.adopt.emailLabel": "Tu correo (privado)", // [CHECK]
@@ -1584,13 +1597,13 @@ const es: Record<string, string> = {
   "email.alert.filled.line2": "Gracias por estar pendiente. Te avisaremos de nuevo cuando necesite llenarse otra vez.", // [CHECK]
   "email.alert.line2": "Consulta la página de la caja para más detalles: {url}", // [CHECK]
   "email.stopLine": "¿Ya no quieres estos correos? Detenlos cuando quieras, sin iniciar sesión: {stopUrl}", // [CHECK]
-  "email.adoptConfirm.subject": "Confirma tu solicitud para adoptar {box}", // [CHECK]
-  "email.adoptConfirm.line1": "Gracias por solicitar adoptar {box}. Confirma tu correo para terminar tu solicitud.", // [CHECK]
+  "email.adoptConfirm.subject": "Confirma tu solicitud para patrocinar {box}", // [CHECK]
+  "email.adoptConfirm.line1": "Gracias por solicitar patrocinar {box}. Confirma tu correo para terminar tu solicitud.", // [CHECK]
   "email.adoptConfirm.line2": "Un administrador revisará tu solicitud una vez que confirmes.", // [CHECK]
   "email.adoptConfirm.cta": "Confirma tu correo: {url}", // [CHECK]
   "email.adoptConfirm.disclaimer": "Si tú no pediste esto, puedes ignorar este correo. No te escribiremos de nuevo a menos que alguien confirme.", // [CHECK]
-  "email.adoptApproved.subject": "Fuiste aprobado para adoptar {box}", // [CHECK]
-  "email.adoptApproved.line1": "Buenas noticias — tu solicitud para adoptar {box} como \"{displayName}\" fue aprobada.", // [CHECK]
+  "email.adoptApproved.subject": "Fuiste aprobado para patrocinar {box}", // [CHECK]
+  "email.adoptApproved.line1": "Buenas noticias — tu solicitud para patrocinar {box} como \"{displayName}\" fue aprobada.", // [CHECK]
   "email.adoptApproved.line2": "Tu nombre ahora aparecerá en la tarjeta de la caja, y recibirás un correo si se reporta vacía o con un problema.", // [CHECK]
   "email.alertConfirm.subject": "Confirma tus alertas para {box}", // [CHECK]
   "email.alertConfirm.line1": "Confirma que quieres recibir alertas por correo de {box}.", // [CHECK]

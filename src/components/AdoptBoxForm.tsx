@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * AdoptBoxForm — the "Apply to adopt this box" inline-expand form on a blessing
+ * AdoptBoxForm — the "Apply to sponsor this box" inline-expand form on a blessing
  * box's card (Blessing Boxes slice 6, Build Plan card UX item 4). Posts to
  * POST /api/public/blessing-boxes/[id]/adopt (that route's own header has
  * the full guard order and rate-limit scopes); this component only owns
@@ -21,7 +21,7 @@
  * Controlled open state (card redesign, 2026-09-19) — `open`/`onOpenChange`
  * are OPTIONAL: omitted, the component behaves exactly as before (its own
  * `useState` + its own collapsed-link trigger button). Passed, the caller
- * (BoxCardBody's sponsor band, whose own "Apply to adopt this box" link is
+ * (BoxCardBody's sponsor band, whose own "Apply to sponsor this box" link is
  * now the ONE trigger for this form) owns open/closed and this component
  * renders no trigger of its own — otherwise the label would appear twice.
  * The Turnstile container still mounts unconditionally either way (this
@@ -176,6 +176,21 @@ export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: Ad
   // useBoxTurnstileWidget.ts's own header) — if the container div were only
   // rendered after `open` flips true, that effect would have already run
   // and found no container to mount into, and nothing would ever retry.
+  //
+  // #669 — a doubted visitor's fallback checkbox must not show while the
+  // form is collapsed (it was rendering above the box's name, under the
+  // sponsor band, for a form nobody had opened). The container itself must
+  // still mount and stay in the DOM (see above) so its widget identity
+  // survives open/close/success, so it's moved OFF-SCREEN with `position:
+  // absolute` while `!open` rather than `display:none` — Cloudflare's own
+  // widget can fail to render into a `display:none` container (no laid-out
+  // box for its iframe), where an off-screen absolute position still gives
+  // it real dimensions. Shown again the moment the form opens, sitting
+  // right after the submit/cancel row (this component's own DOM position
+  // for `turnstileNodes`, unchanged) — visually "inside the form" from the
+  // visitor's point of view. Hidden again once `state === "success"`: there
+  // is nothing left to verify once the application already went through.
+  const turnstileVisible = open && state !== "success";
   const turnstileNodes = (
     <>
       <Script
@@ -183,7 +198,12 @@ export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: Ad
         strategy="afterInteractive"
         onReady={turnstile.mount}
       />
-      <div ref={turnstileContainerRef} data-testid="adopt-turnstile-widget" />
+      <div
+        ref={turnstileContainerRef}
+        data-testid="adopt-turnstile-widget"
+        aria-hidden={turnstileVisible ? undefined : true}
+        className={turnstileVisible ? undefined : "absolute -left-[9999px] -top-[9999px] pointer-events-none"}
+      />
     </>
   );
 

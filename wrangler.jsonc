@@ -63,6 +63,21 @@
   "triggers": {
     "crons": ["*/5 * * * *"]
   },
+  // #485 (PostHog analytics) — comma-separated IP/CIDR list custom-worker.ts's
+  // /ingest proxy checks (src/lib/ipMatch.ts) before forwarding a request to
+  // PostHog; a match returns 204 with nothing sent. PostHog's own "Discard
+  // client IP data" project setting means PostHog itself can never filter by
+  // IP, so this has to run here instead. A plain committed var, not a
+  // secret — an IP address isn't a credential, and this repo already
+  // documents Kyle's home network in this same issue's GitHub comment.
+  // Kept in ONE place, not hardcoded in ipMatch.ts, so a future ISP change
+  // is a config edit, not a code change. Keep this list in sync with the
+  // Cloudflare Web Analytics "Disable RUM" zone Configuration Rule (#652's
+  // mechanism, #485 comment 2026-09-26) — that rule is zone config, not in
+  // this repo, and is NOT updated by this var.
+  "vars": {
+    "ANALYTICS_EXCLUDED_IPS": "66.33.12.72,2607:3640:121:e110::/64"
+  },
   // Staging (#223 step 1): repo-config only, NOT yet wired to a deploy pipeline
   // or DNS route. Named environments do not inherit bindings (assets,
   // services, d1_databases) from the top level in wrangler — only `main`,
@@ -92,7 +107,11 @@
       // too. See that function's own comment for the coupling and upgrade
       // path if it ever needs to be decoupled from auth.
       "vars": {
-        "BETTER_AUTH_RP_ID": "dev.pueblofoodmap.com"
+        "BETTER_AUTH_RP_ID": "dev.pueblofoodmap.com",
+        // Named environments don't inherit `vars` — see the top-level
+        // ANALYTICS_EXCLUDED_IPS comment for the full WHY. Same list as
+        // prod: Kyle's home network is excluded on both.
+        "ANALYTICS_EXCLUDED_IPS": "66.33.12.72,2607:3640:121:e110::/64"
       },
       "assets": {
         "directory": ".open-next/assets",

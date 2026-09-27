@@ -104,6 +104,24 @@ import {
 
 interface BoxCardBodyProps {
   box: PublicBlessingBox;
+  /**
+   * Default "default" — today's photo-first order, rendered by an UNTOUCHED
+   * copy of this component's original return statement (see the bottom of
+   * this file) so `DesktopVenueWindow` and `BoxHistoryContent` — the two
+   * other callers, neither of which passes this prop — keep rendering
+   * byte-for-byte what they always have. "sheet" is BottomSheet's own
+   * mobile redesign (#667): name -> inline status -> address -> most
+   * needed -> host note -> check-in panel render first and unclipped;
+   * photo, the sponsor band and the footer links move below a clipped
+   * "peek" wrapper, reusing #666's grab-bar/preview mechanics.
+   */
+  layout?: "default" | "sheet";
+  /** "sheet" layout only — whether the below-the-fold section (photo, sponsor band, footer) renders in full (true) or clipped to a short faded preview (false). Owned by BottomSheet's own grab-bar state; ignored in "default" layout. */
+  expanded?: boolean;
+  /** "sheet" layout only — called when the collapsed preview is tapped, so BottomSheet's grab bar and the preview itself drive the SAME expand action (#666 accessibility section). */
+  onRequestExpand?: () => void;
+  /** "sheet" layout only — DOM id for the below-the-fold wrapper, so BottomSheet's grab bar `aria-controls` can point at it (mirrors the ordinary-venue detail section's own id). */
+  detailSectionId?: string;
   onCheckinSuccess?: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
   /** See this file's own header. Default true — hidden only where a caller already provides an equivalent link elsewhere (DesktopVenueWindow's header, the history page itself). */
   showHistoryLink?: boolean;
@@ -220,6 +238,10 @@ function formatSponsorNames(names: string[], locale: Locale): React.ReactNode {
 
 export default function BoxCardBody({
   box,
+  layout = "default",
+  expanded = false,
+  onRequestExpand,
+  detailSectionId,
   onCheckinSuccess,
   showHistoryLink = true,
   headingLevel = "h2",
@@ -260,6 +282,248 @@ export default function BoxCardBody({
   const neededFromVisitors = mostNeededChips.length === 0 ? (box.box.neededFromVisitors ?? []) : [];
   const NameTag = headingLevel;
 
+  // ── Sheet layout (#667) ─────────────────────────────────────────────────
+  // A DELIBERATELY separate return, not a reordering of the JSX below via
+  // conditionals — the "default" branch after this one is left byte-for-
+  // byte untouched (same reasoning DesktopVenueWindow/BoxHistoryContent's
+  // Plan risk note calls out: "a default-off prop keeps desktop and history
+  // untouched"). Some markup below is intentionally the same code duplicated
+  // rather than shared through a common variable, because reusing one JSX
+  // const across both branches would mean any change made for one layout's
+  // needs risks silently altering the other's — the two orders diverge too
+  // much (name-first vs. photo-first) for a shared middle ground to stay
+  // simple. Small and boring beats clever here.
+  if (layout === "sheet") {
+    return (
+      <div className={`flex flex-col gap-3 ${className}`}>
+        {/* First view: always rendered, never clipped — everything a
+            visitor needs to report the box's status is one tap away
+            without expanding (#667's "check-ins stay on the card" pick). */}
+        <div className="flex flex-col gap-3 px-4 pt-3 pb-1">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-2">
+              <span
+                className="inline-block rounded-full px-2.5 py-1 text-[11px] font-semibold text-[var(--color-bone-50)]"
+                style={{ backgroundColor: categoryColors[box.category] }}
+              >
+                {t("category.full.blessing_box", locale)}
+              </span>
+              {actions && <div className="flex shrink-0 items-center gap-4">{actions}</div>}
+            </div>
+            <NameTag
+              id={nameId}
+              className="text-xl font-normal leading-tight text-[var(--color-ink-900)]"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {box.name}
+            </NameTag>
+          </div>
+
+          {/* Status pill — ALWAYS inline here (#667 item 4: "no longer
+              overlaid on the photo"), directly under the name regardless of
+              whether the box has a photo. */}
+          <StatusPill box={box} locale={locale} overlay={false} />
+
+          <div className="-mt-2 flex flex-col items-start">
+            {onWalkRoute ? (
+              <button
+                type="button"
+                onClick={onWalkRoute}
+                aria-describedby={showWalkLocationHint ? walkLocationHintId : undefined}
+                aria-label={`${box.address} — ${t("directions.walkAriaLabel", locale, { name: box.name })}`}
+                className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+              >
+                {box.address}
+              </button>
+            ) : (
+              <a
+                href={googleMapsUrl(box.lat, box.lng)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${box.address} — ${t("directions.boxAriaLabel", locale, { name: box.name })}`}
+                className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+              >
+                {box.address}
+              </a>
+            )}
+            {onWalkRoute && (
+              <WalkRouteStatus
+                venue={box}
+                locale={locale}
+                isRouteActive={isWalkRouteActive}
+                routeInfo={walkRouteInfo}
+                walkSteps={walkRouteSteps}
+                showLocationHint={showWalkLocationHint}
+                locationHintId={walkLocationHintId}
+                onClearRoute={onClearWalkRoute}
+                activeStepIndex={activeStepIndex}
+                onStepChange={onStepChange}
+              />
+            )}
+          </div>
+
+          {mostNeededChips.length > 0 && (
+            <div>
+              <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
+                {t("box.mostNeeded", locale)}
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {mostNeededChips.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full bg-[var(--color-bone-100)] px-2.5 py-1 text-sm text-[var(--color-ink-700)]"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {neededFromVisitors.length > 0 && (
+            <div>
+              <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
+                {t("box.mostNeeded.fromVisitors", locale)}
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {neededFromVisitors.map(({ key, count }) => (
+                  <span
+                    key={key}
+                    className="rounded-full bg-[var(--color-bone-100)] px-2.5 py-1 text-sm text-[var(--color-ink-700)]"
+                  >
+                    {t(`box.needs.${key}`, locale)} <span className="text-[var(--color-ink-400)]">· {count}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {box.box.hostNote && <p className="text-sm text-[var(--color-ink-500)]">{box.box.hostNote}</p>}
+
+          <BoxCheckinPanel
+            boxId={box.id}
+            onCheckinSuccess={(result) => onCheckinSuccess?.(result)}
+            latestPhotoId={box.box.latestPhoto?.id ?? null}
+          />
+        </div>
+
+        {/* Below the fold (#667 items 9-13): the photo (or, when there's no
+            photo, the sponsor band) peeks above a bottom-edge fade when
+            collapsed — reuses #666's clip-the-wrapper-never-Drawer.Content
+            rule; BottomSheet owns `expanded`/`onRequestExpand`, this wrapper
+            just renders the CSS state. No status pill overlay here — it
+            already rendered inline above, so it isn't shown twice. */}
+        <div
+          id={detailSectionId}
+          onClick={!expanded ? onRequestExpand : undefined}
+          className={
+            "relative flex flex-col gap-3 " + (expanded ? "" : "max-h-24 overflow-hidden cursor-pointer")
+          }
+        >
+          {/* `inert` while collapsed (#683 review) — same reason as
+              BottomSheet's detail section: clipped controls (photo viewer,
+              sponsor form, History, email sign-up) must not be reachable by
+              Tab or a screen reader, and a tap still falls through to the
+              wrapper's expand handler. */}
+          <div className="contents" inert={!expanded}>
+          {hasPhoto && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setPhotoViewerOpen(true)}
+                aria-label={t("box.photo.viewFullSize", locale)}
+                className="block w-full"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- a runtime, R2-backed image via our own serve route, not a build-time/static asset next/image can optimize */}
+                <img
+                  src={`/api/public/box-photos/${box.box.latestPhoto!.id}`}
+                  alt={t("box.photo.altText", locale, {
+                    name: box.name,
+                    time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale),
+                  })}
+                  className={`block h-[170px] w-full object-cover bg-[var(--color-bone-200)] ${photoRadiusClassName}`}
+                />
+              </button>
+              <div className="pointer-events-none absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 shadow-sm">
+                <span className="block truncate text-xs font-medium text-[var(--color-ink-500)]">
+                  {t("box.photo.caption", locale, { time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale) })}
+                </span>
+              </div>
+              <PhotoViewer
+                src={`/api/public/box-photos/${box.box.latestPhoto!.id}`}
+                alt={t("box.photo.altText", locale, {
+                  name: box.name,
+                  time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale),
+                })}
+                caption={t("box.photo.caption", locale, {
+                  time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale),
+                })}
+                open={photoViewerOpen}
+                onClose={() => setPhotoViewerOpen(false)}
+                locale={locale}
+              />
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 px-4">
+            <div
+              className={`-mx-4 px-4 py-2.5 text-sm ${
+                hasSponsors
+                  ? "bg-[var(--color-sage-50)] text-[var(--color-sage-700)]"
+                  : "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]"
+              }`}
+            >
+              <p>
+                {hasSponsors ? (
+                  <>
+                    {t("box.sponsor.sponsoredByPrefix", locale)}
+                    {formatSponsorNames(box.box.adopters, locale)}
+                  </>
+                ) : (
+                  t("box.sponsor.needsSponsor", locale)
+                )}
+              </p>
+              <p className="mt-0.5 text-xs">
+                {t("box.sponsor.wantToHelp", locale)}
+                <button
+                  type="button"
+                  aria-expanded={adoptOpen}
+                  onClick={() => setAdoptOpen((open) => !open)}
+                  className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
+                >
+                  {t("box.adopt.linkLabel", locale)}
+                </button>
+              </p>
+            </div>
+            <AdoptBoxForm boxId={box.id} open={adoptOpen} onOpenChange={setAdoptOpen} />
+
+            <div className="h-px bg-[var(--color-bone-200)]" />
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium">
+              {showHistoryLink && (
+                <Link
+                  href={`/box/${encodeURIComponent(box.id)}/history`}
+                  className="inline-flex min-h-[44px] items-center text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+                >
+                  {t("box.history.link", locale)}
+                </Link>
+              )}
+              <BoxAlertSignupForm boxId={box.id} />
+            </div>
+          </div>
+          </div>
+
+          {!expanded && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-b from-transparent to-[var(--color-bone-50)]"
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Default layout — UNCHANGED from before #667, byte-for-byte. ────────
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
       {/* Photo, full-bleed, with the status pill and (when there's a photo)

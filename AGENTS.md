@@ -30,6 +30,7 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 | Secret | Lives in | Gotcha |
 |---|---|---|
 | `NEXT_PUBLIC_MAPBOX_TOKEN`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY` | GitHub Actions secrets | Build-time, inlined by `next build` on the runner. Not a Cloudflare Build variable. |
+| `POSTHOG_PROJECT_KEY` (build var `NEXT_PUBLIC_POSTHOG_KEY`) | GitHub Actions secrets | #485. Empty/unset is supported — `src/lib/analytics.ts` never loads posthog-js without a key. |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | GitHub Actions secrets | Deploy workflows. |
 | `CLOUDFLARE_D1_TOKEN` | GitHub Actions secrets | Refresh pipeline only, D1 Write only. Never share it with deploys, because that job parses untrusted HTML. |
 | `JEV_API_KEY` | GitHub Actions secrets | Optional. Without it, refresh runs untriaged. |
@@ -91,6 +92,8 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
 - Job logic lives in `src/lib/scheduledTasks.ts`, never in `custom-worker.ts`, which vitest can't import.
 - `/api/health` deliberately calls nothing external.
 - **Logs:** filter Cloudflare Workers Logs on `event: "form_submit_failure"` or `event: "csp_violation_report"`. Both are PII-free by construction. `POST /api/csp-report` is unauthenticated per the CSP spec but rate-limited (100/hr per IP, 1000/hr site-wide) and always returns 204.
+- **Web Analytics:** the beacon comes only from Cloudflare's edge injection on the zone (no app code; see the CSP comment in `next.config.ts`). dev.pueblofoodmap.com is excluded by a zone Configuration Rule (host `dev.pueblofoodmap.com` → Disable RUM, #652), so no beacon on dev is correct. Web Analytics' own host rules can't do this: the free plan allows one, and narrowing it didn't stop dev visits being recorded. Check beacons with a browser user-agent plus `Accept: text/html`; bare `curl` never shows one.
+- **PostHog (#485):** `custom-worker.ts` proxies `/ingest/*` to PostHog (`persistence: "memory"`, never `cookieless_mode`, which disables session replay; `person_profiles: never`; session replay ON with `maskAllInputs`). Every page load is a new PostHog visitor, so **unique-visitor counts come only from Cloudflare Web Analytics, never PostHog**. The proxy drops any request whose `CF-Connecting-IP` matches the Worker var `ANALYTICS_EXCLUDED_IPS` (`wrangler.jsonc`, both prod and `env.staging` — same list, `src/lib/ipMatch.ts` does the matching). **Keep that list in sync with the Cloudflare Web Analytics "Disable RUM" zone Configuration Rule** covering the same IPs (dashboard/zone config, not in this repo) — a home-network IP change needs both updated together, or one of the two analytics surfaces keeps recording Kyle's own visits. Admin devices additionally self-exclude via a `pfm_internal` localStorage flag (`src/lib/analytics.ts`), set on admin sign-in (`AdminLoginForm.tsx`) and cleared by `/?internal=off`. `NEXT_PUBLIC_POSTHOG_KEY` unset is a fully supported no-op (see the Secrets table above) — the named `track()` calls inside components ship in a later PR.
 
 ## Code gotchas
 

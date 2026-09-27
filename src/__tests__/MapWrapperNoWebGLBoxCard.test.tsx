@@ -176,7 +176,7 @@ describe("MapWrapper — no-WebGL box card (#524)", () => {
     // Check-in control present (exact wording per REVIEW.md's standing rule).
     expect(within(card).getByRole("button", { name: /i used this box/i })).toBeTruthy();
     // Adopt control present.
-    expect(within(card).getByRole("button", { name: /apply to adopt this box/i })).toBeTruthy();
+    expect(within(card).getByRole("button", { name: /apply to sponsor this box/i })).toBeTruthy();
     // Address readable — entirely absent from /box/<id>/history.
     expect(within(card).getByText(TEST_BOX.address)).toBeTruthy();
   });

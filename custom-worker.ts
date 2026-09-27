@@ -21,6 +21,8 @@
 // scheduled()-handler signature needs — none of which is `Element` or collides with DOM.
 import type { ExecutionContext, ExportedHandler, ScheduledController } from "@cloudflare/workers-types/experimental";
 import { runScheduledTasks } from "./src/lib/scheduledTasks";
+import { ingestTarget } from "./src/lib/ingestTarget";
+import { isExcludedIp } from "./src/lib/ipMatch";
 //
 // WHY `@ts-ignore` (not `@ts-expect-error`) on the imports below: .open-next/worker.js
 // is produced by `opennextjs-cloudflare build` and does not exist in a fresh checkout —
@@ -41,7 +43,40 @@ import { default as handler } from "./.open-next/worker.js";
 import { DOQueueHandler, DOShardedTagCache, BucketCachePurge } from "./.open-next/worker.js";
 
 export default {
-  fetch: handler.fetch,
+  // /ingest proxy (#485): PostHog's project setting "Discard client IP data"
+  // means PostHog itself can never filter Kyle's own home traffic out — the
+  // filter has to run upstream of PostHog, here, before a request is ever
+  // forwarded. Anything under /ingest that matches ANALYTICS_EXCLUDED_IPS
+  // (env var, comma-separated IPs/CIDRs — see src/lib/ipMatch.ts) gets a 204
+  // and nothing is sent onward; every other /ingest request is proxied
+  // same-origin to the real PostHog host (src/lib/ingestTarget.ts) so
+  // ad-blockers that target third-party analytics domains don't hide it.
+  // Requests outside /ingest fall straight through to OpenNext, unchanged.
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const target = ingestTarget(url.pathname, url.search);
+    if (target !== null) {
+      if (isExcludedIp(request.headers.get("CF-Connecting-IP"), env.ANALYTICS_EXCLUDED_IPS)) {
+        return new Response(null, { status: 204 });
+      }
+      // Forward the method/body/headers as-is; only the destination host+path
+      // changes. `redirect: "manual"` isn't needed — PostHog's ingest/assets
+      // endpoints don't redirect under normal operation.
+      //
+      // WHY the cast: `request` is typed via @cloudflare/workers-types (see
+      // this file's own header on the scoped ExportedHandler import), but
+      // the bare `Request`/`RequestInit` identifiers below resolve to
+      // lib.dom's versions (this project deliberately never declares global
+      // Request/Response from workers-types — same HTMLRewriter `Element`
+      // collision cloudflare-env.d.ts's header documents). Both describe the
+      // exact same real Workers-runtime object; the mismatch is structural
+      // typing only (their ReadableStream generics disagree), not a real
+      // incompatibility.
+      const proxied = new Request(target, request as unknown as RequestInit);
+      return fetch(proxied);
+    }
+    return handler.fetch(request, env, ctx);
+  },
 
   // Uptime dead-man's-switch (robot-deploy migration, Phase 2 slice 2). Mirrors
   // ToastHoster's src/index.ts scheduled() handler — same design, same reasoning.

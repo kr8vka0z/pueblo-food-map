@@ -1,7 +1,8 @@
 /**
  * /admin/places — the venue list + Publish panel (#237 checkpoint c; venue
  * list added #253; "Add place" link added #254; Publish panel added #256;
- * "Review queue" nav link added as a #259 follow-up).
+ * "Review queue" nav link added as a #259 follow-up; single per-venue
+ * status computed here + staging banner added #673).
  *
  * MOVED HERE from /admin (admin dashboard build): /admin is now the
  * Dashboard (src/app/admin/page.tsx), a to-do-list landing page — this is
@@ -29,6 +30,19 @@
  * (src/lib/adminNavCounts.ts) is the one extra read AdminNav needs for its
  * pending-count pills — every admin page now makes this same call.
  *
+ * #673: displayStatusOf() needs `src/data/published-venues.ts` (what the
+ * public map is ACTUALLY serving) to tell "Live" apart from "Live · edits
+ * waiting," and needs to know whether this is staging (edits waiting is
+ * always a false alarm there, since staging can never Publish —
+ * isProductionWorker(), publishVenues.ts). Both are computed HERE, once per
+ * page load, into a plain `Record<id, AdminDisplayStatus>` — VenueListView
+ * is a "use client" component and must never import the ~2000-entry
+ * published-venues.ts snapshot itself (see that component's own header).
+ * On staging, the Publish panel and status key's "edits waiting" state
+ * would only ever mislead (staging's D1 test data has no bearing on what
+ * production will show), so a "Test site" banner replaces the panel
+ * outright rather than showing a panel that can never do anything.
+ *
  * On AccessDeniedError this delegates to handlePageAuthError()
  * (src/lib/adminAuthErrors.ts): a missing Better Auth session redirects to
  * /admin/login; every other denial reason calls Next's forbidden()
@@ -44,9 +58,12 @@
  */
 
 import { headers } from "next/headers";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { summarizePublishChanges } from "@/lib/adminVenues";
+import { summarizePublishChanges, displayStatusOf, type AdminDisplayStatus } from "@/lib/adminVenues";
+import { isProductionWorker } from "@/lib/publishVenues";
+import { publishedVenues } from "@/data/published-venues";
 import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
 import VenueListView from "@/components/VenueListView";
 import PublishPanel from "@/components/PublishPanel";
@@ -70,12 +87,31 @@ export default async function PlacesPage() {
     handlePageAuthError(err);
   }
 
+  const { env } = await getCloudflareContext({ async: true });
+  const isStaging = !isProductionWorker(env);
+
+  const publishedById = new Map(publishedVenues.map((v) => [v.id, v]));
+  const statusByVenueId: Record<string, AdminDisplayStatus> = {};
+  for (const venue of venues) {
+    statusByVenueId[venue.id] = displayStatusOf(venue, publishedById.get(venue.id), { isStaging });
+  }
+
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={email} active="places" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6">
-        <PublishPanel summary={summarizePublishChanges(venues)} />
-        <VenueListView venues={venues} />
+        {isStaging ? (
+          // #673 pt.6: staging can never Publish (isProductionWorker() is
+          // false there) — a Publish panel that always no-ops, next to
+          // status badges that could never legitimately read "edits
+          // waiting," would only teach an admin to distrust this screen.
+          <p className="mb-6 rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
+            Test site: publishing is turned off here.
+          </p>
+        ) : (
+          <PublishPanel summary={summarizePublishChanges(venues)} />
+        )}
+        <VenueListView venues={venues} statusByVenueId={statusByVenueId} />
       </div>
     </main>
   );

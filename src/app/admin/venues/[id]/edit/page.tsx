@@ -67,11 +67,27 @@
  * admin data. Wrapped in the same try/catch-degrades-to-empty shape as
  * resolveClosureReportContext()/resolveLinkHealthProposalContext() above —
  * a D1 read failure here must never take down the whole edit page.
+ *
+ * #673 pt.3: resolveWaitingToPublishChanges() renders the "Waiting to
+ * publish" box (WaitingToPublishBox.tsx) right under the page title for a
+ * place displayStatusOf() (src/lib/adminVenues.ts) reads as
+ * `live_edits_waiting` — never for a draft, an unedited live place, an
+ * archived place, a blessing box, or (on staging) anything at all, since
+ * those are exactly the states that function returns for. Field-level
+ * diffs come from diffPublishedFields() (compares this D1 row against its
+ * src/data/published-venues.ts entry); "who changed it" comes from
+ * attributeFieldChange() reading audit_log + change_proposals — see both
+ * functions' own headers in adminVenues.ts for the exact rules. Same
+ * degrade-to-empty shape as the other resolvers on this page: any D1
+ * failure here must never take down the rest of the edit page, so it falls
+ * back to naming the venue's own `updated_by` for every field rather than
+ * throwing.
  */
 
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
@@ -80,11 +96,21 @@ import AddVenueForm from "@/components/AddVenueForm";
 import ArchiveVenueButton from "@/components/ArchiveVenueButton";
 import BoxCheckinsAdminPanel from "@/components/BoxCheckinsAdminPanel";
 import HostAlertsAdminPanel from "@/components/HostAlertsAdminPanel";
+import WaitingToPublishBox, { type WaitingToPublishChange } from "@/components/WaitingToPublishBox";
 import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import { parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
 import { loadAllCheckinsForBox, type AdminCheckinRow } from "@/lib/blessingBoxes";
 import { loadHostSubscriptions } from "@/lib/boxAlerts";
+import {
+  displayStatusOf,
+  diffPublishedFields,
+  attributeFieldChange,
+  type VenueAuditEntry,
+  type ApprovedProposalMark,
+} from "@/lib/adminVenues";
+import { isProductionWorker } from "@/lib/publishVenues";
+import { publishedVenues } from "@/data/published-venues";
 import type { AdminVenueRow } from "@/types/venue";
 import type { ClosurePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
 
@@ -205,6 +231,62 @@ async function resolveHostAlerts(db: D1Database, venueId: string): Promise<{ id:
   }
 }
 
+/**
+ * Resolves the "Waiting to publish" box's data for `venue`, or null when it
+ * shouldn't render at all — see this file's own header for the full
+ * reasoning. Only ever called for a place whose status is already known to
+ * be `live_edits_waiting` (the caller checks first), so a null return here
+ * means "the diff came back empty" (shouldn't happen, but never worth a
+ * crash) rather than "this place doesn't qualify."
+ */
+async function resolveWaitingToPublishChanges(
+  db: D1Database,
+  venue: AdminVenueRow,
+  viewerEmail: string,
+): Promise<WaitingToPublishChange[]> {
+  const publishedById = new Map(publishedVenues.map((v) => [v.id, v]));
+  const diffs = diffPublishedFields(venue, publishedById.get(venue.id));
+  if (diffs.length === 0) return [];
+
+  try {
+    const [auditResult, proposalsResult] = await Promise.all([
+      db
+        .prepare(
+          "SELECT actor_email, before_json, after_json, timestamp FROM audit_log " +
+            "WHERE entity = 'venue' AND entity_id = ? AND timestamp > ? ORDER BY timestamp DESC",
+        )
+        .bind(venue.id, venue.published_at ?? "")
+        .all<VenueAuditEntry>(),
+      // reviewed_by is the approving admin's email (adminProposals.ts's
+      // APPROVE_PROPOSAL_SQL) — aliased to actor_email so this reads as the
+      // same shape attributeFieldChange() expects.
+      db
+        .prepare(
+          "SELECT reviewed_by AS actor_email, applied_at FROM change_proposals " +
+            "WHERE target_venue_id = ? AND status = 'approved' AND applied_at IS NOT NULL",
+        )
+        .bind(venue.id)
+        .all<{ actor_email: string | null; applied_at: string }>(),
+    ]);
+
+    const auditEntries = auditResult.results;
+    const approvedMarks: ApprovedProposalMark[] = proposalsResult.results.filter(
+      (mark): mark is ApprovedProposalMark => mark.actor_email !== null,
+    );
+
+    return diffs.map((diff) => ({
+      ...diff,
+      who: attributeFieldChange(diff.field, auditEntries, approvedMarks, viewerEmail, venue.updated_by),
+    }));
+  } catch {
+    // A D1 read failure here must never crash the edit page — fall back to
+    // naming the venue row's own updated_by for every field rather than
+    // throwing (same degrade-to-generic shape as this file's other
+    // resolvers, just with a non-empty fallback instead of null/[]).
+    return diffs.map((diff) => ({ ...diff, who: venue.updated_by }));
+  }
+}
+
 export default async function EditVenuePage({
   params,
   searchParams,
@@ -219,6 +301,7 @@ export default async function EditVenuePage({
   let linkHealthContext: LinkHealthProposalContext | null = null;
   let boxCheckins: AdminCheckinRow[] = [];
   let hostAlerts: { id: number; email: string }[] = [];
+  let waitingToPublish: WaitingToPublishChange[] = [];
   let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
 
   try {
@@ -233,6 +316,17 @@ export default async function EditVenuePage({
         boxCheckins = await resolveBoxCheckins(db, id);
         hostAlerts = await resolveHostAlerts(db, id);
       }
+      // #673 pt.3: only fetch/compute the diff for a place actually waiting
+      // — displayStatusOf() is the single source of truth for that (never a
+      // box, a draft, an unedited live place, or — on staging — anything at
+      // all), same rule the Places tab's own status badge uses.
+      const { env } = await getCloudflareContext({ async: true });
+      const isStaging = !isProductionWorker(env);
+      const publishedById = new Map(publishedVenues.map((v) => [v.id, v]));
+      const status = displayStatusOf(venue, publishedById.get(venue.id), { isStaging });
+      if (status === "live_edits_waiting") {
+        waitingToPublish = await resolveWaitingToPublishChanges(db, venue, identity.email);
+      }
     }
     navCounts = await loadAdminNavCounts(db);
   } catch (err) {
@@ -246,6 +340,7 @@ export default async function EditVenuePage({
       <AdminNav email={email} active="places" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6 space-y-6">
         <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Edit {venue.name}</h2>
+        <WaitingToPublishBox changes={waitingToPublish} />
         {closureContext && (
           <div className="max-w-2xl rounded-[var(--radius-lg)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
             <p className="font-semibold">Reviewing a closure report</p>

@@ -129,6 +129,26 @@ describe("BoxCheckinPanel — rendering", () => {
     expect(screen.getByTestId("turnstile-widget")).toBeDefined();
   });
 
+  // #669 — the widget (and its "Tap the box below…" fallback hint) used to
+  // sit below "Report a problem", several rows from the buttons it belongs
+  // to. It must now land directly under the check-in buttons and above the
+  // quiet-links row, in the SAME <section>'s child order.
+  test("Turnstile widget sits directly under the check-in buttons, above 'Report a problem' (#669)", async () => {
+    renderPanel();
+    await screen.findByRole("button", { name: "I used this box" });
+    const section = screen.getByTestId("turnstile-widget").closest("section")!;
+    const children = Array.from(section.children);
+    const widgetIndex = children.indexOf(screen.getByTestId("turnstile-widget"));
+    const tookRowIndex = children.findIndex((c) => c.contains(screen.getByRole("button", { name: "I used this box" })));
+    const reportRowIndex = children.findIndex((c) =>
+      c.contains(screen.getByRole("button", { name: "Report a problem" })),
+    );
+    expect(tookRowIndex).toBeGreaterThan(-1);
+    expect(reportRowIndex).toBeGreaterThan(-1);
+    expect(widgetIndex).toBeGreaterThan(tookRowIndex);
+    expect(widgetIndex).toBeLessThan(reportRowIndex);
+  });
+
   test("honeypot input is present but hidden", () => {
     renderPanel();
     const honeypot = document.getElementById("box-checkin-website");
@@ -312,6 +332,18 @@ describe("BoxCheckinPanel — a queued tap that never resolves is not stuck fore
       expect(screen.queryByText("That didn't go through. Please try again.")).toBeNull();
       expect(screen.getByText(/tap the box below/i)).toBeDefined();
       expect(mockFetch).not.toHaveBeenCalled();
+
+      // #669 — the hint must sit immediately above the widget it points at,
+      // both above "Report a problem", not several rows away from either.
+      const section = screen.getByTestId("turnstile-widget").closest("section")!;
+      const children = Array.from(section.children);
+      const hintIndex = children.findIndex((c) => c.textContent?.match(/tap the box below/i));
+      const widgetIndex = children.indexOf(screen.getByTestId("turnstile-widget"));
+      const reportRowIndex = children.findIndex((c) =>
+        c.contains(screen.getByRole("button", { name: "Report a problem" })),
+      );
+      expect(hintIndex).toBeLessThan(widgetIndex);
+      expect(widgetIndex).toBeLessThan(reportRowIndex);
     } finally {
       process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = originalManagedKey;
     }

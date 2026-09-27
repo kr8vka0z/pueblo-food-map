@@ -1113,31 +1113,30 @@ export default function MapWrapper({
   );
   const handleMenuClose = useCallback(() => setMenuSection(null), []);
   // Closes whatever the desktop panel is showing (#682 8b) — Escape, the
-  // panel's ✕, re-clicking a lit bar item (handled above instead), and the
-  // "← Saved" back-link all route through this. A venue opened FROM Saved
-  // goes back to the list rather than closing outright, matching the "←
-  // Saved" link's own destination — same transition, so they share this
-  // one callback instead of two near-identical ones.
-  //
-  // Fix (PR #688 review, Important item 1): going back to Saved is NOT a
-  // real close — it must NOT deselect the venue or drop its walking route,
-  // since the map-side state (pin highlight, route) has nothing to do with
-  // which view the PANEL happens to be showing. The branch is read from
-  // `sidePanelView` directly, BEFORE calling setSidePanelView, rather than
-  // inside that call's updater function — a setState updater must be a
-  // pure function of its own previous value only; reaching outside it to
-  // conditionally fire OTHER setState calls (setSelectedVenueId,
-  // setWindowExpanded) from inside one is the same class of bug React's
-  // "no setState in a render/updater body" rule exists to catch, even
-  // though this specific case wouldn't have triggered that lint rule.
+  // panel's ✕, and re-clicking a lit bar item (handled above instead) all
+  // route through this. A REAL close, full stop: the panel closes, the
+  // venue (if any) deselects, and any walking route clears with it — same
+  // as closing an ordinary card. "← Saved" is a separate, deliberate
+  // BACK control (see `backToSaved` below), not a close — coordinator
+  // correction after PR #688 review: an earlier version of this function
+  // special-cased "opened from Saved" to go back to the list instead of
+  // closing, which meant ✕/Escape on such a card couldn't fully close it
+  // at all. Kept deliberately plain (no branching) so it stays obviously
+  // correct for every view.
   const closeDesktopPanel = useCallback(() => {
-    const isBackToSaved = sidePanelView?.kind === "venue" && sidePanelView.from === "saved";
-    setSidePanelView(isBackToSaved ? { kind: "saved" } : null);
-    if (!isBackToSaved) {
-      setSelectedVenueId(null);
-      setWindowExpanded(false);
-    }
-  }, [sidePanelView, setSelectedVenueId, setWindowExpanded]);
+    setSidePanelView(null);
+    setSelectedVenueId(null);
+    setWindowExpanded(false);
+  }, [setSelectedVenueId, setWindowExpanded]);
+
+  // "← Saved" (#682 8b) — the back-link on a venue card opened FROM the
+  // Saved list. A pure navigation within the panel, not a close: the venue
+  // stays selected (pin highlight, walking route) exactly as it would if
+  // the user had merely switched tabs, since going back to Saved has
+  // nothing to do with what's selected on the map.
+  const backToSaved = useCallback(() => {
+    setSidePanelView({ kind: "saved" });
+  }, []);
 
   // Single choke point for "a venue got selected" on desktop (#682 8b,
   // coordinator: "MapWrapper owns one desktop sidePanelView union ...
@@ -2198,13 +2197,13 @@ export default function MapWrapper({
                 onExpand={() => setWindowExpanded(true)}
                 onCollapse={() => setWindowExpanded(false)}
                 onClose={close}
-                // "← Saved" (#682 8b) — close() already returns to the Saved
-                // view instead of closing outright when `from === "saved"`
-                // (see closeDesktopPanel's own comment), so the link and the
-                // panel's own X/Escape share one destination.
+                // "← Saved" (#682 8b) — a back-navigation, NOT a close: uses
+                // `backToSaved` (keeps the venue selected), never `close`
+                // (a real, full close — same for every card, coordinator
+                // correction after PR #688 review).
                 backTo={
                   sidePanelView.from === "saved"
-                    ? { label: t("panel.backToSaved", locale), onClick: close }
+                    ? { label: t("panel.backToSaved", locale), onClick: backToSaved }
                     : undefined
                 }
                 onWalkRoute={handleWalkRoute}

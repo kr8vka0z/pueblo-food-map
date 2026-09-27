@@ -376,7 +376,11 @@ describe("MapWrapper desktop side panel — Saved/Menu views (#682 8b)", () => {
     return getMarkerButton(venueName).querySelector('circle[stroke="#4A8466"]') !== null;
   }
 
-  test("'← Saved' keeps the venue selected (marker stays highlighted); a real close deselects it", async () => {
+  // Coordinator correction after PR #688 review: "← Saved" is a pure BACK
+  // control (keeps the selection); ✕/Escape always mean a real, full close
+  // — including on a card opened FROM Saved. `closeDesktopPanel` carries no
+  // from-Saved branch; `backToSaved` is the separate handler the link uses.
+  test("'← Saved' keeps the venue selected and shows the list; ✕ on that same card does a real close", async () => {
     addFavorite(SAVED_VENUE.id);
     const user = userEvent.setup();
     await renderMapWrapper();
@@ -393,25 +397,25 @@ describe("MapWrapper desktop side panel — Saved/Menu views (#682 8b)", () => {
     const dialog = await screen.findByRole("dialog", { name: new RegExp(SAVED_VENUE.name, "i") });
     expect(markerIsSelected(SAVED_VENUE.name)).toBe(true);
 
-    // "← Saved" — NOT a real close. The venue must stay selected.
+    // "← Saved" — a back-navigation, not a close. Selection survives, and
+    // the list shows again.
     await user.click(within(dialog).getByRole("button", { name: "← Saved" }));
     await screen.findByText("Saved places");
     expect(markerIsSelected(SAVED_VENUE.name)).toBe(true);
+    expect(screen.queryByRole("dialog")).toBeNull();
 
-    // A venue opened from Saved always routes ✕/Escape back to Saved, never
-    // a full close (item 4: "← Saved returns to the list") — so to prove a
-    // REAL close still deselects, open the SAME venue via its own pin
-    // instead (from=undefined), then close it with ✕.
-    await user.click(getMarkerButton(SAVED_VENUE.name));
-    const pinOpenedDialog = await screen.findByRole("dialog", { name: new RegExp(SAVED_VENUE.name, "i") });
-    await user.click(within(pinOpenedDialog).getByRole("button", { name: /close/i }));
+    // Reopen the same card, then close it with ✕ — now a real, full close:
+    // panel closes AND the venue deselects.
+    await user.click(screen.getByText(SAVED_VENUE.name));
+    const reopenedDialog = await screen.findByRole("dialog", { name: new RegExp(SAVED_VENUE.name, "i") });
+    await user.click(within(reopenedDialog).getByRole("button", { name: /close/i }));
     await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
     expect(markerIsSelected(SAVED_VENUE.name)).toBe(false);
   });
 
   // PR #688 review, Important item 3: focus management through the full
-  // Saved -> venue -> back -> close round trip.
-  test("focus returns to the Saved bar button after Saved -> row -> '← Saved' -> ✕ close", async () => {
+  // Saved -> venue -> back -> reopen -> ✕ close round trip.
+  test("focus returns to the Saved bar button after Saved -> row -> '← Saved' -> reopen -> ✕ close", async () => {
     addFavorite(SAVED_VENUE.id);
     const user = userEvent.setup();
     await renderMapWrapper();
@@ -428,14 +432,13 @@ describe("MapWrapper desktop side panel — Saved/Menu views (#682 8b)", () => {
     const dialog = await screen.findByRole("dialog", { name: new RegExp(SAVED_VENUE.name, "i") });
 
     await user.click(within(dialog).getByRole("button", { name: "← Saved" }));
-    const savedHeading = await screen.findByText("Saved places");
+    await screen.findByText("Saved places");
 
-    // Back at the Saved list — its OWN header carries a ✕ too (every
-    // HamburgerMenuContent view does), independent of any venue card. A
-    // venue-from-saved's ✕ always goes back to Saved (item 4), never a full
-    // close, so THIS is the ✕ that actually closes the panel here.
-    const savedPanel = savedHeading.closest('[data-testid="desktop-side-panel"]') as HTMLElement;
-    await user.click(within(savedPanel).getByRole("button", { name: /close/i }));
+    // Reopen the card and close it for real with ✕ — the control this test
+    // is actually checking focus-return for (Escape uses the same path).
+    await user.click(screen.getByText(SAVED_VENUE.name));
+    const reopenedDialog = await screen.findByRole("dialog", { name: new RegExp(SAVED_VENUE.name, "i") });
+    await user.click(within(reopenedDialog).getByRole("button", { name: /close/i }));
 
     await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(savedNavButton));

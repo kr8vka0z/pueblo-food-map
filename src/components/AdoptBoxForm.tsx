@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * AdoptBoxForm — the "Apply to adopt this box" inline-expand form on a blessing
+ * AdoptBoxForm — the "Apply to sponsor this box" inline-expand form on a blessing
  * box's card (Blessing Boxes slice 6, Build Plan card UX item 4). Posts to
  * POST /api/public/blessing-boxes/[id]/adopt (that route's own header has
  * the full guard order and rate-limit scopes); this component only owns
@@ -21,7 +21,7 @@
  * Controlled open state (card redesign, 2026-09-19) — `open`/`onOpenChange`
  * are OPTIONAL: omitted, the component behaves exactly as before (its own
  * `useState` + its own collapsed-link trigger button). Passed, the caller
- * (BoxCardBody's sponsor band, whose own "Apply to adopt this box" link is
+ * (BoxCardBody's sponsor band, whose own "Apply to sponsor this box" link is
  * now the ONE trigger for this form) owns open/closed and this component
  * renders no trigger of its own — otherwise the label would appear twice.
  * The Turnstile container still mounts unconditionally either way (this

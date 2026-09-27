@@ -78,7 +78,7 @@ describe("AdoptBoxForm", () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
     renderForm();
-    await user.click(screen.getByRole("button", { name: "Apply to adopt this box" }));
+    await user.click(screen.getByRole("button", { name: "Apply to sponsor this box" }));
     expect(screen.getByTestId("adopt-turnstile-widget").className).toBe("");
     expect(screen.getByTestId("adopt-turnstile-widget").getAttribute("aria-hidden")).toBeNull();
 

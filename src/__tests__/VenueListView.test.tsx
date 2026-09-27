@@ -5,7 +5,13 @@
  * replaced the old status column + separate "Unpublished changes" column
  * with a single Status column driven by a precomputed `statusByVenueId`
  * map (see VenueListView.tsx's own header for why that map is computed by
- * the page, not this component). The Server Component page that fetches D1
+ * the page, not this component). #674 replaced the status filter's
+ * `<select>` with quick-filter chips (folding the Data refresh tab into
+ * Places) — those cases below are rewritten to use the new control, not
+ * left pinning a dropdown that no longer exists; everything else in this
+ * file (search, category filter, status key, name-link, empty state) is
+ * unaffected and still exercises #253/#255/#672/#673 unchanged. The Server
+ * Component page that fetches D1
  * rows (src/app/admin/places/page.tsx) is intentionally not tested here —
  * see that file's own comment; RSC page tests are hard in this stack, so
  * coverage concentrates on this presentational component.
@@ -207,18 +213,26 @@ describe("VenueListView — search", () => {
 });
 
 // ─── Filters ─────────────────────────────────────────────────────────────────
+//
+// #674 replaced the status <select> with quick-filter chips (the issue's own
+// spec: "quick-filter chips with counts (All / To review / Waiting to
+// publish / Draft / Live / Removed)") — these cases are rewritten, not just
+// added to, to exercise that new control instead of a dropdown that no
+// longer exists.
 
-describe("VenueListView — status filter", () => {
-  test("has an accessible status filter with the four #673 statuses", () => {
+describe("VenueListView — quick-filter chips (#674, formerly a status <select>)", () => {
+  test("has an accessible chip for every #673 status plus 'All places' and 'To review'", () => {
     render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
-    const select = screen.getByLabelText(/status/i) as HTMLSelectElement;
-    const optionText = Array.from(select.options).map((o) => o.textContent);
-    expect(optionText).toEqual(["All", "Draft", "Live", "Live · edits waiting", "Removed"]);
+    for (const label of ["All places", "To review", "Live · edits waiting", "Draft", "Removed"]) {
+      expect(screen.getByRole("button", { name: new RegExp(`^${label}`) })).toBeDefined();
+    }
+    // Exact match for "Live" — "Live · edits waiting" also starts with "Live ".
+    expect(screen.getByRole("button", { name: "Live (1)" })).toBeDefined();
   });
 
   test("filtering to Draft shows only draft venues", () => {
     render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
-    fireEvent.change(screen.getByLabelText(/status/i), { target: { value: "draft" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Draft/ }));
     expect(screen.getByText("Westside Garden")).toBeDefined();
     expect(screen.queryByText("Eastside Pantry")).toBeNull();
     expect(screen.queryByText("Main Street Grocery")).toBeNull();
@@ -227,7 +241,9 @@ describe("VenueListView — status filter", () => {
 
   test("filtering to Live shows only unedited live venues", () => {
     render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
-    fireEvent.change(screen.getByLabelText(/status/i), { target: { value: "live" } });
+    // Exact match, not a `/^Live/` regex — "Live · edits waiting" also
+    // starts with "Live " and would otherwise match too.
+    fireEvent.click(screen.getByRole("button", { name: "Live (1)" }));
     expect(screen.getByText("Eastside Pantry")).toBeDefined();
     expect(screen.queryByText("Main Street Grocery")).toBeNull();
     expect(screen.queryByText("Westside Garden")).toBeNull();
@@ -236,14 +252,14 @@ describe("VenueListView — status filter", () => {
 
   test("filtering to Live · edits waiting shows only that status", () => {
     render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
-    fireEvent.change(screen.getByLabelText(/status/i), { target: { value: "live_edits_waiting" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Live · edits waiting/ }));
     expect(screen.getByText("Main Street Grocery")).toBeDefined();
     expect(screen.queryByText("Eastside Pantry")).toBeNull();
   });
 
   test("filtering to Removed shows only archived venues", () => {
     render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
-    fireEvent.change(screen.getByLabelText(/status/i), { target: { value: "removed" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Removed/ }));
     expect(screen.getByText("Old Convenience Stop")).toBeDefined();
     expect(screen.queryByText("Eastside Pantry")).toBeNull();
   });
@@ -283,10 +299,13 @@ describe("VenueListView — empty state", () => {
 // ─── Count summary ───────────────────────────────────────────────────────────
 
 describe("VenueListView — result count", () => {
-  test("shows a count of filtered vs total venues that updates on filter", () => {
+  // #674: the count now reads "places" (rows can also be a synthetic
+  // "Suggested new place" row, not only a real venue) — see this file's own
+  // header note on the chip-filter rewrite above for why.
+  test("shows a count of filtered vs total places that updates on filter", () => {
     render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
-    expect(screen.getByText(/4 of 4 venues/i)).toBeDefined();
+    expect(screen.getByText(/4 of 4 places/i)).toBeDefined();
     fireEvent.change(screen.getByLabelText(/search/i), { target: { value: "garden" } });
-    expect(screen.getByText(/1 of 4 venues/i)).toBeDefined();
+    expect(screen.getByText(/1 of 4 places/i)).toBeDefined();
   });
 });

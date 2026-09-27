@@ -1,8 +1,11 @@
 /**
  * adminProposals.ts — pure parsing + lifecycle-correctness logic for the
- * `/admin/flags` change-proposal review queue (issue: build the screen that
- * consumes what scripts/refresh-ingest.ts + scripts/refresh/diffEngine.ts
- * write into `change_proposals` — migrations/0001_init_admin_schema.sql).
+ * change-proposal review surfaces (originally built as the standalone
+ * `/admin/flags` queue; #674 folded that queue into the Places tab and the
+ * venue edit page's "Suggestions to review" box — this module's own logic
+ * is unchanged, only its callers moved) that consume what
+ * scripts/refresh-ingest.ts + scripts/refresh/diffEngine.ts write into
+ * `change_proposals` — migrations/0001_init_admin_schema.sql.
  *
  * Kept free of D1/fetch (same reasoning diffEngine.ts's own header gives):
  * the one thing that actually has to be right here — does this proposal's

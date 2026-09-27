@@ -15,9 +15,12 @@ describe("AdminNav", () => {
 
     expect(screen.getByText("Pueblo Food Map Admin")).toBeDefined();
     expect(screen.getByText("admin@example.com")).toBeDefined();
-    for (const label of ["Dashboard", "Blessing Boxes", "Places", "Review queue", "Data refresh", "Photo review", "Sponsor requests"]) {
+    // #674: "Data refresh" is gone — folded into Places, which now carries
+    // that queue's own pending-count pill (see the next test).
+    for (const label of ["Dashboard", "Blessing Boxes", "Places", "Review queue", "Photo review", "Sponsor requests"]) {
       expect(screen.getByRole("link", { name: new RegExp(`^${label}`) })).toBeDefined();
     }
+    expect(screen.queryByRole("link", { name: /Data refresh/ })).toBeNull();
     expect(screen.getByRole("link", { name: "Add place" }).getAttribute("href")).toBe("/admin/venues/new");
   });
 
@@ -35,14 +38,16 @@ describe("AdminNav", () => {
       <AdminNav
         email="a@b.com"
         active="submissions"
-        counts={{ submissions: 3, proposals: 0, photos: 5, adopters: 0 }}
+        counts={{ submissions: 3, proposals: 7, photos: 0, adopters: 0 }}
       />,
     );
 
     expect(screen.getByRole("link", { name: /Review queue/ }).textContent).toContain("3");
-    expect(screen.getByRole("link", { name: /Photo review/ }).textContent).toContain("5");
+    // #674: the "proposals" count (formerly Data refresh's own pill) now
+    // shows on Places.
+    expect(screen.getByRole("link", { name: /^Places/ }).textContent).toContain("7");
     // Zero-count queues render with no pill at all — the link text is exactly the label.
-    expect(screen.getByRole("link", { name: "Data refresh" }).textContent).toBe("Data refresh");
+    expect(screen.getByRole("link", { name: "Photo review" }).textContent).toBe("Photo review");
     expect(screen.getByRole("link", { name: "Sponsor requests" }).textContent).toBe("Sponsor requests");
   });
 
@@ -54,7 +59,6 @@ describe("AdminNav", () => {
       "Blessing Boxes": "/admin/boxes",
       Places: "/admin/places",
       "Review queue": "/admin/submissions",
-      "Data refresh": "/admin/flags",
       "Photo review": "/admin/box-photos",
       "Sponsor requests": "/admin/box-adopters",
     };

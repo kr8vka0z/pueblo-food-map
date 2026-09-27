@@ -7,9 +7,11 @@
  * capped preview of the SAME pending proposals and needs the SAME venue
  * context for its rows — a second, hand-copied batching query would risk
  * silently drifting from this one (e.g. the 100-bound-param batching, or
- * which columns VenueCard's real preview needs). src/app/admin/flags/page.tsx
- * re-exports `VenueLookup` so its own existing importers (ProposalsReviewView,
- * both pages' tests) are unaffected by the move.
+ * which columns VenueCard's real preview needs). `/admin/flags/page.tsx`
+ * used to re-export `VenueLookup` for its own importers — #674 folded that
+ * queue into Places and the venue edit page, so every caller
+ * (ProposalCard.tsx, SuggestionsBox.tsx, both pages) now imports `VenueLookup`
+ * directly from here instead.
  */
 
 import { D1_MAX_BOUND_PARAMS, chunkArray } from "@/lib/d1";

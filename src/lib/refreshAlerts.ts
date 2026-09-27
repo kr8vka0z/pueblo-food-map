@@ -195,7 +195,9 @@ export async function runRefreshAlertsCheck(
         `${pendingAge.count} change_proposals row(s) have sat in "pending" for more than ${PENDING_AGE_ALERT_DAYS} days.`,
         `Oldest: ${pendingAge.oldestCreatedAt} (${pendingAge.oldestAgeDays} day(s) old).`,
         "",
-        "Review at https://pueblofoodmap.com/admin/flags",
+        // #674: /admin/flags folded into Places — this link now lands on
+        // its "To review" filter instead of the retired queue.
+        "Review at https://pueblofoodmap.com/admin/places?show=review",
       ],
     );
   }

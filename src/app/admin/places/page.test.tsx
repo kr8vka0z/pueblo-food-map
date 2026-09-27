@@ -148,14 +148,14 @@ describe("PlacesPage — auth guard", () => {
     expect(screen.getByText("Eastside Pantry")).toBeDefined();
     expect(screen.getByText("Main Street Grocery")).toBeDefined();
     // Shared AdminNav (admin dashboard build) renders the nav row now —
-    // "Places" is the active tab, and the review/data-refresh queues are
-    // still one click away from here.
-    const placesLink = screen.getByRole("link", { name: "Places" });
+    // "Places" is the active tab, and the review queue is still one click
+    // away from here. #674 folded the old "Data refresh" nav item into
+    // Places itself — there is no separate link for it any more.
+    const placesLink = screen.getByRole("link", { name: /^Places/ });
     expect(placesLink.getAttribute("aria-current")).toBe("page");
     const reviewQueueLink = screen.getByRole("link", { name: "Review queue" });
     expect(reviewQueueLink.getAttribute("href")).toBe("/admin/submissions");
-    const flagsQueueLink = screen.getByRole("link", { name: "Data refresh" });
-    expect(flagsQueueLink.getAttribute("href")).toBe("/admin/flags");
+    expect(screen.queryByRole("link", { name: /Data refresh/ })).toBeNull();
     expect(forbidden).not.toHaveBeenCalled();
   });
 

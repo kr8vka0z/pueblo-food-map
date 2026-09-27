@@ -1,7 +1,7 @@
 /**
  * BoxesWaitingChips — the /admin/boxes tab's "Waiting on you:" strip
  * (approved mockup Direction B). Deliberately narrower than the Dashboard's
- * "Needs a decision" panel: ONLY box photos + adoption requests, per the
+ * "Needs a decision" panel: ONLY box photos + sponsor requests, per the
  * task spec ("Omit publish/suggestion chips — Dashboard-only") — those two
  * queues live on this tab because they're blessing-boxes-specific; publish
  * and public-submission review belong to /admin's own to-do list, not a
@@ -36,7 +36,7 @@ export default function BoxesWaitingChips({ photosCount, adoptersCount }: BoxesW
       )}
       {adoptersCount > 0 && (
         <Link href="/admin/box-adopters" className={chipClass}>
-          {pluralize(adoptersCount, "adoption request")}
+          {pluralize(adoptersCount, "sponsor request")}
         </Link>
       )}
     </div>

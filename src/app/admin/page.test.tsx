@@ -77,7 +77,7 @@ describe("DashboardPage (/admin) — auth guard", () => {
     expect(screen.getByText("admin@example.com")).toBeDefined();
     expect(
       screen.getByText(
-        "Nothing waiting on you. New suggestions, data changes, box photos and adoption requests show up here as they come in.",
+        "Nothing waiting on you. New suggestions, data changes, box photos and sponsor requests show up here as they come in.",
       ),
     ).toBeDefined();
     expect(screen.getByText("Every box is doing fine.")).toBeDefined();

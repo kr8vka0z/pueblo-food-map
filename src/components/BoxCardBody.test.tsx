@@ -213,7 +213,7 @@ describe("BoxCardBody — sponsor band (always present, 3 adopter-count states)"
   test("shows 'needs a sponsor' + adopt link when there are no approved adopters", () => {
     renderCard({ adopters: [] });
     expect(screen.getByText("This box needs a sponsor.")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Apply to adopt this box" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Apply to sponsor this box" })).toBeDefined();
   });
 
   test("shows the single sponsor's name", () => {
@@ -237,7 +237,7 @@ describe("BoxCardBody — sponsor band (always present, 3 adopter-count states)"
   test("the adopt link expands AdoptBoxForm in place", async () => {
     const user = userEvent.setup();
     renderCard();
-    const trigger = screen.getByRole("button", { name: "Apply to adopt this box" });
+    const trigger = screen.getByRole("button", { name: "Apply to sponsor this box" });
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
     await user.click(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");

@@ -15,7 +15,7 @@ describe("AdminNav", () => {
 
     expect(screen.getByText("Pueblo Food Map Admin")).toBeDefined();
     expect(screen.getByText("admin@example.com")).toBeDefined();
-    for (const label of ["Dashboard", "Blessing Boxes", "Places", "Review queue", "Data refresh", "Photo review", "Adoption requests"]) {
+    for (const label of ["Dashboard", "Blessing Boxes", "Places", "Review queue", "Data refresh", "Photo review", "Sponsor requests"]) {
       expect(screen.getByRole("link", { name: new RegExp(`^${label}`) })).toBeDefined();
     }
     expect(screen.getByRole("link", { name: "Add place" }).getAttribute("href")).toBe("/admin/venues/new");
@@ -43,7 +43,7 @@ describe("AdminNav", () => {
     expect(screen.getByRole("link", { name: /Photo review/ }).textContent).toContain("5");
     // Zero-count queues render with no pill at all — the link text is exactly the label.
     expect(screen.getByRole("link", { name: "Data refresh" }).textContent).toBe("Data refresh");
-    expect(screen.getByRole("link", { name: "Adoption requests" }).textContent).toBe("Adoption requests");
+    expect(screen.getByRole("link", { name: "Sponsor requests" }).textContent).toBe("Sponsor requests");
   });
 
   test("every nav href points at the right route", () => {
@@ -56,7 +56,7 @@ describe("AdminNav", () => {
       "Review queue": "/admin/submissions",
       "Data refresh": "/admin/flags",
       "Photo review": "/admin/box-photos",
-      "Adoption requests": "/admin/box-adopters",
+      "Sponsor requests": "/admin/box-adopters",
     };
     for (const [label, href] of Object.entries(hrefByLabel)) {
       expect(screen.getByRole("link", { name: new RegExp(`^${label}`) }).getAttribute("href")).toBe(href);

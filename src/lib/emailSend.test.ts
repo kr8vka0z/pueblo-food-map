@@ -30,7 +30,7 @@ describe("composeEmail", () => {
       bodyLineKeys: ["email.adoptConfirm.disclaimer"],
       vars: { box: "Test Box" },
     });
-    expect(subject).toBe("Confirma tu solicitud para adoptar Test Box");
+    expect(subject).toBe("Confirma tu solicitud para patrocinar Test Box");
     expect(text).toContain("Si tú no pediste esto, puedes ignorar este correo.");
     expect(text).not.toContain("If you didn't ask for this");
   });

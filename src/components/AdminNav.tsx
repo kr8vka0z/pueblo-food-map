@@ -51,7 +51,9 @@ interface NavItem {
 
 // Order + labels match the approved mockup's nav row exactly (Direction A/B
 // header) and the task's own list: "Dashboard · Blessing Boxes · Places ·
-// Review queue · Data refresh · Photo review · Adoption requests."
+// Review queue · Data refresh · Photo review · Sponsor requests."
+// (#676: relabeled from "Adoption requests" — public-facing copy says
+// "sponsor," never "adopt.")
 const NAV_ITEMS: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/admin" },
   { key: "boxes", label: "Blessing Boxes", href: "/admin/boxes" },
@@ -59,7 +61,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "submissions", label: "Review queue", href: "/admin/submissions", countKey: "submissions" },
   { key: "flags", label: "Data refresh", href: "/admin/flags", countKey: "proposals" },
   { key: "box-photos", label: "Photo review", href: "/admin/box-photos", countKey: "photos" },
-  { key: "box-adopters", label: "Adoption requests", href: "/admin/box-adopters", countKey: "adopters" },
+  { key: "box-adopters", label: "Sponsor requests", href: "/admin/box-adopters", countKey: "adopters" },
 ];
 
 // Class order deliberately keeps "text-sm" apart from a contiguous

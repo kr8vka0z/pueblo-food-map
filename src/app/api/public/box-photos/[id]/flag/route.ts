@@ -69,7 +69,7 @@ async function sendFlagEmail(photoId: number, boxName: string): Promise<void> {
         ``,
         `Photo ID: ${photoId}`,
         ``,
-        `Review it at https://pueblofoodmap.com/admin/box-photos`,
+        `Review it at https://pueblofoodmap.com/admin/boxes?show=review`,
       ].join("\n"),
     }),
   });

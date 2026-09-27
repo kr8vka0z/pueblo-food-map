@@ -26,13 +26,7 @@
 import Link from "next/link";
 import type { AdminNavCounts } from "@/lib/adminNavCounts";
 
-export type AdminActiveTab =
-  | "dashboard"
-  | "boxes"
-  | "places"
-  | "submissions"
-  | "box-photos"
-  | "box-adopters";
+export type AdminActiveTab = "dashboard" | "boxes" | "places" | "submissions";
 
 export interface AdminNavProps {
   email: string;
@@ -44,8 +38,15 @@ interface NavItem {
   key: AdminActiveTab;
   label: string;
   href: string;
-  /** Which AdminNavCounts field (if any) shows as a pending-count pill on this link. */
-  countKey?: keyof AdminNavCounts;
+  /**
+   * Which AdminNavCounts field(s) show as a pending-count pill on this
+   * link. An array so Blessing Boxes can carry the COMBINED photos+adopters
+   * count (#677: their own separate nav items are gone) without widening
+   * AdminNavCounts itself — the Dashboard (src/app/admin/page.tsx) still
+   * reads `photos`/`adopters` separately for its own needs-card, so nothing
+   * else about that shape changes.
+   */
+  countKeys?: (keyof AdminNavCounts)[];
 }
 
 // Order + labels originally matched the approved mockup's nav row exactly
@@ -54,15 +55,16 @@ interface NavItem {
 // from "Adoption requests" — public-facing copy says "sponsor," never
 // "adopt.") #674 folded the "Data refresh" tab into Places — that item and
 // its own /admin/flags link are gone, and the pending-proposal count pill
-// it used to carry (`proposals`) now shows on Places instead, since that's
-// where those proposals live now.
+// it used to carry (`proposals`) now shows on Places instead. #677 folds
+// "Photo review" and "Sponsor requests" into Blessing Boxes the same way —
+// both items and their /admin/box-photos, /admin/box-adopters links are
+// gone (now redirects), and their combined count pill moves to Blessing
+// Boxes.
 const NAV_ITEMS: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/admin" },
-  { key: "boxes", label: "Blessing Boxes", href: "/admin/boxes" },
-  { key: "places", label: "Places", href: "/admin/places", countKey: "proposals" },
-  { key: "submissions", label: "Review queue", href: "/admin/submissions", countKey: "submissions" },
-  { key: "box-photos", label: "Photo review", href: "/admin/box-photos", countKey: "photos" },
-  { key: "box-adopters", label: "Sponsor requests", href: "/admin/box-adopters", countKey: "adopters" },
+  { key: "boxes", label: "Blessing Boxes", href: "/admin/boxes", countKeys: ["photos", "adopters"] },
+  { key: "places", label: "Places", href: "/admin/places", countKeys: ["proposals"] },
+  { key: "submissions", label: "Review queue", href: "/admin/submissions", countKeys: ["submissions"] },
 ];
 
 // Class order deliberately keeps "text-sm" apart from a contiguous
@@ -110,7 +112,7 @@ export default function AdminNav({ email, active, counts }: AdminNavProps) {
         className="flex flex-wrap items-center gap-1 overflow-x-auto px-4 pb-3 sm:px-6"
       >
         {NAV_ITEMS.map((item) => {
-          const count = item.countKey ? counts[item.countKey] : 0;
+          const count = (item.countKeys ?? []).reduce((sum, key) => sum + counts[key], 0);
           const isActive = item.key === active;
           return (
             <Link

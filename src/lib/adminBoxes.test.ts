@@ -9,7 +9,9 @@
  */
 
 import { describe, expect, test } from "vitest";
-import { loadBoxHealthEntries } from "@/lib/adminBoxes";
+import { loadBoxHealthEntries, groupBoxReviewItems } from "@/lib/adminBoxes";
+import type { AdminBoxPhotoRow } from "@/lib/boxPhotos";
+import type { AdminBoxAdopterRow } from "@/lib/boxAdopters";
 
 interface FakeBoxVenueRow {
   id: string;
@@ -122,5 +124,76 @@ describe("loadBoxHealthEntries", () => {
     const entries = await loadBoxHealthEntries(db, new Date("2026-09-20T00:00:00.000Z"));
 
     expect(entries[0].removedOn).toBe("2026-08-01");
+  });
+});
+
+function photoRow(overrides: Partial<AdminBoxPhotoRow> = {}): AdminBoxPhotoRow {
+  return {
+    id: 1,
+    venue_id: "box-1",
+    venue_name: "Box 1",
+    checkin_id: null,
+    checkin_kind: null,
+    status: "pending",
+    flag_count: 0,
+    created_at: "2026-09-18T15:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function adopterRow(overrides: Partial<AdminBoxAdopterRow> = {}): AdminBoxAdopterRow {
+  return {
+    id: 1,
+    venue_id: "box-1",
+    venue_name: "Box 1",
+    display_name: "The Martinez Family",
+    email: "martinez@example.com",
+    note: null,
+    status: "pending",
+    email_confirmed_at: "2026-09-18T15:00:00.000Z",
+    created_at: "2026-09-18T14:00:00.000Z",
+    ...overrides,
+  };
+}
+
+describe("groupBoxReviewItems", () => {
+  test("empty inputs -> empty map", () => {
+    expect(groupBoxReviewItems([], [])).toEqual({});
+  });
+
+  test("groups a pending photo and a sponsor request under their own venue ids", () => {
+    const result = groupBoxReviewItems(
+      [photoRow({ id: 5, venue_id: "box-1", status: "pending" })],
+      [adopterRow({ id: 9, venue_id: "box-2", display_name: "The Lee Family" })],
+    );
+    expect(result["box-1"]).toEqual({ photo: { id: 5, status: "pending", flagCount: 0 } });
+    expect(result["box-2"]).toEqual({ sponsorRequest: { displayName: "The Lee Family" } });
+  });
+
+  test("a venue with both a photo and a sponsor request gets both under one entry", () => {
+    const result = groupBoxReviewItems(
+      [photoRow({ id: 5, venue_id: "box-1" })],
+      [adopterRow({ id: 9, venue_id: "box-1", display_name: "The Lee Family" })],
+    );
+    expect(result["box-1"]).toEqual({
+      photo: { id: 5, status: "pending", flagCount: 0 },
+      sponsorRequest: { displayName: "The Lee Family" },
+    });
+  });
+
+  test("a flagged photo wins over a pending one for the same venue, regardless of array order", () => {
+    const result = groupBoxReviewItems(
+      [
+        photoRow({ id: 1, venue_id: "box-1", status: "pending" }),
+        photoRow({ id: 2, venue_id: "box-1", status: "flagged", flag_count: 3 }),
+      ],
+      [],
+    );
+    expect(result["box-1"]).toEqual({ photo: { id: 2, status: "flagged", flagCount: 3 } });
+  });
+
+  test("a venue with no review items has no entry in the map", () => {
+    const result = groupBoxReviewItems([photoRow({ venue_id: "box-1" })], []);
+    expect(result["box-2"]).toBeUndefined();
   });
 });

@@ -4,9 +4,11 @@
  * shaping here is already covered by dedicated tests against the pure
  * functions (boxHealth.test.ts, adminDashboard.test.ts) and the
  * presentational components (BoxReportsChart/AllBoxesTable/
- * BoxesWaitingChips .test.tsx files) — this file only pins the
+ * BoxesToReviewBox .test.tsx files) — this file only pins the
  * getAdminDb() -> forbidden() fail-closed wiring and that a real render
- * reaches every section with SOME data.
+ * reaches every section with SOME data. #677: BoxesWaitingChips.tsx was
+ * deleted and replaced by BoxesToReviewBox.tsx (see page.reviewSummary.test.tsx
+ * for that box's own wiring test).
  *
  * #678 removed the status map (AdminBoxesMap) from this page entirely, so
  * the mock + entries-spy this file used to carry for it are gone too — the
@@ -39,9 +41,17 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 const mockLoadBoxHealthEntries = vi.fn();
-vi.mock("@/lib/adminBoxes", () => ({
-  loadBoxHealthEntries: (...args: unknown[]) => mockLoadBoxHealthEntries(...args),
-}));
+vi.mock("@/lib/adminBoxes", async (importOriginal) => {
+  // #677: real groupBoxReviewItems() (a pure function, unit-tested in
+  // adminBoxes.test.ts) stays live here — this mock only overrides the D1
+  // read, same "mock the wiring, not the math" split every other page test
+  // in this app already follows.
+  const actual = await importOriginal<typeof import("@/lib/adminBoxes")>();
+  return {
+    ...actual,
+    loadBoxHealthEntries: (...args: unknown[]) => mockLoadBoxHealthEntries(...args),
+  };
+});
 
 import BoxesPage from "@/app/admin/boxes/page";
 import { forbidden } from "next/navigation";
@@ -90,8 +100,11 @@ describe("BoxesPage (/admin/boxes) — auth guard", () => {
     expect(screen.getByText("Blessing boxes — 0 in service")).toBeDefined();
     expect(screen.getByText(/No box reports in the last 8 weeks/)).toBeDefined();
     expect(screen.getByText("No blessing boxes yet.")).toBeDefined();
-    // Zero pending photos/adopters -> the "Waiting on you" strip renders nothing.
+    // #677: BoxesWaitingChips ("Waiting on you:") is gone — replaced by
+    // BoxesToReviewBox, which also renders nothing when zero photos/adopters
+    // are pending (issue's own spec: "BoxesWaitingChips goes away too").
     expect(screen.queryByText("Waiting on you:")).toBeNull();
+    expect(screen.queryByText(/to review:/)).toBeNull();
     expect(forbidden).not.toHaveBeenCalled();
   });
 

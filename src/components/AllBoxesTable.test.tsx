@@ -11,6 +11,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AllBoxesTable from "@/components/AllBoxesTable";
 import type { BoxHealthEntry, BoxHealthStatus } from "@/lib/boxHealth";
+import type { BoxReviewSummary } from "@/lib/adminBoxes";
 
 function makeEntry(overrides: Partial<BoxHealthEntry> = {}): BoxHealthEntry {
   return {
@@ -234,5 +235,75 @@ describe("AllBoxesTable — sort", () => {
     const bodyRows = screen.getAllByRole("row").slice(1);
     const names = bodyRows.map((row) => within(row).getByRole("link").textContent);
     expect(names).toEqual(["Alpha Box", "Zeta Box"]);
+  });
+});
+
+describe("AllBoxesTable — 'To review' (#677)", () => {
+  const entries = [
+    entryWithStatus("ok-no-review", "ok", 1),
+    entryWithStatus("ok-with-photo", "ok", 1),
+    entryWithStatus("ok-with-sponsor-request", "ok", 1),
+  ];
+
+  function reviewMap(): Record<string, BoxReviewSummary> {
+    return {
+      "ok-with-photo": { photo: { id: 42, status: "pending", flagCount: 0 } },
+      "ok-with-sponsor-request": { sponsorRequest: { displayName: "The Lee Family" } },
+    };
+  }
+
+  test("column: shows a thumbnail + 'New photo' for a pending photo, and 'Sponsor request — <name>' for a request", () => {
+    render(<AllBoxesTable entries={entries} reviewByVenueId={reviewMap()} />);
+    expect(screen.getByAltText("")).toHaveAttribute("src", "/api/admin/box-photos/42/preview");
+    expect(screen.getByText("New photo")).toBeDefined();
+    expect(screen.getByText(/Sponsor request/)).toBeDefined();
+    expect(screen.getByText(/The Lee Family/)).toBeDefined();
+  });
+
+  test("column: a flagged photo shows 'Photo reported (N×)' instead of 'New photo'", () => {
+    render(
+      <AllBoxesTable
+        entries={[entryWithStatus("flagged-box", "ok", 1)]}
+        reviewByVenueId={{ "flagged-box": { photo: { id: 1, status: "flagged", flagCount: 2 } } }}
+      />,
+    );
+    expect(screen.getByText("Photo reported (2×)")).toBeDefined();
+  });
+
+  test("'To review' chip: counts only rows with a review entry, and filters to just them", async () => {
+    const user = userEvent.setup();
+    render(<AllBoxesTable entries={entries} reviewByVenueId={reviewMap()} />);
+
+    expect(screen.getByRole("button", { name: "To review (2)" })).toBeDefined();
+
+    await user.click(screen.getByRole("button", { name: "To review (2)" }));
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(2);
+    expect(screen.queryByText("Box ok-no-review")).toBeNull();
+  });
+
+  test("'To review' chip is disabled at zero, same as every other status chip", () => {
+    render(<AllBoxesTable entries={entries} />);
+    expect(screen.getByRole("button", { name: "To review (0)" })).toHaveProperty("disabled", true);
+  });
+
+  test("initialShowReview pre-selects the 'To review' chip", () => {
+    render(<AllBoxesTable entries={entries} reviewByVenueId={reviewMap()} initialShowReview />);
+    expect(screen.getByRole("button", { name: "To review (2)" }).getAttribute("aria-pressed")).toBe("true");
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(2);
+  });
+
+  test("default 'Needs attention first' sort puts a box with a review item ahead of a worse health status with none", () => {
+    const mixed = [
+      entryWithStatus("empty-no-review", "empty", 1),
+      entryWithStatus("ok-with-review", "ok", 1),
+    ];
+    render(
+      <AllBoxesTable entries={mixed} reviewByVenueId={{ "ok-with-review": { sponsorRequest: { displayName: "X" } } }} />,
+    );
+    const bodyRows = screen.getAllByRole("row").slice(1);
+    const names = bodyRows.map((row) => within(row).getByRole("link").textContent);
+    expect(names).toEqual(["Box ok-with-review", "Box empty-no-review"]);
   });
 });

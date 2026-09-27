@@ -1,41 +1,27 @@
 /**
- * /admin/box-photos — the photo moderation queue (Blessing Boxes slice 5).
- * Same Server-Component-auth-gate / Client-Component-interaction split as
- * /admin/submissions (getAdminDb() -> handlePageAuthError() on failure);
- * this page only SELECTs (loadReviewQueue()), so — like every other
- * read-only admin page — it carries no requireAdminOrigin() CSRF check of
- * its own; that guard lives on the approve/reject mutation routes instead.
+ * /admin/box-photos — retired (#677, "fold Photo review and Sponsor
+ * requests into the Blessing Boxes tab"). The photo moderation queue this
+ * page used to render (BoxPhotosReviewView.tsx, now deleted) is folded into
+ * the Blessing Boxes tab: every pending/flagged photo shows on its box's
+ * own row (the "To review" column, AllBoxesTable.tsx) and resolves from
+ * that box's own edit page (BoxReviewBox.tsx).
+ *
+ * Kept as a redirect rather than deleted outright — same reasoning
+ * /admin/flags/page.tsx's own header gives: an admin's existing
+ * bookmark/muscle-memory still points here, and a plain Server Component
+ * `redirect()` at a non-root path is safe (AGENTS.md's "no server-side
+ * redirect" footgun is specifically about `/`). No auth gate of its own —
+ * this route does no D1 read, so there's nothing to guard; the redirect
+ * target (/admin/boxes) enforces its own.
+ *
+ * `?show=review` on the redirect target pre-selects the tab's own "To
+ * review" chip (AllBoxesTable's initialShowReview), so a bookmark that used
+ * to land on a queue of pending photos still lands somewhere that shows
+ * exactly that.
  */
 
-import { headers } from "next/headers";
-import { getAdminDb } from "@/lib/adminDb";
-import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
-import { loadReviewQueue } from "@/lib/boxPhotos";
-import AdminNav from "@/components/AdminNav";
-import BoxPhotosReviewView from "@/components/BoxPhotosReviewView";
+import { redirect } from "next/navigation";
 
-export default async function BoxPhotosPage() {
-  let email: string;
-  let photos: Awaited<ReturnType<typeof loadReviewQueue>>;
-  let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
-
-  try {
-    const { db, identity } = await getAdminDb(await headers());
-    email = identity.email;
-    photos = await loadReviewQueue(db);
-    navCounts = await loadAdminNavCounts(db);
-  } catch (err) {
-    handlePageAuthError(err);
-  }
-
-  return (
-    <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="box-photos" counts={navCounts} />
-      <div className="px-4 py-6 sm:px-6">
-        <h2 className="wordmark mb-4 text-xl text-[var(--color-ink-900)]">Photo review</h2>
-        <BoxPhotosReviewView photos={photos} />
-      </div>
-    </main>
-  );
+export default function BoxPhotosPage(): never {
+  redirect("/admin/boxes?show=review");
 }

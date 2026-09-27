@@ -419,6 +419,12 @@ export default function BoxCardBody({
             "relative flex flex-col gap-3 " + (expanded ? "" : "max-h-24 overflow-hidden cursor-pointer")
           }
         >
+          {/* `inert` while collapsed (#683 review) — same reason as
+              BottomSheet's detail section: clipped controls (photo viewer,
+              sponsor form, History, email sign-up) must not be reachable by
+              Tab or a screen reader, and a tap still falls through to the
+              wrapper's expand handler. */}
+          <div className="contents" inert={!expanded}>
           {hasPhoto && (
             <div className="relative">
               <button
@@ -503,6 +509,7 @@ export default function BoxCardBody({
               )}
               <BoxAlertSignupForm boxId={box.id} />
             </div>
+          </div>
           </div>
 
           {!expanded && (

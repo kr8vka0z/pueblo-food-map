@@ -922,6 +922,13 @@ export default function BottomSheet({
                     (expanded ? "" : "max-h-16 overflow-hidden cursor-pointer")
                   }
                 >
+                  {/* `inert` while collapsed (#683 review): the clip hides the
+                      phone/website/report controls visually but not from Tab
+                      or a screen reader. Inert takes them out of both, and
+                      acts like `pointer-events: none`, so a tap on the preview
+                      still lands on the wrapper's own expand handler above.
+                      `contents` keeps the children as the wrapper's flex items. */}
+                  <div className="contents" inert={!expanded}>
                   {/* Address — guard: never render "Address not in OpenStreetMap" placeholder */}
                   <div className="flex gap-2.5">
                     <MapPin size={16} className="text-[var(--color-ink-400)] shrink-0 mt-0.5" aria-hidden />
@@ -1015,6 +1022,7 @@ export default function BottomSheet({
 
                   {/* Report venue */}
                   <ReportVenueButton venueId={venue.id} locale={locale} />
+                  </div>
 
                   {/* Cut-off preview fade (#666) — matches the card
                       background (`bone-50`) so the clipped content visibly

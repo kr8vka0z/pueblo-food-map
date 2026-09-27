@@ -201,6 +201,16 @@ describe("BottomSheet — grab bar expand / collapse toggle (#666)", () => {
     );
   });
 
+  test("collapsed detail content is inert (not tabbable or announced) until expanded (#683 review)", async () => {
+    const user = userEvent.setup();
+    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
+    const bar = screen.getByRole("button", { name: /show details/i });
+    const section = document.getElementById(bar.getAttribute("aria-controls")!)!;
+    expect(section.firstElementChild!.hasAttribute("inert")).toBe(true);
+    await user.click(bar);
+    expect(section.firstElementChild!.hasAttribute("inert")).toBe(false);
+  });
+
   test("tapping the grab bar again collapses it (aria-expanded back to false)", async () => {
     const user = userEvent.setup();
     render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);

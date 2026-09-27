@@ -54,4 +54,10 @@ describe("isExcludedIp — malformed input, never throws", () => {
   test("a garbage candidate IP never matches", () => {
     expect(isExcludedIp("not-an-ip", HOME_LIST)).toBe(false);
   });
+
+  test("an entry with an empty prefix (trailing slash) matches nothing, not everything", () => {
+    expect(isExcludedIp("8.8.8.8", "66.33.12.72/")).toBe(false);
+    expect(isExcludedIp("2001:db8::1", "2607:3640:121:e110::/")).toBe(false);
+    expect(isExcludedIp("66.33.12.72", "66.33.12.72/")).toBe(false);
+  });
 });

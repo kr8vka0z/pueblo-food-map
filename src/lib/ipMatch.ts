@@ -60,6 +60,9 @@ function parseIPv4(addr: string): number | null {
 function matchesEntry(ip: string, entry: string): boolean {
   const isV6 = ip.includes(":");
   const [base, prefixStr] = entry.split("/");
+  // "1.2.3.4/" would otherwise parse as prefix 0 (Number("") === 0) and match
+  // EVERY address, dropping all analytics. A malformed entry must match nothing.
+  if (prefixStr !== undefined && prefixStr.trim() === "") return false;
   if (isV6 !== base.includes(":")) return false; // family mismatch
 
   if (isV6) {

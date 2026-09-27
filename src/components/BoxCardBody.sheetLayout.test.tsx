@@ -132,6 +132,14 @@ describe("BoxCardBody layout='sheet' — below-the-fold section (#667 items 9-13
     expect(onRequestExpand).not.toHaveBeenCalled();
   });
 
+  test("collapsed: the clipped content is inert (out of Tab order and the a11y tree); expanded: it isn't (#683 review)", () => {
+    const { unmount } = renderSheet({}, { expanded: false });
+    expect(document.getElementById("test-detail")!.firstElementChild!.hasAttribute("inert")).toBe(true);
+    unmount();
+    renderSheet({}, { expanded: true });
+    expect(document.getElementById("test-detail")!.firstElementChild!.hasAttribute("inert")).toBe(false);
+  });
+
   test("no photo: the sponsor band is the first thing in the below-the-fold wrapper", () => {
     renderSheet({ latestPhoto: null });
     const wrapper = document.getElementById("test-detail")!;

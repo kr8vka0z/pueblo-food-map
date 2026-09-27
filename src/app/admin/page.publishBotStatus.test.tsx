@@ -67,7 +67,7 @@ describe("DashboardPage (/admin) — publish-bot PR status banner (#598)", () =>
     const mockFetch = vi.fn();
     vi.stubGlobal("fetch", mockFetch);
 
-    render(await DashboardPage());
+    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.queryByText(/publish in progress/i)).toBeNull();
     expect(screen.queryByText(/publish is stuck/i)).toBeNull();
@@ -90,7 +90,7 @@ describe("DashboardPage (/admin) — publish-bot PR status banner (#598)", () =>
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    render(await DashboardPage());
+    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
 
     expect(await screen.findByText(/publish is stuck/i)).toBeDefined();
     expect(screen.getByText(/merge conflict/i)).toBeDefined();
@@ -104,7 +104,7 @@ describe("DashboardPage (/admin) — publish-bot PR status banner (#598)", () =>
     const mockFetch = vi.fn(async () => jsonResponse({ message: "rate limited" }, 500));
     vi.stubGlobal("fetch", mockFetch);
 
-    render(await DashboardPage());
+    render(await DashboardPage({ searchParams: Promise.resolve({}) }));
 
     expect(await screen.findByText("admin@example.com")).toBeDefined();
     expect(screen.queryByText(/publish in progress/i)).toBeNull();

@@ -1,171 +1,195 @@
 /**
- * /admin — the Dashboard (admin dashboard build, approved mockup Direction
- * A "to-do list first"). Replaces the old /admin (venue list + Publish
- * panel, now at /admin/places — see that page's own header for the move).
- * This is now the admin's landing page: what needs a decision right now,
- * plus two "worth a glance" side panels, rather than a data table.
+ * /admin — the Dashboard. Overhauled for #680 ("Admin Dashboard overhaul:
+ * needs-you strip, visitors (Cloudflare), blessing box numbers, map data
+ * health"): replaces the earlier "to-do list first" build's
+ * NeedsDecisionPanel / "Boxes that need help" / "Places due for a check"
+ * blocks (issue #680's own Layout item 2: "This replaces today's
+ * NeedsDecisionPanel / needs-help list / stale list blocks") with a
+ * greeting + 7/30/90-day period switch, a 4-card "Needs you" strip, a
+ * Cloudflare Web Analytics Visitors section, a Blessing Boxes numbers
+ * section (reusing src/lib/boxStats.ts, the SAME math the public Boxes page
+ * uses), and a Map data health section. The Publish bar and the
+ * publish-bot status banner are UNCHANGED (#680: "The Publish panel and the
+ * publish-bot status banner stay").
  *
  * Same Better Auth chain as every other admin page (AGENTS.md "Admin
  * authentication"): getAdminDb() verifies identity before this page renders
  * anything, failing closed via handlePageAuthError.
  *
- * Every read below is either a) a query ALSO used by an existing full-queue
- * page (venues, for the Publish bar + stale-places panel — same rows
- * src/app/admin/places/page.tsx already loads; box health, via
- * src/lib/adminBoxes.ts, shared with the future /admin/boxes tab), or b) a
- * small `LIMIT 3` preview of a query an existing full-queue page already
- * runs unfiltered (submissions, proposals) — never a new mutation path, per
- * the task spec's "reuse the same API routes" instruction, which this page
- * satisfies simply by not writing any of its own.
+ * PERIOD SWITCH: a plain `?period=7d|30d|90d` search param, server-rendered
+ * `<Link>`s (no client JS) — the whole page re-renders per period the same
+ * way any other admin filter link already does in this app. Defaults to
+ * 30d; an unrecognized value falls back to 30d rather than erroring, same
+ * "never trust a query param" posture every other admin route takes.
+ * "Every number that has a time range... shows the change vs the previous
+ * period of the same length" (#680) — src/lib/boxStats.ts's
+ * filterByPeriod/filterByPreviousPeriod do that D1-side split; cfAnalytics's
+ * loadVisitorsAnalytics does the equivalent for Cloudflare's numbers.
  *
- * Independent reads run via Promise.all (quality bar: "Promise.all for
- * independent queries"). `photos`/`adopters` reuse their FULL pending
- * arrays (loadReviewQueue/loadPendingAdopters, the exact same loaders
- * /admin/box-photos and /admin/box-adopters already call) rather than a
- * separate LIMIT+COUNT pair — this page already needs the full list to
- * hand NeedsDecisionPanel a real total, so slicing the first 3 off an
- * already-fetched array is cheaper than issuing a second COUNT query for
- * the same thing loadAdminNavCounts()'s countPendingReview/
- * countPendingAdopters would otherwise duplicate. AdminNav's own counts are
- * therefore built BY HAND from these same numbers below rather than via a
- * second loadAdminNavCounts() call (every other admin page calls that
- * helper directly since it has no richer version of the same counts
- * already in hand; this page does).
+ * VISITORS DEGRADES INDEPENDENTLY: loadVisitorsAnalytics() never throws —
+ * missing token, missing account var, a Cloudflare outage, or a timeout all
+ * return null, which this page renders as "Visitor numbers are unavailable
+ * right now" while every other section renders normally (#680's "Done
+ * when"). It is NOT inside the same try/catch as the D1 reads below,
+ * deliberately: a Cloudflare hiccup must never fail the whole page closed.
  *
- * `venues`/`public_submissions`/`change_proposals` reads are allowed to
- * throw on failure (same "core admin data" convention every other admin
- * page's own main query follows); the two blessing-boxes-adjacent reads
- * (box photos/adopters queue, box health) degrade to empty/unknown on
- * failure instead — "one missing table must never break the whole
- * Dashboard," same posture src/lib/adminNavCounts.ts already established
- * for these exact two tables.
+ * BoxHealthEntry's `caretaker` field is read here ONLY for the (unrelated)
+ * needs-help count via rankNeedsHelp — this page never renders a
+ * caretaker/sponsor name itself, so it doesn't touch the field #671/#678 are
+ * renaming to `sponsors: string[]` in parallel.
  */
 
-import { headers } from "next/headers";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { summarizePublishChanges } from "@/lib/adminVenues";
-import { selectStalePlaces } from "@/lib/adminDashboard";
-import { loadBoxHealthEntries } from "@/lib/adminBoxes";
 import { rankNeedsHelp } from "@/lib/boxHealth";
-import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
-import { loadVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
+import { loadBoxHealthEntries } from "@/lib/adminBoxes";
+import { selectStalePlaces } from "@/lib/adminDashboard";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
 import { fetchPublishBotPrStatus, type PublishBotPrStatus } from "@/lib/publishVenues";
+import {
+  filterByPeriod,
+  filterByPreviousPeriod,
+  computeCheckinCounts,
+  computeNetworkPairAverages,
+  computeNetworkOverview,
+  computeMilestones,
+  formatDurationMs,
+  rankLongestSinceLastFill,
+  loadNetworkStatsData,
+  loadNetworkNeedRows,
+  rankNetworkMostNeeded,
+  loadProblemReports,
+  computeProblemReportCounts,
+  groupCheckinsByVenue,
+  periodStartMs,
+} from "@/lib/boxStats";
+import { loadVisitorsAnalytics, DASHBOARD_PERIODS, type DashboardPeriod } from "@/lib/cfAnalytics";
 import type { AdminNavCounts } from "@/lib/adminNavCounts";
 import type { AdminVenueRow } from "@/types/venue";
-import type { ClosurePayload, NewVenuePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
 import AdminNav from "@/components/AdminNav";
 import PublishPanel from "@/components/PublishPanel";
 import PublishBotStatusBanner from "@/components/PublishBotStatusBanner";
-import NeedsDecisionPanel from "@/components/NeedsDecisionPanel";
-import BoxHealthList from "@/components/BoxHealthList";
-import StalePlacesList from "@/components/StalePlacesList";
-import type { ReviewSubmission } from "@/components/SubmissionsReviewView";
+import DashboardNeedsStrip, { type NeedsCardData } from "@/components/DashboardNeedsStrip";
+import KpiCard from "@/components/KpiCard";
+import BarList from "@/components/BarList";
+import DailyBars from "@/components/DailyBars";
 
-/** How many rows the Dashboard shows per "Needs a decision" group before "+N more →" — task spec's own suggested cap. */
-const DECISION_PREVIEW_LIMIT = 3;
-/** How many rows the two right-column panels show before their own "see all" link. */
-const SIDE_PANEL_LIMIT = 4;
+const DEFAULT_PERIOD: DashboardPeriod = "30d";
+const PERIOD_LABELS: Record<DashboardPeriod, string> = { "7d": "7 days", "30d": "30 days", "90d": "90 days" };
+/** Community label per box_checkins.needs key (migration 0012) — same nine keys as the public "what would help you next time?" ask; kept here rather than importing a component-facing label map since only these lowercase keys need a Dashboard-facing display string. */
+const NEED_LABELS: Record<string, string> = {
+  canned_food: "Canned food",
+  fresh_food: "Fresh food",
+  bread: "Bread",
+  baby_items: "Baby items",
+  diapers: "Diapers",
+  hygiene: "Hygiene items",
+  pet_food: "Pet food",
+  drinks: "Drinks",
+  warm_clothing: "Warm clothing",
+};
 
-/**
- * Identical to submissions/page.tsx's own parseSubmissionRow — kept as a
- * separate local copy rather than a shared import, matching this app's
- * established convention of a small, page-local parser per admin page (that
- * page's own version is not exported). Degrades one malformed row to
- * `parseError: true` rather than throwing, same defensive shape used
- * everywhere this JSON column is read.
- */
-function parseSubmissionRow(row: PublicSubmissionRow): ReviewSubmission {
-  const base = {
-    id: row.id,
-    createdAt: row.created_at,
-    submitterEmail: row.submitter_email,
-    targetVenueId: row.target_venue_id,
-  };
-  try {
-    if (row.kind === "new_venue") {
-      return { ...base, kind: "new_venue", parseError: false, payload: JSON.parse(row.payload) as NewVenuePayload };
-    }
-    return { ...base, kind: "closure", parseError: false, payload: JSON.parse(row.payload) as ClosurePayload };
-  } catch {
-    return { ...base, kind: row.kind, parseError: true, payload: null };
-  }
+function parsePeriod(raw: string | undefined): DashboardPeriod {
+  return (DASHBOARD_PERIODS as readonly string[]).includes(raw ?? "") ? (raw as DashboardPeriod) : DEFAULT_PERIOD;
 }
 
-export default async function DashboardPage() {
+/** Google's own "good" LCP threshold — issue #680's "with Google's 2.5s 'good' line". */
+const LCP_GOOD_MS = 2500;
+
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  const { period: rawPeriod } = await searchParams;
+  const period: DashboardPeriod = parsePeriod(rawPeriod);
+  const now = new Date();
+
   let email: string;
   let venues: AdminVenueRow[];
-  let submissionRows: PublicSubmissionRow[];
   let submissionsTotal: number;
-  let proposals: ParsedProposal[];
   let proposalsTotal: number;
-  let proposalVenueLookup: Record<string, VenueLookup>;
   let photos: AdminBoxPhotoRow[];
   let adopters: AdminBoxAdopterRow[];
   let boxHealthEntries: Awaited<ReturnType<typeof loadBoxHealthEntries>>;
   let publishBotStatus: PublishBotPrStatus | null;
+  let networkStats: Awaited<ReturnType<typeof loadNetworkStatsData>>;
+  let needRows: Awaited<ReturnType<typeof loadNetworkNeedRows>>;
+  let problemReportRows: Awaited<ReturnType<typeof loadProblemReports>>;
+  let latestRefresh: { runId: string; createdAt: string; suggestedCount: number } | null;
 
   try {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
 
-    // #598: reads the SAME open publish-bot PR commitPublishedVenues()
-    // (publishVenues.ts) opens — deliberately gated behind getAdminDb()
-    // resolving first (this whole call sits inside the try below, after the
-    // auth line above), so an unauthenticated hit can never trigger a
-    // GitHub call. `GITHUB_PUBLISH_TOKEN` is absent on staging (this file's
-    // own header/AGENTS.md) — skipped entirely rather than fetched with an
-    // empty token, and `.catch(() => null)` matches every other best-effort
-    // Dashboard read above (one GitHub hiccup must never break the page).
     const publishToken = process.env.GITHUB_PUBLISH_TOKEN;
+    const periodStart = periodStartMs(period, now);
+    const cutoffIso = periodStart === null ? new Date(0).toISOString() : new Date(periodStart).toISOString();
 
     const [
       venuesResult,
-      submissionsPreviewResult,
       submissionsTotalRow,
-      proposalsPreviewResult,
       proposalsTotalRow,
       photosAll,
       adoptersAll,
       boxHealth,
       publishBotStatusResult,
+      networkStatsResult,
+      needRowsResult,
+      problemReportsResult,
+      latestRefreshRow,
     ] = await Promise.all([
       db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
-      db
-        .prepare("SELECT * FROM public_submissions WHERE status = 'pending' ORDER BY created_at DESC LIMIT ?")
-        .bind(DECISION_PREVIEW_LIMIT)
-        .all<PublicSubmissionRow>(),
       db.prepare("SELECT COUNT(*) AS n FROM public_submissions WHERE status = 'pending'").first<{ n: number }>(),
-      db
-        .prepare("SELECT * FROM change_proposals WHERE status = 'pending' ORDER BY created_at DESC LIMIT ?")
-        .bind(DECISION_PREVIEW_LIMIT)
-        .all<ChangeProposalRow>(),
       db.prepare("SELECT COUNT(*) AS n FROM change_proposals WHERE status = 'pending'").first<{ n: number }>(),
       loadReviewQueue(db).catch(() => [] as AdminBoxPhotoRow[]),
       loadPendingAdopters(db).catch(() => [] as AdminBoxAdopterRow[]),
       loadBoxHealthEntries(db).catch(() => [] as Awaited<ReturnType<typeof loadBoxHealthEntries>>),
       publishToken ? fetchPublishBotPrStatus(publishToken).catch(() => null) : Promise.resolve(null),
+      loadNetworkStatsData(db).catch(() => ({ boxes: [], checkins: [], photos: [], approvedSponsorCount: 0 })),
+      loadNetworkNeedRows(db, cutoffIso),
+      loadProblemReports(db),
+      db.prepare("SELECT run_id, created_at FROM change_proposals ORDER BY created_at DESC LIMIT 1").first<{
+        run_id: string;
+        created_at: string;
+      }>(),
     ]);
 
     venues = venuesResult.results;
-    submissionRows = submissionsPreviewResult.results;
     submissionsTotal = submissionsTotalRow?.n ?? 0;
-    proposals = proposalsPreviewResult.results.map(parseProposalRow);
     proposalsTotal = proposalsTotalRow?.n ?? 0;
-    proposalVenueLookup = await loadVenueLookup(
-      db,
-      proposals.map((p) => p.row.target_venue_id),
-    );
     photos = photosAll;
     adopters = adoptersAll;
     boxHealthEntries = boxHealth;
     publishBotStatus = publishBotStatusResult;
+    networkStats = networkStatsResult;
+    needRows = needRowsResult;
+    problemReportRows = problemReportsResult;
+
+    // `latestRefreshRow?.run_id` (not just `latestRefreshRow`) — a lenient
+    // test fake or a D1 shape mismatch could hand back a truthy row with no
+    // real column data, which must read as "no refresh yet," never as an
+    // Invalid Date.
+    if (latestRefreshRow?.run_id) {
+      const suggestedRow = await db
+        .prepare("SELECT COUNT(*) AS n FROM change_proposals WHERE run_id = ?")
+        .bind(latestRefreshRow.run_id)
+        .first<{ n: number }>();
+      latestRefresh = {
+        runId: latestRefreshRow.run_id,
+        createdAt: latestRefreshRow.created_at,
+        suggestedCount: suggestedRow?.n ?? 0,
+      };
+    } else {
+      latestRefresh = null;
+    }
   } catch (err) {
     handlePageAuthError(err);
   }
+
+  // Cloudflare degrades independently of every D1 read above — see this
+  // file's own header for why this call sits outside the try/catch.
+  const visitors = await loadVisitorsAnalytics(period, now);
 
   const navCounts: AdminNavCounts = {
     submissions: submissionsTotal,
@@ -176,17 +200,66 @@ export default async function DashboardPage() {
 
   const publishSummary = summarizePublishChanges(venues);
   const showPublishBar = publishSummary.newDrafts > 0 || publishSummary.editedSincePublish > 0 || publishSummary.archived > 0;
+  const waitingToPublishCount = publishSummary.newDrafts + publishSummary.editedSincePublish + publishSummary.archived;
 
-  const stalePlaces = selectStalePlaces(venues, new Date(), { limit: SIDE_PANEL_LIMIT });
-  const needsHelpBoxes = rankNeedsHelp(boxHealthEntries, SIDE_PANEL_LIMIT);
+  const needsHelpBoxes = rankNeedsHelp(boxHealthEntries); // unlimited — same predicate #671's own "Needs help" filter will use
+
+  // ─── "Needs you" strip (#680 Layout item 2) ────────────────────────────
+  // Cards 1 and 3 are TEMPORARY combined-count fallbacks until #674/#675
+  // and #677 land — see this file's own header.
+  const needsCards: NeedsCardData[] = [
+    {
+      key: "review",
+      label: "Places to review",
+      count: submissionsTotal + proposalsTotal,
+      href: "/admin/submissions",
+      detail: `${submissionsTotal} review queue, ${proposalsTotal} data refresh`,
+    },
+    {
+      key: "publish",
+      label: "Waiting to publish",
+      count: waitingToPublishCount,
+      href: "/admin/places",
+    },
+    {
+      key: "box-content",
+      label: "Box photos & sponsor requests",
+      count: photos.length + adopters.length,
+      href: "/admin/box-photos",
+      detail: `${photos.length} photos, ${adopters.length} sponsor requests`,
+    },
+    {
+      key: "box-help",
+      label: "Boxes empty or low",
+      count: needsHelpBoxes.length,
+      href: "/admin/boxes",
+    },
+  ];
+
+  // ─── Blessing boxes (reuses boxStats.ts — same math as the public Boxes page) ──
+  const periodCheckins = filterByPeriod(networkStats.checkins, period, now);
+  const previousCheckins = filterByPreviousPeriod(networkStats.checkins, period, now);
+  const counts = computeCheckinCounts(periodCheckins);
+  const previousCounts = computeCheckinCounts(previousCheckins);
+  const checkinsByVenue = groupCheckinsByVenue(networkStats.checkins);
+  const networkAverages = computeNetworkPairAverages(checkinsByVenue);
+  const networkOverview = computeNetworkOverview(networkStats.boxes.length, networkStats.approvedSponsorCount ?? 0);
+  const boxesForRanking = networkStats.boxes.map((b) => ({ id: b.id, name: b.name, archived: b.archived, checkins: checkinsByVenue.get(b.id) ?? [] }));
+  const longestSinceFill = rankLongestSinceLastFill(boxesForRanking, 4);
+  const periodPhotos = filterByPeriod(networkStats.photos, period, now);
+  const milestones = computeMilestones({ fills: counts.fills, uses: counts.uses });
+  const mostNeeded = rankNetworkMostNeeded(needRows, 4);
+
+  // ─── Map data health ────────────────────────────────────────────────────
+  const publishedVenues = venues.filter((v) => v.status === "published");
+  const newPlacesThisPeriod = filterByPeriod(publishedVenues, period, now).length;
+  const staleThreeMonths = selectStalePlaces(venues, now, { months: 3 });
+  const problemCounts = computeProblemReportCounts(problemReportRows, period, now);
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={email} active="dashboard" counts={navCounts} />
-      <div className="px-4 py-6 sm:px-6">
-        {/* #598: independent of showPublishBar — after a publish, D1 is
-            already promoted (the Publish bar's own summary drops to zero),
-            exactly when this banner needs to show instead. */}
+      <div className="flex flex-col gap-6 px-4 py-6 sm:px-6">
         {publishBotStatus && (
           <PublishBotStatusBanner
             prNumber={publishBotStatus.number}
@@ -196,44 +269,156 @@ export default async function DashboardPage() {
         )}
         {showPublishBar && <PublishPanel summary={publishSummary} reviewHref="/admin/places" />}
 
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-          <div className="min-w-0 flex-1">
-            <NeedsDecisionPanel
-              submissions={submissionRows.map(parseSubmissionRow)}
-              submissionsTotal={submissionsTotal}
-              proposals={proposals}
-              proposalsTotal={proposalsTotal}
-              venueLookup={proposalVenueLookup}
-              photos={photos.slice(0, DECISION_PREVIEW_LIMIT)}
-              photosTotal={photos.length}
-              adopters={adopters.slice(0, DECISION_PREVIEW_LIMIT)}
-              adoptersTotal={adopters.length}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="wordmark text-xl text-[var(--color-ink-900)]">Hi {email.split("@")[0]}</h1>
+          <nav aria-label="Time period" className="flex gap-1 rounded-[var(--radius-md)] border border-[var(--color-bone-200)] bg-white p-1">
+            {DASHBOARD_PERIODS.map((p) => (
+              <Link
+                key={p}
+                href={`/admin?period=${p}`}
+                aria-current={p === period ? "page" : undefined}
+                className={`min-h-11 rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+                  p === period
+                    ? "bg-[var(--color-sage-600)] text-[var(--color-bone-50)]"
+                    : "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)]"
+                }`}
+              >
+                {PERIOD_LABELS[p]}
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        <section aria-label="Needs you">
+          <DashboardNeedsStrip cards={needsCards} />
+        </section>
+
+        <section aria-labelledby="visitors-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
+          <h2 id="visitors-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+            Visitors
+          </h2>
+          {visitors ? (
+            <div className="mt-3 flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <KpiCard label="Visitors" displayValue={String(visitors.visits)} value={visitors.visits} previousValue={visitors.previousVisits} approximate />
+                <KpiCard label="Page views" displayValue={String(visitors.pageviews)} value={visitors.pageviews} previousValue={visitors.previousPageviews} approximate />
+                <KpiCard
+                  label="On a phone"
+                  displayValue={visitors.phoneSharePct === null ? "—" : `${visitors.phoneSharePct}%`}
+                  value={visitors.phoneSharePct ?? 0}
+                  approximate
+                />
+                <KpiCard
+                  label="Phone page load"
+                  displayValue={visitors.phoneLcpMs === null ? "—" : `${(visitors.phoneLcpMs / 1000).toFixed(1)}s`}
+                  value={visitors.phoneLcpMs ?? 0}
+                  approximate
+                />
+              </div>
+              {visitors.phoneLcpMs !== null && (
+                <p className="text-xs text-[var(--color-ink-500)]">
+                  Google calls anything under {(LCP_GOOD_MS / 1000).toFixed(1)}s &quot;good&quot; —{" "}
+                  {visitors.phoneLcpMs <= LCP_GOOD_MS ? "we're in that range." : "we're slower than that right now."}
+                </p>
+              )}
+              <div>
+                <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Visitors per day</h3>
+                <DailyBars points={visitors.dailyVisitors.map((d) => ({ date: d.date, value: d.visits }))} emptyMessage="No visitor data yet for this period." />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-[var(--color-ink-700)]">How people found the site</h3>
+                <BarList
+                  items={visitors.referrers.map((r) => ({ label: r.label, value: r.visits, displayValue: `${r.visits} visits` }))}
+                  emptyMessage="No referrer data yet for this period."
+                />
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-[var(--color-ink-500)]">Visitor numbers are unavailable right now.</p>
+          )}
+        </section>
+
+        <section aria-labelledby="boxes-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
+          <h2 id="boxes-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+            Blessing boxes
+          </h2>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <KpiCard label="Times filled" displayValue={String(counts.fills)} value={counts.fills} previousValue={previousCounts.fills} />
+            <KpiCard label="Times used" displayValue={String(counts.uses)} value={counts.uses} previousValue={previousCounts.uses} />
+            <KpiCard label="Reported empty" displayValue={String(counts.emptyReports)} value={counts.emptyReports} previousValue={previousCounts.emptyReports} />
+            <KpiCard
+              label="Avg. empty → refilled"
+              displayValue={networkAverages.emptyToFillMs === null ? "—" : formatDuration(networkAverages.emptyToFillMs)}
+              value={networkAverages.emptyToFillMs ?? 0}
             />
           </div>
-
-          <div className="flex w-full flex-col gap-4 lg:w-[320px] lg:flex-none">
-            <section className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
-              <h2 className="wordmark text-base text-[var(--color-ink-900)]">Boxes that need help</h2>
-              <div className="mt-2">
-                <BoxHealthList entries={needsHelpBoxes} variant="needs-help" emptyMessage="Every box is doing fine." />
-              </div>
-              <Link
-                href="/admin/boxes"
-                className="mt-3 inline-block text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
-              >
-                All boxes →
-              </Link>
-            </section>
-
-            <section className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
-              <h2 className="wordmark text-base text-[var(--color-ink-900)]">Places due for a check</h2>
-              <div className="mt-2">
-                <StalePlacesList items={stalePlaces.items} totalCount={stalePlaces.totalCount} />
-              </div>
-            </section>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <KpiCard label="Boxes in service" displayValue={String(networkOverview.boxCount)} value={networkOverview.boxCount} />
+            <KpiCard label="With a sponsor" displayValue={`${networkOverview.avgSponsorsPerBox} avg`} value={networkStats.approvedSponsorCount ?? 0} />
+            <KpiCard label="Photos shared" displayValue={String(periodPhotos.length)} value={periodPhotos.length} />
+            <KpiCard label="Getting empty-box emails" displayValue={String(adopters.length)} value={adopters.length} />
           </div>
-        </div>
+          {milestones.length > 0 && (
+            <p className="mt-3 text-sm text-[var(--color-ink-700)]">
+              {milestones.map((m) => (m.metric === "fills" ? `Pueblo has filled its boxes ${m.threshold} times. ` : `Pueblo has used its boxes ${m.threshold} times. `))}
+            </p>
+          )}
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Longest since last filled</h3>
+              <BarList
+                items={longestSinceFill.map((b) => ({
+                  label: b.name,
+                  value: b.lastFilledAt ? now.getTime() - new Date(b.lastFilledAt).getTime() : now.getTime(),
+                  displayValue: b.lastFilledAt ? formatDuration(now.getTime() - new Date(b.lastFilledAt).getTime()) : "never",
+                }))}
+                emptyMessage="No boxes yet."
+              />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Most-needed items</h3>
+              <BarList
+                items={mostNeeded.map((n) => ({ label: NEED_LABELS[n.key] ?? n.key, value: n.count, displayValue: `${n.count} asks` }))}
+                emptyMessage="Not enough check-ins yet to say."
+              />
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="map-health-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
+          <h2 id="map-health-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+            Map data health
+          </h2>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <KpiCard label="Places on the map" displayValue={String(publishedVenues.length)} value={publishedVenues.length} previousValue={publishedVenues.length - newPlacesThisPeriod} />
+            <KpiCard label="New this period" displayValue={String(newPlacesThisPeriod)} value={newPlacesThisPeriod} />
+            <KpiCard label="Not checked in 90+ days" displayValue={String(staleThreeMonths.totalCount)} value={staleThreeMonths.totalCount} />
+            <KpiCard label="Problem reports (open / fixed)" displayValue={`${problemCounts.open} / ${problemCounts.fixed}`} value={problemCounts.open} />
+          </div>
+          <p className="mt-3 text-sm text-[var(--color-ink-500)]">
+            {latestRefresh ? (
+              <>
+                Last data refresh {new Date(latestRefresh.createdAt).toLocaleDateString()} — {latestRefresh.suggestedCount} suggested changes.{" "}
+                <Link href="/admin/flags" className="font-medium text-[var(--color-sage-700)] underline underline-offset-2">
+                  Review →
+                </Link>
+              </>
+            ) : (
+              "No automated data refresh has run yet."
+            )}
+          </p>
+          {staleThreeMonths.totalCount > 0 && (
+            <Link href="/admin/places" className="mt-1 inline-block text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2">
+              See places due for a check →
+            </Link>
+          )}
+        </section>
       </div>
     </main>
   );
+}
+
+function formatDuration(ms: number): string {
+  const { value, unit } = formatDurationMs(ms);
+  return `${value} ${unit}`;
 }

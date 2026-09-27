@@ -20,9 +20,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { BoxHealthEntry, BoxHealthStatus } from "@/lib/boxHealth";
+import type { BoxReviewSummary } from "@/lib/adminBoxes";
 
 export interface AllBoxesTableProps {
   entries: BoxHealthEntry[];
+  /** #677: this venue's pending photo/sponsor-request summary, keyed by venueId — grouped once by adminBoxes.ts's groupBoxReviewItems() from the tab's own already-fetched review queues. Optional/undefined is the same as "nothing to review anywhere" (no venue has an entry). */
+  reviewByVenueId?: Record<string, BoxReviewSummary>;
+  /** #677: `?show=review` pre-selects the "To review" chip — set server-side from the URL (src/app/admin/boxes/page.tsx), never parsed client-side. Same convention as VenueListView's own initialShowReview (#674). */
+  initialShowReview?: boolean;
 }
 
 // Same label/color pairing as BoxHealthList.tsx's STATUS_META, as a badge
@@ -35,7 +40,11 @@ const STATUS_BADGE: Record<BoxHealthStatus, { label: string; className: string }
   quiet: { label: "Quiet", className: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]" },
 };
 
-type StatusFilter = "all" | "needs-help" | BoxHealthStatus;
+// "review" is cross-cutting (a box can be "review" AND "ok" at once — a
+// review item says nothing about box health) — same reasoning "needs-help"
+// already established as its own filter value alongside the real
+// BoxHealthStatus values.
+type StatusFilter = "all" | "needs-help" | "review" | BoxHealthStatus;
 type SponsorFilter = "any" | "has" | "needs";
 type SortKey = "attention" | "oldest" | "newest" | "name";
 
@@ -46,6 +55,7 @@ const ATTENTION_PRIORITY: Record<BoxHealthStatus, number> = { empty: 0, problem:
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
+  { key: "review", label: "To review" },
   { key: "needs-help", label: "Needs help" },
   { key: "empty", label: "Empty" },
   { key: "problem", label: "Problem" },
@@ -97,15 +107,28 @@ function compareDaysAsc(a: number | null, b: number | null): number {
   return a - b;
 }
 
-function sortEntries(entries: BoxHealthEntry[], sort: SortKey): BoxHealthEntry[] {
+function sortEntries(
+  entries: BoxHealthEntry[],
+  sort: SortKey,
+  reviewByVenueId: Record<string, BoxReviewSummary>,
+): BoxHealthEntry[] {
   const sorted = [...entries];
   switch (sort) {
     case "attention":
-      return sorted.sort(
-        (a, b) =>
+      // #677: a box with something to review sorts first, ahead of even an
+      // "empty"/"problem" health status — a review item is admin-actionable
+      // right now, where a health status might just mean "wait for the next
+      // report." Ties within the review tier (and the no-review tier) fall
+      // through to the existing health-status/staleness ordering unchanged.
+      return sorted.sort((a, b) => {
+        const aReview = reviewByVenueId[a.venueId] ? 0 : 1;
+        const bReview = reviewByVenueId[b.venueId] ? 0 : 1;
+        return (
+          aReview - bReview ||
           ATTENTION_PRIORITY[a.health.status] - ATTENTION_PRIORITY[b.health.status] ||
-          compareDaysDesc(a.health.daysSinceLastReport, b.health.daysSinceLastReport),
-      );
+          compareDaysDesc(a.health.daysSinceLastReport, b.health.daysSinceLastReport)
+        );
+      });
     case "oldest":
       return sorted.sort((a, b) => compareDaysDesc(a.health.daysSinceLastReport, b.health.daysSinceLastReport));
     case "newest":
@@ -115,8 +138,13 @@ function sortEntries(entries: BoxHealthEntry[], sort: SortKey): BoxHealthEntry[]
   }
 }
 
-function matchesStatus(entry: BoxHealthEntry, filter: StatusFilter): boolean {
+function matchesStatus(
+  entry: BoxHealthEntry,
+  filter: StatusFilter,
+  reviewByVenueId: Record<string, BoxReviewSummary>,
+): boolean {
   if (filter === "all") return true;
+  if (filter === "review") return reviewByVenueId[entry.venueId] !== undefined;
   if (filter === "needs-help") return NEEDS_HELP_STATUSES.has(entry.health.status);
   return entry.health.status === filter;
 }
@@ -132,6 +160,40 @@ function matchesSearch(entry: BoxHealthEntry, query: string): boolean {
   return haystack.includes(query);
 }
 
+/**
+ * The "To review" column cell (#677): a small thumbnail + "New photo"
+ * (pending) or "Photo reported (N×)" (flagged), and/or "Sponsor request" +
+ * the applicant's public name — the two lines stack when a venue has both.
+ * Blank (no badge, no "—") when there's nothing to review, same "empty
+ * means nothing" convention this table's other cells don't bother marking
+ * explicitly either.
+ */
+function ReviewCell({ summary }: { summary: BoxReviewSummary | undefined }) {
+  if (!summary) return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      {summary.photo && (
+        <div className="flex items-center gap-1.5">
+          {/* eslint-disable-next-line @next/next/no-img-element -- admin-only preview of a runtime R2 object, same reasoning PhotoReviewCard.tsx's own header gives */}
+          <img
+            src={`/api/admin/box-photos/${summary.photo.id}/preview`}
+            alt=""
+            className="h-8 w-8 flex-none rounded object-cover border border-[var(--color-bone-200)]"
+          />
+          <span className="text-xs font-medium text-[var(--color-ink-700)]">
+            {summary.photo.status === "flagged" ? `Photo reported (${summary.photo.flagCount}×)` : "New photo"}
+          </span>
+        </div>
+      )}
+      {summary.sponsorRequest && (
+        <p className="text-xs text-[var(--color-ink-700)]">
+          <span className="font-medium">Sponsor request</span> — {summary.sponsorRequest.displayName}
+        </p>
+      )}
+    </div>
+  );
+}
+
 const filterButtonClass =
   "min-h-12 rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
@@ -140,25 +202,28 @@ const filterButtonActive = "border-[var(--color-sage-500)] bg-[var(--color-sage-
 const filterButtonInactive =
   "border-[var(--color-bone-300)] bg-white text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]";
 
-export default function AllBoxesTable({ entries }: AllBoxesTableProps) {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+export default function AllBoxesTable({ entries, reviewByVenueId = {}, initialShowReview = false }: AllBoxesTableProps) {
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialShowReview ? "review" : "all");
   const [sponsorFilter, setSponsorFilter] = useState<SponsorFilter>("any");
   const [sort, setSort] = useState<SortKey>("attention");
   const [search, setSearch] = useState("");
 
   const statusCounts = useMemo(() => {
     const counts = new Map<StatusFilter, number>();
-    for (const filter of STATUS_FILTERS) counts.set(filter.key, entries.filter((e) => matchesStatus(e, filter.key)).length);
+    for (const filter of STATUS_FILTERS) {
+      counts.set(filter.key, entries.filter((e) => matchesStatus(e, filter.key, reviewByVenueId)).length);
+    }
     return counts;
-  }, [entries]);
+  }, [entries, reviewByVenueId]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     const matched = entries.filter(
-      (e) => matchesStatus(e, statusFilter) && matchesSponsor(e, sponsorFilter) && matchesSearch(e, query),
+      (e) =>
+        matchesStatus(e, statusFilter, reviewByVenueId) && matchesSponsor(e, sponsorFilter) && matchesSearch(e, query),
     );
-    return sortEntries(matched, sort);
-  }, [entries, statusFilter, sponsorFilter, search, sort]);
+    return sortEntries(matched, sort, reviewByVenueId);
+  }, [entries, statusFilter, sponsorFilter, search, sort, reviewByVenueId]);
 
   if (entries.length === 0) {
     return (
@@ -262,18 +327,22 @@ export default function AllBoxesTable({ entries }: AllBoxesTableProps) {
               <th scope="col" className="px-4 py-3 font-medium">
                 Sponsor
               </th>
+              <th scope="col" className="px-4 py-3 font-medium">
+                To review
+              </th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-sm text-[var(--color-ink-500)]">
+                <td colSpan={5} className="px-4 py-10 text-center text-sm text-[var(--color-ink-500)]">
                   No boxes match these filters.
                 </td>
               </tr>
             ) : (
               filtered.map((entry) => {
                 const badge = STATUS_BADGE[entry.health.status];
+                const review = reviewByVenueId[entry.venueId];
                 return (
                   <tr key={entry.venueId} className="border-b border-[var(--color-bone-100)] last:border-b-0">
                     <td className="px-4 py-3">
@@ -298,6 +367,9 @@ export default function AllBoxesTable({ entries }: AllBoxesTableProps) {
                     </td>
                     <td className="px-4 py-3 text-[var(--color-ink-700)]">{formatLastReport(entry)}</td>
                     <td className="px-4 py-3 text-[var(--color-ink-700)]">{formatSponsors(entry.sponsors)}</td>
+                    <td className="px-4 py-3">
+                      <ReviewCell summary={review} />
+                    </td>
                   </tr>
                 );
               })

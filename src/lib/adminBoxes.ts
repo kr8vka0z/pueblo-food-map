@@ -15,7 +15,8 @@
  */
 
 import { loadLatestCheckinPerBox } from "@/lib/blessingBoxes";
-import { loadApprovedAdopterNamesForVenues } from "@/lib/boxAdopters";
+import { loadApprovedAdopterNamesForVenues, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
+import type { AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { computeBoxHealth, type BoxHealthCheckin, type BoxHealthEntry } from "@/lib/boxHealth";
 
 interface BoxVenueRow {
@@ -82,4 +83,56 @@ export async function loadBoxHealthEntries(db: D1Database, now: Date = new Date(
       removedOn: venue.removed_on,
     };
   });
+}
+
+// ─── #677: "To review" grouping for the /admin/boxes tab ───────────────────
+// The tab's own summary box, chip, column and default sort all need "which
+// venues have something pending, and what" — grouped ONCE here (by the page
+// that already calls loadReviewQueue()/loadPendingAdopters() for the
+// summary counts) rather than each consumer re-deriving its own Map, same
+// "one loader, one shape" reasoning loadBoxHealthEntries's own header gives
+// for the box-health assembly above.
+
+/** One venue's review-column contents — at most one photo and one sponsor request shown per venue (a box with several pending photos is rare at Pueblo's real volume; the edit page's own "Things to review" box is where every item, not just one, is listed and resolved). */
+export interface BoxReviewSummary {
+  photo?: { id: number; status: "pending" | "flagged"; flagCount: number };
+  sponsorRequest?: { displayName: string };
+}
+
+/**
+ * Groups the tab's own already-fetched review queues by venue id. A
+ * FLAGGED photo wins over a merely-pending one when a venue somehow has
+ * both (rare) — a visitor's report is the more urgent of the two to
+ * surface in one glance. Both input arrays come pre-sorted newest-first
+ * (loadReviewQueue/loadPendingAdopters' own ORDER BY), so "first match per
+ * venue" is also "most recent."
+ *
+ * ponytail: only the FIRST matching photo/adopter per venue is kept for
+ * this column's single-item summary — a box with a second, third, etc.
+ * pending item just doesn't show it here. Ceiling: fine at Pueblo's real
+ * volume (a handful of boxes, rarely more than one open item each); the
+ * edit page's BoxReviewBox.tsx is the un-capped list if that ever changes.
+ */
+export function groupBoxReviewItems(
+  photos: AdminBoxPhotoRow[],
+  adopters: AdminBoxAdopterRow[],
+): Record<string, BoxReviewSummary> {
+  const byVenue: Record<string, BoxReviewSummary> = {};
+
+  for (const photo of photos) {
+    const existing = byVenue[photo.venue_id];
+    if (existing?.photo && existing.photo.status === "flagged") continue; // already have the more urgent kind
+    byVenue[photo.venue_id] = {
+      ...existing,
+      photo: { id: photo.id, status: photo.status === "flagged" ? "flagged" : "pending", flagCount: photo.flag_count },
+    };
+  }
+
+  for (const adopter of adopters) {
+    const existing = byVenue[adopter.venue_id];
+    if (existing?.sponsorRequest) continue;
+    byVenue[adopter.venue_id] = { ...existing, sponsorRequest: { displayName: adopter.display_name } };
+  }
+
+  return byVenue;
 }

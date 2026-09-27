@@ -19,25 +19,35 @@
  * Reuses src/lib/adminBoxes.ts's loadBoxHealthEntries() — the SAME loader
  * (and therefore the same box set + status math, via boxHealth.ts's
  * computeBoxHealth) the Dashboard's "Boxes that need help" panel already
- * uses, so the two screens can never disagree about a box's status. The
- * chips strip's two counts reuse loadReviewQueue/loadPendingAdopters'
- * FULL pending arrays (same loaders /admin/box-photos and
- * /admin/box-adopters already call) purely for their `.length` — no extra
- * COUNT query, same reasoning the Dashboard's own navCounts construction
- * gives.
+ * uses, so the two screens can never disagree about a box's status.
+ * loadReviewQueue/loadPendingAdopters' FULL pending arrays (same loaders
+ * /admin/box-photos and /admin/box-adopters already call) feed BOTH the
+ * "To review" summary box's X/Y/Z counts (their own `.length`s, no extra
+ * COUNT query — same reasoning the Dashboard's own navCounts construction
+ * gives) AND, via adminBoxes.ts's groupBoxReviewItems(), AllBoxesTable's own
+ * "To review" column/chip/sort (#677).
+ *
+ * `?show=review` (same convention #674 established for /admin/places) pre-
+ * selects the table's "To review" chip. AllBoxesTable's `initialShowReview`
+ * prop only seeds its OWN internal `useState` on first mount — clicking
+ * BoxesToReviewBox's "Show them" link navigates to this SAME route with a
+ * new query, and React would otherwise keep the already-mounted
+ * AllBoxesTable instance (and its stale filter state) rather than re-run
+ * that initializer. The `key` below forces a remount exactly when `show`
+ * flips, so "Show them" actually shows them.
  */
 
 import { headers } from "next/headers";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
-import { loadBoxHealthEntries } from "@/lib/adminBoxes";
+import { loadBoxHealthEntries, groupBoxReviewItems } from "@/lib/adminBoxes";
 import { bucketCheckinsByWeek } from "@/lib/adminDashboard";
 import { loadRecentCheckinsAllBoxes } from "@/lib/blessingBoxes";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
 import { loadAdminNavCounts, type AdminNavCounts } from "@/lib/adminNavCounts";
 import AdminNav from "@/components/AdminNav";
-import BoxesWaitingChips from "@/components/BoxesWaitingChips";
+import BoxesToReviewBox from "@/components/BoxesToReviewBox";
 import BoxReportsChart from "@/components/BoxReportsChart";
 import AllBoxesTable from "@/components/AllBoxesTable";
 
@@ -45,7 +55,11 @@ import AllBoxesTable from "@/components/AllBoxesTable";
 const CHART_WEEKS = 8;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-export default async function BoxesPage() {
+export default async function BoxesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ show?: string }>;
+} = {}) {
   let email: string;
   let boxHealthEntries: Awaited<ReturnType<typeof loadBoxHealthEntries>>;
   let recentCheckins: Awaited<ReturnType<typeof loadRecentCheckinsAllBoxes>>;
@@ -85,11 +99,22 @@ export default async function BoxesPage() {
     CHART_WEEKS,
   );
 
+  const reviewByVenueId = groupBoxReviewItems(photos, adopters);
+  const reviewingBoxCount = Object.keys(reviewByVenueId).length;
+  const flaggedPhotosCount = photos.filter((p) => p.status === "flagged").length;
+  const { show } = searchParams ? await searchParams : {};
+  const showReview = show === "review";
+
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={email} active="boxes" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6">
-        <BoxesWaitingChips photosCount={photos.length} adoptersCount={adopters.length} />
+        <BoxesToReviewBox
+          reviewingBoxCount={reviewingBoxCount}
+          photosCount={photos.length}
+          flaggedPhotosCount={flaggedPhotosCount}
+          sponsorRequestsCount={adopters.length}
+        />
 
         <h2 className="wordmark mb-4 text-lg text-[var(--color-ink-900)]">Blessing boxes — {inServiceCount} in service</h2>
 
@@ -102,7 +127,13 @@ export default async function BoxesPage() {
 
         <section>
           <h2 className="wordmark mb-3 text-lg text-[var(--color-ink-900)]">All boxes</h2>
-          <AllBoxesTable entries={boxHealthEntries} />
+          {/* key forces a remount on `?show=review` — see this file's own header. */}
+          <AllBoxesTable
+            key={showReview ? "review" : "all"}
+            entries={boxHealthEntries}
+            reviewByVenueId={reviewByVenueId}
+            initialShowReview={showReview}
+          />
         </section>
       </div>
     </main>

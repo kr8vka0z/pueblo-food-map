@@ -76,6 +76,14 @@
  * resolveClosureReportContext()/resolveLinkHealthProposalContext() above —
  * a D1 read failure here must never take down the whole edit page.
  *
+ * #677: for the same `blessing_box` check, resolveBoxReviewItems() loads
+ * this box's own pending/flagged photos and pending sponsor requests, shown
+ * right under the title in BoxReviewBox.tsx's "Things to review" box — the
+ * on-page home for what used to live only on the now-folded-away
+ * /admin/box-photos and /admin/box-adopters tabs. See that resolver's own
+ * header for why this reuses the tab's existing loaders rather than a new
+ * query.
+ *
  * #673 pt.3: resolveWaitingToPublishChanges() renders the "Waiting to
  * publish" box (WaitingToPublishBox.tsx) right under the page title for a
  * place displayStatusOf() (src/lib/adminVenues.ts) reads as
@@ -106,11 +114,14 @@ import BoxCheckinsAdminPanel from "@/components/BoxCheckinsAdminPanel";
 import HostAlertsAdminPanel from "@/components/HostAlertsAdminPanel";
 import WaitingToPublishBox, { type WaitingToPublishChange } from "@/components/WaitingToPublishBox";
 import SuggestionsBox from "@/components/SuggestionsBox";
+import BoxReviewBox from "@/components/BoxReviewBox";
 import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
 import { loadAllCheckinsForBox, type AdminCheckinRow } from "@/lib/blessingBoxes";
 import { loadHostSubscriptions } from "@/lib/boxAlerts";
+import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
+import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
 import { loadVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
 import {
   displayStatusOf,
@@ -242,6 +253,34 @@ async function resolveHostAlerts(db: D1Database, venueId: string): Promise<{ id:
 }
 
 /**
+ * #677: this box's own pending/flagged photos and pending sponsor requests,
+ * for the "Things to review" box (BoxReviewBox.tsx). Reuses the SAME
+ * loaders the /admin/boxes tab's summary and column read
+ * (loadReviewQueue/loadPendingAdopters), filtered client-side to this one
+ * venue — no new SQL, same "ponytail" reasoning as adminBoxes.ts's own
+ * D1_MAX_BOUND_PARAMS note: this app's real box/queue volume never
+ * approaches the size where "filter the full queue in memory" would cost
+ * anything over a dedicated WHERE clause, so a second dedicated query isn't
+ * worth adding. Same degrade-to-empty shape as this file's other optional
+ * resolvers — a D1 failure here must never take down the rest of the edit
+ * page.
+ */
+async function resolveBoxReviewItems(
+  db: D1Database,
+  venueId: string,
+): Promise<{ photos: AdminBoxPhotoRow[]; adopters: AdminBoxAdopterRow[] }> {
+  try {
+    const [allPhotos, allAdopters] = await Promise.all([loadReviewQueue(db), loadPendingAdopters(db)]);
+    return {
+      photos: allPhotos.filter((p) => p.venue_id === venueId),
+      adopters: allAdopters.filter((a) => a.venue_id === venueId),
+    };
+  } catch {
+    return { photos: [], adopters: [] };
+  }
+}
+
+/**
  * #674: every PENDING `change_proposals` row targeting this venue, newest
  * first — the SuggestionsBox at the top of this page. Same degrade-to-empty
  * shape as this file's other optional resolvers (resolveBoxCheckins,
@@ -331,6 +370,8 @@ export default async function EditVenuePage({
   let linkHealthContext: LinkHealthProposalContext | null = null;
   let boxCheckins: AdminCheckinRow[] = [];
   let hostAlerts: { id: number; email: string }[] = [];
+  let boxReviewPhotos: AdminBoxPhotoRow[] = [];
+  let boxReviewAdopters: AdminBoxAdopterRow[] = [];
   let waitingToPublish: WaitingToPublishChange[] = [];
   let pendingProposals: ParsedProposal[] = [];
   let suggestionsVenue: VenueLookup | null = null;
@@ -347,6 +388,9 @@ export default async function EditVenuePage({
       if (venue.category === "blessing_box") {
         boxCheckins = await resolveBoxCheckins(db, id);
         hostAlerts = await resolveHostAlerts(db, id);
+        const reviewItems = await resolveBoxReviewItems(db, id);
+        boxReviewPhotos = reviewItems.photos;
+        boxReviewAdopters = reviewItems.adopters;
       }
       // #674: "Suggestions to review" box — every pending change_proposals
       // row targeting this venue (an archived venue can have one too: a
@@ -383,6 +427,9 @@ export default async function EditVenuePage({
       <AdminNav email={email} active="places" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6 space-y-6">
         <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Edit {venue.name}</h2>
+        {venue.category === "blessing_box" && (
+          <BoxReviewBox photos={boxReviewPhotos} adopters={boxReviewAdopters} />
+        )}
         {pendingProposals.length > 0 && suggestionsVenue && (
           <SuggestionsBox proposals={pendingProposals} venue={suggestionsVenue} />
         )}

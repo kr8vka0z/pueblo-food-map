@@ -225,6 +225,68 @@ export default function BottomSheet({
   // reusing it as BoxCardBody's own below-the-fold section id too.
   const DETAIL_SECTION_ID = "bottomsheet-detail";
 
+  // ── Whole-card swipe-up + swipe-down-to-collapse (follow-up to #666) ────
+  // Kyle's actual ask was "swipe up on the card", not only the bar, and a
+  // swipe down on the EXPANDED card should collapse before it closes. Two
+  // different mechanisms, because vaul behaves differently in each
+  // direction for a snapPoints-less drawer (verified by reading
+  // node_modules/vaul/dist/index.mjs, not guessed):
+  //
+  // - Dragging UP: `shouldDrag()` (vaul internal) returns false the moment
+  //   it sees an upward drag start (`isDraggingInDirection` true — see that
+  //   function's own early `if (isDraggingInDirection) return false`), so
+  //   vaul is completely inert on an upward drag from rest. There is no
+  //   vaul decision to intercept — this is entirely OUR OWN recognizer,
+  //   below, composed onto Drawer.Content's own onPointerDown/onPointerUp
+  //   (vaul calls `rest.onPointerDown`/`rest.onPointerUp` first, THEN its
+  //   own logic — confirmed in Content's source — so ours always fires).
+  //
+  // - Dragging DOWN while expanded: vaul DOES own this gesture (drag-to-
+  //   dismiss, unchanged, still gated on scrollTop-at-top the same way it
+  //   already was pre-#666 via its own `shouldDrag`). We don't compete with
+  //   it or reimplement its thresholds (velocity/closeThreshold) — we let
+  //   vaul decide to dismiss, then VETO the dismissal in `handleOpenChange`
+  //   when `expanded` is true and this was a real drag (not Escape/scrim),
+  //   collapsing instead. `dismissDragActive` is the single piece of state
+  //   that makes "was this a drag" knowable inside `handleOpenChange`:
+  //   `onDrag` (Root prop, fires for a downward drag here since `shouldFade`
+  //   is `true` whenever `snapPoints` is undefined — read, not assumed) sets
+  //   it; Escape/scrim never touch `onDrag`, so the flag stays false for
+  //   those and `onClose()` still runs as before.
+  const dismissDragActive = useRef(false);
+  const drawerContentRef = useRef<HTMLDivElement>(null);
+  // Swipe-up-on-the-card recognizer's own start point + "was this gesture
+  // eligible" flag — null'd out at pointerdown if it started on a button,
+  // link, or anything a11y-labelled as one (Kyle's ask: "outside buttons/
+  // links"), and on pointercancel (iOS can fire that instead of pointerup
+  // once native scroll takes over on a short/overflowing card — see this
+  // file's own note near the swipe-up handler below).
+  const cardSwipeStartY = useRef<number | null>(null);
+  function handleContentPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    dismissDragActive.current = false;
+    // Route-strip mode (#509) renders inside this SAME Drawer.Content —
+    // gated out here (matching the `onDrag` prop's own `!isWalkRouteActive`
+    // check above) so a swipe on the strip can't leave `expanded` latently
+    // true for whenever the route clears and the full card returns.
+    const target = event.target as Element;
+    if (isWalkRouteActive || target.closest("button, a, input, textarea, select, [role='button']")) {
+      cardSwipeStartY.current = null;
+      return;
+    }
+    cardSwipeStartY.current = event.clientY;
+  }
+  function handleContentPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    if (cardSwipeStartY.current === null) return;
+    const deltaY = event.clientY - cardSwipeStartY.current;
+    cardSwipeStartY.current = null;
+    if (!expanded && deltaY <= -SWIPE_THRESHOLD_PX) {
+      setExpandedState(true);
+    }
+  }
+  function handleContentPointerCancel() {
+    cardSwipeStartY.current = null;
+  }
+
   // ── Route strip (#509) ──────────────────────────────────────────────────
   // cardRevealed: true = full card showing, false = strip. Defaults to the
   // OPPOSITE of isWalkRouteActive at first render — if a BottomSheet ever
@@ -273,7 +335,18 @@ export default function BottomSheet({
   const showGrabBar = venue !== null && !showStrip && (!isBox || box != null);
 
   function handleOpenChange(isOpen: boolean) {
-    if (!isOpen) onClose();
+    if (isOpen) return;
+    // Veto a drag-dismiss while expanded — collapse to the normal card
+    // instead of closing. `dismissDragActive` is only ever set by vaul's own
+    // `onDrag` (a real drag it engaged), never by Escape or a scrim tap, so
+    // those two continue straight through to `onClose()` exactly as before
+    // (#527/#604 unchanged) — see this file's header comment above for the
+    // full vaul-behavior citation this relies on.
+    if (dismissDragActive.current && expanded && !isWalkRouteActive) {
+      setExpandedState(false);
+      return;
+    }
+    onClose();
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -283,6 +356,34 @@ export default function BottomSheet({
       key={isWalkRouteActive ? "route" : "card"}
       open={open}
       onOpenChange={handleOpenChange}
+      // Marks "vaul just engaged a real drag" for `handleOpenChange` above —
+      // see this file's header comment for why `onDrag` (not `onRelease`)
+      // is the right signal: it only fires once vaul's own `shouldDrag`
+      // already accepted the gesture (collapsed, or expanded-and-scrolled-
+      // to-top), so a scroll inside expanded content never sets it, and
+      // Escape/scrim never touch this prop at all.
+      onDrag={() => {
+        if (!isWalkRouteActive) dismissDragActive.current = true;
+      }}
+      // Runs AFTER `handleOpenChange` for the same release (vaul calls
+      // `closeDrawer()` — which fires `onOpenChange` — before `onRelease`;
+      // confirmed in vaul's own source, not assumed). By the time this
+      // fires, `handleOpenChange` has already vetoed or allowed the close,
+      // so this is purely cleanup: undo the `transition:none`/`transform`
+      // vaul's live drag left on the DOM node when we vetoed (vaul's own
+      // `resetDrawer()` — the thing that normally does this — never runs in
+      // its dismiss branches, only its "didn't dismiss" branches), and clear
+      // the flag either way so it can't leak into the next gesture.
+      onRelease={(_event, open) => {
+        if (!open && dismissDragActive.current && expanded && !isWalkRouteActive) {
+          const el = drawerContentRef.current;
+          if (el) {
+            el.style.transition = "";
+            el.style.transform = "";
+          }
+        }
+        dismissDragActive.current = false;
+      }}
       modal={false}
       // #530 review round 3 (BLOCKER, invisible to every test here — every
       // BottomSheet test mocks vaul): vaul defaults `repositionInputs` to
@@ -336,6 +437,20 @@ export default function BottomSheet({
       <Drawer.Portal>
         <Drawer.Content
           key={venue?.id ?? "empty"}
+          // Composed with vaul's OWN internal `drawerRef` (vaul's `Content`
+          // does `useComposedRefs(ref, drawerRef)` — confirmed in source, so
+          // passing a ref here doesn't replace vaul's, it runs alongside
+          // it), giving `onRelease` above a real DOM node to clear the
+          // leftover drag transform from when we veto a dismiss.
+          ref={drawerContentRef}
+          // Composed the same way — vaul calls `rest.onPointerDown/Up` FIRST,
+          // then its own drag logic (confirmed in source), so these always
+          // fire regardless of whether vaul itself decides to drag. This is
+          // what makes "swipe up anywhere on the collapsed card" possible
+          // without a second competing recognizer on vaul's own gesture.
+          onPointerDown={handleContentPointerDown}
+          onPointerUp={handleContentPointerUp}
+          onPointerCancel={handleContentPointerCancel}
           // #530 review round 2: no `bottom-0` Tailwind class — Safari's own
           // toolbar was slicing the sheet's resting edge off the same way it
           // sliced BottomNav's pill (root cause: a `position:fixed`

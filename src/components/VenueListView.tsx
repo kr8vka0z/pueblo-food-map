@@ -2,51 +2,58 @@
 
 /**
  * VenueListView — the admin's searchable/filterable venue table (read-only
- * list #253; per-row Edit link added #255). Receives every D1 `venues` row
- * (draft + published + archived) as a prop and owns all search/filter UI
- * state client-side — the dataset is comfortably small (low hundreds of
- * rows), well under the point where server-side pagination or a search
- * endpoint would be warranted.
+ * list #253; per-row Edit link added #255, moved onto the name itself and
+ * the separate Actions column removed #672; single Status column + key
+ * added, replacing the old status + "Unpublished changes" pair, #673).
  *
  * Presentational + interactive only: no data fetching (that's the Server
- * Component page, src/app/admin/page.tsx) and no mutation of its own — the
- * Edit link below only navigates to /admin/venues/[id]/edit
- * (src/app/admin/venues/[id]/edit/page.tsx), where AddVenueForm and
- * ArchiveVenueButton own the actual mutations. An archived row gets a
- * muted "Archived" label instead of that link (#568 review finding,
- * 2026-09-24) — PATCH /api/admin/venues/[id] refuses an archived-row edit
- * with a 409, so a link that always dead-ends into that 409 isn't a real
- * action worth offering.
+ * Component page, src/app/admin/places/page.tsx) and no mutation of its
+ * own. `statusByVenueId` is computed there rather than here because it
+ * needs src/data/published-venues.ts (the ~2000-entry public-map snapshot)
+ * to diff against — importing that file into THIS "use client" component
+ * would ship its entire contents to the browser for no reason; the page
+ * only ever hands this component the small per-id status strings it needs.
+ *
+ * The name links to /admin/venues/[id]/edit (src/app/admin/venues/[id]/edit/page.tsx),
+ * where AddVenueForm and ArchiveVenueButton own the actual mutations. An
+ * archived row's name stays plain text instead (#568 review finding,
+ * 2026-09-24, moved here from the old Actions column by #672) — PATCH
+ * /api/admin/venues/[id] refuses an archived-row edit with a 409, so a link
+ * that always dead-ends into that 409 isn't a real action worth offering.
  */
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { categoryLabels } from "@/data/venues";
-import { STATUS_LABELS, hasUnpublishedChanges, formatLastVerified } from "@/lib/adminVenues";
-import type { AdminVenueRow, AdminVenueStatus, VenueCategory } from "@/types/venue";
+import { DISPLAY_STATUS_KEY, DISPLAY_STATUS_LABELS, formatLastVerified, type AdminDisplayStatus } from "@/lib/adminVenues";
+import type { AdminVenueRow, VenueCategory } from "@/types/venue";
 
 interface VenueListViewProps {
   venues: AdminVenueRow[];
+  /** displayStatusOf() per venue id (adminVenues.ts) — computed server-side; see this file's own header for why. */
+  statusByVenueId: Record<string, AdminDisplayStatus>;
 }
 
-type StatusFilter = "all" | AdminVenueStatus;
+type StatusFilter = "all" | AdminDisplayStatus;
 type CategoryFilter = "all" | VenueCategory;
 
 const STATUS_FILTER_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: "all", label: "All" },
-  { value: "published", label: STATUS_LABELS.published },
-  { value: "draft", label: STATUS_LABELS.draft },
-  { value: "archived", label: STATUS_LABELS.archived },
+  { value: "draft", label: DISPLAY_STATUS_LABELS.draft },
+  { value: "live", label: DISPLAY_STATUS_LABELS.live },
+  { value: "live_edits_waiting", label: DISPLAY_STATUS_LABELS.live_edits_waiting },
+  { value: "removed", label: DISPLAY_STATUS_LABELS.removed },
 ];
 
 // Fixed, declared order (not derived from the current venues prop) so the
 // select's option list never shifts as search/filter state changes.
 const ALL_CATEGORIES = Object.keys(categoryLabels) as VenueCategory[];
 
-const STATUS_BADGE_STYLES: Record<AdminVenueStatus, string> = {
-  published: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]", // Live
-  draft: "bg-[var(--color-brand-yellow)] text-[var(--color-ink-900)]", // Draft
-  archived: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]", // Removed
+const STATUS_BADGE_STYLES: Record<AdminDisplayStatus, string> = {
+  live: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]",
+  draft: "bg-[var(--color-brand-yellow)] text-[var(--color-ink-900)]",
+  live_edits_waiting: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]",
+  removed: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
 };
 
 const controlLabelClass =
@@ -58,7 +65,7 @@ const controlInputClass =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
   "focus-visible:border-[var(--color-sage-500)]";
 
-export default function VenueListView({ venues }: VenueListViewProps) {
+export default function VenueListView({ venues, statusByVenueId }: VenueListViewProps) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
@@ -66,17 +73,19 @@ export default function VenueListView({ venues }: VenueListViewProps) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return venues.filter((v) => {
-      if (statusFilter !== "all" && v.status !== statusFilter) return false;
+      if (statusFilter !== "all" && statusByVenueId[v.id] !== statusFilter) return false;
       if (categoryFilter !== "all" && v.category !== categoryFilter) return false;
       if (q && !v.name.toLowerCase().includes(q) && !v.address.toLowerCase().includes(q)) {
         return false;
       }
       return true;
     });
-  }, [venues, query, statusFilter, categoryFilter]);
+  }, [venues, query, statusFilter, categoryFilter, statusByVenueId]);
 
   return (
     <div>
+      <StatusKey />
+
       {/* Search + filters */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex flex-1 flex-col gap-1">
@@ -135,7 +144,7 @@ export default function VenueListView({ venues }: VenueListViewProps) {
         </p>
       ) : (
         <div className="elevation-1 overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full min-w-[680px] text-left text-sm">
             <thead>
               <tr className="border-b border-[var(--color-bone-200)] text-[11px] uppercase tracking-wide text-[var(--color-ink-400)]">
                 <th scope="col" className="px-4 py-3 font-medium">
@@ -153,12 +162,6 @@ export default function VenueListView({ venues }: VenueListViewProps) {
                 <th scope="col" className="px-4 py-3 font-medium">
                   Last verified
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Unpublished changes
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  <span className="sr-only">Actions</span>
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -167,46 +170,35 @@ export default function VenueListView({ venues }: VenueListViewProps) {
                   key={venue.id}
                   className="border-b border-[var(--color-bone-200)] last:border-0 hover:bg-[var(--color-bone-100)]"
                 >
-                  <td className="px-4 py-3 font-medium text-[var(--color-ink-700)]">
-                    {venue.name}
+                  <td className="px-4 py-3 font-medium">
+                    {venue.status === "archived" ? (
+                      // #568 review finding (2026-09-24), moved here by #672:
+                      // PATCH /api/admin/venues/[id] refuses an archived-row
+                      // edit with a 409 (see that route's own header) — a
+                      // link that always 409s on save is a dead end, not a
+                      // real action, so an archived row's name is plain text.
+                      <span className="text-[var(--color-ink-700)]">{venue.name}</span>
+                    ) : (
+                      <Link
+                        href={`/admin/venues/${venue.id}/edit`}
+                        className={
+                          "text-[var(--color-sage-700)] underline underline-offset-2 " +
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
+                        }
+                      >
+                        {venue.name}
+                      </Link>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-[var(--color-ink-700)]">
                     {categoryLabels[venue.category]}
                   </td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={venue.status} />
+                    <StatusBadge status={statusByVenueId[venue.id]} />
                   </td>
                   <td className="px-4 py-3 text-[var(--color-ink-500)]">{venue.address}</td>
                   <td className="px-4 py-3 text-[var(--color-ink-500)]">
                     {formatLastVerified(venue.last_verified)}
-                  </td>
-                  <td className="px-4 py-3">
-                    {hasUnpublishedChanges(venue) && (
-                      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-[var(--color-clay-100)] text-[var(--color-clay-700)]">
-                        Unpublished changes
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {venue.status === "archived" ? (
-                      // #568 review finding (2026-09-24): PATCH /api/admin/venues/[id]
-                      // now refuses an archived-row edit with a 409 (see that
-                      // route's own header) — an Edit link that always 409s on
-                      // save is a dead end, not a real action, so this column
-                      // shows a plain muted label instead of a link for an
-                      // archived row.
-                      <span className="text-sm text-[var(--color-ink-400)]">Archived</span>
-                    ) : (
-                      <Link
-                        href={`/admin/venues/${venue.id}/edit`}
-                        className={
-                          "text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2 " +
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
-                        }
-                      >
-                        Edit
-                      </Link>
-                    )}
                   </td>
                 </tr>
               ))}
@@ -222,7 +214,23 @@ export default function VenueListView({ venues }: VenueListViewProps) {
   );
 }
 
-function StatusBadge({ status }: { status: AdminVenueStatus }) {
+/** #673 pt.2: one line per status, in plain language, above the table — the Places tab's status key. */
+function StatusKey() {
+  return (
+    <dl className="mb-4 flex flex-col gap-1.5 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-3 text-xs text-[var(--color-ink-500)] sm:flex-row sm:flex-wrap sm:gap-x-5 sm:gap-y-1.5">
+      {DISPLAY_STATUS_KEY.map(({ status, description }) => (
+        <div key={status} className="flex items-center gap-1.5">
+          <dt>
+            <StatusBadge status={status} />
+          </dt>
+          <dd>{description}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function StatusBadge({ status }: { status: AdminDisplayStatus }) {
   return (
     <span
       className={
@@ -230,7 +238,7 @@ function StatusBadge({ status }: { status: AdminVenueStatus }) {
         STATUS_BADGE_STYLES[status]
       }
     >
-      {STATUS_LABELS[status]}
+      {DISPLAY_STATUS_LABELS[status]}
     </span>
   );
 }

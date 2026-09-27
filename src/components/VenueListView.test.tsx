@@ -1,15 +1,17 @@
 /**
- * Tests for the "Edit" affordance added to VenueListView (#255). Pre-#255
+ * Tests for VenueListView's name-as-edit-link affordance (#255, moved onto
+ * the name and the separate Actions column removed by #672). Pre-#255
  * rendering (search/filter behavior) shipped in #253 with no dedicated test
- * file of its own; this file covers only the new per-row Edit link rather
- * than retroactively writing full regression coverage for #253's own
- * behavior — out of scope for this slice.
+ * file of its own; this file covers only the per-row name link rather than
+ * retroactively writing full regression coverage for #253's own behavior —
+ * out of scope for this slice.
  */
 
 import { describe, test, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import VenueListView from "@/components/VenueListView";
 import type { AdminVenueRow } from "@/types/venue";
+import type { AdminDisplayStatus } from "@/lib/adminVenues";
 
 function makeVenue(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
   return {
@@ -43,18 +45,36 @@ function makeVenue(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
   };
 }
 
-describe("VenueListView — Edit affordance (#255)", () => {
-  test("each row renders an Edit link pointing at /admin/venues/<id>/edit", () => {
-    render(<VenueListView venues={[makeVenue({ id: "manual-abc" }), makeVenue({ id: "manual-xyz", name: "Westside Grocery" })]} />);
+function makeStatusMap(venues: AdminVenueRow[], status: AdminDisplayStatus = "draft"): Record<string, AdminDisplayStatus> {
+  return Object.fromEntries(venues.map((v) => [v.id, status]));
+}
 
-    const links = screen.getAllByRole("link", { name: /Edit/i });
+describe("VenueListView — name-as-edit-link affordance (#255, #672)", () => {
+  test("each row's name links to /admin/venues/<id>/edit", () => {
+    const venues = [makeVenue({ id: "manual-abc" }), makeVenue({ id: "manual-xyz", name: "Westside Grocery" })];
+    render(<VenueListView venues={venues} statusByVenueId={makeStatusMap(venues)} />);
+
+    const links = screen.getAllByRole("link");
     expect(links).toHaveLength(2);
-    expect(links[0]).toHaveAttribute("href", "/admin/venues/manual-abc/edit");
-    expect(links[1]).toHaveAttribute("href", "/admin/venues/manual-xyz/edit");
+    expect(screen.getByRole("link", { name: "Eastside Pantry" })).toHaveAttribute(
+      "href",
+      "/admin/venues/manual-abc/edit",
+    );
+    expect(screen.getByRole("link", { name: "Westside Grocery" })).toHaveAttribute(
+      "href",
+      "/admin/venues/manual-xyz/edit",
+    );
   });
 
-  test("no Edit link is rendered when the filtered list is empty", () => {
-    render(<VenueListView venues={[]} />);
-    expect(screen.queryByRole("link", { name: /Edit/i })).toBeNull();
+  test("no name link is rendered when the filtered list is empty", () => {
+    render(<VenueListView venues={[]} statusByVenueId={{}} />);
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  test("there is no separate Edit column or link — the name IS the link", () => {
+    const venues = [makeVenue()];
+    render(<VenueListView venues={venues} statusByVenueId={makeStatusMap(venues)} />);
+    expect(screen.queryByText(/^Edit$/)).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: /actions/i })).toBeNull();
   });
 });

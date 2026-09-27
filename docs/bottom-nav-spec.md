@@ -86,6 +86,38 @@ or any data path.
 
 ## 3. The bottom bar
 
+> **Amended 2026-09-26 by Kyle (Boxes zoom + option D look, #670):** two changes to
+> Boxes. First, tapping it **on** now also moves the camera: if the visitor's
+> location is already known (`geo.state.position` set — Near me was already
+> granted, or #670-2 below already resolved it), the map centers on the visitor
+> and zooms to show their 5 nearest boxes, via a new pure helper
+> `nearestBoundsAround(origin, venues, n)` (MapWrapper.tsx, next to
+> `computeCategoryBounds`) — a symmetric box around the visitor sized to the
+> distance to the 5th-nearest box (or however many exist, under 5). If the
+> location is off or unknown, tapping Boxes fits every box in the county, same
+> as before this change — and it **never triggers the location permission
+> prompt** itself (Near me alone owns that). The `/?boxes=1` hand-off from a Menu
+> page (PageNav, below) follows the identical rule, checked once against
+> whatever `userLocation` has already resolved to at that moment — it does not
+> wait for a slow geolocation response. Ticking "Blessing Box" in the Filters
+> panel (#513) keeps the old fit-all behavior; only the two Boxes-specific entry
+> points (bar button, `/?boxes=1`) get the nearest-5 zoom. Second, the "on" look
+> is now **option D** from that day's mockup, replacing the raspberry background
+> wash: the icon stroke and word turn raspberry (`--color-cat-blessing`,
+> unchanged) and **only the heart path on the box's door fills raspberry** — the
+> house outline stays unfilled, both because a filled house still swallows the
+> heart at 24px (#516's original reason for skipping fill outright) and because
+> the filled heart alone is small enough not to collapse, and doubles as a
+> shape-based (not just color-based) cue for color-blind visitors.
+> `BOXES_ACTIVE_STYLE` (the background wash) and its cell-background rendering
+> are removed outright — nothing draws a shape behind the icon anymore.
+> Investigated in the same pass: a faint grey circle Kyle saw stick on the Boxes
+> cell after tapping it off in Chrome's phone emulation traced to the browser's
+> own native `-webkit-tap-highlight-color` (never suppressed in this file), not
+> to the shared `hover:bg-...` class (already scoped under Tailwind's own
+> `@media (hover: hover)`, so it can't get stuck on a real touch device) — fixed
+> by disabling the native highlight on every bar item.
+
 > **Amended 2026-09-19 by Kyle (5th item — Boxes, #516):** a 5th item, "Boxes"
 > ("Cajas" in Spanish), sits third in order — **Near me · Saved · Boxes ·
 > Help · Menu** (Boxes in the middle, under the thumb). It is not a
@@ -150,7 +182,7 @@ indicator, which is what iOS expects.
 |---|---|---|---|---|
 | 1 | Near me | Cercanos *(was "Cerca de mí")* | `locate` | Requests location, flies to it, re-centres if already located |
 | 2 | Saved | Guardados | `star` (was `heart`; changed 2026-09-16 by Kyle to match the venue cards' save star) | Opens the drawer's saved-places view |
-| 3 | Boxes | Cajas | hand-drawn box + heart (no lucide match, see §3 amendment) | Toggles the `blessing_box` category filter; `aria-pressed`, raspberry when on |
+| 3 | Boxes | Cajas | hand-drawn box + heart (no lucide match, see §3 amendment) | Toggles the `blessing_box` category filter; `aria-pressed`, raspberry stroke/label + filled heart when on (option D, #670); zooms to the visitor's 5 nearest boxes if their location is known, else fits all (#670) |
 | 4 | Help *(was "Resources")* | Ayuda *(was "Recursos")* | `hand-helping` | Opens the `/resources` page *(amended 2026-09-16, see §7)* |
 | 5 | Menu | Menú | `menu` | Opens the drawer at the top |
 
@@ -603,6 +635,7 @@ geometry above.
 7. `HamburgerMenu` no longer renders a Map/List row.
 8. `SponsorCredit`'s computed bottom offset includes the bar height below `2xl`.
 9. **(#516)** Boxes carries `aria-pressed` matching `boxesActive`, and tapping it calls `onBoxesToggle` — not `onSectionTap` (it never opens the drawer).
+10. **(#670)** Boxes' heart path fills `currentColor` only when `boxesActive`, the house paths never fill, and the button carries no inline background style either way (`BottomNav.test.tsx`); every bar item suppresses the native tap-highlight overlay (`-webkit-tap-highlight-color`). `nearestBoundsAround` (centered on origin, exactly the nearest n, fewer-than-n, zero venues) is covered on its own in `nearestBoundsAround.test.ts`; MapWrapper's wiring (Boxes-on with a known location fits the nearest-5 bounds, unknown fits all, never calls `getCurrentPosition`, Boxes-off restores the all-venues fit, and the `/?boxes=1` hand-off follows the same known/unknown rule without waiting on geolocation) is covered in `MapWrapperBoxesFit.test.tsx`.
 
 Test 6 is the regression guard for the whole §4 premise — if a future change reinstates
 `sr-only` on the inactive segment, that test fails.

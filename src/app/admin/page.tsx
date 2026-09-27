@@ -54,7 +54,7 @@ import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { summarizePublishChanges } from "@/lib/adminVenues";
 import { rankNeedsHelp } from "@/lib/boxHealth";
 import { loadBoxHealthEntries } from "@/lib/adminBoxes";
-import { selectStalePlaces } from "@/lib/adminDashboard";
+import { selectStalePlaces, resolvePlaceUsageRows } from "@/lib/adminDashboard";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
 import { fetchPublishBotPrStatus, isProductionWorker, type PublishBotPrStatus } from "@/lib/publishVenues";
@@ -76,6 +76,7 @@ import {
   periodStartMs,
 } from "@/lib/boxStats";
 import { loadVisitorsAnalytics, DASHBOARD_PERIODS, type DashboardPeriod } from "@/lib/cfAnalytics";
+import { loadMapUsageAnalytics } from "@/lib/posthogQuery";
 import type { AdminNavCounts } from "@/lib/adminNavCounts";
 import type { AdminVenueRow } from "@/types/venue";
 import AdminNav from "@/components/AdminNav";
@@ -107,6 +108,24 @@ function parsePeriod(raw: string | undefined): DashboardPeriod {
 
 /** Google's own "good" LCP threshold — issue #680's "with Google's 2.5s 'good' line". */
 const LCP_GOOD_MS = 2500;
+
+/** Acronym filter keys FilterPanel.tsx sends that Title Case would mangle ("Snap", "Wic") — every other filter key (a VenueCategory, or "open_now") reads fine through the generic fallback below it. */
+const FILTER_ACRONYM_LABELS: Record<string, string> = { snap: "SNAP", wic: "WIC" };
+
+/** "open_now" -> "Open Now", "meal_site" -> "Meal Site" — a generic fallback rather than an exhaustive VenueCategory map, so a future category needs no Dashboard-side update to show up here. */
+function filterLabel(key: string): string {
+  return FILTER_ACRONYM_LABELS[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** `null` when the denominator is 0 or unavailable — rendered as "—", never a divide-by-zero NaN. Rounded to a whole percent; these are share-of-an-event-count numbers, not precise measurements. */
+function pctOf(count: number, total: number | null | undefined): number | null {
+  if (!total) return null;
+  return Math.round((count / total) * 100);
+}
+
+function formatPct(pct: number | null): string {
+  return pct === null ? "—" : `${pct}%`;
+}
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
   const { period: rawPeriod } = await searchParams;
@@ -201,9 +220,36 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   // Same "staging can never Publish" gate /admin/places uses (#673 pt.6) —
   // a live "waiting to publish" bar on staging would show test-only D1 data
-  // that can never actually be cleared by a Publish click there.
+  // that can never actually be cleared by a Publish click there. Fetched
+  // once, before the PostHog load below, since both need this binding.
   const { env } = await getCloudflareContext({ async: true });
   const isStaging = !isProductionWorker(env);
+
+  // PostHog degrades independently too (#681) — same "never fail the whole
+  // page for one section's outage" posture as Visitors above. POSTHOG_API_HOST
+  // is optional (defaults inside posthogQuery.ts); POSTHOG_PROJECT_ID is a
+  // plain wrangler var (not a secret, matching CF_ANALYTICS_ACCOUNT_ID's own
+  // reasoning), read via the binding per AGENTS.md's "Runtime reads" — only
+  // the API key itself is process.env, since that one IS a secret.
+  const mapUsage = await loadMapUsageAnalytics(period, env.POSTHOG_PROJECT_ID, env.POSTHOG_API_HOST, now);
+  const placeUsage = resolvePlaceUsageRows(mapUsage?.topPlaces ?? [], venues);
+  const posthogProjectId = env.POSTHOG_PROJECT_ID;
+
+  // "Switched to Spanish" is the one headline card the issue asks for as a
+  // % of VISITORS (Kyle's 2026-09-26 rule) rather than a raw event count —
+  // divided by Cloudflare's own number, never PostHog's. cfVisits === null
+  // (Cloudflare unavailable) falls back to the raw switch count instead of
+  // hiding the card outright — see the KpiCard call site below.
+  const cfVisits = visitors?.visits ?? null;
+  const cfPreviousVisits = visitors?.previousVisits ?? null;
+  const localeEsPct = mapUsage ? pctOf(mapUsage.headline.localeSwitchedToEs, cfVisits) : null;
+  const previousLocaleEsPct = mapUsage ? pctOf(mapUsage.headline.previousLocaleSwitchedToEs, cfPreviousVisits) : null;
+
+  // location_permission only ever fires once a browser has ALREADY been
+  // prompted (useGeolocation.ts's `wasPrompt` guard) — there is no distinct
+  // "never asked" event, so it's inferred here as the gap between "near me"
+  // taps and the granted+denied outcomes PostHog did see.
+  const neverAskedLocation = mapUsage ? Math.max(mapUsage.headline.nearMeTaps - mapUsage.location.granted - mapUsage.location.denied, 0) : 0;
 
   const navCounts: AdminNavCounts = {
     submissions: submissionsTotal,
@@ -358,6 +404,126 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </div>
           ) : (
             <p className="mt-2 text-sm text-[var(--color-ink-500)]">Visitor numbers are unavailable right now.</p>
+          )}
+        </section>
+
+        <section aria-labelledby="map-usage-heading" className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="map-usage-heading" className="wordmark text-base text-[var(--color-ink-900)]">
+              What people do on the map
+            </h2>
+            {mapUsage && posthogProjectId && (
+              <a
+                href={`https://us.posthog.com/project/${posthogProjectId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+              >
+                Open in PostHog →
+              </a>
+            )}
+          </div>
+          {mapUsage ? (
+            <div className="mt-3 flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <KpiCard label="Near me taps" displayValue={String(mapUsage.headline.nearMeTaps)} value={mapUsage.headline.nearMeTaps} previousValue={mapUsage.headline.previousNearMeTaps} />
+                <KpiCard label="Searches" displayValue={String(mapUsage.headline.searches)} value={mapUsage.headline.searches} previousValue={mapUsage.headline.previousSearches} />
+                <KpiCard label="Place cards opened" displayValue={String(mapUsage.headline.cardsOpened)} value={mapUsage.headline.cardsOpened} previousValue={mapUsage.headline.previousCardsOpened} />
+                <KpiCard
+                  label="Switched to Spanish"
+                  displayValue={cfVisits === null ? `${mapUsage.headline.localeSwitchedToEs} switches` : formatPct(localeEsPct)}
+                  value={cfVisits === null ? mapUsage.headline.localeSwitchedToEs : (localeEsPct ?? 0)}
+                  previousValue={cfVisits === null ? mapUsage.headline.previousLocaleSwitchedToEs : (previousLocaleEsPct ?? undefined)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Most opened places</h3>
+                  <BarList
+                    items={placeUsage.slice(0, 6).map((p) => ({
+                      label: p.name ?? "Removed place",
+                      value: p.count,
+                      displayValue: `${p.count} opens`,
+                      href: p.href ?? undefined,
+                    }))}
+                    emptyMessage="No place cards opened yet this period."
+                  />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Top searches</h3>
+                  <BarList
+                    items={mapUsage.topSearches.map((s) => ({
+                      label: s.term,
+                      value: s.count,
+                      displayValue: s.zeroResults ? `${s.count} · 0 results` : String(s.count),
+                    }))}
+                    emptyMessage="Not enough repeated searches yet to say."
+                  />
+                  <p className="mt-1 text-xs text-[var(--color-ink-500)]">
+                    Terms searched 3+ times only. A &quot;0 results&quot; tag means every one of those searches found nothing — a hint the map may be missing that place.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">After opening a card, people…</h3>
+                  <BarList
+                    items={[
+                      { label: "Directions (walk)", value: mapUsage.cardActions.directionsWalk, displayValue: formatPct(pctOf(mapUsage.cardActions.directionsWalk, mapUsage.headline.cardsOpened)) },
+                      { label: "Directions (bus)", value: mapUsage.cardActions.directionsBus, displayValue: formatPct(pctOf(mapUsage.cardActions.directionsBus, mapUsage.headline.cardsOpened)) },
+                      { label: "Directions (drive)", value: mapUsage.cardActions.directionsDrive, displayValue: formatPct(pctOf(mapUsage.cardActions.directionsDrive, mapUsage.headline.cardsOpened)) },
+                      { label: "Call", value: mapUsage.cardActions.call, displayValue: formatPct(pctOf(mapUsage.cardActions.call, mapUsage.headline.cardsOpened)) },
+                      { label: "Website", value: mapUsage.cardActions.website, displayValue: formatPct(pctOf(mapUsage.cardActions.website, mapUsage.headline.cardsOpened)) },
+                      { label: "Save", value: mapUsage.cardActions.save, displayValue: formatPct(pctOf(mapUsage.cardActions.save, mapUsage.headline.cardsOpened)) },
+                      { label: "Share", value: mapUsage.cardActions.share, displayValue: formatPct(pctOf(mapUsage.cardActions.share, mapUsage.headline.cardsOpened)) },
+                      { label: "Report", value: mapUsage.cardActions.report, displayValue: formatPct(pctOf(mapUsage.cardActions.report, mapUsage.headline.cardsOpened)) },
+                    ]}
+                    emptyMessage="No card actions yet this period."
+                  />
+                  <p className="mt-1 text-xs text-[var(--color-ink-500)]">Share of cards opened this period.</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Filters people use</h3>
+                  <BarList
+                    items={mapUsage.filters.map((f) => ({
+                      label: filterLabel(f.filter),
+                      value: f.count,
+                      displayValue: cfVisits === null ? `${f.count} toggles` : formatPct(pctOf(f.count, cfVisits)),
+                    }))}
+                    emptyMessage="No filters toggled on yet this period."
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Location shared?</h3>
+                  <BarList
+                    items={[
+                      { label: "Granted", value: mapUsage.location.granted, displayValue: `${mapUsage.location.granted}` },
+                      { label: "Said no", value: mapUsage.location.denied, displayValue: `${mapUsage.location.denied}` },
+                      { label: "Never asked", value: neverAskedLocation, displayValue: `${neverAskedLocation}` },
+                    ]}
+                    emptyMessage="No location prompts yet this period."
+                  />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-[var(--color-ink-700)]">Came from a flyer or link tag</h3>
+                  <BarList
+                    items={mapUsage.utmSources.map((u) => ({
+                      label: u.campaign ? `${u.source} · ${u.campaign}` : u.source,
+                      value: u.sessions,
+                      displayValue: `${u.sessions} sessions`,
+                    }))}
+                    emptyMessage="No tagged flyer or link visits yet this period."
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-[var(--color-ink-500)]">Usage numbers are unavailable right now.</p>
           )}
         </section>
 

@@ -13,6 +13,8 @@ export interface BarListItem {
   value: number;
   /** Pre-formatted for display (e.g. "12 visits") — falls back to the raw value when omitted. */
   displayValue?: string;
+  /** Wraps the label in a link when set — added for #681's "most opened places" list, which links each place to its edit page. Every other caller omits this and keeps a plain label. */
+  href?: string;
 }
 
 export interface BarListProps {
@@ -31,9 +33,19 @@ export default function BarList({ items, emptyMessage }: BarListProps) {
     <ul className="flex flex-col gap-2">
       {items.map((item) => (
         <li key={item.label} className="flex items-center gap-2">
-          <span className="w-28 flex-none truncate text-sm text-[var(--color-ink-700)]" title={item.label}>
-            {item.label}
-          </span>
+          {item.href ? (
+            <a
+              href={item.href}
+              className="w-28 flex-none truncate text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+              title={item.label}
+            >
+              {item.label}
+            </a>
+          ) : (
+            <span className="w-28 flex-none truncate text-sm text-[var(--color-ink-700)]" title={item.label}>
+              {item.label}
+            </span>
+          )}
           <span className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-bone-100)]">
             <span
               className="block h-full rounded-full bg-[var(--color-sage-600)]"

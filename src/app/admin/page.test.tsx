@@ -86,6 +86,7 @@ describe("DashboardPage (/admin) — auth guard", () => {
   afterEach(() => {
     vi.clearAllMocks();
     delete process.env.CF_ANALYTICS_API_TOKEN;
+    delete process.env.POSTHOG_PERSONAL_API_KEY;
   });
 
   test("success: renders the greeting and every #680 section's empty state, forbidden() not called", async () => {
@@ -97,6 +98,14 @@ describe("DashboardPage (/admin) — auth guard", () => {
     expect(screen.getByText("Hi admin")).toBeDefined();
     expect(screen.getByText("Visitors")).toBeDefined();
     expect(screen.getByText("Visitor numbers are unavailable right now.")).toBeDefined();
+    // #681's own "Done when": "If PostHog is unreachable or the key is
+    // missing, only this section shows 'Usage numbers are unavailable right
+    // now'" — POSTHOG_PERSONAL_API_KEY is unset in the test environment
+    // (same convention as CF_ANALYTICS_API_TOKEN above), so this is the
+    // section's own "unavailable" branch; its populated branch is covered
+    // by posthogQuery.test.ts + KpiCard/BarList's own render tests.
+    expect(screen.getByText("What people do on the map")).toBeDefined();
+    expect(screen.getByText("Usage numbers are unavailable right now.")).toBeDefined();
     expect(screen.getByText("Blessing boxes")).toBeDefined();
     expect(screen.getByText("Map data health")).toBeDefined();
     expect(screen.getByText("No automated data refresh has run yet.")).toBeDefined();

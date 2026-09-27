@@ -59,6 +59,10 @@ declare global {
     // rationale as BETTER_AUTH_RP_ID above: a plain wrangler `var`, not worth
     // a full runtime-type regen for one optional string field.
     ANALYTICS_EXCLUDED_IPS?: string;
+    // #681 (admin Dashboard "What people do on the map") — POSTHOG_PROJECT_ID
+    // and POSTHOG_API_HOST are declared once, in worker-configuration.d.ts's
+    // hand-patched `Env` (see that file's header), and reach this interface
+    // through the `extends Env` above — no redeclaration needed here.
   }
 }
 

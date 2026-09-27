@@ -9,6 +9,7 @@
 
 import type { AdminVenueRow, VenueCategory } from "@/types/venue";
 import type { CheckinKind } from "@/lib/blessingBoxes";
+import type { TopPlaceUsageRow } from "@/lib/posthogQuery";
 
 // ─── Stale places ───────────────────────────────────────────────────────────
 
@@ -72,6 +73,45 @@ export function selectStalePlaces(
   }));
 
   return { items, totalCount: stale.length };
+}
+
+// ─── PostHog "most opened places" name resolution (#681) ───────────────────
+
+export interface ResolvedPlaceUsageRow {
+  venueId: string;
+  count: number;
+  /** The place's current D1 name, or null when it's gone/archived — see `label`'s own comment for why this is never shown as a raw id. */
+  name: string | null;
+  href: string | null;
+}
+
+type VenueLookupRow = Pick<AdminVenueRow, "id" | "name" | "status">;
+
+/**
+ * Joins PostHog's `venue_id` counts against D1's current venue rows — pure,
+ * so the "id no longer exists" and "id exists but archived" branches are
+ * both directly testable without a live binding. AGENTS.md's admin rules
+ * archive a venue rather than deleting its row, so "id no longer exists"
+ * is a defensive branch (a very old event referencing an id that's since
+ * been dropped some other way) rather than the expected path — but a
+ * plain "not found" check alone would leave the FAR more likely "archived"
+ * case unhandled, so both count as gone from the map. Sorted by count
+ * desc, so a caller can slice(0, N) directly.
+ */
+export function resolvePlaceUsageRows(rows: readonly TopPlaceUsageRow[], venues: readonly VenueLookupRow[]): ResolvedPlaceUsageRow[] {
+  const byId = new Map(venues.map((v) => [v.id, v]));
+  return rows
+    .map((row) => {
+      const venue = byId.get(row.venueId);
+      const isGone = !venue || venue.status === "archived";
+      return {
+        venueId: row.venueId,
+        count: row.count,
+        name: isGone ? null : venue.name,
+        href: isGone ? null : `/admin/venues/${row.venueId}/edit`,
+      };
+    })
+    .sort((a, b) => b.count - a.count);
 }
 
 // ─── Weekly check-in bucketing ──────────────────────────────────────────────

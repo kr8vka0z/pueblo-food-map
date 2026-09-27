@@ -28,4 +28,20 @@ describe("BarList", () => {
     render(<BarList items={[{ label: "bread", value: 3, displayValue: "3 asks" }]} emptyMessage="none" />);
     expect(screen.getByText("3 asks")).toBeDefined();
   });
+
+  // #681's "most opened places" links each row to its edit page.
+  test("an item with href renders its label as a link; one without stays plain text", () => {
+    render(
+      <BarList
+        items={[
+          { label: "Corner Pantry", value: 5, href: "/admin/venues/v1/edit" },
+          { label: "Removed place", value: 2 },
+        ]}
+        emptyMessage="none"
+      />,
+    );
+    expect(screen.getByRole("link", { name: "Corner Pantry" }).getAttribute("href")).toBe("/admin/venues/v1/edit");
+    expect(screen.queryByRole("link", { name: "Removed place" })).toBeNull();
+    expect(screen.getByText("Removed place")).toBeDefined();
+  });
 });

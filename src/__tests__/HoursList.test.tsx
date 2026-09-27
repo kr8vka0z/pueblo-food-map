@@ -44,15 +44,6 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: nu
   };
 }
 
-// ─── Minimal Mapbox stub ──────────────────────────────────────────────────────
-
-const mockMapboxMap = {
-  project: vi.fn(() => ({ x: 100, y: 100 })),
-  getContainer: vi.fn(() => ({ offsetWidth: 1280, offsetHeight: 800 })),
-  on: vi.fn().mockReturnThis(),
-  off: vi.fn().mockReturnThis(),
-};
-
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
 
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
@@ -74,11 +65,6 @@ describe("DesktopVenueWindow hours list — today row highlight", () => {
       <DesktopVenueWindow
         venue={makeVenue()}
         expanded={true}
-        mapboxMap={
-          mockMapboxMap as unknown as Parameters<
-            typeof DesktopVenueWindow
-          >[0]["mapboxMap"]
-        }
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}

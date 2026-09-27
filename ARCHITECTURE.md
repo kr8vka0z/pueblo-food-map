@@ -35,7 +35,13 @@ Browser
         ├── Map.tsx          (Mapbox GL canvas; SSR-skipped via dynamic import)
         ├── VenueMarker.tsx  (Lucide MapPin button inside each Mapbox Marker)
         ├── BottomSheet.tsx  (mobile: vaul bottom sheet)
-        ├── DesktopVenueWindow.tsx  (desktop: marker-anchored detail panel)
+        ├── DesktopSidePanel.tsx  (desktop: fixed right-hand panel shell —
+        │     inset/size/chrome, Escape, focus-to-heading + focus-return,
+        │     #682. Content is ONE of: DesktopVenueWindow (venue/box card —
+        │     no longer marker-anchored; the map pans the pin clear of the
+        │     panel instead, #682 8a) or HamburgerMenuContent (Saved list /
+        │     Menu, #682 8b) — MapWrapper's `sidePanelView` union picks which,
+        │     mutually exclusive on desktop only)
         ├── DirectionButtons.tsx  (Walk: in-app route + WalkStepper, #555;
         │     Bus/Drive: Google Maps deep links)
         ├── SearchBar / ViewSuggestion / SearchResultsPopover / FilterPanel
@@ -43,8 +49,13 @@ Browser
         │     WIC, #513. No standing Map/List control, #514: an empty focused
         │     bar offers the other view, a typed one adds "See all N matches
         │     as a list", and the Menu has a List/Map line)
-        ├── HamburgerMenu    (drawer: List/Map line, saved places, links,
-        │     language; opened by BottomNav at a section)
+        ├── HamburgerMenu    (shell: mobile full-height sheet, or desktop
+        │     dropdown on non-map pages via PageNav — position, backdrop,
+        │     focus trap/return, Escape, scroll lock. Renders
+        │     HamburgerMenuContent — List/Map line, saved places, links,
+        │     language — split out by #682 8b so the SAME content also
+        │     renders inside DesktopSidePanel on the map page's desktop
+        │     layout, above. Opened by BottomNav at a section)
         ├── ListView         (full-screen nearest-first list, map mode off)
         └── BottomNav        (Near me · Saved · Boxes · Help · Menu — bar below
               2xl (1536px), floating pill at 2xl+; Boxes toggles the

@@ -40,13 +40,6 @@ vi.mock("vaul", async () => {
   return { Drawer: { Root, Portal, Content, Title, Description } };
 });
 
-const mockMapboxMap = {
-  project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
-  getContainer: vi.fn().mockReturnValue({ offsetWidth: 1000, offsetHeight: 800 }),
-  on: vi.fn().mockReturnThis(),
-  off: vi.fn().mockReturnThis(),
-};
-
 function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: number } {
   return {
     id: "no-hours-venue",
@@ -102,7 +95,6 @@ describe("DesktopVenueWindow — hours-unknown label", () => {
       <DesktopVenueWindow
         venue={makeVenue()}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -117,7 +109,6 @@ describe("DesktopVenueWindow — hours-unknown label", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}

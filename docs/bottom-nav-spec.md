@@ -326,6 +326,24 @@ decision lives, and it is an existing Tailwind breakpoint rather than a bespoke 
 > the map locating (`/?near=1`); a saved place opens the map on its pin (`/?venue=<id>`).
 > Both the bar and the drawer are `position: fixed` at every width because those pages scroll.
 
+> **Amended 2026-09-27 (#682, DesktopSidePanel):** on the map page only, while a venue/box
+> card is open on desktop, `BottomNav` (and `SearchBar`) take a `rightInset` px prop and
+> shift left so they re-center in the map area left of the new right-hand panel. Below
+> `2xl` this widens the bar's own `right` offset; at `2xl`+ it shifts the pill's `left`
+> percentage (its `-translate-x-1/2` stays fixed). Both use a `--panel-right-inset` CSS
+> custom property, animated via `transition-[right]`/`transition-[left]`, since the value
+> is a runtime number, not a static breakpoint. Never applies on `PageNav` (no map, no
+> panel) or on mobile (`rightInset` is always 0 there).
+
+> **Amended 2026-09-27 (#682 8b, Saved/Menu in the panel):** on the map page's desktop
+> layout, Saved and Menu now open in the SAME `DesktopSidePanel` the venue/box card uses,
+> instead of `HamburgerMenu`'s own ~280px dropdown — `BottomNav`'s `openSection` reads
+> `sidePanelView` there instead of `menuSection` (which stays mobile-only, unchanged). A
+> venue opened FROM the Saved list does NOT light the Saved item — only the list itself
+> does. Re-tapping the lit item closes the panel; tapping the OTHER item switches views
+> without closing. Selecting Boxes/Near me never closes an open panel (§6/#516 unaffected).
+> `PageNav`'s own desktop dropdown is untouched — there's no map or panel on those pages.
+
 ---
 
 ## 6. "Near me" replaces the orange banner

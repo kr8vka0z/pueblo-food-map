@@ -50,6 +50,10 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { venues as allVenues } from "@/data/venues";
 import type { Venue } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
+import HamburgerMenuContent from "./HamburgerMenuContent";
+import DesktopSidePanel, {
+  DESKTOP_PANEL_RIGHT_CLEARANCE_PX,
+} from "./DesktopSidePanel";
 import ListView from "./ListView";
 import { useOverlayRegistration } from "@/lib/overlayRegistry";
 import {
@@ -91,6 +95,24 @@ const MapCanvas = dynamic(() => import("./Map"), {
 const DesktopVenueWindow = dynamic(() => import("./DesktopVenueWindow"), {
   ssr: false,
 });
+
+/**
+ * The desktop side panel's single render driver (#682 8b — coordinator:
+ * "MapWrapper owns one desktop sidePanelView union ... replacing separate
+ * venue-selected/menu-open desktop states"). Desktop-only; mobile keeps its
+ * existing `selectedVenueId`/`menuSection` flow untouched. `selectedVenueId`
+ * itself stays the map's own ground truth (pins, walking route, box fetch,
+ * deep links) for BOTH platforms — this union only decides what the PANEL
+ * currently shows, kept in sync with `selectedVenueId` at every selection
+ * call site (see `selectVenue`) rather than via a separate sync effect.
+ * `from: "saved"` is set only when a venue is opened from the Saved list, so
+ * the panel can render a "← Saved" link back to it.
+ */
+export type DesktopSidePanelView =
+  | { kind: "venue"; id: string; from?: "saved" }
+  | { kind: "saved" }
+  | { kind: "menu" }
+  | null;
 
 /**
  * Drift-detection padding (in degrees).
@@ -1035,17 +1057,25 @@ export default function MapWrapper({
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const isBelow2xl = useMediaQuery(BELOW_2XL_QUERY);
 
+  // #682 — whether the desktop side panel is currently open, kept in a ref
+  // (declared here, before `selectedVenue` exists) so the category fit-bounds
+  // effect further down — which runs before `selectedVenue` is computed in
+  // source order — can read its CURRENT value without becoming a dependency.
+  // The boolean itself is computed and synced into this ref near
+  // `venueSheetOpen` below, once `selectedVenue` is available.
+  const desktopPanelOpenRef = useRef(false);
+
   // perf(#588) — warm DesktopVenueWindow's chunk as soon as desktop layout is
   // known, well before any venue is selected. Reviewer note on the code-split
   // above: the dynamic() call has no `loading` fallback (unlike MapCanvas's
-  // MapLoadingFallback) because DesktopVenueWindow is marker-anchored — its
-  // on-screen position comes from mapboxMap.project() inside the component
-  // itself, so a static placeholder can't honestly stand in for it without
-  // duplicating that positioning logic. Prefetching here instead means the
-  // module is normally already cached by the time a user actually clicks a
-  // pin (search, pan, hover — every desktop session does several other
-  // things first), so the "click does nothing for a beat" gap the reviewer
-  // flagged is rare in practice rather than eliminated outright.
+  // MapLoadingFallback) because DesktopSidePanel (the fixed shell it renders
+  // inside, #682) already has a fixed size/position with no content-derived
+  // measurement — a placeholder would just be an empty panel flash, not worth
+  // a dedicated loading component. Prefetching here instead means the module
+  // is normally already cached by the time a user actually clicks a pin
+  // (search, pan, hover — every desktop session does several other things
+  // first), so the "click does nothing for a beat" gap the reviewer flagged
+  // is rare in practice rather than eliminated outright.
   const desktopWindowPrefetched = useRef(false);
   useEffect(() => {
     if (isMobile || desktopWindowPrefetched.current) return;
@@ -1054,13 +1084,85 @@ export default function MapWrapper({
   }, [isMobile]);
 
   // ── Drawer (HamburgerMenu) — opened from BottomNav at a section (spec §7) ────
+  // `menuSection` stays the mobile-only state it always was — mobile's
+  // HamburgerMenu is unchanged by #682 8b. `sidePanelView` is the NEW
+  // desktop-only union (#682 8b) that replaces desktop's own read of
+  // `menuSection` — see `selectVenue` above for the venue half, and
+  // `handleNavSectionTap`/`closeDesktopPanel` below for the Saved/Menu half.
   const [menuSection, setMenuSection] = useState<MenuSection | null>(null);
+  const [sidePanelView, setSidePanelView] = useState<DesktopSidePanelView>(null);
   const navRef = useRef<HTMLElement | null>(null);
-  const handleNavSectionTap = useCallback((section: MenuSection) => {
-    // Tapping the open section's own item closes it; any other item re-targets.
-    setMenuSection((current) => (current === section ? null : section));
-  }, []);
+  const handleNavSectionTap = useCallback(
+    (section: MenuSection) => {
+      if (isMobile) {
+        // Tapping the open section's own item closes it; any other item re-targets.
+        setMenuSection((current) => (current === section ? null : section));
+        return;
+      }
+      const kind: "saved" | "menu" = section === "saved" ? "saved" : "menu";
+      setSidePanelView((current) => (current?.kind === kind ? null : { kind }));
+      // Switching to Saved/Menu on desktop always drops any open venue card
+      // — the panel now shows a different view, so the pin highlight and
+      // any walking route should clear with it (judgment call flagged in
+      // the coder's report; the `selectedVenueId !== walkingRouteVenueId`
+      // effect below already clears a stale route once this fires).
+      setSelectedVenueId(null);
+      setWindowExpanded(false);
+    },
+    [isMobile, setSelectedVenueId, setWindowExpanded],
+  );
   const handleMenuClose = useCallback(() => setMenuSection(null), []);
+  // Closes whatever the desktop panel is showing (#682 8b) — Escape, the
+  // panel's ✕, and re-clicking a lit bar item (handled above instead) all
+  // route through this. A REAL close, full stop: the panel closes, the
+  // venue (if any) deselects, and any walking route clears with it — same
+  // as closing an ordinary card. "← Saved" is a separate, deliberate
+  // BACK control (see `backToSaved` below), not a close — coordinator
+  // correction after PR #688 review: an earlier version of this function
+  // special-cased "opened from Saved" to go back to the list instead of
+  // closing, which meant ✕/Escape on such a card couldn't fully close it
+  // at all. Kept deliberately plain (no branching) so it stays obviously
+  // correct for every view.
+  const closeDesktopPanel = useCallback(() => {
+    setSidePanelView(null);
+    setSelectedVenueId(null);
+    setWindowExpanded(false);
+  }, [setSelectedVenueId, setWindowExpanded]);
+
+  // "← Saved" (#682 8b) — the back-link on a venue card opened FROM the
+  // Saved list. A pure navigation within the panel, not a close: the venue
+  // stays selected (pin highlight, walking route) exactly as it would if
+  // the user had merely switched tabs, since going back to Saved has
+  // nothing to do with what's selected on the map.
+  const backToSaved = useCallback(() => {
+    setSidePanelView({ kind: "saved" });
+  }, []);
+
+  // Single choke point for "a venue got selected" on desktop (#682 8b,
+  // coordinator: "MapWrapper owns one desktop sidePanelView union ...
+  // replacing separate venue-selected/menu-open desktop states"). Every
+  // selection path (pin click, search, saved-list, deep link, Enter-to-
+  // select) routes through this so `sidePanelView` (the panel's OWN render
+  // driver on desktop) can never drift out of sync with `selectedVenueId`
+  // (the map's ground truth — pins, walking route, box fetch, deep links —
+  // which stays independent and unchanged for BOTH platforms; an
+  // effect-sync was rejected instead of this shared setter after hitting a
+  // real isMobile-starts-false race with a similar effect earlier in #682 —
+  // see MapWrapper's pan-on-select effect). `from` is set ONLY by the
+  // Saved-list selection path, so the panel can render a "← Saved" link back.
+  // Declared here (early), not beside its call sites further down, because
+  // the `initialVenueId` deep-link effects below also need it and `const`
+  // bindings can't be read before their declaration.
+  const selectVenue = useCallback(
+    (id: string, from?: "saved") => {
+      setSelectedVenueId(id);
+      if (!isMobile) {
+        setSidePanelView({ kind: "venue", id, from });
+        setWindowExpanded(false);
+      }
+    },
+    [isMobile, setSelectedVenueId, setWindowExpanded],
+  );
 
   // ── Origin — user position or Pueblo center fallback ─────────────────────────
   const origin = userLocation ?? PUEBLO_CENTER;
@@ -1180,7 +1282,7 @@ export default function MapWrapper({
     // and Map.tsx's flyTo effect re-fires once `venues`/liveBoxes populate
     // (new array reference) — so there's nothing here to guard against.
     if (initialVenueId) {
-      queueMicrotask(() => setSelectedVenueId(initialVenueId));
+      queueMicrotask(() => selectVenue(initialVenueId));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapboxMap]);
@@ -1214,7 +1316,12 @@ export default function MapWrapper({
     }
     if (allVenues.some((v) => v.id === initialVenueId) || boxIdSet.has(initialVenueId)) {
       deepLinkDoneRef.current = true;
-      setSelectedVenueId(initialVenueId);
+      // Deferred (react-hooks/set-state-in-effect, same convention the
+      // mapboxMap-ready branch above already uses): a raw setState call
+      // here passes that lint rule directly, but `selectVenue` — a plain
+      // function wrapping multiple setState calls — reads as "might
+      // synchronously setState" to its static check.
+      queueMicrotask(() => selectVenue(initialVenueId));
       return;
     }
     if (liveBoxesLoading) return; // could still resolve to a box — wait
@@ -1277,6 +1384,14 @@ export default function MapWrapper({
     const fitPadding = {
       ...basePadding,
       bottom: basePadding.bottom + (isBelow2xl ? BOTTOM_NAV_HEIGHT_PX : 24 + 52),
+      // #682 — an open desktop side panel is also chrome fitted pins must
+      // clear. Added explicitly (not via mapboxMap.setPadding) because
+      // Mapbox's fitBounds REPLACES rather than merges an explicit padding
+      // object with the map's persistent padding (see mapbox-gl's own
+      // `_extendPadding`) — a persistent setPadding call would be silently
+      // ignored by every fitBounds call here, which all pass their own
+      // padding object already.
+      right: basePadding.right + (desktopPanelOpenRef.current ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0),
     };
 
     if (categoriesKey === null) {
@@ -1515,16 +1630,15 @@ export default function MapWrapper({
           // more box-vs-venue branch, same as the other three selection
           // handlers (handleSelectSavedVenue/handleSelectVenueFromPopover/
           // handleSelectFromList).
-          setSelectedVenueId(venue.id);
+          selectVenue(venue.id);
           showVenueOnMap();
-          if (!isMobile) setWindowExpanded(false);
           setIsPopoverOpen(false);
           setActiveIndex(-1);
         }
       }
     },
     // filteredVenues reference is stable between renders with same query/filters.
-    [isPopoverOpen, filteredVenues, activeIndex, isMobile, showVenueOnMap, setSelectedVenueId, setWindowExpanded],
+    [isPopoverOpen, filteredVenues, activeIndex, selectVenue, showVenueOnMap],
   );
 
   // Select a venue from the Saved list (#132 9c). Clears active filters + search
@@ -1534,23 +1648,21 @@ export default function MapWrapper({
   const handleSelectSavedVenue = useCallback(
     (venueId: string) => {
       handleClearAllFilters();
-      setSelectedVenueId(venueId);
+      selectVenue(venueId, "saved");
       showVenueOnMap();
-      if (!isMobile) setWindowExpanded(false);
     },
-    [handleClearAllFilters, isMobile, showVenueOnMap, setSelectedVenueId, setWindowExpanded],
+    [handleClearAllFilters, selectVenue, showVenueOnMap],
   );
 
   /** Called when user clicks/taps a result row inside the popover. */
   const handleSelectVenueFromPopover = useCallback(
     (venueId: string) => {
-      setSelectedVenueId(venueId);
+      selectVenue(venueId);
       showVenueOnMap();
-      if (!isMobile) setWindowExpanded(false);
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     },
-    [isMobile, showVenueOnMap, setSelectedVenueId, setWindowExpanded],
+    [selectVenue, showVenueOnMap],
   );
 
   // Select a venue from the list (#129) — switch back to the map, centered on
@@ -1563,11 +1675,10 @@ export default function MapWrapper({
   // viewMode === "map").
   const handleSelectFromList = useCallback(
     (venueId: string) => {
-      setSelectedVenueId(venueId);
+      selectVenue(venueId);
       showVenueOnMap();
-      if (!isMobile) setWindowExpanded(false);
     },
-    [isMobile, showVenueOnMap, setSelectedVenueId, setWindowExpanded],
+    [selectVenue, showVenueOnMap],
   );
 
   // A box pin now opens the SAME in-map card every other venue uses
@@ -1576,12 +1687,9 @@ export default function MapWrapper({
   // branch to thread through on this path either.
   const handleSelectVenueFromMap = useCallback(
     (id: string) => {
-      setSelectedVenueId(id);
-      if (!isMobile) {
-        setWindowExpanded(false);
-      }
+      selectVenue(id);
     },
-    [isMobile, setSelectedVenueId, setWindowExpanded],
+    [selectVenue],
   );
 
   const handleMapReady = useCallback(
@@ -1682,6 +1790,90 @@ export default function MapWrapper({
   // conditional, which was the "fifth ad-hoc boolean" #542 called out.
   useOverlayRegistration(venueSheetOpen);
 
+  // ── Desktop side panel (#682) — replaces the marker-anchored window ──────────
+  // `sidePanelView` (8b) is the panel's sole render driver on desktop — see
+  // its own type doc above. The venue card still needs the map-ish-view
+  // guard `venueSheetOpen` above uses (a card only makes sense over the map
+  // or mapUnavailable's fallback), but Saved/Menu don't: the old ~280px
+  // dropdown worked over the list view too, and #682 doesn't ask to take
+  // that away. `viewMode`/`mapUnavailable` are read directly (not via
+  // `selectedVenue`, which is null while `sidePanelView.kind !== "venue"`).
+  const desktopPanelOpen =
+    !isMobile &&
+    sidePanelView !== null &&
+    (sidePanelView.kind !== "venue" || viewMode === "map" || mapUnavailable);
+
+  // Stable ids for HamburgerMenuContent's Saved/Menu headings — the venue
+  // view reuses DesktopVenueWindow's own existing heading id. Only read
+  // while `desktopPanelOpen` (DesktopSidePanel unmounts otherwise), so the
+  // fallback empty string here is never actually passed to a mounted panel.
+  const panelHeadingId =
+    sidePanelView?.kind === "venue"
+      ? `venue-window-title-${sidePanelView.id}`
+      : sidePanelView?.kind === "saved"
+      ? "desktop-panel-saved-heading"
+      : sidePanelView?.kind === "menu"
+      ? "desktop-panel-menu-heading"
+      : "";
+
+  // Synced into the ref declared near `isMobile` above, not read as a direct
+  // dependency of the fit-bounds effect: that effect deliberately excludes
+  // isMobile/isBelow2xl too (see its own trailing comment — "the padding
+  // that was current when the category was selected, not re-zoom on
+  // resize"). Reading whatever the panel's state happens to be AT FIT TIME
+  // follows the same rule without forcing that effect to re-run every time
+  // the panel opens or closes.
+  useEffect(() => {
+    desktopPanelOpenRef.current = desktopPanelOpen;
+  }, [desktopPanelOpen]);
+
+  // Pan the selected pin clear of the panel (#682) — the panel's fixed
+  // position/size means a pin near the right edge would otherwise render
+  // under it. `panBy` shifts the camera in screen pixels (not degrees), so
+  // this works regardless of zoom level; a positive x offset moves the
+  // camera's on-screen reference point right, which is the documented Mapbox
+  // way to make map CONTENT appear to shift left (revealing more on the
+  // right) — see the Mapbox GL JS `panBy` example ("panBy([-100, 0])...
+  // appears to move 100 pixels to the right"). Only pans when the pin is
+  // ACTUALLY hidden (positive overflow) — never recenters a pin that's
+  // already clear, so this never fights a fresh fitBounds/flyTo the same
+  // selection just triggered elsewhere.
+  useEffect(() => {
+    // Gate on the panel actually being open (#688 review), not just on a
+    // selection existing: a future path that selects without showing the map
+    // must never pan a hidden map.
+    if (isMobile || !mapboxMap || !selectedVenue || !desktopPanelOpen) return;
+    // `project`/`panBy` guard: real mapboxgl.Map always has both, but
+    // `isMobile` starts `false` (useMediaQuery's SSR-safe default) and only
+    // flips true via a deferred setTimeout — a lint-rule artifact (setState
+    // can't run synchronously in an effect body), never an issue in a real
+    // browser, where a user can't click anything before that timeout fires.
+    // A test that pre-selects a venue via `initialVenueId` (a synchronous
+    // prop, no real user delay) CAN hit this effect on that same first tick,
+    // before isMobile has synced — with a minimal test map mock that only
+    // stubs the methods ITS OWN scenario needs (fitBounds/flyTo/jumpTo, not
+    // project/panBy, since every other desktop-only code path is already
+    // gated by the JSX `!isMobile` render conditional, which this effect —
+    // deliberately independent of what actually renders — is not).
+    if (
+      typeof mapboxMap.project !== "function" ||
+      typeof mapboxMap.getContainer !== "function" ||
+      typeof mapboxMap.panBy !== "function"
+    ) {
+      return;
+    }
+    const pt = mapboxMap.project([selectedVenue.lng, selectedVenue.lat]);
+    const container = mapboxMap.getContainer();
+    const visibleRight = container.offsetWidth - DESKTOP_PANEL_RIGHT_CLEARANCE_PX;
+    const overflow = pt.x - visibleRight;
+    if (overflow <= 0) return;
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    mapboxMap.panBy([overflow, 0], { duration: reducedMotion ? 0 : 300 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVenueId, mapboxMap, isMobile, desktopPanelOpen]);
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -1775,6 +1967,7 @@ export default function MapWrapper({
           onFocus={handleSearchFocus}
           onBlur={handleSearchBlur}
           onKeyDownExtra={handleSearchKeyDown}
+          rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
           filtersButton={{
             count: activeFilterCount,
             onClick: () => setFilterPanelOpen(true),
@@ -1864,19 +2057,25 @@ export default function MapWrapper({
       {/* HamburgerMenu — the drawer, opened by BottomNav at a section (#71, spec §7).
           viewMode/onToggleView/mapDisabled (#514) drive its "List view"/"Map
           view" line — the second way into the switch, for anyone who never
-          taps search. */}
-      <HamburgerMenu
-        onShowWelcome={onShowWelcome}
-        savedVenues={savedVenues}
-        onSelectVenue={handleSelectSavedVenue}
-        open={menuSection !== null}
-        onClose={handleMenuClose}
-        view={menuSection ?? "top"}
-        ignoreOutsideRef={navRef}
-        viewMode={viewMode}
-        onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map")}
-        mapDisabled={mapUnavailable}
-      />
+          taps search. MOBILE ONLY (#682 8b) — desktop's Saved/Menu views
+          render inside DesktopSidePanel below instead (same
+          HamburgerMenuContent, different shell — see that component's own
+          header). Gated on `isMobile`, not just `menuSection`, so a resize
+          mid-session doesn't leave this mounted with the wrong shell. */}
+      {isMobile && (
+        <HamburgerMenu
+          onShowWelcome={onShowWelcome}
+          savedVenues={savedVenues}
+          onSelectVenue={handleSelectSavedVenue}
+          open={menuSection !== null}
+          onClose={handleMenuClose}
+          view={menuSection ?? "top"}
+          ignoreOutsideRef={navRef}
+          viewMode={viewMode}
+          onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map")}
+          mapDisabled={mapUnavailable}
+        />
+      )}
 
       {/* Outside-county message — appears when resolved position is beyond maxBounds (#108). Map mode only (#129). */}
       {viewMode === "map" && outsideCountyVisible && (
@@ -1980,56 +2179,99 @@ export default function MapWrapper({
         />
       )}
 
-      {/* DesktopVenueWindow — marker-anchored, desktop only. Map mode
-          (#129), OR mapUnavailable (#524) — opens over the list with
-          mapboxMap null; DesktopVenueWindow's own position effect no-ops on
-          a null map (see its header comment) and falls back to centering
-          on screen instead of marker-anchoring. */}
-      {!isMobile && (viewMode === "map" || mapUnavailable) && selectedVenue && (
-        <DesktopVenueWindow
-          key={selectedVenueId}
-          venue={selectedVenue}
-          box={getBoxById(selectedVenueId)}
-          onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
-          expanded={windowExpanded}
-          mapboxMap={mapboxMap}
-          onExpand={() => setWindowExpanded(true)}
-          onCollapse={() => setWindowExpanded(false)}
-          onClose={() => {
-            setSelectedVenueId(null);
-            setWindowExpanded(false);
-          }}
-          onWalkRoute={handleWalkRoute}
-          isWalkRouteActive={
-            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
+      {/* DesktopSidePanel (#682, 8b) — fixed right-hand shell. `sidePanelView`
+          decides content: the venue/box card (unchanged from 8a — Map mode
+          #129 or mapUnavailable #524's fallback), or, new in 8b, the Saved
+          list / Menu (HamburgerMenuContent — the SAME content mobile's
+          HamburgerMenu renders, different shell, see that component's own
+          header for why). `panelHeadingId` names whichever view's own
+          focusable heading DesktopSidePanel should focus on view change. */}
+      <DesktopSidePanel open={desktopPanelOpen} onClose={closeDesktopPanel} headingId={panelHeadingId}>
+        {(close) => {
+          if (sidePanelView?.kind === "venue") {
+            if (!selectedVenue) return null;
+            return (
+              <DesktopVenueWindow
+                key={sidePanelView.id}
+                venue={selectedVenue}
+                box={getBoxById(sidePanelView.id)}
+                onCheckinSuccess={(result) => handleBoxCheckinSuccess(sidePanelView.id, result)}
+                expanded={windowExpanded}
+                onExpand={() => setWindowExpanded(true)}
+                onCollapse={() => setWindowExpanded(false)}
+                onClose={close}
+                // "← Saved" (#682 8b) — a back-navigation, NOT a close: uses
+                // `backToSaved` (keeps the venue selected), never `close`
+                // (a real, full close — same for every card, coordinator
+                // correction after PR #688 review).
+                backTo={
+                  sidePanelView.from === "saved"
+                    ? { label: t("panel.backToSaved", locale), onClick: backToSaved }
+                    : undefined
+                }
+                onWalkRoute={handleWalkRoute}
+                isWalkRouteActive={walkingRouteVenueId === sidePanelView.id}
+                onClearWalkRoute={handleClearWalkingRoute}
+                walkRouteInfo={walkingRouteVenueId === sidePanelView.id ? walkingRouteInfo : null}
+                walkRouteSteps={walkingRouteVenueId === sidePanelView.id ? walkingRouteSteps : null}
+                activeStepIndex={activeStepIndex}
+                onStepChange={handleStepChange}
+                showWalkLocationHint={walkLocationHintVenueId === sidePanelView.id}
+              />
+            );
           }
-          onClearWalkRoute={handleClearWalkingRoute}
-          walkRouteInfo={
-            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
-              ? walkingRouteInfo
-              : null
+          if (sidePanelView?.kind === "saved") {
+            return (
+              <HamburgerMenuContent
+                view="saved"
+                locale={locale}
+                savedVenues={savedVenues}
+                onSelectVenue={handleSelectSavedVenue}
+                onClose={close}
+                headingId={panelHeadingId}
+              />
+            );
           }
-          walkRouteSteps={
-            selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
-              ? walkingRouteSteps
-              : null
+          if (sidePanelView?.kind === "menu") {
+            return (
+              <HamburgerMenuContent
+                view="top"
+                locale={locale}
+                onShowWelcome={onShowWelcome}
+                viewMode={viewMode}
+                onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map")}
+                mapDisabled={mapUnavailable}
+                onClose={close}
+                headingId={panelHeadingId}
+              />
+            );
           }
-          activeStepIndex={activeStepIndex}
-          onStepChange={handleStepChange}
-          showWalkLocationHint={
-            selectedVenueId !== null && walkLocationHintVenueId === selectedVenueId
-          }
-        />
-      )}
+          return null;
+        }}
+      </DesktopSidePanel>
 
       {/* BottomNav — LAST in DOM order so keyboard users reach the map and the
           search first (spec §12). Rendered unconditionally: it hides ITSELF
           (overlayRegistry.ts) whenever venueSheetOpen or any other
           full-surface overlay is open (#542) — see the useOverlayRegistration
-          call above for venueSheetOpen's own registration. */}
+          call above for venueSheetOpen's own registration. `rightInset`
+          (#682) shifts it left, clear of the desktop side panel — see
+          BottomNav's own header for why the shift is a CSS var, not a class. */}
       <BottomNav
         locale={locale}
-        openSection={menuSection}
+        // Mobile reads `menuSection` (unchanged); desktop reads
+        // `sidePanelView` instead (#682 8b) — a venue card lights neither
+        // bar item, matching the issue's "only the list is lit" rule for a
+        // venue opened FROM Saved.
+        openSection={
+          isMobile
+            ? menuSection
+            : sidePanelView?.kind === "saved"
+            ? "saved"
+            : sidePanelView?.kind === "menu"
+            ? "top"
+            : null
+        }
         onSectionTap={handleNavSectionTap}
         geoState={geo.state}
         isLocating={isLocating}
@@ -2038,6 +2280,7 @@ export default function MapWrapper({
         boxesActive={selectedCategories?.has("blessing_box") ?? false}
         onBoxesToggle={handleBoxesToggle}
         navRef={navRef}
+        rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
       />
     </div>
   );

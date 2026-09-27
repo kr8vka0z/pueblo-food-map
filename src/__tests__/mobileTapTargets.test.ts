@@ -69,7 +69,12 @@ describe("mobile review #14 — shared press-feedback style is defined once", ()
     "src/components/SearchBar.tsx",
     "src/components/BottomSheet.tsx",
     "src/components/DirectionButtons.tsx",
-    "src/components/HamburgerMenu.tsx",
+    // #682 8b (coordinator: "Split HamburgerMenu.tsx into content-only
+    // pieces... plus a thin wrapper") moved every PRESS_FEEDBACK usage
+    // (close button, sponsor card, menu items) into HamburgerMenuContent —
+    // HamburgerMenu.tsx itself is now pure shell (position/focus/Escape),
+    // with nothing left that needs the press-feedback style.
+    "src/components/HamburgerMenuContent.tsx",
     "src/components/VenuePopupHeader.tsx",
     "src/components/LocationDeniedBanner.tsx",
     "src/components/FavoriteButton.tsx",

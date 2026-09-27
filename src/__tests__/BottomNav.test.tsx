@@ -209,8 +209,28 @@ describe("BottomNav — 2xl pill floats bottom-centre (Kyle, 2026-09-16)", () =>
   test("carries the bottom-centre classes, not the old beside-the-search-box ones", () => {
     renderNav();
     const nav = screen.getByRole("navigation");
-    for (const c of ["2xl:bottom-6", "2xl:left-1/2", "2xl:-translate-x-1/2"]) expect(nav.className).toContain(c);
+    // #682: `left-1/2` became a `calc()` arbitrary value so an open desktop
+    // side panel can shift it via `--panel-right-inset` — see
+    // BottomNav.test.tsx's own "#682 rightInset" describe block below for
+    // that prop's own coverage. The translate stays a plain, fixed -50%.
+    for (const c of ["2xl:bottom-6", "2xl:left-[calc(50%-var(--panel-right-inset,0px)/2)]", "2xl:-translate-x-1/2"]) {
+      expect(nav.className).toContain(c);
+    }
     expect(nav.className).not.toContain("272px");
     expect(nav.className).not.toContain("2xl:top-");
+  });
+});
+
+describe("BottomNav — rightInset shifts clear of the desktop side panel (#682)", () => {
+  test("default (no rightInset): --panel-right-inset is 0px", () => {
+    renderNav();
+    const nav = screen.getByRole("navigation");
+    expect(nav.style.getPropertyValue("--panel-right-inset")).toBe("0px");
+  });
+
+  test("rightInset sets --panel-right-inset to the given px value", () => {
+    renderNav({ rightInset: 404 });
+    const nav = screen.getByRole("navigation");
+    expect(nav.style.getPropertyValue("--panel-right-inset")).toBe("404px");
   });
 });

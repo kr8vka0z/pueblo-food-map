@@ -43,13 +43,6 @@ vi.mock("vaul", async () => {
   return { Drawer: { Root, Portal, Content, Title, Description } };
 });
 
-const mockMapboxMap = {
-  project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
-  getContainer: vi.fn().mockReturnValue({ offsetWidth: 1000, offsetHeight: 800 }),
-  on: vi.fn().mockReturnThis(),
-  off: vi.fn().mockReturnThis(),
-};
-
 const fourthTuesday: IrregularSchedule = {
   recurrence: "monthly_ordinal",
   ordinal: 4,
@@ -122,7 +115,6 @@ describe("DesktopVenueWindow — irregular schedule", () => {
       <DesktopVenueWindow
         venue={makeVenue()}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -136,7 +128,6 @@ describe("DesktopVenueWindow — irregular schedule", () => {
       <DesktopVenueWindow
         venue={makeVenue()}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -151,7 +142,6 @@ describe("DesktopVenueWindow — irregular schedule", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={true}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}

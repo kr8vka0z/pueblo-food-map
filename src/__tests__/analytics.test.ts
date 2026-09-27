@@ -163,16 +163,18 @@ describe("initAnalytics — init options (session replay, masking)", () => {
     );
   });
 
-  test("cookieless mode and IP-discard-friendly config are still set", async () => {
+  test("memory-only persistence (no cookie, nothing stored) and no cookieless_mode, which would disable replay", async () => {
     await initAnalytics({ key: "test-key", pathname: "/" });
     expect(init).toHaveBeenCalledWith(
       "test-key",
       expect.objectContaining({
         api_host: "/ingest",
-        cookieless_mode: "always",
+        persistence: "memory",
         person_profiles: "never",
       }),
     );
+    const [, config] = init.mock.calls[0] as [string, Record<string, unknown>];
+    expect(config).not.toHaveProperty("cookieless_mode");
   });
 
   test("does not override autocapture/heatmaps/web-vitals off — leaves them to PostHog remote config", async () => {

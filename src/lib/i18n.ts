@@ -406,9 +406,10 @@ const en: Record<string, string> = {
   "privacy.other.body": "We use Mapbox to show the map. Loading it shares your IP address with Mapbox, and if you get walking directions, your location too. We use Cloudflare Turnstile on our forms and box check-ins to block spam; it checks some information about your device and browser.",
   // Rewritten (#485, PostHog analytics core): PostHog joins Cloudflare Web
   // Analytics (which stays on as an independent visit count — AGENTS.md
-  // "Observability"). PostHog's cookieless mode and "Discard client IP
-  // data" project setting keep two of this page's promises (no cookies,
-  // IP discarded); this paragraph is rewritten to also disclose the new
+  // "Observability"). PostHog's memory-only persistence (analytics.ts) and
+  // "Discard client IP data" project setting keep two of this page's
+  // promises (no cookies/nothing stored, IP discarded); this paragraph is
+  // rewritten to also disclose the new
   // named taps/search tracking (#485 comment, 2026-09-26) truthfully.
   // Session replay (screen-recording of how a page was used) was turned
   // back ON (Kyle, 2026-09-26, reversing the issue's original "replay OFF")

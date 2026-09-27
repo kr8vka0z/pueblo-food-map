@@ -4,11 +4,16 @@
  * comment) — this file only provides the init entry point, the event
  * allowlist, and the sanitizer those calls will use.
  *
- * WHY cookieless_mode + person_profiles: "always" + "never" (issue body):
- * together they mean no cookie and nothing in localStorage for a public
- * visitor, so no consent banner is needed and two of privacy.analytics's
- * three promises survive untouched. Cost: a returning visitor on a
- * different day counts as new — accepted default.
+ * WHY persistence: "memory" + person_profiles: "never", not cookieless_mode
+ * (Kyle, 2026-09-26, "option B"): the issue originally chose
+ * cookieless_mode: "always", but posthog-js creates no session manager in
+ * that mode, so Session Replay never records (verified in iOS Simulator
+ * Safari: only /ingest/e/ uploads, never replay snapshots). Memory
+ * persistence keeps the privacy page's promises (no cookie, nothing stored
+ * on the device) and lets replay work. Cost: every page load is a new
+ * anonymous PostHog visitor, so **unique-visitor counts always come from
+ * Cloudflare Web Analytics, never PostHog** (Kyle's condition for option B;
+ * see #680/#681).
  *
  * WHY api_host: "/ingest": PostHog's own SDK bytes and API calls are proxied
  * same-origin through custom-worker.ts's /ingest handler (src/lib/
@@ -40,7 +45,7 @@ let client: PostHogClient | null = null;
 /**
  * True if this browser is flagged as one of Kyle's own — set by the admin
  * sign-in success path (AdminLoginForm.tsx) via markInternalDevice(), since
- * cookieless_mode leaves no other durable, cross-network way to recognize
+ * memory-only persistence leaves no other durable, cross-network way to recognize
  * "this is Kyle's phone on cellular" (#485 comment, 2026-09-26).
  */
 export function isInternalDevice(): boolean {
@@ -203,7 +208,8 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
   const posthog = (await import("posthog-js")).default as unknown as PostHogClient;
   posthog.init(key, {
     api_host: "/ingest",
-    cookieless_mode: "always",
+    // Memory only: no cookie, no localStorage/sessionStorage (see header).
+    persistence: "memory",
     person_profiles: "never",
     autocapture: true,
     capture_pageview: "history_change",

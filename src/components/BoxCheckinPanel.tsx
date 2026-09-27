@@ -806,9 +806,6 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
           {t("form.turnstile.error", locale)}
         </p>
       )}
-      {turnstileMode === "fallback" && !turnstileToken && !turnstileError && (
-        <p className="text-xs text-[var(--color-ink-700)]">{t("box.checkin.turnstileFallbackPrompt", locale)}</p>
-      )}
 
       {/* Persistent (not inside `photoOpen &&`) — a successful standalone
           send closes that form immediately (matching the checkin note
@@ -874,23 +871,43 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               {t("box.photo.addButton", locale)}
             </button>
           </div>
-
-          {/* Quiet text links — "Report a problem" (was a grid button; same
-              behavior, tap opens the same note form via handleTap below) beside
-              "Report photo" when the box has a current photo. */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            <button
-              type="button"
-              disabled={busy}
-              aria-disabled={busy}
-              onClick={() => handleTap("problem")}
-              className="inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
-            >
-              {busyKind === "problem" ? t("box.checkin.submitting", locale) : t("box.checkin.problem", locale)}
-            </button>
-            {latestPhotoId != null && <ReportPhotoButton photoId={latestPhotoId} locale={locale} />}
-          </div>
         </>
+      )}
+
+      {/* Turnstile fallback hint + widget container (#669) — moved to sit
+          directly under the check-in buttons it unlocks, above the
+          quiet-links row below, instead of several rows away where the
+          "Tap the box below…" hint used to point at nothing nearby. This
+          block is UNCONDITIONAL (not nested inside `!needsAsk &&` above or
+          the quiet-links block below) — the container div must never
+          unmount while this component is mounted, or the imperatively
+          rendered Turnstile iframe is orphaned and the widget breaks (same
+          reasoning as AdoptBoxForm.tsx's own "OUTSIDE the form" comment).
+          Its FIXED position in this children list (a stable array index
+          across every render, regardless of `needsAsk` toggling `!needsAsk &&`
+          above and below between `false` and an element) is what keeps it
+          from being remounted. */}
+      {turnstileMode === "fallback" && !turnstileToken && !turnstileError && (
+        <p className="text-xs text-[var(--color-ink-700)]">{t("box.checkin.turnstileFallbackPrompt", locale)}</p>
+      )}
+      <div ref={turnstileContainerRef} data-testid="turnstile-widget" />
+
+      {!needsAsk && (
+        /* Quiet text links — "Report a problem" (was a grid button; same
+           behavior, tap opens the same note form via handleTap below) beside
+           "Report photo" when the box has a current photo. */
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <button
+            type="button"
+            disabled={busy}
+            aria-disabled={busy}
+            onClick={() => handleTap("problem")}
+            className="inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
+          >
+            {busyKind === "problem" ? t("box.checkin.submitting", locale) : t("box.checkin.problem", locale)}
+          </button>
+          {latestPhotoId != null && <ReportPhotoButton photoId={latestPhotoId} locale={locale} />}
+        </div>
       )}
 
       {/* "What would help you next time?" ask (migration 0012) — see this
@@ -1097,8 +1114,6 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
           onChange={(e) => setHoneypot(e.target.value)}
         />
       </div>
-
-      <div ref={turnstileContainerRef} data-testid="turnstile-widget" />
     </section>
   );
 }

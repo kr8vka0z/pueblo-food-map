@@ -52,6 +52,13 @@ declare global {
     // import above: it's a plain wrangler `var`, not a binding worth a full
     // runtime-type regen for one optional string field.
     BETTER_AUTH_RP_ID?: string;
+    // #485 (PostHog analytics) — comma-separated IP/CIDR list (both prod and
+    // env.staging get one, see wrangler.jsonc) custom-worker.ts's /ingest
+    // proxy checks via src/lib/ipMatch.ts before forwarding to PostHog.
+    // Declared here rather than regenerated via `npx wrangler types`, same
+    // rationale as BETTER_AUTH_RP_ID above: a plain wrangler `var`, not worth
+    // a full runtime-type regen for one optional string field.
+    ANALYTICS_EXCLUDED_IPS?: string;
   }
 }
 

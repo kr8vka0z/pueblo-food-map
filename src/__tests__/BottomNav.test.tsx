@@ -160,6 +160,51 @@ describe("BottomNav — Boxes (#516)", () => {
   });
 });
 
+// #670 — option D: only the heart path fills, no background circle/wash.
+describe("BottomNav — Boxes 'on' look is option D (#670)", () => {
+  test("the heart path fills currentColor only when boxesActive, and never otherwise", () => {
+    const { rerender, props } = renderNav();
+    const heartPath = () =>
+      screen.getByTestId("nav-boxes").querySelector('path[d^="M12 17.5"]');
+    expect(heartPath()?.getAttribute("fill")).toBe("none");
+    rerender(<BottomNav {...props} boxesActive />);
+    expect(heartPath()?.getAttribute("fill")).toBe("currentColor");
+  });
+
+  test("the house paths (roof, walls) never fill, active or not — only the heart does", () => {
+    const { rerender, props } = renderNav();
+    const houseFills = () =>
+      Array.from(screen.getByTestId("nav-boxes").querySelectorAll("path"))
+        .slice(0, 2)
+        .map((p) => p.getAttribute("fill"));
+    expect(houseFills()).toEqual([null, null]);
+    rerender(<BottomNav {...props} boxesActive />);
+    expect(houseFills()).toEqual([null, null]);
+  });
+
+  test("Boxes carries no inline background style, active or not — no circle behind the icon", () => {
+    const { rerender, props } = renderNav();
+    const btn = () => screen.getByTestId("nav-boxes");
+    expect(btn().getAttribute("style")).toBeNull();
+    rerender(<BottomNav {...props} boxesActive />);
+    expect(btn().getAttribute("style")).toBeNull();
+  });
+});
+
+// #670 — every bar item disables the browser's native tap-highlight overlay,
+// which is what actually produced the "grey circle stuck after a tap" symptom
+// (not Tailwind's hover:, which already only applies under (hover: hover)).
+describe("BottomNav — no native tap-highlight overlay on touch (#670)", () => {
+  test("every nav item suppresses -webkit-tap-highlight-color", () => {
+    renderNav();
+    for (const testId of ["nav-near-me", "nav-boxes", "nav-resources"]) {
+      expect(screen.getByTestId(testId).className).toContain(
+        "[-webkit-tap-highlight-color:transparent]",
+      );
+    }
+  });
+});
+
 describe("BottomNav — 2xl pill floats bottom-centre (Kyle, 2026-09-16)", () => {
   test("carries the bottom-centre classes, not the old beside-the-search-box ones", () => {
     renderNav();

@@ -124,6 +124,11 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
   // comment on this exact block for the full reasoning (the hook's
   // mount-on-first-render effect only ever runs once; the container must
   // already exist in the very first render, not only after `open` flips).
+  //
+  // #669 — same off-screen-while-closed fix as AdoptBoxForm.tsx's own
+  // `turnstileVisible`; see that file's header for the full reasoning
+  // (`display:none` risks Turnstile not rendering into a zero-layout box).
+  const turnstileVisible = open && state !== "success";
   const turnstileNodes = (
     <>
       <Script
@@ -131,7 +136,12 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
         strategy="afterInteractive"
         onReady={turnstile.mount}
       />
-      <div ref={turnstileContainerRef} data-testid="box-alert-turnstile-widget" />
+      <div
+        ref={turnstileContainerRef}
+        data-testid="box-alert-turnstile-widget"
+        aria-hidden={turnstileVisible ? undefined : true}
+        className={turnstileVisible ? undefined : "absolute -left-[9999px] -top-[9999px] pointer-events-none"}
+      />
     </>
   );
 

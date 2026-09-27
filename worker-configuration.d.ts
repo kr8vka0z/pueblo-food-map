@@ -5,6 +5,7 @@ interface __BaseEnv_Env {
 	ADMIN_DB: D1Database;
 	ASSETS: Fetcher;
 	BETTER_AUTH_RP_ID?: "dev.pueblofoodmap.com";
+	ANALYTICS_EXCLUDED_IPS: "66.33.12.72,2607:3640:121:e110::/64";
 	NEXT_PUBLIC_MAPBOX_TOKEN: string;
 	RESEND_API_KEY: string;
 	WORKER_SELF_REFERENCE: Fetcher /* pueblo-food-map-staging */ | Service<typeof import("./custom-worker").default>;
@@ -19,6 +20,7 @@ declare namespace Cloudflare {
 		ADMIN_DB: D1Database;
 		ASSETS: Fetcher;
 		BETTER_AUTH_RP_ID: "dev.pueblofoodmap.com";
+		ANALYTICS_EXCLUDED_IPS: "66.33.12.72,2607:3640:121:e110::/64";
 		NEXT_PUBLIC_MAPBOX_TOKEN: string;
 		RESEND_API_KEY: string;
 		WORKER_SELF_REFERENCE: Fetcher /* pueblo-food-map-staging */;
@@ -30,5 +32,5 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "BETTER_AUTH_RP_ID" | "NEXT_PUBLIC_MAPBOX_TOKEN" | "RESEND_API_KEY" | "HC_PING_URL">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "BETTER_AUTH_RP_ID" | "ANALYTICS_EXCLUDED_IPS" | "NEXT_PUBLIC_MAPBOX_TOKEN" | "RESEND_API_KEY" | "HC_PING_URL">> {}
 }

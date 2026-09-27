@@ -49,12 +49,39 @@ describe("BoxAlertSignupForm", () => {
     expect(screen.queryByLabelText(/your email/i)).toBeNull();
   });
 
+  // #669 — this form's Turnstile container was a third fallback checkbox
+  // that could appear while the form was closed (0px tall in one observed
+  // run). Must be visually hidden until the form opens.
+  test("Turnstile container is visually hidden while the form is closed (#669)", () => {
+    renderForm();
+    const container = screen.getByTestId("box-alert-turnstile-widget");
+    expect(container.className).toMatch(/-left-\[9999px\]/);
+    expect(container.getAttribute("aria-hidden")).toBe("true");
+  });
+
   test("expands to the email field on tap", async () => {
     const user = userEvent.setup();
     renderForm();
     await user.click(screen.getByRole("button", { name: "Email me when it needs filling" }));
     expect(screen.getByLabelText(/your email/i)).toBeDefined();
     expect(screen.getByRole("link", { name: "Privacy" })).toBeDefined();
+  });
+
+  // #669 — the checkbox must appear inside the open form, then hide again
+  // once the sign-up succeeded.
+  test("Turnstile container becomes visible once the form opens, hidden again on success (#669)", async () => {
+    const user = userEvent.setup();
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    renderForm();
+    await user.click(screen.getByRole("button", { name: "Email me when it needs filling" }));
+    expect(screen.getByTestId("box-alert-turnstile-widget").className).toBe("");
+    expect(screen.getByTestId("box-alert-turnstile-widget").getAttribute("aria-hidden")).toBeNull();
+
+    await user.type(screen.getByLabelText(/your email/i), "giver@example.com");
+    await user.click(screen.getByRole("button", { name: "Sign me up" }));
+    await waitFor(() => expect(screen.getByText("Check your email to confirm.")).toBeDefined());
+
+    expect(screen.getByTestId("box-alert-turnstile-widget").className).toMatch(/-left-\[9999px\]/);
   });
 
   test("submits and shows the generic success confirmation (never reveals new/resend/noop/reactivate)", async () => {

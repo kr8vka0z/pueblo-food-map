@@ -80,17 +80,20 @@ interface BottomNavProps {
  * Small box with a roof and a heart on the door (#516 mockup: "Bottom Nav
  * Blessing Box Shortcut - Mockup.html", `#box` symbol) — no lucide icon
  * matches, so this is hand-drawn to lucide's own stroke conventions
- * (24×24 viewBox, stroke-width 2, round caps/joins, no fill) so it sits
- * naturally beside Locate/Star/HandHelping/Menu.
+ * (24×24 viewBox, stroke-width 2, round caps/joins) so it sits naturally
+ * beside Locate/Star/HandHelping/Menu.
  *
- * The pressed (active) state does NOT fill the paths, unlike the mockup's
- * `.bb.on .ico{fill:...}` — filling the roof+wall path renders as a solid
- * house and the heart collapses into it at 24px. The raspberry tint on the
- * cell background plus the raspberry stroke color (see BOXES_ACTIVE_STYLE
- * below) carries the "on" state instead, the same way every other active
- * bar item is colour-only, never fill-only.
+ * Option D (#670, 2026-09-26 mockup — supersedes the raspberry background
+ * wash this component used to carry): the "on" state fills ONLY the heart
+ * path raspberry, via `currentColor` (the button's own text color already
+ * turns raspberry when `active`, so stroke and fill always match with no
+ * separate color prop). The roof+wall path stays unfilled — filling it
+ * renders as a solid house and the heart disappears into it at 24px (#516's
+ * original reason for skipping fill entirely, still true for that path; the
+ * heart alone is small enough not to collapse). The filled heart doubles as
+ * the color-blind-safe cue: the shape itself changes, not just its hue.
  */
-function BoxHeartIcon({ className }: { className?: string }) {
+function BoxHeartIcon({ className, active }: { className?: string; active: boolean }) {
   return (
     <svg
       aria-hidden
@@ -104,17 +107,13 @@ function BoxHeartIcon({ className }: { className?: string }) {
     >
       <path d="M3 10 12 4l9 6" />
       <path d="M5 9v11h14V9" />
-      <path d="M12 17.5s-3-1.8-3-3.6a1.6 1.6 0 0 1 3-.8 1.6 1.6 0 0 1 3 .8c0 1.8-3 3.6-3 3.6z" />
+      <path
+        d="M12 17.5s-3-1.8-3-3.6a1.6 1.6 0 0 1 3-.8 1.6 1.6 0 0 1 3 .8c0 1.8-3 3.6-3 3.6z"
+        fill={active ? "currentColor" : "none"}
+      />
     </svg>
   );
 }
-
-// Boxes' own "on" tint: raspberry text + a light raspberry background wash.
-// color-mix against the existing --color-cat-blessing token rather than a
-// new CSS variable — design:drift only allows tokens already in globals.css.
-const BOXES_ACTIVE_STYLE: React.CSSProperties = {
-  backgroundColor: "color-mix(in srgb, var(--color-cat-blessing) 12%, transparent)",
-};
 
 const ITEM_CLASS =
   // Below 2xl: equal-width cell, 24px icon above a 12px/700 label, 3px gap.
@@ -128,9 +127,24 @@ const ITEM_CLASS =
   // 2xl: icon and word on one line inside the pill (§5).
   "2xl:flex-none 2xl:flex-row 2xl:gap-1.5 2xl:px-3 " +
   "transition-colors duration-150 " +
+  // `hover:bg-...` compiles under Tailwind's own `@media (hover: hover)`
+  // wrapper (v3.4+, still true in v4 — verified against this repo's
+  // node_modules/tailwindcss build output), so it never matches on a
+  // touch-only device; a real phone can't get stuck showing it. #670
+  // investigated a faint grey circle Kyle saw stick on the Boxes cell after
+  // tapping it off in Chrome's phone emulation — that symptom traces to the
+  // BROWSER's own native tap highlight instead (`-webkit-tap-highlight-color`
+  // defaults to a translucent grey rect on `<button>`/`<a>` taps and nothing
+  // in this file cleared it), which devtools' touch emulation reproduces
+  // faithfully. Suppressed below rather than here, since it's unrelated to
+  // this Tailwind hover rule.
   "hover:bg-[var(--color-bone-100)] " +
   "disabled:cursor-default " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
+  // #670 — the actual fix for the grey-circle symptom above: disables the
+  // native tap-highlight overlay on every bar item (all five share this
+  // class), not just Boxes, since the same default applies to any of them.
+  "[-webkit-tap-highlight-color:transparent] " +
   PRESS_FEEDBACK;
 
 const ICON_CLASS = "shrink-0 size-6 2xl:size-5";
@@ -256,9 +270,8 @@ export default function BottomNav({
             className={
               ITEM_CLASS + " " + (boxesActive ? "text-[var(--color-cat-blessing)]" : colorFor(false))
             }
-            style={boxesActive ? BOXES_ACTIVE_STYLE : undefined}
           >
-            <BoxHeartIcon className={ICON_CLASS} />
+            <BoxHeartIcon className={ICON_CLASS} active={boxesActive} />
             <span>{t("nav.boxes", locale)}</span>
           </button>
         </li>

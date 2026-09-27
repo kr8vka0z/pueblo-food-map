@@ -4,7 +4,7 @@
  * NeedsDecisionPanel — the /admin Dashboard's "Needs a decision" panel
  * (approved mockup Direction A). Groups every pending item that needs an
  * admin's decision — public suggestions/closure reports, data-refresh
- * proposals, box photos, adoption requests — into one place, each row
+ * proposals, box photos, sponsor requests — into one place, each row
  * capped (server passes already-trimmed arrays; see src/app/admin/page.tsx)
  * with a "+N more →" link to that item's own full review queue.
  *
@@ -117,7 +117,20 @@ type RejectState = "idle" | "submitting" | "error";
  * route.ts files, not assumed — so a 409 here can only mean a real,
  * unexpected failure and should show "Try again" like any other non-200.
  */
-function RejectButton({ path, confirmMessage, onDone }: { path: string; confirmMessage: string; onDone: () => void }) {
+function RejectButton({
+  path,
+  confirmMessage,
+  onDone,
+  label = "Reject",
+  submittingLabel = "Rejecting…",
+}: {
+  path: string;
+  confirmMessage: string;
+  onDone: () => void;
+  /** Override for rows whose reject action reads as something other than "Reject" (e.g. box-adopters' "Decline"). */
+  label?: string;
+  submittingLabel?: string;
+}) {
   const [state, setState] = useState<RejectState>("idle");
 
   async function handleReject() {
@@ -142,7 +155,7 @@ function RejectButton({ path, confirmMessage, onDone }: { path: string; confirmM
   return (
     <div className="flex items-center gap-2">
       <button type="button" onClick={handleReject} disabled={state === "submitting"} className={secondaryButtonClass}>
-        {state === "submitting" ? "Rejecting…" : "Reject"}
+        {state === "submitting" ? submittingLabel : label}
       </button>
       {state === "error" && (
         <span role="alert" className="text-xs text-[var(--color-danger)]">
@@ -297,7 +310,7 @@ export default function NeedsDecisionPanel({
       <section className="elevation-1 rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white p-4 sm:p-5">
         <h2 className="wordmark text-lg text-[var(--color-ink-900)]">Needs a decision</h2>
         <p className="mt-2 text-sm text-[var(--color-ink-500)]">
-          Nothing waiting on you. New suggestions, data changes, box photos and adoption requests show up here as
+          Nothing waiting on you. New suggestions, data changes, box photos and sponsor requests show up here as
           they come in.
         </p>
       </section>
@@ -404,7 +417,7 @@ export default function NeedsDecisionPanel({
               {adoptersTotal > 0 && (
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-400)]">
-                    Adoption requests
+                    Sponsor requests
                   </p>
                   <ul>
                     {adopters.map((adopter) => (
@@ -414,8 +427,10 @@ export default function NeedsDecisionPanel({
                           <AdopterApproveAction adopterId={adopter.id} onDone={refresh} />
                           <RejectButton
                             path={`/api/admin/box-adopters/${adopter.id}/reject`}
-                            confirmMessage="Reject this adoption request? This can't be undone."
+                            confirmMessage="Decline this sponsor request? This can't be undone."
                             onDone={refresh}
+                            label="Decline"
+                            submittingLabel="Declining…"
                           />
                         </div>
                       </li>
@@ -634,6 +649,8 @@ function AdopterApproveAction({ adopterId, onDone }: { adopterId: number; onDone
     <ApproveButton
       path={`/api/admin/box-adopters/${adopterId}/approve`}
       onDone={onDone}
+      label="Approve sponsor"
+      submittingLabel="Approving…"
       // Override: this route's 409 is a REAL, non-stale business rule
       // ("the applicant hasn't clicked their own confirm-email link yet" —
       // see box-adopters/[id]/approve/route.ts's own header), not a row that

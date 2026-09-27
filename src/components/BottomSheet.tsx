@@ -1,15 +1,39 @@
 "use client";
 
 /**
- * BottomSheet v3 — vaul-based mobile-only sheet with boolean expanded toggle.
+ * BottomSheet v4 — vaul-based mobile-only sheet with a grab-bar toggle
+ * (#666, Maps-style card).
  *
- * Replaces the fragile three-snap-point model (v2) with desktop-parity:
+ * Still a boolean `expanded` toggle, same two states as v3:
  *   collapsed: venue summary — name, category badge, distance, hours-today,
- *              SNAP/WIC pills, two-line notes, Get directions, "Show details"
+ *              SNAP/WIC pills, two-line notes, Get directions, then a
+ *              cut-off "peek" of the detail section fading at the card edge
  *   expanded:  collapsed content + address, full hours table, phone, report
  *
+ * v3's visible "Show details / Hide details" text button is GONE (#666,
+ * Kyle's Maps-app-style pick, 2026-09-26): the toggle is a grab bar — a real
+ * 48×48 `<button>` (`data-vaul-no-drag` so vaul's own drag-to-dismiss never
+ * competes with it, see the button's own comment below) whose accessible
+ * name reuses `detail.showDetails`/`detail.hideDetails`. Tapping the bar,
+ * tapping the cut-off preview, or swiping the bar up/down all drive the
+ * SAME `expanded` state — there is no second source of truth. The detail
+ * section itself is now ALWAYS mounted (never conditionally rendered) and
+ * only CSS-clipped when collapsed — the "peek" is what tells a visitor
+ * there's more, so the content has to exist to peek at. This changed what
+ * BottomSheet.test.tsx can assert: it used to check the phone/hours DOM
+ * nodes were absent while collapsed; now they're always present (rendered)
+ * but visually clipped by CSS jsdom can't compute, so the collapsed tests
+ * assert `aria-expanded` instead — see that file's own note.
+ *
+ * A blessing-box card gets the SAME bar + swipe mechanics, but its own
+ * reordered layout (#667 supersedes #666's "box cards get the bar only"
+ * line) — `layout="sheet"` on `BoxCardBody` below, see that component's own
+ * header for the split between its always-visible first view and its
+ * clipped below-the-fold section (photo/sponsor/footer).
+ *
  * vaul is kept as the drawer container for drag-to-dismiss, scrim, Escape,
- * and a11y Dialog.Title — but WITHOUT snapPoints.
+ * and a11y Dialog.Title — but WITHOUT snapPoints (route-strip mode, #509
+ * below, is the one exception).
  *
  * Three dismissal paths:
  *   1. Escape key (vaul handles natively via onOpenChange) — #527: gated on
@@ -53,9 +77,9 @@
  * simpler than vaul's snap-point internals to get provably right.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Drawer } from "vaul";
-import { X, ChevronUp, ChevronDown, MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
+import { X, MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
@@ -156,6 +180,113 @@ export default function BottomSheet({
   const locale = localeProp ?? ctxLocale;
   const [expanded, setExpanded] = useState(false);
 
+  // ── Grab bar toggle + swipe (#666) ──────────────────────────────────────
+  // One function, one state — the bar's tap, the preview's tap, and both
+  // swipe directions all funnel through this so `expanded`/`onExpandedChange`
+  // never have a second writer.
+  function setExpandedState(next: boolean) {
+    setExpanded((prev) => {
+      if (next === prev) return prev;
+      onExpandedChange?.(next);
+      return next;
+    });
+  }
+  function toggleExpanded() {
+    setExpandedState(!expanded);
+  }
+  // Swipe is start/end delta only (no onPointerMove) — a real touch swipe
+  // vs. a tap already differ enough in clientY at pointerup, and the browser
+  // itself suppresses the synthetic click after a dragged touch, so there's
+  // no double-toggle to guard against (see this file's header for why the
+  // gesture is scoped to the bar rather than the whole card: vaul's own
+  // drag-to-dismiss lives on Drawer.Content, and fighting it for a swipe
+  // starting deeper in scrollable content is the one thing #666's Plan
+  // flags as a real risk — the bar is `data-vaul-no-drag`, so this is the
+  // ONLY place a competing gesture recognizer runs).
+  const swipeStartY = useRef<number | null>(null);
+  const SWIPE_THRESHOLD_PX = 30;
+  function handleBarPointerDown(event: React.PointerEvent<HTMLButtonElement>) {
+    swipeStartY.current = event.clientY;
+  }
+  function handleBarPointerUp(event: React.PointerEvent<HTMLButtonElement>) {
+    if (swipeStartY.current === null) return;
+    const deltaY = event.clientY - swipeStartY.current;
+    swipeStartY.current = null;
+    if (!expanded && deltaY <= -SWIPE_THRESHOLD_PX) {
+      setExpandedState(true);
+    } else if (expanded && deltaY >= SWIPE_THRESHOLD_PX) {
+      setExpandedState(false);
+    }
+  }
+  // Shared by the grab bar's aria-controls and the detail section it points
+  // at — one literal id, not two, because box and ordinary-venue detail
+  // sections are mutually exclusive within a single BottomSheet instance
+  // (never both rendered at once), so there's no real collision risk in
+  // reusing it as BoxCardBody's own below-the-fold section id too.
+  const DETAIL_SECTION_ID = "bottomsheet-detail";
+
+  // ── Whole-card swipe-up + swipe-down-to-collapse (follow-up to #666) ────
+  // Kyle's actual ask was "swipe up on the card", not only the bar, and a
+  // swipe down on the EXPANDED card should collapse before it closes. Two
+  // different mechanisms, because vaul behaves differently in each
+  // direction for a snapPoints-less drawer (verified by reading
+  // node_modules/vaul/dist/index.mjs, not guessed):
+  //
+  // - Dragging UP: `shouldDrag()` (vaul internal) returns false the moment
+  //   it sees an upward drag start (`isDraggingInDirection` true — see that
+  //   function's own early `if (isDraggingInDirection) return false`), so
+  //   vaul is completely inert on an upward drag from rest. There is no
+  //   vaul decision to intercept — this is entirely OUR OWN recognizer,
+  //   below, composed onto Drawer.Content's own onPointerDown/onPointerUp
+  //   (vaul calls `rest.onPointerDown`/`rest.onPointerUp` first, THEN its
+  //   own logic — confirmed in Content's source — so ours always fires).
+  //
+  // - Dragging DOWN while expanded: vaul DOES own this gesture (drag-to-
+  //   dismiss, unchanged, still gated on scrollTop-at-top the same way it
+  //   already was pre-#666 via its own `shouldDrag`). We don't compete with
+  //   it or reimplement its thresholds (velocity/closeThreshold) — we let
+  //   vaul decide to dismiss, then VETO the dismissal in `handleOpenChange`
+  //   when `expanded` is true and this was a real drag (not Escape/scrim),
+  //   collapsing instead. `dismissDragActive` is the single piece of state
+  //   that makes "was this a drag" knowable inside `handleOpenChange`:
+  //   `onDrag` (Root prop, fires for a downward drag here since `shouldFade`
+  //   is `true` whenever `snapPoints` is undefined — read, not assumed) sets
+  //   it; Escape/scrim never touch `onDrag`, so the flag stays false for
+  //   those and `onClose()` still runs as before.
+  const dismissDragActive = useRef(false);
+  const drawerContentRef = useRef<HTMLDivElement>(null);
+  // Swipe-up-on-the-card recognizer's own start point + "was this gesture
+  // eligible" flag — null'd out at pointerdown if it started on a button,
+  // link, or anything a11y-labelled as one (Kyle's ask: "outside buttons/
+  // links"), and on pointercancel (iOS can fire that instead of pointerup
+  // once native scroll takes over on a short/overflowing card — see this
+  // file's own note near the swipe-up handler below).
+  const cardSwipeStartY = useRef<number | null>(null);
+  function handleContentPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    dismissDragActive.current = false;
+    // Route-strip mode (#509) renders inside this SAME Drawer.Content —
+    // gated out here (matching the `onDrag` prop's own `!isWalkRouteActive`
+    // check above) so a swipe on the strip can't leave `expanded` latently
+    // true for whenever the route clears and the full card returns.
+    const target = event.target as Element;
+    if (isWalkRouteActive || target.closest("button, a, input, textarea, select, [role='button']")) {
+      cardSwipeStartY.current = null;
+      return;
+    }
+    cardSwipeStartY.current = event.clientY;
+  }
+  function handleContentPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    if (cardSwipeStartY.current === null) return;
+    const deltaY = event.clientY - cardSwipeStartY.current;
+    cardSwipeStartY.current = null;
+    if (!expanded && deltaY <= -SWIPE_THRESHOLD_PX) {
+      setExpandedState(true);
+    }
+  }
+  function handleContentPointerCancel() {
+    cardSwipeStartY.current = null;
+  }
+
   // ── Route strip (#509) ──────────────────────────────────────────────────
   // cardRevealed: true = full card showing, false = strip. Defaults to the
   // OPPOSITE of isWalkRouteActive at first render — if a BottomSheet ever
@@ -196,9 +327,26 @@ export default function BottomSheet({
   const nextOccurrence = venue?.hours_irregular ? nextIrregularOccurrence(venue.hours_irregular) : null;
   const displayNotes = venue ? getDisplayNotes(venue) : undefined;
   const showStrip = isWalkRouteActive && !cardRevealed;
+  // #666/#667: the grab bar needs SOMETHING to expand into. An ordinary
+  // venue always has a detail section; a box only once its record has
+  // actually loaded (the `box.cardLoading` fallback below has no content to
+  // peek at, so it keeps today's no-bar behavior rather than a bar that
+  // toggles nothing).
+  const showGrabBar = venue !== null && !showStrip && (!isBox || box != null);
 
   function handleOpenChange(isOpen: boolean) {
-    if (!isOpen) onClose();
+    if (isOpen) return;
+    // Veto a drag-dismiss while expanded — collapse to the normal card
+    // instead of closing. `dismissDragActive` is only ever set by vaul's own
+    // `onDrag` (a real drag it engaged), never by Escape or a scrim tap, so
+    // those two continue straight through to `onClose()` exactly as before
+    // (#527/#604 unchanged) — see this file's header comment above for the
+    // full vaul-behavior citation this relies on.
+    if (dismissDragActive.current && expanded && !isWalkRouteActive) {
+      setExpandedState(false);
+      return;
+    }
+    onClose();
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -208,6 +356,34 @@ export default function BottomSheet({
       key={isWalkRouteActive ? "route" : "card"}
       open={open}
       onOpenChange={handleOpenChange}
+      // Marks "vaul just engaged a real drag" for `handleOpenChange` above —
+      // see this file's header comment for why `onDrag` (not `onRelease`)
+      // is the right signal: it only fires once vaul's own `shouldDrag`
+      // already accepted the gesture (collapsed, or expanded-and-scrolled-
+      // to-top), so a scroll inside expanded content never sets it, and
+      // Escape/scrim never touch this prop at all.
+      onDrag={() => {
+        if (!isWalkRouteActive) dismissDragActive.current = true;
+      }}
+      // Runs AFTER `handleOpenChange` for the same release (vaul calls
+      // `closeDrawer()` — which fires `onOpenChange` — before `onRelease`;
+      // confirmed in vaul's own source, not assumed). By the time this
+      // fires, `handleOpenChange` has already vetoed or allowed the close,
+      // so this is purely cleanup: undo the `transition:none`/`transform`
+      // vaul's live drag left on the DOM node when we vetoed (vaul's own
+      // `resetDrawer()` — the thing that normally does this — never runs in
+      // its dismiss branches, only its "didn't dismiss" branches), and clear
+      // the flag either way so it can't leak into the next gesture.
+      onRelease={(_event, open) => {
+        if (!open && dismissDragActive.current && expanded && !isWalkRouteActive) {
+          const el = drawerContentRef.current;
+          if (el) {
+            el.style.transition = "";
+            el.style.transform = "";
+          }
+        }
+        dismissDragActive.current = false;
+      }}
       modal={false}
       // #530 review round 3 (BLOCKER, invisible to every test here — every
       // BottomSheet test mocks vaul): vaul defaults `repositionInputs` to
@@ -261,6 +437,20 @@ export default function BottomSheet({
       <Drawer.Portal>
         <Drawer.Content
           key={venue?.id ?? "empty"}
+          // Composed with vaul's OWN internal `drawerRef` (vaul's `Content`
+          // does `useComposedRefs(ref, drawerRef)` — confirmed in source, so
+          // passing a ref here doesn't replace vaul's, it runs alongside
+          // it), giving `onRelease` above a real DOM node to clear the
+          // leftover drag transform from when we veto a dismiss.
+          ref={drawerContentRef}
+          // Composed the same way — vaul calls `rest.onPointerDown/Up` FIRST,
+          // then its own drag logic (confirmed in source), so these always
+          // fire regardless of whether vaul itself decides to drag. This is
+          // what makes "swipe up anywhere on the collapsed card" possible
+          // without a second competing recognizer on vaul's own gesture.
+          onPointerDown={handleContentPointerDown}
+          onPointerUp={handleContentPointerUp}
+          onPointerCancel={handleContentPointerCancel}
           // #530 review round 2: no `bottom-0` Tailwind class — Safari's own
           // toolbar was slicing the sheet's resting edge off the same way it
           // sliced BottomNav's pill (root cause: a `position:fixed`
@@ -429,10 +619,40 @@ export default function BottomSheet({
               : t("detail.venueDetailsPanel", locale)}
           </Drawer.Description>
 
-          {/* Single scrollable body.
-              No drag handle: the "Show details" button is the one expand
-              affordance — a grabber bar wrongly implied swipe-to-expand (#122
-              follow-up). vaul still allows swipe-down-to-dismiss on the content. */}
+          {/* Grab bar (#666): a real 48×48 button, `data-vaul-no-drag` so
+              vaul's own Drawer.Content drag-to-dismiss never sees pointer
+              events that start here — this file's own header explains why
+              that matters (our swipe handler is the ONLY gesture recognizer
+              on the bar, never competing with vaul's). Sits OUTSIDE the
+              scrollable body below so it never scrolls away, matching every
+              iOS/Android sheet's own fixed-handle convention. #122's old
+              "no drag handle, a grabber wrongly implies swipe" note is
+              exactly what #666 reverses — Kyle's own comparison of four
+              mockups picked the Maps-app bar specifically because the cut-off
+              preview (rendered inside the scrollable body below) now tells
+              people there's more, so a real handle no longer lies about what
+              it does. */}
+          {showGrabBar && (
+            <div className="flex shrink-0 justify-center pt-2 pb-1">
+              <button
+                type="button"
+                data-vaul-no-drag=""
+                aria-expanded={expanded}
+                aria-controls={DETAIL_SECTION_ID}
+                aria-label={t(expanded ? "detail.hideDetails" : "detail.showDetails", locale)}
+                onClick={toggleExpanded}
+                onPointerDown={handleBarPointerDown}
+                onPointerUp={handleBarPointerUp}
+                className={
+                  "flex h-12 w-12 items-center justify-center rounded-md " +
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+                  PRESS_FEEDBACK
+                }
+              >
+                <span aria-hidden className="h-[5px] w-10 rounded-full bg-[var(--color-bone-300)]" />
+              </button>
+            </div>
+          )}
           {/* Card-redesign box actions slot (Share/Fav/Close) — one JSX
               constant so it's built once and handed to BoxCardBody's
               `actions` prop below, rather than duplicating this markup
@@ -491,6 +711,17 @@ export default function BottomSheet({
                     onCheckinSuccess={onCheckinSuccess}
                     className="pb-[max(1rem,env(safe-area-inset-bottom))]"
                     photoRadiusClassName="rounded-t-[var(--radius-xl)]"
+                    // #667: the mobile-only reordered layout — name/status/
+                    // address/most-needed/host-note/check-in first, photo +
+                    // sponsor band + footer clipped below the fold. `expanded`
+                    // is THIS component's own grab-bar state (single source
+                    // of truth); `onRequestExpand` is the preview's own tap-
+                    // to-expand affordance (#666 accessibility section:
+                    // "tapping the cut-off preview also expands").
+                    layout="sheet"
+                    expanded={expanded}
+                    onRequestExpand={() => setExpandedState(true)}
+                    detailSectionId={DETAIL_SECTION_ID}
                     onWalkRoute={onWalkRoute ? () => onWalkRoute(box) : undefined}
                     isWalkRouteActive={isWalkRouteActive}
                     onClearWalkRoute={onClearWalkRoute}
@@ -670,145 +901,138 @@ export default function BottomSheet({
                   onStepChange={onStepChange}
                 />
 
-                {/* Show/Hide details toggle */}
-                <button
-                  type="button"
-                  aria-expanded={expanded}
-                  aria-controls="bottomsheet-detail"
-                  onClick={() => {
-                    setExpanded((v) => {
-                      const n = !v;
-                      onExpandedChange?.(n);
-                      return n;
-                    });
-                  }}
+                {/* Detail section (#666) — ALWAYS mounted now (the old
+                    `{expanded && (...)}` guard is gone), so it exists to be
+                    peeked at. Collapsed: clipped to a short fixed height with
+                    a bottom fade and its own tap-to-expand (the
+                    accessibility section's "tapping the cut-off preview also
+                    expands"). Expanded: full height, no clip, scrolls with
+                    the outer body as before. `data-vaul-no-drag` is
+                    deliberately NOT set here — unlike the grab bar, letting a
+                    drag started in the collapsed preview fall through to
+                    vaul's own dismiss keeps "swipe down on the normal card
+                    closes it" exactly as it was pre-#666 (see this file's
+                    header on why the swipe-to-collapse gesture is scoped to
+                    the bar instead of fought for here). */}
+                <div
+                  id={DETAIL_SECTION_ID}
+                  onClick={!expanded ? () => setExpandedState(true) : undefined}
                   className={
-                    // ~20px tall -> real padding growth (mobile review #8: this is
-                    // the ONLY way to expand the sheet). Type size/color untouched.
-                    // #233: 32px box → 48px hit area via an invisible overlay,
-                    // lopsided on purpose: only 4px up (the direction buttons
-                    // sit 12px above, so 8px stays clear) and 12px down into
-                    // the sheet's bottom padding / the non-interactive
-                    // address row. Nothing moves.
-                    "relative before:absolute before:inset-x-0 before:-top-1 before:-bottom-3 " +
-                    "flex items-center gap-1.5 py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
-                    "hover:text-[var(--color-sage-700)] " +
-                    PRESS_FEEDBACK + " " +
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
-                    "rounded text-left"
+                    "relative flex flex-col gap-4 pt-1 " +
+                    (expanded ? "" : "max-h-16 overflow-hidden cursor-pointer")
                   }
                 >
-                  {expanded ? (
-                    <>
-                      {t("detail.hideDetails", locale)}
-                      <ChevronUp size={16} aria-hidden />
-                    </>
-                  ) : (
-                    <>
-                      {t("detail.showDetails", locale)}
-                      <ChevronDown size={16} aria-hidden />
-                    </>
-                  )}
-                </button>
-
-                {/* Expanded detail section */}
-                <div id="bottomsheet-detail">
-                  {expanded && (
-                    <div className="flex flex-col gap-4 pt-1">
-                      {/* Address — guard: never render "Address not in OpenStreetMap" placeholder */}
-                      <div className="flex gap-2.5">
-                        <MapPin size={16} className="text-[var(--color-ink-400)] shrink-0 mt-0.5" aria-hidden />
-                        <div>
-                          <p className="text-sm text-[var(--color-ink-700)]">
-                            {venue.address === "Address not in OpenStreetMap"
-                              ? `${venue.lat}, ${venue.lng}`
-                              : venue.address}
-                          </p>
-                          {venue.distanceMiles !== undefined && (
-                            <p className="text-sm text-[var(--color-ink-400)] font-mono mt-0.5">
-                              {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* SNAP/WIC detail badges */}
-                      {(venue.accepts_snap || venue.accepts_wic) && (
-                        <div className="flex flex-wrap gap-2">
-                          {venue.accepts_snap && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                              {t("detail.acceptsSnap", locale)}
-                            </span>
-                          )}
-                          {venue.accepts_wic && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
-                              {t("detail.acceptsWic", locale)}
-                            </span>
-                          )}
-                        </div>
+                  {/* `inert` while collapsed (#683 review): the clip hides the
+                      phone/website/report controls visually but not from Tab
+                      or a screen reader. Inert takes them out of both, and
+                      acts like `pointer-events: none`, so a tap on the preview
+                      still lands on the wrapper's own expand handler above.
+                      `contents` keeps the children as the wrapper's flex items. */}
+                  <div className="contents" inert={!expanded}>
+                  {/* Address — guard: never render "Address not in OpenStreetMap" placeholder */}
+                  <div className="flex gap-2.5">
+                    <MapPin size={16} className="text-[var(--color-ink-400)] shrink-0 mt-0.5" aria-hidden />
+                    <div>
+                      <p className="text-sm text-[var(--color-ink-700)]">
+                        {venue.address === "Address not in OpenStreetMap"
+                          ? `${venue.lat}, ${venue.lng}`
+                          : venue.address}
+                      </p>
+                      {venue.distanceMiles !== undefined && (
+                        <p className="text-sm text-[var(--color-ink-400)] font-mono mt-0.5">
+                          {formatMiles(venue.distanceMiles)} {t("distance.fromYou", locale)}
+                        </p>
                       )}
-
-                      {/* Full weekly + monthly hours (#400) — today highlighted + aria-current */}
-                      {(venue.hours_weekly || venue.hours_irregular) && (
-                        <section aria-label={t("detail.hours", locale)}>
-                          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-                            {t("detail.hours", locale)}
-                          </h3>
-                          <HoursList
-                            hours_weekly={venue.hours_weekly}
-                            hours_irregular={venue.hours_irregular}
-                            compact={false}
-                          />
-                        </section>
-                      )}
-
-                      {/* Phone / Contact */}
-                      {venue.phone && (
-                        <section aria-label={t("detail.contact", locale)}>
-                          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
-                            {t("detail.contact", locale)}
-                          </h3>
-                          <a
-                            href={`tel:${venue.phone}`}
-                            // before:* — 2px overlay up/down takes the 44px link to 48 (#233).
-                            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
-                          >
-                            <Phone size={15} className="text-[var(--color-sage-600)]" aria-hidden />
-                            {venue.phone}
-                          </a>
-                        </section>
-                      )}
-
-                      {/* See full details on Plentiful (#128) — Plentiful-sourced venues only */}
-                      {/* safeUrl: venue.url comes from OSM (anyone can edit); reject non-http(s) */}
-                      {venue.source.toLowerCase().includes("plentiful") && safeUrl(venue.url) && (
-                        <a
-                          href={safeUrl(venue.url)!}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={
-                            // min-h-12: one line of text + py-3 is 46px on
-                            // wide phones; #233's floor is 48 (#659).
-                            "flex items-center justify-between gap-2 w-full min-h-12 px-4 py-3 " +
-                            // #534: --color-sage-300 undefined in
-                            // globals.css @theme — sage-500 is DESIGN.md's
-                            // own documented border for this exact chip
-                            // shape (TooltipChip: "bone-50 bg, 1px sage-500
-                            // border"), 3.8:1 against the sage-50 fill below.
-                            "rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
-                            "bg-[var(--color-sage-50)] text-sm font-medium text-[var(--color-sage-700)] " +
-                            "hover:bg-[var(--color-sage-100)] transition-colors " +
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
-                          }
-                        >
-                          <span>{t("detail.plentifulLink", locale)}</span>
-                          <ExternalLink size={15} className="shrink-0" aria-hidden />
-                        </a>
-                      )}
-
-                      {/* Report venue */}
-                      <ReportVenueButton venueId={venue.id} locale={locale} />
                     </div>
+                  </div>
+
+                  {/* SNAP/WIC detail badges */}
+                  {(venue.accepts_snap || venue.accepts_wic) && (
+                    <div className="flex flex-wrap gap-2">
+                      {venue.accepts_snap && (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
+                          {t("detail.acceptsSnap", locale)}
+                        </span>
+                      )}
+                      {venue.accepts_wic && (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-[var(--color-sage-100)] text-[var(--color-sage-700)]">
+                          {t("detail.acceptsWic", locale)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Full weekly + monthly hours (#400) — today highlighted + aria-current */}
+                  {(venue.hours_weekly || venue.hours_irregular) && (
+                    <section aria-label={t("detail.hours", locale)}>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
+                        {t("detail.hours", locale)}
+                      </h3>
+                      <HoursList
+                        hours_weekly={venue.hours_weekly}
+                        hours_irregular={venue.hours_irregular}
+                        compact={false}
+                      />
+                    </section>
+                  )}
+
+                  {/* Phone / Contact */}
+                  {venue.phone && (
+                    <section aria-label={t("detail.contact", locale)}>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)] mb-2">
+                        {t("detail.contact", locale)}
+                      </h3>
+                      <a
+                        href={`tel:${venue.phone}`}
+                        // before:* — 2px overlay up/down takes the 44px link to 48 (#233).
+                        className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
+                      >
+                        <Phone size={15} className="text-[var(--color-sage-600)]" aria-hidden />
+                        {venue.phone}
+                      </a>
+                    </section>
+                  )}
+
+                  {/* See full details on Plentiful (#128) — Plentiful-sourced venues only */}
+                  {/* safeUrl: venue.url comes from OSM (anyone can edit); reject non-http(s) */}
+                  {venue.source.toLowerCase().includes("plentiful") && safeUrl(venue.url) && (
+                    <a
+                      href={safeUrl(venue.url)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={
+                        // min-h-12: one line of text + py-3 is 46px on
+                        // wide phones; #233's floor is 48 (#659).
+                        "flex items-center justify-between gap-2 w-full min-h-12 px-4 py-3 " +
+                        // #534: --color-sage-300 undefined in
+                        // globals.css @theme — sage-500 is DESIGN.md's
+                        // own documented border for this exact chip
+                        // shape (TooltipChip: "bone-50 bg, 1px sage-500
+                        // border"), 3.8:1 against the sage-50 fill below.
+                        "rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
+                        "bg-[var(--color-sage-50)] text-sm font-medium text-[var(--color-sage-700)] " +
+                        "hover:bg-[var(--color-sage-100)] transition-colors " +
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+                      }
+                    >
+                      <span>{t("detail.plentifulLink", locale)}</span>
+                      <ExternalLink size={15} className="shrink-0" aria-hidden />
+                    </a>
+                  )}
+
+                  {/* Report venue */}
+                  <ReportVenueButton venueId={venue.id} locale={locale} />
+                  </div>
+
+                  {/* Cut-off preview fade (#666) — matches the card
+                      background (`bone-50`) so the clipped content visibly
+                      continues below, telling a visitor there's more without
+                      a "Show details" label. */}
+                  {!expanded && (
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-[var(--color-bone-50)]"
+                    />
                   )}
                 </div>
               </div>

@@ -57,6 +57,7 @@ import {
   PUEBLO_CENTER,
 } from "@/data/pueblo-bbox";
 import { useMapFilters } from "@/lib/useMapFilters";
+import { haversineMiles } from "@/lib/distance";
 import { useBoxesList } from "@/lib/useBoxesList";
 import { toVenue } from "@/lib/useBoxVenues";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
@@ -190,6 +191,65 @@ export function computeCategoryBounds(
     if (v.lat > latN) latN = v.lat;
   }
   return [[lngW, latS], [lngE, latN]];
+}
+
+// Miles-per-degree constants for nearestBoundsAround's mile→degree conversion
+// below. Latitude is ~constant (69.0 mi/degree everywhere); longitude shrinks
+// toward the poles by cos(latitude), which is why LNG needs the extra factor
+// and LAT doesn't. Precise enough for a map fit box — not routing math.
+const MILES_PER_DEGREE_LAT = 69.0;
+const MILES_PER_DEGREE_LNG_AT_EQUATOR = 69.172;
+
+/**
+ * Compute a symmetric [[lngW, latS], [lngE, latN]] bounding box centered on
+ * `origin`, sized to just cover the `n` nearest of `venues` (#670: the Boxes
+ * bottom-nav button, tapped on with a known visitor location, zooms to the
+ * visitor's 5 nearest boxes rather than every box in the county).
+ *
+ * WHY centered-and-symmetric rather than a tight bbox around just the n
+ * venues: a plain bbox over N points is usually off-center from the visitor
+ * (whichever side has a farther point pulls the box that way), so the
+ * visitor's own dot could land near an edge instead of the middle. Fitting a
+ * box built from the single farthest-of-the-n distance, in every direction,
+ * guarantees the visitor is dead center — matching the issue's "centered on
+ * the visitor" requirement exactly, at the cost of sometimes including a few
+ * venues beyond the nearest n on the box's shorter axis. That's an accepted
+ * tradeoff (a slightly wider view with a couple of "free" extra pins beats a
+ * center-line the button interaction requires).
+ *
+ * WHY plain mile/degree ratios rather than a haversine-based box (matching
+ * the ratios computeCategoryBounds's lat/lng-only math already uses): this
+ * box only needs to be "just far enough to show 5 pins," not chart-accurate;
+ * the padding + CATEGORY_FIT_MAX_ZOOM cap the caller already applies absorbs
+ * the small ellipsoidal error.
+ *
+ * Returns null for an empty venue list, same contract as computeCategoryBounds.
+ */
+export function nearestBoundsAround(
+  origin: { lat: number; lng: number },
+  venues: Pick<Venue, "lat" | "lng">[],
+  n: number,
+): [[number, number], [number, number]] | null {
+  if (venues.length === 0) return null;
+
+  const nearest = [...venues]
+    .sort((a, b) => haversineMiles(origin, a) - haversineMiles(origin, b))
+    .slice(0, n);
+
+  // Half-size of the box: distance to the farthest of the nearest n (the
+  // "5th-nearest box" the issue names, or the farthest available if fewer
+  // than n exist).
+  const halfSizeMiles = Math.max(...nearest.map((v) => haversineMiles(origin, v)));
+
+  const latDelta = halfSizeMiles / MILES_PER_DEGREE_LAT;
+  const milesPerDegreeLng =
+    MILES_PER_DEGREE_LNG_AT_EQUATOR * Math.cos((origin.lat * Math.PI) / 180);
+  const lngDelta = halfSizeMiles / milesPerDegreeLng;
+
+  return [
+    [origin.lng - lngDelta, origin.lat - latDelta],
+    [origin.lng + lngDelta, origin.lat + latDelta],
+  ];
 }
 
 // Stable listbox id — used for aria-controls on the search input and id on the
@@ -1031,21 +1091,49 @@ export default function MapWrapper({
   // Reuses toggleCategory directly rather than a second flag, so ticking
   // "Blessing Box" in the Filters panel (#513) and tapping Boxes in the bar
   // stay in sync automatically — both read/write the same Set.
+  //
+  // #670 — one-shot override for the category-fit effect below (the
+  // `selectedCategories` effect just past the Route-fit effect). Turning
+  // Boxes ON with an already-known `userLocation` should fit the visitor's
+  // nearest 5 boxes instead of that effect's normal "fit every venue in the
+  // checked categories" bounds. A ref (not state) because it's read and
+  // cleared inside that OTHER effect on the very next run it fires for —
+  // it's a hand-off between this callback and that effect, not something a
+  // render needs to reflect. Left null (the default, no override) for:
+  // turning Boxes OFF, turning it on with no known location (never triggers
+  // the geolocation prompt — Near me already owns that), or the Filters
+  // panel's own checkbox (which calls toggleCategory directly, bypassing
+  // this handler, so it keeps today's fit-all).
+  const pendingBoxesFitBoundsRef = useRef<
+    [[number, number], [number, number]] | null
+  >(null);
   const handleBoxesToggle = useCallback(() => {
+    const turningOn = !selectedCategories?.has("blessing_box");
+    if (turningOn && userLocation) {
+      pendingBoxesFitBoundsRef.current = nearestBoundsAround(userLocation, boxVenues, 5);
+    }
     toggleCategory("blessing_box");
-  }, [toggleCategory]);
+  }, [toggleCategory, selectedCategories, userLocation, boxVenues]);
 
   // ── PageNav "Boxes" (#516) → apply the filter on entry ───────────────────────
   // Same one-shot shape as the auto-locate effect above: a Menu page has no
   // filter state of its own, so it hands off via /?boxes=1 and this effect
   // applies the real filter once the map (and toggleCategory) exist.
+  // #670: same nearest-5 override as handleBoxesToggle above, keyed off
+  // whatever `userLocation` already resolved to at this moment — per the
+  // issue, a hand-off arriving before geolocation resolves must NOT wait on
+  // it, so an unresolved userLocation here just falls through to the
+  // existing fit-all behavior.
   const initialBoxesFilterDoneRef = useRef(false);
   useEffect(() => {
     if (!initialBoxesFilter) return;
     if (initialBoxesFilterDoneRef.current) return;
     initialBoxesFilterDoneRef.current = true;
+    if (userLocation) {
+      pendingBoxesFitBoundsRef.current = nearestBoundsAround(userLocation, boxVenues, 5);
+    }
     toggleCategory("blessing_box");
-  }, [initialBoxesFilter, toggleCategory]);
+  }, [initialBoxesFilter, toggleCategory, userLocation, boxVenues]);
 
   // ── Filters panel (#513) — the side panel behind SearchBar's Filters button.
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
@@ -1198,6 +1286,12 @@ export default function MapWrapper({
       // (the #231 home view, on a fresh load) stands untouched.
       if (prevCategoriesKey == null) return;
 
+      // A real clear also means Boxes just turned off (its own toggle is the
+      // only writer of `pendingBoxesFitBoundsRef`) — drop any pending nearest-5
+      // override so a LATER Boxes-on doesn't fit stale bounds computed for a
+      // location/box-list snapshot that's since moved on.
+      pendingBoxesFitBoundsRef.current = null;
+
       // Real clear — fit the all-venues bounds, capped at CATEGORY_FIT_MAX_ZOOM.
       // NOT the wordmark/home zoom: this is a computed bounds-fit over the
       // whole venue set, a different view than PUEBLO_CENTER/PUEBLO_DEFAULT_ZOOM.
@@ -1224,7 +1318,16 @@ export default function MapWrapper({
     const categoryVenues = [...allVenues, ...boxVenues].filter((v) =>
       selectedCategories!.has(v.category),
     );
-    const bounds = computeCategoryBounds(categoryVenues);
+
+    // #670 — Boxes-on with a known visitor location: use the nearest-5 bounds
+    // handleBoxesToggle/the initialBoxesFilter effect computed and stashed
+    // just before this same `selectedCategories` change, instead of this
+    // effect's normal fit-every-checked-category bounds. One-shot: consumed
+    // and cleared here so the NEXT category change (adding/removing some
+    // other filter while Boxes stays on) falls through to the ordinary fit.
+    const boxesOverride = pendingBoxesFitBoundsRef.current;
+    pendingBoxesFitBoundsRef.current = null;
+    const bounds = boxesOverride ?? computeCategoryBounds(categoryVenues);
     if (!bounds) return;
 
     mapboxMap.fitBounds(bounds, {

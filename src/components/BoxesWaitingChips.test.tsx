@@ -18,12 +18,12 @@ describe("BoxesWaitingChips", () => {
     render(<BoxesWaitingChips photosCount={1} adoptersCount={0} />);
     const link = screen.getByRole("link", { name: "1 photo to review" });
     expect(link.getAttribute("href")).toBe("/admin/box-photos");
-    expect(screen.queryByText(/adoption request/)).toBeNull();
+    expect(screen.queryByText(/sponsor request/)).toBeNull();
   });
 
   test("shows both chips, pluralized, each linking to its own queue", () => {
     render(<BoxesWaitingChips photosCount={3} adoptersCount={2} />);
     expect(screen.getByRole("link", { name: "3 photos to review" }).getAttribute("href")).toBe("/admin/box-photos");
-    expect(screen.getByRole("link", { name: "2 adoption requests" }).getAttribute("href")).toBe("/admin/box-adopters");
+    expect(screen.getByRole("link", { name: "2 sponsor requests" }).getAttribute("href")).toBe("/admin/box-adopters");
   });
 });

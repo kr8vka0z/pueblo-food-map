@@ -26,10 +26,14 @@ function readSource(relativePath: string): string {
 // by #513 ("Category chip leaves the search bar entirely") — the chip and its
 // 14px->26px clear button no longer exist; filters live in FilterPanel instead.
 
-describe("mobile review #8 — BottomSheet Show/Hide details toggle (~20px -> >=24px)", () => {
-  test("toggle button gains vertical padding", () => {
+// #666 replaced the ~20px "Show/Hide details" text-link toggle this guard
+// covered with a real 48×48 grab-bar button (see BottomSheet.tsx's own
+// header) — there's no longer a padding hack to regress, since the tap
+// target IS the button's own size now. Re-pointed at the bar's own floor.
+describe("mobile review #8 (superseded by #666) — BottomSheet grab bar meets the 48px floor", () => {
+  test("grab bar button is a real 48px square, not a padded text link", () => {
     const src = readSource("src/components/BottomSheet.tsx");
-    expect(src).toMatch(/flex items-center gap-1\.5 py-1\.5 text-sm font-medium/);
+    expect(src).toMatch(/flex h-12 w-12 items-center justify-center rounded-md/);
   });
 });
 

@@ -5,6 +5,7 @@ import { preload } from "react-dom";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { SITE_URL, SITE_NAME, OG_IMAGE } from "@/lib/site";
 import { buildWebSiteJsonLd, serializeJsonLd } from "@/lib/venueSchema";
+import Analytics from "@/components/Analytics";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const DESCRIPTION =
@@ -94,6 +95,8 @@ export default function RootLayout({
         <LocaleProvider>
           {children}
         </LocaleProvider>
+        {/* #485 — deferred PostHog init; renders nothing, no-ops with no key */}
+        <Analytics />
         <ServiceWorkerRegister />
       </body>
     </html>

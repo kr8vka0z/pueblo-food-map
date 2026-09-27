@@ -5,6 +5,7 @@ import { Share2, Check } from "lucide-react";
 import { shareVenue } from "@/lib/share";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { track, EVENTS } from "@/lib/analytics";
 
 interface ShareButtonProps {
   venueId: string;
@@ -38,6 +39,10 @@ export default function ShareButton({
     : t("share.labelGeneric", locale);
 
   async function handleClick() {
+    // #485 PR 2: fire on tap, not on shareVenue's resolved result — Kyle
+    // wants "share tapped", not just "share sheet completed" (cancelling the
+    // native sheet still counts as intent).
+    void track(EVENTS.SHARE_CLICKED, { venueId });
     const result = await shareVenue({
       venueId,
       title: venueName ?? "Pueblo Food Map",

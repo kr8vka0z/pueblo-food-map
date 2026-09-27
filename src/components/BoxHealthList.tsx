@@ -1,14 +1,12 @@
 /**
  * BoxHealthList — renders a ranked list of src/lib/boxHealth.ts's
- * BoxHealthEntry rows. Shared by THREE call sites that must never disagree
- * about what a box's status means or how it reads: the /admin Dashboard's
- * "Boxes that need help" panel (capped top ~4, "needs-help" variant) and
- * the /admin/boxes tab's fuller "Needs help now" / "Gone quiet" lists
- * (unlimited, "needs-help"/"quiet" variants) — one presentational component,
- * fed already-ranked-and-limited entries by each caller
- * (src/lib/boxHealth.ts's rankNeedsHelp/rankQuiet), rather than three
- * hand-copied row renderers that could drift on color, label, or relative-
- * time wording.
+ * BoxHealthEntry rows. Currently rendered only by the /admin Dashboard's
+ * "Boxes that need help" panel (capped top ~4, "needs-help" variant, fed by
+ * rankNeedsHelp) — #671 removed the /admin/boxes tab's own "Needs help now"
+ * / "Gone quiet" lists in favor of that tab's own AllBoxesTable filters, so
+ * the "quiet" variant below has no live caller today. Kept rather than
+ * deleted (#680 removes this component together with the Dashboard panel
+ * it still serves) — see #671's build-plan comment on GitHub.
  *
  * No "use client": every row is plain markup + a real navigation Link (to
  * the box's edit screen) — nothing here needs client-side state.
@@ -19,7 +17,7 @@ import type { BoxHealthEntry, BoxHealthStatus } from "@/lib/boxHealth";
 
 export interface BoxHealthListProps {
   entries: BoxHealthEntry[];
-  /** "needs-help" shows the latest report's kind + note; "quiet" shows days since the last report + caretaker instead (there is no unresolved report to show). */
+  /** "needs-help" shows the latest report's kind + note; "quiet" shows days since the last report + sponsor instead (there is no unresolved report to show). */
   variant: "needs-help" | "quiet";
   emptyMessage: string;
 }
@@ -76,7 +74,11 @@ export default function BoxHealthList({ entries, variant, emptyMessage }: BoxHea
                       ? "No reports yet"
                       : `Quiet ${formatRelativeDays(entry.health.daysSinceLastReport)}`}
                     {" · "}
-                    {entry.caretaker ? `Cared for by ${entry.caretaker}` : "No caretaker"}
+                    {/* #671 rename: "caretaker" appears nowhere else in the product; the public
+                        card and the admin adoption queue both already say "sponsor". First name
+                        only here — this compact list has no room for the public card's full
+                        "A, B, +N more" format (see AllBoxesTable's Sponsor column for that). */}
+                    {entry.sponsors[0] ? `Sponsored by ${entry.sponsors[0]}` : "Needs a sponsor"}
                   </span>
                 )}
               </span>

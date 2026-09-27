@@ -2,10 +2,9 @@
  * BoxHealthList render tests (admin dashboard build) — fixture-props
  * coverage, same convention every other *View.test.tsx file in this app
  * uses for its presentational component. Covers both variants this
- * component renders for its three real call sites (Dashboard's "Boxes that
- * need help" panel, the future /admin/boxes tab's "Needs help now"/"Gone
- * quiet" lists) and the empty state each of those callers passes its own
- * message for.
+ * component renders (the Dashboard's own "needs-help", plus "quiet" — see
+ * this component's own header for why "quiet" has no live caller since
+ * #671) and the empty state each caller passes its own message for.
  */
 
 import { describe, expect, test } from "vitest";
@@ -21,7 +20,7 @@ function makeEntry(overrides: Partial<BoxHealthEntry> = {}): BoxHealthEntry {
     lat: 38.27,
     lng: -104.6,
     health: { status: "ok", latest: null, daysSinceLastReport: null },
-    caretaker: null,
+    sponsors: [],
     removedOn: null,
     ...overrides,
   };
@@ -52,24 +51,24 @@ describe("BoxHealthList", () => {
     expect(link.getAttribute("href")).toBe("/admin/venues/box-1/edit");
   });
 
-  test("quiet variant shows days-since and caretaker (or 'No caretaker')", () => {
-    const withCaretaker = makeEntry({
+  test("quiet variant shows days-since and sponsor (or 'Needs a sponsor')", () => {
+    const withSponsor = makeEntry({
       venueId: "box-2",
-      caretaker: "Jamie R.",
+      sponsors: ["Jamie R."],
       health: { status: "quiet", latest: null, daysSinceLastReport: 45 },
     });
-    const noCaretaker = makeEntry({
+    const noSponsor = makeEntry({
       venueId: "box-3",
       name: "Blessing Box - Elm St",
-      caretaker: null,
+      sponsors: [],
       health: { status: "quiet", latest: null, daysSinceLastReport: null },
     });
 
-    render(<BoxHealthList entries={[withCaretaker, noCaretaker]} variant="quiet" emptyMessage="unused" />);
+    render(<BoxHealthList entries={[withSponsor, noSponsor]} variant="quiet" emptyMessage="unused" />);
 
     expect(screen.getByText(/Quiet 45 days ago/)).toBeDefined();
-    expect(screen.getByText(/Cared for by Jamie R\./)).toBeDefined();
+    expect(screen.getByText(/Sponsored by Jamie R\./)).toBeDefined();
     expect(screen.getByText(/No reports yet/)).toBeDefined();
-    expect(screen.getByText(/No caretaker/)).toBeDefined();
+    expect(screen.getByText(/Needs a sponsor/)).toBeDefined();
   });
 });

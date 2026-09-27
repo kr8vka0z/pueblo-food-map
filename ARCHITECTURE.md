@@ -725,10 +725,26 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   with `last_verified` over 12 months old, oldest first).
 - **`/admin/places` — venue list** (`VenueListView`). All `venues` rows —
   draft, published, archived — filtered and searched entirely client-side
-  (low hundreds of rows). A row is flagged "Unpublished changes"
-  (`hasUnpublishedChanges()`, `src/lib/adminVenues.ts`) when it's a draft or
-  was edited since its last publish (`updated_at > published_at`). Read-only
-  itself; each row links to its edit page.
+  (low hundreds of rows). Each row shows ONE status (#673, replacing an old
+  status column + a separate, frequently-disagreeing "Unpublished changes"
+  column): **Draft** / **Live** / **Live · edits waiting** / **Removed**,
+  computed by `displayStatusOf()` (`src/lib/adminVenues.ts`) from the row
+  plus its matching `src/data/published-venues.ts` entry (what the public
+  map is actually serving) — a diff on any field EXCEPT `last_verified`
+  (a "last checked" bump alone never flags a place), never true for a
+  blessing box (boxes are live without publishing) or on staging (which can
+  never Publish — `isProductionWorker()`, `publishVenues.ts`). A status key
+  above the table explains all four in plain language. Read-only itself;
+  each row's NAME is the link to its edit page (#672) — an archived row's
+  name stays plain text (editing an archived venue 409s). A "Live · edits
+  waiting" place's edit page shows a "Waiting to publish" box: every
+  differing field's on-map-now → after-publish values, and who changed it
+  (`diffPublishedFields()` / `attributeFieldChange()`, same file — the
+  latter reads `audit_log` since the last publish, correlating an approved
+  `change_proposals` row's `applied_at` to name a Data Refresh approval
+  distinctly from a plain hand-edit). On staging, a banner replaces the
+  Publish panel outright ("Test site: publishing is turned off here") and no
+  place can ever read "edits waiting."
 - **`/admin/venues/new` and `/admin/venues/[id]/edit`** — one form,
   `AddVenueForm`, in two modes (an optional `venueId` switches create →
   edit; same fields, validation and redirect). `POST /api/admin/venues`

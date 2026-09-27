@@ -35,6 +35,13 @@ import BottomSheet from "@/components/BottomSheet";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import * as shareMod from "@/lib/share";
+import { track, EVENTS } from "@/lib/analytics";
+
+// #485 PR 2: mock the whole module so EVENTS keeps its real allowlist values.
+vi.mock("@/lib/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics")>()),
+  track: vi.fn(),
+}));
 
 // BoxCardBody (rendered for a box venue) renders BoxCheckinPanel directly,
 // which mounts a Turnstile widget — stub it the same way
@@ -522,5 +529,27 @@ describe("BottomSheet — blessing box card (map-first rework)", () => {
     await user.click(screen.getByRole("button", { name: /share/i }));
     expect(shareSpy).toHaveBeenCalledWith(expect.objectContaining({ venueId: "test-box-1", isBox: true }));
     shareSpy.mockRestore();
+  });
+});
+
+// ─── Analytics (#485 PR 2) ───────────────────────────────────────────────────
+
+describe("BottomSheet — analytics", () => {
+  test("clicking the phone number fires call_clicked", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue();
+    render(<BottomSheet venue={venue} onClose={() => {}} />);
+    await user.click(screen.getByRole("button", { name: /show details/i }));
+    await user.click(screen.getByRole("link", { name: /555-0122/ }));
+    expect(track).toHaveBeenCalledWith(EVENTS.CALL_CLICKED, { venueId: venue.id });
+  });
+
+  test("clicking the Plentiful website link fires website_clicked", async () => {
+    const user = userEvent.setup();
+    const venue = makeVenue({ source: "plentiful", url: "https://example.com/pantry" });
+    render(<BottomSheet venue={venue} onClose={() => {}} />);
+    await user.click(screen.getByRole("button", { name: /show details/i }));
+    await user.click(screen.getByRole("link", { name: /plentiful/i }));
+    expect(track).toHaveBeenCalledWith(EVENTS.WEBSITE_CLICKED, { venueId: venue.id });
   });
 });

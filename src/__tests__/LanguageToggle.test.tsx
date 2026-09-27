@@ -14,12 +14,19 @@
  *   9. writeLocaleCookie / readLocaleCookie helpers round-trip in jsdom.
  */
 
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LocaleProvider, useLocale, readLocaleCookie, writeLocaleCookie } from "@/lib/LocaleContext";
 import LanguageToggle from "@/components/LanguageToggle";
 import { t } from "@/lib/i18n";
+import { track, EVENTS } from "@/lib/analytics";
+
+// #485 PR 2: mock the whole module so EVENTS keeps its real allowlist values.
+vi.mock("@/lib/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics")>()),
+  track: vi.fn(),
+}));
 
 // ─── Helper: wrap in LocaleProvider ──────────────────────────────────────────
 
@@ -199,5 +206,23 @@ describe("LocaleProvider — setLocale writes cookie", () => {
     renderWithProvider(<LanguageToggle />, "es");
     await user.click(screen.getByRole("button", { name: /english/i }));
     expect(readLocaleCookie()).toBe("en");
+  });
+});
+
+// ─── Analytics (#485 PR 2) ───────────────────────────────────────────────────
+
+describe("LanguageToggle — analytics", () => {
+  test("switching from EN to ES fires locale_switched", async () => {
+    const user = userEvent.setup();
+    renderWithProvider(<LanguageToggle />);
+    await user.click(screen.getByRole("button", { name: /spanish/i }));
+    expect(track).toHaveBeenCalledWith(EVENTS.LOCALE_SWITCHED, { to: "es" });
+  });
+
+  test("tapping the already-active locale does NOT fire locale_switched", async () => {
+    const user = userEvent.setup();
+    renderWithProvider(<LanguageToggle />);
+    await user.click(screen.getByRole("button", { name: /english/i }));
+    expect(track).not.toHaveBeenCalled();
   });
 });

@@ -17,6 +17,14 @@
  * AccessDeniedError` inside the page still resolves true. Real JWT/D1
  * plumbing stays covered by adminDb.test.ts and adminOrigin.test.ts; this
  * file only proves the page wires those pieces together correctly.
+ *
+ * #673: the page also calls getCloudflareContext() directly now (to read
+ * BETTER_AUTH_RP_ID for isProductionWorker()/isStaging), independent of the
+ * getAdminDb mock above — same mock shape as
+ * src/app/api/admin/publish/route.test.ts. Defaults to production
+ * (BETTER_AUTH_RP_ID undefined) in every test below; the dedicated staging
+ * banner + status-hiding behavior has its own test file
+ * (page.staging.test.tsx).
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -30,6 +38,11 @@ import type { AdminVenueRow } from "@/types/venue";
 const mockGetAdminDb = vi.fn();
 vi.mock("@/lib/adminDb", () => ({
   getAdminDb: (...args: unknown[]) => mockGetAdminDb(...args),
+}));
+
+const mockGetCloudflareContext = vi.fn();
+vi.mock("@opennextjs/cloudflare", () => ({
+  getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 
 // Value is irrelevant -- getAdminDb is mocked, so the page never actually
@@ -115,6 +128,8 @@ describe("PlacesPage — auth guard", () => {
       db: makeFakeDb(venues),
       identity: { email: "admin@example.com" },
     });
+    // Production (BETTER_AUTH_RP_ID unset) — see this file's own header.
+    mockGetCloudflareContext.mockResolvedValue({ env: { BETTER_AUTH_RP_ID: undefined } });
 
     render(await PlacesPage());
 

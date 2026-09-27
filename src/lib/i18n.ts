@@ -381,8 +381,9 @@ const en: Record<string, string> = {
   // un-headed "privacy.body" paragraph is REPLACED by "What we collect"
   // below (privacy.collect.*), plus two new headed sections — one paragraph
   // per i18n key, per the task's own instruction ("not overloading
-  // privacy.body"). privacy.analytics (below) is unchanged wording, kept
-  // last, per the task's own "keep the analytics paragraph unchanged."
+  // privacy.body"). privacy.analytics (below) was unchanged wording at the
+  // time this comment was written; it was rewritten again for #485 (PostHog
+  // added alongside Cloudflare Web Analytics — see that key's own comment).
   "privacy.collect.heading": "What we collect",
   "privacy.collect.body": "Pueblo Food Map collects the information you type into our forms (place reports, suggestions, and feedback). We use it to review what you sent and, if you gave an email address, to write back. Your IP address is checked to block spam when you send a form, and is never saved with what you sent.",
   "privacy.checkins.heading": "Blessing box check-ins",
@@ -403,7 +404,18 @@ const en: Record<string, string> = {
   // described without naming (Turnstile) or didn't mention at all (Mapbox).
   "privacy.other.heading": "Other services we use",
   "privacy.other.body": "We use Mapbox to show the map. Loading it shares your IP address with Mapbox, and if you get walking directions, your location too. We use Cloudflare Turnstile on our forms and box check-ins to block spam; it checks some information about your device and browser.",
-  "privacy.analytics": "We use Cloudflare Web Analytics to count visits and measure how quickly pages load. It sets no cookies and stores nothing on your device, it does not identify you by your IP address or your browser, and it does not follow you to other websites. It records things like which page was viewed, the site you arrived from, your browser and device type, your country, and how long the page took to load. We use no advertising pixels and no other analytics service.",
+  // Rewritten (#485, PostHog analytics core): PostHog joins Cloudflare Web
+  // Analytics (which stays on as an independent visit count — AGENTS.md
+  // "Observability"). PostHog's cookieless mode and "Discard client IP
+  // data" project setting keep two of this page's promises (no cookies,
+  // IP discarded); this paragraph is rewritten to also disclose the new
+  // named taps/search tracking (#485 comment, 2026-09-26) truthfully.
+  // Session replay (screen-recording of how a page was used) was turned
+  // back ON (Kyle, 2026-09-26, reversing the issue's original "replay OFF")
+  // after seeing the #681 admin dashboard mockup — this paragraph discloses
+  // it, and that everything typed is hidden from it (analytics.ts's
+  // session_recording.maskAllInputs).
+  "privacy.analytics": "We use PostHog and Cloudflare Web Analytics to see how people use the map: which pages are viewed, taps on the map and its filters, the words people search for (only searches used often are ever looked at, never a single search — this helps us find places we're missing), and a recording of on-screen activity to help us improve the site. Anything you type is always hidden from that recording. Neither service sets a cookie or stores anything on your device, and your exact IP address is thrown away before it's used for anything. We never see what you type into a form, your exact location, or who you are.",
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
   "directions.walk": "Walk",
@@ -1280,7 +1292,7 @@ const es: Record<string, string> = {
   "privacy.retention.body": "Eliminamos automáticamente las direcciones de correo antiguas de nuestros registros: 90 días después de enviar una sugerencia o reporte de un lugar, de que se rechace una solicitud de adopción de caja, o de que canceles una alerta. Esto no afecta la copia que ya enviamos a nuestro propio correo cuando enviaste un formulario, ni un registro interno que el personal administrativo usa para dar seguimiento a decisiones de moderación. El correo de una alerta activa se mantiene hasta que la canceles.", // [CHECK]
   "privacy.other.heading": "Otros servicios que usamos", // [CHECK]
   "privacy.other.body": "Usamos Mapbox para mostrar el mapa. Cargarlo comparte tu dirección IP con Mapbox, y si pides indicaciones para caminar, también tu ubicación. Usamos Cloudflare Turnstile en nuestros formularios y en los registros de cajas para bloquear spam; revisa cierta información sobre tu dispositivo y navegador.", // [CHECK]
-  "privacy.analytics": "Usamos Cloudflare Web Analytics para contar visitas y medir qué tan rápido cargan las páginas. No usa cookies ni guarda nada en tu dispositivo, no te identifica por tu dirección IP ni por tu navegador, y no te sigue a otros sitios web. Registra datos como qué página se vio, el sitio desde el que llegaste, tu tipo de navegador y dispositivo, tu país y cuánto tardó en cargar la página. No usamos píxeles de publicidad ni ningún otro servicio de análisis.",
+  "privacy.analytics": "Usamos PostHog y Cloudflare Web Analytics para ver cómo la gente usa el mapa: qué páginas se ven, los toques en el mapa y sus filtros, las palabras que la gente busca (solo se revisan las búsquedas usadas con frecuencia, nunca una búsqueda individual, esto nos ayuda a encontrar lugares que nos faltan), y una grabación de la actividad en pantalla para ayudarnos a mejorar el sitio. Lo que escribas siempre queda oculto en esa grabación. Ningún servicio usa cookies ni guarda nada en tu dispositivo, y tu dirección IP exacta se descarta antes de usarse para cualquier cosa. Nunca vemos lo que escribes en un formulario, tu ubicación exacta, ni quién eres.", // [CHECK]
 
   // Directions (#134) — Walk / Bus / Drive buttons on venue detail cards
   "directions.walk": "Caminar",

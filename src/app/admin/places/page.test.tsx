@@ -105,11 +105,22 @@ function makeVenueRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
   };
 }
 
-/** Matches the page's real call chain: db.prepare(sql).all<AdminVenueRow>(). */
-function makeFakeDb(seedRows: AdminVenueRow[]) {
+/**
+ * Matches the page's real call chain: db.prepare(sql).all<AdminVenueRow>()
+ * for the venues query, and (#674) a second .all() for the pending
+ * change_proposals query — dispatches on SQL text so the two never cross
+ * wires (a fake that returned `seedRows` for either query used to work
+ * before #674 added the second one; every test below either doesn't care
+ * about proposals at all, or passes them explicitly).
+ */
+function makeFakeDb(seedRows: AdminVenueRow[], proposalRows: unknown[] = []) {
   return {
-    prepare: () => ({
-      all: async () => ({ success: true, results: seedRows, meta: {} }),
+    prepare: (sql: string) => ({
+      all: async () => ({
+        success: true,
+        results: sql.includes("FROM change_proposals") ? proposalRows : seedRows,
+        meta: {},
+      }),
     }),
   } as unknown as D1Database;
 }

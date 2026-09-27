@@ -43,6 +43,18 @@
  * production will show), so a "Test site" banner replaces the panel
  * outright rather than showing a panel that can never do anything.
  *
+ * #674 ("fold the Data refresh tab into Places"): this page now ALSO loads
+ * every pending `change_proposals` row (the same query /admin/flags/page.tsx
+ * used to run — that page is now a redirect here) and groups it by
+ * `target_venue_id`: a proposal whose target is one of the venues already
+ * SELECTed above (an update/remove, or an `add` restoring an archived one)
+ * goes into `proposalsByVenueId`; everything else — a genuinely-new `add`
+ * with no matching venue row at all — goes into `addProposals`, rendered by
+ * VenueListView as its own "Suggested new place" row. `?show=review`
+ * pre-selects the "To review" chip (passed down as a plain boolean prop,
+ * never parsed client-side — see VenueListView's own header).
+ *
+
  * On AccessDeniedError this delegates to handlePageAuthError()
  * (src/lib/adminAuthErrors.ts): a missing Better Auth session redirects to
  * /admin/login; every other denial reason calls Next's forbidden()
@@ -65,14 +77,41 @@ import { summarizePublishChanges, displayStatusOf, type AdminDisplayStatus } fro
 import { isProductionWorker } from "@/lib/publishVenues";
 import { publishedVenues } from "@/data/published-venues";
 import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
+import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
 import VenueListView from "@/components/VenueListView";
+import ToReviewSummaryBox from "@/components/ToReviewSummaryBox";
 import PublishPanel from "@/components/PublishPanel";
 import AdminNav from "@/components/AdminNav";
 import type { AdminVenueRow } from "@/types/venue";
 
-export default async function PlacesPage() {
+/**
+ * Groups every pending proposal by whether its target already exists among
+ * `venues` (any status — an archived match is a restore, still attached to
+ * that row) or not (a genuinely-new `add`, its own "Suggested new place"
+ * row). See this file's own header for the full reasoning.
+ */
+function groupProposalsByTarget(
+  proposals: ParsedProposal[],
+  venues: AdminVenueRow[],
+): { proposalsByVenueId: Record<string, ParsedProposal[]>; addProposals: ParsedProposal[] } {
+  const venueIds = new Set(venues.map((v) => v.id));
+  const proposalsByVenueId: Record<string, ParsedProposal[]> = {};
+  const addProposals: ParsedProposal[] = [];
+  for (const proposal of proposals) {
+    const targetId = proposal.row.target_venue_id;
+    if (venueIds.has(targetId)) {
+      (proposalsByVenueId[targetId] ??= []).push(proposal);
+    } else {
+      addProposals.push(proposal);
+    }
+  }
+  return { proposalsByVenueId, addProposals };
+}
+
+export default async function PlacesPage({ searchParams }: { searchParams?: Promise<{ show?: string }> } = {}) {
   let email: string;
   let venues: AdminVenueRow[];
+  let proposals: ParsedProposal[] = [];
   let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
 
   try {
@@ -82,6 +121,12 @@ export default async function PlacesPage() {
       .prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC")
       .all<AdminVenueRow>();
     venues = result.results;
+    // Same query /admin/flags/page.tsx used to run before #674 folded that
+    // queue into this page.
+    const proposalsResult = await db
+      .prepare("SELECT * FROM change_proposals WHERE status = 'pending' ORDER BY created_at DESC")
+      .all<ChangeProposalRow>();
+    proposals = proposalsResult.results.map(parseProposalRow);
     navCounts = await loadAdminNavCounts(db);
   } catch (err) {
     handlePageAuthError(err);
@@ -96,10 +141,16 @@ export default async function PlacesPage() {
     statusByVenueId[venue.id] = displayStatusOf(venue, publishedById.get(venue.id), { isStaging });
   }
 
+  const { proposalsByVenueId, addProposals } = groupProposalsByTarget(proposals, venues);
+  const reviewRowCount =
+    Object.values(proposalsByVenueId).filter((p) => p.length > 0).length + addProposals.length;
+  const { show } = searchParams ? await searchParams : {};
+
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={email} active="places" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6">
+        <ToReviewSummaryBox reviewRowCount={reviewRowCount} proposals={proposals} />
         {isStaging ? (
           // #673 pt.6: staging can never Publish (isProductionWorker() is
           // false there) — a Publish panel that always no-ops, next to
@@ -111,7 +162,13 @@ export default async function PlacesPage() {
         ) : (
           <PublishPanel summary={summarizePublishChanges(venues)} />
         )}
-        <VenueListView venues={venues} statusByVenueId={statusByVenueId} />
+        <VenueListView
+          venues={venues}
+          statusByVenueId={statusByVenueId}
+          proposalsByVenueId={proposalsByVenueId}
+          addProposals={addProposals}
+          initialShowReview={show === "review"}
+        />
       </div>
     </main>
   );

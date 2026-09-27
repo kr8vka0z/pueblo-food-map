@@ -4,8 +4,8 @@
  * migrations in adminBoxHealthQueries.sql.test.ts, and the status math is
  * already proven in boxHealth.test.ts — this file only covers the mapping/
  * degrade wiring specific to this module: fast-exit on zero boxes, mapping
- * a latest check-in + caretaker onto each venue, and degrading to "no
- * caretaker data" when the adopter-names read fails).
+ * a latest check-in + sponsor names onto each venue, and degrading to "no
+ * sponsor data" when the adopter-names read fails).
  */
 
 import { describe, expect, test } from "vitest";
@@ -25,6 +25,7 @@ function makeFakeDb(opts: {
   venues: FakeBoxVenueRow[];
   latestCheckins?: { venue_id: string; kind: string; note: string | null; created_at: string }[];
   adopterNamesFails?: boolean;
+  adopterNameRows?: { venue_id: string; display_name: string }[];
 }) {
   return {
     prepare: (sql: string) => ({
@@ -32,7 +33,7 @@ function makeFakeDb(opts: {
         all: async () => {
           if (sql.includes("box_adopters")) {
             if (opts.adopterNamesFails) throw new Error("adopter read failed");
-            return { results: [], meta: {} };
+            return { results: opts.adopterNameRows ?? [], meta: {} };
           }
           return { results: [], meta: {} };
         },
@@ -72,7 +73,7 @@ describe("loadBoxHealthEntries", () => {
     expect(entries[0].venueId).toBe("box-1");
     expect(entries[0].health.status).toBe("empty");
     expect(entries[0].health.latest?.note).toBe("bare");
-    expect(entries[0].caretaker).toBeNull();
+    expect(entries[0].sponsors).toEqual([]);
   });
 
   test("a box with no check-in row reads as 'quiet' with a null latest report", async () => {
@@ -86,7 +87,7 @@ describe("loadBoxHealthEntries", () => {
     expect(entries[0].health.latest).toBeNull();
   });
 
-  test("adopter-name read failure degrades to caretaker: null, never throws", async () => {
+  test("adopter-name read failure degrades to sponsors: [], never throws", async () => {
     const db = makeFakeDb({
       venues: [{ id: "box-3", name: "Blessing Box - Main", address: "2 Main St", lat: 38.2, lng: -104.5 }],
       adopterNamesFails: true,
@@ -94,7 +95,23 @@ describe("loadBoxHealthEntries", () => {
 
     const entries = await loadBoxHealthEntries(db, new Date("2026-09-20T00:00:00.000Z"));
 
-    expect(entries[0].caretaker).toBeNull();
+    expect(entries[0].sponsors).toEqual([]);
+  });
+
+  // #671: the Sponsor column needs the FULL adopter list, not just the
+  // first name, to render the public card's "A, B, +N more" format.
+  test("passes every approved adopter name through, not just the first", async () => {
+    const db = makeFakeDb({
+      venues: [{ id: "box-5", name: "Blessing Box - Sunny", address: "5 Sunny St", lat: 38.2, lng: -104.5 }],
+      adopterNameRows: [
+        { venue_id: "box-5", display_name: "Jamie R." },
+        { venue_id: "box-5", display_name: "Sam T." },
+      ],
+    });
+
+    const entries = await loadBoxHealthEntries(db, new Date("2026-09-20T00:00:00.000Z"));
+
+    expect(entries[0].sponsors).toEqual(["Jamie R.", "Sam T."]);
   });
 
   test("passes blessing_boxes.removed_on straight through as removedOn", async () => {

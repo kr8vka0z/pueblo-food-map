@@ -29,7 +29,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import BottomSheet from "@/components/BottomSheet";
 import type { Venue } from "@/types/venue";
@@ -60,17 +60,35 @@ afterEach(() => {
 
 // ─── Mock vaul ───────────────────────────────────────────────────────────────
 // Render children as plain divs; no portal / animation.
+//
+// `vaulRootProps` (module-scope, via vi.hoisted — a plain module variable
+// referenced inside vi.mock's factory hits vitest's hoisting TDZ otherwise)
+// captures whatever BottomSheet passes to Drawer.Root — `onDrag`,
+// `onRelease`, `onOpenChange` — so tests below can call vaul's OWN hooks
+// directly to prove the swipe-down-collapse-vs-close veto (follow-up to
+// #666), without reimplementing vaul's real gesture math in a test.
+const vaulRootProps = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
 
 vi.mock("vaul", () => {
-  const DrawerRoot = ({ children, open }: { children: React.ReactNode; open: boolean }) =>
-    open ? <div data-testid="vaul-root">{children}</div> : null;
+  const DrawerRoot = ({ children, open, ...rest }: { children: React.ReactNode; open: boolean; [key: string]: unknown }) => {
+    vaulRootProps.current = rest;
+    return open ? <div data-testid="vaul-root">{children}</div> : null;
+  };
 
   const DrawerPortal = ({ children }: { children: React.ReactNode }) => (
     <div data-testid="vaul-portal">{children}</div>
   );
 
-  const DrawerContent = ({ children, ...rest }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
-    <div data-testid="vaul-content" {...rest}>{children}</div>
+  // `ref` destructured explicitly (React 19 lets a plain function component
+  // accept it as a real prop) so BottomSheet's own `ref={drawerContentRef}`
+  // — used to clear vaul's leftover drag transform on a vetoed dismiss —
+  // lands on the actual DOM node the tests below inspect.
+  const DrawerContent = ({
+    children,
+    ref,
+    ...rest
+  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode; ref?: React.Ref<HTMLDivElement> }) => (
+    <div data-testid="vaul-content" ref={ref} {...rest}>{children}</div>
   );
 
   const DrawerTitle = ({ children, className }: { children: React.ReactNode; className?: string }) => (
@@ -224,6 +242,123 @@ describe("BottomSheet — grab bar expand / collapse toggle (#666)", () => {
     fireEvent.pointerDown(bar, { clientY: 200 });
     fireEvent.pointerUp(bar, { clientY: 190 });
     expect(bar.getAttribute("aria-expanded")).toBe("false");
+  });
+});
+
+// ─── Whole-card swipe-up + swipe-down-collapse-vs-close (follow-up to #666) ──
+// Kyle's original ask was "swipe up on the card", not only the bar, and a
+// swipe down on the EXPANDED card should collapse before it closes. These
+// tests exercise the two different mechanisms BottomSheet.tsx uses (see its
+// own header comment on `dismissDragActive` for the full vaul-source
+// citation): swipe-up is our own recognizer on Drawer.Content; swipe-down-
+// while-expanded is vaul's own `onDrag`/`onRelease`/`onOpenChange` hooks,
+// captured here via `vaulRootProps` rather than reimplemented.
+describe("BottomSheet — swipe up anywhere on the collapsed card expands it", () => {
+  test("swiping up on the card body (not the bar) expands", () => {
+    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
+    const bar = screen.getByRole("button", { name: /show details/i });
+    const content = screen.getByTestId("vaul-content");
+    fireEvent.pointerDown(content, { clientY: 300 });
+    fireEvent.pointerUp(content, { clientY: 250 });
+    expect(bar.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  test("swiping up starting on a button/link does not expand (Kyle's 'outside buttons/links')", () => {
+    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
+    const bar = screen.getByRole("button", { name: /show details/i });
+    const closeButton = screen.getByRole("button", { name: "Close" });
+    fireEvent.pointerDown(closeButton, { clientY: 300 });
+    fireEvent.pointerUp(closeButton, { clientY: 250 });
+    expect(bar.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  test("a pointercancel (native scroll taking over) clears the gesture — no expand on the eventual pointerup elsewhere", () => {
+    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
+    const bar = screen.getByRole("button", { name: /show details/i });
+    const content = screen.getByTestId("vaul-content");
+    fireEvent.pointerDown(content, { clientY: 300 });
+    fireEvent.pointerCancel(content);
+    fireEvent.pointerUp(content, { clientY: 250 });
+    expect(bar.getAttribute("aria-expanded")).toBe("false");
+  });
+});
+
+describe("BottomSheet — swipe down while expanded collapses instead of closing", () => {
+  test("a vaul drag-dismiss while expanded collapses the card and does NOT call onClose", () => {
+    const onClose = vi.fn();
+    render(<BottomSheet venue={makeVenue()} onClose={onClose} />);
+    const bar = screen.getByRole("button", { name: /show details/i });
+    fireEvent.click(bar); // expand
+    expect(bar.getAttribute("aria-expanded")).toBe("true");
+
+    // Simulate vaul engaging a real drag (its own onDrag prop), then
+    // deciding to dismiss (its own onOpenChange(false)) — exactly the two
+    // calls vaul's source makes, in that order, for a real drag-dismiss.
+    const onDrag = vaulRootProps.current.onDrag as (...args: unknown[]) => void;
+    const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
+    act(() => {
+      onDrag();
+      onOpenChange(false);
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(bar.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  test("vaul's onRelease(event, false) after a vetoed dismiss clears the leftover drag transform", () => {
+    render(<BottomSheet venue={makeVenue()} onClose={() => {}} />);
+    const bar = screen.getByRole("button", { name: /show details/i });
+    fireEvent.click(bar);
+
+    const content = screen.getByTestId("vaul-content") as HTMLDivElement;
+    // Simulate vaul's live drag having left an inline transform (exactly
+    // what vaul's own onDrag does to the DOM node during a real drag).
+    content.style.transition = "none";
+    content.style.transform = "translate3d(0, 240px, 0)";
+
+    const onDrag = vaulRootProps.current.onDrag as (...args: unknown[]) => void;
+    const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
+    const onRelease = vaulRootProps.current.onRelease as (event: unknown, open: boolean) => void;
+    act(() => {
+      onDrag();
+      onOpenChange(false);
+      onRelease({}, false);
+    });
+
+    expect(content.style.transform).toBe("");
+  });
+
+  test("Escape (no prior onDrag) still closes normally even while expanded — #527/#604 unchanged", () => {
+    const onClose = vi.fn();
+    render(<BottomSheet venue={makeVenue()} onClose={onClose} />);
+    const bar = screen.getByRole("button", { name: /show details/i });
+    fireEvent.click(bar);
+    expect(bar.getAttribute("aria-expanded")).toBe("true");
+
+    // No onDrag call this time — mirrors Escape/scrim, which route straight
+    // to onOpenChange without ever touching vaul's onDrag prop.
+    const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
+    act(() => {
+      onOpenChange(false);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test("a drag-dismiss while COLLAPSED still closes (only the second swipe-down, from expanded, is vetoed)", () => {
+    const onClose = vi.fn();
+    render(<BottomSheet venue={makeVenue()} onClose={onClose} />);
+    const bar = screen.getByRole("button", { name: /show details/i });
+    expect(bar.getAttribute("aria-expanded")).toBe("false");
+
+    const onDrag = vaulRootProps.current.onDrag as (...args: unknown[]) => void;
+    const onOpenChange = vaulRootProps.current.onOpenChange as (open: boolean) => void;
+    act(() => {
+      onDrag();
+      onOpenChange(false);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
 

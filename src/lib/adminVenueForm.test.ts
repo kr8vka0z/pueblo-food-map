@@ -9,8 +9,8 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { mapVenueRowToFormValues, mapSubmissionPayloadToFormValues } from "@/lib/adminVenueForm";
-import type { AdminVenueRow } from "@/types/venue";
+import { mapVenueRowToFormValues, mapSubmissionPayloadToFormValues, mapAddProposalToFormValues } from "@/lib/adminVenueForm";
+import type { AdminVenueRow, Venue } from "@/types/venue";
 import type { NewVenuePayload } from "@/lib/publicSubmissions";
 
 function makeRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
@@ -187,5 +187,73 @@ describe("mapSubmissionPayloadToFormValues", () => {
     const values = mapSubmissionPayloadToFormValues(makePayload());
     expect(values.lat).toBeUndefined();
     expect(values.lng).toBeUndefined();
+  });
+});
+
+// ─── mapAddProposalToFormValues (#674: a genuinely-new `add` proposal opens
+// /admin/venues/new?proposal=<id> prefilled, instead of the old /admin/flags
+// queue's one-click Approve) ────────────────────────────────────────────────
+
+function makeProposalAfter(overrides: Partial<Venue> = {}): Partial<Venue> {
+  return {
+    id: "osm-node-new",
+    name: "Northside Pantry",
+    category: "pantry",
+    lat: 38.27,
+    lng: -104.6,
+    address: "900 Elm St, Pueblo, CO",
+    phone: "719-555-0200",
+    url: "https://northside.example.com",
+    hours_weekly: { mon: ["09:00-17:00"] },
+    last_verified: "2026-09-01",
+    source: "OpenStreetMap",
+    ...overrides,
+  };
+}
+
+describe("mapAddProposalToFormValues", () => {
+  test("maps scalar fields directly, coercing lat/lng to strings", () => {
+    const values = mapAddProposalToFormValues(makeProposalAfter());
+    expect(values.name).toBe("Northside Pantry");
+    expect(values.category).toBe("pantry");
+    expect(values.address).toBe("900 Elm St, Pueblo, CO");
+    expect(values.lastVerified).toBe("2026-09-01");
+    expect(values.lat).toBe("38.27");
+    expect(values.lng).toBe("-104.6");
+    expect(values.phone).toBe("719-555-0200");
+    expect(values.url).toBe("https://northside.example.com");
+    expect(values.source).toBe("OpenStreetMap");
+  });
+
+  test("hours_weekly (an already-parsed object, not JSON text) maps to per-day comma text", () => {
+    const values = mapAddProposalToFormValues(
+      makeProposalAfter({ hours_weekly: { mon: ["09:00-17:00"], wed: ["09:00-12:00", "13:00-17:00"] } }),
+    );
+    expect(values.hours?.mon).toBe("09:00-17:00");
+    expect(values.hours?.wed).toBe("09:00-12:00, 13:00-17:00");
+    expect(values.hours?.tue).toBe("");
+  });
+
+  test("missing/undefined fields degrade to blank, never throw", () => {
+    const values = mapAddProposalToFormValues({});
+    expect(values.name).toBe("");
+    expect(values.category).toBe("");
+    expect(values.address).toBe("");
+    expect(values.lat).toBe("");
+    expect(values.lng).toBe("");
+    expect(values.phone).toBe("");
+    expect(values.hours?.mon).toBe("");
+    expect(values.hoursIrregular).toEqual([]);
+  });
+
+  test("an unrecognized category degrades to the form's own blank 'select a category' state", () => {
+    const values = mapAddProposalToFormValues(makeProposalAfter({ category: "not_a_real_category" as Venue["category"] }));
+    expect(values.category).toBe("");
+  });
+
+  test("accepts_snap/accepts_wic map to the form's tri-state string values", () => {
+    expect(mapAddProposalToFormValues(makeProposalAfter({ accepts_snap: true })).acceptsSnap).toBe("1");
+    expect(mapAddProposalToFormValues(makeProposalAfter({ accepts_snap: false })).acceptsSnap).toBe("0");
+    expect(mapAddProposalToFormValues(makeProposalAfter({})).acceptsWic).toBe("");
   });
 });

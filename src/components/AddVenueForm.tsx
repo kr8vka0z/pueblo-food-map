@@ -37,12 +37,24 @@
  * to /admin/submissions instead of /admin, so the admin lands back on the
  * queue rather than the plain venue list.
  *
- * #390: an optional `proposalId` prop (EDIT mode only — the mirror image of
- * `submissionId` above, which is create-mode-only) rides along in the
- * PATCH body so the edit route can approve the originating `change_proposals`
- * row (source='link_health') atomically with the venue update — wired by
- * src/app/admin/venues/[id]/edit/page.tsx when opened as `?proposal=<id>`.
- * On success that path redirects back to /admin/flags instead of /admin.
+ * #390/#674: an optional `proposalId` prop rides along in the body of
+ * WHICHEVER mode this render is in (unlike `submissionId`, which is
+ * create-only) so that mode's route can approve the originating
+ * `change_proposals` row atomically with the venue write:
+ *   - EDIT mode (#390): PATCH .../<venueId> approves a `link_health`
+ *     proposal — wired by src/app/admin/venues/[id]/edit/page.tsx when
+ *     opened as `?proposal=<id>`.
+ *   - CREATE mode (#674): POST /api/admin/venues approves a genuinely-new
+ *     `add` proposal, using ITS OWN id/source as the new venue's id/
+ *     source_type rather than a fresh manual-<uuid> — wired by
+ *     src/app/admin/venues/new/page.tsx when opened as `?proposal=<id>`,
+ *     initialValues supplied by src/lib/adminVenueForm.ts's
+ *     mapAddProposalToFormValues(). Never sent alongside `submissionId` —
+ *     the two hand-offs (public submission vs. change-proposal) are
+ *     mutually exclusive create paths.
+ * On success either path redirects back to /admin/places?show=review (the
+ * Places tab's "To review" filter — /admin/flags was folded into Places by
+ * #674) instead of /admin/places.
  *
  * #265: `expectedUpdatedAt` (EDIT mode only) is the optimistic-concurrency
  * precondition — the row's `updated_at` as the edit page's own server-side
@@ -539,9 +551,9 @@ export default function AddVenueForm({
       // queue — never in edit mode (submissionId is meaningless there; see
       // this prop's own doc comment above).
       ...(!isEditMode && submissionId != null ? { submissionId } : {}),
-      // #390: mirror image — only ever sent on an edit reached from the
-      // flags queue's link_health hand-off.
-      ...(isEditMode && proposalId != null ? { proposalId } : {}),
+      // #390/#674: sent in WHICHEVER mode this render is in — see this
+      // prop's own doc comment above for why it's no longer edit-only.
+      ...(proposalId != null ? { proposalId } : {}),
       // #265: the optimistic-concurrency precondition — see this prop's own
       // doc comment above. Edit mode only; sent verbatim, no reformatting.
       ...(isEditMode && expectedUpdatedAt != null ? { expectedUpdatedAt } : {}),
@@ -563,16 +575,18 @@ export default function AddVenueForm({
       });
 
       if (res.status === successStatus) {
-        // #259/#390: a create that approved a submission returns to the
-        // review queue; an edit that approved a proposal returns to the
-        // flags queue — so the admin picks up the next pending card in
-        // either case, rather than the plain venue list. Default target is
-        // /admin/places (moved from /admin, admin dashboard build — /admin
-        // is now the Dashboard, a different screen; a venue-edit flow
-        // should land back on the venue list, not the to-do list).
+        // #259/#390/#674: a create that approved a submission returns to the
+        // review queue; either mode approving a change_proposals row
+        // returns to the Places tab's "To review" filter (#674 folded
+        // /admin/flags into Places) — so the admin picks up the next
+        // pending item in either case, rather than the plain venue list.
+        // Default target is /admin/places (moved from /admin, admin
+        // dashboard build — /admin is now the Dashboard, a different
+        // screen; a venue-edit flow should land back on the venue list, not
+        // the to-do list).
         let redirectTo = "/admin/places";
         if (!isEditMode && submissionId != null) redirectTo = "/admin/submissions";
-        else if (isEditMode && proposalId != null) redirectTo = "/admin/flags";
+        else if (proposalId != null) redirectTo = "/admin/places?show=review";
         router.push(redirectTo);
         router.refresh();
         return;

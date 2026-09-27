@@ -100,7 +100,7 @@ const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful"]
 /**
  * True for exactly the shape the first production pipeline run mostly
  * produced (89 of 107 proposals): "still there, nothing else changed." Used
- * by BOTH the client (ProposalsReviewView, to compute which currently-
+ * by BOTH the client (ToReviewSummaryBox, to compute which currently-
  * visible cards the bulk button would approve) and the server
  * (POST /api/admin/proposals/approve-date-only, to re-validate each
  * requested id from a fresh DB read) — a single predicate so the two can
@@ -157,7 +157,7 @@ export function renameMetaOf(diff: ProposedDiff | null): { from_id: string; to_i
  * Fields worth showing in a before/after diff view — `last_verified` is a
  * pure freshness stamp (every add/update proposal carries it, but it isn't
  * something an admin needs to eyeball) and `id` is already shown elsewhere as
- * the card's own venue identifier. Exported so ProposalsReviewView.tsx's
+ * the card's own venue identifier. Exported so ProposalCard.tsx's
  * full FieldDiff table AND NeedsDecisionPanel's compact one-line summary
  * (Dashboard's "Needs a decision" panel) read the SAME set — a second,
  * independently-filtered list here would risk the two screens disagreeing
@@ -379,7 +379,7 @@ export async function applyApprovedProposal(
   const parsed = parseProposalRow(proposalRow);
   if (parsed.parseError) {
     // #568 item 3: no `message` here used to mean both review surfaces
-    // (NeedsDecisionPanel.tsx's ApproveButton, ProposalsReviewView.tsx)
+    // (NeedsDecisionPanel.tsx's ApproveButton, ProposalCard.tsx)
     // fell back to their own generic "Try again"/"Something went wrong" —
     // for a corrupted row, retrying can never succeed, so that copy was
     // actively misleading. Fixed at the shared source both surfaces

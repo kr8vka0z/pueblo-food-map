@@ -38,7 +38,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReviewSubmission } from "@/components/SubmissionsReviewView";
-import { SOURCE_BADGE, fieldLabel, formatFieldValue } from "@/components/ProposalsReviewView";
+// #674: ProposalsReviewView.tsx (the old /admin/flags queue) was deleted —
+// its card was extracted to ProposalCard.tsx, which now owns these exports.
+import { SOURCE_BADGE, fieldLabel, formatFieldValue } from "@/components/ProposalCard";
 import { reviewableDiffFields } from "@/lib/adminProposals";
 import type { ParsedProposal, ProposalChangeType, ProposalSourceValue, ProposedDiff } from "@/lib/adminProposals";
 import type { VenueLookup } from "@/lib/adminVenueLookup";
@@ -478,7 +480,7 @@ const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
 /**
  * Compact one-line "what changed" for an `update` proposal — the Dashboard's
  * fast-triage panel has no room for the full queue's FieldDiff table
- * (ProposalsReviewView.tsx), so this shows only the FIRST reviewable field's
+ * (ProposalCard.tsx), so this shows only the FIRST reviewable field's
  * before -> after plus a "+N more" count. Reuses reviewableDiffFields/
  * fieldLabel/formatFieldValue (the SAME field selection + formatting the
  * full queue's own diff view uses) rather than a second diff parser — the

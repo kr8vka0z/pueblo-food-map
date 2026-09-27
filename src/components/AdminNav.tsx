@@ -31,7 +31,6 @@ export type AdminActiveTab =
   | "boxes"
   | "places"
   | "submissions"
-  | "flags"
   | "box-photos"
   | "box-adopters";
 
@@ -49,17 +48,19 @@ interface NavItem {
   countKey?: keyof AdminNavCounts;
 }
 
-// Order + labels match the approved mockup's nav row exactly (Direction A/B
-// header) and the task's own list: "Dashboard · Blessing Boxes · Places ·
-// Review queue · Data refresh · Photo review · Sponsor requests."
-// (#676: relabeled from "Adoption requests" — public-facing copy says
-// "sponsor," never "adopt.")
+// Order + labels originally matched the approved mockup's nav row exactly
+// (Direction A/B header): "Dashboard · Blessing Boxes · Places · Review
+// queue · Data refresh · Photo review · Sponsor requests." (#676: relabeled
+// from "Adoption requests" — public-facing copy says "sponsor," never
+// "adopt.") #674 folded the "Data refresh" tab into Places — that item and
+// its own /admin/flags link are gone, and the pending-proposal count pill
+// it used to carry (`proposals`) now shows on Places instead, since that's
+// where those proposals live now.
 const NAV_ITEMS: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/admin" },
   { key: "boxes", label: "Blessing Boxes", href: "/admin/boxes" },
-  { key: "places", label: "Places", href: "/admin/places" },
+  { key: "places", label: "Places", href: "/admin/places", countKey: "proposals" },
   { key: "submissions", label: "Review queue", href: "/admin/submissions", countKey: "submissions" },
-  { key: "flags", label: "Data refresh", href: "/admin/flags", countKey: "proposals" },
   { key: "box-photos", label: "Photo review", href: "/admin/box-photos", countKey: "photos" },
   { key: "box-adopters", label: "Sponsor requests", href: "/admin/box-adopters", countKey: "adopters" },
 ];

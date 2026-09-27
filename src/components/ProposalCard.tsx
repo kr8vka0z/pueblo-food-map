@@ -1,125 +1,40 @@
 "use client";
 
 /**
- * ProposalsReviewView — the /admin/flags review queue's card list. Rendered
- * by src/app/admin/flags/page.tsx, which owns the auth gate and the
- * `SELECT ... WHERE status = 'pending' ORDER BY created_at DESC` read; this
- * component is presentational + interactive only, same
- * Server-Component-data / Client-Component-action split as
- * SubmissionsReviewView (the closest sibling — this component mirrors its
- * card-list shape, reject-with-reason flow, and per-row error handling
- * closely rather than inventing new UI conventions).
+ * ProposalCard — one `change_proposals` row's review card: source/lane
+ * badges, a per-change_type detail renderer, the right-hand public-card
+ * preview, and the Approve/Reject actions. Extracted from
+ * ProposalsReviewView.tsx (issue #674, "fold the Data refresh tab into
+ * Places") — that component owned both this card AND the /admin/flags
+ * queue's filter chips/bulk-approve UI; the queue itself is gone (its
+ * chips/filters/bulk-approve moved into the Places tab's VenueListView +
+ * ToReviewSummaryBox), but the SAME card renders in two places now: the
+ * venue edit page's "Suggestions to review" box (SuggestionsBox.tsx, one
+ * venue's own pending proposals) and, for a brand-new `add` proposal with
+ * no existing venue row to attach to, above the prefilled
+ * /admin/venues/new form.
  *
- * Cards, not a dense table — a proposal carries a variable-shape field diff
- * that a fixed set of table columns can't represent cleanly (same reasoning
- * SubmissionsReviewView's own header gives for submissions vs.
- * VenueListView's dense table).
+ * Prop shape changed from ProposalsReviewView's `venueLookup: Record<string,
+ * VenueLookup>` map to a single, optional `venue` — every call site here
+ * already knows exactly which one venue (if any) this card's proposal
+ * targets, so a full lookup map was only ever needed by the old queue's
+ * mixed list of many venues at once.
  *
- * Filterable by source and change_type (client-side, plain array filters —
- * the queue's own SELECT already scopes to `status = 'pending'`, so
- * "filterable in a way that makes a 100+ row queue workable" only needs
- * these two dimensions narrowed further, not a second D1 round trip).
- *
- * Three change_type shapes, each with its own action affordance:
- *   - `remove`: the dangerous kind. Never a single click — a native
- *     window.confirm() gate (same convention ArchiveVenueButton.tsx already
- *     established) before POSTing approve, and the danger (`--color-danger`)
- *     button styling that action already owns on this admin surface.
- *   - `add` / `update`: a plain sage "Approve" button — non-destructive
- *     field edits or a new draft row, POSTs approve directly.
- *   - `link_health` proposals (always change_type "update" from diffEngine,
- *     but source-gated, not change_type-gated, here): NO Approve button at
- *     all — "a dead-link finding is not a field edit to blindly apply"
- *     (the issue's own instruction). A "Review & fix link" navigation Link
- *     to the venue's edit screen instead
- *     (/admin/venues/<id>/edit?proposal=<id>, resolved server-side by that
- *     page's resolveLinkHealthProposalContext()) — POST
- *     /api/admin/proposals/[id]/approve independently enforces this same
- *     rule (400 on a link_health source), so this is defense-in-depth, not
- *     the only guard.
- *
- * Reject (every kind) — POST /api/admin/proposals/<id>/reject — mirrors
- * SubmissionsReviewView's reject-with-optional-reason flow exactly.
- *
- * A 409 `{error: "stale", message}` response from either action (the
- * supersede-race / stale-apply correctness requirements —
- * src/app/api/admin/proposals/[id]/approve/route.ts's own header) surfaces
- * that `message` inline on the card rather than a generic failure string —
- * the one place this queue's error handling diverges from
- * SubmissionsReviewView's, which has no equivalent staleness concept.
- *
- * On any successful action, router.refresh() re-runs the Server Component's
- * query — the acted-on card simply stops matching `status = 'pending'` and
- * disappears from the next render.
- *
- * Detail rendering (usability fix, staging review): Kyle's verdict on
- * staging was "How am I supposed to tell what the change is? There's no
- * detail" — a card could name a venue and a changing field but gave no way
- * to judge the change against the real place. Fixed by widening
- * page.tsx's venueLookup (name/status only -> + category/address/phone/
- * url/last_verified) and adding a distinct detail renderer per
- * change_type: `AddDetails` shows the full proposed record for a venue
- * that isn't on the map yet (diff.after is the only source of truth —
- * venueLookup has nothing to show), `RemoveDetails` now states which
- * source stopped listing the place alongside its current address/category,
- * and `FieldDiff`'s freshness-only branch now names the confirming source
- * and date instead of a source-less "still present" sentence. Hours values
- * everywhere route through @/lib/hours' formatSlot so an admin reads
- * "9am – 5pm," never a raw "09:00-17:00" or a JSON blob.
- *
- * Website/phone links (usability fix, second staging review pass): a
- * Website value used to render as inert plain text — `renderFieldValue()`
- * is the ONE shared place every field value routes through (DetailRow,
- * FieldDiff's after value, LinkHealthDetails' dead-link banner) so a url/
- * phone field reads as a real link everywhere this queue shows one, not
- * just the one spot Kyle happened to review.
- *
- * Right-hand preview (`ProposalPreview`, same review pass — Kyle: "it would
- * be nice if there was a full preview on the right hand side that showed
- * what the new venue card was going to look like. easier to catch errors
- * that way"): renders the REAL public VenueCard component
- * (src/components/VenueCard.tsx, the same one src/components/ListView.tsx
- * uses) fed `buildPreviewVenue()`'s merge of the proposal's `after` diff
- * over the current venueLookup row — not a hand-rolled lookalike, so what
- * an admin sees here is exactly what the public map renders once approved,
- * not an approximation of it. `remove` previews today's card (a remove
- * proposal carries no field diff) under a dimmed `inert` treatment plus a
- * real (non-hidden) sentence explaining the outcome — Kyle's own
- * instruction was explicit that a normal-looking card here would
- * misrepresent what happens on approval. `link_health` never reaches this
- * component (routed to the venue edit screen instead, see the card's own
- * action row below) — a dead-link finding has no proposed field change to
- * preview, and the edit screen IS the real, richer place to inspect it.
- *
- * Bulk "Approve all date-only updates" (issue: the first production run
- * wrote 107 proposals, 89 of them a bare freshness confirmation — "no admin
- * clicks 89 times a month"): computed from `filtered` (the currently
- * DISPLAYED subset, after the source/change-type chips above), not the full
- * `proposals` prop — approving what the reviewer can currently see matches
- * how the single Approve button already behaves per-card. Uses the SAME
- * src/lib/adminProposals.ts `isDateOnlyUpdateProposal` predicate the server
- * route re-validates against, so the button's own count can never overstate
- * what the server will actually apply. A `window.confirm()` gate (same
- * convention as the single Approve button's own remove-confirmation) states
- * the count and that real changes are excluded, then POSTs
- * /api/admin/proposals/approve-date-only with exactly those ids.
- * `router.refresh()` on success re-runs the same Server Component query the
- * single-approve flow already relies on to drop acted-on cards — this
- * component's own local `bulkState` (not the props) is what shows the
- * "Approved N. Skipped K." summary, so it survives that refresh instead of
- * disappearing the instant approved cards stop matching `status =
- * 'pending'`.
- *
- * Triage lanes (#543): each card carries its lane badge (reviewLaneOf —
- * Likely noise / Needs a human / Likely rename) plus Jev's reading in one
- * plain sentence; a lane filter row and a "Needs a human first" sort appear
- * only once more than one lane is present. A lane is a sorting aid, never a
- * gate: every action on the card behaves exactly as before. A rename
- * proposal (meta.rename) names the new listing and approves as "Approve
- * rename" — an update of this same venue id.
+ * Behavior change from the original card (issue #674's own spec): a
+ * genuinely-new `add` proposal (no existing venue row — `venue` is
+ * undefined) no longer shows a one-click Approve button here. Approving a
+ * brand-new place now means opening it in the real "Add a venue" form first
+ * (/admin/venues/new?proposal=<id>, prefilled via
+ * adminVenueForm.ts's mapAddProposalToFormValues) so the admin can review
+ * and fix fields before it's created — the old one-click Approve applied
+ * `diff.after` completely unedited. This card still offers Reject for a bad
+ * suggestion without opening the form. A RESTORE (`add` targeting an
+ * existing archived venue — `venue.status === "archived"`) is unaffected:
+ * the venue row already exists, so Approve here still works exactly as
+ * before (POST .../approve, applyApprovedProposal's isRestore branch).
  */
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { categoryLabels } from "@/data/venues";
@@ -128,13 +43,7 @@ import { formatSlot } from "@/lib/hours";
 import { safeUrl } from "@/lib/safeUrl";
 import VenueCard from "@/components/VenueCard";
 import type { Venue, VenueCategory, WeeklyHours } from "@/types/venue";
-import {
-  isDateOnlyUpdateProposal,
-  renameMetaOf,
-  reviewableDiffFields,
-  reviewLaneOf,
-  REVIEW_LANE_ORDER,
-} from "@/lib/adminProposals";
+import { renameMetaOf, reviewableDiffFields, reviewLaneOf } from "@/lib/adminProposals";
 import type {
   ChangeProposalRow,
   ParsedProposal,
@@ -143,12 +52,7 @@ import type {
   ProposedDiff,
   ReviewLane,
 } from "@/lib/adminProposals";
-import type { VenueLookup } from "@/app/admin/flags/page";
-
-export interface ProposalsReviewViewProps {
-  proposals: ParsedProposal[];
-  venueLookup: Record<string, VenueLookup>;
-}
+import type { VenueLookup } from "@/lib/adminVenueLookup";
 
 // ─── Shared styling (reuses existing DESIGN.md tokens — no new ones) ───────
 
@@ -166,7 +70,7 @@ export const SOURCE_BADGE: Record<ProposalSourceValue, { label: string; classNam
 };
 
 // Triage lanes (#543) — existing badge colour pairs only, no new tokens.
-const LANE_BADGE: Record<ReviewLane, { label: string; className: string }> = {
+export const LANE_BADGE: Record<ReviewLane, { label: string; className: string }> = {
   needs_human: { label: "Needs a human", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
   likely_rename: { label: "Likely rename", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   likely_noise: { label: "Likely noise", className: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]" },
@@ -183,7 +87,9 @@ const pct = (p: number) => `${Math.round(p * 100)}%`;
 
 /**
  * One plain sentence from the stored Jev answers (triage_json), or null
- * when the row was never triaged. Exported for tests.
+ * when the row was never triaged. Exported for tests and for
+ * adminProposals.ts's Places "To review" row summary, which reuses this
+ * exact sentence rather than a second copy.
  */
 export function triageSummary(row: Pick<ChangeProposalRow, "triage_json">): string | null {
   if (!row.triage_json) return null;
@@ -206,7 +112,7 @@ export function triageSummary(row: Pick<ChangeProposalRow, "triage_json">): stri
   return null;
 }
 
-const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
+export const CHANGE_TYPE_LABEL: Record<ProposalChangeType, string> = {
   add: "New venue",
   update: "Field update",
   remove: "Remove",
@@ -232,12 +138,6 @@ const dangerButtonClass =
   "transition-colors duration-150 hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
-
-const filterChipClass = (active: boolean) =>
-  "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-150 " +
-  (active
-    ? "border-[var(--color-sage-500)] bg-[var(--color-sage-100)] text-[var(--color-sage-700)]"
-    : "border-[var(--color-bone-300)] text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)]");
 
 const fieldLabelClass = "text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-400)]";
 
@@ -297,214 +197,15 @@ function formatSubmittedAt(iso: string): string {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-type SourceFilter = "all" | ProposalSourceValue;
-type ChangeTypeFilter = "all" | ProposalChangeType;
-
-/** Bulk-approve's own local result state — kept separate from each card's per-row ActionState (defined below) since this action targets a whole set of cards, not one. */
-type BulkApproveState =
-  | { status: "idle" }
-  | { status: "submitting" }
-  | { status: "done"; approved: number; skipped: number }
-  | { status: "error"; message: string };
-
-export default function ProposalsReviewView({ proposals, venueLookup }: ProposalsReviewViewProps) {
-  const router = useRouter();
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
-  const [changeTypeFilter, setChangeTypeFilter] = useState<ChangeTypeFilter>("all");
-  const [bulkState, setBulkState] = useState<BulkApproveState>({ status: "idle" });
-  const [laneFilter, setLaneFilter] = useState<"all" | ReviewLane>("all");
-  const [laneSort, setLaneSort] = useState(false);
-
-  const laneOf = (p: ParsedProposal) => reviewLaneOf(p.row, p.parseError ? null : p.diff);
-  const presentLanes = useMemo(
-    () =>
-      (Object.keys(REVIEW_LANE_ORDER) as ReviewLane[]).filter((lane) =>
-        proposals.some((p) => reviewLaneOf(p.row, p.parseError ? null : p.diff) === lane),
-      ),
-    [proposals],
-  );
-
-  const presentSources = useMemo(
-    () => [...new Set(proposals.map((p) => p.row.source))] as ProposalSourceValue[],
-    [proposals],
-  );
-  const presentChangeTypes = useMemo(
-    () => [...new Set(proposals.map((p) => p.row.change_type))] as ProposalChangeType[],
-    [proposals],
-  );
-
-  const filtered = proposals.filter((p) => {
-    if (sourceFilter !== "all" && p.row.source !== sourceFilter) return false;
-    if (changeTypeFilter !== "all" && p.row.change_type !== changeTypeFilter) return false;
-    if (laneFilter !== "all" && laneOf(p) !== laneFilter) return false;
-    return true;
-  });
-  // Stable sort: within a lane, the server's newest-first order is kept.
-  if (laneSort) filtered.sort((a, b) => REVIEW_LANE_ORDER[laneOf(a)] - REVIEW_LANE_ORDER[laneOf(b)]);
-
-  // Same predicate the server re-validates against (src/lib/adminProposals.ts)
-  // — scoped to `filtered`, the currently VISIBLE subset, not the whole queue.
-  const dateOnlyIds = useMemo(
-    () => filtered.filter((p) => !p.parseError && isDateOnlyUpdateProposal(p.row, p.diff)).map((p) => p.row.id),
-    [filtered],
-  );
-
-  async function handleBulkApprove(ids: number[]) {
-    const confirmed = window.confirm(
-      `Approve all ${ids.length} proposals that only update the last-verified date? Real changes are not included.`,
-    );
-    if (!confirmed) return;
-    setBulkState({ status: "submitting" });
-    try {
-      const res = await fetch("/api/admin/proposals/approve-date-only", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
-      const data = (await res.json().catch(() => null)) as
-        | { approved?: number; skipped?: { id: number }[]; error?: string }
-        | null;
-      if (res.status === 200 && data) {
-        setBulkState({ status: "done", approved: data.approved ?? 0, skipped: data.skipped?.length ?? 0 });
-        router.refresh();
-        return;
-      }
-      // Reviewer finding (PR #417): a "Nothing was applied" claim is only
-      // true for a request the server never started processing (400/401/403
-      // — bad body/id-cap/auth, rejected before the per-id loop runs). A 500
-      // means the loop was already partway through when something broke, so
-      // some ids may have applied already — claiming "nothing" there would
-      // be a lie the way it was for the server's own per-id loop before this
-      // same review round (route.ts's try/catch fix).
-      if (data?.error === "too_many_ids") {
-        setBulkState({
-          status: "error",
-          message: "More than 200 date-only proposals selected — narrow the filter and retry.",
-        });
-        return;
-      }
-      const requestNeverStarted = res.status === 400 || res.status === 401 || res.status === 403;
-      setBulkState({
-        status: "error",
-        message: requestNeverStarted
-          ? "Something went wrong. Nothing was applied. Try again."
-          : "Something went wrong. Some proposals may already be approved — refresh before retrying.",
-      });
-    } catch {
-      // fetch() itself threw (network failure) — the request never reached
-      // the server, so "nothing was applied" is genuinely true here.
-      setBulkState({ status: "error", message: "Something went wrong. Nothing was applied. Try again." });
-    }
-  }
-
-  if (proposals.length === 0) {
-    return (
-      <div className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-16 text-center">
-        <p className="text-sm font-semibold text-[var(--color-ink-700)]">No proposals to review</p>
-        <p className="mt-1 text-sm text-[var(--color-ink-500)]">
-          Changes found by the automated venue-refresh pipeline will show up here.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      {(presentSources.length > 1 || presentChangeTypes.length > 1) && (
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setSourceFilter("all")} className={filterChipClass(sourceFilter === "all")}>
-            All sources
-          </button>
-          {presentSources.map((source) => (
-            <button key={source} type="button" onClick={() => setSourceFilter(source)} className={filterChipClass(sourceFilter === source)}>
-              {SOURCE_BADGE[source]?.label ?? source}
-            </button>
-          ))}
-          <span className="mx-1 h-4 w-px bg-[var(--color-bone-300)]" aria-hidden />
-          <button
-            type="button"
-            onClick={() => setChangeTypeFilter("all")}
-            className={filterChipClass(changeTypeFilter === "all")}
-          >
-            All change types
-          </button>
-          {presentChangeTypes.map((ct) => (
-            <button key={ct} type="button" onClick={() => setChangeTypeFilter(ct)} className={filterChipClass(changeTypeFilter === ct)}>
-              {CHANGE_TYPE_LABEL[ct] ?? ct}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Triage lanes (#543) — only once more than one lane is present, so an
-          all-untriaged queue looks exactly as it did before triage existed. */}
-      {presentLanes.length > 1 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setLaneFilter("all")} className={filterChipClass(laneFilter === "all")}>
-            All lanes
-          </button>
-          {presentLanes.map((lane) => (
-            <button key={lane} type="button" onClick={() => setLaneFilter(lane)} className={filterChipClass(laneFilter === lane)}>
-              {LANE_BADGE[lane].label}
-            </button>
-          ))}
-          <span className="mx-1 h-4 w-px bg-[var(--color-bone-300)]" aria-hidden />
-          <button type="button" aria-pressed={laneSort} onClick={() => setLaneSort((v) => !v)} className={filterChipClass(laneSort)}>
-            Needs a human first
-          </button>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-[var(--color-ink-500)]">
-          {filtered.length} of {proposals.length} pending {proposals.length === 1 ? "proposal" : "proposals"}
-        </p>
-        {dateOnlyIds.length > 0 && (
-          <button
-            type="button"
-            onClick={() => handleBulkApprove(dateOnlyIds)}
-            disabled={bulkState.status === "submitting"}
-            className={primaryButtonClass}
-          >
-            {bulkState.status === "submitting" ? "Approving…" : `Approve all ${dateOnlyIds.length} date-only updates`}
-          </button>
-        )}
-      </div>
-
-      {(bulkState.status === "done" || bulkState.status === "error") && (
-        <p aria-live="polite" className="text-sm text-[var(--color-ink-500)]">
-          {bulkState.status === "done" ? `Approved ${bulkState.approved}. Skipped ${bulkState.skipped}.` : bulkState.message}
-        </p>
-      )}
-
-      {filtered.length === 0 ? (
-        <div className="rounded-[var(--radius-lg)] border border-[var(--color-bone-200)] bg-white px-4 py-10 text-center">
-          <p className="text-sm text-[var(--color-ink-500)]">No proposals match this filter.</p>
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-4">
-          {filtered.map((proposal) => (
-            <li key={proposal.row.id}>
-              <ProposalCard proposal={proposal} venueLookup={venueLookup} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-// ─── One card + its own local action state ─────────────────────────────────
-
 type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };
 
-function ProposalCard({
-  proposal,
-  venueLookup,
-}: {
+export interface ProposalCardProps {
   proposal: ParsedProposal;
-  venueLookup: Record<string, VenueLookup>;
-}) {
+  /** The proposal's current target venue, or undefined for a genuinely-new `add` with no existing row. */
+  venue?: VenueLookup;
+}
+
+export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
   const router = useRouter();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -517,11 +218,14 @@ function ProposalCard({
   const sourceBadge = SOURCE_BADGE[source] ?? { label: row.source, className: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]" };
   const reasonFieldId = `proposal-reject-reason-${row.id}`;
 
-  const targetVenue = venueLookup[row.target_venue_id];
   const afterName = !proposal.parseError && typeof proposal.diff.after?.name === "string" ? proposal.diff.after.name : undefined;
   const beforeName = !proposal.parseError && typeof proposal.diff.before?.name === "string" ? proposal.diff.before.name : undefined;
-  const venueName = targetVenue?.name ?? afterName ?? beforeName ?? row.target_venue_id;
-  const isRestore = changeType === "add" && targetVenue?.status === "archived";
+  const venueName = venue?.name ?? afterName ?? beforeName ?? row.target_venue_id;
+  const isRestore = changeType === "add" && venue?.status === "archived";
+  // A brand-new `add` (no existing row at all) routes through the "Add a
+  // venue" form instead of a one-click Approve here — see this file's own
+  // header for why.
+  const isNewPlace = changeType === "add" && !isRestore;
   const lane = reviewLaneOf(row, proposal.parseError ? null : proposal.diff);
   const laneBadge = LANE_BADGE[lane];
   const summary = triageSummary(row);
@@ -606,9 +310,7 @@ function ProposalCard({
           <p className="text-base font-semibold text-[var(--color-ink-700)]">{venueName}</p>
           {/* Address alongside the name — recognising the actual place, not just
               matching an id, is what lets an admin judge the change at all. */}
-          {targetVenue?.address && (
-            <p className="text-xs text-[var(--color-ink-500)]">{targetVenue.address}</p>
-          )}
+          {venue?.address && <p className="text-xs text-[var(--color-ink-500)]">{venue.address}</p>}
           <p className="text-xs text-[var(--color-ink-400)]">{row.target_venue_id}</p>
           {rename && (
             <p className="mt-2 text-sm text-[var(--color-ink-700)]">
@@ -626,7 +328,7 @@ function ProposalCard({
           ) : source === "link_health" ? (
             <LinkHealthDetails diff={proposal.diff} />
           ) : changeType === "remove" ? (
-            <RemoveDetails name={venueName} venue={targetVenue} sourceLabel={sourceBadge.label} />
+            <RemoveDetails name={venueName} venue={venue} sourceLabel={sourceBadge.label} />
           ) : changeType === "add" ? (
             <AddDetails diff={proposal.diff} sourceLabel={sourceBadge.label} isRestore={isRestore} />
           ) : (
@@ -636,7 +338,7 @@ function ProposalCard({
 
         {!proposal.parseError && source !== "link_health" && (
           <div data-testid="proposal-preview" className="min-w-0 lg:w-[320px] lg:shrink-0">
-            <ProposalPreview changeType={changeType} diff={proposal.diff} venue={targetVenue} venueId={row.target_venue_id} />
+            <ProposalPreview changeType={changeType} diff={proposal.diff} venue={venue} venueId={row.target_venue_id} />
           </div>
         )}
       </div>
@@ -647,7 +349,12 @@ function ProposalCard({
             Review &amp; fix link
           </Link>
         )}
-        {!proposal.parseError && source !== "link_health" && changeType !== "remove" && (
+        {!proposal.parseError && isNewPlace && (
+          <Link href={`/admin/venues/new?proposal=${row.id}`} className={primaryButtonClass}>
+            Review as new place
+          </Link>
+        )}
+        {!proposal.parseError && source !== "link_health" && !isNewPlace && changeType !== "remove" && (
           <button
             type="button"
             onClick={() => handleApprove()}
@@ -787,16 +494,15 @@ function DetailRow({ label, value, field }: { label: string; value: string; fiel
 }
 
 /**
- * `venue` (the current D1 row, from page.tsx's widened venueLookup) is
- * normally present — a remove proposal targets a venue that still exists
- * (that's the point) — but stays optional so this never throws on a stray
- * lookup miss. Address is NOT repeated here — the card header (above this
- * component) already shows it for every non-`add` card, same source, so a
- * second copy would just be visual noise on the one card type that most
- * needs its message to stand out. Names `sourceLabel` explicitly
- * ("OpenStreetMap no longer lists...") instead of the old source-less "this
- * source" — a reviewer with several sources in the queue at once needs to
- * know which one dropped it.
+ * `venue` (the current D1 row) is normally present — a remove proposal
+ * targets a venue that still exists (that's the point) — but stays optional
+ * so this never throws on a stray lookup miss. Address is NOT repeated here
+ * — the card header (above this component) already shows it for every
+ * non-`add` card, same source, so a second copy would just be visual noise
+ * on the one card type that most needs its message to stand out. Names
+ * `sourceLabel` explicitly ("OpenStreetMap no longer lists...") instead of
+ * the old source-less "this source" — a reviewer with several sources in
+ * the queue at once needs to know which one dropped it.
  */
 function RemoveDetails({ name, venue, sourceLabel }: { name: string; venue: VenueLookup | undefined; sourceLabel: string }) {
   return (
@@ -926,9 +632,9 @@ function FieldDiff({ diff, sourceLabel }: { diff: ProposedDiff; sourceLabel: str
 
 /**
  * Builds the Venue object handed to the real VenueCard for the preview
- * column — `after` merged OVER the current venueLookup row so an `update`
- * proposal shows the RESULTING card, not today's. `add` proposals carry a
- * full `after` record already (diffEngine.ts's buildProposal never emits a
+ * column — `after` merged OVER the current venue so an `update` proposal
+ * shows the RESULTING card, not today's. `add` proposals carry a full
+ * `after` record already (diffEngine.ts's buildProposal never emits a
  * partial add); `remove` calls this with `after: null` (a remove proposal
  * carries no field diff — diffEngine always writes `fields_changed: []` for
  * it) to preview today's card unmodified, with the "will disappear" framing
@@ -940,13 +646,13 @@ function FieldDiff({ diff, sourceLabel }: { diff: ProposedDiff; sourceLabel: str
  * VenueCard's own render, so a missing value there defaults rather than
  * blocking the whole preview — an `add` proposal's diff, for instance,
  * doesn't carry `source` (only `change_proposals.source`, a different
- * column, does), and there's no existing venueLookup row for a brand-new
- * venue to fall back to.
+ * column, does), and there's no existing venue row for a brand-new venue to
+ * fall back to.
  *
- * Returns null when even that minimum isn't met (a stray venueLookup miss
- * on an `update`/`remove`, or a malformed proposal) — same fail-soft
- * posture as this file's other per-row defensive branches (parseError,
- * RemoveDetails' optional venue) rather than crashing the card on bad data.
+ * Returns null when even that minimum isn't met (a stray lookup miss on an
+ * `update`/`remove`, or a malformed proposal) — same fail-soft posture as
+ * this file's other per-row defensive branches (parseError, RemoveDetails'
+ * optional venue) rather than crashing the card on bad data.
  */
 function buildPreviewVenue(venue: VenueLookup | undefined, after: Partial<Venue> | null | undefined, id: string): Venue | null {
   const base: Partial<Venue> = venue

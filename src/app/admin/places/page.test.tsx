@@ -105,11 +105,22 @@ function makeVenueRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
   };
 }
 
-/** Matches the page's real call chain: db.prepare(sql).all<AdminVenueRow>(). */
-function makeFakeDb(seedRows: AdminVenueRow[]) {
+/**
+ * Matches the page's real call chain: db.prepare(sql).all<AdminVenueRow>()
+ * for the venues query, and (#674) a second .all() for the pending
+ * change_proposals query — dispatches on SQL text so the two never cross
+ * wires (a fake that returned `seedRows` for either query used to work
+ * before #674 added the second one; every test below either doesn't care
+ * about proposals at all, or passes them explicitly).
+ */
+function makeFakeDb(seedRows: AdminVenueRow[], proposalRows: unknown[] = []) {
   return {
-    prepare: () => ({
-      all: async () => ({ success: true, results: seedRows, meta: {} }),
+    prepare: (sql: string) => ({
+      all: async () => ({
+        success: true,
+        results: sql.includes("FROM change_proposals") ? proposalRows : seedRows,
+        meta: {},
+      }),
     }),
   } as unknown as D1Database;
 }
@@ -137,14 +148,14 @@ describe("PlacesPage — auth guard", () => {
     expect(screen.getByText("Eastside Pantry")).toBeDefined();
     expect(screen.getByText("Main Street Grocery")).toBeDefined();
     // Shared AdminNav (admin dashboard build) renders the nav row now —
-    // "Places" is the active tab, and the review/data-refresh queues are
-    // still one click away from here.
-    const placesLink = screen.getByRole("link", { name: "Places" });
+    // "Places" is the active tab, and the review queue is still one click
+    // away from here. #674 folded the old "Data refresh" nav item into
+    // Places itself — there is no separate link for it any more.
+    const placesLink = screen.getByRole("link", { name: /^Places/ });
     expect(placesLink.getAttribute("aria-current")).toBe("page");
     const reviewQueueLink = screen.getByRole("link", { name: "Review queue" });
     expect(reviewQueueLink.getAttribute("href")).toBe("/admin/submissions");
-    const flagsQueueLink = screen.getByRole("link", { name: "Data refresh" });
-    expect(flagsQueueLink.getAttribute("href")).toBe("/admin/flags");
+    expect(screen.queryByRole("link", { name: /Data refresh/ })).toBeNull();
     expect(forbidden).not.toHaveBeenCalled();
   });
 

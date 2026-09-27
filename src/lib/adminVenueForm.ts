@@ -21,7 +21,7 @@
 import type { AddVenueFormValues, IrregularEntryDraft } from "@/components/AddVenueForm";
 import { DISPLAY_DAY_KEYS, type DayKey } from "@/lib/hours";
 import { categoryLabels } from "@/data/venues";
-import type { AdminVenueRow, IrregularSchedule, VenueCategory, WeeklyHours } from "@/types/venue";
+import type { AdminVenueRow, IrregularSchedule, Venue, VenueCategory, WeeklyHours } from "@/types/venue";
 import type { NewVenuePayload } from "@/lib/publicSubmissions";
 
 // Same technique adminVenueValidation.ts's VALID_CATEGORIES and
@@ -38,23 +38,28 @@ function triStateToFormValue(value: number | null): "" | "1" | "0" {
 }
 
 /**
- * `hours_weekly` JSON text (or null) -> one comma-joined text field per day,
- * matching the shape AddVenueForm's per-day inputs edit directly. Malformed
- * stored JSON degrades to every day blank rather than throwing — a data
- * problem in an existing row should never crash the edit page itself.
+ * A blank per-day draft — every day's text field empty. Shared starting
+ * point for both hoursWeeklyJsonToDraft (below) and
+ * mapAddProposalToFormValues's own hours_weekly handling (a proposal's
+ * `after.hours_weekly` is an already-parsed WeeklyHours object, not JSON
+ * text, so it skips the JSON.parse step but needs the same blank base).
  */
-function hoursWeeklyJsonToDraft(json: string | null): Record<DayKey, string> {
+function emptyHoursDraft(): Record<DayKey, string> {
   const draft = {} as Record<DayKey, string>;
   for (const day of DISPLAY_DAY_KEYS) draft[day] = "";
-  if (!json) return draft;
+  return draft;
+}
 
-  let parsed: WeeklyHours;
-  try {
-    parsed = JSON.parse(json) as WeeklyHours;
-  } catch {
-    return draft;
-  }
-
+/**
+ * A parsed WeeklyHours object -> one comma-joined text field per day,
+ * matching the shape AddVenueForm's per-day inputs edit directly. Extracted
+ * from hoursWeeklyJsonToDraft (below) so mapAddProposalToFormValues can
+ * reuse the exact same day-by-day mapping on an already-parsed object
+ * (ProposedDiff.after carries Venue.hours_weekly as WeeklyHours, never as
+ * D1's JSON-text column form) rather than a second hand-copied loop.
+ */
+function weeklyHoursObjectToDraft(parsed: WeeklyHours): Record<DayKey, string> {
+  const draft = emptyHoursDraft();
   for (const day of DISPLAY_DAY_KEYS) {
     const slots = parsed[day];
     if (slots && slots.length > 0) draft[day] = slots.join(", ");
@@ -63,12 +68,48 @@ function hoursWeeklyJsonToDraft(json: string | null): Record<DayKey, string> {
 }
 
 /**
+ * `hours_weekly` JSON text (or null) -> one comma-joined text field per day,
+ * matching the shape AddVenueForm's per-day inputs edit directly. Malformed
+ * stored JSON degrades to every day blank rather than throwing — a data
+ * problem in an existing row should never crash the edit page itself.
+ */
+function hoursWeeklyJsonToDraft(json: string | null): Record<DayKey, string> {
+  if (!json) return emptyHoursDraft();
+
+  let parsed: WeeklyHours;
+  try {
+    parsed = JSON.parse(json) as WeeklyHours;
+  } catch {
+    return emptyHoursDraft();
+  }
+
+  return weeklyHoursObjectToDraft(parsed);
+}
+
+/**
+ * A parsed IrregularSchedule[] -> editable draft rows. Extracted from
+ * hoursIrregularJsonToDraft (below) for the same reuse reason
+ * weeklyHoursObjectToDraft was split out above — mapAddProposalToFormValues
+ * gets an already-parsed array (ProposedDiff.after's shape), not JSON text.
+ * `day_of_month`/`ordinal` are converted to strings (String(1) not "1") to
+ * match the select/input values IrregularEntryDraft's fields bind to.
+ */
+function irregularArrayToDraft(parsed: IrregularSchedule[]): IrregularEntryDraft[] {
+  return parsed.map((entry) => ({
+    recurrence: entry.recurrence,
+    ordinal: entry.ordinal !== undefined ? (String(entry.ordinal) as IrregularEntryDraft["ordinal"]) : "",
+    weekday: entry.weekday ?? "",
+    dayOfMonth: entry.day_of_month !== undefined ? String(entry.day_of_month) : "",
+    slots: (entry.slots ?? []).join(", "),
+    note: entry.note ?? "",
+  }));
+}
+
+/**
  * `hours_irregular` JSON text (or null) -> a list of editable draft rows,
  * mirroring hoursWeeklyJsonToDraft()'s own "malformed JSON degrades to
  * empty, never throws" contract — a data problem in an existing row must
- * never crash the edit page. `day_of_month`/`ordinal` are converted to
- * strings (String(1) not "1") to match the select/input values
- * IrregularEntryDraft's fields bind to.
+ * never crash the edit page.
  */
 function hoursIrregularJsonToDraft(json: string | null): IrregularEntryDraft[] {
   if (!json) return [];
@@ -81,14 +122,7 @@ function hoursIrregularJsonToDraft(json: string | null): IrregularEntryDraft[] {
   }
   if (!Array.isArray(parsed)) return [];
 
-  return parsed.map((entry) => ({
-    recurrence: entry.recurrence,
-    ordinal: entry.ordinal !== undefined ? (String(entry.ordinal) as IrregularEntryDraft["ordinal"]) : "",
-    weekday: entry.weekday ?? "",
-    dayOfMonth: entry.day_of_month !== undefined ? String(entry.day_of_month) : "",
-    slots: (entry.slots ?? []).join(", "),
-    note: entry.note ?? "",
-  }));
+  return irregularArrayToDraft(parsed);
 }
 
 /**
@@ -172,5 +206,51 @@ export function mapSubmissionPayloadToFormValues(payload: NewVenuePayload): Part
     acceptsWic: payload.acceptsWic ? "1" : "0",
     notes,
     source: "Public suggestion",
+  };
+}
+
+/**
+ * Maps a pending `change_proposals` "add" row's `proposed_diff.after` (a
+ * `Partial<Venue>` — scripts/refresh/diffEngine.ts's buildProposal for a
+ * fresh add always writes the FULL incoming venue there, never a partial
+ * one) to `Partial<AddVenueFormValues>` — the same target shape
+ * mapVenueRowToFormValues()/mapSubmissionPayloadToFormValues() above
+ * produce (issue #674, "fold Data refresh into Places": a genuinely-new
+ * `add` proposal now opens /admin/venues/new?proposal=<id> prefilled from
+ * here, instead of the old /admin/flags queue's one-click, unedited
+ * Approve).
+ *
+ * Every field is read defensively (Partial<Venue>, not Venue) even though
+ * diffEngine never emits a partial one today — a malformed or
+ * hand-corrected proposed_diff row must degrade to a blank field the admin
+ * fills in, never crash the pre-fill.
+ *
+ * category reconciliation mirrors mapSubmissionPayloadToFormValues()'s own
+ * VALID_CATEGORIES check: `after.category` is trusted D1/scraper data, not
+ * form input, but a category value outside VenueCategory (a schema
+ * drift, a future source) must still degrade to the form's own "select a
+ * category" empty state rather than crash validateCreateVenuePayload() at
+ * save time with no chance for the admin to see why.
+ */
+export function mapAddProposalToFormValues(after: Partial<Venue>): Partial<AddVenueFormValues> {
+  const category = after.category && VALID_CATEGORIES.has(after.category) ? after.category : "";
+
+  return {
+    name: after.name ?? "",
+    category,
+    address: after.address ?? "",
+    lastVerified: after.last_verified ?? "",
+    lat: after.lat !== undefined ? String(after.lat) : "",
+    lng: after.lng !== undefined ? String(after.lng) : "",
+    hours: after.hours_weekly ? weeklyHoursObjectToDraft(after.hours_weekly) : emptyHoursDraft(),
+    hoursIrregular: after.hours_irregular ? irregularArrayToDraft(after.hours_irregular) : [],
+    acceptsSnap: after.accepts_snap === undefined ? "" : after.accepts_snap ? "1" : "0",
+    acceptsWic: after.accepts_wic === undefined ? "" : after.accepts_wic ? "1" : "0",
+    phone: after.phone ?? "",
+    email: after.email ?? "",
+    url: after.url ?? "",
+    operator: after.operator ?? "",
+    notes: after.notes ?? "",
+    source: after.source ?? "",
   };
 }

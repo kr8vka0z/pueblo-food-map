@@ -1,6 +1,7 @@
 /**
  * /admin/venues/new — Better-Auth-gated "Add a venue" page (#254;
- * `?submission=<id>` review-queue pre-fill added #259).
+ * `?submission=<id>` review-queue pre-fill added #259; `?proposal=<id>`
+ * fold-in added #674).
  *
  * Same auth chain as /admin/places (src/app/admin/places/page.tsx, AGENTS.md
  * "Admin authentication"): getAdminDb() verifies the caller's Better Auth
@@ -33,6 +34,23 @@
  * own prop type — real Next.js rendering always supplies it — purely so
  * this page's pre-#259 test calls (`NewVenuePage()`, no args) keep working
  * unchanged; see page.test.tsx.
+ *
+ * #674: `?proposal=<id>` is the Places tab's "Suggested new place" row hand-
+ * off — a genuinely-new, pending `change_proposals` "add" row (never a
+ * restore: an `add` targeting an already-archived venue attaches to THAT
+ * venue's own edit-page card instead, see ProposalCard.tsx's own header).
+ * resolveProposalPrefill() below mirrors resolveSubmissionPrefill()'s own
+ * "any failure degrades to the plain form, never a 404/500" shape, mapped
+ * via src/lib/adminVenueForm.ts's mapAddProposalToFormValues(). The parsed
+ * proposal itself (not just its mapped form values) also renders as a
+ * read-only ProposalCard above the form — same source/lane/triage context
+ * and Reject action the edit page's SuggestionsBox offers, so an admin can
+ * reject a bad suggestion without touching the form at all. That card's own
+ * "add, not a restore" branch never shows an Approve button (see its own
+ * header) — POST /api/admin/venues's `proposalId` field (this page threads
+ * the id through as AddVenueForm's `proposalId` prop) IS the approval path
+ * here: saving the form approves the proposal and creates the venue in one
+ * atomic batch.
  */
 
 import { headers } from "next/headers";
@@ -41,12 +59,20 @@ import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { loadAdminNavCounts, ZERO_ADMIN_NAV_COUNTS, type AdminNavCounts } from "@/lib/adminNavCounts";
 import AdminNav from "@/components/AdminNav";
 import AddVenueForm, { type AddVenueFormValues } from "@/components/AddVenueForm";
-import { mapSubmissionPayloadToFormValues } from "@/lib/adminVenueForm";
+import ProposalCard from "@/components/ProposalCard";
+import { mapSubmissionPayloadToFormValues, mapAddProposalToFormValues } from "@/lib/adminVenueForm";
+import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
 import type { NewVenuePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
 
 interface NewVenuePrefill {
   submissionId: number;
   initialValues: Partial<AddVenueFormValues>;
+}
+
+interface NewVenueProposalPrefill {
+  proposalId: number;
+  initialValues: Partial<AddVenueFormValues>;
+  proposal: ParsedProposal;
 }
 
 /**
@@ -79,20 +105,54 @@ async function resolveSubmissionPrefill(
   }
 }
 
+/**
+ * Resolves `?proposal=<id>` to a pre-fill, or null on ANY failure mode —
+ * same shape as resolveSubmissionPrefill above: absent/non-integer param, no
+ * matching pending `add` row, a parseError on the stored diff, or an empty
+ * `diff.after` (nothing to prefill from). Deliberately does NOT check
+ * whether `target_venue_id` already exists in `venues` — that's POST
+ * /api/admin/venues's own resolveAddProposalTarget check at SAVE time (the
+ * authoritative one); this page's job is only to render a sensible prefill,
+ * and a race between page load and save is exactly what that route's 409
+ * already handles.
+ */
+async function resolveProposalPrefill(
+  db: D1Database,
+  rawProposalParam: string | undefined,
+): Promise<NewVenueProposalPrefill | null> {
+  if (!rawProposalParam) return null;
+
+  const proposalId = Number(rawProposalParam);
+  if (!Number.isInteger(proposalId) || proposalId <= 0) return null;
+
+  const row = await db
+    .prepare("SELECT * FROM change_proposals WHERE id = ? AND change_type = 'add' AND status = 'pending'")
+    .bind(proposalId)
+    .first<ChangeProposalRow>();
+  if (!row) return null;
+
+  const parsed = parseProposalRow(row);
+  if (parsed.parseError || !parsed.diff.after) return null;
+
+  return { proposalId, initialValues: mapAddProposalToFormValues(parsed.diff.after), proposal: parsed };
+}
+
 export default async function NewVenuePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ submission?: string }>;
+  searchParams?: Promise<{ submission?: string; proposal?: string }>;
 } = {}) {
   let email: string;
   let prefill: NewVenuePrefill | null = null;
+  let proposalPrefill: NewVenueProposalPrefill | null = null;
   let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
 
   try {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
-    const { submission } = searchParams ? await searchParams : {};
+    const { submission, proposal } = searchParams ? await searchParams : {};
     prefill = await resolveSubmissionPrefill(db, submission);
+    proposalPrefill = await resolveProposalPrefill(db, proposal);
     navCounts = await loadAdminNavCounts(db);
   } catch (err) {
     handlePageAuthError(err);
@@ -101,9 +161,17 @@ export default async function NewVenuePage({
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
       <AdminNav email={email} active="places" counts={navCounts} />
-      <div className="px-4 py-6 sm:px-6">
-        <h2 className="wordmark mb-4 text-xl text-[var(--color-ink-900)]">Add a venue</h2>
-        {prefill ? (
+      <div className="px-4 py-6 sm:px-6 space-y-6">
+        <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Add a venue</h2>
+        {proposalPrefill && (
+          <div className="max-w-2xl">
+            <h3 className="mb-2 text-sm font-semibold text-[var(--color-ink-700)]">Suggested new place</h3>
+            <ProposalCard proposal={proposalPrefill.proposal} />
+          </div>
+        )}
+        {proposalPrefill ? (
+          <AddVenueForm initialValues={proposalPrefill.initialValues} proposalId={proposalPrefill.proposalId} />
+        ) : prefill ? (
           <AddVenueForm initialValues={prefill.initialValues} submissionId={prefill.submissionId} />
         ) : (
           <AddVenueForm />

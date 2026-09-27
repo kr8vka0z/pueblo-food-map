@@ -64,10 +64,11 @@ function makeVenueRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
   };
 }
 
+/** #674: dispatches on SQL text so the venues query and the pending change_proposals query never cross wires — see page.test.tsx's own makeFakeDb for the same fix. */
 function makeFakeDb(seedRows: AdminVenueRow[]) {
   return {
-    prepare: () => ({
-      all: async () => ({ success: true, results: seedRows, meta: {} }),
+    prepare: (sql: string) => ({
+      all: async () => ({ success: true, results: sql.includes("FROM change_proposals") ? [] : seedRows, meta: {} }),
     }),
   } as unknown as D1Database;
 }

@@ -179,8 +179,10 @@ AGENTS.md "Automated venue-refresh pipeline".
   "date-only" shape **auto-applies** (Kyle, 2026-09-15): `proposalSql.ts`'s
   `buildProposalWriteStatements()` writes the `venues.last_verified` UPDATE,
   an `audit_log` row, and an already-`approved` proposal row. It uses the
-  same `isDateOnlyUpdateProposal()` predicate as `/admin/flags`' bulk-approve
-  (`src/lib/adminProposals.ts`), so the two can't disagree on what counts.
+  same `isDateOnlyUpdateProposal()` predicate as the Places tab's
+  `ToReviewSummaryBox`'s bulk-approve (`src/lib/adminProposals.ts` — #674
+  folded the standalone `/admin/flags` queue that used to own this button
+  into Places), so the two can't disagree on what counts.
   Every other shape is only ever a pending proposal, with one opt-in
   exception — see "Jev triage + rename pairing" below.
 - **Jev triage + rename pairing (#543)** — `scripts/refresh/triage.ts` +
@@ -211,12 +213,15 @@ AGENTS.md "Automated venue-refresh pipeline".
   missing); a 150-proposal cap that aborts the whole run. Stricter than §6,
   which writes flagged removal proposals instead — chosen because the job
   runs unattended, and writing nothing beats half-writing.
-- **Review:** `/admin/flags` (`src/app/admin/flags/page.tsx`,
-  `ProposalsReviewView.tsx`, `api/admin/proposals/[id]/{approve,reject}`,
-  #390, plus bulk `approve-date-only`) is the only HUMAN-facing code path
-  that turns a real-change proposal into a `venues` mutation — the
-  ingestion job's own opt-in auto-apply lane (#543, above) is the one
-  machine exception. How it handles the
+- **Review:** the Places tab (`src/app/admin/places/page.tsx`,
+  `VenueListView.tsx`'s "To review" column, `ProposalCard.tsx`,
+  `api/admin/proposals/[id]/{approve,reject}`, #390, plus bulk
+  `approve-date-only`) — originally a standalone `/admin/flags` queue
+  (`ProposalsReviewView.tsx`), folded into Places by #674, which now
+  redirects there — is the only HUMAN-facing code path that turns a
+  real-change proposal into a `venues` mutation — the ingestion job's own
+  opt-in auto-apply lane (#543, above) is the one machine exception. How it
+  handles the
   supersede race, stale applies and rejection memory: atlas-kb "PFM AGENTS
   History — Venue-Refresh Pipeline", "Change-proposal review queue (#390)".
   Auto-supersede (§6.10a) and rejection memory (§6.10b) stay the ingestion
@@ -834,8 +839,9 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   one bad row degrades to a still-rejectable "couldn't read details" card.
   The payload mapper's category fallback and notes folding are explained in
   `src/lib/adminVenueForm.ts`.
-- **`/admin/flags` — refresh proposals (#390).** See "Automated
-  venue-refresh pipeline" above.
+- **Refresh proposals (#390) — folded into the Places tab by #674.**
+  `/admin/flags` now just redirects to `/admin/places?show=review`. See
+  "Automated venue-refresh pipeline" above.
 - **`/admin/boxes` — Blessing Boxes tab.** `AdminBoxesMap` (a small
   dedicated `react-map-gl` component, not the public `Map.tsx`) with pins
   colored by status, "Needs help now" / "Gone quiet" lists, an 8-week

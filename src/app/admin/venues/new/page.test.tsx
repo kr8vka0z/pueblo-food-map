@@ -39,13 +39,18 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/components/AddVenueForm", () => ({
-  default: (props: { initialValues?: { name?: string }; submissionId?: number }) => (
+  default: (props: { initialValues?: { name?: string }; submissionId?: number; proposalId?: number }) => (
     <div
       data-testid="add-venue-form-stub"
       data-name={props.initialValues?.name}
       data-submission-id={props.submissionId}
+      data-proposal-id={props.proposalId}
     />
   ),
+}));
+
+vi.mock("@/components/ProposalCard", () => ({
+  default: () => <div data-testid="proposal-card-stub" />,
 }));
 
 import NewVenuePage from "@/app/admin/venues/new/page";
@@ -141,6 +146,89 @@ describe("NewVenuePage — auth guard", () => {
 
     expect(forbidden).not.toHaveBeenCalled();
     expect(logAdminAuthFailure).not.toHaveBeenCalled();
+  });
+});
+
+function makeAddProposalRow(overrides: Partial<import("@/lib/adminProposals").ChangeProposalRow> = {}): import("@/lib/adminProposals").ChangeProposalRow {
+  return {
+    id: 77,
+    source: "osm",
+    target_venue_id: "osm-node-new",
+    change_type: "add",
+    proposed_diff: JSON.stringify({
+      before: null,
+      after: { name: "Northside Pantry", category: "pantry", address: "900 Elm St, Pueblo, CO", lat: 38.27, lng: -104.6 },
+      fields_changed: ["name", "category", "address", "lat", "lng"],
+    }),
+    diff_hash: "h77",
+    run_id: "run-1",
+    anomaly: 0,
+    status: "pending",
+    created_at: "2026-09-01T12:00:00.000Z",
+    reviewed_by: null,
+    reviewed_at: null,
+    applied_at: null,
+    ...overrides,
+  };
+}
+
+describe("NewVenuePage — ?proposal=<id> pre-fill (#674)", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test("a pending 'add' proposal -> AddVenueForm receives mapped initialValues + proposalId, and the ProposalCard renders", async () => {
+    mockGetAdminDb.mockResolvedValue({
+      db: makeFakeDb(makeAddProposalRow() as unknown as PublicSubmissionRow),
+      identity: { email: "admin@example.com" },
+    });
+
+    render(await NewVenuePage({ searchParams: Promise.resolve({ proposal: "77" }) }));
+
+    const stub = screen.getByTestId("add-venue-form-stub");
+    expect(stub.getAttribute("data-name")).toBe("Northside Pantry");
+    expect(stub.getAttribute("data-proposal-id")).toBe("77");
+    expect(screen.getByTestId("proposal-card-stub")).toBeDefined();
+  });
+
+  test("no matching pending 'add' proposal (bad id) -> falls back to the plain form, no crash", async () => {
+    mockGetAdminDb.mockResolvedValue({
+      db: makeFakeDb(null),
+      identity: { email: "admin@example.com" },
+    });
+
+    render(await NewVenuePage({ searchParams: Promise.resolve({ proposal: "999" }) }));
+
+    const stub = screen.getByTestId("add-venue-form-stub");
+    expect(stub.getAttribute("data-proposal-id")).toBeNull();
+    expect(screen.queryByTestId("proposal-card-stub")).toBeNull();
+  });
+
+  test("a non-integer ?proposal= value -> falls back to the plain form (never queries D1)", async () => {
+    const throwIfCalled = () => {
+      throw new Error("db.prepare should never be called for a non-integer proposal param");
+    };
+    mockGetAdminDb.mockResolvedValue({
+      db: makeFakeDb(throwIfCalled),
+      identity: { email: "admin@example.com" },
+    });
+
+    render(await NewVenuePage({ searchParams: Promise.resolve({ proposal: "not-a-number" }) }));
+
+    const stub = screen.getByTestId("add-venue-form-stub");
+    expect(stub.getAttribute("data-proposal-id")).toBeNull();
+  });
+
+  test("a malformed proposed_diff degrades to the plain form instead of crashing the page", async () => {
+    mockGetAdminDb.mockResolvedValue({
+      db: makeFakeDb(makeAddProposalRow({ proposed_diff: "{not valid json" }) as unknown as PublicSubmissionRow),
+      identity: { email: "admin@example.com" },
+    });
+
+    render(await NewVenuePage({ searchParams: Promise.resolve({ proposal: "77" }) }));
+
+    const stub = screen.getByTestId("add-venue-form-stub");
+    expect(stub.getAttribute("data-proposal-id")).toBeNull();
   });
 });
 

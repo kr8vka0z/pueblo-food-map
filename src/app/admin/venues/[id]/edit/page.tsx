@@ -41,17 +41,25 @@
  * be awaited (same convention as /venue/[id]/page.tsx and
  * /admin/venues/new/page.tsx).
  *
- * #390: `?proposal=<id>` is the /admin/flags queue's link_health hand-off —
- * that queue's card intentionally has no Approve button for a link_health
- * proposal (a dead-URL observation isn't safe to blindly apply; see
- * src/components/ProposalsReviewView.tsx's own header), only a "Review &
- * fix link" navigation link here. resolveLinkHealthProposalContext() below
- * mirrors resolveClosureReportContext() exactly — same match-against-THIS-
- * venue check, same "any failure degrades to the plain page" shape — and
- * when accepted threads the proposal id through as AddVenueForm's new
- * `proposalId` prop (that component's header explains the PATCH-time
- * approval), plus renders the dead URL + last-seen HTTP status in a banner
- * so the admin has context before editing.
+ * #390: `?proposal=<id>` is a link_health hand-off (originally from the now-
+ * folded-into-Places /admin/flags queue, #674) — a link_health proposal
+ * intentionally has no Approve button on its ProposalCard (a dead-URL
+ * observation isn't safe to blindly apply; see ProposalCard.tsx's own
+ * header), only a "Review & fix link" navigation link. That card is one of
+ * potentially several this page's own SuggestionsBox renders below (#674:
+ * every pending proposal targeting this venue, not just a link_health one);
+ * resolveLinkHealthProposalContext() below is a SEPARATE, narrower resolver
+ * that only powers the banner + AddVenueForm's `proposalId` prop for the
+ * ONE proposal `?proposal=` names — mirrors resolveClosureReportContext()
+ * exactly — same match-against-THIS-venue check, same "any failure degrades
+ * to the plain page" shape — and when accepted threads the proposal id
+ * through as AddVenueForm's `proposalId` prop (that component's header
+ * explains the PATCH-time approval), plus renders the dead URL + last-seen
+ * HTTP status in a banner so the admin has context before editing.
+ *
+ * #674: SuggestionsBox (rendered below, right under the page title) shows
+ * EVERY pending change_proposals row targeting this venue as its own card —
+ * see resolvePendingProposals() below and SuggestionsBox.tsx's own header.
  *
  * #265: passes `venue.updated_at` straight through to AddVenueForm's
  * `expectedUpdatedAt` prop — the optimistic-concurrency precondition PATCH
@@ -97,11 +105,13 @@ import ArchiveVenueButton from "@/components/ArchiveVenueButton";
 import BoxCheckinsAdminPanel from "@/components/BoxCheckinsAdminPanel";
 import HostAlertsAdminPanel from "@/components/HostAlertsAdminPanel";
 import WaitingToPublishBox, { type WaitingToPublishChange } from "@/components/WaitingToPublishBox";
+import SuggestionsBox from "@/components/SuggestionsBox";
 import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
-import { parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
+import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
 import { loadAllCheckinsForBox, type AdminCheckinRow } from "@/lib/blessingBoxes";
 import { loadHostSubscriptions } from "@/lib/boxAlerts";
+import { loadVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
 import {
   displayStatusOf,
   diffPublishedFields,
@@ -232,6 +242,26 @@ async function resolveHostAlerts(db: D1Database, venueId: string): Promise<{ id:
 }
 
 /**
+ * #674: every PENDING `change_proposals` row targeting this venue, newest
+ * first — the SuggestionsBox at the top of this page. Same degrade-to-empty
+ * shape as this file's other optional resolvers (resolveBoxCheckins,
+ * resolveHostAlerts above) — a D1 failure here must never take down the
+ * rest of the edit page, and a plain [] is exactly what SuggestionsBox
+ * already renders nothing for.
+ */
+async function resolvePendingProposals(db: D1Database, venueId: string): Promise<ParsedProposal[]> {
+  try {
+    const result = await db
+      .prepare("SELECT * FROM change_proposals WHERE target_venue_id = ? AND status = 'pending' ORDER BY created_at DESC")
+      .bind(venueId)
+      .all<ChangeProposalRow>();
+    return result.results.map(parseProposalRow);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Resolves the "Waiting to publish" box's data for `venue`, or null when it
  * shouldn't render at all — see this file's own header for the full
  * reasoning. Only ever called for a place whose status is already known to
@@ -302,6 +332,8 @@ export default async function EditVenuePage({
   let boxCheckins: AdminCheckinRow[] = [];
   let hostAlerts: { id: number; email: string }[] = [];
   let waitingToPublish: WaitingToPublishChange[] = [];
+  let pendingProposals: ParsedProposal[] = [];
+  let suggestionsVenue: VenueLookup | null = null;
   let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
 
   try {
@@ -315,6 +347,17 @@ export default async function EditVenuePage({
       if (venue.category === "blessing_box") {
         boxCheckins = await resolveBoxCheckins(db, id);
         hostAlerts = await resolveHostAlerts(db, id);
+      }
+      // #674: "Suggestions to review" box — every pending change_proposals
+      // row targeting this venue (an archived venue can have one too: a
+      // restore, ProposalCard.tsx's own `isRestore` branch). Only bothers
+      // loading the venue's VenueLookup context (a second, tiny SELECT)
+      // when there's actually something to show it to — the common case
+      // (an unedited place) skips this entirely.
+      pendingProposals = await resolvePendingProposals(db, id);
+      if (pendingProposals.length > 0) {
+        const lookup = await loadVenueLookup(db, [id]);
+        suggestionsVenue = lookup[id] ?? null;
       }
       // #673 pt.3: only fetch/compute the diff for a place actually waiting
       // — displayStatusOf() is the single source of truth for that (never a
@@ -340,6 +383,9 @@ export default async function EditVenuePage({
       <AdminNav email={email} active="places" counts={navCounts} />
       <div className="px-4 py-6 sm:px-6 space-y-6">
         <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Edit {venue.name}</h2>
+        {pendingProposals.length > 0 && suggestionsVenue && (
+          <SuggestionsBox proposals={pendingProposals} venue={suggestionsVenue} />
+        )}
         <WaitingToPublishBox changes={waitingToPublish} />
         {closureContext && (
           <div className="max-w-2xl rounded-[var(--radius-lg)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
@@ -365,8 +411,8 @@ export default async function EditVenuePage({
                 : "The automated refresh flagged this venue's link as unreachable."}{" "}
               Update or remove the URL below, then save.
             </p>
-            <Link href="/admin/flags" className="mt-2 inline-block font-medium underline underline-offset-2">
-              Back to data refresh queue
+            <Link href="/admin/places?show=review" className="mt-2 inline-block font-medium underline underline-offset-2">
+              Back to Places
             </Link>
           </div>
         )}

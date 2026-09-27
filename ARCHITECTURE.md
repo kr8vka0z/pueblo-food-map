@@ -714,15 +714,30 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
 
 ### Surfaces
 
-- **`/admin` — Dashboard** (`src/app/admin/page.tsx`). A to-do landing page
-  that `Promise.all`s several best-effort D1 reads: a `PublishPanel` (only
-  when unpublished changes exist — the same component and action
-  `/admin/places` uses), `NeedsDecisionPanel` (Suggestions / Data refresh /
-  Blessing boxes — capped previews that link out to each full queue; any
-  decision needing more than one click links out rather than growing an
-  inline form), and two side panels: `BoxHealthList` ("Boxes that need
-  help") and `StalePlacesList` ("Places due for a check" — published venues
-  with `last_verified` over 12 months old, oldest first).
+- **`/admin` — Dashboard** (`src/app/admin/page.tsx`, overhauled #680). A
+  greeting + a 7/30/90-day period switch (`?period=`, server-rendered
+  `<Link>`s, no client JS) that every period-scoped number on the page
+  reads from and compares against the previous period of the same length
+  (`src/lib/boxStats.ts`'s `filterByPeriod`/`filterByPreviousPeriod`;
+  `src/lib/cfAnalytics.ts`'s equivalent split for Cloudflare's numbers).
+  Below that: a `PublishPanel` (only when unpublished changes exist and this
+  isn't staging — same "Test site" banner gate `/admin/places` uses), a
+  `DashboardNeedsStrip` (four link cards: places to review, waiting to
+  publish, box photos & sponsor requests, boxes empty or low — two of the
+  four are temporary combined-count fallbacks until #674/#675 and #677 fold
+  their own queues into other tabs), a **Visitors** section reading
+  Cloudflare's GraphQL Analytics API server-side (`cfAnalytics.ts` — the
+  ONLY source of unique-visitor numbers in this app; PostHog is
+  memory-only and counts every page load as a new visitor — AGENTS.md's
+  "PostHog" section), a **Blessing boxes** numbers section reusing
+  `boxStats.ts` (the
+  same math the public Boxes page uses), and a **Map data health** section
+  (published-place counts, `StalePlacesList`'s data at a 90-day/3-month
+  threshold, the latest automated data-refresh run, and box problem-report
+  counts). `KpiCard`/`BarList`/`DailyBars` render every number as plain
+  SVG/CSS — no chart library. A Cloudflare API failure or missing token
+  degrades ONLY the Visitors section to "unavailable right now"; every
+  other section renders from D1 regardless.
 - **`/admin/places` — venue list** (`VenueListView`). All `venues` rows —
   draft, published, archived — filtered and searched entirely client-side
   (low hundreds of rows). Each row shows ONE status (#673, replacing an old

@@ -38,6 +38,7 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 | `TURNSTILE_SECRET_KEY`, `TURNSTILE_BOX_SECRET_KEY` | Worker runtime | Kept separate so rotating one doesn't reset the other's rate-limit buckets. |
 | `CHECKIN_RATE_LIMIT_SECRET` | Worker runtime | Dedicated HMAC key for the D1 rate limiters (box check-ins, public forms, CSP reports). Never reuse a Turnstile secret. |
 | `GITHUB_PUBLISH_TOKEN` | Worker runtime | Fine-grained PAT (this repo only; Contents + Pull requests RW). If unset, Publish returns 503. |
+| `CF_ANALYTICS_API_TOKEN` | Worker runtime (`wrangler secret put`) | Account-scoped "Account Analytics: Read" only. Missing/failing → the admin Dashboard's Visitors section (`src/lib/cfAnalytics.ts`) shows "unavailable"; the rest of the page still renders. Never sent to the browser. |
 | `BETTER_AUTH_SECRET`, `ADMIN_ALLOWLIST` | Worker runtime | See Admin. |
 | `HC_PING_URL` | Worker runtime, **prod only** | Never set it on staging. |
 

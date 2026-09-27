@@ -178,6 +178,9 @@ const en: Record<string, string> = {
   "menu.saved.heading": "Saved places",
   "menu.saved.emptyTitle": "No saved places yet",
   "menu.saved.emptyBody": "Tap the star on any place to save it. It will show up here.",
+  // Desktop side panel (#682) — link back to the Saved list from a venue card
+  // opened by clicking a saved place, so the user doesn't lose their spot.
+  "panel.backToSaved": "← Saved",
 
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Open menu",
@@ -1096,6 +1099,7 @@ const es: Record<string, string> = {
   "menu.saved.heading": "Lugares guardados",
   "menu.saved.emptyTitle": "Todavía no tienes lugares guardados",
   "menu.saved.emptyBody": "Toca la estrella en cualquier lugar para guardarlo. Aparecerá aquí.",
+  "panel.backToSaved": "← Guardados", // [CHECK]
 
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Abrir menú",

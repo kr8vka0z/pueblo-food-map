@@ -10,46 +10,141 @@
  * edge-flipping avoids the viewport edge, not the app's own floating chrome.
  * Kyle's fix (option B, mockups 2026-09-26): ONE floating panel, always in
  * the same place, and the map pans the SELECTED PIN clear of it instead —
- * see MapWrapper's pan-on-select effect. This component owns only that
- * fixed position, size and chrome (inset, radius, shadow, scroll); it has no
- * opinion on what's inside.
+ * see MapWrapper's pan-on-select effect.
  *
- * `open` is a plain unmount gate, not an animated show/hide — same as the
- * DesktopVenueWindow it replaces positioning for. Content owns its own
- * dialog semantics (role="dialog", Escape, focus-on-mount) — see
- * DesktopVenueWindow's own header for why that logic stayed there rather
- * than moving up here for this slice (#682 8a is venue/box cards only; a
- * later slice adding Saved/Menu as panel views will need the same
- * Escape/focus wiring for THOSE views too, at which point lifting it here
- * stops being premature).
+ * 8b (Saved/Menu as panel views): this shell now owns Escape handling and
+ * focus management for WHATEVER view is showing (venue card, Saved list, or
+ * Menu) — 8a left that inside DesktopVenueWindow itself, which worked while
+ * the venue card was the only thing the panel could ever show, but Saved/
+ * Menu content (HamburgerMenuContent) has none of its own. A single
+ * registration point here means Saved/Menu don't need to duplicate it.
+ *
+ *   - Escape: the same isNativeDialogOpen()/typing-guard DesktopVenueWindow
+ *     used to run itself (see dialogGuard.ts, and the #508/box-check-in
+ *     comment this used to carry) — verbatim, just generalized to "is focus
+ *     on a form control INSIDE THIS PANEL" instead of "inside this venue
+ *     window" specifically. Registers via the shared overlay-escape stack
+ *     (overlayRegistry.ts), so Filters opened on top of this panel still
+ *     closes Filters first (#527/#604).
+ *   - Focus-to-heading on view change: `headingId` names the CURRENT view's
+ *     own focusable `<h2 tabIndex={-1}>` (DesktopVenueWindow's venue-name
+ *     heading, or HamburgerMenuContent's title when given a headingId) —
+ *     focused whenever it changes, so switching Saved -> a venue -> back
+ *     always lands focus somewhere sane for a keyboard/screen-reader user.
+ *   - Focus-return-to-trigger: captured in an effect keyed on `headingId`,
+ *     but ONLY when focus is currently OUTSIDE this panel — a pin click or a
+ *     bar-item click (both outside) recaptures the trigger; a click INSIDE
+ *     the panel that changes the view (a saved row, the "← Saved" link)
+ *     does NOT, so closing still returns focus to whatever opened the panel
+ *     from outside, not to whichever inside row happened to be clicked last.
+ *     This effect must run BEFORE the focus-to-heading one below (React
+ *     runs effects in declaration order), since focus-to-heading moves
+ *     `document.activeElement` INSIDE the panel — reversed, every view
+ *     change would look like an "inside click" to the capture check.
+ *
+ * "Overlay registration" here means the Escape STACK (`useOverlayEscape`,
+ * `overlayRegistry.ts`) — deliberately NOT `useOverlayRegistration` (the
+ * "hide BottomNav while any full-surface overlay is open" registry). This
+ * panel is not full-surface: the bar stays visible and shifts left instead
+ * (MapWrapper's `rightInset`), and re-clicking the lit bar item is how one
+ * of the ways to close the panel — hiding the bar would break that.
+ *
+ * No Tab trap, no outside-click-to-close: `aria-modal="false"`, same as the
+ * DesktopVenueWindow this replaces (which never had either either) — a
+ * deliberate, non-modal panel, not a dialog overlay.
  */
 
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { isNativeDialogOpen } from "@/lib/dialogGuard";
+import { useOverlayEscape } from "@/lib/overlayRegistry";
 
 interface DesktopSidePanelProps {
   /** Renders the panel when true; unmounts (returns null) when false. */
   open: boolean;
-  children: ReactNode;
+  /** Called on Escape, or when a view's own close control fires the render-prop below. */
+  onClose: () => void;
+  /** id of the CURRENT view's own focusable heading — focused on mount and on every change. */
+  headingId: string;
+  /** Render prop: receives the wrapped closer (onClose + focus-restore) — see file header. */
+  children: (close: () => void) => ReactNode;
 }
 
-/** Panel width (#682 mockup: "at least 340px" — fixed here, so the floor is trivially met). */
 export const DESKTOP_PANEL_WIDTH_PX = 380;
-/** Inset from the viewport edge on all three open sides (top/right/bottom). */
 export const DESKTOP_PANEL_INSET_PX = 12;
-/**
- * How far the map/search bar/bottom bar must clear the panel's LEFT edge —
- * the panel's own footprint (width + its right inset) plus a small breathing
- * gap so a pin or bar doesn't sit flush against the panel. Shared by
- * MapWrapper's bar-shift props, fit-bounds padding and pan-on-select math so
- * all three agree on where the panel actually is.
- */
 export const DESKTOP_PANEL_RIGHT_CLEARANCE_PX = DESKTOP_PANEL_WIDTH_PX + DESKTOP_PANEL_INSET_PX + 12;
 
-export default function DesktopSidePanel({ open, children }: DesktopSidePanelProps) {
+export default function DesktopSidePanel({ open, onClose, headingId, children }: DesktopSidePanelProps) {
+  // Rules-of-hooks: every hook below only makes sense while mounted, and
+  // this component only mounts while `open` — so the early return has to
+  // happen in THIS component, before any hook runs, not inside the one that
+  // holds them (see DesktopSidePanelShell).
   if (!open) return null;
+  return (
+    <DesktopSidePanelShell onClose={onClose} headingId={headingId}>
+      {children}
+    </DesktopSidePanelShell>
+  );
+}
+
+function DesktopSidePanelShell({
+  onClose,
+  headingId,
+  children,
+}: Omit<DesktopSidePanelProps, "open">) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  const handleClose = useCallback(() => {
+    onClose();
+    const el = triggerRef.current;
+    if (el?.isConnected) queueMicrotask(() => el.focus());
+  }, [onClose]);
+
+  const handleEscape = useCallback(() => {
+    // #508 (moved from DesktopVenueWindow, 8b): Escape while a box's
+    // PhotoViewer is open must close ONLY the photo, not this whole panel.
+    if (isNativeDialogOpen()) return;
+    // A box's check-in panel (BoxCardBody -> BoxCheckinPanel) has a note
+    // textarea living inside whatever view is showing. Without this guard,
+    // Escape while typing a note both loses focus AND closes the whole
+    // panel — the browser's own "Escape clears an input" behavior competing
+    // with this panel's own Escape-to-dismiss. Only global-dismiss when
+    // focus is on the panel shell itself, not on a form control inside it.
+    const active = document.activeElement;
+    const typing = active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+    if (typing && panelRef.current?.contains(active)) return;
+    handleClose();
+  }, [handleClose]);
+  // This shell is mounted only while the panel is open — i.e. always "open"
+  // for the life of the instance — so it registers unconditionally (`true`),
+  // same reasoning DesktopVenueWindow's own registration used to give.
+  // `useOverlayEscape` only invokes the callback while THIS panel is the
+  // TOPMOST overlay, so Filters opened on top no longer also closes this.
+  useOverlayEscape(true, handleEscape);
+
+  // Capture the return-focus target — see this file's header for the full
+  // "outside click only" reasoning. MUST run before the focus-to-heading
+  // effect below (declaration order = effect order).
+  useEffect(() => {
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      !panelRef.current?.contains(active)
+    ) {
+      triggerRef.current = active;
+    }
+  }, [headingId]);
+
+  // Focus the current view's heading whenever it changes (including mount).
+  useEffect(() => {
+    const heading = document.getElementById(headingId);
+    if (heading?.isConnected) heading.focus();
+  }, [headingId]);
 
   return (
     <div
+      ref={panelRef}
       data-testid="desktop-side-panel"
       className={
         // Absolute within MapWrapper's full-viewport `relative` root (same
@@ -72,7 +167,15 @@ export default function DesktopSidePanel({ open, children }: DesktopSidePanelPro
         width: DESKTOP_PANEL_WIDTH_PX,
       }}
     >
-      {children}
+      {/* eslint-disable-next-line react-hooks/refs -- `handleClose` closes
+          over `triggerRef`/`onClose`, but only DEREFERENCES the ref when
+          actually invoked (a click or the Escape handler above), never
+          during this render — the flagged line just passes the function
+          value down, the same render-prop shape any `onClose` callback
+          uses. The rule's static check can't tell "invoked now" from
+          "passed as a value for later," so it flags every ref-closing
+          callback threaded through a render prop. */}
+      {children(handleClose)}
     </div>
   );
 }

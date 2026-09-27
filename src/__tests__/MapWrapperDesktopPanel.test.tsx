@@ -18,11 +18,13 @@
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import React from "react";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import MapWrapper from "@/components/MapWrapper";
 import { DESKTOP_PANEL_RIGHT_CLEARANCE_PX } from "@/components/DesktopSidePanel";
 import { venues as allRealVenues } from "@/data/venues";
+import { addFavorite, __resetFavoritesForTests } from "@/lib/favorites";
 
 vi.mock("mapbox-gl/dist/mapbox-gl.css", () => ({}));
 
@@ -87,9 +89,11 @@ vi.mock("react-map-gl/mapbox", async () => {
 });
 
 const TEST_VENUE = allRealVenues[0];
+const SAVED_VENUE = allRealVenues[1];
 
 beforeEach(() => {
   mockOnLoadHolder.current = undefined;
+  __resetFavoritesForTests();
 
   HTMLCanvasElement.prototype.getContext = (() => ({
     getExtension: () => null,
@@ -223,5 +227,131 @@ describe("MapWrapper desktop side panel (#682)", () => {
       await Promise.resolve();
     });
     expect(fakeMap.panBy).not.toHaveBeenCalled();
+  });
+});
+
+// ─── 8b — Saved/Menu as panel views ───────────────────────────────────────────
+// Coordinator's approved plan: "MapWrapper owns one desktop sidePanelView
+// union ... venue selection and Menu/Saved become mutually exclusive on
+// desktop only". Each test below is one of that plan's own acceptance items.
+
+describe("MapWrapper desktop side panel — Saved/Menu views (#682 8b)", () => {
+  test("venue open -> tap Saved: venue card is replaced by the Saved list, and Saved lights up in the bar", async () => {
+    addFavorite(SAVED_VENUE.id);
+    const user = userEvent.setup();
+    await renderMapWrapper();
+    fireMapReady(400);
+    await screen.findByRole("dialog", { name: new RegExp(TEST_VENUE.name, "i") });
+
+    await user.click(screen.getByTestId("nav-saved"));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("Saved places")).toBeDefined();
+    expect(screen.getByText(SAVED_VENUE.name)).toBeDefined();
+    expect(screen.getByTestId("nav-saved").getAttribute("aria-current")).toBe("true");
+  });
+
+  test("saved row -> venue card with a '← Saved' back-link; clicking it returns to the list", async () => {
+    addFavorite(SAVED_VENUE.id);
+    const user = userEvent.setup();
+    await renderMapWrapper();
+    fireMapReady(400);
+    await screen.findByRole("dialog", { name: new RegExp(TEST_VENUE.name, "i") });
+
+    await user.click(screen.getByTestId("nav-saved"));
+    await screen.findByText("Saved places");
+    await user.click(screen.getByText(SAVED_VENUE.name));
+
+    const dialog = await screen.findByRole("dialog", { name: new RegExp(SAVED_VENUE.name, "i") });
+    // FavoriteButton's aria-label ("Remove ... from saved") also matches
+    // /saved/i, so match the exact back-link text instead.
+    const backLink = within(dialog).getByRole("button", { name: "← Saved" });
+    // Opening from Saved does NOT light the Saved bar item — only the list does.
+    expect(screen.getByTestId("nav-saved").getAttribute("aria-current")).toBeNull();
+
+    await user.click(backLink);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByText("Saved places")).toBeDefined();
+    expect(screen.getByText(SAVED_VENUE.name)).toBeDefined();
+  });
+
+  test("Menu while Saved is open: switches to the Menu view", async () => {
+    addFavorite(SAVED_VENUE.id);
+    const user = userEvent.setup();
+    await renderMapWrapper();
+    fireMapReady(400);
+    await screen.findByRole("dialog");
+
+    await user.click(screen.getByTestId("nav-saved"));
+    await screen.findByText("Saved places");
+
+    await user.click(screen.getByTestId("nav-top"));
+
+    expect(screen.queryByText("Saved places")).toBeNull();
+    expect(screen.getByRole("menu")).toBeDefined();
+    expect(screen.getByTestId("nav-top").getAttribute("aria-current")).toBe("true");
+  });
+
+  test("re-clicking the lit Menu item closes the panel entirely", async () => {
+    const user = userEvent.setup();
+    await renderMapWrapper();
+    fireMapReady(400);
+    await screen.findByRole("dialog");
+
+    await user.click(screen.getByTestId("nav-top"));
+    await screen.findByRole("menu");
+
+    await user.click(screen.getByTestId("nav-top"));
+
+    await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
+    expect(screen.getByTestId("nav-top").getAttribute("aria-current")).toBeNull();
+  });
+
+  test("Menu opens over the list view too (unlike a venue card, which needs the map)", async () => {
+    const user = userEvent.setup();
+    await renderMapWrapper();
+    fireMapReady(400);
+    const dialog = await screen.findByRole("dialog");
+    // Close the deep-linked venue card first so we start from a clean panel.
+    await user.click(within(dialog).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
+
+    // Switch to list view via the Menu's own "List view" line, then close it.
+    // HamburgerMenuItem renders role="menuitem" on the <li>, the actual
+    // clickable control is the <button> inside it — query that directly, or
+    // userEvent.click(li) never reaches the button's own onClick (click
+    // events bubble UP from the real target, never down into a descendant).
+    await user.click(screen.getByTestId("nav-top"));
+    await screen.findByRole("menu");
+    await user.click(screen.getByRole("button", { name: /list view/i }));
+    await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
+
+    // Now on the list — Menu must still open (the old 280px dropdown worked here too).
+    await user.click(screen.getByTestId("nav-top"));
+    expect(screen.getByRole("menu")).toBeDefined();
+  });
+
+  test("Filters opened over an open Saved panel: Escape closes Filters only (#527/#604)", async () => {
+    addFavorite(SAVED_VENUE.id);
+    const user = userEvent.setup();
+    await renderMapWrapper();
+    fireMapReady(400);
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
+
+    await user.click(screen.getByTestId("nav-saved"));
+    await screen.findByText("Saved places");
+
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    await screen.findByRole("dialog", { name: /filters/i });
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /filters/i })).toBeNull());
+    // Filters closed; the Saved panel is still showing underneath.
+    expect(screen.getByText("Saved places")).toBeDefined();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByTestId("desktop-side-panel")).toBeNull());
   });
 });

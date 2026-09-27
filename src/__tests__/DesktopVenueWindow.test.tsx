@@ -25,6 +25,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
+import DesktopSidePanel from "@/components/DesktopSidePanel";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import { track, EVENTS } from "@/lib/analytics";
@@ -467,19 +468,28 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
     expect(link.className).toContain("order-1");
   });
 
-  test("Escape does not close the window while focus is inside the check-in note textarea", async () => {
+  // #682 8b: Escape handling moved to DesktopSidePanel (coordinator: "Lift
+  // ... overlay registration into DesktopSidePanel, since there are now
+  // non-venue views") — this box's textarea guard is exercised through the
+  // real shell now, not DesktopVenueWindow standalone.
+  test("Escape does not close the panel while focus is inside the check-in note textarea", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
+    const venue = makeBoxVenue();
     render(
-      <DesktopVenueWindow
-        venue={makeBoxVenue()}
-        box={makeBox()}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
-        onClose={onClose}
-        locale="en"
-      />,
+      <DesktopSidePanel open onClose={onClose} headingId={`venue-window-title-${venue.id}`}>
+        {(close) => (
+          <DesktopVenueWindow
+            venue={venue}
+            box={makeBox()}
+            expanded={true}
+            onExpand={vi.fn()}
+            onCollapse={vi.fn()}
+            onClose={close}
+            locale="en"
+          />
+        )}
+      </DesktopSidePanel>,
     );
     // "I filled it" expands an optional-note form with a textarea (BoxCheckinPanel).
     await user.click(screen.getByRole("button", { name: "I filled it" }));

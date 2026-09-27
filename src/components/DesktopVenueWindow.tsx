@@ -32,11 +32,17 @@
  * above); it no longer changes the component's own width/height, since the
  * panel's size is fixed by the shell.
  *
- * Keyboard:
- *   Escape dismisses. Tab cycles within. Close X (Escape equivalent).
+ * Escape/focus (#682 8b): this component used to register its own Escape
+ * handler (with the box-check-in-typing guard below) and focus itself on
+ * mount. Both moved to `DesktopSidePanel`, which now wraps non-venue views
+ * too (Saved/Menu) and needs the SAME guards for all of them — a single
+ * registration point instead of one per view. This component has no
+ * Escape/focus logic of its own anymore; its heading (`venue-window-title-
+ * ${id}`) is a real `tabIndex={-1}` target DesktopSidePanel focuses directly
+ * on view change, and DesktopSidePanel's `handleClose` render-prop (passed
+ * in as `onClose`) already restores focus to the trigger on close.
  */
 
-import { useCallback, useEffect, useRef } from "react";
 import { MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
@@ -54,8 +60,6 @@ import VenuePopupHeader from "@/components/VenuePopupHeader";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import HoursList from "@/components/HoursList";
 import BoxCardBody from "@/components/BoxCardBody";
-import { isNativeDialogOpen } from "@/lib/dialogGuard";
-import { useOverlayEscape } from "@/lib/overlayRegistry";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -98,6 +102,13 @@ interface DesktopVenueWindowProps {
   activeStepIndex?: number;
   /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap. */
   onStepChange?: (index: number) => void;
+  /**
+   * "← Saved" back-link (#682 8b) — present only when this card was opened
+   * from the Saved list on desktop. Renders above the persistent header bar;
+   * clicking it returns the panel to the Saved view without deselecting the
+   * venue's own map state (MapWrapper owns that decision).
+   */
+  backTo?: { label: string; onClick: () => void };
 }
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
@@ -119,52 +130,16 @@ export default function DesktopVenueWindow({
   showWalkLocationHint = false,
   activeStepIndex = 0,
   onStepChange = () => {},
+  backTo,
 }: DesktopVenueWindowProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
-  const windowRef = useRef<HTMLDivElement>(null);
 
   const isBox = venue.category === "blessing_box";
 
   const status = computeVenueOpenStatus(venue);
   const nextOccurrence = venue.hours_irregular ? nextIrregularOccurrence(venue.hours_irregular) : null;
   const displayNotes = getDisplayNotes(venue);
-
-  // ── Keyboard handling ────────────────────────────────────────────────────
-
-  // #527: this window is mounted only while a venue is selected — i.e.
-  // always "open" for the life of the instance — so it registers into the
-  // shared overlay-escape stack unconditionally (`true`). `useOverlayEscape`
-  // only invokes the callback below while this window is the TOPMOST
-  // overlay, so pressing Escape with e.g. the Filters panel or the Menu open
-  // on top of a selected venue no longer also closes this window — see
-  // overlayRegistry.ts's own header.
-  const handleEscape = useCallback(() => {
-    // #508 fix pass: Escape while a box's PhotoViewer is open must close
-    // ONLY the photo, not this whole window — see dialogGuard.ts's own
-    // header. This handler used to be a plain bubble-phase document
-    // listener (no `{capture: true}`), so unlike the vaul/Radix case (see
-    // BottomSheet.tsx's own comment) checking the guard directly here is
-    // enough; there is no ordering race to work around. `useOverlayEscape`
-    // preserves that same bubble-phase dispatch.
-    if (isNativeDialogOpen()) return;
-    // A box's check-in panel (BoxCardBody -> BoxCheckinPanel) has a note
-    // textarea living inside this window. Without this guard, Escape while
-    // typing a note both loses focus AND closes the whole card — the
-    // browser's own "Escape clears an input" behavior competing with this
-    // window's own Escape-to-dismiss. Only global-dismiss when focus is on
-    // the window shell itself, not on a form control inside it.
-    const active = document.activeElement;
-    const typing = active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
-    if (typing && windowRef.current?.contains(active)) return;
-    onClose();
-  }, [onClose]);
-  useOverlayEscape(true, handleEscape);
-
-  // Focus the window when it mounts so keyboard users can tab inside
-  useEffect(() => {
-    windowRef.current?.focus();
-  }, [venue.id]);
 
   // ── Shared body top: name + operator ─────────────────────────────────────
   // Venue title is always at the top of the body, same layout in both states.
@@ -176,11 +151,15 @@ export default function DesktopVenueWindow({
         <h2
           className={
             (expanded ? "text-xl" : "text-lg") +
-            " font-normal text-[var(--color-ink-900)] leading-tight" +
+            " font-normal text-[var(--color-ink-900)] leading-tight outline-none" +
             (expanded ? " mb-1" : "")
           }
           style={{ fontFamily: "var(--font-display)" }}
           id={`venue-window-title-${venue.id}`}
+          // #682 8b: DesktopSidePanel focuses this heading directly on view
+          // change (not this component's own root) — real elements need
+          // tabIndex={-1} to be focus()-able without being in Tab order.
+          tabIndex={-1}
         >
           {venue.name}
         </h2>
@@ -504,15 +483,31 @@ export default function DesktopVenueWindow({
 
   return (
     <div
-      ref={windowRef}
       role="dialog"
       aria-modal="false"
       aria-labelledby={`venue-window-title-${venue.id}`}
-      tabIndex={-1}
       // #682: fills DesktopSidePanel's fixed-size shell — no left/top/width
       // of its own anymore (see this file's header for why).
-      className="flex flex-col h-full overflow-hidden focus:outline-none"
+      className="flex flex-col h-full overflow-hidden"
     >
+      {/* "← Saved" (#682 8b) — only when this card was opened from the
+          Saved list. Sits above the persistent header bar, its own shrink-0
+          row, so the header/body split below is untouched. */}
+      {backTo && (
+        <button
+          type="button"
+          onClick={backTo.onClick}
+          className={
+            "shrink-0 px-4 py-2 text-left text-sm font-medium " +
+            "text-[var(--color-sage-700)] hover:text-[var(--color-sage-600)] " +
+            "border-b border-[var(--color-bone-200)] " +
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
+            "transition-colors duration-100"
+          }
+        >
+          {backTo.label}
+        </button>
+      )}
       {/* Persistent header bar — always visible in both states. A box has no
           Show/Hide toggle (historyHref swaps that slot for a History link —
           see VenuePopupHeader's own header); expanded/onToggle are unused

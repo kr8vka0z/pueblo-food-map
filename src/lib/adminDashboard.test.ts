@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, test } from "vitest";
-import { selectStalePlaces, bucketCheckinsByWeek } from "@/lib/adminDashboard";
+import { selectStalePlaces, bucketCheckinsByWeek, resolvePlaceUsageRows } from "@/lib/adminDashboard";
 import type { AdminVenueRow } from "@/types/venue";
 
 const NOW = new Date("2026-09-21T12:00:00.000Z");
@@ -83,5 +83,40 @@ describe("bucketCheckinsByWeek", () => {
   test("a malformed timestamp is dropped, not thrown", () => {
     const checkins = [{ kind: "filled" as const, createdAt: "not-a-date" }];
     expect(() => bucketCheckinsByWeek(checkins, NOW, 8)).not.toThrow();
+  });
+});
+
+describe("resolvePlaceUsageRows", () => {
+  const venues = [
+    { id: "v1", name: "Corner Pantry", status: "published" as const },
+    { id: "v2", name: "Old Site", status: "archived" as const },
+  ];
+
+  test("a published venue gets its current name and edit link", () => {
+    const [row] = resolvePlaceUsageRows([{ venueId: "v1", count: 9 }], venues);
+    expect(row).toEqual({ venueId: "v1", count: 9, name: "Corner Pantry", href: "/admin/venues/v1/edit" });
+  });
+
+  test("an archived venue reads as gone — same as one whose id no longer exists at all", () => {
+    const [archived, missing] = resolvePlaceUsageRows(
+      [
+        { venueId: "v2", count: 3 },
+        { venueId: "does-not-exist", count: 1 },
+      ],
+      venues,
+    );
+    expect(archived).toEqual({ venueId: "v2", count: 3, name: null, href: null });
+    expect(missing).toEqual({ venueId: "does-not-exist", count: 1, name: null, href: null });
+  });
+
+  test("re-sorts by count desc regardless of input order", () => {
+    const rows = resolvePlaceUsageRows(
+      [
+        { venueId: "v2", count: 1 },
+        { venueId: "v1", count: 9 },
+      ],
+      venues,
+    );
+    expect(rows.map((r) => r.venueId)).toEqual(["v1", "v2"]);
   });
 });

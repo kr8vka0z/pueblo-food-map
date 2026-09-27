@@ -1,34 +1,18 @@
 /**
- * BoxAdoptersReviewView tests (Blessing Boxes slice 6). Same mocked-fetch /
- * mocked-useRouter pattern as BoxPhotosReviewView.test.tsx.
+ * BoxAdoptersReviewView tests — wrapper-level only (empty state, one card
+ * per adopter). Per-card behavior moved to SponsorRequestCard.test.tsx when
+ * that card was extracted (#677). This view itself is slated for deletion
+ * once /admin/box-adopters redirects — kept alive only until that cleanup
+ * step.
  */
 
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { describe, expect, test, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
 import type { AdminBoxAdopterRow } from "@/lib/boxAdopters";
 
-const mockPush = vi.fn();
-const mockRefresh = vi.fn();
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
-}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 
 import BoxAdoptersReviewView from "@/components/BoxAdoptersReviewView";
-
-const mockFetch = vi.fn();
-
-beforeEach(() => {
-  mockFetch.mockReset();
-  mockPush.mockReset();
-  mockRefresh.mockReset();
-  vi.stubGlobal("fetch", mockFetch);
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
-});
 
 function makeAdopter(overrides: Partial<AdminBoxAdopterRow> = {}): AdminBoxAdopterRow {
   return {
@@ -51,77 +35,14 @@ describe("BoxAdoptersReviewView", () => {
     expect(screen.getByText("No sponsor requests to review")).toBeInTheDocument();
   });
 
-  test("renders a confirmed card: box, name, email, and 'Email confirmed' badge", () => {
-    render(<BoxAdoptersReviewView adopters={[makeAdopter()]} />);
-    expect(screen.getByText("Test Blessing Box")).toBeInTheDocument();
-    expect(screen.getByText("The Martinez Family")).toBeInTheDocument();
-    expect(screen.getByText("martinez@example.com")).toBeInTheDocument();
-    expect(screen.getByText("Email confirmed")).toBeInTheDocument();
-  });
-
-  test("an unconfirmed application shows the awaiting-confirmation badge and the note when present", () => {
+  test("renders one SponsorRequestCard per adopter", () => {
     render(
       <BoxAdoptersReviewView
-        adopters={[makeAdopter({ email_confirmed_at: null, note: "We run a little pantry group" })]}
+        adopters={[makeAdopter({ id: 1 }), makeAdopter({ id: 2, display_name: "The Lee Family" })]}
       />,
     );
-    expect(screen.getByText("Awaiting email confirmation")).toBeInTheDocument();
-    expect(screen.getByText("We run a little pantry group")).toBeInTheDocument();
-  });
-
-  test("Approve: POSTs to the approve route and refreshes on success", async () => {
-    const user = userEvent.setup();
-    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
-    render(<BoxAdoptersReviewView adopters={[makeAdopter()]} />);
-
-    await user.click(screen.getByRole("button", { name: "Approve sponsor" }));
-
-    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
-    expect(mockFetch).toHaveBeenCalledWith("/api/admin/box-adopters/7/approve", { method: "POST" });
-  });
-
-  test("Approve on an unconfirmed application (409) shows the specific unconfirmed message", async () => {
-    const user = userEvent.setup();
-    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: "unconfirmed" }), { status: 409 }));
-    render(<BoxAdoptersReviewView adopters={[makeAdopter({ email_confirmed_at: null })]} />);
-
-    await user.click(screen.getByRole("button", { name: "Approve sponsor" }));
-
-    await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent("This applicant hasn't confirmed their email yet"),
-    );
-    expect(mockRefresh).not.toHaveBeenCalled();
-  });
-
-  test("Reject: reveals the reason field, POSTs it, refreshes on success", async () => {
-    const user = userEvent.setup();
-    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
-    render(<BoxAdoptersReviewView adopters={[makeAdopter()]} />);
-
-    await user.click(screen.getByRole("button", { name: "Decline" }));
-    await user.type(screen.getByLabelText(/Reason/), "Never responded");
-    await user.click(screen.getByRole("button", { name: "Confirm decline" }));
-
-    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
-    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/api/admin/box-adopters/7/reject");
-    expect(JSON.parse(init.body as string)).toEqual({ reason: "Never responded" });
-  });
-
-  test("an already-approved adopter's action buttons read Remove, not Decline", async () => {
-    render(<BoxAdoptersReviewView adopters={[makeAdopter({ status: "approved" })]} />);
-    expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Decline" })).not.toBeInTheDocument();
-  });
-
-  test("Reject: Cancel closes the form without submitting", async () => {
-    const user = userEvent.setup();
-    render(<BoxAdoptersReviewView adopters={[makeAdopter()]} />);
-
-    await user.click(screen.getByRole("button", { name: "Decline" }));
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
-
-    expect(screen.queryByLabelText(/Reason/)).not.toBeInTheDocument();
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("button", { name: "Approve sponsor" })).toHaveLength(2);
+    expect(screen.getByText("The Martinez Family")).toBeInTheDocument();
+    expect(screen.getByText("The Lee Family")).toBeInTheDocument();
   });
 });

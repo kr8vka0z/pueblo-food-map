@@ -14,8 +14,10 @@ import {
   buildVenueMetaDescription,
   buildVenueTitle,
   parseVenueCity,
+  parseVenueCityCore,
   nearbyVenues,
   FREE_CATEGORIES,
+  PLACEHOLDER_ADDRESS,
 } from "@/lib/venueSummary";
 import { venues } from "@/data/venues";
 import { SITE_NAME } from "@/lib/site";
@@ -94,7 +96,7 @@ describe("buildVenueSummary — truth rules", () => {
     expect(summary.toLowerCase()).not.toContain("hours unknown");
   });
 
-  test("weekly hours are covered in words, grouped by consecutive identical days", () => {
+  test("weekly hours are covered in words: 'Hours: {range}, {times}.' — single day plural, range as full weekday names", () => {
     const v = fixture({
       hours_weekly: {
         mon: ["09:00-17:00"],
@@ -104,11 +106,83 @@ describe("buildVenueSummary — truth rules", () => {
       },
     });
     const summary = buildVenueSummary(v, "en").join(" ");
-    expect(summary).toContain("Mon–Wed, 9am – 5pm");
-    expect(summary).toContain("Sat, 10am – 2pm");
+    expect(summary).toContain("Hours: Monday to Wednesday, 9am – 5pm; Saturdays, 10am – 2pm.");
   });
 
-  test("hours_irregular is covered in words, with the admin note stripped", () => {
+  test("ES hours prefix is gender-neutral 'Horario:' regardless of the venue's gendered 'what' phrase", () => {
+    const v = fixture({ category: "meal_site", hours_weekly: { fri: ["11:00-14:00"] } });
+    const summary = buildVenueSummary(v, "es").join(" ");
+    expect(summary).toContain("Horario: los viernes, 11am – 2pm.");
+    expect(summary).not.toContain("Está abierto");
+  });
+
+  test("a day's own multiple slots are SORTED by start time and joined with 'and', not left in data order", () => {
+    // Real-data regression (Pueblo Community Soup Kitchen): slots stored as
+    // [10:30am-12pm, 8:30am-9:30am] — out of order — previously rendered as
+    // nonsense prose. Sorted, the earlier slot comes first.
+    const v = fixture({ hours_weekly: { mon: ["10:30 AM - 12:00 PM", "8:30 AM - 9:30 AM"] } });
+    const summary = buildVenueSummary(v, "en").join(" ");
+    expect(summary).toContain("Hours: Mondays, 8:30am – 9:30am and 10:30am – 12pm.");
+  });
+
+  test("multiple day-groups are separated by '; ', never ambiguous with the intra-day 'and'/comma", () => {
+    // Real-data regression (The Pueblo Shelter/SafeSide Recovery): weekday
+    // group has ONE slot, Friday has TWO — old comma-only joining made the
+    // whole thing read as one flat, ambiguous list.
+    const v = fixture({
+      hours_weekly: {
+        mon: ["4:30 PM - 5:00 PM"],
+        tue: ["4:30 PM - 5:00 PM"],
+        wed: ["4:30 PM - 5:00 PM"],
+        thu: ["4:30 PM - 5:00 PM"],
+        fri: ["2:00 PM - 4:00 PM", "4:30 PM - 5:00 PM"],
+        sat: ["4:30 PM - 5:00 PM"],
+        sun: ["4:30 PM - 5:00 PM"],
+      },
+    });
+    const summary = buildVenueSummary(v, "en").join(" ");
+    expect(summary).toContain(
+      "Hours: Monday to Thursday, 4:30pm – 5pm; Fridays, 2pm – 4pm and 4:30pm – 5pm; Saturday to Sunday, 4:30pm – 5pm.",
+    );
+  });
+
+  test("all 7 days, all the SAME time → 'every day', not 'Mon–Sun'", () => {
+    const v = fixture({
+      hours_weekly: {
+        mon: ["09:00-17:00"],
+        tue: ["09:00-17:00"],
+        wed: ["09:00-17:00"],
+        thu: ["09:00-17:00"],
+        fri: ["09:00-17:00"],
+        sat: ["09:00-17:00"],
+        sun: ["09:00-17:00"],
+      },
+    });
+    const summary = buildVenueSummary(v, "en").join(" ");
+    expect(summary).toContain("Hours: every day, 9am – 5pm.");
+  });
+
+  test("all 7 days, literal 24-hour slot → the fixed 'Open 24 hours, every day.' phrase, not the general template", () => {
+    // Real-data regression: ~8 convenience stores render every day as
+    // "00:00-24:00" — the old grouper produced "Mon–Sun, Open 24 hours."
+    const allDays24h = {
+      mon: ["00:00-24:00"],
+      tue: ["00:00-24:00"],
+      wed: ["00:00-24:00"],
+      thu: ["00:00-24:00"],
+      fri: ["00:00-24:00"],
+      sat: ["00:00-24:00"],
+      sun: ["00:00-24:00"],
+    };
+    const v = fixture({ hours_weekly: allDays24h });
+    expect(buildVenueSummary(v, "en").join(" ")).toContain("Hours: Open 24 hours, every day.");
+    // ES: routed through localizedSlot, so no English literal leaks in.
+    const summaryEs = buildVenueSummary(v, "es").join(" ");
+    expect(summaryEs).toContain("Horario: Abierto las 24 horas, todos los días.");
+    expect(summaryEs).not.toContain("Open 24 hours");
+  });
+
+  test("hours_irregular (monthly_ordinal) is covered in words, with the admin note stripped", () => {
     const v = fixture({
       hours_weekly: undefined,
       hours_irregular: [
@@ -122,17 +196,33 @@ describe("buildVenueSummary — truth rules", () => {
       ],
     });
     const summary = buildVenueSummary(v, "en").join(" ");
-    // day.fri is the abbreviated form ("Fri") — matches every other hours
-    // display in this app (HoursList, formatSlot's own day labels).
-    expect(summary).toContain("2nd Fri of each month");
+    expect(summary).toContain("Hours: the 2nd Friday of each month, 10am – 3:45pm.");
     expect(summary).not.toContain("Unverified admin note");
   });
 
-  test("24-hour slots use the localized 'Open 24 hours' string, not the English literal, in ES", () => {
-    const v = fixture({ hours_weekly: { mon: ["00:00-24:00"] } });
-    const summary = buildVenueSummary(v, "es").join(" ");
-    expect(summary).not.toContain("Open 24 hours");
-    expect(summary).toContain("24 horas");
+  test("hours_irregular 'last' ordinal renders lowercase mid-sentence ('last', not 'Last')", () => {
+    const v = fixture({
+      hours_irregular: [
+        { recurrence: "monthly_ordinal", ordinal: "last", weekday: "tue", slots: ["11:00-12:00"] },
+      ],
+    });
+    expect(buildVenueSummary(v, "en").join(" ")).toContain("the last Tuesday of each month, 11am – 12pm.");
+    expect(buildVenueSummary(v, "es").join(" ")).toContain("el último martes de cada mes, 11am – 12pm.");
+  });
+
+  test("hours_irregular (monthly_date)", () => {
+    const v = fixture({ hours_irregular: [{ recurrence: "monthly_date", day_of_month: 15, slots: ["09:00-11:00"] }] });
+    expect(buildVenueSummary(v, "en").join(" ")).toContain("Hours: the 15 of each month, 9am – 11am.");
+  });
+
+  test("hours_irregular recurrence 'other' (no computable date, note untrusted) contributes nothing", () => {
+    const v = fixture({
+      hours_weekly: undefined,
+      hours_irregular: [{ recurrence: "other", slots: [], note: "call ahead, unverified" }],
+    });
+    const summary = buildVenueSummary(v, "en").join(" ");
+    expect(summary.toLowerCase()).not.toContain("open");
+    expect(summary).not.toContain("call ahead");
   });
 
   test("last verified renders as 'Month YYYY' from last_verified, no Intl on the client path", () => {
@@ -149,7 +239,48 @@ describe("buildVenueSummary — truth rules", () => {
   });
 });
 
+// ─── Main sentence: address option + OSM placeholder guard (#705 review) ───
+
+describe("buildVenueSummary — main sentence address handling", () => {
+  test("default (includeAddress unset) includes the full street address", () => {
+    const summary = buildVenueSummary(fixture()).join(" ");
+    expect(summary).toContain("at 100 Test St, Pueblo, CO 81003.");
+  });
+
+  test("includeAddress: false omits the street address and uses the city instead", () => {
+    const summary = buildVenueSummary(fixture(), "en", { includeAddress: false }).join(" ");
+    expect(summary).not.toContain("100 Test St");
+    expect(summary).toContain("Test Fixture Pantry is a free food pantry in Pueblo, CO.");
+  });
+
+  test("the OSM placeholder address never reaches the summary, even with includeAddress: true (the default)", () => {
+    const v = fixture({ address: PLACEHOLDER_ADDRESS });
+    const summary = buildVenueSummary(v, "en", { includeAddress: true }).join(" ");
+    expect(summary).not.toContain(PLACEHOLDER_ADDRESS);
+    // No parseable city in a bare placeholder string → falls back to "Pueblo County".
+    expect(summary).toContain("Test Fixture Pantry is a free food pantry in Pueblo County, CO.");
+  });
+
+  test("ES: includeAddress false / placeholder guard produce the gender-agreeing no-address template", () => {
+    const v = fixture({ address: PLACEHOLDER_ADDRESS });
+    expect(buildVenueSummary(v, "es").join(" ")).toContain(
+      "Test Fixture Pantry es una despensa de alimentos gratuita en el Condado de Pueblo, CO.",
+    );
+  });
+});
+
 // ─── City parsing ────────────────────────────────────────────────────────────
+
+describe("parseVenueCityCore (no locale, no fallback text)", () => {
+  test("returns the parsed city", () => {
+    expect(parseVenueCityCore("215 Canal St, Pueblo, CO 81004")).toBe("Pueblo");
+  });
+
+  test("returns null when no city can be parsed (never fallback prose)", () => {
+    expect(parseVenueCityCore("Mineral Palace Park")).toBeNull();
+    expect(parseVenueCityCore("West Carrizo Springs Avenue, CO")).toBeNull();
+  });
+});
 
 describe("parseVenueCity", () => {
   test("street, city, CO zip", () => {
@@ -242,6 +373,31 @@ describe("buildVenueMetaDescription — length budget over all published venues"
     const description = buildVenueMetaDescription(v);
     expect(description.length).toBeLessThanOrEqual(160);
     expect(description.endsWith(" ")).toBe(false);
+  });
+
+  test("a sentence too long to fit is SKIPPED, not a hard stop — a later, shorter sentence still gets included", () => {
+    // Real-data regression (Natural Grocers): main + a long multi-group
+    // hours sentence together exceed 160, dropping the short "It accepts
+    // SNAP/EBT." sentence that would otherwise fit. `continue` (not
+    // `break`) keeps trying every remaining sentence.
+    const v = fixture({
+      name: "A Fairly Long Grocery Store Name For This Test Fixture",
+      category: "grocery",
+      address: "9999 A Reasonably Long Street Name, Pueblo, CO 81003",
+      accepts_snap: true,
+      hours_weekly: {
+        mon: ["08:30-21:06"],
+        tue: ["08:30-21:06"],
+        wed: ["08:00-21:06"],
+        thu: ["08:30-21:06"],
+        fri: ["08:30-21:06"],
+        sat: ["08:30-21:06"],
+        sun: ["09:00-19:35"],
+      },
+    });
+    const description = buildVenueMetaDescription(v);
+    expect(description).not.toContain("Hours:"); // too long to fit — skipped
+    expect(description).toContain("It accepts SNAP/EBT.");
   });
 });
 

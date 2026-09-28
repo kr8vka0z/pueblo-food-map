@@ -30,6 +30,7 @@ import {
   venuePageMetadataFields,
   serializeJsonLd,
 } from "@/lib/venueSchema";
+import { nearbyVenues } from "@/lib/venueSummary";
 import { venues } from "@/data/venues";
 import VenueContent from "@/components/VenueContent";
 
@@ -77,7 +78,7 @@ export default async function EsVenuePage({
           __html: serializeJsonLd(buildVenueBreadcrumbJsonLd(v, "es")),
         }}
       />
-      <VenueContent venue={v} />
+      <VenueContent venue={v} nearby={nearbyVenues(v, venues)} />
     </>
   );
 }

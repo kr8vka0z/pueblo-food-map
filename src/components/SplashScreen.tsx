@@ -28,6 +28,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Wordmark from './Wordmark';
 import { useGeolocation } from '@/lib/useGeolocation';
 import { useLocale, writeLocaleCookie } from '@/lib/LocaleContext';
+import { markSplashSeen } from '@/lib/splashGate';
 import { t } from '@/lib/i18n';
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
@@ -75,21 +76,34 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
   // Each splash CTA sets the site language to its own language, then runs the
   // standard find-food flow. (The EN/ES toggle lives on the map view, not here.)
   //
-  // Review fix (#689 PR 2, item 3): this splash mounts on /es too
+  // Review fix (#689 PR 2, round 2): this splash mounts on /es too
   // (HomePageClient, shared by both trees). setLocale() only flips the
   // CLIENT-side `locale` state — it can never change `tree`, which is fixed
-  // by which root layout served the page (LocaleContext.tsx). Picking "EN"
-  // on the /es splash with a plain setLocale("en") would leave an English
-  // body sitting under an /es URL: server metadata, hreflang, and JSON-LD
-  // would all still say Spanish while the visible page reads English. When
-  // the chosen language differs from `tree`, this instead writes the cookie
-  // and does a full navigation to the OTHER tree's home ("/" or "/es") —
-  // the only way to actually get that language's server-rendered page.
+  // by which root layout served the page (LocaleContext.tsx).
+  //
+  // ONLY the ES-tree-picks-English case needs a cross-tree navigation:
+  // Kyle's decision 2 on #689 keeps "/" with an es cookie on TODAY's
+  // in-page client-side Spanish (no server-side redirect, no auto-
+  // navigation — AGENTS.md hard rule) — so picking Spanish on the EN
+  // splash stays the ORIGINAL plain in-place setLocale (this is the
+  // decision, not an oversight: the earlier round of this fix made EN+ES
+  // cross-navigate too, which was wrong). Picking English on the /es
+  // splash is different: there's no way to render an English BODY under
+  // an /es URL in the first place (server metadata/hreflang/JSON-LD would
+  // still say Spanish), so that one case navigates to the EN tree's home,
+  // "/?near=1" — near=1 so the destination runs the same geo-locate flow
+  // this CTA promises instead of landing on a bare map. markSplashSeen()
+  // runs FIRST: HomePageClient's own effect only skips the splash via
+  // ?near=1 for THIS one page load (see its own header) — without also
+  // writing the persistent gate, a later visit with no ?near=1 in the URL
+  // would show the EN splash again, undoing the choice just made.
   const handleCtaClick = useCallback(
     (lang: 'en' | 'es') => {
-      if (lang !== tree) {
-        writeLocaleCookie(lang);
-        window.location.assign(lang === 'es' ? '/es' : '/');
+      if (tree === 'es' && lang === 'en') {
+        markSplashSeen();
+        writeLocaleCookie('en');
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- WHY not router.push(): this crosses root layouts (/es -> (site)), always a full page load (design decision 2) — router.push does a client-side soft nav that can't switch root layouts. Same intentional choice LanguageToggle.tsx's mirrored links make.
+        window.location.assign('/?near=1');
         return;
       }
       setLocale(lang);

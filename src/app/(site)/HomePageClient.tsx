@@ -65,6 +65,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { readSplashGate, markSplashSeen } from '@/lib/splashGate';
 
 // WHY dynamic + ssr:false: MapWrapper pulls in vaul, Radix UI, geolocation
 // hooks, and all venue UI. None of it is needed during SSR (this component
@@ -82,12 +83,12 @@ const SplashScreen = dynamic(() => import('@/components/SplashScreen'), {
   loading: () => null,
 });
 
-const GATE_KEY = 'pfm.splash.seen.v2';
+// GATE_KEY itself lives in src/lib/splashGate.ts (#689 PR 2 follow-up
+// review fix) — see that file's header for why it's not defined here:
+// SplashScreen's cross-tree CTA case needs markSplashSeen() too, and
+// SplashScreen is mounted BY this file via next/dynamic below, so a
+// shared module avoids a circular import between the two.
 
-function readGate(): boolean {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem(GATE_KEY) === '1';
-}
 
 export default function HomePageClient() {
   // null = not yet determined (SSR-safe: avoids flash of wrong content).
@@ -149,12 +150,12 @@ export default function HomePageClient() {
       // A shared venue link (either form) goes straight to the pin — skip the splash.
       // Near me and Boxes both come from inside the app (PageNav), so the
       // splash was already seen.
-      setSplashShown(resolvedId || nearParam || boxesParam ? false : !readGate());
+      setSplashShown(resolvedId || nearParam || boxesParam ? false : !readSplashGate());
     });
   }, []);
 
   const dismissSplash = useCallback((mode: 'located' | 'pueblo-center') => {
-    localStorage.setItem(GATE_KEY, '1');
+    markSplashSeen();
     setViewport(mode);
     setSplashShown(false);
     // Move focus to the map container so keyboard users land on the map.

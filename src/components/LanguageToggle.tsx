@@ -107,6 +107,15 @@ export default function LanguageToggle() {
               // (location.assign, not router.push) — crossing root layouts
               // always is, design decision 2.
               onClick={(e) => {
+                // Nit fix: a modified click (middle-click, ctrl/cmd/shift/
+                // alt+click) means "open in a new tab/window" — the
+                // browser's own default handling for a real <a> already
+                // does that correctly. preventDefault()-ing it here would
+                // break that expectation (e.g. cmd+click silently
+                // navigating the CURRENT tab instead of opening a new
+                // one). Let it through unmodified; only a plain left-click
+                // gets the cookie-write + query/hash-preserving override.
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                 writeLocaleCookie(l);
                 void track(EVENTS.LOCALE_SWITCHED, { to: l });
                 e.preventDefault();

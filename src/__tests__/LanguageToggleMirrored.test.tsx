@@ -121,4 +121,32 @@ describe("LanguageToggle mirrored link preserves query/hash on click", () => {
     fireEvent.click(enLink);
     expect(assign).toHaveBeenCalledWith("/about?venue=abc-123#panel=open");
   });
+
+  // Nit fix: a modified click means "open in a new tab" — must not be
+  // overridden. Only a plain left-click gets the location.assign override.
+  test.each([
+    ["ctrlKey", { ctrlKey: true }],
+    ["metaKey (cmd)", { metaKey: true }],
+    ["shiftKey", { shiftKey: true }],
+    ["altKey", { altKey: true }],
+    ["middle-click (button 1)", { button: 1 }],
+  ] as const)("a %s click is NOT overridden — no location.assign, browser handles it", (_name, eventInit) => {
+    pathnameValue = "/venues";
+    renderWithProvider();
+
+    const esLink = screen.getByRole("link", { name: /spanish/i });
+    fireEvent.click(esLink, eventInit);
+
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  test("a plain left-click (button 0, no modifiers) still gets the override", () => {
+    pathnameValue = "/venues";
+    renderWithProvider();
+
+    const esLink = screen.getByRole("link", { name: /spanish/i });
+    fireEvent.click(esLink, { button: 0 });
+
+    expect(assign).toHaveBeenCalledWith("/es/venues?venue=abc-123#panel=open");
+  });
 });

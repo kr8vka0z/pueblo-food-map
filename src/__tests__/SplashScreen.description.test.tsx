@@ -27,9 +27,16 @@ beforeEach(() => {
 });
 
 function renderSplash(locale: "en" | "es" = "en") {
+  // tree: "en" — SplashScreen actually mounts on BOTH trees (shared
+  // HomePageClient, /es too), but this file only exercises the EN-tree
+  // scenario; `locale` is the switchable client toggle these tests exist to
+  // cover. The ES-tree cross-tree-navigation behavior (#689 PR 2 review
+  // fix, SplashScreen.tsx's handleCtaClick) has its own coverage in
+  // SplashScreen.esTree.test.tsx.
   vi.spyOn(LocaleContext, "useLocale").mockReturnValue({
     locale,
     setLocale: vi.fn(),
+    tree: "en",
   });
   return render(<SplashScreen onPrimary={vi.fn()} />);
 }

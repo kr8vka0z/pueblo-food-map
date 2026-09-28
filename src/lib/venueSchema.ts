@@ -11,10 +11,16 @@
  */
 
 import type { Venue } from "@/types/venue";
-import { venues, categoryLabels } from "@/data/venues";
+import { venues } from "@/data/venues";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
 import { DISPLAY_DAY_KEYS, slotToIsoTimes } from "@/lib/hours";
-import { t } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
+
+/** "in Pueblo, CO." / "en Pueblo, CO." — boilerplate, not a [CHECK] copy key. */
+const IN_PUEBLO_CO: Record<Locale, string> = {
+  en: "in Pueblo, CO.",
+  es: "en Pueblo, CO.",
+};
 
 /**
  * @type record maps VenueCategory → schema.org @type value.
@@ -60,17 +66,28 @@ function extractStreetAddress(address: string): string {
 
 /**
  * BreadcrumbList for a venue page (SEO/AEO plan Phase 0): Pueblo Food Map ›
- * All places › {venue}. It mirrors the visible breadcrumb
- * VenueContent renders, which is what makes it eligible for Google's
- * breadcrumb display. English always, like the rest of this file's JSON-LD
- * (#386).
+ * All places › {venue}. It mirrors the visible breadcrumb VenueContent
+ * renders, which is what makes it eligible for Google's breadcrumb display.
+ *
+ * #689 PR 2: `locale` defaults "en" — this function's own output for the
+ * existing EN call site is unaffected by the default (SITE_URL, plain
+ * `/venue/<id>`, `t(key, "en")` labels — same values the old hardcoded
+ * "en" produced). The "JSON-LD is always English" rule (#386) is now
+ * "JSON-LD matches the URL's language" (ARCHITECTURE.md) — an ES caller
+ * passes locale: "es" and gets /es URLs + t(key, "es") labels. The middle
+ * crumb still reads the SAME key ("footer.venues") the visible breadcrumb
+ * link renders for that locale, so the two can't drift.
  */
-export function buildVenueBreadcrumbJsonLd(venue: Venue): Record<string, unknown> {
+export function buildVenueBreadcrumbJsonLd(
+  venue: Venue,
+  locale: Locale = "en",
+): Record<string, unknown> {
+  const siteUrl = locale === "es" ? `${SITE_URL}/es` : SITE_URL;
   const crumbs = [
-    { name: SITE_NAME, url: SITE_URL },
+    { name: SITE_NAME, url: siteUrl },
     // Same key the visible breadcrumb link renders, so the two can't drift.
-    { name: t("footer.venues", "en"), url: `${SITE_URL}/venues` },
-    { name: venue.name, url: `${SITE_URL}${venuePath(venue.id)}` },
+    { name: t("footer.venues", locale), url: `${siteUrl}/venues` },
+    { name: venue.name, url: `${SITE_URL}${venuePath(venue.id, locale)}` },
   ];
   return {
     "@context": "https://schema.org",
@@ -99,15 +116,54 @@ export function serializeJsonLd(value: unknown): string {
   );
 }
 
+/**
+ * The title/description/path a venue page's `generateMetadata` needs, for
+ * either tree. Extracted (#689 PR 2, advisor decision) so
+ * src/app/(site)/venue/[id]/page.tsx and src/app/es/venue/[id]/page.tsx both
+ * stay thin wrappers around ONE description string instead of duplicating
+ * the `${name} — ${category} in Pueblo, CO. ${address}.` template. `title`
+ * is always the venue's proper noun — no locale variant, same as before.
+ */
+export function venuePageMetadataFields(
+  venue: Venue,
+  locale: Locale = "en",
+): { title: string; description: string; path: string } {
+  return {
+    title: venue.name,
+    description: `${venue.name} — ${t(`category.full.${venue.category}`, locale)} ${IN_PUEBLO_CO[locale]} ${venue.address}.`,
+    path: venuePath(venue.id, locale),
+  };
+}
+
 export function getVenueById(id: string): Venue | undefined {
   return venues.find((v) => v.id === id);
 }
 
-export function venuePath(id: string): string {
-  return `/venue/${id}`;
+/**
+ * #689 PR 2: `locale` defaults "en" — every existing call site (venue page,
+ * unchanged) still gets `/venue/<id>`. English slugs mirror 1:1 under /es
+ * (design decision 1), so this is a plain prefix, not a translation table.
+ */
+export function venuePath(id: string, locale: Locale = "en"): string {
+  return locale === "es" ? `/es/venue/${id}` : `/venue/${id}`;
 }
 
-export function buildVenueJsonLd(venue: Venue): Record<string, unknown> {
+/**
+ * #689 PR 2: `locale` defaults "en" and, once it does, this function's EN
+ * output is byte-identical to before #689 (review fix, item 7) — no
+ * `inLanguage` field here: schema.org doesn't define `inLanguage` on
+ * LocalBusiness/GroceryStore/ConvenienceStore/FoodEstablishment/Place (the
+ * types this venue node actually uses, CATEGORY_SCHEMA_TYPE above), only on
+ * CreativeWork-derived types. The page's language is already signaled by
+ * the WebSite node's own `inLanguage` (buildWebSiteJsonLd, RootShell) and
+ * by the page's `<html lang>` / hreflang — inventing a non-standard
+ * property here would be exactly the kind of made-up schema.org shape this
+ * file's own openingHoursSpecification comment warns against.
+ */
+export function buildVenueJsonLd(
+  venue: Venue,
+  locale: Locale = "en",
+): Record<string, unknown> {
   const postalCode = extractPostalCode(venue.address);
   const address: Record<string, string> = {
     "@type": "PostalAddress",
@@ -124,8 +180,8 @@ export function buildVenueJsonLd(venue: Venue): Record<string, unknown> {
     "@context": "https://schema.org",
     "@type": CATEGORY_SCHEMA_TYPE[venue.category],
     name: venue.name,
-    description: `${categoryLabels[venue.category]} in Pueblo, CO.`,
-    url: `${SITE_URL}/venue/${venue.id}`,
+    description: `${t(`category.full.${venue.category}`, locale)} ${IN_PUEBLO_CO[locale]}`,
+    url: `${SITE_URL}${venuePath(venue.id, locale)}`,
     address,
     geo: {
       "@type": "GeoCoordinates",
@@ -178,6 +234,7 @@ export function buildVenueJsonLd(venue: Venue): Record<string, unknown> {
 
 export function buildVenueListJsonLd(
   venueList: Venue[],
+  locale: Locale = "en",
 ): Record<string, unknown> {
   return {
     "@context": "https://schema.org",
@@ -185,7 +242,7 @@ export function buildVenueListJsonLd(
     itemListElement: venueList.map((v, i) => ({
       "@type": "ListItem",
       position: i + 1,
-      url: `${SITE_URL}/venue/${v.id}`,
+      url: `${SITE_URL}${venuePath(v.id, locale)}`,
       name: v.name,
     })),
   };
@@ -196,16 +253,20 @@ export function buildVenueListJsonLd(
  *
  * WHY it takes plain strings (not i18n keys): the /about page resolves each
  * Q&A through t() for the request's locale and passes them in, so the
- * structured data always matches the FAQ actually rendered on the page —
- * this lib stays pure (no next/headers, no i18n import), same as every other
- * builder here.
+ * structured data always matches the FAQ actually rendered on the page.
+ *
+ * `locale` (#689 PR 2, defaults "en") only sets `inLanguage` — the caller
+ * already resolved question/answer text for that locale, so this stays a
+ * one-line addition, not a second i18n dependency.
  */
 export function buildFaqJsonLd(
   items: { question: string; answer: string }[],
+  locale: Locale = "en",
 ): Record<string, unknown> {
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",
+    inLanguage: locale,
     mainEntity: items.map((item) => ({
       "@type": "Question",
       name: item.question,
@@ -230,19 +291,25 @@ export function buildFaqJsonLd(
  *   "on whose behalf the creator was working" (README: "Built for and with
  *   Pueblo Food Project").
  * - `logo` and `areaServed` give answer engines the brand mark and the region.
+ *
+ * #689 PR 2: `locale` (defaults "en") gives the /es tree its own WebSite
+ * node — `@id`/`url` under /es, `inLanguage: "es"` — while the Organization
+ * node underneath stays the single shared entity (same @id both locales,
+ * `publisher` still points at it), since it's the same organization either
+ * way, not a second one.
  */
-export function buildWebSiteJsonLd(): Record<string, unknown> {
+export function buildWebSiteJsonLd(locale: Locale = "en"): Record<string, unknown> {
+  const siteUrl = locale === "es" ? `${SITE_URL}/es` : SITE_URL;
   return {
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "WebSite",
-        "@id": `${SITE_URL}/#website`,
+        "@id": locale === "es" ? `${siteUrl}#website` : `${siteUrl}/#website`,
         name: SITE_NAME,
-        url: SITE_URL,
-        description:
-          "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores.",
-        inLanguage: "en",
+        url: siteUrl,
+        description: t("jsonld.website.description", locale),
+        inLanguage: locale,
         publisher: { "@id": `${SITE_URL}/#organization` },
         sourceOrganization: {
           "@type": "Organization",

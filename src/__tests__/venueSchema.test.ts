@@ -14,6 +14,7 @@ import {
   buildVenueBreadcrumbJsonLd,
   buildVenueListJsonLd,
   buildWebSiteJsonLd,
+  buildFaqJsonLd,
   serializeJsonLd,
 } from "@/lib/venueSchema";
 import { venues } from "@/data/venues";
@@ -337,6 +338,74 @@ describe("serializeJsonLd", () => {
     const result = serializeJsonLd(safe);
     expect(result).toContain("Pueblo Community Garden");
     expect(result).toContain("38.27");
+  });
+});
+
+// ─── #689 PR 2: JSON-LD matches the URL's language ─────────────────────────
+//
+// Supersedes #386's "JSON-LD is always English" rule. EN assertions above
+// stay unchanged (locale defaults "en"); these add the ES side.
+
+describe("locale-aware JSON-LD (#689)", () => {
+  const grocery = venues.find((v) => v.category === "grocery")!;
+
+  test("venuePath defaults to /venue/<id>, locale es → /es/venue/<id>", () => {
+    expect(venuePath("abc-123")).toBe("/venue/abc-123");
+    expect(venuePath("abc-123", "es")).toBe("/es/venue/abc-123");
+  });
+
+  // Review fix (item 7): buildVenueJsonLd never emits "inLanguage" — the
+  // venue node's schema.org types (LocalBusiness/GroceryStore/etc.) don't
+  // define that property; the page's language is signaled by the WebSite
+  // node's own inLanguage and by <html lang>/hreflang instead.
+  test("buildVenueJsonLd(venue, 'es') uses the /es url; no inLanguage field", () => {
+    const ld = buildVenueJsonLd(grocery, "es");
+    expect(ld["url"]).toBe(`${SITE_URL}/es/venue/${grocery.id}`);
+    expect("inLanguage" in ld).toBe(false);
+    expect(ld["description"]).toBe(`${t(`category.full.${grocery.category}`, "es")} en Pueblo, CO.`);
+  });
+
+  test("buildVenueJsonLd(venue) (default) still uses the EN url; no inLanguage field", () => {
+    const ld = buildVenueJsonLd(grocery);
+    expect(ld["url"]).toBe(`${SITE_URL}/venue/${grocery.id}`);
+    expect("inLanguage" in ld).toBe(false);
+  });
+
+  test("buildVenueListJsonLd(venues, 'es') emits /es/venue/ urls", () => {
+    const ld = buildVenueListJsonLd(venues, "es");
+    const items = ld["itemListElement"] as Array<Record<string, unknown>>;
+    for (const item of items) {
+      expect((item["url"] as string).startsWith(`${SITE_URL}/es/venue/`)).toBe(true);
+    }
+  });
+
+  test("buildFaqJsonLd(items, 'es') sets inLanguage es; default stays en", () => {
+    const items = [{ question: "q", answer: "a" }];
+    expect(buildFaqJsonLd(items)["inLanguage"]).toBe("en");
+    expect(buildFaqJsonLd(items, "es")["inLanguage"]).toBe("es");
+  });
+
+  test("buildWebSiteJsonLd('es') uses the /es site url and inLanguage es, same Organization @id", () => {
+    const ldEn = buildWebSiteJsonLd();
+    const ldEs = buildWebSiteJsonLd("es");
+    const graphEn = ldEn["@graph"] as Array<Record<string, unknown>>;
+    const graphEs = ldEs["@graph"] as Array<Record<string, unknown>>;
+    expect(graphEs[0]["@id"]).toBe(`${SITE_URL}/es#website`);
+    expect(graphEs[0]["url"]).toBe(`${SITE_URL}/es`);
+    expect(graphEs[0]["inLanguage"]).toBe("es");
+    // Organization is the same shared entity for both locales.
+    expect(graphEs[1]["@id"]).toBe(graphEn[1]["@id"]);
+  });
+
+  test("buildVenueBreadcrumbJsonLd(venue, 'es') uses /es urls and the ES footer.venues label", () => {
+    const crumbs = buildVenueBreadcrumbJsonLd(grocery, "es");
+    const items = crumbs["itemListElement"] as Array<Record<string, unknown>>;
+    expect(items.map((i) => i["item"])).toEqual([
+      `${SITE_URL}/es`,
+      `${SITE_URL}/es/venues`,
+      `${SITE_URL}${venuePath(grocery.id, "es")}`,
+    ]);
+    expect(items[1]["name"]).toBe(t("footer.venues", "es"));
   });
 });
 

@@ -30,12 +30,12 @@ import { notFound } from "next/navigation";
 import { buildPageMetadata } from "@/lib/site";
 import {
   getVenueById,
-  venuePath,
   buildVenueJsonLd,
   buildVenueBreadcrumbJsonLd,
+  venuePageMetadataFields,
   serializeJsonLd,
 } from "@/lib/venueSchema";
-import { venues, categoryLabels } from "@/data/venues";
+import { venues } from "@/data/venues";
 import VenueContent from "@/components/VenueContent";
 
 export const dynamicParams = false;
@@ -52,17 +52,13 @@ export async function generateMetadata({
   const { id } = await params;
   const v = getVenueById(id);
   if (!v) return {};
-  return buildPageMetadata({
-    title: v.name,
-    // WHY name + address (not just category): the prior description was
-    // byte-identical for every venue sharing a category — a duplicate-content
-    // SEO problem search engines can penalize. Issue #164 quick win (S4).
-    // Metadata stays English always (#287) — categoryLabels, not t(), is
-    // deliberate here even though the visible page (VenueContent) now shows
-    // this same category in the visitor's locale.
-    description: `${v.name} — ${categoryLabels[v.category]} in Pueblo, CO. ${v.address}.`,
-    path: venuePath(v.id),
-  });
+  // WHY name + address (not just category): the prior description was
+  // byte-identical for every venue sharing a category — a duplicate-content
+  // SEO problem search engines can penalize. Issue #164 quick win (S4).
+  // mirrored: true (#689 PR 2) — this route has an /es counterpart, so it
+  // now carries hreflang; venuePageMetadataFields is the SAME helper
+  // src/app/es/venue/[id]/page.tsx calls, just with locale defaulted to en.
+  return buildPageMetadata({ ...venuePageMetadataFields(v), mirrored: true });
 }
 
 export default async function VenuePage({
@@ -76,7 +72,9 @@ export default async function VenuePage({
 
   return (
     <>
-      {/* Venue-specific JSON-LD structured data — English always (#386) */}
+      {/* Venue-specific JSON-LD structured data — English (this EN-tree
+          page; /es/venue/[id]'s page.tsx passes locale: "es" — #689
+          supersedes #386's old "always English" rule) */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildVenueJsonLd(v)) }}

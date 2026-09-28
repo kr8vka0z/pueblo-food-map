@@ -5,6 +5,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import PageNav from "@/components/PageNav";
+import { LocaleProvider } from "@/lib/LocaleContext";
 import { addFavorite, removeFavorite } from "@/lib/favorites";
 import { venues } from "@/data/venues";
 
@@ -108,5 +109,52 @@ describe("PageNav", () => {
   test("ES", () => {
     render(<PageNav locale="es" />);
     expect(screen.getByRole("link", { name: /Volver al mapa/ })).toBeDefined();
+  });
+});
+
+// #689 PR 2 review fix: PageNav also renders on /es/about, /es/venues and
+// /es/resources — every push target must stay in the /es tree, not just
+// show Spanish text. `tree` (LocaleProvider's initialLocale="es", the real
+// /es-tree scenario) is what these read, not the `locale` prop.
+describe("PageNav on the /es tree", () => {
+  function renderEsTree(ui: React.ReactElement) {
+    return render(<LocaleProvider initialLocale="es">{ui}</LocaleProvider>);
+  }
+
+  test("selecting a saved place pushes /es?venue=<encoded id>", () => {
+    const venue = venues[0];
+    addFavorite(venue.id);
+    try {
+      renderEsTree(<PageNav locale="es" />);
+      fireEvent.click(screen.getByTestId("nav-saved"));
+      fireEvent.click(screen.getByText(venue.name));
+      expect(push).toHaveBeenCalledWith(`/es?venue=${encodeURIComponent(venue.id)}`);
+    } finally {
+      removeFavorite(venue.id);
+    }
+  });
+
+  test("Near me pushes /es?near=1", () => {
+    renderEsTree(<PageNav locale="es" />);
+    fireEvent.click(screen.getByTestId("nav-near-me"));
+    expect(push).toHaveBeenCalledWith("/es?near=1");
+  });
+
+  test("Boxes pushes /es?boxes=1", () => {
+    renderEsTree(<PageNav locale="es" />);
+    fireEvent.click(screen.getByTestId("nav-boxes"));
+    expect(push).toHaveBeenCalledWith("/es?boxes=1");
+  });
+
+  test("Resources shows as current only on /es/resources", () => {
+    pathname = "/es/resources";
+    renderEsTree(<PageNav locale="es" />);
+    expect(screen.getByTestId("nav-resources").getAttribute("aria-current")).toBe("page");
+  });
+
+  test("Resources does NOT show as current on the EN /resources while tree is es (no cross-tree false positive)", () => {
+    pathname = "/resources";
+    renderEsTree(<PageNav locale="es" />);
+    expect(screen.getByTestId("nav-resources").getAttribute("aria-current")).toBeNull();
   });
 });

@@ -3,8 +3,10 @@
  *
  * Proves the extracted client component renders EN by default and ES when
  * wrapped in a LocaleProvider set to "es" (#289) — including the FAQ, whose
- * JSON-LD (passed in as `faqJsonLd`) stays English always (#386) regardless
- * of the visible locale.
+ * JSON-LD (passed in as `faqJsonLd`, a fixture string here) AboutContent
+ * renders verbatim from its caller — the caller's own choice of English vs.
+ * Spanish (#689 supersedes #386's old "always English" rule) isn't this
+ * component's concern.
  */
 
 import { describe, test, expect, vi } from "vitest";

@@ -37,6 +37,8 @@ import type { GeoState } from "@/lib/useGeolocation";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { useAnyOverlayOpen } from "@/lib/overlayRegistry";
+import { useLocale } from "@/lib/LocaleContext";
+import { localizedHref } from "@/lib/localizedHref";
 
 /**
  * Space the nav takes off the bottom of the screen below 2xl, excluding the
@@ -180,6 +182,12 @@ export default function BottomNav({
   onResourcesPage = false,
   rightInset = 0,
 }: BottomNavProps) {
+  // #689 PR 2: tree (not the `locale` prop) decides whether Resources links
+  // into /es — see localizedHref's own header. Read via useLocale() here
+  // (not a new prop) since this component already renders inside
+  // RootShell's LocaleProvider on every page that mounts it.
+  const { tree } = useLocale();
+
   // #542: single choke point for "hide the bar while a full-surface overlay
   // is open" — every overlay (Menu on mobile, Filters, PhotoViewer, the
   // route steps sheet, the full venue/box card via MapWrapper's
@@ -306,7 +314,7 @@ export default function BottomNav({
             thing as Menu. */}
         <li className="flex flex-1 2xl:flex-none 2xl:h-11">
           <Link
-            href="/resources"
+            href={localizedHref("/resources", tree)}
             data-testid="nav-resources"
             aria-current={onResourcesPage ? "page" : undefined}
             className={ITEM_CLASS + " " + colorFor(onResourcesPage)}

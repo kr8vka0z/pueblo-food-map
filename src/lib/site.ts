@@ -10,6 +10,7 @@
  */
 
 import type { Metadata, Viewport } from "next";
+import { t, type Locale } from "@/lib/i18n";
 
 export const SITE_URL = "https://pueblofoodmap.com";
 export const SITE_NAME = "Pueblo Food Map";
@@ -79,6 +80,40 @@ export const ROOT_VIEWPORT: Viewport = {
 };
 
 /**
+ * src/app/es/layout.tsx's metadata export — the ES tree's own root layout
+ * (#689 PR 2, design decision 2: a second root layout is the only way to
+ * get `<html lang="es">` into the server HTML on this Next version). Same
+ * shape as ROOT_METADATA, Spanish content and es_US OG locale. Every /es
+ * page sets its own metadata via buildPageMetadata anyway, so this mostly
+ * matters as the title.template default — same reason ROOT_METADATA's
+ * title/description duplicate the homepage's own.
+ */
+export const ES_ROOT_METADATA: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: t("meta.home.title", "es"),
+    template: "%s · Pueblo Food Map",
+  },
+  description: t("meta.home.description", "es"),
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: t("meta.home.title", "es"),
+    description: t("meta.home.description", "es"),
+    url: `${SITE_URL}/es`,
+    locale: "es_US",
+    alternateLocale: ["en_US"],
+    images: [OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: t("meta.home.title", "es"),
+    description: t("meta.home.description", "es"),
+    images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
+  },
+};
+
+/**
  * Compose a client-side <title> matching the format layout.tsx's
  * `title.template` ("%s · Pueblo Food Map") produces server-side.
  *
@@ -94,6 +129,23 @@ export function pageDocumentTitle(shortTitle: string): string {
   return `${shortTitle} · ${SITE_NAME}`;
 }
 
+const OG_LOCALE: Record<Locale, string> = { en: "en_US", es: "es_US" };
+
+/**
+ * Given a page's OWN path (as it exists in its own tree — `/about` for the
+ * EN tree, `/es/about` for the ES tree), return the counterpart path in the
+ * other tree. Slugs are identical under /es (#689 decision 1: English
+ * slugs), so this is a plain prefix add/strip, not a translation table.
+ */
+function counterpartPath(path: string, locale: Locale): { en: string; es: string } {
+  if (locale === "es") {
+    const en = path === "/es" ? "" : path.replace(/^\/es/, "");
+    return { en, es: path };
+  }
+  const es = path === "/" ? "/es" : `/es${path}`;
+  return { en: path, es };
+}
+
 /**
  * Build complete per-page metadata for a static content page.
  *
@@ -102,25 +154,52 @@ export function pageDocumentTitle(shortTitle: string): string {
  * "Merging"). A subpage that set only {title,url} would drop the inherited OG
  * image. This returns the FULL openGraph/twitter (brand image included) with
  * per-page title/url + a self-canonical, so subpage previews keep the image.
+ *
+ * `locale`/`mirrored` (#689 PR 2) default to "en"/false, so every pre-existing
+ * call site is byte-identical: no `alternates.languages`, `openGraph.locale`
+ * stays "en_US". A page opts into hreflang by passing `mirrored: true` (its
+ * EN counterpart) or `locale: "es", mirrored: true` (its /es wrapper) — the
+ * counterpart URL is derived from `path`, never hand-typed, so the pair can't
+ * drift. Non-mirrored pages (`/suggest`, `/privacy`, etc.) get no hreflang at
+ * all, per #689's scope table.
  */
 export function buildPageMetadata(opts: {
   title: string;
   description: string;
   path: string;
+  locale?: Locale;
+  mirrored?: boolean;
 }): Metadata {
+  const locale = opts.locale ?? "en";
+  const mirrored = opts.mirrored ?? false;
   const url = `${SITE_URL}${opts.path}`;
+  const ogLocale = OG_LOCALE[locale];
+  const ogAlternateLocale = locale === "es" ? OG_LOCALE.en : OG_LOCALE.es;
+
+  const alternates: Metadata["alternates"] = { canonical: url };
+  if (mirrored) {
+    const { en, es } = counterpartPath(opts.path, locale);
+    // x-default → EN (#689 design decision 5): EN is the fallback for
+    // locales/crawlers that don't match either explicit alternate.
+    alternates.languages = {
+      en: `${SITE_URL}${en}`,
+      es: `${SITE_URL}${es}`,
+      "x-default": `${SITE_URL}${en}`,
+    };
+  }
+
   return {
     title: opts.title,
     description: opts.description,
-    alternates: { canonical: url },
+    alternates,
     openGraph: {
       type: "website",
       siteName: SITE_NAME,
       title: opts.title,
       description: opts.description,
       url,
-      locale: "en_US",
-      alternateLocale: ["es_US"],
+      locale: ogLocale,
+      alternateLocale: [ogAlternateLocale],
       images: [OG_IMAGE],
     },
     twitter: {

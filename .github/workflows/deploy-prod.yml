@@ -146,7 +146,11 @@ jobs:
           # assertion to a warning.
           attempts=6
           status=0
-          for path in "/" "/venues" "/venue/${VENUE_ID}" "/sitemap.xml" "/robots.txt"; do
+          # #689 PR 2: /es, /es/venues and /es/venue/<id> join the loop —
+          # same 200 check as their EN counterparts. The <html lang="es">
+          # body check right below is what actually proves they're the /es
+          # tree (a 200 alone would also pass if they quietly served English).
+          for path in "/" "/venues" "/venue/${VENUE_ID}" "/es" "/es/venues" "/es/venue/${VENUE_ID}" "/sitemap.xml" "/robots.txt"; do
             code=""
             for i in $(seq 1 "$attempts"); do
               # No -f: a 404 must be READ, not turned into a curl error. `-f`
@@ -162,6 +166,34 @@ jobs:
             echo "GET ${ORIGIN}${path} -> ${code}"
             if [ "$code" != "200" ]; then
               echo "Smoke check failed: ${path} returned ${code}, expected 200" >&2
+              status=1
+            fi
+          done
+          # #689 PR 2: the three /es paths above returned 200 — also confirm
+          # the body actually carries <html lang="es"> (review fix: grepping
+          # bare lang="es" risked a false-positive match against an
+          # unrelated attribute or an embedded RSC payload string), so a
+          # deploy that quietly serves the EN page (or an error page) under
+          # an /es URL with a 200 status still fails loudly. Retries like
+          # the path loop above.
+          for path in "/es" "/es/venues" "/es/venue/${VENUE_ID}"; do
+            body=""
+            ok=1
+            for i in $(seq 1 "$attempts"); do
+              body=$(curl -sS "${ORIGIN}${path}" || echo "")
+              if printf '%s' "$body" | grep -q '<html lang="es"'; then
+                ok=0
+                break
+              fi
+              if [ "$i" -lt "$attempts" ]; then
+                echo "GET ${ORIGIN}${path} -> missing <html lang=\"es\"> (attempt ${i}/${attempts}, retrying in 10s)"
+                sleep 10
+              fi
+            done
+            if [ "$ok" = "0" ]; then
+              echo "GET ${ORIGIN}${path} -> <html lang=\"es\"> present"
+            else
+              echo "Smoke check failed: ${path} response body is missing <html lang=\"es\">" >&2
               status=1
             fi
           done

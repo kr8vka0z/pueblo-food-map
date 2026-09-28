@@ -4,11 +4,17 @@
  * LocaleContext — global locale state for EN/ES toggle.
  *
  * - LocaleProvider starts at "en" and, after hydration, switches to the
- *   saved `pfm-locale` cookie read from document.cookie (#289). layout.tsx
- *   passes no initialLocale: no route reads the cookie server-side, so
- *   pages stay static (#287) — see ARCHITECTURE.md "Known bilingual
- *   limitation".
- * - useLocale() hook returns { locale, setLocale } for any client component.
+ *   saved `pfm-locale` cookie read from document.cookie (#289) — UNLESS a
+ *   caller passes `initialLocale`. src/app/(site)/layout.tsx (the EN root
+ *   layout) still passes none: no route reads the cookie server-side, so
+ *   its pages stay static (#287). src/app/es/layout.tsx (#689 PR 2, the
+ *   /es root layout) DOES pass `initialLocale="es"` — which also LOCKS the
+ *   tree, since the cookie-sync effect only runs `if (!initialLocale)` —
+ *   see ARCHITECTURE.md "i18n model" for the full picture.
+ * - useLocale() hook returns { locale, setLocale, tree } for any client
+ *   component — `tree` is fixed at the ROUTE that served the page (#689 PR
+ *   2), distinct from the switchable `locale`; see its own field comment
+ *   below and src/lib/localizedHref.ts's header for why the split matters.
  * - setLocale writes the `pfm-locale` cookie so the choice persists across
  *   sessions.
  *
@@ -62,20 +68,34 @@ export function writeLocaleCookie(locale: Locale): void {
 interface LocaleContextValue {
   locale: Locale;
   setLocale: (locale: Locale) => void;
+  /**
+   * The route TREE this page was served from ("en" | "es") — #689 PR 2.
+   * Fixed at mount from `initialLocale`; unlike `locale`, it never changes
+   * client-side (setLocale doesn't touch it), because it reflects which
+   * root layout served this page, not the visitor's language preference.
+   * localizedHref (src/lib/localizedHref.ts) keys off THIS, never `locale`
+   * — see that file's header for why the distinction matters.
+   */
+  tree: Locale;
 }
 
 const LocaleContext = createContext<LocaleContextValue>({
   locale: "en",
   setLocale: () => undefined,
+  tree: "en",
 });
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 interface LocaleProviderProps {
   /**
-   * Optional initial locale. layout.tsx does not pass it (a server-side
-   * cookie read would make routes dynamic, #287); when absent the provider
-   * starts at "en" and applies the saved cookie client-side on mount.
+   * Optional initial locale. The EN root layout (src/app/(site)/layout.tsx)
+   * does not pass it (a server-side cookie read would make routes dynamic,
+   * #287); when absent, the provider starts at "en" and applies the saved
+   * cookie client-side on mount. The ES root layout (src/app/es/layout.tsx,
+   * #689 PR 2) DOES pass `initialLocale="es"` — locking the tree (the
+   * cookie-sync effect below only runs `if (!initialLocale)`), not just
+   * seeding the initial state.
    */
   initialLocale?: Locale;
   children: React.ReactNode;
@@ -86,6 +106,10 @@ export function LocaleProvider({
   children,
 }: LocaleProviderProps) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale ?? "en");
+  // WHY not state: tree reflects which root layout served this page —
+  // that only ever changes via a full page load (crossing root layouts),
+  // never a client-side re-render, so it's derived once and never updated.
+  const tree = initialLocale ?? "en";
 
   // Sync client cookie on mount when no explicit initialLocale prop is provided (#289)
   useEffect(() => {
@@ -110,7 +134,7 @@ export function LocaleProvider({
   }, [locale]);
 
   return (
-    <LocaleContext.Provider value={{ locale, setLocale }}>
+    <LocaleContext.Provider value={{ locale, setLocale, tree }}>
       {children}
     </LocaleContext.Provider>
   );

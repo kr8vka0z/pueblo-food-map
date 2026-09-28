@@ -12,10 +12,19 @@
  * `metadata`/`viewport` stay in each layout.tsx (and in
  * app/global-not-found.tsx) — only page/layout/global-not-found files can
  * export them, a plain component can't.
+ *
+ * #689 PR 2: `lang` also drives the LocaleProvider's `initialLocale` and the
+ * WebSite JSON-LD's locale. Passing `initialLocale="es"` LOCKS the provider
+ * to Spanish — LocaleContext's cookie-sync effect only runs `if
+ * (!initialLocale)` (src/lib/LocaleContext.tsx), so a stale `pfm-locale=en`
+ * cookie can never flip an /es page back to English after hydration. The EN
+ * tree (lang="en") passes no initialLocale, same as before this change, so
+ * its cookie-sync behavior is untouched.
  */
 import { preload } from "react-dom";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { buildWebSiteJsonLd, serializeJsonLd } from "@/lib/venueSchema";
+import type { Locale } from "@/lib/i18n";
 import Analytics from "@/components/Analytics";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
@@ -23,7 +32,7 @@ export default function RootShell({
   lang,
   children,
 }: Readonly<{
-  lang: string;
+  lang: Locale;
   children: React.ReactNode;
 }>) {
   // WHY preload() here instead of a <head> element: React 19's preload() API
@@ -47,10 +56,12 @@ export default function RootShell({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: serializeJsonLd(buildWebSiteJsonLd()),
+            __html: serializeJsonLd(buildWebSiteJsonLd(lang)),
           }}
         />
-        <LocaleProvider>{children}</LocaleProvider>
+        <LocaleProvider initialLocale={lang === "es" ? "es" : undefined}>
+          {children}
+        </LocaleProvider>
         {/* #485 — deferred PostHog init; renders nothing, no-ops with no key */}
         <Analytics />
         <ServiceWorkerRegister />

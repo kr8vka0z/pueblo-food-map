@@ -6,20 +6,31 @@
  * Extracted from src/app/(site)/not-found.tsx so the page's text can read the
  * visitor's locale via useLocale() (#289) without forcing not-found.tsx to
  * read a cookie server-side — see that file's header comment for the
- * static-caching rationale (ARCHITECTURE.md "Known bilingual limitation", #287).
+ * static-caching rationale (ARCHITECTURE.md "i18n model", #287).
  */
 
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { localizedHref } from "@/lib/localizedHref";
 import { pageDocumentTitle } from "@/lib/site";
 
 export default function NotFoundContent() {
-  const { locale } = useLocale();
+  const { locale, tree } = useLocale();
   // <title> follows locale client-side (#589) — notfound.documentTitle
   // matches not-found.tsx's metadata title exactly ("Page Not Found").
-  useDocumentTitle(pageDocumentTitle(t("notfound.documentTitle", locale)));
+  // skip under /es is defensive, not currently reachable: this component
+  // only renders from (site)/not-found.tsx and global-not-found.tsx (both
+  // EN tree) — #689 PR 2's own es/not-found.tsx and its /es/[...rest]
+  // catch-all were removed (staging measured the catch-all's per-request,
+  // no-store, unstyled __next_error__ shell as worse than the prerendered
+  // English global-not-found on low-end phones); unmatched /es/* now
+  // falls through to that EN 404 by design (see es/layout.tsx's own
+  // comment). Left in place in case a future /es not-found route returns.
+  useDocumentTitle(pageDocumentTitle(t("notfound.documentTitle", locale)), {
+    skip: tree === "es",
+  });
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)] items-center justify-center p-6 text-center">
@@ -34,7 +45,7 @@ export default function NotFoundContent() {
           {t("notfound.body", locale)}
         </p>
         <Link
-          href="/"
+          href={localizedHref("/", tree)}
           className={
             "inline-flex items-center justify-center px-5 py-2.5 rounded-[var(--radius-md)] " +
             "bg-[var(--color-sage-600)] text-white text-sm font-medium " +

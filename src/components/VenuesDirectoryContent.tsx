@@ -6,7 +6,7 @@
  * Extracted from src/app/(site)/venues/page.tsx so the directory's headings and
  * per-venue hours text read the visitor's locale via useLocale() (#289),
  * while the page itself stays a server-rendered, crawlable Server Component
- * (no cookies() read — ARCHITECTURE.md "Known bilingual limitation", #287). The
+ * (no cookies() read — ARCHITECTURE.md "i18n model", #287). The
  * grouped-by-category data is computed server-side by groupVenuesByCategory
  * (still exported from page.tsx, pure and locale-independent) and passed in.
  */
@@ -15,6 +15,7 @@ import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { localizedHref } from "@/lib/localizedHref";
 import { pageDocumentTitle } from "@/lib/site";
 import SiteFooter from "@/components/SiteFooter";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
@@ -26,14 +27,17 @@ interface VenuesDirectoryContentProps {
 }
 
 export default function VenuesDirectoryContent({ groups }: VenuesDirectoryContentProps) {
-  const { locale } = useLocale();
+  const { locale, tree } = useLocale();
   // <title> follows locale client-side (#589) — venues.documentTitle
   // matches page.tsx's metadata title exactly ("All Food Resources").
-  useDocumentTitle(pageDocumentTitle(t("venues.documentTitle", locale)));
+  // skip under /es (#689 PR 2): the server title there is already Spanish.
+  useDocumentTitle(pageDocumentTitle(t("venues.documentTitle", locale)), {
+    skip: tree === "es",
+  });
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
-      <PageNav locale={locale} />
+      <PageNav locale={locale} backHref={localizedHref("/", tree)} />
 
       {/* Page content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-8">
@@ -90,7 +94,7 @@ export default function VenuesDirectoryContent({ groups }: VenuesDirectoryConten
                   return (
                     <li key={v.id}>
                       <Link
-                        href={`/venue/${v.id}`}
+                        href={localizedHref(`/venue/${v.id}`, tree)}
                         className={
                           "text-base font-semibold text-[var(--color-sage-600)] " +
                           "hover:text-[var(--color-sage-700)] transition-colors " +

@@ -10,7 +10,7 @@
  * browse every resource. SEO/AEO PR4 item S5.
  *
  * Static server component with a static English `metadata` export (crawler
- * metadata stays English-only, ARCHITECTURE.md "Known bilingual limitation",
+ * metadata stays English-only, ARCHITECTURE.md "i18n model",
  * #287). The visible body is VenuesDirectoryContent — a client component
  * reading the visitor's locale via useLocale() (#289) — so this route never
  * reads cookies() itself and keeps its 100% static caching.
@@ -31,6 +31,8 @@ export const metadata: Metadata = buildPageMetadata({
   description:
     "Browse every food resource on the Pueblo Food Map — food pantries, grocery stores, community gardens, farms, and meal sites across Pueblo County, CO, with addresses and hours.",
   path: "/venues",
+  // #689 PR 2: this page has an /es counterpart — carries hreflang now.
+  mirrored: true,
 });
 
 /**

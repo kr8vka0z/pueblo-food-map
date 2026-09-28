@@ -138,9 +138,9 @@ existing tools, not a PR.
 
 Target: ≥ 90% of pantries with hours before Phase 3's by-day pages ship.
 
-### Phase 2: Make each venue page the best answer — merged to `dev` (#705)
+### Phase 2: Make each venue page the best answer — live on prod 2026-09-28 (#704)
 
-**Status:** merged to `dev` 2026-09-28 (PR #705, closes #704). Summary
+**Status:** live on prod 2026-09-28 via promotion #707 (PRs #705 and #706, issue #704). Summary
 sentence, richer JSON-LD, intent titles, and Nearby all shipped in
 `src/lib/venueSummary.ts` — see ARCHITECTURE.md "Answer-first venue pages"
 for the mechanism. `hours_irregular` coverage is code-complete but untested

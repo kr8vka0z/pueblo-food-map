@@ -119,13 +119,22 @@ const nextConfig: NextConfig = {
   // near me" ask for location. Next blocks dev resources from unlisted hosts;
   // this setting does nothing in production builds.
   allowedDevOrigins: ["kyles-macbook-air.tail433d07.ts.net"],
-  // Required for next/navigation's forbidden() (used by src/app/admin/page.tsx,
-  // #237 checkpoint c) — still an experimental API on this Next version; the
-  // flag opts in per next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/authInterrupts.md.
-  // Renders src/app/forbidden.tsx and returns a real HTTP 403 instead of a
-  // generic error page.
   experimental: {
+    // Required for next/navigation's forbidden() (used by
+    // src/app/(site)/admin/page.tsx, #237 checkpoint c) — still an
+    // experimental API on this Next version; the flag opts in per
+    // next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/authInterrupts.md.
+    // Renders src/app/(site)/forbidden.tsx and returns a real HTTP 403
+    // instead of a generic error page.
     authInterrupts: true,
+    // Route groups (#689 PR 1) mean src/app/(site)/ is a root layout with
+    // no top-level app/layout.tsx above it, so an unmatched URL has no
+    // single layout to compose a 404 page from. app/global-not-found.tsx
+    // is Next's prescribed fix (node_modules/next/dist/docs/.../not-found.md,
+    // "global-not-found.js (experimental)") — required ahead of PR 2, which
+    // adds a second root layout (src/app/es/layout.tsx) where this becomes
+    // load-bearing, not just tidy.
+    globalNotFound: true,
   },
   images: {
     // Cloudflare Workers does not support the Node.js APIs that Next.js image

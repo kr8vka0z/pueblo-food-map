@@ -72,8 +72,9 @@ describe("sitemap", () => {
   });
 
   // Guards the class of bug above: every non-venue URL must be served by a
-  // real src/app/**/page.tsx. Route groups and dynamic segments aren't used
-  // by any static sitemap URL, so a plain path → directory mapping is enough.
+  // real src/app/**/page.tsx. Every public page now lives under the (site)
+  // route group (#689 PR 1) — route groups don't change the URL, so a plain
+  // path → directory mapping under src/app/(site) is still enough.
   test("every static (non-venue) URL maps to a real page.tsx", async () => {
     const entries = await sitemap();
     const staticPaths = entries
@@ -81,7 +82,7 @@ describe("sitemap", () => {
       .filter((path) => !path.startsWith("/venue/"));
     expect(staticPaths.length).toBeGreaterThan(0);
     for (const path of staticPaths) {
-      const pageFile = join(process.cwd(), "src/app", path, "page.tsx");
+      const pageFile = join(process.cwd(), "src/app/(site)", path, "page.tsx");
       expect(existsSync(pageFile), `${path} → ${pageFile}`).toBe(true);
     }
   });

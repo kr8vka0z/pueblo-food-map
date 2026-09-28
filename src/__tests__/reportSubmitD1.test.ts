@@ -88,7 +88,7 @@ describe("POST /report/submit", () => {
     mockCheckFormRateLimit.mockResolvedValue(true);
     mockGetCloudflareContext.mockReset();
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeD1().db } });
-    const mod = await import("@/app/report/submit/route");
+    const mod = await import("@/app/(site)/report/submit/route");
     POST = mod.POST;
   });
 

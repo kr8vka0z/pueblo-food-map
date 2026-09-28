@@ -178,7 +178,7 @@ describe("wiring: suggest/submit fires logFormFailure on turnstile rejection", (
   }
 
   test("suggest route: Turnstile rejection → 400 + console.warn form_submit_failure", async () => {
-    const mod = await import("@/app/suggest/submit/route");
+    const mod = await import("@/app/(site)/suggest/submit/route");
     const req = makeRequest("http://localhost/suggest/submit", {
       venueName: "Test Venue",
       address: "123 Main St, Pueblo, CO",
@@ -234,7 +234,7 @@ describe("wiring: report/submit fires logFormFailure on turnstile rejection", ()
   }
 
   test("report route: Turnstile rejection → 400 + console.warn form_submit_failure", async () => {
-    const mod = await import("@/app/report/submit/route");
+    const mod = await import("@/app/(site)/report/submit/route");
     const req = makeRequest("http://localhost/report/submit", {
       venueId: "osm-way-535656814",
       issueType: "closed",
@@ -288,7 +288,7 @@ describe("wiring: feedback/submit fires logFormFailure on turnstile rejection", 
   }
 
   test("feedback route: Turnstile rejection → 400 + console.warn form_submit_failure", async () => {
-    const mod = await import("@/app/feedback/submit/route");
+    const mod = await import("@/app/(site)/feedback/submit/route");
     const req = makeRequest("http://localhost/feedback/submit", {
       feedbackType: "general",
       message: "Great resource for the community!",

@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
 import manifest from "./manifest";
-import { viewport } from "./layout";
+import { viewport } from "./(site)/layout";
 
 const PUBLIC_DIR = path.resolve(__dirname, "../../public");
 

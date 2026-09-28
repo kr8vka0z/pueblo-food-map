@@ -14,6 +14,12 @@ const en: Record<string, string> = {
   // default verbatim), so this holds the FULL string per locale rather than
   // a short title + pageDocumentTitle() suffix like every other page.
   "app.documentTitle": "Pueblo Food Map — Food Resources in Pueblo County, CO",
+  // WebSite JSON-LD description (#689 PR 2, src/lib/venueSchema.ts
+  // buildWebSiteJsonLd) — machine-readable, not visible body copy, but still
+  // real text search/AI answer engines can quote, so it goes through t()
+  // like every other locale-facing string.
+  "jsonld.website.description":
+    "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores.",
 
   // Top bar
   "topbar.locale.en": "EN",
@@ -952,6 +958,8 @@ const es: Record<string, string> = {
   // App
   "app.name": "Pueblo Food Map",
   "app.documentTitle": "Pueblo Food Map — Recursos de alimentos en el Condado de Pueblo, CO",
+  "jsonld.website.description":
+    "Un mapa comunitario de recursos alimentarios en el condado de Pueblo, Colorado — huertos comunitarios, paisajes comestibles, despensas de alimentos y supermercados.", // [CHECK]
 
   // Top bar
   "topbar.locale.en": "EN",

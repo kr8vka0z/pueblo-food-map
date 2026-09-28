@@ -13,13 +13,13 @@
  *   sign-in, whichever endpoint minted the session.
  * - authEventsPlugin(): path-matched before/after hooks for the events a
  *   database hook can't see — sign-out (the session is gone by the time any
- *   `after` runs, so it's captured `before`), a sign-in link requested for a
- *   non-allowlisted email, an invalid/expired link, a failed passkey, and a
- *   passkey added/removed.
+ *   `after` runs, so it's captured `before`), a sign-in code requested for a
+ *   non-allowlisted email, a wrong/expired/used-up code, a failed passkey,
+ *   and a passkey added/removed.
  *
  * A recording failure must NEVER block or change a sign-in: every write goes
  * through recordAuthEvent(), which catches and logs to the console. And
- * nothing secret is stored — never a sign-in-link token, session token or
+ * nothing secret is stored — never a sign-in code, session token or
  * passkey credential data (detail_json holds a short reason code only).
  */
 
@@ -74,9 +74,10 @@ export const INSERT_SIGN_IN_EVENT_SQL = `INSERT INTO auth_events
 export function signInMethodForPath(path: string | undefined): SignInMethod | null {
   if (!path) return null;
   if (path.startsWith("/passkey/")) return "passkey";
-  if (path.startsWith("/magic-link/") || path === "/sign-in/magic-link") return "email_link";
-  // #684 (6-digit email code) — forward-compatible so the method is right the day it lands.
+  // #684: the 6-digit email code replaced the sign-in link.
   if (path.includes("email-otp")) return "email_code";
+  // Rows written before #684 keep "email_link" (activityLog.ts still labels it).
+  if (path.startsWith("/magic-link/")) return "email_link";
   return null;
 }
 
@@ -182,21 +183,9 @@ export function authEventsDatabaseHooks(deps: AuthEventDeps) {
   };
 }
 
-/** The `error` code a failed magic-link verify redirects with (`?error=INVALID_TOKEN`), if any. */
-function redirectErrorCode(returned: unknown): string | null {
-  if (!isAPIError(returned)) return null;
-  const location = (returned.headers as Headers | undefined)?.get?.("location");
-  if (!location) return "unknown";
-  try {
-    return new URL(location, "https://pueblofoodmap.com").searchParams.get("error") ?? null;
-  } catch {
-    return "unknown";
-  }
-}
-
 const PASSKEY_SIGN_IN_PATH = "/passkey/verify-authentication";
-const MAGIC_LINK_VERIFY_PATH = "/magic-link/verify";
-const MAGIC_LINK_REQUEST_PATH = "/sign-in/magic-link";
+const CODE_SIGN_IN_PATH = "/sign-in/email-otp";
+const CODE_REQUEST_PATH = "/email-otp/send-verification-otp";
 const PASSKEY_ADDED_PATH = "/passkey/verify-registration";
 const PASSKEY_REMOVED_PATH = "/passkey/delete-passkey";
 const SIGN_OUT_PATH = "/sign-out";
@@ -204,7 +193,7 @@ const SIGN_OUT_PATH = "/sign-out";
 /**
  * Better Auth plugin for the non-session-create events. Must be registered
  * BEFORE adminAuthAllowlistPlugin (auth-options.ts): that plugin's
- * magic-link gate short-circuits a non-allowlisted request, and a
+ * send-code gate short-circuits a non-allowlisted request, and a
  * short-circuited request runs no later hooks, so the rejection is recorded
  * here first. This hook only observes — it never changes the response, so
  * the anti-enumeration guarantee is untouched.
@@ -216,7 +205,7 @@ export function authEventsPlugin(deps: AuthEventDeps) {
       before: [
         {
           matcher(ctx: { path?: string }) {
-            return ctx.path === MAGIC_LINK_REQUEST_PATH;
+            return ctx.path === CODE_REQUEST_PATH;
           },
           handler: createAuthMiddleware(async (ctx) => {
             const email = (ctx.body as { email?: unknown } | undefined)?.email;
@@ -224,7 +213,7 @@ export function authEventsPlugin(deps: AuthEventDeps) {
               await recordAuthEvent(deps, {
                 event: "sign_in_failed",
                 email: typeof email === "string" ? email.slice(0, 254) : null,
-                method: "email_link",
+                method: "email_code",
                 ip: clientIp(ctx.headers),
                 userAgent: userAgent(ctx.headers),
                 detail: { reason: "not_allowlisted" },
@@ -256,21 +245,26 @@ export function authEventsPlugin(deps: AuthEventDeps) {
       after: [
         {
           matcher(ctx: { path?: string }) {
-            return ctx.path === MAGIC_LINK_VERIFY_PATH || ctx.path === PASSKEY_SIGN_IN_PATH;
+            return ctx.path === CODE_SIGN_IN_PATH || ctx.path === PASSKEY_SIGN_IN_PATH;
           },
           handler: createAuthMiddleware(async (ctx) => {
             // Success is already recorded by the session.create hook; only a
-            // verify that minted no session is a failure.
+            // sign-in that minted no session is a failure.
             if (ctx.context.newSession) return;
             const isPasskey = ctx.path === PASSKEY_SIGN_IN_PATH;
-            const reason = isPasskey
-              ? isAPIError(ctx.context.returned)
-                ? String(ctx.context.returned.body?.code ?? ctx.context.returned.status ?? "passkey_failed")
-                : "passkey_failed"
-              : (redirectErrorCode(ctx.context.returned) ?? "no_session");
+            const returned = ctx.context.returned;
+            const reason = isAPIError(returned)
+              ? String(returned.body?.code ?? returned.status ?? "failed")
+              : isPasskey
+                ? "passkey_failed"
+                : "no_session";
+            // The typed email (a code sign-in only) — the allowlist gate
+            // already refused non-admins with the same error as a wrong code.
+            const email = isPasskey ? null : (ctx.body as { email?: unknown } | undefined)?.email;
             await recordAuthEvent(deps, {
               event: "sign_in_failed",
-              method: isPasskey ? "passkey" : "email_link",
+              email: typeof email === "string" ? email.slice(0, 254) : null,
+              method: isPasskey ? "passkey" : "email_code",
               ip: clientIp(ctx.headers),
               userAgent: userAgent(ctx.headers),
               detail: { reason: reason.slice(0, 80) },

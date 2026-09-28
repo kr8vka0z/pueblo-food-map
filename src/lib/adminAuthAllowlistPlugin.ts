@@ -1,46 +1,62 @@
 /**
- * Admin allowlist enforcement plugin (#315 Phase 2) — the CRITICAL security
- * gate for this phase. Better Auth's own plugin system has no single
- * "reject a sign-in" hook point that fires early enough on its own, so this
- * ships as a small plugin object with a `hooks.before` array (the exact
- * shape Better Auth's own built-in `nextCookies()` plugin uses — see
- * node_modules/better-auth/dist/integrations/next-js.mjs), matched by path
- * and consumed identically to every other plugin's hooks by the dispatch
- * pipeline (node_modules/better-auth/dist/api/dispatch.mjs: `getHooks()`
- * flatMaps every plugin's `hooks.before` and runs them all BEFORE the
- * endpoint handler ever executes).
+ * Admin allowlist enforcement plugin (#315 Phase 2; email-code gate #684) —
+ * the CRITICAL security gate for admin sign-in. Better Auth's plugin system
+ * has no single "reject a sign-in" hook point that fires early enough on its
+ * own, so this ships as a small plugin object with a `hooks.before` array
+ * (the shape Better Auth's own `nextCookies()` plugin uses), matched by path
+ * and run by the dispatch pipeline (node_modules/better-auth/dist/api/
+ * dispatch.mjs: every plugin's `hooks.before` runs BEFORE the endpoint).
  *
- * Two gates, matching the two ways this phase allows a session to exist:
+ * Gates, matching the ways a session can come to exist:
  *
- * 1. `/sign-in/magic-link` — reject a non-allowlisted email BEFORE
- *    magicLink's own handler runs. This has to be a `hooks.before`
- *    intercept, not a check inside `sendMagicLink` (auth-options.ts) or
- *    `databaseHooks.verification.create.before`: magicLink's own handler
- *    (node_modules/better-auth/dist/plugins/magic-link/index.mjs)
- *    calls `internalAdapter.createVerificationValue(...)` — which persists
- *    the token row — BEFORE it calls `sendMagicLink`. A before-hook is the
- *    only point that runs ahead of that write.
+ * 1. `/email-otp/send-verification-otp` — sending a sign-in code. A
+ *    non-allowlisted email, or any `type` other than "sign-in", gets
+ *    `{ success: true }` — byte-identical to a real send — BEFORE the
+ *    emailOTP handler runs. It has to be a before-hook: that handler writes
+ *    the code's `verification` row before it calls `sendVerificationOTP`.
+ *    So a non-admin address gets no code row, no email, and a response that
+ *    can't be told apart from a real send (anti-enumeration).
  *
- * 2. `/passkey/generate-register-options` + `/passkey/verify-registration`
+ * 2. `/sign-in/email-otp` — signing in with a code. A non-allowlisted email
+ *    is refused with emailOTP's own "Invalid OTP" error (the same thing a
+ *    wrong code returns) before any code is checked. Defense in depth: gate
+ *    1 means such an email never has a code to begin with.
+ *
+ * 3. Every other emailOTP endpoint (verify-email, check-verification-otp,
+ *    password reset, change email) — this admin uses none of them, so they
+ *    are refused outright (404), shrinking the surface to exactly the two
+ *    paths above.
+ *
+ * 4. `/passkey/generate-register-options` + `/passkey/verify-registration`
  *    — reject passkey registration for any session whose user isn't
- *    allowlisted. `@better-auth/passkey`'s own endpoints already require a
- *    fresh session by default (`freshSessionMiddleware`, see that plugin's
- *    source) — this hook is the additional allowlist layer requested by
- *    #315, not a replacement for that auth check.
+ *    allowlisted. `@better-auth/passkey` already requires a fresh session;
+ *    this is the additional allowlist layer (#315).
  *
- * Anti-enumeration: the magic-link gate returns the SAME `{ status: true }`
- * shape signInMagicLink itself returns on success (see its `d.mts`
- * response type) via `ctx.json(...)`, which Better Auth's dispatch treats
- * as a full short-circuit response (any truthy non-`{context}` return value
- * from a before-hook fully replaces the endpoint's response — dispatch.mjs
- * `runBeforeHooks`). A non-allowlisted email therefore gets a byte-identical
- * response to an allowlisted one, with no verification row ever created and
- * no email ever sent — nothing distinguishes "not allowlisted" from "email
- * sent" from the outside.
+ * Plus `databaseHooks.user.create.before` (defense in depth): no
+ * non-allowlisted `user` row can ever be persisted, whatever the path.
  */
 
 import { createAuthMiddleware, APIError, getSessionFromCtx } from "better-auth/api";
 import { isAllowlistedEmail } from "@/lib/adminAllowlist";
+
+export const SEND_CODE_PATH = "/email-otp/send-verification-otp";
+export const SIGN_IN_WITH_CODE_PATH = "/sign-in/email-otp";
+
+// emailOTP endpoints this admin never uses — refused outright (gate 3).
+export const REFUSED_EMAIL_OTP_PATHS = new Set([
+  "/email-otp/check-verification-otp",
+  "/email-otp/verify-email",
+  "/email-otp/request-password-reset",
+  "/forget-password/email-otp",
+  "/email-otp/reset-password",
+  "/email-otp/request-email-change",
+  "/email-otp/change-email",
+]);
+
+// emailOTP's own wrong-code error (better-auth/dist/plugins/email-otp/
+// error-codes.mjs; not exported by the package), reproduced so a refused
+// non-admin email is indistinguishable from a wrong code.
+const INVALID_OTP = { code: "INVALID_OTP", message: "Invalid OTP" };
 
 const PASSKEY_REGISTRATION_PATHS = new Set([
   "/passkey/generate-register-options",
@@ -54,19 +70,39 @@ export function adminAuthAllowlistPlugin() {
       before: [
         {
           matcher(ctx: { path?: string }) {
-            return ctx.path === "/sign-in/magic-link";
+            return ctx.path === SEND_CODE_PATH;
           },
           handler: createAuthMiddleware(async (ctx) => {
-            const email = (ctx.body as { email?: unknown } | undefined)
-              ?.email;
-            if (typeof email !== "string" || !isAllowlistedEmail(email)) {
-              // Identical shape to signInMagicLink's own success response
-              // (see magic-link/index.d.mts: `{ status: boolean }`) — no
-              // verification row is created, no email is sent, and the
-              // caller cannot distinguish this from a real send.
-              return ctx.json({ status: true });
+            const body = ctx.body as { email?: unknown; type?: unknown } | undefined;
+            const email = body?.email;
+            if (typeof email !== "string" || !isAllowlistedEmail(email) || body?.type !== "sign-in") {
+              // Identical shape to sendVerificationOTP's own success response
+              // (`{ success: true }`) — no code row, no email, and the caller
+              // can't tell this apart from a real send.
+              return ctx.json({ success: true });
             }
             return undefined;
+          }),
+        },
+        {
+          matcher(ctx: { path?: string }) {
+            return ctx.path === SIGN_IN_WITH_CODE_PATH;
+          },
+          handler: createAuthMiddleware(async (ctx) => {
+            const email = (ctx.body as { email?: unknown } | undefined)?.email;
+            if (typeof email !== "string" || !isAllowlistedEmail(email)) {
+              // Same error a wrong code gets — never reveals the allowlist.
+              throw APIError.from("BAD_REQUEST", INVALID_OTP);
+            }
+            return undefined;
+          }),
+        },
+        {
+          matcher(ctx: { path?: string }) {
+            return ctx.path !== undefined && REFUSED_EMAIL_OTP_PATHS.has(ctx.path);
+          },
+          handler: createAuthMiddleware(async () => {
+            throw new APIError("NOT_FOUND");
           }),
         },
         {

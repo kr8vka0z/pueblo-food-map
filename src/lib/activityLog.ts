@@ -390,7 +390,11 @@ export const METHOD_LABELS: Record<string, string> = {
 };
 
 const FAILURE_REASONS: Record<string, string> = {
-  not_allowlisted: "sign-in link requested for an email that isn't an admin",
+  not_allowlisted: "sign-in requested for an email that isn't an admin",
+  INVALID_OTP: "wrong sign-in code",
+  OTP_EXPIRED: "sign-in code had expired",
+  TOO_MANY_ATTEMPTS: "too many wrong codes",
+  // Rows from before #684 (sign-in links).
   INVALID_TOKEN: "sign-in link was invalid, expired or already used",
   EXPIRED_TOKEN: "sign-in link had expired",
   passkey_failed: "passkey wasn't accepted",

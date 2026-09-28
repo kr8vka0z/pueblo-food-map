@@ -2,9 +2,9 @@
  * AdminLoginForm tests (#315 Phase 2).
  *
  * Covers the client-side half of the login experience: email validation,
- * the magic-link submit -> "sent" confirmation (and, critically, the error
- * branch when the API call itself fails — see the fix WHY comment in
- * AdminLoginForm.tsx's handleMagicLinkSubmit), passkey sign-in, and the
+ * the email-code flow (#684: send → type the code on the same page →
+ * sign in, resend cooldown, "use a different email", the error copy), the
+ * error branch when the API call itself fails, passkey sign-in, and the
  * signed-in "set up a passkey" prompt driven by authClient.useSession().
  *
  * `@/lib/authClient` is mocked module-wide (same pattern
@@ -14,12 +14,13 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockUseSession = vi.fn();
 const mockUseListPasskeys = vi.fn();
-const mockSignInMagicLink = vi.fn();
+const mockSendCode = vi.fn();
+const mockSignInEmailOtp = vi.fn();
 const mockSignInPasskey = vi.fn();
 const mockAddPasskey = vi.fn();
 const mockReplace = vi.fn();
@@ -32,8 +33,11 @@ vi.mock("@/lib/authClient", () => ({
   authClient: {
     useSession: () => mockUseSession(),
     useListPasskeys: () => mockUseListPasskeys(),
+    emailOtp: {
+      sendVerificationOtp: (...args: unknown[]) => mockSendCode(...args),
+    },
     signIn: {
-      magicLink: (...args: unknown[]) => mockSignInMagicLink(...args),
+      emailOtp: (...args: unknown[]) => mockSignInEmailOtp(...args),
       passkey: (...args: unknown[]) => mockSignInPasskey(...args),
     },
     passkey: {
@@ -47,7 +51,8 @@ import AdminLoginForm from "@/components/AdminLoginForm";
 beforeEach(() => {
   mockUseSession.mockReset();
   mockUseListPasskeys.mockReset();
-  mockSignInMagicLink.mockReset();
+  mockSendCode.mockReset();
+  mockSignInEmailOtp.mockReset();
   mockSignInPasskey.mockReset();
   mockAddPasskey.mockReset();
   mockReplace.mockReset();
@@ -61,62 +66,132 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("AdminLoginForm — signed-out: magic-link email form", () => {
+describe("AdminLoginForm — signed-out: email code (#684)", () => {
+  async function reachCodeStep(email = "kysboyd@gmail.com") {
+    mockSendCode.mockResolvedValue({ data: { success: true }, error: null });
+    const user = userEvent.setup();
+    render(<AdminLoginForm />);
+    await user.type(screen.getByLabelText(/^email$/i), email);
+    await user.click(screen.getByRole("button", { name: /email me a code/i }));
+    await screen.findByTestId("admin-login-sent");
+    return user;
+  }
+
   test("rejects an invalid email client-side without calling the API", async () => {
     const user = userEvent.setup();
     render(<AdminLoginForm />);
 
-    await user.type(screen.getByLabelText(/email/i), "not-an-email");
-    await user.click(screen.getByRole("button", { name: /send me a sign-in link/i }));
+    await user.type(screen.getByLabelText(/^email$/i), "not-an-email");
+    await user.click(screen.getByRole("button", { name: /email me a code/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/valid email/i);
-    expect(mockSignInMagicLink).not.toHaveBeenCalled();
+    expect(mockSendCode).not.toHaveBeenCalled();
   });
 
-  test("a successful call shows the same 'link sent' confirmation for any address (anti-enumeration)", async () => {
-    mockSignInMagicLink.mockResolvedValue({ data: { status: true }, error: null });
-    const user = userEvent.setup();
-    render(<AdminLoginForm />);
+  test("a send shows the same code step for any address (anti-enumeration), on the same page", async () => {
+    await reachCodeStep("attacker@evil.com");
 
-    await user.type(screen.getByLabelText(/email/i), "attacker@evil.com");
-    await user.click(screen.getByRole("button", { name: /send me a sign-in link/i }));
-
-    expect(await screen.findByTestId("admin-login-sent")).toHaveTextContent(
-      "attacker@evil.com",
-    );
-    expect(mockSignInMagicLink).toHaveBeenCalledWith({
-      email: "attacker@evil.com",
-      callbackURL: "/admin/login",
-    });
+    expect(screen.getByTestId("admin-login-sent")).toHaveTextContent("We sent a 6-digit code to attacker@evil.com");
+    expect(mockSendCode).toHaveBeenCalledWith({ email: "attacker@evil.com", type: "sign-in" });
+    const codeField = screen.getByLabelText(/sign-in code/i);
+    expect(codeField.getAttribute("inputmode")).toBe("numeric");
+    expect(codeField.getAttribute("autocomplete")).toBe("one-time-code");
   });
 
-  test("an API-level error (result.error, no thrown exception) shows the error state, not 'sent'", async () => {
+  test("typing the 6-digit code signs in with it (no button press needed, digits only)", async () => {
+    mockSignInEmailOtp.mockResolvedValue({ data: { token: "t" }, error: null });
+    const user = await reachCodeStep();
+
+    await user.type(screen.getByLabelText(/sign-in code/i), "12a3 456");
+
+    await waitFor(() => expect(mockSignInEmailOtp).toHaveBeenCalledWith({ email: "kysboyd@gmail.com", otp: "123456" }));
+    expect(mockSignInEmailOtp).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ["INVALID_OTP", "That code didn't match. Try again."],
+    ["OTP_EXPIRED", "That code expired. Send a new one."],
+    ["TOO_MANY_ATTEMPTS", "Too many tries. Send a new code."],
+  ])("%s shows its own message", async (code, message) => {
+    mockSignInEmailOtp.mockResolvedValue({ data: null, error: { code, status: 400 } });
+    const user = await reachCodeStep();
+
+    await user.type(screen.getByLabelText(/sign-in code/i), "123456");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+  });
+
+  test("a short code isn't sent; the Sign in button explains", async () => {
+    const user = await reachCodeStep();
+
+    await user.type(screen.getByLabelText(/sign-in code/i), "123");
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/6-digit code/i);
+    expect(mockSignInEmailOtp).not.toHaveBeenCalled();
+  });
+
+  test("Resend code is disabled for 30 seconds after a send, then sends a new code", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = await reachCodeStep();
+      const resend = screen.getByRole("button", { name: /resend code/i });
+      expect(resend).toBeDisabled();
+      expect(resend).toHaveTextContent("Resend code (30s)");
+
+      // One tick per second, each flushed through React (the ticker chains timeouts).
+      for (let i = 0; i < 31; i++) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000);
+        });
+      }
+      await waitFor(() => expect(screen.getByRole("button", { name: /resend code/i })).not.toBeDisabled());
+      await user.click(screen.getByRole("button", { name: /resend code/i }));
+
+      expect(mockSendCode).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole("button", { name: /resend code/i })).toBeDisabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("Use a different email goes back to the email step", async () => {
+    const user = await reachCodeStep();
+
+    await user.click(screen.getByRole("button", { name: /use a different email/i }));
+
+    expect(screen.queryByTestId("admin-login-sent")).toBeNull();
+    expect((screen.getByLabelText(/^email$/i) as HTMLInputElement).value).toBe("");
+  });
+
+  test("an API-level error sending the code (result.error, no thrown exception) shows the error state", async () => {
     // Regression guard: better-auth's client resolves { data, error } on a
-    // non-2xx response rather than throwing — a naive try/catch-only check
-    // would miss this and always show the success confirmation.
-    mockSignInMagicLink.mockResolvedValue({
-      data: null,
-      error: { message: "Resend API error 401" },
-    });
+    // non-2xx response rather than throwing.
+    mockSendCode.mockResolvedValue({ data: null, error: { message: "Resend API error 401" } });
     const user = userEvent.setup();
     render(<AdminLoginForm />);
 
-    await user.type(screen.getByLabelText(/email/i), "kysboyd@gmail.com");
-    await user.click(screen.getByRole("button", { name: /send me a sign-in link/i }));
+    await user.type(screen.getByLabelText(/^email$/i), "kysboyd@gmail.com");
+    await user.click(screen.getByRole("button", { name: /email me a code/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/something went wrong/i);
     expect(screen.queryByTestId("admin-login-sent")).toBeNull();
   });
 
   test("a thrown network-level failure also shows the error state", async () => {
-    mockSignInMagicLink.mockRejectedValue(new Error("network down"));
+    mockSendCode.mockRejectedValue(new Error("network down"));
     const user = userEvent.setup();
     render(<AdminLoginForm />);
 
-    await user.type(screen.getByLabelText(/email/i), "kysboyd@gmail.com");
-    await user.click(screen.getByRole("button", { name: /send me a sign-in link/i }));
+    await user.type(screen.getByLabelText(/^email$/i), "kysboyd@gmail.com");
+    await user.click(screen.getByRole("button", { name: /email me a code/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/something went wrong/i);
+  });
+
+  test("never mentions a sign-in link", () => {
+    render(<AdminLoginForm />);
+    expect(document.body.textContent).not.toMatch(/link/i);
   });
 });
 
@@ -221,7 +296,7 @@ describe("AdminLoginForm — signed-in: returning admin who already has a passke
   });
 
   // #485 core: the admin sign-in success path is the one place every
-  // sign-in route (magic link, passkey, first-time register) converges,
+  // sign-in route (email code, passkey, first-time register) converges,
   // so it's what marks this browser opted out of analytics.
   test("flags this device internal for analytics (pfm_internal) once signed in", async () => {
     window.localStorage.clear();

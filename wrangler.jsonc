@@ -108,7 +108,7 @@
       "name": "pueblo-food-map-staging",
       "routes": [
         // Admin serves at /admin on this same apex host — gated by Better
-        // Auth alone (magic link + passkey; Cloudflare Access has been fully
+        // Auth alone (email code + passkey; Cloudflare Access has been fully
         // removed from this path), not a separate subdomain route. The
         // admin.pueblofoodmap.com / dev.admin.pueblofoodmap.com subdomains
         // are retired.
@@ -164,7 +164,7 @@
           // earlier ponytail shortcut of reusing prod's PREVIEW d1 id.
           // Provisioned + migrated + seeded with fake data specifically so
           // dev.pueblofoodmap.com's admin surface has real rows to render —
-          // admin is gated by Better Auth alone (magic link + passkey), not
+          // admin is gated by Better Auth alone (email code + passkey), not
           // Cloudflare Access — prod admin data (pueblo-food-map-admin,
           // d6ea5afd-...) is never read from or written to by this env.
           "database_name": "pueblo-food-map-admin-staging",

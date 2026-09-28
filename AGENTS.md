@@ -51,14 +51,15 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 
 ## Admin authentication and data
 
-- **Better Auth is the only gate** (magic link + passkey, one-email allowlist) on prod and staging. There is no Cloudflare Access.
+- **Better Auth is the only gate** (6-digit email code + passkey, one-email allowlist) on prod and staging. There is no Cloudflare Access, and no magic link (#684).
+- **The allowlist gate is `adminAuthAllowlistPlugin.ts`**, on `/email-otp/send-verification-otp` (non-admin email or non-`sign-in` type → identical `{success:true}`, no code row, no email) and `/sign-in/email-otp`; every other emailOTP endpoint 404s. Its tests (`adminAuthAllowlistPlugin.test.ts`) are the security boundary — never weaken them.
 - **`getAdminDb()` (`src/lib/adminDb.ts`) is the single choke point.** It checks the session before returning the `ADMIN_DB` binding. New admin code must fetch D1 through it, never through `getCloudflareContext()`. Public routes (suggest/report, `/api/public/**`) are the exception and read `getCloudflareContext().env.ADMIN_DB` directly.
 - **`requireAdminOrigin()`** (CSRF protection) is required on every non-GET `/api/admin/*` route.
 - **`ADMIN_ALLOWLIST`**: comma-separated emails; if unset it defaults to Kyle only. It must always fail toward "only Kyle", never toward "everyone".
 - **`ADMIN_OWNER_EMAIL`** (wrangler var, prod + staging) is the one account that sees `/admin/activity` (#679). Everyone else gets a 404 and no nav item; unset falls back to Kyle (`src/lib/adminOwner.ts`). Sign-ins/failures are recorded in `auth_events` by `src/lib/authEvents.ts`, whose writes must never block a sign-in.
 - **Session cookie:** `useSecureCookies: false` is required. Otherwise better-auth double-prefixes `__Host-session_token` and the cookie silently drops. `secure: true` is set by hand instead.
 - **`BETTER_AUTH_RP_ID`** is set on staging only (`wrangler.jsonc` `env.staging.vars`), so passkeys never cross environments. Read it via the binding.
-- **Magic-link rate limit:** 5 per hour, enforced in-app (D1 `rateLimit`), plus one Cloudflare zone rule on `/api/auth/*` that lives in the dashboard, not in this repo.
+- **Sign-in rate limits:** sending a code 5/hour and typing one 10/15 min per IP, enforced in-app (D1 `rateLimit` `customRules`), plus 3 tries per code and one Cloudflare zone rule on `/api/auth/*` that lives in the dashboard, not in this repo.
 - **Writes:** each write is one atomic `db.batch()` plus an `audit_log` row carrying `identity.sessionId` in `session_id` (the Activity log groups by it). Archive, never `DELETE`. The server re-validates every field (`adminVenueValidation.ts`). PATCH and archive carry the `updated_at` precondition (409 on a concurrent save); any new dependent write in the same batch must be `WHERE EXISTS`-gated on it.
 - **Publish ordering is load-bearing:** the GitHub commit/PR/auto-merge must succeed *before* D1 marks drafts published. `isProductionWorker()` refuses Publish on staging (403).
 - **One store:** everything lives in the `pueblo-food-map-admin` D1 database. There is no Workers KV, by design.

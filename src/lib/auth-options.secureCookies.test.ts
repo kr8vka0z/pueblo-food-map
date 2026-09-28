@@ -21,6 +21,7 @@ import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getCookies, createCookieGetter } from "better-auth/cookies";
 import { buildAuthOptions } from "@/lib/auth-options";
+import { signInWithEmailCode } from "@/__tests__/helpers/authTestHelpers";
 
 describe("non-session cookies also get Secure restored (#595)", () => {
   test("session_data, account_data, and dont_remember all resolve secure:true", () => {
@@ -56,7 +57,7 @@ describe("non-session cookies also get Secure restored (#595)", () => {
 });
 
 describe("passkey WebAuthn challenge cookie — real ceremony (#595, PR #614 review)", () => {
-  // WHY the full magic-link -> session -> generatePasskeyRegistrationOptions
+  // WHY the full email-code -> session -> generatePasskeyRegistrationOptions
   // round trip instead of only the declarative check above: the config-value
   // test proves "a cookie literally named better-auth-passkey gets
   // secure:true" but not that the passkey PLUGIN actually requests a cookie
@@ -81,30 +82,7 @@ describe("passkey WebAuthn challenge cookie — real ceremony (#595, PR #614 rev
   async function signInAndGetSessionCookie(
     auth: ReturnType<typeof betterAuth<ReturnType<typeof buildAuthOptions>>>,
   ): Promise<string> {
-    await auth.api.signInMagicLink({
-      body: { email: ALLOWLISTED_EMAIL },
-      headers: requestHeaders(),
-    });
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
-    const [, sendInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const sentBody = JSON.parse(sendInit.body as string);
-    const tokenMatch = /token=([^&\s"]+)/.exec(sentBody.text as string);
-    if (!tokenMatch) {
-      throw new Error("magic-link email did not contain a token URL");
-    }
-    const verifyResponse = await auth.api.magicLinkVerify({
-      query: { token: tokenMatch[1], callbackURL: "/" },
-      headers: requestHeaders(),
-      asResponse: true,
-    });
-    const setCookie = verifyResponse.headers.get("set-cookie");
-    if (!setCookie) {
-      throw new Error("magicLinkVerify did not set a session cookie");
-    }
-    return setCookie
-      .split(",")
-      .map((part) => part.split(";")[0].trim())
-      .join("; ");
+  return signInWithEmailCode(auth, ALLOWLISTED_EMAIL);
   }
 
   beforeEach(() => {

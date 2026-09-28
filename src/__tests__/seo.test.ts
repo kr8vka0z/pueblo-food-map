@@ -10,6 +10,8 @@
  */
 
 import { describe, test, expect } from "vitest";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { SITE_URL, SITE_NAME, OG_IMAGE, buildPageMetadata } from "@/lib/site";
 import sitemap from "@/app/sitemap";
 import robots from "@/app/robots";
@@ -18,11 +20,8 @@ import { venues } from "@/data/venues";
 // ─── sitemap ─────────────────────────────────────────────────────────────────
 
 describe("sitemap", () => {
-  // sitemap() is async as of Blessing Boxes slice 1 — it reads live box
-  // routes from D1 (see src/app/sitemap.ts's loadBoxRoutes). In this jsdom
-  // test environment getCloudflareContext() throws (no Worker context), so
-  // loadBoxRoutes' own try/catch degrades to zero box entries — these tests
-  // exercise exactly the same static + venue routes they always did.
+  // sitemap() is synchronous again (SEO/AEO plan Phase 0 dropped its live D1
+  // box read); `await` on a plain value is harmless, so these tests keep it.
   test("returns an array of entries", async () => {
     const entries = await sitemap();
     expect(Array.isArray(entries)).toBe(true);
@@ -61,6 +60,40 @@ describe("sitemap", () => {
     const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     expect(urls).toContain(`${SITE_URL}/privacy`);
+  });
+
+  // SEO/AEO plan Phase 0: `/boxes` never existed (a 404 in every crawl), and
+  // `/box/<id>` is a noindexed client-side redirect shell, not a page.
+  test("lists no Blessing Box URLs", async () => {
+    const entries = await sitemap();
+    const urls = entries.map((e) => e.url);
+    expect(urls).not.toContain(`${SITE_URL}/boxes`);
+    expect(urls.filter((u) => u.startsWith(`${SITE_URL}/box/`))).toEqual([]);
+  });
+
+  // Guards the class of bug above: every non-venue URL must be served by a
+  // real src/app/**/page.tsx. Route groups and dynamic segments aren't used
+  // by any static sitemap URL, so a plain path → directory mapping is enough.
+  test("every static (non-venue) URL maps to a real page.tsx", async () => {
+    const entries = await sitemap();
+    const staticPaths = entries
+      .map((e) => e.url.slice(SITE_URL.length) || "/")
+      .filter((path) => !path.startsWith("/venue/"));
+    expect(staticPaths.length).toBeGreaterThan(0);
+    for (const path of staticPaths) {
+      const pageFile = join(process.cwd(), "src/app", path, "page.tsx");
+      expect(existsSync(pageFile), `${path} → ${pageFile}`).toBe(true);
+    }
+  });
+
+  test("every venue URL is a real venue id", async () => {
+    const entries = await sitemap();
+    const venueIds = entries
+      .map((e) => e.url.slice(SITE_URL.length))
+      .filter((path) => path.startsWith("/venue/"))
+      .map((path) => path.slice("/venue/".length));
+    const known = new Set(venues.map((v) => v.id));
+    expect(venueIds.filter((id) => !known.has(id))).toEqual([]);
   });
 
   test("no duplicate URLs", async () => {

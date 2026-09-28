@@ -9,16 +9,8 @@
  * mode), so those surfaces need their own credit line, linking to
  * https://www.openstreetmap.org/copyright.
  *
- * WHY a source-string prefix check, not a `source_type` field: the public
- * `Venue` type (src/types/venue.ts) has no `source_type` — only the admin
- * D1 row does, and that's stripped before publish. `source` is the only
- * signal a published Venue carries, and the OSM scraper
- * (scripts/fetch-osm-grocery.py / ingest-osm-grocery.py) always writes it
- * as "OpenStreetMap (way/<id>)" or "OpenStreetMap (node/<id>)" — see
- * published-venues.ts for real examples.
+ * The /venue/<id> page used to render its own credit, only for OSM-sourced
+ * venues (an `isOsmSourced()` source-prefix check). It now carries SiteFooter,
+ * whose credit covers it (SEO/AEO plan Phase 0), so that helper is gone.
  */
 export const OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright";
-
-export function isOsmSourced(source: string): boolean {
-  return source.startsWith("OpenStreetMap");
-}

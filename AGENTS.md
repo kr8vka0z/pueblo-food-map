@@ -18,6 +18,7 @@ How it's built: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md). This
 - **Rollback (code only):** `bunx wrangler deployments list --name <worker>`, then `bunx wrangler rollback <id> --name <worker> -y`. The worker is `pueblo-food-map` for prod or `pueblo-food-map-staging` for staging. You can also use Dashboard → Workers & Pages → `pueblo-food-map` → Deployments, which also has the build logs. Rollback does not undo D1 migrations, and `main` still holds the bad commit, so follow up with a `git revert` PR into `dev` and promote it.
 - **Discoverability / SEO traps — a green build doesn't prove a page works on this stack:**
   - Static pages with `dynamicParams = false` need `open-next.config.ts`'s `staticAssetsIncrementalCache` override. Without it every prerendered dynamic path 404s; this caused a 10-day outage.
+  - Only `pueblofoodmap.com` may be indexed: `custom-worker.ts` noindexes every other host (`src/lib/indexingHost.ts`), and `deploy-prod.yml` fails if the canonical host ever gets the header. Keep venue pages reachable through server-rendered links, not just the sitemap (ARCHITECTURE.md "Crawlability and indexing").
   - Never add a server-side redirect on `/`. Next 16 `proxy.ts` fails the build, and a `next.config` `redirects()` `has` rule 500'd the live homepage. Legacy `?venue=`/`#venue=` links are handled client-side.
 - **`env.staging` inherits almost nothing** from the top level of `wrangler.jsonc`. Every new binding, var or secret needs its staging twin. `triggers` is the exception: it does inherit (see Scheduled jobs).
 - Don't run bare `wrangler types`, which corrupts the DOM types. Use `npx wrangler types --include-runtime=false`.
@@ -104,7 +105,7 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
 - **Page metadata:** use `buildPageMetadata` (`src/lib/site.ts`), never a raw per-page `metadata` literal, which drops the inherited OG image.
 - **JSON-LD:** always go through `serializeJsonLd`, which escapes `<`; a raw `JSON.stringify` lets `</script>` break out of the tag.
 - **Blessing Boxes:**
-  - Every interaction (check-in, photo, adopt) lives in the on-map venue card, never on a separate page (REVIEW.md has the one exception).
+  - Every interaction (check-in, photo, adopt) lives in the on-map venue card, never on a separate page (REVIEW.md lists the read-only exceptions).
   - Boxes are live: admin edits show immediately, with no Publish.
   - Photos go to R2 (`pfm-box-photos`, with its own staging bucket). D1 holds metadata only.
   - Box alert sends never block a check-in.

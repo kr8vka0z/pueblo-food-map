@@ -27,8 +27,12 @@ rationale in [ARCHITECTURE.md](ARCHITECTURE.md).
 ## Standing rules for this repo (owner decisions — a diff that breaks one is a Blocker)
 
 - **Every Blessing Box interaction (check-in, photo, adopt) lives in the on-map venue
-  card — never a separate page.** The one exception is `/box/<id>/history`, a read-only
-  chronological log, not an interaction. Check-in wording is exactly **"I used this box"**.
+  card — never a separate page.** Two read-only pages are the exceptions, because neither
+  is an interaction: `/box/<id>/history`, a chronological log, and `/blessing-boxes`, a
+  server-rendered list of live boxes for search engines (SEO/AEO plan, `docs/seo-aeo-plan.md`).
+  The list may show each box's name, address and status, and link to the box's map card;
+  it must not carry check-in, photo or adopt controls. Check-in wording is exactly
+  **"I used this box"**.
 - **D1 migrations reach the target database before the code that needs them.** The
   promotion checklist in AGENTS.md (search "promotion checklist") shows how to list the
   outstanding ones. Never rebuild a table other tables reference — no safe way to do that

@@ -31,3 +31,23 @@ describe("SiteFooter — OSM attribution", () => {
     expect(screen.getByRole("link", { name: t("osm.attribution", "es") })).toBeDefined();
   });
 });
+
+// SEO/AEO plan Phase 0: the footer is the crawlable path to /venues (and from
+// there every /venue/<id>) and to /resources.
+describe("SiteFooter — crawl links", () => {
+  test("links to /venues and /resources (EN)", () => {
+    render(<SiteFooter />);
+    expect(screen.getByRole("link", { name: t("footer.venues", "en") }).getAttribute("href")).toBe("/venues");
+    expect(screen.getByRole("link", { name: t("footer.resources", "en") }).getAttribute("href")).toBe("/resources");
+  });
+
+  test("the same links in ES", () => {
+    render(
+      <LocaleProvider initialLocale="es">
+        <SiteFooter />
+      </LocaleProvider>,
+    );
+    expect(screen.getByRole("link", { name: t("footer.venues", "es") }).getAttribute("href")).toBe("/venues");
+    expect(screen.getByRole("link", { name: t("footer.resources", "es") }).getAttribute("href")).toBe("/resources");
+  });
+});

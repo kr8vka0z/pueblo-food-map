@@ -492,6 +492,13 @@ const en: Record<string, string> = {
   "footer.about": "About",
   "footer.privacy": "Privacy",
   "footer.suggest": "Suggest a place",
+  // SEO/AEO plan Phase 0: the footer is how crawlers reach /venues (and from
+  // there every venue page) — before this, no page's server HTML linked it.
+  "footer.venues": "All places",
+  "footer.resources": "Food help programs",
+  // Venue-page breadcrumb (SEO/AEO plan Phase 0): "Map › All places › {name}".
+  "breadcrumb.label": "Breadcrumb",
+  "breadcrumb.map": "Map",
 
   // Venues directory (#PR4)
   "nav.venuesList": "Browse all places",
@@ -1356,6 +1363,10 @@ const es: Record<string, string> = {
   "footer.about": "Acerca de",
   "footer.privacy": "Privacidad",
   "footer.suggest": "Sugerir un lugar",
+  "footer.venues": "Todos los lugares", // [CHECK]
+  "footer.resources": "Programas de ayuda alimentaria",
+  "breadcrumb.label": "Ruta de navegación", // [CHECK]
+  "breadcrumb.map": "Mapa",
 
   // Venues directory (#PR4)
   "nav.venuesList": "Ver todos los lugares",

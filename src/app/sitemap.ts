@@ -6,45 +6,21 @@
  * appended dynamically from the venues array. Venue pages use monthly
  * changeFrequency and 0.7 priority — meaningful but below the homepage.
  *
- * Blessing box pages (slice 1) are appended after venues, read live from D1
- * — boxes are excluded from the venues array on purpose (live, not
- * published), so this is the one place sitemap.ts reaches outside its
- * usual build-time-only data source. `force-dynamic` + a try/catch around
- * the D1 read (never the sitemap-wide function) matches AGENTS.md's
- * invariant that a `next build` must never itself touch D1 — this file
- * still builds fine with zero box entries; the read only ever runs at
- * request time. A D1 failure degrades to "no box entries this request"
- * rather than 500ing the whole sitemap.
+ * WHY no Blessing Box URLs (SEO/AEO plan Phase 0, docs/seo-aeo-plan.md):
+ * `/boxes` was listed here but never existed (a 404 in every crawl), and each
+ * `/box/<id>` is a client-side redirect shell into the map card (see
+ * src/app/box/[id]/page.tsx), not a page worth indexing — it's `noindex` now.
+ * Boxes come back to the sitemap as the planned read-only `/blessing-boxes`
+ * list (REVIEW.md). With the live D1 read gone, this file is build-time data
+ * only again and no longer `force-dynamic`. src/__tests__/seo.test.ts checks
+ * that every static URL below maps to a real page.tsx.
  */
 
 import type { MetadataRoute } from "next";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { SITE_URL } from "@/lib/site";
 import { venues } from "@/data/venues";
-import { loadLiveBoxes } from "@/lib/blessingBoxes";
-import { logBlessingBoxesReadFailure } from "@/lib/logger";
 
-export const dynamic = "force-dynamic";
-
-async function loadBoxRoutes(): Promise<MetadataRoute.Sitemap> {
-  try {
-    const { env } = getCloudflareContext();
-    const boxes = await loadLiveBoxes(env.ADMIN_DB);
-    return boxes.map((b) => ({
-      url: `${SITE_URL}/box/${b.id}`,
-      lastModified: b.last_verified,
-      // "daily": a box's live status/host details can change any time,
-      // unlike an ordinary venue's monthly-refresh cadence.
-      changeFrequency: "daily",
-      priority: 0.6,
-    }));
-  } catch (err) {
-    logBlessingBoxesReadFailure(err instanceof Error ? err.message : "unknown error");
-    return [];
-  }
-}
-
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+export default function sitemap(): MetadataRoute.Sitemap {
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: SITE_URL,
@@ -70,15 +46,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       // JS-only homepage map) — below /about's 0.8, above the utility forms.
       url: `${SITE_URL}/venues`,
       changeFrequency: "weekly",
-      priority: 0.7,
-    },
-    {
-      // WHY 0.7/"hourly": the boxes counterpart to /venues above — a real
-      // browse/discovery page (find a box, sorted by need), not a watcher
-      // page, so it shares /venues' priority tier; "hourly" because a
-      // box's status changes far faster than an ordinary venue's details.
-      url: `${SITE_URL}/boxes`,
-      changeFrequency: "hourly",
       priority: 0.7,
     },
     {
@@ -116,7 +83,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  const boxRoutes = await loadBoxRoutes();
-
-  return [...staticRoutes, ...venueRoutes, ...boxRoutes];
+  return [...staticRoutes, ...venueRoutes];
 }

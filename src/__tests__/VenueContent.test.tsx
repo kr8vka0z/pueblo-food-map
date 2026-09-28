@@ -9,7 +9,7 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import VenueContent from "@/components/VenueContent";
@@ -61,17 +61,20 @@ describe("VenueContent — locale", () => {
 });
 
 // ─── OSM attribution (#133 4.5) ────────────────────────────────────────────────
+// The page's own OSM-only credit line moved into SiteFooter (SEO/AEO plan
+// Phase 0), whose credit shows on every venue page, exactly once.
 
 describe("VenueContent — OSM attribution", () => {
-  test("shows an OpenStreetMap copyright link for an OSM-sourced venue", () => {
+  test("shows one OpenStreetMap copyright link for an OSM-sourced venue", () => {
     render(<VenueContent venue={OSM_FIXTURE_VENUE} />);
-    const link = screen.getByRole("link", { name: t("osm.attribution", "en") });
-    expect(link.getAttribute("href")).toBe(OSM_COPYRIGHT_URL);
+    const links = screen.getAllByRole("link", { name: t("osm.attribution", "en") });
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("href")).toBe(OSM_COPYRIGHT_URL);
   });
 
-  test("does not show it for a non-OSM-sourced venue", () => {
+  test("shows the footer's credit on a non-OSM venue too (same as /venues)", () => {
     render(<VenueContent venue={FIXTURE_VENUE} />);
-    expect(screen.queryByRole("link", { name: t("osm.attribution", "en") })).toBeNull();
+    expect(screen.getAllByRole("link", { name: t("osm.attribution", "en") })).toHaveLength(1);
   });
 
   test("renders the ES translation", () => {
@@ -81,5 +84,34 @@ describe("VenueContent — OSM attribution", () => {
       </LocaleProvider>,
     );
     expect(screen.getByRole("link", { name: t("osm.attribution", "es") })).toBeDefined();
+  });
+});
+
+// ─── Crawl links (SEO/AEO plan Phase 0) ────────────────────────────────────────
+
+describe("VenueContent — breadcrumb and footer links", () => {
+  test("breadcrumb: Map (/) › All places (/venues) › venue name (current page)", () => {
+    render(<VenueContent venue={FIXTURE_VENUE} />);
+    const nav = screen.getByRole("navigation", { name: t("breadcrumb.label", "en") });
+    const links = within(nav).getAllByRole("link");
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/", "/venues"]);
+    expect(within(nav).getByText(FIXTURE_VENUE.name).getAttribute("aria-current")).toBe("page");
+  });
+
+  test("the page links to /venues and /resources from its footer", () => {
+    render(<VenueContent venue={FIXTURE_VENUE} />);
+    const footer = screen.getByRole("contentinfo");
+    expect(within(footer).getByRole("link", { name: t("footer.venues", "en") }).getAttribute("href")).toBe("/venues");
+    expect(within(footer).getByRole("link", { name: t("footer.resources", "en") }).getAttribute("href")).toBe("/resources");
+  });
+
+  test("breadcrumb is localized in ES", () => {
+    render(
+      <LocaleProvider initialLocale="es">
+        <VenueContent venue={FIXTURE_VENUE} />
+      </LocaleProvider>,
+    );
+    const nav = screen.getByRole("navigation", { name: t("breadcrumb.label", "es") });
+    expect(within(nav).getByRole("link", { name: t("breadcrumb.map", "es") })).toBeDefined();
   });
 });

@@ -1,10 +1,10 @@
 /**
  * SiteFooter — slim navigation footer for static utility pages.
  *
- * WHY: The map homepage has no footer (full-viewport map). Utility pages
- * (/about, /privacy, /suggest, /feedback) share this footer so visitors
- * can find the About page and navigate back to the map without hunting.
- * Introduced in #155 (About page).
+ * WHY: The map homepage has no footer (full-viewport map). Every other
+ * public page (/about, /privacy, /suggest, /feedback, /venues, /resources,
+ * /venue/<id>) shares this footer so visitors can find the About page and
+ * navigate back to the map without hunting. Introduced in #155 (About page).
  *
  * Client component: reads locale from LocaleContext so the language toggle
  * on the map page propagates here consistently with other components.
@@ -31,6 +31,27 @@ export default function SiteFooter() {
           }
         >
           {t("footer.backToMap", locale)}
+        </Link>
+        {/* /venues and /resources (SEO/AEO plan Phase 0): the footer is the
+            crawlable path to the venue directory and, through it, every
+            /venue/<id> page — the map's own links only exist after JS runs. */}
+        <Link
+          href="/venues"
+          className={
+            "hover:text-[var(--color-ink-700)] transition-colors " +
+            "focus-visible:outline-none focus-visible:underline"
+          }
+        >
+          {t("footer.venues", locale)}
+        </Link>
+        <Link
+          href="/resources"
+          className={
+            "hover:text-[var(--color-ink-700)] transition-colors " +
+            "focus-visible:outline-none focus-visible:underline"
+          }
+        >
+          {t("footer.resources", locale)}
         </Link>
         <Link
           href="/about"

@@ -160,21 +160,29 @@ describe("sitemap", () => {
   });
 
   // #689 PR 2 (design decision 10) — every mirrored route's sitemap entry
-  // carries alternates.languages pointing at its counterpart.
+  // carries alternates.languages pointing at its counterpart. x-default
+  // (review fix, item 4: "add x-default: enUrl to every mirrored entry's
+  // alternates") added to every expectation below — a stricter assertion
+  // than before, not a weaker one.
   describe("es alternates (#689)", () => {
     test("/ and /es both point at each other", async () => {
       const entries = await sitemap();
       const en = entries.find((e) => e.url === SITE_URL);
       const es = entries.find((e) => e.url === `${SITE_URL}/es`);
-      expect(en?.alternates?.languages).toEqual({ en: SITE_URL, es: `${SITE_URL}/es` });
-      expect(es?.alternates?.languages).toEqual({ en: SITE_URL, es: `${SITE_URL}/es` });
+      const expected = { en: SITE_URL, es: `${SITE_URL}/es`, "x-default": SITE_URL };
+      expect(en?.alternates?.languages).toEqual(expected);
+      expect(es?.alternates?.languages).toEqual(expected);
     });
 
     test("/about and /es/about both point at each other", async () => {
       const entries = await sitemap();
       const en = entries.find((e) => e.url === `${SITE_URL}/about`);
       const es = entries.find((e) => e.url === `${SITE_URL}/es/about`);
-      const expected = { en: `${SITE_URL}/about`, es: `${SITE_URL}/es/about` };
+      const expected = {
+        en: `${SITE_URL}/about`,
+        es: `${SITE_URL}/es/about`,
+        "x-default": `${SITE_URL}/about`,
+      };
       expect(en?.alternates?.languages).toEqual(expected);
       expect(es?.alternates?.languages).toEqual(expected);
     });
@@ -186,8 +194,9 @@ describe("sitemap", () => {
         const esUrl = `${SITE_URL}/es/venue/${v.id}`;
         const en = entries.find((e) => e.url === enUrl);
         const es = entries.find((e) => e.url === esUrl);
-        expect(en?.alternates?.languages, enUrl).toEqual({ en: enUrl, es: esUrl });
-        expect(es?.alternates?.languages, esUrl).toEqual({ en: enUrl, es: esUrl });
+        const expected = { en: enUrl, es: esUrl, "x-default": enUrl };
+        expect(en?.alternates?.languages, enUrl).toEqual(expected);
+        expect(es?.alternates?.languages, esUrl).toEqual(expected);
       }
     });
 

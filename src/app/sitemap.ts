@@ -28,11 +28,17 @@ import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/site";
 import { venues } from "@/data/venues";
 
-/** Build the {en, es} alternates.languages block Next expects, given a page's EN path. */
-function esAlternates(enPath: string): { languages: { en: string; es: string } } {
+/**
+ * Build the {en, es, x-default} alternates.languages block Next expects,
+ * given a page's EN path. x-default → EN (review fix, matches
+ * buildPageMetadata's own hreflang and #689 design decision 5) — without
+ * it a crawler/locale that matches neither explicit alternate has no
+ * documented fallback for this page pair.
+ */
+function esAlternates(enPath: string): { languages: { en: string; es: string; "x-default": string } } {
   const enUrl = enPath === "/" ? SITE_URL : `${SITE_URL}${enPath}`;
   const esUrl = enPath === "/" ? `${SITE_URL}/es` : `${SITE_URL}/es${enPath}`;
-  return { languages: { en: enUrl, es: esUrl } };
+  return { languages: { en: enUrl, es: esUrl, "x-default": enUrl } };
 }
 
 export default function sitemap(): MetadataRoute.Sitemap {

@@ -18,6 +18,11 @@
  *                    false here — the item can never show "on" until the
  *                    map applies the filter and the resident is back on it.
  *   - A saved place — the map, opened on that pin (/?venue=<id>).
+ * All three targets above go through localizedHref(path, tree) (#689 PR 2
+ * review fix): this component also renders on /es/about, /es/venues and
+ * /es/resources, and a bare "/?near=1" push from there would silently
+ * leave the /es tree — tree (LocaleContext, NOT the switchable `locale`
+ * prop) decides whether that becomes "/es?near=1" instead.
  * "Show welcome screen" is map-only (the splash lives there), so the drawer
  * omits it here.
  *
@@ -40,6 +45,8 @@ import { usePathname, useRouter } from "next/navigation";
 import BottomNav, { type MenuSection } from "./BottomNav";
 import HamburgerMenu from "./HamburgerMenu";
 import { t, type Locale } from "@/lib/i18n";
+import { useLocale } from "@/lib/LocaleContext";
+import { localizedHref } from "@/lib/localizedHref";
 import { useFavorites } from "@/lib/favorites";
 import { venues } from "@/data/venues";
 
@@ -58,6 +65,11 @@ const NO_GEO = { permission: "prompt", position: null } as const;
 export default function PageNav({ locale, backHref = "/" }: { locale: Locale; backHref?: string }) {
   const router = useRouter();
   const pathname = usePathname();
+  // #689 PR 2 review fix: this component renders on /es/about, /es/venues
+  // and /es/resources too — every push target below (a saved place, Near
+  // me, Boxes) must stay in the SAME tree it was pushed from, or a tap
+  // silently drops an /es visitor into the EN tree.
+  const { tree } = useLocale();
   const [section, setSection] = useState<MenuSection | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
 
@@ -100,7 +112,9 @@ export default function PageNav({ locale, backHref = "/" }: { locale: Locale; ba
         onClose={handleClose}
         view={section ?? "top"}
         savedVenues={savedVenues}
-        onSelectVenue={(id) => router.push(`/?venue=${encodeURIComponent(id)}`)}
+        onSelectVenue={(id) =>
+          router.push(localizedHref(`/?venue=${encodeURIComponent(id)}`, tree))
+        }
         ignoreOutsideRef={navRef}
       />
 
@@ -111,11 +125,11 @@ export default function PageNav({ locale, backHref = "/" }: { locale: Locale; ba
         geoState={NO_GEO}
         isLocating={false}
         isDrifted={false}
-        onNearMe={() => router.push("/?near=1")}
+        onNearMe={() => router.push(localizedHref("/?near=1", tree))}
         boxesActive={false}
-        onBoxesToggle={() => router.push("/?boxes=1")}
+        onBoxesToggle={() => router.push(localizedHref("/?boxes=1", tree))}
         navRef={navRef}
-        onResourcesPage={pathname === "/resources"}
+        onResourcesPage={pathname === localizedHref("/resources", tree)}
       />
     </>
   );

@@ -7,8 +7,8 @@
  * pathname.
  */
 
-import { describe, test, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 let pathnameValue = "/venues";
 vi.mock("next/navigation", () => ({
@@ -66,5 +66,87 @@ describe("LanguageToggle on a non-mirrored page (/suggest)", () => {
     expect(screen.getByRole("button", { name: /english/i }).tagName).toBe("BUTTON");
     expect(screen.getByRole("button", { name: /spanish/i }).tagName).toBe("BUTTON");
     expect(screen.queryByRole("link")).toBeNull();
+  });
+});
+
+// Review fix (item 2): a plain href on the mirrored-page link can't carry
+// the CURRENT page's query/hash (mirroredCounterpartHref never sees them —
+// see its own header) — onClick must append them via location.assign, or a
+// tap from e.g. "/?venue=<id>" silently drops that state crossing trees.
+describe("LanguageToggle mirrored link preserves query/hash on click", () => {
+  let assign: ReturnType<typeof vi.fn>;
+  const originalLocation = window.location;
+
+  beforeEach(() => {
+    assign = vi.fn();
+    // jsdom's window.location isn't directly writable — replace it with a
+    // mock carrying the fields this component reads/calls.
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: {
+        ...originalLocation,
+        search: "?venue=abc-123",
+        hash: "#panel=open",
+        assign,
+      },
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: originalLocation,
+    });
+  });
+
+  test("clicking the mirrored ES link navigates to the counterpart href PLUS the current query and hash", () => {
+    pathnameValue = "/venues";
+    renderWithProvider();
+
+    const esLink = screen.getByRole("link", { name: /spanish/i });
+    // href itself stays the bare pathname (no-JS / crawler fallback).
+    expect(esLink.getAttribute("href")).toBe("/es/venues");
+
+    fireEvent.click(esLink);
+    expect(assign).toHaveBeenCalledWith("/es/venues?venue=abc-123#panel=open");
+  });
+
+  test("clicking the mirrored EN link (from the ES tree) also preserves query and hash", () => {
+    pathnameValue = "/es/about";
+    renderWithProvider("es");
+
+    const enLink = screen.getByRole("link", { name: /english/i });
+    expect(enLink.getAttribute("href")).toBe("/about");
+
+    fireEvent.click(enLink);
+    expect(assign).toHaveBeenCalledWith("/about?venue=abc-123#panel=open");
+  });
+
+  // Nit fix: a modified click means "open in a new tab" — must not be
+  // overridden. Only a plain left-click gets the location.assign override.
+  test.each([
+    ["ctrlKey", { ctrlKey: true }],
+    ["metaKey (cmd)", { metaKey: true }],
+    ["shiftKey", { shiftKey: true }],
+    ["altKey", { altKey: true }],
+    ["middle-click (button 1)", { button: 1 }],
+  ] as const)("a %s click is NOT overridden — no location.assign, browser handles it", (_name, eventInit) => {
+    pathnameValue = "/venues";
+    renderWithProvider();
+
+    const esLink = screen.getByRole("link", { name: /spanish/i });
+    fireEvent.click(esLink, eventInit);
+
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  test("a plain left-click (button 0, no modifiers) still gets the override", () => {
+    pathnameValue = "/venues";
+    renderWithProvider();
+
+    const esLink = screen.getByRole("link", { name: /spanish/i });
+    fireEvent.click(esLink, { button: 0 });
+
+    expect(assign).toHaveBeenCalledWith("/es/venues?venue=abc-123#panel=open");
   });
 });

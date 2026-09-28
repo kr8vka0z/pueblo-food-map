@@ -17,7 +17,11 @@
  * href to that counterpart URL instead of an in-place setLocale() button —
  * crossing root layouts is a full page load (design decision 2), so a
  * client-side setLocale() there would leave the URL/server metadata/JSON-LD
- * un-switched. The segment matching the CURRENT tree (l === tree) stays the
+ * un-switched. Its `href` is the bare counterpart pathname (correct for a
+ * no-JS visitor or a crawler); its `onClick` preventDefaults and re-navigates
+ * via `location.assign` with the CURRENT page's query/hash appended, since
+ * a plain href can't carry those (review fix — see the onClick's own
+ * comment). The segment matching the CURRENT tree (l === tree) stays the
  * original in-place button — unaffected, same as a non-mirrored page. When
  * `usePathname()` has no counterpart (non-mirrored page, or null — the
  * value in this test suite without a route mocked), BOTH segments are the
@@ -90,13 +94,32 @@ export default function LanguageToggle() {
             <a
               key={l}
               href={counterpartHref}
-              // Writes the cookie + fires the same analytics event as the
-              // in-place toggle, then lets the browser navigate normally
-              // (no preventDefault/router.push — crossing root layouts is
-              // always a full load, design decision 2).
-              onClick={() => {
+              // href is the bare pathname (no query/hash — a no-JS visitor
+              // or a crawler following this link still lands on the right
+              // TREE, just not necessarily the exact same map state).
+              // onClick (review fix): writes the cookie + fires the same
+              // analytics event as the in-place toggle, THEN preventDefault
+              // + location.assign with the CURRENT page's query/hash
+              // appended — a plain href can't carry those (mirroredCounterpartHref
+              // never sees them; see its own header), so without this a tap
+              // on the toggle from e.g. /?venue=<id> would silently drop
+              // that state crossing trees. Still a full page load
+              // (location.assign, not router.push) — crossing root layouts
+              // always is, design decision 2.
+              onClick={(e) => {
+                // Nit fix: a modified click (middle-click, ctrl/cmd/shift/
+                // alt+click) means "open in a new tab/window" — the
+                // browser's own default handling for a real <a> already
+                // does that correctly. preventDefault()-ing it here would
+                // break that expectation (e.g. cmd+click silently
+                // navigating the CURRENT tab instead of opening a new
+                // one). Let it through unmodified; only a plain left-click
+                // gets the cookie-write + query/hash-preserving override.
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                 writeLocaleCookie(l);
                 void track(EVENTS.LOCALE_SWITCHED, { to: l });
+                e.preventDefault();
+                window.location.assign(counterpartHref + window.location.search + window.location.hash);
               }}
               // aria-pressed is a button-only ARIA state (jsx-a11y/role-
               // supports-aria-props) — this is a real <a>, so aria-current

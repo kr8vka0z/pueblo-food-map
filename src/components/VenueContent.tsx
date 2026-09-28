@@ -237,17 +237,17 @@ export default function VenueContent({ venue: v, nearby = [] }: VenueContentProp
           </section>
         )}
 
-        {/* Operator / source attribution */}
-        {(v.operator || v.source) && (
+        {/* Operator attribution. Gated on operator alone: "Last verified" moved
+            up to the summary (#704), so a source-only venue would otherwise
+            render this heading over nothing. */}
+        {v.operator && (
           <section>
             <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
               {t("detail.sources", locale)}
             </h2>
-            {v.operator && (
-              <p className="text-sm text-[var(--color-ink-500)]">
-                {t("operator.operated_by", locale)}: {v.operator}
-              </p>
-            )}
+            <p className="text-sm text-[var(--color-ink-500)]">
+              {t("operator.operated_by", locale)}: {v.operator}
+            </p>
           </section>
         )}
 

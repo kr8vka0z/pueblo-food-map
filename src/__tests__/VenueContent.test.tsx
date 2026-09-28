@@ -87,6 +87,19 @@ describe("VenueContent — OSM attribution", () => {
   });
 });
 
+describe("VenueContent — Sources & data section", () => {
+  test("no empty heading for a venue with a source but no operator", () => {
+    render(<VenueContent venue={OSM_FIXTURE_VENUE} />);
+    expect(screen.queryByRole("heading", { name: t("detail.sources", "en") })).toBeNull();
+  });
+
+  test("shows the operator under the heading when there is one", () => {
+    render(<VenueContent venue={{ ...OSM_FIXTURE_VENUE, operator: "Fixture Food Bank" }} />);
+    expect(screen.getByRole("heading", { name: t("detail.sources", "en") })).toBeDefined();
+    expect(screen.getByText(/Fixture Food Bank/)).toBeDefined();
+  });
+});
+
 // ─── Crawl links (SEO/AEO plan Phase 0) ────────────────────────────────────────
 
 describe("VenueContent — breadcrumb and footer links", () => {

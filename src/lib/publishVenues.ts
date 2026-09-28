@@ -436,6 +436,8 @@ export async function fetchPublishSnapshot(db: D1Database): Promise<PublishSnaps
 
 export interface PublishAuditMeta {
   actorEmail: string;
+  /** #679 — the publishing admin's Better Auth session id, written to audit_log.session_id. */
+  actorSessionId?: string;
   publishedAt: string;
   prUrl: string;
   snapshotCount: number;
@@ -518,9 +520,9 @@ export async function promotePublishedDrafts(
   statements.push(
     db
       .prepare(
-        "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       )
-      .bind(meta.actorEmail, "venue", meta.publishedAt, "publish", null, afterJson, meta.publishedAt),
+      .bind(meta.actorEmail, "venue", meta.publishedAt, "publish", null, afterJson, meta.publishedAt, meta.actorSessionId ?? null),
   );
 
   await db.batch(statements);

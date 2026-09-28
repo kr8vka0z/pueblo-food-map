@@ -47,11 +47,19 @@ export async function generateMetadata({
   const { id } = await params;
   const box = await loadBox(id);
   if (!box) return {};
-  return buildPageMetadata({
-    title: box.name,
-    description: `${box.name} — a community blessing box in Pueblo, CO. ${box.address}.`,
-    path: `/box/${box.id}`,
-  });
+  return {
+    ...buildPageMetadata({
+      title: box.name,
+      description: `${box.name} — a community blessing box in Pueblo, CO. ${box.address}.`,
+      path: `/box/${box.id}`,
+    }),
+    // noindex, follow (SEO/AEO plan Phase 0): this URL renders "Loading…" and
+    // redirects into the map card, so it has nothing to index. The head
+    // metadata above still feeds link previews for shares and QR stickers.
+    // "follow" lets a crawler that lands here still follow the redirect.
+    // Boxes get indexed through the planned read-only /blessing-boxes list.
+    robots: { index: false, follow: true },
+  };
 }
 
 export default async function BoxPage({

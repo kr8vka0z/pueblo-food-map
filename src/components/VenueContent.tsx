@@ -24,7 +24,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
-import { OSM_COPYRIGHT_URL, isOsmSourced } from "@/lib/osmAttribution";
+import SiteFooter from "@/components/SiteFooter";
 
 interface VenueContentProps {
   venue: Venue;
@@ -42,19 +42,47 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
-      {/* Top nav bar — matches privacy.tsx / suggest.tsx pattern */}
-      <nav className="h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0">
-        <Link
-          href="/"
-          className={
-            "text-sm font-medium text-[var(--color-sage-600)] " +
-            "hover:text-[var(--color-sage-700)] transition-colors " +
-            "focus-visible:outline-none focus-visible:ring-2 " +
-            "focus-visible:ring-[var(--color-sage-500)] rounded"
-          }
-        >
-          ← {t("report.backToMap", locale)}
-        </Link>
+      {/* Breadcrumb (SEO/AEO plan Phase 0): Map › All places › this venue.
+          Replaces the old lone "← Back to map" link, so every venue page
+          links up to /venues in its server HTML. It mirrors the
+          BreadcrumbList JSON-LD in src/app/venue/[id]/page.tsx. */}
+      <nav
+        aria-label={t("breadcrumb.label", locale)}
+        className="min-h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0"
+      >
+        <ol className="flex flex-wrap items-center gap-x-2 text-sm">
+          <li>
+            <Link
+              href="/"
+              className={
+                "inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
+                "hover:text-[var(--color-sage-700)] transition-colors " +
+                "focus-visible:outline-none focus-visible:ring-2 " +
+                "focus-visible:ring-[var(--color-sage-500)] rounded"
+              }
+            >
+              {t("breadcrumb.map", locale)}
+            </Link>
+          </li>
+          <li aria-hidden className="text-[var(--color-ink-400)]">›</li>
+          <li>
+            <Link
+              href="/venues"
+              className={
+                "inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
+                "hover:text-[var(--color-sage-700)] transition-colors " +
+                "focus-visible:outline-none focus-visible:ring-2 " +
+                "focus-visible:ring-[var(--color-sage-500)] rounded"
+              }
+            >
+              {t("footer.venues", locale)}
+            </Link>
+          </li>
+          <li aria-hidden className="text-[var(--color-ink-400)]">›</li>
+          <li aria-current="page" className="text-[var(--color-ink-500)] truncate max-w-[16rem]">
+            {v.name}
+          </li>
+        </ol>
       </nav>
 
       {/* Content */}
@@ -182,22 +210,6 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
             <p className="text-xs text-[var(--color-ink-400)] mt-1">
               {t("detail.lastVerified", locale)}: {v.last_verified}
             </p>
-            {/* ODbL attribution (#133 4.5) — this page has no SiteFooter
-                (see file header: highest-risk page in the repo, minimal nav
-                only), so venues actually sourced from OSM get their own
-                credit line here rather than none at all. */}
-            {isOsmSourced(v.source) && (
-              <p className="text-xs text-[var(--color-ink-400)] mt-1">
-                <a
-                  href={OSM_COPYRIGHT_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center min-h-11 hover:text-[var(--color-ink-700)] transition-colors focus-visible:outline-none focus-visible:underline"
-                >
-                  {t("osm.attribution", locale)}
-                </a>
-              </p>
-            )}
           </section>
         )}
 
@@ -229,6 +241,11 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
           </Link>
         </div>
       </div>
+      {/* SiteFooter (SEO/AEO plan Phase 0): links to /venues, /resources
+          and /about, and carries the ODbL "© OpenStreetMap contributors"
+          credit (#133 4.5) that this page used to render itself, for
+          OSM-sourced venues only. */}
+      <SiteFooter />
     </main>
   );
 }

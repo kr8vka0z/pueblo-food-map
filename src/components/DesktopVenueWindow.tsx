@@ -1,15 +1,14 @@
 "use client";
 
 /**
- * DesktopVenueWindow — marker-anchored floating panel for desktop (≥768px).
+ * DesktopVenueWindow — the venue/box card content for desktop (≥768px).
  *
  * Two states, same component:
- *   collapsed  (~360×auto): persistent header bar, then body with name, category
- *                           badge, SNAP/WIC pills, distance, hours-today, notes
- *                           (2 lines).
- *   expanded   (~420×720):  persistent header bar, then scrollable body with full
- *                           venue detail, hours table (today highlighted), address,
- *                           Get directions, phone, SNAP/WIC, notes.
+ *   collapsed: persistent header bar, then body with name, category
+ *              badge, SNAP/WIC pills, distance, hours-today, notes (2 lines).
+ *   expanded:  persistent header bar, then scrollable body with full
+ *              venue detail, hours table (today highlighted), address,
+ *              Get directions, phone, SNAP/WIC, notes.
  *
  * Persistent header bar (issue #64):
  *   - Always visible, same height (~44px), same background in both states.
@@ -21,49 +20,35 @@
  *   - Venue title lives in the body, same layout container in both states
  *     (no title jump between states).
  *
- * Anchoring:
- *   Rendered OUTSIDE the Leaflet map container (sibling div, absolute over map).
- *   Position computed from marker screen coords via map.latLngToContainerPoint().
- *   Default: top-right of marker, 12px gap.
- *   Edge-flip math (hand-rolled — @floating-ui not in deps):
- *     - Clips right edge → top-left
- *     - Clips bottom edge → place above marker
- *     - Combined clip (right + above also clips top) → clamp vertically
- *   Recomputes on Leaflet 'move' + 'zoom' events.
- *   #524: when `mapboxMap` is null (no-WebGL fallback — Map.tsx never
- *   mounts, so there is no marker to anchor to), the position effect below
- *   no-ops and this window centers on screen instead (see the render's
- *   `mapboxMap ? ... : ...` style branch) rather than sitting pinned at its
- *   unset {left:0, top:0} default.
+ * Positioning (#682): this component used to anchor itself beside the
+ * clicked marker (hand-rolled edge-flip math off `map.project()`) — that's
+ * what let it land under the search bar or bottom bar whenever a pin was
+ * near an edge. It now renders as plain flex content INSIDE
+ * `DesktopSidePanel`, which owns the fixed position/size/chrome; the
+ * selected pin is kept clear of the panel by MapWrapper panning the map
+ * instead (see MapWrapper's pan-on-select effect). No `mapboxMap` prop, no
+ * position state, no edge-flip — one fixed layout regardless of where the
+ * marker sits. `expanded` still swaps the BODY content (see the two states
+ * above); it no longer changes the component's own width/height, since the
+ * panel's size is fixed by the shell.
  *
- * Keyboard:
- *   Escape dismisses. Tab cycles within. Close X (Escape equivalent).
+ * Escape/focus (#682 8b): this component used to register its own Escape
+ * handler (with the box-check-in-typing guard below) and focus itself on
+ * mount. Both moved to `DesktopSidePanel`, which now wraps non-venue views
+ * too (Saved/Menu) and needs the SAME guards for all of them — a single
+ * registration point instead of one per view. This component has no
+ * Escape/focus logic of its own anymore; its heading (`venue-window-title-
+ * ${id}`) is a real `tabIndex={-1}` target DesktopSidePanel focuses directly
+ * on view change, and DesktopSidePanel's `handleClose` render-prop (passed
+ * in as `onClose`) already restores focus to the trigger on close.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import { MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import { safeUrl } from "@/lib/safeUrl";
 import { track, EVENTS } from "@/lib/analytics";
-import { BOTTOM_NAV_HEIGHT_PX } from "@/components/BottomNav";
 import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
-
-/**
- * Minimal interface covering the mapboxgl.Map methods DesktopVenueWindow uses.
- * Wired in #47: onMapReady now delivers a mapboxgl.Map instance.
- *
- * Key difference from Leaflet:
- *   Leaflet:  latLngToContainerPoint([lat, lng]) → Point
- *   Mapbox:   project([lng, lat]) → Point  (lng/lat order reversed)
- */
-interface MapboxMap {
-  /** Convert [lng, lat] to container pixel coordinates. */
-  project: (lnglat: [number, number]) => { x: number; y: number };
-  getContainer: () => HTMLElement;
-  on: (event: string, fn: () => void) => MapboxMap;
-  off: (event: string, fn: () => void) => MapboxMap;
-}
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
@@ -75,77 +60,7 @@ import VenuePopupHeader from "@/components/VenuePopupHeader";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import HoursList from "@/components/HoursList";
 import BoxCardBody from "@/components/BoxCardBody";
-import { isNativeDialogOpen } from "@/lib/dialogGuard";
-import { useOverlayEscape } from "@/lib/overlayRegistry";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const WINDOW_QUICK_W = 360;
-const WINDOW_QUICK_H = 220;
-const WINDOW_EXPANDED_W = 420;
-const WINDOW_EXPANDED_H = 720;
-const MARKER_GAP = 12; // px gap between marker tip and window edge
-
-// ─── Edge-flip math ───────────────────────────────────────────────────────────
-
-interface WindowPosition {
-  left: number;
-  top: number;
-}
-
-/**
- * Compute the absolute CSS position (relative to the map container) for the
- * floating window so that it:
- *  1. Appears top-right of the marker by default.
- *  2. Flips left if it would clip the right edge of the viewport.
- *  3. Places above the marker if it would clip the bottom edge.
- *  4. Clamps vertically if after flipping it would clip the top edge.
- *
- * @param markerX  marker screen X in the map container (px from left)
- * @param markerY  marker screen Y in the map container (px from top) — this is
- *                 the tip of the pin (iconAnchor bottom-center)
- * @param containerW  width of the map container (px)
- * @param containerH  height of the map container (px)
- * @param windowW  width of the floating window (px)
- * @param windowH  height of the floating window (px)
- */
-function computeWindowPosition(
-  markerX: number,
-  markerY: number,
-  containerW: number,
-  containerH: number,
-  windowW: number,
-  windowH: number,
-): WindowPosition {
-  // Default: top-right of the marker tip
-  let left = markerX + MARKER_GAP;
-  let top = markerY - windowH;
-
-  // Clip check — right edge
-  if (left + windowW > containerW - MARKER_GAP) {
-    // Flip to left side of marker
-    left = markerX - windowW - MARKER_GAP;
-  }
-
-  // Clip check — left edge (after flip)
-  if (left < MARKER_GAP) {
-    left = MARKER_GAP;
-  }
-
-  // Clip check — bottom edge
-  if (top + windowH > containerH - MARKER_GAP) {
-    // Place above the marker
-    top = markerY - windowH - MARKER_GAP;
-  }
-
-  // Clip check — top edge (after above-placement or tall window)
-  if (top < MARKER_GAP) {
-    top = MARKER_GAP;
-  }
-
-  return { left, top };
-}
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -162,8 +77,6 @@ interface DesktopVenueWindowProps {
   /** Forwarded to BoxCardBody's check-in panel — see BottomSheet's identical prop. */
   onCheckinSuccess?: (result: { status: BoxStatus; lastFilledAt: string | null; kind: CheckinKind }) => void;
   expanded: boolean;
-  /** mapboxgl.Map instance delivered by Map.tsx onLoad → onMapReady. */
-  mapboxMap: MapboxMap | null;
   onExpand: () => void;
   onCollapse: () => void;
   onClose: () => void;
@@ -189,6 +102,13 @@ interface DesktopVenueWindowProps {
   activeStepIndex?: number;
   /** Moves the stepper to a different turn (#555) — Back/Next or an "All turns" row tap. */
   onStepChange?: (index: number) => void;
+  /**
+   * "← Saved" back-link (#682 8b) — present only when this card was opened
+   * from the Saved list on desktop. Renders above the persistent header bar;
+   * clicking it returns the panel to the Saved view without deselecting the
+   * venue's own map state (MapWrapper owns that decision).
+   */
+  backTo?: { label: string; onClick: () => void };
 }
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
@@ -198,7 +118,6 @@ export default function DesktopVenueWindow({
   box,
   onCheckinSuccess,
   expanded,
-  mapboxMap,
   onExpand,
   onCollapse,
   onClose,
@@ -211,108 +130,16 @@ export default function DesktopVenueWindow({
   showWalkLocationHint = false,
   activeStepIndex = 0,
   onStepChange = () => {},
+  backTo,
 }: DesktopVenueWindowProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
-  const windowRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<WindowPosition>({ left: 0, top: 0 });
 
   const isBox = venue.category === "blessing_box";
-  // A box has no expand/collapse state (2026-09-18 — see boxBody's own
-  // comment below) and always shows its full content, so it always sizes
-  // like an ordinary venue's expanded window regardless of the `expanded`
-  // prop (still meaningful for ordinary venues, which genuinely toggle).
-  const windowW = expanded || isBox ? WINDOW_EXPANDED_W : WINDOW_QUICK_W;
-  const windowH = expanded || isBox ? WINDOW_EXPANDED_H : WINDOW_QUICK_H;
 
   const status = computeVenueOpenStatus(venue);
   const nextOccurrence = venue.hours_irregular ? nextIrregularOccurrence(venue.hours_irregular) : null;
   const displayNotes = getDisplayNotes(venue);
-
-  // ── Position computation ─────────────────────────────────────────────────
-  // Recomputes position on mount and whenever the map pans/zooms.
-  // The initial compute is scheduled via queueMicrotask to satisfy the
-  // react-hooks/set-state-in-effect rule (setState must not be called
-  // synchronously at the top level of an effect body).
-
-  useEffect(() => {
-    if (!mapboxMap) return;
-
-    function computeAndSet() {
-      if (!mapboxMap) return;
-      // Mapbox project takes [lng, lat] (opposite of Leaflet's [lat, lng])
-      const pt = mapboxMap.project([venue.lng, venue.lat]);
-      const container = mapboxMap.getContainer();
-      // Use the card's actual rendered size so anchoring tracks the
-      // content-hugged height (#121); fall back to design constants pre-layout.
-      const el = windowRef.current;
-      // Subtract the bottom nav's footprint so the window's bottom-edge clip
-      // check (review item 7a) treats that space as already occupied — the
-      // nav sits ABOVE the map's own bottom edge at every breakpoint this
-      // component renders at (desktop, >=768px), and BOTTOM_NAV_HEIGHT_PX
-      // (76) happens to equal both shapes it takes there: below 2xl it's the
-      // bar itself; at 2xl+ it's the floating pill's 24px offset + 52px
-      // height. Without this, a window anchored near the bottom of a short
-      // viewport could render partly behind the nav.
-      const clippedContainerH = container.offsetHeight - BOTTOM_NAV_HEIGHT_PX;
-      const pos = computeWindowPosition(
-        pt.x,
-        pt.y,
-        container.offsetWidth,
-        clippedContainerH,
-        el?.offsetWidth || windowW,
-        el?.offsetHeight || windowH,
-      );
-      setPosition(pos);
-    }
-
-    // Initial position — deferred one microtask to avoid synchronous
-    // setState-in-effect lint violation.
-    queueMicrotask(computeAndSet);
-
-    mapboxMap.on("move", computeAndSet);
-    mapboxMap.on("zoom", computeAndSet);
-    return () => {
-      mapboxMap.off("move", computeAndSet);
-      mapboxMap.off("zoom", computeAndSet);
-    };
-  }, [mapboxMap, venue.lat, venue.lng, windowW, windowH]);
-
-  // ── Keyboard handling ────────────────────────────────────────────────────
-
-  // #527: this window is mounted only while a venue is selected — i.e.
-  // always "open" for the life of the instance — so it registers into the
-  // shared overlay-escape stack unconditionally (`true`). `useOverlayEscape`
-  // only invokes the callback below while this window is the TOPMOST
-  // overlay, so pressing Escape with e.g. the Filters panel or the Menu open
-  // on top of a selected venue no longer also closes this window — see
-  // overlayRegistry.ts's own header.
-  const handleEscape = useCallback(() => {
-    // #508 fix pass: Escape while a box's PhotoViewer is open must close
-    // ONLY the photo, not this whole window — see dialogGuard.ts's own
-    // header. This handler used to be a plain bubble-phase document
-    // listener (no `{capture: true}`), so unlike the vaul/Radix case (see
-    // BottomSheet.tsx's own comment) checking the guard directly here is
-    // enough; there is no ordering race to work around. `useOverlayEscape`
-    // preserves that same bubble-phase dispatch.
-    if (isNativeDialogOpen()) return;
-    // A box's check-in panel (BoxCardBody -> BoxCheckinPanel) has a note
-    // textarea living inside this window. Without this guard, Escape while
-    // typing a note both loses focus AND closes the whole card — the
-    // browser's own "Escape clears an input" behavior competing with this
-    // window's own Escape-to-dismiss. Only global-dismiss when focus is on
-    // the window shell itself, not on a form control inside it.
-    const active = document.activeElement;
-    const typing = active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
-    if (typing && windowRef.current?.contains(active)) return;
-    onClose();
-  }, [onClose]);
-  useOverlayEscape(true, handleEscape);
-
-  // Focus the window when it mounts so keyboard users can tab inside
-  useEffect(() => {
-    windowRef.current?.focus();
-  }, [venue.id]);
 
   // ── Shared body top: name + operator ─────────────────────────────────────
   // Venue title is always at the top of the body, same layout in both states.
@@ -324,11 +151,15 @@ export default function DesktopVenueWindow({
         <h2
           className={
             (expanded ? "text-xl" : "text-lg") +
-            " font-normal text-[var(--color-ink-900)] leading-tight" +
+            " font-normal text-[var(--color-ink-900)] leading-tight outline-none" +
             (expanded ? " mb-1" : "")
           }
           style={{ fontFamily: "var(--font-display)" }}
           id={`venue-window-title-${venue.id}`}
+          // #682 8b: DesktopSidePanel focuses this heading directly on view
+          // change (not this component's own root) — real elements need
+          // tabIndex={-1} to be focus()-able without being in Tab order.
+          tabIndex={-1}
         >
           {venue.name}
         </h2>
@@ -652,43 +483,31 @@ export default function DesktopVenueWindow({
 
   return (
     <div
-      ref={windowRef}
       role="dialog"
       aria-modal="false"
       aria-labelledby={`venue-window-title-${venue.id}`}
-      tabIndex={-1}
-      className={
-        "absolute z-[900] flex flex-col " +
-        "bg-[var(--color-bone-50)] " +
-        "rounded-[var(--radius-lg)] " +
-        "border border-[var(--color-bone-200)] " +
-        "shadow-[0_8px_32px_rgba(0,0,0,0.18)] " +
-        "overflow-hidden " +
-        "focus:outline-none " +
-        "transition-[width,height] duration-150"
-      }
-      style={
-        mapboxMap
-          ? {
-              left: position.left,
-              top: position.top,
-              width: windowW,
-              height: "auto",
-              maxHeight: "calc(100% - 24px)",
-            }
-          : {
-              // #524: no map to anchor a marker position to (position stays
-              // its unused {left:0, top:0} default) — center on screen
-              // instead of pinning to the corner.
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              width: windowW,
-              height: "auto",
-              maxHeight: "calc(100% - 24px)",
-            }
-      }
+      // #682: fills DesktopSidePanel's fixed-size shell — no left/top/width
+      // of its own anymore (see this file's header for why).
+      className="flex flex-col h-full overflow-hidden"
     >
+      {/* "← Saved" (#682 8b) — only when this card was opened from the
+          Saved list. Sits above the persistent header bar, its own shrink-0
+          row, so the header/body split below is untouched. */}
+      {backTo && (
+        <button
+          type="button"
+          onClick={backTo.onClick}
+          className={
+            "shrink-0 px-4 py-2 text-left text-sm font-medium " +
+            "text-[var(--color-sage-700)] hover:text-[var(--color-sage-600)] " +
+            "border-b border-[var(--color-bone-200)] " +
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)] " +
+            "transition-colors duration-100"
+          }
+        >
+          {backTo.label}
+        </button>
+      )}
       {/* Persistent header bar — always visible in both states. A box has no
           Show/Hide toggle (historyHref swaps that slot for a History link —
           see VenuePopupHeader's own header); expanded/onToggle are unused

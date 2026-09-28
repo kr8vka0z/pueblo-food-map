@@ -29,7 +29,7 @@ import { bustEdgeCache } from "@/lib/edgeCache";
 import { logFormFailure } from "@/lib/logger";
 
 const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
 /** Reviewer-entered reason, capped generously — this is an internal admin note, not public-facing copy, so no i18n and no tight limit. */
 const MAX_REVIEW_REASON_LENGTH = 500;
@@ -100,6 +100,8 @@ export async function POST(
       JSON.stringify(existing),
       JSON.stringify(afterRow),
       timestamp,
+      // #679: ties this action to the sign-in that made it (Activity log).
+      identity.sessionId ?? null,
     );
 
   await db.batch([updatePhoto, insertAudit]);

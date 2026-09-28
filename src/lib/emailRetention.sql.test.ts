@@ -46,6 +46,7 @@ function buildDb(): Database.Database {
   db.exec(readFileSync(join(process.cwd(), "migrations", "0005_blessing_boxes.sql"), "utf-8"));
   db.exec(readFileSync(join(process.cwd(), "migrations", "0010_box_adopters_alerts.sql"), "utf-8"));
   db.exec(readFileSync(join(process.cwd(), "migrations", "0011_alert_email_lang.sql"), "utf-8"));
+  db.exec(readFileSync(join(process.cwd(), "migrations", "0017_auth_events.sql"), "utf-8"));
   return db;
 }
 
@@ -158,6 +159,28 @@ describe("runEmailRetentionCleanup — real SQLite", () => {
     const counts = await runEmailRetentionCleanup(db, NOW);
 
     expect(counts.submissionsBlanked).toBe(0);
+  });
+
+  // #679 — the admin sign-in record and the audit trail are kept permanently.
+  test("never touches auth_events or audit_log, however old their rows", async () => {
+    sqlite
+      .prepare("INSERT INTO auth_events (event, email, ip, created_at) VALUES ('sign_in_failed', 'someone@example.com', '203.0.113.9', ?)")
+      .run(OLD);
+    sqlite
+      .prepare(
+        "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES ('admin@example.com', 'venue', 'v1', 'update', '{}', '{}', ?, 's1')",
+      )
+      .run(OLD);
+    const before = JSON.stringify([
+      sqlite.prepare("SELECT * FROM auth_events").all(),
+      sqlite.prepare("SELECT * FROM audit_log").all(),
+    ]);
+
+    await runEmailRetentionCleanup(db, NOW);
+
+    expect(
+      JSON.stringify([sqlite.prepare("SELECT * FROM auth_events").all(), sqlite.prepare("SELECT * FROM audit_log").all()]),
+    ).toBe(before);
   });
 
   test("blanks a rejected box_adopters row reviewed over 90 days ago, keeps the row", async () => {

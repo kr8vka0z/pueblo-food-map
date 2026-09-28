@@ -133,6 +133,7 @@ export default async function PlacesPage({
   searchParams,
 }: { searchParams?: Promise<{ show?: string; from?: string }> } = {}) {
   let email: string;
+  let showActivity = false;
   let venues: AdminVenueRow[];
   let proposals: ParsedProposal[] = [];
   let submissions: ReviewSubmission[] = [];
@@ -141,6 +142,7 @@ export default async function PlacesPage({
   try {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
+    showActivity = identity.isOwner === true;
     const result = await db
       .prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC")
       .all<AdminVenueRow>();
@@ -181,7 +183,7 @@ export default async function PlacesPage({
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="places" counts={navCounts} />
+      <AdminNav email={email} active="places" counts={navCounts} showActivity={showActivity} />
       <div className="px-4 py-6 sm:px-6">
         <ToReviewSummaryBox reviewRowCount={reviewRowCount} proposals={proposals} submissionCount={submissions.length} />
         {isStaging ? (

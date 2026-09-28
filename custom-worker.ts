@@ -23,6 +23,7 @@ import type { ExecutionContext, ExportedHandler, ScheduledController } from "@cl
 import { runScheduledTasks } from "./src/lib/scheduledTasks";
 import { ingestTarget } from "./src/lib/ingestTarget";
 import { isExcludedIp } from "./src/lib/ipMatch";
+import { applyHostIndexingPolicy } from "./src/lib/indexingHost";
 //
 // WHY `@ts-ignore` (not `@ts-expect-error`) on the imports below: .open-next/worker.js
 // is produced by `opennextjs-cloudflare build` and does not exist in a fresh checkout —
@@ -75,7 +76,11 @@ export default {
       const proxied = new Request(target, request as unknown as RequestInit);
       return fetch(proxied);
     }
-    return handler.fetch(request, env, ctx);
+    // Every host but pueblofoodmap.com (dev., *.workers.dev) gets
+    // `X-Robots-Tag: noindex` — src/lib/indexingHost.ts has the why. The
+    // canonical host's response is returned untouched.
+    const response = await handler.fetch(request, env, ctx);
+    return applyHostIndexingPolicy(response, url.hostname);
   },
 
   // Uptime dead-man's-switch (robot-deploy migration, Phase 2 slice 2). Mirrors

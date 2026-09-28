@@ -33,7 +33,7 @@ import { loadBoxPhotoById, type BoxPhotoRow } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";
 
 const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
 async function authorize(headers: HeaderSource): Promise<AdminDbAccess> {
   const access = await getAdminDb(headers);
@@ -85,6 +85,8 @@ export async function POST(
       JSON.stringify(existing),
       JSON.stringify(afterRow),
       timestamp,
+      // #679: ties this action to the sign-in that made it (Activity log).
+      identity.sessionId ?? null,
     );
 
   await db.batch([updatePhoto, insertAudit]);

@@ -145,6 +145,7 @@ export default async function NewVenuePage({
   searchParams?: Promise<{ submission?: string; proposal?: string }>;
 } = {}) {
   let email: string;
+  let showActivity = false;
   let prefill: NewVenuePrefill | null = null;
   let proposalPrefill: NewVenueProposalPrefill | null = null;
   let navCounts: AdminNavCounts = ZERO_ADMIN_NAV_COUNTS;
@@ -152,6 +153,7 @@ export default async function NewVenuePage({
   try {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
+    showActivity = identity.isOwner === true;
     const { submission, proposal } = searchParams ? await searchParams : {};
     prefill = await resolveSubmissionPrefill(db, submission);
     proposalPrefill = await resolveProposalPrefill(db, proposal);
@@ -162,7 +164,7 @@ export default async function NewVenuePage({
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="places" counts={navCounts} />
+      <AdminNav email={email} active="places" counts={navCounts} showActivity={showActivity} />
       <div className="px-4 py-6 sm:px-6 space-y-6">
         <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Add a venue</h2>
         {proposalPrefill && (

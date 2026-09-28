@@ -35,7 +35,13 @@ Browser
         ├── Map.tsx          (Mapbox GL canvas; SSR-skipped via dynamic import)
         ├── VenueMarker.tsx  (Lucide MapPin button inside each Mapbox Marker)
         ├── BottomSheet.tsx  (mobile: vaul bottom sheet)
-        ├── DesktopVenueWindow.tsx  (desktop: marker-anchored detail panel)
+        ├── DesktopSidePanel.tsx  (desktop: fixed right-hand panel shell —
+        │     inset/size/chrome, Escape, focus-to-heading + focus-return,
+        │     #682. Content is ONE of: DesktopVenueWindow (venue/box card —
+        │     no longer marker-anchored; the map pans the pin clear of the
+        │     panel instead, #682 8a) or HamburgerMenuContent (Saved list /
+        │     Menu, #682 8b) — MapWrapper's `sidePanelView` union picks which,
+        │     mutually exclusive on desktop only)
         ├── DirectionButtons.tsx  (Walk: in-app route + WalkStepper, #555;
         │     Bus/Drive: Google Maps deep links)
         ├── SearchBar / ViewSuggestion / SearchResultsPopover / FilterPanel
@@ -43,8 +49,13 @@ Browser
         │     WIC, #513. No standing Map/List control, #514: an empty focused
         │     bar offers the other view, a typed one adds "See all N matches
         │     as a list", and the Menu has a List/Map line)
-        ├── HamburgerMenu    (drawer: List/Map line, saved places, links,
-        │     language; opened by BottomNav at a section)
+        ├── HamburgerMenu    (shell: mobile full-height sheet, or desktop
+        │     dropdown on non-map pages via PageNav — position, backdrop,
+        │     focus trap/return, Escape, scroll lock. Renders
+        │     HamburgerMenuContent — List/Map line, saved places, links,
+        │     language — split out by #682 8b so the SAME content also
+        │     renders inside DesktopSidePanel on the map page's desktop
+        │     layout, above. Opened by BottomNav at a section)
         ├── ListView         (full-screen nearest-first list, map mode off)
         └── BottomNav        (Near me · Saved · Boxes · Help · Menu — bar below
               2xl (1536px), floating pill at 2xl+; Boxes toggles the
@@ -61,7 +72,7 @@ Next.js App Router (Cloudflare Worker)
   └── src/app/api/public/**   (unauthenticated box reads and writes)
   └── src/app/report/[venueId], suggest, feedback  (+ submit/route.ts each)
   └── src/app/admin/**, src/app/api/admin/**  (admin panel — see "Admin panel")
-  └── SiteFooter.tsx (slim nav footer on the utility pages)
+  └── SiteFooter.tsx (slim nav footer on every public page but the map — the crawl path to /venues)
 
 Data layer (static TS modules, no API calls at render time)
   └── src/data/venues.ts          (public venue list — see "Data aggregator" below)
@@ -76,6 +87,7 @@ Lib (selected)
   └── src/lib/favorites.ts, distance.ts, searchVenues.ts
   └── src/lib/turnstile.ts, formRateLimit.ts  (form protection)
   └── src/lib/adminDb.ts, adminSession.ts, adminOrigin.ts  (admin gate)
+  └── src/lib/adminOwner.ts, authEvents.ts, activityLog.ts  (owner-only Activity log, #679)
   └── src/lib/publishVenues.ts    (Publish engine)
   └── src/lib/blessingBoxes.ts    (live box reads)
 
@@ -423,6 +435,34 @@ never corrected by a stale observer. The hook's header has the full trace.
 
 ---
 
+## Crawlability and indexing
+
+The SEO/AEO plan (`docs/seo-aeo-plan.md`, Phase 0) is the source for this section.
+The rules it sets:
+
+- **Every venue page must be reachable through server-rendered links**, not only
+  through the sitemap. `/` has a visually hidden `<nav>` (skip-link style) that
+  links to `/venues`, `/resources` and `/about`. `SiteFooter` links to `/venues`
+  and `/resources` on every other public page, including `/venue/<id>`. `/venues`
+  links to every venue. The map's own links only exist after JS runs.
+- **`/venue/<id>`** has a visible breadcrumb (Map › All places › name) plus a
+  matching `BreadcrumbList` JSON-LD (`buildVenueBreadcrumbJsonLd`). The page's
+  ODbL credit comes from `SiteFooter`.
+- **The sitemap is build-time data only**: the static routes plus the published
+  venues. `src/__tests__/seo.test.ts` fails if a static sitemap URL has no
+  `page.tsx`. That's how the old `/boxes` entry 404'd unnoticed. Blessing
+  Boxes aren't in it: `/box/<id>` is a `noindex` redirect shell into the map
+  card. Boxes come back through the planned read-only `/blessing-boxes` list
+  (REVIEW.md).
+- **Only `pueblofoodmap.com` is indexable.** `custom-worker.ts` adds
+  `X-Robots-Tag: noindex, nofollow` to every response on any other host
+  (dev., *.workers.dev), via `src/lib/indexingHost.ts`. This is deliberately a
+  header, not a robots.txt `Disallow`: a crawler must be able to fetch a page
+  to see its noindex and drop it. `deploy-prod.yml`'s smoke test fails if the
+  canonical host ever sends the header, or if workers.dev stops sending it.
+
+---
+
 ## Form-route triad
 
 Three user-submission flows share the same structure:
@@ -672,7 +712,8 @@ Full design: atlas-kb `projects/Pueblo Food Map/Blessing Boxes Build Plan.md`.
   without a Publish.
 - **Every interaction (check-in, photo, adopt) lives in the on-map venue
   card**, never a separate page — REVIEW.md's standing rules own that rule
-  (the one exception, `/box/<id>/history`, is a read-only log).
+  (the read-only exceptions are the `/box/<id>/history` log and the
+  planned `/blessing-boxes` list).
 - **Alerts** (`src/lib/boxAlerts.ts`, roles `host`/`adopter`/`giver` in one
   `alert_subscriptions` table): empty/problem → host + adopters; empty/low →
   givers; filled → everyone subscribed. 6h cooldown per subscription, except
@@ -692,8 +733,8 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
 
 ### The shape every admin surface follows
 
-- **Auth:** Better Auth is the sole gate (magic link + passkey, one-email
-  allowlist). **`getAdminDb()` (`src/lib/adminDb.ts`) is the only way to
+- **Auth:** Better Auth is the sole gate (a 6-digit email code typed on the
+  sign-in page, #684, + passkey; one-email allowlist). **`getAdminDb()` (`src/lib/adminDb.ts`) is the only way to
   reach the `ADMIN_DB` binding** and calls `requireAdminSession()` first, so
   no page or route — including a client-side navigation a layout guard would
   miss — reads admin data without a live session. Mutating `/api/admin/*`
@@ -716,9 +757,27 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   queue, `/api/public/**` box routes — read `getCloudflareContext().env.ADMIN_DB`
   directly, never `getAdminDb()`.
 - Every page except `/admin/login` shares one header (`AdminNav`) with
-  pending-count pills.
+  pending-count pills. Its **Activity** item is rendered only for the owner
+  (`identity.isOwner`, see `/admin/activity` below).
 
 ### Surfaces
+
+- **`/admin/activity` — Activity log, owner only** (#679). Every admin
+  sign-in, failed attempt and action, newest first, grouped by day, then by
+  sign-in. `getAdminDb()` sets `identity.isOwner` from the `ADMIN_OWNER_EMAIL`
+  var (`src/lib/adminOwner.ts`, fails toward Kyle); anyone else gets a 404
+  before anything is read. Two sources (`src/lib/activityLog.ts`):
+  `auth_events` (migration `0017`) — written by Better Auth hooks in
+  `src/lib/authEvents.ts` (`session.create.after` for sign-ins; a plugin's
+  path hooks for sign-out, a sign-in code requested for a non-allowlisted
+  email, a wrong/expired/used-up code, a failed passkey, passkey added/removed;
+  never blocks a sign-in, never stores a token) — and `audit_log`, whose
+  `session_id` ties each action to its sign-in. Actor without an `@`
+  (`refresh-pipeline`, `refresh-pipeline-ai`) → an "Automatic" group; human rows from before `0017`
+  → a per-person "before sign-ins were recorded" group. Filters are a GET
+  form (person, activity type, date range in America/Denver, place/box
+  name); paging is "Show older" (`?until=`, 300 rows per source). Both tables
+  are kept permanently — the 90-day email cleanup never touches them.
 
 - **`/admin` — Dashboard** (`src/app/admin/page.tsx`, overhauled #680). A
   greeting + a 7/30/90-day period switch (`?period=`, server-rendered

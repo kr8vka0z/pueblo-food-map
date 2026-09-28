@@ -133,6 +133,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const now = new Date();
 
   let email: string;
+  let showActivity = false;
   let venues: AdminVenueRow[];
   let submissionsTotal: number;
   let proposalsTotal: number;
@@ -148,6 +149,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   try {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
+    showActivity = identity.isOwner === true;
 
     const publishToken = process.env.GITHUB_PUBLISH_TOKEN;
     const periodStart = periodStartMs(period, now);
@@ -322,7 +324,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="dashboard" counts={navCounts} />
+      <AdminNav email={email} active="dashboard" counts={navCounts} showActivity={showActivity} />
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-6">
         {publishBotStatus && (
           <PublishBotStatusBanner

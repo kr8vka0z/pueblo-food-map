@@ -14,7 +14,7 @@
  * own `db` keeps the config itself — plugins, baseURL, secret — defined once.
  *
  * WHY no Workers KV anywhere: task scope requires ALL auth state (users,
- * sessions, magic-link/verification tokens, passkey challenges) to live in
+ * sessions, sign-in codes/verification rows, passkey challenges) to live in
  * D1 alongside the rest of this app's admin data — one store, one backup
  * surface, no second binding to provision or reason about. Better Auth's
  * `secondaryStorage` option (which would route sessions/rate-limit data to a
@@ -33,17 +33,22 @@
  */
 
 import type { BetterAuthOptions } from "better-auth";
-import { magicLink } from "better-auth/plugins";
+import { emailOTP } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { adminAuthAllowlistPlugin } from "@/lib/adminAuthAllowlistPlugin";
-import { sendAdminMagicLinkEmail } from "@/lib/adminMagicLinkEmail";
+import { sendAdminSignInCodeEmail, SIGN_IN_CODE_MINUTES } from "@/lib/adminSignInCodeEmail";
 import { logAdminAuthEvent } from "@/lib/logger";
+import {
+  authEventsDatabaseHooks,
+  authEventsPlugin,
+  type AuthEventDeps,
+} from "@/lib/authEvents";
 
 /**
  * Every hostname this Worker answers admin traffic on (mirrors
  * adminOrigin.ts's ADMIN_ORIGINS + the hostname list documented in that file's
  * header comment: the public apex — where admin now serves at the `/admin`
- * path, gated by Better Auth alone (magic link + passkey; Cloudflare Access
+ * path, gated by Better Auth alone (email code + passkey; Cloudflare Access
  * has been fully removed from this path) — the staging apex, and the bare
  * workers.dev fallback). Better Auth needs this to
  * construct correct absolute callback/redirect URLs regardless of which
@@ -81,10 +86,10 @@ const ADMIN_ALLOWED_HOSTS = [
  * annotation: an explicit return-type annotation widens the returned object
  * to the general `BetterAuthOptions` interface, erasing the literal
  * `plugins` tuple type. `betterAuth()`'s own generic inference needs that
- * literal tuple to add each plugin's endpoints (e.g. `auth.api.signInMagicLink`)
+ * literal tuple to add each plugin's endpoints (e.g. `auth.api.signInEmailOTP`)
  * to the resulting instance's type — `satisfies` checks the same structural
  * assignability without erasing it (verified: auth-options.test.ts's
- * `auth.api.signInMagicLink` etc. only type-checks with `satisfies`).
+ * `auth.api.signInEmailOTP` etc. only type-checks with `satisfies`).
  */
 export function buildAuthOptions(
   database: NonNullable<BetterAuthOptions["database"]>,
@@ -93,7 +98,12 @@ export function buildAuthOptions(
   // config as before this parameter existed. Only staging ever passes an
   // override.
   rpID: string = "pueblofoodmap.com",
+  // #679 — where the permanent admin sign-in record (auth_events) is
+  // written. Only the runtime (auth.ts) passes it; the schema-generation CLI
+  // and config-only tests pass nothing, which turns recording off.
+  authEvents: AuthEventDeps = { db: undefined },
 ) {
+  const signInEventHooks = authEventsDatabaseHooks(authEvents);
   return {
     database,
     // Falls back to the `better-auth-secret-123456789` dev default only in
@@ -121,7 +131,7 @@ export function buildAuthOptions(
       fallback: "https://pueblofoodmap.com",
     },
     // #315 Phase 2 — CRITICAL: this admin has exactly one legitimate account-
-    // creation path (an allowlisted email's first magic-link sign-in;
+    // creation path (an allowlisted email's first email-code sign-in;
     // passkey registration only ever attaches to an EXISTING allowlisted
     // session, never mints a new user on its own). Email/password is never
     // enabled at all — Better Auth defaults `emailAndPassword` to disabled
@@ -132,12 +142,12 @@ export function buildAuthOptions(
     emailAndPassword: {
       enabled: false,
     },
-    // #318 Phase 4 item 1 — D1-backed rate limit on the magic-link REQUEST
-    // endpoint. REUSES Better Auth's own native `rateLimit` engine rather
+    // #318 Phase 4 item 1 — D1-backed rate limit on the sign-in REQUEST
+    // endpoints. REUSES Better Auth's own native `rateLimit` engine rather
     // than hand-rolling a limiter — this is a SEPARATE D1 table/mechanism
     // from the three public forms' own D1-backed limiter (src/lib/
     // formRateLimit.ts, #587): different attack surface (unauthenticated
-    // magic-link requests vs. public form spam), different table (Better
+    // sign-in requests vs. public form spam), different table (Better
     // Auth's own `rateLimit` model vs. box_checkin_rate_limit), no reason to
     // share one.
     //
@@ -172,41 +182,26 @@ export function buildAuthOptions(
     // run this session — no working shell — and needs parent
     // confirmation/regeneration before this lands on remote D1).
     //
-    // WHY `customRules["/sign-in/magic-link"]` at 1h/5 (not the magicLink
-    // plugin's own baked-in 60s/5 default): verified in
-    // node_modules/better-auth/dist/plugins/magic-link/index.mjs:41 that
-    // `/sign-in/magic-link` is the exact literal path `signInMagicLink`'s
-    // endpoint registers — the same string this file's own
-    // `adminAuthAllowlistPlugin` gate already path-matches. That plugin
-    // ships its own default rate-limit rule at that identical path (window
-    // 60s/max 5 — magic-link/index.mjs:157-163), but
-    // node_modules/better-auth/dist/api/rate-limiter/index.mjs's
-    // `resolveRateLimitConfig()` resolves top-level `customRules` LAST —
-    // after the library's built-in `/sign-in*` special rule and after any
-    // plugin-contributed rule — so this exact-string entry reliably
-    // overrides the plugin's shorter window rather than racing it. 3600s/5
-    // mirrors src/lib/formRateLimit.ts's own public-form per-IP threshold
-    // (`MAX_PER_IP_PER_HOUR = 5`, 1h window; formerly src/lib/rateLimit.ts's
-    // `RATE_LIMIT_MAX` before #587) for a consistent posture across every
-    // request-a-link surface this app exposes.
+    // WHY these `customRules` (#684, replacing the old 1h/5 rule on the
+    // removed sign-in-link endpoint): the emailOTP plugin ships its own 60s/3 rule
+    // on each of its paths (node_modules/better-auth/dist/plugins/email-otp/
+    // index.mjs `rateLimit`), but rate-limiter/index.mjs's
+    // `resolveRateLimitConfig()` resolves top-level `customRules` LAST, so
+    // these exact-path entries win. Sending a code: 5 per hour per IP (same
+    // posture as src/lib/formRateLimit.ts's public forms). Typing a code:
+    // 10 per 15 minutes per IP — on top of emailOTP's own `allowedAttempts: 3`
+    // per code, so guessing needs a fresh code (and a send) every 3 tries.
     //
-    // NOT a landmine for adminAuthAllowlistPlugin.test.ts's real
-    // magic-link integration tests: verified in
-    // node_modules/better-auth/dist/api/index.mjs's `router()` that rate
-    // limiting is wired into the ROUTER's `onRequest` hook only (invoked
-    // by `auth.handler(request)`, the real HTTP entry point) — every call
-    // in that test file is a direct `auth.api.signInMagicLink(...)` call,
-    // which invokes the endpoint function directly and never passes
-    // through the router's `onRequest` at all. Real traffic through
-    // src/app/api/auth/[...all]/route.ts's `toNextJsHandler()` DOES go
-    // through `auth.handler`, so production requests are genuinely gated —
-    // but this repo's existing test suite needs no `rateLimit` table
-    // either way and is unaffected by this change.
+    // Rate limiting runs in the ROUTER's `onRequest` hook only
+    // (better-auth/dist/api/index.mjs `router()`), i.e. real HTTP traffic
+    // through `auth.handler` — direct `auth.api.*` calls in tests bypass it,
+    // and `enabled` is false under vitest anyway.
     rateLimit: {
       enabled: process.env.NODE_ENV === "production",
       storage: "database",
       customRules: {
-        "/sign-in/magic-link": { window: 3600, max: 5 },
+        "/email-otp/send-verification-otp": { window: 3600, max: 5 },
+        "/sign-in/email-otp": { window: 900, max: 10 },
       },
     },
     // #318 Phase 4 item 5 — short-lived session for this single
@@ -300,6 +295,12 @@ export function buildAuthOptions(
     // https origins, not plain http://localhost, so an unconditional
     // Secure flag changes nothing about that.
     advanced: {
+      // #679 — read the client IP from Cloudflare's header. Without this the
+      // live `session.ipAddress` was an empty string on every row (Better
+      // Auth's default header list doesn't include CF-Connecting-IP).
+      ipAddress: {
+        ipAddressHeaders: ["cf-connecting-ip"],
+      },
       useSecureCookies: false,
       cookies: {
         session_token: {
@@ -313,9 +314,21 @@ export function buildAuthOptions(
       },
     },
     plugins: [
-      magicLink({
-        sendMagicLink: async ({ email, url }) => {
-          await sendAdminMagicLinkEmail({ email, url });
+      // #684 — a 6-digit code typed on the same tab replaces the emailed
+      // magic link (a link always opened a second tab). Better Auth keeps
+      // the code in the existing `verification` table, hashed, so there is
+      // no migration. Every /email-otp/* path other than sending a sign-in
+      // code and signing in with one is refused by adminAuthAllowlistPlugin.
+      emailOTP({
+        otpLength: 6,
+        expiresIn: SIGN_IN_CODE_MINUTES * 60,
+        allowedAttempts: 3,
+        storeOTP: "hashed",
+        sendVerificationOTP: async ({ email, otp, type }) => {
+          // The allowlist gate already refused every other type; this is
+          // belt-and-braces so no other kind of code email can ever go out.
+          if (type !== "sign-in") return;
+          await sendAdminSignInCodeEmail({ email, otp });
         },
       }),
       // rpID is env-driven for per-environment passkey isolation (#318):
@@ -344,11 +357,17 @@ export function buildAuthOptions(
           userVerification: "required",
         },
       }),
+      // #679 — records failed sign-ins, sign-outs and passkey changes in
+      // auth_events. Must sit BEFORE adminAuthAllowlistPlugin: that plugin
+      // short-circuits a non-allowlisted sign-in-code request, and a
+      // short-circuited request runs no later hooks. It only observes; it
+      // never changes a response.
+      authEventsPlugin(authEvents),
       // #315 CRITICAL — must be the LAST plugin in this array. Better
       // Auth's plugin hooks all run in registration order (dispatch.mjs's
       // `getHooks()` flatMaps each plugin's `hooks.before` in array order),
-      // and this plugin's magic-link gate must run before magicLink's own
-      // endpoint executes regardless of where magicLink itself sits in this
+      // and this plugin's email-code gate must run before emailOTP's own
+      // endpoints execute regardless of where emailOTP itself sits in this
       // list — but placing it last keeps the ordering trivially correct by
       // inspection: every other plugin's endpoints exist by the time this
       // one's path-matched hooks are added, so there's no risk of this
@@ -372,8 +391,10 @@ export function buildAuthOptions(
     databaseHooks: {
       session: {
         create: {
-          after: async () => {
+          after: async (session, ctx) => {
             logAdminAuthEvent("login");
+            // #679 — the durable sign-in row (method, IP, device, location).
+            await signInEventHooks.session.create.after(session, ctx);
           },
         },
       },

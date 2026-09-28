@@ -89,10 +89,14 @@
   // secret; see AGENTS.md's Secrets table). One project serves prod AND
   // staging (both post events through the same /ingest proxy to the same
   // PostHog project, #485), so the id is identical in both places below.
+  // #679 — ADMIN_OWNER_EMAIL: the ONE account that can see the admin
+  // Activity log (/admin/activity). A plain var (an email, not a
+  // credential). src/lib/adminOwner.ts fails toward "only Kyle" if unset.
   "vars": {
     "ANALYTICS_EXCLUDED_IPS": "66.33.12.72,2607:3640:121:e110::/64",
     "CF_ANALYTICS_ACCOUNT_ID": "8878836432b8b59274b8d0c711901d20",
-    "POSTHOG_PROJECT_ID": "630731"
+    "POSTHOG_PROJECT_ID": "630731",
+    "ADMIN_OWNER_EMAIL": "kysboyd@gmail.com"
   },
   // Staging (#223 step 1): repo-config only, NOT yet wired to a deploy pipeline
   // or DNS route. Named environments do not inherit bindings (assets,
@@ -104,7 +108,7 @@
       "name": "pueblo-food-map-staging",
       "routes": [
         // Admin serves at /admin on this same apex host — gated by Better
-        // Auth alone (magic link + passkey; Cloudflare Access has been fully
+        // Auth alone (email code + passkey; Cloudflare Access has been fully
         // removed from this path), not a separate subdomain route. The
         // admin.pueblofoodmap.com / dev.admin.pueblofoodmap.com subdomains
         // are retired.
@@ -136,7 +140,9 @@
         // Same PostHog project as prod (#681) — see the top-level
         // POSTHOG_PROJECT_ID comment. posthogQuery.ts itself still scopes
         // every query to the production `$host`, same as cfAnalytics.ts.
-        "POSTHOG_PROJECT_ID": "630731"
+        "POSTHOG_PROJECT_ID": "630731",
+        // #679 — same owner as prod; see the top-level ADMIN_OWNER_EMAIL comment.
+        "ADMIN_OWNER_EMAIL": "kysboyd@gmail.com"
       },
       "assets": {
         "directory": ".open-next/assets",
@@ -158,7 +164,7 @@
           // earlier ponytail shortcut of reusing prod's PREVIEW d1 id.
           // Provisioned + migrated + seeded with fake data specifically so
           // dev.pueblofoodmap.com's admin surface has real rows to render —
-          // admin is gated by Better Auth alone (magic link + passkey), not
+          // admin is gated by Better Auth alone (email code + passkey), not
           // Cloudflare Access — prod admin data (pueblo-food-map-admin,
           // d6ea5afd-...) is never read from or written to by this env.
           "database_name": "pueblo-food-map-admin-staging",

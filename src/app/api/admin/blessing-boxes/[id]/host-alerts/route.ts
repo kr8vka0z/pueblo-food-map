@@ -47,7 +47,7 @@ import {
 } from "@/lib/boxAlerts";
 
 const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
 async function authorize(headers: HeaderSource): Promise<AdminDbAccess> {
   const access = await getAdminDb(headers);
@@ -111,6 +111,8 @@ export async function POST(
       null,
       JSON.stringify({ venue_id: venueId, email }),
       timestamp,
+      // #679: ties this action to the sign-in that made it (Activity log).
+      identity.sessionId ?? null,
     );
   await db.batch([insertStatement, insertAudit]);
 
@@ -175,6 +177,8 @@ export async function DELETE(
       JSON.stringify({ venue_id: venueId, email, unsubscribed_at: null }),
       JSON.stringify({ venue_id: venueId, email, unsubscribed_at: timestamp }),
       timestamp,
+      // #679: ties this action to the sign-in that made it (Activity log).
+      identity.sessionId ?? null,
     );
   await db.batch([removeStatement, insertAudit]);
 

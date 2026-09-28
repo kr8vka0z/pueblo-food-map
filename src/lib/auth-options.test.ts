@@ -19,8 +19,8 @@
  *
  * Scope: Phase 1 provisions the auth ENGINE only — no login UI, no route
  * gating. This test proves the engine constructs without throwing and
- * exposes the plugins/endpoints Phase 1 requires (magicLink, passkey); it
- * does NOT exercise a live sign-in flow (no sendMagicLink or WebAuthn
+ * exposes the plugins/endpoints it requires (emailOTP since #684, passkey); it
+ * does NOT exercise a live sign-in flow (no code email or WebAuthn
  * ceremony is wired yet — see auth-options.ts's own `// Phase 2:` markers).
  */
 
@@ -31,10 +31,11 @@ import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getCookies } from "better-auth/cookies";
 import { buildAuthOptions } from "@/lib/auth-options";
+import { signInWithEmailCode } from "@/__tests__/helpers/authTestHelpers";
 
 // Full migrated schema (user/session/verification/passkey/rateLimit tables)
 // — needed only by the rpID-isolation describe block below, which drives a
-// real magic-link -> session -> passkey-registration-options ceremony, and
+// real email-code -> session -> passkey-registration-options ceremony, and
 // therefore actually dispatches requests through Better Auth's rate-limit
 // middleware. Every other test in this file only introspects
 // buildAuthOptions()'s returned config object, never invokes a real
@@ -64,11 +65,13 @@ describe("buildAuthOptions", () => {
     // handler, not a config object that merely type-checks.
     expect(typeof auth.handler).toBe("function");
 
-    // magicLink and passkey are both registered at config level (schema
-    // coverage for Phase 1), confirmed via the endpoints each plugin
-    // contributes to auth.api.
-    expect(typeof auth.api.signInMagicLink).toBe("function");
-    expect(typeof auth.api.magicLinkVerify).toBe("function");
+    // emailOTP (#684) and passkey are both registered at config level,
+    // confirmed via the endpoints each plugin contributes to auth.api.
+    expect(typeof auth.api.sendVerificationOTP).toBe("function");
+    expect(typeof auth.api.signInEmailOTP).toBe("function");
+    // #684: the magic-link plugin is gone entirely.
+    expect("signInMagicLink" in auth.api).toBe(false);
+    expect("magicLinkVerify" in auth.api).toBe(false);
     expect(typeof auth.api.generatePasskeyRegistrationOptions).toBe(
       "function",
     );
@@ -89,7 +92,7 @@ describe("buildAuthOptions", () => {
   });
 });
 
-describe("rate limit — D1-backed, magic-link custom rule (#318 Phase 4 item 1)", () => {
+describe("rate limit — D1-backed, email-code custom rules (#318 Phase 4 item 1, #684)", () => {
   // Config introspection only, on an UNMIGRATED in-memory database — no
   // real endpoint is ever dispatched here, `auth.options` is read directly.
   // Under better-auth >= 1.7.4 a boot-time schema-validation check requires
@@ -99,7 +102,7 @@ describe("rate limit — D1-backed, magic-link custom rule (#318 Phase 4 item 1)
   // dispatched, not at construction, so config-only tests like these never
   // trip it. See auth-options.ts's own `rateLimit` WHY comment for the full
   // source trace behind every value asserted here.
-  test("rateLimit is enabled in production, D1-backed, with the magic-link custom rule", () => {
+  test("rateLimit is enabled in production, D1-backed, with the email-code custom rules", () => {
     // WHY force NODE_ENV to "production" for this one assertion:
     // auth-options.ts's `enabled` mirrors better-auth's own
     // production-only default (create-context.mjs:171) — asserting
@@ -115,9 +118,10 @@ describe("rate limit — D1-backed, magic-link custom rule (#318 Phase 4 item 1)
 
       expect(options.rateLimit?.enabled).toBe(true);
       expect(options.rateLimit?.storage).toBe("database");
-      expect(options.rateLimit?.customRules?.["/sign-in/magic-link"]).toEqual(
-        { window: 3600, max: 5 },
-      );
+      expect(options.rateLimit?.customRules).toEqual({
+        "/email-otp/send-verification-otp": { window: 3600, max: 5 },
+        "/sign-in/email-otp": { window: 900, max: 10 },
+      });
     } finally {
       vi.unstubAllEnvs();
     }
@@ -190,37 +194,14 @@ describe("passkey rpID — per-environment isolation (#318)", () => {
     return new Headers({ host: "pueblofoodmap.com", ...extra });
   }
 
-  /** Signs in via magic link and returns a real, usable session cookie
+  /** Signs in with an emailed code and returns a real, usable session cookie
    * header — the only legitimate way to obtain an authenticated session in
    * this system (emailAndPassword.enabled is false). Mirrors
    * adminAuthAllowlistPlugin.test.ts's own bootstrap exactly. */
   async function signInAndGetSessionCookie(
     auth: ReturnType<typeof buildTestAuth>,
   ): Promise<string> {
-    await auth.api.signInMagicLink({
-      body: { email: ALLOWLISTED_EMAIL },
-      headers: requestHeaders(),
-    });
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
-    const [, sendInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const sentBody = JSON.parse(sendInit.body as string);
-    const tokenMatch = /token=([^&\s"]+)/.exec(sentBody.text as string);
-    if (!tokenMatch) {
-      throw new Error("magic-link email did not contain a token URL");
-    }
-    const verifyResponse = await auth.api.magicLinkVerify({
-      query: { token: tokenMatch[1], callbackURL: "/" },
-      headers: requestHeaders(),
-      asResponse: true,
-    });
-    const setCookie = verifyResponse.headers.get("set-cookie");
-    if (!setCookie) {
-      throw new Error("magicLinkVerify did not set a session cookie");
-    }
-    return setCookie
-      .split(",")
-      .map((part) => part.split(";")[0].trim())
-      .join("; ");
+  return signInWithEmailCode(auth, ALLOWLISTED_EMAIL);
   }
 
   beforeEach(() => {

@@ -178,6 +178,9 @@ const en: Record<string, string> = {
   "menu.saved.heading": "Saved places",
   "menu.saved.emptyTitle": "No saved places yet",
   "menu.saved.emptyBody": "Tap the star on any place to save it. It will show up here.",
+  // Desktop side panel (#682) — link back to the Saved list from a venue card
+  // opened by clicking a saved place, so the user doesn't lose their spot.
+  "panel.backToSaved": "← Saved",
 
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Open menu",
@@ -385,7 +388,7 @@ const en: Record<string, string> = {
   // time this comment was written; it was rewritten again for #485 (PostHog
   // added alongside Cloudflare Web Analytics — see that key's own comment).
   "privacy.collect.heading": "What we collect",
-  "privacy.collect.body": "Pueblo Food Map collects the information you type into our forms (place reports, suggestions, and feedback). We use it to review what you sent and, if you gave an email address, to write back. Your IP address is checked to block spam when you send a form, and is never saved with what you sent.",
+  "privacy.collect.body": "Pueblo Food Map collects the information you type into our forms (place reports, suggestions, and feedback). We use it to review what you sent and, if you gave an email address, to write back. Your IP address is checked to block spam when you send a form, and is never saved with what you sent. Sign-ins to the site's admin area, used by the Pueblo Food Map team, are logged with the time, device and IP address, for security.",
   "privacy.checkins.heading": "Blessing box check-ins",
   "privacy.checkins.body": "Checking in at a blessing box is anonymous. We do not ask for your name or email, and we do not save your IP address. A photo you add is reviewed before it shows, and location details hidden inside the photo file are removed.",
   // New paragraph (#594) — the per-browser check-in rate-limit ID
@@ -489,6 +492,13 @@ const en: Record<string, string> = {
   "footer.about": "About",
   "footer.privacy": "Privacy",
   "footer.suggest": "Suggest a place",
+  // SEO/AEO plan Phase 0: the footer is how crawlers reach /venues (and from
+  // there every venue page) — before this, no page's server HTML linked it.
+  "footer.venues": "All places",
+  "footer.resources": "Food help programs",
+  // Venue-page breadcrumb (SEO/AEO plan Phase 0): "Map › All places › {name}".
+  "breadcrumb.label": "Breadcrumb",
+  "breadcrumb.map": "Map",
 
   // Venues directory (#PR4)
   "nav.venuesList": "Browse all places",
@@ -1096,6 +1106,7 @@ const es: Record<string, string> = {
   "menu.saved.heading": "Lugares guardados",
   "menu.saved.emptyTitle": "Todavía no tienes lugares guardados",
   "menu.saved.emptyBody": "Toca la estrella en cualquier lugar para guardarlo. Aparecerá aquí.",
+  "panel.backToSaved": "← Guardados", // [CHECK]
 
   // Hamburger menu (#71, #96, #99, #109)
   "menu.open": "Abrir menú",
@@ -1280,7 +1291,7 @@ const es: Record<string, string> = {
   "privacy.linkLabel": "Privacidad",
   "privacy.heading": "Privacidad",
   "privacy.collect.heading": "Qué recopilamos", // [CHECK]
-  "privacy.collect.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). La usamos para revisar lo que enviaste y, si diste un correo electrónico, para responderte. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con lo que enviaste.", // [CHECK]
+  "privacy.collect.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). La usamos para revisar lo que enviaste y, si diste un correo electrónico, para responderte. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con lo que enviaste. Los inicios de sesión en el área de administración del sitio, que usa el equipo de Pueblo Food Map, se registran con la hora, el dispositivo y la dirección IP, por seguridad.", // [CHECK]
   "privacy.checkins.heading": "Registros en cajas de bendición", // [CHECK]
   "privacy.checkins.body": "Registrar tu visita a una caja de bendición es anónimo. No pedimos tu nombre ni tu correo, y no guardamos tu dirección IP. Una foto que agregues se revisa antes de publicarse, y los detalles de ubicación ocultos en el archivo de la foto se eliminan.", // [CHECK]
   "privacy.checkins.body2": "Cada registro también usa un identificador aleatorio que tu navegador guarda, para distinguir registros repetidos sin pedirte tu nombre ni tu correo. No está vinculado a quién eres, y borrar los datos del sitio en tu navegador genera uno nuevo.", // [CHECK]
@@ -1352,6 +1363,10 @@ const es: Record<string, string> = {
   "footer.about": "Acerca de",
   "footer.privacy": "Privacidad",
   "footer.suggest": "Sugerir un lugar",
+  "footer.venues": "Todos los lugares", // [CHECK]
+  "footer.resources": "Programas de ayuda alimentaria",
+  "breadcrumb.label": "Ruta de navegación", // [CHECK]
+  "breadcrumb.map": "Mapa",
 
   // Venues directory (#PR4)
   "nav.venuesList": "Ver todos los lugares",

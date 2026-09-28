@@ -29,7 +29,17 @@ import { buildAuthOptions } from "./auth-options";
 // concrete instantiation via `ReturnType<typeof createAuthInstance>`
 // preserves it.
 function createAuthInstance(database: D1Database, rpID?: string) {
-  return betterAuth(buildAuthOptions(database, rpID));
+  return betterAuth(
+    buildAuthOptions(database, rpID, {
+      // #679 — the permanent sign-in record lives in the same ADMIN_DB.
+      db: database,
+      // Cloudflare's per-request geo (city/region/country). Read lazily per
+      // event: the auth instance is cached per isolate, `cf` is per request.
+      getGeo: async () => (await getCloudflareContext({ async: true })).cf as
+        | { city?: unknown; region?: unknown; country?: unknown }
+        | undefined,
+    }),
+  );
 }
 
 type Auth = ReturnType<typeof createAuthInstance>;

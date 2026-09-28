@@ -22,6 +22,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import FilterPanel from "@/components/FilterPanel";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
+import DesktopSidePanel from "@/components/DesktopSidePanel";
 import LocationDeniedBanner from "@/components/LocationDeniedBanner";
 import type { Venue } from "@/types/venue";
 
@@ -142,13 +143,11 @@ describe("#527 — Escape closes only the topmost overlay; scroll lock is shared
     expect(document.body.style.overflow).toBe("");
   });
 
-  test("DesktopVenueWindow open, Filters opened on top: Escape closes Filters only, window stays open", async () => {
-    const mockMapboxMap = {
-      project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
-      getContainer: vi.fn().mockReturnValue({ offsetWidth: 1000, offsetHeight: 800 }),
-      on: vi.fn().mockReturnThis(),
-      off: vi.fn().mockReturnThis(),
-    };
+  // #682 8b: the Escape listener under test moved from DesktopVenueWindow to
+  // DesktopSidePanel (coordinator: "Lift ... overlay registration into
+  // DesktopSidePanel") — wraps the real shell now, same as
+  // DesktopVenueWindow.escapeGuard.test.tsx.
+  test("DesktopVenueWindow open (inside DesktopSidePanel), Filters opened on top: Escape closes Filters only, window stays open", async () => {
     const venue: Venue & { distanceMiles?: number } = {
       id: "test-venue-527",
       name: "Test Venue 527",
@@ -168,15 +167,18 @@ describe("#527 — Escape closes only the topmost overlay; scroll lock is shared
           <button type="button" onClick={() => setFilterOpen((o) => !o)}>
             Toggle filters
           </button>
-          <DesktopVenueWindow
-            venue={venue}
-            expanded={false}
-            mapboxMap={mockMapboxMap}
-            onExpand={() => {}}
-            onCollapse={() => {}}
-            onClose={onClose}
-            locale="en"
-          />
+          <DesktopSidePanel open onClose={onClose} headingId={`venue-window-title-${venue.id}`}>
+            {(close) => (
+              <DesktopVenueWindow
+                venue={venue}
+                expanded={false}
+                onExpand={() => {}}
+                onCollapse={() => {}}
+                onClose={close}
+                locale="en"
+              />
+            )}
+          </DesktopSidePanel>
           <FilterPanel {...FILTER_PANEL_STATIC_PROPS} open={filterOpen} onClose={() => setFilterOpen(false)} />
         </>
       );

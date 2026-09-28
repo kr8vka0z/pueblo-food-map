@@ -32,7 +32,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, act, fireEvent } from "@testing-library/react";
+import { render, screen, act, fireEvent, within } from "@testing-library/react";
 import React from "react";
 import HomePage from "@/app/page";
 
@@ -169,6 +169,24 @@ describe("server-rendered SEO content", () => {
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading).toBeTruthy();
     expect(heading.className).toContain("sr-only");
+  });
+
+  // SEO/AEO plan Phase 0: the homepage's server HTML used to have zero links,
+  // leaving /venues (and every venue page) unreachable without running JS.
+  test("renders crawlable links to /venues, /resources and /about synchronously", () => {
+    render(<HomePage />);
+    const nav = screen.getByRole("navigation", { name: "Site" });
+    const hrefs = within(nav).getAllByRole("link").map((l) => l.getAttribute("href"));
+    expect(hrefs).toEqual(["/venues", "/resources", "/about"]);
+  });
+
+  test("the crawl links are visually hidden until focused (skip-link pattern)", () => {
+    render(<HomePage />);
+    const nav = screen.getByRole("navigation", { name: "Site" });
+    for (const link of within(nav).getAllByRole("link")) {
+      expect(link.className).toContain("sr-only");
+      expect(link.className).toContain("focus:not-sr-only");
+    }
   });
 });
 

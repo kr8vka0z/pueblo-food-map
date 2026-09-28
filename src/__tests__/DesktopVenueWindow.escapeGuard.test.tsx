@@ -1,19 +1,25 @@
 /**
  * DesktopVenueWindow Escape-guard test (#508 fix pass review blocker,
  * 2026-09-19) — PhotoViewer nested inside a real DesktopVenueWindow box
- * card. Reproduces the actual bug: opening the box's photo full-size and
- * pressing Escape used to ALSO close the whole window, because
- * DesktopVenueWindow's own document-level Escape listener
- * (src/components/DesktopVenueWindow.tsx, "Keyboard handling") had no idea
- * a modal photo dialog was open above it. Fixed via `isNativeDialogOpen()`
- * (src/lib/dialogGuard.ts) — this test proves the fix against the real
- * component (not a mock of the Escape mechanism).
+ * card, wrapped in the real DesktopSidePanel shell. Reproduces the actual
+ * bug: opening the box's photo full-size and pressing Escape used to ALSO
+ * close the whole window, because the panel's own document-level Escape
+ * listener had no idea a modal photo dialog was open above it. Fixed via
+ * `isNativeDialogOpen()` (src/lib/dialogGuard.ts) — this test proves the fix
+ * against the real components (not a mock of the Escape mechanism).
+ *
+ * #682 8b: the Escape listener this guards moved from DesktopVenueWindow to
+ * DesktopSidePanel (coordinator: "Lift ... overlay registration into
+ * DesktopSidePanel, since there are now non-venue views") — both tests now
+ * wrap in the real shell, since standing DesktopVenueWindow up alone no
+ * longer registers anything to guard.
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
+import DesktopSidePanel from "@/components/DesktopSidePanel";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 
@@ -35,13 +41,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
 });
-
-const mockMapboxMap = {
-  project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
-  getContainer: vi.fn().mockReturnValue({ offsetWidth: 1000, offsetHeight: 800 }),
-  on: vi.fn().mockReturnThis(),
-  off: vi.fn().mockReturnThis(),
-};
 
 function makeBoxVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: number } {
   return {
@@ -90,20 +89,24 @@ function makeBox(overrides: Partial<PublicBlessingBox["box"]> = {}): PublicBless
 }
 
 describe("DesktopVenueWindow — Escape closes only the open PhotoViewer, not the window", () => {
-  test("photo open + Escape: window's onClose NOT called, photo closes", async () => {
+  test("photo open + Escape: panel's onClose NOT called, photo closes", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
+    const venue = makeBoxVenue();
     render(
-      <DesktopVenueWindow
-        venue={makeBoxVenue()}
-        box={makeBox()}
-        expanded={false}
-        mapboxMap={mockMapboxMap}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
-        onClose={onClose}
-        locale="en"
-      />,
+      <DesktopSidePanel open onClose={onClose} headingId={`venue-window-title-${venue.id}`}>
+        {(close) => (
+          <DesktopVenueWindow
+            venue={venue}
+            box={makeBox()}
+            expanded={false}
+            onExpand={vi.fn()}
+            onCollapse={vi.fn()}
+            onClose={close}
+            locale="en"
+          />
+        )}
+      </DesktopSidePanel>,
     );
 
     await user.click(screen.getByRole("button", { name: "View photo full size" }));
@@ -116,20 +119,24 @@ describe("DesktopVenueWindow — Escape closes only the open PhotoViewer, not th
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  test("regression: with no photo open, Escape still closes the window as before", async () => {
+  test("regression: with no photo open, Escape still closes the panel as before", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
+    const venue = makeBoxVenue();
     render(
-      <DesktopVenueWindow
-        venue={makeBoxVenue()}
-        box={makeBox()}
-        expanded={false}
-        mapboxMap={mockMapboxMap}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
-        onClose={onClose}
-        locale="en"
-      />,
+      <DesktopSidePanel open onClose={onClose} headingId={`venue-window-title-${venue.id}`}>
+        {(close) => (
+          <DesktopVenueWindow
+            venue={venue}
+            box={makeBox()}
+            expanded={false}
+            onExpand={vi.fn()}
+            onCollapse={vi.fn()}
+            onClose={close}
+            locale="en"
+          />
+        )}
+      </DesktopSidePanel>,
     );
     screen.getByRole("dialog").focus();
     await user.keyboard("{Escape}");

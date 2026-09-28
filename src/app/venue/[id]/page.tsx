@@ -32,6 +32,7 @@ import {
   getVenueById,
   venuePath,
   buildVenueJsonLd,
+  buildVenueBreadcrumbJsonLd,
   serializeJsonLd,
 } from "@/lib/venueSchema";
 import { venues, categoryLabels } from "@/data/venues";
@@ -79,6 +80,11 @@ export default async function VenuePage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildVenueJsonLd(v)) }}
+      />
+      {/* BreadcrumbList — mirrors VenueContent's visible breadcrumb (SEO/AEO plan Phase 0) */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildVenueBreadcrumbJsonLd(v)) }}
       />
       <VenueContent venue={v} />
     </>

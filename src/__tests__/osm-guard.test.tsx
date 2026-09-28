@@ -51,13 +51,6 @@ vi.mock("vaul", async () => {
 });
 
 // ─── Minimal mapboxgl.Map stub (for DesktopVenueWindow) ──────────────────────
-const mockMapboxMap = {
-  project: vi.fn().mockReturnValue({ x: 0, y: 0 }),
-  getContainer: vi.fn().mockReturnValue({ offsetWidth: 1000, offsetHeight: 800 }),
-  on: vi.fn().mockReturnThis(),
-  off: vi.fn().mockReturnThis(),
-};
-
 // ─── Venue factory ────────────────────────────────────────────────────────────
 
 function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: number } {
@@ -85,7 +78,6 @@ describe("DesktopVenueWindow — OSM notes guard", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -102,7 +94,6 @@ describe("DesktopVenueWindow — OSM notes guard", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={true}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -117,7 +108,6 @@ describe("DesktopVenueWindow — OSM notes guard", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={false}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -132,7 +122,6 @@ describe("DesktopVenueWindow — OSM notes guard", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={true}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -153,7 +142,6 @@ describe("DesktopVenueWindow — address placeholder guard", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={true}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}
@@ -170,7 +158,6 @@ describe("DesktopVenueWindow — address placeholder guard", () => {
       <DesktopVenueWindow
         venue={venue}
         expanded={true}
-        mapboxMap={mockMapboxMap}
         onExpand={vi.fn()}
         onCollapse={vi.fn()}
         onClose={vi.fn()}

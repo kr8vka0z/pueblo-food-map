@@ -18,6 +18,7 @@ How it's built: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md). This
 - **Rollback (code only):** `bunx wrangler deployments list --name <worker>`, then `bunx wrangler rollback <id> --name <worker> -y`. The worker is `pueblo-food-map` for prod or `pueblo-food-map-staging` for staging. You can also use Dashboard → Workers & Pages → `pueblo-food-map` → Deployments, which also has the build logs. Rollback does not undo D1 migrations, and `main` still holds the bad commit, so follow up with a `git revert` PR into `dev` and promote it.
 - **Discoverability / SEO traps — a green build doesn't prove a page works on this stack:**
   - Static pages with `dynamicParams = false` need `open-next.config.ts`'s `staticAssetsIncrementalCache` override. Without it every prerendered dynamic path 404s; this caused a 10-day outage.
+  - Only `pueblofoodmap.com` may be indexed: `custom-worker.ts` noindexes every other host (`src/lib/indexingHost.ts`), and `deploy-prod.yml` fails if the canonical host ever gets the header. Keep venue pages reachable through server-rendered links, not just the sitemap (ARCHITECTURE.md "Crawlability and indexing").
   - Never add a server-side redirect on `/`. Next 16 `proxy.ts` fails the build, and a `next.config` `redirects()` `has` rule 500'd the live homepage. Legacy `?venue=`/`#venue=` links are handled client-side.
 - **`env.staging` inherits almost nothing** from the top level of `wrangler.jsonc`. Every new binding, var or secret needs its staging twin. `triggers` is the exception: it does inherit (see Scheduled jobs).
 - Don't run bare `wrangler types`, which corrupts the DOM types. Use `npx wrangler types --include-runtime=false`.
@@ -50,14 +51,16 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 
 ## Admin authentication and data
 
-- **Better Auth is the only gate** (magic link + passkey, one-email allowlist) on prod and staging. There is no Cloudflare Access.
+- **Better Auth is the only gate** (6-digit email code + passkey, one-email allowlist) on prod and staging. There is no Cloudflare Access, and no magic link (#684).
+- **The allowlist gate is `adminAuthAllowlistPlugin.ts`**, on `/email-otp/send-verification-otp` (non-admin email or non-`sign-in` type → identical `{success:true}`, no code row, no email) and `/sign-in/email-otp`; every other emailOTP endpoint 404s. Its tests (`adminAuthAllowlistPlugin.test.ts`) are the security boundary — never weaken them.
 - **`getAdminDb()` (`src/lib/adminDb.ts`) is the single choke point.** It checks the session before returning the `ADMIN_DB` binding. New admin code must fetch D1 through it, never through `getCloudflareContext()`. Public routes (suggest/report, `/api/public/**`) are the exception and read `getCloudflareContext().env.ADMIN_DB` directly.
 - **`requireAdminOrigin()`** (CSRF protection) is required on every non-GET `/api/admin/*` route.
 - **`ADMIN_ALLOWLIST`**: comma-separated emails; if unset it defaults to Kyle only. It must always fail toward "only Kyle", never toward "everyone".
+- **`ADMIN_OWNER_EMAIL`** (wrangler var, prod + staging) is the one account that sees `/admin/activity` (#679). Everyone else gets a 404 and no nav item; unset falls back to Kyle (`src/lib/adminOwner.ts`). Sign-ins/failures are recorded in `auth_events` by `src/lib/authEvents.ts`, whose writes must never block a sign-in.
 - **Session cookie:** `useSecureCookies: false` is required. Otherwise better-auth double-prefixes `__Host-session_token` and the cookie silently drops. `secure: true` is set by hand instead.
 - **`BETTER_AUTH_RP_ID`** is set on staging only (`wrangler.jsonc` `env.staging.vars`), so passkeys never cross environments. Read it via the binding.
-- **Magic-link rate limit:** 5 per hour, enforced in-app (D1 `rateLimit`), plus one Cloudflare zone rule on `/api/auth/*` that lives in the dashboard, not in this repo.
-- **Writes:** each write is one atomic `db.batch()` plus an `audit_log` row. Archive, never `DELETE`. The server re-validates every field (`adminVenueValidation.ts`). PATCH and archive carry the `updated_at` precondition (409 on a concurrent save); any new dependent write in the same batch must be `WHERE EXISTS`-gated on it.
+- **Sign-in rate limits:** sending a code 5/hour and typing one 10/15 min per IP, enforced in-app (D1 `rateLimit` `customRules`), plus 3 tries per code and one Cloudflare zone rule on `/api/auth/*` that lives in the dashboard, not in this repo.
+- **Writes:** each write is one atomic `db.batch()` plus an `audit_log` row carrying `identity.sessionId` in `session_id` (the Activity log groups by it). Archive, never `DELETE`. The server re-validates every field (`adminVenueValidation.ts`). PATCH and archive carry the `updated_at` precondition (409 on a concurrent save); any new dependent write in the same batch must be `WHERE EXISTS`-gated on it.
 - **Publish ordering is load-bearing:** the GitHub commit/PR/auto-merge must succeed *before* D1 marks drafts published. `isProductionWorker()` refuses Publish on staging (403).
 - **One store:** everything lives in the `pueblo-food-map-admin` D1 database. There is no Workers KV, by design.
 
@@ -67,7 +70,7 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 
 1. See what's pending: `npx wrangler d1 migrations list pueblo-food-map-admin --remote`.
 2. **Export first:** `wrangler d1 export pueblo-food-map-admin --remote --output <file>`, saved to `~/Backups/pfm-prod-d1/` on the Mac. A rollback can't undo a migration.
-3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, and `0016` are not idempotent (they fail with "duplicate column" on a re-run).
+3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, `0016`, and `0017` are not idempotent (they fail with "duplicate column" on a re-run).
 4. Confirm the Worker has every runtime secret in the table above, then promote and back-merge.
 5. If a migration changed published venue fields, the public map only updates at the next admin **Publish**. The Publish bar only shows when `updated_at > published_at`, so data migrations must set `updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')` on the rows they change.
 
@@ -103,7 +106,7 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
 - **Page metadata:** use `buildPageMetadata` (`src/lib/site.ts`), never a raw per-page `metadata` literal, which drops the inherited OG image.
 - **JSON-LD:** always go through `serializeJsonLd`, which escapes `<`; a raw `JSON.stringify` lets `</script>` break out of the tag.
 - **Blessing Boxes:**
-  - Every interaction (check-in, photo, adopt) lives in the on-map venue card, never on a separate page (REVIEW.md has the one exception).
+  - Every interaction (check-in, photo, adopt) lives in the on-map venue card, never on a separate page (REVIEW.md lists the read-only exceptions).
   - Boxes are live: admin edits show immediately, with no Publish.
   - Photos go to R2 (`pfm-box-photos`, with its own staging bucket). D1 holds metadata only.
   - Box alert sends never block a check-in.

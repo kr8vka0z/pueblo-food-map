@@ -69,9 +69,38 @@ describe("getAdminDb", () => {
 
     const result = await getAdminDb(headersWith("session=abc"));
 
-    expect(result.identity).toEqual({ email: "admin@pueblofoodmap.com" });
+    expect(result.identity).toEqual({ email: "admin@pueblofoodmap.com", isOwner: false });
     expect(result.db).toBe(fakeDb);
     expect(mockGetCloudflareContext).toHaveBeenCalledWith({ async: true });
     expect(mockRequireAdminSession).toHaveBeenCalledTimes(1);
+  });
+
+  // #679 — the Activity log's owner flag comes from the ADMIN_OWNER_EMAIL
+  // binding and fails toward "only Kyle" when that var is unset.
+  test("flags the ADMIN_OWNER_EMAIL account as the owner (case-insensitive)", async () => {
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: {}, ADMIN_OWNER_EMAIL: "Owner@Example.com" } });
+    mockRequireAdminSession.mockResolvedValue({ email: "owner@example.com", sessionId: "s1" });
+
+    const result = await getAdminDb(headersWith("session=abc"));
+
+    expect(result.identity).toEqual({ email: "owner@example.com", sessionId: "s1", isOwner: true });
+  });
+
+  test("an allowlisted admin who isn't ADMIN_OWNER_EMAIL is not the owner", async () => {
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: {}, ADMIN_OWNER_EMAIL: "owner@example.com" } });
+    mockRequireAdminSession.mockResolvedValue({ email: "kysboyd@gmail.com" });
+
+    const result = await getAdminDb(headersWith("session=abc"));
+
+    expect(result.identity.isOwner).toBe(false);
+  });
+
+  test("with ADMIN_OWNER_EMAIL unset, only the default owner (Kyle) is the owner", async () => {
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: {} } });
+    mockRequireAdminSession.mockResolvedValue({ email: "kysboyd@gmail.com" });
+    expect((await getAdminDb(headersWith("session=abc"))).identity.isOwner).toBe(true);
+
+    mockRequireAdminSession.mockResolvedValue({ email: "other-admin@example.com" });
+    expect((await getAdminDb(headersWith("session=abc"))).identity.isOwner).toBe(false);
   });
 });

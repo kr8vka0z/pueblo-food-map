@@ -60,6 +60,14 @@ export class AccessDeniedError extends Error {
 
 export interface AdminIdentity {
   email: string;
+  /**
+   * Better Auth `session.id` (never the token) of the request's sign-in —
+   * written to audit_log.session_id so the owner's Activity page (#679)
+   * groups each action under the sign-in that made it.
+   */
+  sessionId?: string;
+  /** True only for ADMIN_OWNER_EMAIL's account (src/lib/adminOwner.ts). Set by getAdminDb(). */
+  isOwner?: boolean;
 }
 
 /**

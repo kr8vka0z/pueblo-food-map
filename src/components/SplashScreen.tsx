@@ -27,7 +27,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Wordmark from './Wordmark';
 import { useGeolocation } from '@/lib/useGeolocation';
-import { useLocale } from '@/lib/LocaleContext';
+import { useLocale, writeLocaleCookie } from '@/lib/LocaleContext';
 import { t } from '@/lib/i18n';
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ interface SplashScreenProps {
 
 export default function SplashScreen({ onPrimary }: SplashScreenProps) {
   const geo = useGeolocation();
-  const { locale, setLocale } = useLocale();
+  const { locale, setLocale, tree } = useLocale();
 
   // Track whether a geo request is in flight so we know to watch for state changes.
   const [geoRequested, setGeoRequested] = useState(false);
@@ -74,12 +74,28 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
 
   // Each splash CTA sets the site language to its own language, then runs the
   // standard find-food flow. (The EN/ES toggle lives on the map view, not here.)
+  //
+  // Review fix (#689 PR 2, item 3): this splash mounts on /es too
+  // (HomePageClient, shared by both trees). setLocale() only flips the
+  // CLIENT-side `locale` state — it can never change `tree`, which is fixed
+  // by which root layout served the page (LocaleContext.tsx). Picking "EN"
+  // on the /es splash with a plain setLocale("en") would leave an English
+  // body sitting under an /es URL: server metadata, hreflang, and JSON-LD
+  // would all still say Spanish while the visible page reads English. When
+  // the chosen language differs from `tree`, this instead writes the cookie
+  // and does a full navigation to the OTHER tree's home ("/" or "/es") —
+  // the only way to actually get that language's server-rendered page.
   const handleCtaClick = useCallback(
     (lang: 'en' | 'es') => {
+      if (lang !== tree) {
+        writeLocaleCookie(lang);
+        window.location.assign(lang === 'es' ? '/es' : '/');
+        return;
+      }
       setLocale(lang);
       handlePrimaryClick();
     },
-    [setLocale, handlePrimaryClick],
+    [tree, setLocale, handlePrimaryClick],
   );
 
   // ── Render ───────────────────────────────────────────────────────────────────

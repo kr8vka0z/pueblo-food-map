@@ -9,8 +9,9 @@
  * this route sets its own noindex).
  *
  * Renders AdminLoginForm (src/components/AdminLoginForm.tsx), a fully
- * self-contained Client Component that owns the whole flow: email magic
- * link, "use a passkey" for returning admins, and the post-verification
+ * self-contained Client Component that owns the whole flow: an emailed
+ * 6-digit code typed on this page (#684), "use a passkey" for returning
+ * admins, and the post-verification
  * "set up a passkey" prompt. This Server Component is just the page shell
  * (matches /admin's own <main>/<header> structure) — no auth logic lives
  * here.

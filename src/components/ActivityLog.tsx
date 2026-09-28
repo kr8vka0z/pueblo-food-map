@@ -25,6 +25,12 @@ import {
   type AuthEventRow,
 } from "@/lib/activityLog";
 
+/** Readable names for system actors (actor_email without an "@"). */
+const AUTOMATIC_ACTOR_LABELS: Record<string, string> = {
+  "refresh-pipeline": "weekly data refresh",
+  "refresh-pipeline-ai": "data refresh, AI auto-apply",
+};
+
 /** Runs of this many or more consecutive same-tag actions collapse. */
 const COLLAPSE_RUN = 3;
 
@@ -191,7 +197,7 @@ function GroupCard({ group }: { group: ActivityGroup }) {
     );
     sub = signIn ? <DeviceLine row={signIn} /> : null;
   } else if (group.kind === "automatic") {
-    heading = <>Automatic — {group.actor === "refresh-pipeline" ? "weekly data refresh" : group.actor}</>;
+    heading = <>Automatic — {AUTOMATIC_ACTOR_LABELS[group.actor] ?? group.actor}</>;
   } else {
     heading = <>{group.email} — before sign-ins were recorded</>;
   }

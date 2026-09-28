@@ -16,6 +16,7 @@ import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { buildAuthOptions } from "@/lib/auth-options";
 import { signInMethodForPath, type AuthEventDeps } from "@/lib/authEvents";
+import { lastEmailedCode } from "@/__tests__/helpers/authTestHelpers";
 
 const MIGRATIONS = [
   "0001_init_admin_schema.sql",
@@ -87,68 +88,69 @@ afterEach(() => {
   fetchSpy.mockRestore();
 });
 
-async function requestLink(auth: ReturnType<typeof setup>["auth"], email: string) {
+async function requestCode(auth: ReturnType<typeof setup>["auth"], email: string) {
   return auth.handler(
-    new Request(`${ORIGIN}/api/auth/sign-in/magic-link`, {
+    new Request(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
       method: "POST",
       headers: { "content-type": "application/json", origin: ORIGIN, ...CLIENT },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, type: "sign-in" }),
     }),
   );
 }
 
-/** Requests a link for the owner and returns the verify URL from the (mocked) Resend send. */
-async function emailedLink(auth: ReturnType<typeof setup>["auth"]): Promise<string> {
-  await requestLink(auth, OWNER);
-  const [, init] = fetchSpy.mock.calls.at(-1) as [string, RequestInit];
-  const html = JSON.parse(init.body as string).html as string;
-  const match = html.match(/https:\/\/[^"'\s<>]*magic-link\/verify[^"'\s<>]*/);
-  if (!match) throw new Error("no verify link in the email");
-  return match[0].replaceAll("&amp;", "&");
+async function submitCode(auth: ReturnType<typeof setup>["auth"], email: string, otp: string) {
+  return auth.handler(
+    new Request(`${ORIGIN}/api/auth/sign-in/email-otp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: ORIGIN, ...CLIENT },
+      body: JSON.stringify({ email, otp }),
+    }),
+  );
 }
 
+/** Requests a code for the owner, signs in with it (as a browser would, through auth.handler). */
 async function signIn(auth: ReturnType<typeof setup>["auth"]) {
-  const link = await emailedLink(auth);
-  const res = await auth.handler(new Request(link, { headers: CLIENT }));
+  await requestCode(auth, OWNER);
+  const res = await submitCode(auth, OWNER, lastEmailedCode());
   const cookie = (res.headers.getSetCookie?.() ?? [res.headers.get("set-cookie") ?? ""])
     .map((c) => c.split(";")[0])
     .join("; ");
   return { res, cookie };
 }
 
-describe("auth_events — sign-in record (#679)", () => {
-  test("a sign-in link for a non-allowlisted email logs one failed attempt, response unchanged", async () => {
+describe("auth_events — sign-in record (#679, email code #684)", () => {
+  test("a sign-in code for a non-allowlisted email logs one failed attempt, response unchanged", async () => {
     const { auth, events } = setup();
 
-    const res = await requestLink(auth, "attacker@evil.com");
+    const res = await requestCode(auth, "attacker@evil.com");
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: true }); // anti-enumeration shape untouched
+    expect(await res.json()).toEqual({ success: true }); // anti-enumeration shape untouched
     expect(fetchSpy).not.toHaveBeenCalled();
     const rows = events();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       event: "sign_in_failed",
       email: "attacker@evil.com",
-      method: "email_link",
+      method: "email_code",
       ip: "203.0.113.9",
       country: "US",
     });
     expect(JSON.parse(rows[0].detail_json!)).toEqual({ reason: "not_allowlisted" });
   });
 
-  test("requesting a link for an allowlisted email logs nothing (only the sign-in itself is an event)", async () => {
+  test("requesting a code for an allowlisted email logs nothing (only the sign-in itself is an event)", async () => {
     const { auth, events } = setup();
-    await requestLink(auth, OWNER);
+    await requestCode(auth, OWNER);
     expect(events()).toHaveLength(0);
   });
 
-  test("signing in with a link writes exactly one sign_in row with method, IP, device and location", async () => {
+  test("signing in with a code writes exactly one sign_in row with method, IP, device and location", async () => {
     const { db, auth, events } = setup();
 
     const { res } = await signIn(auth);
 
-    expect(res.status).toBe(302);
+    expect(res.status).toBe(200);
     const rows = events();
     expect(rows).toHaveLength(1);
     const session = db.prepare('SELECT id, "ipAddress" FROM "session"').get() as { id: string; ipAddress: string };
@@ -156,7 +158,7 @@ describe("auth_events — sign-in record (#679)", () => {
       event: "sign_in",
       email: OWNER,
       session_id: session.id,
-      method: "email_link",
+      method: "email_code",
       ip: "203.0.113.9",
       user_agent: CLIENT["user-agent"],
       city: "Pueblo",
@@ -165,29 +167,31 @@ describe("auth_events — sign-in record (#679)", () => {
     });
     // The comment on #679: Better Auth itself now records the Cloudflare client IP.
     expect(session.ipAddress).toBe("203.0.113.9");
-    // No token of any kind is stored.
-    expect(JSON.stringify(rows[0])).not.toMatch(/token/i);
+    // Neither the code nor a token is stored.
+    expect(JSON.stringify(rows[0])).not.toMatch(/token|otp/i);
   });
 
-  test("an invalid sign-in link logs one failed attempt with the reason", async () => {
+  test("a wrong code logs one failed attempt with the reason and the typed email", async () => {
     const { auth, events } = setup();
+    await requestCode(auth, OWNER);
+    const wrong = lastEmailedCode() === "000000" ? "111111" : "000000";
 
-    const res = await auth.handler(
-      new Request(`${ORIGIN}/api/auth/magic-link/verify?token=not-a-real-token&callbackURL=%2Fadmin`, { headers: CLIENT }),
-    );
+    const res = await submitCode(auth, OWNER, wrong);
 
-    expect(res.status).toBe(302);
+    expect(res.status).toBe(400);
     const rows = events();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ event: "sign_in_failed", method: "email_link", email: null, ip: "203.0.113.9" });
-    expect(JSON.parse(rows[0].detail_json!)).toEqual({ reason: "INVALID_TOKEN" });
+    expect(rows[0]).toMatchObject({ event: "sign_in_failed", method: "email_code", email: OWNER, ip: "203.0.113.9" });
+    expect(JSON.parse(rows[0].detail_json!)).toEqual({ reason: "INVALID_OTP" });
+    expect(rows[0].detail_json).not.toContain(wrong);
   });
 
-  test("a used link can't be reused, and the reuse is logged as a failure", async () => {
+  test("a used code can't be reused, and the reuse is logged as a failure", async () => {
     const { auth, events } = setup();
-    const link = await emailedLink(auth);
-    await auth.handler(new Request(link, { headers: CLIENT }));
-    await auth.handler(new Request(link, { headers: CLIENT }));
+    await requestCode(auth, OWNER);
+    const otp = lastEmailedCode();
+    await submitCode(auth, OWNER, otp);
+    await submitCode(auth, OWNER, otp);
 
     expect(events().map((r) => r.event)).toEqual(["sign_in", "sign_in_failed"]);
   });
@@ -260,7 +264,7 @@ describe("auth_events — sign-in record (#679)", () => {
 
     const { res, cookie } = await signIn(auth);
 
-    expect(res.status).toBe(302);
+    expect(res.status).toBe(200);
     expect(cookie).toContain("__Host-session_token=");
     expect((db.prepare('SELECT COUNT(*) AS n FROM "session"').get() as { n: number }).n).toBe(1);
     expect(errorSpy).toHaveBeenCalled();
@@ -269,7 +273,7 @@ describe("auth_events — sign-in record (#679)", () => {
 
   test("recording is off when no events db is configured (schema CLI, config-only tests)", async () => {
     const { auth, events } = setup(() => ({ db: undefined }));
-    await requestLink(auth, "attacker@evil.com");
+    await requestCode(auth, "attacker@evil.com");
     await signIn(auth);
     expect(events()).toHaveLength(0);
   });

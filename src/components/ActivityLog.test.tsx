@@ -80,4 +80,13 @@ describe("ActivityLog", () => {
     render(<ActivityLog days={[]} filters={filters} people={[]} olderHref={null} />);
     expect(screen.getByText("No activity matches these filters.")).toBeDefined();
   });
+
+  test("labels both automatic refresh actors readably", () => {
+    const auto = (id: number, actor: string) => ({ ...action(id, 1), actor_email: actor, session_id: null });
+    const days = buildActivityDays({ actions: [auto(1, "refresh-pipeline"), auto(2, "refresh-pipeline-ai")], events: [], sessionHeaders: [] });
+    render(<ActivityLog days={days} filters={filters} people={[]} olderHref={null} />);
+
+    expect(screen.getByText("Automatic — weekly data refresh")).toBeDefined();
+    expect(screen.getByText("Automatic — data refresh, AI auto-apply")).toBeDefined();
+  });
 });

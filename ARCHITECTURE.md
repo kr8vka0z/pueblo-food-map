@@ -704,8 +704,8 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
 
 ### The shape every admin surface follows
 
-- **Auth:** Better Auth is the sole gate (magic link + passkey, one-email
-  allowlist). **`getAdminDb()` (`src/lib/adminDb.ts`) is the only way to
+- **Auth:** Better Auth is the sole gate (a 6-digit email code typed on the
+  sign-in page, #684, + passkey; one-email allowlist). **`getAdminDb()` (`src/lib/adminDb.ts`) is the only way to
   reach the `ADMIN_DB` binding** and calls `requireAdminSession()` first, so
   no page or route — including a client-side navigation a layout guard would
   miss — reads admin data without a live session. Mutating `/api/admin/*`
@@ -740,11 +740,11 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   before anything is read. Two sources (`src/lib/activityLog.ts`):
   `auth_events` (migration `0017`) — written by Better Auth hooks in
   `src/lib/authEvents.ts` (`session.create.after` for sign-ins; a plugin's
-  path hooks for sign-out, a sign-in link requested for a non-allowlisted
-  email, an invalid/used link, a failed passkey, passkey added/removed;
+  path hooks for sign-out, a sign-in code requested for a non-allowlisted
+  email, a wrong/expired/used-up code, a failed passkey, passkey added/removed;
   never blocks a sign-in, never stores a token) — and `audit_log`, whose
   `session_id` ties each action to its sign-in. Actor without an `@`
-  (`refresh-pipeline`) → an "Automatic" group; human rows from before `0017`
+  (`refresh-pipeline`, `refresh-pipeline-ai`) → an "Automatic" group; human rows from before `0017`
   → a per-person "before sign-ins were recorded" group. Filters are a GET
   form (person, activity type, date range in America/Denver, place/box
   name); paging is "Show older" (`?until=`, 300 rows per source). Both tables

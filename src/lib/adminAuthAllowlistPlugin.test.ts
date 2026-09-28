@@ -19,7 +19,7 @@
  * these tests, not just auth-options.test.ts's construction-only check —
  * exactly the mechanism that caught this file's own tests when better-auth
  * 1.7.4 added a boot-time schema-validation check and every test here that
- * dispatches a real request (signInMagicLink, magicLinkVerify,
+ * dispatches a real request (sendVerificationOTP, signInEmailOTP,
  * generatePasskeyRegistrationOptions) started failing on a missing
  * `rateLimit` table until 0004 was added below.
  *
@@ -37,7 +37,8 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { buildAuthOptions } from "@/lib/auth-options";
-import { adminAuthAllowlistPlugin } from "@/lib/adminAuthAllowlistPlugin";
+import { adminAuthAllowlistPlugin, REFUSED_EMAIL_OTP_PATHS } from "@/lib/adminAuthAllowlistPlugin";
+import { cookieHeaderFrom, lastEmailedCode, signInWithEmailCode } from "@/__tests__/helpers/authTestHelpers";
 
 const MIGRATION_SQL = [
   readFileSync(
@@ -52,10 +53,14 @@ const MIGRATION_SQL = [
 
 const ALLOWLISTED_EMAIL = "kysboyd@gmail.com"; // matches adminAllowlist.ts's default
 
-function buildTestAuth() {
+function buildTestAuthWithDb() {
   const db = new Database(":memory:");
   db.exec(MIGRATION_SQL);
-  return betterAuth(buildAuthOptions(db));
+  return { auth: betterAuth(buildAuthOptions(db)), db };
+}
+
+function buildTestAuth() {
+  return buildTestAuthWithDb().auth;
 }
 
 /** Minimum headers every direct auth.api call in this file needs — see file header WHY. */
@@ -63,7 +68,7 @@ function requestHeaders(extra?: Record<string, string>): Headers {
   return new Headers({ host: "pueblofoodmap.com", ...extra });
 }
 
-describe("magic-link allowlist gate (/sign-in/magic-link)", () => {
+describe("email-code allowlist gate (#684)", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -80,70 +85,173 @@ describe("magic-link allowlist gate (/sign-in/magic-link)", () => {
     delete process.env.ADMIN_ALLOWLIST;
   });
 
-  test("rejects a non-allowlisted email BEFORE creating a verification row or sending mail", async () => {
-    const auth = buildTestAuth();
+  function verificationRows(db: Database.Database): number {
+    return (db.prepare('SELECT COUNT(*) AS n FROM "verification"').get() as { n: number }).n;
+  }
 
-    const result = await auth.api.signInMagicLink({
-      body: { email: "attacker@evil.com" },
+  test("a non-allowlisted email gets the identical response, no code row and no email", async () => {
+    const { auth, db } = buildTestAuthWithDb();
+
+    const result = await auth.api.sendVerificationOTP({
+      body: { email: "attacker@evil.com", type: "sign-in" },
       headers: requestHeaders(),
     });
 
     // Anti-enumeration: identical success shape to a real send.
-    expect(result).toEqual({ status: true });
-    // No email was ever sent for the rejected address.
+    expect(result).toEqual({ success: true });
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(verificationRows(db)).toBe(0);
   });
 
-  test("accepts an allowlisted email and actually sends the magic-link mail", async () => {
-    const auth = buildTestAuth();
+  test("an allowlisted email gets a 6-digit code email (code in the subject, no link) and a hashed code row", async () => {
+    const { auth, db } = buildTestAuthWithDb();
 
-    const result = await auth.api.signInMagicLink({
-      body: { email: ALLOWLISTED_EMAIL },
+    const result = await auth.api.sendVerificationOTP({
+      body: { email: ALLOWLISTED_EMAIL, type: "sign-in" },
       headers: requestHeaders(),
     });
 
-    expect(result).toEqual({ status: true });
+    expect(result).toEqual({ success: true });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.resend.com/emails");
     const body = JSON.parse(init.body as string);
     expect(body.to).toEqual([ALLOWLISTED_EMAIL]);
-    expect(body.html).toContain("http"); // the real magic-link URL is embedded
+    const code = lastEmailedCode();
+    expect(body.subject).toBe(`Your sign-in code: ${code}`);
+    expect(body.html).toContain(code);
+    expect(body.html).not.toMatch(/href=|https?:\/\//);
+    expect(body.text).toContain("expires in 10 minutes");
+    // Stored hashed: the plain code is nowhere in the database.
+    expect(verificationRows(db)).toBe(1);
+    const stored = db.prepare('SELECT value FROM "verification"').get() as { value: string };
+    expect(stored.value).not.toContain(code);
   });
 
   test("comparison is case-insensitive, matching the allowlist helper", async () => {
-    // No surrounding whitespace here: the endpoint's own zod `email()` body
-    // schema rejects a whitespace-padded address before any hook runs — see
-    // adminAllowlist.test.ts for whitespace-trimming coverage of the
-    // underlying isAllowlistedEmail() comparison itself.
-    const auth = buildTestAuth();
-
-    const result = await auth.api.signInMagicLink({
-      body: { email: "KysBoyd@Gmail.COM" },
+    const { auth } = buildTestAuthWithDb();
+    await auth.api.sendVerificationOTP({
+      body: { email: "KysBoyd@Gmail.COM", type: "sign-in" },
       headers: requestHeaders(),
     });
-
-    expect(result).toEqual({ status: true });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   test("honors a custom ADMIN_ALLOWLIST", async () => {
     process.env.ADMIN_ALLOWLIST = "someone-else@example.com";
-    const auth = buildTestAuth();
+    const { auth } = buildTestAuthWithDb();
 
-    const rejected = await auth.api.signInMagicLink({
-      body: { email: ALLOWLISTED_EMAIL },
-      headers: requestHeaders(),
-    });
-    expect(rejected).toEqual({ status: true });
+    await auth.api.sendVerificationOTP({ body: { email: ALLOWLISTED_EMAIL, type: "sign-in" }, headers: requestHeaders() });
     expect(fetchSpy).not.toHaveBeenCalled();
 
-    const accepted = await auth.api.signInMagicLink({
-      body: { email: "someone-else@example.com" },
-      headers: requestHeaders(),
-    });
-    expect(accepted).toEqual({ status: true });
+    await auth.api.sendVerificationOTP({ body: { email: "someone-else@example.com", type: "sign-in" }, headers: requestHeaders() });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(["email-verification", "forget-password"] as const)(
+    "a %s code is never created or sent, even for an allowlisted email",
+    async (type) => {
+      const { auth, db } = buildTestAuthWithDb();
+      const result = await auth.api.sendVerificationOTP({ body: { email: ALLOWLISTED_EMAIL, type }, headers: requestHeaders() });
+      expect(result).toEqual({ success: true });
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(verificationRows(db)).toBe(0);
+    },
+  );
+
+  test("the emailed code signs in, once only", async () => {
+    const { auth, db } = buildTestAuthWithDb();
+    await auth.api.sendVerificationOTP({ body: { email: ALLOWLISTED_EMAIL, type: "sign-in" }, headers: requestHeaders() });
+    const otp = lastEmailedCode();
+
+    const res = await auth.api.signInEmailOTP({ body: { email: ALLOWLISTED_EMAIL, otp }, headers: requestHeaders(), asResponse: true });
+    expect(res.status).toBe(200);
+    expect(cookieHeaderFrom(res)).toContain("__Host-session_token=");
+    expect((db.prepare('SELECT COUNT(*) AS n FROM "session"').get() as { n: number }).n).toBe(1);
+
+    await expect(
+      auth.api.signInEmailOTP({ body: { email: ALLOWLISTED_EMAIL, otp }, headers: requestHeaders() }),
+    ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
+  });
+
+  test("three wrong codes → too many tries, and then even the right code is refused", async () => {
+    const { auth } = buildTestAuthWithDb();
+    await auth.api.sendVerificationOTP({ body: { email: ALLOWLISTED_EMAIL, type: "sign-in" }, headers: requestHeaders() });
+    const otp = lastEmailedCode();
+    const wrong = otp === "000000" ? "111111" : "000000";
+
+    for (let i = 0; i < 3; i++) {
+      await expect(
+        auth.api.signInEmailOTP({ body: { email: ALLOWLISTED_EMAIL, otp: wrong }, headers: requestHeaders() }),
+      ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
+    }
+    await expect(
+      auth.api.signInEmailOTP({ body: { email: ALLOWLISTED_EMAIL, otp }, headers: requestHeaders() }),
+    ).rejects.toMatchObject({ body: { code: "TOO_MANY_ATTEMPTS" } });
+  });
+
+  test("an expired code is refused", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const { auth } = buildTestAuthWithDb();
+      await auth.api.sendVerificationOTP({ body: { email: ALLOWLISTED_EMAIL, type: "sign-in" }, headers: requestHeaders() });
+      const otp = lastEmailedCode();
+      vi.setSystemTime(Date.now() + 11 * 60 * 1000);
+
+      await expect(
+        auth.api.signInEmailOTP({ body: { email: ALLOWLISTED_EMAIL, otp }, headers: requestHeaders() }),
+      ).rejects.toMatchObject({ body: { code: "OTP_EXPIRED" } });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("signing in with a code is refused for a non-allowlisted email with the same error as a wrong code", async () => {
+    const { auth, db } = buildTestAuthWithDb();
+
+    await expect(
+      auth.api.signInEmailOTP({ body: { email: "attacker@evil.com", otp: "123456" }, headers: requestHeaders() }),
+    ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
+    expect((db.prepare('SELECT COUNT(*) AS n FROM "user"').get() as { n: number }).n).toBe(0);
+  });
+
+  test("even holding a VALID code, a non-allowlisted email is refused at the gate (defense in depth)", async () => {
+    const { auth, db } = buildTestAuthWithDb();
+    // Server-only endpoint: plants a real code, as if gate 1 had been bypassed.
+    const otp = await auth.api.createVerificationOTP({ body: { email: "attacker@evil.com", type: "sign-in" } });
+
+    await expect(
+      auth.api.signInEmailOTP({ body: { email: "attacker@evil.com", otp }, headers: requestHeaders() }),
+    ).rejects.toMatchObject({ body: { code: "INVALID_OTP" } });
+    expect((db.prepare('SELECT COUNT(*) AS n FROM "session"').get() as { n: number }).n).toBe(0);
+    // Refused before the code was even checked: it's still unused.
+    expect(verificationRows(db)).toBe(1);
+  });
+
+  test("the old /sign-in/magic-link endpoint no longer exists", async () => {
+    const { auth } = buildTestAuthWithDb();
+    const res = await auth.handler(
+      new Request("https://pueblofoodmap.com/api/auth/sign-in/magic-link", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://pueblofoodmap.com" },
+        body: JSON.stringify({ email: ALLOWLISTED_EMAIL }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test.each([...REFUSED_EMAIL_OTP_PATHS])("the unused emailOTP endpoint %s is refused", async (path) => {
+    const { auth } = buildTestAuthWithDb();
+    const res = await auth.handler(
+      new Request(`https://pueblofoodmap.com/api/auth${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://pueblofoodmap.com" },
+        body: JSON.stringify({ email: ALLOWLISTED_EMAIL, otp: "123456", type: "sign-in", password: "x".repeat(12), newEmail: "x@example.com" }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -219,42 +327,11 @@ describe("passkey registration allowlist gate", () => {
   test("an allowlisted, authenticated session CAN reach passkey registration options", async () => {
     const auth = buildTestAuth();
 
-    // Real bootstrap: sign in via magic link, then verify the token to mint
-    // a real session — the only legitimate way to obtain an authenticated
-    // session in this system (see auth-options.ts's emailAndPassword.enabled
-    // = false). The magic-link token is recovered from the mocked Resend
-    // call's own email body rather than read back out of the `verification`
-    // table directly — this proves the token actually delivered to the user
-    // is the one that verifies, not just some token that happens to exist
-    // in the DB.
-    await auth.api.signInMagicLink({
-      body: { email: ALLOWLISTED_EMAIL },
-      headers: requestHeaders(),
-    });
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
-    const [, sendInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const sentBody = JSON.parse(sendInit.body as string);
-    const tokenMatch = /token=([^&\s"]+)/.exec(sentBody.text as string);
-    if (!tokenMatch) {
-      throw new Error("magic-link email did not contain a token URL");
-    }
-    const token = tokenMatch[1];
-
-    const verifyResponse = await auth.api.magicLinkVerify({
-      query: { token, callbackURL: "/" },
-      headers: requestHeaders(),
-      asResponse: true,
-    });
-    const setCookie = verifyResponse.headers.get("set-cookie");
-    if (!setCookie) {
-      throw new Error("magicLinkVerify did not set a session cookie");
-    }
-    // A real browser/fetch client sends back only name=value pairs on the
-    // Cookie header, not the Set-Cookie attributes (Path, HttpOnly, etc.).
-    const cookieHeader = setCookie
-      .split(",")
-      .map((part) => part.split(";")[0].trim())
-      .join("; ");
+    // Real bootstrap: sign in with the emailed code — the only legitimate
+    // way to obtain an authenticated session in this system (see
+    // auth-options.ts's emailAndPassword.enabled = false). The code comes
+    // from the mocked Resend email itself (authTestHelpers.ts).
+    const cookieHeader = await signInWithEmailCode(auth, ALLOWLISTED_EMAIL);
 
     // The gate under test: does NOT throw FORBIDDEN for this allowlisted,
     // authenticated session. (It may still fail deeper in the WebAuthn

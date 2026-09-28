@@ -146,7 +146,7 @@ jobs:
           # assertion to a warning.
           attempts=6
           status=0
-          for path in "/" "/venues" "/venue/${VENUE_ID}"; do
+          for path in "/" "/venues" "/venue/${VENUE_ID}" "/sitemap.xml" "/robots.txt"; do
             code=""
             for i in $(seq 1 "$attempts"); do
               # No -f: a 404 must be READ, not turned into a curl error. `-f`
@@ -165,6 +165,36 @@ jobs:
               status=1
             fi
           done
+          # Indexing policy (SEO/AEO plan Phase 0, src/lib/indexingHost.ts):
+          # only pueblofoodmap.com may be indexed. A noindex leaking onto the
+          # canonical host would quietly deindex the whole site, so that's a
+          # hard failure. The workers.dev origin above must carry the header;
+          # it's retried like the loop above, since the old version (without
+          # the header) can answer for a moment after `wrangler deploy`.
+          # A failed curl is reported as such, never read as "no header".
+          has_noindex() {
+            local headers
+            headers=$(curl -sS -D - -o /dev/null "$1") || return 2
+            printf '%s' "$headers" | grep -qi '^x-robots-tag:.*noindex'
+          }
+          rc=0; has_noindex "https://pueblofoodmap.com/" || rc=$?
+          case "$rc" in
+            0) echo "Smoke check failed: https://pueblofoodmap.com/ sends X-Robots-Tag noindex" >&2; status=1 ;;
+            1) echo "https://pueblofoodmap.com/ -> indexable (no X-Robots-Tag noindex)" ;;
+            *) echo "Smoke check failed: could not fetch https://pueblofoodmap.com/" >&2; status=1 ;;
+          esac
+          rc=1
+          for i in $(seq 1 "$attempts"); do
+            rc=0; has_noindex "${ORIGIN}/" || rc=$?
+            [ "$rc" = "0" ] && break
+            [ "$i" -lt "$attempts" ] && { echo "${ORIGIN}/ has no noindex yet (attempt ${i}/${attempts}, retrying in 10s)"; sleep 10; }
+          done
+          if [ "$rc" = "0" ]; then
+            echo "${ORIGIN}/ -> noindex"
+          else
+            echo "Smoke check failed: ${ORIGIN}/ is missing X-Robots-Tag noindex" >&2
+            status=1
+          fi
           exit $status
       # Belt and suspenders on top of the HC.io dead-man's-switch (wrangler.jsonc
       # `triggers`/`vars`, custom-worker.ts `scheduled()`): that switch only fires on

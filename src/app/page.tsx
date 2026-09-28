@@ -19,6 +19,7 @@
  */
 
 import type { Metadata } from "next";
+import Link from "next/link";
 import { buildVenueListJsonLd, serializeJsonLd } from "@/lib/venueSchema";
 import { buildPageMetadata } from "@/lib/site";
 import { venues } from "@/data/venues";
@@ -30,6 +31,19 @@ export const metadata: Metadata = buildPageMetadata({
     "Find free and low-cost food near you in Pueblo County, CO — pantries, community gardens, grocery stores, and meal sites, with SNAP/WIC info and directions.",
   path: "/",
 });
+
+// Not exported: Next.js rejects unknown named exports from a page file.
+const HOME_CRAWL_LINKS = [
+  { href: "/venues", label: "All food resources in Pueblo County" },
+  { href: "/resources", label: "Food help programs (SNAP, WIC, 2-1-1)" },
+  { href: "/about", label: "About Pueblo Food Map" },
+] as const;
+
+const HOME_CRAWL_LINK_CLASS =
+  "sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 " +
+  "focus:px-3 focus:py-2 focus:rounded focus:bg-[var(--color-bone-50)] " +
+  "focus:text-[var(--color-ink-900)] focus:outline-none focus:ring-2 " +
+  "focus:ring-[var(--color-sage-500)]";
 
 export default function HomePage() {
   // Build ItemList JSON-LD once (referentially stable — venues array is static).
@@ -44,6 +58,25 @@ export default function HomePage() {
       />
       {/* sr-only: gives crawlers/AT a real <h1> without changing the splash/map visual design */}
       <h1 className="sr-only">Pueblo Food Map — Food Resources in Pueblo County, CO</h1>
+      {/* Server-rendered links (SEO/AEO plan Phase 0). Before this, the
+          homepage's server HTML had zero <a> links, so crawlers that don't run
+          JS couldn't get from / to /venues (and from there every venue page).
+          Visually hidden like the <h1> above, so the map design is
+          unchanged; screen-reader users get the same links. Each link shows
+          itself when focused (the skip-link pattern), so keyboard focus never
+          lands on something invisible. English only, like the <h1>. */}
+      {/* `absolute` keeps the zero-size list out of the flex layout. */}
+      <nav aria-label="Site" className="absolute">
+        <ul>
+          {HOME_CRAWL_LINKS.map(({ href, label }) => (
+            <li key={href}>
+              <Link href={href} className={HOME_CRAWL_LINK_CLASS}>
+                {label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
       <HomePageClient />
     </>
   );

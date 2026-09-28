@@ -58,6 +58,31 @@ function extractStreetAddress(address: string): string {
 }
 
 /**
+ * BreadcrumbList for a venue page (SEO/AEO plan Phase 0): Pueblo Food Map ›
+ * All food resources › {venue}. It mirrors the visible breadcrumb
+ * VenueContent renders, which is what makes it eligible for Google's
+ * breadcrumb display. English always, like the rest of this file's JSON-LD
+ * (#386).
+ */
+export function buildVenueBreadcrumbJsonLd(venue: Venue): Record<string, unknown> {
+  const crumbs = [
+    { name: SITE_NAME, url: SITE_URL },
+    { name: "All food resources", url: `${SITE_URL}/venues` },
+    { name: venue.name, url: `${SITE_URL}${venuePath(venue.id)}` },
+  ];
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: crumbs.map((crumb, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: crumb.name,
+      item: crumb.url,
+    })),
+  };
+}
+
+/**
  * Serialize a JSON-LD object for safe injection into a <script> tag.
  *
  * WHY: JSON.stringify does NOT escape `<`, so a `</script>` (or `<!--`) in any
@@ -191,9 +216,18 @@ export function buildFaqJsonLd(
  * WHY @graph instead of a flat WebSite object: a bare WebSite node has no
  * identity separate from the page it's declared on. Wrapping WebSite +
  * Organization in one @graph, linked by publisher/@id, makes the site itself
- * a linkable schema.org Organization entity (with a sameAs back to its own
- * canonical presences) — search engines can then associate the WebSite with
- * a known, cross-referenced entity instead of an anonymous node.
+ * a linkable schema.org Organization entity — search engines can then
+ * associate the WebSite with a known, cross-referenced entity instead of an
+ * anonymous node.
+ *
+ * SEO/AEO plan Phase 0 fixed the Organization's links:
+ * - `sameAs` means "this same entity elsewhere". It used to list
+ *   pueblofoodmap.com (itself, a no-op) and pueblofoodproject.org (a different
+ *   organization). It now lists only the project's own public repo.
+ * - Pueblo Food Project is the WebSite's `sourceOrganization`, schema.org's
+ *   "on whose behalf the creator was working" (README: "Built for and with
+ *   Pueblo Food Project").
+ * - `logo` and `areaServed` give answer engines the brand mark and the region.
  */
 export function buildWebSiteJsonLd(): Record<string, unknown> {
   return {
@@ -208,13 +242,23 @@ export function buildWebSiteJsonLd(): Record<string, unknown> {
           "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores.",
         inLanguage: "en",
         publisher: { "@id": `${SITE_URL}/#organization` },
+        sourceOrganization: {
+          "@type": "Organization",
+          name: "Pueblo Food Project",
+          url: "https://pueblofoodproject.org",
+        },
       },
       {
         "@type": "Organization",
         "@id": `${SITE_URL}/#organization`,
         name: SITE_NAME,
         url: SITE_URL,
-        sameAs: ["https://pueblofoodproject.org", "https://pueblofoodmap.com"],
+        logo: `${SITE_URL}/icons/icon-512.png`,
+        areaServed: {
+          "@type": "AdministrativeArea",
+          name: "Pueblo County, Colorado",
+        },
+        sameAs: ["https://github.com/kr8vka0z/pueblo-food-map"],
       },
     ],
   };

@@ -70,6 +70,12 @@ describe("box/[id] generateMetadata", () => {
     expect(String(metadata.description)).toContain(box.address);
   });
 
+  test("known box -> noindex, follow (a redirect shell, not an indexable page)", async () => {
+    mockLoadLiveBoxById.mockResolvedValue(makeBox());
+    const metadata = await generateMetadata({ params: Promise.resolve({ id: "any-id" }) });
+    expect(metadata.robots).toEqual({ index: false, follow: true });
+  });
+
   test("unknown id -> empty metadata (same 404 convention as /venue/[id])", async () => {
     mockLoadLiveBoxById.mockResolvedValue(null);
     const metadata = await generateMetadata({ params: Promise.resolve({ id: "not-a-real-box" }) });

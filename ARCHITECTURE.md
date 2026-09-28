@@ -72,7 +72,7 @@ Next.js App Router (Cloudflare Worker)
   └── src/app/api/public/**   (unauthenticated box reads and writes)
   └── src/app/report/[venueId], suggest, feedback  (+ submit/route.ts each)
   └── src/app/admin/**, src/app/api/admin/**  (admin panel — see "Admin panel")
-  └── SiteFooter.tsx (slim nav footer on the utility pages)
+  └── SiteFooter.tsx (slim nav footer on every public page but the map — the crawl path to /venues)
 
 Data layer (static TS modules, no API calls at render time)
   └── src/data/venues.ts          (public venue list — see "Data aggregator" below)
@@ -431,6 +431,34 @@ never corrected by a stale observer. The hook's header has the full trace.
 - US government program names (SNAP, WIC) are not translated.
 - Keys marked `[CHECK]` in the ES dictionary need review by a native
   Mexican-Spanish speaker for regional naturalness.
+
+---
+
+## Crawlability and indexing
+
+The SEO/AEO plan (`docs/seo-aeo-plan.md`, Phase 0) is the source for this section.
+The rules it sets:
+
+- **Every venue page must be reachable through server-rendered links**, not only
+  through the sitemap. `/` has a visually hidden `<nav>` (skip-link style) that
+  links to `/venues`, `/resources` and `/about`. `SiteFooter` links to `/venues`
+  and `/resources` on every other public page, including `/venue/<id>`. `/venues`
+  links to every venue. The map's own links only exist after JS runs.
+- **`/venue/<id>`** has a visible breadcrumb (Map › All places › name) plus a
+  matching `BreadcrumbList` JSON-LD (`buildVenueBreadcrumbJsonLd`). The page's
+  ODbL credit comes from `SiteFooter`.
+- **The sitemap is build-time data only**: the static routes plus the published
+  venues. `src/__tests__/seo.test.ts` fails if a static sitemap URL has no
+  `page.tsx`. That's how the old `/boxes` entry 404'd unnoticed. Blessing
+  Boxes aren't in it: `/box/<id>` is a `noindex` redirect shell into the map
+  card. Boxes come back through the planned read-only `/blessing-boxes` list
+  (REVIEW.md).
+- **Only `pueblofoodmap.com` is indexable.** `custom-worker.ts` adds
+  `X-Robots-Tag: noindex, nofollow` to every response on any other host
+  (dev., *.workers.dev), via `src/lib/indexingHost.ts`. This is deliberately a
+  header, not a robots.txt `Disallow`: a crawler must be able to fetch a page
+  to see its noindex and drop it. `deploy-prod.yml`'s smoke test fails if the
+  canonical host ever sends the header, or if workers.dev stops sending it.
 
 ---
 

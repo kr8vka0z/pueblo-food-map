@@ -11,6 +11,7 @@ import {
   getVenueById,
   venuePath,
   buildVenueJsonLd,
+  buildVenueBreadcrumbJsonLd,
   buildVenueListJsonLd,
   buildWebSiteJsonLd,
   serializeJsonLd,
@@ -277,8 +278,23 @@ describe("buildWebSiteJsonLd", () => {
     expect(organization["@type"]).toBe("Organization");
     expect(organization["@id"]).toBe(`${SITE_URL}/#organization`);
     expect(Array.isArray(organization["sameAs"])).toBe(true);
-    expect(organization["sameAs"]).toContain("https://pueblofoodproject.org");
-    expect(organization["sameAs"]).toContain("https://pueblofoodmap.com");
+  });
+
+  // SEO/AEO plan Phase 0: sameAs is "the same entity elsewhere" — never the
+  // site itself, and never a different organization.
+  test("sameAs lists neither the site itself nor Pueblo Food Project", () => {
+    expect(organization["sameAs"]).not.toContain(SITE_URL);
+    expect(organization["sameAs"]).not.toContain("https://pueblofoodproject.org");
+  });
+
+  test("Pueblo Food Project is the WebSite's sourceOrganization", () => {
+    const source = website["sourceOrganization"] as Record<string, unknown>;
+    expect(source["url"]).toBe("https://pueblofoodproject.org");
+  });
+
+  test("Organization has an absolute logo URL and Pueblo County as areaServed", () => {
+    expect(String(organization["logo"])).toMatch(new RegExp(`^${SITE_URL}/`));
+    expect((organization["areaServed"] as Record<string, unknown>)["name"]).toBe("Pueblo County, Colorado");
   });
 
   test("WebSite.publisher @id matches Organization @id", () => {
@@ -322,3 +338,33 @@ describe("serializeJsonLd", () => {
     expect(result).toContain("38.27");
   });
 });
+
+// ─── buildVenueBreadcrumbJsonLd (SEO/AEO plan Phase 0) ─────────────────────────
+
+describe("buildVenueBreadcrumbJsonLd", () => {
+  const venue = venues[0];
+  const crumbs = buildVenueBreadcrumbJsonLd(venue);
+  const items = crumbs["itemListElement"] as Array<Record<string, unknown>>;
+
+  test("is a BreadcrumbList", () => {
+    expect(crumbs["@context"]).toBe("https://schema.org");
+    expect(crumbs["@type"]).toBe("BreadcrumbList");
+  });
+
+  test("home › /venues › the venue, in order, with absolute URLs", () => {
+    expect(items.map((i) => i["position"])).toEqual([1, 2, 3]);
+    expect(items.map((i) => i["item"])).toEqual([
+      SITE_URL,
+      `${SITE_URL}/venues`,
+      `${SITE_URL}${venuePath(venue.id)}`,
+    ]);
+    expect(items[0]["name"]).toBe(SITE_NAME);
+    expect(items[2]["name"]).toBe(venue.name);
+  });
+
+  test("serializes safely (a </script> in a name can't break out)", () => {
+    const hostile = { ...venue, name: "Evil </script><script>alert(1)</script>" };
+    expect(serializeJsonLd(buildVenueBreadcrumbJsonLd(hostile))).not.toContain("</script>");
+  });
+});
+

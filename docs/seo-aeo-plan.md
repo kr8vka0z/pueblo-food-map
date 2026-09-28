@@ -72,6 +72,9 @@ Unchanged from v1. They're the test set for every phase and for measurement (§4
 
 ### Phase 0: Get crawled and measured (one small PR + dashboard tasks, do first)
 
+**Status:** code items 1–4 are built on `claude/seo-aeo-plan-review-ss66kh`
+(PR into `dev`). Items 5–8 are Kyle's.
+
 Code (one PR into `dev`):
 
 1. **Give crawlers a path to every venue.**
@@ -89,13 +92,16 @@ Code (one PR into `dev`):
    Consider dropping `/suggest`, `/feedback` and `/privacy` from the sitemap as
    well; they're low value but harmless.
 3. **`noindex` every non-prod host.** Add an `X-Robots-Tag: noindex` header in
-   `custom-worker.ts`, and a `Disallow: /` in `robots.ts`, whenever the host
-   isn't `pueblofoodmap.com`. Read the host from the request; don't add a new
-   var. Add a `deploy-prod.yml` smoke assertion that prod does **not** send the
-   header, because a mistake here would deindex the whole site.
-4. **Organization JSON-LD.** Drop the self `sameAs`. Add `logo` and
-   `areaServed: Pueblo County, CO`. Keep PFP as `parentOrganization` or
-   `sponsor` if that's accurate, rather than `sameAs` (it's a different org).
+   `custom-worker.ts` whenever the host isn't `pueblofoodmap.com`. Read the host
+   from the request; don't add a new var. Deliberately **no** robots.txt
+   `Disallow` there: a crawler has to fetch a page to see its noindex, and
+   drop anything it already indexed. Add a `deploy-prod.yml` smoke assertion
+   that prod does **not** send the header, because a mistake here would
+   deindex the whole site.
+4. **Organization JSON-LD.** Drop the self `sameAs` and PFP (a different
+   organization) from `sameAs`; keep the GitHub repo there. Add `logo` and
+   `areaServed: Pueblo County`. Record PFP as the WebSite's
+   `sourceOrganization` ("built for and with Pueblo Food Project").
 
 Dashboard and ops (no code):
 

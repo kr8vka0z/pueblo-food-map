@@ -7,9 +7,13 @@
  * <h1>, crawl links) are re-emitted here in Spanish rather than imported,
  * because they're the page's OWN localized content, not shared logic.
  *
- * Internal links point within the /es tree literally (not yet via
- * localizedHref — that helper lands in the next slice and this file's
- * three links get threaded through it then, same as every other /es page).
+ * Internal links point within the /es tree as plain "/es/..." literals, NOT
+ * via localizedHref: this file only ever renders on the /es tree (tree is
+ * always "es" here), so there's no ambiguity localizedHref would resolve —
+ * unlike a shared component (SiteFooter, BottomNav, ...) that renders on
+ * BOTH trees and needs it to pick the right one. Same reasoning as the EN
+ * homepage's own HOME_CRAWL_LINKS (src/app/(site)/page.tsx), which is
+ * equally hardcoded to "/venues" etc.
  */
 
 import type { Metadata } from "next";

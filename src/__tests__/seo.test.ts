@@ -72,17 +72,23 @@ describe("sitemap", () => {
   });
 
   // Guards the class of bug above: every non-venue URL must be served by a
-  // real src/app/**/page.tsx. Every public page now lives under the (site)
-  // route group (#689 PR 1) — route groups don't change the URL, so a plain
-  // path → directory mapping under src/app/(site) is still enough.
+  // real src/app/**/page.tsx. Every public EN page lives under the (site)
+  // route group (#689 PR 1) — route groups don't change the URL. #689 PR 2
+  // (design decision 10, "Emit the ES URLs ... for every mirrored route")
+  // added /es entries, which live under src/app/es/ instead — this test is
+  // updated to route each path to the tree it's actually served from,
+  // rather than assuming (site) for everything.
   test("every static (non-venue) URL maps to a real page.tsx", async () => {
     const entries = await sitemap();
     const staticPaths = entries
       .map((e) => e.url.slice(SITE_URL.length) || "/")
-      .filter((path) => !path.startsWith("/venue/"));
+      .filter((path) => !path.includes("/venue/"));
     expect(staticPaths.length).toBeGreaterThan(0);
     for (const path of staticPaths) {
-      const pageFile = join(process.cwd(), "src/app/(site)", path, "page.tsx");
+      const isEs = path === "/es" || path.startsWith("/es/");
+      const routeDir = isEs ? "src/app/es" : "src/app/(site)";
+      const relativePath = isEs ? (path === "/es" ? "" : path.slice("/es".length)) : path;
+      const pageFile = join(process.cwd(), routeDir, relativePath, "page.tsx");
       expect(existsSync(pageFile), `${path} → ${pageFile}`).toBe(true);
     }
   });
@@ -117,15 +123,21 @@ describe("sitemap", () => {
     expect(urls).toContain(firstVenueUrl);
   });
 
-  test("all venue URLs start with SITE_URL/venue/", async () => {
+  // #689 PR 2 (design decision 10) added an /es twin for every venue, so
+  // the count doubles and each entry must be under EXACTLY ONE of the two
+  // valid venue prefixes — stricter than the pre-#689 assertion (single
+  // prefix, single count), not weaker: it still fails on a stray URL under
+  // neither tree, and now also fails if either tree's count is wrong.
+  test("all venue URLs are under /venue/ (EN) or /es/venue/ (ES), one of each per venue", async () => {
     const entries = await sitemap();
-    const venueEntries = entries.filter((e) =>
-      e.url.includes("/venue/"),
-    );
-    expect(venueEntries.length).toBe(venues.length);
-    for (const entry of venueEntries) {
-      expect(entry.url.startsWith(`${SITE_URL}/venue/`)).toBe(true);
-    }
+    const venueEntries = entries.filter((e) => e.url.includes("/venue/"));
+    expect(venueEntries.length).toBe(venues.length * 2);
+
+    const enVenueUrls = venueEntries.filter((e) => e.url.startsWith(`${SITE_URL}/venue/`));
+    const esVenueUrls = venueEntries.filter((e) => e.url.startsWith(`${SITE_URL}/es/venue/`));
+    expect(enVenueUrls.length).toBe(venues.length);
+    expect(esVenueUrls.length).toBe(venues.length);
+    expect(enVenueUrls.length + esVenueUrls.length).toBe(venueEntries.length);
   });
 
   // S6 (#164 quick win) — venue entries carry a real lastModified so crawlers
@@ -145,6 +157,56 @@ describe("sitemap", () => {
     const v = venues[0];
     const entry = entries.find((e) => e.url === `${SITE_URL}/venue/${v.id}`);
     expect(entry?.lastModified).toBe(v.last_verified);
+  });
+
+  // #689 PR 2 (design decision 10) — every mirrored route's sitemap entry
+  // carries alternates.languages pointing at its counterpart.
+  describe("es alternates (#689)", () => {
+    test("/ and /es both point at each other", async () => {
+      const entries = await sitemap();
+      const en = entries.find((e) => e.url === SITE_URL);
+      const es = entries.find((e) => e.url === `${SITE_URL}/es`);
+      expect(en?.alternates?.languages).toEqual({ en: SITE_URL, es: `${SITE_URL}/es` });
+      expect(es?.alternates?.languages).toEqual({ en: SITE_URL, es: `${SITE_URL}/es` });
+    });
+
+    test("/about and /es/about both point at each other", async () => {
+      const entries = await sitemap();
+      const en = entries.find((e) => e.url === `${SITE_URL}/about`);
+      const es = entries.find((e) => e.url === `${SITE_URL}/es/about`);
+      const expected = { en: `${SITE_URL}/about`, es: `${SITE_URL}/es/about` };
+      expect(en?.alternates?.languages).toEqual(expected);
+      expect(es?.alternates?.languages).toEqual(expected);
+    });
+
+    test("every venue's EN and ES entries point at each other", async () => {
+      const entries = await sitemap();
+      for (const v of venues) {
+        const enUrl = `${SITE_URL}/venue/${v.id}`;
+        const esUrl = `${SITE_URL}/es/venue/${v.id}`;
+        const en = entries.find((e) => e.url === enUrl);
+        const es = entries.find((e) => e.url === esUrl);
+        expect(en?.alternates?.languages, enUrl).toEqual({ en: enUrl, es: esUrl });
+        expect(es?.alternates?.languages, esUrl).toEqual({ en: enUrl, es: esUrl });
+      }
+    });
+
+    test("non-mirrored routes (/suggest, /privacy, /feedback, /boxes/activity) have no alternates block", async () => {
+      const entries = await sitemap();
+      for (const path of ["/suggest", "/privacy", "/feedback", "/boxes/activity"]) {
+        const entry = entries.find((e) => e.url === `${SITE_URL}${path}`);
+        expect(entry?.alternates, path).toBeUndefined();
+      }
+    });
+
+    test("an /es venue entry carries the same lastModified as its EN twin", async () => {
+      const entries = await sitemap();
+      const v = venues[0];
+      const en = entries.find((e) => e.url === `${SITE_URL}/venue/${v.id}`);
+      const es = entries.find((e) => e.url === `${SITE_URL}/es/venue/${v.id}`);
+      expect(es?.lastModified).toBe(en?.lastModified);
+      expect(es?.lastModified).toBe(v.last_verified);
+    });
   });
 });
 

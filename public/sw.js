@@ -32,13 +32,22 @@
  *
  * Bust every cache: bump CACHE_VERSION. Disable the worker for everyone:
  * set KILL_SWITCH = true and deploy (it clears its caches and unregisters).
+ *
+ * #689 PR 2: /es, /es/venues and /es/resources joined SHELL_PAGES (the /es
+ * tree's own equivalents of /, /venues, /resources) — CACHE_VERSION bumps
+ * to v2 so an already-installed PWA actually re-runs `install` and
+ * precaches them; a stale worker would otherwise keep serving its old
+ * cache forever and never learn the new URLs exist. The offline
+ * navigation fallback (networkOnlyWithShellFallback) now also picks the
+ * shell matching the FAILED url's own tree — an /es/about visitor who
+ * loses signal lands back on the cached /es shell, not the English one.
  */
 
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const CACHE_NAME = `pfm-${CACHE_VERSION}`;
 const KILL_SWITCH = false;
 
-const SHELL_PAGES = ["/", "/venues", "/resources"];
+const SHELL_PAGES = ["/", "/venues", "/resources", "/es", "/es/venues", "/es/resources"];
 
 // Pages that must never come out of a cache: /api (live data, auth), /admin,
 // /alerts (a subscription token rides in ?t=), /box (live D1 boxes).
@@ -153,13 +162,23 @@ async function networkFirst(request) {
 // page — keeps the visitor inside a working app (bottom nav, cached JS)
 // instead of a dead end. Deliberately does NOT cache the fetched response
 // itself: that would make every page a visitor has ever opened a 4th+
-// permanent shell page with no eviction, unlike the 3 fixed SHELL_PAGES.
+// permanent shell page with no eviction, unlike the fixed SHELL_PAGES.
+//
+// #689 PR 2: which shell to fall back to now depends on the failed URL's
+// OWN tree — /es/about offline should land back on the cached /es shell
+// (Spanish, still in the /es tree), not silently drop a Spanish visitor
+// into the English homepage.
+function shellPathFor(pathname) {
+  return pathname === "/es" || pathname.startsWith("/es/") ? "/es" : "/";
+}
+
 async function networkOnlyWithShellFallback(request) {
   try {
     return await fetch(request);
   } catch (err) {
     const cache = await caches.open(CACHE_NAME);
-    const shellFallback = await cache.match("/");
+    const shellPath = shellPathFor(new URL(request.url).pathname);
+    const shellFallback = await cache.match(shellPath);
     if (shellFallback) return shellFallback;
     throw err;
   }

@@ -165,6 +165,21 @@ jobs:
               status=1
             fi
           done
+          # An unmatched URL must answer a real 404 (src/app/global-not-found.tsx,
+          # #689). A soft-200 here would let crawlers index junk URLs; a 500
+          # means the experimental globalNotFound path broke on the Worker.
+          # Retried only past a failed fetch (000), never past a wrong status.
+          missing="/smoke-check-no-such-page"
+          for i in $(seq 1 "$attempts"); do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" "${ORIGIN}${missing}" || echo "000")
+            [ "$code" != "000" ] && break
+            if [ "$i" -lt "$attempts" ]; then sleep 10; fi
+          done
+          echo "GET ${ORIGIN}${missing} -> ${code}"
+          if [ "$code" != "404" ]; then
+            echo "Smoke check failed: ${missing} returned ${code}, expected 404" >&2
+            status=1
+          fi
           # Indexing policy (SEO/AEO plan Phase 0, src/lib/indexingHost.ts):
           # only pueblofoodmap.com may be indexed. A noindex leaking onto the
           # canonical host would quietly deindex the whole site, so that's a

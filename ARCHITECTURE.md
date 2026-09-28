@@ -84,8 +84,13 @@ Next.js App Router (Cloudflare Worker)
         venues/, venue/[id]/) each pass locale: "es" to buildPageMetadata and
         the venueSchema.ts builders, and render the SAME client "Content"
         components as their (site)/ counterparts — no page logic duplicated.
-        Its own not-found.tsx is required for an explicit notFound() inside
-        es/venue/[id] to resolve in-tree (see "i18n model" below).
+        No es/not-found.tsx: dynamicParams=false on es/venue/[id] means an
+        unknown id 404s at Next's ROUTING level, before that page's own
+        notFound() call ever runs — there is no in-tree notFound() call
+        anywhere under /es to catch. Unmatched /es/* URLs (including an
+        unknown venue id) fall through to the EN app/global-not-found.tsx —
+        an accepted tradeoff; see "i18n model" below for why a catch-all
+        route meant to fix that measured worse, not better.
   └── src/components/RootShell.tsx — the shared <html>/<body> shell (font
         preload, WebSite JSON-LD, LocaleProvider, Analytics, SW register)
         (site)/layout.tsx, es/layout.tsx and global-not-found.tsx (below) all
@@ -460,6 +465,21 @@ toggle only, `<title>` corrected client-side after hydration (#589, #605,
 #610 — below). `/venue/[id]` and `/es/venue/[id]` both deliberately keep
 their SSR `<title>` as the venue's proper name — nothing to translate
 (#287's original reasoning still applies there, just per-tree now).
+
+**Unmatched /es/* URLs render the ENGLISH 404, not a Spanish one** — an
+accepted tradeoff (#689 PR 2 follow-up, round 2). There is no `es/not-found.tsx`
+and no `es/[...rest]` catch-all: an es/venue/[id] id outside
+`generateStaticParams` 404s at Next's ROUTING level (dynamicParams=false),
+before that page's own `notFound()` call ever runs, so no in-tree
+`notFound()` exists anywhere under `/es` to catch — both files were tried
+and removed. The catch-all's own 404 response measured WORSE on low-end
+phones than the prerendered `app/global-not-found.tsx` it replaced:
+`notFound()` thrown from a genuinely dynamic, per-request route ships
+Next's own blank `__next_error__` shell (no CSS, no-store, fetched fresh
+every time), not the instant, cacheable, fully-branded English fallback.
+Every unmatched `/es/*` URL — a bad venue id or a wholly made-up path —
+now falls through to that same English `global-not-found.tsx`, same as
+any unmatched EN-tree URL.
 
 **`<title>` on a NON-mirrored page (#589; client-side fix #605, self-heal
 #610):** Next.js Metadata renders `<title>` once, server-side, always in

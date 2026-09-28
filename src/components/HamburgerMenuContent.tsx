@@ -300,14 +300,14 @@ export default function HamburgerMenuContent({
                 workflow). */}
             {tree === "en" && locale === "es" && (
               <div className="px-5 py-3 border-t border-[var(--color-bone-200)]">
-                {/* Link, not <a> (review fix: @next/next/no-html-link-for-pages
-                    started flagging this literal "/es" once src/app/es/[...rest]
-                    (#689 PR 2 follow-up) made Next recognize it as a real
-                    page). Unlike LanguageToggle's mirrored links, this one
-                    never needs to preserve query/hash (it's always the /es
-                    HOME, not "wherever I am on the other tree"), so plain
-                    Link navigation is correct here — no onClick override
-                    needed. */}
+                {/* Link, not <a> (review fix): @next/next/no-html-link-for-pages
+                    flags a literal href="/es" — src/app/es/page.tsx is a
+                    real, matched page in this app, so the plugin wants
+                    Link for it like any other internal destination. Unlike
+                    LanguageToggle's mirrored links, this one never needs to
+                    preserve query/hash (it's always the /es HOME, not
+                    "wherever I am on the other tree"), so plain Link
+                    navigation is correct here — no onClick override needed. */}
                 <Link
                   href="/es"
                   onClick={onClose}

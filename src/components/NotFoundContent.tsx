@@ -19,9 +19,15 @@ import { pageDocumentTitle } from "@/lib/site";
 export default function NotFoundContent() {
   const { locale, tree } = useLocale();
   // <title> follows locale client-side (#589) — notfound.documentTitle
-  // matches not-found.tsx's metadata title exactly ("Page Not Found" /
-  // es/not-found.tsx's Spanish title, #689). skip under /es: the server
-  // title there is already Spanish.
+  // matches not-found.tsx's metadata title exactly ("Page Not Found").
+  // skip under /es is defensive, not currently reachable: this component
+  // only renders from (site)/not-found.tsx and global-not-found.tsx (both
+  // EN tree) — #689 PR 2's own es/not-found.tsx and its /es/[...rest]
+  // catch-all were removed (staging measured the catch-all's per-request,
+  // no-store, unstyled __next_error__ shell as worse than the prerendered
+  // English global-not-found on low-end phones); unmatched /es/* now
+  // falls through to that EN 404 by design (see es/layout.tsx's own
+  // comment). Left in place in case a future /es not-found route returns.
   useDocumentTitle(pageDocumentTitle(t("notfound.documentTitle", locale)), {
     skip: tree === "es",
   });

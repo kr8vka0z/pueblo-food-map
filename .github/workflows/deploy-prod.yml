@@ -168,33 +168,37 @@ jobs:
           # Indexing policy (SEO/AEO plan Phase 0, src/lib/indexingHost.ts):
           # only pueblofoodmap.com may be indexed. A noindex leaking onto the
           # canonical host would quietly deindex the whole site, so that's a
-          # hard failure. The workers.dev origin above must carry the header;
-          # it's retried like the loop above, since the old version (without
-          # the header) can answer for a moment after `wrangler deploy`.
-          # A failed curl is reported as such, never read as "no header".
+          # hard failure; the workers.dev origin above must carry the header.
+          # Both checks retry like the path loop above (the old version can
+          # answer for a moment after `wrangler deploy`, and one network blip
+          # mustn't fail a good deploy), and a failed fetch is reported as a
+          # failed fetch, never read as "header present" or "header missing".
+          # has_noindex: 0 = header present, 1 = absent, 2 = curl failed.
           has_noindex() {
             local headers
             headers=$(curl -sS -D - -o /dev/null "$1") || return 2
             printf '%s' "$headers" | grep -qi '^x-robots-tag:.*noindex'
           }
-          rc=0; has_noindex "https://pueblofoodmap.com/" || rc=$?
-          case "$rc" in
-            0) echo "Smoke check failed: https://pueblofoodmap.com/ sends X-Robots-Tag noindex" >&2; status=1 ;;
-            1) echo "https://pueblofoodmap.com/ -> indexable (no X-Robots-Tag noindex)" ;;
-            *) echo "Smoke check failed: could not fetch https://pueblofoodmap.com/" >&2; status=1 ;;
-          esac
-          rc=1
-          for i in $(seq 1 "$attempts"); do
-            rc=0; has_noindex "${ORIGIN}/" || rc=$?
-            [ "$rc" = "0" ] && break
-            [ "$i" -lt "$attempts" ] && { echo "${ORIGIN}/ has no noindex yet (attempt ${i}/${attempts}, retrying in 10s)"; sleep 10; }
-          done
-          if [ "$rc" = "0" ]; then
-            echo "${ORIGIN}/ -> noindex"
-          else
-            echo "Smoke check failed: ${ORIGIN}/ is missing X-Robots-Tag noindex" >&2
-            status=1
-          fi
+          # expect_noindex URL WANT: WANT is 0 (must have it) or 1 (must not).
+          expect_noindex() {
+            local url="$1" want="$2" rc=2 i
+            for i in $(seq 1 "$attempts"); do
+              rc=0; has_noindex "$url" || rc=$?
+              [ "$rc" = "$want" ] && break
+              if [ "$i" -lt "$attempts" ]; then
+                echo "${url}: noindex check got ${rc}, want ${want} (attempt ${i}/${attempts}, retrying in 10s)"
+                sleep 10
+              fi
+            done
+            case "$rc" in
+              "$want") [ "$want" = "0" ] && echo "${url} -> noindex" || echo "${url} -> indexable (no X-Robots-Tag noindex)" ;;
+              2) echo "Smoke check failed: could not fetch ${url}" >&2; status=1 ;;
+              0) echo "Smoke check failed: ${url} sends X-Robots-Tag noindex" >&2; status=1 ;;
+              *) echo "Smoke check failed: ${url} is missing X-Robots-Tag noindex" >&2; status=1 ;;
+            esac
+          }
+          expect_noindex "https://pueblofoodmap.com/" 1
+          expect_noindex "${ORIGIN}/" 0
           exit $status
       # Belt and suspenders on top of the HC.io dead-man's-switch (wrangler.jsonc
       # `triggers`/`vars`, custom-worker.ts `scheduled()`): that switch only fires on

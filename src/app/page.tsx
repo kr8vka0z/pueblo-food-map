@@ -67,7 +67,9 @@ export default function HomePage() {
           lands on something invisible. English only, like the <h1>. */}
       {/* `absolute` keeps the zero-size list out of the flex layout. */}
       <nav aria-label="Site" className="absolute">
-        <ul>
+        {/* list-none explicitly, rather than relying on Tailwind Preflight, so
+            no bullet can ever show over the map. */}
+        <ul className="list-none">
           {HOME_CRAWL_LINKS.map(({ href, label }) => (
             <li key={href}>
               <Link href={href} className={HOME_CRAWL_LINK_CLASS}>

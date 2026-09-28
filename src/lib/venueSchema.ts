@@ -14,6 +14,7 @@ import type { Venue } from "@/types/venue";
 import { venues, categoryLabels } from "@/data/venues";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
 import { DISPLAY_DAY_KEYS, slotToIsoTimes } from "@/lib/hours";
+import { t } from "@/lib/i18n";
 
 /**
  * @type record maps VenueCategory → schema.org @type value.
@@ -59,7 +60,7 @@ function extractStreetAddress(address: string): string {
 
 /**
  * BreadcrumbList for a venue page (SEO/AEO plan Phase 0): Pueblo Food Map ›
- * All food resources › {venue}. It mirrors the visible breadcrumb
+ * All places › {venue}. It mirrors the visible breadcrumb
  * VenueContent renders, which is what makes it eligible for Google's
  * breadcrumb display. English always, like the rest of this file's JSON-LD
  * (#386).
@@ -67,7 +68,8 @@ function extractStreetAddress(address: string): string {
 export function buildVenueBreadcrumbJsonLd(venue: Venue): Record<string, unknown> {
   const crumbs = [
     { name: SITE_NAME, url: SITE_URL },
-    { name: "All food resources", url: `${SITE_URL}/venues` },
+    // Same key the visible breadcrumb link renders, so the two can't drift.
+    { name: t("footer.venues", "en"), url: `${SITE_URL}/venues` },
     { name: venue.name, url: `${SITE_URL}${venuePath(venue.id)}` },
   ];
   return {

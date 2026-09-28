@@ -18,6 +18,7 @@ import {
 } from "@/lib/venueSchema";
 import { venues } from "@/data/venues";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
+import { t } from "@/lib/i18n";
 
 // ─── getVenueById ─────────────────────────────────────────────────────────────
 
@@ -360,6 +361,10 @@ describe("buildVenueBreadcrumbJsonLd", () => {
     ]);
     expect(items[0]["name"]).toBe(SITE_NAME);
     expect(items[2]["name"]).toBe(venue.name);
+  });
+
+  test("the middle crumb's name matches the visible breadcrumb link (EN)", () => {
+    expect(items[1]["name"]).toBe(t("footer.venues", "en"));
   });
 
   test("serializes safely (a </script> in a name can't break out)", () => {

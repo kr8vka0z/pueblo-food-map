@@ -114,6 +114,25 @@ export function serializeJsonLd(value: unknown): string {
   );
 }
 
+/**
+ * The title/description/path a venue page's `generateMetadata` needs, for
+ * either tree. Extracted (#689 PR 2, advisor decision) so
+ * src/app/(site)/venue/[id]/page.tsx and src/app/es/venue/[id]/page.tsx both
+ * stay thin wrappers around ONE description string instead of duplicating
+ * the `${name} — ${category} in Pueblo, CO. ${address}.` template. `title`
+ * is always the venue's proper noun — no locale variant, same as before.
+ */
+export function venuePageMetadataFields(
+  venue: Venue,
+  locale: Locale = "en",
+): { title: string; description: string; path: string } {
+  return {
+    title: venue.name,
+    description: `${venue.name} — ${t(`category.full.${venue.category}`, locale)} ${IN_PUEBLO_CO[locale]} ${venue.address}.`,
+    path: venuePath(venue.id, locale),
+  };
+}
+
 export function getVenueById(id: string): Venue | undefined {
   return venues.find((v) => v.id === id);
 }

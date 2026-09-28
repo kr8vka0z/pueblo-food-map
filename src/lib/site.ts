@@ -10,7 +10,7 @@
  */
 
 import type { Metadata, Viewport } from "next";
-import type { Locale } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 
 export const SITE_URL = "https://pueblofoodmap.com";
 export const SITE_NAME = "Pueblo Food Map";
@@ -77,6 +77,40 @@ export const ROOT_VIEWPORT: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: "#FBFAF6",
+};
+
+/**
+ * src/app/es/layout.tsx's metadata export — the ES tree's own root layout
+ * (#689 PR 2, design decision 2: a second root layout is the only way to
+ * get `<html lang="es">` into the server HTML on this Next version). Same
+ * shape as ROOT_METADATA, Spanish content and es_US OG locale. Every /es
+ * page sets its own metadata via buildPageMetadata anyway, so this mostly
+ * matters as the title.template default — same reason ROOT_METADATA's
+ * title/description duplicate the homepage's own.
+ */
+export const ES_ROOT_METADATA: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: t("meta.home.title", "es"),
+    template: "%s · Pueblo Food Map",
+  },
+  description: t("meta.home.description", "es"),
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: t("meta.home.title", "es"),
+    description: t("meta.home.description", "es"),
+    url: `${SITE_URL}/es`,
+    locale: "es_US",
+    alternateLocale: ["en_US"],
+    images: [OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: t("meta.home.title", "es"),
+    description: t("meta.home.description", "es"),
+    images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
+  },
 };
 
 /**

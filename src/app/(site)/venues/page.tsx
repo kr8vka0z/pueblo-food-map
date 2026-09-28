@@ -31,6 +31,8 @@ export const metadata: Metadata = buildPageMetadata({
   description:
     "Browse every food resource on the Pueblo Food Map — food pantries, grocery stores, community gardens, farms, and meal sites across Pueblo County, CO, with addresses and hours.",
   path: "/venues",
+  // #689 PR 2: this page has an /es counterpart — carries hreflang now.
+  mirrored: true,
 });
 
 /**

@@ -21,6 +21,25 @@ const en: Record<string, string> = {
   "jsonld.website.description":
     "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores.",
 
+  // Per-page <title>/<meta description> for the /es tree's thin wrapper
+  // pages (#689 PR 2, src/app/es/**/page.tsx). Their EN counterparts keep
+  // hand-written literals in page.tsx (unchanged, #287's original design) —
+  // these keys exist so the ES side gets the same native-speaker [CHECK]
+  // review as every other locale-facing string, instead of a raw literal
+  // buried in a page file.
+  "meta.home.title": "Pueblo Food Map — Food Resources in Pueblo County, CO",
+  "meta.home.description":
+    "Find free and low-cost food near you in Pueblo County, CO — pantries, community gardens, grocery stores, and meal sites, with SNAP/WIC info and directions.",
+  "meta.about.title": "About",
+  "meta.about.description":
+    "About Pueblo Food Map — our mission to connect Pueblo County residents with free and low-cost food resources, and how venue data is sourced.",
+  "meta.resources.title": "Food help programs",
+  "meta.resources.description":
+    "How to get SNAP, WIC, Double Up Food Bucks, 2-1-1 Colorado, the Food Resource Hotline and senior food boxes in Pueblo County, CO — what each is for and how to sign up.",
+  "meta.venues.title": "All Food Resources",
+  "meta.venues.description":
+    "Browse every food resource on the Pueblo Food Map — food pantries, grocery stores, community gardens, farms, and meal sites across Pueblo County, CO, with addresses and hours.",
+
   // Top bar
   "topbar.locale.en": "EN",
   "topbar.locale.es": "ES",
@@ -960,6 +979,19 @@ const es: Record<string, string> = {
   "app.documentTitle": "Pueblo Food Map — Recursos de alimentos en el Condado de Pueblo, CO",
   "jsonld.website.description":
     "Un mapa comunitario de recursos alimentarios en el condado de Pueblo, Colorado — huertos comunitarios, paisajes comestibles, despensas de alimentos y supermercados.", // [CHECK]
+
+  "meta.home.title": "Pueblo Food Map — Recursos de alimentos en el Condado de Pueblo, CO",
+  "meta.home.description":
+    "Encuentra comida gratis y de bajo costo cerca de ti en el Condado de Pueblo, CO — despensas, huertos comunitarios, supermercados y comedores comunitarios, con información sobre SNAP/WIC y direcciones.", // [CHECK]
+  "meta.about.title": "Acerca de",
+  "meta.about.description":
+    "Acerca de Pueblo Food Map — nuestra misión de conectar a los residentes del Condado de Pueblo con recursos de alimentos gratuitos y de bajo costo, y cómo se obtienen los datos de los lugares.", // [CHECK]
+  "meta.resources.title": "Programas de ayuda alimentaria",
+  "meta.resources.description":
+    "Cómo obtener SNAP, WIC, Double Up Food Bucks, 2-1-1 Colorado, la Línea de Ayuda Alimentaria y cajas de alimentos para personas mayores en el Condado de Pueblo, CO — para qué sirve cada uno y cómo inscribirse.", // [CHECK]
+  "meta.venues.title": "Todos los recursos alimentarios",
+  "meta.venues.description":
+    "Explora todos los recursos alimentarios en Pueblo Food Map — despensas de alimentos, supermercados, huertos comunitarios, granjas y comedores comunitarios en todo el Condado de Pueblo, CO, con direcciones y horarios.", // [CHECK]
 
   // Top bar
   "topbar.locale.en": "EN",

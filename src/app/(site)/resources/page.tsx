@@ -17,6 +17,8 @@ export const metadata: Metadata = buildPageMetadata({
   description:
     "How to get SNAP, WIC, Double Up Food Bucks, 2-1-1 Colorado, the Food Resource Hotline and senior food boxes in Pueblo County, CO — what each is for and how to sign up.",
   path: "/resources",
+  // #689 PR 2: this page has an /es counterpart — carries hreflang now.
+  mirrored: true,
 });
 
 export default function ResourcesPage() {

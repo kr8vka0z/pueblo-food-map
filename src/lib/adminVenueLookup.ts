@@ -1,7 +1,7 @@
 /**
  * adminVenueLookup.ts — the "current venue" context lookup a change-proposal
  * card needs to show alongside its diff. Originally lived inline in
- * src/app/admin/flags/page.tsx (#397/#390/staging-review widenings — see
+ * src/app/(site)/admin/flags/page.tsx (#397/#390/staging-review widenings — see
  * git history there for the full why); MOVED here (admin dashboard build)
  * because the new /admin Dashboard's "Needs a decision" panel shows a
  * capped preview of the SAME pending proposals and needs the SAME venue

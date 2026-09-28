@@ -1,7 +1,7 @@
 /**
  * PublishBotStatusBanner — the admin Dashboard's own view of the SAME open
  * publish-bot PR src/lib/publishVenues.ts's commitPublishedVenues() opens
- * (#598). Rendered above PublishPanel on /admin (src/app/admin/page.tsx)
+ * (#598). Rendered above PublishPanel on /admin (src/app/(site)/admin/page.tsx)
  * ONLY when fetchPublishBotPrStatus() found an open PR — most page loads
  * render nothing at all, since a publish's PR merges within minutes on a
  * healthy CI run.

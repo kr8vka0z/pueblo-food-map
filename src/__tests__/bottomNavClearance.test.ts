@@ -12,7 +12,7 @@
  * silent-drift risk for `--viewport-small` (globals.css: must have both a
  * `vh` base for pre-svh browsers and an `@supports (height: 100svh)`
  * override, or a bottom-pinned element silently loses either the fallback
- * or the real fix) and `themeColor` (layout.tsx: must literally equal
+ * or the real fix) and `themeColor` (ROOT_VIEWPORT, src/lib/site.ts: must literally equal
  * `--color-bone-50`, globals.css — a `<meta name="theme-color">` value
  * can't reference a CSS custom property, so it's a second hard-coded hex
  * with no compiler link to the first). Also guards that BottomNav.tsx /
@@ -87,13 +87,13 @@ describe("#530 — small-viewport anchoring for bottom-pinned chrome", () => {
     ).toMatch(/@supports\s*\(height:\s*100svh\)\s*\{\s*:root\s*\{\s*--viewport-small:\s*100svh;/);
   });
 
-  test("layout.tsx's themeColor matches globals.css's --color-bone-50", () => {
+  test("ROOT_VIEWPORT's themeColor matches globals.css's --color-bone-50", () => {
     const css = readSrc("src/app/globals.css");
-    const layout = readSrc("src/app/layout.tsx");
+    const site = readSrc("src/lib/site.ts");
     const cssMatch = css.match(/--color-bone-50:\s*(#[0-9a-fA-F]{6});/);
     expect(cssMatch, "expected --color-bone-50 to be declared in globals.css").not.toBeNull();
-    const themeColorMatch = layout.match(/themeColor:\s*["'](#[0-9a-fA-F]{6})["']/);
-    expect(themeColorMatch, "expected a themeColor: \"#hex\" entry in layout.tsx's viewport export").not.toBeNull();
+    const themeColorMatch = site.match(/themeColor:\s*["'](#[0-9a-fA-F]{6})["']/);
+    expect(themeColorMatch, "expected a themeColor: \"#hex\" entry in ROOT_VIEWPORT (src/lib/site.ts)").not.toBeNull();
     expect(themeColorMatch![1].toLowerCase()).toBe(cssMatch![1].toLowerCase());
   });
 

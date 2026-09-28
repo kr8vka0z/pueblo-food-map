@@ -3,7 +3,7 @@
 /**
  * PrivacyContent — visible body of /privacy.
  *
- * Extracted from src/app/privacy/page.tsx so the page's text reads the
+ * Extracted from src/app/(site)/privacy/page.tsx so the page's text reads the
  * visitor's locale via useLocale() (#289) while the page itself stays a
  * static Server Component (no cookies() read — ARCHITECTURE.md "Known bilingual
  * limitation", #287).

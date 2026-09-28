@@ -34,7 +34,7 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, fireEvent, within } from "@testing-library/react";
 import React from "react";
-import HomePage from "@/app/page";
+import HomePage from "@/app/(site)/page";
 
 // ─── Mock next/dynamic — resolve synchronously in Vitest/jsdom ───────────────
 // WHY: next/dynamic's real implementation relies on webpack/Turbopack chunk

@@ -19,7 +19,7 @@
  *     renders as its own synthetic "Suggested new place" row — see the Row
  *     union type below.
  * `itemsByVenueId`/`addItems` are grouped server-side
- * (src/app/admin/places/page.tsx) — this component only renders and
+ * (src/app/(site)/admin/places/page.tsx) — this component only renders and
  * filters what it's handed, same "no data fetching here" boundary this
  * file's own header already established for statusByVenueId.
  *
@@ -44,7 +44,7 @@
  * against a venue of ANY status.
  *
  * Presentational + interactive only: no data fetching (that's the Server
- * Component page, src/app/admin/places/page.tsx) and no mutation of its
+ * Component page, src/app/(site)/admin/places/page.tsx) and no mutation of its
  * own beyond what ProposalCard/SubmissionCard (rendered nowhere in this
  * file directly, but SOURCE_BADGE/LANE_BADGE/fieldLabel and
  * summarizeSubmissionForRow are reused from them) already own.
@@ -54,7 +54,7 @@
  * would ship its entire contents to the browser for no reason; the page
  * only ever hands this component the small per-id status strings it needs.
  *
- * The name links to /admin/venues/[id]/edit (src/app/admin/venues/[id]/edit/page.tsx),
+ * The name links to /admin/venues/[id]/edit (src/app/(site)/admin/venues/[id]/edit/page.tsx),
  * where AddVenueForm and ArchiveVenueButton own the actual mutations. An
  * archived row's name stays plain text UNLESS it has a pending review item
  * to review (#674: a restore's / a public report's "Suggestions to review"
@@ -82,7 +82,7 @@ interface VenueListViewProps {
   itemsByVenueId?: Record<string, ReviewItem[]>;
   /** Genuinely-new suggestions (an `add` proposal or a "new_venue" submission) with no existing venue row — rendered as their own "Suggested new place" rows. */
   addItems?: ReviewItem[];
-  /** #674: `?show=review` pre-selects the "To review" chip — set server-side from the URL (src/app/admin/places/page.tsx), never parsed client-side. */
+  /** #674: `?show=review` pre-selects the "To review" chip — set server-side from the URL (src/app/(site)/admin/places/page.tsx), never parsed client-side. */
   initialShowReview?: boolean;
   /** #675: `?from=public` pre-selects the "The public" source filter chip — same server-side-only convention as initialShowReview. */
   initialSourceFilter?: SourceFilter;

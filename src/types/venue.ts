@@ -71,7 +71,7 @@ export interface Venue {
 }
 
 // ─── Admin row shape (#253) ─────────────────────────────────────────────────
-// The admin's read-only venue list (src/app/admin/page.tsx,
+// The admin's read-only venue list (src/app/(site)/admin/page.tsx,
 // src/components/VenueListView.tsx) reads full D1 `venues` rows, not the
 // public Venue shape above — SELECT * includes every admin-only workflow
 // column (status, source_type, outside_county, audit columns) that the

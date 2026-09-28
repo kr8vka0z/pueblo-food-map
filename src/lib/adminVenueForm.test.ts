@@ -2,7 +2,7 @@
  * Tests for src/lib/adminVenueForm.ts (#255).
  *
  * Covers the D1 row -> AddVenueForm initialValues mapping used by the edit
- * page (src/app/admin/venues/[id]/edit/page.tsx): tri-state accepts_snap/wic
+ * page (src/app/(site)/admin/venues/[id]/edit/page.tsx): tri-state accepts_snap/wic
  * round-tripping, hours_weekly JSON -> per-day comma-joined draft text,
  * null-to-empty-string coercion on optional fields, and malformed-JSON
  * defensiveness.

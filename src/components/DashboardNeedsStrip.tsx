@@ -8,7 +8,7 @@
  * Two of the four cards are TEMPORARY fallbacks until #674/#675 (fold Data
  * refresh + Review queue into the Places list) and #677 (fold Photo review
  * + Sponsor requests into the Blessing Boxes tab) land — see each card's
- * own `detail` string, built by the caller (src/app/admin/page.tsx), not
+ * own `detail` string, built by the caller (src/app/(site)/admin/page.tsx), not
  * hardcoded here, so this component doesn't need to know which upstream
  * issue is open.
  */

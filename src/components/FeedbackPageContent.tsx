@@ -3,7 +3,7 @@
 /**
  * FeedbackPageContent — visible body of /feedback.
  *
- * Extracted from src/app/feedback/page.tsx so the page's text (and
+ * Extracted from src/app/(site)/feedback/page.tsx so the page's text (and
  * FeedbackForm, which now reads useLocale() itself — #289) reflects the
  * visitor's locale while the page stays a static Server Component (no
  * cookies() read — ARCHITECTURE.md "Known bilingual limitation", #287).

@@ -209,7 +209,7 @@ Mono (Geist Mono):
 #### 3.2.2 Font loading
 
 ```ts
-// src/app/layout.tsx
+// src/app/(site)/layout.tsx
 import { Inter, Fraunces, Geist_Mono } from "next/font/google";
 
 const inter = Inter({
@@ -865,7 +865,7 @@ Three small PRs land the redesign behind the existing CI gate.
 ### 12.1 PR 1 — Design tokens + typography swap
 
 - Update `globals.css` with the `@theme` token block from §3.
-- Swap fonts in `src/app/layout.tsx` from Geist Sans → Inter + Fraunces (mono stays).
+- Swap fonts in `src/app/(site)/layout.tsx` from Geist Sans → Inter + Fraunces (mono stays).
 - No layout changes yet. Visual diff: warmer page, new fonts, same layout.
 - Risk: very low. Pure visual.
 

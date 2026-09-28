@@ -2,7 +2,7 @@
  * VenueContent bilingual rendering tests (pueblo-food-map#bilingual-static-pages).
  *
  * Proves the extracted client component (the highest-risk page in the repo —
- * see src/app/venue/[id]/page.tsx's own header comment) renders EN by
+ * see src/app/(site)/venue/[id]/page.tsx's own header comment) renders EN by
  * default and ES when wrapped in a LocaleProvider set to "es" (#289),
  * including the category label and the "View on the map" CTA that used to
  * be a hardcoded English string.

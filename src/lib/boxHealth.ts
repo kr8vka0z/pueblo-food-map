@@ -104,7 +104,7 @@ export interface BoxHealthEntry {
    * flag, NOT a query filter: a removed box still appears here, same as it
    * still appears on the public map marked out-of-service, rather than
    * disappearing from admin management entirely). Feeds the Boxes tab's
-   * "N in service" count (src/app/admin/boxes/page.tsx); unused by the
+   * "N in service" count (src/app/(site)/admin/boxes/page.tsx); unused by the
    * Dashboard's "Boxes that need help" panel, which doesn't distinguish it.
    */
   removedOn: string | null;
@@ -114,7 +114,7 @@ export interface BoxHealthEntry {
  * Boxes still in service — `removed_on` is a display flag on
  * BoxHealthEntry, not a query filter (see that field's own doc comment), so
  * every "needs attention" surface (Dashboard's help panel — see
- * src/app/admin/page.tsx) filters it out HERE, in one shared place, rather
+ * src/app/(site)/admin/page.tsx) filters it out HERE, in one shared place, rather
  * than each caller re-deriving the
  * same `removedOn === null` check. A removed box is out of service; nobody
  * needs to go check on it or see it flagged "gone quiet." It still appears

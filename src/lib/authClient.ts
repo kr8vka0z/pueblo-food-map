@@ -1,7 +1,7 @@
 /**
  * Better Auth CLIENT (#315 Phase 2) — the browser-side counterpart to
  * auth-options.ts's server config. Used only by the login page
- * (src/app/admin/login/page.tsx) so far; nothing else in the app calls this
+ * (src/app/(site)/admin/login/page.tsx) so far; nothing else in the app calls this
  * yet (route gating is a later phase — see AGENTS.md's Better Auth
  * section).
  *

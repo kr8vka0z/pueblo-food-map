@@ -3,18 +3,19 @@
 /**
  * VenueContent — visible body of /venue/[id].
  *
- * Extracted from src/app/(site)/venue/[id]/page.tsx so the page's text reads the
- * visitor's locale via useLocale() (#289). This is the highest-risk page in
- * the repo (see that file's own header comment on the 2026-08-24 to
- * 2026-09-02 production outage) — this extraction changes ONLY the visible
- * JSX, not generateStaticParams, dynamicParams, generateMetadata, or the
- * venue JSON-LD, all of which stay in the server page.tsx untouched and
- * still read no dynamic API.
+ * This SAME component renders on BOTH /venue/[id] (src/app/(site)/venue/[id]/
+ * page.tsx) and /es/venue/[id] (src/app/es/venue/[id]/page.tsx) — its text
+ * reads the tree's locale via useLocale() (#289). This is the highest-risk
+ * page in the repo (see the EN page.tsx's own header comment on the
+ * 2026-08-24 to 2026-09-02 production outage) — this extraction changes ONLY
+ * the visible JSX, not generateStaticParams, dynamicParams, generateMetadata,
+ * or the venue JSON-LD, all of which stay in each server page.tsx untouched
+ * and still read no dynamic API.
  *
  * The category label here uses t(`category.full.${category}`, locale) —
- * visible on-screen text, in scope for bilingual support — unlike
- * generateMetadata's description (machine-readable metadata, stays English
- * per #287/#386) which still reads the raw English categoryLabels map.
+ * matching generateMetadata's description, which calls the SAME
+ * venuePageMetadataFields helper (venueSchema.ts) with the page's own
+ * locale (#689 supersedes #287/#386's old "metadata stays English" rule).
  */
 
 import Link from "next/link";

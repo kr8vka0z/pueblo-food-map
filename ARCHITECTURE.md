@@ -63,9 +63,9 @@ Browser
 
 Next.js App Router (Cloudflare Worker)
   └── src/app/(site)/  — a route group (URL-invisible, #689 PR 1), holding every
-        public and admin route below. Exists so a future src/app/es/layout.tsx
-        (#689 PR 2) can be a SECOND root layout — Next.js requires multiple root
-        layouts to give an `/es` page a server-rendered `<html lang="es">`.
+        public and admin route below. Its OWN root layout, alongside the SECOND
+        one at src/app/es/ (#689 PR 2) — Next.js requires multiple root layouts
+        to give an /es page a server-rendered `<html lang="es">`.
     └── layout.tsx      (metadata/viewport from src/lib/site.ts's ROOT_METADATA/
           ROOT_VIEWPORT; renders <RootShell lang="en"> — font preload, WebSite
           JSON-LD, LocaleProvider — reads no cookie, ServiceWorkerRegister →
@@ -79,10 +79,18 @@ Next.js App Router (Cloudflare Worker)
           (public pages; each localized body is a client "Content" component)
     └── report/[venueId], suggest, feedback  (+ submit/route.ts each)
     └── admin/**  (admin panel — see "Admin panel")
+  └── src/app/es/  — the /es tree's own root layout (#689 PR 2). Thin wrapper
+        pages for the five mirrored routes (page.tsx, about/, resources/,
+        venues/, venue/[id]/) each pass locale: "es" to buildPageMetadata and
+        the venueSchema.ts builders, and render the SAME client "Content"
+        components as their (site)/ counterparts — no page logic duplicated.
+        Its own not-found.tsx is required for an explicit notFound() inside
+        es/venue/[id] to resolve in-tree (see "i18n model" below).
   └── src/components/RootShell.tsx — the shared <html>/<body> shell (font
-        preload, WebSite JSON-LD, LocaleProvider, Analytics, SW register) both
-        (site)/layout.tsx and app/global-not-found.tsx render, parameterized by
-        `lang` (#689 PR 1; PR 2's es/layout.tsx reuses it with lang="es")
+        preload, WebSite JSON-LD, LocaleProvider, Analytics, SW register)
+        (site)/layout.tsx, es/layout.tsx and global-not-found.tsx (below) all
+        render, parameterized by `lang` (#689 PR 1; PR 2's es/layout.tsx
+        reuses it with lang="es", which also locks LocaleProvider to Spanish)
   └── src/app/global-not-found.tsx — 404 for a URL that matches no route at
         all (required once (site)/ became a route group with no top-level
         app/layout.tsx to compose a 404 from; `experimental.globalNotFound` in
@@ -410,45 +418,65 @@ EN and ES dictionaries live in `src/lib/i18n.ts` as plain `Record<string, string
 objects. `t(key, locale, vars?)` looks up the ES dict first, falls back to EN
 if a key is missing.
 
-**Locale is client-side only.** `LocaleContext` (`src/lib/LocaleContext.tsx`)
-holds the active locale in React state and writes it to the `pfm-locale`
-cookie on change. No route reads that cookie on the server: `layout.tsx`
-renders `<LocaleProvider>` with no `initialLocale`, so every page's first
-render is English (the static public pages are prerendered that way), and
-the provider switches to the saved
-locale from `document.cookie` in an effect after hydration (#289). A Spanish
-visitor therefore sees English briefly on a hard page load. The reason is
-#287: a server-side `cookies()` read makes a route dynamic and loses the
-static edge caching these pages depend on (see AGENTS.md "Discoverability /
-SEO" for the outage that makes this constraint load-bearing).
+**Locale (the switchable client toggle) vs. tree (the route you're served
+from) are two different things** — #689 PR 2 made this split explicit.
+`LocaleContext` (`src/lib/LocaleContext.tsx`) holds the active `locale` in
+React state and writes it to the `pfm-locale` cookie on change; it also
+exposes a separate `tree` field, fixed for the provider's lifetime at
+whichever root layout served the page. On the EN tree (`src/app/(site)/`,
+no `initialLocale` passed to `LocaleProvider`), the provider still starts at
+`"en"` and switches to the saved cookie's locale in an effect after
+hydration (#289) — a Spanish visitor sees English briefly on a hard page
+load there, for the same reason as before (#287: a server-side `cookies()`
+read would make the route dynamic and lose the static edge caching these
+pages depend on — see AGENTS.md "Discoverability / SEO" for the outage that
+makes this constraint load-bearing). `localizedHref`
+(`src/lib/localizedHref.ts`) always keys off `tree`, never `locale` — an EN
+page whose locale cookie says "es" still links within the EN tree, so a
+visitor never half-migrates.
 
-**Known bilingual limitation — what is and isn't localized.** This is the
+**Two route trees, not one — what's mirrored and what isn't.** This is the
 one place it's stated; code comments point here.
 
-| Surface | Language |
+The five in-scope routes (`/`, `/venues`, `/venue/[id]`, `/resources`,
+`/about`) are **mirrored**: each has a full `/es` twin with its own root
+layout (`src/app/es/layout.tsx`, `lang="es"`, `LocaleProvider
+initialLocale="es"` — which also LOCKS the tree, so a stale `pfm-locale=en`
+cookie can never flip an `/es` page back to English post-hydration).
+
+| Surface, on a MIRRORED page | Language |
 |---|---|
-| Visible page body (every public page, incl. /about and /privacy) | Visitor's locale, via `useLocale()` in each page's client "Content" component (#289) |
-| `<title>` | Visitor's locale, corrected client-side after hydration (#589, #605, #610 — below); `/venue/[id]` deliberately keeps its English server title (#287) |
-| `<meta>` description, OpenGraph/Twitter tags | English always (#287) |
-| JSON-LD (venue schema, /about's FAQPage) | English always (#386) — built server-side with a hardcoded `"en"` |
-| URLs | One URL per page for both locales; no `/es` tree or `hreflang` (deferred, #164) |
+| `<html lang>` | Server-rendered, matches the tree — `"en"` or `"es"` (#689 PR 2; two root layouts, `RootShell` shared) |
+| Visible page body | Matches the tree — the SAME client "Content" component (`useLocale()`, #289) renders under whichever provider is active |
+| `<title>`, `<meta>` description, OpenGraph/Twitter | Server-rendered, matches the tree (`buildPageMetadata`'s `locale`/`mirrored` options, `src/lib/site.ts`); `hreflang` alternates (`en`/`es`/`x-default` → EN) point at the counterpart URL |
+| JSON-LD (venue schema, WebSite, `/about`'s FAQPage) | Matches the tree — every builder in `src/lib/venueSchema.ts` takes an optional `locale` (defaults `"en"`), sets `inLanguage` and `/es` URLs. Supersedes the old #386 "always English" rule |
+| URLs | English slugs under `/es` (`/es/venues`, `/es/venue/<id>`) — not translated |
 
-Crawlers therefore index English metadata. A separate `/es` route tree is the
-only way to change that, and it's an SEO decision, not a content one — the
-visible content is already bilingual.
+Non-mirrored pages (`/suggest`, `/feedback`, `/privacy`, `/report/*`,
+`/box/*`, `/boxes/activity`, `/alerts/*`, `/admin/*`, `/api/*` — #689 "Out"
+scope) keep the PRE-#689 behavior exactly: single URL, English-only
+`<title>`/metadata/JSON-LD, visible body follows the client-side locale
+toggle only, `<title>` corrected client-side after hydration (#589, #605,
+#610 — below). `/venue/[id]` and `/es/venue/[id]` both deliberately keep
+their SSR `<title>` as the venue's proper name — nothing to translate
+(#287's original reasoning still applies there, just per-tree now).
 
-**`<title>` (#589; client-side fix #605, self-heal #610):** Next.js Metadata
-renders `<title>` once, server-side, always in English
-(`buildPageMetadata`/`generateMetadata`, `src/lib/site.ts`). `useDocumentTitle`
-(`src/lib/useDocumentTitle.ts`) corrects it for the current locale after
-hydration and on a live EN↔ES toggle; every localized page's "Content"
-component calls it with a `t()`-composed string. A plain
+**`<title>` on a NON-mirrored page (#589; client-side fix #605, self-heal
+#610):** Next.js Metadata renders `<title>` once, server-side, always in
+English (`buildPageMetadata`/`generateMetadata`, `src/lib/site.ts`).
+`useDocumentTitle` (`src/lib/useDocumentTitle.ts`) corrects it for the
+current locale after hydration and on a live EN↔ES toggle; every localized
+page's "Content" component calls it with a `t()`-composed string. A plain
 `document.title = ...` isn't enough on a hard load: Next's streaming-metadata
 Suspense chunk can arrive after the hook's effect and overwrite `<title>`'s
 DOM node directly (bypassing the setter) — a real timing race, not a fixed
 order. So the hook self-heals with a `MutationObserver` on `document.head`,
 disconnected on unmount so a page that stays English (`/venue/[id]`) is
 never corrected by a stale observer. The hook's header has the full trace.
+**On a mirrored page** the server `<title>` is already correct for its tree
+(English on `(site)/`, Spanish on `es/`), so `useDocumentTitle` is called
+with `skip: tree === "es"` (#689 PR 2) — a true no-op there, not a
+harmless-but-wasted re-write of the same string.
 
 **Translation notes:**
 - Mexican / Latin American Spanish throughout (not Castilian).
@@ -476,7 +504,9 @@ The rules it sets:
   `page.tsx`. That's how the old `/boxes` entry 404'd unnoticed. Blessing
   Boxes aren't in it: `/box/<id>` is a `noindex` redirect shell into the map
   card. Boxes come back through the planned read-only `/blessing-boxes` list
-  (REVIEW.md).
+  (REVIEW.md). Every mirrored route's entry carries `alternates.languages`
+  pointing at its `/es` (or EN) counterpart, and the counterpart itself is a
+  SEPARATE full entry — not just a cross-reference (#689 PR 2, `src/app/sitemap.ts`).
 - **Only `pueblofoodmap.com` is indexable.** `custom-worker.ts` adds
   `X-Robots-Tag: noindex, nofollow` to every response on any other host
   (dev., *.workers.dev), via `src/lib/indexingHost.ts`. This is deliberately a

@@ -3,17 +3,18 @@
 /**
  * AboutContent — visible body of /about, including its FAQPage JSON-LD.
  *
- * Extracted from src/app/(site)/about/page.tsx so the visible mission/FAQ copy
- * reads the visitor's locale via useLocale() (#289), while the page itself
- * stays a static Server Component (no cookies() read — ARCHITECTURE.md "Known
- * bilingual limitation", #287).
+ * This SAME component renders on BOTH /about (src/app/(site)/about/page.tsx)
+ * and /es/about (src/app/es/about/page.tsx) — the visible mission/FAQ copy
+ * reads the tree's locale via useLocale() (#289), while each page.tsx stays a
+ * static Server Component (no cookies() read — ARCHITECTURE.md "i18n model",
+ * #287).
  *
- * The FAQPage JSON-LD is built server-side, ALWAYS in English (#386 — every
- * JSON-LD block on this site is machine-readable metadata, out of scope for
- * bilingual support), and passed in as a pre-serialized string. That means
- * the injected JSON-LD only matches this component's visible FAQ text
- * verbatim when locale === "en" — the same tradeoff /venue/[id]'s
- * description already accepts for metadata vs. visible copy.
+ * The FAQPage JSON-LD is built server-side by the CALLING page.tsx (English
+ * on /about, Spanish on /es/about — #689 supersedes #386's old "JSON-LD is
+ * always English" rule with "JSON-LD matches the URL's language") and
+ * passed in as a pre-serialized string — always matching this component's
+ * visible FAQ text on a mirrored page, since both read the same tree's
+ * locale.
  */
 
 import Link from "next/link";
@@ -29,7 +30,7 @@ import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 const FAQ_NUMS = [1, 2, 3, 4, 5, 6] as const;
 
 interface AboutContentProps {
-  /** Pre-serialized FAQPage JSON-LD, built in English (#386). */
+  /** Pre-serialized FAQPage JSON-LD, matching the caller's tree (#689). */
   faqJsonLd: string;
   /** Live venue count for the "N places" stat line. */
   venueCount: number;
@@ -139,7 +140,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         </section>
 
         {/* FAQ — approved copy (PR4 S8); the JSON-LD above mirrors this text
-            verbatim only in English (#386) */}
+            verbatim, in whichever tree served this page (#689) */}
         <section aria-labelledby="faq-heading">
           <h2 id="faq-heading" className="text-lg font-semibold text-[var(--color-ink-700)] mb-3">
             {t("about.faq.heading", locale)}

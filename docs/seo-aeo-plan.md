@@ -184,17 +184,33 @@ Verify each on staging (the `staticAssetsIncrementalCache` trap).
 
 URLs are flat (`/food-pantries`, not `/venues/pantries`); Kyle approved that.
 
-### Phase 4: Spanish that search engines can see (P1, specced in #689)
+### Phase 4: Spanish that search engines can see — DONE (P1, specced in #689)
 
-**Full spec: #689** (two PRs: a root-layout restructure, then the `/es` tree).
-Kyle made it P1 on 2026-09-28, so it runs alongside Phases 0–3 rather than
-after them. Any Phase 3 hub ships with its `/es` twin in the same PR.
+**Full spec: #689** (two PRs: a root-layout restructure, then the `/es`
+tree). Kyle made it P1 on 2026-09-28, so it ran alongside Phases 0–3 rather
+than after them. PR 1 (#695) merged to `dev` 2026-09-28: route groups +
+shared `RootShell`, no behavior change. PR 2 shipped the `/es` tree itself:
+`/`, `/venues`, `/venue/<id>` (all 107), `/resources` and `/about` each have
+a Spanish twin under `/es`, server-rendered (`<html lang="es">`, Spanish
+`<title>`/description/OG, JSON-LD with `inLanguage: "es"`), with two-way
+`hreflang` + `x-default` on both trees and matching sitemap entries. Any
+future Phase 3 hub still ships with its `/es` twin in the same PR, per the
+original plan.
 
-Summary: add an `/es/...` mirror of the public pages with Spanish
-metadata and JSON-LD (`inLanguage: "es"`) and two-way `hreflang` + `x-default`,
-also in the sitemap. The toggle navigates between trees. **No server-side
-redirect on `/`**, so no `Accept-Language` auto-redirect. It doubles the
-prerendered paths and needs `/es` smoke tests.
+Summary of what shipped: an `/es/...` mirror of the public pages with
+Spanish metadata and JSON-LD (`inLanguage: "es"`) and two-way `hreflang` +
+`x-default`, also in the sitemap. The language toggle becomes a real
+cross-tree link on a mirrored page; **no server-side redirect on `/`**, so
+no `Accept-Language` auto-redirect — a visitor with an `es` cookie on `/`
+keeps today's client-side Spanish plus a "Ver en español" link to `/es`.
+Prerendered paths roughly doubled (~115 → ~230); `/es` smoke tests and a
+`lang="es"` body check are in `deploy-prod.yml`.
+
+**Follow-up (not a PR):** once GSC/Bing are live, confirm the `/es` pages
+are indexed, and add 3–4 Spanish questions to the monthly AI prompt panel.
+Native-speaker review of the `[CHECK]`-marked Spanish copy the mirrored
+pages render (see the PR 2 issue comment on #689) should land before PR 2
+promotes to `main`.
 (Quote Pueblo County's Hispanic share only from current ACS data.)
 
 ### Phase 5: Authority (ongoing, starts in parallel with Phase 0)
@@ -257,4 +273,4 @@ doing the outreach.
 | Flat hub URLs (`/food-pantries`) | Approved. |
 | Partner outreach | Kyle, working from [`seo-outreach.md`](seo-outreach.md). |
 | Hours / phone data pass (Phase 1) | Kyle, in progress; out of scope for code PRs. |
-| Spanish `/es` tree (Phase 4) | **P1**, specced in #689. |
+| Spanish `/es` tree (Phase 4) | **P1**, specced in #689 — done (PR 1 #695 merged, PR 2 shipped the `/es` tree). |

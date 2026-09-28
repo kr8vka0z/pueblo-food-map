@@ -72,7 +72,9 @@ export default async function VenuePage({
 
   return (
     <>
-      {/* Venue-specific JSON-LD structured data — English always (#386) */}
+      {/* Venue-specific JSON-LD structured data — English (this EN-tree
+          page; /es/venue/[id]'s page.tsx passes locale: "es" — #689
+          supersedes #386's old "always English" rule) */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(buildVenueJsonLd(v)) }}

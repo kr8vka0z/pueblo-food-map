@@ -138,7 +138,14 @@ existing tools, not a PR.
 
 Target: ≥ 90% of pantries with hours before Phase 3's by-day pages ship.
 
-### Phase 2: Make each venue page the best answer (one PR)
+### Phase 2: Make each venue page the best answer — merged to `dev` (#705)
+
+**Status:** merged to `dev` 2026-09-28 (PR #705, closes #704). Summary
+sentence, richer JSON-LD, intent titles, and Nearby all shipped in
+`src/lib/venueSummary.ts` — see ARCHITECTURE.md "Answer-first venue pages"
+for the mechanism. `hours_irregular` coverage is code-complete but untested
+against real data: no published venue has that field set yet (Phase 1 is
+still in progress), so that path is covered only by a synthetic fixture.
 
 1. **An answer-first summary sentence**, built only from verified fields. For
    example: *"Bessemer Mobile Food Pantry is a free food pantry at 215 Canal

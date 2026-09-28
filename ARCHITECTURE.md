@@ -534,6 +534,45 @@ The rules it sets:
   to see its noindex and drop it. `deploy-prod.yml`'s smoke test fails if the
   canonical host ever sends the header, or if workers.dev stops sending it.
 
+### Answer-first venue pages (SEO/AEO plan Phase 2, `src/lib/venueSummary.ts`)
+
+`buildVenueSummary(venue, locale, options?)` assembles a venue's answer-first
+paragraph — what it is (with "free" wording only for `FREE_CATEGORIES`), its
+hours in words, SNAP/WIC only when confirmed `true`, and "Last verified" —
+from verified `Venue` fields only, entirely at build time (no `new Date()`,
+no client-only `Intl`). It's called from **both** sides of the render: the
+server (`buildVenueJsonLd`'s `description`, `venuePageMetadataFields`'s meta
+description) and the client (`VenueContent`'s on-page paragraph, at the
+page's own current `locale`) — the same function, so the three can never
+drift apart. `{ includeAddress: false }` drops the street address from the
+sentence (VenueContent passes this — the address is already shown in the
+header just above); the default (`true`, used by meta/JSON-LD) keeps it.
+
+- **City parsing** (`parseVenueCityCore`/`parseVenueCity`): pulls the city
+  out of a free-text address for the page `<title>`
+  (`"{Name} – {category} in {City}, CO"`, ladder-shortened to fit ≤ 70
+  rendered chars, never truncating the name) and the no-address sentence.
+  The core returns `string | null`; `buildVenueJsonLd`'s `addressLocality`
+  uses the core directly and OMITS the field on `null` rather than emit
+  fallback prose ("Pueblo County") as a structured-data city name.
+- **Postal code** (`extractPostalCode`, venueSchema.ts): takes the LAST
+  5-digit group in the address, not the first — a leading 5-digit house
+  number (e.g. "37137 US 50 Bus...") would otherwise win over the real zip.
+- **OSM placeholder guard** (`PLACEHOLDER_ADDRESS`): a venue whose
+  `address` is literally "Address not in OpenStreetMap" (an OSM import gap)
+  never shows that string in the summary, `<meta description>`, or JSON-LD
+  `streetAddress` — same guard BottomSheet.tsx/DesktopVenueWindow.tsx's map
+  cards already apply (their own fallback is raw lat/lng; a sentence falls
+  back to the parsed city instead).
+- **`sameAs`** is emitted only when a venue's `url` is unique among
+  published venues (`URL_COUNTS`, computed once at module load) — 10
+  gardens/edible landscapes share one Pueblo Food Project program-page URL,
+  which is not any single venue's own identity.
+- **Nearby** (`nearbyVenues`): the 3–5 nearest same-category published
+  venues by haversine distance (`src/lib/distance.ts`), computed in the
+  server `venue/[id]/page.tsx` (both EN and ES) and passed to `VenueContent`
+  as a prop — adds no client JS.
+
 ---
 
 ## Form-route triad

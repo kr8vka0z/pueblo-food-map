@@ -103,7 +103,7 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
 - **Page metadata:** use `buildPageMetadata` (`src/lib/site.ts`), never a raw per-page `metadata` literal, which drops the inherited OG image.
 - **JSON-LD:** always go through `serializeJsonLd`, which escapes `<`; a raw `JSON.stringify` lets `</script>` break out of the tag.
 - **Blessing Boxes:**
-  - Every interaction (check-in, photo, adopt) lives in the on-map venue card, never on a separate page (REVIEW.md has the one exception).
+  - Every interaction (check-in, photo, adopt) lives in the on-map venue card, never on a separate page (REVIEW.md lists the read-only exceptions).
   - Boxes are live: admin edits show immediately, with no Publish.
   - Photos go to R2 (`pfm-box-photos`, with its own staging bucket). D1 holds metadata only.
   - Box alert sends never block a check-in.

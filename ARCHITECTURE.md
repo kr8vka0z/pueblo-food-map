@@ -683,7 +683,8 @@ Full design: atlas-kb `projects/Pueblo Food Map/Blessing Boxes Build Plan.md`.
   without a Publish.
 - **Every interaction (check-in, photo, adopt) lives in the on-map venue
   card**, never a separate page — REVIEW.md's standing rules own that rule
-  (the one exception, `/box/<id>/history`, is a read-only log).
+  (the read-only exceptions are the `/box/<id>/history` log and the
+  planned `/blessing-boxes` list).
 - **Alerts** (`src/lib/boxAlerts.ts`, roles `host`/`adopter`/`giver` in one
   `alert_subscriptions` table): empty/problem → host + adopters; empty/low →
   givers; filled → everyone subscribed. 6h cooldown per subscription, except

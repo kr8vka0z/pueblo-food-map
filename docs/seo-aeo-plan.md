@@ -1,6 +1,6 @@
 # SEO / AEO plan
 
-Status: **draft v2, for discussion** (2026-09-28). v1 was written from the code
+Status: **draft v2** (2026-09-28). Kyle's decisions are in §6. v1 was written from the code
 alone; v2 adds a live audit of pueblofoodmap.com, the non-prod hosts, search
 results and competing directories. Nothing here is scheduled yet; each phase
 becomes one issue (and, where it's code, one PR into `dev`) once agreed.
@@ -99,7 +99,7 @@ Code (one PR into `dev`):
 
 Dashboard and ops (no code):
 
-5. **Search Console and Bing Webmaster Tools.** Verify via a DNS TXT record in
+5. **Search Console and Bing Webmaster Tools** (Kyle, later). Verify via a DNS TXT record in
    Cloudflare, submit the sitemap, and **request indexing** for `/`, `/venues`,
    `/resources` and `/about`. Bing matters because ChatGPT search and Copilot
    use its index. Bing WMT can import from Search Console in one step.
@@ -112,6 +112,10 @@ Dashboard and ops (no code):
    The 2026-09-28 web-search baseline is in §1: we are cited for none of them.
 
 ### Phase 1: Complete the facts (admin data work, the highest AEO value)
+
+**Parked:** Kyle is already doing this data pass; nothing here needs a PR. Kept
+for context, because Phase 2's summary sentence and Phase 3's by-day pages
+depend on it.
 
 No schema or copy can fix a page with no hours. This is admin work in the
 existing tools, not a PR.
@@ -160,9 +164,9 @@ Verify each on staging (the `staticAssetsIncrementalCache` trap).
 1. **`/food-pantries`**: all pantries with the day/time summary from Phase 2,
    and a "how pantries work" FAQ. This is the page meant to beat feedam.org.
 2. **`/blessing-boxes`**: a read-only list of live boxes, linking into the map
-   card. This is real demand ("blessing box Pueblo"), it fixes the `/boxes`
-   gap properly, and a list isn't an interaction, but **confirm it fits the
-   REVIEW.md "no separate box page" rule** before building.
+   card. This is real demand ("blessing box Pueblo"), and it fixes the `/boxes`
+   gap properly. **Approved:** REVIEW.md now lists it as a read-only exception
+   to the "no separate box page" rule (no check-in, photo or adopt controls).
 3. **`/snap-wic-stores`**: the 50 SNAP and 49 WIC venues.
 4. **`/community-gardens`** (gardens + edible landscapes), and **`/meal-sites`**
    once there's more than one.
@@ -172,8 +176,7 @@ Verify each on staging (the `staticAssetsIncrementalCache` trap).
    coverage target. **Area/ZIP pages are deferred**: at 33 pantries, most areas
    would be thin near-duplicates.
 
-URL naming (flat `/food-pantries` vs nested `/venues/pantries`) is an open
-question below; flat names match what people type and are the recommendation.
+URLs are flat (`/food-pantries`, not `/venues/pantries`); Kyle approved that.
 
 ### Phase 4: Spanish that search engines can see (epic, needs a decision)
 
@@ -201,6 +204,9 @@ and likelihood:
    two-way link, since our map shows their boxes live.
 4. **Organization entity:** real `sameAs` profiles once they exist (social, a
    Wikidata item).
+The full contact list is in [`seo-outreach.md`](seo-outreach.md). Kyle is
+doing the outreach.
+
 5. **`/llms.txt`** (cheap, unproven) and a published **open dataset**
    (JSON/CSV linked from `/about`) to earn reuse and citations.
 
@@ -233,13 +239,13 @@ and likelihood:
 - Blessing Box interactions stay on the map card (REVIEW.md); a hub page lists
   and links, nothing more.
 
-## 6. Open questions for Kyle
+## 6. Decisions (Kyle, 2026-09-28)
 
-1. Are Search Console / Bing Webmaster Tools set up? The evidence (the site is
-   absent even for its own name) suggests not, or that nothing is indexed.
-2. Is a `/blessing-boxes` list page OK under the REVIEW.md box rule?
-3. Flat hub URLs (`/food-pantries`) OK?
-4. Who can ask PFP about the broken `/foodfinder/` page and a link? Who's the
-   contact at the county and the blessing-box org?
-5. Is the `/es` tree in scope this quarter, or after Phases 0–3?
-6. Who does the Phase 1 hours data pass, and by when?
+| Question | Decision |
+|---|---|
+| Search Console / Bing Webmaster Tools | Kyle sets them up later (Phase 0 item 5). |
+| `/blessing-boxes` read-only list | Approved; REVIEW.md updated. |
+| Flat hub URLs (`/food-pantries`) | Approved. |
+| Partner outreach | Kyle, working from [`seo-outreach.md`](seo-outreach.md). |
+| Hours / phone data pass (Phase 1) | Kyle, in progress; out of scope for code PRs. |
+| Spanish `/es` tree (Phase 4) | Open. |

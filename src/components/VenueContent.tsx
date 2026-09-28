@@ -37,7 +37,7 @@ import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
 import { venuePath } from "@/lib/venueSchema";
-import { buildVenueSummary, type NearbyVenue } from "@/lib/venueSummary";
+import { buildVenueSummary, PLACEHOLDER_ADDRESS, type NearbyVenue } from "@/lib/venueSummary";
 import { formatMiles } from "@/lib/distance";
 import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
@@ -55,7 +55,7 @@ interface VenueContentProps {
 export default function VenueContent({ venue: v, nearby = [] }: VenueContentProps) {
   const { locale, tree } = useLocale();
   const displayNotes = getDisplayNotes(v);
-  const summary = buildVenueSummary(v, locale);
+  const summary = buildVenueSummary(v, locale, { includeAddress: false });
 
   const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}`;
   // Fragment form, matching HomePageClient's #venue= handling — there is no
@@ -122,11 +122,21 @@ export default function VenueContent({ venue: v, nearby = [] }: VenueContentProp
           >
             {v.name}
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-500)]">{v.address}</p>
+          {/* Same OSM placeholder guard as BottomSheet.tsx/DesktopVenueWindow.tsx's
+              own address lines — never render the literal "Address not in
+              OpenStreetMap" string. */}
+          <p className="mt-1 text-sm text-[var(--color-ink-500)]">
+            {v.address === PLACEHOLDER_ADDRESS ? `${v.lat}, ${v.lng}` : v.address}
+          </p>
           {/* Answer-first summary (#704) — the fact people actually search
               for ("[name] hours", "does [store] take EBT"), assembled from
               verified fields only. Includes "Last verified" (decision 6:
-              shown near the top instead of only under Sources & data). */}
+              shown near the top instead of only under Sources & data).
+              includeAddress: false (review fix) — the street address is
+              already shown just above; the summary here starts from "is a
+              free pantry in {city}, CO" instead of repeating it. Meta
+              description and JSON-LD description (venueSchema.ts) keep the
+              full address — those are read out of page context. */}
           <p className="mt-3 text-sm text-[var(--color-ink-700)] leading-relaxed">
             {summary.join(" ")}
           </p>
@@ -256,7 +266,7 @@ export default function VenueContent({ venue: v, nearby = [] }: VenueContentProp
                   <Link
                     href={localizedHref(venuePath(n.id), tree)}
                     className={
-                      "inline-flex flex-col min-h-11 justify-center text-sm font-medium text-[var(--color-sage-700)] " +
+                      "inline-flex flex-col min-h-12 justify-center text-sm font-medium text-[var(--color-sage-700)] " +
                       "hover:text-[var(--color-sage-600)] transition-colors " +
                       "focus-visible:outline-none focus-visible:ring-2 " +
                       "focus-visible:ring-[var(--color-sage-500)] rounded"
@@ -264,7 +274,7 @@ export default function VenueContent({ venue: v, nearby = [] }: VenueContentProp
                   >
                     {n.name}
                     <span className="text-xs font-normal text-[var(--color-ink-500)]">
-                      {formatMiles(n.distanceMiles)} {t("distance.fromYou", locale)}
+                      {t("detail.nearby.away", locale, { miles: formatMiles(n.distanceMiles) })}
                     </span>
                   </Link>
                 </li>

@@ -178,14 +178,17 @@ Verify each on staging (the `staticAssetsIncrementalCache` trap).
 
 URLs are flat (`/food-pantries`, not `/venues/pantries`); Kyle approved that.
 
-### Phase 4: Spanish that search engines can see (epic, needs a decision)
+### Phase 4: Spanish that search engines can see (P1, specced in #689)
 
-Unchanged from v1. Add an `/es/...` mirror of the public pages with Spanish
+**Full spec: #689** (two PRs: a root-layout restructure, then the `/es` tree).
+Kyle made it P1 on 2026-09-28, so it runs alongside Phases 0–3 rather than
+after them. Any Phase 3 hub ships with its `/es` twin in the same PR.
+
+Summary: add an `/es/...` mirror of the public pages with Spanish
 metadata and JSON-LD (`inLanguage: "es"`) and two-way `hreflang` + `x-default`,
 also in the sitemap. The toggle navigates between trees. **No server-side
 redirect on `/`**, so no `Accept-Language` auto-redirect. It doubles the
-prerendered paths and needs `/es` smoke tests. Do it after Phases 0–3, so it
-mirrors hub pages that already exist rather than chasing them.
+prerendered paths and needs `/es` smoke tests.
 (Quote Pueblo County's Hispanic share only from current ACS data.)
 
 ### Phase 5: Authority (ongoing, starts in parallel with Phase 0)
@@ -248,4 +251,4 @@ doing the outreach.
 | Flat hub URLs (`/food-pantries`) | Approved. |
 | Partner outreach | Kyle, working from [`seo-outreach.md`](seo-outreach.md). |
 | Hours / phone data pass (Phase 1) | Kyle, in progress; out of scope for code PRs. |
-| Spanish `/es` tree (Phase 4) | Open. |
+| Spanish `/es` tree (Phase 4) | **P1**, specced in #689. |

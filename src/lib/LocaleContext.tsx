@@ -4,11 +4,17 @@
  * LocaleContext — global locale state for EN/ES toggle.
  *
  * - LocaleProvider starts at "en" and, after hydration, switches to the
- *   saved `pfm-locale` cookie read from document.cookie (#289). layout.tsx
- *   passes no initialLocale: no route reads the cookie server-side, so
- *   pages stay static (#287) — see ARCHITECTURE.md "Known bilingual
- *   limitation".
- * - useLocale() hook returns { locale, setLocale } for any client component.
+ *   saved `pfm-locale` cookie read from document.cookie (#289) — UNLESS a
+ *   caller passes `initialLocale`. src/app/(site)/layout.tsx (the EN root
+ *   layout) still passes none: no route reads the cookie server-side, so
+ *   its pages stay static (#287). src/app/es/layout.tsx (#689 PR 2, the
+ *   /es root layout) DOES pass `initialLocale="es"` — which also LOCKS the
+ *   tree, since the cookie-sync effect only runs `if (!initialLocale)` —
+ *   see ARCHITECTURE.md "i18n model" for the full picture.
+ * - useLocale() hook returns { locale, setLocale, tree } for any client
+ *   component — `tree` is fixed at the ROUTE that served the page (#689 PR
+ *   2), distinct from the switchable `locale`; see its own field comment
+ *   below and src/lib/localizedHref.ts's header for why the split matters.
  * - setLocale writes the `pfm-locale` cookie so the choice persists across
  *   sessions.
  *
@@ -83,9 +89,13 @@ const LocaleContext = createContext<LocaleContextValue>({
 
 interface LocaleProviderProps {
   /**
-   * Optional initial locale. layout.tsx does not pass it (a server-side
-   * cookie read would make routes dynamic, #287); when absent the provider
-   * starts at "en" and applies the saved cookie client-side on mount.
+   * Optional initial locale. The EN root layout (src/app/(site)/layout.tsx)
+   * does not pass it (a server-side cookie read would make routes dynamic,
+   * #287); when absent, the provider starts at "en" and applies the saved
+   * cookie client-side on mount. The ES root layout (src/app/es/layout.tsx,
+   * #689 PR 2) DOES pass `initialLocale="es"` — locking the tree (the
+   * cookie-sync effect below only runs `if (!initialLocale)`), not just
+   * seeding the initial state.
    */
   initialLocale?: Locale;
   children: React.ReactNode;

@@ -20,6 +20,7 @@ import {
 import { venues } from "@/data/venues";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
 import { t } from "@/lib/i18n";
+import { buildVenueSummary } from "@/lib/venueSummary";
 
 // ─── getVenueById ─────────────────────────────────────────────────────────────
 
@@ -203,6 +204,45 @@ describe("buildVenueJsonLd", () => {
   });
 });
 
+// ─── #704 JSON-LD enrichment (SEO/AEO plan Phase 2) ────────────────────────
+
+describe("buildVenueJsonLd — #704 enrichment", () => {
+  const pantry = venues.find((v) => v.category === "pantry")!;
+  const grocery = venues.find((v) => v.category === "grocery")!;
+  const convenience = venues.find((v) => v.category === "convenience")!;
+
+  test("sameAs carries the venue's own url when present", () => {
+    const withUrl = { ...grocery, url: "https://example.com/store" };
+    const ld = buildVenueJsonLd(withUrl);
+    expect(ld["sameAs"]).toEqual(["https://example.com/store"]);
+  });
+
+  test("sameAs is omitted when the venue has no url", () => {
+    const withoutUrl = { ...grocery, url: undefined };
+    const ld = buildVenueJsonLd(withoutUrl);
+    expect("sameAs" in ld).toBe(false);
+  });
+
+  test("isAccessibleForFree is true for a free category (pantry)", () => {
+    const ld = buildVenueJsonLd(pantry);
+    expect(ld["isAccessibleForFree"]).toBe(true);
+  });
+
+  test("isAccessibleForFree is omitted for a non-free category (grocery)", () => {
+    const ld = buildVenueJsonLd(grocery);
+    expect("isAccessibleForFree" in ld).toBe(false);
+  });
+
+  test("paymentAccepted is SNAP/EBT only when accepts_snap === true", () => {
+    const confirmed = { ...convenience, accepts_snap: true as const };
+    const declined = { ...convenience, accepts_snap: false as const };
+    const unknown = { ...convenience, accepts_snap: undefined };
+    expect(buildVenueJsonLd(confirmed)["paymentAccepted"]).toBe("SNAP/EBT");
+    expect("paymentAccepted" in buildVenueJsonLd(declined)).toBe(false);
+    expect("paymentAccepted" in buildVenueJsonLd(unknown)).toBe(false);
+  });
+});
+
 // ─── buildVenueListJsonLd ─────────────────────────────────────────────────────
 
 describe("buildVenueListJsonLd", () => {
@@ -358,11 +398,14 @@ describe("locale-aware JSON-LD (#689)", () => {
   // venue node's schema.org types (LocalBusiness/GroceryStore/etc.) don't
   // define that property; the page's language is signaled by the WebSite
   // node's own inLanguage and by <html lang>/hreflang instead.
+  // #704 (SEO/AEO plan Phase 2), Decisions item 2: "The summary becomes
+  // `description`" — the old byte-per-category-identical literal this test
+  // asserted is exactly the duplicate-content problem #704 fixes.
   test("buildVenueJsonLd(venue, 'es') uses the /es url; no inLanguage field", () => {
     const ld = buildVenueJsonLd(grocery, "es");
     expect(ld["url"]).toBe(`${SITE_URL}/es/venue/${grocery.id}`);
     expect("inLanguage" in ld).toBe(false);
-    expect(ld["description"]).toBe(`${t(`category.full.${grocery.category}`, "es")} en Pueblo, CO.`);
+    expect(ld["description"]).toBe(buildVenueSummary(grocery, "es").join(" "));
   });
 
   test("buildVenueJsonLd(venue) (default) still uses the EN url; no inLanguage field", () => {

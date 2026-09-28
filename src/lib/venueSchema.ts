@@ -15,12 +15,12 @@ import { venues } from "@/data/venues";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
 import { DISPLAY_DAY_KEYS, slotToIsoTimes } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
-
-/** "in Pueblo, CO." / "en Pueblo, CO." — boilerplate, not a [CHECK] copy key. */
-const IN_PUEBLO_CO: Record<Locale, string> = {
-  en: "in Pueblo, CO.",
-  es: "en Pueblo, CO.",
-};
+import {
+  buildVenueMetaDescription,
+  buildVenueSummary,
+  buildVenueTitle,
+  FREE_CATEGORIES,
+} from "@/lib/venueSummary";
 
 /**
  * @type record maps VenueCategory → schema.org @type value.
@@ -120,17 +120,25 @@ export function serializeJsonLd(value: unknown): string {
  * The title/description/path a venue page's `generateMetadata` needs, for
  * either tree. Extracted (#689 PR 2, advisor decision) so
  * src/app/(site)/venue/[id]/page.tsx and src/app/es/venue/[id]/page.tsx both
- * stay thin wrappers around ONE description string instead of duplicating
- * the `${name} — ${category} in Pueblo, CO. ${address}.` template. `title`
- * is always the venue's proper noun — no locale variant, same as before.
+ * stay thin wrappers around ONE title/description pair instead of
+ * duplicating the template.
+ *
+ * #704 (SEO/AEO plan Phase 2) replaced the old byte-for-category-identical
+ * "${name} — ${category} in Pueblo, CO. ${address}." template with two
+ * length-budgeted, answer-first builders from src/lib/venueSummary.ts:
+ * `title` now carries the search intent term ("{Name} – {category phrase}
+ * in {City}, CO", ≤ 70 chars rendered with the brand suffix), and
+ * `description` is the same verified-fact summary sentence(s) JSON-LD's
+ * `description` uses (buildVenueJsonLd below), cut at a sentence boundary
+ * to stay ≤ 160 chars — never a separate, drifting description string.
  */
 export function venuePageMetadataFields(
   venue: Venue,
   locale: Locale = "en",
 ): { title: string; description: string; path: string } {
   return {
-    title: venue.name,
-    description: `${venue.name} — ${t(`category.full.${venue.category}`, locale)} ${IN_PUEBLO_CO[locale]} ${venue.address}.`,
+    title: buildVenueTitle(venue, locale),
+    description: buildVenueMetaDescription(venue, locale),
     path: venuePath(venue.id, locale),
   };
 }
@@ -180,7 +188,11 @@ export function buildVenueJsonLd(
     "@context": "https://schema.org",
     "@type": CATEGORY_SCHEMA_TYPE[venue.category],
     name: venue.name,
-    description: `${t(`category.full.${venue.category}`, locale)} ${IN_PUEBLO_CO[locale]}`,
+    // #704 (SEO/AEO plan Phase 2): the old description was byte-identical
+    // for every venue sharing a category ("Food Pantry in Pueblo, CO.") —
+    // now the same verified-fact summary sentence(s) venuePageMetadataFields
+    // uses for <meta description>, so the two can't drift.
+    description: buildVenueSummary(venue, locale).join(" "),
     url: `${SITE_URL}${venuePath(venue.id, locale)}`,
     address,
     geo: {
@@ -193,6 +205,25 @@ export function buildVenueJsonLd(
   // Only include telephone when a phone number is present — omit rather than null.
   if (venue.phone) {
     result["telephone"] = venue.phone;
+  }
+
+  // #704: the venue's own outbound link — "the same entity elsewhere",
+  // never the map's own URL (that's already `url` above).
+  if (venue.url) {
+    result["sameAs"] = [venue.url];
+  }
+
+  // #704 truth rule: "free" only for the 4 categories venueSummary.ts's
+  // FREE_CATEGORIES names — the same set the summary sentence's "what"
+  // phrase uses, so the two can never disagree about which venues are free.
+  if (FREE_CATEGORIES.has(venue.category)) {
+    result["isAccessibleForFree"] = true;
+  }
+
+  // #704 truth rule: SNAP/EBT only when accepts_snap is CONFIRMED true —
+  // false or missing stays silent, never a "does not accept" claim.
+  if (venue.accepts_snap === true) {
+    result["paymentAccepted"] = "SNAP/EBT";
   }
 
   // Only include openingHoursSpecification when hours_weekly exists and yields

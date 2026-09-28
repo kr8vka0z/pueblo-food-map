@@ -63,10 +63,14 @@ describe("venue page generateMetadata", () => {
     expect(descA).not.toBe(descB);
   });
 
-  test("description stays under 160 chars for every venue", async () => {
+  // #704 Decisions: "meta description ≤ 160 characters, cut at a sentence
+  // boundary" — <= (not the old strict <) matches that budget exactly;
+  // buildVenueMetaDescription (src/lib/venueSummary.ts) accumulates whole
+  // sentences up to and including 160.
+  test("description stays within the 160-char budget for every venue", async () => {
     const descriptions = await Promise.all(venues.map((v) => descriptionFor(v.id)));
     for (const description of descriptions) {
-      expect(description.length).toBeLessThan(160);
+      expect(description.length).toBeLessThanOrEqual(160);
     }
   });
 

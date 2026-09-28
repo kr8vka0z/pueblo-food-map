@@ -2,16 +2,19 @@
  * Regression checks for PR A of the mobile review
  * (pfm-mobile-review-2026-09-15.md, items 1 + 3):
  *
- *   1. layout.tsx's viewport export carries viewportFit: "cover" — required
- *      before any env(safe-area-inset-*) rule (item 2) does anything at all.
+ *   1. ROOT_VIEWPORT (src/lib/site.ts — the (site) root layout's viewport
+ *      export, #689 PR 1 extracted it there so app/global-not-found.tsx can
+ *      reuse it too) carries viewportFit: "cover" — required before any
+ *      env(safe-area-inset-*) rule (item 2) does anything at all.
  *   2. No form-field input/select/textarea in src/components regresses back
  *      to a bare 14px text-sm — iOS Safari auto-zooms the page on focusing
  *      any field under 16px.
  *
- * Both read source as plain text rather than importing the modules: layout.tsx
- * is a Server Component that calls react-dom's preload() at module scope, and
- * pulling that (plus every downstream import) into a jsdom vitest run is far
- * more fragile than a small regex over the file the export actually lives in.
+ * Both read source as plain text rather than importing the modules: the
+ * (site) root layout is a Server Component that calls react-dom's preload()
+ * at module scope, and pulling that (plus every downstream import) into a
+ * jsdom vitest run is far more fragile than a small regex over the file the
+ * export actually lives in.
  */
 
 import { describe, test, expect } from "vitest";
@@ -19,16 +22,16 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 describe("mobile viewport + form field zoom", () => {
-  test("layout.tsx's viewport export sets viewportFit to cover", () => {
+  test("ROOT_VIEWPORT sets viewportFit to cover", () => {
     const source = readFileSync(
-      join(process.cwd(), "src", "app", "layout.tsx"),
+      join(process.cwd(), "src", "lib", "site.ts"),
       "utf-8",
     );
-    expect(source).toMatch(/export const viewport:\s*Viewport\s*=\s*\{/);
+    expect(source).toMatch(/export const ROOT_VIEWPORT:\s*Viewport\s*=\s*\{/);
     // Pull just the object literal so a stray `viewportFit` mentioned in a
     // comment elsewhere in the file can't produce a false pass.
-    const match = source.match(/export const viewport:\s*Viewport\s*=\s*\{([\s\S]*?)\};/);
-    expect(match, "viewport export not found or not closed with `};`").not.toBeNull();
+    const match = source.match(/export const ROOT_VIEWPORT:\s*Viewport\s*=\s*\{([\s\S]*?)\};/);
+    expect(match, "ROOT_VIEWPORT export not found or not closed with `};`").not.toBeNull();
     expect(match![1]).toMatch(/viewportFit:\s*"cover"/);
   });
 

@@ -2,7 +2,7 @@
  * ActivityLog — the owner-only admin Activity page's body (#679): filters,
  * then days → sign-ins → actions. Pure presentation over
  * src/lib/activityLog.ts's buildActivityDays(); the page
- * (src/app/admin/activity/page.tsx) does the owner check and the loading.
+ * (src/app/(site)/admin/activity/page.tsx) does the owner check and the loading.
  *
  * Plain server component: the filters are a GET form and long runs collapse
  * with a native <details>, so nothing here needs client JS.

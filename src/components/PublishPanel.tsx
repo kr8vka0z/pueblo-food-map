@@ -3,7 +3,7 @@
 /**
  * PublishPanel — the admin's Publish action (#256).
  *
- * Rendered above VenueListView on /admin (src/app/admin/page.tsx) so the
+ * Rendered above VenueListView on /admin (src/app/(site)/admin/page.tsx) so the
  * admin sees "what will publish" — new drafts, published rows edited since
  * their last publish, and previously-live rows now archived (will be
  * removed) — before scrolling the venue list. Counts are computed

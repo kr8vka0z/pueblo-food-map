@@ -12,7 +12,7 @@
  *
  * Each count degrades to 0 INDEPENDENTLY on any read failure (missing
  * table, D1 hiccup) — same "one missing table must never break the whole
- * admin shell" posture src/app/admin/page.tsx originally established for
+ * admin shell" posture src/app/(site)/admin/page.tsx originally established for
  * pendingPhotoCount/pendingAdopterCount. A broken box_photos table must not
  * also blank the submissions badge, so this is four small try/catches, not
  * one around the whole Promise.all.

@@ -3,7 +3,7 @@
 /**
  * AboutContent — visible body of /about, including its FAQPage JSON-LD.
  *
- * Extracted from src/app/about/page.tsx so the visible mission/FAQ copy
+ * Extracted from src/app/(site)/about/page.tsx so the visible mission/FAQ copy
  * reads the visitor's locale via useLocale() (#289), while the page itself
  * stays a static Server Component (no cookies() read — ARCHITECTURE.md "Known
  * bilingual limitation", #287).

@@ -1,6 +1,6 @@
 /**
  * POST /api/public/alerts/stop — the mutation half of /alerts/stop
- * (Blessing Boxes slice 6). The page itself (src/app/alerts/stop/page.tsx)
+ * (Blessing Boxes slice 6). The page itself (src/app/(site)/alerts/stop/page.tsx)
  * never mutates on its own GET — a mail scanner prefetching the page's HTML
  * must not silently unsubscribe someone. Two real callers reach this route
  * instead, both of which this handler must serve identically:

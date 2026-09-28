@@ -15,7 +15,7 @@
  * is), so no client-side route-matching logic is needed — every Link here
  * is a real navigation, no client JS required for the highlighting itself.
  *
- * NOT a layout (`src/app/admin/layout.tsx`): a layout wrapping every
+ * NOT a layout (`src/app/(site)/admin/layout.tsx`): a layout wrapping every
  * /admin/* route would also wrap /admin/login, and any auth/count read
  * inside it would throw AccessDeniedError -> redirect("/admin/login") on
  * the very login page itself, an infinite redirect loop. Each page instead
@@ -48,7 +48,7 @@ interface NavItem {
    * Which AdminNavCounts field(s) show as a pending-count pill on this
    * link. An array so Blessing Boxes can carry the COMBINED photos+adopters
    * count (#677: their own separate nav items are gone) without widening
-   * AdminNavCounts itself — the Dashboard (src/app/admin/page.tsx) still
+   * AdminNavCounts itself — the Dashboard (src/app/(site)/admin/page.tsx) still
    * reads `photos`/`adopters` separately for its own needs-card, so nothing
    * else about that shape changes.
    */

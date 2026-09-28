@@ -1,6 +1,6 @@
 /**
  * adminVenues.ts — small pure helpers for the read-only admin venue list
- * (#253: src/app/admin/page.tsx, src/components/VenueListView.tsx; #673
+ * (#253: src/app/(site)/admin/page.tsx, src/components/VenueListView.tsx; #673
  * "one status per place" rework replaced the old status+"Unpublished
  * changes" pair with a single displayStatusOf()).
  *
@@ -134,7 +134,7 @@ export interface PublishChangeSummary {
 /**
  * Change-summary counts for the admin's Publish panel (#256): what a Publish
  * click would actually do, computed from the same `SELECT *` rows
- * src/app/admin/page.tsx already loads for VenueListView — no second query.
+ * src/app/(site)/admin/page.tsx already loads for VenueListView — no second query.
  *
  * - `newDrafts`: every `draft` row (never been on the public map).
  * - `editedSincePublish`: `published` rows whose displayStatusOf() reads

@@ -3,7 +3,7 @@
 /**
  * VenuesDirectoryContent — visible body of /venues.
  *
- * Extracted from src/app/venues/page.tsx so the directory's headings and
+ * Extracted from src/app/(site)/venues/page.tsx so the directory's headings and
  * per-venue hours text read the visitor's locale via useLocale() (#289),
  * while the page itself stays a server-rendered, crawlable Server Component
  * (no cookies() read — ARCHITECTURE.md "Known bilingual limitation", #287). The

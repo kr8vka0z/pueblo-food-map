@@ -3,7 +3,7 @@
  * caller that needs to bind a variable-length id list into a `WHERE id IN
  * (...)` statement chunks it the same way instead of re-deriving the limit.
  *
- * Extracted from src/app/admin/flags/page.tsx's loadVenueLookup (#397),
+ * Extracted from src/app/(site)/admin/flags/page.tsx's loadVenueLookup (#397),
  * which first measured this against the real API, not docs: 100 bound
  * parameters succeed, 101 fail with `too many SQL variables at offset 235:
  * SQLITE_ERROR` (D1 error code 7500). That page's own fix is unchanged

@@ -3,7 +3,7 @@
 /**
  * VenueContent — visible body of /venue/[id].
  *
- * Extracted from src/app/venue/[id]/page.tsx so the page's text reads the
+ * Extracted from src/app/(site)/venue/[id]/page.tsx so the page's text reads the
  * visitor's locale via useLocale() (#289). This is the highest-risk page in
  * the repo (see that file's own header comment on the 2026-08-24 to
  * 2026-09-02 production outage) — this extraction changes ONLY the visible
@@ -45,7 +45,7 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
       {/* Breadcrumb (SEO/AEO plan Phase 0): Map › All places › this venue.
           Replaces the old lone "← Back to map" link, so every venue page
           links up to /venues in its server HTML. It mirrors the
-          BreadcrumbList JSON-LD in src/app/venue/[id]/page.tsx. */}
+          BreadcrumbList JSON-LD in src/app/(site)/venue/[id]/page.tsx. */}
       <nav
         aria-label={t("breadcrumb.label", locale)}
         className="min-h-12 flex items-center px-4 border-b border-[var(--color-bone-200)] shrink-0"

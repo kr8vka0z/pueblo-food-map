@@ -18,7 +18,7 @@
  *
  * Deliberately NOT a client component: it owns no state of its own (every
  * card manages its own approve/reject/mark-done state) and the edit page
- * (src/app/admin/venues/[id]/edit/page.tsx) already does the D1 reads this
+ * (src/app/(site)/admin/venues/[id]/edit/page.tsx) already does the D1 reads this
  * box needs server-side, same "Server Component fetches, presentational
  * children render" split every other admin page/box pair in this app
  * follows (WaitingToPublishBox.tsx is the closest sibling).

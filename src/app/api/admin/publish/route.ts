@@ -78,7 +78,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     // message rather than a scary generic error. Expected/normal until Kyle
     // provisions the PAT (#260) — not a fail-loud case like the
     // RESEND_API_KEY/TURNSTILE_SECRET_KEY convention this used to match
-    // (src/app/feedback/submit/route.ts), because those routes have no UI
+    // (src/app/(site)/feedback/submit/route.ts), because those routes have no UI
     // surface distinguishing "not configured" from "broken."
     return NextResponse.json({ ok: false, error: "publish_not_configured" }, { status: 503 });
   }

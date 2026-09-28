@@ -7,7 +7,7 @@
  * an admin's email / "Automatic data refresh" / "Approved from Data refresh
  * by …" rules).
  *
- * Presentational only — src/app/admin/venues/[id]/edit/page.tsx computes
+ * Presentational only — src/app/(site)/admin/venues/[id]/edit/page.tsx computes
  * `changes` from D1 (audit_log + change_proposals) and passes them in
  * already resolved, same split as every other Server-Component-fetches /
  * Client-or-presentational-renders pair in this admin (VenueListView,

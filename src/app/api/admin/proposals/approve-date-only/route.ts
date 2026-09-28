@@ -49,7 +49,7 @@
  * **D1's 100-bound-parameter ceiling (#397)** means the pre-validation
  * `SELECT * FROM change_proposals WHERE id IN (...)` can't bind more than
  * 100 ids in one statement — src/lib/d1.ts's chunkArray()/D1_MAX_BOUND_PARAMS
- * (extracted from src/app/admin/flags/page.tsx's own venue-lookup batching)
+ * (extracted from src/app/(site)/admin/flags/page.tsx's own venue-lookup batching)
  * split the request's id list into ≤100-id chunks the same way that lookup
  * already does. The per-request cap below (200) is comfortably above what a
  * single admin's filtered "date-only" queue is ever likely to hold in one

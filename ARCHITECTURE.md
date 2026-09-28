@@ -87,6 +87,7 @@ Lib (selected)
   └── src/lib/favorites.ts, distance.ts, searchVenues.ts
   └── src/lib/turnstile.ts, formRateLimit.ts  (form protection)
   └── src/lib/adminDb.ts, adminSession.ts, adminOrigin.ts  (admin gate)
+  └── src/lib/adminOwner.ts, authEvents.ts, activityLog.ts  (owner-only Activity log, #679)
   └── src/lib/publishVenues.ts    (Publish engine)
   └── src/lib/blessingBoxes.ts    (live box reads)
 
@@ -727,9 +728,27 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   queue, `/api/public/**` box routes — read `getCloudflareContext().env.ADMIN_DB`
   directly, never `getAdminDb()`.
 - Every page except `/admin/login` shares one header (`AdminNav`) with
-  pending-count pills.
+  pending-count pills. Its **Activity** item is rendered only for the owner
+  (`identity.isOwner`, see `/admin/activity` below).
 
 ### Surfaces
+
+- **`/admin/activity` — Activity log, owner only** (#679). Every admin
+  sign-in, failed attempt and action, newest first, grouped by day, then by
+  sign-in. `getAdminDb()` sets `identity.isOwner` from the `ADMIN_OWNER_EMAIL`
+  var (`src/lib/adminOwner.ts`, fails toward Kyle); anyone else gets a 404
+  before anything is read. Two sources (`src/lib/activityLog.ts`):
+  `auth_events` (migration `0017`) — written by Better Auth hooks in
+  `src/lib/authEvents.ts` (`session.create.after` for sign-ins; a plugin's
+  path hooks for sign-out, a sign-in link requested for a non-allowlisted
+  email, an invalid/used link, a failed passkey, passkey added/removed;
+  never blocks a sign-in, never stores a token) — and `audit_log`, whose
+  `session_id` ties each action to its sign-in. Actor without an `@`
+  (`refresh-pipeline`) → an "Automatic" group; human rows from before `0017`
+  → a per-person "before sign-ins were recorded" group. Filters are a GET
+  form (person, activity type, date range in America/Denver, place/box
+  name); paging is "Show older" (`?until=`, 300 rows per source). Both tables
+  are kept permanently — the 90-day email cleanup never touches them.
 
 - **`/admin` — Dashboard** (`src/app/admin/page.tsx`, overhauled #680). A
   greeting + a 7/30/90-day period switch (`?period=`, server-rendered

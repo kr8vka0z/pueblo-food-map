@@ -83,8 +83,8 @@ async function authorizeArchiveRequest(headers: HeaderSource): Promise<AdminDbAc
 // insert entirely when the archive UPDATE below didn't actually apply —
 // same shape and reasoning as the sibling edit route's own AUDIT_INSERT_SQL.
 // Trailing two bind params (id, the new timestamp) are the guard.
-const AUDIT_INSERT_SQL = `INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp)
-  SELECT ?, ?, ?, ?, ?, ?, ?
+const AUDIT_INSERT_SQL = `INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id)
+  SELECT ?, ?, ?, ?, ?, ?, ?, ?
   WHERE EXISTS (SELECT 1 FROM venues WHERE id = ? AND updated_at = ?)`;
 
 // The `AND kind = 'closure' AND target_venue_id = ?` guard (mirrors the
@@ -167,6 +167,8 @@ export async function POST(
       JSON.stringify(existing),
       JSON.stringify(afterRow),
       timestamp,
+      // #679: ties this action to the sign-in that made it (Activity log).
+      identity.sessionId ?? null,
       ...dependentGuardArgs,
     );
 

@@ -59,6 +59,9 @@ declare global {
     // rationale as BETTER_AUTH_RP_ID above: a plain wrangler `var`, not worth
     // a full runtime-type regen for one optional string field.
     ANALYTICS_EXCLUDED_IPS?: string;
+    // #679 — the one account that sees /admin/activity (src/lib/adminOwner.ts).
+    // Same "plain var, declared by hand" rationale as the two above.
+    ADMIN_OWNER_EMAIL?: string;
     // #681 (admin Dashboard "What people do on the map") — POSTHOG_PROJECT_ID
     // and POSTHOG_API_HOST are declared once, in worker-configuration.d.ts's
     // hand-patched `Env` (see that file's header), and reach this interface

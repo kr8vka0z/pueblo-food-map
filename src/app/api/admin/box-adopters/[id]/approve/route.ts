@@ -32,7 +32,7 @@ import { bustEdgeCache } from "@/lib/edgeCache";
 import { logFormFailure } from "@/lib/logger";
 
 const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
 async function authorize(headers: HeaderSource): Promise<AdminDbAccess> {
   const access = await getAdminDb(headers);
@@ -80,7 +80,7 @@ export async function POST(
     .bind(identity.email, timestamp, adopterId);
   const insertAudit = db
     .prepare(AUDIT_INSERT_SQL)
-    .bind(identity.email, "box_adopter", String(adopterId), "update", JSON.stringify(existing), JSON.stringify(afterRow), timestamp);
+    .bind(identity.email, "box_adopter", String(adopterId), "update", JSON.stringify(existing), JSON.stringify(afterRow), timestamp, identity.sessionId ?? null);
   const upsertSubscription = upsertApprovedAdopterSubscriptionStatement(db, {
     venueId: existing.venue_id,
     email: existing.email,

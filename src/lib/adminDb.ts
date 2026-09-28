@@ -31,6 +31,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { AdminIdentity, HeaderSource } from "./adminOrigin";
 import { requireAdminSession } from "./adminSession";
+import { isOwnerEmail } from "./adminOwner";
 
 export interface AdminDbAccess {
   db: D1Database;
@@ -50,5 +51,10 @@ export async function getAdminDb(
 ): Promise<AdminDbAccess> {
   const identity = await requireAdminSession(headers); // Better Auth session + allowlist — throws AccessDeniedError
   const { env } = await getCloudflareContext({ async: true });
-  return { db: env.ADMIN_DB, identity };
+  // #679 — owner flag for the Activity log, from the wrangler var (binding,
+  // not process.env — AGENTS.md "Runtime reads").
+  return {
+    db: env.ADMIN_DB,
+    identity: { ...identity, isOwner: isOwnerEmail(identity.email, env.ADMIN_OWNER_EMAIL) },
+  };
 }

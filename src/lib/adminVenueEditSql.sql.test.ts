@@ -27,6 +27,7 @@ const MIGRATIONS = [
   "0001_init_admin_schema.sql",
   "0005_blessing_boxes.sql",
   "0008_box_events.sql",
+  "0017_auth_events.sql",
 ];
 
 function buildDb(): Database.Database {
@@ -77,7 +78,7 @@ function runEdit(db: Database.Database, id: string, expectedUpdatedAt: string) {
     db.prepare(BOX_INSERT_SQL).run(id, "Host", null, null, null, null, null, id, NEW_TS);
     db.prepare(BOX_EVENT_INSERT_SQL_GUARDED).run(id, "renamed", "Old Name → New Name", NEW_TS, id, NEW_TS);
     db.prepare(AUDIT_INSERT_SQL).run(
-      "admin@example.com", "venue", id, "update", "{}", "{}", NEW_TS, id, NEW_TS,
+      "admin@example.com", "venue", id, "update", "{}", "{}", NEW_TS, "session-1", id, NEW_TS,
     );
   })();
   return updateChanges;

@@ -346,6 +346,8 @@ export async function PATCH(
       // create route's own after_json.
       JSON.stringify(fields.box !== null ? { ...afterRow, box: fields.box } : afterRow),
       updatedAt,
+      // #679: ties this action to the sign-in that made it (Activity log).
+      identity.sessionId ?? null,
       ...dependentGuardArgs,
     );
   const approveProposal =

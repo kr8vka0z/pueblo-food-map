@@ -69,8 +69,8 @@ const DONE_SUBMISSION_SQL =
 // SELECT-form so the guard can skip the insert entirely when the UPDATE
 // above didn't actually apply — same shape as the archive route's own
 // AUDIT_INSERT_SQL.
-const AUDIT_INSERT_SQL = `INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp)
-  SELECT ?, 'venue', ?, 'update', NULL, ?, ?
+const AUDIT_INSERT_SQL = `INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id)
+  SELECT ?, 'venue', ?, 'update', NULL, ?, ?, ?
   WHERE EXISTS (SELECT 1 FROM public_submissions WHERE id = ? AND status = 'approved')`;
 
 export async function POST(
@@ -107,7 +107,7 @@ export async function POST(
   const markDone = db.prepare(DONE_SUBMISSION_SQL).bind(identity.email, timestamp, id);
   const insertAudit = db
     .prepare(AUDIT_INSERT_SQL)
-    .bind(identity.email, pending.target_venue_id, JSON.stringify({ event: "public_submission_marked_done", submissionId: id }), timestamp, id);
+    .bind(identity.email, pending.target_venue_id, JSON.stringify({ event: "public_submission_marked_done", submissionId: id }), timestamp, identity.sessionId ?? null, id);
 
   // Atomic: same "no dependent write without its trigger having actually
   // applied" reasoning as every other admin mutation batch in this app.

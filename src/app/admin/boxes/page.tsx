@@ -61,6 +61,7 @@ export default async function BoxesPage({
   searchParams?: Promise<{ show?: string }>;
 } = {}) {
   let email: string;
+  let showActivity = false;
   let boxHealthEntries: Awaited<ReturnType<typeof loadBoxHealthEntries>>;
   let recentCheckins: Awaited<ReturnType<typeof loadRecentCheckinsAllBoxes>>;
   let photos: AdminBoxPhotoRow[];
@@ -77,6 +78,7 @@ export default async function BoxesPage({
   try {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
+    showActivity = identity.isOwner === true;
 
     [boxHealthEntries, recentCheckins, photos, adopters, navCounts] = await Promise.all([
       loadBoxHealthEntries(db, now).catch(() => [] as Awaited<ReturnType<typeof loadBoxHealthEntries>>),
@@ -107,7 +109,7 @@ export default async function BoxesPage({
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="boxes" counts={navCounts} />
+      <AdminNav email={email} active="boxes" counts={navCounts} showActivity={showActivity} />
       <div className="px-4 py-6 sm:px-6">
         <BoxesToReviewBox
           reviewingBoxCount={reviewingBoxCount}

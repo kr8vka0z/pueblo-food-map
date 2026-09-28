@@ -289,6 +289,8 @@ export function toTriState(value: boolean | undefined): number | null {
 /** Actor identity recorded on the venue mutation + audit row — the reviewing admin from the caller's OWN Better Auth session, never the pipeline's bot identity that generated the proposal. Narrowed to just the field this module needs, not the full AdminIdentity shape (adminOrigin.ts) — keeps this file's D1-adjacent code from importing an auth type it only uses for one string field. */
 export interface ApprovingIdentity {
   email: string;
+  /** #679 — the reviewing admin's Better Auth session id, written to audit_log.session_id. */
+  sessionId?: string;
 }
 
 /**
@@ -304,7 +306,7 @@ export type ApplyApprovedProposalResult =
   | { ok: false; status: number; error: string; message?: string };
 
 const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
 // `WHERE id = ? AND status = 'pending'` closes the supersede-race window —
 // see applyApprovedProposal's own header, correctness requirement 1 in the
@@ -601,7 +603,7 @@ export async function applyApprovedProposal(
 
   const insertAudit = db
     .prepare(AUDIT_INSERT_SQL)
-    .bind(identity.email, "venue", proposalRow.target_venue_id, auditAction, beforeJson, JSON.stringify(afterRowForAudit), timestamp);
+    .bind(identity.email, "venue", proposalRow.target_venue_id, auditAction, beforeJson, JSON.stringify(afterRowForAudit), timestamp, identity.sessionId ?? null);
   const approveProposal = db.prepare(APPROVE_PROPOSAL_SQL).bind(identity.email, timestamp, timestamp, proposalRow.id);
 
   // A rename proposal (#543) updates the OLD row in place above; recording

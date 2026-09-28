@@ -124,6 +124,21 @@ describe("POST /api/admin/box-photos/[id]/approve", () => {
     expect(batch).not.toHaveBeenCalled();
   });
 
+  // #679 — the audit row carries the admin's sign-in, so the owner's
+  // Activity log can group it under that sign-in.
+  test("the audit_log row records the caller's session id", async () => {
+    mockRequireAdminSession.mockResolvedValue({ email: ADMIN_EMAIL, sessionId: "sess-123" });
+    const { db, batch } = makeFakeDb(makeExistingRow({ status: "pending" }));
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
+
+    const res = await callApprove(makeRequest({ origin: ADMIN_ORIGIN }));
+
+    expect(res.status).toBe(200);
+    const auditStmt = (batch.mock.calls[0][0] as BoundStatement[])[1];
+    expect(auditStmt.sql).toContain("session_id");
+    expect(auditStmt.args[7]).toBe("sess-123");
+  });
+
   test("pending -> approved: 200, db.batch() writes the UPDATE + audit_log row", async () => {
     const existing = makeExistingRow({ status: "pending" });
     const { db, batch } = makeFakeDb(existing);

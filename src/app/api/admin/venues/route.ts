@@ -81,7 +81,7 @@ const VENUES_INSERT_COLUMNS = [
 const VENUES_INSERT_SQL = `INSERT INTO venues (${VENUES_INSERT_COLUMNS.join(", ")}) VALUES (${VENUES_INSERT_COLUMNS.map(() => "?").join(", ")})`;
 
 const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
 // Blessing Boxes slice 1: a fresh blessing_box create always inserts its
 // blessing_boxes row too (never an upsert here — the venue row is brand
@@ -326,6 +326,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       // this table), so the full box payload belongs in the create record.
       JSON.stringify(fields.box !== null ? { ...venueRowForAudit, box: fields.box } : venueRowForAudit),
       timestamp,
+      // #679: ties this action to the sign-in that made it (Activity log).
+      identity.sessionId ?? null,
     );
 
   // ponytail: the `AND status = 'pending'` clause makes a double-approve (or

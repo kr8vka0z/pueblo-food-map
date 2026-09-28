@@ -184,7 +184,12 @@ Verify each on staging (the `staticAssetsIncrementalCache` trap).
 
 URLs are flat (`/food-pantries`, not `/venues/pantries`); Kyle approved that.
 
-### Phase 4: Spanish that search engines can see — merged to dev; prod pending the [CHECK] native-speaker review and a staging check (P1, specced in #689)
+### Phase 4: Spanish that search engines can see — live on prod 2026-09-28 (P1, specced in #689)
+
+**Status:** live on prod via promotion #702 (PR 1 #695, PR 2 #697 + fixes #698).
+Kyle released it before the native-speaker `[CHECK]` review; the 139 lines to
+review are listed on #689 and are still open. Corrections ship as ordinary
+`i18n.ts` PRs.
 
 **Full spec: #689** (two PRs: a root-layout restructure, then the `/es`
 tree). Kyle made it P1 on 2026-09-28, so it ran alongside Phases 0–3 rather
@@ -273,4 +278,4 @@ doing the outreach.
 | Flat hub URLs (`/food-pantries`) | Approved. |
 | Partner outreach | Kyle, working from [`seo-outreach.md`](seo-outreach.md). |
 | Hours / phone data pass (Phase 1) | Kyle, in progress; out of scope for code PRs. |
-| Spanish `/es` tree (Phase 4) | **P1**, specced in #689 — merged to `dev` (PR 1 #695, PR 2 #697); prod pending the `[CHECK]` native-speaker review and a staging check. |
+| Spanish `/es` tree (Phase 4) | **P1**, specced in #689 — live on prod 2026-09-28 (#695, #697, #698 via #702). The `[CHECK]` native-speaker review is still open on #689. |

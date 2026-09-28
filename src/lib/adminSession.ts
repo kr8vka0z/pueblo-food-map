@@ -83,5 +83,5 @@ export async function requireAdminSession(
   if (!isAllowlistedEmail(result.user.email)) {
     throw new AccessDeniedError("not_allowlisted");
   }
-  return { email: result.user.email };
+  return { email: result.user.email, sessionId: result.session?.id };
 }

@@ -78,7 +78,7 @@ describe("requireAdminSession", () => {
 
     await expect(
       requireAdminSession(headersWithCookie("__Host-session_token=abc")),
-    ).resolves.toEqual({ email: "kysboyd@gmail.com" });
+    ).resolves.toEqual({ email: "kysboyd@gmail.com", sessionId: "s1" });
   });
 
   // Was "forwards only the cookie header" — updated because

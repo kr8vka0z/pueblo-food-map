@@ -402,6 +402,7 @@ export default async function EditVenuePage({
 }) {
   const { id } = await params;
   let email: string;
+  let showActivity = false;
   let venue: AdminVenueRow | null;
   let closureContext: ClosureReportContext | null = null;
   let linkHealthContext: LinkHealthProposalContext | null = null;
@@ -418,6 +419,7 @@ export default async function EditVenuePage({
   try {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
+    showActivity = identity.isOwner === true;
     venue = await db.prepare("SELECT * FROM venues WHERE id = ?").bind(id).first<AdminVenueRow>();
     if (venue) {
       const { submission, proposal } = await searchParams;
@@ -470,7 +472,7 @@ export default async function EditVenuePage({
 
   return (
     <main className="min-h-screen bg-[var(--color-bone-50)]">
-      <AdminNav email={email} active="places" counts={navCounts} />
+      <AdminNav email={email} active="places" counts={navCounts} showActivity={showActivity} />
       <div className="px-4 py-6 sm:px-6 space-y-6">
         <h2 className="wordmark text-xl text-[var(--color-ink-900)]">Edit {venue.name}</h2>
         {venue.category === "blessing_box" && (

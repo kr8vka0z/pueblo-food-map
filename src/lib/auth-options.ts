@@ -38,6 +38,11 @@ import { passkey } from "@better-auth/passkey";
 import { adminAuthAllowlistPlugin } from "@/lib/adminAuthAllowlistPlugin";
 import { sendAdminMagicLinkEmail } from "@/lib/adminMagicLinkEmail";
 import { logAdminAuthEvent } from "@/lib/logger";
+import {
+  authEventsDatabaseHooks,
+  authEventsPlugin,
+  type AuthEventDeps,
+} from "@/lib/authEvents";
 
 /**
  * Every hostname this Worker answers admin traffic on (mirrors
@@ -93,7 +98,12 @@ export function buildAuthOptions(
   // config as before this parameter existed. Only staging ever passes an
   // override.
   rpID: string = "pueblofoodmap.com",
+  // #679 — where the permanent admin sign-in record (auth_events) is
+  // written. Only the runtime (auth.ts) passes it; the schema-generation CLI
+  // and config-only tests pass nothing, which turns recording off.
+  authEvents: AuthEventDeps = { db: undefined },
 ) {
+  const signInEventHooks = authEventsDatabaseHooks(authEvents);
   return {
     database,
     // Falls back to the `better-auth-secret-123456789` dev default only in
@@ -300,6 +310,12 @@ export function buildAuthOptions(
     // https origins, not plain http://localhost, so an unconditional
     // Secure flag changes nothing about that.
     advanced: {
+      // #679 — read the client IP from Cloudflare's header. Without this the
+      // live `session.ipAddress` was an empty string on every row (Better
+      // Auth's default header list doesn't include CF-Connecting-IP).
+      ipAddress: {
+        ipAddressHeaders: ["cf-connecting-ip"],
+      },
       useSecureCookies: false,
       cookies: {
         session_token: {
@@ -344,6 +360,12 @@ export function buildAuthOptions(
           userVerification: "required",
         },
       }),
+      // #679 — records failed sign-ins, sign-outs and passkey changes in
+      // auth_events. Must sit BEFORE adminAuthAllowlistPlugin: that plugin
+      // short-circuits a non-allowlisted sign-in-link request, and a
+      // short-circuited request runs no later hooks. It only observes; it
+      // never changes a response.
+      authEventsPlugin(authEvents),
       // #315 CRITICAL — must be the LAST plugin in this array. Better
       // Auth's plugin hooks all run in registration order (dispatch.mjs's
       // `getHooks()` flatMaps each plugin's `hooks.before` in array order),
@@ -372,8 +394,10 @@ export function buildAuthOptions(
     databaseHooks: {
       session: {
         create: {
-          after: async () => {
+          after: async (session, ctx) => {
             logAdminAuthEvent("login");
+            // #679 — the durable sign-in row (method, IP, device, location).
+            await signInEventHooks.session.create.after(session, ctx);
           },
         },
       },

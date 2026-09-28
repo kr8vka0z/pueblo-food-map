@@ -120,6 +120,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     snapshot.draftIds,
     {
       actorEmail: identity.email,
+      actorSessionId: identity.sessionId,
       publishedAt,
       prUrl: commitResult.prUrl,
       snapshotCount: validation.venues.length,

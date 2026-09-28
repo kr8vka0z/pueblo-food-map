@@ -44,7 +44,7 @@ interface BoxCheckinRow {
 }
 
 const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
+  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
 async function authorizeVisibilityRequest(headers: HeaderSource): Promise<AdminDbAccess> {
   const access = await getAdminDb(headers);
@@ -103,6 +103,8 @@ export async function POST(
       JSON.stringify(existing),
       JSON.stringify(afterRow),
       timestamp,
+      // #679: ties this action to the sign-in that made it (Activity log).
+      identity.sessionId ?? null,
     );
 
   // Atomic: the visibility flip and its own audit trail land together or not at all — same convention as every other admin mutation in this app.

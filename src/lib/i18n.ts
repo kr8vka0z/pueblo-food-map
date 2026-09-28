@@ -388,7 +388,7 @@ const en: Record<string, string> = {
   // time this comment was written; it was rewritten again for #485 (PostHog
   // added alongside Cloudflare Web Analytics — see that key's own comment).
   "privacy.collect.heading": "What we collect",
-  "privacy.collect.body": "Pueblo Food Map collects the information you type into our forms (place reports, suggestions, and feedback). We use it to review what you sent and, if you gave an email address, to write back. Your IP address is checked to block spam when you send a form, and is never saved with what you sent.",
+  "privacy.collect.body": "Pueblo Food Map collects the information you type into our forms (place reports, suggestions, and feedback). We use it to review what you sent and, if you gave an email address, to write back. Your IP address is checked to block spam when you send a form, and is never saved with what you sent. Sign-ins to the site's admin area, used by the Pueblo Food Map team, are logged with the time, device and IP address, for security.",
   "privacy.checkins.heading": "Blessing box check-ins",
   "privacy.checkins.body": "Checking in at a blessing box is anonymous. We do not ask for your name or email, and we do not save your IP address. A photo you add is reviewed before it shows, and location details hidden inside the photo file are removed.",
   // New paragraph (#594) — the per-browser check-in rate-limit ID
@@ -1284,7 +1284,7 @@ const es: Record<string, string> = {
   "privacy.linkLabel": "Privacidad",
   "privacy.heading": "Privacidad",
   "privacy.collect.heading": "Qué recopilamos", // [CHECK]
-  "privacy.collect.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). La usamos para revisar lo que enviaste y, si diste un correo electrónico, para responderte. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con lo que enviaste.", // [CHECK]
+  "privacy.collect.body": "Pueblo Food Map recopila la información que escribes en nuestros formularios (reportes de lugares, sugerencias y comentarios). La usamos para revisar lo que enviaste y, si diste un correo electrónico, para responderte. Tu dirección IP se revisa para bloquear spam cuando envías un formulario, y nunca se guarda junto con lo que enviaste. Los inicios de sesión en el área de administración del sitio, que usa el equipo de Pueblo Food Map, se registran con la hora, el dispositivo y la dirección IP, por seguridad.", // [CHECK]
   "privacy.checkins.heading": "Registros en cajas de bendición", // [CHECK]
   "privacy.checkins.body": "Registrar tu visita a una caja de bendición es anónimo. No pedimos tu nombre ni tu correo, y no guardamos tu dirección IP. Una foto que agregues se revisa antes de publicarse, y los detalles de ubicación ocultos en el archivo de la foto se eliminan.", // [CHECK]
   "privacy.checkins.body2": "Cada registro también usa un identificador aleatorio que tu navegador guarda, para distinguir registros repetidos sin pedirte tu nombre ni tu correo. No está vinculado a quién eres, y borrar los datos del sitio en tu navegador genera uno nuevo.", // [CHECK]

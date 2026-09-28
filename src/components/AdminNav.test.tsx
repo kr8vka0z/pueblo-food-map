@@ -86,4 +86,18 @@ describe("AdminNav", () => {
       expect(screen.getByRole("link", { name: new RegExp(`^${label}`) }).getAttribute("href")).toBe(href);
     }
   });
+
+  // #679 — the Activity item exists only in the owner's HTML.
+  test("never renders the Activity item unless showActivity is set", () => {
+    render(<AdminNav email="other-admin@example.com" active="dashboard" counts={ZERO_ADMIN_NAV_COUNTS} />);
+    expect(screen.queryByRole("link", { name: "Activity" })).toBeNull();
+    expect(document.body.innerHTML).not.toContain("/admin/activity");
+  });
+
+  test("renders the Activity item for the owner, pointing at /admin/activity", () => {
+    render(<AdminNav email="owner@example.com" active="activity" counts={ZERO_ADMIN_NAV_COUNTS} showActivity />);
+    const link = screen.getByRole("link", { name: "Activity" });
+    expect(link.getAttribute("href")).toBe("/admin/activity");
+    expect(link.getAttribute("aria-current")).toBe("page");
+  });
 });

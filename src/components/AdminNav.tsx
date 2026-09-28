@@ -26,12 +26,18 @@
 import Link from "next/link";
 import type { AdminNavCounts } from "@/lib/adminNavCounts";
 
-export type AdminActiveTab = "dashboard" | "boxes" | "places";
+export type AdminActiveTab = "dashboard" | "boxes" | "places" | "activity";
 
 export interface AdminNavProps {
   email: string;
   active: AdminActiveTab;
   counts: AdminNavCounts;
+  /**
+   * #679 — true only for the owner (identity.isOwner from getAdminDb()).
+   * The Activity item is not rendered at all otherwise, so it never appears
+   * in another admin's HTML; the page itself also 404s for them.
+   */
+  showActivity?: boolean;
 }
 
 interface NavItem {
@@ -69,6 +75,9 @@ const NAV_ITEMS: NavItem[] = [
   { key: "places", label: "Places", href: "/admin/places", countKeys: ["proposals", "submissions"] },
 ];
 
+// #679 — owner only; appended to NAV_ITEMS only when `showActivity` is true.
+const ACTIVITY_ITEM: NavItem = { key: "activity", label: "Activity", href: "/admin/activity" };
+
 // Class order deliberately keeps "text-sm" apart from a contiguous
 // "px-3 py-2" pair: src/__tests__/mobile-viewport-and-form-zoom.test.ts
 // fingerprints exactly that substring to catch a REAL form field regressing
@@ -100,7 +109,8 @@ const primaryButtonClass =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-orange)] " +
   "focus-visible:ring-offset-2";
 
-export default function AdminNav({ email, active, counts }: AdminNavProps) {
+export default function AdminNav({ email, active, counts, showActivity = false }: AdminNavProps) {
+  const items = showActivity ? [...NAV_ITEMS, ACTIVITY_ITEM] : NAV_ITEMS;
   return (
     <header className="border-b border-[var(--color-bone-200)] bg-white">
       <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -113,7 +123,7 @@ export default function AdminNav({ email, active, counts }: AdminNavProps) {
         aria-label="Admin"
         className="flex flex-wrap items-center gap-1 overflow-x-auto px-4 pb-3 sm:px-6"
       >
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const count = (item.countKeys ?? []).reduce((sum, key) => sum + counts[key], 0);
           const isActive = item.key === active;
           return (

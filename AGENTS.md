@@ -54,10 +54,11 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 - **`getAdminDb()` (`src/lib/adminDb.ts`) is the single choke point.** It checks the session before returning the `ADMIN_DB` binding. New admin code must fetch D1 through it, never through `getCloudflareContext()`. Public routes (suggest/report, `/api/public/**`) are the exception and read `getCloudflareContext().env.ADMIN_DB` directly.
 - **`requireAdminOrigin()`** (CSRF protection) is required on every non-GET `/api/admin/*` route.
 - **`ADMIN_ALLOWLIST`**: comma-separated emails; if unset it defaults to Kyle only. It must always fail toward "only Kyle", never toward "everyone".
+- **`ADMIN_OWNER_EMAIL`** (wrangler var, prod + staging) is the one account that sees `/admin/activity` (#679). Everyone else gets a 404 and no nav item; unset falls back to Kyle (`src/lib/adminOwner.ts`). Sign-ins/failures are recorded in `auth_events` by `src/lib/authEvents.ts`, whose writes must never block a sign-in.
 - **Session cookie:** `useSecureCookies: false` is required. Otherwise better-auth double-prefixes `__Host-session_token` and the cookie silently drops. `secure: true` is set by hand instead.
 - **`BETTER_AUTH_RP_ID`** is set on staging only (`wrangler.jsonc` `env.staging.vars`), so passkeys never cross environments. Read it via the binding.
 - **Magic-link rate limit:** 5 per hour, enforced in-app (D1 `rateLimit`), plus one Cloudflare zone rule on `/api/auth/*` that lives in the dashboard, not in this repo.
-- **Writes:** each write is one atomic `db.batch()` plus an `audit_log` row. Archive, never `DELETE`. The server re-validates every field (`adminVenueValidation.ts`). PATCH and archive carry the `updated_at` precondition (409 on a concurrent save); any new dependent write in the same batch must be `WHERE EXISTS`-gated on it.
+- **Writes:** each write is one atomic `db.batch()` plus an `audit_log` row carrying `identity.sessionId` in `session_id` (the Activity log groups by it). Archive, never `DELETE`. The server re-validates every field (`adminVenueValidation.ts`). PATCH and archive carry the `updated_at` precondition (409 on a concurrent save); any new dependent write in the same batch must be `WHERE EXISTS`-gated on it.
 - **Publish ordering is load-bearing:** the GitHub commit/PR/auto-merge must succeed *before* D1 marks drafts published. `isProductionWorker()` refuses Publish on staging (403).
 - **One store:** everything lives in the `pueblo-food-map-admin` D1 database. There is no Workers KV, by design.
 
@@ -67,7 +68,7 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 
 1. See what's pending: `npx wrangler d1 migrations list pueblo-food-map-admin --remote`.
 2. **Export first:** `wrangler d1 export pueblo-food-map-admin --remote --output <file>`, saved to `~/Backups/pfm-prod-d1/` on the Mac. A rollback can't undo a migration.
-3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, and `0016` are not idempotent (they fail with "duplicate column" on a re-run).
+3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, `0016`, and `0017` are not idempotent (they fail with "duplicate column" on a re-run).
 4. Confirm the Worker has every runtime secret in the table above, then promote and back-merge.
 5. If a migration changed published venue fields, the public map only updates at the next admin **Publish**. The Publish bar only shows when `updated_at > published_at`, so data migrations must set `updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')` on the rows they change.
 

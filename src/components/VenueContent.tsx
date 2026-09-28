@@ -21,6 +21,7 @@ import Link from "next/link";
 import { Phone } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { localizedHref } from "@/lib/localizedHref";
 import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
@@ -31,14 +32,15 @@ interface VenueContentProps {
 }
 
 export default function VenueContent({ venue: v }: VenueContentProps) {
-  const { locale } = useLocale();
+  const { locale, tree } = useLocale();
   const displayNotes = getDisplayNotes(v);
 
   const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}`;
   // Fragment form, matching HomePageClient's #venue= handling — there is no
   // /?venue= redirect to bypass (next.config.ts removed it; see that file's
   // 2026-06-20 note), this is just the CTA's original link form.
-  const viewOnMapHref = `/#venue=${v.id}`;
+  // localizedHref (#689 PR 2) keeps this in the /es tree on an /es/venue/<id> page.
+  const viewOnMapHref = localizedHref(`/#venue=${v.id}`, tree);
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
@@ -53,7 +55,7 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
         <ol className="flex flex-wrap items-center gap-x-2 text-sm">
           <li>
             <Link
-              href="/"
+              href={localizedHref("/", tree)}
               className={
                 "inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
                 "hover:text-[var(--color-sage-700)] transition-colors " +
@@ -67,7 +69,7 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
           <li aria-hidden className="text-[var(--color-ink-400)]">›</li>
           <li>
             <Link
-              href="/venues"
+              href={localizedHref("/venues", tree)}
               className={
                 "inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
                 "hover:text-[var(--color-sage-700)] transition-colors " +

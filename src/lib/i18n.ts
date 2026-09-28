@@ -215,6 +215,14 @@ const en: Record<string, string> = {
   "menu.sponsoredBy": "Sponsored by",
   "menu.showWelcome": "Show welcome screen",
   "menu.language": "Language / Idioma",
+  // #689 PR 2, design decision 2 / Kyle's 2026-09-28 decision 2: shown in the
+  // Menu, below the toggle, ONLY when a visitor is on the EN tree (`/`) with
+  // an `es` locale cookie — offers the fully-Spanish /es tree (Spanish
+  // <title>, hreflang, JSON-LD) without ever auto-navigating there. Same
+  // text in both dicts on purpose: it's inherently Spanish-facing UI (only
+  // ever rendered for an ES-locale visitor), not a translatable EN string.
+  "menu.verEnEspanol": "Ver en español →",
+
   // Map/List entry point (#514) — top of the Menu, for anyone who never taps
   // search. Reads the OPPOSITE of the current view (the destination, same
   // convention as viewSuggestion.* above). Hidden entirely while the map
@@ -1156,6 +1164,7 @@ const es: Record<string, string> = {
   "menu.sponsoredBy": "Patrocinado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.language": "Language / Idioma",
+  "menu.verEnEspanol": "Ver en español →",
   "menu.listView": "Vista de lista",
   "menu.mapView": "Vista de mapa",
 

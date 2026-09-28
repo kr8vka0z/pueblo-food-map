@@ -19,6 +19,7 @@
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { localizedHref } from "@/lib/localizedHref";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { pageDocumentTitle } from "@/lib/site";
 import { formatPublishedDate } from "@/lib/dataFreshness";
@@ -37,16 +38,22 @@ interface AboutContentProps {
 }
 
 export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: AboutContentProps) {
-  const { locale } = useLocale();
-  // <title> follows locale client-side (#589) — SSR's English title
-  // (page.tsx's metadata) is what search engines and a first paint see; this
-  // only corrects it after hydration for an ES visitor.
-  useDocumentTitle(pageDocumentTitle(t("about.documentTitle", locale)));
+  const { locale, tree } = useLocale();
+  // <title> follows locale client-side (#589) — SSR's title (page.tsx's
+  // metadata, English on /about or Spanish on /es/about — #689) is what
+  // search engines and a first paint see; this only corrects it after
+  // hydration for a CLIENT-SIDE toggle on the EN page. skip under /es: the
+  // server title there is already Spanish, so there's nothing to correct.
+  useDocumentTitle(pageDocumentTitle(t("about.documentTitle", locale)), {
+    skip: tree === "es",
+  });
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
-      {/* FAQPage structured data — English always (#386); mirrors the visible
-          FAQ section below only when locale === "en" */}
+      {/* FAQPage structured data — matches the URL's language (#689
+          supersedes #386's "always English" rule): the caller (page.tsx /
+          es/about/page.tsx) passes locale-appropriate JSON-LD already
+          serialized, always mirroring the FAQ section rendered below. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: faqJsonLd }}
@@ -54,7 +61,7 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
 
       {/* DRAFT COPY — pending final text from Kyle / Pueblo Food Project (#155) */}
 
-      <PageNav locale={locale} />
+      <PageNav locale={locale} backHref={localizedHref("/", tree)} />
 
       {/* Page content */}
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-8 space-y-8">

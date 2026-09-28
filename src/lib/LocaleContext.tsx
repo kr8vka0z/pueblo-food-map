@@ -62,11 +62,21 @@ export function writeLocaleCookie(locale: Locale): void {
 interface LocaleContextValue {
   locale: Locale;
   setLocale: (locale: Locale) => void;
+  /**
+   * The route TREE this page was served from ("en" | "es") — #689 PR 2.
+   * Fixed at mount from `initialLocale`; unlike `locale`, it never changes
+   * client-side (setLocale doesn't touch it), because it reflects which
+   * root layout served this page, not the visitor's language preference.
+   * localizedHref (src/lib/localizedHref.ts) keys off THIS, never `locale`
+   * — see that file's header for why the distinction matters.
+   */
+  tree: Locale;
 }
 
 const LocaleContext = createContext<LocaleContextValue>({
   locale: "en",
   setLocale: () => undefined,
+  tree: "en",
 });
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -86,6 +96,10 @@ export function LocaleProvider({
   children,
 }: LocaleProviderProps) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale ?? "en");
+  // WHY not state: tree reflects which root layout served this page —
+  // that only ever changes via a full page load (crossing root layouts),
+  // never a client-side re-render, so it's derived once and never updated.
+  const tree = initialLocale ?? "en";
 
   // Sync client cookie on mount when no explicit initialLocale prop is provided (#289)
   useEffect(() => {
@@ -110,7 +124,7 @@ export function LocaleProvider({
   }, [locale]);
 
   return (
-    <LocaleContext.Provider value={{ locale, setLocale }}>
+    <LocaleContext.Provider value={{ locale, setLocale, tree }}>
       {children}
     </LocaleContext.Provider>
   );

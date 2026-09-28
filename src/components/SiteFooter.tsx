@@ -15,16 +15,17 @@
 import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { localizedHref } from "@/lib/localizedHref";
 import { OSM_COPYRIGHT_URL } from "@/lib/osmAttribution";
 
 export default function SiteFooter() {
-  const { locale } = useLocale();
+  const { locale, tree } = useLocale();
 
   return (
     <footer className="border-t border-[var(--color-bone-200)] bg-[var(--color-bone-50)]">
       <div className="max-w-lg mx-auto px-4 py-4 flex flex-wrap gap-x-6 gap-y-2 text-xs text-[var(--color-ink-400)]">
         <Link
-          href="/"
+          href={localizedHref("/", tree)}
           className={
             "hover:text-[var(--color-ink-700)] transition-colors " +
             "focus-visible:outline-none focus-visible:underline"
@@ -36,7 +37,7 @@ export default function SiteFooter() {
             crawlable path to the venue directory and, through it, every
             /venue/<id> page — the map's own links only exist after JS runs. */}
         <Link
-          href="/venues"
+          href={localizedHref("/venues", tree)}
           className={
             "hover:text-[var(--color-ink-700)] transition-colors " +
             "focus-visible:outline-none focus-visible:underline"
@@ -45,7 +46,7 @@ export default function SiteFooter() {
           {t("footer.venues", locale)}
         </Link>
         <Link
-          href="/resources"
+          href={localizedHref("/resources", tree)}
           className={
             "hover:text-[var(--color-ink-700)] transition-colors " +
             "focus-visible:outline-none focus-visible:underline"
@@ -54,7 +55,7 @@ export default function SiteFooter() {
           {t("footer.resources", locale)}
         </Link>
         <Link
-          href="/about"
+          href={localizedHref("/about", tree)}
           className={
             "hover:text-[var(--color-ink-700)] transition-colors " +
             "focus-visible:outline-none focus-visible:underline"

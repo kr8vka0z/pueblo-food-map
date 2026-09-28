@@ -20,6 +20,7 @@
 import { Phone, MessageSquareText, ExternalLink, ChevronDown } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { localizedHref } from "@/lib/localizedHref";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { pageDocumentTitle } from "@/lib/site";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
@@ -91,14 +92,17 @@ const ACTION_CLASS =
   PRESS_FEEDBACK;
 
 export default function ResourcesContent() {
-  const { locale } = useLocale();
+  const { locale, tree } = useLocale();
   // <title> follows locale client-side (#589) — resources.heading's EN
   // value ("Food help programs") matches page.tsx's metadata title exactly.
-  useDocumentTitle(pageDocumentTitle(t("resources.heading", locale)));
+  // skip under /es (#689 PR 2): the server title there is already Spanish.
+  useDocumentTitle(pageDocumentTitle(t("resources.heading", locale)), {
+    skip: tree === "es",
+  });
 
   return (
     <main className={"flex flex-col min-h-screen bg-[var(--color-bone-50)] " + PAGE_NAV_CLEARANCE}>
-      <PageNav locale={locale} />
+      <PageNav locale={locale} backHref={localizedHref("/", tree)} />
 
       <div className="flex-1 w-full max-w-lg mx-auto px-4 py-6 space-y-3">
         <h1

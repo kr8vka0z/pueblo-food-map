@@ -16,6 +16,19 @@
  * matching generateMetadata's description, which calls the SAME
  * venuePageMetadataFields helper (venueSchema.ts) with the page's own
  * locale (#689 supersedes #287/#386's old "metadata stays English" rule).
+ *
+ * #704 (SEO/AEO plan Phase 2) adds the answer-first summary paragraph and
+ * the Nearby list. The summary is built HERE (client-side, via
+ * buildVenueSummary — no Date/Intl, so no hydration mismatch — same
+ * contract every t() call on this page already relies on) rather than
+ * passed as a server-computed string prop: `locale` can diverge from the
+ * page's own `tree` post-hydration (an EN-tree visitor with an `es`
+ * cookie — see localizedHref.ts's own header), and the visible body must
+ * always match whichever locale is currently showing, exactly like the
+ * category label and every other t() string on this page. `nearby` (the
+ * 3–5 nearest same-category venues) stays server-computed and passed down
+ * as a prop instead — it needs the whole venue list, which this client
+ * component doesn't otherwise import.
  */
 
 import Link from "next/link";
@@ -23,6 +36,9 @@ import { Phone } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
+import { venuePath } from "@/lib/venueSchema";
+import { buildVenueSummary, PLACEHOLDER_ADDRESS, type NearbyVenue } from "@/lib/venueSummary";
+import { formatMiles } from "@/lib/distance";
 import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
@@ -30,11 +46,16 @@ import SiteFooter from "@/components/SiteFooter";
 
 interface VenueContentProps {
   venue: Venue;
+  /** Server-computed (#704) — see this file's own header for why. Defaults
+   * to [] so every existing test/call site that doesn't pass it still
+   * renders (no Nearby block) exactly as before. */
+  nearby?: NearbyVenue[];
 }
 
-export default function VenueContent({ venue: v }: VenueContentProps) {
+export default function VenueContent({ venue: v, nearby = [] }: VenueContentProps) {
   const { locale, tree } = useLocale();
   const displayNotes = getDisplayNotes(v);
+  const summary = buildVenueSummary(v, locale, { includeAddress: false });
 
   const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}`;
   // Fragment form, matching HomePageClient's #venue= handling — there is no
@@ -101,7 +122,24 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
           >
             {v.name}
           </h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-500)]">{v.address}</p>
+          {/* Same OSM placeholder guard as BottomSheet.tsx/DesktopVenueWindow.tsx's
+              own address lines — never render the literal "Address not in
+              OpenStreetMap" string. */}
+          <p className="mt-1 text-sm text-[var(--color-ink-500)]">
+            {v.address === PLACEHOLDER_ADDRESS ? `${v.lat}, ${v.lng}` : v.address}
+          </p>
+          {/* Answer-first summary (#704) — the fact people actually search
+              for ("[name] hours", "does [store] take EBT"), assembled from
+              verified fields only. Includes "Last verified" (decision 6:
+              shown near the top instead of only under Sources & data).
+              includeAddress: false (review fix) — the street address is
+              already shown just above; the summary here starts from "is a
+              free pantry in {city}, CO" instead of repeating it. Meta
+              description and JSON-LD description (venueSchema.ts) keep the
+              full address — those are read out of page context. */}
+          <p className="mt-3 text-sm text-[var(--color-ink-700)] leading-relaxed">
+            {summary.join(" ")}
+          </p>
         </header>
 
         {/* SNAP / WIC badges */}
@@ -210,9 +248,38 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
                 {t("operator.operated_by", locale)}: {v.operator}
               </p>
             )}
-            <p className="text-xs text-[var(--color-ink-400)] mt-1">
-              {t("detail.lastVerified", locale)}: {v.last_verified}
-            </p>
+          </section>
+        )}
+
+        {/* Nearby (#704): the 3–5 nearest same-category places, server-computed
+            (see this file's own header) and passed down as `nearby` — adds no
+            client JS. Omitted entirely on 0 results; shows whatever exists
+            below 3 (decision 5). */}
+        {nearby.length > 0 && (
+          <section aria-label={t("detail.nearby", locale)}>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-ink-500)] mb-2">
+              {t("detail.nearby", locale)}
+            </h2>
+            <ul className="space-y-2">
+              {nearby.map((n) => (
+                <li key={n.id}>
+                  <Link
+                    href={localizedHref(venuePath(n.id), tree)}
+                    className={
+                      "inline-flex flex-col min-h-12 justify-center text-sm font-medium text-[var(--color-sage-700)] " +
+                      "hover:text-[var(--color-sage-600)] transition-colors " +
+                      "focus-visible:outline-none focus-visible:ring-2 " +
+                      "focus-visible:ring-[var(--color-sage-500)] rounded"
+                    }
+                  >
+                    {n.name}
+                    <span className="text-xs font-normal text-[var(--color-ink-500)]">
+                      {t("detail.nearby.away", locale, { miles: formatMiles(n.distanceMiles) })}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

@@ -32,6 +32,23 @@ describe("localizedHref", () => {
       expect(localizedHref("/privacy", "es")).toBe("/privacy");
       expect(localizedHref("/boxes/activity", "es")).toBe("/boxes/activity");
     });
+
+    // Review fix: PageNav's off-map nav targets (Near me, Boxes, a saved
+    // place) are query strings on the root path with NO hash at all —
+    // splitting on "#" alone left these unrewritten.
+    test("query strings on the root path get the /es prefix", () => {
+      expect(localizedHref("/?near=1", "es")).toBe("/es?near=1");
+      expect(localizedHref("/?boxes=1", "es")).toBe("/es?boxes=1");
+      expect(localizedHref("/?venue=abc-123", "es")).toBe("/es?venue=abc-123");
+    });
+
+    test("query strings on a non-root mirrored path also get the /es prefix", () => {
+      expect(localizedHref("/venues?category=pantry", "es")).toBe("/es/venues?category=pantry");
+    });
+
+    test("a query string AND a hash together are both preserved, in order", () => {
+      expect(localizedHref("/?foo=1#bar", "es")).toBe("/es?foo=1#bar");
+    });
   });
 });
 

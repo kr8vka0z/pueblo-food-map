@@ -28,21 +28,28 @@ function isMirrored(basePath: string): boolean {
 
 /**
  * @param path A plain EN-tree-form path, e.g. "/venues", "/venue/<id>",
- *   "/about", or "/#venue=<id>" (hash preserved). Never pass an /es path in.
+ *   "/about", "/#venue=<id>", or "/?near=1" (query and/or hash preserved,
+ *   whichever comes first splits the base path from the suffix). Never
+ *   pass an /es path in.
  * @param tree The CURRENT page's route tree ("en" | "es") — LocaleContext's
  *   `tree` field, not `locale`.
  */
 export function localizedHref(path: string, tree: Locale): string {
   if (tree !== "es") return path;
 
-  const hashIndex = path.indexOf("#");
-  const basePath = hashIndex === -1 ? path : path.slice(0, hashIndex);
-  const hash = hashIndex === -1 ? "" : path.slice(hashIndex);
+  // WHY search for the FIRST of ? or #, not just #: PageNav's off-map nav
+  // targets (Near me -> "/?near=1", Boxes -> "/?boxes=1", a saved place ->
+  // "/?venue=<id>") are query strings on the root path, with no hash at
+  // all — splitting on "#" alone left them unrewritten (a real bug: those
+  // links dropped an /es visitor straight into the EN tree).
+  const splitIndex = path.search(/[?#]/);
+  const basePath = splitIndex === -1 ? path : path.slice(0, splitIndex);
+  const suffix = splitIndex === -1 ? "" : path.slice(splitIndex);
 
   if (!isMirrored(basePath)) return path;
 
   const esBase = basePath === "/" ? "/es" : `/es${basePath}`;
-  return `${esBase}${hash}`;
+  return `${esBase}${suffix}`;
 }
 
 /**

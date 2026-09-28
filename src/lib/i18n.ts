@@ -973,6 +973,49 @@ const en: Record<string, string> = {
   "activity.kind.paused": "Box paused",
   "activity.kind.removed": "Box removed",
 
+  // Answer-first venue summary (SEO/AEO plan Phase 2, #704) — assembled by
+  // src/lib/venueSummary.ts from verified fields only. "what" phrases carry
+  // "free" ONLY for the 4 free categories (venueSummary.ts's FREE_CATEGORIES)
+  // — the single source of truth the truth-rule tests check.
+  "summary.what.pantry": "a free food pantry",
+  "summary.what.meal_site": "a free meal site",
+  "summary.what.garden": "a free community garden",
+  "summary.what.edible_landscape": "a free edible landscape",
+  "summary.what.grocery": "a grocery store",
+  "summary.what.convenience": "a convenience store",
+  "summary.what.farm": "a farm and market",
+  "summary.mainSentence": "{name} is {what} at {address}.",
+  "summary.hoursWeekly": "It's open {schedule}.",
+  "summary.hoursIrregular": "It's open {schedule}.",
+  "summary.snap": "It accepts SNAP/EBT.",
+  "summary.wic": "It accepts WIC.",
+  "summary.snapAndWic": "It accepts SNAP/EBT and WIC.",
+  "summary.lastVerified": "Last verified {month}.",
+  "summary.and": "and",
+  "summary.title.in": "in",
+  // Title/summary fallback when a venue's address has no parseable city
+  // (issue #704 Decisions: "if the city can't be parsed, use 'Pueblo
+  // County'").
+  "summary.cityFallback": "Pueblo County",
+  // Detail/nearby.ts's own Nearby section, "Nearby {Category}" heading.
+  "detail.nearby": "Nearby",
+  // Localizes formatSlot()'s (hours.ts) English-only "Open 24 hours"
+  // literal for the summary sentence only — see venueSummary.ts's own
+  // localizedSlot() comment for why hours.ts itself stays English there.
+  "hours.open24": "Open 24 hours",
+  "month.1": "January",
+  "month.2": "February",
+  "month.3": "March",
+  "month.4": "April",
+  "month.5": "May",
+  "month.6": "June",
+  "month.7": "July",
+  "month.8": "August",
+  "month.9": "September",
+  "month.10": "October",
+  "month.11": "November",
+  "month.12": "December",
+
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -1717,6 +1760,42 @@ const es: Record<string, string> = {
   "activity.kind.renamed": "Caja con nombre cambiado", // [CHECK]
   "activity.kind.paused": "Caja pausada", // [CHECK]
   "activity.kind.removed": "Caja eliminada", // [CHECK]
+
+  // Answer-first venue summary (SEO/AEO plan Phase 2, #704) — see the EN
+  // dictionary's own comment above this block. Gendered articles are baked
+  // into each "what" phrase (una despensa/un comedor/etc.) so
+  // summary.mainSentence stays one template for every category.
+  "summary.what.pantry": "una despensa de alimentos gratuita", // [CHECK]
+  "summary.what.meal_site": "un comedor comunitario gratuito", // [CHECK]
+  "summary.what.garden": "un huerto comunitario gratuito", // [CHECK]
+  "summary.what.edible_landscape": "un paisaje comestible gratuito", // [CHECK]
+  "summary.what.grocery": "un supermercado", // [CHECK]
+  "summary.what.convenience": "una tienda de conveniencia", // [CHECK]
+  "summary.what.farm": "una granja y mercado", // [CHECK]
+  "summary.mainSentence": "{name} es {what} en {address}.", // [CHECK]
+  "summary.hoursWeekly": "Está abierto {schedule}.", // [CHECK]
+  "summary.hoursIrregular": "Está abierto {schedule}.", // [CHECK]
+  "summary.snap": "Acepta SNAP/EBT.", // [CHECK]
+  "summary.wic": "Acepta WIC.", // [CHECK]
+  "summary.snapAndWic": "Acepta SNAP/EBT y WIC.", // [CHECK]
+  "summary.lastVerified": "Última verificación: {month}.", // [CHECK]
+  "summary.and": "y", // [CHECK]
+  "summary.title.in": "en", // [CHECK]
+  "summary.cityFallback": "el Condado de Pueblo", // [CHECK]
+  "detail.nearby": "Cerca", // [CHECK]
+  "hours.open24": "Abierto las 24 horas", // [CHECK]
+  "month.1": "enero", // [CHECK]
+  "month.2": "febrero", // [CHECK]
+  "month.3": "marzo", // [CHECK]
+  "month.4": "abril", // [CHECK]
+  "month.5": "mayo", // [CHECK]
+  "month.6": "junio", // [CHECK]
+  "month.7": "julio", // [CHECK]
+  "month.8": "agosto", // [CHECK]
+  "month.9": "septiembre", // [CHECK]
+  "month.10": "octubre", // [CHECK]
+  "month.11": "noviembre", // [CHECK]
+  "month.12": "diciembre", // [CHECK]
 };
 
 /** Substitute simple {key} placeholders. */

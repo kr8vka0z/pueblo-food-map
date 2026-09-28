@@ -20,6 +20,7 @@ import {
 import { venues } from "@/data/venues";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
 import { t } from "@/lib/i18n";
+import type { Venue } from "@/types/venue";
 
 // ─── getVenueById ─────────────────────────────────────────────────────────────
 
@@ -96,11 +97,15 @@ describe("buildVenueJsonLd", () => {
     expect(geo["longitude"]).toBe(grocery.lng);
   });
 
-  test("address has PostalAddress type with Pueblo/CO/US", () => {
+  // #705 review fix: addressLocality used to be hardcoded "Pueblo" for
+  // every venue (wrong for Pueblo West/Colorado City/Blende/Baxter/
+  // Avondale/Vineland) — now parsed per venue (see the dedicated
+  // "addressLocality" describe block below for the parsed-vs-omitted
+  // cases). This generic test only checks the fields every venue always has.
+  test("address has PostalAddress type with CO/US", () => {
     const ld = buildVenueJsonLd(grocery);
     const addr = ld["address"] as Record<string, unknown>;
     expect(addr["@type"]).toBe("PostalAddress");
-    expect(addr["addressLocality"]).toBe("Pueblo");
     expect(addr["addressRegion"]).toBe("CO");
     expect(addr["addressCountry"]).toBe("US");
   });
@@ -200,6 +205,123 @@ describe("buildVenueJsonLd", () => {
       expect(typeof ld["description"]).toBe("string");
       expect((ld["description"] as string).length).toBeGreaterThan(0);
     }
+  });
+});
+
+// ─── #704 JSON-LD enrichment (SEO/AEO plan Phase 2) ────────────────────────
+
+describe("buildVenueJsonLd — #704 enrichment", () => {
+  const pantry = venues.find((v) => v.category === "pantry")!;
+  const grocery = venues.find((v) => v.category === "grocery")!;
+  const convenience = venues.find((v) => v.category === "convenience")!;
+
+  test("sameAs carries the venue's own url when present and unique", () => {
+    const withUrl = { ...grocery, url: "https://example.com/a-url-no-published-venue-shares" };
+    const ld = buildVenueJsonLd(withUrl);
+    expect(ld["sameAs"]).toEqual(["https://example.com/a-url-no-published-venue-shares"]);
+  });
+
+  test("sameAs is omitted when the venue has no url", () => {
+    const withoutUrl = { ...grocery, url: undefined };
+    const ld = buildVenueJsonLd(withoutUrl);
+    expect("sameAs" in ld).toBe(false);
+  });
+
+  // #705 review fix: 10 published gardens/edible landscapes share ONE
+  // Pueblo Food Project URL (a program page, not any one venue's own
+  // identity) — sameAs on all 10 would falsely claim they're all "the same
+  // entity" as each other. URL_COUNTS (venueSchema.ts) is computed once
+  // from the real published venue set, so this is a structural test over
+  // real data (never a pinned literal venue name/hours/phone).
+  test("sameAs is omitted when the venue's url is shared by other published venues", () => {
+    const urlCounts = new Map<string, number>();
+    for (const v of venues) if (v.url) urlCounts.set(v.url, (urlCounts.get(v.url) ?? 0) + 1);
+    const sharedUrl = [...urlCounts.entries()].find(([, count]) => count > 1);
+    expect(sharedUrl, "expected at least one shared venue url in real data").toBeDefined();
+    const [url] = sharedUrl!;
+    const sharers = venues.filter((v) => v.url === url);
+    for (const v of sharers) {
+      expect("sameAs" in buildVenueJsonLd(v), v.id).toBe(false);
+    }
+  });
+
+  test("sameAs is present when the venue's url is unique among published venues", () => {
+    const urlCounts = new Map<string, number>();
+    for (const v of venues) if (v.url) urlCounts.set(v.url, (urlCounts.get(v.url) ?? 0) + 1);
+    const uniqueUrlVenue = venues.find((v) => v.url && urlCounts.get(v.url) === 1);
+    expect(uniqueUrlVenue).toBeDefined();
+    expect(buildVenueJsonLd(uniqueUrlVenue!)["sameAs"]).toEqual([uniqueUrlVenue!.url]);
+  });
+
+  test("isAccessibleForFree is true for a free category (pantry)", () => {
+    const ld = buildVenueJsonLd(pantry);
+    expect(ld["isAccessibleForFree"]).toBe(true);
+  });
+
+  test("isAccessibleForFree is omitted for a non-free category (grocery)", () => {
+    const ld = buildVenueJsonLd(grocery);
+    expect("isAccessibleForFree" in ld).toBe(false);
+  });
+
+  test("paymentAccepted is SNAP/EBT only when accepts_snap === true", () => {
+    const confirmed = { ...convenience, accepts_snap: true as const };
+    const declined = { ...convenience, accepts_snap: false as const };
+    const unknown = { ...convenience, accepts_snap: undefined };
+    expect(buildVenueJsonLd(confirmed)["paymentAccepted"]).toBe("SNAP/EBT");
+    expect("paymentAccepted" in buildVenueJsonLd(declined)).toBe(false);
+    expect("paymentAccepted" in buildVenueJsonLd(unknown)).toBe(false);
+  });
+});
+
+// ─── #705 review fixes: addressLocality parsing + postal code extraction ──
+
+describe("buildVenueJsonLd — OSM placeholder address guard (#705 review)", () => {
+  const grocery = venues.find((v) => v.category === "grocery")!;
+
+  test("omits streetAddress entirely rather than emit the literal placeholder string", () => {
+    const v = { ...grocery, address: "Address not in OpenStreetMap" };
+    const addr = buildVenueJsonLd(v)["address"] as Record<string, unknown>;
+    expect("streetAddress" in addr).toBe(false);
+  });
+});
+
+describe("buildVenueJsonLd — addressLocality (#705 review)", () => {
+  const grocery = venues.find((v) => v.category === "grocery")!;
+
+  test("uses the parsed city, not a hardcoded 'Pueblo'", () => {
+    const v = { ...grocery, address: "78 North McCulloch Boulevard, Pueblo West, CO 81007" };
+    const addr = buildVenueJsonLd(v)["address"] as Record<string, unknown>;
+    expect(addr["addressLocality"]).toBe("Pueblo West");
+  });
+
+  test("omits addressLocality entirely when no city can be parsed — never the 'Pueblo County' fallback prose", () => {
+    const v = { ...grocery, address: "Mineral Palace Park" };
+    const addr = buildVenueJsonLd(v)["address"] as Record<string, unknown>;
+    expect("addressLocality" in addr).toBe(false);
+  });
+});
+
+describe("buildVenueJsonLd — postalCode extraction (#705 review)", () => {
+  const grocery = venues.find((v) => v.category === "grocery")!;
+
+  test("uses the zip after 'CO', not a leading 5-digit house number", () => {
+    // Real-data regression (DiTomaso Farms / Musso Farms): a 5-digit house
+    // number at the START of the address used to win over the real zip.
+    const v = { ...grocery, address: "37137 US 50 Bus, Pueblo, CO 81006" };
+    const addr = buildVenueJsonLd(v)["address"] as Record<string, unknown>;
+    expect(addr["postalCode"]).toBe("81006");
+  });
+
+  test("still extracts a zip when there's no 'CO' segment at all", () => {
+    const v = { ...grocery, address: "1242 South Prairie Avenue, Pueblo 81004" };
+    const addr = buildVenueJsonLd(v)["address"] as Record<string, unknown>;
+    expect(addr["postalCode"]).toBe("81004");
+  });
+
+  test("omits postalCode when the address has no 5-digit zip at all", () => {
+    const v = { ...grocery, address: "410 Main Street, Boone" };
+    const addr = buildVenueJsonLd(v)["address"] as Record<string, unknown>;
+    expect("postalCode" in addr).toBe(false);
   });
 });
 
@@ -358,11 +480,33 @@ describe("locale-aware JSON-LD (#689)", () => {
   // venue node's schema.org types (LocalBusiness/GroceryStore/etc.) don't
   // define that property; the page's language is signaled by the WebSite
   // node's own inLanguage and by <html lang>/hreflang instead.
+  // #704 (SEO/AEO plan Phase 2), Decisions item 2: "The summary becomes
+  // `description`" — the old byte-per-category-identical literal this test
+  // asserted is exactly the duplicate-content problem #704 fixes.
   test("buildVenueJsonLd(venue, 'es') uses the /es url; no inLanguage field", () => {
     const ld = buildVenueJsonLd(grocery, "es");
     expect(ld["url"]).toBe(`${SITE_URL}/es/venue/${grocery.id}`);
     expect("inLanguage" in ld).toBe(false);
-    expect(ld["description"]).toBe(`${t(`category.full.${grocery.category}`, "es")} en Pueblo, CO.`);
+  });
+
+  // #705 review fix (item 12): pinned to a synthetic fixture's own expected
+  // literal, not to buildVenueSummary's output — comparing a builder's
+  // output to itself proves nothing about correctness.
+  test("description is the answer-first summary (ES) — pinned to a synthetic fixture", () => {
+    const fixture: Venue = {
+      id: "test-fixture-garden",
+      name: "Test Garden Venue",
+      category: "garden",
+      lat: 38.27,
+      lng: -104.61,
+      address: "1 Test Ave, Pueblo, CO 81003",
+      source: "test",
+      last_verified: "2026-06-01",
+    };
+    const ld = buildVenueJsonLd(fixture, "es");
+    expect(ld["description"]).toBe(
+      "Test Garden Venue es un huerto comunitario gratuito en 1 Test Ave, Pueblo, CO 81003. Última verificación: junio 2026.",
+    );
   });
 
   test("buildVenueJsonLd(venue) (default) still uses the EN url; no inLanguage field", () => {

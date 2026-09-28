@@ -15,12 +15,14 @@ import { venues } from "@/data/venues";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
 import { DISPLAY_DAY_KEYS, slotToIsoTimes } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
-
-/** "in Pueblo, CO." / "en Pueblo, CO." — boilerplate, not a [CHECK] copy key. */
-const IN_PUEBLO_CO: Record<Locale, string> = {
-  en: "in Pueblo, CO.",
-  es: "en Pueblo, CO.",
-};
+import {
+  buildVenueMetaDescription,
+  buildVenueSummary,
+  buildVenueTitle,
+  parseVenueCityCore,
+  FREE_CATEGORIES,
+  PLACEHOLDER_ADDRESS,
+} from "@/lib/venueSummary";
 
 /**
  * @type record maps VenueCategory → schema.org @type value.
@@ -53,11 +55,37 @@ const SCHEMA_DAY: Record<string, string> = {
   sun: "https://schema.org/Sunday",
 };
 
-/** Extract a 5-digit zip code from an address string, if present. */
+/**
+ * Extract a 5-digit zip code from an address string, if present.
+ *
+ * WHY the LAST match, not the first: review fix (#705) — a house number can
+ * itself be 5 digits ("37137 US 50 Bus, Pueblo, CO 81006" was extracting
+ * "37137", the house number, as the postal code). A street address's own
+ * zip, when present, is always the LAST 5-digit group in the string (it
+ * comes after the city/state); a leading 5-digit house number never does.
+ */
 function extractPostalCode(address: string): string | undefined {
-  const match = address.match(/\b(\d{5})(?:-\d{4})?\b/);
-  return match ? match[1] : undefined;
+  const matches = [...address.matchAll(/\b(\d{5})(?:-\d{4})?\b/g)];
+  return matches.length > 0 ? matches[matches.length - 1][1] : undefined;
 }
+
+/**
+ * Count of published venues sharing each `url` — computed once at module
+ * load. Used by buildVenueJsonLd to decide whether `sameAs` (schema.org's
+ * "this same entity elsewhere") is safe to emit: 10 gardens/edible
+ * landscapes share ONE Pueblo Food Project URL
+ * (https://pueblofoodproject.org/gardens/), which is a page ABOUT the
+ * gardens program, not any one garden's own identity — sameAs on all 10
+ * would tell a search engine 10 different entities are "the same page",
+ * which is false. A url a single venue uses is a legitimate sameAs.
+ */
+const URL_COUNTS: Map<string, number> = (() => {
+  const counts = new Map<string, number>();
+  for (const v of venues) {
+    if (v.url) counts.set(v.url, (counts.get(v.url) ?? 0) + 1);
+  }
+  return counts;
+})();
 
 /** Extract the street portion (up to the first comma) from an address. */
 function extractStreetAddress(address: string): string {
@@ -120,17 +148,25 @@ export function serializeJsonLd(value: unknown): string {
  * The title/description/path a venue page's `generateMetadata` needs, for
  * either tree. Extracted (#689 PR 2, advisor decision) so
  * src/app/(site)/venue/[id]/page.tsx and src/app/es/venue/[id]/page.tsx both
- * stay thin wrappers around ONE description string instead of duplicating
- * the `${name} — ${category} in Pueblo, CO. ${address}.` template. `title`
- * is always the venue's proper noun — no locale variant, same as before.
+ * stay thin wrappers around ONE title/description pair instead of
+ * duplicating the template.
+ *
+ * #704 (SEO/AEO plan Phase 2) replaced the old byte-for-category-identical
+ * "${name} — ${category} in Pueblo, CO. ${address}." template with two
+ * length-budgeted, answer-first builders from src/lib/venueSummary.ts:
+ * `title` now carries the search intent term ("{Name} – {category phrase}
+ * in {City}, CO", ≤ 70 chars rendered with the brand suffix), and
+ * `description` is the same verified-fact summary sentence(s) JSON-LD's
+ * `description` uses (buildVenueJsonLd below), cut at a sentence boundary
+ * to stay ≤ 160 chars — never a separate, drifting description string.
  */
 export function venuePageMetadataFields(
   venue: Venue,
   locale: Locale = "en",
 ): { title: string; description: string; path: string } {
   return {
-    title: venue.name,
-    description: `${venue.name} — ${t(`category.full.${venue.category}`, locale)} ${IN_PUEBLO_CO[locale]} ${venue.address}.`,
+    title: buildVenueTitle(venue, locale),
+    description: buildVenueMetaDescription(venue, locale),
     path: venuePath(venue.id, locale),
   };
 }
@@ -167,11 +203,25 @@ export function buildVenueJsonLd(
   const postalCode = extractPostalCode(venue.address);
   const address: Record<string, string> = {
     "@type": "PostalAddress",
-    streetAddress: extractStreetAddress(venue.address),
-    addressLocality: "Pueblo",
     addressRegion: "CO",
     addressCountry: "US",
   };
+  // #705 review fix (same guard as buildVenueSummary's PLACEHOLDER_ADDRESS
+  // check): never emit the literal "Address not in OpenStreetMap" as a
+  // structured-data street address — omit the field entirely rather than
+  // publish a placeholder string as fact.
+  if (venue.address !== PLACEHOLDER_ADDRESS) {
+    address["streetAddress"] = extractStreetAddress(venue.address);
+  }
+  // #705 review fix: addressLocality was hardcoded "Pueblo" for every venue,
+  // wrong for the ~14 in Pueblo West/Colorado City/Blende/Baxter/Avondale/
+  // Vineland. Uses the CORE parser (no locale, no "Pueblo County" fallback
+  // text) — when the city can't be parsed, omitting the field entirely is
+  // correct; emitting fallback prose as a structured-data city name isn't.
+  const city = parseVenueCityCore(venue.address);
+  if (city) {
+    address["addressLocality"] = city;
+  }
   if (postalCode) {
     address["postalCode"] = postalCode;
   }
@@ -180,7 +230,11 @@ export function buildVenueJsonLd(
     "@context": "https://schema.org",
     "@type": CATEGORY_SCHEMA_TYPE[venue.category],
     name: venue.name,
-    description: `${t(`category.full.${venue.category}`, locale)} ${IN_PUEBLO_CO[locale]}`,
+    // #704 (SEO/AEO plan Phase 2): the old description was byte-identical
+    // for every venue sharing a category ("Food Pantry in Pueblo, CO.") —
+    // now the same verified-fact summary sentence(s) venuePageMetadataFields
+    // uses for <meta description>, so the two can't drift.
+    description: buildVenueSummary(venue, locale).join(" "),
     url: `${SITE_URL}${venuePath(venue.id, locale)}`,
     address,
     geo: {
@@ -193,6 +247,30 @@ export function buildVenueJsonLd(
   // Only include telephone when a phone number is present — omit rather than null.
   if (venue.phone) {
     result["telephone"] = venue.phone;
+  }
+
+  // #704: the venue's own outbound link — "the same entity elsewhere",
+  // never the map's own URL (that's already `url` above). #705 review fix:
+  // only when that url belongs to THIS venue alone (URL_COUNTS <= 1) — a
+  // url shared by multiple venues (the 10 gardens/edible landscapes on one
+  // Pueblo Food Project page) is a program page, not any one venue's own
+  // identity; sameAs on all 10 would falsely claim they're all "the same
+  // entity" as each other.
+  if (venue.url && (URL_COUNTS.get(venue.url) ?? 0) <= 1) {
+    result["sameAs"] = [venue.url];
+  }
+
+  // #704 truth rule: "free" only for the 4 categories venueSummary.ts's
+  // FREE_CATEGORIES names — the same set the summary sentence's "what"
+  // phrase uses, so the two can never disagree about which venues are free.
+  if (FREE_CATEGORIES.has(venue.category)) {
+    result["isAccessibleForFree"] = true;
+  }
+
+  // #704 truth rule: SNAP/EBT only when accepts_snap is CONFIRMED true —
+  // false or missing stays silent, never a "does not accept" claim.
+  if (venue.accepts_snap === true) {
+    result["paymentAccepted"] = "SNAP/EBT";
   }
 
   // Only include openingHoursSpecification when hours_weekly exists and yields

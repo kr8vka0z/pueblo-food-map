@@ -973,6 +973,104 @@ const en: Record<string, string> = {
   "activity.kind.paused": "Box paused",
   "activity.kind.removed": "Box removed",
 
+  // Answer-first venue summary (SEO/AEO plan Phase 2, #704) — assembled by
+  // src/lib/venueSummary.ts from verified fields only. "what" phrases carry
+  // "free" ONLY for the 4 free categories (venueSummary.ts's FREE_CATEGORIES)
+  // — the single source of truth the truth-rule tests check.
+  "summary.what.pantry": "a free food pantry",
+  "summary.what.meal_site": "a free meal site",
+  "summary.what.garden": "a free community garden",
+  "summary.what.edible_landscape": "a free edible landscape",
+  "summary.what.grocery": "a grocery store",
+  "summary.what.convenience": "a convenience store",
+  "summary.what.farm": "a farm and market",
+  "summary.mainSentence": "{name} is {what} at {address}.",
+  // Used instead of summary.mainSentence when the street address is either
+  // the OSM placeholder (PLACEHOLDER_ADDRESS, venueSummary.ts) or
+  // deliberately omitted (VenueContent's on-page paragraph — the address is
+  // already shown just above it in the header).
+  "summary.mainSentenceNoAddress": "{name} is {what} in {city}, CO.",
+  // Gender-neutral hours prefix (review fix — "Está abierto" disagreed with
+  // some "what" phrases' Spanish gender; "Horario" needs no agreement).
+  // Used for BOTH weekly and monthly/irregular schedules, joined into one
+  // sentence — see venueSummary.ts buildHoursSentence.
+  "summary.hours": "Hours: {schedule}.",
+  // Weekly day-group phrases (venueSummary.ts formatWeeklyGroup) — distinct
+  // from the short "day.mon" abbreviations (HoursList's table) and from
+  // "summary.day.full.*" below (the singular form a range wraps).
+  "summary.day.mon": "Mondays",
+  "summary.day.tue": "Tuesdays",
+  "summary.day.wed": "Wednesdays",
+  "summary.day.thu": "Thursdays",
+  "summary.day.fri": "Fridays",
+  "summary.day.sat": "Saturdays",
+  "summary.day.sun": "Sundays",
+  "summary.day.everyDay": "every day",
+  "summary.day.range": "{start} to {end}",
+  "summary.day.full.mon": "Monday",
+  "summary.day.full.tue": "Tuesday",
+  "summary.day.full.wed": "Wednesday",
+  "summary.day.full.thu": "Thursday",
+  "summary.day.full.fri": "Friday",
+  "summary.day.full.sat": "Saturday",
+  "summary.day.full.sun": "Sunday",
+  // A group that's literally every day of the week AND every day is the
+  // same 24-hour slot gets this fixed phrase instead of the general
+  // "{dayPhrase}, {timesLabel}" template — "Open 24 hours, every day" reads
+  // like a person would say it; "every day, Open 24 hours" doesn't.
+  "summary.hours.open24EveryDay": "Open 24 hours, every day",
+  // Monthly (irregular) schedule prose — summary-only, distinct from
+  // hours.ts's own hours.irregular.monthlyOrdinal/monthlyDate keys (shared
+  // with the page's separate Hours section, which also renders the admin
+  // `note` field this summary sentence deliberately never reads).
+  "summary.hours.monthlyOrdinal": "the {ordinal} {weekdayFull} of each month",
+  "summary.hours.monthlyDate": "the {day} of each month",
+  // Lowercase mid-sentence "last" (see hours.irregular.ordinal.last for the
+  // capitalized UI-label version this is deliberately NOT reused from).
+  "summary.ordinal.last": "last",
+  "summary.snap": "It accepts SNAP/EBT.",
+  "summary.wic": "It accepts WIC.",
+  "summary.snapAndWic": "It accepts SNAP/EBT and WIC.",
+  "summary.lastVerified": "Last verified {month}.",
+  "summary.and": "and",
+  "summary.title.in": "in",
+  // Short, natural NOUN phrases for the title's 2nd (shortened) rung —
+  // distinct from the filter-chip labels ("category.*"), which read oddly
+  // stripped of their chip context ("Corner Store – Convenience in...").
+  "summary.title.category.pantry": "Pantry",
+  "summary.title.category.grocery": "Grocery Store",
+  "summary.title.category.convenience": "Store",
+  "summary.title.category.farm": "Farm Stand",
+  "summary.title.category.garden": "Garden",
+  "summary.title.category.edible_landscape": "Edible Landscape",
+  "summary.title.category.meal_site": "Meal Site",
+  // Title/summary fallback when a venue's address has no parseable city
+  // (issue #704 Decisions: "if the city can't be parsed, use 'Pueblo
+  // County'").
+  "summary.cityFallback": "Pueblo County",
+  // VenueContent's Nearby section heading.
+  "detail.nearby": "Nearby",
+  // Nearby list's per-item distance suffix — deliberately NOT
+  // distance.fromYou ("from you"), which reads as distance from the
+  // visitor; a Nearby entry's distance is from THIS venue, not the visitor.
+  "detail.nearby.away": "{miles} away",
+  // Localizes formatSlot()'s (hours.ts) English-only "Open 24 hours"
+  // literal for the summary sentence only — see venueSummary.ts's own
+  // localizedSlot() comment for why hours.ts itself stays English there.
+  "hours.open24": "Open 24 hours",
+  "month.1": "January",
+  "month.2": "February",
+  "month.3": "March",
+  "month.4": "April",
+  "month.5": "May",
+  "month.6": "June",
+  "month.7": "July",
+  "month.8": "August",
+  "month.9": "September",
+  "month.10": "October",
+  "month.11": "November",
+  "month.12": "December",
+
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -1717,6 +1815,73 @@ const es: Record<string, string> = {
   "activity.kind.renamed": "Caja con nombre cambiado", // [CHECK]
   "activity.kind.paused": "Caja pausada", // [CHECK]
   "activity.kind.removed": "Caja eliminada", // [CHECK]
+
+  // Answer-first venue summary (SEO/AEO plan Phase 2, #704) — see the EN
+  // dictionary's own comment above this block. Gendered articles are baked
+  // into each "what" phrase (una despensa/un comedor/etc.) so
+  // summary.mainSentence stays one template for every category.
+  "summary.what.pantry": "una despensa de alimentos gratuita", // [CHECK]
+  "summary.what.meal_site": "un comedor comunitario gratuito", // [CHECK]
+  "summary.what.garden": "un huerto comunitario gratuito", // [CHECK]
+  "summary.what.edible_landscape": "un paisaje comestible gratuito", // [CHECK]
+  "summary.what.grocery": "un supermercado", // [CHECK]
+  "summary.what.convenience": "una tienda de conveniencia", // [CHECK]
+  "summary.what.farm": "una granja y mercado", // [CHECK]
+  "summary.mainSentence": "{name} es {what} en {address}.", // [CHECK]
+  "summary.mainSentenceNoAddress": "{name} es {what} en {city}, CO.", // [CHECK]
+  // Gender-neutral — "Horario" (the schedule) needs no article, so it works
+  // for every category's "what" phrase regardless of gender (review fix:
+  // "Está abierto" disagreed with some).
+  "summary.hours": "Horario: {schedule}.", // [CHECK]
+  "summary.day.mon": "los lunes", // [CHECK]
+  "summary.day.tue": "los martes", // [CHECK]
+  "summary.day.wed": "los miércoles", // [CHECK]
+  "summary.day.thu": "los jueves", // [CHECK]
+  "summary.day.fri": "los viernes", // [CHECK]
+  "summary.day.sat": "los sábados", // [CHECK]
+  "summary.day.sun": "los domingos", // [CHECK]
+  "summary.day.everyDay": "todos los días", // [CHECK]
+  "summary.day.range": "de {start} a {end}", // [CHECK]
+  "summary.day.full.mon": "lunes", // [CHECK]
+  "summary.day.full.tue": "martes", // [CHECK]
+  "summary.day.full.wed": "miércoles", // [CHECK]
+  "summary.day.full.thu": "jueves", // [CHECK]
+  "summary.day.full.fri": "viernes", // [CHECK]
+  "summary.day.full.sat": "sábado", // [CHECK]
+  "summary.day.full.sun": "domingo", // [CHECK]
+  "summary.hours.open24EveryDay": "Abierto las 24 horas, todos los días", // [CHECK]
+  "summary.hours.monthlyOrdinal": "el {ordinal} {weekdayFull} de cada mes", // [CHECK]
+  "summary.hours.monthlyDate": "el día {day} de cada mes", // [CHECK]
+  "summary.ordinal.last": "último", // [CHECK]
+  "summary.snap": "Acepta SNAP/EBT.", // [CHECK]
+  "summary.wic": "Acepta WIC.", // [CHECK]
+  "summary.snapAndWic": "Acepta SNAP/EBT y WIC.", // [CHECK]
+  "summary.lastVerified": "Última verificación: {month}.", // [CHECK]
+  "summary.and": "y", // [CHECK]
+  "summary.title.in": "en", // [CHECK]
+  "summary.title.category.pantry": "Despensa", // [CHECK]
+  "summary.title.category.grocery": "Supermercado", // [CHECK]
+  "summary.title.category.convenience": "Tienda", // [CHECK]
+  "summary.title.category.farm": "Puesto de granja", // [CHECK]
+  "summary.title.category.garden": "Huerto", // [CHECK]
+  "summary.title.category.edible_landscape": "Paisaje comestible", // [CHECK]
+  "summary.title.category.meal_site": "Comedor", // [CHECK]
+  "summary.cityFallback": "el Condado de Pueblo", // [CHECK]
+  "detail.nearby": "Lugares cercanos", // [CHECK]
+  "detail.nearby.away": "a {miles}", // [CHECK]
+  "hours.open24": "Abierto las 24 horas", // [CHECK]
+  "month.1": "enero", // [CHECK]
+  "month.2": "febrero", // [CHECK]
+  "month.3": "marzo", // [CHECK]
+  "month.4": "abril", // [CHECK]
+  "month.5": "mayo", // [CHECK]
+  "month.6": "junio", // [CHECK]
+  "month.7": "julio", // [CHECK]
+  "month.8": "agosto", // [CHECK]
+  "month.9": "septiembre", // [CHECK]
+  "month.10": "octubre", // [CHECK]
+  "month.11": "noviembre", // [CHECK]
+  "month.12": "diciembre", // [CHECK]
 };
 
 /** Substitute simple {key} placeholders. */

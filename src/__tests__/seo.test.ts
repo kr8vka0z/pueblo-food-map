@@ -307,4 +307,76 @@ describe("buildPageMetadata", () => {
     const tw = m.twitter as { images?: Array<{ url?: string }> };
     expect(tw.images?.[0]?.url).toBe(OG_IMAGE.url);
   });
+
+  // ─── #689 PR 2: locale + mirrored ───────────────────────────────────────
+
+  test("default call (no locale/mirrored) has no alternates.languages", () => {
+    // Regression guard: existing non-mirrored callers (/suggest, /privacy,
+    // etc.) must keep getting no hreflang at all.
+    expect(m.alternates?.languages).toBeUndefined();
+  });
+
+  test("default call keeps openGraph.locale en_US / alternateLocale es_US", () => {
+    const og = m.openGraph as { locale?: string; alternateLocale?: string[] };
+    expect(og.locale).toBe("en_US");
+    expect(og.alternateLocale).toEqual(["es_US"]);
+  });
+
+  test("mirrored EN page emits hreflang en/es/x-default, x-default → EN", () => {
+    const mm = buildPageMetadata({
+      title: "About",
+      description: "d",
+      path: "/about",
+      mirrored: true,
+    });
+    expect(mm.alternates?.languages).toEqual({
+      en: `${SITE_URL}/about`,
+      es: `${SITE_URL}/es/about`,
+      "x-default": `${SITE_URL}/about`,
+    });
+  });
+
+  test("mirrored ES page emits hreflang en/es/x-default and ES openGraph locale", () => {
+    const mm = buildPageMetadata({
+      title: "Acerca de",
+      description: "d",
+      path: "/es/about",
+      locale: "es",
+      mirrored: true,
+    });
+    expect(mm.alternates?.languages).toEqual({
+      en: `${SITE_URL}/about`,
+      es: `${SITE_URL}/es/about`,
+      "x-default": `${SITE_URL}/about`,
+    });
+    expect(mm.alternates?.canonical).toBe(`${SITE_URL}/es/about`);
+    const og = mm.openGraph as { locale?: string; alternateLocale?: string[] };
+    expect(og.locale).toBe("es_US");
+    expect(og.alternateLocale).toEqual(["en_US"]);
+  });
+
+  test("mirrored ES homepage (path /es) maps to EN / not /es-stripped-empty", () => {
+    const mm = buildPageMetadata({
+      title: "Inicio",
+      description: "d",
+      path: "/es",
+      locale: "es",
+      mirrored: true,
+    });
+    expect(mm.alternates?.languages).toEqual({
+      en: SITE_URL,
+      es: `${SITE_URL}/es`,
+      "x-default": SITE_URL,
+    });
+  });
+
+  test("non-mirrored ES-locale call (hypothetical) still has no alternates.languages", () => {
+    const mm = buildPageMetadata({
+      title: "x",
+      description: "d",
+      path: "/es/suggest",
+      locale: "es",
+    });
+    expect(mm.alternates?.languages).toBeUndefined();
+  });
 });

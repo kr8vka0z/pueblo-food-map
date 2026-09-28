@@ -32,9 +32,14 @@ beforeEach(() => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function renderSplash(locale: "en" | "es" = "en") {
+  // tree: "en" — SplashScreen only mounts on the EN homepage (not mirrored
+  // under /es); `locale` is the switchable client toggle these tests exist
+  // to cover, `tree` (#689 PR 2) is a separate, fixed field the mock must
+  // still satisfy structurally.
   vi.spyOn(LocaleContext, "useLocale").mockReturnValue({
     locale,
     setLocale: vi.fn(),
+    tree: "en",
   });
   return render(<SplashScreen onPrimary={vi.fn()} />);
 }

@@ -3,24 +3,26 @@
 /**
  * VenueContent — visible body of /venue/[id].
  *
- * Extracted from src/app/(site)/venue/[id]/page.tsx so the page's text reads the
- * visitor's locale via useLocale() (#289). This is the highest-risk page in
- * the repo (see that file's own header comment on the 2026-08-24 to
- * 2026-09-02 production outage) — this extraction changes ONLY the visible
- * JSX, not generateStaticParams, dynamicParams, generateMetadata, or the
- * venue JSON-LD, all of which stay in the server page.tsx untouched and
- * still read no dynamic API.
+ * This SAME component renders on BOTH /venue/[id] (src/app/(site)/venue/[id]/
+ * page.tsx) and /es/venue/[id] (src/app/es/venue/[id]/page.tsx) — its text
+ * reads the tree's locale via useLocale() (#289). This is the highest-risk
+ * page in the repo (see the EN page.tsx's own header comment on the
+ * 2026-08-24 to 2026-09-02 production outage) — this extraction changes ONLY
+ * the visible JSX, not generateStaticParams, dynamicParams, generateMetadata,
+ * or the venue JSON-LD, all of which stay in each server page.tsx untouched
+ * and still read no dynamic API.
  *
  * The category label here uses t(`category.full.${category}`, locale) —
- * visible on-screen text, in scope for bilingual support — unlike
- * generateMetadata's description (machine-readable metadata, stays English
- * per #287/#386) which still reads the raw English categoryLabels map.
+ * matching generateMetadata's description, which calls the SAME
+ * venuePageMetadataFields helper (venueSchema.ts) with the page's own
+ * locale (#689 supersedes #287/#386's old "metadata stays English" rule).
  */
 
 import Link from "next/link";
 import { Phone } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { localizedHref } from "@/lib/localizedHref";
 import type { Venue } from "@/types/venue";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
@@ -31,14 +33,15 @@ interface VenueContentProps {
 }
 
 export default function VenueContent({ venue: v }: VenueContentProps) {
-  const { locale } = useLocale();
+  const { locale, tree } = useLocale();
   const displayNotes = getDisplayNotes(v);
 
   const directionsHref = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}`;
   // Fragment form, matching HomePageClient's #venue= handling — there is no
   // /?venue= redirect to bypass (next.config.ts removed it; see that file's
   // 2026-06-20 note), this is just the CTA's original link form.
-  const viewOnMapHref = `/#venue=${v.id}`;
+  // localizedHref (#689 PR 2) keeps this in the /es tree on an /es/venue/<id> page.
+  const viewOnMapHref = localizedHref(`/#venue=${v.id}`, tree);
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)]">
@@ -53,7 +56,7 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
         <ol className="flex flex-wrap items-center gap-x-2 text-sm">
           <li>
             <Link
-              href="/"
+              href={localizedHref("/", tree)}
               className={
                 "inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
                 "hover:text-[var(--color-sage-700)] transition-colors " +
@@ -67,7 +70,7 @@ export default function VenueContent({ venue: v }: VenueContentProps) {
           <li aria-hidden className="text-[var(--color-ink-400)]">›</li>
           <li>
             <Link
-              href="/venues"
+              href={localizedHref("/venues", tree)}
               className={
                 "inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
                 "hover:text-[var(--color-sage-700)] transition-colors " +

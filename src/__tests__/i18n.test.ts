@@ -13,6 +13,10 @@ const IDENTICAL_ALLOWLIST = new Set([
   "search.shortcut",
   "menu.title",
   "menu.language",
+  // #689 PR 2: only ever rendered for an ES-locale visitor (see the key's
+  // own comment in i18n.ts) — inherently Spanish-facing UI text, not a
+  // translatable EN string, so identical EN/ES is correct here too.
+  "menu.verEnEspanol",
   "resources.211.name",
   "resources.wic.name",
   "resources.doubleup.name",

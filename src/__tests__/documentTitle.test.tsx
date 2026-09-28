@@ -1,14 +1,25 @@
 /**
- * document.title locale tests (#589).
+ * document.title locale tests (#589, extended by #689 PR 2).
  *
- * The locale is a client cookie/toggle (LocaleContext), not a route, so
- * Next.js Metadata's server-rendered <title> can only ever be English
- * (ARCHITECTURE.md "Known bilingual limitation", #287) — a Spanish visitor got a
- * fully-localized page body under a stubbornly-English tab title. This file
- * proves the client-side fix (useDocumentTitle, src/lib/useDocumentTitle.ts)
- * for every page whose body is actually localized: rendering each page's
- * "Content" component under `<LocaleProvider initialLocale="es">` and
- * asserting `document.title` is the Spanish string.
+ * ORIGINAL (#589) problem: on non-mirrored pages (still true today —
+ * /privacy, /feedback, /suggest, /boxes/activity, /alerts/*, /report/*,
+ * /box/[id]/history), locale is only ever a client cookie/toggle, so Next's
+ * server-rendered <title> stays English regardless — this file proves the
+ * client-side fix (useDocumentTitle) corrects it after the cookie flips
+ * `locale` to "es", via `renderEs` (real LocaleProvider, tree stays "en"
+ * for these pages since they have no /es counterpart).
+ *
+ * #689 PR 2 changed this for the FOUR pages that gained an /es counterpart
+ * (About, Resources, Venues, NotFound): their server <title> is Spanish
+ * ALREADY when actually served from the /es tree, so useDocumentTitle must
+ * be a no-op there (trap 3) — tested in the second describe block below via
+ * `renderEs` (tree="es" there IS the real /es-tree scenario). Their
+ * ORIGINAL #589 behavior (an EN page whose locale COOKIE flips to "es",
+ * tree stays "en") still needs proving separately, via
+ * `renderClientToggleEs`, which mocks tree="en" explicitly — seeding
+ * `locale="es"` via `initialLocale` on LocaleProvider ALSO sets `tree`
+ * (LocaleContext.tsx derives it), so it can no longer stand in for both
+ * scenarios on these four components.
  *
  * Pages deliberately excluded (not localized, or nothing translatable in the
  * title — see the PR body for the full list):
@@ -17,9 +28,10 @@
  *   - /admin/* — internal tool, gated by Better Auth, never localized.
  */
 
-import { describe, test, expect, vi } from "vitest";
+import { describe, test, expect, vi, afterEach } from "vitest";
 import { render, act } from "@testing-library/react";
 import React from "react";
+import * as LocaleContext from "@/lib/LocaleContext";
 import { LocaleProvider, useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -118,6 +130,32 @@ function renderEs(ui: React.ReactElement) {
   return render(<LocaleProvider initialLocale="es">{ui}</LocaleProvider>);
 }
 
+/**
+ * #689 PR 2: render with useLocale() mocked to locale="es", tree="en" —
+ * simulating a CLIENT-SIDE cookie toggle to Spanish on an EN-tree page
+ * (what this whole file existed to prove, #589), as distinct from the
+ * real /es tree (tree="es"), where useDocumentTitle is now a no-op (trap
+ * 3, "src/lib/useDocumentTitle.ts ... must be a no-op under /es where the
+ * server title is already Spanish"). `renderEs` above now ALSO sets tree
+ * (LocaleProvider derives it from initialLocale — LocaleContext.tsx), so
+ * for the pages that gained a `skip: tree === "es"` guard (About,
+ * Resources, Venues, NotFound), only this mock-based helper still proves
+ * the ORIGINAL #589 behavior; `renderEs` is used below to prove the NEW
+ * #689 skip behavior on the same four components instead.
+ */
+function renderClientToggleEs(ui: React.ReactElement) {
+  vi.spyOn(LocaleContext, "useLocale").mockReturnValue({
+    locale: "es",
+    tree: "en",
+    setLocale: vi.fn(),
+  });
+  return render(ui);
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 // ─── / (home) — needs its own next/dynamic + MapWrapper/SplashScreen mocks ──
 // Same rationale as src/__tests__/page.test.tsx's own header: next/dynamic's
 // real (ssr:false) chunk loading never settles under Vitest/jsdom, and
@@ -211,8 +249,8 @@ describe("document.title follows locale (#589)", () => {
     expect(document.title).toBe(EXPECTED_ES.home);
   });
 
-  test("/about", () => {
-    renderEs(
+  test("/about (EN tree, client-side cookie toggle to es)", () => {
+    renderClientToggleEs(
       <AboutContent faqJsonLd='{"@type":"FAQPage"}' venueCount={42} publishedAt="2026-01-01T00:00:00.000Z" />,
     );
     expect(document.title).toBe(EXPECTED_ES.about);
@@ -223,8 +261,8 @@ describe("document.title follows locale (#589)", () => {
     expect(document.title).toBe(EXPECTED_ES.privacy);
   });
 
-  test("/resources", () => {
-    renderEs(<ResourcesContent />);
+  test("/resources (EN tree, client-side cookie toggle to es)", () => {
+    renderClientToggleEs(<ResourcesContent />);
     expect(document.title).toBe(EXPECTED_ES.resources);
   });
 
@@ -238,8 +276,8 @@ describe("document.title follows locale (#589)", () => {
     expect(document.title).toBe(EXPECTED_ES.suggest);
   });
 
-  test("/venues", () => {
-    renderEs(<VenuesDirectoryContent groups={FIXTURE_GROUPS} />);
+  test("/venues (EN tree, client-side cookie toggle to es)", () => {
+    renderClientToggleEs(<VenuesDirectoryContent groups={FIXTURE_GROUPS} />);
     expect(document.title).toBe(EXPECTED_ES.venues);
   });
 
@@ -271,9 +309,43 @@ describe("document.title follows locale (#589)", () => {
     expect(document.title).toBe(EXPECTED_ES.boxHistory);
   });
 
-  test("404 not-found", () => {
-    renderEs(<NotFoundContent />);
+  test("404 not-found (EN tree, client-side cookie toggle to es)", () => {
+    renderClientToggleEs(<NotFoundContent />);
     expect(document.title).toBe(EXPECTED_ES.notFound);
+  });
+});
+
+// #689 PR 2, trap 3: "useDocumentTitle ... must be a no-op under /es where
+// the server title is already Spanish." The four components above that
+// gained a `skip: tree === "es"` guard must NOT touch document.title at
+// all when actually rendered under the /es tree (tree="es", the real
+// es/layout.tsx scenario — `renderEs`'s `initialLocale="es"` now also sets
+// tree, per LocaleContext.tsx's derivation).
+describe("useDocumentTitle is a no-op under the real /es tree (#689)", () => {
+  test("/es/about never overwrites document.title", () => {
+    document.title = "Unchanged";
+    renderEs(
+      <AboutContent faqJsonLd='{"@type":"FAQPage"}' venueCount={42} publishedAt="2026-01-01T00:00:00.000Z" />,
+    );
+    expect(document.title).toBe("Unchanged");
+  });
+
+  test("/es/resources never overwrites document.title", () => {
+    document.title = "Unchanged";
+    renderEs(<ResourcesContent />);
+    expect(document.title).toBe("Unchanged");
+  });
+
+  test("/es/venues never overwrites document.title", () => {
+    document.title = "Unchanged";
+    renderEs(<VenuesDirectoryContent groups={FIXTURE_GROUPS} />);
+    expect(document.title).toBe("Unchanged");
+  });
+
+  test("/es not-found never overwrites document.title", () => {
+    document.title = "Unchanged";
+    renderEs(<NotFoundContent />);
+    expect(document.title).toBe("Unchanged");
   });
 });
 

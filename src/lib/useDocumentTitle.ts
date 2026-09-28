@@ -52,12 +52,22 @@
  * Deliberately does NOT read locale itself: keeping it a plain string-in,
  * side-effect-out hook means it owes nothing to i18n and stays reusable for
  * any future non-locale document.title need.
+ *
+ * `skip` (#689 PR 2): under the /es tree, the server title is ALREADY
+ * Spanish (buildPageMetadata + the es/layout.tsx root's title.template) —
+ * there is no EN-first title this hook needs to self-heal, so callers pass
+ * `skip: tree === "es"` (tree, not locale — see LocaleContext's own
+ * comment) to make the whole effect, including the MutationObserver, a
+ * true no-op rather than a harmless-but-wasted re-write of the same string.
  */
 
 import { useEffect } from "react";
 
-export function useDocumentTitle(title: string): void {
+export function useDocumentTitle(title: string, options?: { skip?: boolean }): void {
+  const skip = options?.skip ?? false;
+
   useEffect(() => {
+    if (skip) return;
     document.title = title;
 
     // Scoped to document.head (not just the <title> node) because a stomp
@@ -81,5 +91,5 @@ export function useDocumentTitle(title: string): void {
     });
 
     return () => observer.disconnect();
-  }, [title]);
+  }, [title, skip]);
 }

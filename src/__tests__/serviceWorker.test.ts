@@ -66,6 +66,13 @@ describe("sw.js classifyRequest (#130)", () => {
     expect(classify(`${ORIGIN}/resources`, { mode: "navigate" })).toBe("page");
   });
 
+  // #689 PR 2 — the /es tree's own shell pages join SHELL_PAGES.
+  test("navigations to /es, /es/venues and /es/resources are also network-first pages", () => {
+    expect(classify(`${ORIGIN}/es`, { mode: "navigate" })).toBe("page");
+    expect(classify(`${ORIGIN}/es/venues`, { mode: "navigate" })).toBe("page");
+    expect(classify(`${ORIGIN}/es/resources`, { mode: "navigate" })).toBe("page");
+  });
+
   test("RSC payload fetches for the same paths are NOT cached (only real navigations are)", () => {
     expect(classify(`${ORIGIN}/venues?_rsc=1x2y`, { mode: "cors" })).toBe("bypass");
   });
@@ -99,6 +106,31 @@ describe("sw.js classifyRequest (#130)", () => {
     expect(classify(`${ORIGIN}/admin`, { mode: "navigate" })).toBe("bypass");
     expect(classify(`${ORIGIN}/alerts/some-token`, { mode: "navigate" })).toBe("bypass");
     expect(classify(`${ORIGIN}/sw.js`)).toBe("bypass");
+  });
+
+  // #689 PR 2 — /es/about and /es/venue/<id> aren't precached shells (same
+  // as their EN counterparts), but still get a rescue landing offline.
+  test("/es pages outside SHELL_PAGES are also shell-fallback", () => {
+    expect(classify(`${ORIGIN}/es/about`, { mode: "navigate" })).toBe("shell-fallback");
+    expect(classify(`${ORIGIN}/es/venue/some-pantry`, { mode: "navigate" })).toBe("shell-fallback");
+  });
+});
+
+describe("sw.js shellPathFor (#689 PR 2)", () => {
+  test("an /es (or /es/...) url falls back to the /es shell", () => {
+    const { context } = loadSw();
+    expect(context.shellPathFor("/es")).toBe("/es");
+    expect(context.shellPathFor("/es/about")).toBe("/es");
+    expect(context.shellPathFor("/es/venue/some-pantry")).toBe("/es");
+  });
+
+  test("every other url falls back to the / shell", () => {
+    const { context } = loadSw();
+    expect(context.shellPathFor("/")).toBe("/");
+    expect(context.shellPathFor("/about")).toBe("/");
+    expect(context.shellPathFor("/venue/some-pantry")).toBe("/");
+    // Not an /es prefix match — a coincidental path shouldn't be confused with it.
+    expect(context.shellPathFor("/estate-sale")).toBe("/");
   });
 });
 

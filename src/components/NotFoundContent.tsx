@@ -13,13 +13,18 @@ import Link from "next/link";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { localizedHref } from "@/lib/localizedHref";
 import { pageDocumentTitle } from "@/lib/site";
 
 export default function NotFoundContent() {
-  const { locale } = useLocale();
+  const { locale, tree } = useLocale();
   // <title> follows locale client-side (#589) — notfound.documentTitle
-  // matches not-found.tsx's metadata title exactly ("Page Not Found").
-  useDocumentTitle(pageDocumentTitle(t("notfound.documentTitle", locale)));
+  // matches not-found.tsx's metadata title exactly ("Page Not Found" /
+  // es/not-found.tsx's Spanish title, #689). skip under /es: the server
+  // title there is already Spanish.
+  useDocumentTitle(pageDocumentTitle(t("notfound.documentTitle", locale)), {
+    skip: tree === "es",
+  });
 
   return (
     <main className="flex flex-col min-h-screen bg-[var(--color-bone-50)] items-center justify-center p-6 text-center">
@@ -34,7 +39,7 @@ export default function NotFoundContent() {
           {t("notfound.body", locale)}
         </p>
         <Link
-          href="/"
+          href={localizedHref("/", tree)}
           className={
             "inline-flex items-center justify-center px-5 py-2.5 rounded-[var(--radius-md)] " +
             "bg-[var(--color-sage-600)] text-white text-sm font-medium " +

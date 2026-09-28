@@ -34,6 +34,7 @@ import LanguageToggle from "./LanguageToggle";
 import type { MenuSection } from "./BottomNav";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
+import { localizedHref } from "@/lib/localizedHref";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
@@ -69,7 +70,7 @@ export default function HamburgerMenuContent({
   mapDisabled = false,
   headingId,
 }: HamburgerMenuContentProps) {
-  const { locale: ctxLocale } = useLocale();
+  const { locale: ctxLocale, tree } = useLocale();
   const locale = localeProp ?? ctxLocale;
 
   const closeLabel = t("menu.close", locale);
@@ -237,17 +238,19 @@ export default function HamburgerMenuContent({
                 onClick={onClose}
                 icon={<MessageSquare size={14} />}
               />
-              {/* About this map (#155) — internal link, no external icon */}
+              {/* About this map (#155) — internal link, no external icon.
+                  localizedHref (#689 PR 2): keeps the drawer in the /es tree
+                  when it's open on a mirrored /es page. */}
               <HamburgerMenuItem
                 label={t("nav.about", locale)}
-                href="/about"
+                href={localizedHref("/about", tree)}
                 onClick={onClose}
                 icon={<Info size={14} />}
               />
               {/* Browse all places (#PR4) — internal link to the full directory */}
               <HamburgerMenuItem
                 label={t("nav.venuesList", locale)}
-                href="/venues"
+                href={localizedHref("/venues", tree)}
                 onClick={onClose}
                 icon={<List size={14} />}
               />
@@ -266,7 +269,7 @@ export default function HamburgerMenuContent({
                   the bottom nav's Resources item goes there too. */}
               <HamburgerMenuItem
                 label={t("nav.resourcesPage", locale)}
-                href="/resources"
+                href={localizedHref("/resources", tree)}
                 onClick={onClose}
                 icon={<HandHelping size={14} />}
               />
@@ -285,6 +288,29 @@ export default function HamburgerMenuContent({
               </span>
               <LanguageToggle />
             </div>
+            {/* "Ver en español" (#689, Kyle's 2026-09-28 decision 2) — only
+                when the client-side toggle has flipped THIS EN page to
+                Spanish (tree stays "en"; there's no server-side redirect on
+                /, AGENTS.md hard rule). Offers the fully-Spanish /es tree
+                without auto-navigating. Placed here (Menu, below the
+                toggle) rather than floating over the map — a `preview`
+                sign-off with Kyle should confirm this placement before it
+                ships to prod (design-affecting; see this repo's DESIGN.md
+                workflow). */}
+            {tree === "en" && locale === "es" && (
+              <div className="px-5 py-3 border-t border-[var(--color-bone-200)]">
+                <a
+                  href="/es"
+                  onClick={onClose}
+                  className={
+                    "text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] " +
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
+                  }
+                >
+                  {t("menu.verEnEspanol", "es")}
+                </a>
+              </div>
+            )}
           </>
         )}
       </div>

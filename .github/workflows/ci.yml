@@ -244,7 +244,13 @@ jobs:
       - name: Run Lighthouse
         uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # v12
         with:
-          urls: http://localhost:3000/
+          # #689 PR 2: /es added — the /es tree's own root layout (fonts,
+          # LocaleProvider, RootShell) is different enough from the EN one
+          # that a regression there (e.g. an accessibility issue specific
+          # to the locked provider) wouldn't show up scoring / alone.
+          urls: |
+            http://localhost:3000/
+            http://localhost:3000/es
           configPath: ./.lighthouserc.json
           uploadArtifacts: true
           temporaryPublicStorage: true

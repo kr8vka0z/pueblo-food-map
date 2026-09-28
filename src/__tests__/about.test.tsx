@@ -11,7 +11,7 @@
  *   7. about.stat.count is parameterized with a live count, not hardcoded (#PR4).
  */
 
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { SITE_URL } from "@/lib/site";
 import { buildPageMetadata } from "@/lib/site";
@@ -20,7 +20,25 @@ import { I18N_DICTIONARIES, t } from "@/lib/i18n";
 import { buildFaqJsonLd } from "@/lib/venueSchema";
 import SiteFooter from "@/components/SiteFooter";
 import HamburgerMenu from "@/components/HamburgerMenu";
+import * as LocaleContext from "@/lib/LocaleContext";
 import { LocaleProvider } from "@/lib/LocaleContext";
+
+// #689 PR 2: mocks useLocale() to locale="es", tree="en" — a client-side
+// cookie toggle to Spanish on the EN tree, as distinct from
+// `<LocaleProvider initialLocale="es">` below, which now ALSO sets
+// tree="es" (the real /es tree, where SiteFooter's About link correctly
+// rewrites to /es/about via localizedHref — see SiteFooter.test.tsx for
+// that coverage). This file's ES SiteFooter assertions were written before
+// #689 to prove ES TEXT with an unchanged /about href — that's the EN-tree
+// client-toggle scenario, so they use this helper now.
+function renderSiteFooterClientToggleEs() {
+  vi.spyOn(LocaleContext, "useLocale").mockReturnValue({
+    locale: "es",
+    tree: "en",
+    setLocale: vi.fn(),
+  });
+  return render(<SiteFooter />);
+}
 
 // ─── next/link mock (same pattern as HamburgerMenu.test.tsx) ─────────────────
 vi.mock("next/link", () => ({
@@ -41,6 +59,13 @@ vi.mock("next/link", () => ({
     </a>
   ),
 }));
+
+// #689 PR 2: restore the useLocale() spy after each test so it never leaks
+// into a later test that renders without a LocaleProvider (e.g. the
+// HamburgerMenu tests below).
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // ─── window.matchMedia stub (required by HamburgerMenu for mobile detection) ──
 beforeEach(() => {
@@ -171,12 +196,8 @@ describe("SiteFooter", () => {
     expect(links.length, "Expected an <a href='/about'> in SiteFooter").toBeGreaterThan(0);
   });
 
-  test("renders an About link pointing to /about (ES)", () => {
-    const { container } = render(
-      <LocaleProvider initialLocale="es">
-        <SiteFooter />
-      </LocaleProvider>,
-    );
+  test("renders an About link pointing to /about (ES client toggle, EN tree)", () => {
+    const { container } = renderSiteFooterClientToggleEs();
     const links = container.querySelectorAll("a[href='/about']");
     expect(links.length, "Expected an <a href='/about'> in SiteFooter (ES)").toBeGreaterThan(0);
   });
@@ -201,12 +222,8 @@ describe("SiteFooter", () => {
     expect(aboutLink?.textContent?.trim()).toBe(t("footer.about", "en"));
   });
 
-  test("About link text uses the ES i18n key", () => {
-    const { container } = render(
-      <LocaleProvider initialLocale="es">
-        <SiteFooter />
-      </LocaleProvider>,
-    );
+  test("About link text uses the ES i18n key (client toggle, EN tree)", () => {
+    const { container } = renderSiteFooterClientToggleEs();
     const aboutLink = container.querySelector("a[href='/about']");
     expect(aboutLink?.textContent?.trim()).toBe(t("footer.about", "es"));
   });

@@ -30,6 +30,8 @@ export const metadata: Metadata = buildPageMetadata({
   description:
     "Find free and low-cost food near you in Pueblo County, CO — pantries, community gardens, grocery stores, and meal sites, with SNAP/WIC info and directions.",
   path: "/",
+  // #689 PR 2: this page has an /es counterpart — carries hreflang now.
+  mirrored: true,
 });
 
 // Not exported: Next.js rejects unknown named exports from a page file.

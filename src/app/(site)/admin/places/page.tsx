@@ -5,7 +5,7 @@
  * status computed here + staging banner added #673).
  *
  * MOVED HERE from /admin (admin dashboard build): /admin is now the
- * Dashboard (src/app/admin/page.tsx), a to-do-list landing page — this is
+ * Dashboard (src/app/(site)/admin/page.tsx), a to-do-list landing page — this is
  * the exact same list + Publish panel that page used to render, unchanged
  * in behavior, just at its own URL so the Dashboard can be a genuinely
  * different screen rather than this one with extra panels bolted on.
@@ -74,7 +74,7 @@
  * On AccessDeniedError this delegates to handlePageAuthError()
  * (src/lib/adminAuthErrors.ts): a missing Better Auth session redirects to
  * /admin/login; every other denial reason calls Next's forbidden()
- * control-flow function, which renders src/app/forbidden.tsx and returns a
+ * control-flow function, which renders src/app/(site)/forbidden.tsx and returns a
  * real HTTP 403 — not a 200 with an inline error message.
  *
  * Not unit-tested directly — RSC page tests (real D1 binding + headers()+

@@ -1,7 +1,7 @@
 /**
  * Auth-guard regression test for the /admin/venues/new Server Component
  * page (#254; `?submission=<id>` pre-fill added #259) — mirrors
- * src/app/admin/page.test.tsx's own rationale: this page has its own
+ * src/app/(site)/admin/page.test.tsx's own rationale: this page has its own
  * getAdminDb() -> forbidden() fail-closed wiring that nothing else pins, so
  * a future edit routing around it wouldn't fail red without this test.
  *

@@ -1,6 +1,6 @@
 /**
  * BoxesPage (/admin/boxes) auth-guard test — same rationale as
- * src/app/admin/page.test.tsx (the Dashboard's own page test): the data
+ * src/app/(site)/admin/page.test.tsx (the Dashboard's own page test): the data
  * shaping here is already covered by dedicated tests against the pure
  * functions (boxHealth.test.ts, adminDashboard.test.ts) and the
  * presentational components (BoxReportsChart/AllBoxesTable/

@@ -3,7 +3,7 @@
  * `?submission=<id>` review-queue pre-fill added #259; `?proposal=<id>`
  * fold-in added #674).
  *
- * Same auth chain as /admin/places (src/app/admin/places/page.tsx, AGENTS.md
+ * Same auth chain as /admin/places (src/app/(site)/admin/places/page.tsx, AGENTS.md
  * "Admin authentication"): getAdminDb() verifies the caller's Better Auth
  * session before this page renders anything, failing closed via Next's
  * forbidden() control-flow function on AccessDeniedError. Header swapped
@@ -32,7 +32,7 @@
  *
  * `searchParams` is a Promise in this Next.js version (must be awaited, same
  * convention as `params` elsewhere in this app, e.g.
- * src/app/admin/venues/[id]/edit/page.tsx). Declared OPTIONAL in this file's
+ * src/app/(site)/admin/venues/[id]/edit/page.tsx). Declared OPTIONAL in this file's
  * own prop type — real Next.js rendering always supplies it — purely so
  * this page's pre-#259 test calls (`NewVenuePage()`, no args) keep working
  * unchanged; see page.test.tsx.

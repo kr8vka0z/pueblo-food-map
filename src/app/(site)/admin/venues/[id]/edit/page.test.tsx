@@ -1,7 +1,7 @@
 /**
  * Auth-guard + not-found regression test for the /admin/venues/[id]/edit
  * Server Component page (#255; `?submission=<id>` closure-report context
- * added #270) — mirrors src/app/admin/venues/new/page.test.tsx's own
+ * added #270) — mirrors src/app/(site)/admin/venues/new/page.test.tsx's own
  * rationale: this page has its own getAdminDb() -> forbidden()/notFound()
  * fail-closed wiring that nothing else pins, so a future edit routing
  * around it wouldn't fail red without this test.

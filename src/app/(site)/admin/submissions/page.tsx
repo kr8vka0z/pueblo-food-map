@@ -19,7 +19,7 @@
  * `?show=review&from=public` on the redirect target pre-selects the
  * Places tab's own "To review" quick filter AND "The public" source filter
  * (VenueListView's `initialShowReview`/`initialSourceFilter` props, set
- * server-side from these two params — src/app/admin/places/page.tsx), so a
+ * server-side from these two params — src/app/(site)/admin/places/page.tsx), so a
  * bookmark that used to land on a queue of pending submissions still lands
  * somewhere that shows exactly that.
  */

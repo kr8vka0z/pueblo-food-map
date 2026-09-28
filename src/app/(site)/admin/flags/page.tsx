@@ -6,7 +6,7 @@
  * "Suggested new place" row for a brand-new `add`), with a "To review"
  * summary box, quick-filter chips, and the source/lane filters this page's
  * queue used to own — see src/components/VenueListView.tsx and
- * src/app/admin/places/page.tsx.
+ * src/app/(site)/admin/places/page.tsx.
  *
  * Kept as a redirect rather than deleted outright: the nightly refresh
  * pipeline's alert email (src/lib/refreshAlerts.ts) and any admin's

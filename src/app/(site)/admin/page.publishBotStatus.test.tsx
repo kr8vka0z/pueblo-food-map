@@ -1,5 +1,5 @@
 /**
- * Regression test for #598 — new file because src/app/admin/page.test.tsx
+ * Regression test for #598 — new file because src/app/(site)/admin/page.test.tsx
  * is an existing test file (write-guarded on fix/* branches); this covers
  * ONLY the new PublishBotStatusBanner wiring, not the rest of the page
  * (see that file for the auth-guard coverage this mirrors the mock setup

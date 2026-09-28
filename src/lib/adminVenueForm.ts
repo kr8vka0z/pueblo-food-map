@@ -5,8 +5,8 @@
  * (#259, the review queue's "Approve" -> pre-filled create form).
  *
  * Kept as a plain, framework-free function (no "use client") so both the
- * Server Component pages (src/app/admin/venues/[id]/edit/page.tsx and
- * src/app/admin/venues/new/page.tsx, neither of which can import runtime
+ * Server Component pages (src/app/(site)/admin/venues/[id]/edit/page.tsx and
+ * src/app/(site)/admin/venues/new/page.tsx, neither of which can import runtime
  * code from a "use client" module) and this file's own unit tests can call
  * these mappers directly — same lib/component split as
  * adminVenueValidation.ts vs. AddVenueForm.tsx's client-side validateClient().

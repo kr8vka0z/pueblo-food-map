@@ -26,7 +26,7 @@ export interface AllBoxesTableProps {
   entries: BoxHealthEntry[];
   /** #677: this venue's pending photo/sponsor-request summary, keyed by venueId — grouped once by adminBoxes.ts's groupBoxReviewItems() from the tab's own already-fetched review queues. Optional/undefined is the same as "nothing to review anywhere" (no venue has an entry). */
   reviewByVenueId?: Record<string, BoxReviewSummary>;
-  /** #677: `?show=review` pre-selects the "To review" chip — set server-side from the URL (src/app/admin/boxes/page.tsx), never parsed client-side. Same convention as VenueListView's own initialShowReview (#674). */
+  /** #677: `?show=review` pre-selects the "To review" chip — set server-side from the URL (src/app/(site)/admin/boxes/page.tsx), never parsed client-side. Same convention as VenueListView's own initialShowReview (#674). */
   initialShowReview?: boolean;
 }
 

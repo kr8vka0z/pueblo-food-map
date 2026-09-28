@@ -14,7 +14,7 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { SITE_URL, buildPageMetadata } from "@/lib/site";
 import sitemap from "@/app/sitemap";
-import { groupVenuesByCategory } from "@/app/venues/page";
+import { groupVenuesByCategory } from "@/app/(site)/venues/page";
 import { I18N_DICTIONARIES, t } from "@/lib/i18n";
 import { categoryLabels } from "@/data/venues";
 import type { Venue, VenueCategory } from "@/types/venue";

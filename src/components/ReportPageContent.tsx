@@ -3,7 +3,7 @@
 /**
  * ReportPageContent — visible body of /report/[venueId].
  *
- * Extracted from src/app/report/[venueId]/page.tsx so the page's text (and
+ * Extracted from src/app/(site)/report/[venueId]/page.tsx so the page's text (and
  * ReportForm, which now reads useLocale() itself — #289) reflects the
  * visitor's locale while the page stays statically generated
  * (generateStaticParams + dynamicParams = false, unchanged by this

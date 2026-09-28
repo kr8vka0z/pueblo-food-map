@@ -86,7 +86,7 @@ describe("1.1 — throw on missing TURNSTILE_SECRET_KEY", () => {
     vi.resetModules();
     vi.stubEnv("RESEND_API_KEY", "test_key");
     // deliberately do NOT stub TURNSTILE_SECRET_KEY
-    const { POST } = await import("@/app/report/submit/route");
+    const { POST } = await import("@/app/(site)/report/submit/route");
     vi.stubGlobal("fetch", vi.fn()); // should not be reached
 
     const req = makeReq("http://localhost/report/submit", {
@@ -105,7 +105,7 @@ describe("1.1 — throw on missing TURNSTILE_SECRET_KEY", () => {
   test("suggest/submit throws when TURNSTILE_SECRET_KEY is absent", async () => {
     vi.resetModules();
     vi.stubEnv("RESEND_API_KEY", "test_key");
-    const { POST } = await import("@/app/suggest/submit/route");
+    const { POST } = await import("@/app/(site)/suggest/submit/route");
     vi.stubGlobal("fetch", vi.fn());
 
     const req = makeReq("http://localhost/suggest/submit", {
@@ -122,7 +122,7 @@ describe("1.1 — throw on missing TURNSTILE_SECRET_KEY", () => {
   test("feedback/submit throws when TURNSTILE_SECRET_KEY is absent", async () => {
     vi.resetModules();
     vi.stubEnv("RESEND_API_KEY", "test_key");
-    const { POST } = await import("@/app/feedback/submit/route");
+    const { POST } = await import("@/app/(site)/feedback/submit/route");
     vi.stubGlobal("fetch", vi.fn());
 
     const req = makeReq("http://localhost/feedback/submit", {
@@ -158,7 +158,7 @@ describe("1.2 — over-cap inputs rejected server-side", () => {
     vi.stubEnv("RESEND_API_KEY", "test_key");
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret");
     vi.stubEnv("CHECKIN_RATE_LIMIT_SECRET", "test-rate-limit-secret");
-    const { POST } = await import("@/app/report/submit/route");
+    const { POST } = await import("@/app/(site)/report/submit/route");
     vi.stubGlobal("fetch", mockTurnstileOk());
 
     const req = makeReq("http://localhost/report/submit", {
@@ -182,7 +182,7 @@ describe("1.2 — over-cap inputs rejected server-side", () => {
     vi.stubEnv("RESEND_API_KEY", "test_key");
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret");
     vi.stubEnv("CHECKIN_RATE_LIMIT_SECRET", "test-rate-limit-secret");
-    const { POST } = await import("@/app/suggest/submit/route");
+    const { POST } = await import("@/app/(site)/suggest/submit/route");
     vi.stubGlobal("fetch", mockTurnstileOk());
 
     const req = makeReq("http://localhost/suggest/submit", {
@@ -204,7 +204,7 @@ describe("1.2 — over-cap inputs rejected server-side", () => {
     vi.stubEnv("RESEND_API_KEY", "test_key");
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret");
     vi.stubEnv("CHECKIN_RATE_LIMIT_SECRET", "test-rate-limit-secret");
-    const { POST } = await import("@/app/feedback/submit/route");
+    const { POST } = await import("@/app/(site)/feedback/submit/route");
     vi.stubGlobal("fetch", mockTurnstileOk());
 
     const req = makeReq("http://localhost/feedback/submit", {
@@ -236,7 +236,7 @@ describe("1.3 — CR/LF stripped; unknown venueId rejected in report route", () 
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeD1() } });
     mockCheckFormRateLimit.mockReset();
     mockCheckFormRateLimit.mockResolvedValue(true);
-    const mod = await import("@/app/report/submit/route");
+    const mod = await import("@/app/(site)/report/submit/route");
     POST = mod.POST;
   });
 

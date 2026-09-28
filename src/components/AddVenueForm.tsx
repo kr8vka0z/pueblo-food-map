@@ -7,7 +7,7 @@
  * Presentational + self-contained: owns all field state, client-side
  * validation, and the fetch call to the venues API. No auth/D1 in scope
  * here — the Better Auth gate (getAdminDb()) lives in the parent Server Component
- * (src/app/admin/venues/new/page.tsx or .../[id]/edit/page.tsx, same
+ * (src/app/(site)/admin/venues/new/page.tsx or .../[id]/edit/page.tsx, same
  * pattern as AGENTS.md "Admin authentication"). This mirrors SuggestForm.tsx's
  * own form/route split; this component imitates SuggestForm's
  * input/label/error token classes (bone borders, sage focus rings) directly
@@ -25,13 +25,13 @@
  * the Server Component's venues query re-runs and the change is visible
  * immediately. `initialValues` (pre-#255) already covered pre-filling the
  * form; edit mode is just that same prop combined with `venueId`, wired by
- * the edit page (src/app/admin/venues/[id]/edit/page.tsx) via
+ * the edit page (src/app/(site)/admin/venues/[id]/edit/page.tsx) via
  * src/lib/adminVenueForm.ts's mapVenueRowToFormValues().
  *
  * #259: an optional `submissionId` prop (create mode only) rides along in
  * the POST body so the create route can approve the originating
  * `public_submissions` row atomically with the venue insert — wired by
- * src/app/admin/venues/new/page.tsx when opened as `?submission=<id>`, with
+ * src/app/(site)/admin/venues/new/page.tsx when opened as `?submission=<id>`, with
  * initialValues supplied by src/lib/adminVenueForm.ts's
  * mapSubmissionPayloadToFormValues(). On success that path redirects back
  * to /admin/places?show=review&from=public (#675: /admin/submissions itself
@@ -44,12 +44,12 @@
  * create-only) so that mode's route can approve the originating
  * `change_proposals` row atomically with the venue write:
  *   - EDIT mode (#390): PATCH .../<venueId> approves a `link_health`
- *     proposal — wired by src/app/admin/venues/[id]/edit/page.tsx when
+ *     proposal — wired by src/app/(site)/admin/venues/[id]/edit/page.tsx when
  *     opened as `?proposal=<id>`.
  *   - CREATE mode (#674): POST /api/admin/venues approves a genuinely-new
  *     `add` proposal, using ITS OWN id/source as the new venue's id/
  *     source_type rather than a fresh manual-<uuid> — wired by
- *     src/app/admin/venues/new/page.tsx when opened as `?proposal=<id>`,
+ *     src/app/(site)/admin/venues/new/page.tsx when opened as `?proposal=<id>`,
  *     initialValues supplied by src/lib/adminVenueForm.ts's
  *     mapAddProposalToFormValues(). Never sent alongside `submissionId` —
  *     the two hand-offs (public submission vs. change-proposal) are
@@ -191,7 +191,7 @@ export interface AddVenueFormProps {
    * `expectedUpdatedAt` in the PATCH body; PATCH /api/admin/venues/<id>
    * binds it into its UPDATE's `WHERE ... AND updated_at = ?` precondition
    * (see that route's own header) and rejects with 409 if another admin's
-   * save landed first. Wired by src/app/admin/venues/[id]/edit/page.tsx
+   * save landed first. Wired by src/app/(site)/admin/venues/[id]/edit/page.tsx
    * from the same `venue` row mapVenueRowToFormValues() already reads.
    */
   expectedUpdatedAt?: string;

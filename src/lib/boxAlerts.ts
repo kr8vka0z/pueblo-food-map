@@ -678,7 +678,7 @@ export type StopResult = "stopped" | "not_found" | "rate_limited";
  * from the /alerts/stop PAGE's own GET). 2026-09-18 security review (item
  * 6): a GET-mutates page was found to be indistinguishable from a mail
  * scanner's link-prefetch, which would silently unsubscribe someone who
- * never asked to be — see src/app/alerts/stop/page.tsx's own header for the
+ * never asked to be — see src/app/(site)/alerts/stop/page.tsx's own header for the
  * fix (the page never mutates; a client component auto-POSTs here on
  * mount, real JS in a real browser only). Rate-limited per token value
  * (fold into the SAME neutral "not found" outcome as a genuinely unknown

@@ -3,7 +3,7 @@
  * #677, "fold Photo review and Sponsor requests into the Blessing Boxes
  * tab"): "N to review: X photos (Y reported by a visitor) and Z sponsor
  * requests," with a "Show them" link that applies the table's own "To
- * review" filter via `?show=review` (src/app/admin/boxes/page.tsx reads it
+ * review" filter via `?show=review` (src/app/(site)/admin/boxes/page.tsx reads it
  * server-side into AllBoxesTable's `initialShowReview` prop — same
  * `?show=review` convention #674 established for the Places tab's
  * ToReviewSummaryBox.tsx). Replaces BoxesWaitingChips.tsx entirely (task

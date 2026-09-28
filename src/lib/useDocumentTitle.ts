@@ -67,7 +67,7 @@ export function useDocumentTitle(title: string): void {
     // legitimately wants a different (or no) locale-driven title later —
     // e.g. client-navigating to /venue/[id], which deliberately stays
     // English (its title is a proper venue name, nothing to translate —
-    // src/app/venue/[id]/page.tsx) — never gets corrected by a stale
+    // src/app/(site)/venue/[id]/page.tsx) — never gets corrected by a stale
     // observer left running from the PREVIOUS page's title.
     const observer = new MutationObserver(() => {
       if (document.title !== title) {

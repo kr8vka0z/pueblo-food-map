@@ -12,7 +12,7 @@
  * file (search, category filter, status key, name-link, empty state) is
  * unaffected and still exercises #253/#255/#672/#673 unchanged. The Server
  * Component page that fetches D1
- * rows (src/app/admin/places/page.tsx) is intentionally not tested here —
+ * rows (src/app/(site)/admin/places/page.tsx) is intentionally not tested here —
  * see that file's own comment; RSC page tests are hard in this stack, so
  * coverage concentrates on this presentational component.
  */

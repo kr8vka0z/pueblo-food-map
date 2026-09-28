@@ -64,7 +64,7 @@ export interface PublicSubmissionRow {
 
 /**
  * The parsed `payload` shape a kind="new_venue" row's JSON deserializes to —
- * exactly the `sanitized` object src/app/suggest/submit/route.ts writes.
+ * exactly the `sanitized` object src/app/(site)/suggest/submit/route.ts writes.
  * Duplicated here (not imported) because that route module is a
  * "use server"-adjacent route handler with its own local types, not a
  * shared lib — same reasoning AddVenueForm.tsx already gives for declaring
@@ -84,7 +84,7 @@ export interface NewVenuePayload {
 
 /**
  * The parsed `payload` shape a kind="closure" row's JSON deserializes to —
- * exactly the `sanitized` object src/app/report/submit/route.ts writes.
+ * exactly the `sanitized` object src/app/(site)/report/submit/route.ts writes.
  */
 export interface ClosurePayload {
   venueId: string;
@@ -97,8 +97,8 @@ export interface ClosurePayload {
 
 // ─── Review-surface shapes (#675, "fold the Review queue into Places") ─────
 // Moved here from the now-deleted SubmissionsReviewView.tsx / retired
-// /admin/submissions/page.tsx: both the Places tab (src/app/admin/places/page.tsx)
-// and the venue edit page (src/app/admin/venues/[id]/edit/page.tsx) now parse
+// /admin/submissions/page.tsx: both the Places tab (src/app/(site)/admin/places/page.tsx)
+// and the venue edit page (src/app/(site)/admin/venues/[id]/edit/page.tsx) now parse
 // `public_submissions` rows, so the shared read/payload shape belongs in this
 // module (which already owns the write-path types above) rather than in
 // either page or a component.

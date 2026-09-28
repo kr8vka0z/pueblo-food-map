@@ -53,7 +53,7 @@ and surface one decision at a time.
   `change_proposals` table exists but is empty. **The public map does NOT read D1 at
   request time** — it reads a static file `src/data/published-venues.ts`. D1 is
   admin-only; "Publish" regenerates that static file.
-- **Admin surface — this is ALL that exists today:** `src/app/admin/page.tsx` (one
+- **Admin surface — this is ALL that exists today:** `src/app/(site)/admin/page.tsx` (one
   page), `src/app/api/admin/publish/route.ts` (+ `route.test.ts`), and
   `src/app/api/admin/whoami/route.ts`. So: a login-gated page, a whoami check, and a
   Publish endpoint. No add/edit/delete, no approval queue.

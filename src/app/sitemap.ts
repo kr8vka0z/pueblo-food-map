@@ -9,7 +9,7 @@
  * WHY no Blessing Box URLs (SEO/AEO plan Phase 0, docs/seo-aeo-plan.md):
  * `/boxes` was listed here but never existed (a 404 in every crawl), and each
  * `/box/<id>` is a client-side redirect shell into the map card (see
- * src/app/box/[id]/page.tsx), not a page worth indexing — it's `noindex` now.
+ * src/app/(site)/box/[id]/page.tsx), not a page worth indexing — it's `noindex` now.
  * Boxes come back to the sitemap as the planned read-only `/blessing-boxes`
  * list (REVIEW.md). With the live D1 read gone, this file is build-time data
  * only again and no longer `force-dynamic`. src/__tests__/seo.test.ts checks

@@ -62,16 +62,39 @@ Browser
               blessing_box filter, #516; docs/bottom-nav-spec.md)
 
 Next.js App Router (Cloudflare Worker)
-  └── src/app/layout.tsx      (metadata, font preload; wraps with LocaleProvider — reads no cookie;
-        mounts ServiceWorkerRegister → public/sw.js, see "Offline / installable app", #130)
-  └── src/app/manifest.ts     (/manifest.webmanifest — installable app, #130)
-  └── src/app/page.tsx        (Server Component: venue-index JSON-LD, metadata;
-        mounts HomePageClient.tsx — splash gate + MapWrapper)
-  └── src/app/about, privacy, resources, venues, venue/[id], box/[id] …
-        (public pages; each localized body is a client "Content" component)
-  └── src/app/api/public/**   (unauthenticated box reads and writes)
-  └── src/app/report/[venueId], suggest, feedback  (+ submit/route.ts each)
-  └── src/app/admin/**, src/app/api/admin/**  (admin panel — see "Admin panel")
+  └── src/app/(site)/  — a route group (URL-invisible, #689 PR 1), holding every
+        public and admin route below. Exists so a future src/app/es/layout.tsx
+        (#689 PR 2) can be a SECOND root layout — Next.js requires multiple root
+        layouts to give an `/es` page a server-rendered `<html lang="es">`.
+    └── layout.tsx      (metadata/viewport from src/lib/site.ts's ROOT_METADATA/
+          ROOT_VIEWPORT; renders <RootShell lang="en"> — font preload, WebSite
+          JSON-LD, LocaleProvider — reads no cookie, ServiceWorkerRegister →
+          public/sw.js, see "Offline / installable app", #130 — and Analytics)
+    └── not-found.tsx   (branded 404 for an explicit notFound() call inside this
+          route tree — venue/[id], box/[id], report/[venueId])
+    └── forbidden.tsx   (branded 403 for next/navigation's forbidden(), admin/page.tsx)
+    └── page.tsx        (Server Component: venue-index JSON-LD, metadata;
+          mounts HomePageClient.tsx — splash gate + MapWrapper)
+    └── about, privacy, resources, venues, venue/[id], box/[id] …
+          (public pages; each localized body is a client "Content" component)
+    └── report/[venueId], suggest, feedback  (+ submit/route.ts each)
+    └── admin/**  (admin panel — see "Admin panel")
+  └── src/components/RootShell.tsx — the shared <html>/<body> shell (font
+        preload, WebSite JSON-LD, LocaleProvider, Analytics, SW register) both
+        (site)/layout.tsx and app/global-not-found.tsx render, parameterized by
+        `lang` (#689 PR 1; PR 2's es/layout.tsx reuses it with lang="es")
+  └── src/app/global-not-found.tsx — 404 for a URL that matches no route at
+        all (required once (site)/ became a route group with no top-level
+        app/layout.tsx to compose a 404 from; `experimental.globalNotFound` in
+        next.config.ts). Reuses RootShell + ROOT_METADATA/ROOT_VIEWPORT since
+        it has no parent layout to inherit them from.
+  └── src/app/manifest.ts, robots.ts, sitemap.ts, favicon.ico, apple-icon.png,
+        globals.css — stay at the src/app/ root, outside (site)/: special
+        metadata files and globals.css need no layout, and global-not-found.tsx
+        needs the same globals.css import.
+  └── src/app/api/**   (route handlers — no layout, so route groups don't
+        apply; api/public/** is unauthenticated box reads and writes,
+        api/admin/** backs the admin panel)
   └── SiteFooter.tsx (slim nav footer on every public page but the map — the crawl path to /venues)
 
 Data layer (static TS modules, no API calls at render time)
@@ -225,7 +248,7 @@ AGENTS.md "Automated venue-refresh pipeline".
   missing); a 150-proposal cap that aborts the whole run. Stricter than §6,
   which writes flagged removal proposals instead — chosen because the job
   runs unattended, and writing nothing beats half-writing.
-- **Review:** the Places tab (`src/app/admin/places/page.tsx`,
+- **Review:** the Places tab (`src/app/(site)/admin/places/page.tsx`,
   `VenueListView.tsx`'s "To review" column, `ProposalCard.tsx`,
   `api/admin/proposals/[id]/{approve,reject}`, #390, plus bulk
   `approve-date-only`) — originally a standalone `/admin/flags` queue
@@ -473,7 +496,7 @@ Three user-submission flows share the same structure:
 /feedback/page.tsx           → FeedbackForm → POST /feedback/submit
 ```
 
-Each route handler (`src/app/*/submit/route.ts`) runs the same pipeline:
+Each route handler (`src/app/(site)/*/submit/route.ts`) runs the same pipeline:
 
 1. Content-Type guard
 2. **Cloudflare Turnstile** verification — rejects bots before any further
@@ -611,9 +634,10 @@ connection — minus the map itself (Mapbox tiles are out of scope).
 
 **Pieces.**
 - `src/app/manifest.ts` → `/manifest.webmanifest` (name, `short_name` "Food
-  Map", `start_url` `/`, standalone, bone-50 colours tied to `layout.tsx`'s
-  `themeColor` by `manifest.test.ts`). Icons in `public/icons/` plus
-  `src/app/apple-icon.png` are PNGs drawn from the OG image's pin mark.
+  Map", `start_url` `/`, standalone, bone-50 colours tied to `ROOT_VIEWPORT`'s
+  (`src/lib/site.ts`) `themeColor` by `manifest.test.ts`). Icons in
+  `public/icons/` plus `src/app/apple-icon.png` are PNGs drawn from the OG
+  image's pin mark.
 - `public/sw.js` — hand-written service worker, no Workbox. Served as a plain
   static file (never bundled); `public/_headers` sends `Cache-Control:
   no-cache` so each deploy's copy reaches visitors.
@@ -779,7 +803,7 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   name); paging is "Show older" (`?until=`, 300 rows per source). Both tables
   are kept permanently — the 90-day email cleanup never touches them.
 
-- **`/admin` — Dashboard** (`src/app/admin/page.tsx`, overhauled #680). A
+- **`/admin` — Dashboard** (`src/app/(site)/admin/page.tsx`, overhauled #680). A
   greeting + a 7/30/90-day period switch (`?period=`, server-rendered
   `<Link>`s, no client JS) that every period-scoped number on the page
   reads from and compares against the previous period of the same length

@@ -161,7 +161,7 @@ vi.mock("@/components/SplashScreen", () => ({
   ),
 }));
 
-import HomePage from "@/app/page";
+import HomePage from "@/app/(site)/page";
 import AboutContent from "@/components/AboutContent";
 import PrivacyContent from "@/components/PrivacyContent";
 import ResourcesContent from "@/components/ResourcesContent";

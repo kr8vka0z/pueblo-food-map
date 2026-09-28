@@ -55,7 +55,7 @@ describe("POST /feedback/submit", () => {
     mockCheckFormRateLimit.mockResolvedValue(true);
     mockGetCloudflareContext.mockReset();
     mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: {} as D1Database } });
-    const mod = await import("@/app/feedback/submit/route");
+    const mod = await import("@/app/(site)/feedback/submit/route");
     POST = mod.POST;
   });
 

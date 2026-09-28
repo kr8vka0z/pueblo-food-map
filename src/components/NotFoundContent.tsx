@@ -3,7 +3,7 @@
 /**
  * NotFoundContent — visible body of the branded 404 page.
  *
- * Extracted from src/app/not-found.tsx so the page's text can read the
+ * Extracted from src/app/(site)/not-found.tsx so the page's text can read the
  * visitor's locale via useLocale() (#289) without forcing not-found.tsx to
  * read a cookie server-side — see that file's header comment for the
  * static-caching rationale (ARCHITECTURE.md "Known bilingual limitation", #287).

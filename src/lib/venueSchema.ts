@@ -69,12 +69,14 @@ function extractStreetAddress(address: string): string {
  * All places › {venue}. It mirrors the visible breadcrumb VenueContent
  * renders, which is what makes it eligible for Google's breadcrumb display.
  *
- * #689 PR 2: `locale` defaults "en" so every existing call site (venue
- * page, unchanged) is byte-identical. The "JSON-LD is always English" rule
- * (#386) is now "JSON-LD matches the URL's language" (ARCHITECTURE.md) — an
- * ES caller passes locale: "es" and gets /es URLs + t(key, "es") labels. The
- * middle crumb still reads the SAME key ("footer.venues") the visible
- * breadcrumb link renders for that locale, so the two can't drift.
+ * #689 PR 2: `locale` defaults "en" — this function's own output for the
+ * existing EN call site is unaffected by the default (SITE_URL, plain
+ * `/venue/<id>`, `t(key, "en")` labels — same values the old hardcoded
+ * "en" produced). The "JSON-LD is always English" rule (#386) is now
+ * "JSON-LD matches the URL's language" (ARCHITECTURE.md) — an ES caller
+ * passes locale: "es" and gets /es URLs + t(key, "es") labels. The middle
+ * crumb still reads the SAME key ("footer.venues") the visible breadcrumb
+ * link renders for that locale, so the two can't drift.
  */
 export function buildVenueBreadcrumbJsonLd(
   venue: Venue,
@@ -146,6 +148,18 @@ export function venuePath(id: string, locale: Locale = "en"): string {
   return locale === "es" ? `/es/venue/${id}` : `/venue/${id}`;
 }
 
+/**
+ * #689 PR 2: `locale` defaults "en" and, once it does, this function's EN
+ * output is byte-identical to before #689 (review fix, item 7) — no
+ * `inLanguage` field here: schema.org doesn't define `inLanguage` on
+ * LocalBusiness/GroceryStore/ConvenienceStore/FoodEstablishment/Place (the
+ * types this venue node actually uses, CATEGORY_SCHEMA_TYPE above), only on
+ * CreativeWork-derived types. The page's language is already signaled by
+ * the WebSite node's own `inLanguage` (buildWebSiteJsonLd, RootShell) and
+ * by the page's `<html lang>` / hreflang — inventing a non-standard
+ * property here would be exactly the kind of made-up schema.org shape this
+ * file's own openingHoursSpecification comment warns against.
+ */
 export function buildVenueJsonLd(
   venue: Venue,
   locale: Locale = "en",
@@ -168,7 +182,6 @@ export function buildVenueJsonLd(
     name: venue.name,
     description: `${t(`category.full.${venue.category}`, locale)} ${IN_PUEBLO_CO[locale]}`,
     url: `${SITE_URL}${venuePath(venue.id, locale)}`,
-    inLanguage: locale,
     address,
     geo: {
       "@type": "GeoCoordinates",

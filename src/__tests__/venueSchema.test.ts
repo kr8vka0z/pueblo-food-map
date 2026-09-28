@@ -354,17 +354,21 @@ describe("locale-aware JSON-LD (#689)", () => {
     expect(venuePath("abc-123", "es")).toBe("/es/venue/abc-123");
   });
 
-  test("buildVenueJsonLd(venue, 'es') uses the /es url and inLanguage es", () => {
+  // Review fix (item 7): buildVenueJsonLd never emits "inLanguage" — the
+  // venue node's schema.org types (LocalBusiness/GroceryStore/etc.) don't
+  // define that property; the page's language is signaled by the WebSite
+  // node's own inLanguage and by <html lang>/hreflang instead.
+  test("buildVenueJsonLd(venue, 'es') uses the /es url; no inLanguage field", () => {
     const ld = buildVenueJsonLd(grocery, "es");
     expect(ld["url"]).toBe(`${SITE_URL}/es/venue/${grocery.id}`);
-    expect(ld["inLanguage"]).toBe("es");
+    expect("inLanguage" in ld).toBe(false);
     expect(ld["description"]).toBe(`${t(`category.full.${grocery.category}`, "es")} en Pueblo, CO.`);
   });
 
-  test("buildVenueJsonLd(venue) (default) is still inLanguage en with the EN url", () => {
+  test("buildVenueJsonLd(venue) (default) still uses the EN url; no inLanguage field", () => {
     const ld = buildVenueJsonLd(grocery);
     expect(ld["url"]).toBe(`${SITE_URL}/venue/${grocery.id}`);
-    expect(ld["inLanguage"]).toBe("en");
+    expect("inLanguage" in ld).toBe(false);
   });
 
   test("buildVenueListJsonLd(venues, 'es') emits /es/venue/ urls", () => {

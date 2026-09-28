@@ -19,7 +19,9 @@ import {
   buildVenueMetaDescription,
   buildVenueSummary,
   buildVenueTitle,
+  parseVenueCityCore,
   FREE_CATEGORIES,
+  PLACEHOLDER_ADDRESS,
 } from "@/lib/venueSummary";
 
 /**
@@ -53,11 +55,37 @@ const SCHEMA_DAY: Record<string, string> = {
   sun: "https://schema.org/Sunday",
 };
 
-/** Extract a 5-digit zip code from an address string, if present. */
+/**
+ * Extract a 5-digit zip code from an address string, if present.
+ *
+ * WHY the LAST match, not the first: review fix (#705) — a house number can
+ * itself be 5 digits ("37137 US 50 Bus, Pueblo, CO 81006" was extracting
+ * "37137", the house number, as the postal code). A street address's own
+ * zip, when present, is always the LAST 5-digit group in the string (it
+ * comes after the city/state); a leading 5-digit house number never does.
+ */
 function extractPostalCode(address: string): string | undefined {
-  const match = address.match(/\b(\d{5})(?:-\d{4})?\b/);
-  return match ? match[1] : undefined;
+  const matches = [...address.matchAll(/\b(\d{5})(?:-\d{4})?\b/g)];
+  return matches.length > 0 ? matches[matches.length - 1][1] : undefined;
 }
+
+/**
+ * Count of published venues sharing each `url` — computed once at module
+ * load. Used by buildVenueJsonLd to decide whether `sameAs` (schema.org's
+ * "this same entity elsewhere") is safe to emit: 10 gardens/edible
+ * landscapes share ONE Pueblo Food Project URL
+ * (https://pueblofoodproject.org/gardens/), which is a page ABOUT the
+ * gardens program, not any one garden's own identity — sameAs on all 10
+ * would tell a search engine 10 different entities are "the same page",
+ * which is false. A url a single venue uses is a legitimate sameAs.
+ */
+const URL_COUNTS: Map<string, number> = (() => {
+  const counts = new Map<string, number>();
+  for (const v of venues) {
+    if (v.url) counts.set(v.url, (counts.get(v.url) ?? 0) + 1);
+  }
+  return counts;
+})();
 
 /** Extract the street portion (up to the first comma) from an address. */
 function extractStreetAddress(address: string): string {
@@ -175,11 +203,25 @@ export function buildVenueJsonLd(
   const postalCode = extractPostalCode(venue.address);
   const address: Record<string, string> = {
     "@type": "PostalAddress",
-    streetAddress: extractStreetAddress(venue.address),
-    addressLocality: "Pueblo",
     addressRegion: "CO",
     addressCountry: "US",
   };
+  // #705 review fix (same guard as buildVenueSummary's PLACEHOLDER_ADDRESS
+  // check): never emit the literal "Address not in OpenStreetMap" as a
+  // structured-data street address — omit the field entirely rather than
+  // publish a placeholder string as fact.
+  if (venue.address !== PLACEHOLDER_ADDRESS) {
+    address["streetAddress"] = extractStreetAddress(venue.address);
+  }
+  // #705 review fix: addressLocality was hardcoded "Pueblo" for every venue,
+  // wrong for the ~14 in Pueblo West/Colorado City/Blende/Baxter/Avondale/
+  // Vineland. Uses the CORE parser (no locale, no "Pueblo County" fallback
+  // text) — when the city can't be parsed, omitting the field entirely is
+  // correct; emitting fallback prose as a structured-data city name isn't.
+  const city = parseVenueCityCore(venue.address);
+  if (city) {
+    address["addressLocality"] = city;
+  }
   if (postalCode) {
     address["postalCode"] = postalCode;
   }
@@ -208,8 +250,13 @@ export function buildVenueJsonLd(
   }
 
   // #704: the venue's own outbound link — "the same entity elsewhere",
-  // never the map's own URL (that's already `url` above).
-  if (venue.url) {
+  // never the map's own URL (that's already `url` above). #705 review fix:
+  // only when that url belongs to THIS venue alone (URL_COUNTS <= 1) — a
+  // url shared by multiple venues (the 10 gardens/edible landscapes on one
+  // Pueblo Food Project page) is a program page, not any one venue's own
+  // identity; sameAs on all 10 would falsely claim they're all "the same
+  // entity" as each other.
+  if (venue.url && (URL_COUNTS.get(venue.url) ?? 0) <= 1) {
     result["sameAs"] = [venue.url];
   }
 

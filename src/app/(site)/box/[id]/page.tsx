@@ -57,7 +57,7 @@ export async function generateMetadata({
     // redirects into the map card, so it has nothing to index. The head
     // metadata above still feeds link previews for shares and QR stickers.
     // "follow" lets a crawler that lands here still follow the redirect.
-    // Boxes get indexed through the planned read-only /blessing-boxes list.
+    // Boxes get indexed through the read-only /blessing-boxes list (#709 PR B).
     robots: { index: false, follow: true },
   };
 }

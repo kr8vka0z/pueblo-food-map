@@ -173,11 +173,21 @@ describe("server-rendered SEO content", () => {
 
   // SEO/AEO plan Phase 0: the homepage's server HTML used to have zero links,
   // leaving /venues (and every venue page) unreachable without running JS.
-  test("renders crawlable links to /venues, /resources and /about synchronously", () => {
+  // #709 PR A item 6 ("links to the three new hubs from ... the `/` Site nav
+  // block") appended the three hub hrefs; the original three are unchanged.
+  test("renders crawlable links to /venues, /resources, /about and the three hubs synchronously", () => {
     render(<HomePage />);
     const nav = screen.getByRole("navigation", { name: "Site" });
     const hrefs = within(nav).getAllByRole("link").map((l) => l.getAttribute("href"));
-    expect(hrefs).toEqual(["/venues", "/resources", "/about"]);
+    expect(hrefs).toEqual([
+      "/venues",
+      "/resources",
+      "/about",
+      "/food-pantries",
+      "/snap-wic-stores",
+      "/community-gardens",
+      "/blessing-boxes",
+    ]);
   });
 
   test("the crawl links are visually hidden until focused (skip-link pattern)", () => {

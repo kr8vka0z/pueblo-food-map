@@ -1071,6 +1071,71 @@ const en: Record<string, string> = {
   "month.11": "November",
   "month.12": "December",
 
+
+  // ─── SEO hub pages (#709): /food-pantries, /snap-wic-stores, /community-gardens ───
+  // Titles get " · Pueblo Food Map" appended by the layout template.
+  "meta.foodPantries.title": "Food Pantries in Pueblo, CO",
+  "meta.foodPantries.description":
+    "Every food pantry on the Pueblo Food Map in Pueblo County, CO, with addresses, hours in plain words where we have them, and how food pantries work.",
+  "meta.snapWic.title": "SNAP and WIC Stores in Pueblo, CO",
+  "meta.snapWic.description":
+    "Places in Pueblo County, CO that accept SNAP/EBT or WIC, such as grocery stores and markets, with addresses.",
+  "meta.gardens.title": "Community Gardens in Pueblo, CO",
+  "meta.gardens.description":
+    "Community gardens and edible landscapes in Pueblo County, CO, with addresses and hours where we have them.",
+  // Short link labels: footer, /venues "Browse by topic" list.
+  "footer.foodPantries": "Food pantries",
+  "footer.snapWic": "SNAP and WIC stores",
+  "footer.gardens": "Community gardens",
+  "venues.browseTopics": "Browse by topic",
+  // Shared by the hub lists.
+  "hubs.hoursMissing": "Hours not listed. Check before you go.",
+  "hubs.pantries.heading": "Food pantries in Pueblo County",
+  "hubs.pantries.introFree": "There are {count} free food pantries on the map in Pueblo County, CO. Each one is listed below with its address, and hours where we have them.",
+  "hubs.pantries.introPlain": "There are {count} food pantries on the map in Pueblo County, CO. Each one is listed below with its address, and hours where we have them.",
+  "hubs.pantries.faq.heading": "How food pantries work",
+  "hubs.pantries.faq.q1": "What is a food pantry?",
+  "hubs.pantries.faq.a1": "A food pantry gives groceries to people who need them, usually at no cost. Many are run by churches, community groups and nonprofits.",
+  "hubs.pantries.faq.q2": "Do I need to call or sign up first?",
+  "hubs.pantries.faq.a2": "It depends on the pantry. Some are open on set days and hours, and some ask you to call first. Check the hours listed here, and call ahead if a phone number is on the place's page.",
+  "hubs.pantries.faq.q3": "How often can I go?",
+  "hubs.pantries.faq.a3": "Each pantry sets its own limits. Ask what they are when you call or visit.",
+  "hubs.pantries.faq.q4": "What if the hours are missing or a pantry is closed?",
+  "hubs.pantries.faq.a4": "Hours can change, and some places have not shared theirs. Call ahead, or call 2-1-1 or the Food Resource Hotline at 855-855-4626 and ask about pantries open today.",
+  "hubs.snapWic.heading": "Places that accept SNAP and WIC",
+  "hubs.snapWic.intro": "{snap} places on the map accept SNAP/EBT and {wic} accept WIC. Each one is listed below with its address.",
+  "hubs.snapWic.badgeSnap": "Accepts SNAP/EBT",
+  "hubs.snapWic.badgeWic": "Accepts WIC",
+  "hubs.snapWic.note": "What a place accepts can change. Check with the place before you go.",
+  "hubs.snapWic.apply": "Want to apply for SNAP or WIC?",
+  // /blessing-boxes (#709 PR B). Deliberately no "free" wording: blessing_box is not in FREE_CATEGORIES.
+  "meta.boxes.title": "Blessing Boxes in Pueblo, CO",
+  "meta.boxes.description":
+    "Community blessing boxes in Pueblo County, CO: small boxes where neighbors leave and take food and basics. Names and addresses, with a link to each on the map.",
+  // "list" on purpose: bare "Blessing boxes" is also the box.stats.boxCount label, and the footer renders on that page (exact-text test queries collide).
+  "footer.boxes": "Blessing box list",
+  "hubs.boxes.heading": "Blessing boxes in Pueblo County",
+  "hubs.boxes.intro": "There are {count} blessing boxes on the map in Pueblo County, CO. Each one links to its card on the map.",
+  "hubs.boxes.introOne": "There is 1 blessing box on the map in Pueblo County, CO. It links to its card on the map.",
+  "hubs.boxes.what": "A blessing box is a small community box where neighbors leave and take food and basics. Open the map to see a box's current details.",
+  "hubs.boxes.empty": "There are no blessing boxes listed right now.",
+  "hubs.boxes.degraded": "We couldn't load the list of blessing boxes right now. Open the map to see them.",
+  "hubs.boxes.openMap": "Open the map",
+  "hubs.gardens.heading": "Community gardens and edible landscapes in Pueblo County",
+  "hubs.gardens.section.garden": "Community gardens",
+  "hubs.gardens.section.edible_landscape": "Edible landscapes",
+  "hubs.gardens.introFree": "There are {count} free community gardens and edible landscapes on the map in Pueblo County, CO. Each one is listed below with its address and hours where we have them.",
+  "hubs.gardens.introPlain": "There are {count} community gardens and edible landscapes on the map in Pueblo County, CO. Each one is listed below with its address and hours where we have them.",
+  // /resources FAQ (#709). Sources and fetch dates: src/components/ResourcesFaq.tsx.
+  "resources.faq.heading": "Common questions",
+  "resources.faq.q1": "How do I apply for SNAP in Pueblo County?",
+  "resources.faq.a1": "You can apply online with Colorado PEAK or the MyCOBenefits app, or fill out a paper application and return it to your county human services office. The county decides who qualifies, based on income, resources and household size. The Food Resource Hotline at 855-855-4626 can help you apply by phone.",
+  "resources.faq.q2": "How do I apply for WIC?",
+  "resources.faq.a2": "Call your local WIC clinic to make an appointment, or fill out the online sign-up form at coloradowicsignup.com and a WIC staff member will contact you within 10 days. When you make your appointment, the clinic can tell you which documents to bring.",
+  "resources.faq.q3": "What should I bring to a food pantry?",
+  "resources.faq.a3": "It depends on the pantry, because each one sets its own requirements. Check the place's page on this map for hours and details, and call ahead if a phone number is listed. The Food Resource Hotline at 855-855-4626 can also point you to pantries near you.",
+  "resources.faq.q4": "Where can I get emergency food today?",
+  "resources.faq.a4": "Dial 2-1-1 or (866) 760-6489, or text your ZIP code to 898-211, and ask about emergency food near you. The Food Resource Hotline at 855-855-4626 (Monday to Thursday 8:30 a.m. to 4:30 p.m., Friday 8 a.m. to noon) can connect you with food pantries and free meal sites. You can also look at the food pantries on this map and check their hours before you go.",
 };
 
 // ─── Mexican Spanish dictionary (PR 3) ────────────────────────────────────────
@@ -1882,6 +1947,65 @@ const es: Record<string, string> = {
   "month.10": "octubre", // [CHECK]
   "month.11": "noviembre", // [CHECK]
   "month.12": "diciembre", // [CHECK]
+
+  // ─── SEO hub pages (#709) ───
+  "meta.foodPantries.title": "Despensas de alimentos en Pueblo, CO", // [CHECK]
+  "meta.foodPantries.description":
+    "Todas las despensas de alimentos en Pueblo Food Map, en el Condado de Pueblo, CO, con direcciones, horarios en palabras sencillas cuando los tenemos, y cómo funcionan las despensas.", // [CHECK]
+  "meta.snapWic.title": "Lugares que aceptan SNAP y WIC en Pueblo, CO", // [CHECK]
+  "meta.snapWic.description":
+    "Lugares en el Condado de Pueblo, CO que aceptan SNAP/EBT o WIC, como supermercados y mercados, con direcciones.", // [CHECK]
+  "meta.gardens.title": "Huertos comunitarios en Pueblo, CO", // [CHECK]
+  "meta.gardens.description":
+    "Huertos comunitarios y paisajes comestibles en el Condado de Pueblo, CO, con direcciones y horarios cuando los tenemos.", // [CHECK]
+  "footer.foodPantries": "Despensas de alimentos", // [CHECK]
+  "footer.snapWic": "Lugares con SNAP y WIC", // [CHECK]
+  "footer.gardens": "Huertos comunitarios", // [CHECK]
+  "venues.browseTopics": "Explorar por tema", // [CHECK]
+  "hubs.hoursMissing": "Horario no disponible. Confirma antes de ir.", // [CHECK]
+  "hubs.pantries.heading": "Despensas de alimentos en el Condado de Pueblo", // [CHECK]
+  "hubs.pantries.introFree": "Hay {count} despensas de alimentos gratuitas en el mapa del Condado de Pueblo, CO. Cada una aparece abajo con su dirección, y su horario cuando lo tenemos.", // [CHECK]
+  "hubs.pantries.introPlain": "Hay {count} despensas de alimentos en el mapa del Condado de Pueblo, CO. Cada una aparece abajo con su dirección, y su horario cuando lo tenemos.", // [CHECK]
+  "hubs.pantries.faq.heading": "Cómo funcionan las despensas de alimentos", // [CHECK]
+  "hubs.pantries.faq.q1": "¿Qué es una despensa de alimentos?", // [CHECK]
+  "hubs.pantries.faq.a1": "Una despensa de alimentos entrega comida a las personas que la necesitan, normalmente sin costo. Muchas son operadas por iglesias, grupos comunitarios y organizaciones sin fines de lucro.", // [CHECK]
+  "hubs.pantries.faq.q2": "¿Necesito llamar o inscribirme primero?", // [CHECK]
+  "hubs.pantries.faq.a2": "Depende de la despensa. Algunas abren en días y horarios fijos, y otras piden que llames primero. Revisa el horario que aparece aquí y llama antes si la página del lugar tiene un teléfono.", // [CHECK]
+  "hubs.pantries.faq.q3": "¿Cada cuánto puedo ir?", // [CHECK]
+  "hubs.pantries.faq.a3": "Cada despensa fija sus propios límites. Pregunta cuáles son cuando llames o vayas.", // [CHECK]
+  "hubs.pantries.faq.q4": "¿Qué hago si falta el horario o la despensa está cerrada?", // [CHECK]
+  "hubs.pantries.faq.a4": "Los horarios pueden cambiar, y algunos lugares no han compartido el suyo. Llama antes, o llama al 2-1-1 o a la Línea de Recursos Alimentarios al 855-855-4626 y pregunta por las despensas abiertas hoy.", // [CHECK]
+  "hubs.snapWic.heading": "Lugares que aceptan SNAP y WIC", // [CHECK]
+  "hubs.snapWic.intro": "{snap} lugares en el mapa aceptan SNAP/EBT y {wic} aceptan WIC. Cada uno aparece abajo con su dirección.", // [CHECK]
+  "hubs.snapWic.badgeSnap": "Acepta SNAP/EBT", // [CHECK]
+  "hubs.snapWic.badgeWic": "Acepta WIC", // [CHECK]
+  "hubs.snapWic.note": "Lo que acepta un lugar puede cambiar. Confirma con el lugar antes de ir.", // [CHECK]
+  "hubs.snapWic.apply": "¿Quieres solicitar SNAP o WIC?", // [CHECK]
+  "meta.boxes.title": "Cajas de bendiciones en Pueblo, CO", // [CHECK]
+  "meta.boxes.description":
+    "Cajas de bendiciones comunitarias en el Condado de Pueblo, CO: cajas pequeñas donde los vecinos dejan y toman comida y artículos básicos. Nombres y direcciones, con un enlace a cada una en el mapa.", // [CHECK]
+  "footer.boxes": "Lista de cajas de bendiciones", // [CHECK]
+  "hubs.boxes.heading": "Cajas de bendiciones en el Condado de Pueblo", // [CHECK]
+  "hubs.boxes.intro": "Hay {count} cajas de bendiciones en el mapa del Condado de Pueblo, CO. Cada una enlaza a su tarjeta en el mapa.", // [CHECK]
+  "hubs.boxes.introOne": "Hay 1 caja de bendiciones en el mapa del Condado de Pueblo, CO. Enlaza a su tarjeta en el mapa.", // [CHECK]
+  "hubs.boxes.what": "Una caja de bendiciones es una caja comunitaria pequeña donde los vecinos dejan y toman comida y artículos básicos. Abre el mapa para ver los detalles actuales de cada caja.", // [CHECK]
+  "hubs.boxes.empty": "Por ahora no hay cajas de bendiciones en la lista.", // [CHECK]
+  "hubs.boxes.degraded": "No pudimos cargar la lista de cajas de bendiciones en este momento. Abre el mapa para verlas.", // [CHECK]
+  "hubs.boxes.openMap": "Abrir el mapa", // [CHECK]
+  "hubs.gardens.heading": "Huertos comunitarios y paisajes comestibles en el Condado de Pueblo", // [CHECK]
+  "hubs.gardens.section.garden": "Huertos comunitarios", // [CHECK]
+  "hubs.gardens.section.edible_landscape": "Paisajes comestibles", // [CHECK]
+  "hubs.gardens.introFree": "Hay {count} huertos comunitarios y paisajes comestibles gratuitos en el mapa del Condado de Pueblo, CO. Cada uno aparece abajo con su dirección y horario cuando los tenemos.", // [CHECK]
+  "hubs.gardens.introPlain": "Hay {count} huertos comunitarios y paisajes comestibles en el mapa del Condado de Pueblo, CO. Cada uno aparece abajo con su dirección y horario cuando los tenemos.", // [CHECK]
+  "resources.faq.heading": "Preguntas frecuentes", // [CHECK]
+  "resources.faq.q1": "¿Cómo solicito SNAP en el Condado de Pueblo?", // [CHECK]
+  "resources.faq.a1": "Puedes solicitarlo en línea con Colorado PEAK o con la aplicación MyCOBenefits, o llenar una solicitud en papel y entregarla en la oficina de servicios humanos de tu condado. El condado decide quién califica según los ingresos, los recursos y el tamaño del hogar. La Línea de Recursos Alimentarios, al 855-855-4626, puede ayudarte a solicitarlo por teléfono.", // [CHECK]
+  "resources.faq.q2": "¿Cómo solicito WIC?", // [CHECK]
+  "resources.faq.a2": "Llama a tu clínica WIC local para hacer una cita, o llena el formulario de inscripción en línea en coloradowicsignup.com y un miembro del personal de WIC se comunicará contigo en un plazo de 10 días. Al hacer tu cita, la clínica puede decirte qué documentos llevar.", // [CHECK]
+  "resources.faq.q3": "¿Qué debo llevar a una despensa de alimentos?", // [CHECK]
+  "resources.faq.a3": "Depende de la despensa, porque cada una fija sus propios requisitos. Revisa la página del lugar en este mapa para ver el horario y los detalles, y llama antes si hay un teléfono. La Línea de Recursos Alimentarios, al 855-855-4626, también puede indicarte despensas cerca de ti.", // [CHECK]
+  "resources.faq.q4": "¿Dónde puedo conseguir comida de emergencia hoy?", // [CHECK]
+  "resources.faq.a4": "Marca el 2-1-1 o el (866) 760-6489, o envía tu código postal por mensaje de texto al 898-211, y pregunta por comida de emergencia cerca de ti. La Línea de Recursos Alimentarios, al 855-855-4626 (de lunes a jueves de 8:30 a.m. a 4:30 p.m., viernes de 8 a.m. a 12 p.m.), puede conectarte con despensas y comedores comunitarios gratuitos. También puedes ver las despensas de este mapa y confirmar sus horarios antes de ir.", // [CHECK]
 };
 
 /** Substitute simple {key} placeholders. */

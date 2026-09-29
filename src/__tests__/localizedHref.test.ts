@@ -18,6 +18,16 @@ describe("localizedHref", () => {
       expect(localizedHref("/about", "es")).toBe("/es/about");
     });
 
+    test("the #709 hub paths get the /es prefix", () => {
+      expect(localizedHref("/food-pantries", "es")).toBe("/es/food-pantries");
+      expect(localizedHref("/snap-wic-stores", "es")).toBe("/es/snap-wic-stores");
+      expect(localizedHref("/community-gardens", "es")).toBe("/es/community-gardens");
+      expect(localizedHref("/blessing-boxes", "es")).toBe("/es/blessing-boxes");
+      expect(mirroredCounterpartHref("/es/blessing-boxes", "es")).toBe("/blessing-boxes");
+      expect(mirroredCounterpartHref("/es/food-pantries", "es")).toBe("/food-pantries");
+      expect(mirroredCounterpartHref("/snap-wic-stores", "en")).toBe("/es/snap-wic-stores");
+    });
+
     test("venue detail paths get the /es prefix", () => {
       expect(localizedHref("/venue/abc-123", "es")).toBe("/es/venue/abc-123");
     });

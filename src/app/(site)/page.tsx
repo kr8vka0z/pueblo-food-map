@@ -39,6 +39,11 @@ const HOME_CRAWL_LINKS = [
   { href: "/venues", label: "All food resources in Pueblo County" },
   { href: "/resources", label: "Food help programs (SNAP, WIC, 2-1-1)" },
   { href: "/about", label: "About Pueblo Food Map" },
+  // SEO Phase 3 hubs (#709)
+  { href: "/food-pantries", label: "Food pantries in Pueblo County" },
+  { href: "/snap-wic-stores", label: "Places that accept SNAP and WIC" },
+  { href: "/community-gardens", label: "Community gardens in Pueblo County" },
+  { href: "/blessing-boxes", label: "Blessing boxes in Pueblo County" },
 ] as const;
 
 const HOME_CRAWL_LINK_CLASS =

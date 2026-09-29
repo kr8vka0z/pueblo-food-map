@@ -294,8 +294,11 @@ function describeIrregularEntry(entry: IrregularSchedule, locale: Locale): strin
  * phrase's gender). A venue can have both weekly and irregular schedules at
  * once (e.g. Lynn Gardens Baptist Church, #400) — both sets of groups render
  * in the same sentence.
+ *
+ * Exported for the hub list pages (src/lib/hubPages.ts, #709), which show each
+ * place's hours alone rather than inside the full summary.
  */
-function buildHoursSentence(venue: Venue, locale: Locale): string | null {
+export function buildHoursSentence(venue: Venue, locale: Locale): string | null {
   const segments: string[] = [];
 
   if (venue.hours_weekly) {

@@ -138,9 +138,9 @@ existing tools, not a PR.
 
 Target: ≥ 90% of pantries with hours before Phase 3's by-day pages ship.
 
-### Phase 2: Make each venue page the best answer — merged to `dev` (#705)
+### Phase 2: Make each venue page the best answer — live on prod 2026-09-28 (#704)
 
-**Status:** merged to `dev` 2026-09-28 (PR #705, closes #704). Summary
+**Status:** live on prod 2026-09-28 via promotion #707 (PRs #705 and #706, issue #704). Summary
 sentence, richer JSON-LD, intent titles, and Nearby all shipped in
 `src/lib/venueSummary.ts` — see ARCHITECTURE.md "Answer-first venue pages"
 for the mechanism. `hours_irregular` coverage is code-complete but untested
@@ -169,6 +169,13 @@ still in progress), so that path is covered only by a synthetic fixture.
    let them drag down site quality.
 
 ### Phase 3: Hub pages for the queries people type (one PR)
+
+**Status:** PR A (#709) built `/food-pantries`, `/snap-wic-stores`,
+`/community-gardens` (each with an `/es` twin) and the `/resources` FAQ. PR B
+built item 2, `/blessing-boxes` (+ `/es`): force-dynamic, D1 read at request time,
+noindex on read failure. `/meal-sites` is a later PR. See ARCHITECTURE.md "Hub pages".
+Live counts today: 33 pantries, 50 SNAP, 8 WIC (the "49 WIC" below is stale; the
+pages compute counts from data).
 
 Static, server-rendered, `buildPageMetadata`, ItemList JSON-LD, a short FAQ,
 linked from `/venues`, the footer and the `/` nav block, and in the sitemap.

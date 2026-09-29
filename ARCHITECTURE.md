@@ -513,9 +513,10 @@ The rules it sets:
 
 - **Every venue page must be reachable through server-rendered links**, not only
   through the sitemap. `/` has a visually hidden `<nav>` (skip-link style) that
-  links to `/venues`, `/resources` and `/about`. `SiteFooter` links to `/venues`
-  and `/resources` on every other public page, including `/venue/<id>`. `/venues`
-  links to every venue. The map's own links only exist after JS runs.
+  links to `/venues`, `/resources`, `/about` and the three hub pages below
+  (the `/es` page has a Spanish twin). `SiteFooter` links to `/venues`,
+  `/resources` and the three hubs on every other public page, including
+  `/venue/<id>`. `/venues` links to every venue and to the three hubs. The map's own links only exist after JS runs.
 - **`/venue/<id>`** has a visible breadcrumb (Map › All places › name) plus a
   matching `BreadcrumbList` JSON-LD (`buildVenueBreadcrumbJsonLd`). The page's
   ODbL credit comes from `SiteFooter`.
@@ -574,6 +575,51 @@ header just above); the default (`true`, used by meta/JSON-LD) keeps it.
   as a prop — adds no client JS.
 
 ---
+
+### Hub pages (SEO/AEO plan Phase 3, #709)
+
+`/food-pantries`, `/snap-wic-stores` and `/community-gardens`, each with an `/es`
+twin (`localizedHref`'s `MIRRORED_STATIC` lists them). They are the pages meant to
+rank for the queries people type ("food pantry Pueblo", "SNAP stores Pueblo").
+`/blessing-boxes` (PR B, below) is the fourth, and the one dynamic exception.
+
+- **Server components with a `locale` prop**, not the `/venues` client-component
+  pattern: `src/components/HubPages.tsx` exports `FoodPantriesHub`,
+  `SnapWicHub` and `CommunityGardensHub`. The six `page.tsx` files are thin
+  wrappers (`buildPageMetadata` with `mirrored: true` on BOTH trees, then the hub
+  with a fixed locale), so the routes stay static and add no client JS beyond
+  the existing `PageNav`/`SiteFooter` chrome.
+- **List logic is pure** (`src/lib/hubPages.ts`): pantries sorted by name; SNAP/WIC
+  places by strict `=== true` with counts computed from the filtered list;
+  gardens then edible landscapes; `allFree()` gates "free" wording on
+  `FREE_CATEGORIES`; `hubAddress()` hides the OSM placeholder; `hubHours()` is
+  `buildHoursSentence` (venueSummary.ts). A place with no hours says
+  "Hours not listed. Check before you go." — never invented hours.
+- **JSON-LD** is the house builders fed the exact rendered list:
+  `buildVenueListJsonLd` (ItemList) on every hub, and `FaqSection` builds the
+  FAQPage from the same items array it renders, so the schema text can't drift
+  from the visible text. `/resources` gets the same `FaqSection` through
+  `ResourcesFaq`, passed to the client `ResourcesContent` as its `faq` prop. The
+  official source URLs and fetch dates for those answers are in the header of
+  `src/components/ResourcesFaq.tsx`.
+- **Sitemap and smoke test:** each hub has EN + ES entries with alternates;
+  `deploy-prod.yml` checks all eight (incl. `/blessing-boxes`) for 200 and the `/es` ones for `<html lang="es">`.
+- **`/blessing-boxes` (+ `/es`) is the dynamic one.** Boxes live only in D1, and
+  admin edits must show immediately, so both page files set
+  `export const dynamic = "force-dynamic"` (route-segment config; it affects only
+  those two routes — the build's route table shows them as ƒ and nothing else
+  changed). `src/lib/blessingBoxesHubData.ts` reads D1 through `getCloudflareContext().env.ADMIN_DB` +
+  `loadLiveBoxesForHub` (the boxes query + visible check-ins for `status`; same
+  SQL and mapper as `loadLiveBoxes`, minus its photo/adopter/needs reads; never
+  `getAdminDb`, never host contact), wrapped in React `cache()` so
+  `generateMetadata` and the page share one load per request. On a
+  D1 error it returns `degraded: true`: the page shows an honest message with a
+  map link (never "0 boxes"), no JSON-LD, and the metadata adds
+  `robots: { index: false, follow: true }`. Each box links to the map card at
+  `/?venue=<id>` (`/es?venue=<id>`). Read-only per REVIEW.md: no check-in,
+  photo, adopt or alert controls. No page caching (OpenNext's incremental cache
+  can't revalidate); the cost is 2 D1 reads (~30 box rows, then their check-ins) per page
+  view, and the upgrade path is an edge-cached read like `src/lib/edgeCache.ts`.
 
 ## Form-route triad
 

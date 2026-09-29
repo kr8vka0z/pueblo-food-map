@@ -187,6 +187,23 @@ describe("sitemap", () => {
       expect(es?.alternates?.languages).toEqual(expected);
     });
 
+    // #709: each hub is a mirrored pair with hreflang alternates both ways.
+    test.each(["/food-pantries", "/snap-wic-stores", "/community-gardens", "/blessing-boxes"])(
+      "%s and its /es twin are in the sitemap and point at each other",
+      async (path) => {
+        const entries = await sitemap();
+        const en = entries.find((e) => e.url === `${SITE_URL}${path}`);
+        const es = entries.find((e) => e.url === `${SITE_URL}/es${path}`);
+        const expected = {
+          en: `${SITE_URL}${path}`,
+          es: `${SITE_URL}/es${path}`,
+          "x-default": `${SITE_URL}${path}`,
+        };
+        expect(en?.alternates?.languages).toEqual(expected);
+        expect(es?.alternates?.languages).toEqual(expected);
+      },
+    );
+
     test("every venue's EN and ES entries point at each other", async () => {
       const entries = await sitemap();
       for (const v of venues) {

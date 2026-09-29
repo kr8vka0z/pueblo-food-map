@@ -168,14 +168,17 @@ still in progress), so that path is covered only by a synthetic fixture.
    stay "Crawled – not indexed" after two months, `noindex` them rather than
    let them drag down site quality.
 
-### Phase 3: Hub pages for the queries people type (one PR)
+### Phase 3: Hub pages for the queries people type — live on prod 2026-09-29 (#709)
 
-**Status:** PR A (#709) built `/food-pantries`, `/snap-wic-stores`,
-`/community-gardens` (each with an `/es` twin) and the `/resources` FAQ. PR B
-built item 2, `/blessing-boxes` (+ `/es`): force-dynamic, D1 read at request time,
-noindex on read failure. `/meal-sites` is a later PR. See ARCHITECTURE.md "Hub pages".
-Live counts today: 33 pantries, 50 SNAP, 8 WIC (the "49 WIC" below is stale; the
-pages compute counts from data).
+**Status:** live on prod 2026-09-29 via promotion #713 (issue #709). PR #710 built
+`/food-pantries`, `/snap-wic-stores`, `/community-gardens` (each with an `/es`
+twin) and the `/resources` FAQ. PR #712 built item 2, `/blessing-boxes` (+ `/es`):
+force-dynamic, 2 D1 reads at request time, noindex on read failure; prod listed
+28 live boxes at launch. `/meal-sites` waits until there's more than one meal
+site; by-day and area/ZIP pages stay deferred (item 6). See ARCHITECTURE.md
+"Hub pages". Counts at launch: 33 pantries, 50 SNAP, 8 WIC (the "49 WIC" below
+is stale; the pages compute counts from data). The new Spanish strings are on
+the #689 `[CHECK]` review list. Follow-up: footer tap targets (#711).
 
 Static, server-rendered, `buildPageMetadata`, ItemList JSON-LD, a short FAQ,
 linked from `/venues`, the footer and the `/` nav block, and in the sitemap.

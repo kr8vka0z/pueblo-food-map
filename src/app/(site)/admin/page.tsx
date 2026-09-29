@@ -30,8 +30,9 @@
  * missing token, missing account var, a Cloudflare outage, or a timeout all
  * return null, which this page renders as "Visitor numbers are unavailable
  * right now" while every other section renders normally (#680's "Done
- * when"). It is NOT inside the same try/catch as the D1 reads below,
- * deliberately: a Cloudflare hiccup must never fail the whole page closed.
+ * when"). It starts in the same Promise.all as the D1 reads (so their
+ * latencies overlap, not add) but can never fail the page closed, because it
+ * never rejects: a Cloudflare hiccup only nulls this one section.
  *
  * BoxHealthEntry is read here ONLY for its `health` status (rankNeedsHelp's
  * count) — this page never renders a sponsor name itself, so it never
@@ -145,11 +146,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   let needRows: Awaited<ReturnType<typeof loadNetworkNeedRows>>;
   let problemReportRows: Awaited<ReturnType<typeof loadProblemReports>>;
   let latestRefresh: { runId: string; createdAt: string; suggestedCount: number } | null;
+  let env: Awaited<ReturnType<typeof getCloudflareContext>>["env"];
+  let visitors: Awaited<ReturnType<typeof loadVisitorsAnalytics>>;
+  let mapUsage: Awaited<ReturnType<typeof loadMapUsageAnalytics>>;
 
   try {
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
     showActivity = identity.isOwner === true;
+    // Read only after the session check above. Both bindings are needed
+    // before the D1 burst below so the two analytics calls can start with it.
+    ({ env } = await getCloudflareContext({ async: true }));
 
     const publishToken = process.env.GITHUB_PUBLISH_TOKEN;
     const periodStart = periodStartMs(period, now);
@@ -167,6 +174,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       needRowsResult,
       problemReportsResult,
       latestRefreshRow,
+      visitorsResult,
+      mapUsageResult,
     ] = await Promise.all([
       db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
       db.prepare("SELECT COUNT(*) AS n FROM public_submissions WHERE status = 'pending'").first<{ n: number }>(),
@@ -178,11 +187,27 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       loadNetworkStatsData(db).catch(() => ({ boxes: [], checkins: [], photos: [], approvedSponsorCount: 0 })),
       loadNetworkNeedRows(db, cutoffIso),
       loadProblemReports(db),
-      db.prepare("SELECT run_id, created_at FROM change_proposals ORDER BY created_at DESC LIMIT 1").first<{
-        run_id: string;
-        created_at: string;
-      }>(),
+      // The suggested-count is a subquery, not a second read after this
+      // burst: a dependent query would cost one more D1 round trip.
+      db
+        .prepare(
+          "SELECT run_id, created_at, (SELECT COUNT(*) FROM change_proposals WHERE run_id = c.run_id) AS n " +
+            "FROM change_proposals c ORDER BY created_at DESC LIMIT 1",
+        )
+        .first<{ run_id: string; created_at: string; n: number }>(),
+      // WHY these two sit in the same Promise.all as the D1 reads: Cloudflare
+      // and PostHog are independent network calls (each up to a 4s timeout,
+      // and the in-memory caches are empty on a cold Worker, the usual first
+      // visit after sign-in). Awaiting them after the D1 burst stacked their
+      // latency on top of it. Neither ever rejects (both return null on any
+      // failure), so they still degrade independently of every D1 read, see
+      // this file's own header. PostHog's project id / API host are plain
+      // wrangler vars, read via the binding per AGENTS.md "Runtime reads".
+      loadVisitorsAnalytics(period, now),
+      loadMapUsageAnalytics(period, env.POSTHOG_PROJECT_ID, env.POSTHOG_API_HOST, now),
     ]);
+    visitors = visitorsResult;
+    mapUsage = mapUsageResult;
 
     venues = venuesResult.results;
     submissionsTotal = submissionsTotalRow?.n ?? 0;
@@ -200,14 +225,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     // real column data, which must read as "no refresh yet," never as an
     // Invalid Date.
     if (latestRefreshRow?.run_id) {
-      const suggestedRow = await db
-        .prepare("SELECT COUNT(*) AS n FROM change_proposals WHERE run_id = ?")
-        .bind(latestRefreshRow.run_id)
-        .first<{ n: number }>();
       latestRefresh = {
         runId: latestRefreshRow.run_id,
         createdAt: latestRefreshRow.created_at,
-        suggestedCount: suggestedRow?.n ?? 0,
+        suggestedCount: latestRefreshRow.n ?? 0,
       };
     } else {
       latestRefresh = null;
@@ -216,24 +237,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     handlePageAuthError(err);
   }
 
-  // Cloudflare degrades independently of every D1 read above — see this
-  // file's own header for why this call sits outside the try/catch.
-  const visitors = await loadVisitorsAnalytics(period, now);
-
   // Same "staging can never Publish" gate /admin/places uses (#673 pt.6) —
   // a live "waiting to publish" bar on staging would show test-only D1 data
-  // that can never actually be cleared by a Publish click there. Fetched
-  // once, before the PostHog load below, since both need this binding.
-  const { env } = await getCloudflareContext({ async: true });
+  // that can never actually be cleared by a Publish click there.
   const isStaging = !isProductionWorker(env);
 
-  // PostHog degrades independently too (#681) — same "never fail the whole
-  // page for one section's outage" posture as Visitors above. POSTHOG_API_HOST
-  // is optional (defaults inside posthogQuery.ts); POSTHOG_PROJECT_ID is a
-  // plain wrangler var (not a secret, matching CF_ANALYTICS_ACCOUNT_ID's own
-  // reasoning), read via the binding per AGENTS.md's "Runtime reads" — only
-  // the API key itself is process.env, since that one IS a secret.
-  const mapUsage = await loadMapUsageAnalytics(period, env.POSTHOG_PROJECT_ID, env.POSTHOG_API_HOST, now);
   const placeUsage = resolvePlaceUsageRows(mapUsage?.topPlaces ?? [], venues);
   const posthogProjectId = env.POSTHOG_PROJECT_ID;
 

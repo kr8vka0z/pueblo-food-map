@@ -127,12 +127,16 @@ describe("useMapFilters — open-now filter", () => {
   // as "everything is closed" to a hungry user. A venue with genuinely
   // unknown hours must now survive the filter; a venue whose hours ARE known
   // and currently reads closed must still be dropped (that part was correct).
-  test("a venue with no hours_weekly survives the Open now filter", () => {
+  // "No hours" means neither weekly NOR irregular hours (#400): an
+  // irregular-only venue has known hours and is correctly dropped when
+  // closed, so counting it here made this test fail on its closed days.
+  test("a venue with no known hours survives the Open now filter", () => {
     const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
-    const noHoursCount = allVenues.filter((v) => !v.hours_weekly).length;
+    const noHours = (v: (typeof allVenues)[number]) => !v.hours_weekly && !v.hours_irregular;
+    const noHoursCount = allVenues.filter(noHours).length;
     expect(noHoursCount).toBeGreaterThan(0); // sanity: fixture actually has some
     act(() => result.current.setFilterOpenNow(true));
-    const survivingNoHours = result.current.filteredVenues.filter((v) => !v.hours_weekly);
+    const survivingNoHours = result.current.filteredVenues.filter(noHours);
     expect(survivingNoHours.length).toBe(noHoursCount);
   });
 

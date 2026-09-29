@@ -32,9 +32,9 @@
  * localStorage (so future page loads still skip straight to the map).
  * Pass down as onShowWelcome to MapWrapper → HamburgerMenu.
  *
- * #202: MapWrapper and SplashScreen are loaded via next/dynamic (ssr:false)
- * to code-split their JS (vaul, Radix UI, geolocation hooks, venue data) into
- * async chunks. WHY: this component already returns null during SSR
+ * #202: MapWrapper is loaded via next/dynamic (ssr:false) to code-split its
+ * JS (vaul, Radix UI, geolocation hooks, venue data) into an async chunk.
+ * SplashScreen was too, until the mobile-LCP fix (static import below). WHY: this component already returns null during SSR
  * (hydration-safe), so ssr:false has no effect on server output — it only
  * moves parse/exec off the blocking initial JS load, reducing TBT on
  * throttled mobile.
@@ -66,19 +66,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { readSplashGate, markSplashSeen } from '@/lib/splashGate';
+// WHY a static import (mobile LCP): the splash's purpose line IS the LCP
+// element. As a next/dynamic({ssr:false}) chunk it was only discovered after
+// hydration, then loaded through Turbopack's async-loader -> chunk levels, so
+// on slow 4G the text painted ~4 s in (Lighthouse devtools throttling, local
+// prod build: LCP 4.3 s -> 2.8 s, element render delay ~400 ms -> ~50 ms with
+// this change). Statically importing it puts it in the same parallel chunk
+// wave as the rest of the page. Cost: the splash code (small; the i18n
+// dictionary loads a moment later for the map anyway) ships to returning
+// visitors who skip the splash. MapWrapper stays dynamic: it is the heavy part.
+import SplashScreen from '@/components/SplashScreen';
 
 // WHY dynamic + ssr:false: MapWrapper pulls in vaul, Radix UI, geolocation
 // hooks, and all venue UI. None of it is needed during SSR (this component
 // already returns null). Code-splitting it defers ~200KB of parse/exec off
 // the blocking JS window — the primary TBT lever for #202.
 const MapWrapper = dynamic(() => import('@/components/MapWrapper'), {
-  ssr: false,
-  loading: () => null,
-});
-
-// WHY dynamic: SplashScreen imports the geolocation hook and locale context
-// eagerly; deferring it alongside MapWrapper keeps the async chunk boundary clean.
-const SplashScreen = dynamic(() => import('@/components/SplashScreen'), {
   ssr: false,
   loading: () => null,
 });

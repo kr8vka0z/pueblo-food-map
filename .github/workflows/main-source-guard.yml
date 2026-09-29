@@ -1,0 +1,43 @@
+# Only three kinds of branch may open a PR into `main` (= production):
+#   release/*   the weekly release PR (release.yml)
+#   hotfix/*    an emergency patch for something broken on the live site
+#   publish-bot venue-data publishes from the admin Publish button (no version)
+# Everything else ships via `dev` and the next weekly release; a stray
+# dev -> main "promotion" would put unreleased, unversioned work on prod.
+#
+# The job name `main-source-guard` is deliberately stable: it is meant to be
+# added to the `main` ruleset's required checks (a manual settings change, not
+# something a workflow can do). Until then it is advisory.
+#
+# Head ref goes through `env`, not `${{ }}` in `run:` — branch names are
+# attacker-chosen text.
+name: Main source guard
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  main-source-guard:
+    name: main-source-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check head branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+        run: |
+          # A fork branch named `release/x` must not pass: same-repo only.
+          if [ "$IS_FORK" != "true" ]; then
+            case "$HEAD_REF" in
+              release/*|hotfix/*|publish-bot) echo "OK: $HEAD_REF -> main"; exit 0 ;;
+            esac
+          fi
+          echo "PRs into main must come from release/*, hotfix/*, or publish-bot (got: $HEAD_REF)." >&2
+          echo "Work merges to dev and ships in the next weekly release (see AGENTS.md 'Release schedule')." >&2
+          exit 1

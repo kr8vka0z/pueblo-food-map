@@ -9,13 +9,29 @@ How it's built: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md). This
 
 ---
 
+## Release schedule — weekly, Sunday
+
+All work merges to `dev` all week. Saturday night (`release.yml`, Sun 02:00 UTC) a `Release vX.Y.Z` PR is opened from `dev` into `main`; Kyle walks dev.pueblofoodmap.com on Sunday and merges it, which deploys prod, then tags `vX.Y.Z` and publishes the GitHub Release (`deploy-prod.yml`).
+
+- **Only three things reach `main`:** the weekly `release/*` PR, `hotfix/*` PRs, and `publish-bot` (venue data, no version). The `main-source-guard` check fails any other head branch.
+- **Agents never propose or open a `dev` → `main` promotion, and never ask Kyle to push to prod midweek.** Finished work "ships in the next Sunday release". Say that, nothing more.
+- **PR titles into `dev` must be Conventional Commits** (`type(scope)!: description`; the `PR title` check enforces it). The squash title is what the release tooling reads.
+- **Versions (semver):** major = something users relied on was removed or changed, set by hand only (`--version` or the workflow's `version` input; a `!` title never bumps major on its own); minor = any `feat`; patch = everything else.
+- **Changelog voice** (the prompt in `release.yml` says the same): Keep a Changelog headings, plain language for food-bank partners and the public. `### New`, `### Improved`, `### Fixed` only. One short sentence per bullet saying what a visitor or admin notices, PR link at the end. Leave out dependency bumps, CI, docs and refactors unless visible; roll security updates into one "Security updates." bullet. No jargon.
+- **Merge methods:** feature PRs into `dev` = squash. `release/*` and `hotfix/*` into `main` = squash (`main` requires linear history). The automatic `main` → `dev` sync PR = **merge commit** (bot only; never squash it). Nobody else merges into `main` or `dev` with a merge commit.
+- **Hotfix lane — an emergency, only for something broken on the live site; say so explicitly.** Branch `hotfix/<slug>` from `main`, fix + test, run `node scripts/release/prepare.mjs --out /tmp/prs.md` (patch bump from the newest `v*` tag), add a `## [X.Y.Z] - date` section to CHANGELOG.md under `## [Unreleased]`, squash-merge the PR into `main`. Same tag/release path on merge; the fix reaches `dev` through the automatic sync below. If a weekly release PR is open, close it and re-run `release.yml` after the sync lands, or the two changelogs collide.
+- **Back-sync (`main` → `dev`):** after ANY push to `main` (release, hotfix, or `publish-bot` venue data), `deploy-prod.yml`'s `sync-dev` job opens a `sync/main-<sha>` PR into `dev` and enables auto-merge with a merge commit, unless `dev` already contains `main`. That is what puts hotfix code and venue data on staging, brings the version bump and changelog to `dev`, and stops the next release PR from conflicting (squash releases leave the two histories diverged). If the sync PR shows conflicts, resolve them on the `sync/*` branch and keep the merge commit. Nobody edits CHANGELOG.md by hand on `dev`.
+- **First release / manual cut** (`schedule`/`workflow_dispatch` only run once `release.yml` is on `main`): from a `dev` checkout run `node scripts/release/prepare.mjs --version X.Y.Z`, write the CHANGELOG section per the voice above (`bash scripts/release/section.sh X.Y.Z` proves it parses), push `release/vX.Y.Z`, open the PR into `main`, and push the lightweight tag `cut/vX.Y.Z` on the dev commit you cut from. `prepare.mjs` starts next week's PR list at the newest `cut/*` tag; without one it falls back to the newest `v*` tag.
+
+---
+
 ## Hosting and deploys — Cloudflare Workers via OpenNext
 
 - Prod: https://pueblofoodmap.com/. Staging: https://dev.pueblofoodmap.com/. The direct Worker, which bypasses the CDN, is https://pueblo-food-map.kyle-boyd.workers.dev/.
 - **Deploys go only through GitHub Actions.** A push to `main` runs `deploy-prod.yml`; a push to `dev` runs `deploy-dev.yml`. Never run `npm run deploy` or `wrangler deploy` by hand. Workers Builds must stay disconnected, because reconnecting it double-deploys every push. `deploy-prod.yml` smoke-tests `/`, `/venues`, one `/venue/<id>`, `/es`, `/es/venues`, one `/es/venue/<id>`, the four SEO hubs (`/food-pantries`, `/snap-wic-stores`, `/community-gardens`, `/blessing-boxes`) and their `/es` twins, `/sitemap.xml`, `/robots.txt` and `/llms.txt` (200), the `/es` pages for `<html lang="es">` in the response body, an unmatched URL (404), and the noindex header policy after each deploy.
 - **Stranded `main`:** if `main`'s tip ≠ the last Deploy Prod run's `headSha` (`gh run list --workflow "Deploy Prod" --limit 1 --json headSha`), run `deploy-prod.yml` via `workflow_dispatch`.
-- **Branch sync:** Dependabot targets `dev`. After each squash promotion, true-merge `main` back into `dev` (recipe in REVIEW.md). Check that the branches match with `git diff --stat origin/dev origin/main`, never with a commit count.
-- **Rollback (code only):** `bunx wrangler deployments list --name <worker>`, then `bunx wrangler rollback <id> --name <worker> -y`. The worker is `pueblo-food-map` for prod or `pueblo-food-map-staging` for staging. You can also use Dashboard → Workers & Pages → `pueblo-food-map` → Deployments, which also has the build logs. Rollback does not undo D1 migrations, and `main` still holds the bad commit, so follow up with a `git revert` PR into `dev` and promote it.
+- **Branch sync:** Dependabot targets `dev`. After every push to `main`, `deploy-prod.yml` opens the auto-merging `main` → `dev` sync PR (see Release schedule). Check that the branches match with `git diff --stat origin/dev origin/main`, never with a commit count.
+- **Rollback (code only):** `bunx wrangler deployments list --name <worker>`, then `bunx wrangler rollback <id> --name <worker> -y`. The worker is `pueblo-food-map` for prod or `pueblo-food-map-staging` for staging. You can also use Dashboard → Workers & Pages → `pueblo-food-map` → Deployments, which also has the build logs. Rollback does not undo D1 migrations, and `main` still holds the bad commit, so follow up with a `git revert` PR into `dev`; it ships in the next release, or as a `hotfix/*` if prod is broken now.
 - **Discoverability / SEO traps — a green build doesn't prove a page works on this stack:**
   - Static pages with `dynamicParams = false` need `open-next.config.ts`'s `staticAssetsIncrementalCache` override. Without it every prerendered dynamic path 404s; this caused a 10-day outage.
   - Only `pueblofoodmap.com` may be indexed: `custom-worker.ts` noindexes every other host (`src/lib/indexingHost.ts`), and `deploy-prod.yml` fails if the canonical host ever gets the header. Keep venue pages reachable through server-rendered links, not just the sitemap (ARCHITECTURE.md "Crawlability and indexing").
@@ -66,12 +82,12 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 
 ## Promotion checklist — D1 migrations
 
-`deploy-dev.yml` applies migrations to staging automatically. **Production migrations are a manual step that Kyle approves.** Before promoting `dev` → `main`:
+`deploy-dev.yml` applies migrations to staging automatically. **Production migrations are a manual step that Kyle approves.** Before merging the weekly release PR (or a hotfix) into `main`:
 
 1. See what's pending: `npx wrangler d1 migrations list pueblo-food-map-admin --remote`.
 2. **Export first:** `wrangler d1 export pueblo-food-map-admin --remote --output <file>`, saved to `~/Backups/pfm-prod-d1/` on the Mac. A rollback can't undo a migration.
 3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, `0016`, and `0017` are not idempotent (they fail with "duplicate column" on a re-run).
-4. Confirm the Worker has every runtime secret in the table above, then promote and back-merge.
+4. Confirm the Worker has every runtime secret in the table above, then merge the release (the sync back to `dev` is automatic).
 5. If a migration changed published venue fields, the public map only updates at the next admin **Publish**. The Publish bar only shows when `updated_at > published_at`, so data migrations must set `updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')` on the rows they change.
 
 To run wrangler against prod from the Mac (wrangler isn't logged in there):

@@ -72,3 +72,4 @@ OPS-SECRETS.local.md
 # Scratch Playwright measuring harness (#233/#659) -- never committed, see
 # the touch-target audit PR description for how it was driven.
 /.audit-233/
+.release-prs.md

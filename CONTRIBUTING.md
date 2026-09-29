@@ -35,13 +35,16 @@ performance).
      hidden behind the bottom bar.
    - In Chrome DevTools, throttle CPU to **4×** and network to **Slow 4G**, and
      re-check the interaction that changed.
-5. Open a pull request against `dev` (never `main`). CI runs lint,
-   typecheck, tests, and build on every PR and must pass before merge.
-   `dev` deploys to staging (`dev.pueblofoodmap.com`); maintainers promote
-   `dev` to `main` (production) separately.
+5. Open a pull request against `dev` (never `main`). Title it as a
+   Conventional Commit (`feat(map): ...`, `fix: ...`) — a check enforces it,
+   because the title becomes the commit message the release notes are built
+   from. CI runs lint, typecheck, tests, and build on every PR and must pass
+   before merge. `dev` deploys to staging (`dev.pueblofoodmap.com`). Merged
+   work ships to production in the maintainers' weekly release (cut Saturday
+   night, merged Sunday) — there is no mid-week promotion.
 
 CodeRabbit reviews pull requests into `main` and `dev` (see
-`.coderabbit.yaml`; drafts, Dependabot, the release bot, and
+`.coderabbit.yaml`; drafts, Dependabot, the weekly release PR, and
 "Publish venues update" PRs are skipped). While the repository has fewer
 than 10 stars, CodeRabbit does not start a review on its own — comment
 `@coderabbitai review` on the pull request to request one, and again after

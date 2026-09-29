@@ -188,7 +188,7 @@ describe("sitemap", () => {
     });
 
     // #709: each hub is a mirrored pair with hreflang alternates both ways.
-    test.each(["/food-pantries", "/snap-wic-stores", "/community-gardens"])(
+    test.each(["/food-pantries", "/snap-wic-stores", "/community-gardens", "/blessing-boxes"])(
       "%s and its /es twin are in the sitemap and point at each other",
       async (path) => {
         const entries = await sitemap();

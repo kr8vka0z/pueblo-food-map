@@ -186,6 +186,7 @@ describe("server-rendered SEO content", () => {
       "/food-pantries",
       "/snap-wic-stores",
       "/community-gardens",
+      "/blessing-boxes",
     ]);
   });
 

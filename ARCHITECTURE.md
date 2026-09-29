@@ -581,7 +581,7 @@ header just above); the default (`true`, used by meta/JSON-LD) keeps it.
 `/food-pantries`, `/snap-wic-stores` and `/community-gardens`, each with an `/es`
 twin (`localizedHref`'s `MIRRORED_STATIC` lists them). They are the pages meant to
 rank for the queries people type ("food pantry Pueblo", "SNAP stores Pueblo").
-`/blessing-boxes` is a later PR.
+`/blessing-boxes` (PR B, below) is the fourth, and the one dynamic exception.
 
 - **Server components with a `locale` prop**, not the `/venues` client-component
   pattern: `src/components/HubPages.tsx` exports `FoodPantriesHub`,
@@ -603,7 +603,23 @@ rank for the queries people type ("food pantry Pueblo", "SNAP stores Pueblo").
   official source URLs and fetch dates for those answers are in the header of
   `src/components/ResourcesFaq.tsx`.
 - **Sitemap and smoke test:** each hub has EN + ES entries with alternates;
-  `deploy-prod.yml` checks all six for 200 and the `/es` ones for `<html lang="es">`.
+  `deploy-prod.yml` checks all eight (incl. `/blessing-boxes`) for 200 and the `/es` ones for `<html lang="es">`.
+- **`/blessing-boxes` (+ `/es`) is the dynamic one.** Boxes live only in D1, and
+  admin edits must show immediately, so both page files set
+  `export const dynamic = "force-dynamic"` (route-segment config; it affects only
+  those two routes — the build's route table shows them as ƒ and nothing else
+  changed). `src/lib/blessingBoxesHubData.ts` reads D1 through `getCloudflareContext().env.ADMIN_DB` +
+  `loadLiveBoxesForHub` (the boxes query + visible check-ins for `status`; same
+  SQL and mapper as `loadLiveBoxes`, minus its photo/adopter/needs reads; never
+  `getAdminDb`, never host contact), wrapped in React `cache()` so
+  `generateMetadata` and the page share one load per request. On a
+  D1 error it returns `degraded: true`: the page shows an honest message with a
+  map link (never "0 boxes"), no JSON-LD, and the metadata adds
+  `robots: { index: false, follow: true }`. Each box links to the map card at
+  `/?venue=<id>` (`/es?venue=<id>`). Read-only per REVIEW.md: no check-in,
+  photo, adopt or alert controls. No page caching (OpenNext's incremental cache
+  can't revalidate); the cost is 2 D1 reads (~30 box rows, then their check-ins) per page
+  view, and the upgrade path is an edge-cached read like `src/lib/edgeCache.ts`.
 
 ## Form-route triad
 

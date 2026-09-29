@@ -1,6 +1,7 @@
 /**
  * Pure list builders for the SEO hub pages (SEO/AEO plan Phase 3, #709):
- * /food-pantries, /snap-wic-stores, /community-gardens (+ /es twins).
+ * /food-pantries, /snap-wic-stores, /community-gardens (+ /es twins), plus the
+ * /blessing-boxes list helpers (PR B).
  *
  * WHY here and not in the page files: Next rejects unknown named exports from
  * a page file, and both trees (EN + /es) plus the tests import these. No
@@ -18,6 +19,8 @@
 
 import type { Venue } from "@/types/venue";
 import type { Locale } from "@/lib/i18n";
+import { localizedHref } from "@/lib/localizedHref";
+import { SITE_URL } from "@/lib/site";
 import { FREE_CATEGORIES, PLACEHOLDER_ADDRESS, buildHoursSentence } from "@/lib/venueSummary";
 
 const byName = (a: Venue, b: Venue) => a.name.localeCompare(b.name);
@@ -68,4 +71,39 @@ export function hubAddress(venue: Venue): string | null {
 /** Hours in plain words ("Hours: Thursdays, 11am – 2pm."), or null when the place has none. */
 export function hubHours(venue: Venue, locale: Locale): string | null {
   return buildHoursSentence(venue, locale);
+}
+
+// ─── /blessing-boxes (PR B) ─────────────────────────────────────────────────
+// Boxes come from D1 at request time (PublicBlessingBox), not the build-time
+// snapshot, but the list rules are the same pure shape as the hubs above.
+
+/** Every live box, sorted by name (copy — never mutates the loader's array). */
+export function boxesForHub<T extends { name: string }>(list: T[]): T[] {
+  return [...list].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Map deep link for a box: the home page reads `?venue=<id>` and opens that
+ * pin's card. `localizedHref("/", tree)` gives "/" or "/es" — both mount the
+ * same HomePageClient. The id is encoded: box ids come from admin-entered rows.
+ */
+export function boxDeepLink(id: string, locale: Locale): string {
+  return `${localizedHref("/", locale)}?venue=${encodeURIComponent(id)}`;
+}
+
+/** ItemList JSON-LD for the rendered box list: absolute deep-link URLs, positions 1..n. */
+export function buildBoxListJsonLd(
+  boxes: { id: string; name: string }[],
+  locale: Locale,
+): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: boxes.map((b, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${SITE_URL}${boxDeepLink(b.id, locale)}`,
+      name: b.name,
+    })),
+  };
 }

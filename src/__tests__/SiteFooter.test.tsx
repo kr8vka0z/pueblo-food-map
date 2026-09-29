@@ -72,6 +72,7 @@ describe("SiteFooter — crawl links", () => {
     expect(screen.getByRole("link", { name: t("footer.foodPantries", "en") }).getAttribute("href")).toBe("/food-pantries");
     expect(screen.getByRole("link", { name: t("footer.snapWic", "en") }).getAttribute("href")).toBe("/snap-wic-stores");
     expect(screen.getByRole("link", { name: t("footer.gardens", "en") }).getAttribute("href")).toBe("/community-gardens");
+    expect(screen.getByRole("link", { name: t("footer.boxes", "en") }).getAttribute("href")).toBe("/blessing-boxes");
   });
 
   test("rewrites the three hubs to /es/... on the real /es tree", () => {
@@ -83,6 +84,7 @@ describe("SiteFooter — crawl links", () => {
     expect(screen.getByRole("link", { name: t("footer.foodPantries", "es") }).getAttribute("href")).toBe("/es/food-pantries");
     expect(screen.getByRole("link", { name: t("footer.snapWic", "es") }).getAttribute("href")).toBe("/es/snap-wic-stores");
     expect(screen.getByRole("link", { name: t("footer.gardens", "es") }).getAttribute("href")).toBe("/es/community-gardens");
+    expect(screen.getByRole("link", { name: t("footer.boxes", "es") }).getAttribute("href")).toBe("/es/blessing-boxes");
   });
 
   // #689 PR 2 — the real /es tree: hrefs rewrite to /es/... via localizedHref.

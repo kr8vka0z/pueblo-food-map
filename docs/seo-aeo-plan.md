@@ -171,8 +171,9 @@ still in progress), so that path is covered only by a synthetic fixture.
 ### Phase 3: Hub pages for the queries people type (one PR)
 
 **Status:** PR A (#709) built `/food-pantries`, `/snap-wic-stores`,
-`/community-gardens` (each with an `/es` twin) and the `/resources` FAQ. Items 2
-(`/blessing-boxes`) and `/meal-sites` are later PRs. See ARCHITECTURE.md "Hub pages".
+`/community-gardens` (each with an `/es` twin) and the `/resources` FAQ. PR B
+built item 2, `/blessing-boxes` (+ `/es`): force-dynamic, D1 read at request time,
+noindex on read failure. `/meal-sites` is a later PR. See ARCHITECTURE.md "Hub pages".
 Live counts today: 33 pantries, 50 SNAP, 8 WIC (the "49 WIC" below is stale; the
 pages compute counts from data).
 

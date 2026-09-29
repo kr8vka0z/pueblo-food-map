@@ -25,6 +25,7 @@ import {
   mapRowToPublicBox,
   mapRowsToPublicBoxes,
   loadLiveBoxes,
+  loadLiveBoxesForHub,
   loadLiveBoxById,
   loadVisibleCheckins,
   loadVisibleCheckinsForVenues,
@@ -340,6 +341,48 @@ function makeFakeDb(
   };
   return { prepare } as unknown as D1Database;
 }
+
+describe("loadLiveBoxesForHub (slim /blessing-boxes loader)", () => {
+  /** Wraps makeFakeDb and records every SQL string prepared. */
+  function recordingDb(rows: BoxJoinRow[], checkins: Record<string, CheckinStatusInput[]> = {}) {
+    const inner = makeFakeDb(rows, {}, checkins) as unknown as { prepare: (sql: string) => unknown };
+    const queries: string[] = [];
+    const db = {
+      prepare: (sql: string) => {
+        queries.push(sql);
+        return inner.prepare(sql);
+      },
+    } as unknown as D1Database;
+    return { db, queries };
+  }
+
+  test("issues exactly 2 reads: live boxes, then visible check-ins", async () => {
+    const { db, queries } = recordingDb([makeRow({ id: "a" }), makeRow({ id: "b" })]);
+    await loadLiveBoxesForHub(db, NOW);
+    expect(queries).toHaveLength(2);
+    expect(queries[0]).toContain("FROM venues");
+    expect(queries[1]).toContain("box_checkins");
+    expect(queries.join("\n")).not.toMatch(/box_photos|box_adopters/);
+  });
+
+  test("status comes from each box's own check-ins; extras are empty defaults", async () => {
+    const { db } = recordingDb(
+      [makeRow({ id: "a" }), makeRow({ id: "b" })],
+      { a: [ci({ kind: "filled" })], b: [ci({ kind: "empty" })] },
+    );
+    const boxes = await loadLiveBoxesForHub(db, NOW);
+    expect(boxes.map((b) => b.box.status)).toEqual(["stocked", "empty"]);
+    expect(boxes[0].box.latestPhoto).toBeNull();
+    expect(boxes[0].box.adopters).toEqual([]);
+    expect("host_contact" in boxes[0]).toBe(false);
+  });
+
+  test("no boxes -> [] after a single read (check-ins skipped)", async () => {
+    const { db, queries } = recordingDb([]);
+    expect(await loadLiveBoxesForHub(db, NOW)).toEqual([]);
+    expect(queries).toHaveLength(1);
+  });
+});
 
 describe("loadLiveBoxes / loadLiveBoxById", () => {
   test("loadLiveBoxes maps every row from db.all()", async () => {

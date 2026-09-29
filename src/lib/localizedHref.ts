@@ -30,6 +30,7 @@ const MIRRORED_STATIC = new Set([
   "/food-pantries",
   "/snap-wic-stores",
   "/community-gardens",
+  "/blessing-boxes",
 ]);
 
 function isMirrored(basePath: string): boolean {

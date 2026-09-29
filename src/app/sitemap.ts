@@ -10,8 +10,8 @@
  * `/boxes` was listed here but never existed (a 404 in every crawl), and each
  * `/box/<id>` is a client-side redirect shell into the map card (see
  * src/app/(site)/box/[id]/page.tsx), not a page worth indexing — it's `noindex` now.
- * Boxes come back to the sitemap as the planned read-only `/blessing-boxes`
- * list (REVIEW.md). With the live D1 read gone, this file is build-time data
+ * Boxes are in the sitemap as the read-only `/blessing-boxes` list (+ /es twin,
+ * #709 PR B; REVIEW.md). That page reads D1 itself; this file does not. With the live D1 read gone, this file is build-time data
  * only again and no longer `force-dynamic`. src/__tests__/seo.test.ts checks
  * that every static URL below maps to a real page.tsx.
  *
@@ -121,6 +121,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 0.8,
       alternates: esAlternates("/community-gardens"),
+    },
+    // /blessing-boxes (#709 PR B): rendered per request from D1 (not part of
+    // the Publish snapshot), so the list is always current; same tier as the hubs.
+    {
+      url: `${SITE_URL}/blessing-boxes`,
+      changeFrequency: "weekly",
+      priority: 0.8,
+      alternates: esAlternates("/blessing-boxes"),
+    },
+    {
+      url: `${SITE_URL}/es/blessing-boxes`,
+      changeFrequency: "weekly",
+      priority: 0.8,
+      alternates: esAlternates("/blessing-boxes"),
     },
     {
       // WHY 0.7: a browse/discovery page (the crawlable counterpart to the

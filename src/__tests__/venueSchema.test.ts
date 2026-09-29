@@ -18,7 +18,7 @@ import {
   serializeJsonLd,
 } from "@/lib/venueSchema";
 import { venues } from "@/data/venues";
-import { SITE_URL, SITE_NAME } from "@/lib/site";
+import { SITE_URL, SITE_NAME, SITE_CONTACT_EMAIL } from "@/lib/site";
 import { t } from "@/lib/i18n";
 import type { Venue } from "@/types/venue";
 
@@ -402,6 +402,11 @@ describe("buildWebSiteJsonLd", () => {
     expect(organization["@type"]).toBe("Organization");
     expect(organization["@id"]).toBe(`${SITE_URL}/#organization`);
     expect(Array.isArray(organization["sameAs"])).toBe(true);
+  });
+
+  test("Organization carries the public contact email", () => {
+    expect(organization["email"]).toBe(SITE_CONTACT_EMAIL);
+    expect(SITE_CONTACT_EMAIL).toBe("hello@pueblofoodmap.com");
   });
 
   // SEO/AEO plan Phase 0: sameAs is "the same entity elsewhere" — never the

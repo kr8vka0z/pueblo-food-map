@@ -12,7 +12,7 @@
 
 import type { Venue } from "@/types/venue";
 import { venues } from "@/data/venues";
-import { SITE_URL, SITE_NAME } from "@/lib/site";
+import { SITE_URL, SITE_NAME, SITE_CONTACT_EMAIL } from "@/lib/site";
 import { DISPLAY_DAY_KEYS, slotToIsoTimes } from "@/lib/hours";
 import { t, type Locale } from "@/lib/i18n";
 import {
@@ -400,6 +400,7 @@ export function buildWebSiteJsonLd(locale: Locale = "en"): Record<string, unknow
         "@id": `${SITE_URL}/#organization`,
         name: SITE_NAME,
         url: SITE_URL,
+        email: SITE_CONTACT_EMAIL,
         logo: `${SITE_URL}/icons/icon-512.png`,
         areaServed: {
           "@type": "AdministrativeArea",

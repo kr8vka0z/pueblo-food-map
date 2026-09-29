@@ -73,7 +73,7 @@ Unchanged from v1. They're the test set for every phase and for measurement (§4
 ### Phase 0: Get crawled and measured (one small PR + dashboard tasks, do first)
 
 **Status:** code items 1–4 are built on `claude/seo-aeo-plan-review-ss66kh`
-(PR into `dev`). Items 5–8 are Kyle's.
+(PR into `dev`). Items 5–7 are done (2026-09-29). Item 8 is Kyle's.
 
 Code (one PR into `dev`):
 
@@ -105,14 +105,16 @@ Code (one PR into `dev`):
 
 Dashboard and ops (no code):
 
-5. **Search Console and Bing Webmaster Tools** (Kyle, later). Verify via a DNS TXT record in
-   Cloudflare, submit the sitemap, and **request indexing** for `/`, `/venues`,
-   `/resources` and `/about`. Bing matters because ChatGPT search and Copilot
-   use its index. Bing WMT can import from Search Console in one step.
-6. **IndexNow**: turn on Cloudflare Crawler Hints (a zone toggle).
-7. **GitHub repo description.** It still says "POC", and the GitHub page is
-   what search currently shows for our name. Rewrite it as one plain sentence
-   about the live service.
+5. **Search Console and Bing Webmaster Tools** — **done 2026-09-29.** Both are
+   live. Google Search Console is a domain property, verified with a DNS TXT
+   record in Cloudflare. The sitemap is submitted to both: Google shows Success
+   (234 URLs), Bing is still processing. Indexing is requested in Google for
+   `/`, `/food-pantries`, `/snap-wic-stores` and `/es`. Bing matters because
+   ChatGPT search and Copilot use its index.
+6. **IndexNow** — **done 2026-09-29.** Cloudflare Crawler Hints (a zone toggle)
+   is on.
+7. **GitHub repo description** — **done 2026-09-29.** It no longer says "POC";
+   it's one plain sentence about the live service.
 8. **Baseline prompt panel.** Ask ChatGPT, Perplexity, Google (AI Overview) and
    Copilot 12 fixed questions from §2. Record who gets cited. Re-run monthly.
    The 2026-09-28 web-search baseline is in §1: we are cited for none of them.
@@ -254,7 +256,7 @@ and likelihood:
 The full contact list is in [`seo-outreach.md`](seo-outreach.md). Kyle is
 doing the outreach.
 
-5. **`/llms.txt`** (cheap, unproven) and a published **open dataset**
+5. **`/llms.txt`** (cheap, unproven; shipped 2026-09-29, see "2026-09-29 audit follow-ups") and a published **open dataset**
    (JSON/CSV linked from `/about`) to earn reuse and citations.
 
 ---
@@ -290,9 +292,27 @@ doing the outreach.
 
 | Question | Decision |
 |---|---|
-| Search Console / Bing Webmaster Tools | Kyle sets them up later (Phase 0 item 5). |
+| Search Console / Bing Webmaster Tools | Kyle sets them up later (Phase 0 item 5). **Done 2026-09-29** (see Phase 0). |
 | `/blessing-boxes` read-only list | Approved; REVIEW.md updated. |
 | Flat hub URLs (`/food-pantries`) | Approved. |
 | Partner outreach | Kyle, working from [`seo-outreach.md`](seo-outreach.md). |
 | Hours / phone data pass (Phase 1) | Kyle, in progress; out of scope for code PRs. |
 | Spanish `/es` tree (Phase 4) | **P1**, specced in #689 — live on prod 2026-09-28 (#695, #697, #698 via #702). The `[CHECK]` native-speaker review is still open on #689. |
+
+---
+
+## 7. 2026-09-29 audit follow-ups
+
+- **`/llms.txt`** shipped in this PR: a static `public/llms.txt`, smoke-tested in
+  `deploy-prod.yml`. It has no counts, so it can't go stale.
+- **Home mobile LCP.** The splash line was the slow element: its code loaded
+  only after hydration, through several rounds of chunk fetches. It is now in
+  the first chunk wave, and PostHog no longer downloads its unused surveys
+  bundle. Numbers and what's left are in this PR's description.
+- **`/about` contact:** done in this PR. It now shows `hello@pueblofoodmap.com`
+  (no personal name, per Kyle), and the Organization JSON-LD carries the same
+  `email`. A Wikidata item for the Organization is filed as a P2 issue.
+- **First AI prompt-panel run and the `/es` indexing check** are due about
+  2026-10-13 (tracked on #689).
+- **`/` was already indexed on 2026-09-29**, but the brand query still ranks the
+  GitHub repo first. That's authority, so it's Phase 5 work, not a code fix.

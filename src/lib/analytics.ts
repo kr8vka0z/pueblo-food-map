@@ -212,6 +212,11 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
     persistence: "memory",
     person_profiles: "never",
     autocapture: true,
+    // No PostHog surveys exist (project 630731 has zero, checked 2026-09-29) and
+    // the site never renders one, yet posthog-js fetched its ~30 KB surveys.js
+    // bundle on every page whenever the project's surveys flag was on. Turning
+    // it off only skips that download; it changes nothing that is collected.
+    disable_surveys: true,
     capture_pageview: "history_change",
     // Session replay is ON (Kyle, 2026-09-26 — reverses the issue's original
     // "replay OFF" default; see #681, the admin dashboard mockup). Still

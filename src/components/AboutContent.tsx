@@ -22,7 +22,7 @@ import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { pageDocumentTitle } from "@/lib/site";
+import { pageDocumentTitle, SITE_CONTACT_EMAIL } from "@/lib/site";
 import { formatPublishedDate } from "@/lib/dataFreshness";
 import SiteFooter from "@/components/SiteFooter";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
@@ -158,6 +158,18 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
             ))}
           </div>
         </section>
+
+        {/* Contact: one shared address, no personal name (trust signal, SEO plan) */}
+        <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
+          {t("about.contact.body", locale)}{" "}
+          <a
+            href={`mailto:${SITE_CONTACT_EMAIL}`}
+            className="underline text-[var(--color-sage-700)] hover:text-[var(--color-sage-600)]"
+          >
+            {SITE_CONTACT_EMAIL}
+          </a>
+          .
+        </p>
 
         {/* Suggest CTA */}
         <section aria-labelledby="suggest-heading" className="pt-2">

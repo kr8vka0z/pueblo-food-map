@@ -535,6 +535,14 @@ The rules it sets:
   to see its noindex and drop it. `deploy-prod.yml`'s smoke test fails if the
   canonical host ever sends the header, or if workers.dev stops sending it.
 
+- **`/llms.txt`** is a hand-written static file, `public/llms.txt` (llmstxt.org
+  format). Cloudflare Workers Static Assets serves it before the Worker runs
+  (`text/plain; charset=utf-8`, no route or middleware involved, same as
+  `sw.js`), and `deploy-prod.yml` smoke-tests it. It carries no counts, so it
+  can't go stale; update it by hand when a public page is added or renamed.
+- **AI crawler policy** lives in `src/app/robots.ts` (WHY in its header):
+  answer/search bots are allowed, training-only crawlers are blocked.
+
 ### Answer-first venue pages (SEO/AEO plan Phase 2, `src/lib/venueSummary.ts`)
 
 `buildVenueSummary(venue, locale, options?)` assembles a venue's answer-first

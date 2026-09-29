@@ -63,14 +63,25 @@ jobs:
 
       # One open release PR at a time: cutting a second while last week's is
       # unreviewed would ship two overlapping changelogs.
-      - name: Skip if a release PR is already open
+      # Also skips while a main -> dev sync PR is still open: cutting from a dev
+      # that doesn't yet contain main would base the release on stale history
+      # and the release PR would conflict.
+      - name: Skip if a release or sync PR is already open
         id: open
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           n=$(gh pr list --base main --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("release/"))] | length')
-          echo "open=$n" >> "$GITHUB_OUTPUT"
-          [ "$n" = "0" ] || echo "::warning::A release PR is already open; skipping this cut."
+          s=$(gh pr list --base dev --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("sync/main-"))] | length')
+          echo "open=$((n + s))" >> "$GITHUB_OUTPUT"
+          if [ "$n" != "0" ]; then
+            echo "::warning::A release PR is already open; skipping this cut."
+            echo "Weekly release skipped: a release PR is already open." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "$s" != "0" ]; then
+            echo "::warning::A main -> dev sync PR is still open; skipping this cut until it merges."
+            echo "Weekly release skipped: an open sync/main-* PR into dev must merge first." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       # --dry-run: only picks the version and writes the PR list. The version
       # bump happens AFTER the model step so the model can't touch package files.
@@ -101,6 +112,16 @@ jobs:
       # allowed_bots "*": a schedule run's actor can be a bot, which the action
       # otherwise refuses. Safe here because this workflow has no issue/PR
       # trigger an outsider could use to feed the model a prompt.
+      #
+      # Tools are scoped because checkout leaves the App token in .git/config
+      # (extraheader): the model gets Read plus Edit on CHANGELOG.md only, no
+      # Bash, and is denied .git explicitly. Both `.git/**` and `./.git/**`
+      # spellings are listed since path-rule anchoring differs by version. The
+      # hash + grep checks in the next steps are the backstop if a rule is wrong.
+      - name: Snapshot git config
+        if: steps.prep.outputs.run == 'true'
+        run: sha256sum .git/config > "$RUNNER_TEMP/gitconfig.sha"
+
       - name: Write changelog section
         if: steps.prep.outputs.run == 'true'
         uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1
@@ -138,7 +159,8 @@ jobs:
 
             Edit only CHANGELOG.md. Do not run git.
           claude_args: |
-            --allowedTools "Read,Edit"
+            --allowedTools "Read,Edit(CHANGELOG.md)"
+            --disallowedTools "Read(.git/**),Read(./.git/**),Edit(.git/**),Edit(./.git/**),Bash"
 
       - name: Open release PR
         if: steps.prep.outputs.run == 'true'
@@ -147,6 +169,12 @@ jobs:
           VERSION: ${{ steps.prep.outputs.version }}
         run: |
           set -euo pipefail
+          sha256sum -c "$RUNNER_TEMP/gitconfig.sha" >/dev/null \
+            || { echo ".git/config changed during the model step" >&2; exit 1; }
+          if grep -Eq 'x-access-token|ghs_|ghp_|github_pat_' CHANGELOG.md; then
+            echo "CHANGELOG.md contains something that looks like a credential" >&2
+            exit 1
+          fi
           # The model may change CHANGELOG.md and nothing else. Anything more
           # (or nothing at all) fails the run rather than shipping a surprise.
           if [ "$(git status --porcelain)" != " M CHANGELOG.md" ]; then

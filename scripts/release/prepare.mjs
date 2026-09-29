@@ -37,11 +37,13 @@ export function parseSubject(subject) {
 
 /**
  * Commits that are release plumbing, not shipped work: the merge commits of
- * main -> dev sync PRs (feature PRs are squashed, so any "Merge ..." on dev's
- * first-parent line is a sync) and the exact release commit title. Counting
- * them would make every week look like it has something to release.
+ * main -> dev sync PRs (head branch `sync/main-*`; only those are merge
+ * commits by design, so an ordinary "Merge pull request" is still real work)
+ * and the exact release commit title. Counting them would make every week
+ * look like it has something to release.
  */
-export const isNoise = (subject) => /^Merge /.test(subject) || /^chore\(release\): v\d+\.\d+\.\d+$/.test(subject);
+export const isNoise = (subject) =>
+  /^Merge pull request #\d+ from [^/]+\/sync\/main-/.test(subject) || /^chore\(release\): v\d+\.\d+\.\d+$/.test(subject);
 
 /** Pure bump logic. `items` = [{type}]. Returns the new version. */
 export function nextVersion(current, items, { override } = {}) {

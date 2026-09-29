@@ -32,6 +32,7 @@ describe("isNoise", () => {
   test("drops sync merges and the release commit, keeps real work", () => {
     expect(isNoise("Merge pull request #9 from kr8vka0z/sync/main-abc1234")).toBe(true);
     expect(isNoise("chore(release): v1.2.0")).toBe(true);
+    expect(isNoise("Merge pull request #9 from kr8vka0z/feat-y")).toBe(false);
     expect(isNoise("chore(release): weekly release pipeline (#720)")).toBe(false);
     expect(isNoise("fix(map): pins (#5)")).toBe(false);
   });

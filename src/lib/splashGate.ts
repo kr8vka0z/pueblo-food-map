@@ -13,8 +13,9 @@
  *
  * Also owns the "skip the splash?" decision, in two forms that must agree:
  * shouldSkipSplash() (React, after hydration) and SPLASH_GATE_SCRIPT (inline,
- * before the server-rendered splash is first painted). splashSsr.test.tsx
- * asserts they match.
+ * before the server-rendered splash is first painted, on full page loads only;
+ * client-side navigations resolve in HomePageClient's layout effect).
+ * splashSsr.test.tsx asserts they match.
  */
 
 const GATE_KEY = "pfm.splash.seen.v2";
@@ -34,7 +35,12 @@ export function readSplashGate(): boolean {
 }
 
 export function markSplashSeen(): void {
-  localStorage.setItem(GATE_KEY, "1");
+  try {
+    localStorage.setItem(GATE_KEY, "1");
+  } catch {
+    // WHY: with storage blocked, throwing here would abort dismissSplash before
+    // it hides the splash, trapping the visitor on it. They just see it again next visit.
+  }
 }
 
 /**

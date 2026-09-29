@@ -4,20 +4,24 @@
  * returning visitors or deep links.
  *
  * Covers:
- *   (a) a plain synchronous render already shows the real splash, marked
- *       `data-splash-pending`, with no <main> yet
- *   (b) once the gate resolves: returning visitor → map, no splash; first
- *       visitor → splash (no longer pending) plus map
+ *   (a) server output (renderToString) already contains the real splash,
+ *       marked `data-splash-pending`, with no <main>
+ *   (b) client render (the client-side-navigation case): the gate resolves in
+ *       a layout effect, inside render()'s act, so a returning visitor never
+ *       has the splash in the DOM once render() returns; a first visitor has
+ *       it, no longer pending
  *   (c) the inline SPLASH_GATE_SCRIPT and shouldSkipSplash() agree on every
  *       URL/storage combination — the two are hand-mirrored (ES5 vs TS), so
- *       this is what keeps them from drifting.
+ *       this is what keeps them from drifting
+ *   (d) blocked storage neither throws nor traps the visitor on the splash
  *
  * SplashScreen is rendered REAL (need its root attribute and #splash-purpose);
  * MapWrapper and next/dynamic are mocked the same way as page.test.tsx.
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, act } from "@testing-library/react";
+import { render } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import React from "react";
 import HomePageClient from "@/app/(site)/HomePageClient";
 import { t } from "@/lib/i18n";
@@ -25,6 +29,7 @@ import {
   SPLASH_GATE_SCRIPT,
   SPLASH_SEEN_ATTR,
   markSplashSeen,
+  readSplashGate,
   shouldSkipSplash,
 } from "@/lib/splashGate";
 
@@ -60,46 +65,49 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
-/** Let the mount effect's queueMicrotask + dynamic() resolution settle. */
-async function flush() {
-  await act(async () => {
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-  });
-}
+describe("server output (renderToString)", () => {
+  test("has the real splash, marked pending, and no <main>", () => {
+    // Even with the gate set: the server can't know, so it always emits the
+    // pending splash (the inline script + CSS hide it for returning visitors).
+    markSplashSeen();
+    const host = document.createElement("div");
+    host.innerHTML = renderToString(<HomePageClient />);
 
-describe("first render (what the server emits)", () => {
-  test("shows the real splash, marked pending, with no <main> yet", async () => {
-    // Assertions run BEFORE any await: the gate resolves in a microtask.
-    const { container } = render(<HomePageClient />);
-
-    expect(container.querySelector("#splash-purpose")?.textContent).toBe(
+    expect(host.querySelector("#splash-purpose")?.textContent).toBe(
       t("splash.purpose", "en"),
     );
-    const dialog = container.querySelector('[role="dialog"]');
-    expect(dialog?.hasAttribute("data-splash-pending")).toBe(true);
-    expect(container.querySelector("main")).toBeNull();
-
-    await flush(); // settle the pending microtask before test teardown
+    expect(host.querySelector('[role="dialog"]')?.hasAttribute("data-splash-pending")).toBe(true);
+    expect(host.querySelector("main")).toBeNull();
   });
 });
 
-describe("after the gate resolves", () => {
-  test("returning visitor: no splash, map mounted", async () => {
+describe("client render (gate resolves before paint)", () => {
+  // No await anywhere below: the layout effect's setState is flushed inside
+  // render()'s own act, i.e. before a browser would paint. This is the
+  // client-side-navigation case, where the inline script never runs.
+  test("returning visitor: no splash in the DOM once render() returns, map mounted", () => {
     markSplashSeen();
     const { container } = render(<HomePageClient />);
-    await flush();
 
     expect(container.querySelector("#splash-purpose")).toBeNull();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(container.querySelector("main")).not.toBeNull();
   });
 
-  test("first visitor: splash stays but is no longer pending, map mounted", async () => {
+  test("first visitor: splash shown but no longer pending, map mounted", () => {
     const { container } = render(<HomePageClient />);
-    await flush();
 
     const dialog = container.querySelector('[role="dialog"]');
     expect(dialog).not.toBeNull();
     expect(dialog!.hasAttribute("data-splash-pending")).toBe(false);
+    expect(container.querySelector("main")).not.toBeNull();
+  });
+
+  test("deep link (?venue=): no splash once render() returns", () => {
+    window.history.replaceState(null, "", "/?venue=abc");
+    const { container } = render(<HomePageClient />);
+
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(container.querySelector("main")).not.toBeNull();
   });
 });
@@ -136,5 +144,27 @@ describe("SPLASH_GATE_SCRIPT parity with shouldSkipSplash", () => {
     expect(SPLASH_GATE_SCRIPT).not.toMatch(/=>|\bconst\b|\blet\b|\?\?|startsWith|`/);
     // dangerouslySetInnerHTML on <script> is not escaped.
     expect(SPLASH_GATE_SCRIPT).not.toContain("<");
+  });
+});
+
+describe("blocked storage", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  test("markSplashSeen swallows a throwing setItem (dismiss must not abort)", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    expect(() => markSplashSeen()).not.toThrow();
+  });
+
+  test("a throwing getItem reads as unseen, and a first visit still resolves to the splash", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    expect(readSplashGate()).toBe(false);
+
+    const { container } = render(<HomePageClient />);
+    expect(container.querySelector('[role="dialog"]')?.hasAttribute("data-splash-pending")).toBe(false);
+    expect(container.querySelector("main")).not.toBeNull();
   });
 });

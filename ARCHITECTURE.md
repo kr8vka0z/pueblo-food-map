@@ -852,11 +852,11 @@ server HTML (/ and /es)
     for returning visitors / deep links it sets data-splash-seen on <html>,
     and globals.css hides [data-splash-pending] until React unmounts it
     (full page loads only: React never executes a script it renders on a
-    client-side navigation, so there the pending splash is visible until the
-    effect resolves)
+    client-side navigation)
 
-HomePageClient.tsx hydrates, then its effect resolves the gate
-(shouldSkipSplash(), same rules as the script)
+HomePageClient.tsx layout effect resolves the gate (shouldSkipSplash(), same
+rules as the script). On client-side navigation this is the only gate: its
+setState flushes before the browser paints, so no pending-splash flash
   → reads localStorage key 'pfm.splash.seen.v2'
   → if not set:  keep SplashScreen (overlay, z-9000) above the live map
   → if set:      unmount the splash, mount the interactive map

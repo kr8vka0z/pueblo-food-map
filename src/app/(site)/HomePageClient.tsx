@@ -26,10 +26,12 @@
  * The splash is server-rendered (and in the first client render) with
  * `pending`, so a first-time visitor sees it at first paint instead of after
  * ~180 KB of JS hydrates. localStorage and the URL are unknown server-side, so
- * `splashShown` starts null and the effect below resolves it. Returning
- * visitors and deep links never see the pending splash: page.tsx's inline
- * SPLASH_GATE_SCRIPT sets a data attribute on <html> before it is parsed and
- * globals.css hides it until React unmounts it. <main>/MapWrapper mount only
+ * `splashShown` starts null and the layout effect below resolves it. Returning
+ * visitors and deep links never see the pending splash: on a full page load,
+ * page.tsx's inline SPLASH_GATE_SCRIPT sets a data attribute on <html> before
+ * it is parsed and globals.css hides it until React unmounts it; on
+ * client-side navigation the script doesn't run, but the layout effect
+ * resolves the gate before the browser paints. <main>/MapWrapper mount only
  * once resolved. page.tsx's synchronous server output (JSON-LD, sr-only <h1>)
  * renders above this component regardless.
  *
@@ -68,7 +70,7 @@
  * unaffected — MapWrapper first mounts with `splashShown` already `false`.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { readSplashGate, markSplashSeen, resolveVenueId, shouldSkipSplash } from '@/lib/splashGate';
 // WHY a static import (mobile LCP): the splash's purpose line IS the LCP
@@ -101,7 +103,8 @@ const MapWrapper = dynamic(() => import('@/components/MapWrapper'), {
 export default function HomePageClient() {
   // null = not yet determined (localStorage/URL are unknown server-side). The
   // server and first client render both show the splash as `pending` and no
-  // map; the effect then resolves the true value without a hydration mismatch.
+  // map; the layout effect then resolves the true value without a hydration
+  // mismatch.
   const [splashShown, setSplashShown] = useState<boolean | null>(null);
   const [viewport, setViewport] = useState<'located' | 'pueblo-center'>('pueblo-center');
   // Deep link (#132): a ?venue=<id> URL opens straight to that pin.
@@ -114,51 +117,55 @@ export default function HomePageClient() {
   // Ref to the map container element — focus moves here on splash dismiss.
   const mapContainerRef = useRef<HTMLElement | null>(null);
 
-  // One-shot: read localStorage after first mount. useRef guards re-entry.
+  // One-shot: read localStorage and the URL on mount. useRef guards re-entry.
   const initialized = useRef(false);
 
-  useEffect(() => {
+  // WHY a layout effect with direct setState: on client-side navigation to "/"
+  // the inline SPLASH_GATE_SCRIPT never runs (React doesn't execute scripts it
+  // renders), so the gate must resolve before first paint or returning visitors
+  // would flash the pending splash. setState in a layout effect is flushed
+  // synchronously before the browser paints. window.location is already the new
+  // URL here: Next's HistoryUpdater pushes it in useInsertionEffect, which runs
+  // before layout effects.
+  /* eslint-disable react-hooks/set-state-in-effect -- see WHY above */
+  useLayoutEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
-    // Wrap in a scheduler callback to avoid the set-state-in-effect lint rule,
-    // which flags synchronous setState in effect bodies. The queueMicrotask
-    // ensures we're in the microtask queue, not the synchronous effect body.
-    queueMicrotask(() => {
-      // Captured before the near/boxes strip below rewrites the URL, so the
-      // skip decision still sees them.
-      const { search, hash } = window.location;
-      const params = new URLSearchParams(search);
-      // "Near me" in the bottom nav on a Menu page (PageNav) links to /?near=1:
-      // open the map and locate, as the splash's "Find food near me" does.
-      const nearParam = params.get('near') === '1';
-      if (nearParam) {
-        setViewport('located');
-        // Strip it so a refresh doesn't locate again.
-        params.delete('near');
-        const qs = params.toString();
-        window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
-      }
-      // "Boxes" in the bottom nav on a Menu page (PageNav) links to
-      // /?boxes=1: same read-once-then-strip shape as near, above.
-      const boxesParam = params.get('boxes') === '1';
-      if (boxesParam) {
-        setInitialBoxesFilter(true);
-        params.delete('boxes');
-        const qs = params.toString();
-        window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
-      }
-      // ?venue=<id> and the #venue=<id> fragment (used by /venue/[id]'s "View on
-      // the map" CTA) both land here. There's no /?venue= → /venue/<id> redirect
-      // to bypass (next.config.ts removed it — a `has`-query redirect on "/"
-      // 500'd on OpenNext/Cloudflare, see that file's 2026-06-20 hotfix note);
-      // PageNav's saved-venue links use the plain query form instead, and both
-      // are read client-side.
-      setInitialVenueId(resolveVenueId(search, hash));
-      // A shared venue link, Near me and Boxes (both from inside the app, via
-      // PageNav) all skip the splash, as does a visitor who already saw it.
-      setSplashShown(!shouldSkipSplash({ search, hash, gateSeen: readSplashGate() }));
-    });
+    // Captured before the near/boxes strip below rewrites the URL, so the
+    // skip decision still sees them.
+    const { search, hash } = window.location;
+    const params = new URLSearchParams(search);
+    // "Near me" in the bottom nav on a Menu page (PageNav) links to /?near=1:
+    // open the map and locate, as the splash's "Find food near me" does.
+    const nearParam = params.get('near') === '1';
+    if (nearParam) {
+      setViewport('located');
+      // Strip it so a refresh doesn't locate again.
+      params.delete('near');
+      const qs = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    }
+    // "Boxes" in the bottom nav on a Menu page (PageNav) links to
+    // /?boxes=1: same read-once-then-strip shape as near, above.
+    const boxesParam = params.get('boxes') === '1';
+    if (boxesParam) {
+      setInitialBoxesFilter(true);
+      params.delete('boxes');
+      const qs = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    }
+    // ?venue=<id> and the #venue=<id> fragment (used by /venue/[id]'s "View on
+    // the map" CTA) both land here. There's no /?venue= → /venue/<id> redirect
+    // to bypass (next.config.ts removed it — a `has`-query redirect on "/"
+    // 500'd on OpenNext/Cloudflare, see that file's 2026-06-20 hotfix note);
+    // PageNav's saved-venue links use the plain query form instead, and both
+    // are read client-side.
+    setInitialVenueId(resolveVenueId(search, hash));
+    // A shared venue link, Near me and Boxes (both from inside the app, via
+    // PageNav) all skip the splash, as does a visitor who already saw it.
+    setSplashShown(!shouldSkipSplash({ search, hash, gateSeen: readSplashGate() }));
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const dismissSplash = useCallback((mode: 'located' | 'pueblo-center') => {
     markSplashSeen();

@@ -155,9 +155,13 @@ export default async function NewVenuePage({
     email = identity.email;
     showActivity = identity.isOwner === true;
     const { submission, proposal } = searchParams ? await searchParams : {};
-    prefill = await resolveSubmissionPrefill(db, submission);
-    proposalPrefill = await resolveProposalPrefill(db, proposal);
-    navCounts = await loadAdminNavCounts(db);
+    // Independent reads, one round trip's wait instead of three (each D1 call
+    // is an edge -> primary round trip).
+    [prefill, proposalPrefill, navCounts] = await Promise.all([
+      resolveSubmissionPrefill(db, submission),
+      resolveProposalPrefill(db, proposal),
+      loadAdminNavCounts(db),
+    ]);
   } catch (err) {
     handlePageAuthError(err);
   }

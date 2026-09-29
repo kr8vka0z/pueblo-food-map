@@ -918,6 +918,17 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
 - Every page except `/admin/login` shares one header (`AdminNav`) with
   pending-count pills. Its **Activity** item is rendered only for the owner
   (`identity.isOwner`, see `/admin/activity` below).
+- **Admin page speed.** Every admin page is a dynamic server render: one
+  session read (`getAdminDb()`), then its D1 reads. Each D1 call is a round
+  trip to the WNAM primary, so a page's reads run in one `Promise.all`, never
+  one `await` after another (the venue edit page's only real dependencies are
+  the venue row and the suggestion lookup). The Dashboard's Cloudflare and
+  PostHog calls start in that same `Promise.all`. `admin/loading.tsx` shows the
+  header (`AdminNavSkeleton`) plus "Loading…" during client navigation;
+  `admin/login/loading.tsx` renders nothing so it doesn't flash over the sign-in
+  form. Because that shell streams before the page's session check, a first
+  full-page request to a guarded admin URL answers 200 and redirects on the
+  client instead of a 307/403. It carries no admin data.
 
 ### Surfaces
 

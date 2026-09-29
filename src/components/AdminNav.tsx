@@ -146,3 +146,38 @@ export default function AdminNav({ email, active, counts, showActivity = false }
     </header>
   );
 }
+
+/**
+ * Static stand-in for AdminNav, rendered by admin/loading.tsx while the next
+ * admin page renders on the server. No layout exists to hoist the real nav
+ * into (see the header comment above), so a client navigation would
+ * otherwise show a blank page until the whole server render finishes. This
+ * reuses the same classes and nav labels so nothing shifts when the real
+ * header replaces it. It can't know the email, the pending counts or which
+ * tab is active (all come from the page's own session/D1 reads), so those are
+ * left out: a same-height empty line stands in for "Signed in as", no pills,
+ * no active tab and no Activity item (owner-only, unknowable here).
+ */
+export function AdminNavSkeleton() {
+  return (
+    <header className="border-b border-[var(--color-bone-200)] bg-white">
+      <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <p className="wordmark text-2xl text-[var(--color-ink-900)]">Pueblo Food Map Admin</p>
+        <p className="text-sm text-[var(--color-ink-500)]" aria-hidden>
+          &nbsp;
+        </p>
+      </div>
+      <nav aria-label="Admin" className="flex flex-wrap items-center gap-1 overflow-x-auto px-4 pb-3 sm:px-6">
+        {NAV_ITEMS.map((item) => (
+          <Link key={item.key} href={item.href} className={`${navLinkBase} ${navLinkInactive}`}>
+            {item.label}
+          </Link>
+        ))}
+        <span className="flex-1" aria-hidden />
+        <Link href="/admin/venues/new" className={primaryButtonClass}>
+          Add place
+        </Link>
+      </nav>
+    </header>
+  );
+}

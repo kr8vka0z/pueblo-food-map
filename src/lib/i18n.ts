@@ -515,6 +515,7 @@ const en: Record<string, string> = {
   "about.origin.body": "Finding food assistance in Pueblo meant juggling separate tools — the Pueblo Food Project site, Plentiful, FoodFinder, Pueblo Transit, and 211. Pueblo Food Map consolidates those sources into a single, bilingual map that works on any smartphone, no app install required.",
   "about.howWeSource.heading": "How places are added",
   "about.howWeSource.body": "Place data comes from Pueblo Food Project, OpenStreetMap, Plentiful's public directory, and USDA benefit data. All listings are reviewed before going live. If you know of a resource we're missing, please suggest it.",
+  "about.contact.body": "Questions or partnership ideas? Email",
   "about.suggest.heading": "Know something we're missing?",
   "about.suggest.body": "If you know of a food pantry, community garden, or other resource that isn't on the map yet, let us know.",
   "about.suggest.cta": "Suggest a place",
@@ -1565,6 +1566,7 @@ const es: Record<string, string> = {
   "about.origin.body": "Encontrar apoyo alimentario en Pueblo requería usar varias herramientas por separado: el sitio de Pueblo Food Project, Plentiful, FoodFinder, Pueblo Transit y el 211. Pueblo Food Map consolida esas fuentes en un solo mapa bilingüe que funciona en cualquier celular, sin necesidad de instalar una aplicación.",
   "about.howWeSource.heading": "Cómo agregamos lugares",
   "about.howWeSource.body": "Los datos de los lugares provienen de Pueblo Food Project, OpenStreetMap, el directorio público de Plentiful y datos de beneficios del USDA. Todos los registros se revisan antes de publicarse. Si conoces un recurso que no está en el mapa, puedes sugerirlo.",
+  "about.contact.body": "¿Preguntas o ideas para colaborar? Escríbenos a", // [CHECK]
   "about.suggest.heading": "¿Sabes de algo que nos falta?",
   "about.suggest.body": "Si conoces una despensa comunitaria, huerto o algún otro recurso alimentario que aún no está en el mapa, cuéntanos.",
   "about.suggest.cta": "Sugerir un lugar",

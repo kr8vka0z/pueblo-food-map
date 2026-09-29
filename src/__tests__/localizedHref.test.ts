@@ -22,6 +22,8 @@ describe("localizedHref", () => {
       expect(localizedHref("/food-pantries", "es")).toBe("/es/food-pantries");
       expect(localizedHref("/snap-wic-stores", "es")).toBe("/es/snap-wic-stores");
       expect(localizedHref("/community-gardens", "es")).toBe("/es/community-gardens");
+      expect(localizedHref("/blessing-boxes", "es")).toBe("/es/blessing-boxes");
+      expect(mirroredCounterpartHref("/es/blessing-boxes", "es")).toBe("/blessing-boxes");
       expect(mirroredCounterpartHref("/es/food-pantries", "es")).toBe("/food-pantries");
       expect(mirroredCounterpartHref("/snap-wic-stores", "en")).toBe("/es/snap-wic-stores");
     });

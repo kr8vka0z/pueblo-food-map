@@ -83,6 +83,15 @@ export default function SiteFooter() {
           {t("footer.gardens", locale)}
         </Link>
         <Link
+          href={localizedHref("/blessing-boxes", tree)}
+          className={
+            "hover:text-[var(--color-ink-700)] transition-colors " +
+            "focus-visible:outline-none focus-visible:underline"
+          }
+        >
+          {t("footer.boxes", locale)}
+        </Link>
+        <Link
           href={localizedHref("/about", tree)}
           className={
             "hover:text-[var(--color-ink-700)] transition-colors " +

@@ -40,6 +40,7 @@ const HOME_CRAWL_LINKS = [
   { href: "/es/food-pantries", label: "Despensas de alimentos en el Condado de Pueblo" }, // [CHECK]
   { href: "/es/snap-wic-stores", label: "Lugares que aceptan SNAP y WIC" }, // [CHECK]
   { href: "/es/community-gardens", label: "Huertos comunitarios en el Condado de Pueblo" }, // [CHECK]
+  { href: "/es/blessing-boxes", label: "Cajas de bendiciones en el Condado de Pueblo" }, // [CHECK]
 ] as const;
 
 const HOME_CRAWL_LINK_CLASS =

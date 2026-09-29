@@ -71,6 +71,7 @@ describe("VenuesDirectoryContent — hub links", () => {
       "/food-pantries",
       "/snap-wic-stores",
       "/community-gardens",
+      "/blessing-boxes",
     ]);
   });
 
@@ -85,6 +86,7 @@ describe("VenuesDirectoryContent — hub links", () => {
       "/es/food-pantries",
       "/es/snap-wic-stores",
       "/es/community-gardens",
+      "/es/blessing-boxes",
     ]);
   });
 });

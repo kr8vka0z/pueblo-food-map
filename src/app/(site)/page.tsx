@@ -43,6 +43,7 @@ const HOME_CRAWL_LINKS = [
   { href: "/food-pantries", label: "Food pantries in Pueblo County" },
   { href: "/snap-wic-stores", label: "Places that accept SNAP and WIC" },
   { href: "/community-gardens", label: "Community gardens in Pueblo County" },
+  { href: "/blessing-boxes", label: "Blessing boxes in Pueblo County" },
 ] as const;
 
 const HOME_CRAWL_LINK_CLASS =

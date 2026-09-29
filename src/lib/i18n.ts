@@ -1108,6 +1108,19 @@ const en: Record<string, string> = {
   "hubs.snapWic.badgeWic": "Accepts WIC",
   "hubs.snapWic.note": "What a place accepts can change. Check with the place before you go.",
   "hubs.snapWic.apply": "Want to apply for SNAP or WIC?",
+  // /blessing-boxes (#709 PR B). Deliberately no "free" wording: blessing_box is not in FREE_CATEGORIES.
+  "meta.boxes.title": "Blessing Boxes in Pueblo, CO",
+  "meta.boxes.description":
+    "Community blessing boxes in Pueblo County, CO: small boxes where neighbors leave and take food and basics. Names and addresses, with a link to each on the map.",
+  // "list" on purpose: bare "Blessing boxes" is also the box.stats.boxCount label, and the footer renders on that page (exact-text test queries collide).
+  "footer.boxes": "Blessing box list",
+  "hubs.boxes.heading": "Blessing boxes in Pueblo County",
+  "hubs.boxes.intro": "There are {count} blessing boxes on the map in Pueblo County, CO. Each one links to its card on the map.",
+  "hubs.boxes.introOne": "There is 1 blessing box on the map in Pueblo County, CO. It links to its card on the map.",
+  "hubs.boxes.what": "A blessing box is a small community box where neighbors leave and take food and basics. Open the map to see a box's current details.",
+  "hubs.boxes.empty": "There are no blessing boxes listed right now.",
+  "hubs.boxes.degraded": "We couldn't load the list of blessing boxes right now. Open the map to see them.",
+  "hubs.boxes.openMap": "Open the map",
   "hubs.gardens.heading": "Community gardens and edible landscapes in Pueblo County",
   "hubs.gardens.section.garden": "Community gardens",
   "hubs.gardens.section.edible_landscape": "Edible landscapes",
@@ -1968,6 +1981,17 @@ const es: Record<string, string> = {
   "hubs.snapWic.badgeWic": "Acepta WIC", // [CHECK]
   "hubs.snapWic.note": "Lo que acepta un lugar puede cambiar. Confirma con el lugar antes de ir.", // [CHECK]
   "hubs.snapWic.apply": "¿Quieres solicitar SNAP o WIC?", // [CHECK]
+  "meta.boxes.title": "Cajas de bendiciones en Pueblo, CO", // [CHECK]
+  "meta.boxes.description":
+    "Cajas de bendiciones comunitarias en el Condado de Pueblo, CO: cajas pequeñas donde los vecinos dejan y toman comida y artículos básicos. Nombres y direcciones, con un enlace a cada una en el mapa.", // [CHECK]
+  "footer.boxes": "Lista de cajas de bendiciones", // [CHECK]
+  "hubs.boxes.heading": "Cajas de bendiciones en el Condado de Pueblo", // [CHECK]
+  "hubs.boxes.intro": "Hay {count} cajas de bendiciones en el mapa del Condado de Pueblo, CO. Cada una enlaza a su tarjeta en el mapa.", // [CHECK]
+  "hubs.boxes.introOne": "Hay 1 caja de bendiciones en el mapa del Condado de Pueblo, CO. Enlaza a su tarjeta en el mapa.", // [CHECK]
+  "hubs.boxes.what": "Una caja de bendiciones es una caja comunitaria pequeña donde los vecinos dejan y toman comida y artículos básicos. Abre el mapa para ver los detalles actuales de cada caja.", // [CHECK]
+  "hubs.boxes.empty": "Por ahora no hay cajas de bendiciones en la lista.", // [CHECK]
+  "hubs.boxes.degraded": "No pudimos cargar la lista de cajas de bendiciones en este momento. Abre el mapa para verlas.", // [CHECK]
+  "hubs.boxes.openMap": "Abrir el mapa", // [CHECK]
   "hubs.gardens.heading": "Huertos comunitarios y paisajes comestibles en el Condado de Pueblo", // [CHECK]
   "hubs.gardens.section.garden": "Huertos comunitarios", // [CHECK]
   "hubs.gardens.section.edible_landscape": "Paisajes comestibles", // [CHECK]

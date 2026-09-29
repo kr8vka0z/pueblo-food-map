@@ -153,7 +153,10 @@ jobs:
           # SEO Phase 3 (#709): the three hub pages join, EN + ES. They are
           # plain static routes, and a 200 here proves the deploy shipped them
           # (static assets can lag the Worker, hence the retry loop below).
-          for path in "/" "/venues" "/venue/${VENUE_ID}" "/es" "/es/venues" "/es/venue/${VENUE_ID}" "/food-pantries" "/es/food-pantries" "/snap-wic-stores" "/es/snap-wic-stores" "/community-gardens" "/es/community-gardens" "/sitemap.xml" "/robots.txt"; do
+          # PR B adds /blessing-boxes (+ /es): that one is dynamic (D1 read),
+          # and a D1 failure still answers 200 (degraded page, noindex), so a
+          # 200 proves the route deployed, not that D1 is healthy.
+          for path in "/" "/venues" "/venue/${VENUE_ID}" "/es" "/es/venues" "/es/venue/${VENUE_ID}" "/food-pantries" "/es/food-pantries" "/snap-wic-stores" "/es/snap-wic-stores" "/community-gardens" "/es/community-gardens" "/blessing-boxes" "/es/blessing-boxes" "/sitemap.xml" "/robots.txt"; do
             code=""
             for i in $(seq 1 "$attempts"); do
               # No -f: a 404 must be READ, not turned into a curl error. `-f`
@@ -180,7 +183,7 @@ jobs:
           # an /es URL with a 200 status still fails loudly. Retries like
           # the path loop above.
           # #709: the /es hubs get the same body check.
-          for path in "/es" "/es/venues" "/es/venue/${VENUE_ID}" "/es/food-pantries" "/es/snap-wic-stores" "/es/community-gardens"; do
+          for path in "/es" "/es/venues" "/es/venue/${VENUE_ID}" "/es/food-pantries" "/es/snap-wic-stores" "/es/community-gardens" "/es/blessing-boxes"; do
             body=""
             ok=1
             for i in $(seq 1 "$attempts"); do

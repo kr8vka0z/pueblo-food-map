@@ -29,6 +29,7 @@ describe("/es homepage — Sitio nav", () => {
       "/es/food-pantries",
       "/es/snap-wic-stores",
       "/es/community-gardens",
+      "/es/blessing-boxes",
     ]);
   });
 });

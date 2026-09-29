@@ -27,6 +27,7 @@ const HUB_LINKS = [
   { path: "/food-pantries", labelKey: "footer.foodPantries" },
   { path: "/snap-wic-stores", labelKey: "footer.snapWic" },
   { path: "/community-gardens", labelKey: "footer.gardens" },
+  { path: "/blessing-boxes", labelKey: "footer.boxes" },
 ] as const;
 
 interface VenuesDirectoryContentProps {

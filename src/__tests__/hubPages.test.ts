@@ -8,6 +8,9 @@
 import { describe, test, expect } from "vitest";
 import {
   allFree,
+  boxDeepLink,
+  boxesForHub,
+  buildBoxListJsonLd,
   gardensForHub,
   hubAddress,
   hubHours,
@@ -173,5 +176,44 @@ describe("hub JSON-LD (house builders fed the hub lists)", () => {
       name: "Q?",
       acceptedAnswer: { "@type": "Answer", text: "A." },
     });
+  });
+});
+
+// /blessing-boxes helpers (PR B) — synthetic ids/names only.
+describe("boxesForHub", () => {
+  test("sorts by name without mutating the input", () => {
+    const input = [{ name: "Zeta Box" }, { name: "Alpha Box" }, { name: "Mid Box" }];
+    expect(boxesForHub(input).map((b) => b.name)).toEqual(["Alpha Box", "Mid Box", "Zeta Box"]);
+    expect(input[0].name).toBe("Zeta Box");
+  });
+});
+
+describe("boxDeepLink", () => {
+  test("EN goes to /?venue=<id>, ES to /es?venue=<id>", () => {
+    expect(boxDeepLink("box-a", "en")).toBe("/?venue=box-a");
+    expect(boxDeepLink("box-a", "es")).toBe("/es?venue=box-a");
+  });
+
+  test("encodes the id", () => {
+    expect(boxDeepLink("a b&c", "en")).toBe("/?venue=a%20b%26c");
+  });
+});
+
+describe("buildBoxListJsonLd", () => {
+  test("ItemList with absolute deep-link URLs and positions 1..n", () => {
+    const ld = buildBoxListJsonLd([{ id: "a", name: "A" }, { id: "b", name: "B" }], "es") as {
+      "@type": string;
+      itemListElement: { position: number; url: string; name: string }[];
+    };
+    expect(ld["@type"]).toBe("ItemList");
+    expect(ld.itemListElement.map((e) => e.position)).toEqual([1, 2]);
+    expect(ld.itemListElement[0].url).toBe(`${SITE_URL}/es?venue=a`);
+    expect(ld.itemListElement[1].name).toBe("B");
+  });
+});
+
+describe("hubAddress on a box", () => {
+  test("omits the OSM placeholder", () => {
+    expect(hubAddress(fx("p", { category: "blessing_box", address: PLACEHOLDER_ADDRESS }))).toBeNull();
   });
 });

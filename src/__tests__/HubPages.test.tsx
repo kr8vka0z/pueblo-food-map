@@ -7,7 +7,8 @@
 
 import { describe, test, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { CommunityGardensHub, FoodPantriesHub, SnapWicHub } from "@/components/HubPages";
+import { BlessingBoxesHub, CommunityGardensHub, FoodPantriesHub, SnapWicHub } from "@/components/HubPages";
+import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import ResourcesContent from "@/components/ResourcesContent";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { resourcesFaqJsonLd } from "@/lib/resourcesFaq";
@@ -227,5 +228,86 @@ describe("/resources FAQ (ResourcesContent + resourcesFaqJsonLd)", () => {
     const faq = container.querySelector("section[aria-labelledby='resources-faq-heading']")?.textContent ?? "";
     expect(faq.length).toBeGreaterThan(0);
     expect(faq).not.toMatch(/immigration|citizen|proof of|need (an? )?ID/i);
+  });
+});
+
+// /blessing-boxes (PR B): synthetic boxes only.
+function boxFx(
+  id: string,
+  overrides: Partial<PublicBlessingBox> = {},
+  status: PublicBlessingBox["box"]["status"] = "unknown",
+): PublicBlessingBox {
+  return {
+    ...fx(id, { name: `Box ${id}` }),
+    category: "blessing_box",
+    box: {
+      hostName: "Private Host",
+      hostNote: null,
+      mostNeeded: null,
+      installedOn: null,
+      removedOn: null,
+      status,
+      lastFilledAt: null,
+      recentCheckins: [],
+      latestPhoto: null,
+      adopters: [],
+    },
+    ...overrides,
+  };
+}
+
+describe("BlessingBoxesHub", () => {
+  const BOXES = [
+    boxFx("zz", { name: "Zulu Box" }, "low"),
+    boxFx("aa", { name: "Alpha Box", address: PLACEHOLDER_ADDRESS }),
+  ];
+
+  test("h1, live count, sorted links into the map card, EN", () => {
+    render(<BlessingBoxesHub locale="en" boxes={BOXES} degraded={false} />);
+    expect(screen.getByRole("heading", { level: 1, name: t("hubs.boxes.heading", "en") })).toBeDefined();
+    expect(screen.getByText(/There are 2 blessing boxes/)).toBeDefined();
+    const links = screen.getAllByRole("link").filter((a) => a.getAttribute("href")?.includes("?venue="));
+    expect(links.map((a) => a.textContent)).toEqual(["Alpha Box", "Zulu Box"]);
+    expect(links[0].getAttribute("href")).toBe("/?venue=aa");
+  });
+
+  test("ES links go to /es?venue=<id> and copy is Spanish", () => {
+    render(<BlessingBoxesHub locale="es" boxes={BOXES} degraded={false} />);
+    expect(screen.getByRole("link", { name: "Zulu Box" }).getAttribute("href")).toBe("/es?venue=zz");
+    expect(screen.getByText(/Hay 2 cajas de bendiciones/)).toBeDefined();
+  });
+
+  test("placeholder address omitted; status only when known; no host data, no 'free', no controls", () => {
+    const { container } = render(<BlessingBoxesHub locale="en" boxes={BOXES} degraded={false} />);
+    expect(container.textContent).not.toContain(PLACEHOLDER_ADDRESS);
+    expect(container.textContent).not.toContain("Address not in");
+    expect(container.textContent).not.toContain("Private Host");
+    expect(container.textContent).not.toMatch(/\bfree\b/i);
+    expect(screen.getByText("Status: Running low")).toBeDefined();
+    expect(screen.getAllByText(/^Status:/)).toHaveLength(1);
+    expect(container.querySelector("button, form, input")).toBeNull();
+  });
+
+  test("ItemList JSON-LD matches the visible list", () => {
+    const { container } = render(<BlessingBoxesHub locale="en" boxes={BOXES} degraded={false} />);
+    const [ld] = jsonLd(container) as { itemListElement: { name: string; url: string }[] }[];
+    expect(ld.itemListElement.map((e) => e.name)).toEqual(["Alpha Box", "Zulu Box"]);
+    expect(ld.itemListElement[0].url).toBe("https://pueblofoodmap.com/?venue=aa");
+  });
+
+  test("real empty result: says none listed, no JSON-LD, no '0 boxes'", () => {
+    const { container } = render(<BlessingBoxesHub locale="en" boxes={[]} degraded={false} />);
+    expect(screen.getByText(t("hubs.boxes.empty", "en"))).toBeDefined();
+    expect(jsonLd(container)).toHaveLength(0);
+    expect(container.textContent).not.toMatch(/\b0 blessing/);
+  });
+
+  test("degraded: honest message + map link, no list, no JSON-LD, never a count", () => {
+    const { container } = render(<BlessingBoxesHub locale="en" boxes={[]} degraded={true} />);
+    expect(screen.getByText(t("hubs.boxes.degraded", "en"))).toBeDefined();
+    expect(screen.getByRole("link", { name: t("hubs.boxes.openMap", "en") }).getAttribute("href")).toBe("/");
+    expect(container.querySelector("ul")).toBeNull();
+    expect(jsonLd(container)).toHaveLength(0);
+    expect(container.textContent).not.toMatch(/There are|no blessing boxes listed/);
   });
 });

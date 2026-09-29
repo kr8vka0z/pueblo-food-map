@@ -1,6 +1,8 @@
 /**
- * HubPages — bodies of the SEO hub pages /food-pantries, /snap-wic-stores and
- * /community-gardens, plus their /es twins (SEO/AEO plan Phase 3, #709).
+ * HubPages — bodies of the SEO hub pages /food-pantries, /snap-wic-stores,
+ * /community-gardens and /blessing-boxes, plus their /es twins (SEO/AEO plan Phase 3, #709).
+ * (/blessing-boxes is the exception to "static": its page files are force-dynamic
+ * and read D1 at request time; this component is still a plain server component.)
  *
  * WHY server components taking `locale` as a prop (unlike /venues, which is a
  * client component reading useLocale()): these are the pages meant to rank, and
@@ -23,8 +25,12 @@ import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { localizedHref } from "@/lib/localizedHref";
 import { buildVenueListJsonLd, serializeJsonLd } from "@/lib/venueSchema";
+import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import {
   allFree,
+  boxDeepLink,
+  boxesForHub,
+  buildBoxListJsonLd,
   gardensForHub,
   hubAddress,
   hubHours,
@@ -156,6 +162,64 @@ export function SnapWicHub({ locale, venues }: { locale: Locale; venues: Venue[]
           );
         })}
       </ul>
+    </HubShell>
+  );
+}
+
+/**
+ * /blessing-boxes body (PR B). Read-only: names link into the map card; no
+ * check-in, photo, adopt or alert controls (REVIEW.md exception). `degraded`
+ * (D1 read failed) shows an honest message and a map link, never "0 boxes",
+ * and emits no JSON-LD. A status line shows only when the box has a real
+ * signal (not "unknown") — status is computed at request time from check-ins.
+ * No "free" wording anywhere: blessing_box is not in FREE_CATEGORIES.
+ */
+export function BlessingBoxesHub({
+  locale,
+  boxes,
+  degraded,
+}: {
+  locale: Locale;
+  boxes: PublicBlessingBox[];
+  degraded: boolean;
+}) {
+  const sorted = boxesForHub(boxes);
+  const showList = !degraded && sorted.length > 0;
+  const intro = degraded
+    ? t("hubs.boxes.degraded", locale)
+    : sorted.length === 0
+      ? t("hubs.boxes.empty", locale)
+      : t(sorted.length === 1 ? "hubs.boxes.introOne" : "hubs.boxes.intro", locale, {
+          count: String(sorted.length),
+        });
+  return (
+    <HubShell locale={locale} heading={t("hubs.boxes.heading", locale)} intro={intro}>
+      {showList && <JsonLd data={buildBoxListJsonLd(sorted, locale)} />}
+      <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">{t("hubs.boxes.what", locale)}</p>
+      {showList ? (
+        <ul className="space-y-4">
+          {sorted.map((b) => {
+            const address = hubAddress(b);
+            return (
+              <li key={b.id}>
+                <Link href={boxDeepLink(b.id, locale)} className={PLACE_LINK_CLASS}>
+                  {b.name}
+                </Link>
+                {address && <p className={DETAIL_CLASS}>{address}</p>}
+                {b.box.status !== "unknown" && (
+                  <p className={DETAIL_CLASS + " mt-0.5"}>
+                    {t("box.status", locale)}: {t(`box.status.${b.box.status}`, locale)}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <Link href={localizedHref("/", locale)} className={PLACE_LINK_CLASS + " underline"}>
+          {t("hubs.boxes.openMap", locale)}
+        </Link>
+      )}
     </HubShell>
   );
 }

@@ -736,6 +736,24 @@ export async function loadLiveBoxes(db: D1Database, now: Date = new Date()): Pro
   );
 }
 
+/**
+ * Slim variant of loadLiveBoxes for /blessing-boxes: the boxes query plus the
+ * visible check-ins (needed for `status`) — 2 D1 reads instead of 5. The page
+ * shows only name, address, status, so photos/adopters/needs are skipped and
+ * come back empty. Same SQL and mapper as loadLiveBoxes, so the shape and
+ * status rule cannot drift; a check-ins failure throws (like loadLiveBoxes),
+ * which the page maps to its degraded state.
+ */
+export async function loadLiveBoxesForHub(db: D1Database, now: Date = new Date()): Promise<PublicBlessingBox[]> {
+  const result = await db.prepare(SELECT_LIVE_BOXES_SQL).all<BoxJoinRow>();
+  const rows = result.results ?? [];
+  const checkinsByVenue = await loadVisibleCheckinsForVenues(
+    db,
+    rows.map((r) => r.id),
+  );
+  return rows.map((row) => mapRowToPublicBox(row, checkinsByVenue.get(row.id) ?? [], now));
+}
+
 // ─── Admin health (Dashboard + Blessing Boxes tab) ─────────────────────────
 // Unlike every query above, these read EVERY visible check-in kind,
 // including 'problem' — an admin needs to see a problem report to act on

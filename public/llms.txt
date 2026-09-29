@@ -1,0 +1,38 @@
+# Pueblo Food Map
+
+> A free, bilingual (English and Spanish) map of free and low-cost food resources in Pueblo County, Colorado: food pantries, SNAP and WIC stores, community gardens, blessing boxes and more. Built for and with Pueblo Food Project. Hours change often, so call ahead before you go.
+
+## Start here
+
+- [Map (home)](https://pueblofoodmap.com/): The interactive map of every listed food resource in Pueblo County.
+- [All food resources](https://pueblofoodmap.com/venues): One page listing every place on the map, with links to each place's page.
+- [Food help programs](https://pueblofoodmap.com/resources): How to get SNAP, WIC, Double Up Food Bucks and 2-1-1 Colorado, with common questions answered.
+- [About](https://pueblofoodmap.com/about): What the site is, how places are added, and how to contact us.
+
+## Food resources by type
+
+- [Food pantries](https://pueblofoodmap.com/food-pantries): Free food pantries in Pueblo County with hours and locations.
+- [SNAP and WIC stores](https://pueblofoodmap.com/snap-wic-stores): Stores and other places that accept SNAP (EBT) and WIC.
+- [Community gardens](https://pueblofoodmap.com/community-gardens): Community gardens and edible landscapes.
+- [Blessing boxes](https://pueblofoodmap.com/blessing-boxes): Neighborhood blessing boxes and their current status.
+
+## Individual places
+
+- Every place has its own page at `https://pueblofoodmap.com/venue/<id>`. It shows the address, hours, whether it accepts SNAP or WIC, and a "last verified" date. Find any place's page from [All food resources](https://pueblofoodmap.com/venues).
+
+## Spanish (Español)
+
+- [Mapa](https://pueblofoodmap.com/es): The map in Spanish.
+- [Todos los recursos](https://pueblofoodmap.com/es/venues): Every place, in Spanish.
+- [Programas de ayuda alimentaria](https://pueblofoodmap.com/es/resources): Food help programs, in Spanish.
+- [Acerca de](https://pueblofoodmap.com/es/about): About the site, in Spanish.
+- [Despensas de alimentos](https://pueblofoodmap.com/es/food-pantries): Food pantries, in Spanish.
+- [Tiendas SNAP y WIC](https://pueblofoodmap.com/es/snap-wic-stores): SNAP and WIC stores, in Spanish.
+- [Huertos comunitarios](https://pueblofoodmap.com/es/community-gardens): Community gardens, in Spanish.
+- [Cajas de bendiciones](https://pueblofoodmap.com/es/blessing-boxes): Blessing boxes, in Spanish.
+- Each place's Spanish page is `https://pueblofoodmap.com/es/venue/<id>`.
+
+## Where the data comes from
+
+- Place data comes from Pueblo Food Project, OpenStreetMap, Plentiful's public directory, and USDA benefit data. Listings are reviewed before they go live. See [About](https://pueblofoodmap.com/about).
+- Hours and availability change. Each place page shows when it was last verified; call the place before you go.

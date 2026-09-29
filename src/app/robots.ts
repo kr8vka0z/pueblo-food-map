@@ -16,6 +16,16 @@
  * re-establishes in version-controlled code a policy that previously lived
  * only as a Cloudflare dashboard bot-management rule — invisible to this
  * repo and to anyone without CF dashboard access.
+ *
+ * WHY the allowed bots stay allowed (the one-line policy): GPTBot,
+ * ChatGPT-User, OAI-SearchBot, PerplexityBot, ClaudeBot and bingbot are how
+ * ChatGPT, Perplexity, Copilot and Claude find and cite this site, and
+ * Googlebot feeds Google AI Overviews (Google-Extended is only an opt-out for
+ * Gemini training, and is left allowed too). Blocking them would remove the
+ * site from those answers, which is the goal of docs/seo-aeo-plan.md. The five
+ * blocked bots (CCBot, Bytespider, Amazonbot, Applebot-Extended,
+ * meta-externalagent) are training-data crawlers that don't send citations or
+ * visits back.
  */
 
 import type { MetadataRoute } from "next";

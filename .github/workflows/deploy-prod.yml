@@ -156,7 +156,7 @@ jobs:
           # PR B adds /blessing-boxes (+ /es): that one is dynamic (D1 read),
           # and a D1 failure still answers 200 (degraded page, noindex), so a
           # 200 proves the route deployed, not that D1 is healthy.
-          for path in "/" "/venues" "/venue/${VENUE_ID}" "/es" "/es/venues" "/es/venue/${VENUE_ID}" "/food-pantries" "/es/food-pantries" "/snap-wic-stores" "/es/snap-wic-stores" "/community-gardens" "/es/community-gardens" "/blessing-boxes" "/es/blessing-boxes" "/sitemap.xml" "/robots.txt"; do
+          for path in "/" "/venues" "/venue/${VENUE_ID}" "/es" "/es/venues" "/es/venue/${VENUE_ID}" "/food-pantries" "/es/food-pantries" "/snap-wic-stores" "/es/snap-wic-stores" "/community-gardens" "/es/community-gardens" "/blessing-boxes" "/es/blessing-boxes" "/sitemap.xml" "/robots.txt" "/llms.txt"; do
             code=""
             for i in $(seq 1 "$attempts"); do
               # No -f: a 404 must be READ, not turned into a curl error. `-f`

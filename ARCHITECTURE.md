@@ -899,7 +899,8 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   miss — reads admin data without a live session. Mutating `/api/admin/*`
   routes also call `requireAdminOrigin()` (CSRF, `src/lib/adminOrigin.ts`).
   Failures map to a login redirect / 401 (no session) or 403 via
-  `src/lib/adminAuthErrors.ts`. Cookie, allowlist and rate-limit gotchas:
+  `src/lib/adminAuthErrors.ts` (for admin *pages* the status is 200, see
+  "Admin page speed" below). Cookie, allowlist and rate-limit gotchas:
   AGENTS.md "Admin authentication".
 - **Server Component page owns the gate and the reads; a Client Component
   owns the form; a route handler owns the authoritative write.** Client
@@ -924,11 +925,11 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   one `await` after another (the venue edit page's only real dependencies are
   the venue row and the suggestion lookup). The Dashboard's Cloudflare and
   PostHog calls start in that same `Promise.all`. `admin/loading.tsx` shows the
-  header (`AdminNavSkeleton`) plus "Loading…" during client navigation;
-  `admin/login/loading.tsx` renders nothing so it doesn't flash over the sign-in
-  form. Because that shell streams before the page's session check, a first
-  full-page request to a guarded admin URL answers 200 and redirects on the
-  client instead of a 307/403. It carries no admin data.
+  header (`AdminNavSkeleton`) plus "Loading…" during client navigation (it also wraps `/admin/login`).
+  Because that shell streams before the page's session check, a first
+  full-page request to a guarded admin URL answers 200 (noindex) and redirects
+  or renders forbidden/not-found on the client instead of a 307/403/404 (this
+  includes an unknown venue id on the edit page). It carries no admin data.
 
 ### Surfaces
 

@@ -57,6 +57,10 @@ const venueRow = {
 describe("EditVenuePage — D1 reads overlap", () => {
   test("nav counts start with the venue read; every other read starts together", async () => {
     let issued = 0; // reads other than the venue row
+    let openVenue!: () => void;
+    const venueGate = new Promise<void>((r) => {
+      openVenue = r;
+    });
     const release: Array<() => void> = [];
     const pending = <T,>(value: T) => {
       issued += 1;
@@ -67,7 +71,7 @@ describe("EditVenuePage — D1 reads overlap", () => {
         const stmt = {
           bind: () => stmt,
           all: () => pending({ success: true, results: [], meta: {} }),
-          first: async () => (sql.includes("FROM venues") ? venueRow : pending({ n: 0 })),
+          first: () => (sql.includes("FROM venues") ? venueGate.then(() => venueRow) : pending({ n: 0 })),
         };
         return stmt;
       },
@@ -78,6 +82,11 @@ describe("EditVenuePage — D1 reads overlap", () => {
       params: Promise.resolve({ id: "manual-abc" }),
       searchParams: Promise.resolve({}),
     });
+    await new Promise((r) => setTimeout(r, 0));
+
+    // The 4 nav counts are already in flight while the venue read is unresolved.
+    expect(issued).toBe(4);
+    openVenue();
     await new Promise((r) => setTimeout(r, 0));
 
     // 4 nav counts + pending proposals + pending reports

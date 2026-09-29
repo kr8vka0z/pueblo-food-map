@@ -1,7 +1,9 @@
 /**
  * app/(site)/forbidden.tsx — Next.js special file rendered when
  * next/navigation's forbidden() is called (#237 checkpoint c). Next returns
- * a real HTTP 403 for this response — see node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/forbidden.md.
+ * a real HTTP 403 for this response, EXCEPT under /admin: admin/loading.tsx
+ * streams a shell first, so admin pages answer 200 (noindex) and this UI is
+ * rendered client-side. See node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/forbidden.md.
  * Currently only src/app/(site)/admin/page.tsx triggers this, on an
  * AccessDeniedError from getAdminDb().
  *

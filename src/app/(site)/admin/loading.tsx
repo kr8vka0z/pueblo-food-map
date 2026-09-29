@@ -11,8 +11,9 @@
  * Trade-off: the shell is flushed before the page's session check runs, so a
  * first, full-page request to a guarded admin URL now answers 200 and moves
  * the visitor with a client-side redirect instead of a 307/403 status. The
- * shell holds no admin data, so nothing leaks. /admin/login opts out (see
- * login/loading.tsx).
+ * shell holds no admin data, so nothing leaks. This boundary also wraps
+ * /admin/login, so a non-prefetched navigation there (e.g. after sign-out)
+ * can briefly show this header before the sign-in form.
  */
 
 import { AdminNavSkeleton } from "@/components/AdminNav";

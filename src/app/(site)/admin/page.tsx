@@ -191,8 +191,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       // burst: a dependent query would cost one more D1 round trip.
       db
         .prepare(
-          "SELECT run_id, created_at, (SELECT COUNT(*) FROM change_proposals WHERE run_id = c.run_id) AS n " +
-            "FROM change_proposals c ORDER BY created_at DESC LIMIT 1",
+          // Derived table: pick the newest row first, then count once. A
+          // correlated subquery on the outer rows would run the COUNT per row
+          // before the ORDER BY (no index on created_at) and slow as the table grows.
+          "SELECT l.run_id, l.created_at, (SELECT COUNT(*) FROM change_proposals WHERE run_id = l.run_id) AS n " +
+            "FROM (SELECT run_id, created_at FROM change_proposals ORDER BY created_at DESC LIMIT 1) l",
         )
         .first<{ run_id: string; created_at: string; n: number }>(),
       // WHY these two sit in the same Promise.all as the D1 reads: Cloudflare

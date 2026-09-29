@@ -54,6 +54,34 @@ export default function SiteFooter() {
         >
           {t("footer.resources", locale)}
         </Link>
+        {/* SEO Phase 3 hubs (#709): crawlable links to the three topic pages. */}
+        <Link
+          href={localizedHref("/food-pantries", tree)}
+          className={
+            "hover:text-[var(--color-ink-700)] transition-colors " +
+            "focus-visible:outline-none focus-visible:underline"
+          }
+        >
+          {t("footer.foodPantries", locale)}
+        </Link>
+        <Link
+          href={localizedHref("/snap-wic-stores", tree)}
+          className={
+            "hover:text-[var(--color-ink-700)] transition-colors " +
+            "focus-visible:outline-none focus-visible:underline"
+          }
+        >
+          {t("footer.snapWic", locale)}
+        </Link>
+        <Link
+          href={localizedHref("/community-gardens", tree)}
+          className={
+            "hover:text-[var(--color-ink-700)] transition-colors " +
+            "focus-visible:outline-none focus-visible:underline"
+          }
+        >
+          {t("footer.gardens", locale)}
+        </Link>
         <Link
           href={localizedHref("/about", tree)}
           className={

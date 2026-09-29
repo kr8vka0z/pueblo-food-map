@@ -60,3 +60,30 @@ describe("VenuesDirectoryContent — locale", () => {
     expect(screen.getByText(t("venues.noHours", "es"))).toBeDefined();
   });
 });
+
+// #709: crawlable links to the three hub pages, each in its own tree.
+describe("VenuesDirectoryContent — hub links", () => {
+  test("EN links to the three hubs", () => {
+    render(<VenuesDirectoryContent groups={FIXTURE_GROUPS} />);
+    const nav = screen.getByRole("navigation", { name: t("venues.browseTopics", "en") });
+    expect([...nav.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual([
+      "/food-pantries",
+      "/snap-wic-stores",
+      "/community-gardens",
+    ]);
+  });
+
+  test("ES tree links to the /es hubs", () => {
+    render(
+      <LocaleProvider initialLocale="es">
+        <VenuesDirectoryContent groups={FIXTURE_GROUPS} />
+      </LocaleProvider>,
+    );
+    const nav = screen.getByRole("navigation", { name: t("venues.browseTopics", "es") });
+    expect([...nav.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual([
+      "/es/food-pantries",
+      "/es/snap-wic-stores",
+      "/es/community-gardens",
+    ]);
+  });
+});

@@ -36,6 +36,10 @@ const HOME_CRAWL_LINKS = [
   { href: "/es/venues", label: "Todos los recursos alimentarios en el Condado de Pueblo" }, // [CHECK]
   { href: "/es/resources", label: "Programas de ayuda alimentaria (SNAP, WIC, 2-1-1)" }, // [CHECK]
   { href: "/es/about", label: "Acerca de Pueblo Food Map" }, // [CHECK]
+  // SEO Phase 3 hubs (#709)
+  { href: "/es/food-pantries", label: "Despensas de alimentos en el Condado de Pueblo" }, // [CHECK]
+  { href: "/es/snap-wic-stores", label: "Lugares que aceptan SNAP y WIC" }, // [CHECK]
+  { href: "/es/community-gardens", label: "Huertos comunitarios en el Condado de Pueblo" }, // [CHECK]
 ] as const;
 
 const HOME_CRAWL_LINK_CLASS =

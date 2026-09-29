@@ -17,6 +17,7 @@
  * Pueblo County DHS). Re-check them when editing — phone hours drift.
  */
 
+import type { ReactNode } from "react";
 import { Phone, MessageSquareText, ExternalLink, ChevronDown } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
@@ -91,7 +92,9 @@ const ACTION_CLASS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   PRESS_FEEDBACK;
 
-export default function ResourcesContent() {
+/** `faq` is a server-rendered node (ResourcesFaq, #709) passed through as a prop,
+ * so its text and FAQPage JSON-LD reach the server HTML without client JS. */
+export default function ResourcesContent({ faq }: { faq?: ReactNode }) {
   const { locale, tree } = useLocale();
   // <title> follows locale client-side (#589) — resources.heading's EN
   // value ("Food help programs") matches page.tsx's metadata title exactly.
@@ -190,6 +193,8 @@ export default function ResourcesContent() {
             </details>
           </section>
         ))}
+
+        {faq && <div className="pt-4">{faq}</div>}
 
         <p className="text-xs text-[var(--color-ink-500)] leading-relaxed">
           {t("resources.checked", locale)}

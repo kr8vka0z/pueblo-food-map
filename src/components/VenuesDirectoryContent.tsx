@@ -22,6 +22,12 @@ import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/h
 import type { Venue, VenueCategory } from "@/types/venue";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
+const HUB_LINKS = [
+  { path: "/food-pantries", labelKey: "footer.foodPantries" },
+  { path: "/snap-wic-stores", labelKey: "footer.snapWic" },
+  { path: "/community-gardens", labelKey: "footer.gardens" },
+] as const;
+
 interface VenuesDirectoryContentProps {
   groups: { category: VenueCategory; items: Venue[] }[];
 }
@@ -51,6 +57,29 @@ export default function VenuesDirectoryContent({ groups }: VenuesDirectoryConten
           <p className="mt-2 text-sm text-[var(--color-ink-700)]">
             {t("venues.intro", locale)}
           </p>
+          {/* SEO Phase 3 hubs (#709): crawlable links to the topic pages. */}
+          <nav aria-label={t("venues.browseTopics", locale)} className="mt-3">
+            <p className="text-sm font-semibold text-[var(--color-ink-700)]">
+              {t("venues.browseTopics", locale)}
+            </p>
+            <ul className="flex flex-col">
+              {HUB_LINKS.map(({ path, labelKey }) => (
+                <li key={path}>
+                  <Link
+                    href={localizedHref(path, tree)}
+                    className={
+                      "inline-flex items-center min-h-12 text-base font-semibold text-[var(--color-sage-600)] " +
+                      "hover:text-[var(--color-sage-700)] transition-colors " +
+                      "focus-visible:outline-none focus-visible:ring-2 " +
+                      "focus-visible:ring-[var(--color-sage-500)] rounded"
+                    }
+                  >
+                    {t(labelKey, locale)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
 
         {groups.map(({ category, items }) => {

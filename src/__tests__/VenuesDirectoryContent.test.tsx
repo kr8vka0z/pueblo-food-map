@@ -13,6 +13,7 @@ import { render, screen } from "@testing-library/react";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import VenuesDirectoryContent from "@/components/VenuesDirectoryContent";
+import { PLACEHOLDER_ADDRESS } from "@/lib/venueSummary";
 import type { Venue } from "@/types/venue";
 
 // PageNav (bottom nav + drawer) has its own test; stub it so this page test
@@ -85,5 +86,24 @@ describe("VenuesDirectoryContent — hub links", () => {
       "/es/snap-wic-stores",
       "/es/community-gardens",
     ]);
+  });
+});
+
+// Truth rule: the OSM placeholder is never shown; a real address still is.
+describe("VenuesDirectoryContent — placeholder address", () => {
+  test("omits the placeholder, keeps real addresses", () => {
+    const base = FIXTURE_GROUPS[0].items[0];
+    const groups = [
+      {
+        category: "pantry" as const,
+        items: [
+          { ...base, id: "p1", name: "Placeholder Pantry", address: PLACEHOLDER_ADDRESS },
+          { ...base, id: "p2", name: "Real Pantry", address: "2 Test St, Pueblo, CO" },
+        ],
+      },
+    ];
+    const { container } = render(<VenuesDirectoryContent groups={groups} />);
+    expect(container.textContent).not.toContain("Address not in");
+    expect(screen.getByText("2 Test St, Pueblo, CO")).toBeDefined();
   });
 });

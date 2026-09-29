@@ -11,7 +11,7 @@
 import type { Metadata } from "next";
 import { buildPageMetadata } from "@/lib/site";
 import ResourcesContent from "@/components/ResourcesContent";
-import ResourcesFaq from "@/components/ResourcesFaq";
+import { resourcesFaqJsonLd } from "@/lib/resourcesFaq";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Food help programs",
@@ -23,5 +23,5 @@ export const metadata: Metadata = buildPageMetadata({
 });
 
 export default function ResourcesPage() {
-  return <ResourcesContent faq={<ResourcesFaq locale="en" />} />;
+  return <ResourcesContent faqJsonLd={resourcesFaqJsonLd("en")} />;
 }

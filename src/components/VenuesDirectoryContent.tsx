@@ -19,6 +19,7 @@ import { localizedHref } from "@/lib/localizedHref";
 import { pageDocumentTitle } from "@/lib/site";
 import SiteFooter from "@/components/SiteFooter";
 import { DISPLAY_DAY_KEYS, formatSlot, describeIrregularSchedule } from "@/lib/hours";
+import { PLACEHOLDER_ADDRESS } from "@/lib/venueSummary";
 import type { Venue, VenueCategory } from "@/types/venue";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
@@ -133,7 +134,10 @@ export default function VenuesDirectoryContent({ groups }: VenuesDirectoryConten
                       >
                         {v.name}
                       </Link>
-                      <p className="mt-0.5 text-sm text-[var(--color-ink-500)]">{v.address}</p>
+                      {/* Truth rule: never show the OSM placeholder (same guard as the hub pages). */}
+                      {v.address !== PLACEHOLDER_ADDRESS && (
+                        <p className="mt-0.5 text-sm text-[var(--color-ink-500)]">{v.address}</p>
+                      )}
                       <p className="mt-0.5 text-sm text-[var(--color-ink-500)]">{hoursText}</p>
                     </li>
                   );

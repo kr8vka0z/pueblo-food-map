@@ -1,8 +1,11 @@
 /**
- * ResourcesFaq — the "Common questions" FAQ on /resources and /es/resources (#709).
+ * resourcesFaqJsonLd — FAQPage JSON-LD for the "Common questions" FAQ on /resources
+ * and /es/resources (#709).
  *
- * Server component, handed to the client ResourcesContent as its `faq` prop, so
- * the FAQ text and FAQPage JSON-LD are in the server HTML with no client JS.
+ * The page passes this string (fixed to the tree's locale, server-rendered) to
+ * the client ResourcesContent, which renders the visible Q&As itself at the
+ * visitor's locale (the /about pattern). For the tree's own locale the visible
+ * text equals this JSON-LD exactly: both come from faqItemsFor.
  *
  * SOURCES for the answers (i18n keys `resources.faq.*`), all fetched 2026-09-28.
  * Every answer is general; none makes a claim about eligibility, ID, income or
@@ -30,20 +33,15 @@
  *   a4 Emergency food: https://www.211colorado.org/food-assistance/ — dial 2-1-1
  *      or (866) 760-6489, text ZIP to 898-211 (the page gives no hours, so none
  *      are stated for 2-1-1); Food Resource Hotline hours (Mon-Thu 8:30-4:30,
- *      Fri 8-noon) and "food pantries, free meal sites" from the hotline page above.
+ *      Fri 8-noon) and "food pantries" and "meal sites" from the hotline page above (the word
+ *      "free" before "meal sites" in the answer copy is ours, not a quote).
  * Re-check these when editing: phone hours drift.
  */
 
-import { t, type Locale } from "@/lib/i18n";
-import FaqSection, { faqItemsFor } from "@/components/FaqSection";
+import type { Locale } from "@/lib/i18n";
+import { faqItemsFor } from "@/lib/faqItems";
+import { buildFaqJsonLd, serializeJsonLd } from "@/lib/venueSchema";
 
-export default function ResourcesFaq({ locale }: { locale: Locale }) {
-  return (
-    <FaqSection
-      id="resources-faq-heading"
-      heading={t("resources.faq.heading", locale)}
-      items={faqItemsFor("resources.faq", 4, locale)}
-      locale={locale}
-    />
-  );
+export function resourcesFaqJsonLd(locale: Locale): string {
+  return serializeJsonLd(buildFaqJsonLd(faqItemsFor("resources.faq", 4, locale), locale));
 }

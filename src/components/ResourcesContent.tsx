@@ -17,7 +17,6 @@
  * Pueblo County DHS). Re-check them when editing — phone hours drift.
  */
 
-import type { ReactNode } from "react";
 import { Phone, MessageSquareText, ExternalLink, ChevronDown } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
@@ -26,6 +25,8 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { pageDocumentTitle } from "@/lib/site";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import SiteFooter from "@/components/SiteFooter";
+import FaqList from "@/components/FaqList";
+import { faqItemsFor } from "@/lib/faqItems";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
 type Action =
@@ -92,9 +93,11 @@ const ACTION_CLASS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   PRESS_FEEDBACK;
 
-/** `faq` is a server-rendered node (ResourcesFaq, #709) passed through as a prop,
- * so its text and FAQPage JSON-LD reach the server HTML without client JS. */
-export default function ResourcesContent({ faq }: { faq?: ReactNode }) {
+/** `faqJsonLd` is the pre-serialized FAQPage JSON-LD (src/lib/resourcesFaq.ts),
+ * fixed to the route tree's locale and server-rendered. The visible FAQ is
+ * rendered here at the visitor's locale, like the cards above — the /about
+ * pattern — so a Spanish-cookie visitor never sees an English FAQ. */
+export default function ResourcesContent({ faqJsonLd }: { faqJsonLd?: string }) {
   const { locale, tree } = useLocale();
   // <title> follows locale client-side (#589) — resources.heading's EN
   // value ("Food help programs") matches page.tsx's metadata title exactly.
@@ -194,7 +197,16 @@ export default function ResourcesContent({ faq }: { faq?: ReactNode }) {
           </section>
         ))}
 
-        {faq && <div className="pt-4">{faq}</div>}
+        <div className="pt-4">
+          {faqJsonLd && (
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: faqJsonLd }} />
+          )}
+          <FaqList
+            id="resources-faq-heading"
+            heading={t("resources.faq.heading", locale)}
+            items={faqItemsFor("resources.faq", 4, locale)}
+          />
+        </div>
 
         <p className="text-xs text-[var(--color-ink-500)] leading-relaxed">
           {t("resources.checked", locale)}

@@ -8,7 +8,9 @@
 import { describe, test, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { CommunityGardensHub, FoodPantriesHub, SnapWicHub } from "@/components/HubPages";
-import ResourcesFaq from "@/components/ResourcesFaq";
+import ResourcesContent from "@/components/ResourcesContent";
+import { LocaleProvider } from "@/lib/LocaleContext";
+import { resourcesFaqJsonLd } from "@/lib/resourcesFaq";
 import { t } from "@/lib/i18n";
 import { PLACEHOLDER_ADDRESS } from "@/lib/venueSummary";
 import type { Venue } from "@/types/venue";
@@ -162,8 +164,8 @@ describe("CommunityGardensHub", () => {
   test("free wording appears (both categories are in FREE_CATEGORIES); groups by category", () => {
     render(<CommunityGardensHub locale="en" venues={list} />);
     expect(screen.getByText(/There are 2 free community gardens and edible landscapes/)).toBeDefined();
-    expect(screen.getByRole("heading", { level: 2, name: t("category.full.garden", "en") })).toBeDefined();
-    expect(screen.getByRole("heading", { level: 2, name: t("category.full.edible_landscape", "en") })).toBeDefined();
+    expect(screen.getByRole("heading", { level: 2, name: t("hubs.gardens.section.garden", "en") })).toBeDefined();
+    expect(screen.getByRole("heading", { level: 2, name: t("hubs.gardens.section.edible_landscape", "en") })).toBeDefined();
     expect(screen.queryByText("A Store")).toBeNull();
   });
 
@@ -180,15 +182,21 @@ describe("CommunityGardensHub", () => {
   });
 });
 
-describe("ResourcesFaq", () => {
+describe("/resources FAQ (ResourcesContent + resourcesFaqJsonLd)", () => {
+  function renderPage(tree: "en" | "es", jsonLdLocale: "en" | "es" = tree) {
+    return render(
+      <LocaleProvider initialLocale={tree}>
+        <ResourcesContent faqJsonLd={resourcesFaqJsonLd(jsonLdLocale)} />
+      </LocaleProvider>,
+    );
+  }
+
   test.each(["en", "es"] as const)("%s: four Q&As, FAQPage JSON-LD text equals the visible text", (locale) => {
-    const { container } = render(<ResourcesFaq locale={locale} />);
-    const faq = jsonLd(container)[0] as {
-      "@type": string;
+    const { container } = renderPage(locale);
+    const faq = jsonLd(container).find((b) => b["@type"] === "FAQPage") as {
       inLanguage: string;
       mainEntity: { name: string; acceptedAnswer: { text: string } }[];
     };
-    expect(faq["@type"]).toBe("FAQPage");
     expect(faq.inLanguage).toBe(locale);
     expect(faq.mainEntity).toHaveLength(4);
     for (const q of faq.mainEntity) {
@@ -199,10 +207,25 @@ describe("ResourcesFaq", () => {
     expect(container.textContent).not.toMatch(/resources\.faq\./);
   });
 
-  test("EN answers state no eligibility/ID/income/immigration claim", () => {
-    const { container } = render(<ResourcesFaq locale="en" />);
-    // "income" appears once, in the SNAP answer: the county decides based on it (CDHS wording).
-    const text = container.textContent ?? "";
-    expect(text).not.toMatch(/immigration|citizen|proof of|need (an? )?ID/i);
+  test("the visible FAQ follows the visitor's locale, not the JSON-LD's tree", () => {
+    // Spanish visitor (cookie/provider) on the EN page: JSON-LD stays English,
+    // the visible FAQ is Spanish.
+    const { container } = renderPage("es", "en");
+    expect(screen.getByRole("heading", { level: 2, name: t("resources.faq.heading", "es") })).toBeDefined();
+    const faq = jsonLd(container).find((b) => b["@type"] === "FAQPage") as { inLanguage: string };
+    expect(faq.inLanguage).toBe("en");
+  });
+
+  test("Spanish copy names the hotline like the card does (Recursos, not Ayuda)", () => {
+    renderPage("es");
+    expect(document.body.textContent).not.toContain("Línea de Ayuda Alimentaria");
+  });
+
+  test("EN answers state no eligibility/ID/immigration claim", () => {
+    const { container } = renderPage("en");
+    // Only the FAQ section: the program cards above it have their own, separately sourced text.
+    const faq = container.querySelector("section[aria-labelledby='resources-faq-heading']")?.textContent ?? "";
+    expect(faq.length).toBeGreaterThan(0);
+    expect(faq).not.toMatch(/immigration|citizen|proof of|need (an? )?ID/i);
   });
 });

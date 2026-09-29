@@ -34,7 +34,8 @@ import {
 import type { Venue } from "@/types/venue";
 import PageNav, { PAGE_NAV_CLEARANCE } from "@/components/PageNav";
 import SiteFooter from "@/components/SiteFooter";
-import FaqSection, { faqItemsFor } from "@/components/FaqSection";
+import FaqSection from "@/components/FaqSection";
+import { faqItemsFor } from "@/lib/faqItems";
 
 const PLACE_LINK_CLASS =
   "inline-flex items-center min-h-12 text-base font-semibold text-[var(--color-sage-600)] " +
@@ -172,7 +173,7 @@ export function CommunityGardensHub({ locale, venues }: { locale: Locale; venues
       {groups.map(({ category, items }) => (
         <section key={category} aria-labelledby={`${category}-heading`}>
           <h2 id={`${category}-heading`} className="text-lg font-semibold text-[var(--color-ink-700)] mb-2">
-            {t(`category.full.${category}`, locale)}
+            {t(`hubs.gardens.section.${category}`, locale)}
           </h2>
           <ul className="space-y-4">
             {items.map((v) => (

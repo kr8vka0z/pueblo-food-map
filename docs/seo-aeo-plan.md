@@ -170,6 +170,12 @@ still in progress), so that path is covered only by a synthetic fixture.
 
 ### Phase 3: Hub pages for the queries people type (one PR)
 
+**Status:** PR A (#709) built `/food-pantries`, `/snap-wic-stores`,
+`/community-gardens` (each with an `/es` twin) and the `/resources` FAQ. Items 2
+(`/blessing-boxes`) and `/meal-sites` are later PRs. See ARCHITECTURE.md "Hub pages".
+Live counts today: 33 pantries, 50 SNAP, 8 WIC (the "49 WIC" below is stale; the
+pages compute counts from data).
+
 Static, server-rendered, `buildPageMetadata`, ItemList JSON-LD, a short FAQ,
 linked from `/venues`, the footer and the `/` nav block, and in the sitemap.
 Verify each on staging (the `staticAssetsIncrementalCache` trap).

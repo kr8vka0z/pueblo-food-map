@@ -10,6 +10,7 @@ import type { Metadata } from "next";
 import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
 import ResourcesContent from "@/components/ResourcesContent";
+import { resourcesFaqJsonLd } from "@/lib/resourcesFaq";
 
 export const metadata: Metadata = buildPageMetadata({
   title: t("meta.resources.title", "es"),
@@ -20,5 +21,5 @@ export const metadata: Metadata = buildPageMetadata({
 });
 
 export default function EsResourcesPage() {
-  return <ResourcesContent />;
+  return <ResourcesContent faqJsonLd={resourcesFaqJsonLd("es")} />;
 }

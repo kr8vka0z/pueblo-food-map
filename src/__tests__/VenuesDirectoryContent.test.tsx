@@ -13,6 +13,7 @@ import { render, screen } from "@testing-library/react";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import VenuesDirectoryContent from "@/components/VenuesDirectoryContent";
+import { PLACEHOLDER_ADDRESS } from "@/lib/venueSummary";
 import type { Venue } from "@/types/venue";
 
 // PageNav (bottom nav + drawer) has its own test; stub it so this page test
@@ -58,5 +59,51 @@ describe("VenuesDirectoryContent — locale", () => {
     ).toBeDefined();
     expect(screen.getByText(t("category.full.pantry", "es"))).toBeDefined();
     expect(screen.getByText(t("venues.noHours", "es"))).toBeDefined();
+  });
+});
+
+// #709: crawlable links to the three hub pages, each in its own tree.
+describe("VenuesDirectoryContent — hub links", () => {
+  test("EN links to the three hubs", () => {
+    render(<VenuesDirectoryContent groups={FIXTURE_GROUPS} />);
+    const nav = screen.getByRole("navigation", { name: t("venues.browseTopics", "en") });
+    expect([...nav.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual([
+      "/food-pantries",
+      "/snap-wic-stores",
+      "/community-gardens",
+    ]);
+  });
+
+  test("ES tree links to the /es hubs", () => {
+    render(
+      <LocaleProvider initialLocale="es">
+        <VenuesDirectoryContent groups={FIXTURE_GROUPS} />
+      </LocaleProvider>,
+    );
+    const nav = screen.getByRole("navigation", { name: t("venues.browseTopics", "es") });
+    expect([...nav.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual([
+      "/es/food-pantries",
+      "/es/snap-wic-stores",
+      "/es/community-gardens",
+    ]);
+  });
+});
+
+// Truth rule: the OSM placeholder is never shown; a real address still is.
+describe("VenuesDirectoryContent — placeholder address", () => {
+  test("omits the placeholder, keeps real addresses", () => {
+    const base = FIXTURE_GROUPS[0].items[0];
+    const groups = [
+      {
+        category: "pantry" as const,
+        items: [
+          { ...base, id: "p1", name: "Placeholder Pantry", address: PLACEHOLDER_ADDRESS },
+          { ...base, id: "p2", name: "Real Pantry", address: "2 Test St, Pueblo, CO" },
+        ],
+      },
+    ];
+    const { container } = render(<VenuesDirectoryContent groups={groups} />);
+    expect(container.textContent).not.toContain("Address not in");
+    expect(screen.getByText("2 Test St, Pueblo, CO")).toBeDefined();
   });
 });

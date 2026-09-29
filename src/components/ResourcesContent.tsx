@@ -25,6 +25,8 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { pageDocumentTitle } from "@/lib/site";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import SiteFooter from "@/components/SiteFooter";
+import FaqList from "@/components/FaqList";
+import { faqItemsFor } from "@/lib/faqItems";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
 
 type Action =
@@ -91,7 +93,11 @@ const ACTION_CLASS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   PRESS_FEEDBACK;
 
-export default function ResourcesContent() {
+/** `faqJsonLd` is the pre-serialized FAQPage JSON-LD (src/lib/resourcesFaq.ts),
+ * fixed to the route tree's locale and server-rendered. The visible FAQ is
+ * rendered here at the visitor's locale, like the cards above — the /about
+ * pattern — so a Spanish-cookie visitor never sees an English FAQ. */
+export default function ResourcesContent({ faqJsonLd }: { faqJsonLd?: string }) {
   const { locale, tree } = useLocale();
   // <title> follows locale client-side (#589) — resources.heading's EN
   // value ("Food help programs") matches page.tsx's metadata title exactly.
@@ -190,6 +196,17 @@ export default function ResourcesContent() {
             </details>
           </section>
         ))}
+
+        <div className="pt-4">
+          {faqJsonLd && (
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: faqJsonLd }} />
+          )}
+          <FaqList
+            id="resources-faq-heading"
+            heading={t("resources.faq.heading", locale)}
+            items={faqItemsFor("resources.faq", 4, locale)}
+          />
+        </div>
 
         <p className="text-xs text-[var(--color-ink-500)] leading-relaxed">
           {t("resources.checked", locale)}

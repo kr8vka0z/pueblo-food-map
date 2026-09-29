@@ -12,7 +12,8 @@
  * from — it can never change client-side, unlike `locale`.
  *
  * Only MIRRORED paths (#689 scope table: /, /venues, /venue/<id>,
- * /resources, /about) get rewritten. A path with no /es counterpart
+ * /resources, /about, plus the #709 hubs /food-pantries, /snap-wic-stores,
+ * /community-gardens) get rewritten. A path with no /es counterpart
  * (/suggest, /privacy, /feedback, /boxes/activity, ...) is returned
  * unchanged even when `tree` is "es" — those pages deliberately stay
  * single-URL (issue #689 "Out" scope), so a link to them from an /es page
@@ -20,7 +21,16 @@
  */
 import type { Locale } from "@/lib/i18n";
 
-const MIRRORED_STATIC = new Set(["/", "/venues", "/resources", "/about"]);
+// SEO Phase 3 hubs (#709) are mirrored too: each has an /es twin.
+const MIRRORED_STATIC = new Set([
+  "/",
+  "/venues",
+  "/resources",
+  "/about",
+  "/food-pantries",
+  "/snap-wic-stores",
+  "/community-gardens",
+]);
 
 function isMirrored(basePath: string): boolean {
   return MIRRORED_STATIC.has(basePath) || basePath.startsWith("/venue/");

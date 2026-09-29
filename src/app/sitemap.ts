@@ -16,7 +16,7 @@
  * that every static URL below maps to a real page.tsx.
  *
  * #689 PR 2 (design decision 10): every MIRRORED route (/, /venues,
- * /venue/<id>, /resources, /about) gets a matching /es entry, and EACH of
+ * /venue/<id>, /resources, /about, plus the #709 hubs) gets a matching /es entry, and EACH of
  * the pair carries `alternates.languages` pointing at the other — Next's
  * MetadataRoute.Sitemap supports this per-entry (node_modules/next/dist/
  * docs/.../metadata/sitemap.md, "Generating a localized sitemap"). Only
@@ -82,6 +82,45 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.8,
       alternates: esAlternates("/resources"),
+    },
+    // WHY 0.8 / weekly: the SEO Phase 3 hub pages (#709) are the pages meant to
+    // rank for "food pantry Pueblo", "SNAP stores Pueblo" etc. — same tier as
+    // /about and /resources, and the lists change with each Publish.
+    {
+      url: `${SITE_URL}/food-pantries`,
+      changeFrequency: "weekly",
+      priority: 0.8,
+      alternates: esAlternates("/food-pantries"),
+    },
+    {
+      url: `${SITE_URL}/es/food-pantries`,
+      changeFrequency: "weekly",
+      priority: 0.8,
+      alternates: esAlternates("/food-pantries"),
+    },
+    {
+      url: `${SITE_URL}/snap-wic-stores`,
+      changeFrequency: "weekly",
+      priority: 0.8,
+      alternates: esAlternates("/snap-wic-stores"),
+    },
+    {
+      url: `${SITE_URL}/es/snap-wic-stores`,
+      changeFrequency: "weekly",
+      priority: 0.8,
+      alternates: esAlternates("/snap-wic-stores"),
+    },
+    {
+      url: `${SITE_URL}/community-gardens`,
+      changeFrequency: "weekly",
+      priority: 0.8,
+      alternates: esAlternates("/community-gardens"),
+    },
+    {
+      url: `${SITE_URL}/es/community-gardens`,
+      changeFrequency: "weekly",
+      priority: 0.8,
+      alternates: esAlternates("/community-gardens"),
     },
     {
       // WHY 0.7: a browse/discovery page (the crawlable counterpart to the

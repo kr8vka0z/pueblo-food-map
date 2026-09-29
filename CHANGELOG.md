@@ -52,10 +52,7 @@ Pueblo Food Map's public launch. Everything added since June.
 - The bottom bar, search bar and Menu no longer cover or block each other. ([#544](https://github.com/kr8vka0z/pueblo-food-map/issues/544)) ([#548](https://github.com/kr8vka0z/pueblo-food-map/issues/548)) ([#533](https://github.com/kr8vka0z/pueblo-food-map/issues/533)) ([#535](https://github.com/kr8vka0z/pueblo-food-map/issues/535)) ([#538](https://github.com/kr8vka0z/pueblo-food-map/issues/538)) ([#546](https://github.com/kr8vka0z/pueblo-food-map/issues/546)) ([#467](https://github.com/kr8vka0z/pueblo-food-map/issues/467))
 - Tapping a Blessing Box opens its card instead of a blank history page. ([#634](https://github.com/kr8vka0z/pueblo-food-map/issues/634))
 - Admin coordinate fields no longer change by accident when you scroll. ([#441](https://github.com/kr8vka0z/pueblo-food-map/issues/441))
-
-### Security updates
-
-- Stronger protection for the site and its forms, including spam limits, safer sign-in cookies, stricter browser security rules, and updated software. ([#283](https://github.com/kr8vka0z/pueblo-food-map/issues/283)) ([#357](https://github.com/kr8vka0z/pueblo-food-map/issues/357)) ([#371](https://github.com/kr8vka0z/pueblo-food-map/issues/371)) ([#425](https://github.com/kr8vka0z/pueblo-food-map/issues/425)) ([#606](https://github.com/kr8vka0z/pueblo-food-map/issues/606)) ([#614](https://github.com/kr8vka0z/pueblo-food-map/issues/614)) ([#618](https://github.com/kr8vka0z/pueblo-food-map/issues/618)) ([#629](https://github.com/kr8vka0z/pueblo-food-map/issues/629))
+- Security updates: stronger protection for the site and its forms, including spam limits, safer sign-in cookies, stricter browser security rules, and updated software. ([#283](https://github.com/kr8vka0z/pueblo-food-map/issues/283)) ([#357](https://github.com/kr8vka0z/pueblo-food-map/issues/357)) ([#371](https://github.com/kr8vka0z/pueblo-food-map/issues/371)) ([#425](https://github.com/kr8vka0z/pueblo-food-map/issues/425)) ([#606](https://github.com/kr8vka0z/pueblo-food-map/issues/606)) ([#614](https://github.com/kr8vka0z/pueblo-food-map/issues/614)) ([#618](https://github.com/kr8vka0z/pueblo-food-map/issues/618)) ([#629](https://github.com/kr8vka0z/pueblo-food-map/issues/629))
 
 ## [0.1.7](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.6...v0.1.7) (2026-06-30)
 

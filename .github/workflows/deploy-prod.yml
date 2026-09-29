@@ -265,3 +265,100 @@ jobs:
       - name: Notify Healthchecks.io of deploy failure
         if: failure()
         run: curl -fsS --retry 3 "${{ secrets.HC_PING_URL }}/fail"
+
+  # Weekly-release bookkeeping (AGENTS.md "Release schedule"). Separate job so
+  # the deploy job above keeps its read-only token, and so it only runs once the
+  # smoke checks passed (`needs` skips it on failure): a red deploy must never
+  # get a tag or a "released" GitHub Release.
+  #
+  # Idempotent on purpose: the version in package.json names the release, and a
+  # push that doesn't change it (a publish-bot venue-data merge) finds the tag
+  # already present and does nothing. Only a release/hotfix merge, which bumps
+  # the version, creates a tag.
+  #
+  # App token, not GITHUB_TOKEN, for the back-merge PR: a PR opened with the
+  # built-in token starts no CI (#367), so it could never meet the required
+  # checks and auto-merge would wait forever. Node comes preinstalled on the
+  # runner image; `npm version` needs no install.
+  release:
+    name: Tag, publish release, sync back to dev
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Mint a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Check whether this version is already released
+        id: ver
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "v$version already released; nothing to do."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # `--target` pins the tag to the commit that was just deployed, so a
+      # later push to main can't move where v$version points.
+      - name: Create tag and GitHub Release
+        if: steps.ver.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          bash scripts/release/section.sh "$VERSION" > "$RUNNER_TEMP/notes.md"
+          gh release create "v$VERSION" --target "$GITHUB_SHA" \
+            --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+
+      # Merge commits are disabled repo-wide, so `main` can't be merged back
+      # into `dev`. Instead carry over the only two things a release changes
+      # that dev must also have — the version and the changelog — as a normal
+      # squash PR. This carries NO code: a weekly release's code is already on dev,
+  # but a hotfix's fix is not — AGENTS.md's hotfix lane has its own hotfix -> dev
+  # PR for that. Files are scoped narrowly on purpose: taking main's whole
+      # package.json would clobber Dependabot bumps already on dev. dev never
+      # edits CHANGELOG.md itself (release.yml is its only writer), so main's
+      # copy is safe to take whole.
+      - name: Open sync PR back into dev
+        if: steps.ver.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          branch="chore/sync-v$VERSION"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "$branch already exists; skipping."; exit 0
+          fi
+          git fetch --depth=1 origin dev
+          git config user.name "pueblo-release-bot"
+          git config user.email "pueblo-release-bot@users.noreply.github.com"
+          git switch -c "$branch" FETCH_HEAD
+          git checkout "$GITHUB_SHA" -- CHANGELOG.md
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          # Stage first: `git checkout <sha> -- file` stages its change, which a
+          # plain `git diff --quiet` (unstaged only) would miss.
+          git add package.json package-lock.json CHANGELOG.md
+          if git diff --cached --quiet; then echo "dev already has v$VERSION."; exit 0; fi
+          git commit -m "chore(release): sync v$VERSION back to dev"
+          git push origin "$branch"
+          url=$(gh pr create --base dev --head "$branch" \
+            --title "chore(release): sync v$VERSION back to dev" \
+            --body "Automatic. Carries the v$VERSION version bump and changelog from main back to dev after the release deployed.")
+          gh pr merge --auto --squash "$url"

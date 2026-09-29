@@ -731,7 +731,8 @@ The app is a Next.js App Router project compiled for Cloudflare Workers by
 (`deploy-prod.yml`'s header explains why the two must never run together).
 Push to `main` → `deploy-prod.yml` deploys the top-level `wrangler.jsonc`
 Worker (`pueblo-food-map`, pueblofoodmap.com); push to `dev` →
-`deploy-dev.yml` deploys the staging Worker at dev.pueblofoodmap.com. Only
+`deploy-dev.yml` deploys the staging Worker at dev.pueblofoodmap.com. `main`
+only receives the weekly release PR, `hotfix/*` and `publish-bot` (below). Only
 `deploy-prod.yml` has a `workflow_dispatch` recovery trigger.
 
 **CI is the gate.** `ci.yml` runs `lint → design:lint → design:drift →
@@ -748,6 +749,25 @@ subset) and `npm audit`; typecheck and build always run. The diff check, not
 the branch name, is the safety property — see `ci.yml`'s "Detect data-only
 publish-bot PR" step comment.
 
+**Weekly release flow (replaced ad-hoc `dev` → `main` promotions).** Work
+merges to `dev` all week (`pr-title.yml` requires Conventional Commit PR
+titles). `release.yml` (cron Sun 02:00 UTC = Saturday evening Mountain, or
+`workflow_dispatch`) runs `scripts/release/prepare.mjs` — next version from
+the merged-PR titles (`feat` → minor, else patch; major only when forced),
+bumps `package.json`/lock, lists the PRs — has Claude write the plain-language
+CHANGELOG.md section, and opens `Release vX.Y.Z` from `release/vX.Y.Z` into
+`main`. Merging it (squash; merge commits are disabled) triggers
+`deploy-prod.yml`; once the smoke checks pass its `release` job tags
+`vX.Y.Z`, publishes the GitHub Release from that CHANGELOG section, and opens
+an auto-merging sync PR carrying the version + changelog back to `dev`. It is
+a no-op when `package.json`'s version already has a release, which is what
+keeps `publish-bot` merges (no version change) from tagging anything.
+`main-source-guard` (`main-source-guard.yml`) rejects PRs into `main` unless
+from `release/*`, `hotfix/*` or `publish-bot`. Because releases are squashes,
+the `v*` tag is not an ancestor of `dev`; the cut also pushes `cut/vX.Y.Z` on
+the dev commit it was cut from, which is where the next release's PR list
+starts. Operating rules and the hotfix lane: AGENTS.md "Release schedule".
+
 **`GITHUB_TOKEN` pushes don't trigger workflows.** GitHub won't start a
 workflow for a push made with `GITHUB_TOKEN`, so a workflow that merges into
 `main` that way lands a commit that never deploys, with no red signal.
@@ -757,7 +777,7 @@ why Publish uses the `GITHUB_PUBLISH_TOKEN` PAT. Auto-merge only waits for CI
 because the `dev` ruleset requires the same checks as `main` (delete that
 ruleset and auto-merge silently becomes merge-on-open). A consequence: a
 dependency bump, security bumps included, waits on `dev` until the next
-promotion. Any new workflow that pushes to `main` must avoid `GITHUB_TOKEN`. Incident history:
+weekly release. Any new workflow that pushes to `main` must avoid `GITHUB_TOKEN`. Incident history:
 atlas-kb "PFM ARCHITECTURE History — 2026-09-24 Trim".
 
 **Environment variables:** `NEXT_PUBLIC_*` vars are baked into the client

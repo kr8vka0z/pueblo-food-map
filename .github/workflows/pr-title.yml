@@ -1,0 +1,38 @@
+# Fails a PR into `dev` whose title isn't a Conventional Commit.
+#
+# WHY: PRs are squash-merged, so the PR title becomes the commit subject on
+# `dev`. scripts/release/prepare.mjs reads those subjects to pick the weekly
+# version (feat -> minor, else patch) and to list what shipped; a title without
+# a type is invisible to that. Enforced here, at the one place titles are set,
+# rather than trusting reviewers to notice.
+#
+# No third-party action: a title is one regex. The title reaches the shell
+# through `env`, never `${{ }}` inside `run:`, because it is attacker-chosen text.
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [dev]
+
+permissions:
+  contents: read
+
+jobs:
+  conventional-title:
+    name: Conventional PR title
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if printf '%s' "$TITLE" | grep -Eq '^(feat|fix|perf|refactor|docs|chore|ci|test|build|style|revert)(\([^)]+\))?!?: .+'; then
+            echo "OK: $TITLE"
+          else
+            echo "PR title must be a Conventional Commit: type(scope)!: description" >&2
+            echo "types: feat fix perf refactor docs chore ci test build style revert" >&2
+            echo "got:   $TITLE" >&2
+            exit 1
+          fi

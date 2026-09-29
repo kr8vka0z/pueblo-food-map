@@ -1,0 +1,173 @@
+# Weekly release cut: Saturday 8pm Mountain (Sun 02:00 UTC; 7pm in winter) this
+# opens a `Release vX.Y.Z` PR from `dev` into `main`. Kyle reviews it Sunday,
+# and merging it (squash — merge commits are disabled repo-wide) deploys prod
+# via deploy-prod.yml, which then tags and publishes the GitHub Release.
+# Process + rules: AGENTS.md "Release schedule".
+#
+# WHY every push/PR here uses a GitHub App token, not GITHUB_TOKEN: pushes and
+# PRs made with the built-in token deliberately fire no workflows (#367), so
+# the release PR would sit with no CI and could never satisfy the required
+# checks. The App is the one dependabot-auto-merge.yml already uses; its
+# RELEASE_PLEASE_APP_* secret names are historical.
+#
+# WHY this only registers once it is on `main`: GitHub runs `schedule` and
+# `workflow_dispatch` only from the default branch's copy of a workflow. The
+# first release is therefore cut by hand (see AGENTS.md); this file starts
+# working after that release reaches main. It always checks out `dev` on
+# purpose — a scheduled run's default checkout would be `main`.
+name: Weekly release
+
+on:
+  schedule:
+    - cron: "0 2 * * 0"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Force this version (X.Y.Z). Empty = computed. Use for a major bump."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-release
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    name: Cut release PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # claude-code-action exchanges an OIDC token for its own access.
+      id-token: write
+    steps:
+      - name: Mint a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: dev
+          # Full history + tags: prepare.mjs walks dev back to the last release.
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      # One open release PR at a time: cutting a second while last week's is
+      # unreviewed would ship two overlapping changelogs.
+      - name: Skip if a release PR is already open
+        id: open
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          n=$(gh pr list --base main --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("release/"))] | length')
+          echo "open=$n" >> "$GITHUB_OUTPUT"
+          [ "$n" = "0" ] || echo "::warning::A release PR is already open; skipping this cut."
+
+      # Exit 3 = no PRs since the last release: not a failure, just nothing to do.
+      - name: Compute version and PR list
+        id: prep
+        if: steps.open.outputs.open == '0'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          FORCE_VERSION: ${{ inputs.version }}
+        run: |
+          set +e
+          args=(--out "$GITHUB_WORKSPACE/.release-prs.md")
+          [ -z "$FORCE_VERSION" ] || args+=(--version "$FORCE_VERSION")
+          node scripts/release/prepare.mjs "${args[@]}"
+          rc=$?
+          set -e
+          if [ "$rc" = "3" ]; then echo "run=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          [ "$rc" = "0" ] || exit "$rc"
+          echo "run=true" >> "$GITHUB_OUTPUT"
+          echo "date=$(TZ=America/Denver date +%F)" >> "$GITHUB_OUTPUT"
+
+      # The PR-list file sits in the workspace (not RUNNER_TEMP) so the model's
+      # Read tool can reach it; the commit step below adds named files only.
+      # The prose is written by Claude from the PR list; the version, PR list
+      # and file edits above are deterministic so the model can't change them.
+      - name: Write changelog section
+        if: steps.prep.outputs.run == 'true'
+        uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Write the CHANGELOG.md entry for release v${{ steps.prep.outputs.version }}.
+
+            Input: ${{ steps.prep.outputs.prs_file }} lists every PR merged since the last release (title + description).
+
+            Edit CHANGELOG.md: insert ONE new section directly below the
+            `## [Unreleased]` heading (leave that heading and an empty body
+            for it), headed exactly:
+              ## [${{ steps.prep.outputs.version }}] - ${{ steps.prep.outputs.date }}
+
+            Audience: food-bank partners and the public, not developers. Plain
+            language, no jargon (no "refactor", "API", "endpoint", "D1", file
+            or component names).
+
+            Use only these subheadings, and skip any that would be empty:
+              ### New        (something visitors or admins can now do)
+              ### Improved   (something that got better, faster, clearer)
+              ### Fixed      (something that was broken and works now)
+
+            One short sentence per bullet saying what a visitor or admin will
+            notice. End each bullet with the PR link, like
+            `([#123](https://github.com/${{ github.repository }}/pull/123))`.
+            Merge PRs about the same thing into one bullet with all its links.
+
+            Leave out dependency bumps, CI, docs, tests and refactors unless a
+            visitor or admin can notice the difference. Roll every security
+            update into ONE bullet under Improved: "Security updates."
+
+            Edit only CHANGELOG.md. Do not run git.
+          claude_args: |
+            --allowedTools "Read,Edit"
+
+      - name: Open release PR
+        if: steps.prep.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.prep.outputs.version }}
+        run: |
+          set -euo pipefail
+          # A model that skipped the edit must fail the run, not ship a blank release.
+          bash scripts/release/section.sh "$VERSION" > "$RUNNER_TEMP/section.md"
+
+          CUT_SHA=$(git rev-parse HEAD)
+          git config user.name "pueblo-release-bot"
+          git config user.email "pueblo-release-bot@users.noreply.github.com"
+          git switch -c "release/v$VERSION"
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "chore(release): v$VERSION"
+          git push origin "release/v$VERSION"
+
+          {
+            cat "$RUNNER_TEMP/section.md"
+            cat <<'EOF'
+
+          ---
+          ### Sunday checklist
+          - [ ] Walk https://dev.pueblofoodmap.com/ — this is exactly what ships.
+          - [ ] Any pending prod D1 migrations? Export first — see AGENTS.md "Promotion checklist".
+          - [ ] Reply **"push pueblo-food-map to prod"**, then squash-merge this PR. Merging deploys production and publishes the GitHub Release.
+          EOF
+          } > "$RUNNER_TEMP/body.md"
+
+          gh pr create --base main --head "release/v$VERSION" \
+            --title "Release v$VERSION" --body-file "$RUNNER_TEMP/body.md"
+
+          # Marks which dev commit this release was cut from. Squash merges make
+          # the v* tag on main a non-ancestor of dev, so next week's prepare.mjs
+          # needs this tag to know where "since last release" starts.
+          git tag "cut/v$VERSION" "$CUT_SHA"
+          git push origin "cut/v$VERSION"

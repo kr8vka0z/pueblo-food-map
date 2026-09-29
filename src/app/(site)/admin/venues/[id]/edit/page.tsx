@@ -420,37 +420,20 @@ export default async function EditVenuePage({
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
     showActivity = identity.isOwner === true;
+    // WHY Promise.all throughout (was ~10 awaits in a row): every D1 call is
+    // an edge -> primary round trip, so a serial chain cost the SUM of them.
+    // Only real dependencies stay sequential: the venue row gates the rest
+    // (an unknown id still 404s with no extra reads), and the VenueLookup
+    // read needs to know whether any suggestion exists. Every resolver below
+    // already degrades to an empty value instead of rejecting, and
+    // loadAdminNavCounts never rejects, so overlapping them changes no
+    // failure behavior. The session check above still runs first and alone.
+    // Nav counts start now and are awaited with the phase-2 reads below, so
+    // they overlap the venue read without holding up what depends on it.
+    const navCountsPromise = loadAdminNavCounts(db);
     venue = await db.prepare("SELECT * FROM venues WHERE id = ?").bind(id).first<AdminVenueRow>();
     if (venue) {
       const { submission, proposal } = await searchParams;
-      closureContext = await resolveClosureReportContext(db, id, submission);
-      linkHealthContext = await resolveLinkHealthProposalContext(db, id, proposal);
-      if (venue.category === "blessing_box") {
-        boxCheckins = await resolveBoxCheckins(db, id);
-        hostAlerts = await resolveHostAlerts(db, id);
-        const reviewItems = await resolveBoxReviewItems(db, id);
-        boxReviewPhotos = reviewItems.photos;
-        boxReviewAdopters = reviewItems.adopters;
-      }
-      // #674: "Suggestions to review" box — every pending change_proposals
-      // row targeting this venue (an archived venue can have one too: a
-      // restore, ProposalCard.tsx's own `isRestore` branch). Only bothers
-      // loading the venue's VenueLookup context (a second, tiny SELECT)
-      // when there's actually something to show it to — the common case
-      // (an unedited place) skips this entirely.
-      pendingProposals = await resolvePendingProposals(db, id);
-      // #675: every pending closure report targeting this venue joins the
-      // SAME "Suggestions to review" box as the proposals above — one
-      // ReviewItem[] the box dispatches on by `kind`, see SuggestionsBox.tsx.
-      const pendingSubmissions = await resolvePendingSubmissions(db, id);
-      suggestionItems = [
-        ...pendingProposals.map((proposal): ReviewItem => ({ kind: "proposal", proposal })),
-        ...pendingSubmissions.map((submission): ReviewItem => ({ kind: "submission", submission })),
-      ];
-      if (suggestionItems.length > 0) {
-        const lookup = await loadVenueLookup(db, [id]);
-        suggestionsVenue = lookup[id] ?? null;
-      }
       // #673 pt.3: only fetch/compute the diff for a place actually waiting
       // — displayStatusOf() is the single source of truth for that (never a
       // box, a draft, an unedited live place, or — on staging — anything at
@@ -459,11 +442,51 @@ export default async function EditVenuePage({
       const isStaging = !isProductionWorker(env);
       const publishedById = new Map(publishedVenues.map((v) => [v.id, v]));
       const status = displayStatusOf(venue, publishedById.get(venue.id), { isStaging });
-      if (status === "live_edits_waiting") {
-        waitingToPublish = await resolveWaitingToPublishChanges(db, venue, identity.email);
+      const isBox = venue.category === "blessing_box";
+      const noReviewItems = { photos: [] as AdminBoxPhotoRow[], adopters: [] as AdminBoxAdopterRow[] };
+      const [closure, linkHealth, checkins, alerts, reviewItems, proposals, pendingSubmissions, waiting, counts] =
+        await Promise.all([
+          resolveClosureReportContext(db, id, submission),
+          resolveLinkHealthProposalContext(db, id, proposal),
+          isBox ? resolveBoxCheckins(db, id) : Promise.resolve([] as AdminCheckinRow[]),
+          isBox ? resolveHostAlerts(db, id) : Promise.resolve([] as { id: number; email: string }[]),
+          isBox ? resolveBoxReviewItems(db, id) : Promise.resolve(noReviewItems),
+          // #674: "Suggestions to review" box — every pending change_proposals
+          // row targeting this venue (an archived venue can have one too: a
+          // restore, ProposalCard.tsx's own `isRestore` branch).
+          resolvePendingProposals(db, id),
+          // #675: every pending closure report targeting this venue joins the
+          // SAME "Suggestions to review" box as the proposals above — one
+          // ReviewItem[] the box dispatches on by `kind`, see SuggestionsBox.tsx.
+          resolvePendingSubmissions(db, id),
+          status === "live_edits_waiting"
+            ? resolveWaitingToPublishChanges(db, venue, identity.email)
+            : Promise.resolve([] as WaitingToPublishChange[]),
+          navCountsPromise,
+        ]);
+      navCounts = counts;
+      closureContext = closure;
+      linkHealthContext = linkHealth;
+      boxCheckins = checkins;
+      hostAlerts = alerts;
+      boxReviewPhotos = reviewItems.photos;
+      boxReviewAdopters = reviewItems.adopters;
+      pendingProposals = proposals;
+      waitingToPublish = waiting;
+      suggestionItems = [
+        ...pendingProposals.map((proposal): ReviewItem => ({ kind: "proposal", proposal })),
+        ...pendingSubmissions.map((submission): ReviewItem => ({ kind: "submission", submission })),
+      ];
+      // Only bothers loading the venue's VenueLookup context (a second, tiny
+      // SELECT) when there's actually something to show it to — the common
+      // case (an unedited place) skips this entirely.
+      if (suggestionItems.length > 0) {
+        const lookup = await loadVenueLookup(db, [id]);
+        suggestionsVenue = lookup[id] ?? null;
       }
+    } else {
+      navCounts = await navCountsPromise;
     }
-    navCounts = await loadAdminNavCounts(db);
   } catch (err) {
     handlePageAuthError(err);
   }

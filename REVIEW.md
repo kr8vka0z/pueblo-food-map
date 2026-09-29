@@ -37,7 +37,7 @@ rationale in [ARCHITECTURE.md](ARCHITECTURE.md).
   promotion checklist in AGENTS.md (search "promotion checklist") shows how to list the
   outstanding ones. Never rebuild a table other tables reference — no safe way to do that
   without cascading deletes.
-- **After a release, the version + CHANGELOG sync back to `dev` via an automatic squash PR** (merge commits are disabled; AGENTS.md "Release schedule"). Compare branches
+- **After every push to `main`, an automatic `sync/main-<sha>` PR merges `main` into `dev` with a merge commit** (the only merge-commit PR; releases and hotfixes into `main` are squashes — AGENTS.md "Release schedule"). Compare branches
   with `git diff --stat origin/dev origin/main` — never a commit count
   (`git rev-list --count`), which reads non-zero even when the branches are
   content-identical (squash-only merges rewrite SHAs).

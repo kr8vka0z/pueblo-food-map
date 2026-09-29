@@ -1,7 +1,8 @@
 # Weekly release cut: Saturday 8pm Mountain (Sun 02:00 UTC; 7pm in winter) this
 # opens a `Release vX.Y.Z` PR from `dev` into `main`. Kyle reviews it Sunday,
-# and merging it (squash — merge commits are disabled repo-wide) deploys prod
-# via deploy-prod.yml, which then tags and publishes the GitHub Release.
+# and squash-merging it (main requires linear history) deploys prod via
+# deploy-prod.yml, which then tags, publishes the GitHub Release, and opens the
+# main -> dev sync PR.
 # Process + rules: AGENTS.md "Release schedule".
 #
 # WHY every push/PR here uses a GitHub App token, not GITHUB_TOKEN: pushes and
@@ -41,8 +42,6 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      # claude-code-action exchanges an OIDC token for its own access.
-      id-token: write
     steps:
       - name: Mint a GitHub App token
         id: app-token
@@ -54,7 +53,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: dev
-          # Full history + tags: prepare.mjs walks dev back to the last release.
+          # Full history + tags: prepare.mjs lists `<latest v* tag>..dev`.
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
@@ -73,6 +72,8 @@ jobs:
           echo "open=$n" >> "$GITHUB_OUTPUT"
           [ "$n" = "0" ] || echo "::warning::A release PR is already open; skipping this cut."
 
+      # --dry-run: only picks the version and writes the PR list. The version
+      # bump happens AFTER the model step so the model can't touch package files.
       # Exit 3 = no PRs since the last release: not a failure, just nothing to do.
       - name: Compute version and PR list
         id: prep
@@ -82,7 +83,7 @@ jobs:
           FORCE_VERSION: ${{ inputs.version }}
         run: |
           set +e
-          args=(--out "$GITHUB_WORKSPACE/.release-prs.md")
+          args=(--dry-run --out "$GITHUB_WORKSPACE/.release-prs.md")
           [ -z "$FORCE_VERSION" ] || args+=(--version "$FORCE_VERSION")
           node scripts/release/prepare.mjs "${args[@]}"
           rc=$?
@@ -93,14 +94,20 @@ jobs:
           echo "date=$(TZ=America/Denver date +%F)" >> "$GITHUB_OUTPUT"
 
       # The PR-list file sits in the workspace (not RUNNER_TEMP) so the model's
-      # Read tool can reach it; the commit step below adds named files only.
-      # The prose is written by Claude from the PR list; the version, PR list
-      # and file edits above are deterministic so the model can't change them.
+      # Read tool can reach it; it is gitignored and never committed.
+      #
+      # github_token: without it the action mints its own token and revokes it
+      # at the end, which would also kill the push credential checkout stored.
+      # allowed_bots "*": a schedule run's actor can be a bot, which the action
+      # otherwise refuses. Safe here because this workflow has no issue/PR
+      # trigger an outsider could use to feed the model a prompt.
       - name: Write changelog section
         if: steps.prep.outputs.run == 'true'
         uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          allowed_bots: "*"
           prompt: |
             Write the CHANGELOG.md entry for release v${{ steps.prep.outputs.version }}.
 
@@ -140,16 +147,27 @@ jobs:
           VERSION: ${{ steps.prep.outputs.version }}
         run: |
           set -euo pipefail
-          # A model that skipped the edit must fail the run, not ship a blank release.
+          # The model may change CHANGELOG.md and nothing else. Anything more
+          # (or nothing at all) fails the run rather than shipping a surprise.
+          if [ "$(git status --porcelain)" != " M CHANGELOG.md" ]; then
+            echo "Expected exactly CHANGELOG.md to be modified; got:" >&2
+            git status --porcelain >&2
+            exit 1
+          fi
           bash scripts/release/section.sh "$VERSION" > "$RUNNER_TEMP/section.md"
 
-          CUT_SHA=$(git rev-parse HEAD)
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
           git config user.name "pueblo-release-bot"
           git config user.email "pueblo-release-bot@users.noreply.github.com"
+          CUT_SHA=$(git rev-parse HEAD)
           git switch -c "release/v$VERSION"
           git add package.json package-lock.json CHANGELOG.md
           git commit -m "chore(release): v$VERSION"
-          git push origin "release/v$VERSION"
+          # Re-cut of the same version (last week's PR was closed unmerged):
+          # overwrite the stale branch. Safe: the "already open" guard above
+          # guarantees no open PR is using it.
+          git push --force origin "release/v$VERSION"
 
           {
             cat "$RUNNER_TEMP/section.md"
@@ -166,8 +184,9 @@ jobs:
           gh pr create --base main --head "release/v$VERSION" \
             --title "Release v$VERSION" --body-file "$RUNNER_TEMP/body.md"
 
-          # Marks which dev commit this release was cut from. Squash merges make
-          # the v* tag on main a non-ancestor of dev, so next week's prepare.mjs
-          # needs this tag to know where "since last release" starts.
-          git tag "cut/v$VERSION" "$CUT_SHA"
-          git push origin "cut/v$VERSION"
+          # Marks the dev commit this release was cut from. The release lands
+          # on main as a squash, so the v* tag doesn't carry dev's history with
+          # it; prepare.mjs starts next week's PR list from this tag instead.
+          # Hotfixes make no cut tag (they don't come from dev).
+          git tag -f "cut/v$VERSION" "$CUT_SHA"
+          git push --force origin "cut/v$VERSION"

@@ -752,21 +752,27 @@ publish-bot PR" step comment.
 **Weekly release flow (replaced ad-hoc `dev` → `main` promotions).** Work
 merges to `dev` all week (`pr-title.yml` requires Conventional Commit PR
 titles). `release.yml` (cron Sun 02:00 UTC = Saturday evening Mountain, or
-`workflow_dispatch`) runs `scripts/release/prepare.mjs` — next version from
-the merged-PR titles (`feat` → minor, else patch; major only when forced),
-bumps `package.json`/lock, lists the PRs — has Claude write the plain-language
-CHANGELOG.md section, and opens `Release vX.Y.Z` from `release/vX.Y.Z` into
-`main`. Merging it (squash; merge commits are disabled) triggers
-`deploy-prod.yml`; once the smoke checks pass its `release` job tags
-`vX.Y.Z`, publishes the GitHub Release from that CHANGELOG section, and opens
-an auto-merging sync PR carrying the version + changelog back to `dev`. It is
-a no-op when `package.json`'s version already has a release, which is what
-keeps `publish-bot` merges (no version change) from tagging anything.
+`workflow_dispatch`) runs `scripts/release/prepare.mjs` (dry run: next version
+from the merged-PR titles — `feat` → minor, else patch, major only via a forced
+version — plus the PR list), has Claude write the plain-language CHANGELOG.md
+section (the run fails unless that is the only file changed), then bumps
+`package.json`/lock itself and opens `Release vX.Y.Z` from `release/vX.Y.Z`
+into `main`. `main` requires linear history, so it is squash-merged; that
+triggers `deploy-prod.yml`. Once the smoke checks pass, two independent jobs
+run: `release` tags `vX.Y.Z` and publishes the GitHub Release from that
+CHANGELOG section (a no-op when the version already has a release, which keeps
+`publish-bot` merges from tagging anything), and `sync-dev` (after ANY push to
+`main`) opens a `sync/main-<sha>` PR into `dev` with auto-merge as a MERGE
+COMMIT, unless `dev` already contains `main`. Squash releases leave `main` and
+`dev` with diverged histories; the merge commit re-joins them, carries hotfix
+code and venue data to staging, and keeps the next release PR conflict-free.
 `main-source-guard` (`main-source-guard.yml`) rejects PRs into `main` unless
-from `release/*`, `hotfix/*` or `publish-bot`. Because releases are squashes,
-the `v*` tag is not an ancestor of `dev`; the cut also pushes `cut/vX.Y.Z` on
-the dev commit it was cut from, which is where the next release's PR list
-starts. Operating rules and the hotfix lane: AGENTS.md "Release schedule".
+from `release/*`, `hotfix/*` or `publish-bot`. Since a squash means the `v*`
+tag doesn't carry dev's old commits, the cut also pushes a lightweight
+`cut/vX.Y.Z` tag on the dev commit it was cut from; the next release's PR list
+starts at the newest reachable `cut/*` tag (falling back to the newest `v*` tag
+for the first run and for hotfixes). Operating rules and the hotfix lane:
+AGENTS.md "Release schedule".
 
 **`GITHUB_TOKEN` pushes don't trigger workflows.** GitHub won't start a
 workflow for a push made with `GITHUB_TOKEN`, so a workflow that merges into

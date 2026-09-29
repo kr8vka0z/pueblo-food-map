@@ -22,6 +22,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buildVenueListJsonLd, serializeJsonLd } from "@/lib/venueSchema";
 import { buildPageMetadata } from "@/lib/site";
+import { SPLASH_GATE_SCRIPT } from "@/lib/splashGate";
 import { venues } from "@/data/venues";
 import HomePageClient from "./HomePageClient";
 
@@ -86,6 +87,9 @@ export default function HomePage() {
           ))}
         </ul>
       </nav>
+      {/* Must sit right before HomePageClient: runs before the splash markup is
+          parsed, so returning visitors never paint it (see splashGate.ts). */}
+      <script dangerouslySetInnerHTML={{ __html: SPLASH_GATE_SCRIPT }} />
       <HomePageClient />
     </>
   );

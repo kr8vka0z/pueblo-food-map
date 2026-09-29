@@ -845,11 +845,23 @@ The venue card opens, and `/venues` and `/resources` load offline.
 ## Splash gate and first-visit flow
 
 ```
-HomePageClient.tsx mounts
+server HTML (/ and /es)
+  → SplashScreen is rendered with data-splash-pending (first-time visitors
+    see it at first paint; no <main>/map yet)
+  → inline SPLASH_GATE_SCRIPT (splashGate.ts) runs before the splash is parsed;
+    for returning visitors / deep links it sets data-splash-seen on <html>,
+    and globals.css hides [data-splash-pending] until React unmounts it
+    (full page loads only: React never executes a script it renders on a
+    client-side navigation)
+
+HomePageClient.tsx layout effect resolves the gate (shouldSkipSplash(), same
+rules as the script). On client-side navigation this is the only gate: its
+setState flushes before the browser paints, so no pending-splash flash
   → reads localStorage key 'pfm.splash.seen.v2'
-  → if not set:  show SplashScreen overlay (z-9000) above the live map
-  → if set:      skip to interactive map
-  → if ?venue=<id> in URL: skip splash, open deep-linked venue
+  → if not set:  keep SplashScreen (overlay, z-9000) above the live map
+  → if set:      unmount the splash, mount the interactive map
+  → if ?venue=<id> or #venue=<id> in URL: skip splash, open deep-linked venue
+  → if ?near=1 or ?boxes=1 (PageNav hops): skip splash, locate / filter boxes
 
 SplashScreen CTA "Find food near me"
   → requests geolocation
@@ -861,9 +873,16 @@ SplashScreen CTA "Find food near me"
   → user returns to map with same state on re-dismiss
 ```
 
-The map is always mounted under the splash so the basemap loads in
-parallel. While the splash is visible, `main` receives `inert` and
-`aria-hidden` so keyboard and screen-reader users cannot reach the map.
+Once the gate resolves, the map is mounted under the splash so the basemap
+loads in parallel (`<main>`/MapWrapper never mount while unresolved, so
+mapbox-gl's load timing is unchanged for returning visitors). While the
+splash is visible, `main` receives `inert` and `aria-hidden` so keyboard and
+screen-reader users cannot reach the map. `<html>` carries
+`suppressHydrationWarning` (RootShell.tsx) because the script adds
+`data-splash-seen` before hydration.
+
+Residual: returning visitors still see nothing until the map chunk loads
+(the splash is hidden, and `<main>` mounts only after hydration).
 
 ---
 

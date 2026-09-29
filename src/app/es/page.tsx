@@ -21,6 +21,7 @@ import Link from "next/link";
 import { buildVenueListJsonLd, serializeJsonLd } from "@/lib/venueSchema";
 import { buildPageMetadata } from "@/lib/site";
 import { t } from "@/lib/i18n";
+import { SPLASH_GATE_SCRIPT } from "@/lib/splashGate";
 import { venues } from "@/data/venues";
 import HomePageClient from "../(site)/HomePageClient";
 
@@ -75,6 +76,8 @@ export default function EsHomePage() {
           ))}
         </ul>
       </nav>
+      {/* Same gate script as the EN homepage — see src/app/(site)/page.tsx. */}
+      <script dangerouslySetInnerHTML={{ __html: SPLASH_GATE_SCRIPT }} />
       <HomePageClient />
     </>
   );

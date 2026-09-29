@@ -50,7 +50,10 @@ export default function RootShell({
   });
 
   return (
-    <html lang={lang} className="h-full antialiased">
+    // suppressHydrationWarning: the home page's inline script adds
+    // data-splash-seen to <html> before hydration; this silences only this
+    // element's own attribute mismatch (same pattern as next-themes).
+    <html lang={lang} className="h-full antialiased" suppressHydrationWarning>
       <body className="h-full flex flex-col">
         {/* WebSite JSON-LD — sitewide structured data for search engines */}
         <script

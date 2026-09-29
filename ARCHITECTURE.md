@@ -535,6 +535,14 @@ The rules it sets:
   to see its noindex and drop it. `deploy-prod.yml`'s smoke test fails if the
   canonical host ever sends the header, or if workers.dev stops sending it.
 
+- **`/llms.txt`** is a hand-written static file, `public/llms.txt` (llmstxt.org
+  format). Cloudflare Workers Static Assets serves it before the Worker runs
+  (`text/plain; charset=utf-8`, no route or middleware involved, same as
+  `sw.js`), and `deploy-prod.yml` smoke-tests it. It carries no counts, so it
+  can't go stale; update it by hand when a public page is added or renamed.
+- **AI crawler policy** lives in `src/app/robots.ts` (WHY in its header):
+  answer/search bots are allowed, training-only crawlers are blocked.
+
 ### Answer-first venue pages (SEO/AEO plan Phase 2, `src/lib/venueSummary.ts`)
 
 `buildVenueSummary(venue, locale, options?)` assembles a venue's answer-first
@@ -723,7 +731,8 @@ The app is a Next.js App Router project compiled for Cloudflare Workers by
 (`deploy-prod.yml`'s header explains why the two must never run together).
 Push to `main` → `deploy-prod.yml` deploys the top-level `wrangler.jsonc`
 Worker (`pueblo-food-map`, pueblofoodmap.com); push to `dev` →
-`deploy-dev.yml` deploys the staging Worker at dev.pueblofoodmap.com. Only
+`deploy-dev.yml` deploys the staging Worker at dev.pueblofoodmap.com. `main`
+only receives the weekly release PR, `hotfix/*` and `publish-bot` (below). Only
 `deploy-prod.yml` has a `workflow_dispatch` recovery trigger.
 
 **CI is the gate.** `ci.yml` runs `lint → design:lint → design:drift →
@@ -740,6 +749,31 @@ subset) and `npm audit`; typecheck and build always run. The diff check, not
 the branch name, is the safety property — see `ci.yml`'s "Detect data-only
 publish-bot PR" step comment.
 
+**Weekly release flow (replaced ad-hoc `dev` → `main` promotions).** Work
+merges to `dev` all week (`pr-title.yml` requires Conventional Commit PR
+titles). `release.yml` (cron Sun 02:00 UTC = Saturday evening Mountain, or
+`workflow_dispatch`) runs `scripts/release/prepare.mjs` (dry run: next version
+from the merged-PR titles — `feat` → minor, else patch, major only via a forced
+version — plus the PR list), has Claude write the plain-language CHANGELOG.md
+section (the run fails unless that is the only file changed), then bumps
+`package.json`/lock itself and opens `Release vX.Y.Z` from `release/vX.Y.Z`
+into `main`. `main` requires linear history, so it is squash-merged; that
+triggers `deploy-prod.yml`. Once the smoke checks pass, two independent jobs
+run: `release` tags `vX.Y.Z` and publishes the GitHub Release from that
+CHANGELOG section (a no-op when the version already has a release, which keeps
+`publish-bot` merges from tagging anything), and `sync-dev` (after ANY push to
+`main`) opens a `sync/main-<sha>` PR into `dev` with auto-merge as a MERGE
+COMMIT, unless `dev` already contains `main`. Squash releases leave `main` and
+`dev` with diverged histories; the merge commit re-joins them, carries hotfix
+code and venue data to staging, and keeps the next release PR conflict-free.
+`main-source-guard` (`main-source-guard.yml`) rejects PRs into `main` unless
+from `release/*`, `hotfix/*` or `publish-bot`. Since a squash means the `v*`
+tag doesn't carry dev's old commits, the cut also pushes a lightweight
+`cut/vX.Y.Z` tag on the dev commit it was cut from; the next release's PR list
+starts at the newest reachable `cut/*` tag (falling back to the newest `v*` tag
+for the first run and for hotfixes). Operating rules and the hotfix lane:
+AGENTS.md "Release schedule".
+
 **`GITHUB_TOKEN` pushes don't trigger workflows.** GitHub won't start a
 workflow for a push made with `GITHUB_TOKEN`, so a workflow that merges into
 `main` that way lands a commit that never deploys, with no red signal.
@@ -749,7 +783,7 @@ why Publish uses the `GITHUB_PUBLISH_TOKEN` PAT. Auto-merge only waits for CI
 because the `dev` ruleset requires the same checks as `main` (delete that
 ruleset and auto-merge silently becomes merge-on-open). A consequence: a
 dependency bump, security bumps included, waits on `dev` until the next
-promotion. Any new workflow that pushes to `main` must avoid `GITHUB_TOKEN`. Incident history:
+weekly release. Any new workflow that pushes to `main` must avoid `GITHUB_TOKEN`. Incident history:
 atlas-kb "PFM ARCHITECTURE History — 2026-09-24 Trim".
 
 **Environment variables:** `NEXT_PUBLIC_*` vars are baked into the client
@@ -837,11 +871,23 @@ The venue card opens, and `/venues` and `/resources` load offline.
 ## Splash gate and first-visit flow
 
 ```
-HomePageClient.tsx mounts
+server HTML (/ and /es)
+  → SplashScreen is rendered with data-splash-pending (first-time visitors
+    see it at first paint; no <main>/map yet)
+  → inline SPLASH_GATE_SCRIPT (splashGate.ts) runs before the splash is parsed;
+    for returning visitors / deep links it sets data-splash-seen on <html>,
+    and globals.css hides [data-splash-pending] until React unmounts it
+    (full page loads only: React never executes a script it renders on a
+    client-side navigation)
+
+HomePageClient.tsx layout effect resolves the gate (shouldSkipSplash(), same
+rules as the script). On client-side navigation this is the only gate: its
+setState flushes before the browser paints, so no pending-splash flash
   → reads localStorage key 'pfm.splash.seen.v2'
-  → if not set:  show SplashScreen overlay (z-9000) above the live map
-  → if set:      skip to interactive map
-  → if ?venue=<id> in URL: skip splash, open deep-linked venue
+  → if not set:  keep SplashScreen (overlay, z-9000) above the live map
+  → if set:      unmount the splash, mount the interactive map
+  → if ?venue=<id> or #venue=<id> in URL: skip splash, open deep-linked venue
+  → if ?near=1 or ?boxes=1 (PageNav hops): skip splash, locate / filter boxes
 
 SplashScreen CTA "Find food near me"
   → requests geolocation
@@ -853,9 +899,16 @@ SplashScreen CTA "Find food near me"
   → user returns to map with same state on re-dismiss
 ```
 
-The map is always mounted under the splash so the basemap loads in
-parallel. While the splash is visible, `main` receives `inert` and
-`aria-hidden` so keyboard and screen-reader users cannot reach the map.
+Once the gate resolves, the map is mounted under the splash so the basemap
+loads in parallel (`<main>`/MapWrapper never mount while unresolved, so
+mapbox-gl's load timing is unchanged for returning visitors). While the
+splash is visible, `main` receives `inert` and `aria-hidden` so keyboard and
+screen-reader users cannot reach the map. `<html>` carries
+`suppressHydrationWarning` (RootShell.tsx) because the script adds
+`data-splash-seen` before hydration.
+
+Residual: returning visitors still see nothing until the map chunk loads
+(the splash is hidden, and `<main>` mounts only after hydration).
 
 ---
 
@@ -899,7 +952,8 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   miss — reads admin data without a live session. Mutating `/api/admin/*`
   routes also call `requireAdminOrigin()` (CSRF, `src/lib/adminOrigin.ts`).
   Failures map to a login redirect / 401 (no session) or 403 via
-  `src/lib/adminAuthErrors.ts`. Cookie, allowlist and rate-limit gotchas:
+  `src/lib/adminAuthErrors.ts` (for admin *pages* the status is 200, see
+  "Admin page speed" below). Cookie, allowlist and rate-limit gotchas:
   AGENTS.md "Admin authentication".
 - **Server Component page owns the gate and the reads; a Client Component
   owns the form; a route handler owns the authoritative write.** Client
@@ -918,6 +972,17 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
 - Every page except `/admin/login` shares one header (`AdminNav`) with
   pending-count pills. Its **Activity** item is rendered only for the owner
   (`identity.isOwner`, see `/admin/activity` below).
+- **Admin page speed.** Every admin page is a dynamic server render: one
+  session read (`getAdminDb()`), then its D1 reads. Each D1 call is a round
+  trip to the WNAM primary, so a page's reads run in one `Promise.all`, never
+  one `await` after another (the venue edit page's only real dependencies are
+  the venue row and the suggestion lookup). The Dashboard's Cloudflare and
+  PostHog calls start in that same `Promise.all`. `admin/loading.tsx` shows the
+  header (`AdminNavSkeleton`) plus "Loading…" during client navigation (it also wraps `/admin/login`).
+  Because that shell streams before the page's session check, a first
+  full-page request to a guarded admin URL answers 200 (noindex) and redirects
+  or renders forbidden/not-found on the client instead of a 307/403/404 (this
+  includes an unknown venue id on the edit page). It carries no admin data.
 
 ### Surfaces
 

@@ -143,23 +143,30 @@ export default async function PlacesPage({
     const { db, identity } = await getAdminDb(await headers());
     email = identity.email;
     showActivity = identity.isOwner === true;
-    const result = await db
-      .prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC")
-      .all<AdminVenueRow>();
-    venues = result.results;
-    // Same query /admin/flags/page.tsx used to run before #674 folded that
-    // queue into this page.
-    const proposalsResult = await db
-      .prepare("SELECT * FROM change_proposals WHERE status = 'pending' ORDER BY created_at DESC")
-      .all<ChangeProposalRow>();
+    // WHY one Promise.all: the reads are independent, and each D1 call is a
+    // round trip to the primary (WNAM), so awaiting them in turn made this
+    // page cost the SUM of five round trips instead of the slowest one. The
+    // session check above still runs first and alone. Errors surface exactly
+    // as before (loadAdminNavCounts never rejects; a failed read still
+    // reaches handlePageAuthError).
+    const [venuesResult, proposalsResult, submissionsResult, counts] = await Promise.all([
+      db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
+      // Same query /admin/flags/page.tsx used to run before #674 folded that
+      // queue into this page.
+      db
+        .prepare("SELECT * FROM change_proposals WHERE status = 'pending' ORDER BY created_at DESC")
+        .all<ChangeProposalRow>(),
+      // #675: same query the now-retired /admin/submissions/page.tsx used to
+      // run before that queue folded into this page.
+      db
+        .prepare("SELECT * FROM public_submissions WHERE status = 'pending' ORDER BY created_at DESC")
+        .all<PublicSubmissionRow>(),
+      loadAdminNavCounts(db),
+    ]);
+    venues = venuesResult.results;
     proposals = proposalsResult.results.map(parseProposalRow);
-    // #675: same query the now-retired /admin/submissions/page.tsx used to
-    // run before that queue folded into this page.
-    const submissionsResult = await db
-      .prepare("SELECT * FROM public_submissions WHERE status = 'pending' ORDER BY created_at DESC")
-      .all<PublicSubmissionRow>();
     submissions = submissionsResult.results.map(parseSubmissionRow);
-    navCounts = await loadAdminNavCounts(db);
+    navCounts = counts;
   } catch (err) {
     handlePageAuthError(err);
   }

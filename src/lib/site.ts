@@ -14,6 +14,9 @@ import { t, type Locale } from "@/lib/i18n";
 
 export const SITE_URL = "https://pueblofoodmap.com";
 export const SITE_NAME = "Pueblo Food Map";
+// Public contact address (forwards to the site owner; no personal name on the site).
+// Shown on /about and in the Organization JSON-LD.
+export const SITE_CONTACT_EMAIL = "hello@pueblofoodmap.com";
 export const OG_IMAGE = {
   url: `${SITE_URL}/og-image.png`,
   width: 1200,

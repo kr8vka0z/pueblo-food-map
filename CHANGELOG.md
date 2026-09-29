@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+<!-- New sections are written at release time by .github/workflows/release.yml,
+     directly below the Unreleased heading (see AGENTS.md "Release schedule");
+     don't edit by hand. 0.1.7 and older are the release-please era, kept as-is. -->
+
+## [Unreleased]
+
+## [1.0.0] - 2026-09-29
+
+Pueblo Food Map's public launch. Everything added since June.
+
+### New
+
+- Blessing Boxes are on the map: open a box's card to see whether it is stocked, check in when you use it, and read its recent activity. ([#470](https://github.com/kr8vka0z/pueblo-food-map/issues/470)) ([#471](https://github.com/kr8vka0z/pueblo-food-map/issues/471)) ([#472](https://github.com/kr8vka0z/pueblo-food-map/issues/472)) ([#473](https://github.com/kr8vka0z/pueblo-food-map/issues/473)) ([#476](https://github.com/kr8vka0z/pueblo-food-map/issues/476)) ([#552](https://github.com/kr8vka0z/pueblo-food-map/issues/552))
+- Blessing Box cards have photos, a "what would help next time?" note, box and sponsor counts, and a full-size photo viewer with a "Please update this box" button. ([#490](https://github.com/kr8vka0z/pueblo-food-map/issues/490)) ([#503](https://github.com/kr8vka0z/pueblo-food-map/issues/503)) ([#505](https://github.com/kr8vka0z/pueblo-food-map/issues/505)) ([#517](https://github.com/kr8vka0z/pueblo-food-map/issues/517)) ([#518](https://github.com/kr8vka0z/pueblo-food-map/issues/518)) ([#521](https://github.com/kr8vka0z/pueblo-food-map/issues/521))
+- Neighbors can sponsor a Blessing Box and sign up for email alerts, and subscribers are emailed when a box runs low, runs out, or is restocked. ([#491](https://github.com/kr8vka0z/pueblo-food-map/issues/491)) ([#494](https://github.com/kr8vka0z/pueblo-food-map/issues/494)) ([#498](https://github.com/kr8vka0z/pueblo-food-map/issues/498)) ([#683](https://github.com/kr8vka0z/pueblo-food-map/issues/683))
+- The whole site is available in Spanish at /es, with its own pages that search engines can find. ([#695](https://github.com/kr8vka0z/pueblo-food-map/issues/695)) ([#697](https://github.com/kr8vka0z/pueblo-food-map/issues/697)) ([#698](https://github.com/kr8vka0z/pueblo-food-map/issues/698))
+- A new bottom bar on phones (a floating bar on tablets) gives quick access to Saved places, Boxes and Help, and Help lists food assistance programs in collapsible cards. ([#449](https://github.com/kr8vka0z/pueblo-food-map/issues/449)) ([#455](https://github.com/kr8vka0z/pueblo-food-map/issues/455)) ([#463](https://github.com/kr8vka0z/pueblo-food-map/issues/463)) ([#465](https://github.com/kr8vka0z/pueblo-food-map/issues/465)) ([#520](https://github.com/kr8vka0z/pueblo-food-map/issues/520)) ([#453](https://github.com/kr8vka0z/pueblo-food-map/issues/453)) ([#454](https://github.com/kr8vka0z/pueblo-food-map/issues/454))
+- Search has a Filters panel with multi-category choices, and a Map/List switch built into the search bar. ([#519](https://github.com/kr8vka0z/pueblo-food-map/issues/519)) ([#540](https://github.com/kr8vka0z/pueblo-food-map/issues/540)) ([#446](https://github.com/kr8vka0z/pueblo-food-map/issues/446)) ([#522](https://github.com/kr8vka0z/pueblo-food-map/issues/522))
+- Step-by-step walking directions, with a slim route strip so you can still see the map while you walk. ([#556](https://github.com/kr8vka0z/pueblo-food-map/issues/556)) ([#523](https://github.com/kr8vka0z/pueblo-food-map/issues/523)) ([#245](https://github.com/kr8vka0z/pueblo-food-map/issues/245))
+- Places with hours that change from month to month now show their real schedule. ([#628](https://github.com/kr8vka0z/pueblo-food-map/issues/628))
+- Pueblo Food Map can be installed like an app on your phone and shows a basic page when you are offline. ([#638](https://github.com/kr8vka0z/pueblo-food-map/issues/638)) ([#651](https://github.com/kr8vka0z/pueblo-food-map/issues/651))
+- On desktop, place cards, Saved and the Menu open in one panel on the right, so nothing hides behind the search bar. ([#688](https://github.com/kr8vka0z/pueblo-food-map/issues/688))
+- New pages list all food pantries, SNAP/WIC stores, community gardens and Blessing Boxes, with a short FAQ. ([#710](https://github.com/kr8vka0z/pueblo-food-map/issues/710)) ([#712](https://github.com/kr8vka0z/pueblo-food-map/issues/712))
+- Every place has an answer-first page with a plain summary, hours and nearby places, making it easier to find in search. ([#705](https://github.com/kr8vka0z/pueblo-food-map/issues/705)) ([#706](https://github.com/kr8vka0z/pueblo-food-map/issues/706)) ([#274](https://github.com/kr8vka0z/pueblo-food-map/issues/274)) ([#275](https://github.com/kr8vka0z/pueblo-food-map/issues/275)) ([#276](https://github.com/kr8vka0z/pueblo-food-map/issues/276)) ([#277](https://github.com/kr8vka0z/pueblo-food-map/issues/277)) ([#692](https://github.com/kr8vka0z/pueblo-food-map/issues/692)) ([#717](https://github.com/kr8vka0z/pueblo-food-map/issues/717))
+- Admins can sign in with a 6-digit code sent by email (or a passkey), and every sign-in is recorded in an owner-only Activity log. ([#319](https://github.com/kr8vka0z/pueblo-food-map/issues/319)) ([#321](https://github.com/kr8vka0z/pueblo-food-map/issues/321)) ([#326](https://github.com/kr8vka0z/pueblo-food-map/issues/326)) ([#327](https://github.com/kr8vka0z/pueblo-food-map/issues/327)) ([#328](https://github.com/kr8vka0z/pueblo-food-map/issues/328)) ([#329](https://github.com/kr8vka0z/pueblo-food-map/issues/329)) ([#693](https://github.com/kr8vka0z/pueblo-food-map/issues/693)) ([#691](https://github.com/kr8vka0z/pueblo-food-map/issues/691))
+- Admins can add, edit, review and publish places, with a Dashboard, one Places review list, and location maps. ([#242](https://github.com/kr8vka0z/pueblo-food-map/issues/242)) ([#261](https://github.com/kr8vka0z/pueblo-food-map/issues/261)) ([#263](https://github.com/kr8vka0z/pueblo-food-map/issues/263)) ([#264](https://github.com/kr8vka0z/pueblo-food-map/issues/264)) ([#266](https://github.com/kr8vka0z/pueblo-food-map/issues/266)) ([#259](https://github.com/kr8vka0z/pueblo-food-map/issues/259)) ([#268](https://github.com/kr8vka0z/pueblo-food-map/issues/268)) ([#564](https://github.com/kr8vka0z/pueblo-food-map/issues/564)) ([#686](https://github.com/kr8vka0z/pueblo-food-map/issues/686))
+- Place details stay fresh automatically: the site checks sources for changes, and admins approve suggested edits, including quick bulk approval of date-only updates. ([#388](https://github.com/kr8vka0z/pueblo-food-map/issues/388)) ([#391](https://github.com/kr8vka0z/pueblo-food-map/issues/391)) ([#395](https://github.com/kr8vka0z/pueblo-food-map/issues/395)) ([#399](https://github.com/kr8vka0z/pueblo-food-map/issues/399)) ([#417](https://github.com/kr8vka0z/pueblo-food-map/issues/417)) ([#424](https://github.com/kr8vka0z/pueblo-food-map/issues/424)) ([#637](https://github.com/kr8vka0z/pueblo-food-map/issues/637)) ([#624](https://github.com/kr8vka0z/pueblo-food-map/issues/624))
+
+### Improved
+
+- Phone cards for places and Blessing Boxes are easier to use: swipe up to read more, with the most important details first, and phone numbers look like links and call when tapped. ([#683](https://github.com/kr8vka0z/pueblo-food-map/issues/683)) ([#554](https://github.com/kr8vka0z/pueblo-food-map/issues/554)) ([#582](https://github.com/kr8vka0z/pueblo-food-map/issues/582)) ([#579](https://github.com/kr8vka0z/pueblo-food-map/issues/579))
+- The map no longer hides places with unknown hours when "Open now" is on; they show "Hours unknown - call ahead", and freshness and notes are clearer. ([#385](https://github.com/kr8vka0z/pueblo-food-map/issues/385))
+- Buttons and links are bigger and easier to tap, text is easier to read, and the screen edges work better on iPhones. ([#662](https://github.com/kr8vka0z/pueblo-food-map/issues/662)) ([#663](https://github.com/kr8vka0z/pueblo-food-map/issues/663)) ([#433](https://github.com/kr8vka0z/pueblo-food-map/issues/433)) ([#430](https://github.com/kr8vka0z/pueblo-food-map/issues/430)) ([#435](https://github.com/kr8vka0z/pueblo-food-map/issues/435)) ([#641](https://github.com/kr8vka0z/pueblo-food-map/issues/641)) ([#639](https://github.com/kr8vka0z/pueblo-food-map/issues/639))
+- Pages open faster: the welcome screen shows right away, and the map and admin pages load sooner. ([#719](https://github.com/kr8vka0z/pueblo-food-map/issues/719)) ([#718](https://github.com/kr8vka0z/pueblo-food-map/issues/718)) ([#625](https://github.com/kr8vka0z/pueblo-food-map/issues/625)) ([#246](https://github.com/kr8vka0z/pueblo-food-map/issues/246)) ([#351](https://github.com/kr8vka0z/pueblo-food-map/issues/351)) ([#608](https://github.com/kr8vka0z/pueblo-food-map/issues/608))
+- Public wording says "place" instead of "venue", and the Menu backdrop is warmer. ([#642](https://github.com/kr8vka0z/pueblo-food-map/issues/642))
+- Suggesting a place now asks for your email so we can follow up. ([#243](https://github.com/kr8vka0z/pueblo-food-map/issues/243))
+- The privacy policy now matches what we collect, and email addresses are deleted after 90 days. ([#443](https://github.com/kr8vka0z/pueblo-food-map/issues/443)) ([#444](https://github.com/kr8vka0z/pueblo-food-map/issues/444)) ([#616](https://github.com/kr8vka0z/pueblo-food-map/issues/616))
+- Admins are protected from overwriting each other's edits when two people save the same place. ([#633](https://github.com/kr8vka0z/pueblo-food-map/issues/633))
+
+### Fixed
+
+- About 218 place and report pages that were showing "not found" are back. ([#392](https://github.com/kr8vka0z/pueblo-food-map/issues/392)) ([#405](https://github.com/kr8vka0z/pueblo-food-map/issues/405))
+- The map no longer opens zoomed onto every place, and Walk asks for your location instead of starting downtown. Black triangles and a broken county outline are gone too. ([#244](https://github.com/kr8vka0z/pueblo-food-map/issues/244)) ([#249](https://github.com/kr8vka0z/pueblo-food-map/issues/249)) ([#245](https://github.com/kr8vka0z/pueblo-food-map/issues/245)) ([#569](https://github.com/kr8vka0z/pueblo-food-map/issues/569)) ([#572](https://github.com/kr8vka0z/pueblo-food-map/issues/572))
+- Spanish visitors no longer see English page titles or English-only pages. ([#447](https://github.com/kr8vka0z/pueblo-food-map/issues/447)) ([#605](https://github.com/kr8vka0z/pueblo-food-map/issues/605)) ([#610](https://github.com/kr8vka0z/pueblo-food-map/issues/610))
+- The bottom bar, search bar and Menu no longer cover or block each other. ([#544](https://github.com/kr8vka0z/pueblo-food-map/issues/544)) ([#548](https://github.com/kr8vka0z/pueblo-food-map/issues/548)) ([#533](https://github.com/kr8vka0z/pueblo-food-map/issues/533)) ([#535](https://github.com/kr8vka0z/pueblo-food-map/issues/535)) ([#538](https://github.com/kr8vka0z/pueblo-food-map/issues/538)) ([#546](https://github.com/kr8vka0z/pueblo-food-map/issues/546)) ([#467](https://github.com/kr8vka0z/pueblo-food-map/issues/467))
+- Tapping a Blessing Box opens its card instead of a blank history page. ([#634](https://github.com/kr8vka0z/pueblo-food-map/issues/634))
+- Admin coordinate fields no longer change by accident when you scroll. ([#441](https://github.com/kr8vka0z/pueblo-food-map/issues/441))
+- Security updates: stronger protection for the site and its forms, including spam limits, safer sign-in cookies, stricter browser security rules, and updated software. ([#283](https://github.com/kr8vka0z/pueblo-food-map/issues/283)) ([#357](https://github.com/kr8vka0z/pueblo-food-map/issues/357)) ([#371](https://github.com/kr8vka0z/pueblo-food-map/issues/371)) ([#425](https://github.com/kr8vka0z/pueblo-food-map/issues/425)) ([#606](https://github.com/kr8vka0z/pueblo-food-map/issues/606)) ([#614](https://github.com/kr8vka0z/pueblo-food-map/issues/614)) ([#618](https://github.com/kr8vka0z/pueblo-food-map/issues/618)) ([#629](https://github.com/kr8vka0z/pueblo-food-map/issues/629))
+
 ## [0.1.7](https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.6...v0.1.7) (2026-06-30)
 
 
@@ -157,29 +206,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 * **design:** land PR 2 — new layout, custom markers, search, basemap, detail panel ([#22](https://github.com/kr8vka0z/pueblo-food-map/issues/22)) ([d21caca](https://github.com/kr8vka0z/pueblo-food-map/commit/d21cacaa33911f5e37feec598dc24ad32d76271c))
 * **design:** PR 3 — Spanish translations, empty states, reduced motion ([#23](https://github.com/kr8vka0z/pueblo-food-map/issues/23)) ([a433e91](https://github.com/kr8vka0z/pueblo-food-map/commit/a433e91244a74ac7fc13b9c63f1cd099a2bfd78d))
 * **design:** swap to Inter + Fraunces and add full design-system token set ([#20](https://github.com/kr8vka0z/pueblo-food-map/issues/20)) ([380f7b6](https://github.com/kr8vka0z/pueblo-food-map/commit/380f7b60ebd43714e7b1c4f1f8aaa05c01331761))
+* `scripts/geocode-pfp.py` — reproducible Nominatim geocoder for the ten PFP venues, with per-id manual overrides and an audit trail in `data/raw/pfp-geocodes.json`.
 
-## [Unreleased]
-
-### Added
-
-- `scripts/geocode-pfp.py` — reproducible Nominatim geocoder for the ten PFP
-  venues. Honors Nominatim's usage policy (custom User-Agent with contact
-  email, 1.1s rate limit, Pueblo-county `viewbox` bias) and supports per-id
-  manual overrides for addresses Nominatim cannot resolve to a single node.
-  Writes a full audit trail to `data/raw/pfp-geocodes.json`.
 
 ### Changed
 
-- Replaced the placeholder latitude/longitude on every PFP community garden and
-  edible-landscape venue with precise geocodes from Nominatim. Some pins
-  shifted by more than four miles, including Bethany Lutheran (4.30 mi),
-  JJ Raigoza Park (3.37 mi), and Ray Aguilera Garden (3.27 mi). See
-  `data/raw/pfp-geocodes.json` for the matched OSM ids and display names.
-- Updated the listed address for La Familia Community Garden from the
-  "5th & Hudson" intersection to "814 E 5th St, Pueblo, CO 81001" (the
-  actual lot the garden sits on, per PFP).
-- Ray Aguilera Community Garden uses a manual coordinate supplied by PFP
-  because the garden plot sits south of the OSM Ray Aguilera Park centroid.
+* Replaced the placeholder coordinates on every PFP community garden and edible-landscape venue with precise Nominatim geocodes (some pins moved more than four miles); La Familia Community Garden's address is now "814 E 5th St, Pueblo, CO 81001"; Ray Aguilera Community Garden uses a PFP-supplied manual coordinate.
 
 ## [0.1.0] - 2026-05-12
 
@@ -207,5 +239,5 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - Replaced the default Next.js scaffold page with the production map UI.
 
-[Unreleased]: https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kr8vka0z/pueblo-food-map/compare/v0.1.7...HEAD
 [0.1.0]: https://github.com/kr8vka0z/pueblo-food-map/releases/tag/v0.1.0

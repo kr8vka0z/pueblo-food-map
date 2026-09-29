@@ -156,7 +156,7 @@ jobs:
           # PR B adds /blessing-boxes (+ /es): that one is dynamic (D1 read),
           # and a D1 failure still answers 200 (degraded page, noindex), so a
           # 200 proves the route deployed, not that D1 is healthy.
-          for path in "/" "/venues" "/venue/${VENUE_ID}" "/es" "/es/venues" "/es/venue/${VENUE_ID}" "/food-pantries" "/es/food-pantries" "/snap-wic-stores" "/es/snap-wic-stores" "/community-gardens" "/es/community-gardens" "/blessing-boxes" "/es/blessing-boxes" "/sitemap.xml" "/robots.txt"; do
+          for path in "/" "/venues" "/venue/${VENUE_ID}" "/es" "/es/venues" "/es/venue/${VENUE_ID}" "/food-pantries" "/es/food-pantries" "/snap-wic-stores" "/es/snap-wic-stores" "/community-gardens" "/es/community-gardens" "/blessing-boxes" "/es/blessing-boxes" "/sitemap.xml" "/robots.txt" "/llms.txt"; do
             code=""
             for i in $(seq 1 "$attempts"); do
               # No -f: a 404 must be READ, not turned into a curl error. `-f`
@@ -265,3 +265,97 @@ jobs:
       - name: Notify Healthchecks.io of deploy failure
         if: failure()
         run: curl -fsS --retry 3 "${{ secrets.HC_PING_URL }}/fail"
+
+  # Release bookkeeping (AGENTS.md "Release schedule"). Two separate jobs, both
+  # gated on the deploy so a red deploy never gets a tag or a sync, and NOT on
+  # each other: a failed sync must not be skipped by a re-run just because the
+  # release already exists, and vice versa. Each job's own check makes it
+  # idempotent, so a re-run only redoes what is missing.
+  #
+  # Both use an App token for their writes (job token stays read-only): objects
+  # created with GITHUB_TOKEN start no workflows (#367), so a sync PR opened
+  # with it would never get CI and auto-merge would wait forever.
+  release:
+    name: Tag and publish GitHub Release
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Mint a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The version in package.json names the release. A push that doesn't
+      # change it (a publish-bot venue-data merge) finds its release already
+      # there and does nothing; only a release/hotfix merge bumps the version.
+      # `--target` pins the tag to the commit that was just deployed, so a
+      # later push to main can't move where vX.Y.Z points.
+      - name: Create tag and GitHub Release if missing
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "v$version already released; nothing to do."
+            exit 0
+          fi
+          bash scripts/release/section.sh "$version" > "$RUNNER_TEMP/notes.md"
+          gh release create "v$version" --target "$GITHUB_SHA" \
+            --title "v$version" --notes-file "$RUNNER_TEMP/notes.md"
+
+  # main -> dev sync, after ANY push to main (release, hotfix, publish-bot).
+  # Release/hotfix PRs reach main as SQUASH commits (main's ruleset requires
+  # linear history), so main's history and dev's diverge; without a real merge
+  # commit the next release PR conflicts on everything main changed. A merge
+  # commit into dev makes main's tip an ancestor of dev again. It also carries
+  # a hotfix's code and the venue data publish-bot put on main to staging, and
+  # brings the version bump + changelog — one mechanism for all three.
+  #
+  # Uses a branch at main's tip rather than `main` itself as the PR head:
+  # "delete head branch on merge" must never be able to point at main.
+  # Decided from the compare API, so no checkout or history fetch is needed:
+  # "behind"/"identical" = main is already an ancestor of dev.
+  sync-dev:
+    name: Sync main into dev
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Mint a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+
+      - name: Open auto-merging sync PR if dev lacks main
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          status=$(gh api "repos/$REPO/compare/dev...$GITHUB_SHA" --jq .status)
+          case "$status" in
+            behind|identical) echo "dev already contains this main commit ($status)."; exit 0 ;;
+          esac
+          branch="sync/main-${GITHUB_SHA:0:7}"
+          # Re-run safe: reuse the branch and any PR already open for it.
+          gh api "repos/$REPO/git/ref/heads/$branch" >/dev/null 2>&1 \
+            || gh api -X POST "repos/$REPO/git/refs" -f "ref=refs/heads/$branch" -f "sha=$GITHUB_SHA" >/dev/null
+          url=$(gh pr list --repo "$REPO" --base dev --head "$branch" --state open --json url --jq '.[0].url // empty')
+          if [ -z "$url" ]; then
+            url=$(gh pr create --repo "$REPO" --base dev --head "$branch" \
+              --title "chore(release): sync main into dev (${GITHUB_SHA:0:7})" \
+              --body "Automatic. Merges what reached main (release, hotfix or venue publish) back into dev with a merge commit so the two branches share history again. Do not squash.")
+          fi
+          gh pr merge --auto --merge "$url"

@@ -65,4 +65,18 @@ describe("AboutContent — locale", () => {
     const script = container.querySelector('script[type="application/ld+json"]');
     expect(script?.innerHTML).toBe(FIXTURE_JSON_LD);
   });
+
+  test("shows a mailto contact link in both locales", () => {
+    for (const locale of ["en", "es"] as const) {
+      const { unmount } = render(
+        <LocaleProvider initialLocale={locale === "es" ? "es" : undefined}>
+          <AboutContent faqJsonLd={FIXTURE_JSON_LD} venueCount={42} publishedAt="2026-01-01T00:00:00.000Z" />
+        </LocaleProvider>,
+      );
+      const link = screen.getByRole("link", { name: "hello@pueblofoodmap.com" });
+      expect(link.getAttribute("href")).toBe("mailto:hello@pueblofoodmap.com");
+      expect(screen.getByText(t("about.contact.body", locale), { exact: false })).toBeDefined();
+      unmount();
+    }
+  });
 });

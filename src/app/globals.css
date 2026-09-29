@@ -432,6 +432,15 @@ body {
     -1px  1px 0 #fff, 0  1px 0 #fff, 1px  1px 0 #fff;
 }
 
+/* Hides the server-rendered splash for returning visitors and deep links until
+   React resolves the gate and unmounts it. The inline SPLASH_GATE_SCRIPT sets
+   data-splash-seen on <html> before the splash is parsed; the splash only
+   carries data-splash-pending while unresolved, so a re-shown splash (#99)
+   is unaffected. */
+html[data-splash-seen] [data-splash-pending] {
+  display: none;
+}
+
 /* Thinner variant for the smaller text (purpose line, microcopy) — a lighter
    0.5px outline so it doesn't read as heavy at small sizes. */
 .splash-text-outline-sm {

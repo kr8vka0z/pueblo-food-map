@@ -23,21 +23,28 @@
  * via the inert + aria-hidden attributes passed down to MapWrapper while
  * splashShown is true.
  *
- * Renders null during the initial SSR-safe render to avoid a hydration
- * mismatch (localStorage is unavailable server-side) — this no longer costs
- * crawlers real markup, since page.tsx's synchronous server output (JSON-LD,
- * sr-only <h1>, metadata) renders above this component regardless.
+ * The splash is server-rendered (and in the first client render) with
+ * `pending`, so a first-time visitor sees it at first paint instead of after
+ * ~180 KB of JS hydrates. localStorage and the URL are unknown server-side, so
+ * `splashShown` starts null and the layout effect below resolves it. Returning
+ * visitors and deep links never see the pending splash: on a full page load,
+ * page.tsx's inline SPLASH_GATE_SCRIPT sets a data attribute on <html> before
+ * it is parsed and globals.css hides it until React unmounts it; on
+ * client-side navigation the script doesn't run, but the layout effect
+ * resolves the gate before the browser paints. <main>/MapWrapper mount only
+ * once resolved. page.tsx's synchronous server output (JSON-LD, sr-only <h1>)
+ * renders above this component regardless.
  *
  * #99: showSplashAgain() re-shows the splash overlay WITHOUT clearing
  * localStorage (so future page loads still skip straight to the map).
  * Pass down as onShowWelcome to MapWrapper → HamburgerMenu.
  *
- * #202: MapWrapper and SplashScreen are loaded via next/dynamic (ssr:false)
- * to code-split their JS (vaul, Radix UI, geolocation hooks, venue data) into
- * async chunks. WHY: this component already returns null during SSR
- * (hydration-safe), so ssr:false has no effect on server output — it only
- * moves parse/exec off the blocking initial JS load, reducing TBT on
- * throttled mobile.
+ * #202: MapWrapper is loaded via next/dynamic (ssr:false) to code-split its
+ * JS (vaul, Radix UI, geolocation hooks, venue data) into an async chunk.
+ * SplashScreen was too, until the mobile-LCP fix (static import below). WHY:
+ * MapWrapper only mounts after the gate resolves client-side, so it is never
+ * in server output either way — ssr:false only moves parse/exec off the
+ * blocking initial JS load, reducing TBT on throttled mobile.
  *
  * #589's useDocumentTitle call for '/' lives in MapWrapper.tsx, NOT here,
  * on purpose: MapWrapper already imports the i18n dictionary and is
@@ -50,7 +57,7 @@
  * comment at its useDocumentTitle call.
  *
  * #588: MapWrapper's mapbox-gl load (already deferred by #226) is HELD
- * (`holdMapLoad={splashShown}`) while the splash overlay is up for a
+ * (`holdMapLoad={splashShown === true}`) while the splash overlay is up for a
  * first-time visitor — mapbox-gl's own parse/exec (~530ms at 4x CPU
  * throttle) dominates mobile TBT/TTI, and #226's idle-callback used to fire
  * it during the ~2s a visitor is still reading the splash (the map is inert
@@ -60,25 +67,28 @@
  * visitors don't wait any longer than before; only Lighthouse's synthetic
  * never-interacts run, and a visitor who reads for a while before tapping,
  * stop paying that cost early. Returning visitors (no splash) are
- * unaffected — `splashShown` is `false` for them from the start.
+ * unaffected — MapWrapper first mounts with `splashShown` already `false`.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { readSplashGate, markSplashSeen } from '@/lib/splashGate';
+import { readSplashGate, markSplashSeen, resolveVenueId, shouldSkipSplash } from '@/lib/splashGate';
+// WHY a static import (mobile LCP): the splash's purpose line IS the LCP
+// element. As a next/dynamic({ssr:false}) chunk it was only discovered after
+// hydration, then loaded through Turbopack's async-loader -> chunk levels, so
+// on slow 4G the text painted ~4 s in (Lighthouse devtools throttling, local
+// prod build: LCP 4.3 s -> 2.8 s, element render delay ~400 ms -> ~50 ms with
+// this change). Statically importing it puts it in the same parallel chunk
+// wave as the rest of the page. Cost: the splash code (small; the i18n
+// dictionary loads a moment later for the map anyway) ships to returning
+// visitors who skip the splash. MapWrapper stays dynamic: it is the heavy part.
+import SplashScreen from '@/components/SplashScreen';
 
 // WHY dynamic + ssr:false: MapWrapper pulls in vaul, Radix UI, geolocation
-// hooks, and all venue UI. None of it is needed during SSR (this component
-// already returns null). Code-splitting it defers ~200KB of parse/exec off
+// hooks, and all venue UI. None of it is needed during SSR (it only mounts
+// once the gate resolves). Code-splitting it defers ~200KB of parse/exec off
 // the blocking JS window — the primary TBT lever for #202.
 const MapWrapper = dynamic(() => import('@/components/MapWrapper'), {
-  ssr: false,
-  loading: () => null,
-});
-
-// WHY dynamic: SplashScreen imports the geolocation hook and locale context
-// eagerly; deferring it alongside MapWrapper keeps the async chunk boundary clean.
-const SplashScreen = dynamic(() => import('@/components/SplashScreen'), {
   ssr: false,
   loading: () => null,
 });
@@ -91,9 +101,10 @@ const SplashScreen = dynamic(() => import('@/components/SplashScreen'), {
 
 
 export default function HomePageClient() {
-  // null = not yet determined (SSR-safe: avoids flash of wrong content).
-  // We initialize to null so the server renders nothing, then the client
-  // effect determines the true value without a hydration mismatch.
+  // null = not yet determined (localStorage/URL are unknown server-side). The
+  // server and first client render both show the splash as `pending` and no
+  // map; the layout effect then resolves the true value without a hydration
+  // mismatch.
   const [splashShown, setSplashShown] = useState<boolean | null>(null);
   const [viewport, setViewport] = useState<'located' | 'pueblo-center'>('pueblo-center');
   // Deep link (#132): a ?venue=<id> URL opens straight to that pin.
@@ -106,53 +117,55 @@ export default function HomePageClient() {
   // Ref to the map container element — focus moves here on splash dismiss.
   const mapContainerRef = useRef<HTMLElement | null>(null);
 
-  // One-shot: read localStorage after first mount. useRef guards re-entry.
+  // One-shot: read localStorage and the URL on mount. useRef guards re-entry.
   const initialized = useRef(false);
 
-  useEffect(() => {
+  // WHY a layout effect with direct setState: on client-side navigation to "/"
+  // the inline SPLASH_GATE_SCRIPT never runs (React doesn't execute scripts it
+  // renders), so the gate must resolve before first paint or returning visitors
+  // would flash the pending splash. setState in a layout effect is flushed
+  // synchronously before the browser paints. window.location is already the new
+  // URL here: Next's HistoryUpdater pushes it in useInsertionEffect, which runs
+  // before layout effects.
+  /* eslint-disable react-hooks/set-state-in-effect -- see WHY above */
+  useLayoutEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
-    // Wrap in a scheduler callback to avoid the set-state-in-effect lint rule,
-    // which flags synchronous setState in effect bodies. The queueMicrotask
-    // ensures we're in the microtask queue, not the synchronous effect body.
-    queueMicrotask(() => {
-      const params = new URLSearchParams(window.location.search);
-      const venueParam = params.get('venue');
-      // "Near me" in the bottom nav on a Menu page (PageNav) links to /?near=1:
-      // open the map and locate, as the splash's "Find food near me" does.
-      const nearParam = params.get('near') === '1';
-      if (nearParam) {
-        setViewport('located');
-        // Strip it so a refresh doesn't locate again.
-        params.delete('near');
-        const qs = params.toString();
-        window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
-      }
-      // "Boxes" in the bottom nav on a Menu page (PageNav) links to
-      // /?boxes=1: same read-once-then-strip shape as near, above.
-      const boxesParam = params.get('boxes') === '1';
-      if (boxesParam) {
-        setInitialBoxesFilter(true);
-        params.delete('boxes');
-        const qs = params.toString();
-        window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
-      }
-      // Also read #venue=<id> fragment: used by /venue/[id]'s "View on the map"
-      // CTA. There's no /?venue= → /venue/<id> redirect to bypass (next.config.ts
-      // removed it — a `has`-query redirect on "/" 500'd on OpenNext/Cloudflare,
-      // see that file's 2026-06-20 hotfix note); PageNav's saved-venue links use
-      // the plain query form instead, and both land here and are read client-side.
-      const hashParam = window.location.hash.startsWith('#venue=')
-        ? window.location.hash.slice('#venue='.length)
-        : null;
-      const resolvedId = venueParam ?? hashParam;
-      setInitialVenueId(resolvedId);
-      // A shared venue link (either form) goes straight to the pin — skip the splash.
-      // Near me and Boxes both come from inside the app (PageNav), so the
-      // splash was already seen.
-      setSplashShown(resolvedId || nearParam || boxesParam ? false : !readSplashGate());
-    });
+    // Captured before the near/boxes strip below rewrites the URL, so the
+    // skip decision still sees them.
+    const { search, hash } = window.location;
+    const params = new URLSearchParams(search);
+    // "Near me" in the bottom nav on a Menu page (PageNav) links to /?near=1:
+    // open the map and locate, as the splash's "Find food near me" does.
+    const nearParam = params.get('near') === '1';
+    if (nearParam) {
+      setViewport('located');
+      // Strip it so a refresh doesn't locate again.
+      params.delete('near');
+      const qs = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    }
+    // "Boxes" in the bottom nav on a Menu page (PageNav) links to
+    // /?boxes=1: same read-once-then-strip shape as near, above.
+    const boxesParam = params.get('boxes') === '1';
+    if (boxesParam) {
+      setInitialBoxesFilter(true);
+      params.delete('boxes');
+      const qs = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    }
+    // ?venue=<id> and the #venue=<id> fragment (used by /venue/[id]'s "View on
+    // the map" CTA) both land here. There's no /?venue= → /venue/<id> redirect
+    // to bypass (next.config.ts removed it — a `has`-query redirect on "/"
+    // 500'd on OpenNext/Cloudflare, see that file's 2026-06-20 hotfix note);
+    // PageNav's saved-venue links use the plain query form instead, and both
+    // are read client-side.
+    setInitialVenueId(resolveVenueId(search, hash));
+    // A shared venue link, Near me and Boxes (both from inside the app, via
+    // PageNav) all skip the splash, as does a visitor who already saw it.
+    setSplashShown(!shouldSkipSplash({ search, hash, gateSeen: readSplashGate() }));
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const dismissSplash = useCallback((mode: 'located' | 'pueblo-center') => {
     markSplashSeen();
@@ -174,35 +187,39 @@ export default function HomePageClient() {
     setSplashShown(true);
   }, []);
 
-  // SSR-safe: render nothing until we know whether splash is needed
-  if (splashShown === null) return null;
-
   return (
     <>
-      {/* Map is always mounted — visible behind the splash overlay when splash is shown */}
-      <main
-        className="flex-1 flex flex-col min-h-0"
-        ref={mapContainerRef}
-        // tabIndex makes the container focusable so we can move focus here on dismiss.
-        tabIndex={-1}
-        // While the splash is up: block keyboard navigation and screen-reader access
-        // to the behind-map. inert covers pointer, keyboard, and focus; aria-hidden
-        // covers the AT tree. Both are removed on dismiss.
-        inert={splashShown || undefined}
-        aria-hidden={splashShown || undefined}
-      >
-        <MapWrapper
-          viewport={viewport}
-          onShowWelcome={showSplashAgain}
-          initialVenueId={initialVenueId}
-          initialBoxesFilter={initialBoxesFilter}
-          holdMapLoad={splashShown}
-        />
-      </main>
+      {/* Map mounts only once the gate resolves (never while null): useDeferredMapLoad
+          treats a hold true→false edge as an immediate load trigger, so mounting
+          it earlier would change when mapbox-gl loads for returning visitors. */}
+      {splashShown !== null && (
+        <main
+          className="flex-1 flex flex-col min-h-0"
+          ref={mapContainerRef}
+          // tabIndex makes the container focusable so we can move focus here on dismiss.
+          tabIndex={-1}
+          // While the splash is up: block keyboard navigation and screen-reader access
+          // to the behind-map. inert covers pointer, keyboard, and focus; aria-hidden
+          // covers the AT tree. Both are removed on dismiss.
+          inert={splashShown || undefined}
+          aria-hidden={splashShown || undefined}
+        >
+          <MapWrapper
+            viewport={viewport}
+            onShowWelcome={showSplashAgain}
+            initialVenueId={initialVenueId}
+            initialBoxesFilter={initialBoxesFilter}
+            holdMapLoad={splashShown === true}
+          />
+        </main>
+      )}
 
-      {/* Splash overlay — full-viewport frosted scrim on top of the map */}
-      {splashShown && (
+      {/* Splash overlay — full-viewport frosted scrim. Present while unresolved
+          (null) so it is in the server HTML; `pending` lets CSS hide it for
+          returning visitors until this unmounts it. */}
+      {splashShown !== false && (
         <SplashScreen
+          pending={splashShown === null}
           onPrimary={(mode) => dismissSplash(mode)}
         />
       )}

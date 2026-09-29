@@ -163,6 +163,14 @@ describe("initAnalytics — init options (session replay, masking)", () => {
     );
   });
 
+  test("surveys are disabled so posthog-js never downloads surveys.js (none are used)", async () => {
+    await initAnalytics({ key: "test-key", pathname: "/" });
+    expect(init).toHaveBeenCalledWith(
+      "test-key",
+      expect.objectContaining({ disable_surveys: true }),
+    );
+  });
+
   test("memory-only persistence (no cookie, nothing stored) and no cookieless_mode, which would disable replay", async () => {
     await initAnalytics({ key: "test-key", pathname: "/" });
     expect(init).toHaveBeenCalledWith(

@@ -36,11 +36,17 @@ import { t } from '@/lib/i18n';
 interface SplashScreenProps {
   /** Called after geo request resolves (granted → 'located') or is denied → 'pueblo-center' */
   onPrimary: (mode: 'located' | 'pueblo-center') => void;
+  /**
+   * True while HomePageClient hasn't resolved the gate yet (server HTML and
+   * first client render). Marks the root so globals.css can hide it for
+   * returning visitors; absent once resolved so a re-shown splash (#99) stays visible.
+   */
+  pending?: boolean;
 }
 
 // ─── SplashScreen ──────────────────────────────────────────────────────────────
 
-export default function SplashScreen({ onPrimary }: SplashScreenProps) {
+export default function SplashScreen({ onPrimary, pending }: SplashScreenProps) {
   const geo = useGeolocation();
   const { locale, setLocale, tree } = useLocale();
 
@@ -144,6 +150,7 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
       // #590: point at the existing purpose paragraph below (id="splash-purpose")
       // rather than adding new hidden copy — it already reads as a description.
       aria-describedby="splash-purpose"
+      data-splash-pending={pending ? '' : undefined}
     >
       {/* ── Inner flex wrapper: centers content when it fits, lets it scroll naturally when tall ── */}
       <div className="flex min-h-full items-center justify-center">

@@ -140,6 +140,29 @@ describe("splash failure handed in", () => {
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
   });
 
+  test("a later splash success (prop back to null) clears a stale card (PR #741 review)", async () => {
+    let rerenderMap: (ui: React.ReactElement) => void = () => {};
+    await act(async () => {
+      const r = render(
+        <LocaleProvider>
+          <MapWrapper splashLocationFailure={FAILED} />
+        </LocaleProvider>,
+      );
+      rerenderMap = r.rerender;
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+    expect(await screen.findByRole("heading", { name: "We couldn't find you" })).toBeTruthy();
+    await act(async () => {
+      rerenderMap(
+        <LocaleProvider>
+          <MapWrapper splashLocationFailure={null} />
+        </LocaleProvider>,
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+
   test("Try again that fails again keeps the card, with the new reason", async () => {
     stubGeolocation(fail(2)); // POSITION_UNAVAILABLE, both attempts
     await renderMap({ splashLocationFailure: FAILED });

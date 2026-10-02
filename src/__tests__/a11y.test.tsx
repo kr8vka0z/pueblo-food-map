@@ -5,7 +5,7 @@
  *   1. SplashScreen — first-visit gate (PR 3)
  *   2. SearchBar — floating search bar above map (PR 6)
  *   3. BottomNav — Near me / Saved / Boxes / Help / Menu (idle / locating / open / Boxes-active states)
- *   4. LocationDeniedBanner — permission-denied overlay (PR 7)
+ *   4. LocationHelpCard — location-failure bottom card (#739; was PR 7's LocationDeniedBanner)
  *   5. VenueMarker — Mapbox marker button (PR 45, Mapbox migration)
  *
  * Map.tsx is excluded from direct axe tests: it requires a real Mapbox GL

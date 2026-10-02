@@ -554,10 +554,14 @@ export default function MapWrapper({
     // so this effect fires even when permission stays "denied"/"failed" across retries.
   }, [geo.state]);
 
-  // Splash handed over a failure → show the card for it. Deferred out of the
-  // effect body (set-state-in-effect lint rule), like autoLocate below.
+  // Mirror the splash's latest outcome in both directions: a failure shows the
+  // card, and a later successful splash (prop back to null) clears it. Clearing
+  // can't be left to the geo.state effect: autoLocateDoneRef only re-locates
+  // once per session, so a reopened splash that succeeds never produces the
+  // granted state that would hide a stale card (PR #741 review). Deferred out
+  // of the effect body (set-state-in-effect lint rule), like autoLocate below.
   useEffect(() => {
-    if (splashLocationFailure) queueMicrotask(() => setLocationFailure(splashLocationFailure));
+    queueMicrotask(() => setLocationFailure(splashLocationFailure));
   }, [splashLocationFailure]);
 
   // ── Explicit recenter counter — incremented on each user-initiated locate tap ──

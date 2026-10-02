@@ -642,7 +642,7 @@ export default function AddVenueForm({
   // Informational-emphasis tones per DESIGN.md's Do's/Don'ts: sage for a calm
   // positive confirmation (same hue as the "Show details" / operator-link
   // convention), clay for "didn't work, here's guidance" (the same role clay
-  // already plays in LocationDeniedBanner/VenueListView) — never red, since
+  // already plays in VenueListView) — never red, since
   // these never block submission the way a field validation error does.
   const geocodeToneClass: Record<GeocodeStatus, string> = {
     idle: "",

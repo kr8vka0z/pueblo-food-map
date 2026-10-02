@@ -121,11 +121,11 @@ describe("buildFilters", () => {
 
 describe("buildLocationPermission", () => {
   test("sums granted and denied, ignores an unrecognized result value", () => {
-    expect(buildLocationPermission([["granted", 7], ["denied", 2], ["prompt", 100]])).toEqual({ granted: 7, denied: 2 });
+    expect(buildLocationPermission([["granted", 7], ["denied", 2], ["prompt", 100]])).toEqual({ granted: 7, denied: 2, timeout: 0, unavailable: 0 });
   });
 
-  test("empty rows -> both zero", () => {
-    expect(buildLocationPermission([])).toEqual({ granted: 0, denied: 0 });
+  test("empty rows -> all zero", () => {
+    expect(buildLocationPermission([])).toEqual({ granted: 0, denied: 0, timeout: 0, unavailable: 0 });
   });
 });
 

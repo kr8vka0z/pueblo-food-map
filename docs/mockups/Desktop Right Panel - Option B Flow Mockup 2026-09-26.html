@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM desktop: where the place card goes</title>
+<style>
+  :root { --bone-50:#FBFAF6; --bone-100:#F4F1EA; --bone-200:#E8E3D6; --bone-300:#D4CDB8; --ink-400:#6A645A; --ink-500:#5F5A52; --ink-700:#2D2A26; --sage-600:#2C5F4F; --clay-100:#F8E2D4; --clay-700:#7C2D12; --rasp:#C2447B; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#e9e6df; font:14px/1.45 -apple-system,system-ui,sans-serif; color:#1A1817; padding:22px; }
+  h1 { font:600 22px Georgia,serif; margin:0 0 4px; } .sub { color:var(--ink-400); margin:0 0 18px; max-width:1180px; }
+  .grid { display:grid; grid-template-columns:repeat(2, 600px); gap:26px 30px; }
+  .label { font-weight:700; } .who { font-size:12px; color:var(--ink-400); margin:1px 0 7px; } .note { font-size:13px; color:var(--ink-500); margin:8px 0 0; }
+  .rec { background:var(--sage-600); color:#fff; font-size:11px; padding:2px 7px; border-radius:99px; margin-left:6px; vertical-align:2px; }
+  .screen { position:relative; width:600px; height:375px; border-radius:10px; overflow:hidden; border:6px solid #222; background:
+      linear-gradient(90deg,transparent 22%,#fff 22%,#fff 23%,transparent 23%), linear-gradient(90deg,transparent 55%,#fff 55%,#fff 56%,transparent 56%), linear-gradient(90deg,transparent 81%,#fff 81%,#fff 82%,transparent 82%),
+      linear-gradient(0deg,transparent 30%,#fff 30%,#fff 31.5%,transparent 31.5%), linear-gradient(0deg,transparent 64%,#fff 64%,#fff 65.5%,transparent 65.5%), #ece9e4; }
+  .search { position:absolute; top:10px; left:50%; transform:translateX(-50%); width:260px; height:30px; border-radius:99px; background:var(--bone-50); border:1px solid var(--bone-300); box-shadow:0 1px 4px rgba(0,0,0,.12); font-size:11px; color:var(--ink-400); padding:7px 14px; z-index:3; }
+  .bnav { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); width:250px; height:30px; border-radius:99px; background:var(--bone-50); border:1px solid var(--bone-300); box-shadow:0 1px 4px rgba(0,0,0,.12); font-size:10px; color:var(--ink-500); display:flex; justify-content:space-around; align-items:center; z-index:3; }
+  .pin { position:absolute; width:14px; height:14px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); background:var(--rasp); border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.3); z-index:2; }
+  .pin.sel { width:18px; height:18px; outline:3px solid rgba(194,68,123,.35); }
+  .card { position:absolute; background:var(--bone-50); border-radius:10px; box-shadow:0 6px 24px rgba(0,0,0,.2); overflow:hidden; font-size:10px; z-index:4; }
+  .card .band { background:var(--clay-100); color:var(--clay-700); padding:5px 10px; }
+  .card .bd { padding:8px 10px; } .card .bb { display:inline-block; background:var(--rasp); color:#fff; border-radius:99px; padding:1px 6px; font-size:9px; }
+  .card h4 { font:600 12px Georgia,serif; margin:5px 0 3px; } .card .addr { color:var(--sage-600); text-decoration:underline; }
+  .card .btns { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; margin-top:6px; } .card .btns span { border:1px solid var(--bone-300); border-radius:5px; text-align:center; padding:4px 0; background:#fff; }
+  .card .x { position:absolute; right:8px; top:6px; color:var(--ink-500); }
+  .card .grab { width:30px; height:3px; border-radius:2px; background:var(--bone-300); margin:5px auto 0; }
+  .panel { position:absolute; top:0; bottom:0; background:var(--bone-50); box-shadow:2px 0 12px rgba(0,0,0,.15); z-index:4; font-size:10px; }
+  .panel .search2 { margin:10px; height:28px; border-radius:99px; border:1px solid var(--bone-300); background:#fff; color:var(--ink-400); padding:6px 12px; }
+  .bad { position:absolute; border:2px dashed #d33; border-radius:10px; z-index:5; }
+  .tag { position:absolute; background:#FFD84D; color:#1a1a1a; font-size:10.5px; font-weight:700; padding:2px 6px; border-radius:5px; z-index:6; white-space:nowrap; }
+</style></head>
+<body>
+<h1>Option B: one panel on the right for everything</h1>
+<p class="sub">Menu and Saved already open in the top-right corner on desktop today, which is exactly where option B puts the card. So instead of two things fighting over that corner, the right-hand panel becomes the one place they all open. Only one thing shows there at a time.</p>
+<div class="grid">
+  <div><div class="label">1. A card is open</div><div class="screen"><div class="search" style="left:38%">🔍 Search</div><div class="bnav" style="left:38%"><span>Near me</span><span>Saved</span><span>Boxes</span><span>Help</span><span>Menu</span></div>
+      <div class="pin" style="left:150px;top:190px"></div><div class="pin sel" style="left:230px;top:170px"></div><div class="pin" style="left:90px;top:90px"></div>
+      <div class="card" style="right:10px;top:10px;bottom:10px;width:210px"><div class="band">This box needs a sponsor.</div><div class="bd"><span class="bb">Blessing Box</span><h4>Blessing Box - 1308 E Ash St</h4><span class="addr">1308 E Ash St</span><div class="btns"><span>I filled it</span><span>Running low</span><span>It's empty</span></div></div><span class="x">✕</span></div></div><p class="note">Click a pin and its card opens in the right panel. The search bar and bottom bar shift left to make room.</p></div>
+  <div><div class="label">2. Click Saved</div><div class="screen"><div class="search" style="left:38%">🔍 Search</div><div class="bnav" style="left:38%"><span>Near me</span><span>Saved</span><span>Boxes</span><span>Help</span><span>Menu</span></div>
+      <div class="pin" style="left:150px;top:190px"></div><div class="pin sel" style="left:230px;top:170px"></div><div class="pin" style="left:90px;top:90px"></div>
+      <div class="card" style="right:10px;top:10px;bottom:10px;width:210px"><div class="bd"><h4 style="margin-top:2px">Saved places</h4><div style="border-top:1px solid #E8E3D6;padding:6px 0">★ Posada Food Pantry</div><div style="border-top:1px solid #E8E3D6;padding:6px 0">★ Care and Share — Pueblo</div><div style="border-top:1px solid #E8E3D6;padding:6px 0">★ Blessing Box - 1249 E Routt Ave</div></div><span class="x">✕</span></div></div><p class="note">The same panel switches to your saved places, and the card closes. “Saved” lights up in the bottom bar.</p></div>
+  <div><div class="label">3. Click a saved place</div><div class="screen"><div class="search" style="left:38%">🔍 Search</div><div class="bnav" style="left:38%"><span>Near me</span><span>Saved</span><span>Boxes</span><span>Help</span><span>Menu</span></div>
+      <div class="pin" style="left:150px;top:190px"></div><div class="pin sel" style="left:230px;top:170px"></div><div class="pin" style="left:90px;top:90px"></div>
+      <div class="card" style="right:10px;top:10px;bottom:10px;width:210px"><div class="bd" style="padding-bottom:0"><span style="color:#2C5F4F;text-decoration:underline">← Saved</span></div><div class="bd"><span class="bb" style="background:#2C5F4F">Food pantry</span><h4>Posada Food Pantry</h4><span class="addr">1320 E 6th St</span><div class="btns"><span>Walk</span><span>Bus</span><span>Drive</span></div></div><span class="x">✕</span></div></div><p class="note">Its card opens in the panel with a “← Saved” link to go back to your list.</p></div>
+  <div><div class="label">4. Click Menu</div><div class="screen"><div class="search" style="left:38%">🔍 Search</div><div class="bnav" style="left:38%"><span>Near me</span><span>Saved</span><span>Boxes</span><span>Help</span><span>Menu</span></div>
+      <div class="pin" style="left:150px;top:190px"></div><div class="pin sel" style="left:230px;top:170px"></div><div class="pin" style="left:90px;top:90px"></div>
+      <div class="card" style="right:10px;top:10px;bottom:10px;width:210px"><div class="bd"><h4 style="margin-top:2px">Menu</h4><div style="border-top:1px solid #E8E3D6;padding:6px 0">About</div><div style="border-top:1px solid #E8E3D6;padding:6px 0">Suggest a place</div><div style="border-top:1px solid #E8E3D6;padding:6px 0">Feedback</div><div style="border-top:1px solid #E8E3D6;padding:6px 0">Browse all places</div><div style="border-top:1px solid #E8E3D6;padding:6px 0">English / Español</div></div><span class="x">✕</span></div></div><p class="note">The Menu opens in the same panel. <b>Help</b> keeps opening its own page, as today. <b>Filters</b> keeps sliding in from the left, so it never collides with the right panel. <b>Boxes</b> and <b>Near me</b> only move the map. ✕ closes the panel and the bars slide back.</p></div>
+</div></body></html>

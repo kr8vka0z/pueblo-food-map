@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM desktop: where the place card goes</title>
+<style>
+  :root { --bone-50:#FBFAF6; --bone-100:#F4F1EA; --bone-200:#E8E3D6; --bone-300:#D4CDB8; --ink-400:#6A645A; --ink-500:#5F5A52; --ink-700:#2D2A26; --sage-600:#2C5F4F; --clay-100:#F8E2D4; --clay-700:#7C2D12; --rasp:#C2447B; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#e9e6df; font:14px/1.45 -apple-system,system-ui,sans-serif; color:#1A1817; padding:22px; }
+  h1 { font:600 22px Georgia,serif; margin:0 0 4px; } .sub { color:var(--ink-400); margin:0 0 18px; max-width:1180px; }
+  .grid { display:grid; grid-template-columns:repeat(2, 600px); gap:26px 30px; }
+  .label { font-weight:700; } .who { font-size:12px; color:var(--ink-400); margin:1px 0 7px; } .note { font-size:13px; color:var(--ink-500); margin:8px 0 0; }
+  .rec { background:var(--sage-600); color:#fff; font-size:11px; padding:2px 7px; border-radius:99px; margin-left:6px; vertical-align:2px; }
+  .screen { position:relative; width:600px; height:375px; border-radius:10px; overflow:hidden; border:6px solid #222; background:
+      linear-gradient(90deg,transparent 22%,#fff 22%,#fff 23%,transparent 23%), linear-gradient(90deg,transparent 55%,#fff 55%,#fff 56%,transparent 56%), linear-gradient(90deg,transparent 81%,#fff 81%,#fff 82%,transparent 82%),
+      linear-gradient(0deg,transparent 30%,#fff 30%,#fff 31.5%,transparent 31.5%), linear-gradient(0deg,transparent 64%,#fff 64%,#fff 65.5%,transparent 65.5%), #ece9e4; }
+  .search { position:absolute; top:10px; left:50%; transform:translateX(-50%); width:260px; height:30px; border-radius:99px; background:var(--bone-50); border:1px solid var(--bone-300); box-shadow:0 1px 4px rgba(0,0,0,.12); font-size:11px; color:var(--ink-400); padding:7px 14px; z-index:3; }
+  .bnav { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); width:250px; height:30px; border-radius:99px; background:var(--bone-50); border:1px solid var(--bone-300); box-shadow:0 1px 4px rgba(0,0,0,.12); font-size:10px; color:var(--ink-500); display:flex; justify-content:space-around; align-items:center; z-index:3; }
+  .pin { position:absolute; width:14px; height:14px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); background:var(--rasp); border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.3); z-index:2; }
+  .pin.sel { width:18px; height:18px; outline:3px solid rgba(194,68,123,.35); }
+  .card { position:absolute; background:var(--bone-50); border-radius:10px; box-shadow:0 6px 24px rgba(0,0,0,.2); overflow:hidden; font-size:10px; z-index:4; }
+  .card .band { background:var(--clay-100); color:var(--clay-700); padding:5px 10px; }
+  .card .bd { padding:8px 10px; } .card .bb { display:inline-block; background:var(--rasp); color:#fff; border-radius:99px; padding:1px 6px; font-size:9px; }
+  .card h4 { font:600 12px Georgia,serif; margin:5px 0 3px; } .card .addr { color:var(--sage-600); text-decoration:underline; }
+  .card .btns { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; margin-top:6px; } .card .btns span { border:1px solid var(--bone-300); border-radius:5px; text-align:center; padding:4px 0; background:#fff; }
+  .card .x { position:absolute; right:8px; top:6px; color:var(--ink-500); }
+  .card .grab { width:30px; height:3px; border-radius:2px; background:var(--bone-300); margin:5px auto 0; }
+  .panel { position:absolute; top:0; bottom:0; background:var(--bone-50); box-shadow:2px 0 12px rgba(0,0,0,.15); z-index:4; font-size:10px; }
+  .panel .search2 { margin:10px; height:28px; border-radius:99px; border:1px solid var(--bone-300); background:#fff; color:var(--ink-400); padding:6px 12px; }
+  .bad { position:absolute; border:2px dashed #d33; border-radius:10px; z-index:5; }
+  .tag { position:absolute; background:#FFD84D; color:#1a1a1a; font-size:10.5px; font-weight:700; padding:2px 6px; border-radius:5px; z-index:6; white-space:nowrap; }
+</style></head>
+<body>
+<h1>Desktop: where should the place card go?</h1>
+<p class="sub">Today the card floats next to the pin, so it can land under the search bar (like your screenshot) or under the bottom bar. Each option below keeps the card clear of both. Same card contents in every option; the phone layout isn't affected.</p>
+<div class="grid">
+
+  <div><div class="label">Today</div><div class="who">Card floats beside the pin</div>
+    <div class="screen"><div class="search">🔍 Search</div><div class="bnav"><span>Near me</span><span>Saved</span><span>Boxes</span><span>Help</span><span>Menu</span></div>
+      <div class="pin" style="left:282px;top:190px"></div><div class="pin sel" style="left:318px;top:200px"></div><div class="pin" style="left:120px;top:90px"></div>
+      <div class="card" style="left:338px;top:18px;width:200px">
+        <div class="band">This box needs a sponsor.</div><div class="bd"><span class="bb">Blessing Box</span><h4>Blessing Box - 1308 E Ash St</h4><span class="addr">1308 E Ash St</span><div class="btns"><span>I filled it</span><span>Running low</span><span>It's empty</span></div></div></div>
+      <div class="bad" style="left:330px;top:6px;width:120px;height:40px"></div><span class="tag" style="left:330px;top:50px">search bar covers the card</span></div>
+    <p class="note">The card's position depends on where the pin is, so it keeps running into the fixed search bar and bottom bar.</p></div>
+
+  <div><div class="label">A. Side panel on the left<span class="rec">my pick</span></div><div class="who">Google Maps, Apple Maps, Airbnb, Zillow on desktop</div>
+    <div class="screen"><div class="panel" style="left:0;width:230px"><div class="search2">🔍 Search</div>
+        <div class="card" style="position:relative;box-shadow:none;border-radius:0;background:transparent"><div class="band">This box needs a sponsor.</div><div class="bd"><span class="bb">Blessing Box</span><h4>Blessing Box - 1308 E Ash St</h4><span class="addr">1308 E Ash St, Pueblo</span><div class="btns"><span>I filled it</span><span>Running low</span><span>It's empty</span></div><p style="color:#6A645A;margin:8px 0 0">…rest of the card scrolls here</p></div><span class="x">✕</span></div></div>
+      <div class="bnav" style="left:415px"><span>Near me</span><span>Saved</span><span>Boxes</span><span>Help</span><span>Menu</span></div>
+      <div class="pin" style="left:330px;top:190px"></div><div class="pin sel" style="left:410px;top:170px"></div><div class="pin" style="left:520px;top:90px"></div>
+      <span class="tag" style="left:300px;top:120px">map slides so the pin stays in view</span></div>
+    <p class="note">The card opens in a full-height panel that the search bar sits on top of, so they can never overlap. There's always room for the whole card, and it scrolls if it's long. The map slides over so the pin stays visible to the right. It's the most familiar desktop map layout.</p></div>
+
+  <div><div class="label">B. Floating card, top right</div><div class="who">Apple Maps on Mac, Uber on the web</div>
+    <div class="screen"><div class="search" style="left:38%">🔍 Search</div><div class="bnav" style="left:38%"><span>Near me</span><span>Saved</span><span>Boxes</span><span>Help</span><span>Menu</span></div>
+      <div class="pin" style="left:150px;top:190px"></div><div class="pin sel" style="left:230px;top:170px"></div><div class="pin" style="left:90px;top:90px"></div>
+      <div class="card" style="right:10px;top:10px;bottom:10px;width:210px">
+        <div class="band">This box needs a sponsor.</div><div class="bd"><span class="bb">Blessing Box</span><h4>Blessing Box - 1308 E Ash St</h4><span class="addr">1308 E Ash St</span><div class="btns"><span>I filled it</span><span>Running low</span><span>It's empty</span></div><p style="color:#6A645A;margin:8px 0 0">…scrolls</p></div><span class="x">✕</span></div>
+      <span class="tag" style="left:110px;top:120px">search + bar shift left</span></div>
+    <p class="note">The card always opens in the same spot, a tall floating card on the right. While it's open, the search bar and bottom bar slide left to make room, so nothing overlaps. It feels lighter than a panel because the map still shows around it.</p></div>
+
+  <div><div class="label">C. Bottom sheet, like the phone</div><div class="who">Same as the phone version (#666, #667)</div>
+    <div class="screen"><div class="search">🔍 Search</div>
+      <div class="pin" style="left:282px;top:100px"></div><div class="pin sel" style="left:318px;top:120px"></div><div class="pin" style="left:120px;top:60px"></div>
+      <div class="card" style="left:50%;transform:translateX(-50%);bottom:0;width:360px;height:175px;border-radius:12px 12px 0 0"><div class="grab"></div>
+        <div class="bd"><span class="bb">Blessing Box</span><h4>Blessing Box - 1308 E Ash St</h4><span class="addr">1308 E Ash St</span><div class="btns"><span>I filled it</span><span>Running low</span><span>It's empty</span></div></div></div>
+      <span class="tag" style="left:130px;top:150px">bottom bar hides while open</span></div>
+    <p class="note">One design for every screen size: the card slides up from the bottom, with the same grab bar and swipe/tap behavior as the phone. It's the simplest to build and maintain, but it wastes the wide screen, and a mouse user can't swipe.</p></div>
+
+</div>
+</body></html>

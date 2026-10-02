@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blessing Box card — redesign mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Tokens copied from pueblo-food-map DESIGN.md — no new colors. */
+:root{
+  --bone50:#FBFAF6;--bone100:#F4F1EA;--bone200:#E8E3D6;--bone300:#D4CDB8;
+  --ink400:#6A645A;--ink500:#5F5A52;--ink700:#2D2A26;--ink900:#1A1817;
+  --sage50:#EAF0EC;--sage100:#D1DDD3;--sage500:#4A8466;--sage600:#2C5F4F;--sage700:#1F4639;
+  --orange:#F7943C;--navy:#190F3F;--success:#15803D;--warning:#B45309;--danger:#B91C1C;
+  --blessing:#C2447B;
+  --display:'Fraunces',Georgia,serif;--sans:'Public Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:var(--sans);color:var(--ink700);background:#fff;padding:32px 24px 64px;line-height:1.45}
+h1{font-family:var(--display);font-weight:600;font-size:30px;color:var(--ink900)}
+.lede{max-width:70ch;margin:8px 0 28px;color:var(--ink500);font-size:15px}
+.row{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.col{width:375px}
+.col h2{font-family:var(--display);font-weight:600;font-size:20px;color:var(--ink900)}
+.col .why{font-size:13px;color:var(--ink500);margin:4px 0 12px;min-height:74px}
+.state{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink400);margin:22px 0 8px}
+/* phone stage: a flat map-ish backdrop with the slide-up card on it */
+.stage{background:#DDE5DC;border-radius:24px;padding:44px 0 0;overflow:hidden;border:1px solid var(--bone200)}
+.sheet{background:var(--bone50);border-radius:20px 20px 0 0;padding:10px 18px 22px;box-shadow:0 -2px 14px rgba(26,24,23,.10)}
+.grab{width:40px;height:4px;border-radius:9999px;background:var(--bone300);margin:0 auto 12px}
+.badge{display:inline-block;background:var(--blessing);color:var(--bone50);font-size:11px;font-weight:600;padding:3px 10px;border-radius:9999px}
+.title{font-family:var(--display);font-weight:600;font-size:24px;line-height:1.15;color:var(--ink900);margin-top:8px}
+.addr{font-size:13px;color:var(--ink500);margin-top:3px}
+.dir{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border-radius:10px;background:var(--orange);color:var(--navy);font-weight:700;font-size:14px;border:0}
+.label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink400)}
+.rule{height:1px;background:var(--bone200);margin:14px 0}
+.dot{width:10px;height:10px;border-radius:9999px;display:inline-block;flex:none}
+.stocked{--c:var(--success)}.low{--c:var(--warning)}.empty{--c:var(--danger)}.unknown{--c:var(--ink400)}
+.btn{min-height:44px;border-radius:10px;font:600 14px var(--sans);padding:0 12px;border:1px solid var(--bone300);background:#fff;color:var(--ink700)}
+.btn.primary{background:var(--sage600);border-color:var(--sage600);color:var(--bone50)}
+.links{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;font-weight:500}
+.links a{color:var(--sage600);text-decoration:underline;text-underline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{background:var(--bone100);border-radius:9999px;padding:4px 10px;font-size:13px;color:var(--ink700)}
+.photo{display:block;width:100%;object-fit:cover;background:var(--bone200)}
+.cap{font-size:12px;color:var(--ink400);display:flex;justify-content:space-between;margin-top:4px}
+.cap a{color:var(--ink400)}
+
+/* ---------- A: Status line ---------- */
+.a-credit{font-size:14px;color:var(--ink700);margin-top:8px}
+.a-credit b{font-weight:600;color:var(--ink900)}
+.a-top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:12px}
+.a-status{display:flex;align-items:center;gap:10px;margin-top:2px}
+.a-status .dot{background:var(--c)}
+.a-status strong{font-size:18px;font-weight:700;color:var(--c)}
+.a-status span{font-size:13px;color:var(--ink500)}
+.a-note{font-size:13px;color:var(--ink500);margin-top:8px}
+.a-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.a-quiet{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.a-quiet .btn{font-size:13px;font-weight:500;padding:0 6px}
+
+/* ---------- B: Photo first ---------- */
+.b .sheet{padding:0 0 22px;overflow:hidden}
+.b .photo-wrap{position:relative}
+.b .photo{height:170px}
+.b .grab{position:absolute;top:10px;left:50%;transform:translateX(-50%);margin:0;background:var(--bone50);opacity:.9}
+.b .pill{position:absolute;left:14px;bottom:12px;background:var(--bone50);border-radius:9999px;padding:6px 12px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--c)}
+.b .pill .dot{background:var(--c)}
+.b .pill span{font-weight:500;color:var(--ink500)}
+.b .nophoto{padding:26px 18px 0;position:relative}
+.b .nophoto .grab{top:10px}
+.b .nophoto .pill{position:static;display:inline-flex;background:var(--bone100);margin-bottom:10px}
+.b .credit{background:var(--sage50);padding:10px 18px;font-size:14px;color:var(--sage700);display:flex;gap:10px;align-items:center}
+.b .credit svg{flex:none}
+.b .credit b{font-weight:600}
+.b .body{padding:14px 18px 0}
+.b .head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.b .title{margin-top:6px;font-size:22px}
+.b .ask{font-family:var(--display);font-weight:600;font-size:18px;color:var(--ink900)}
+.b .stack{display:grid;gap:8px;margin-top:10px}
+.b .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* ---------- C: Host header + meter ---------- */
+.c .hosted{font-size:13px;color:var(--ink500);margin-top:8px}
+.c .hosted b{color:var(--ink900);font-weight:600}
+.c .title{margin-top:2px}
+.c .meter{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:14px}
+.c .seg{height:8px;border-radius:9999px;background:var(--bone200)}
+.c .seg.on{background:var(--c)}
+.c .meter-cap{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px}
+.c .meter-cap strong{font-size:16px;color:var(--c)}
+.c .meter-cap span{font-size:13px;color:var(--ink500)}
+.c .split{display:grid;grid-template-columns:1fr 104px;gap:12px;margin-top:14px;align-items:start}
+.c .split .photo{height:104px;border-radius:10px;border:1px solid var(--bone200)}
+.c .q{font-size:15px;font-weight:600;color:var(--ink900)}
+.c .tri{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.c .tri .btn{font-size:13px;padding:0 4px}
+.c .tri .btn i{display:block;width:8px;height:8px;border-radius:9999px;margin:0 auto 3px;background:var(--c)}
+.c .wide{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.c .wide .btn{font-weight:500;font-size:13px}
+</style>
+</head>
+<body>
+<h1>Blessing Box card — three directions</h1>
+<p class="lede">Same information as today's card, same colors and typefaces as the rest of the map. In all three, who hosts or cares for the box sits at the top, the five check-in choices stop being five equal buttons, and the small links (History, adopt, email alerts) move to one quiet row at the bottom. Each is shown twice: a full box, and a bare box with no host, no photo and no recent check-ins.</p>
+
+<div class="row" id="row"></div>
+
+<script>
+const PHOTO = "data:image/svg+xml;utf8," + encodeURIComponent(
+ `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 375 200'><rect width='375' height='200' fill='#CFC7B0'/><rect y='140' width='375' height='60' fill='#9DB59F'/><rect x='150' y='40' width='80' height='120' rx='4' fill='#F4F1EA' stroke='#6A645A' stroke-width='3'/><path d='M140 44 L190 14 L240 44Z' fill='#C2447B'/><line x1='150' y1='80' x2='230' y2='80' stroke='#6A645A' stroke-width='2'/><line x1='150' y1='118' x2='230' y2='118' stroke='#6A645A' stroke-width='2'/><rect x='158' y='58' width='14' height='22' fill='#BE2D45'/><rect x='176' y='62' width='12' height='18' fill='#1F4E8C'/><rect x='194' y='56' width='16' height='24' fill='#F7943C'/><rect x='160' y='96' width='22' height='22' fill='#2C5F4F'/><rect x='188' y='100' width='30' height='18' fill='#92591D'/><rect x='186' y='160' width='8' height='40' fill='#6A645A'/><text x='187' y='192' font-family='sans-serif' font-size='9' fill='#2D2A26' text-anchor='middle'></text></svg>`);
+
+const full = {name:"Routt Street Blessing Box", addr:"216 W Routt Ave, Pueblo", status:"stocked", statusText:"Stocked",
+  filled:"Filled 2 hours ago", host:"Seventh-Day Adventist Church", adopters:"the Boyd Family",
+  note:"Please close the door tight — the wind catches it.", needs:["Canned soup","Diapers","Pet food"], photo:true, photoCap:"Photo from 3 hours ago",
+  recent:"Someone filled it · 2 hours ago"};
+const bare = {name:"Practice Box #3", addr:"1400 E Example St, Pueblo", status:"unknown", statusText:"Unknown",
+  filled:"No recent check-ins", host:null, adopters:null, note:null, needs:[], photo:false, recent:null};
+
+const heart = `<svg width="18" height="18" viewBox="0 0 24 24" fill="#2C5F4F" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.420 3 7.500 3c1.740 0 3.410.81 4.500 2.090C13.090 3.810 14.760 3 16.500 3 19.580 3 22 5.420 22 8.500c0 3.780-3.400 6.860-8.550 11.540L12 21.350z"/></svg>`;
+const footer = () => `<div class="rule"></div><div class="links"><a href="#">History</a><a href="#">Apply to adopt this box</a><a href="#">Email me when it needs filling</a></div>`;
+const credit = d => [d.host&&`Hosted by <b>${d.host}</b>`, d.adopters&&`Cared for by <b>${d.adopters}</b>`].filter(Boolean);
+
+function A(d){
+  const c = credit(d);
+  return `<div class="stage"><div class="sheet"><div class="grab"></div>
+  <span class="badge">Blessing Box</span>
+  <div class="title">${d.name}</div>
+  ${c.length?`<div class="a-credit">${c.join(" · ")}</div>`:""}
+  <div class="a-top"><div><div class="addr">${d.addr}</div>
+    <div class="a-status ${d.status}"><i class="dot"></i><strong>${d.statusText}</strong><span>${d.filled}</span></div></div>
+    <button class="dir">Directions</button></div>
+  ${d.note?`<p class="a-note">“${d.note}”</p>`:""}
+  ${d.photo?`<div style="margin-top:12px"><img class="photo" style="height:120px;border-radius:10px" src="${PHOTO}" alt=""><div class="cap"><span>${d.photoCap}</span><a href="#">Report photo</a></div></div>`:""}
+  ${d.needs.length?`<div style="margin-top:12px"><div class="label">Most needed</div><div class="chips">${d.needs.map(n=>`<span class="chip">${n}</span>`).join("")}</div></div>`:""}
+  <div class="rule"></div>
+  <div class="label">Check in at this box</div>
+  <div class="a-grid"><button class="btn primary">I filled it</button><button class="btn primary">I used this box</button></div>
+  <div class="a-quiet"><button class="btn">Running low</button><button class="btn">It's empty</button><button class="btn">Add a photo</button></div>
+  <div class="links" style="margin-top:10px"><a href="#" style="color:var(--ink500)">Report a problem</a></div>
+  ${footer(d)}</div></div>`;
+}
+
+function B(d){
+  const c = credit(d);
+  const pill = `<div class="pill ${d.status}"><i class="dot"></i>${d.statusText}<span>· ${d.filled}</span></div>`;
+  return `<div class="stage b"><div class="sheet">
+  ${d.photo?`<div class="photo-wrap ${d.status}"><img class="photo" src="${PHOTO}" alt=""><div class="grab"></div>${pill}</div>`
+           :`<div class="nophoto ${d.status}"><div class="grab"></div>${pill}</div>`}
+  ${c.length?`<div class="credit">${heart}<span>${c.join("<br>")}</span></div>`:""}
+  <div class="body">
+   <div class="head"><div><span class="badge">Blessing Box</span><div class="title">${d.name}</div><div class="addr">${d.addr}</div></div><button class="dir">Directions</button></div>
+   ${d.needs.length?`<div style="margin-top:12px"><div class="label">Most needed</div><div class="chips">${d.needs.map(n=>`<span class="chip">${n}</span>`).join("")}</div></div>`:""}
+   ${d.note?`<p class="a-note">“${d.note}”</p>`:""}
+   <div class="rule"></div>
+   <div class="ask">Were you just here?</div>
+   <div class="stack"><div class="two"><button class="btn primary">I filled it</button><button class="btn primary">I used this box</button></div>
+   <div class="two"><button class="btn">Running low</button><button class="btn">It's empty</button></div></div>
+   <div class="links" style="margin-top:12px"><a href="#">Add a photo</a><a href="#" style="color:var(--ink500)">Report a problem</a>${d.photo?'<a href="#" style="color:var(--ink500)">Report photo</a>':""}</div>
+   ${footer(d)}</div></div></div>`;
+}
+
+function C(d){
+  const on = {stocked:3,low:2,empty:1,unknown:0}[d.status];
+  return `<div class="stage c"><div class="sheet"><div class="grab"></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><div>
+   <span class="badge">Blessing Box</span>
+   ${d.host?`<div class="hosted">Hosted by <b>${d.host}</b></div>`:`<div class="hosted">&nbsp;</div>`}
+   <div class="title">${d.name}</div><div class="addr">${d.addr}</div>
+   ${d.adopters?`<div class="hosted" style="margin-top:6px">Cared for by <b>${d.adopters}</b></div>`:""}
+  </div><button class="dir">Directions</button></div>
+  <div class="${d.status}"><div class="meter">${[1,2,3].map(i=>`<i class="seg ${i<=on?"on":""}"></i>`).join("")}</div>
+   <div class="meter-cap"><strong>${d.statusText}</strong><span>${d.filled}</span></div></div>
+  ${(d.needs.length||d.photo||d.note)?`<div class="${d.photo?"split":""}" style="${d.photo?"":"margin-top:14px"}"><div>
+     ${d.needs.length?`<div class="label">Most needed</div><div class="chips">${d.needs.map(n=>`<span class="chip">${n}</span>`).join("")}</div>`:""}
+     ${d.note?`<p class="a-note">“${d.note}”</p>`:""}</div>
+     ${d.photo?`<div><img class="photo" src="${PHOTO}" alt=""><div class="cap"><span>3 hours ago</span></div></div>`:""}</div>`:""}
+  <div class="rule"></div>
+  <div class="q">How does the box look right now?</div>
+  <div class="tri"><button class="btn stocked"><i></i>I filled it</button><button class="btn low"><i></i>Running low</button><button class="btn empty"><i></i>It's empty</button></div>
+  <div class="wide"><button class="btn">I used this box</button><button class="btn">Add a photo</button></div>
+  <div class="links" style="margin-top:10px"><a href="#" style="color:var(--ink500)">Report a problem</a></div>
+  ${footer(d)}</div></div>`;
+}
+
+const cols = [
+ ["1 · Status line", "Closest to today's card, tidied. Host and sponsor sit in one line right under the name. Status becomes one big colored word instead of a small tag. The two common taps (filled / used) are the solid buttons; the rest are quieter.", A],
+ ["2 · Photo first", "The newest photo leads the card with the status sitting on it, then a soft green band crediting the host and sponsor — the most prominent credit of the three. Check-in is asked as a question.", B],
+ ["3 · Fill gauge", "“Hosted by” sits above the name like a byline. Status is a three-step gauge (empty → low → stocked), and the check-in buttons mirror it with matching colored dots. Photo shrinks to a thumbnail, so this is the shortest card.", C],
+];
+document.getElementById("row").innerHTML = cols.map(([h,w,f]) =>
+ `<div class="col"><h2>${h}</h2><p class="why">${w}</p><div class="state">Full box</div>${f(full)}<div class="state">Bare box — no host, photo or check-ins</div>${f(bare)}</div>`).join("");
+</script>
+</body>
+</html>

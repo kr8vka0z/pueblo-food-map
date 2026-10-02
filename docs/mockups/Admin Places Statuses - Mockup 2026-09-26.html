@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM admin: Places statuses made clear</title>
+<style>
+  :root { --bone-50:#FBFAF6; --bone-100:#F4F1EA; --bone-200:#E8E3D6; --bone-300:#D4CDB8; --ink-400:#6A645A; --ink-500:#5F5A52; --ink-700:#2D2A26; --ink-900:#1A1817;
+          --sage-50:#EAF0EC; --sage-100:#D1DDD3; --sage-600:#2C5F4F; --sage-700:#1F4639; --clay-100:#F8E2D4; --clay-700:#7C2D12; --yellow:#F6D55C; --orange:#F0A04B; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#e9e6df; font:14px/1.45 -apple-system,system-ui,sans-serif; color:var(--ink-900); padding:22px; }
+  h1 { font:600 22px Georgia,serif; margin:0 0 4px; } .sub { color:var(--ink-400); margin:0 0 18px; }
+  .frame { background:var(--bone-50); border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:28px; max-width:1180px; }
+  .flabel { font-weight:700; margin:0 0 6px; }
+  .nav { display:flex; gap:6px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--bone-200); background:#fff; }
+  .nav a { padding:8px 12px; border-radius:10px; color:var(--ink-500); font-size:14px; } .nav a.on { background:var(--sage-600); color:#fff; }
+  .nav .add { margin-left:auto; background:var(--orange); color:#1a1a1a; font-weight:600; }
+  .in { padding:18px 20px; }
+  .devbar { background:#FFF4C7; color:#5b4a00; padding:9px 20px; font-size:13px; border-bottom:1px solid #f1df8a; }
+  .card { background:#fff; border:1px solid var(--bone-200); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+  .pub { display:flex; align-items:center; gap:14px; }
+  .pub p { margin:0; flex:1; } .pub small { display:block; color:var(--ink-400); }
+  .btn { background:var(--sage-600); color:#fff; border-radius:9px; padding:9px 14px; font-weight:600; font-size:13px; white-space:nowrap; }
+  .legend { display:grid; grid-template-columns:repeat(4,1fr); gap:10px 18px; }
+  .legend div { font-size:13px; color:var(--ink-500); } .legend .badge { margin-bottom:4px; }
+  .legend h4 { grid-column:1/-1; margin:0; font-size:13px; color:var(--ink-700); }
+  .also { grid-column:1/-1; border-top:1px solid var(--bone-200); padding-top:8px; font-size:13px; color:var(--ink-500); }
+  .badge { display:inline-block; font-size:12px; font-weight:600; padding:2px 8px; border-radius:5px; }
+  .b-draft { background:var(--yellow); color:var(--ink-900); } .b-live { background:var(--sage-100); color:var(--sage-700); }
+  .b-wait { background:var(--clay-100); color:var(--clay-700); } .b-gone { background:var(--bone-100); color:var(--ink-500); }
+  .filters { display:flex; gap:10px; margin-bottom:10px; }
+  .filters input, .filters select { border:1px solid var(--bone-300); border-radius:9px; padding:7px 10px; font-size:13px; background:#fff; }
+  .filters input { width:280px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--bone-200); border-radius:12px; overflow:hidden; }
+  th { text-align:left; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-400); font-weight:500; padding:10px 14px; border-bottom:1px solid var(--bone-200); }
+  td { padding:10px 14px; border-bottom:1px solid var(--bone-100); }
+  .nm { color:var(--sage-700); font-weight:600; text-decoration:underline; text-underline-offset:2px; } .nm.plain { color:var(--ink-500); text-decoration:none; font-weight:500; }
+  .callout { background:#FFD84D; color:#1a1a1a; font-size:12px; font-weight:700; padding:2px 7px; border-radius:6px; margin-left:8px; vertical-align:1px; }
+  .wait { border:1px solid #efc6ad; background:#FDF3EC; border-radius:12px; padding:14px 16px; margin-bottom:16px; }
+  .wait h3 { margin:0 0 2px; font-size:15px; color:var(--clay-700); } .wait p { margin:0 0 10px; color:var(--ink-500); font-size:13px; }
+  .diff { width:100%; background:#fff; border:1px solid #f0d9c9; }
+  .diff td { font-size:13px; } .diff .old { color:var(--ink-400); text-decoration:line-through; } .diff .new { color:var(--sage-700); font-weight:600; }
+  .form { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .field label { display:block; font-size:12px; color:var(--ink-400); margin-bottom:3px; }
+  .field div { border:1px solid var(--bone-300); border-radius:9px; padding:8px 10px; background:#fff; }
+</style></head>
+<body>
+<h1>Places: what the statuses mean, made obvious</h1>
+<p class="sub">One status per place instead of a status plus a separate “Unpublished changes” badge, a key at the top, and the edit page shows exactly what's waiting to publish. The yellow tags are notes.</p>
+
+<p class="flabel">1. Places tab</p>
+<div class="frame">
+  <div class="nav"><a>Dashboard</a><a>Blessing Boxes</a><a class="on">Places</a><a>Review queue</a><a>Data refresh</a><a>Photo review</a><a>Adoption requests</a><a class="add">Add place</a></div>
+  <div class="devbar"><b>Test site.</b> Publishing is turned off here, so nothing on this site is ever “waiting to publish”. Use the live admin to publish. <span class="callout">dev only; there the Publish box and “edits waiting” tags are hidden. The rest shows the live admin.</span></div>
+  <div class="in">
+    <div class="card pub"><p><b>2 places waiting to publish</b> — 1 new, 1 edited.<small>Saved edits don't reach the public map until you press Publish.</small></p><span class="btn">Publish to the public map</span></div>
+    <div class="card legend">
+      <h4>What the statuses mean <span class="callout">new key</span></h4>
+      <div><span class="badge b-draft">Draft</span><br>New place. Not on the public map yet. Goes live the next time you Publish.</div>
+      <div><span class="badge b-live">Live</span><br>On the public map, exactly as shown here.</div>
+      <div><span class="badge b-wait">Live · edits waiting</span><br>On the public map, but you've saved changes the map doesn't show yet. Open it to see what changed; Publish to push them.</div>
+      <div><span class="badge b-gone">Removed</span><br>Taken off the public map. Kept here for the record; can't be edited.</div>
+      <div class="also"><b>Not the same thing:</b> <u>Data refresh</u> = changes suggested by outside sources (Plentiful, OpenStreetMap). Nothing changes until you approve one, and then it shows here as “edits waiting”. <u>Review queue</u> = places and fixes sent in by the public.</div>
+    </div>
+    <div class="filters"><input placeholder="Search places"><select><option>All statuses</option><option>Draft</option><option>Live</option><option>Live · edits waiting</option><option>Removed</option></select><select><option>All kinds</option></select></div>
+    <table>
+      <thead><tr><th>Name <span class="callout">name = edit link (#672)</span></th><th>Kind</th><th>Status <span class="callout">one column</span></th><th>Address</th><th>Last checked</th></tr></thead>
+      <tbody>
+        <tr><td><span class="nm">Valley Market</span></td><td>Grocery</td><td><span class="badge b-draft">Draft</span></td><td>1001 E 4th St</td><td>Sep 20</td></tr>
+        <tr><td><span class="nm">Posada Food Pantry</span></td><td>Food pantry</td><td><span class="badge b-wait">Live · edits waiting</span></td><td>1320 E 6th St</td><td>Sep 25</td></tr>
+        <tr><td><span class="nm">Care and Share — Pueblo</span></td><td>Food pantry</td><td><span class="badge b-live">Live</span></td><td>2851 Aspen Ln</td><td>Sep 18</td></tr>
+        <tr><td><span class="nm">Bessemer Mobile Food Pantry</span></td><td>Mobile pantry</td><td><span class="badge b-live">Live</span></td><td>Bessemer Park</td><td>Sep 12</td></tr>
+        <tr><td><span class="nm plain">Old Town Grocery</span></td><td>Grocery</td><td><span class="badge b-gone">Removed</span></td><td>200 S Union Ave</td><td>Aug 30</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<p class="flabel">2. Editing a place that has edits waiting</p>
+<div class="frame">
+  <div class="nav"><a>Dashboard</a><a>Blessing Boxes</a><a class="on">Places</a><a>Review queue</a><a>Data refresh</a><a>Photo review</a><a>Adoption requests</a><a class="add">Add place</a></div>
+  <div class="in">
+    <h2 style="font:600 20px Georgia,serif;margin:0 0 12px">Posada Food Pantry <span class="badge b-wait" style="vertical-align:3px">Live · edits waiting</span></h2>
+    <div class="wait">
+      <h3>Waiting to publish <span class="callout">new box</span></h3>
+      <p>The public map still shows the old values below. Last saved Sep 25. Press Publish on the Places tab to push these.</p>
+      <table class="diff"><thead><tr><th>Field</th><th>On the public map now</th><th>After you publish</th></tr></thead><tbody>
+        <tr><td>Takes SNAP</td><td class="old">not set</td><td class="new">Yes</td></tr>
+        <tr><td>Takes WIC</td><td class="old">not set</td><td class="new">No</td></tr>
+        <tr><td>Tuesday hours</td><td class="old">9:00 AM – 12:00 PM</td><td class="new">10:00 AM – 2:00 PM</td></tr>
+      </tbody></table>
+    </div>
+    <div class="form">
+      <div class="field"><label>Name</label><div>Posada Food Pantry</div></div>
+      <div class="field"><label>Kind</label><div>Food pantry</div></div>
+      <div class="field"><label>Address</label><div>1320 E 6th St, Pueblo, CO 81001</div></div>
+      <div class="field"><label>Phone</label><div>(719) 555-0142</div></div>
+    </div>
+  </div>
+</div>
+</body></html>

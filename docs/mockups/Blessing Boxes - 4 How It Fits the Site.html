@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How Blessing Boxes fit the site · Architecture</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #FBFAF6;
+      --color-ink:     #2D2A26;
+      --color-muted:   #5F5A52;
+      --color-accent:  #2C5F4F;
+      --font-sans:     'Public Sans', system-ui, -apple-system, sans-serif;
+      --font-serif:    'Fraunces', Georgia, serif;
+      --font-mono:     ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1240px; width: 100%; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · Blessing Boxes</p>
+    <h1>How Blessing Boxes fit the site</h1>
+
+    <svg viewBox="0 0 1080 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="site-fit-title site-fit-desc">
+      <title id="site-fit-title">How Blessing Boxes fit the site</title>
+      <desc id="site-fit-desc">Architecture diagram showing Kyle's admin editor publishing a fixed map snapshot that covers every other place, next to a new live box layer that serves blessing-box pins, cards and pages straight from the database (cached about 60 seconds) so a box appears without a republish and a practice box seeded on dev never reaches production, fed by check-ins and uploads (including a QR sticker that opens a box's check-in panel directly), sends alert and confirmation emails through Resend, with the monthly Plentiful refresh routed to a review queue instead of overwriting box data.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5F5A52"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#FBFAF6"/>
+
+      <!-- Zone: NEW live layer (drawn before arrows and nodes) -->
+      <rect x="520" y="208" width="464" height="232" rx="8" fill="rgba(44,95,79,0.03)" stroke="#2C5F4F" stroke-width="0.8"/>
+      <rect x="576" y="212" width="120" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="636" y="221" fill="#2C5F4F" font-size="7" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">NEW · LIVE LAYER</text>
+
+      <!-- Arrows (drawn before nodes) -->
+      <!-- a) Admin editor -> Database -->
+      <line x1="220" y1="152" x2="300" y2="152" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="228" y="128" width="64" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="260" y="138" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SAVE DRAFT</text>
+
+      <!-- b) Database -> Map snapshot -->
+      <line x1="460" y1="152" x2="540" y2="152" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="468" y="128" width="52" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="494" y="138" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">PUBLISH</text>
+
+      <!-- c) Map snapshot -> Visitor's phone -->
+      <line x1="720" y1="152" x2="820" y2="152" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="726" y="128" width="60" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="756" y="138" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">LOADS MAP</text>
+
+      <!-- d) Visitor's phone -> Live box layer (box pins, cards, pages — not the snapshot) -->
+      <path d="M 860,184 V 192 Q 860,200 852,200 H 708 Q 700,200 700,208 V 240" fill="none" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="732" y="192" width="72" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="768" y="202" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">BOXES LIVE</text>
+
+      <!-- e) Visitor's phone -> Check-in + photo upload -->
+      <path d="M 940,184 V 205 Q 940,213 932,213 H 788 Q 780,213 780,221 V 384 Q 780,392 772,392 H 740" fill="none" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="786" y="330" width="52" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="812" y="340" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">CHECK IN</text>
+
+      <!-- f) Check-in + photo upload -> Database (write) -->
+      <path d="M 540,392 H 412 Q 404,392 404,384 V 184" fill="none" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="368" y="280" width="44" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="390" y="290" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">WRITE</text>
+
+      <!-- g) Check-in + photo upload -> Photo storage -->
+      <line x1="740" y1="392" x2="800" y2="392" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="748" y="368" width="44" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="770" y="378" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">PHOTO</text>
+
+      <!-- h) Live box layer -> Database (reads) -->
+      <path d="M 540,276 H 428 Q 420,276 420,268 V 184" fill="none" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="432" y="224" width="44" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="454" y="234" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">READS</text>
+
+      <!-- j) Live box layer -> Resend (emails out) — hops over arrow (e)'s vertical segment at x=780 -->
+      <path d="M 740,276 H 772 a 8,8 0 0,1 16,0 H 800" fill="none" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="744" y="252" width="52" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="770" y="261" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">EMAILS OUT</text>
+
+      <!-- i) Monthly Plentiful refresh -> Admin editor -->
+      <line x1="140" y1="360" x2="140" y2="184" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="88" y="264" width="96" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="136" y="274" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">MISSING BOX</text>
+
+      <!-- Nodes -->
+      <!-- Admin editor -->
+      <rect x="60" y="120" width="160" height="64" rx="6" fill="#FFFFFF" stroke="#2D2A26" stroke-width="1"/>
+      <text x="140" y="146" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Admin editor</text>
+      <text x="140" y="162" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">Kyle · drafts + review queue</text>
+
+      <!-- Database (store) -->
+      <rect x="300" y="120" width="160" height="64" rx="6" fill="rgba(45,42,38,0.05)" stroke="#5F5A52" stroke-width="1"/>
+      <text x="380" y="146" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Database</text>
+      <text x="380" y="162" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">D1 · one source of truth</text>
+
+      <!-- Map snapshot -->
+      <rect x="540" y="120" width="180" height="64" rx="6" fill="#FFFFFF" stroke="#2D2A26" stroke-width="1"/>
+      <text x="630" y="146" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Map snapshot</text>
+      <text x="630" y="162" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">other places only</text>
+
+      <!-- Visitor's phone (external) -->
+      <rect x="820" y="120" width="160" height="64" rx="6" fill="rgba(45,42,38,0.03)" stroke="rgba(45,42,38,0.30)" stroke-width="1"/>
+      <text x="900" y="146" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Visitor's phone</text>
+      <text x="900" y="162" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">browser</text>
+
+      <!-- Live box layer (focal, coral) — box pins/cards/pages read straight from here, no publish step -->
+      <rect x="540" y="240" width="200" height="72" rx="6" fill="rgba(44,95,79,0.08)" stroke="#2C5F4F" stroke-width="1"/>
+      <text x="640" y="266" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Live box layer</text>
+      <text x="640" y="282" fill="#2C5F4F" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">box pins · cards · pages</text>
+      <text x="640" y="298" fill="#2C5F4F" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">status · last filled · log · stats</text>
+
+      <!-- Check-in + photo upload -->
+      <rect x="540" y="360" width="200" height="72" rx="6" fill="#FFFFFF" stroke="#2D2A26" stroke-width="1"/>
+      <text x="640" y="386" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Check-in + photo upload</text>
+      <text x="640" y="402" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">bot check + rate limit</text>
+      <text x="640" y="418" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">QR sticker → opens directly</text>
+
+      <!-- Resend (email) -->
+      <rect x="800" y="240" width="160" height="64" rx="6" fill="rgba(45,42,38,0.05)" stroke="#5F5A52" stroke-width="1"/>
+      <text x="880" y="266" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Resend</text>
+      <text x="880" y="282" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">alerts · confirm-your-email</text>
+
+      <!-- Photo storage (store) -->
+      <rect x="800" y="360" width="160" height="64" rx="6" fill="rgba(45,42,38,0.05)" stroke="#5F5A52" stroke-width="1"/>
+      <text x="880" y="386" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Photo storage</text>
+      <text x="880" y="402" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">Cloudflare R2 · new</text>
+
+      <!-- Monthly Plentiful refresh (external) -->
+      <rect x="60" y="360" width="160" height="64" rx="6" fill="rgba(45,42,38,0.03)" stroke="rgba(45,42,38,0.30)" stroke-width="1"/>
+      <text x="140" y="386" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Plentiful refresh</text>
+      <text x="140" y="402" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">monthly · no longer overwrites boxes</text>
+
+      <!-- Legend -->
+      <line x1="40" y1="456" x2="1040" y2="456" stroke="rgba(45,42,38,0.10)" stroke-width="0.8"/>
+      <text x="40" y="472" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+
+      <rect x="40" y="484" width="14" height="10" rx="2" fill="#FFFFFF" stroke="#2D2A26" stroke-width="1"/>
+      <text x="60" y="492" fill="#5F5A52" font-size="8.5" font-family="'Public Sans', sans-serif">Admin / app screen</text>
+
+      <rect x="220" y="484" width="14" height="10" rx="2" fill="rgba(45,42,38,0.05)" stroke="#5F5A52" stroke-width="1"/>
+      <text x="240" y="492" fill="#5F5A52" font-size="8.5" font-family="'Public Sans', sans-serif">Stored data</text>
+
+      <rect x="360" y="484" width="14" height="10" rx="2" fill="rgba(45,42,38,0.03)" stroke="rgba(45,42,38,0.30)" stroke-width="1"/>
+      <text x="380" y="492" fill="#5F5A52" font-size="8.5" font-family="'Public Sans', sans-serif">Outside the app</text>
+
+      <rect x="520" y="484" width="14" height="10" rx="2" fill="rgba(44,95,79,0.08)" stroke="#2C5F4F" stroke-width="1"/>
+      <text x="540" y="492" fill="#5F5A52" font-size="8.5" font-family="'Public Sans', sans-serif">The new fast-changing piece</text>
+
+      <rect x="760" y="484" width="14" height="10" rx="2" fill="rgba(44,95,79,0.03)" stroke="#2C5F4F" stroke-width="0.8"/>
+      <text x="780" y="492" fill="#5F5A52" font-size="8.5" font-family="'Public Sans', sans-serif">Live-layer group</text>
+    </svg>
+  </div>
+</body>
+</html>

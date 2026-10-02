@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM admin: static location map on the edit page</title>
+<style>
+  :root { --bone-50:#FBFAF6; --bone-200:#E8E3D6; --bone-300:#D4CDB8; --ink-400:#6A645A; --ink-500:#5F5A52; --ink-700:#2D2A26; --sage-600:#2C5F4F; --sage-700:#1F4639; --orange:#F0A04B; --rasp:#C2447B; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#e9e6df; font:14px/1.45 -apple-system,system-ui,sans-serif; color:#1A1817; padding:22px; }
+  h1 { font:600 22px Georgia,serif; margin:0 0 4px; } .sub { color:var(--ink-400); margin:0 0 18px; max-width:1100px; }
+  .frame { background:var(--bone-50); border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); max-width:1180px; margin-bottom:24px; }
+  .nav { display:flex; gap:6px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--bone-200); background:#fff; }
+  .nav a { padding:8px 12px; border-radius:10px; color:var(--ink-500); } .nav a.on { background:var(--sage-600); color:#fff; } .nav .add { margin-left:auto; background:var(--orange); color:#1a1a1a; font-weight:600; }
+  .in { padding:18px 20px; }
+  h2 { font:600 20px Georgia,serif; margin:0 0 14px; }
+  .sec { display:grid; grid-template-columns:1fr 420px; gap:20px; align-items:start; background:#fff; border:1px solid var(--bone-200); border-radius:12px; padding:16px; }
+  .sec h3 { grid-column:1/-1; margin:0; font-size:15px; }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .field.full { grid-column:1/-1; } .field label { display:block; font-size:12px; color:var(--ink-400); margin-bottom:3px; }
+  .field div { border:1px solid var(--bone-300); border-radius:9px; padding:8px 10px; background:#fff; }
+  .link { color:var(--sage-700); text-decoration:underline; font-size:13px; font-weight:600; }
+  .smap { position:relative; height:240px; border-radius:10px; overflow:hidden; border:1px solid var(--bone-300);
+          background: linear-gradient(90deg,transparent 30%,#fff 30%,#fff 32%,transparent 32%), linear-gradient(90deg,transparent 70%,#fff 70%,#fff 72%,transparent 72%),
+          linear-gradient(0deg,transparent 45%,#fff 45%,#fff 48%,transparent 48%), linear-gradient(0deg,transparent 80%,#f3c77a 80%,#f3c77a 82%,transparent 82%), #e9eee4; }
+  .smap .pin { position:absolute; left:50%; top:50%; width:22px; height:22px; border-radius:50% 50% 50% 0; transform:translate(-50%,-100%) rotate(-45deg); border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.3); }
+  .smap .st { position:absolute; font-size:11px; color:var(--ink-500); }
+  .cap { font-size:12px; color:var(--ink-400); margin-top:6px; display:flex; justify-content:space-between; }
+  .callout { background:#FFD84D; color:#1a1a1a; font-size:12px; font-weight:700; padding:2px 7px; border-radius:6px; margin-left:8px; vertical-align:1px; }
+</style></head>
+<body>
+<h1>A small map on every place and box page</h1>
+<p class="sub">A still map picture (not a draggable map) centered on the place's pin, next to its address and coordinates. It redraws when the coordinates change, so a wrong pin is obvious before you save. The big map on the Blessing Boxes tab is removed. The yellow tags are notes.</p>
+
+<div class="frame">
+  <div class="nav"><a>Dashboard</a><a>Blessing Boxes</a><a class="on">Places</a><a class="add">Add place</a></div>
+  <div class="in">
+    <h2>Posada Food Pantry</h2>
+    <div class="sec">
+      <h3>Location</h3>
+      <div class="fields">
+        <div class="field full"><label>Address</label><div>1320 E 6th St, Pueblo, CO 81001</div></div>
+        <div class="field"><label>Latitude</label><div>38.2654</div></div>
+        <div class="field"><label>Longitude</label><div>-104.5947</div></div>
+        <div class="field full"><span class="link">Find coordinates from address</span></div>
+      </div>
+      <div>
+        <div class="smap"><span class="st" style="left:34%;top:38%">E 6th St</span><span class="st" style="left:74%;top:8%">Santa Fe Ave</span><span class="pin" style="background:var(--sage-600)"></span></div>
+        <div class="cap"><span>Pin color matches the place's kind on the public map</span><span class="link">Open in Google Maps</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="frame">
+  <div class="nav"><a>Dashboard</a><a class="on">Blessing Boxes</a><a>Places</a><a class="add">Add place</a></div>
+  <div class="in">
+    <h2>Blessing Box - 1249 E Routt Ave</h2>
+    <div class="sec">
+      <h3>Location <span class="callout">same on box pages</span></h3>
+      <div class="fields">
+        <div class="field full"><label>Address</label><div>1249 E Routt Ave, Pueblo, CO 81004</div></div>
+        <div class="field"><label>Latitude</label><div>38.2412</div></div>
+        <div class="field"><label>Longitude</label><div>-104.5903</div></div>
+        <div class="field full"><span class="link">Find coordinates from address</span></div>
+      </div>
+      <div>
+        <div class="smap"><span class="st" style="left:34%;top:38%">E Routt Ave</span><span class="pin" style="background:var(--rasp)"></span></div>
+        <div class="cap"><span>Raspberry pin for a blessing box</span><span class="link">Open in Google Maps</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

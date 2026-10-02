@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM blessing box card — check-in placement</title>
+<style>
+  :root {
+    --bone-50:#FBFAF6; --bone-100:#F4F1EA; --bone-200:#E8E3D6; --bone-300:#D4CDB8;
+    --ink-400:#6A645A; --ink-700:#2D2A26; --ink-900:#1A1817;
+    --sage-50:#EAF0EC; --sage-500:#4A8466; --sage-600:#2C5F4F; --clay-100:#F8E2D4; --clay-700:#7C2D12;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px; background:#e9e6df; font:15px/1.4 -apple-system,system-ui,sans-serif; color:var(--ink-900); }
+  h1 { font:600 22px Georgia,serif; margin:0 0 4px; }
+  .sub { color:var(--ink-400); margin:0 0 24px; }
+  .row { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+  .col { width:300px; }
+  .label { font-weight:700; margin-bottom:4px; }
+  .note { color:var(--ink-400); font-size:13px; margin:8px 0 0; min-height:54px; }
+  .phone { position:relative; width:300px; height:620px; border-radius:40px; border:10px solid #111; overflow:hidden;
+           background:
+             linear-gradient(90deg,transparent 48%,#fff 48%,#fff 52%,transparent 52%),
+             linear-gradient(0deg,transparent 60%,#fff 60%,#fff 63%,transparent 63%),
+             #dfe7d6; }
+  .pin { position:absolute; left:140px; top:150px; width:22px; height:22px; border-radius:50% 50% 50% 0; transform:rotate(-45deg);
+         background:var(--sage-600); border:2px solid #fff; }
+  .sheet { position:absolute; left:0; right:0; bottom:0; background:var(--bone-50); border-radius:16px 16px 0 0;
+           box-shadow:0 -4px 16px rgba(0,0,0,.18); padding:10px 16px 22px; transition:height .25s ease; overflow:hidden; }
+  .grab { width:40px; height:5px; border-radius:3px; background:var(--bone-300); margin:0 auto 10px; }
+  .top { display:flex; justify-content:space-between; align-items:flex-start; }
+  .name { font:600 19px Georgia,serif; margin:0; }
+  .x { width:28px; height:28px; border-radius:50%; background:var(--bone-200); display:grid; place-items:center; font-size:14px; color:var(--ink-700); }
+  .badge { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; background:var(--sage-50); color:var(--sage-600); margin:6px 0; }
+  .meta { font-size:13px; color:var(--ink-700); }
+  .open { color:var(--sage-600); font-weight:600; }
+  .pills span { display:inline-block; font-size:11px; padding:1px 7px; border-radius:99px; background:var(--clay-100); color:var(--clay-700); margin:6px 4px 0 0; }
+  .notes { font-size:13px; color:var(--ink-400); margin:8px 0 10px; }
+  .dirs { display:flex; gap:8px; }
+  .dirs div { flex:1; text-align:center; padding:10px 0; border-radius:10px; background:var(--sage-600); color:#fff; font-size:13px; font-weight:600; }
+  .dirs div + div { background:var(--bone-100); color:var(--sage-600); border:1px solid var(--bone-300); }
+  .toggle { color:var(--sage-600); font-size:14px; font-weight:600; padding:12px 0 0; }
+  .toggle.left { text-align:left; }
+  .toggle.center { text-align:center; }
+  .chev { display:block; margin:0 auto; width:18px; height:10px; }
+  .detail { border-top:1px solid var(--bone-200); margin-top:14px; padding-top:12px; font-size:13px; color:var(--ink-700); }
+  .detail b { display:block; font-size:12px; color:var(--ink-400); font-weight:600; margin-top:10px; }
+  .detail table { width:100%; font-size:13px; border-collapse:collapse; }
+  .detail td { padding:2px 0; } .detail td+td { text-align:right; }
+  .callout { position:absolute; background:#FFD84D; color:#1a1a1a; font-size:12px; font-weight:700; padding:4px 8px; border-radius:6px;
+             box-shadow:0 2px 6px rgba(0,0,0,.2); white-space:nowrap; z-index:5; }
+  .ring { position:absolute; border:3px solid #FFB800; border-radius:10px; z-index:4; pointer-events:none; }
+  .arrow { position:absolute; left:50%; transform:translateX(-50%); font-size:28px; color:var(--sage-600); z-index:5; }
+  #live .sheet { touch-action:none; cursor:grab; }
+  .hint { font-size:13px; color:var(--ink-400); }
+</style>
+
+<style>
+  .col { width:300px; }
+  .phone .sheet { padding:10px 0 22px; }
+  .in { padding:0 16px; }
+  .shot { width:300px; height:620px; border-radius:40px; border:10px solid #111; overflow:hidden; background:#fff; }
+  .shot img { width:100%; display:block; }
+  .brow { display:flex; align-items:center; gap:14px; }
+  .brow .bb { background:#C2447B; color:#fff; font-size:12px; font-weight:600; padding:3px 10px; border-radius:99px; margin-right:auto; }
+  .brow .ic { font-size:15px; color:var(--ink-700); }
+  .bname { font:600 18px Georgia,serif; margin:8px 0 6px; }
+  .status { display:inline-flex; align-items:center; gap:6px; background:var(--bone-100); border-radius:99px; padding:4px 10px; font-size:12px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:#15803D; }
+  .status b { color:#15803D; } .status span { color:var(--ink-400); }
+  .addr { display:block; margin:8px 0 0; font-size:13px; color:var(--sage-600); text-decoration:underline; }
+  .need { margin-top:10px; font-size:12px; color:var(--ink-400); font-weight:600; }
+  .chips span { display:inline-block; font-size:12px; padding:3px 9px; border-radius:99px; background:var(--bone-100); color:var(--ink-700); margin:4px 4px 0 0; }
+  .photo { height:120px; background:linear-gradient(135deg,#9bb59f,#5d7f6a 55%,#3c5a49); position:relative; margin-top:14px; }
+  .photo i { position:absolute; right:8px; top:8px; font-style:normal; font-size:11px; background:rgba(251,250,246,.9); padding:2px 7px; border-radius:99px; color:var(--ink-700); }
+  .photo em { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:rgba(255,255,255,.85); font-size:12px; font-style:normal; }
+  .sponsor { background:var(--clay-100); color:var(--clay-700); font-size:13px; padding:10px 16px; }
+  .sponsor.first { margin-top:14px; }
+  .sponsor u { display:block; font-size:12px; margin-top:4px; }
+  .ci { padding:12px 16px 0; }
+  .ci h4 { font:600 15px Georgia,serif; margin:0 0 8px; }
+  .g3 { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .g2 { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin-top:6px; }
+  .btn { border:1px solid var(--bone-300); border-radius:10px; background:#fff; text-align:center; font-size:12px; padding:8px 2px; }
+  .btn .d { display:block; width:7px; height:7px; border-radius:50%; margin:0 auto 3px; }
+  .links { font-size:12px; color:var(--sage-600); text-decoration:underline; padding:12px 16px 0; display:flex; gap:14px; }
+  .peekwrap { position:relative; overflow:hidden; }
+  .peekwrap::after { content:""; position:absolute; left:0; right:0; bottom:0; height:40px; background:linear-gradient(transparent, var(--bone-50)); pointer-events:none; }
+  .peekwrap.open::after { display:none; }
+  .research { max-width:1240px; background:#fff; border-radius:12px; padding:14px 18px; margin:0 0 22px; font-size:14px; }
+  .research li { margin:3px 0; }
+  .callout { position:absolute; }
+</style>
+</head>
+<body>
+<h1>Blessing box card: where do the check-in buttons go?</h1>
+<p class="sub">Both have the grey bar and swipe-up. A keeps the card short; B puts check-in on the first view. Drag any card to try it.</p>
+<div class="row">
+  <div class="col"><div class="label">A1. Check-in below: card opens</div>
+    <div class="phone" data-live data-card="330">
+      <div class="pin" style="background:#C2447B"></div>
+      <div class="sheet" style="height:330px; overflow:hidden">
+      <div class="grab"></div>
+      <div class="in">
+        <div class="brow"><span class="bb">Blessing Box</span><span class="ic">⤴</span><span class="ic">☆</span><span class="x">✕</span></div>
+        <p class="bname">Blessing Box - 1249 E Routt Ave</p>
+        <div class="status"><i class="dot"></i><b>Stocked</b><span>· filled 2 hours ago</span></div>
+        <a class="addr">1249 E Routt Ave, Pueblo, CO 81004</a>
+        <div class="need">Most needed</div>
+        <div class="chips"><span>Canned food</span><span>Diapers</span><span>Hygiene items</span></div>
+      </div>
+        <div class="peekwrap " style="max-height:56px"><div class="photo"><i>Photo · 2 days ago</i><em>latest box photo</em></div><div class="sponsor">This box needs a sponsor.<u>Want to help too? Apply to adopt this box</u></div>
+      <div class="ci"><h4>Please update this box</h4>
+        <div class="g3"><div class="btn"><i class="d" style="background:#15803D"></i>I filled it</div><div class="btn"><i class="d" style="background:#C2410C"></i>Running low</div><div class="btn"><i class="d" style="background:#B91C1C"></i>It's empty</div></div>
+        <div class="g2"><div class="btn">I used this box</div><div class="btn">Add a photo</div></div>
+      </div>
+      <div class="links"><span>Report a problem</span></div>
+      <div class="links"><span>History</span><span>Email me when it needs filling</span></div></div>
+      </div><div class="callout" style="left:30px; top:232px">Map stays mostly visible</div>
+    </div>
+    <p class="note">Short card. To check in, swipe up or tap the bar first.</p></div>
+  <div class="col"><div class="label">A2. After swiping up</div>
+    <div class="phone" data-live data-card="330">
+      <div class="pin" style="background:#C2447B"></div>
+      <div class="sheet" style="height:560px; overflow:auto">
+      <div class="grab"></div>
+      <div class="in">
+        <div class="brow"><span class="bb">Blessing Box</span><span class="ic">⤴</span><span class="ic">☆</span><span class="x">✕</span></div>
+        <p class="bname">Blessing Box - 1249 E Routt Ave</p>
+        <div class="status"><i class="dot"></i><b>Stocked</b><span>· filled 2 hours ago</span></div>
+        <a class="addr">1249 E Routt Ave, Pueblo, CO 81004</a>
+        <div class="need">Most needed</div>
+        <div class="chips"><span>Canned food</span><span>Diapers</span><span>Hygiene items</span></div>
+      </div>
+        <div class="peekwrap open" style="max-height:none"><div class="photo"><i>Photo · 2 days ago</i><em>latest box photo</em></div><div class="sponsor">This box needs a sponsor.<u>Want to help too? Apply to adopt this box</u></div>
+      <div class="ci"><h4>Please update this box</h4>
+        <div class="g3"><div class="btn"><i class="d" style="background:#15803D"></i>I filled it</div><div class="btn"><i class="d" style="background:#C2410C"></i>Running low</div><div class="btn"><i class="d" style="background:#B91C1C"></i>It's empty</div></div>
+        <div class="g2"><div class="btn">I used this box</div><div class="btn">Add a photo</div></div>
+      </div>
+      <div class="links"><span>Report a problem</span></div>
+      <div class="links"><span>History</span><span>Email me when it needs filling</span></div></div>
+      </div>
+    </div>
+    <p class="note">Photo, sponsor band, then “Please update this box”.</p></div>
+  <div class="col"><div class="label">B1. Check-in on the card: opens</div>
+    <div class="phone" data-live data-card="470">
+      <div class="pin" style="background:#C2447B"></div>
+      <div class="sheet" style="height:470px; overflow:hidden">
+      <div class="grab"></div>
+      <div class="in">
+        <div class="brow"><span class="bb">Blessing Box</span><span class="ic">⤴</span><span class="ic">☆</span><span class="x">✕</span></div>
+        <p class="bname">Blessing Box - 1249 E Routt Ave</p>
+        <div class="status"><i class="dot"></i><b>Stocked</b><span>· filled 2 hours ago</span></div>
+        <a class="addr">1249 E Routt Ave, Pueblo, CO 81004</a>
+        <div class="need">Most needed</div>
+        <div class="chips"><span>Canned food</span><span>Diapers</span><span>Hygiene items</span></div>
+      </div>
+      <div class="ci"><h4>Please update this box</h4>
+        <div class="g3"><div class="btn"><i class="d" style="background:#15803D"></i>I filled it</div><div class="btn"><i class="d" style="background:#C2410C"></i>Running low</div><div class="btn"><i class="d" style="background:#B91C1C"></i>It's empty</div></div>
+        <div class="g2"><div class="btn">I used this box</div><div class="btn">Add a photo</div></div>
+      </div>
+        <div class="peekwrap " style="max-height:56px"><div class="photo"><i>Photo · 2 days ago</i><em>latest box photo</em></div><div class="sponsor">This box needs a sponsor.<u>Want to help too? Apply to adopt this box</u></div><div class="links"><span>Report a problem</span></div><div class="links"><span>History</span><span>Email me when it needs filling</span></div></div>
+      </div><div class="callout" style="left:40px; top:60px">Check-in is one tap away</div>
+    </div>
+    <p class="note">Check-in buttons are right there, but the card covers most of the map.</p></div>
+  <div class="col"><div class="label">B2. After swiping up</div>
+    <div class="phone" data-live data-card="470">
+      <div class="pin" style="background:#C2447B"></div>
+      <div class="sheet" style="height:560px; overflow:auto">
+      <div class="grab"></div>
+      <div class="in">
+        <div class="brow"><span class="bb">Blessing Box</span><span class="ic">⤴</span><span class="ic">☆</span><span class="x">✕</span></div>
+        <p class="bname">Blessing Box - 1249 E Routt Ave</p>
+        <div class="status"><i class="dot"></i><b>Stocked</b><span>· filled 2 hours ago</span></div>
+        <a class="addr">1249 E Routt Ave, Pueblo, CO 81004</a>
+        <div class="need">Most needed</div>
+        <div class="chips"><span>Canned food</span><span>Diapers</span><span>Hygiene items</span></div>
+      </div>
+      <div class="ci"><h4>Please update this box</h4>
+        <div class="g3"><div class="btn"><i class="d" style="background:#15803D"></i>I filled it</div><div class="btn"><i class="d" style="background:#C2410C"></i>Running low</div><div class="btn"><i class="d" style="background:#B91C1C"></i>It's empty</div></div>
+        <div class="g2"><div class="btn">I used this box</div><div class="btn">Add a photo</div></div>
+      </div>
+        <div class="peekwrap open" style="max-height:none"><div class="photo"><i>Photo · 2 days ago</i><em>latest box photo</em></div><div class="sponsor">This box needs a sponsor.<u>Want to help too? Apply to adopt this box</u></div><div class="links"><span>Report a problem</span></div><div class="links"><span>History</span><span>Email me when it needs filling</span></div></div>
+      </div>
+    </div>
+    <p class="note">The photo, sponsor band and links move below the fold.</p></div>
+</div>
+<script>
+  // Mock only: closed / card / full with a pointer drag, or a tap on the grab bar or the peek.
+  document.querySelectorAll('.phone[data-live]').forEach(phone => {
+    const sheet = phone.querySelector('.sheet'), peek = sheet.querySelector('.peekwrap'), grab = sheet.querySelector('.grab');
+    const card = +phone.dataset.card;
+    let state = peek.classList.contains('open') ? 'full' : 'card', y = null;
+    function set(s) {
+      state = s;
+      sheet.style.height = s === 'closed' ? '0px' : (s === 'full' ? 560 : card) + 'px';
+      sheet.style.padding = s === 'closed' ? '0' : '';
+      sheet.style.overflow = s === 'full' ? 'auto' : 'hidden';
+      peek.style.maxHeight = s === 'full' ? 'none' : '56px';
+      peek.classList.toggle('open', s === 'full');
+      phone.querySelectorAll('.callout').forEach(c => c.style.display = s === 'card' ? '' : 'none');
+    }
+    sheet.addEventListener('pointerdown', e => { y = e.clientY; sheet.setPointerCapture(e.pointerId); });
+    sheet.addEventListener('pointerup', e => {
+      const dy = e.clientY - y; y = null;
+      if (Math.abs(dy) < 8) { if (e.target === grab || (state === 'card' && peek.contains(e.target))) set(state === 'full' ? 'card' : 'full'); return; }
+      if (dy < 0 && state === 'card') set('full'); else if (dy > 0) set(state === 'full' ? 'card' : 'closed');
+    });
+    phone.addEventListener('click', () => { if (state === 'closed') set('card'); });
+  });
+</script>
+</body></html>

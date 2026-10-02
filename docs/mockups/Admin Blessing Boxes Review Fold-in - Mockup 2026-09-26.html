@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM admin: Blessing Boxes with Photo review + Sponsor requests folded in</title>
+<style>
+  :root { --bone-50:#FBFAF6; --bone-100:#F4F1EA; --bone-200:#E8E3D6; --bone-300:#D4CDB8; --ink-400:#6A645A; --ink-500:#5F5A52; --ink-700:#2D2A26; --ink-900:#1A1817;
+          --sage-50:#EAF0EC; --sage-100:#D1DDD3; --sage-600:#2C5F4F; --sage-700:#1F4639; --clay-100:#F8E2D4; --clay-700:#7C2D12; --orange:#F0A04B;
+          --navy:#1E3A5F; --blue-50:#E8EEF6; --warn:#B45309; --danger:#B91C1C; --rasp:#C2447B; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#e9e6df; font:14px/1.45 -apple-system,system-ui,sans-serif; color:var(--ink-900); padding:22px; }
+  h1 { font:600 22px Georgia,serif; margin:0 0 4px; } .sub { color:var(--ink-400); margin:0 0 18px; max-width:1100px; }
+  .frame { background:var(--bone-50); border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:28px; max-width:1180px; }
+  .flabel { font-weight:700; margin:0 0 6px; }
+  .nav { display:flex; gap:6px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--bone-200); background:#fff; }
+  .nav a { padding:8px 12px; border-radius:10px; color:var(--ink-500); font-size:14px; } .nav a.on { background:var(--sage-600); color:#fff; }
+  .nav a .ct { display:inline-block; margin-left:6px; background:var(--orange); color:#1a1a1a; font-size:11px; font-weight:700; border-radius:99px; padding:0 6px; }
+  .nav .gone { text-decoration:line-through; opacity:.45; } .nav .add { margin-left:auto; background:var(--orange); color:#1a1a1a; font-weight:600; }
+  .in { padding:18px 20px; }
+  .card { background:#fff; border:1px solid var(--bone-200); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+  h2 { font:600 19px Georgia,serif; margin:0 0 12px; }
+  .top { display:grid; grid-template-columns:1fr; gap:14px; margin-bottom:14px; }
+  .top .card { display:flex; align-items:center; gap:12px; margin:0; } .top p { margin:0; flex:1; } .top small { display:block; color:var(--ink-400); }
+  .big { font:600 26px Georgia,serif; min-width:30px; }
+  .btn { background:var(--sage-600); color:#fff; border-radius:9px; padding:8px 13px; font-weight:600; font-size:13px; white-space:nowrap; display:inline-block; }
+  .btn.ghost { background:#fff; color:var(--sage-700); border:1px solid var(--bone-300); } .btn.dghost { background:#fff; color:var(--danger); border:1px solid var(--danger); }
+  .map { height:150px; border-radius:10px; background: linear-gradient(90deg,transparent 42%,#f3c77a 42%,#f3c77a 43%,transparent 43%), #e6ece1; display:grid; place-items:center; color:var(--ink-400); font-size:13px; }
+  .badge { display:inline-block; font-size:12px; font-weight:600; padding:2px 8px; border-radius:5px; white-space:nowrap; }
+  .b-rev { background:var(--blue-50); color:var(--navy); border:1px solid #c9d6e8; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; align-items:center; }
+  .chip { border:1px solid var(--bone-300); background:#fff; border-radius:999px; padding:5px 11px; font-size:13px; color:var(--ink-700); display:inline-flex; gap:6px; align-items:center; }
+  .chip b { color:var(--ink-400); font-weight:600; } .chip.on { background:var(--sage-600); border-color:var(--sage-600); color:#fff; } .chip.on b { color:#D1DDD3; }
+  .chip i { width:8px; height:8px; border-radius:50%; } .chip.rev { border-color:#c9d6e8; background:var(--blue-50); color:var(--navy); }
+  .filters { display:flex; gap:10px; align-items:center; margin-bottom:8px; }
+  .filters input, .filters select { border:1px solid var(--bone-300); border-radius:9px; padding:7px 10px; font-size:13px; background:#fff; } .filters input { width:260px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--bone-200); border-radius:12px; overflow:hidden; }
+  th { text-align:left; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-400); font-weight:500; padding:10px 14px; border-bottom:1px solid var(--bone-200); }
+  td { padding:10px 14px; border-bottom:1px solid var(--bone-100); vertical-align:top; }
+  .nm { color:var(--sage-700); font-weight:600; text-decoration:underline; text-underline-offset:2px; } .ad { font-size:12px; color:var(--ink-500); }
+  .st { display:inline-block; font-size:12px; font-weight:600; padding:2px 7px; border-radius:5px; }
+  .rev { font-size:13px; } .rev div + div { margin-top:5px; }
+  .thumb { display:inline-block; width:28px; height:28px; border-radius:5px; vertical-align:middle; margin-right:6px; background:linear-gradient(135deg,#9bb59f,#5d7f6a 55%,#3c5a49); }
+  .callout { background:#FFD84D; color:#1a1a1a; font-size:12px; font-weight:700; padding:2px 7px; border-radius:6px; margin-left:8px; vertical-align:1px; }
+  .sug { border:1px solid #c9d6e8; background:#F4F7FB; border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+  .sug h3 { margin:0 0 10px; font-size:15px; color:var(--navy); }
+  .item { background:#fff; border:1px solid #dbe3ee; border-radius:10px; padding:12px 14px; display:flex; gap:14px; }
+  .item + .item { margin-top:10px; }
+  .item .body { flex:1; } .item .hd { display:flex; align-items:center; gap:8px; margin-bottom:6px; } .item .hd .when { margin-left:auto; font-size:12px; color:var(--ink-400); }
+  .item .acts { display:flex; gap:8px; margin-top:10px; } .item .note { font-size:12.5px; color:var(--ink-500); }
+  .photo { width:180px; height:135px; border-radius:8px; background:linear-gradient(135deg,#9bb59f,#5d7f6a 55%,#3c5a49); display:grid; place-items:center; color:rgba(255,255,255,.85); font-size:12px; flex:none; }
+  .kv { display:grid; grid-template-columns:110px 1fr; gap:3px 10px; font-size:13px; } .kv span:nth-child(odd) { color:var(--ink-400); }
+  .form { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .field label { display:block; font-size:12px; color:var(--ink-400); margin-bottom:3px; } .field div { border:1px solid var(--bone-300); border-radius:9px; padding:8px 10px; background:#fff; }
+</style></head>
+<body>
+<h1>Blessing Boxes: Photo review and Sponsor requests folded in</h1>
+<p class="sub">Same idea as Places: anything waiting on you about a box shows on that box's row, and you approve or reject it on the box's own page. The “Photo review” and “Adoption requests” tabs go away. “Adoption” becomes “sponsor” everywhere in the admin. The yellow tags are notes.</p>
+
+<p class="flabel">1. Blessing Boxes tab</p>
+<div class="frame">
+  <div class="nav"><a>Dashboard</a><a class="on">Blessing Boxes<span class="ct">4</span></a><a>Places</a><a class="gone">Photo review</a><a class="gone">Adoption requests</a><a class="add">Add place</a></div>
+  <div class="in">
+    <div class="top">
+      <div class="card"><span class="big">4</span><p><b>To review</b><small>3 photos (1 reported by a visitor) and 1 sponsor request.</small></p><span class="btn ghost">Show them</span></div>
+          </div>
+    <div class="card"><h2 style="margin-bottom:8px">Blessing boxes — 28 in service</h2><div class="map">map, full width (#671)</div></div>
+
+    <h2 style="margin-top:6px">All boxes</h2>
+    <div class="chips">
+      <span class="chip on">All <b>28</b></span><span class="chip rev">To review <b>4</b></span><span class="chip">Needs help <b>2</b></span>
+      <span class="chip"><i style="background:var(--danger)"></i>Empty <b>1</b></span><span class="chip"><i style="background:var(--warn)"></i>Low <b>1</b></span>
+      <span class="chip"><i style="background:#8A847A"></i>Quiet <b>23</b></span><span class="chip"><i style="background:#3F7D5E"></i>OK <b>3</b></span>
+      <span class="callout">“To review” chip is new</span>
+    </div>
+    <div class="filters"><input placeholder="Search name, address or sponsor"><select><option>Sponsor: any</option><option>Has a sponsor</option><option>Needs a sponsor</option></select><select><option>Sort: needs attention first</option></select></div>
+    <table>
+      <thead><tr><th>Box</th><th>Status</th><th>To review <span class="callout">new column</span></th><th>Last report</th><th>Sponsor</th></tr></thead>
+      <tbody>
+        <tr><td><span class="nm">Blessing Box - 573 S Rogers Dr</span><div class="ad">573 S Rogers Dr, Pueblo, CO</div></td><td><span class="st" style="background:var(--clay-100);color:var(--danger)">Empty</span></td>
+          <td class="rev"><div><span class="thumb"></span><span class="badge b-rev">New photo</span></div></td><td>2 days ago</td><td>Maria G.</td></tr>
+        <tr><td><span class="nm">Blessing Box - 1923 E 8th St</span><div class="ad">1923 E 8th St, Pueblo, CO</div></td><td><span class="st" style="background:var(--clay-100);color:var(--warn)">Low</span></td>
+          <td class="rev" style="color:var(--ink-400)">—</td><td>1 day ago</td><td>First Methodist</td></tr>
+        <tr><td><span class="nm">Blessing Box - 1249 E Routt Ave</span><div class="ad">1249 E Routt Ave, Pueblo, CO</div></td><td><span class="st" style="background:var(--sage-100);color:var(--sage-700)">OK</span></td>
+          <td class="rev"><div><span class="thumb"></span><span class="badge b-rev">Photo reported</span> 1 report</div><div><span class="badge b-rev">Sponsor request</span> The Martinez Family</div></td><td>5 days ago</td><td>St. Pius</td></tr>
+        <tr><td><span class="nm">Blessing Box - 216 W Routt</span><div class="ad">216 W Routt, Pueblo, CO</div></td><td><span class="st" style="background:var(--bone-100);color:var(--ink-500)">Quiet</span></td>
+          <td class="rev"><div><span class="thumb"></span><span class="badge b-rev">New photo</span></div></td><td>No reports yet</td><td style="color:var(--ink-500)">Needs a sponsor</td></tr>
+        <tr><td><span class="nm">Blessing Box - 1308 E Ash St</span><div class="ad">1308 E Ash St, Pueblo, CO</div></td><td><span class="st" style="background:var(--bone-100);color:var(--ink-500)">Quiet</span></td>
+          <td class="rev" style="color:var(--ink-400)">—</td><td>No reports yet</td><td style="color:var(--ink-500)">Needs a sponsor</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:var(--ink-400);margin:8px 2px 0">Boxes with something to review sort to the top by default.</p>
+  </div>
+</div>
+
+<p class="flabel">2. Opening a box with things to review</p>
+<div class="frame">
+  <div class="nav"><a>Dashboard</a><a class="on">Blessing Boxes<span class="ct">4</span></a><a>Places</a><a class="add">Add place</a></div>
+  <div class="in">
+    <h2>Blessing Box - 1249 E Routt Ave <span class="st" style="background:var(--sage-100);color:var(--sage-700);vertical-align:3px">OK</span></h2>
+    <div class="sug">
+      <h3>2 things to review <span class="callout">replaces Photo review and Adoption requests</span></h3>
+      <div class="item">
+        <div class="photo">reported photo</div>
+        <div class="body">
+          <div class="hd"><span class="badge b-rev">Photo reported</span><span class="when">reported Sep 25 · photo added Sep 20</span></div>
+          <div class="note">A visitor reported this photo (1 report). It's hidden from the public card until you decide.</div>
+          <div class="acts"><span class="btn">Keep photo</span><span class="btn dghost">Remove photo</span></div>
+        </div>
+      </div>
+      <div class="item">
+        <div class="body">
+          <div class="hd"><span class="badge b-rev">Sponsor request</span><span class="when">sent Sep 24</span></div>
+          <div class="kv"><span>Public name</span><span><b>The Martinez Family</b></span><span>Email (private)</span><span>martinez.family@example.com</span><span>Note</span><span>“We live on this block and can stock it on weekends.”</span></div>
+          <div class="note" style="margin-top:6px">Approving adds them to “Sponsored by …” on the public card, next to St. Pius.</div>
+          <div class="acts"><span class="btn">Approve sponsor</span><span class="btn ghost">Decline</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="form">
+      <div class="field"><label>Name</label><div>Blessing Box - 1249 E Routt Ave</div></div>
+      <div class="field"><label>Address</label><div>1249 E Routt Ave, Pueblo, CO 81004</div></div>
+      <div class="field"><label>Most needed</label><div>Canned food, Diapers</div></div>
+      <div class="field"><label>Host note</label><div>Please take only what you need.</div></div>
+    </div>
+  </div>
+</div>
+</body></html>

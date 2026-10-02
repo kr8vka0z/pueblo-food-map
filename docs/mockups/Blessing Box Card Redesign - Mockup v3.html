@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blessing Box card — v3: Directions options + "what do you need" ask</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Tokens copied from pueblo-food-map DESIGN.md — no new colors. */
+:root{
+  --bone50:#FBFAF6;--bone100:#F4F1EA;--bone200:#E8E3D6;--bone300:#D4CDB8;
+  --ink400:#6A645A;--ink500:#5F5A52;--ink700:#2D2A26;--ink900:#1A1817;
+  --sage50:#EAF0EC;--sage100:#D1DDD3;--sage600:#2C5F4F;--sage700:#1F4639;
+  --clay100:#F8E2D4;--clay700:#7C2D12;
+  --success:#15803D;--warning:#B45309;--danger:#B91C1C;--blessing:#C2447B;
+  --display:'Fraunces',Georgia,serif;--sans:'Public Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:var(--sans);color:var(--ink700);background:#fff;padding:32px 24px 64px;line-height:1.45}
+h1{font-family:var(--display);font-weight:600;font-size:30px;color:var(--ink900)}
+h1+.lede{margin-bottom:8px}
+.part{font-family:var(--display);font-weight:600;font-size:24px;color:var(--ink900);margin:36px 0 4px}
+.lede{max-width:74ch;margin:6px 0 22px;color:var(--ink500);font-size:15px}
+.row{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.col{width:375px}
+.col h2{font-family:var(--display);font-weight:600;font-size:20px;color:var(--ink900)}
+.col .why{font-size:13px;color:var(--ink500);margin:4px 0 12px;min-height:72px}
+.stage{background:#DDE5DC;border-radius:24px;padding:44px 0 0;overflow:hidden;border:1px solid var(--bone200)}
+.stage.flat{padding-top:0;background:none;border:1px solid var(--bone200)}
+.sheet{background:var(--bone50);border-radius:20px 20px 0 0;padding:0 0 22px;overflow:hidden;box-shadow:0 -2px 14px rgba(26,24,23,.10)}
+.flat .sheet{border-radius:0;box-shadow:none;padding-top:4px}
+.grab{width:40px;height:4px;border-radius:9999px;background:var(--bone50);opacity:.9;position:absolute;top:10px;left:50%;transform:translateX(-50%)}
+.photo-wrap{position:relative;--c:var(--success)}
+.photo{display:block;width:100%;height:170px;object-fit:cover;background:var(--bone200)}
+.dot{width:10px;height:10px;border-radius:9999px;display:inline-block;flex:none;background:var(--c)}
+.pill{position:absolute;left:14px;bottom:12px;background:var(--bone50);border-radius:9999px;padding:6px 12px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--c)}
+.pill span{font-weight:500;color:var(--ink500)}
+.credit{padding:10px 18px;font-size:14px;display:flex;gap:10px;align-items:flex-start;background:var(--sage50);color:var(--sage700)}
+.credit svg{flex:none;margin-top:2px}
+.credit b{font-weight:600}
+.credit a{font-weight:600;color:inherit;text-decoration:underline;text-underline-offset:2px}
+.credit .line2{font-size:13px;margin-top:2px}
+.body{padding:14px 18px 0}
+.badge{display:inline-block;background:var(--blessing);color:var(--bone50);font-size:11px;font-weight:600;padding:3px 10px;border-radius:9999px}
+.title{font-family:var(--display);font-weight:600;font-size:22px;line-height:1.15;color:var(--ink900);margin-top:6px}
+.addr{font-size:13px;color:var(--ink500);margin-top:3px}
+.label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink400)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{background:var(--bone100);border-radius:9999px;padding:4px 10px;font-size:13px}
+.chip small{color:var(--ink400);font-size:12px}
+.rule{height:1px;background:var(--bone200);margin:14px 0}
+.q{font-family:var(--display);font-weight:600;font-size:18px;color:var(--ink900)}
+.sub{font-size:13px;color:var(--ink500);margin-top:2px}
+.btn{min-height:48px;border-radius:10px;font:600 13px var(--sans);padding:4px;border:1px solid var(--bone300);background:#fff;color:var(--ink700)}
+.btn.on{background:var(--sage50);border-color:var(--sage600);color:var(--sage700)}
+.btn.solid{background:var(--sage600);border-color:var(--sage600);color:var(--bone50)}
+.tri{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.tri .btn i{display:block;width:8px;height:8px;border-radius:9999px;margin:0 auto 3px;background:var(--c)}
+.wide{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.wide .btn{font-weight:500;min-height:44px}
+.links{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;font-weight:500}
+.links a{color:var(--sage600);text-decoration:underline;text-underline-offset:2px}
+.links a.quiet{color:var(--ink500)}
+.thanks{font-size:14px;font-weight:600;color:var(--success)}
+
+/* Directions option 1 — round button on the photo */
+.dir-fab{position:absolute;right:12px;bottom:10px;width:44px;height:44px;border-radius:9999px;background:var(--bone50);display:grid;place-items:center;border:0}
+/* Directions option 2 — the address is the link */
+.dir-addr{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:14px;font-weight:500;color:var(--sage600);text-decoration:underline;text-underline-offset:2px}
+/* Directions option 3 — quiet outline button, full width */
+.dir-line{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:44px;margin-top:10px;border-radius:10px;border:1px solid var(--sage600);background:transparent;color:var(--sage700);font:600 14px var(--sans)}
+
+/* need picker */
+.pick{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.pick .p{min-height:40px;padding:0 14px;border-radius:9999px;border:1px solid var(--bone300);background:#fff;font:500 14px var(--sans);color:var(--ink700)}
+.pick .p.sel{background:var(--sage600);border-color:var(--sage600);color:var(--bone50)}
+.step{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink400);margin:0 0 8px}
+</style>
+</head>
+<body>
+<h1>Blessing Box card — v3</h1>
+<p class="lede">Base card is the one you approved: photo first, sponsor band under it (no "Hosted by", several sponsors allowed, the adopt link always there), dot check-in row, and only two links at the bottom.</p>
+
+<div class="part">Part 1 — where Directions goes</div>
+<p class="lede">The orange button is gone in all three. Pick one.</p>
+<div class="row" id="dirs"></div>
+
+<div class="part">Part 2 — asking people what they need</div>
+<p class="lede">"I used this box" stays one tap and is saved right away. Only after that does the card ask what would help next time — tap any, or skip. No typing, so there is nothing for you to moderate. The picks then fill the "Most needed" line by themselves.</p>
+<div class="row" id="flow"></div>
+
+<script>
+const PHOTO = "data:image/svg+xml;utf8," + encodeURIComponent(
+ `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 375 200'><rect width='375' height='200' fill='#CFC7B0'/><rect y='140' width='375' height='60' fill='#9DB59F'/><rect x='150' y='40' width='80' height='120' rx='4' fill='#F4F1EA' stroke='#6A645A' stroke-width='3'/><path d='M140 44 L190 14 L240 44Z' fill='#C2447B'/><line x1='150' y1='80' x2='230' y2='80' stroke='#6A645A' stroke-width='2'/><line x1='150' y1='118' x2='230' y2='118' stroke='#6A645A' stroke-width='2'/><rect x='158' y='58' width='14' height='22' fill='#BE2D45'/><rect x='176' y='62' width='12' height='18' fill='#1F4E8C'/><rect x='194' y='56' width='16' height='24' fill='#F7943C'/><rect x='160' y='96' width='22' height='22' fill='#2C5F4F'/><rect x='188' y='100' width='30' height='18' fill='#92591D'/><rect x='186' y='160' width='8' height='40' fill='#6A645A'/></svg>`);
+const heart = `<svg width="18" height="18" viewBox="0 0 24 24" fill="#2C5F4F" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+const arrow = c => `<svg width="20" height="20" viewBox="0 0 24 24" fill="${c}" aria-hidden="true"><path d="M21.71 11.29l-9-9a1 1 0 0 0-1.42 0l-9 9a1 1 0 0 0 0 1.42l9 9a1 1 0 0 0 1.42 0l9-9a1 1 0 0 0 0-1.42zM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5-3.5 3.5z"/></svg>`;
+
+const band = `<div class="credit">${heart}<div>Sponsored by <b>the Boyd Family</b> and <b>Eastside Youth Group</b><div class="line2">Want to help too? <a href="#">Apply to adopt this box</a></div></div></div>`;
+const needs = list => `<div style="margin-top:12px"><div class="label">Most needed</div><div class="chips">${list.map(n=>`<span class="chip">${n}</span>`).join("")}</div></div>`;
+const checkin = `<div class="rule"></div><div class="q">How does the box look right now?</div>
+  <div class="tri"><button class="btn" style="--c:var(--success)"><i></i>I filled it</button><button class="btn" style="--c:var(--warning)"><i></i>Running low</button><button class="btn" style="--c:var(--danger)"><i></i>It's empty</button></div>
+  <div class="wide"><button class="btn">I used this box</button><button class="btn">Add a photo</button></div>`;
+const foot = `<div class="links" style="margin-top:10px"><a class="quiet" href="#">Report a problem</a><a class="quiet" href="#">Report photo</a></div><div class="rule"></div><div class="links"><a href="#">History</a><a href="#">Email me when it needs filling</a></div>`;
+
+function dirCard(v){
+  const head = `<span class="badge">Blessing Box</span><div class="title">Routt Street Blessing Box</div>`;
+  const addr = v===2 ? `<a class="dir-addr" href="#">${arrow("#2C5F4F")}216 W Routt Ave, Pueblo</a>` : `<div class="addr">216 W Routt Ave, Pueblo</div>`;
+  return `<div class="stage"><div class="sheet">
+   <div class="photo-wrap"><img class="photo" src="${PHOTO}" alt=""><div class="grab"></div>
+    <div class="pill"><i class="dot"></i>Stocked<span>· filled 2 hours ago</span></div>
+    ${v===1?`<button class="dir-fab" aria-label="Directions">${arrow("#2C5F4F")}</button>`:""}</div>
+   ${band}<div class="body">${head}${addr}
+   ${v===3?`<button class="dir-line">${arrow("#1F4639")}Directions</button>`:""}
+   ${needs(["Canned soup","Diapers","Pet food"])}${checkin}${foot}</div></div></div>`;
+}
+document.getElementById("dirs").innerHTML = [
+ ["A · Round button on the photo","A small round arrow in the photo's corner, like a maps app. Takes no room in the card. Risk: an arrow alone is less obvious than a word. On a box with no photo it sits at the right of the name instead.",1],
+ ["B · The address is the link","The address line itself opens directions, with a small arrow in front. Nothing extra on the card at all. My pick — tapping an address to get there is what people already expect.",2],
+ ["C · Quiet outline button","Still a full button that says Directions, but in the card's green outline instead of solid orange, under the address. Most obvious, costs one row of height.",3],
+].map(([h,w,v])=>`<div class="col"><h2>${h}</h2><p class="why">${w}</p>${dirCard(v)}</div>`).join("");
+
+const items = ["Canned food","Fresh food","Bread","Baby items","Diapers","Hygiene items","Pet food","Water / drinks","Warm clothing"];
+const frame = inner => `<div class="stage flat"><div class="sheet"><div class="body">${inner}</div></div></div>`;
+document.getElementById("flow").innerHTML = [
+ ["1 · They tap “I used this box”","Same single tap as today. It is recorded the moment they tap — the next question can never lose a check-in.",
+  frame(`<div class="q">How does the box look right now?</div>
+   <div class="tri"><button class="btn" style="--c:var(--success)"><i></i>I filled it</button><button class="btn" style="--c:var(--warning)"><i></i>Running low</button><button class="btn" style="--c:var(--danger)"><i></i>It's empty</button></div>
+   <div class="wide"><button class="btn on">I used this box</button><button class="btn">Add a photo</button></div>`)],
+ ["2 · The card asks what would help","Replaces the buttons in place. Tap as many as they like, then Send — or Skip. Nine fixed choices, English and Spanish.",
+  frame(`<p class="thanks">Thanks — enjoy!</p>
+   <div class="q" style="margin-top:10px">What would help you next time?</div><p class="sub">Tap any. This tells givers what to bring.</p>
+   <div class="pick">${items.map((n,i)=>`<button class="p ${[0,4].includes(i)?"sel":""}">${n}</button>`).join("")}</div>
+   <div class="wide" style="margin-top:14px"><button class="btn solid">Send</button><button class="btn">Skip</button></div>`)],
+ ["3 · The card's “Most needed” fills itself","Shows the three most-picked items at this box over the last 30 days. If you typed your own “most needed” text for a box in admin, yours shows instead.",
+  frame(`<p class="thanks">Got it — thank you.</p>
+   <div style="margin-top:12px"><div class="label">Most needed · from people who use this box</div>
+   <div class="chips"><span class="chip">Canned food <small>· 6</small></span><span class="chip">Diapers <small>· 4</small></span><span class="chip">Pet food <small>· 2</small></span></div></div>
+   <div class="rule"></div><div class="links"><a href="#">History</a><a href="#">Email me when it needs filling</a></div>`)],
+].map(([h,w,html])=>`<div class="col"><h2>${h}</h2><p class="why">${w}</p>${html}</div>`).join("");
+</script>
+</body>
+</html>

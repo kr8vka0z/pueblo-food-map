@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM admin: Activity log (owner only)</title>
+<style>
+  :root { --bone-50:#FBFAF6; --bone-100:#F4F1EA; --bone-200:#E8E3D6; --bone-300:#D4CDB8; --ink-400:#6A645A; --ink-500:#5F5A52; --ink-700:#2D2A26; --sage-50:#EAF0EC; --sage-100:#D1DDD3; --sage-600:#2C5F4F; --sage-700:#1F4639;
+          --clay-100:#F8E2D4; --clay-700:#7C2D12; --orange:#F0A04B; --navy:#1E3A5F; --blue-50:#E8EEF6; --danger:#B91C1C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#e9e6df; font:14px/1.45 -apple-system,system-ui,sans-serif; color:#1A1817; padding:22px; }
+  h1 { font:600 22px Georgia,serif; margin:0 0 4px; } .sub { color:var(--ink-400); margin:0 0 18px; max-width:1100px; }
+  .frame { background:var(--bone-50); border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); max-width:1180px; }
+  .nav { display:flex; gap:6px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--bone-200); background:#fff; }
+  .nav a { padding:8px 12px; border-radius:10px; color:var(--ink-500); } .nav a.on { background:var(--sage-600); color:#fff; } .nav .add { margin-left:auto; background:var(--orange); color:#1a1a1a; font-weight:600; }
+  .lock { font-size:11px; margin-left:4px; }
+  .in { padding:18px 20px; }
+  h2 { font:600 20px Georgia,serif; margin:0 0 4px; } .hint { color:var(--ink-400); font-size:13px; margin:0 0 14px; }
+  .filters { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .filters select, .filters input { border:1px solid var(--bone-300); border-radius:9px; padding:7px 10px; font-size:13px; background:#fff; } .filters input { width:240px; }
+  .day { font-size:12px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-400); margin:16px 0 6px; }
+  .sess { background:#fff; border:1px solid var(--bone-200); border-radius:12px; margin-bottom:10px; overflow:hidden; }
+  .sh { display:flex; gap:12px; align-items:center; padding:11px 14px; background:var(--bone-100); border-bottom:1px solid var(--bone-200); font-size:13px; }
+  .sh b { color:var(--ink-700); } .sh .meta { color:var(--ink-500); } .sh .t { margin-left:auto; color:var(--ink-400); }
+  .row { display:grid; grid-template-columns:80px 150px 1fr; gap:12px; padding:9px 14px; border-top:1px solid var(--bone-100); font-size:13px; align-items:start; }
+  .row:first-of-type { border-top:0; } .row .tm { color:var(--ink-400); }
+  .tag { display:inline-block; font-size:11.5px; font-weight:600; padding:2px 7px; border-radius:5px; }
+  .t-in { background:var(--sage-100); color:var(--sage-700); } .t-edit { background:var(--blue-50); color:var(--navy); } .t-pub { background:var(--sage-600); color:#fff; }
+  .t-rej { background:var(--clay-100); color:var(--clay-700); } .t-fail { background:#FDE8E8; color:var(--danger); } .t-sys { background:var(--bone-100); color:var(--ink-500); border:1px solid var(--bone-300); }
+  .diff { margin-top:4px; font-size:12.5px; color:var(--ink-500); } .old { text-decoration:line-through; color:var(--ink-400); } .new { color:var(--sage-700); font-weight:600; }
+  .lnk { color:var(--sage-700); text-decoration:underline; }
+  .callout { background:#FFD84D; color:#1a1a1a; font-size:12px; font-weight:700; padding:2px 7px; border-radius:6px; margin-left:8px; vertical-align:1px; }
+  .alert { border:1px solid #f3b4b4; background:#FDF1F1; }
+  .alert .sh { background:#FDE8E8; }
+</style></head>
+<body>
+<h1>Activity log: every sign-in and every change, visible only to Kyle</h1>
+<p class="sub">Grouped by sign-in: each sign-in shows who, how, from where and on what device, with everything that login did underneath. Automatic changes (data refresh) and failed sign-in attempts are listed too. The yellow tags are notes.</p>
+<div class="frame">
+  <div class="nav"><a>Dashboard</a><a>Blessing Boxes</a><a>Places</a><a class="on">Activity<span class="lock">🔒</span></a><a class="add">Add place</a></div>
+  <div class="in">
+    <h2>Activity <span class="callout">tab only exists for Kyle's account; anyone else gets “not found”</span></h2>
+    <p class="hint">Every admin sign-in and every change made in the admin, newest first. Kept permanently.</p>
+    <div class="filters">
+      <select><option>Everyone</option><option>kysboyd@gmail.com</option><option>Automatic (data refresh)</option></select>
+      <select><option>All activity</option><option>Sign-ins</option><option>Failed sign-ins</option><option>Edits</option><option>Approvals &amp; rejections</option><option>Publishes</option><option>Removals</option></select>
+      <select><option>Last 30 days</option><option>Last 7 days</option><option>All time</option></select>
+      <input placeholder="Search a place or box">
+    </div>
+
+    <div class="day">Today, Sat Sep 26</div>
+    <div class="sess">
+      <div class="sh"><span class="tag t-in">Signed in</span><b>kysboyd@gmail.com</b><span class="meta">with a passkey · Chrome on Mac · Pueblo, CO · 73.14.x.x</span><span class="t">9:35 AM</span></div>
+      <div class="row"><span class="tm">9:41 AM</span><span><span class="tag t-edit">Edited</span></span><span><span class="lnk">Posada Food Pantry</span><div class="diff">Phone <span class="old">(719) 555-0142</span> → <span class="new">(719) 555-0199</span> · Tuesday hours <span class="old">9–12</span> → <span class="new">10–2</span></div></span></div>
+      <div class="row"><span class="tm">9:44 AM</span><span><span class="tag t-edit">Approved</span></span><span>Sponsor request from <b>The Martinez Family</b> for <span class="lnk">Blessing Box - 1249 E Routt Ave</span></span></div>
+      <div class="row"><span class="tm">9:46 AM</span><span><span class="tag t-rej">Rejected</span></span><span>Data refresh suggestion for <span class="lnk">Minnequa VFW Post 3641</span> (suggested removal) · reason: “still open, called them”</span></div>
+      <div class="row"><span class="tm">9:52 AM</span><span><span class="tag t-pub">Published</span></span><span>2 places to the public map (1 new, 1 edited) · <span class="lnk">publish PR #681</span></span></div>
+    </div>
+    <div class="sess alert">
+      <div class="sh"><span class="tag t-fail">Failed sign-in</span><b>someone@example.com</b><span class="meta">asked for a sign-in link · not on the admin list, no email sent · Denver, CO</span><span class="t">3:12 AM</span><span class="callout">failed tries show in red</span></div>
+    </div>
+
+    <div class="day">Thu Sep 25</div>
+    <div class="sess">
+      <div class="sh"><span class="tag t-sys">Automatic</span><b>Data refresh</b><span class="meta">weekly run</span><span class="t">7:41 PM</span></div>
+      <div class="row"><span class="tm">7:41 PM</span><span><span class="tag t-sys">Updated 49</span></span><span>“Last checked” date on 49 places (nothing else changed) · <span class="lnk">show all</span></span></div>
+      <div class="row"><span class="tm">7:41 PM</span><span><span class="tag t-sys">Suggested 18</span></span><span>18 changes waiting for review</span></div>
+    </div>
+    <div class="sess">
+      <div class="sh"><span class="tag t-in">Signed in</span><b>kysboyd@gmail.com</b><span class="meta">with a sign-in link · Safari on iPhone · Pueblo, CO</span><span class="t">3:30 PM</span></div>
+      <div class="row"><span class="tm">3:38 PM</span><span><span class="tag t-edit">Edited 4</span></span><span>SNAP/WIC on 4 places · <span class="lnk">show all</span></span></div>
+      <div class="row"><span class="tm">4:02 PM</span><span><span class="tag t-in">Signed out</span></span><span></span></div>
+    </div>
+  </div>
+</div>
+</body></html>

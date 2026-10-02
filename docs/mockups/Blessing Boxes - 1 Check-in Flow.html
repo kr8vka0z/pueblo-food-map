@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checking in at a Blessing Box · Swimlane</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #FBFAF6;   /* bone50 */
+      --color-ink:     #2D2A26;   /* ink700 */
+      --color-muted:   #5F5A52;   /* ink500 */
+      --color-accent:  #2C5F4F;   /* sage600 */
+      --font-sans:     'Public Sans', system-ui, -apple-system, sans-serif;
+      --font-serif:    'Fraunces', Georgia, serif;
+      --font-mono:     ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1240px; width: 100%; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Swimlane · Blessing Boxes</p>
+    <h1>Checking in at a Blessing Box</h1>
+
+    <svg viewBox="0 0 1120 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="checkin-flow-title checkin-flow-desc">
+      <title id="checkin-flow-title">Checking in at a Blessing Box</title>
+      <desc id="checkin-flow-desc">Swimlane diagram showing a neighbor opening a box by map, list, or QR sticker, choosing a check-in and optional photo, the website's bot check and save, and how photo or problem reports route to any admin before appearing publicly, with every review action logged against who did it and when.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5F5A52"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2C5F4F"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#FBFAF6"/>
+
+      <!-- Lane dividers -->
+      <line x1="40" y1="72" x2="1080" y2="72" stroke="rgba(45,42,38,0.22)" stroke-width="1"/>
+      <line x1="40" y1="192" x2="1080" y2="192" stroke="rgba(45,42,38,0.10)" stroke-width="1"/>
+      <line x1="40" y1="312" x2="1080" y2="312" stroke="rgba(45,42,38,0.10)" stroke-width="1"/>
+      <line x1="40" y1="432" x2="1080" y2="432" stroke="rgba(45,42,38,0.22)" stroke-width="1"/>
+
+      <!-- Actor label column divider -->
+      <line x1="170" y1="72" x2="170" y2="432" stroke="rgba(45,42,38,0.22)" stroke-width="1"/>
+
+      <!-- Lane labels -->
+      <text x="60" y="136" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" letter-spacing="0.16em">PERSON</text>
+      <text x="60" y="256" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" letter-spacing="0.16em">WEBSITE</text>
+      <text x="60" y="376" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" letter-spacing="0.16em">ADMIN</text>
+
+      <!-- Arrows (drawn before nodes) -->
+      <!-- a) Open the box -> Check in (within Person) -->
+      <line x1="350" y1="132" x2="390" y2="132" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- b) Check in -> Bot check (Person -> Website handoff, critical, coral) -->
+      <path d="M 490,160 V 184 Q 490,192 498,192 H 672 Q 680,192 680,200 V 224" fill="none" stroke="#2C5F4F" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <rect x="545" y="172" width="50" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="570" y="182" fill="#2C5F4F" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SUBMIT</text>
+
+      <!-- c) Bot check -> Saved (within Website) -->
+      <line x1="750" y1="252" x2="790" y2="252" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- d) Saved -> Public log (no photo, not a problem) -->
+      <line x1="910" y1="252" x2="930" y2="252" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- e) Saved -> Admin review (has a photo, or is a problem report) -->
+      <line x1="850" y1="280" x2="850" y2="340" stroke="#5F5A52" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <rect x="864" y="298" width="74" height="12" rx="2" fill="#FBFAF6"/>
+      <text x="901" y="308" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">TO REVIEW</text>
+
+      <!-- f) Admin review -> Public log (approved photo goes live), dashed -->
+      <path d="M 890,340 V 324 Q 890,316 898,316 H 982 Q 990,316 990,308 V 280" fill="none" stroke="#5F5A52" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+      <!-- g) Public log -> Admin review (admin can hide any check-in later), dashed -->
+      <path d="M 1010,280 V 292 Q 1010,300 1002,300 H 878 Q 870,300 870,308 V 340" fill="none" stroke="#5F5A52" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+      <!-- Nodes -->
+      <!-- 1. Open the box -->
+      <rect x="190" y="104" width="160" height="56" rx="6" fill="#FFFFFF" stroke="#2D2A26" stroke-width="1"/>
+      <text x="270" y="128" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Open the box</text>
+      <text x="270" y="144" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">map · list · QR sticker</text>
+
+      <!-- 2. Check in -->
+      <rect x="390" y="104" width="200" height="56" rx="6" fill="#FFFFFF" stroke="#2D2A26" stroke-width="1"/>
+      <text x="490" y="128" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Check in</text>
+      <text x="490" y="144" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">filled·took·low·empty·problem</text>
+
+      <!-- 3. Bot check -->
+      <rect x="610" y="224" width="140" height="56" rx="6" fill="#FFFFFF" stroke="#2D2A26" stroke-width="1"/>
+      <text x="680" y="248" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Bot check</text>
+      <text x="680" y="264" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">turnstile + rate limit</text>
+
+      <!-- 4. Saved -->
+      <rect x="790" y="224" width="120" height="56" rx="6" fill="#FFFFFF" stroke="#2D2A26" stroke-width="1"/>
+      <text x="850" y="248" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Saved</text>
+      <text x="850" y="264" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">box_checkins row</text>
+
+      <!-- 5. Public log (focal) -->
+      <rect x="930" y="224" width="120" height="56" rx="6" fill="rgba(44,95,79,0.08)" stroke="#2C5F4F" stroke-width="1"/>
+      <text x="990" y="248" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Public log</text>
+      <text x="990" y="264" fill="#2C5F4F" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">updates within ~1 min</text>
+
+      <!-- 6. Admin review -->
+      <rect x="610" y="340" width="320" height="88" rx="6" fill="#FFFFFF" stroke="#2D2A26" stroke-width="1"/>
+      <text x="770" y="362" fill="#2D2A26" font-size="12" font-weight="600" font-family="'Public Sans', sans-serif" text-anchor="middle">Admin review</text>
+      <text x="770" y="378" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">any admin</text>
+      <text x="770" y="392" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">photos · problem reports</text>
+      <text x="770" y="406" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">approve → live · reject / hide</text>
+      <text x="770" y="420" fill="#5F5A52" font-size="9" font-family="ui-monospace, monospace" text-anchor="middle">every action logged: who + when</text>
+
+      <!-- Legend -->
+      <line x1="40" y1="456" x2="1080" y2="456" stroke="rgba(45,42,38,0.10)" stroke-width="0.8"/>
+      <text x="40" y="472" fill="#5F5A52" font-size="8" font-family="ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+
+      <rect x="40" y="484" width="14" height="10" rx="2" fill="#FFFFFF" stroke="#2D2A26" stroke-width="1"/>
+      <text x="60" y="492" fill="#5F5A52" font-size="8.5" font-family="'Public Sans', sans-serif">Step</text>
+
+      <rect x="180" y="484" width="14" height="10" rx="2" fill="rgba(44,95,79,0.08)" stroke="#2C5F4F" stroke-width="1"/>
+      <text x="200" y="492" fill="#5F5A52" font-size="8.5" font-family="'Public Sans', sans-serif">Goes public</text>
+
+      <line x1="340" y1="490" x2="368" y2="490" stroke="#2C5F4F" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <text x="376" y="492" fill="#5F5A52" font-size="8.5" font-family="'Public Sans', sans-serif">Critical handoff</text>
+
+      <line x1="520" y1="490" x2="548" y2="490" stroke="#5F5A52" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+      <text x="556" y="492" fill="#5F5A52" font-size="8.5" font-family="'Public Sans', sans-serif">Admin decision</text>
+    </svg>
+  </div>
+</body>
+</html>

@@ -417,8 +417,8 @@ export function decideWalkResume(
     return { kind: "fetch", origin: geoState.position };
   }
 
-  // Denied, or geolocation unavailable — useGeolocation's request() reports
-  // both outcomes as permission: "denied". Never fall back to PUEBLO_CENTER (#207):
+  // Denied, or the fix failed (permission "failed": timeout/unavailable, #738).
+  // Never fall back to PUEBLO_CENTER (#207):
   // a walking route drawn from downtown when the user is elsewhere is misleading.
   return { kind: "show-hint" };
 }
@@ -518,6 +518,9 @@ export default function MapWrapper({
   // ── Location-denied banner (PR 7) ────────────────────────────────────────────
   // Shows only when the user ACTIVELY re-taps locate (not on initial mount when
   // permission is already denied — that path uses silent Pueblo-center fallback).
+  // Only a real refusal ("denied") qualifies: a timeout/unavailable failure
+  // (permission "failed", #738) isn't something the person can fix in browser
+  // settings, so it keeps the silent fallback and the next tap retries.
   //
   // Strategy: track "user requested at" as a timestamp ref.
   //   - handleLocateRequest sets the ref and calls geo.request()
@@ -996,8 +999,9 @@ export default function MapWrapper({
     // fix. Treating {granted, position:null} as "resolved" here would consume
     // the ref and show the hint prematurely, then silently drop the real
     // position when it arrives a moment later (the ref is one-shot). Both
-    // getCurrentPosition branches (success/error) always settle within 8s
-    // (its own timeout option), so this can't wait forever.
+    // getCurrentPosition branches (success/error) always settle (first try
+    // plus the one low-accuracy retry, each bounded by its timeout option),
+    // so this can't wait forever.
     if (geo.state.permission === "granted" && geo.state.position === null) return;
 
     walkAwaitingVenueIdRef.current = null; // one resolution per request
@@ -1171,6 +1175,7 @@ export default function MapWrapper({
   const {
     query,
     setQuery,
+    commitSearch,
     selectedCategories,
     filterOpenNow,
     setFilterOpenNow,
@@ -1560,13 +1565,16 @@ export default function MapWrapper({
    * (still gives a stray mousedown elsewhere a grace period).
    */
   const handleSearchBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    // Leaving the box commits the search for analytics (#738); before the
+    // early return so tabbing into our own popover still counts.
+    commitSearch();
     const next = e.relatedTarget;
     if (next instanceof Node && searchAreaRef.current?.contains(next)) return;
     blurTimerRef.current = setTimeout(() => {
       setIsPopoverOpen(false);
       setActiveIndex(-1);
     }, 150);
-  }, []);
+  }, [commitSearch]);
 
   /**
    * Shared blur handler for the popover rows themselves (ViewSuggestion's
@@ -1616,6 +1624,7 @@ export default function MapWrapper({
         setIsPopoverOpen(false);
         setActiveIndex(-1);
       } else if (e.key === "Enter") {
+        commitSearch(); // Enter commits the search for analytics (#738)
         if (popoverVisible && activeIndex >= 0 && activeIndex < filteredVenues.length) {
           e.preventDefault();
           const venue = filteredVenues[activeIndex];
@@ -1638,7 +1647,7 @@ export default function MapWrapper({
       }
     },
     // filteredVenues reference is stable between renders with same query/filters.
-    [isPopoverOpen, filteredVenues, activeIndex, selectVenue, showVenueOnMap],
+    [isPopoverOpen, filteredVenues, activeIndex, selectVenue, showVenueOnMap, commitSearch],
   );
 
   // Select a venue from the Saved list (#132 9c). Clears active filters + search
@@ -1763,7 +1772,8 @@ export default function MapWrapper({
     // #485 PR 2: fired ONLY here, not inside handleLocateRequest — that
     // function is shared with the Walk-without-location path (#207), which
     // isn't a "Near me" tap and must not be misattributed as one.
-    void track(EVENTS.NEAR_ME_CLICKED, {});
+    // source tells this apart from the splash CTA's tap (#738).
+    void track(EVENTS.NEAR_ME_CLICKED, { source: "map" });
     handleViewModeChange("map");
     handleLocateRequest();
   }, [handleViewModeChange, handleLocateRequest]);

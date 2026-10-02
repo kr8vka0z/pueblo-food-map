@@ -372,7 +372,7 @@ Walk tapped, userLocation === null
   → calls handleLocateRequest()   (same geo.request() flow "Near me" uses)
   → resume effect watches geo.state, applies decideWalkResume(awaitingVenueId, selectedVenueId, geo.state):
       granted + position     → fetchWalkingRoute(venue, position)   — draws the real route
-      denied / unavailable   → setWalkLocationHintVenueId(venue.id) — "share your location" hint, no route
+      denied / failed        → setWalkLocationHintVenueId(venue.id) — "share your location" hint, no route
       stale (venue no longer selected) → noop, nothing drawn or shown
 ```
 
@@ -399,10 +399,14 @@ User taps "Near me" (BottomNav)
   → handleLocateRequest()
     → stamps userRequestedAtRef
     → increments recenterRequestId  (Map.tsx flyTo fires even if position unchanged)
-    → calls geo.request()
+    → calls geo.request()   (first try high accuracy, ≤60 s cached fix; a timeout /
+                              unavailable error retries ONCE at low accuracy, ≤5 min cached fix;
+                              code 1 is the only "denied"; a second failure is GeoState
+                              {permission:'failed', reason:'timeout'|'unavailable'}, which the
+                              next tap simply retries — #738)
   → useEffect watches geo.state
     → clears isLocating when permission resolves
-    → shows bannerVisible if permission === 'denied' AND a fresh request was pending
+    → shows bannerVisible if permission === 'denied' (not 'failed') AND a fresh request was pending
     → shows outsideCountyVisible if position is outside PUEBLO_COUNTY_BBOX
 ```
 

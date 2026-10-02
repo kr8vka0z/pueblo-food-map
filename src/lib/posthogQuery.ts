@@ -124,6 +124,10 @@ export interface FilterUsageRow {
 export interface LocationPermissionCounts {
   granted: number;
   denied: number;
+  /** #738: no fix in time even after the low-accuracy retry — not a refusal. */
+  timeout: number;
+  /** #738: the device couldn't produce a position (OS location off, no GPS API). */
+  unavailable: number;
 }
 
 export interface UtmSourceRow {
@@ -266,16 +270,16 @@ export function buildFilters(rows: readonly unknown[][]): FilterUsageRow[] {
     .sort((a, b) => b.count - a.count);
 }
 
-/** Rows: [result, count] — `location_permission` only ever fires with `result: "granted" | "denied"` (useGeolocation.ts); any other value is ignored rather than guessed at. */
+/** Rows: [result, count] — `location_permission` fires with `result: "granted" | "denied" | "timeout" | "unavailable"` (useGeolocation.ts, #738); any other value is ignored rather than guessed at. */
 export function buildLocationPermission(rows: readonly unknown[][]): LocationPermissionCounts {
-  let granted = 0;
-  let denied = 0;
+  const counts: LocationPermissionCounts = { granted: 0, denied: 0, timeout: 0, unavailable: 0 };
   for (const row of rows) {
     const [result, count] = row as [string, number];
-    if (result === "granted") granted += count ?? 0;
-    else if (result === "denied") denied += count ?? 0;
+    if (result === "granted" || result === "denied" || result === "timeout" || result === "unavailable") {
+      counts[result] += count ?? 0;
+    }
   }
-  return { granted, denied };
+  return counts;
 }
 
 /** Rows: [source, campaign, sessions]. */

@@ -62,14 +62,14 @@ describe("useGeolocation — location_permission tracking", () => {
     mockGeolocation({ granted: true, lat: 38.25, lng: -104.6 });
     const { result } = renderHook(() => useGeolocation());
     act(() => result.current.request());
-    expect(track).toHaveBeenCalledWith(EVENTS.LOCATION_PERMISSION, { result: "granted" });
+    expect(track).toHaveBeenCalledWith(EVENTS.LOCATION_PERMISSION, { result: "granted", ms: expect.any(Number) });
   });
 
   test("a fresh denied request fires location_permission denied", () => {
     mockGeolocation({ granted: false, code: 1 });
     const { result } = renderHook(() => useGeolocation());
     act(() => result.current.request());
-    expect(track).toHaveBeenCalledWith(EVENTS.LOCATION_PERMISSION, { result: "denied" });
+    expect(track).toHaveBeenCalledWith(EVENTS.LOCATION_PERMISSION, { result: "denied", ms: expect.any(Number) });
   });
 
   test("a re-center request (already granted) does not fire a second time", () => {

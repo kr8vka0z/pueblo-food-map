@@ -258,11 +258,21 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const localeEsPct = mapUsage ? pctOf(mapUsage.headline.localeSwitchedToEs, cfVisits) : null;
   const previousLocaleEsPct = mapUsage ? pctOf(mapUsage.headline.previousLocaleSwitchedToEs, cfPreviousVisits) : null;
 
-  // location_permission only ever fires once a browser has ALREADY been
-  // prompted (useGeolocation.ts's `wasPrompt` guard) — there is no distinct
-  // "never asked" event, so it's inferred here as the gap between "near me"
-  // taps and the granted+denied outcomes PostHog did see.
-  const neverAskedLocation = mapUsage ? Math.max(mapUsage.headline.nearMeTaps - mapUsage.location.granted - mapUsage.location.denied, 0) : 0;
+  // granted/denied only fire for a request that started undecided
+  // (useGeolocation.ts's `wasUndecided` guard), while timeout/unavailable
+  // fire on every failed request (#738) — there is no distinct "never asked"
+  // event, so it's inferred here as the gap between "near me" taps and all
+  // four outcomes PostHog did see.
+  const neverAskedLocation = mapUsage
+    ? Math.max(
+        mapUsage.headline.nearMeTaps -
+          mapUsage.location.granted -
+          mapUsage.location.denied -
+          mapUsage.location.timeout -
+          mapUsage.location.unavailable,
+        0,
+      )
+    : 0;
 
   const navCounts: AdminNavCounts = {
     submissions: submissionsTotal,
@@ -521,6 +531,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     items={[
                       { label: "Granted", value: mapUsage.location.granted, displayValue: `${mapUsage.location.granted}` },
                       { label: "Said no", value: mapUsage.location.denied, displayValue: `${mapUsage.location.denied}` },
+                      { label: "Timed out, no location found", value: mapUsage.location.timeout, displayValue: `${mapUsage.location.timeout}` },
+                      { label: "Phone couldn't find its location", value: mapUsage.location.unavailable, displayValue: `${mapUsage.location.unavailable}` },
                       { label: "Never asked", value: neverAskedLocation, displayValue: `${neverAskedLocation}` },
                     ]}
                     emptyMessage="No location prompts yet this period."

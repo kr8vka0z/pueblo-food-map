@@ -90,7 +90,7 @@ describe("MapWrapper — near_me_clicked", () => {
     const user = userEvent.setup();
     await renderWrapper();
     await user.click(screen.getByRole("button", { name: /^Near me$/i }));
-    expect(track).toHaveBeenCalledWith(EVENTS.NEAR_ME_CLICKED, {});
+    expect(track).toHaveBeenCalledWith(EVENTS.NEAR_ME_CLICKED, { source: "map" });
   });
 });
 

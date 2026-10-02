@@ -345,7 +345,7 @@ Key state atoms and their roles:
 | `walkingRouteVenueId` | `string \| null` | Venue the route targets; the Map prop is render-gated on it matching `selectedVenueId` |
 | `walkReqSeq` | `ref<number>` | Monotonic counter for in-flight walk fetches: bumped per request and per explicit clear; a result whose captured seq is stale is discarded (latest-*request*-wins, so a same-venue double tap with a moved `userLocation` is caught too). Not bumped on selection change — the render gate above covers that race |
 | `walkAwaitingVenueIdRef` | `ref<string \| null>` | Venue whose Walk tap is waiting on a just-triggered location request (#207) |
-| `walkLocationHintVenueId` | `string \| null` | Venue whose Walk tap hit a denied/unavailable location (#207) — shows the "share your location" hint |
+| `walkLocationHintVenueId` | `string \| null` | Venue whose Walk tap hit a denied/failed location (#207, #738) — shows the "share your location" hint |
 | `activeStepIndex` | `number` | Turn the stepper shows — one source of truth for the phone RouteStrip, the full card and `DesktopVenueWindow`; reset on every new route, venue switch and clear |
 | `focusPoint` / `focusRequestId` | `{lng, lat} \| null` / `number` | The stepper's camera target and its own "fire again" counter (#555) — separate from `recenterRequestId` so a step tap doesn't also re-fire the user-location flyTo |
 
@@ -372,7 +372,7 @@ Walk tapped, userLocation === null
   → calls handleLocateRequest()   (same geo.request() flow "Near me" uses)
   → resume effect watches geo.state, applies decideWalkResume(awaitingVenueId, selectedVenueId, geo.state):
       granted + position     → fetchWalkingRoute(venue, position)   — draws the real route
-      denied / unavailable   → setWalkLocationHintVenueId(venue.id) — "share your location" hint, no route
+      denied / failed        → setWalkLocationHintVenueId(venue.id) — "share your location" hint, no route
       stale (venue no longer selected) → noop, nothing drawn or shown
 ```
 
@@ -399,10 +399,14 @@ User taps "Near me" (BottomNav)
   → handleLocateRequest()
     → stamps userRequestedAtRef
     → increments recenterRequestId  (Map.tsx flyTo fires even if position unchanged)
-    → calls geo.request()
+    → calls geo.request()   (first try high accuracy, ≤60 s cached fix; a timeout /
+                              unavailable error retries ONCE at low accuracy, ≤5 min cached fix;
+                              code 1 is the only "denied"; a second failure is GeoState
+                              {permission:'failed', reason:'timeout'|'unavailable'}, which the
+                              next tap simply retries — #738)
   → useEffect watches geo.state
     → clears isLocating when permission resolves
-    → shows bannerVisible if permission === 'denied' AND a fresh request was pending
+    → shows bannerVisible if permission === 'denied' (not 'failed') AND a fresh request was pending
     → shows outsideCountyVisible if position is outside PUEBLO_COUNTY_BBOX
 ```
 

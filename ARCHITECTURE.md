@@ -345,7 +345,7 @@ Key state atoms and their roles:
 | `walkingRouteVenueId` | `string \| null` | Venue the route targets; the Map prop is render-gated on it matching `selectedVenueId` |
 | `walkReqSeq` | `ref<number>` | Monotonic counter for in-flight walk fetches: bumped per request and per explicit clear; a result whose captured seq is stale is discarded (latest-*request*-wins, so a same-venue double tap with a moved `userLocation` is caught too). Not bumped on selection change — the render gate above covers that race |
 | `walkAwaitingVenueIdRef` | `ref<string \| null>` | Venue whose Walk tap is waiting on a just-triggered location request (#207) |
-| `walkLocationHintVenueId` | `string \| null` | Venue whose Walk tap hit a denied/unavailable location (#207) — shows the "share your location" hint |
+| `walkLocationHintVenueId` | `string \| null` | Venue whose Walk tap hit a denied/failed location (#207, #738) — shows the "share your location" hint |
 | `activeStepIndex` | `number` | Turn the stepper shows — one source of truth for the phone RouteStrip, the full card and `DesktopVenueWindow`; reset on every new route, venue switch and clear |
 | `focusPoint` / `focusRequestId` | `{lng, lat} \| null` / `number` | The stepper's camera target and its own "fire again" counter (#555) — separate from `recenterRequestId` so a step tap doesn't also re-fire the user-location flyTo |
 

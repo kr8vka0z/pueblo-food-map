@@ -482,6 +482,7 @@ describe("decideWalkResume — Walk-without-location resume decision (#207)", ()
   const GEO_GRANTED: GeoState = { permission: "granted", position: REAL_POSITION };
   const GEO_GRANTED_NULL: GeoState = { permission: "granted", position: null };
   const GEO_DENIED: GeoState = { permission: "denied", position: null };
+  const GEO_FAILED: GeoState = { permission: "failed", position: null, reason: "timeout" };
 
   test("grant: fetches from the real resolved position, never PUEBLO_CENTER", () => {
     const action = decideWalkResume("v1", "v1", GEO_GRANTED);
@@ -493,6 +494,11 @@ describe("decideWalkResume — Walk-without-location resume decision (#207)", ()
     const action = decideWalkResume("v1", "v1", GEO_DENIED);
     expect(action).toEqual({ kind: "show-hint" });
     expect(action).not.toHaveProperty("origin");
+  });
+
+  test("failed fix (timeout/unavailable, #738): shows a hint, never fetches a route", () => {
+    const action = decideWalkResume("v1", "v1", GEO_FAILED);
+    expect(action).toEqual({ kind: "show-hint" });
   });
 
   test("granted but position still null: treated as show-hint, never fabricates an origin", () => {

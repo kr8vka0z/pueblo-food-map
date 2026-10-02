@@ -37,6 +37,13 @@ export type GeoState =
   | { permission: "denied"; position: null }
   | { permission: "failed"; position: null; reason: GeoFailureReason };
 
+/**
+ * The two GeoState results that leave a visitor without a position (#739):
+ * what LocationHelpCard explains. Lives here, next to GeoState, so SplashScreen
+ * (which only has its own hook instance) can hand the result to MapWrapper.
+ */
+export type LocationFailure = Extract<GeoState, { permission: "denied" | "failed" }>;
+
 // GeolocationPositionError codes (spec values; avoids relying on the global
 // GeolocationPositionError constructor, absent in jsdom and some old WebViews).
 const GEO_PERMISSION_DENIED = 1;

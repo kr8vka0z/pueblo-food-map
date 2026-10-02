@@ -41,9 +41,9 @@ import SearchResultsPopover, {
   type VenueWithDistance,
   optionId,
 } from "./SearchResultsPopover";
-import LocationDeniedBanner from "./LocationDeniedBanner";
+import LocationHelpCard from "./LocationHelpCard";
 import MapErrorBoundary from "./MapErrorBoundary";
-import { useGeolocation, type GeoState } from "@/lib/useGeolocation";
+import { useGeolocation, type GeoState, type LocationFailure } from "@/lib/useGeolocation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -429,6 +429,12 @@ interface MapWrapperProps {
   /** Optional: viewport mode from splash gate (PR 3). Defaults to 'pueblo-center'. */
   viewport?: SplashViewport;
   /**
+   * Why the splash's "Find food near me" produced no position (#739). Set →
+   * show LocationHelpCard on arrival. A prop because the splash runs its own
+   * geolocation hook: this component's geo.state never sees that failure.
+   */
+  splashLocationFailure?: LocationFailure | null;
+  /**
    * Called when the user activates "Show welcome screen" from the hamburger
    * menu (#99). Re-shows the SplashScreen WITHOUT clearing localStorage.
    */
@@ -455,6 +461,7 @@ interface MapWrapperProps {
 
 export default function MapWrapper({
   viewport = 'pueblo-center',
+  splashLocationFailure = null,
   onShowWelcome,
   initialVenueId,
   initialBoxesFilter = false,
@@ -515,36 +522,43 @@ export default function MapWrapper({
   // live regardless (a real splash-CTA tap still starts the load right away).
   const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId), holdMapLoad);
 
-  // ── Location-denied banner (PR 7) ────────────────────────────────────────────
-  // Shows only when the user ACTIVELY re-taps locate (not on initial mount when
-  // permission is already denied — that path uses silent Pueblo-center fallback).
-  // Only a real refusal ("denied") qualifies: a timeout/unavailable failure
-  // (permission "failed", #738) isn't something the person can fix in browser
-  // settings, so it keeps the silent fallback and the next tap retries.
-  //
-  // Strategy: track "user requested at" as a timestamp ref.
-  //   - handleLocateRequest sets the ref and calls geo.request()
-  //   - A useEffect watches geo.state.permission; if it transitions to "denied"
-  //     AND a request was made after the last time the banner was shown, the
-  //     banner appears.
-  //   - bannerShownAt tracks when we last surfaced the banner so subsequent
-  //     automatic Permissions API changes don't re-trigger it.
-  const [bannerVisible, setBannerVisible] = useState(false);
+  // ── Location help card (#739; replaced PR 7's denied-only banner) ───────────
+  // Explains a locate attempt that gave no position, so the visitor isn't left
+  // on the Pueblo-center map wondering. Shows after a USER-initiated attempt
+  // fails — never on plain page load, even when the Permissions API already
+  // reports "denied" (nothing was tapped, so nothing to explain):
+  //   - the splash CTA failed → splashLocationFailure prop (effect below);
+  //   - a "Near me" tap failed, "denied" OR "failed" (#738) → the geo.state
+  //     effect below, gated on a fresh request via the timestamp refs.
+  // Hidden by: the card's X/Escape/list button, a successful locate, a venue
+  // opening (the sheet takes the card's space).
+  const [locationFailure, setLocationFailure] = useState<LocationFailure | null>(null);
   const userRequestedAtRef = useRef<number>(0);   // epoch ms of last user-initiated request
-  const bannerShownAtRef   = useRef<number>(0);   // epoch ms of last time banner was shown
+  const failureShownAtRef  = useRef<number>(0);   // epoch ms of last time the card was shown
 
   useEffect(() => {
+    const p = geo.state.permission;
     if (
-      geo.state.permission === "denied" &&
-      userRequestedAtRef.current > bannerShownAtRef.current
+      (p === "denied" || p === "failed") &&
+      userRequestedAtRef.current > failureShownAtRef.current
     ) {
-      setBannerVisible(true);
-      bannerShownAtRef.current = Date.now();
+      setLocationFailure(geo.state);
+      failureShownAtRef.current = Date.now();
+    } else if (p === "granted" && geo.state.position !== null) {
+      // A successful (re)try — the map is about to centre on the visitor.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLocationFailure(null);
     }
     // Depend on geo.state (object reference) rather than just permission:
     // useGeolocation always creates a new state object on each setState call,
-    // so this effect fires even when permission stays "denied" across retries.
+    // so this effect fires even when permission stays "denied"/"failed" across retries.
   }, [geo.state]);
+
+  // Splash handed over a failure → show the card for it. Deferred out of the
+  // effect body (set-state-in-effect lint rule), like autoLocate below.
+  useEffect(() => {
+    if (splashLocationFailure) queueMicrotask(() => setLocationFailure(splashLocationFailure));
+  }, [splashLocationFailure]);
 
   // ── Explicit recenter counter — incremented on each user-initiated locate tap ──
   // Map.tsx's flyTo effect depends on this value so the map re-centers every
@@ -691,6 +705,9 @@ export default function MapWrapper({
     if (selectedVenueId !== walkLocationHintVenueId) {
       queueMicrotask(() => setWalkLocationHintVenueId(null));
     }
+    // #739: the bottom sheet takes the location card's space; dismiss (not
+    // just hide) so it doesn't pop back when the sheet closes.
+    if (selectedVenueId !== null) queueMicrotask(() => setLocationFailure(null));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVenueId]);
 
@@ -968,7 +985,7 @@ export default function MapWrapper({
   );
 
   // Watch geo.state for resolution of an in-flight locate request.
-  // Mirrors the existing bannerVisible effect: use refs (not isLocating state)
+  // Mirrors the location-card effect above: use refs (not isLocating state)
   // as the gate so this effect never depends on the state it sets.
   useEffect(() => {
     if (geo.state.permission === "prompt") return;
@@ -980,7 +997,7 @@ export default function MapWrapper({
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setOutsideCountyVisible(isOutsideCounty(geo.state.position));
     }
-  // Only re-run when geo.state (object ref) changes — same pattern as bannerVisible.
+  // Only re-run when geo.state (object ref) changes — same pattern as the location-card effect.
   }, [geo.state]);
 
   // ── Resume a Walk request once its triggered geolocation resolves (#207) ────
@@ -1021,7 +1038,7 @@ export default function MapWrapper({
     }
     // action.kind === "noop": the venue that asked is no longer selected —
     // nothing to attach the result to (see decideWalkResume's WHY comment).
-  // Only re-run when geo.state (object ref) changes — same pattern as bannerVisible.
+  // Only re-run when geo.state (object ref) changes — same pattern as the location-card effect.
   }, [geo.state, selectedVenueId, fetchWalkingRoute, boxVenues]);
 
   // Handle map moveend: update drift state (called from Map's onMoveEnd prop).
@@ -2142,14 +2159,19 @@ export default function MapWrapper({
 
       {/* Legend removed: category browse is now in the search-focus dropdown (#95) */}
 
-      {/* LocationDeniedBanner — appears only after active re-tap → denial. Map mode only (#129). */}
-      {viewMode === "map" && bannerVisible && (
-        <LocationDeniedBanner
-          onRetry={() => {
-            // Re-request; if still denied, the useEffect above re-shows the banner.
-            handleLocateRequest();
+      {/* LocationHelpCard (#739) — after a failed splash CTA or Near me tap. Map mode only (#129). */}
+      {viewMode === "map" && locationFailure && (
+        <LocationHelpCard
+          failure={locationFailure}
+          // Re-request; if it fails again the geo.state effect re-shows the card
+          // (possibly with a new reason), if it works the same effect clears it.
+          onRetry={handleLocateRequest}
+          onShowList={() => {
+            handleViewModeChange("list");
+            setLocationFailure(null);
           }}
-          onDismiss={() => setBannerVisible(false)}
+          onDismiss={() => setLocationFailure(null)}
+          rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
         />
       )}
 

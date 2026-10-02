@@ -132,14 +132,17 @@ describe("BottomNav a11y", () => {
   });
 });
 
-// ─── LocationDeniedBanner ─────────────────────────────────────────────────────
+// ─── LocationHelpCard ─────────────────────────────────────────────────────────
 
-import LocationDeniedBanner from "@/components/LocationDeniedBanner";
+import LocationHelpCard from "@/components/LocationHelpCard";
 
-describe("LocationDeniedBanner a11y", () => {
-  test("has no axe violations", async () => {
+describe("LocationHelpCard a11y", () => {
+  test.each([
+    ["denied", { permission: "denied", position: null }],
+    ["failed", { permission: "failed", position: null, reason: "timeout" }],
+  ] as const)("%s has no axe violations", async (_name, failure) => {
     const { container } = render(
-      <LocationDeniedBanner onRetry={vi.fn()} onDismiss={vi.fn()} />,
+      <LocationHelpCard failure={failure} onRetry={vi.fn()} onShowList={vi.fn()} onDismiss={vi.fn()} />,
     );
     const results = await runAxe(container);
     expect(

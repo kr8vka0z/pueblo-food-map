@@ -26,7 +26,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Wordmark from './Wordmark';
-import { useGeolocation } from '@/lib/useGeolocation';
+import { useGeolocation, type LocationFailure } from '@/lib/useGeolocation';
 import { useLocale, writeLocaleCookie } from '@/lib/LocaleContext';
 import { markSplashSeen } from '@/lib/splashGate';
 import { track, EVENTS } from '@/lib/analytics';
@@ -35,8 +35,12 @@ import { t } from '@/lib/i18n';
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
 interface SplashScreenProps {
-  /** Called after geo request resolves (granted → 'located') or is denied → 'pueblo-center' */
-  onPrimary: (mode: 'located' | 'pueblo-center') => void;
+  /**
+   * Called after geo request resolves (granted → 'located') or fails → 'pueblo-center'.
+   * `failure` is set on the failing path so the map can explain it (#739):
+   * MapWrapper runs its own geolocation hook and never sees this one's result.
+   */
+  onPrimary: (mode: 'located' | 'pueblo-center', failure?: LocationFailure) => void;
   /**
    * True while HomePageClient hasn't resolved the gate yet (server HTML and
    * first client render). Marks the root so globals.css can hide it for
@@ -64,7 +68,12 @@ export default function SplashScreen({ onPrimary, pending }: SplashScreenProps) 
         ? 'located'
         : 'pueblo-center';
 
-    onPrimary(mode);
+    onPrimary(
+      mode,
+      geo.state.permission === 'denied' || geo.state.permission === 'failed'
+        ? geo.state
+        : undefined,
+    );
   }, [geoRequested, geo.state, onPrimary]);
 
   const handlePrimaryClick = useCallback(() => {
@@ -76,7 +85,8 @@ export default function SplashScreen({ onPrimary, pending }: SplashScreenProps) 
     // (permission 'failed', #738) falls through so this tap tries again; its
     // eventual fallback to Pueblo-center is the resolve effect above.
     if (geo.state.permission === 'denied') {
-      onPrimary('pueblo-center');
+      // Already refused on an earlier visit: still tell them why (#739).
+      onPrimary('pueblo-center', geo.state);
       return;
     }
     setGeoRequested(true);

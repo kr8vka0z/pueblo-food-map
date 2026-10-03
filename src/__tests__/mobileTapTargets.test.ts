@@ -76,7 +76,7 @@ describe("mobile review #14 — shared press-feedback style is defined once", ()
     // with nothing left that needs the press-feedback style.
     "src/components/HamburgerMenuContent.tsx",
     "src/components/VenuePopupHeader.tsx",
-    "src/components/LocationDeniedBanner.tsx",
+    "src/components/LocationHelpCard.tsx",
     "src/components/FavoriteButton.tsx",
     "src/components/ShareButton.tsx",
     // ViewToggle.tsx removed by #514 (the inline search-bar switch it

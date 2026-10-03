@@ -59,7 +59,7 @@
 - [ ] Refresh after splash is dismissed → splash does **not** reappear (localStorage gate)
 - [ ] Try in Safari (iOS) + Chrome (Android) + desktop Chrome + Firefox
 - [ ] Tab through the page on desktop → search bar → locate button → markers (Enter opens sheet)
-- [ ] Trigger location-denied banner: block geolocation in DevTools → tap locate button → expect `role="alert"` banner with retry + dismiss options
+- [ ] Trigger the location help card: block geolocation in DevTools → tap Near me → expect the `role="status"` location help card ("Location is off": list button + close; no Try again)
 
 ---
 

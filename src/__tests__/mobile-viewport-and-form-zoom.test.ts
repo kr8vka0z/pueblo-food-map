@@ -61,7 +61,6 @@ describe("mobile viewport + form field zoom", () => {
       "FilterPanel.tsx",
       "EmptySearchPopover.tsx",
       "SearchResultsPopover.tsx",
-      "LocationDeniedBanner.tsx",
     ];
     for (const file of files) {
       const source = readFileSync(join(process.cwd(), "src", "components", file), "utf-8");

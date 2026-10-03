@@ -83,6 +83,7 @@ import { readSplashGate, markSplashSeen, resolveVenueId, shouldSkipSplash } from
 // dictionary loads a moment later for the map anyway) ships to returning
 // visitors who skip the splash. MapWrapper stays dynamic: it is the heavy part.
 import SplashScreen from '@/components/SplashScreen';
+import type { LocationFailure } from '@/lib/useGeolocation';
 
 // WHY dynamic + ssr:false: MapWrapper pulls in vaul, Radix UI, geolocation
 // hooks, and all venue UI. None of it is needed during SSR (it only mounts
@@ -107,6 +108,9 @@ export default function HomePageClient() {
   // mismatch.
   const [splashShown, setSplashShown] = useState<boolean | null>(null);
   const [viewport, setViewport] = useState<'located' | 'pueblo-center'>('pueblo-center');
+  // Why the splash's "Find food near me" produced no position, if it didn't (#739);
+  // handed to MapWrapper, which shows LocationHelpCard for it.
+  const [splashLocationFailure, setSplashLocationFailure] = useState<LocationFailure | null>(null);
   // Deep link (#132): a ?venue=<id> URL opens straight to that pin.
   const [initialVenueId, setInitialVenueId] = useState<string | null>(null);
   // Boxes (#516): "Boxes" on a Menu page (PageNav, no map/filter state of its
@@ -167,9 +171,10 @@ export default function HomePageClient() {
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const dismissSplash = useCallback((mode: 'located' | 'pueblo-center') => {
+  const dismissSplash = useCallback((mode: 'located' | 'pueblo-center', failure?: LocationFailure) => {
     markSplashSeen();
     setViewport(mode);
+    setSplashLocationFailure(failure ?? null);
     setSplashShown(false);
     // Move focus to the map container so keyboard users land on the map.
     // setTimeout 0 gives React time to flush the state update and remove inert.
@@ -206,6 +211,7 @@ export default function HomePageClient() {
         >
           <MapWrapper
             viewport={viewport}
+            splashLocationFailure={splashLocationFailure}
             onShowWelcome={showSplashAgain}
             initialVenueId={initialVenueId}
             initialBoxesFilter={initialBoxesFilter}
@@ -220,7 +226,7 @@ export default function HomePageClient() {
       {splashShown !== false && (
         <SplashScreen
           pending={splashShown === null}
-          onPrimary={(mode) => dismissSplash(mode)}
+          onPrimary={dismissSplash}
         />
       )}
     </>

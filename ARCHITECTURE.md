@@ -335,7 +335,7 @@ Key state atoms and their roles:
 | `filterPanelOpen` | `boolean` | Whether FilterPanel is open (#513) |
 | `isDrifted` | `boolean` | User-location dot has left the viewport — shows "Re-center" |
 | `isLocating` | `boolean` | Geo request in flight — spinner on BottomNav's "Near me" |
-| `bannerVisible` | `boolean` | Location-denied banner after an active re-tap |
+| `locationFailure` | `LocationFailure \| null` | Which message `LocationHelpCard` shows (denied / failed + reason), or null (#739) |
 | `outsideCountyVisible` | `boolean` | Toast when the position is outside Pueblo County |
 | `isPopoverOpen / activeIndex` | `boolean / number` | Typeahead popover ARIA state |
 | `windowExpanded` | `boolean` | Desktop venue window expanded state |
@@ -406,7 +406,7 @@ User taps "Near me" (BottomNav)
                               next tap simply retries — #738)
   → useEffect watches geo.state
     → clears isLocating when permission resolves
-    → shows bannerVisible if permission === 'denied' (not 'failed') AND a fresh request was pending
+    → sets locationFailure (LocationHelpCard) if permission is 'denied' OR 'failed' AND a fresh user request was pending; clears it on a granted position (#739)
     → shows outsideCountyVisible if position is outside PUEBLO_COUNTY_BBOX
 ```
 
@@ -896,7 +896,10 @@ setState flushes before the browser paints, so no pending-splash flash
 SplashScreen CTA "Find food near me"
   → requests geolocation
   → on grant: dismissSplash('located') → sets GATE_KEY, passes viewport='located' to MapWrapper
-  → on deny:  dismissSplash('pueblo-center')
+  → on deny/fail: dismissSplash('pueblo-center', failure) — failure is the denied/failed
+    GeoState (also on the already-denied short-circuit); HomePageClient passes it to
+    MapWrapper as splashLocationFailure, which shows LocationHelpCard (#739). A plain page
+    load never shows the card: only a tap (splash CTA or Near me) can.
 
 "Show welcome screen" hamburger menu item (#99)
   → re-shows splash overlay WITHOUT clearing GATE_KEY

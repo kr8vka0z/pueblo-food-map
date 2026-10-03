@@ -57,7 +57,8 @@ describe("splash after a location failure", () => {
     const onPrimary = vi.fn();
     render(<SplashScreen onPrimary={onPrimary} />);
     fireEvent.click(screen.getAllByRole("button")[0]);
-    expect(onPrimary).toHaveBeenCalledWith("pueblo-center");
+    // #739: the refusal is handed up so the map can explain it.
+    expect(onPrimary).toHaveBeenCalledWith("pueblo-center", { permission: "denied", position: null });
     expect(request).not.toHaveBeenCalled();
   });
 
@@ -67,6 +68,18 @@ describe("splash after a location failure", () => {
     fireEvent.click(screen.getAllByRole("button")[0]);
     geoState = { permission: "failed", position: null, reason: "unavailable" };
     rerender(<SplashScreen onPrimary={onPrimary} />);
-    expect(onPrimary).toHaveBeenCalledWith("pueblo-center");
+    expect(onPrimary).toHaveBeenCalledWith("pueblo-center", {
+      permission: "failed",
+      position: null,
+      reason: "unavailable",
+    });
+  });
+
+  test("a granted position goes to 'located' with no failure (#739)", () => {
+    geoState = { permission: "granted", position: { lat: 38.25, lng: -104.6 } };
+    const onPrimary = vi.fn();
+    render(<SplashScreen onPrimary={onPrimary} />);
+    fireEvent.click(screen.getAllByRole("button")[0]);
+    expect(onPrimary).toHaveBeenCalledWith("located");
   });
 });

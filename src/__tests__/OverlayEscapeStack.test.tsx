@@ -23,7 +23,7 @@ import HamburgerMenu from "@/components/HamburgerMenu";
 import FilterPanel from "@/components/FilterPanel";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
 import DesktopSidePanel from "@/components/DesktopSidePanel";
-import LocationDeniedBanner from "@/components/LocationDeniedBanner";
+import LocationHelpCard from "@/components/LocationHelpCard";
 import type { Venue } from "@/types/venue";
 
 function stubMatchMedia(matches: boolean) {
@@ -197,11 +197,11 @@ describe("#527 — Escape closes only the topmost overlay; scroll lock is shared
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // CI review follow-up on PR #604: LocationDeniedBanner ran its own
+  // CI review follow-up on PR #604: LocationDeniedBanner (now LocationHelpCard, #739) ran its own
   // ungated document Escape listener — the same failure mode #527 fixed for
   // the other four overlays, reachable since the banner isn't full-screen
   // and nothing blocks opening Filters on top of it.
-  test("LocationDeniedBanner open, Filters opened on top: Escape closes Filters only, banner stays open", async () => {
+  test("LocationHelpCard open, Filters opened on top: Escape closes Filters only, banner stays open", async () => {
     const onDismiss = vi.fn();
 
     function Harness() {
@@ -211,7 +211,7 @@ describe("#527 — Escape closes only the topmost overlay; scroll lock is shared
           <button type="button" onClick={() => setFilterOpen((o) => !o)}>
             Toggle filters
           </button>
-          <LocationDeniedBanner onRetry={() => {}} onDismiss={onDismiss} locale="en" />
+          <LocationHelpCard failure={{ permission: "denied", position: null }} onRetry={() => {}} onShowList={() => {}} onDismiss={onDismiss} locale="en" />
           <FilterPanel {...FILTER_PANEL_STATIC_PROPS} open={filterOpen} onClose={() => setFilterOpen(false)} />
         </>
       );

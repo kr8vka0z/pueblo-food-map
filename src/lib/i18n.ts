@@ -165,11 +165,17 @@ const en: Record<string, string> = {
   "splash.cta.primary": "Find food near me",
   "splash.microcopy": "We only use your location to show food nearby. Nothing is saved.",
 
-  // Location denied banner (#68)
-  "banner.title": "Location turned off",
-  "banner.body": "We can't show food near you without your location. You can still browse the Pueblo map below, or try again.",
-  "banner.retry": "Try again",
-  "banner.dismiss": "Browse Pueblo map",
+  // Location help card (#739; replaces the #68 denied banner). Body = a
+  // reason-specific lead sentence + locationCard.tapPin. "See all places as a
+  // list" reuses viewSuggestion.seeAsList; close reuses detail.close.
+  "locationCard.denied.title": "Location is off",
+  "locationCard.denied.body": "No problem, you can still find food.",
+  "locationCard.denied.hint": "To use your location next time, turn it on in your browser or phone settings.",
+  "locationCard.failed.title": "We couldn't find you",
+  "locationCard.failed.body.timeout": "Your phone took too long to find where you are. This happens a lot indoors.",
+  "locationCard.failed.body.unavailable": "Your phone couldn't work out where you are right now.",
+  "locationCard.tapPin": "Tap any pin on the map to see hours and directions.",
+  "locationCard.retry": "Try again",
 
   // Wordmark (#61)
   "wordmark.ariaLabel": "Pueblo Food Map — reset map view",
@@ -1286,11 +1292,15 @@ const es: Record<string, string> = {
   "splash.cta.primary": "Encuentra comida cerca de mí",
   "splash.microcopy": "Solo usamos tu ubicación para mostrar alimentos cercanos. Nada se guarda.",
 
-  // Location denied banner (#68)
-  "banner.title": "Ubicación desactivada",
-  "banner.body": "No podemos mostrar alimentos cercanos sin tu ubicación. Aún puedes explorar el mapa de Pueblo, o intentarlo de nuevo.",
-  "banner.retry": "Intentar de nuevo",
-  "banner.dismiss": "Explorar el mapa de Pueblo",
+  // Location help card (#739) — all [CHECK]: native-speaker review pending.
+  "locationCard.denied.title": "Ubicación desactivada", // [CHECK]
+  "locationCard.denied.body": "No hay problema, aún puedes encontrar comida.", // [CHECK]
+  "locationCard.denied.hint": "Para usar tu ubicación la próxima vez, actívala en la configuración del navegador o del teléfono.", // [CHECK]
+  "locationCard.failed.title": "No pudimos encontrarte", // [CHECK]
+  "locationCard.failed.body.timeout": "Tu teléfono tardó demasiado en encontrar dónde estás. Esto pasa mucho bajo techo.", // [CHECK]
+  "locationCard.failed.body.unavailable": "Tu teléfono no pudo saber dónde estás en este momento.", // [CHECK]
+  "locationCard.tapPin": "Toca cualquier punto del mapa para ver horarios y cómo llegar.", // [CHECK]
+  "locationCard.retry": "Intentar de nuevo", // [CHECK]
 
   // Wordmark (#61)
   "wordmark.ariaLabel": "Mapa de alimentos de Pueblo — restablecer vista",

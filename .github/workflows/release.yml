@@ -172,14 +172,8 @@ jobs:
         run: |
           set -euo pipefail
           # The push below carries a repo-write token, so prove it still goes
-          # to this repo. `get-url` applies any url.*.insteadOf rewrite, so a
-          # retargeted remote or a rewrite rule both fail here. Never echo the
-          # URL: it embeds the token.
-          if ! git remote get-url --push origin \
-            | grep -Eiq "^https://([^@/]+@)?github\.com/${GITHUB_REPOSITORY}(\.git)?$"; then
-            echo "origin no longer points at ${GITHUB_REPOSITORY}; refusing to push" >&2
-            exit 1
-          fi
+          # to this repo (tested in check-push-target.test.mjs).
+          bash scripts/release/check-push-target.sh "$GITHUB_REPOSITORY"
           if grep -Eq 'x-access-token|ghs_|ghp_|github_pat_' CHANGELOG.md; then
             echo "CHANGELOG.md contains something that looks like a credential" >&2
             exit 1

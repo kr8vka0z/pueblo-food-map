@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-04
+
+### New
+
+- When "Find food near me" can't get your location, we automatically try again, and if it still can't find you, a card explains why and offers other ways to find food, like seeing every place as a list. ([#740](https://github.com/kr8vka0z/pueblo-food-map/pull/740)) ([#741](https://github.com/kr8vka0z/pueblo-food-map/pull/741))
+
 ## [1.0.0] - 2026-09-29
 
 Pueblo Food Map's public launch. Everything added since June.

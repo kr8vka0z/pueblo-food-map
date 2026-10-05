@@ -45,7 +45,7 @@
  * descendant of it) and starts the load right then, in parallel with the
  * geolocation request that same tap kicks off — not serialized behind
  * SplashScreen's actual dismiss, which itself waits on geolocation to
- * resolve (up to the 8s getCurrentPosition timeout) and would defeat the
+ * resolve (up to ~14s: an 8s high-accuracy attempt plus a 6s low-accuracy retry, #738) and would defeat the
  * overlap. `hold` flipping true→false (the splash's real dismiss) is ALSO
  * an unconditional trigger — belt-and-suspenders for a dismissal that
  * reaches here without a real pointer/key DOM event (a script-driven

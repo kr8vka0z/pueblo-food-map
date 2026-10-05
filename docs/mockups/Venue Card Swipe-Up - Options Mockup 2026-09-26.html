@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM venue card — “there's more” options</title>
+<style>
+  :root {
+    --bone-50:#FBFAF6; --bone-100:#F4F1EA; --bone-200:#E8E3D6; --bone-300:#D4CDB8;
+    --ink-400:#6A645A; --ink-700:#2D2A26; --ink-900:#1A1817;
+    --sage-50:#EAF0EC; --sage-500:#4A8466; --sage-600:#2C5F4F; --clay-100:#F8E2D4; --clay-700:#7C2D12;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px; background:#e9e6df; font:15px/1.4 -apple-system,system-ui,sans-serif; color:var(--ink-900); }
+  h1 { font:600 22px Georgia,serif; margin:0 0 4px; }
+  .sub { color:var(--ink-400); margin:0 0 24px; }
+  .row { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+  .col { width:300px; }
+  .label { font-weight:700; margin-bottom:4px; }
+  .note { color:var(--ink-400); font-size:13px; margin:8px 0 0; min-height:54px; }
+  .phone { position:relative; width:300px; height:620px; border-radius:40px; border:10px solid #111; overflow:hidden;
+           background:
+             linear-gradient(90deg,transparent 48%,#fff 48%,#fff 52%,transparent 52%),
+             linear-gradient(0deg,transparent 60%,#fff 60%,#fff 63%,transparent 63%),
+             #dfe7d6; }
+  .pin { position:absolute; left:140px; top:150px; width:22px; height:22px; border-radius:50% 50% 50% 0; transform:rotate(-45deg);
+         background:var(--sage-600); border:2px solid #fff; }
+  .sheet { position:absolute; left:0; right:0; bottom:0; background:var(--bone-50); border-radius:16px 16px 0 0;
+           box-shadow:0 -4px 16px rgba(0,0,0,.18); padding:10px 16px 22px; transition:height .25s ease; overflow:hidden; }
+  .grab { width:40px; height:5px; border-radius:3px; background:var(--bone-300); margin:0 auto 10px; }
+  .top { display:flex; justify-content:space-between; align-items:flex-start; }
+  .name { font:600 19px Georgia,serif; margin:0; }
+  .x { width:28px; height:28px; border-radius:50%; background:var(--bone-200); display:grid; place-items:center; font-size:14px; color:var(--ink-700); }
+  .badge { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; background:var(--sage-50); color:var(--sage-600); margin:6px 0; }
+  .meta { font-size:13px; color:var(--ink-700); }
+  .open { color:var(--sage-600); font-weight:600; }
+  .pills span { display:inline-block; font-size:11px; padding:1px 7px; border-radius:99px; background:var(--clay-100); color:var(--clay-700); margin:6px 4px 0 0; }
+  .notes { font-size:13px; color:var(--ink-400); margin:8px 0 10px; }
+  .dirs { display:flex; gap:8px; }
+  .dirs div { flex:1; text-align:center; padding:10px 0; border-radius:10px; background:var(--sage-600); color:#fff; font-size:13px; font-weight:600; }
+  .dirs div + div { background:var(--bone-100); color:var(--sage-600); border:1px solid var(--bone-300); }
+  .toggle { color:var(--sage-600); font-size:14px; font-weight:600; padding:12px 0 0; }
+  .toggle.left { text-align:left; }
+  .toggle.center { text-align:center; }
+  .chev { display:block; margin:0 auto; width:18px; height:10px; }
+  .detail { border-top:1px solid var(--bone-200); margin-top:14px; padding-top:12px; font-size:13px; color:var(--ink-700); }
+  .detail b { display:block; font-size:12px; color:var(--ink-400); font-weight:600; margin-top:10px; }
+  .detail table { width:100%; font-size:13px; border-collapse:collapse; }
+  .detail td { padding:2px 0; } .detail td+td { text-align:right; }
+  .callout { position:absolute; background:#FFD84D; color:#1a1a1a; font-size:12px; font-weight:700; padding:4px 8px; border-radius:6px;
+             box-shadow:0 2px 6px rgba(0,0,0,.2); white-space:nowrap; z-index:5; }
+  .ring { position:absolute; border:3px solid #FFB800; border-radius:10px; z-index:4; pointer-events:none; }
+  .arrow { position:absolute; left:50%; transform:translateX(-50%); font-size:28px; color:var(--sage-600); z-index:5; }
+  #live .sheet { touch-action:none; cursor:grab; }
+  .hint { font-size:13px; color:var(--ink-400); }
+</style>
+
+<style>
+  .chev { display:inline-block; vertical-align:middle; margin-left:4px; }
+  .peek { position:relative; border-top:1px solid var(--bone-200); margin-top:12px; padding-top:10px; font-size:13px; color:var(--ink-700); }
+  .peek::after { content:""; position:absolute; left:0; right:0; bottom:0; height:30px; background:linear-gradient(transparent, var(--bone-50)); }
+  .peek b { display:block; font-size:12px; color:var(--ink-400); font-weight:600; }
+  .pill { display:block; width:max-content; margin:10px auto 0; padding:9px 18px; border-radius:99px; background:var(--sage-50);
+          color:var(--sage-600); font-size:14px; font-weight:600; border:1px solid var(--sage-100); }
+  .who { font-size:12px; color:var(--ink-400); margin:2px 0 8px; min-height:32px; }
+  .rec { background:var(--sage-600); color:#fff; font-size:11px; padding:2px 7px; border-radius:99px; margin-left:6px; vertical-align:2px; }
+  .research { max-width:1240px; background:#fff; border-radius:12px; padding:14px 18px; margin:0 0 22px; font-size:14px; }
+  .research li { margin:3px 0; }
+  .col { width:300px; }
+  .phone .sheet { cursor:grab; touch-action:none; }
+</style>
+</head>
+<body>
+<h1>How people know the card has more: 4 options</h1>
+<p class="sub">Every option has the grab bar and swipe-up. They differ only in what sits at the bottom of the card. Drag any card up or down, or tap its button.</p>
+<div class="research"><b>What the big platforms do</b>
+<ul>
+<li><b>Apple:</b> a resizable sheet should have a grab bar. People can drag it or tap it to switch heights, and VoiceOver can use it too. Swiping up inside the card also expands it.</li>
+<li><b>Google (Material 3):</b> the same bar. Tapping it switches heights, and the tap area is at least 48px.</li>
+<li><b>Map apps</b> (Apple Maps, Google Maps): show the bar and let the next section run off the bottom edge, with no “more” button.</li>
+<li><b>A down-arrow next to text</b> is the web's standard way to say “tap to open more here”, as in FAQs and accordions. It usually points down, not up.</li>
+</ul></div>
+<div class="row">
+  <div class="col">
+    <div class="label">A. Maps-app style</div>
+    <div class="who">Seen in: Apple Maps, Google Maps, Find My</div>
+    <div class="phone" data-card="290">
+      <div class="pin"></div>
+      <div class="sheet" style="height:290px">
+        <div class="grab"></div>
+        <div class="top"><p class="name">Posada Food Pantry</p><div class="x">✕</div></div>
+        <span class="badge">Food pantry</span>
+        <div class="meta">0.8 mi · <span class="open">Open now</span> · until 4:00 PM</div>
+        <div class="pills"><span>SNAP</span><span>WIC</span></div>
+        <div class="notes">Bring ID if you have it. Walk-ins welcome Tue and Thu.</div>
+        <div class="dirs"><div>Walk</div><div>Bus</div><div>Drive</div></div><div class="peek collapsed-only"><b>Address</b>1320 E 6th St, Pueblo, CO 81001</div>
+        <div class="detail full" hidden>
+          <b>Address</b>1320 E 6th St, Pueblo, CO 81001
+          <b>Hours</b>
+          <table><tr><td>Tue</td><td>10:00 AM – 4:00 PM</td></tr><tr><td>Thu</td><td>10:00 AM – 4:00 PM</td></tr><tr><td>Sat</td><td>9:00 AM – 12:00 PM</td></tr></table>
+          <b>Phone</b>(719) 555-0142
+        </div>
+      </div>
+    </div>
+    <p class="note">Grab bar plus the next section cut off at the bottom. No button: the cut-off text shows there's more. Tap the bar or swipe up.</p>
+  </div>
+  <div class="col">
+    <div class="label">B. Bar + plain “Show details”<span class="rec">my pick</span></div>
+    <div class="who">Seen in: Most sheet-based web apps</div>
+    <div class="phone" data-card="290">
+      <div class="pin"></div>
+      <div class="sheet" style="height:290px">
+        <div class="grab"></div>
+        <div class="top"><p class="name">Posada Food Pantry</p><div class="x">✕</div></div>
+        <span class="badge">Food pantry</span>
+        <div class="meta">0.8 mi · <span class="open">Open now</span> · until 4:00 PM</div>
+        <div class="pills"><span>SNAP</span><span>WIC</span></div>
+        <div class="notes">Bring ID if you have it. Walk-ins welcome Tue and Thu.</div>
+        <div class="dirs"><div>Walk</div><div>Bus</div><div>Drive</div></div>
+        <div class="detail full" hidden>
+          <b>Address</b>1320 E 6th St, Pueblo, CO 81001
+          <b>Hours</b>
+          <table><tr><td>Tue</td><td>10:00 AM – 4:00 PM</td></tr><tr><td>Thu</td><td>10:00 AM – 4:00 PM</td></tr><tr><td>Sat</td><td>9:00 AM – 12:00 PM</td></tr></table>
+          <b>Phone</b>(719) 555-0142
+        </div><div class="toggle center" data-t>Show details</div>
+      </div>
+    </div>
+    <p class="note">Grab bar for swipers, a plain centered text button for tappers. The bar already means “drag me”, so no arrow.</p>
+  </div>
+  <div class="col">
+    <div class="label">C. Bar + “Show details ⌄”</div>
+    <div class="who">Seen in: Web accordions, FAQs, settings lists</div>
+    <div class="phone" data-card="290">
+      <div class="pin"></div>
+      <div class="sheet" style="height:290px">
+        <div class="grab"></div>
+        <div class="top"><p class="name">Posada Food Pantry</p><div class="x">✕</div></div>
+        <span class="badge">Food pantry</span>
+        <div class="meta">0.8 mi · <span class="open">Open now</span> · until 4:00 PM</div>
+        <div class="pills"><span>SNAP</span><span>WIC</span></div>
+        <div class="notes">Bring ID if you have it. Walk-ins welcome Tue and Thu.</div>
+        <div class="dirs"><div>Walk</div><div>Bus</div><div>Drive</div></div>
+        <div class="detail full" hidden>
+          <b>Address</b>1320 E 6th St, Pueblo, CO 81001
+          <b>Hours</b>
+          <table><tr><td>Tue</td><td>10:00 AM – 4:00 PM</td></tr><tr><td>Thu</td><td>10:00 AM – 4:00 PM</td></tr><tr><td>Sat</td><td>9:00 AM – 12:00 PM</td></tr></table>
+          <b>Phone</b>(719) 555-0142
+        </div><div class="toggle center" data-t><span>Show details</span><svg class="chev" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1.5 1.5 L6 6 L10.5 1.5" fill="none" stroke="#2C5F4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      </div>
+    </div>
+    <p class="note">Same as B, but with today's small down-arrow. On the web a down-arrow next to text means “there's more, tap to open”.</p>
+  </div>
+  <div class="col">
+    <div class="label">D. Bar + peek + pill button</div>
+    <div class="who">Seen in: Airbnb, Uber and delivery apps (mix of A and B)</div>
+    <div class="phone" data-card="345">
+      <div class="pin"></div>
+      <div class="sheet" style="height:345px">
+        <div class="grab"></div>
+        <div class="top"><p class="name">Posada Food Pantry</p><div class="x">✕</div></div>
+        <span class="badge">Food pantry</span>
+        <div class="meta">0.8 mi · <span class="open">Open now</span> · until 4:00 PM</div>
+        <div class="pills"><span>SNAP</span><span>WIC</span></div>
+        <div class="notes">Bring ID if you have it. Walk-ins welcome Tue and Thu.</div>
+        <div class="dirs"><div>Walk</div><div>Bus</div><div>Drive</div></div><div class="peek collapsed-only"><b>Address</b>1320 E 6th St, Pueblo, CO 81001</div>
+        <div class="detail full" hidden>
+          <b>Address</b>1320 E 6th St, Pueblo, CO 81001
+          <b>Hours</b>
+          <table><tr><td>Tue</td><td>10:00 AM – 4:00 PM</td></tr><tr><td>Thu</td><td>10:00 AM – 4:00 PM</td></tr><tr><td>Sat</td><td>9:00 AM – 12:00 PM</td></tr></table>
+          <b>Phone</b>(719) 555-0142
+        </div><div class="pill" data-t>Show details</div>
+      </div>
+    </div>
+    <p class="note">Cut-off preview of the details, plus a soft pill-shaped “Show details” button. The most obvious, but the busiest.</p>
+  </div>
+</div>
+<script>
+  // Mock only: closed / card / details with a pointer drag or a tap on the button.
+  document.querySelectorAll('.phone').forEach(phone => {
+    const sheet = phone.querySelector('.sheet'), full = sheet.querySelector('.full');
+    const t = sheet.querySelector('[data-t]'), grab = sheet.querySelector('.grab');
+    const card = +phone.dataset.card; let state = 'card', y = null;
+    function set(s) {
+      state = s;
+      sheet.style.height = s === 'closed' ? '0px' : (s === 'full' ? 540 : card) + 'px';
+      sheet.style.padding = s === 'closed' ? '0 16px' : '';
+      full.hidden = s !== 'full';
+      sheet.querySelectorAll('.collapsed-only').forEach(el => el.hidden = s === 'full');
+      if (t) { (t.querySelector('span') || t).textContent = s === 'full' ? 'Hide details' : 'Show details';
+               const c = t.querySelector('.chev'); if (c) c.style.transform = s === 'full' ? 'rotate(180deg)' : ''; }
+    }
+    sheet.addEventListener('pointerdown', e => { y = e.clientY; sheet.setPointerCapture(e.pointerId); });
+    sheet.addEventListener('pointerup', e => {
+      const dy = e.clientY - y; y = null;
+      if (Math.abs(dy) < 8) {
+        if ((t && t.contains(e.target)) || e.target === grab) set(state === 'full' ? 'card' : 'full');
+        return;
+      }
+      if (dy < 0 && state === 'card') set('full'); else if (dy > 0) set(state === 'full' ? 'card' : 'closed');
+    });
+    phone.addEventListener('click', () => { if (state === 'closed') set('card'); });
+  });
+</script>
+</body></html>

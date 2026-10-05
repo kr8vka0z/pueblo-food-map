@@ -22,11 +22,13 @@ import { useFavorites } from "@/lib/favorites";
 import { track, EVENTS } from "@/lib/analytics";
 import type { Venue, VenueCategory } from "@/types/venue";
 
-// #485 PR 2: how long a typed search must sit still before it counts as
-// "one search" — long enough that a normal typing cadence collapses to a
-// single event, short enough that Kyle sees a result within the same
-// session. Named so a future tune doesn't require re-deriving the number.
-const SEARCH_TRACK_DEBOUNCE_MS = 600;
+// #485 PR 2 / #738: how long a typed search must sit untouched before it
+// counts as "one search" when the user never presses Enter or leaves the box.
+// 600 ms (the original value) was shorter than a slow typer's pause between
+// letters and logged every prefix; 2 s is longer than that pause yet still
+// lands within the session. Named so a future tune doesn't require
+// re-deriving the number.
+const SEARCH_TRACK_IDLE_MS = 2000;
 
 /** Lat/lng origin — user position or Pueblo center fallback. */
 export interface LatLng {
@@ -185,16 +187,31 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     filteredVenuesRef.current = filteredVenues;
   }, [filteredVenues]);
 
+  // #738: the settled search, not every prefix. A slow typer paused >600 ms
+  // between letters and logged "pan", "pant", "pantry"; now a search is sent
+  // when the user commits it (Enter / leaving the box -> commitSearch) or
+  // after a long idle, and never twice in a row.
+  const queryRef = useRef(query);
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
+  const lastSentTermRef = useRef<string | null>(null);
+
+  const commitSearch = useCallback(() => {
+    const term = queryRef.current.trim().toLowerCase();
+    if (term === "" || term === lastSentTermRef.current) return;
+    lastSentTermRef.current = term;
+    void track(EVENTS.SEARCH_USED, {
+      results: filteredVenuesRef.current.length,
+      term: queryRef.current,
+    });
+  }, []);
+
   useEffect(() => {
     if (query.trim() === "") return;
-    const timer = setTimeout(() => {
-      void track(EVENTS.SEARCH_USED, {
-        results: filteredVenuesRef.current.length,
-        term: query,
-      });
-    }, SEARCH_TRACK_DEBOUNCE_MS);
+    const timer = setTimeout(commitSearch, SEARCH_TRACK_IDLE_MS);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, commitSearch]);
 
   // ── anyFilterActive ──────────────────────────────────────────────────────────
   const anyFilterActive =
@@ -245,6 +262,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     // State
     query,
     setQuery,
+    commitSearch,
     selectedCategories,
     setSelectedCategories,
     filterOpenNow,

@@ -1,0 +1,238 @@
+<!doctype html>
+<!--
+  Pueblo Food Map — how to make the phone number look tappable (2026-09-23).
+  Static mockup only; tokens copied from the repo's DESIGN.md / globals.css.
+  Five phone-width venue cards: today's card, then four options (A–D).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Venue card — tappable phone number mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bone50:#FBFAF6; --bone100:#F4F1EA; --bone200:#E8E3D6; --bone300:#D4CDB8;
+    --ink400:#6A645A; --ink500:#5F5A52; --ink700:#2D2A26; --ink900:#1A1817;
+    --sage50:#EAF0EC; --sage100:#D1DDD3; --sage300:#A9C2B1; --sage500:#4A8466; --sage600:#2C5F4F; --sage700:#1F4639;
+    --pantry:#BE2D45; --orange:#F7943C; --navy:#190F3F;
+    --r-md:10px; --r-xl:20px;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px 24px 64px; background:#E9E6DE; font-family:'Public Sans',system-ui,sans-serif; color:var(--ink700); }
+  header { max-width:1400px; margin:0 auto 28px; }
+  h1 { font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:28px; margin:0 0 6px; color:var(--ink900); }
+  header p { margin:0; font-size:15px; color:var(--ink500); max-width:760px; line-height:1.5; }
+  .grid { max-width:1400px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:28px; }
+  .col h2 { font-size:15px; font-weight:700; margin:0 0 4px; color:var(--ink900); }
+  .col .tag { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:999px; background:var(--bone200); color:var(--ink500); margin-bottom:6px; }
+  .col .tag.rec { background:var(--orange); color:var(--navy); }
+  .col .why { font-size:13px; line-height:1.45; color:var(--ink500); margin:0 0 12px; min-height:58px; }
+
+  /* the phone-width sheet */
+  .sheet { width:100%; max-width:340px; background:var(--bone50); border-radius:var(--r-xl) var(--r-xl) 0 0; box-shadow:0 -2px 18px rgba(26,24,23,.12); padding:10px 18px 22px; }
+  .grab { width:40px; height:5px; border-radius:3px; background:var(--bone300); margin:0 auto 14px; }
+  .badge { display:inline-block; font-size:11px; font-weight:600; color:var(--bone50); background:var(--pantry); padding:3px 9px; border-radius:999px; }
+  .title { font-family:'Fraunces',Georgia,serif; font-size:22px; font-weight:400; color:var(--ink900); margin:8px 0 2px; }
+  .status { font-size:13px; color:var(--ink500); margin:0 0 12px; }
+  .status b { color:#15803D; font-weight:600; }
+  .dirs { display:flex; gap:8px; margin-bottom:16px; }
+  .dir { flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:10px 6px; border-radius:var(--r-md); font-size:13px; font-weight:600; }
+  .dir.walk { background:var(--sage500); color:var(--bone50); }
+  .dir.alt { background:var(--bone50); color:var(--ink700); border:1px solid var(--bone300); }
+  .row { display:flex; gap:10px; font-size:14px; margin-bottom:14px; }
+  .row svg { flex-shrink:0; margin-top:2px; }
+  .label { font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--ink400); margin:0 0 8px; }
+  .hours { font-size:14px; margin-bottom:16px; }
+  .hours div { display:flex; justify-content:space-between; padding:2px 0; }
+  .hours .today { font-weight:600; color:var(--sage700); }
+  .plentiful { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-radius:var(--r-md); border:1px solid var(--sage300); background:var(--sage50); color:var(--sage700); font-size:14px; font-weight:500; margin-top:4px; }
+  .report { margin-top:14px; font-size:13px; color:var(--ink500); text-decoration:underline; text-underline-offset:2px; }
+  section.contact { margin-bottom:16px; }
+  a { color:inherit; text-decoration:none; }
+
+  /* CURRENT */
+  .cur { display:flex; align-items:center; gap:10px; font-size:14px; color:var(--ink700); }
+  .cur svg { color:var(--ink400); }
+  /* A — underlined link */
+  .optA { display:inline-flex; align-items:center; gap:10px; min-height:44px; font-size:15px; font-weight:600; color:var(--sage700); text-decoration:underline; text-decoration-thickness:1.5px; text-underline-offset:3px; }
+  .optA svg { color:var(--sage600); }
+  /* B — outlined pill (same as Resources page "Call 2-1-1") */
+  .optB { display:inline-flex; align-items:center; gap:7px; min-height:44px; padding:0 16px; border-radius:999px; border:1px solid var(--sage500); background:#fff; color:var(--sage700); font-size:14px; font-weight:600; }
+  /* C — full-width row, same family as the Plentiful link */
+  .optC { display:flex; align-items:center; gap:12px; min-height:52px; padding:10px 14px; border-radius:var(--r-md); border:1px solid var(--sage500); background:#fff; color:var(--sage700); }
+  .optC .ic { width:34px; height:34px; border-radius:999px; background:var(--sage500); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .optC .txt { flex:1; line-height:1.2; }
+  .optC .txt b { display:block; font-size:14px; font-weight:700; }
+  .optC .txt span { font-size:13px; color:var(--ink500); font-variant-numeric:tabular-nums; }
+  .optC .chev { color:var(--sage600); }
+  /* D — Call joins the action row at the top */
+  .dir.call { background:#fff; color:var(--sage700); border:1px solid var(--sage500); }
+
+  .notes { max-width:1400px; margin:36px auto 0; background:#fff; border-radius:14px; padding:22px 26px; font-size:14px; line-height:1.55; }
+  .notes h3 { font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:20px; margin:0 0 10px; color:var(--ink900); }
+  .notes li { margin-bottom:6px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+  <symbol id="pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
+  <symbol id="ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="walk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"/><path d="m7 21 3-5 3 2v4"/><path d="m8 11 3-3 3 3 3 1"/><path d="M11 8v6"/></symbol>
+</svg>
+
+<header>
+  <h1>Making the phone number look tappable</h1>
+  <p>Same venue card (Salvation Army, as it looks on a phone) five ways. The first is today. The phone number already dials when tapped; the job is making that obvious at a glance. Every option keeps a finger-sized tap area (44px or taller) and would apply everywhere the number shows: the map pop-up card, the desktop window, and the venue page.</p>
+</header>
+
+<div class="grid">
+
+  <!-- CURRENT -->
+  <div class="col">
+    <span class="tag">Today</span>
+    <h2>Plain text with an icon</h2>
+    <p class="why">Grey icon, dark text, same as the address above it. Nothing says "tap me," so people read it as information, not an action.</p>
+    <div class="sheet">
+      <div class="grab"></div>
+      <span class="badge">Food pantry</span>
+      <div class="title">Salvation Army – Pueblo</div>
+      <p class="status"><b>Open</b> · until 12pm</p>
+      <div class="dirs"><div class="dir walk">Walk</div><div class="dir alt">Bus</div><div class="dir alt">Drive</div></div>
+      <div class="row"><svg width="16" height="16" style="color:var(--ink400)"><use href="#pin"/></svg><div>401 S Prairie Ave, Pueblo, CO 81005</div></div>
+      <section class="contact"><p class="label">Contact</p>
+        <a class="cur" href="tel:7195433656"><svg width="15" height="15"><use href="#phone"/></svg>(719) 543-3656</a>
+      </section>
+      <a class="plentiful" href="#">See full details on Plentiful <svg width="15" height="15"><use href="#ext"/></svg></a>
+      <div class="report">Report a problem with this place</div>
+    </div>
+  </div>
+
+  <!-- A -->
+  <div class="col">
+    <span class="tag">Option A</span>
+    <h2>Underlined green link</h2>
+    <p class="why">Smallest change: green, bold, underlined, the web's classic "this is a link." Clear to most people, but it still reads as text, and it's easy to miss on a busy card.</p>
+    <div class="sheet">
+      <div class="grab"></div>
+      <span class="badge">Food pantry</span>
+      <div class="title">Salvation Army – Pueblo</div>
+      <p class="status"><b>Open</b> · until 12pm</p>
+      <div class="dirs"><div class="dir walk">Walk</div><div class="dir alt">Bus</div><div class="dir alt">Drive</div></div>
+      <div class="row"><svg width="16" height="16" style="color:var(--ink400)"><use href="#pin"/></svg><div>401 S Prairie Ave, Pueblo, CO 81005</div></div>
+      <section class="contact"><p class="label">Contact</p>
+        <a class="optA" href="tel:7195433656"><svg width="16" height="16"><use href="#phone"/></svg>(719) 543-3656</a>
+      </section>
+      <a class="plentiful" href="#">See full details on Plentiful <svg width="15" height="15"><use href="#ext"/></svg></a>
+      <div class="report">Report a problem with this place</div>
+    </div>
+  </div>
+
+  <!-- B -->
+  <div class="col">
+    <span class="tag">Option B</span>
+    <h2>"Call" pill button</h2>
+    <p class="why">An outlined pill with the word "Call." It's the exact button the Resources page already uses for "Call 2-1-1," so the whole site would treat phone numbers the same way.</p>
+    <div class="sheet">
+      <div class="grab"></div>
+      <span class="badge">Food pantry</span>
+      <div class="title">Salvation Army – Pueblo</div>
+      <p class="status"><b>Open</b> · until 12pm</p>
+      <div class="dirs"><div class="dir walk">Walk</div><div class="dir alt">Bus</div><div class="dir alt">Drive</div></div>
+      <div class="row"><svg width="16" height="16" style="color:var(--ink400)"><use href="#pin"/></svg><div>401 S Prairie Ave, Pueblo, CO 81005</div></div>
+      <section class="contact"><p class="label">Contact</p>
+        <a class="optB" href="tel:7195433656"><svg width="14" height="14"><use href="#phone"/></svg>Call (719) 543-3656</a>
+      </section>
+      <a class="plentiful" href="#">See full details on Plentiful <svg width="15" height="15"><use href="#ext"/></svg></a>
+      <div class="report">Report a problem with this place</div>
+    </div>
+  </div>
+
+  <!-- C -->
+  <div class="col">
+    <span class="tag rec">Option C · Recommended</span>
+    <h2>Full-width "Call" row</h2>
+    <p class="why">A full-width row, the same shape as the Plentiful link below it, with a filled green phone circle and an arrow. It's the biggest target for a thumb, and it looks like the phone's own "call" rows.</p>
+    <div class="sheet">
+      <div class="grab"></div>
+      <span class="badge">Food pantry</span>
+      <div class="title">Salvation Army – Pueblo</div>
+      <p class="status"><b>Open</b> · until 12pm</p>
+      <div class="dirs"><div class="dir walk">Walk</div><div class="dir alt">Bus</div><div class="dir alt">Drive</div></div>
+      <div class="row"><svg width="16" height="16" style="color:var(--ink400)"><use href="#pin"/></svg><div>401 S Prairie Ave, Pueblo, CO 81005</div></div>
+      <section class="contact"><p class="label">Contact</p>
+        <a class="optC" href="tel:7195433656">
+          <span class="ic"><svg width="16" height="16"><use href="#phone"/></svg></span>
+          <span class="txt"><b>Call</b><span>(719) 543-3656</span></span>
+          <svg class="chev" width="18" height="18"><use href="#chev"/></svg>
+        </a>
+      </section>
+      <a class="plentiful" href="#">See full details on Plentiful <svg width="15" height="15"><use href="#ext"/></svg></a>
+      <div class="report">Report a problem with this place</div>
+    </div>
+  </div>
+
+  <!-- C in Spanish -->
+  <div class="col">
+    <span class="tag rec">Option C · Spanish</span>
+    <h2>Same card, Spanish mode</h2>
+    <p class="why">The button text switches to "Llamar," the word the Resources page already uses. The number itself stays the same.</p>
+    <div class="sheet">
+      <div class="grab"></div>
+      <span class="badge">Despensa de alimentos</span>
+      <div class="title">Salvation Army – Pueblo</div>
+      <p class="status"><b>Abierto</b> · hasta las 12pm</p>
+      <div class="dirs"><div class="dir walk">A pie</div><div class="dir alt">Autobús</div><div class="dir alt">Auto</div></div>
+      <div class="row"><svg width="16" height="16" style="color:var(--ink400)"><use href="#pin"/></svg><div>401 S Prairie Ave, Pueblo, CO 81005</div></div>
+      <section class="contact"><p class="label">Contacto</p>
+        <a class="optC" href="tel:7195433656">
+          <span class="ic"><svg width="16" height="16"><use href="#phone"/></svg></span>
+          <span class="txt"><b>Llamar</b><span>(719) 543-3656</span></span>
+          <svg class="chev" width="18" height="18"><use href="#chev"/></svg>
+        </a>
+      </section>
+      <a class="plentiful" href="#">Ver detalles en Plentiful <svg width="15" height="15"><use href="#ext"/></svg></a>
+      <div class="report">Reportar un problema con este lugar</div>
+    </div>
+  </div>
+
+  <!-- D -->
+  <div class="col">
+    <span class="tag">Option D</span>
+    <h2>"Call" joins Walk / Bus / Drive</h2>
+    <p class="why">Puts Call in the top button row, the most visible spot on the card. It's the boldest option, but it squeezes four buttons onto a small phone, and places with no phone number would get a different row.</p>
+    <div class="sheet">
+      <div class="grab"></div>
+      <span class="badge">Food pantry</span>
+      <div class="title">Salvation Army – Pueblo</div>
+      <p class="status"><b>Open</b> · until 12pm</p>
+      <div class="dirs"><div class="dir walk">Walk</div><div class="dir alt">Bus</div><div class="dir alt">Drive</div><div class="dir call"><svg width="13" height="13"><use href="#phone"/></svg>Call</div></div>
+      <div class="row"><svg width="16" height="16" style="color:var(--ink400)"><use href="#pin"/></svg><div>401 S Prairie Ave, Pueblo, CO 81005</div></div>
+      <section class="contact"><p class="label">Contact</p>
+        <div class="cur"><svg width="15" height="15"><use href="#phone"/></svg>(719) 543-3656</div>
+      </section>
+      <a class="plentiful" href="#">See full details on Plentiful <svg width="15" height="15"><use href="#ext"/></svg></a>
+      <div class="report">Report a problem with this place</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="notes">
+  <h3>Recommendation: Option C</h3>
+  <ul>
+    <li><b>It looks like a button, not text.</b> A shape with a border, a filled phone icon and an arrow is what phones themselves use for "tap to call." Underlining (A) relies on people knowing web-link habits.</li>
+    <li><b>It says the action.</b> "Call" / "Llamar" in words beats relying on the icon alone, which matters for low-literacy and first-time users.</li>
+    <li><b>It matches its neighbour.</b> Same width, radius and green as the Plentiful link right below it, so the card reads as a tidy list of things you can do.</li>
+    <li><b>Biggest thumb target</b> (52px tall, full width), which helps on cheap phones and for shaky hands.</li>
+    <li><b>Fits the "hours unknown — call ahead" message.</b> About 2 of 3 venues show that line; the call button is now the obvious next step.</li>
+    <li>Runner-up: <b>B</b>, if you'd rather match the Resources page's pill buttons exactly. D is not recommended: four buttons crowd a small screen.</li>
+  </ul>
+</div>
+
+</body>
+</html>

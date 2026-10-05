@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM admin: Blessing Boxes, one filterable table</title>
+<style>
+  :root { --bone-50:#FBFAF6; --bone-100:#F4F1EA; --bone-200:#E8E3D6; --bone-300:#D4CDB8; --ink-400:#6A645A; --ink-500:#5F5A52; --ink-700:#2D2A26; --ink-900:#1A1817;
+          --sage-100:#D1DDD3; --sage-600:#2C5F4F; --sage-700:#1F4639; --clay-100:#F8E2D4; --clay-700:#7C2D12; --warn:#B45309; --danger:#B91C1C; --orange:#F0A04B; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bone-50); font:14px/1.45 -apple-system,system-ui,sans-serif; color:var(--ink-900); }
+  .nav { display:flex; gap:6px; align-items:center; padding:14px 24px; border-bottom:1px solid var(--bone-200); background:#fff; }
+  .nav a { padding:9px 14px; border-radius:10px; color:var(--ink-500); font-size:15px; }
+  .nav a.on { background:var(--sage-600); color:#fff; }
+  .nav .add { margin-left:auto; background:var(--orange); color:#1a1a1a; font-weight:600; }
+  .wrap { padding:24px; max-width:1200px; }
+  .card { background:#fff; border:1px solid var(--bone-200); border-radius:14px; padding:18px 20px; margin-bottom:22px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  h2 { font:600 19px Georgia,serif; margin:0 0 12px; }
+  .map { height:300px; border-radius:10px; position:relative; overflow:hidden;
+         background: linear-gradient(90deg,transparent 42%,#f3c77a 42%,#f3c77a 43%,transparent 43%), linear-gradient(0deg,transparent 55%,#fff 55%,#fff 57%,transparent 57%), linear-gradient(160deg,transparent 60%,#a7d3ea 60%,#a7d3ea 63%,transparent 63%), #e6ece1; }
+  .pin { position:absolute; width:12px; height:12px; border-radius:50%; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.3); }
+  .legend { display:flex; gap:16px; margin-top:8px; font-size:13px; color:var(--ink-500); }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+  .removed { opacity:.35; text-decoration:line-through; }
+  .ghost { border:2px dashed var(--bone-300); border-radius:10px; padding:10px 14px; color:var(--ink-400); font-size:13px; margin-top:14px; }
+  .chart { height:90px; display:flex; align-items:flex-end; gap:10px; padding:0 4px; }
+  .chart div { flex:1; background:var(--sage-100); border-radius:4px 4px 0 0; }
+  /* filters */
+  .filters { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; margin-bottom:12px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { border:1px solid var(--bone-300); background:#fff; border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; color:var(--ink-700); display:inline-flex; gap:6px; align-items:center; }
+  .chip b { font-weight:600; color:var(--ink-400); }
+  .chip.on { background:var(--sage-600); border-color:var(--sage-600); color:#fff; } .chip.on b { color:#D1DDD3; }
+  .chip i { width:8px; height:8px; border-radius:50%; }
+  .chip:disabled { opacity:.45; cursor:default; }
+  .search { flex:1; min-width:220px; max-width:320px; border:1px solid var(--bone-300); border-radius:10px; padding:8px 12px; font-size:14px; }
+  select { border:1px solid var(--bone-300); border-radius:10px; padding:8px 10px; font-size:13px; background:#fff; color:var(--ink-700); }
+  label.sel { font-size:12px; color:var(--ink-400); display:flex; gap:6px; align-items:center; }
+  .count { font-size:13px; color:var(--ink-400); margin:0 0 8px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--bone-200); border-radius:12px; overflow:hidden; }
+  th { text-align:left; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-400); font-weight:500; padding:11px 16px; border-bottom:1px solid var(--bone-200); }
+  td { padding:11px 16px; border-bottom:1px solid var(--bone-100); vertical-align:top; }
+  td .n { font-weight:600; color:var(--ink-700); } td .a { font-size:12px; color:var(--ink-500); }
+  .badge { display:inline-block; font-size:12px; font-weight:600; padding:2px 7px; border-radius:5px; }
+  .edit { color:var(--sage-700); text-decoration:underline; font-weight:600; }
+  .callout { background:#FFD84D; color:#1a1a1a; font-size:12px; font-weight:700; padding:3px 8px; border-radius:6px; display:inline-block; margin-left:8px; vertical-align:2px; }
+  .empty { text-align:center; color:var(--ink-400); padding:26px; }
+</style></head>
+<body>
+<div class="nav"><a>Dashboard</a><a class="on">Blessing Boxes</a><a>Places</a><a>Review queue</a><a>Data refresh</a><a>Photo review</a><a>Adoption requests</a><a class="add">Add place</a></div>
+<div class="wrap">
+  <div class="card">
+    <h2>Blessing boxes — 28 in service <span class="callout">Map now full width</span></h2>
+    <div class="map" id="map"></div>
+    <div class="legend"><span><i style="background:#3F7D5E"></i>OK</span><span><i style="background:var(--warn)"></i>Low</span><span><i style="background:var(--danger)"></i>Empty</span><span><i style="background:var(--clay-700)"></i>Problem</span><span><i style="background:#8A847A"></i>Quiet</span></div>
+    <div class="ghost"><span class="removed">Needs help now · Gone quiet lists</span> — removed. The table below covers both.</div>
+  </div>
+
+  <div class="card"><h2>Box reports, last 8 weeks</h2><div class="chart"><div style="height:20%"></div><div style="height:35%"></div><div style="height:15%"></div><div style="height:50%"></div><div style="height:30%"></div><div style="height:60%"></div><div style="height:45%"></div><div style="height:70%"></div></div></div>
+
+  <h2>All boxes <span class="callout">New: filters</span></h2>
+  <div class="filters">
+    <div class="chips" id="chips"></div>
+    <input class="search" id="q" placeholder="Search name, address or sponsor">
+    <label class="sel">Sponsor <select id="care"><option value="">Any</option><option value="yes">Has a sponsor</option><option value="no">Needs a sponsor</option></select></label>
+    <label class="sel">Sort <select id="sort"><option value="attn">Needs attention first</option><option value="old">Last report: oldest first</option><option value="new">Last report: newest first</option><option value="name">Name A–Z</option></select></label>
+  </div>
+  <p class="count" id="count"></p>
+  <table><thead><tr><th>Box</th><th>Status</th><th>Last report</th><th>Sponsor</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+</div>
+<script>
+  // Sample data only: names from the live list, statuses mixed so the filters have something to show.
+  const S = { ok:["OK","background:var(--sage-100);color:var(--sage-700)","#3F7D5E"], low:["Low","background:var(--clay-100);color:var(--warn)","#B45309"],
+              empty:["Empty","background:var(--clay-100);color:var(--danger)","#B91C1C"], problem:["Problem","background:var(--clay-100);color:var(--clay-700)","#7C2D12"],
+              quiet:["Quiet","background:var(--bone-100);color:var(--ink-500)","#8A847A"] };
+  const streets = ["216 W Routt","573 S Rogers Dr","1308 E Ash St","1923 E 8th St","1139 Cedar St","1016 N Elizabeth St","621 E Paseo Dorado Dr","1113 Blake St","903 E 2nd St","1099 S McCulloch Blvd","1411 Santa Rosa St","2724 Cheyenne Ave","2713 N Grand Ave","1249 E Routt Ave","516 W 6th St","540 Alma Ave","2320 E Routt Ave","740 W 15th St","1004 W 15th St","2529 E 8th St","1320 E 6th St","88 Lamar Ave","415 Beulah Ave","1702 Carteret Ave","310 Quincy St","2100 Pueblo Blvd","1515 Fortino Blvd","930 Berkley Ave"];
+  const plan = {1:["empty",2,"Maria G."],3:["low",1,"First Methodist"],6:["problem",0,null],9:["ok",3,"Tom R."],13:["ok",5,"St. Pius"],15:["ok",12,null],19:["low",4,"Dana K."]};
+  const boxes = streets.map((s,i) => { const p = plan[i]; return { name:"Blessing Box - "+s, addr:s+", Pueblo, CO",
+      status:p?p[0]:"quiet", days:p?p[1]:null, care:p?p[2]:null, x:8+((i*37)%84), y:10+((i*53)%78) }; });
+  const rank = { empty:0, problem:1, low:2, quiet:3, ok:4 };
+  const map = document.getElementById('map');
+  boxes.forEach(b => { const d=document.createElement('span'); d.className='pin'; d.style.left=b.x+'%'; d.style.top=b.y+'%'; d.style.background=S[b.status][2]; map.appendChild(d); });
+  const chipDefs = [["all","All"],["help","Needs help"],["empty","Empty"],["problem","Problem"],["low","Low"],["quiet","Quiet"],["ok","OK"]];
+  let active = "all";
+  const match = (b,k) => k==="all" || (k==="help" ? ["low","empty","problem"].includes(b.status) : b.status===k);
+  const chips = document.getElementById('chips');
+  function drawChips() {
+    chips.innerHTML = "";
+    for (const [k,l] of chipDefs) {
+      const n = boxes.filter(b => match(b,k)).length, c = document.createElement('button');
+      c.className = "chip" + (k===active ? " on" : ""); c.disabled = n===0 && k!=="all";
+      const dot = S[k] ? `<i style="background:${S[k][2]}"></i>` : "";
+      c.innerHTML = `${dot}${l} <b>${n}</b>`; c.onclick = () => { active=k; drawChips(); draw(); }; chips.appendChild(c);
+    }
+  }
+  function lastReport(b){ return b.days===null ? "No reports yet" : b.days===0 ? "Today" : b.days===1 ? "1 day ago" : b.days+" days ago"; }
+  function draw() {
+    const q = document.getElementById('q').value.toLowerCase(), care = document.getElementById('care').value, sort = document.getElementById('sort').value;
+    let rows = boxes.filter(b => match(b,active) && (!q || (b.name+b.addr+(b.care||"")).toLowerCase().includes(q)) && (!care || (care==="yes") === !!b.care));
+    const age = b => b.days===null ? 1e9 : b.days;
+    rows.sort(sort==="attn" ? (a,b)=> rank[a.status]-rank[b.status] || age(b)-age(a)
+            : sort==="old" ? (a,b)=> age(b)-age(a) : sort==="new" ? (a,b)=> age(a)-age(b) : (a,b)=> a.name.localeCompare(b.name));
+    document.getElementById('count').textContent = `Showing ${rows.length} of ${boxes.length} boxes`;
+    document.getElementById('rows').innerHTML = rows.length ? rows.map(b => `<tr><td><div class="n">${b.name}</div><div class="a">${b.addr}</div></td>
+      <td><span class="badge" style="${S[b.status][1]}">${S[b.status][0]}</span></td><td>${lastReport(b)}</td><td>${b.care||"Needs a sponsor"}</td><td style="text-align:right"><span class="edit">Edit</span></td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">No boxes match these filters.</td></tr>`;
+  }
+  ['q','care','sort'].forEach(id => document.getElementById(id).addEventListener('input', draw));
+  drawChips(); draw();
+</script>
+</body></html>

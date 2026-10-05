@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM admin: Dashboard overhaul (fake data)</title>
+<style>
+  :root { --bone-50:#FBFAF6; --bone-100:#F4F1EA; --bone-200:#E8E3D6; --bone-300:#D4CDB8; --ink-400:#6A645A; --ink-500:#5F5A52; --ink-700:#2D2A26; --ink-900:#1A1817;
+          --sage-50:#EAF0EC; --sage-100:#D1DDD3; --sage-500:#4A8466; --sage-600:#2C5F4F; --sage-700:#1F4639; --clay-100:#F8E2D4; --clay-500:#C2410C; --clay-700:#7C2D12; --orange:#F0A04B;
+          --navy:#1E3A5F; --blue-50:#E8EEF6; --rasp:#C2447B; --danger:#B91C1C; --warn:#B45309; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#e9e6df; font:14px/1.45 -apple-system,system-ui,sans-serif; color:var(--ink-900); padding:22px; }
+  .frame { background:var(--bone-50); border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); max-width:1240px; }
+  .nav { display:flex; gap:6px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--bone-200); background:#fff; }
+  .nav a { padding:8px 12px; border-radius:10px; color:var(--ink-500); } .nav a.on { background:var(--sage-600); color:#fff; }
+  .nav a .ct { display:inline-block; margin-left:6px; background:var(--orange); color:#1a1a1a; font-size:11px; font-weight:700; border-radius:99px; padding:0 6px; }
+  .nav .add { margin-left:auto; background:var(--orange); color:#1a1a1a; font-weight:600; }
+  .in { padding:20px 22px; }
+  .head { display:flex; align-items:end; gap:14px; margin-bottom:16px; }
+  .head h1 { font:600 24px Georgia,serif; margin:0; } .head p { margin:2px 0 0; color:var(--ink-400); }
+  .seg { margin-left:auto; display:flex; border:1px solid var(--bone-300); border-radius:10px; overflow:hidden; background:#fff; }
+  .seg span { padding:7px 12px; font-size:13px; color:var(--ink-500); } .seg span.on { background:var(--sage-600); color:#fff; }
+  .needs { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:22px; }
+  .need { background:#fff; border:1px solid var(--bone-200); border-left:4px solid var(--orange); border-radius:10px; padding:10px 14px; }
+  .need b { font:600 22px Georgia,serif; display:block; } .need span { font-size:13px; color:var(--ink-500); } .need u { font-size:12px; color:var(--sage-700); }
+  .need.ok { border-left-color:var(--sage-500); }
+  h2 { font:600 18px Georgia,serif; margin:24px 0 4px; display:flex; align-items:center; gap:8px; }
+  .src { font:600 11px -apple-system,system-ui,sans-serif; padding:2px 7px; border-radius:5px; letter-spacing:.02em; }
+  .src.now { background:var(--sage-100); color:var(--sage-700); } .src.new { background:#FFF1C9; color:#6b5200; border:1px solid #f0d680; }
+  .hint { color:var(--ink-400); font-size:13px; margin:0 0 12px; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:12px; }
+  .kpi { background:#fff; border:1px solid var(--bone-200); border-radius:12px; padding:12px 14px; }
+  .kpi .l { font-size:12px; color:var(--ink-400); } .kpi .v { font:600 26px Georgia,serif; margin:2px 0; }
+  .kpi .d { font-size:12px; font-weight:600; } .up { color:var(--sage-600); } .dn { color:var(--clay-500); }
+  .kpi svg { width:100%; height:34px; display:block; margin-top:4px; }
+  .grid2 { display:grid; grid-template-columns:1.4fr 1fr; gap:12px; } .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .card { background:#fff; border:1px solid var(--bone-200); border-radius:12px; padding:14px 16px; }
+  .card h3 { margin:0 0 10px; font-size:14px; color:var(--ink-700); }
+  .bars .r { display:grid; grid-template-columns:150px 1fr 48px; gap:10px; align-items:center; font-size:13px; margin:5px 0; }
+  .bars .b { height:10px; border-radius:5px; background:var(--sage-500); } .bars .n { text-align:right; color:var(--ink-500); }
+  .bars .r.warn .b { background:var(--clay-500); }
+  .chart { display:flex; align-items:flex-end; gap:5px; height:120px; padding-top:6px; }
+  .chart div { flex:1; background:var(--sage-100); border-radius:3px 3px 0 0; position:relative; } .chart div.hi { background:var(--sage-500); }
+  .axis { display:flex; justify-content:space-between; font-size:11px; color:var(--ink-400); margin-top:4px; }
+  .split { display:flex; height:14px; border-radius:7px; overflow:hidden; margin:6px 0; }
+  .legend { display:flex; gap:14px; font-size:12px; color:var(--ink-500); flex-wrap:wrap; } .legend i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; }
+  .tbl { width:100%; border-collapse:collapse; font-size:13px; } .tbl td { padding:6px 0; border-bottom:1px solid var(--bone-100); } .tbl td:last-child { text-align:right; color:var(--ink-500); }
+  .zero { color:var(--clay-700); font-weight:600; } .pill { font-size:11px; background:var(--clay-100); color:var(--clay-700); padding:1px 6px; border-radius:4px; margin-left:6px; }
+  .note { background:#FFF8E1; border:1px solid #f0d680; border-radius:10px; padding:10px 14px; font-size:13px; color:#5b4a00; margin-top:10px; }
+  .boxk .v { color:var(--rasp); }
+  .foot { font-size:12px; color:var(--ink-400); margin-top:22px; border-top:1px solid var(--bone-200); padding-top:10px; }
+</style></head>
+<body>
+<div class="frame">
+  <div class="nav"><a class="on">Dashboard</a><a>Blessing Boxes<span class="ct">4</span></a><a>Places<span class="ct">6</span></a><a>Activity 🔒</a><a class="add">Add place</a></div>
+  <div class="in">
+    <div class="head"><div><h1>Good evening, Kyle</h1><p>Here's how Pueblo Food Map is doing. All numbers below are fake, for the mockup.</p></div>
+      <div class="seg"><span>7 days</span><span class="on">30 days</span><span>90 days</span></div></div>
+
+    <div class="needs">
+      <div class="need"><b>6</b><span>places to review</span><br><u>Open Places →</u></div>
+      <div class="need"><b>2</b><span>waiting to publish</span><br><u>Publish →</u></div>
+      <div class="need"><b>4</b><span>box photos &amp; sponsor requests</span><br><u>Open Blessing Boxes →</u></div>
+      <div class="need ok"><b>2</b><span>boxes empty or low</span><br><u>See which →</u></div>
+    </div>
+
+    <h2>Visitors <span class="src now">Available now · Cloudflare Web Analytics</span></h2>
+    <p class="hint">Counted without cookies. Visitors are unique for each day; a “visit” is one page load.</p>
+    <div class="kpis">
+      <div class="kpi"><div class="l">Visitors</div><div class="v">1,284</div><div class="d up">▲ 18% vs last 30 days</div>
+        <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline fill="none" stroke="#4A8466" stroke-width="2" points="0,24 10,22 20,23 30,18 40,19 50,15 60,16 70,11 80,12 90,7 100,5"/></svg></div>
+      <div class="kpi"><div class="l">Page views</div><div class="v">3,902</div><div class="d up">▲ 22%</div>
+        <svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline fill="none" stroke="#4A8466" stroke-width="2" points="0,25 10,24 20,21 30,22 40,17 50,18 60,13 70,14 80,9 90,8 100,6"/></svg></div>
+      <div class="kpi"><div class="l">On a phone</div><div class="v">81%</div><div class="d" style="color:var(--ink-400)">15% computer · 4% tablet</div></div>
+      <div class="kpi"><div class="l">Page load on phones</div><div class="v">1.9 s</div><div class="d up">Good · Google's bar is 2.5 s</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>Visitors per day</h3>
+        <div class="chart"><div style="height:30%"></div><div style="height:34%"></div><div style="height:28%"></div><div style="height:40%"></div><div style="height:38%"></div><div style="height:22%"></div><div style="height:20%"></div><div style="height:42%"></div><div style="height:45%"></div><div style="height:41%"></div><div style="height:48%"></div><div style="height:52%"></div><div style="height:30%"></div><div style="height:27%"></div><div style="height:55%"></div><div style="height:58%"></div><div style="height:54%"></div><div style="height:60%"></div><div style="height:63%"></div><div style="height:35%"></div><div style="height:33%"></div><div style="height:66%"></div><div style="height:70%"></div><div style="height:64%"></div><div style="height:72%"></div><div style="height:75%"></div><div style="height:44%"></div><div style="height:40%"></div><div class="hi" style="height:92%"></div><div style="height:78%"></div></div>
+        <div class="axis"><span>Aug 28</span><span>Sep 12</span><span>Sep 26</span></div>
+        <div class="note" style="margin-top:8px">The spike is the day a Facebook post went out. The dips are weekends.</div></div>
+      <div class="card"><h3>How people found the site</h3><div class="bars">
+        <div class="r"><span>Typed it / bookmark</span><div class="b" style="width:100%"></div><span class="n">41%</span></div>
+        <div class="r"><span>Google</span><div class="b" style="width:70%"></div><span class="n">29%</span></div>
+        <div class="r"><span>Facebook</span><div class="b" style="width:36%"></div><span class="n">15%</span></div>
+        <div class="r"><span>pueblofoodproject.org</span><div class="b" style="width:22%"></div><span class="n">9%</span></div>
+        <div class="r"><span>QR code flyers</span><div class="b" style="width:14%"></div><span class="n">6%</span></div></div>
+        <p class="hint" style="margin:8px 0 0">QR codes show up here only if each flyer's link has its own tag, like <code>?from=flyer</code>.</p></div>
+    </div>
+
+    <h2>What people do on the map <span class="src new">Needs new tracking</span></h2>
+    <p class="hint">Cloudflare only counts page loads, not taps. These need a small built-in counter: just “this happened” tallies, with no names, no locations and no cookies.</p>
+    <div class="kpis">
+      <div class="kpi"><div class="l">“Find food near me” taps</div><div class="v">612</div><div class="d up">▲ 12%</div></div>
+      <div class="kpi"><div class="l">Searches</div><div class="v">438</div><div class="d up">▲ 9%</div></div>
+      <div class="kpi"><div class="l">Place cards opened</div><div class="v">2,140</div><div class="d up">▲ 25%</div></div>
+      <div class="kpi"><div class="l">Switched to Spanish</div><div class="v">14%</div><div class="d" style="color:var(--ink-400)">of visitors</div></div>
+      <div class="kpi" style="display:none"><div class="l">Directions taps</div><div class="v">391</div><div class="d" style="color:var(--ink-400)">Walk 140 · Bus 88 · Drive 163</div></div>
+    </div>
+    <div class="grid3">
+      <div class="card"><h3>Most opened places</h3><table class="tbl">
+        <tr><td>1. Care and Share — Pueblo</td><td>214</td></tr><tr><td>2. Posada Food Pantry</td><td>188</td></tr><tr><td>3. Pueblo Community Soup Kitchen</td><td>161</td></tr>
+        <tr><td>4. Salvation Army Pueblo</td><td>133</td></tr><tr><td>5. Blessing Box - 1249 E Routt Ave</td><td>97</td></tr><tr><td>6. Bessemer Mobile Food Pantry</td><td>84</td></tr></table></div>
+      <div class="card"><h3>Top searches</h3><table class="tbl">
+        <tr><td>food bank</td><td>52</td></tr><tr><td>soup kitchen</td><td>38</td></tr><tr><td>diapers <span class="pill">0 results</span></td><td class="zero">27</td></tr>
+        <tr><td>despensa</td><td>19</td></tr><tr><td>pet food <span class="pill">0 results</span></td><td class="zero">14</td></tr><tr><td>snap</td><td>12</td></tr></table>
+        <p class="hint" style="margin:8px 0 0">Searches with no results point at gaps in the map's places.</p></div>
+      <div class="card"><h3>After opening a card, people…</h3><div class="bars">
+        <div class="r"><span>Directions (391)</span><div class="b" style="width:100%"></div><span class="n">18%</span></div>
+                <div class="r"><span>Tapped to call</span><div class="b" style="width:38%"></div><span class="n">7%</span></div>
+        <div class="r"><span>Opened website</span><div class="b" style="width:33%"></div><span class="n">6%</span></div>
+        <div class="r"><span>Saved it</span><div class="b" style="width:22%"></div><span class="n">4%</span></div>
+        <div class="r"><span>Shared it</span><div class="b" style="width:11%"></div><span class="n">2%</span></div>
+        <div class="r warn"><span>Reported a problem</span><div class="b" style="width:6%"></div><span class="n">1%</span></div></div></div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="card"><h3>Filters people use</h3><div class="bars">
+        <div class="r"><span>Open now</span><div class="b" style="width:100%"></div><span class="n">34%</span></div>
+        <div class="r"><span>Food pantries</span><div class="b" style="width:80%"></div><span class="n">27%</span></div>
+        <div class="r"><span>Blessing boxes</span><div class="b" style="width:62%;background:var(--rasp)"></div><span class="n">21%</span></div>
+        <div class="r"><span>Takes SNAP</span><div class="b" style="width:41%"></div><span class="n">14%</span></div>
+        <div class="r"><span>Takes WIC</span><div class="b" style="width:18%"></div><span class="n">6%</span></div></div></div>
+      <div class="card"><h3>Location shared?</h3>
+        <div class="split"><div style="width:68%;background:var(--sage-500)"></div><div style="width:22%;background:var(--bone-300)"></div><div style="width:10%;background:var(--clay-500)"></div></div>
+        <div class="legend"><span><i style="background:var(--sage-500)"></i>Shared 68%</span><span><i style="background:var(--bone-300)"></i>Never asked 22%</span><span><i style="background:var(--clay-500)"></i>Said no 10%</span></div>
+        <p class="hint" style="margin:10px 0 0">If “Said no” grows, the map should explain better why it asks.</p></div>
+    </div>
+
+    <h2>Blessing boxes <span class="src now">Available now · already collected</span></h2>
+    <p class="hint">The same numbers as the public Boxes page, plus admin-only extras.</p>
+    <div class="kpis boxk">
+      <div class="kpi"><div class="l">Times filled</div><div class="v">46</div><div class="d up">▲ 11</div></div>
+      <div class="kpi"><div class="l">Times used</div><div class="v">128</div><div class="d up">▲ 30</div></div>
+      <div class="kpi"><div class="l">Reported empty</div><div class="v">9</div><div class="d dn">▲ 3</div></div>
+      <div class="kpi"><div class="l">Empty → refilled, on average</div><div class="v">1.8 days</div><div class="d up">▼ 0.4 days faster</div></div>
+    </div>
+    <div class="grid3">
+      <div class="card"><h3>Network</h3><table class="tbl"><tr><td>Boxes in service</td><td>28</td></tr><tr><td>With a sponsor</td><td>11 (39%)</td></tr><tr><td>Photos shared</td><td>12</td></tr><tr><td>People getting empty-box emails</td><td>23</td></tr></table></div>
+      <div class="card"><h3>Longest since last filled</h3><table class="tbl"><tr><td>216 W Routt</td><td>41 days</td></tr><tr><td>1308 E Ash St</td><td>33 days</td></tr><tr><td>903 E 2nd St</td><td>27 days</td></tr><tr><td>2724 Cheyenne Ave</td><td>19 days</td></tr></table></div>
+      <div class="card"><h3>Most-needed items people ask for</h3><div class="bars">
+        <div class="r"><span>Canned food</span><div class="b" style="width:100%;background:var(--rasp)"></div><span class="n">31</span></div>
+        <div class="r"><span>Diapers</span><div class="b" style="width:61%;background:var(--rasp)"></div><span class="n">19</span></div>
+        <div class="r"><span>Hygiene items</span><div class="b" style="width:45%;background:var(--rasp)"></div><span class="n">14</span></div>
+        <div class="r"><span>Fresh food</span><div class="b" style="width:29%;background:var(--rasp)"></div><span class="n">9</span></div></div></div>
+    </div>
+
+    <h2>Map data health <span class="src now">Available now</span></h2>
+    <div class="kpis">
+      <div class="kpi"><div class="l">Places on the map</div><div class="v">107</div><div class="d" style="color:var(--ink-400)">+3 this month</div></div>
+      <div class="kpi"><div class="l">Not checked in 90+ days</div><div class="v" style="color:var(--clay-700)">12</div><div class="d"><u style="color:var(--sage-700)">See which →</u></div></div>
+      <div class="kpi"><div class="l">Last data refresh</div><div class="v" style="font-size:20px">Thu, Sep 25</div><div class="d" style="color:var(--ink-400)">49 checked · 18 suggestions</div></div>
+      <div class="kpi"><div class="l">Public problem reports</div><div class="v">7</div><div class="d" style="color:var(--ink-400)">5 fixed · 2 open</div></div>
+    </div>
+    <div class="foot">Green tag = numbers the site already has; they can go on the dashboard right away. Yellow tag = needs the new tap counter built first.</div>
+  </div>
+</div>
+</body></html>

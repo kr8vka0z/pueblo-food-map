@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pueblo Food Map — Map/List via the search bar (2026-09-19)</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --orange:#F7943C;--navy:#190F3F;
+    --bone50:#FBFAF6;--bone100:#F4F1EA;--bone200:#E8E3D6;--bone300:#D4CDB8;
+    --ink400:#6A645A;--ink500:#5F5A52;--ink700:#2D2A26;--ink900:#1A1817;
+    --sage50:#EAF0EC;--sage600:#2C5F4F;--sage700:#1F4639;
+    --blessing:#C2447B;--pantry:#BE2D45;--grocery:#1F4E8C;--meal:#6B3FA0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#dcd8cc;font-family:'Public Sans',system-ui,sans-serif;color:var(--ink900)}
+  header{max-width:1400px;margin:0 auto;padding:28px 24px 8px}
+  h1{font-family:'Fraunces',Georgia,serif;font-size:30px;margin:0 0 6px}
+  header p{margin:4px 0;color:var(--ink700);max-width:960px;line-height:1.5}
+  .row{display:flex;flex-wrap:wrap;gap:30px;justify-content:center;max-width:1400px;margin:0 auto;padding:24px}
+  .opt{width:280px}
+  .opt h2{font-family:'Fraunces',Georgia,serif;font-size:20px;margin:0 0 4px}
+  .opt .sub{font-size:13px;color:var(--ink500);margin:0 0 12px;line-height:1.45;min-height:76px}
+  .phone{position:relative;width:280px;height:590px;border-radius:32px;border:9px solid #1d1b19;overflow:hidden;
+    background:
+      linear-gradient(90deg,transparent 48%,#fff 48%,#fff 52%,transparent 52%) 0 0/120px 90px,
+      linear-gradient(0deg,transparent 46%,#fff 46%,#fff 54%,transparent 54%) 0 0/90px 140px,
+      #ebe7e1;}
+  .phone.list{background:var(--bone100)}
+  .park{position:absolute;border-radius:40%;background:#bfe6ae}
+  .pin{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .search{position:absolute;top:14px;left:10px;right:10px;height:44px;border-radius:22px;background:var(--bone50);
+    border:1px solid var(--bone300);display:flex;align-items:center;padding:0 12px 0 5px;gap:7px;box-shadow:0 2px 8px rgba(0,0,0,.12);z-index:5}
+  .search.focus{border:2px solid var(--sage600)}
+  .search .q{flex:1;color:var(--ink400);font-size:15px;white-space:nowrap}
+  .search .q.typed{color:var(--ink900)}
+  .caret{display:inline-block;width:1.5px;height:17px;background:var(--sage600);vertical-align:-3px;margin-left:1px}
+  .ico{width:18px;height:18px;flex:none;fill:none;stroke:var(--ink700);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .fbtn{height:34px;width:34px;border-radius:17px;display:grid;place-items:center;flex:none}
+  .nav{position:absolute;bottom:10px;left:10px;right:10px;height:56px;border-radius:28px;background:var(--bone50);display:flex;justify-content:space-around;align-items:center;font-size:10px;font-weight:600;color:var(--ink700);box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:4}
+  .nav div{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .nav .ico{width:17px;height:17px}
+  .nav .act{color:var(--sage700)} .nav .act .ico{stroke:var(--sage600)}
+  .drop{position:absolute;top:64px;left:10px;right:10px;background:var(--bone50);border:1px solid var(--bone200);border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.16);z-index:6;overflow:hidden}
+  .sug{display:flex;align-items:center;gap:11px;padding:0 14px;height:52px;font-size:14px;font-weight:600;color:var(--sage700)}
+  .sug .ico{stroke:var(--sage600)}
+  .sug small{display:block;font-weight:400;font-size:11.5px;color:var(--ink500);margin-top:1px}
+  .sug .chev{margin-left:auto;color:var(--ink400);font-weight:400;font-size:18px}
+  .res{display:flex;align-items:center;gap:10px;padding:0 14px;height:46px;font-size:13.5px;border-top:1px solid var(--bone200)}
+  .res span.m{margin-left:auto;font-size:11.5px;color:var(--ink400)}
+  .res b{font-weight:600}
+  .sw{width:10px;height:10px;border-radius:50%;flex:none}
+  .lrow{position:absolute;left:10px;right:10px;height:64px;background:var(--bone50);border:1px solid var(--bone200);border-radius:12px;padding:10px 12px;font-size:13px}
+  .lrow b{display:block;font-size:13.5px}
+  .lrow span{font-size:11.5px;color:var(--ink500)}
+  .dim{position:absolute;inset:0;background:rgba(26,24,23,.35);z-index:6}
+  .menu{position:absolute;left:0;right:0;bottom:0;background:var(--bone50);border-radius:20px 20px 0 0;z-index:7;padding:8px 0 20px;box-shadow:0 -6px 20px rgba(0,0,0,.2)}
+  .grab{width:38px;height:4px;border-radius:2px;background:var(--bone300);margin:0 auto 6px}
+  .menu h3{font-family:'Fraunces',Georgia,serif;font-size:18px;margin:4px 18px 8px}
+  .mi{display:flex;align-items:center;gap:12px;height:46px;padding:0 18px;font-size:14px;color:var(--ink900);border-top:1px solid var(--bone200)}
+  .mi.new{background:var(--sage50);color:var(--sage700);font-weight:600}
+  .mi.new .ico{stroke:var(--sage600)}
+  .newtag{margin-left:auto;font-size:10px;font-weight:700;background:#C2410C;color:#fff;border-radius:5px;padding:2px 6px}
+  .note{max-width:1400px;margin:0 auto;padding:0 24px 40px;font-size:14px;color:var(--ink700);line-height:1.55}
+  .note li{margin:5px 0}
+</style>
+</head>
+<body>
+<svg style="display:none">
+  <symbol id="map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></symbol>
+  <symbol id="list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></symbol>
+  <symbol id="filt" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  <symbol id="loc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
+  <symbol id="star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.8 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.3l1-6.2L3 9.7l6.2-.9z"/></symbol>
+  <symbol id="hand" viewBox="0 0 24 24"><path d="M3 14c3-1 5-3 9-3h4a2 2 0 0 1 0 4h-5M3 20h11l7-5"/></symbol>
+  <symbol id="menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+  <symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></symbol>
+  <symbol id="home" viewBox="0 0 24 24"><path d="m3 11 9-7 9 7v9H3z"/></symbol>
+</svg>
+
+<header>
+  <h1>Map / List — through the search bar</h1>
+  <p>No switch on the screen at all. Tapping the empty search bar drops down one small line that offers the other view. Typing replaces it with normal search results. A "List view" line in the Menu is the second way in, for people who never tap search. (Filters button on the left is from #513.)</p>
+</header>
+
+<div class="row">
+
+  <!-- 1 -->
+  <div class="opt">
+    <h2>1 · On the map, tap search</h2>
+    <p class="sub">One line drops down under the bar: "See all places as a list" with the current count. Tap it and the list opens (search closes).</p>
+    <div class="phone">
+      <div class="park" style="left:30px;top:220px;width:90px;height:70px"></div>
+      <div class="pin" style="left:180px;top:300px;background:var(--blessing)"></div>
+      <div class="pin" style="left:70px;top:380px;background:var(--pantry)"></div>
+      <div class="search focus"><span class="fbtn"><svg class="ico"><use href="#filt"/></svg></span><span class="q"><span class="caret"></span>Search food, places…</span></div>
+      <div class="drop">
+        <div class="sug"><svg class="ico"><use href="#list"/></svg><span>See all places as a list<small>128 places</small></span><span class="chev">›</span></div>
+      </div>
+      <div class="nav"><div><svg class="ico"><use href="#loc"/></svg>Near me</div><div><svg class="ico"><use href="#star"/></svg>Saved</div><div><svg class="ico"><use href="#hand"/></svg>Resources</div><div><svg class="ico"><use href="#menu"/></svg>Menu</div></div>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="opt">
+    <h2>2 · On the list, tap search</h2>
+    <p class="sub">Same spot, the other way: "Back to the map". Nothing else on the list screen changes.</p>
+    <div class="phone list">
+      <div class="lrow" style="top:70px"><b>Routt St Blessing Box</b><span>Blessing box · 0.4 mi · filled 2 h ago</span></div>
+      <div class="lrow" style="top:142px"><b>Care and Share Pantry</b><span>Pantry · 0.9 mi · open until 5</span></div>
+      <div class="lrow" style="top:214px"><b>Grocery Outlet</b><span>Grocery · 1.2 mi · SNAP</span></div>
+      <div class="lrow" style="top:286px"><b>Posada Meal Site</b><span>Meal site · 1.6 mi · dinner 5–6</span></div>
+      <div class="lrow" style="top:358px"><b>East Side Garden</b><span>Garden · 1.9 mi</span></div>
+      <div class="search focus"><span class="fbtn"><svg class="ico"><use href="#filt"/></svg></span><span class="q"><span class="caret"></span>Search food, places…</span></div>
+      <div class="drop">
+        <div class="sug"><svg class="ico"><use href="#map"/></svg><span>Back to the map<small>128 places</small></span><span class="chev">›</span></div>
+      </div>
+      <div class="nav"><div><svg class="ico"><use href="#loc"/></svg>Near me</div><div><svg class="ico"><use href="#star"/></svg>Saved</div><div><svg class="ico"><use href="#hand"/></svg>Resources</div><div><svg class="ico"><use href="#menu"/></svg>Menu</div></div>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <div class="opt">
+    <h2>3 · Start typing</h2>
+    <p class="sub">The suggestion line gives way to matching places, same as today's search results. The list line can come back as the last row: "See all 4 matches as a list".</p>
+    <div class="phone">
+      <div class="park" style="left:30px;top:220px;width:90px;height:70px"></div>
+      <div class="pin" style="left:180px;top:300px;background:var(--blessing)"></div>
+      <div class="search focus"><span class="fbtn"><svg class="ico"><use href="#filt"/></svg></span><span class="q typed">pan<span class="caret"></span></span></div>
+      <div class="drop">
+        <div class="res" style="border-top:0"><span class="sw" style="background:var(--pantry)"></span><span><b>Pan</b>try at St. Mary</span><span class="m">0.7 mi</span></div>
+        <div class="res"><span class="sw" style="background:var(--pantry)"></span><span>Care and Share <b>Pan</b>try</span><span class="m">0.9 mi</span></div>
+        <div class="res"><span class="sw" style="background:var(--pantry)"></span><span>Eastside Food <b>Pan</b>try</span><span class="m">1.8 mi</span></div>
+        <div class="res"><span class="sw" style="background:var(--grocery)"></span><span><b>Pan</b>adería El Sol</span><span class="m">2.1 mi</span></div>
+        <div class="sug" style="border-top:1px solid var(--bone200);height:46px;font-size:13px"><svg class="ico" style="width:16px;height:16px"><use href="#list"/></svg><span>See all 4 matches as a list</span><span class="chev">›</span></div>
+      </div>
+      <div class="nav"><div><svg class="ico"><use href="#loc"/></svg>Near me</div><div><svg class="ico"><use href="#star"/></svg>Saved</div><div><svg class="ico"><use href="#hand"/></svg>Resources</div><div><svg class="ico"><use href="#menu"/></svg>Menu</div></div>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="opt">
+    <h2>4 · Second way in: Menu</h2>
+    <p class="sub">"List view" at the top of the Menu (says "Map view" when you're on the list), for anyone who never taps search.</p>
+    <div class="phone">
+      <div class="park" style="left:30px;top:220px;width:90px;height:70px"></div>
+      <div class="pin" style="left:180px;top:200px;background:var(--blessing)"></div>
+      <div class="search"><span class="fbtn"><svg class="ico"><use href="#filt"/></svg></span><span class="q">Search food, places…</span></div>
+      <div class="dim"></div>
+      <div class="menu">
+        <div class="grab"></div>
+        <h3>Pueblo Food Map</h3>
+        <div class="mi new"><svg class="ico"><use href="#list"/></svg>List view<span class="newtag">NEW</span></div>
+        <div class="mi"><svg class="ico"><use href="#plus"/></svg>Suggest a venue</div>
+        <div class="mi"><svg class="ico"><use href="#chat"/></svg>Send us feedback</div>
+        <div class="mi"><svg class="ico"><use href="#home"/></svg>Show welcome screen</div>
+        <div class="mi"><svg class="ico"><use href="#globe"/></svg>Language / Idioma</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <ul>
+    <li>The search bar is clean: Filters on the left, text across the rest, nothing on the right.</li>
+    <li>Screen 3's last row ("See all N matches as a list") is optional — say if you want it.</li>
+    <li>The Menu line's exact spot and look is a guess at the real Menu; the four other lines are its real items.</li>
+  </ul>
+</div>
+</body>
+</html>

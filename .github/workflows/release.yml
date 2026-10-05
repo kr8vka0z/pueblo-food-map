@@ -117,11 +117,13 @@ jobs:
       # (extraheader): the model gets Read plus Edit on CHANGELOG.md only, no
       # Bash, and is denied .git explicitly. Both `.git/**` and `./.git/**`
       # spellings are listed since path-rule anchoring differs by version. The
-      # hash + grep checks in the next steps are the backstop if a rule is wrong.
-      - name: Snapshot git config
-        if: steps.prep.outputs.run == 'true'
-        run: sha256sum .git/config > "$RUNNER_TEMP/gitconfig.sha"
-
+      # credential grep + "only CHANGELOG.md changed" checks in the next step
+      # are the backstop if a rule is wrong.
+      #
+      # WHY there is no hash check on .git/config: the action itself rewrites
+      # it before the model starts (sets the git user, swaps checkout's
+      # credential for its own), so a before/after hash fails on every run.
+      # That check blocked the first scheduled cut (2026-10-04).
       - name: Write changelog section
         if: steps.prep.outputs.run == 'true'
         uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1
@@ -169,8 +171,6 @@ jobs:
           VERSION: ${{ steps.prep.outputs.version }}
         run: |
           set -euo pipefail
-          sha256sum -c "$RUNNER_TEMP/gitconfig.sha" >/dev/null \
-            || { echo ".git/config changed during the model step" >&2; exit 1; }
           if grep -Eq 'x-access-token|ghs_|ghp_|github_pat_' CHANGELOG.md; then
             echo "CHANGELOG.md contains something that looks like a credential" >&2
             exit 1

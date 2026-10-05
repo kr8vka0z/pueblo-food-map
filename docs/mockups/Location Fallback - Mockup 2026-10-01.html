@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM #739: when Find food near me can't get a location</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bone-50:#FBFAF6; --bone-100:#F4F1EA; --bone-200:#E8E3D6; --bone-300:#D4CDB8; --ink-400:#6A645A; --ink-500:#5F5A52;
+          --ink-700:#2D2A26; --ink-900:#1A1817; --navy:#190F3F; --orange:#F7943C; --sage-50:#EAF0EC; --sage-500:#4A8466;
+          --sage-600:#2C5F4F; --clay-500:#C2410C; --clay-700:#7C2D12; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px; background:#e9e6df; font:15px/1.45 'Public Sans',system-ui,sans-serif; color:var(--ink-900); }
+  h1 { font:600 24px 'Fraunces',Georgia,serif; margin:0 0 4px; }
+  .sub { color:var(--ink-500); margin:0 0 16px; max-width:1100px; }
+  .controls { display:flex; gap:24px; flex-wrap:wrap; margin:0 0 22px; align-items:center; }
+  .seg { display:inline-flex; background:#fff; border:1px solid var(--bone-300); border-radius:999px; padding:3px; }
+  .seg button { border:0; background:none; font:600 14px 'Public Sans',sans-serif; padding:8px 14px; border-radius:999px; cursor:pointer; color:var(--ink-500); }
+  .seg button.on { background:var(--navy); color:#fff; }
+  .ctl-label { font-size:13px; font-weight:700; color:var(--ink-500); margin-right:6px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, 380px); gap:28px 30px; }
+  .label { font-weight:700; font-size:16px; } .who { font-size:13px; color:var(--ink-500); margin:2px 0 10px; min-height:38px; }
+  .note { font-size:13px; color:var(--ink-500); margin:10px 0 0; }
+  .rec { display:inline-block; background:var(--sage-600); color:#fff; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; margin-left:6px; vertical-align:2px; }
+
+  /* Phone frame: real 360px dev-site screenshot behind, overlay on top */
+  .phone { position:relative; width:360px; height:740px; border-radius:22px; overflow:hidden; box-shadow:0 4px 18px rgba(0,0,0,.18); background:#ddd; }
+  .phone > img { position:absolute; inset:0; width:360px; height:740px; }
+  .reset { position:absolute; top:52%; left:50%; transform:translate(-50%,-50%); display:none; background:var(--navy); color:#fff; border:0;
+           font:600 13px 'Public Sans',sans-serif; padding:8px 14px; border-radius:999px; cursor:pointer; }
+  .phone.closed .card { display:none; } .phone.closed .reset { display:block; }
+
+  .card { position:absolute; background:var(--bone-100); border-radius:14px; padding:16px 16px 14px;
+          box-shadow:0 6px 24px rgba(25,15,63,.22), 0 1px 3px rgba(0,0,0,.12); }
+  .card h2 { font:600 18px/1.25 'Fraunces',Georgia,serif; color:var(--navy); margin:0 34px 6px 0; display:flex; gap:8px; align-items:flex-start; }
+  .card h2 svg { flex:none; margin-top:1px; }
+  .card p { margin:0 0 12px; font-size:14px; color:var(--ink-700); }
+  .card .hint { font-size:13px; color:var(--ink-500); margin:10px 0 0; }
+  .x { position:absolute; top:2px; right:2px; width:44px; height:44px; border:0; background:none; border-radius:999px; cursor:pointer; color:var(--ink-500); display:grid; place-items:center; }
+  .x:hover { background:var(--bone-200); }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .btn { min-height:48px; padding:0 18px; border-radius:999px; border:0; background:var(--orange); color:var(--navy); font:700 15px 'Public Sans',sans-serif; cursor:pointer; }
+  .btn2 { min-height:48px; padding:0 16px; border-radius:999px; border:1.5px solid var(--sage-600); background:transparent; color:var(--sage-600); font:700 15px 'Public Sans',sans-serif; cursor:pointer; }
+  .link { min-height:48px; padding:0 6px; border:0; background:none; color:var(--ink-500); text-decoration:underline; text-underline-offset:2px; font:400 14px 'Public Sans',sans-serif; cursor:pointer; }
+
+  /* A: today's banner style, top, clay edge */
+  .A .card { top:76px; left:16px; right:16px; border-left:4px solid var(--clay-700); }
+  /* B + C: bottom card, above the bottom bar, in thumb reach */
+  .B .card, .C .card { left:10px; right:10px; bottom:82px; border-top:4px solid var(--sage-600); }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 4px; }
+  .chip { min-height:44px; padding:0 14px; border-radius:999px; border:1px solid var(--bone-300); background:var(--bone-50); color:var(--ink-700);
+          font:600 14px 'Public Sans',sans-serif; cursor:pointer; }
+  .chip.on { background:var(--sage-600); border-color:var(--sage-600); color:#fff; }
+  .section { margin:34px 0 0; max-width:1150px; }
+  .section h3 { font:600 18px 'Fraunces',Georgia,serif; margin:0 0 8px; }
+  table { border-collapse:collapse; background:#fff; font-size:14px; }
+  td, th { border:1px solid var(--bone-300); padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--bone-100); }
+</style></head>
+<body>
+<h1>When “Find food near me” can’t get a location</h1>
+<p class="sub">Today the welcome screen just closes and you land on this map of all of Pueblo, with no explanation. More than half of those visitors leave without opening a place. Three ways to tell them what happened and what to do next. All three sit on a real screenshot of the dev site at a small Android phone size (360px). Use the switches to see each message and the Spanish version. Tap the × to close a card.</p>
+
+<div class="controls">
+  <div><span class="ctl-label">What went wrong</span>
+    <span class="seg" id="reason"><button data-v="off" class="on">Location is off</button><button data-v="lost">Couldn’t find you</button></span></div>
+  <div><span class="ctl-label">Language</span>
+    <span class="seg" id="lang"><button data-v="en" class="on">English</button><button data-v="es">Español</button></span></div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="section">
+  <h3>What each message means</h3>
+  <table>
+    <tr><th>Message</th><th>When it shows</th><th>Share of “denied” since launch</th></tr>
+    <tr><td><b>Location is off</b></td><td>The person tapped “Don’t allow”, or location is switched off for the browser or the whole phone. Phones report these the same way, so they share one message. Trying again won’t help until they turn it on, so there’s no “Try again” button.</td><td>About 3 in 4</td></tr>
+    <tr><td><b>Couldn’t find you</b></td><td>Location is on, but the phone couldn’t work out where it is in time (common indoors). Once the location fix ships (#738), the site retries on its own first, so this shows only when the retry also fails. Trying again often works.</td><td>About 1 in 4 (6 of 24)</td></tr>
+  </table>
+  <p class="note">Spanish text is a first draft and needs a native speaker’s check, like the other [CHECK] lines.</p>
+</div>
+
+<template id="phone">
+  <div class="phone"><img src="Location Fallback - today 2026-10-01.png" alt="dev site map at 360px after location failed">
+    <div class="card"></div><button class="reset">Show card again</button></div>
+</template>
+
+<script>
+const T = {
+  en: {
+    off:  { title:"Location is off", body:"No problem, you can still find food.", howto:"To use your location next time, turn it on in your browser or phone settings." },
+    lost: { title:"We couldn’t find you", body:"Your phone took too long to find where you are. This happens a lot indoors.", howto:"" },
+    retry:"Try again", list:"See all places as a list", browse:"Just browse the map",
+    tapPin:"Tap any pin on the map to see hours and directions.",
+    pick:"Pick your area to see the places closest to you:",
+    areas:["Downtown","East Side","Northside","Belmont","Bessemer","South Side","Pueblo West"], close:"Close",
+  },
+  es: {
+    off:  { title:"Ubicación desactivada", body:"No hay problema, aún puedes encontrar comida.", howto:"Para usar tu ubicación la próxima vez, actívala en la configuración del navegador o del teléfono." },
+    lost: { title:"No pudimos encontrarte", body:"Tu teléfono tardó demasiado en encontrar dónde estás. Esto pasa mucho bajo techo.", howto:"" },
+    retry:"Intentar de nuevo", list:"Ver todos los lugares en lista", browse:"Solo explorar el mapa",
+    tapPin:"Toca cualquier punto del mapa para ver horarios y cómo llegar.",
+    pick:"Elige tu zona para ver los lugares más cercanos:",
+    areas:["Centro","East Side","Northside","Belmont","Bessemer","South Side","Pueblo West"], close:"Cerrar",
+  },
+};
+const OPTS = [
+  { k:"A", title:"A. Today’s warning banner, shown right away",
+    who:"Reuses the banner the map already shows on a second tap of Near me. Smallest change.",
+    note:"Sits at the top under the search bar, in the same spot and style as today’s banner. Familiar, but it’s far from the thumb on a phone, the orange-brown warning edge reads as an error, and it covers the top of the map." },
+  { k:"B", title:"B. Friendly card by your thumb",
+    who:"Bottom card above the menu bar, like Google Maps’ “location off” prompt.",
+    note:"Calmer green edge, buttons in thumb reach. Points people at the two things that work without location: tapping a pin, or the list of all places." },
+  { k:"C", title:"C. Pick your area", rec:true,
+    who:"Same bottom card, plus area buttons. Tapping one zooms the map there.",
+    note:"Gives people a stand-in for “near me” without sharing location. No outside service, just a short list of Pueblo areas. Adds a little more to build than B. Recommended." },
+];
+let reason = "off", lang = "en";
+const icon = (c) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+  (c === "#C2410C" ? `<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>`
+                   : `<circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/>`) + `</svg>`;
+const X = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
+
+function cardHTML(k) {
+  const t = T[lang], r = t[reason], canRetry = reason === "lost";
+  const head = `<button class="x" aria-label="${t.close}">${X}</button><h2>${icon(k === "A" ? "#C2410C" : "#2C5F4F")}<span>${r.title}</span></h2>`;
+  const howto = r.howto ? `<p class="hint">${r.howto}</p>` : "";
+  if (k === "A") {
+    return head + `<p>${r.body} ${t.tapPin}</p>` +
+      `<div class="row">${canRetry ? `<button class="btn">${t.retry}</button>` : ""}<button class="link">${t.browse}</button></div>` + howto;
+  }
+  if (k === "B") {
+    return head + `<p>${r.body} ${t.tapPin}</p>` +
+      `<div class="row">${canRetry ? `<button class="btn">${t.retry}</button>` : ""}<button class="btn2">${t.list}</button></div>` + howto;
+  }
+  return head + `<p>${r.body} ${t.pick}</p>` +
+    `<div class="chips">${t.areas.map(a => `<button class="chip">${a}</button>`).join("")}</div>` +
+    (canRetry ? `<div class="row" style="margin-top:8px"><button class="btn">${t.retry}</button></div>` : "") + howto;
+}
+
+const grid = document.getElementById("grid"), tpl = document.getElementById("phone");
+for (const o of OPTS) {
+  const col = document.createElement("div");
+  col.innerHTML = `<div class="label">${o.title}${o.rec ? '<span class="rec">Recommended</span>' : ""}</div><div class="who">${o.who}</div>`;
+  const ph = tpl.content.firstElementChild.cloneNode(true); ph.classList.add(o.k); ph.dataset.k = o.k;
+  col.appendChild(ph);
+  col.insertAdjacentHTML("beforeend", `<p class="note">${o.note}</p>`);
+  grid.appendChild(col);
+  ph.addEventListener("click", (e) => {
+    if (e.target.closest(".x")) ph.classList.add("closed");
+    else if (e.target.closest(".reset")) ph.classList.remove("closed");
+    else if (e.target.closest(".chip")) { ph.querySelectorAll(".chip").forEach(c => c.classList.remove("on")); e.target.closest(".chip").classList.add("on"); }
+  });
+}
+function render() { document.querySelectorAll(".phone").forEach(ph => ph.querySelector(".card").innerHTML = cardHTML(ph.dataset.k)); document.documentElement.lang = lang; }
+function seg(id, set) { const s = document.getElementById(id); s.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+  s.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); set(b.dataset.v); render(); }); }
+seg("reason", v => reason = v); seg("lang", v => lang = v); render();
+</script>
+</body></html>

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pueblo Food Map — Map/List switch options (2026-09-19)</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --orange:#F7943C;--navy:#190F3F;
+    --bone50:#FBFAF6;--bone100:#F4F1EA;--bone200:#E8E3D6;--bone300:#D4CDB8;
+    --ink400:#6A645A;--ink500:#5F5A52;--ink700:#2D2A26;--ink900:#1A1817;
+    --sage50:#EAF0EC;--sage600:#2C5F4F;--sage700:#1F4639;
+    --blessing:#C2447B;--pantry:#BE2D45;--grocery:#1F4E8C;--meal:#6B3FA0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#dcd8cc;font-family:'Public Sans',system-ui,sans-serif;color:var(--ink900)}
+  header{max-width:1500px;margin:0 auto;padding:28px 24px 8px}
+  h1{font-family:'Fraunces',Georgia,serif;font-size:30px;margin:0 0 6px}
+  header p{margin:4px 0;color:var(--ink700);max-width:960px;line-height:1.5}
+  .row{display:flex;flex-wrap:wrap;gap:30px;justify-content:center;max-width:1500px;margin:0 auto;padding:24px}
+  .opt{width:280px}
+  .opt h2{font-family:'Fraunces',Georgia,serif;font-size:20px;margin:0 0 4px}
+  .opt .seen{font-size:11.5px;font-weight:600;color:var(--sage700);margin:0 0 6px}
+  .opt .sub{font-size:13px;color:var(--ink500);margin:0 0 12px;line-height:1.45;min-height:94px}
+  .phone{position:relative;width:280px;height:590px;border-radius:32px;border:9px solid #1d1b19;overflow:hidden;
+    background:
+      linear-gradient(90deg,transparent 48%,#fff 48%,#fff 52%,transparent 52%) 0 0/120px 90px,
+      linear-gradient(0deg,transparent 46%,#fff 46%,#fff 54%,transparent 54%) 0 0/90px 140px,
+      #ebe7e1;}
+  .phone.list{background:var(--bone100)}
+  .park{position:absolute;border-radius:40%;background:#bfe6ae}
+  .pin{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .search{position:absolute;top:14px;left:10px;right:10px;height:44px;border-radius:22px;background:var(--bone50);
+    border:1px solid var(--bone300);display:flex;align-items:center;padding:0 5px;gap:7px;box-shadow:0 2px 8px rgba(0,0,0,.12);z-index:5}
+  .search .q{flex:1;color:var(--ink400);font-size:15px;white-space:nowrap}
+  .ico{width:18px;height:18px;flex:none;fill:none;stroke:var(--ink700);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .fbtn{height:34px;width:34px;border-radius:17px;display:grid;place-items:center;flex:none}
+  .viewsw{display:flex;height:34px;border-radius:17px;overflow:hidden;border:1px solid var(--bone300);flex:none}
+  .viewsw span{width:30px;display:grid;place-items:center}
+  .viewsw span:first-child{background:var(--ink900)}
+  .viewsw span:first-child .ico{stroke:#fff}
+  .nav{position:absolute;bottom:10px;left:10px;right:10px;height:56px;border-radius:28px;background:var(--bone50);display:flex;justify-content:space-around;align-items:center;font-size:10px;font-weight:600;color:var(--ink700);box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:4}
+  .nav div{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .nav .ico{width:17px;height:17px}
+  /* A: floating pill */
+  .fpill{position:absolute;left:50%;transform:translateX(-50%);bottom:78px;height:42px;border-radius:21px;background:var(--ink900);color:#fff;display:flex;align-items:center;gap:8px;padding:0 18px;font-size:14px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.28);z-index:5;white-space:nowrap}
+  .fpill .ico{stroke:#fff}
+  /* B: single icon */
+  .one{height:34px;width:34px;border-radius:17px;border:1px solid var(--bone300);display:grid;place-items:center;flex:none;background:#fff}
+  /* C: peek sheet */
+  .peek{position:absolute;left:0;right:0;bottom:0;height:150px;background:var(--bone50);border-radius:20px 20px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.18);z-index:3;padding:8px 16px 0}
+  .grab{width:38px;height:4px;border-radius:2px;background:var(--bone300);margin:0 auto 8px}
+  .peek b{font-size:14.5px}
+  .peek .s{font-size:12px;color:var(--ink500);margin-top:2px}
+  .mini{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px;color:var(--ink700)}
+  .sw{width:10px;height:10px;border-radius:50%;flex:none}
+  /* D: tabs */
+  .tabs{position:absolute;top:66px;left:50%;transform:translateX(-50%);display:flex;background:var(--bone50);border:1px solid var(--bone300);border-radius:18px;padding:3px;z-index:5;box-shadow:0 1px 5px rgba(0,0,0,.12)}
+  .tabs span{height:28px;padding:0 14px;border-radius:14px;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--ink500)}
+  .tabs span.on{background:var(--sage600);color:#fff}
+  .tabs span.on .ico{stroke:#fff}
+  .tabs .ico{width:14px;height:14px;stroke:var(--ink500)}
+  /* list rows */
+  .lrow{position:absolute;left:10px;right:10px;height:64px;background:var(--bone50);border:1px solid var(--bone200);border-radius:12px;padding:10px 12px;font-size:13px}
+  .lrow b{display:block;font-size:13.5px}
+  .lrow span{font-size:11.5px;color:var(--ink500)}
+  .tagnote{position:absolute;z-index:6;font-size:10.5px;font-weight:700;color:#fff;background:#C2410C;border-radius:6px;padding:3px 7px;white-space:nowrap}
+  .note{max-width:1500px;margin:0 auto;padding:0 24px 40px;font-size:14px;color:var(--ink700);line-height:1.55}
+  .note li{margin:5px 0}
+  .pick{display:inline-block;font-size:11px;font-weight:700;background:var(--orange);color:var(--navy);border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:middle}
+</style>
+</head>
+<body>
+<svg style="display:none">
+  <symbol id="map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></symbol>
+  <symbol id="list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></symbol>
+  <symbol id="filt" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  <symbol id="srch" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="loc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
+  <symbol id="star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.8 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.3l1-6.2L3 9.7l6.2-.9z"/></symbol>
+  <symbol id="hand" viewBox="0 0 24 24"><path d="M3 14c3-1 5-3 9-3h4a2 2 0 0 1 0 4h-5M3 20h11l7-5"/></symbol>
+  <symbol id="menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+</svg>
+
+<header>
+  <h1>Map / List switch — options</h1>
+  <p>Kyle wants to keep a way to flip between the map and the list, just not the dark two-part switch jammed into the search bar. Every screen already carries the Filters button in the magnifier spot (#513). Each option names the well-known apps that use the same pattern, so it will feel familiar to visitors.</p>
+</header>
+
+<div class="row">
+
+  <!-- TODAY -->
+  <div class="opt">
+    <h2>Today</h2>
+    <p class="seen">&nbsp;</p>
+    <p class="sub">Two-part dark switch fused to the right end of the search bar. Two icons with no words, the dark half competes with the search box for attention, and it squeezes the typing space.</p>
+    <div class="phone">
+      <div class="park" style="left:30px;top:220px;width:90px;height:70px"></div>
+      <div class="pin" style="left:180px;top:300px;background:var(--blessing)"></div>
+      <div class="search"><span class="fbtn"><svg class="ico"><use href="#filt"/></svg></span><span class="q">Search</span><div class="viewsw"><span><svg class="ico" style="width:15px;height:15px"><use href="#map"/></svg></span><span><svg class="ico" style="width:15px;height:15px"><use href="#list"/></svg></span></div></div>
+      <div class="nav"><div><svg class="ico"><use href="#loc"/></svg>Near me</div><div><svg class="ico"><use href="#star"/></svg>Saved</div><div><svg class="ico"><use href="#hand"/></svg>Resources</div><div><svg class="ico"><use href="#menu"/></svg>Menu</div></div>
+    </div>
+  </div>
+
+  <!-- A -->
+  <div class="opt">
+    <h2>A · Floating "List" button <span class="pick">Atlas pick</span></h2>
+    <p class="seen">Seen in: Airbnb, Zillow, Yelp</p>
+    <p class="sub">One button floating above the bottom bar, centred, with a word on it. On the map it says "List"; on the list it says "Map". Search bar gets its full width back. Always in thumb reach.</p>
+    <div class="phone">
+      <div class="park" style="left:30px;top:220px;width:90px;height:70px"></div>
+      <div class="pin" style="left:180px;top:300px;background:var(--blessing)"></div>
+      <div class="pin" style="left:70px;top:380px;background:var(--pantry)"></div>
+      <div class="search"><span class="fbtn"><svg class="ico"><use href="#filt"/></svg></span><span class="q">Search food, places…</span></div>
+      <div class="fpill"><svg class="ico" style="width:16px;height:16px"><use href="#list"/></svg>List</div>
+      <div class="nav"><div><svg class="ico"><use href="#loc"/></svg>Near me</div><div><svg class="ico"><use href="#star"/></svg>Saved</div><div><svg class="ico"><use href="#hand"/></svg>Resources</div><div><svg class="ico"><use href="#menu"/></svg>Menu</div></div>
+    </div>
+  </div>
+
+  <!-- A list state -->
+  <div class="opt">
+    <h2>A · after tapping it</h2>
+    <p class="seen">&nbsp;</p>
+    <p class="sub">Same button, same spot, now says "Map". Nothing else moves.</p>
+    <div class="phone list">
+      <div class="search"><span class="fbtn"><svg class="ico"><use href="#filt"/></svg></span><span class="q">Search food, places…</span></div>
+      <div class="lrow" style="top:70px"><b>Routt St Blessing Box</b><span>Blessing box · 0.4 mi · filled 2 h ago</span></div>
+      <div class="lrow" style="top:142px"><b>Care and Share Pantry</b><span>Pantry · 0.9 mi · open until 5</span></div>
+      <div class="lrow" style="top:214px"><b>Grocery Outlet</b><span>Grocery · 1.2 mi · SNAP</span></div>
+      <div class="lrow" style="top:286px"><b>Posada Meal Site</b><span>Meal site · 1.6 mi · dinner 5–6</span></div>
+      <div class="lrow" style="top:358px"><b>East Side Garden</b><span>Garden · 1.9 mi</span></div>
+      <div class="fpill"><svg class="ico" style="width:16px;height:16px"><use href="#map"/></svg>Map</div>
+      <div class="nav"><div><svg class="ico"><use href="#loc"/></svg>Near me</div><div><svg class="ico"><use href="#star"/></svg>Saved</div><div><svg class="ico"><use href="#hand"/></svg>Resources</div><div><svg class="ico"><use href="#menu"/></svg>Menu</div></div>
+    </div>
+  </div>
+
+  <!-- B -->
+  <div class="opt">
+    <h2>B · One quiet icon in the bar</h2>
+    <p class="seen">Seen in: Redfin, many store finders</p>
+    <p class="sub">Keeps it in the search bar, but as one light round button showing where it takes you (list icon on the map, map icon on the list). Smallest change; still icon-only, so less obvious to first-time visitors.</p>
+    <div class="phone">
+      <div class="park" style="left:30px;top:220px;width:90px;height:70px"></div>
+      <div class="pin" style="left:180px;top:300px;background:var(--blessing)"></div>
+      <div class="search"><span class="fbtn"><svg class="ico"><use href="#filt"/></svg></span><span class="q">Search</span><span class="one"><svg class="ico" style="width:16px;height:16px"><use href="#list"/></svg></span></div>
+      <div class="tagnote" style="top:64px;right:14px">Map ⇄ List</div>
+      <div class="nav"><div><svg class="ico"><use href="#loc"/></svg>Near me</div><div><svg class="ico"><use href="#star"/></svg>Saved</div><div><svg class="ico"><use href="#hand"/></svg>Resources</div><div><svg class="ico"><use href="#menu"/></svg>Menu</div></div>
+    </div>
+  </div>
+
+  <!-- C -->
+  <div class="opt">
+    <h2>C · Pull-up list</h2>
+    <p class="seen">Seen in: Google Maps, Apple Maps</p>
+    <p class="sub">No switch at all. A short panel at the bottom shows how many places are on the map and the nearest two; drag it up (or tap it) and it becomes the full list. Always visible, but it covers part of the map and fights with the place cards that also rise from the bottom.</p>
+    <div class="phone">
+      <div class="park" style="left:30px;top:180px;width:90px;height:70px"></div>
+      <div class="pin" style="left:180px;top:240px;background:var(--blessing)"></div>
+      <div class="pin" style="left:70px;top:300px;background:var(--pantry)"></div>
+      <div class="search"><span class="fbtn"><svg class="ico"><use href="#filt"/></svg></span><span class="q">Search food, places…</span></div>
+      <div class="peek" style="bottom:66px;border-radius:20px">
+        <div class="grab"></div>
+        <b>128 places on the map</b>
+        <div class="s">Drag up for the list</div>
+        <div class="mini"><span class="sw" style="background:var(--blessing)"></span>Routt St Blessing Box · 0.4 mi</div>
+        <div class="mini"><span class="sw" style="background:var(--pantry)"></span>Care and Share Pantry · 0.9 mi</div>
+      </div>
+      <div class="nav"><div><svg class="ico"><use href="#loc"/></svg>Near me</div><div><svg class="ico"><use href="#star"/></svg>Saved</div><div><svg class="ico"><use href="#hand"/></svg>Resources</div><div><svg class="ico"><use href="#menu"/></svg>Menu</div></div>
+    </div>
+  </div>
+
+  <!-- D -->
+  <div class="opt">
+    <h2>D · Map | List tabs under the bar</h2>
+    <p class="seen">Seen in: Yelp (older), Indeed, Eventbrite</p>
+    <p class="sub">A small labelled two-way switch sitting under the search bar, not inside it. Words make it obvious; both choices always visible. Uses a thin strip of map at the top.</p>
+    <div class="phone">
+      <div class="park" style="left:30px;top:220px;width:90px;height:70px"></div>
+      <div class="pin" style="left:180px;top:300px;background:var(--blessing)"></div>
+      <div class="search"><span class="fbtn"><svg class="ico"><use href="#filt"/></svg></span><span class="q">Search food, places…</span></div>
+      <div class="tabs"><span class="on"><svg class="ico"><use href="#map"/></svg>Map</span><span><svg class="ico"><use href="#list"/></svg>List</span></div>
+      <div class="nav"><div><svg class="ico"><use href="#loc"/></svg>Near me</div><div><svg class="ico"><use href="#star"/></svg>Saved</div><div><svg class="ico"><use href="#hand"/></svg>Resources</div><div><svg class="ico"><use href="#menu"/></svg>Menu</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <ul>
+    <li><b>A</b> — most common pattern on map-and-list apps; one word says what happens; frees the search bar entirely (more room for typing and for the Filters button). Must hide while a place card is open so it doesn't sit on top of it.</li>
+    <li><b>B</b> — least work; fixes the heavy dark look but stays icon-only.</li>
+    <li><b>C</b> — the "real map app" feel; biggest build, and it competes with the place cards and the walking-route strip (#509) for the bottom of the screen.</li>
+    <li><b>D</b> — clearest labels; costs a strip of map and adds a third layer at the top.</li>
+    <li>On a computer the site also flips between a full map and a full list today (no side-by-side), so whichever option wins is used there too, at the same spot.</li>
+  </ul>
+</div>
+</body>
+</html>

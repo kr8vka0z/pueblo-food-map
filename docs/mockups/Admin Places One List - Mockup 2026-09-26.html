@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PFM admin: one Places list (Data refresh + Review queue folded in)</title>
+<style>
+  :root { --bone-50:#FBFAF6; --bone-100:#F4F1EA; --bone-200:#E8E3D6; --bone-300:#D4CDB8; --ink-400:#6A645A; --ink-500:#5F5A52; --ink-700:#2D2A26; --ink-900:#1A1817;
+          --sage-50:#EAF0EC; --sage-100:#D1DDD3; --sage-600:#2C5F4F; --sage-700:#1F4639; --clay-100:#F8E2D4; --clay-700:#7C2D12; --yellow:#F6D55C; --orange:#F0A04B;
+          --navy:#1E3A5F; --blue-50:#E8EEF6; --danger:#B91C1C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#e9e6df; font:14px/1.45 -apple-system,system-ui,sans-serif; color:var(--ink-900); padding:22px; }
+  h1 { font:600 22px Georgia,serif; margin:0 0 4px; } .sub { color:var(--ink-400); margin:0 0 18px; max-width:1100px; }
+  .frame { background:var(--bone-50); border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:28px; max-width:1180px; }
+  .flabel { font-weight:700; margin:0 0 6px; }
+  .nav { display:flex; gap:6px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--bone-200); background:#fff; }
+  .nav a { padding:8px 12px; border-radius:10px; color:var(--ink-500); font-size:14px; } .nav a.on { background:var(--sage-600); color:#fff; }
+  .nav a .ct { display:inline-block; margin-left:6px; background:var(--orange); color:#1a1a1a; font-size:11px; font-weight:700; border-radius:99px; padding:0 6px; }
+  .nav .gone { text-decoration:line-through; opacity:.45; }
+  .nav .add { margin-left:auto; background:var(--orange); color:#1a1a1a; font-weight:600; }
+  .in { padding:18px 20px; }
+  .card { background:#fff; border:1px solid var(--bone-200); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+  .top { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .top .card { display:flex; align-items:center; gap:12px; margin:0; }
+  .top p { margin:0; flex:1; } .top small { display:block; color:var(--ink-400); }
+  .big { font:600 26px Georgia,serif; color:var(--ink-900); min-width:34px; }
+  .btn { background:var(--sage-600); color:#fff; border-radius:9px; padding:8px 13px; font-weight:600; font-size:13px; white-space:nowrap; display:inline-block; }
+  .btn.ghost { background:#fff; color:var(--sage-700); border:1px solid var(--bone-300); }
+  .btn.danger { background:var(--danger); }
+  .legend { display:grid; grid-template-columns:repeat(5,1fr); gap:8px 16px; font-size:12.5px; color:var(--ink-500); margin-top:14px; }
+  .legend h4 { grid-column:1/-1; margin:0; font-size:13px; color:var(--ink-700); }
+  .badge { display:inline-block; font-size:12px; font-weight:600; padding:2px 8px; border-radius:5px; white-space:nowrap; }
+  .b-draft { background:var(--yellow); color:var(--ink-900); } .b-live { background:var(--sage-100); color:var(--sage-700); }
+  .b-wait { background:var(--clay-100); color:var(--clay-700); } .b-gone { background:var(--bone-100); color:var(--ink-500); }
+  .b-rev { background:var(--blue-50); color:var(--navy); border:1px solid #c9d6e8; } .b-new { background:#fff; color:var(--navy); border:1px dashed var(--navy); }
+  .src { font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-400); }
+  .ai { display:inline-block; font-size:11px; padding:1px 6px; border-radius:4px; background:var(--bone-100); color:var(--ink-500); margin-left:4px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 10px; }
+  .chip { border:1px solid var(--bone-300); background:#fff; border-radius:999px; padding:5px 11px; font-size:13px; color:var(--ink-700); }
+  .chip b { color:var(--ink-400); font-weight:600; margin-left:3px; } .chip.on { background:var(--sage-600); border-color:var(--sage-600); color:#fff; } .chip.on b { color:#D1DDD3; }
+  .filters { display:flex; gap:10px; align-items:center; margin-bottom:6px; }
+  .filters input, .filters select { border:1px solid var(--bone-300); border-radius:9px; padding:7px 10px; font-size:13px; background:#fff; }
+  .filters input { width:260px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--bone-200); border-radius:12px; overflow:hidden; }
+  th { text-align:left; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-400); font-weight:500; padding:10px 14px; border-bottom:1px solid var(--bone-200); }
+  td { padding:10px 14px; border-bottom:1px solid var(--bone-100); vertical-align:top; }
+  .nm { color:var(--sage-700); font-weight:600; text-decoration:underline; text-underline-offset:2px; }
+  .rev { font-size:13px; } .rev div + div { margin-top:4px; }
+  .callout { background:#FFD84D; color:#1a1a1a; font-size:12px; font-weight:700; padding:2px 7px; border-radius:6px; margin-left:8px; vertical-align:1px; }
+  .sug { border:1px solid #c9d6e8; background:#F4F7FB; border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+  .sug h3 { margin:0 0 10px; font-size:15px; color:var(--navy); }
+  .item { background:#fff; border:1px solid #dbe3ee; border-radius:10px; padding:12px 14px; }
+  .item + .item { margin-top:10px; }
+  .item .hd { display:flex; align-items:center; gap:8px; margin-bottom:6px; } .item .hd .when { margin-left:auto; font-size:12px; color:var(--ink-400); }
+  .item .acts { display:flex; gap:8px; margin-top:10px; }
+  .item q { display:block; font-style:italic; color:var(--ink-700); margin:4px 0; }
+  .item .note { font-size:12.5px; color:var(--ink-500); }
+  .diff { width:100%; border:1px solid var(--bone-200); }
+  .diff td { font-size:13px; padding:7px 12px; } .diff th { padding:7px 12px; }
+  .old { color:var(--ink-400); text-decoration:line-through; } .new { color:var(--sage-700); font-weight:600; }
+  .wait { border:1px solid #efc6ad; background:#FDF3EC; border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+  .wait h3 { margin:0 0 2px; font-size:15px; color:var(--clay-700); } .wait p { margin:0 0 10px; color:var(--ink-500); font-size:13px; }
+  .form { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .field label { display:block; font-size:12px; color:var(--ink-400); margin-bottom:3px; }
+  .field div { border:1px solid var(--bone-300); border-radius:9px; padding:8px 10px; background:#fff; }
+  .flow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; background:#fff; border:1px solid var(--bone-200); border-radius:12px; padding:12px 16px; max-width:1180px; margin-bottom:22px; }
+  .flow .arr { color:var(--ink-400); } .flow small { color:var(--ink-400); }
+</style></head>
+<body>
+<h1>One Places list: Data refresh and Review queue folded in</h1>
+<p class="sub">Every suggestion about a place, whether from the data refresh or from the public, shows up on that place's row. You approve or reject it on the place's own page. The “Review queue” and “Data refresh” tabs go away. The yellow tags are notes.</p>
+
+<p class="flabel">How a place moves</p>
+<div class="flow">
+  <span class="badge b-rev">To review</span><small>data refresh or the public suggests something</small>
+  <span class="arr">→ Approve →</span>
+  <span class="badge b-wait">Live · edits waiting</span><small>saved here, not on the map yet</small>
+  <span class="arr">→ Publish →</span>
+  <span class="badge b-live">Live</span>
+  <span style="margin-left:14px"></span>
+  <small>Reject → the suggestion disappears, nothing changes</small>
+</div>
+
+<p class="flabel">1. Places tab</p>
+<div class="frame">
+  <div class="nav"><a>Dashboard</a><a>Blessing Boxes</a><a class="on">Places<span class="ct">6</span></a><a class="gone">Review queue</a><a class="gone">Data refresh</a><a>Photo review</a><a>Adoption requests</a><a class="add">Add place</a></div>
+  <div class="in">
+    <div class="top">
+      <div class="card"><span class="big">6</span><p><b>To review</b><small>4 from the data refresh, 2 from the public. Nothing changes until you approve.</small></p><span class="btn ghost">Show them</span></div>
+      <div class="card"><span class="big">2</span><p><b>Waiting to publish</b><small>1 new, 1 edited. Approved but not on the public map yet.</small></p><span class="btn">Publish</span></div>
+    </div>
+    <div class="legend">
+      <h4>Key <span class="callout">always visible, one line each</span></h4>
+      <div><span class="badge b-rev">To review</span><br>Someone or something suggested a change. Open the place to approve or reject.</div>
+      <div><span class="badge b-draft">Draft</span><br>New place, not on the map yet.</div>
+      <div><span class="badge b-live">Live</span><br>On the map, exactly as shown.</div>
+      <div><span class="badge b-wait">Live · edits waiting</span><br>Approved changes the map doesn't show until you Publish.</div>
+      <div><span class="badge b-gone">Removed</span><br>Taken off the map.</div>
+    </div>
+
+    <div class="chips" style="margin-top:16px">
+      <span class="chip on">All places <b>146</b></span><span class="chip">To review <b>6</b></span><span class="chip">Waiting to publish <b>2</b></span><span class="chip">Draft <b>1</b></span><span class="chip">Live <b>138</b></span><span class="chip">Removed <b>5</b></span>
+    </div>
+    <div class="filters">
+      <input placeholder="Search places">
+      <select><option>From: anyone</option><option>Data refresh</option><option>The public</option></select>
+      <select><option>AI sorting: any</option><option>Likely noise</option><option>Needs a human</option><option>Likely rename</option></select>
+      <select><option>All kinds</option></select>
+      <span class="callout">old Data refresh filters live here now</span>
+    </div>
+    <table>
+      <thead><tr><th>Name</th><th>Kind</th><th>Status</th><th>To review <span class="callout">new column</span></th><th>Last checked</th></tr></thead>
+      <tbody>
+        <tr><td><span class="nm">Posada Food Pantry</span></td><td>Food pantry</td><td><span class="badge b-live">Live</span></td>
+          <td class="rev"><div><span class="badge b-rev">Data refresh</span> new phone number <span class="ai">Likely noise</span></div><div><span class="badge b-rev">Public</span> “Hours are wrong”</div></td><td>Sep 25</td></tr>
+        <tr><td><span class="nm">Eastside Community Pantry</span> <span class="badge b-new">Suggested new place</span></td><td>Food pantry</td><td>—</td>
+          <td class="rev"><div><span class="badge b-rev">Public</span> new place sent in Sep 23</div></td><td>—</td></tr>
+        <tr><td><span class="nm">Minnequa VFW Post 3641</span></td><td>Food pantry</td><td><span class="badge b-live">Live</span></td>
+          <td class="rev"><div><span class="badge b-rev">Data refresh</span> looks closed: suggests removal <span class="ai">Needs a human</span></div></td><td>Sep 25</td></tr>
+        <tr><td><span class="nm">Salvation Army Pueblo</span></td><td>Soup kitchen</td><td><span class="badge b-wait">Live · edits waiting</span></td>
+          <td class="rev"><div><span class="badge b-rev">Data refresh</span> website link broken</div></td><td>Sep 25</td></tr>
+        <tr><td><span class="nm">Pueblo Cooperative Care Center</span></td><td>Food pantry</td><td><span class="badge b-live">Live</span></td>
+          <td class="rev"><div><span class="badge b-rev">Data refresh</span> listed under a new name <span class="ai">Likely rename</span></div></td><td>Sep 25</td></tr>
+        <tr><td><span class="nm">Valley Market</span></td><td>Grocery</td><td><span class="badge b-draft">Draft</span></td><td class="rev" style="color:var(--ink-400)">—</td><td>Sep 20</td></tr>
+        <tr><td><span class="nm">Care and Share — Pueblo</span></td><td>Food pantry</td><td><span class="badge b-live">Live</span></td><td class="rev" style="color:var(--ink-400)">—</td><td>Sep 18</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:var(--ink-400);margin:8px 2px 0">Places with something to review sort to the top by default.</p>
+  </div>
+</div>
+
+<p class="flabel">2. Opening a place with suggestions</p>
+<div class="frame">
+  <div class="nav"><a>Dashboard</a><a>Blessing Boxes</a><a class="on">Places<span class="ct">6</span></a><a>Photo review</a><a>Adoption requests</a><a class="add">Add place</a></div>
+  <div class="in">
+    <h2 style="font:600 20px Georgia,serif;margin:0 0 12px">Posada Food Pantry <span class="badge b-live" style="vertical-align:3px">Live</span></h2>
+    <div class="sug">
+      <h3>2 suggestions to review <span class="callout">replaces the Data refresh and Review queue tabs</span></h3>
+      <div class="item">
+        <div class="hd"><span class="badge b-rev">Data refresh</span><span class="src">from Plentiful</span><span class="ai">AI: Likely noise</span><span class="when">found Sep 25</span></div>
+        <table class="diff"><thead><tr><th>Field</th><th>Now</th><th>Suggested</th></tr></thead><tbody><tr><td>Phone</td><td class="old">(719) 555-0142</td><td class="new">(719) 555-0199</td></tr></tbody></table>
+        <div class="note" style="margin-top:6px">AI's reading: Plentiful lists a second line for the same pantry; the current number still works.</div>
+        <div class="acts"><span class="btn">Approve</span><span class="btn ghost">Reject</span></div>
+      </div>
+      <div class="item">
+        <div class="hd"><span class="badge b-rev">Public</span><span class="src">problem report · hours are wrong</span><span class="when">sent Sep 24</span></div>
+        <div class="quote" style="font-style:italic;color:#2D2A26;margin:4px 0">“They're closed Tuesdays now, only Thursday and Saturday.”</div>
+        <div class="note">A report, not a ready-made change: fix the hours below if it's right, then mark it done.</div>
+        <div class="acts"><span class="btn">Mark done</span><span class="btn ghost">Reject</span></div>
+      </div>
+    </div>
+    <div class="wait">
+      <h3>Waiting to publish</h3>
+      <p>Nothing yet. Approved changes appear here until you Publish, with who made each one.</p>
+    </div>
+    <div class="form">
+      <div class="field"><label>Name</label><div>Posada Food Pantry</div></div>
+      <div class="field"><label>Kind</label><div>Food pantry</div></div>
+      <div class="field"><label>Phone</label><div>(719) 555-0142</div></div>
+      <div class="field"><label>Tuesday hours</label><div>9:00 AM – 12:00 PM</div></div>
+    </div>
+  </div>
+</div>
+</body></html>

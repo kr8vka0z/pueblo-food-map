@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blessing Box card — combined mockup (v2)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Tokens copied from pueblo-food-map DESIGN.md — no new colors. */
+:root{
+  --bone50:#FBFAF6;--bone100:#F4F1EA;--bone200:#E8E3D6;--bone300:#D4CDB8;
+  --ink400:#6A645A;--ink500:#5F5A52;--ink700:#2D2A26;--ink900:#1A1817;
+  --sage50:#EAF0EC;--sage100:#D1DDD3;--sage600:#2C5F4F;--sage700:#1F4639;
+  --clay100:#F8E2D4;--clay700:#7C2D12;
+  --orange:#F7943C;--navy:#190F3F;--success:#15803D;--warning:#B45309;--danger:#B91C1C;
+  --blessing:#C2447B;
+  --display:'Fraunces',Georgia,serif;--sans:'Public Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:var(--sans);color:var(--ink700);background:#fff;padding:32px 24px 64px;line-height:1.45}
+h1{font-family:var(--display);font-weight:600;font-size:30px;color:var(--ink900)}
+.lede{max-width:72ch;margin:8px 0 28px;color:var(--ink500);font-size:15px}
+.row{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.col{width:375px}
+.col h2{font-family:var(--display);font-weight:600;font-size:20px;color:var(--ink900)}
+.col .why{font-size:13px;color:var(--ink500);margin:4px 0 12px;min-height:56px}
+.stage{background:#DDE5DC;border-radius:24px;padding:44px 0 0;overflow:hidden;border:1px solid var(--bone200)}
+.sheet{background:var(--bone50);border-radius:20px 20px 0 0;padding:0 0 22px;overflow:hidden;box-shadow:0 -2px 14px rgba(26,24,23,.10)}
+.grab{width:40px;height:4px;border-radius:9999px;background:var(--bone50);opacity:.9;position:absolute;top:10px;left:50%;transform:translateX(-50%)}
+.photo-wrap{position:relative}
+.photo{display:block;width:100%;height:170px;object-fit:cover;background:var(--bone200)}
+.nophoto{position:relative;padding:26px 18px 0}
+.nophoto .grab{background:var(--bone300)}
+.stocked{--c:var(--success)}.low{--c:var(--warning)}.empty{--c:var(--danger)}.unknown{--c:var(--ink400)}
+.dot{width:10px;height:10px;border-radius:9999px;display:inline-block;flex:none;background:var(--c)}
+.pill{position:absolute;left:14px;bottom:12px;background:var(--bone50);border-radius:9999px;padding:6px 12px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--c)}
+.pill span{font-weight:500;color:var(--ink500)}
+.nophoto .pill{position:static;display:inline-flex;background:var(--bone100);margin-bottom:10px}
+.photocap{position:absolute;right:12px;bottom:12px;background:var(--bone50);border-radius:9999px;padding:4px 10px;font-size:11px;color:var(--ink500)}
+
+/* credit band — always present; its second line is always the adopt link */
+.credit{padding:10px 18px;font-size:14px;display:flex;gap:10px;align-items:flex-start;background:var(--sage50);color:var(--sage700)}
+.credit.needs{background:var(--clay100);color:var(--clay700)}
+.credit svg{flex:none;margin-top:2px}
+.credit b{font-weight:600}
+.credit a{display:inline-block;margin-top:2px;font-weight:600;color:inherit;text-decoration:underline;text-underline-offset:2px}
+.credit .line2{font-size:13px}
+
+.body{padding:14px 18px 0}
+.head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.badge{display:inline-block;background:var(--blessing);color:var(--bone50);font-size:11px;font-weight:600;padding:3px 10px;border-radius:9999px}
+.title{font-family:var(--display);font-weight:600;font-size:22px;line-height:1.15;color:var(--ink900);margin-top:6px}
+.addr{font-size:13px;color:var(--ink500);margin-top:3px}
+.dir{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border-radius:10px;background:var(--orange);color:var(--navy);font-weight:700;font-size:14px;border:0}
+.label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink400)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{background:var(--bone100);border-radius:9999px;padding:4px 10px;font-size:13px}
+.note{font-size:13px;color:var(--ink500);margin-top:10px}
+.rule{height:1px;background:var(--bone200);margin:14px 0}
+.q{font-family:var(--display);font-weight:600;font-size:18px;color:var(--ink900)}
+.btn{min-height:48px;border-radius:10px;font:600 13px var(--sans);padding:4px;border:1px solid var(--bone300);background:#fff;color:var(--ink700)}
+.tri{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.tri .btn i{display:block;width:8px;height:8px;border-radius:9999px;margin:0 auto 3px;background:var(--c)}
+.wide{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.wide .btn{font-weight:500;min-height:44px}
+.links{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;font-weight:500}
+.links a{color:var(--sage600);text-decoration:underline;text-underline-offset:2px}
+.links a.quiet{color:var(--ink500)}
+</style>
+</head>
+<body>
+<h1>Blessing Box card — combined mockup</h1>
+<p class="lede">Photo first, with the host and sponsor band right under it. The band always carries the sponsor link: a box with no sponsor asks for one; a sponsored box points people to another box that needs one. The check-in is the "How does the box look right now?" row with the colored dots. The bottom holds only History and Email me when it needs filling. Shown in three states.</p>
+
+<div class="row" id="row"></div>
+
+<script>
+const PHOTO = "data:image/svg+xml;utf8," + encodeURIComponent(
+ `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 375 200'><rect width='375' height='200' fill='#CFC7B0'/><rect y='140' width='375' height='60' fill='#9DB59F'/><rect x='150' y='40' width='80' height='120' rx='4' fill='#F4F1EA' stroke='#6A645A' stroke-width='3'/><path d='M140 44 L190 14 L240 44Z' fill='#C2447B'/><line x1='150' y1='80' x2='230' y2='80' stroke='#6A645A' stroke-width='2'/><line x1='150' y1='118' x2='230' y2='118' stroke='#6A645A' stroke-width='2'/><rect x='158' y='58' width='14' height='22' fill='#BE2D45'/><rect x='176' y='62' width='12' height='18' fill='#1F4E8C'/><rect x='194' y='56' width='16' height='24' fill='#F7943C'/><rect x='160' y='96' width='22' height='22' fill='#2C5F4F'/><rect x='188' y='100' width='30' height='18' fill='#92591D'/><rect x='186' y='160' width='8' height='40' fill='#6A645A'/></svg>`);
+
+const heart = fill => `<svg width="18" height="18" viewBox="0 0 24 24" fill="${fill}" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+
+const boxes = [
+ {h:"Hosted and sponsored", w:"Green band: host, sponsor, and a link to find a box that still needs a sponsor.",
+  name:"Routt Street Blessing Box", addr:"216 W Routt Ave, Pueblo", status:"stocked", statusText:"Stocked", filled:"filled 2 hours ago",
+  host:"Seventh-Day Adventist Church", sponsor:"the Boyd Family", photo:true, needs:["Canned soup","Diapers","Pet food"],
+  note:"Please close the door tight — the wind catches it."},
+ {h:"Hosted, no sponsor", w:"Band turns warm and asks for a sponsor. The link opens the same adopt form the card has today, in place.",
+  name:"Practice Box #2", addr:"900 W Example Ave, Pueblo", status:"low", statusText:"Running low", filled:"filled 3 days ago",
+  host:"Eastside Library", sponsor:null, photo:true, needs:["Peanut butter","Socks"], note:null},
+ {h:"Bare box", w:"No photo, no host, no sponsor, no check-ins. The sponsor ask is still the first thing under the status.",
+  name:"Practice Box #3", addr:"1400 E Example St, Pueblo", status:"unknown", statusText:"Unknown", filled:"no recent check-ins",
+  host:null, sponsor:null, photo:false, needs:[], note:null},
+];
+
+function card(d){
+  const pill = `<div class="pill"><i class="dot"></i>${d.statusText}<span>· ${d.filled}</span></div>`;
+  const top = d.photo
+    ? `<div class="photo-wrap ${d.status}"><img class="photo" src="${PHOTO}" alt=""><div class="grab"></div>${pill}<div class="photocap">Photo · 3 hours ago</div></div>`
+    : `<div class="nophoto ${d.status}"><div class="grab"></div>${pill}</div>`;
+  const hostLine = d.host ? `Hosted by <b>${d.host}</b><br>` : "";
+  const band = d.sponsor
+    ? `<div class="credit">${heart("#2C5F4F")}<div>${hostLine}Sponsored by <b>${d.sponsor}</b><div class="line2"><a href="#">Find a box that needs a sponsor</a></div></div></div>`
+    : `<div class="credit needs">${heart("#7C2D12")}<div>${hostLine}<b>This box needs a sponsor.</b><div class="line2"><a href="#">Apply to adopt this box</a></div></div></div>`;
+  return `<div class="stage"><div class="sheet">${top}${band}
+   <div class="body">
+    <div class="head"><div><span class="badge">Blessing Box</span><div class="title">${d.name}</div><div class="addr">${d.addr}</div></div><button class="dir">Directions</button></div>
+    ${d.needs.length?`<div style="margin-top:12px"><div class="label">Most needed</div><div class="chips">${d.needs.map(n=>`<span class="chip">${n}</span>`).join("")}</div></div>`:""}
+    ${d.note?`<p class="note">“${d.note}”</p>`:""}
+    <div class="rule"></div>
+    <div class="q">How does the box look right now?</div>
+    <div class="tri"><button class="btn stocked"><i></i>I filled it</button><button class="btn low"><i></i>Running low</button><button class="btn empty"><i></i>It's empty</button></div>
+    <div class="wide"><button class="btn">I used this box</button><button class="btn">Add a photo</button></div>
+    <div class="links" style="margin-top:10px"><a class="quiet" href="#">Report a problem</a>${d.photo?'<a class="quiet" href="#">Report photo</a>':""}</div>
+    <div class="rule"></div>
+    <div class="links"><a href="#">History</a><a href="#">Email me when it needs filling</a></div>
+   </div></div></div>`;
+}
+document.getElementById("row").innerHTML = boxes.map(d =>
+ `<div class="col"><h2>${d.h}</h2><p class="why">${d.w}</p>${card(d)}</div>`).join("");
+</script>
+</body>
+</html>

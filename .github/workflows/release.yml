@@ -117,8 +117,8 @@ jobs:
       # (extraheader): the model gets Read plus Edit on CHANGELOG.md only, no
       # Bash, and is denied .git explicitly. Both `.git/**` and `./.git/**`
       # spellings are listed since path-rule anchoring differs by version. The
-      # credential grep + "only CHANGELOG.md changed" checks in the next step
-      # are the backstop if a rule is wrong.
+      # push-target check, credential grep and "only CHANGELOG.md changed"
+      # checks in the next step are the backstop if a rule is wrong.
       #
       # WHY there is no hash check on .git/config: the action itself rewrites
       # it before the model starts (sets the git user, swaps checkout's
@@ -171,6 +171,15 @@ jobs:
           VERSION: ${{ steps.prep.outputs.version }}
         run: |
           set -euo pipefail
+          # The push below carries a repo-write token, so prove it still goes
+          # to this repo. `get-url` applies any url.*.insteadOf rewrite, so a
+          # retargeted remote or a rewrite rule both fail here. Never echo the
+          # URL: it embeds the token.
+          if ! git remote get-url --push origin \
+            | grep -Eiq "^https://([^@/]+@)?github\.com/${GITHUB_REPOSITORY}(\.git)?$"; then
+            echo "origin no longer points at ${GITHUB_REPOSITORY}; refusing to push" >&2
+            exit 1
+          fi
           if grep -Eq 'x-access-token|ghs_|ghp_|github_pat_' CHANGELOG.md; then
             echo "CHANGELOG.md contains something that looks like a credential" >&2
             exit 1

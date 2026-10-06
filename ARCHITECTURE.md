@@ -759,7 +759,9 @@ titles). `release.yml` (cron Sun 02:00 UTC = Saturday evening Mountain, or
 `workflow_dispatch`) runs `scripts/release/prepare.mjs` (dry run: next version
 from the merged-PR titles — `feat` → minor, else patch, major only via a forced
 version — plus the PR list), has Claude write the plain-language CHANGELOG.md
-section (the run fails unless that is the only file changed), then bumps
+section (the run fails unless that is the only file changed, and unless
+`scripts/release/check-push-target.sh` confirms `origin` still pushes to this
+repo — the model step shares the checkout that holds the write token), then bumps
 `package.json`/lock itself and opens `Release vX.Y.Z` from `release/vX.Y.Z`
 into `main`. `main` requires linear history, so it is squash-merged; that
 triggers `deploy-prod.yml`. Once the smoke checks pass, two independent jobs

@@ -123,6 +123,15 @@ jobs:
           npm audit >> $GITHUB_STEP_SUMMARY 2>&1 || true
           echo '```' >> $GITHUB_STEP_SUMMARY
 
+      - name: Lockfile flags (production packages must not be marked dev)
+        # WHY: the audit below passes `--omit=dev`, so it only checks what the
+        # lockfile says is production. npm 10 (Node 22's bundled npm) has
+        # marked reachable packages dev on lockfile writes (e527456, 51bfc98),
+        # which hides them from the audit; fail here instead of auditing less.
+        # Same condition as the audit step: a data-only publish PR skips both.
+        if: steps.detect.outputs.data_only != 'true'
+        run: node scripts/security/check-lockfile-flags.mjs
+
       - name: Run NPM Dependency Audit (production only, blocking)
         # Skipped for a data-only publish PR (#336) -- same reasoning as
         # ci.yml's "npm audit (production deps, high/critical only)" step: a

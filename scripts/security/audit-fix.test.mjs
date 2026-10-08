@@ -185,11 +185,16 @@ describe("audit-fix.sh: a fix is available", () => {
     expect(r.prBody).toContain("| new-dev-tool | - | 1.0.0 |");
   });
 
-  test("a PR is already open: no second PR, stale branch is replaced, auto-merge is re-queued", () => {
-    const r = run({ lockAfter: BUMPED, openPr: "42", staleBranch: true });
+  // The stub prints what `gh pr list --jq` would: "<number> <auto-merge already on?>".
+  test.each([
+    // Left open by a run that died before switching auto-merge on: switch it on now, or nothing ever merges it.
+    ["42 false", ["gh[app-token] pr merge --auto --squash 42"]],
+    ["42 true", []],
+  ])("a PR is already open (%s): no second PR, stale branch is replaced", (openPr, merges) => {
+    const r = run({ lockAfter: BUMPED, openPr, staleBranch: true });
     expect(r.status).toBe(0);
     expect(r.calls(/ pr create /)).toEqual([]);
-    expect(r.calls(/ pr merge /)).toEqual(["gh[app-token] pr merge --auto --squash 42"]);
+    expect(r.calls(/ pr merge /)).toEqual(merges);
     expect(r.remote("rev-parse", `${BRANCH}^`)).toBe(r.remote("rev-parse", "dev"));
     expect(r.remote("diff", "--name-only", "dev", BRANCH)).toBe("package-lock.json");
   });

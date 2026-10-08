@@ -46,8 +46,14 @@ if [ -s "$tmp/rows.md" ]; then
   # One fixed branch, recreated from current dev each run: a stale or conflicted PR heals itself next run.
   git push -q --force origin "$BRANCH"
 
-  pr=$(gh pr list --head "$BRANCH" --base dev --state open --json number --jq '.[0].number // empty')
-  if [ -z "$pr" ]; then
+  # "<number> <true|false>": is a PR open for the branch, and is auto-merge already switched on?
+  open=$(gh pr list --head "$BRANCH" --base dev --state open --json number,autoMergeRequest \
+    --jq '.[0] | select(.) | "\(.number) \(.autoMergeRequest != null)"')
+  armed=false
+  if [ -n "$open" ]; then
+    pr=${open% *}
+    armed=${open#* }
+  else
     {
       echo "Automated fix for known security advisories. Only \`package-lock.json\` changed; \`package.json\` is unchanged."
       printf '\n| package | before | after |\n|---|---|---|\n'
@@ -56,9 +62,10 @@ if [ -s "$tmp/rows.md" ]; then
     } > "$tmp/body.md"
     pr=$(gh pr create --base dev --head "$BRANCH" --title "$TITLE" --body-file "$tmp/body.md")
   fi
-  # dev's ruleset requires four status checks, so --auto waits for green. Re-run each day so a PR whose
-  # auto-merge never got switched on (an earlier run died after creating it) is not stuck forever.
-  gh pr merge --auto --squash "$pr"
+  # dev's ruleset requires four status checks, so --auto waits for green. Also done for a PR left open by an
+  # earlier run that died between create and this call, or no one would ever merge it (and the audit below,
+  # run on the fixed lockfile, would stay quiet). Skipped when already on, so a healthy open PR costs no call.
+  [ "$armed" = true ] || gh pr merge --auto --squash "$pr"
 else
   cp "$tmp/before.json" package-lock.json # drop metadata-only churn
 fi

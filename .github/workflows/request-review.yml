@@ -10,6 +10,19 @@ name: Request review on human PRs
 # contributors), where a plain `pull_request` run would only get a read-only token
 # and couldn't request a reviewer. This job NEVER checks out or runs the PR's code —
 # it only calls the GitHub API — so pull_request_target is safe here.
+#
+# WHY there is a repository Actions policy for this file: from 2026-11-02 GitHub
+# blocks the `pull_request_target` event in public repositories unless an
+# Actions policy explicitly allows it. This repo has policy id 6930, "Allow
+# pull_request_target for the two API-only workflows" (Settings -> Actions ->
+# Policies; REST `repos/kr8vka0z/pueblo-food-map/actions/policies`, header
+# `X-GitHub-Api-Version: 2026-03-10`), created 2026-10-08. It is scoped to
+# exactly this file and dependabot-auto-merge.yml and allow-lists exactly one
+# event, `pull_request_target`. Consequences: adding any other trigger here (e.g.
+# `workflow_dispatch`) is blocked until the policy's allowed events are updated,
+# and deleting the policy stops this workflow (and dependabot-auto-merge.yml)
+# from running. A new workflow that needs `pull_request_target` must be added to
+# the policy's file list.
 
 on:
   pull_request_target:

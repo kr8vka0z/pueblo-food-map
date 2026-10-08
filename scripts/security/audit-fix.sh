@@ -133,8 +133,8 @@ else
       printf '\nThe automatic fixer can update these packages, but the job did not open a pull request because the check would still fail afterwards:\n\n| package | before | after |\n|---|---|---|\n%s\n\nStill failing after those updates:\n\n%s\n' "$(cat "$tmp/rows.md")" "$still"
     fi
     [ -z "$held" ] || printf '\nSome fixes were held back because the fixed version is less than 3 days old (a safety delay against hijacked releases). The job picks them up by itself once they are 3 days old. For an urgent hand fix, add `--min-release-age-exclude=<package>` to the commands below.\n\n```\n%s\n```\n' "$held"
-    echo
-    echo "The usual cause is a package pinned to an exact version in package.json, which the automatic fixer cannot touch. Monday's Dependabot version update normally bumps it."
+    # Not said when a fix PR is merely stuck: then the cause is that PR's failing checks, not a pin.
+    [ -n "$stuck_pr" ] || printf '\n%s\n' "The usual cause is a package pinned to an exact version in package.json, which the automatic fixer cannot touch. Monday's Dependabot version update normally bumps it."
     printf '\nTo fix it by hand, make both changes in ONE pull request into `dev`, from a new branch (never push to `%s`: the job owns it and overwrites it every run). `--save-exact` matters: without it npm turns an exact pin into a range.\n\n```\nnpx -y %s install --save-exact --package-lock-only --ignore-scripts <package>@<fixed version>\nnpx -y %s audit fix --package-lock-only --ignore-scripts --omit=dev\n```\n' "$BRANCH" "$NPM" "$NPM"
     printf '\nLast checked: %s. This issue closes itself when the check passes again.\n' "$(date -u +%F)"
   } > "$tmp/issue.md"

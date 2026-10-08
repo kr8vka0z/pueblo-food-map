@@ -74,6 +74,8 @@ interface HamburgerMenuProps {
   onToggleView?: () => void;
   /** #165 — true while the map can't mount; hides the line rather than showing a dead action. */
   mapDisabled?: boolean;
+  /** "Learn how to use this map" (#159) — starts the guided tour. Omit to hide the item. */
+  onStartTour?: () => void;
 }
 
 // All focusable elements inside the panel for tab-trap.
@@ -92,6 +94,7 @@ export default function HamburgerMenu({
   viewMode,
   onToggleView,
   mapDisabled = false,
+  onStartTour,
 }: HamburgerMenuProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   // Element focused when the drawer opened (the nav item) — focus returns there on close.
@@ -353,6 +356,18 @@ export default function HamburgerMenu({
             onToggleView={onToggleView}
             mapDisabled={mapDisabled}
             onClose={close}
+            // onClose (the prop), not close(): close() queues a focus hop
+            // back to the nav button, which would land mid-tour and pull
+            // focus out of the tour's dialog. The tour returns focus to that
+            // same button itself when it ends (#159).
+            onStartTour={
+              onStartTour
+                ? () => {
+                    onClose();
+                    onStartTour();
+                  }
+                : undefined
+            }
           />
         </div>
       )}

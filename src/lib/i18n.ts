@@ -164,6 +164,9 @@ const en: Record<string, string> = {
   "splash.purpose": "A free, community-built map of food resources across Pueblo County.",
   "splash.cta.primary": "Find food near me",
   "splash.microcopy": "We only use your location to show food nearby. Nothing is saved.",
+  // Guided tour triggers (#159). The tour's own step copy lives in
+  // src/lib/guidedTour.ts (lazy-loaded with the tour, see its header).
+  "splash.tour": "Take a tour",
 
   // Location help card (#739; replaces the #68 denied banner). Body = a
   // reason-specific lead sentence + locationCard.tapPin. "See all places as a
@@ -222,6 +225,7 @@ const en: Record<string, string> = {
   // Agency credit (StyxCredit.tsx) — followed by the linked name "The Styx Group".
   "credit.builtBy": "Designed, built and managed by",
   "menu.showWelcome": "Show welcome screen",
+  "menu.tour": "Learn how to use this map",
   "menu.language": "Language / Idioma",
   // #689 PR 2, design decision 2 / Kyle's 2026-09-28 decision 2: shown in the
   // Menu, below the toggle, ONLY when a visitor is on the EN tree (`/`) with
@@ -1361,6 +1365,7 @@ const es: Record<string, string> = {
   "splash.purpose": "Un mapa comunitario y gratuito de recursos alimentarios en el condado de Pueblo.",
   "splash.cta.primary": "Encuentra comida cerca de mí",
   "splash.microcopy": "Solo usamos tu ubicación para mostrar alimentos cercanos. Nada se guarda.",
+  "splash.tour": "Ver cómo funciona", // [CHECK]
 
   // Location help card (#739) — all [CHECK]: native-speaker review pending.
   "locationCard.denied.title": "Ubicación desactivada", // [CHECK]
@@ -1408,6 +1413,7 @@ const es: Record<string, string> = {
   "menu.sponsoredBy": "Patrocinado por",
   "credit.builtBy": "Diseñado, creado y administrado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
+  "menu.tour": "Aprende a usar este mapa", // [CHECK]
   "menu.language": "Language / Idioma",
   "menu.verEnEspanol": "Ver en español →",
   "menu.listView": "Vista de lista",

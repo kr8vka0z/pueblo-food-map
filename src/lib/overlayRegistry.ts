@@ -141,6 +141,21 @@ export function useOverlayStackId(isOpen: boolean): string {
   return id;
 }
 
+/**
+ * Moves `id` to the top of the stack (no-op if it isn't on it). For the
+ * guided tour (#159) only: it is modal and covers everything, so it is
+ * always the real topmost layer — but it OPENS the venue card itself mid-tour,
+ * and that card pushes onto this stack after the tour did (a commit later on
+ * desktop, where DesktopVenueWindow is a lazy chunk). Without raising, Escape
+ * during that step would close the card instead of the tour.
+ */
+export function raiseOverlay(id: string): void {
+  const idx = overlayStack.indexOf(id);
+  if (idx === -1 || idx === overlayStack.length - 1) return;
+  overlayStack.splice(idx, 1);
+  overlayStack.push(id);
+}
+
 /** True while `id` is the most-recently-opened overlay still on the stack. */
 export function isTopmostOverlay(id: string): boolean {
   return overlayStack.length > 0 && overlayStack[overlayStack.length - 1] === id;

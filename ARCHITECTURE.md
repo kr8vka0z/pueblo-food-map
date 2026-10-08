@@ -795,13 +795,20 @@ atlas-kb "PFM ARCHITECTURE History — 2026-09-24 Trim".
 **Security fixes.** Dependabot *security* updates always target `main` (they
 ignore `target-branch`), so they are off in repo settings and `security-fix.yml`
 replaces them: daily it runs `scripts/security/audit-fix.sh` on `dev`, which
-applies `npm audit fix --package-lock-only` with npm 11 (npm 10 hides production
-packages from the audit, #752/#753) and, if a version changed, opens an
-auto-merging `fix/security-advisories` PR into `dev` with an App token. It then
-re-runs the required "Dependency CVE Audit" command; if that still fails
-(usually an exact-pinned direct dependency, out of `audit fix`'s reach) it keeps
-one open issue, "Security check is failing and cannot be fixed automatically",
-and closes it when the check passes. The run stays green; the issue is the signal.
+applies `npm audit fix --package-lock-only --omit=dev --min-release-age=3` with a
+pinned npm 11 (npm 10 hides production packages from the audit, #752/#753;
+build tools are left to Dependabot; a version under 3 days old is never locked,
+since the PR merges with no human). If the required "Dependency CVE Audit"
+command passes on the fixed lockfile it opens an auto-merging
+`fix/security-advisories` PR into `dev` with an App token, reusing only a
+same-repo PR (`--head` matches by branch name, so a fork PR could otherwise be
+adopted). A fix that would still leave the check red is not shipped: while the
+check is red nothing merges unless one PR turns it green, so a partial PR could
+never land. Issue state follows dev's own lockfile: one bot-authored issue,
+"Security check is failing and cannot be fixed automatically", is created or
+edited while dev fails (not when the PR was just created and is minutes from
+merging) and closed when dev passes. The run is green when the result was
+reported (fixed, or issue raised) and red when the job itself could not run.
 
 **Environment variables:** `NEXT_PUBLIC_*` vars are baked into the client
 bundle at build time, so they are GitHub Actions repo secrets injected into

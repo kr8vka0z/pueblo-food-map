@@ -1,7 +1,9 @@
 /**
  * audit-fix.test.mjs — drives the real scripts/security/audit-fix.sh in a throwaway git repo (with a local bare repo as `origin`, so the push is real)
- * and stub `npx` / `npm` / `gh` first on PATH. Guards the risky parts: nothing ships unless a package version really changed, the lockfile-only and
- * no-false-"dev" guards stop a bad push, the PR and issue calls use the right tokens, and the "failing" issue is created once, edited, then closed.
+ * and stub `npx` / `npm` / `gh` first on PATH. The stubs are small simulators: `npm audit` fails while the lockfile in the working directory holds a
+ * "vulnerable" name@version, and `gh pr list` / `gh issue list` run the script's own `--jq` program (real jq) over fixture JSON.
+ * Guards the risky parts: nothing ships unless the fix turns the required check green, only a same-repo PR is ever reused, the PR and issue calls
+ * use the right tokens, and the one bot-owned issue follows dev's own lockfile (created once, edited, closed; a human's look-alike is never touched).
  */
 import { describe, test, expect } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -22,37 +24,52 @@ const lock = (pkgs) =>
   JSON.stringify({ name: "app", lockfileVersion: 3, packages: { "": { name: "app", version: "1.0.0" }, ...pkgs } }, null, 2) + "\n";
 const BASE = {
   "node_modules/lodash": { version: "4.17.20" },
+  "node_modules/minimist": { version: "1.2.0" },
   "node_modules/some-test-tool": { version: "2.0.0", dev: true },
 };
 const BUMPED = { ...BASE, "node_modules/lodash": { version: "4.17.21" } };
+// Vulnerable name@version lists the npm stub fails the check on. FIXABLE is cured by BUMPED; PARTIAL still fails after it (minimist has no fix).
+const FIXABLE = "lodash@4.17.20";
+const PARTIAL = "lodash@4.17.20,minimist@1.2.0";
 
-const AUDIT_JSON = JSON.stringify({
-  vulnerabilities: {
-    lodash: {
-      name: "lodash",
-      severity: "high",
-      via: [{ source: 1, name: "lodash", title: "Prototype Pollution", url: "https://github.com/advisories/GHSA-test-1234", severity: "high" }],
-    },
-    semver: { name: "semver", severity: "moderate", via: [{ url: "https://github.com/advisories/GHSA-moderate", severity: "moderate" }] },
-  },
-});
+const pr = (number, extra = {}) => ({ number, headRefName: BRANCH, isCrossRepository: false, autoMergeRequest: null, ...extra });
+const botIssue = (number) => ({ number, title: ISSUE_TITLE, author: { is_bot: true } });
+const humanIssue = (number) => ({ number, title: ISSUE_TITLE, author: { is_bot: false } });
 
 // Each stub appends one line to $STUB_LOG, which lives outside the repo so it never shows up in `git status`.
 const STUBS = {
   // The real `npm audit fix` exits 1 while any advisory stays unfixed; the script must ignore that.
   npx: `echo "npx $*" >> "$STUB_LOG"
+[ -z "\${STUB_NPX_STDERR:-}" ] || echo "$STUB_NPX_STDERR" >&2
 [ -z "\${STUB_LOCK_AFTER:-}" ] || cp "$STUB_LOCK_AFTER" package-lock.json
 [ -z "\${STUB_DIRTY_FILE:-}" ] || echo changed >> "$STUB_DIRTY_FILE"
 exit 1`,
+  // Fails (exit 1) while package-lock.json in the cwd holds a name@version listed in STUB_VULN; --json names them like npm does.
   npm: `echo "npm $*" >> "$STUB_LOG"
-case " $* " in *" --json "*) cat "\${STUB_AUDIT_JSON:-/dev/null}" ;; esac
-exit "\${STUB_AUDIT_EXIT:-0}"`,
+if [ -n "\${STUB_AUDIT_BROKEN:-}" ]; then
+  case " $* " in *" --json "*) echo '{"error":{"code":"ENOTFOUND"}}' ;; esac
+  exit 1
+fi
+out=$(jq -c --arg v "\${STUB_VULN:-}" '
+  [.packages | to_entries[] | select(.key != "") | {n: (.key | sub("^.*node_modules/"; "")), v: .value.version}] as $have
+  | ($v | split(",")) as $bad
+  | [$have[] | select((.n + "@" + .v) as $id | $bad | any(. == $id))]
+  | {vulnerabilities: (map({key: .n, value: {name: .n, severity: "high", via: [{url: ("https://advisories.test/" + .n)}]}}) | from_entries)}' package-lock.json)
+case " $* " in *" --json "*) echo "$out" ;; esac
+[ "$(echo "$out" | jq '.vulnerabilities | length')" = 0 ]`,
   gh: `echo "gh[$GH_TOKEN] $*" >> "$STUB_LOG"
-while [ $# -gt 0 ]; do [ "$1" != --body-file ] || cp "$2" "$STUB_OUT/body-$GH_SUB.md"; shift; done
+args=("$@"); head=""; prog="."
+for ((i = 0; i < \${#args[@]}; i++)); do
+  case "\${args[i]}" in
+    --head) head="\${args[i+1]}" ;;
+    --jq) prog="\${args[i+1]}" ;;
+    --body-file) cp "\${args[i+1]}" "$STUB_OUT/body-$GH_SUB.md" ;;
+  esac
+done
 case "$GH_SUB" in
-  "pr list") echo "\${STUB_OPEN_PR:-}" ;;
+  "pr list") printf '%s' "\${STUB_PRS:-[]}" | jq --arg h "$head" '[.[] | select(.headRefName == $h)]' | jq -r "$prog" ;;
   "pr create") echo "https://github.com/o/r/pull/9" ;;
-  "issue list") echo "\${STUB_ISSUES:-[]}" ;;
+  "issue list") printf '%s' "\${STUB_ISSUES:-[]}" ;;
 esac`,
 };
 
@@ -62,7 +79,7 @@ esac`,
  * scripts/release/check-push-target.test.mjs) correctly refuses a local bare `origin`, and the script calls
  * it by a cwd-relative path, so the production script needs no test-only switch.
  */
-function run({ lockAfter, dirtyFile, pushCheck = 0, openPr = "", issues = [], auditExit = 0, auditJson, staleBranch = false } = {}) {
+function run({ lockAfter, dirtyFile, pushCheck = 0, prs = [], issues = [], vuln = "", auditBroken = false, npxStderr = "", staleBranch = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "audit-fix-"));
   const [bare, work, bin, out] = ["origin.git", "work", "bin", "out"].map((d) => join(root, d));
   const log = join(root, "calls.log");
@@ -103,8 +120,6 @@ function run({ lockAfter, dirtyFile, pushCheck = 0, openPr = "", issues = [], au
   }
   const lockAfterFile = join(root, "lock-after.json");
   if (lockAfter) writeFileSync(lockAfterFile, lock(lockAfter));
-  const auditJsonFile = join(root, "audit.json");
-  if (auditJson) writeFileSync(auditJsonFile, auditJson);
 
   const env = {
     ...GIT_ENV,
@@ -115,12 +130,13 @@ function run({ lockAfter, dirtyFile, pushCheck = 0, openPr = "", issues = [], au
     STUB_LOG: log,
     STUB_OUT: out,
     STUB_PUSH_CHECK: String(pushCheck),
-    STUB_AUDIT_EXIT: String(auditExit),
-    STUB_OPEN_PR: openPr,
+    STUB_VULN: vuln,
+    STUB_PRS: JSON.stringify(prs),
     STUB_ISSUES: JSON.stringify(issues),
+    ...(auditBroken && { STUB_AUDIT_BROKEN: "1" }),
+    ...(npxStderr && { STUB_NPX_STDERR: npxStderr }),
     ...(lockAfter && { STUB_LOCK_AFTER: lockAfterFile }),
     ...(dirtyFile && { STUB_DIRTY_FILE: dirtyFile }),
-    ...(auditJson && { STUB_AUDIT_JSON: auditJsonFile }),
   };
   const r = spawnSync("bash", [script], { cwd: work, env, encoding: "utf8" });
   const lines = existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean) : [];
@@ -140,17 +156,24 @@ function run({ lockAfter, dirtyFile, pushCheck = 0, openPr = "", issues = [], au
   };
 }
 
+const ISSUE_WRITES = / issue (create|edit|close)/;
+const PR_WRITES = / pr (create|merge|close)/;
+
 describe("audit-fix.sh: nothing worth shipping", () => {
-  test("no change and a green check: no push, no PR, no issue", () => {
+  test("no change and a green check: no push, no PR, no issue, one audit", () => {
     const r = run();
     expect(r.status).toBe(0);
     expect(r.remoteBranches()).toEqual(["dev"]);
-    expect(r.calls(/ pr /)).toEqual([]);
-    expect(r.calls(/ issue (create|edit|close)/)).toEqual([]);
+    expect(r.calls(PR_WRITES)).toEqual([]);
+    expect(r.calls(ISSUE_WRITES)).toEqual([]);
     expect(r.dirty()).toBe("");
-    // The write goes through npm 11, never the bundled npm 10 (#752/#753); the check runs exactly as CI runs it.
-    expect(r.calls(/^npx/)).toEqual(["npx -y npm@11 audit fix --package-lock-only --ignore-scripts"]);
+    // Pinned npm 11 for the write (#752/#753), production deps only, 3-day release age; the check runs as CI runs it, once.
+    expect(r.calls(/^npx/)).toEqual(["npx -y npm@11.21.0 audit fix --package-lock-only --ignore-scripts --omit=dev --min-release-age=3"]);
     expect(r.calls(/^npm/)).toEqual(["npm audit --audit-level=high --omit=dev"]);
+    // The open-PR lookup must ask for this branch into dev (a wrong --head would miss the bot's own PR).
+    const listed = r.calls(/ pr list /);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toContain(`--head ${BRANCH} --base dev`);
   });
 
   test("lockfile churn with no version change is dropped: lockfile restored, nothing pushed", () => {
@@ -158,15 +181,28 @@ describe("audit-fix.sh: nothing worth shipping", () => {
     const r = run({ lockAfter: churned });
     expect(r.status).toBe(0);
     expect(r.remoteBranches()).toEqual(["dev"]);
-    expect(r.calls(/ pr /)).toEqual([]);
+    expect(r.calls(PR_WRITES)).toEqual([]);
     expect(r.dirty()).toBe("");
+  });
+
+  test("nothing to fix and the bot's own PR is still open: it is superseded and closed with its branch", () => {
+    const r = run({ prs: [pr(42)] });
+    expect(r.status).toBe(0);
+    expect(r.calls(/ pr close 42 --delete-branch /)).toHaveLength(1);
+    expect(r.calls(/ pr (create|merge)/)).toEqual([]);
+  });
+
+  test("a fork PR from a branch with the same name is never closed", () => {
+    const r = run({ prs: [pr(43, { isCrossRepository: true })] });
+    expect(r.status).toBe(0);
+    expect(r.calls(PR_WRITES)).toEqual([]);
   });
 });
 
-describe("audit-fix.sh: a fix is available", () => {
-  test("pushes only package-lock.json on a fresh branch, opens one PR into dev and queues auto-merge", () => {
-    // Also proves the dev-flag guard lets a NEW package carry dev:true (only packages present before are checked).
-    const r = run({ lockAfter: { ...BUMPED, "node_modules/new-dev-tool": { version: "1.0.0", dev: true } } });
+describe("audit-fix.sh: a fix turns the check green", () => {
+  test("pushes only package-lock.json on a fresh branch, opens one PR into dev, arms auto-merge on that commit, raises no issue", () => {
+    // dev is red (FIXABLE) and this run just created the fix PR: it is minutes from merging, so no issue either way.
+    const r = run({ lockAfter: { ...BUMPED, "node_modules/new-tool": { version: "1.0.0" } }, vuln: FIXABLE });
     expect(r.status).toBe(0);
     expect(r.remoteBranches()).toEqual(["dev", BRANCH]);
     expect(r.remote("diff", "--name-only", "dev", BRANCH)).toBe("package-lock.json");
@@ -179,76 +215,134 @@ describe("audit-fix.sh: a fix is available", () => {
     expect(created[0]).toContain("--base dev");
     expect(created[0]).toContain(`--head ${BRANCH}`);
     expect(created[0]).toContain(PR_TITLE);
-    expect(r.calls(/ pr merge /)).toEqual(["gh[app-token] pr merge --auto --squash https://github.com/o/r/pull/9"]);
+    // Never merge content this run did not just push.
+    expect(r.calls(/ pr merge /)).toEqual([
+      `gh[app-token] pr merge --auto --squash --match-head-commit ${r.remote("rev-parse", BRANCH)} https://github.com/o/r/pull/9`,
+    ]);
     expect(r.calls(/ pr /).every((l) => l.startsWith("gh[app-token]"))).toBe(true);
     expect(r.prBody).toContain("| lodash | 4.17.20 | 4.17.21 |");
-    expect(r.prBody).toContain("| new-dev-tool | - | 1.0.0 |");
+    expect(r.prBody).toContain("| new-tool | - | 1.0.0 |");
+    expect(r.calls(ISSUE_WRITES)).toEqual([]);
   });
 
-  // The stub prints what `gh pr list --jq` would: "<number> <auto-merge already on?>".
+  // The stub's `gh pr list` runs the script's own --jq over this fixture, so a flipped condition changes the outcome.
   test.each([
-    // Left open by a run that died before switching auto-merge on: switch it on now, or nothing ever merges it.
-    ["42 false", ["gh[app-token] pr merge --auto --squash 42"]],
-    ["42 true", []],
-  ])("a PR is already open (%s): no second PR, stale branch is replaced", (openPr, merges) => {
-    const r = run({ lockAfter: BUMPED, openPr, staleBranch: true });
+    // Left open by a run that died before arming auto-merge: arm it now, or nothing ever merges it.
+    [false, 1],
+    [true, 0],
+  ])("a same-repo PR is already open (auto-merge on: %s): no second PR, stale branch replaced, armed %i time(s)", (on, merges) => {
+    const r = run({ lockAfter: BUMPED, prs: [pr(42, { autoMergeRequest: on ? { enabledAt: "x" } : null })], staleBranch: true });
     expect(r.status).toBe(0);
     expect(r.calls(/ pr create /)).toEqual([]);
-    expect(r.calls(/ pr merge /)).toEqual(merges);
+    const armed = r.calls(/ pr merge /);
+    expect(armed).toHaveLength(merges);
+    armed.forEach((l) => expect(l).toContain(`--match-head-commit ${r.remote("rev-parse", BRANCH)} 42`));
     expect(r.remote("rev-parse", `${BRANCH}^`)).toBe(r.remote("rev-parse", "dev"));
     expect(r.remote("diff", "--name-only", "dev", BRANCH)).toBe("package-lock.json");
+  });
+
+  test("a PR from a fork with the same branch name is neither reused nor armed: a new PR is created", () => {
+    const r = run({ lockAfter: BUMPED, prs: [pr(43, { isCrossRepository: true })], vuln: FIXABLE });
+    expect(r.status).toBe(0);
+    expect(r.calls(/ pr create /)).toHaveLength(1);
+    expect(r.calls(/ pr (merge|close) /).filter((l) => /\b43\b/.test(l))).toEqual([]);
+    expect(r.calls(/ pr merge /)).toHaveLength(1);
+  });
+
+  test.each([
+    ["no issue is open", [], "create"],
+    ["the bot's issue is open (kept open, edited)", [botIssue(7)], "edit 7"],
+  ])("fix PR already open at the start and dev still red (%s): the issue names the PR", (_n, issues, verb) => {
+    const r = run({ lockAfter: BUMPED, prs: [pr(42)], vuln: FIXABLE, issues });
+    expect(r.status).toBe(0);
+    expect(r.calls(new RegExp(` issue ${verb} `))).toHaveLength(1);
+    expect(r.calls(/ issue close /)).toEqual([]);
+    expect(r.issueBody).toContain("#42");
   });
 });
 
 describe("audit-fix.sh: guards stop a bad push", () => {
   test.each([
     ["another file was modified", { lockAfter: BUMPED, dirtyFile: "package.json" }],
-    // The #752 regression: production-reachable packages flagged dev:true hide from `npm audit --omit=dev`.
-    ["a package gains dev:true", { lockAfter: { ...BUMPED, "node_modules/lodash": { version: "4.17.21", dev: true } } }],
     ["the push-target check fails", { lockAfter: BUMPED, pushCheck: 1 }],
   ])("%s: non-zero exit, nothing pushed, no PR", (_name, opts) => {
-    const r = run(opts);
+    const r = run({ ...opts, vuln: FIXABLE });
     expect(r.status).not.toBe(0);
     expect(r.remoteBranches()).toEqual(["dev"]);
-    expect(r.calls(/ pr (create|merge)/)).toEqual([]);
+    expect(r.calls(PR_WRITES)).toEqual([]);
+  });
+});
+
+describe("audit-fix.sh: a fix that would not turn the check green is not shipped", () => {
+  test("no push, no PR; the issue lists what still fails and the fixable rows", () => {
+    const r = run({ lockAfter: BUMPED, vuln: PARTIAL });
+    expect(r.status).toBe(0);
+    expect(r.remoteBranches()).toEqual(["dev"]);
+    expect(r.calls(PR_WRITES)).toEqual([]);
+    expect(r.dirty()).toBe("");
+    expect(r.calls(/ issue create /)).toHaveLength(1);
+    // minimist is named twice: failing on dev now, and still failing after the fix.
+    expect(r.issueBody.match(/advisories\.test\/minimist/g)).toHaveLength(2);
+    expect(r.issueBody).toContain("| lodash | 4.17.20 | 4.17.21 |"); // what the fixer could do
+  });
+
+  test("a same-repo bot PR left open from an earlier run is closed with its branch", () => {
+    const r = run({ lockAfter: BUMPED, vuln: PARTIAL, prs: [pr(42)] });
+    expect(r.status).toBe(0);
+    expect(r.calls(/ pr close 42 --delete-branch /)).toHaveLength(1);
+    expect(r.calls(/ pr (create|merge) /)).toEqual([]);
+    expect(r.remoteBranches()).toEqual(["dev"]);
   });
 });
 
 describe("audit-fix.sh: the failing-check issue", () => {
-  const failing = { auditExit: 1, auditJson: AUDIT_JSON };
-
-  test("creates one issue (issue token only) naming the high/critical packages when none is open", () => {
-    const r = run({ ...failing, issues: [{ number: 5, title: "Something else" }] });
+  test("creates one issue (issue token only) naming the failing packages; a human's look-alike issue is not touched", () => {
+    const r = run({ vuln: FIXABLE, issues: [humanIssue(5)] });
     expect(r.status).toBe(0);
     const created = r.calls(/ issue create /);
     expect(created).toHaveLength(1);
     expect(created[0]).toContain(ISSUE_TITLE);
-    expect(r.calls(/ issue edit /)).toEqual([]);
+    expect(r.calls(/ issue (edit|close) /)).toEqual([]);
     expect(r.calls(/ issue /).every((l) => l.startsWith("gh[issue-token]"))).toBe(true);
     expect(r.issueBody).toContain("lodash");
-    expect(r.issueBody).toContain("https://github.com/advisories/GHSA-test-1234");
-    expect(r.issueBody).not.toContain("semver"); // moderate: not what the check fails on
+    expect(r.issueBody).toContain("https://advisories.test/lodash");
   });
 
-  test("edits the open issue instead of making a second one", () => {
-    const r = run({ ...failing, issues: [{ number: 5, title: "Something else" }, { number: 7, title: ISSUE_TITLE }] });
+  test("edits the bot's open issue instead of making a second one", () => {
+    const r = run({ vuln: FIXABLE, issues: [humanIssue(5), botIssue(7)] });
     expect(r.status).toBe(0);
     expect(r.calls(/ issue create /)).toEqual([]);
-    expect(r.calls(/ issue edit 7 /)).toHaveLength(1);
     expect(r.calls(/ issue edit /)).toHaveLength(1);
+    expect(r.calls(/ issue edit 7 /)).toHaveLength(1);
+    expect(r.calls(/ issue /).every((l) => l.startsWith("gh[issue-token]"))).toBe(true);
+  });
+
+  test("a fix held back by the 3-day release age is passed on in the issue", () => {
+    const warning = "npm warn audit fix lodash@4.17.21 was held back: published after the configured release-age cutoff";
+    const r = run({ vuln: FIXABLE, npxStderr: warning });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain(warning);
+    expect(r.issueBody).toContain(warning);
   });
 
   test("an audit that fails without naming a package (registry error) is a red run, not an issue", () => {
-    const r = run({ auditExit: 1, auditJson: JSON.stringify({ error: { code: "ENOTFOUND" } }) });
+    const r = run({ auditBroken: true });
     expect(r.status).not.toBe(0);
     expect(r.calls(/ issue (create|edit)/)).toEqual([]);
   });
 
-  test("closes the open issue (and only that one) once the check passes", () => {
-    const r = run({ issues: [{ number: 5, title: "Something else" }, { number: 7, title: ISSUE_TITLE }] });
+  test("closes the bot's open issue (and only that one) once dev's own lockfile passes", () => {
+    const r = run({ issues: [humanIssue(5), botIssue(7)] });
     expect(r.status).toBe(0);
     expect(r.calls(/ issue close /)).toHaveLength(1);
     expect(r.calls(/ issue close 7 /)).toHaveLength(1);
     expect(r.calls(/ issue (create|edit)/)).toEqual([]);
+    expect(r.calls(/ issue /).every((l) => l.startsWith("gh[issue-token]"))).toBe(true);
+  });
+
+  test("a human's look-alike issue alone is never closed", () => {
+    const r = run({ issues: [humanIssue(5)] });
+    expect(r.status).toBe(0);
+    expect(r.calls(ISSUE_WRITES)).toEqual([]);
   });
 });

@@ -1,8 +1,10 @@
-# Daily security fix: 11am Mountain (17:00 UTC), after Monday's 9am Dependabot run
-# and well before the Saturday-night release cut. All logic is in
+# Daily security fix, about 17:00 UTC (10-11am Mountain; GitHub starts this repo's
+# schedules several hours late), still after Monday's 9am Dependabot run and
+# before the Saturday-night release cut. All logic is in
 # scripts/security/audit-fix.sh (tested in audit-fix.test.mjs): it patches what
 # `npm audit` can patch in package-lock.json, opens an auto-merging PR into `dev`,
-# and keeps one open issue while the required "Dependency CVE Audit" check is red.
+# and keeps one open issue while dev's own lockfile fails the required
+# "Dependency CVE Audit" check.
 #
 # WHY this exists instead of Dependabot security updates: those always open
 # against the default branch (`main`) and ignore `target-branch`, so they could
@@ -27,13 +29,19 @@
 #
 # WHY the lockfile is written with npm 11 (inside the script, not set up here):
 # Node 22's bundled npm 10 flags production-reachable packages `"dev": true` and
-# blinds `npm audit --omit=dev` (#752/#753). No `npm ci` is needed: audit and
-# audit fix work from the lockfile alone.
+# blinds `npm audit --omit=dev` (#752/#753). The version is pinned exactly
+# (npm@11.21.0): registry-fetched code runs beside a repo-write token and a
+# published version is immutable; bump it by hand in the script, since Dependabot
+# cannot see it. `--omit=dev` repairs only what the required check audits, so a
+# build-tool bump cannot break lint/build and block the production fix.
+# `--min-release-age=3` never locks a version published in the last 3 days, because
+# this PR merges with no human. No `npm ci` is needed: audit and audit fix work
+# from the lockfile alone.
 name: Security fixes
 
 on:
   schedule:
-    - cron: "0 17 * * *"
+    - cron: "23 17 * * *"
   workflow_dispatch:
 
 permissions:
@@ -58,7 +66,12 @@ jobs:
         with:
           app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          # Least privilege: by default the token inherits everything the installation has.
+          permission-contents: write
+          permission-pull-requests: write
 
+      # The script's `git push` relies on checkout's default persist-credentials: true
+      # (it leaves the App token in git config).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: dev

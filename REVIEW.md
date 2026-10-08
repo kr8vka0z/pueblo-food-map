@@ -47,7 +47,9 @@ rationale in [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Dependabot targets `dev`, never `main`.** The `dev` branch ruleset requires the same
   four checks as `main` (`Lint, typecheck, build`, Semgrep, TruffleHog, Dependency CVE
   Audit) — loosening or removing that ruleset silently turns Dependabot auto-merge into
-  merge-on-open. Never `paths-ignore` a required check.
+  merge-on-open. Never `paths-ignore` a required check. Dependabot *security* updates
+  are switched off on purpose (they always target `main`); `security-fix.yml` replaces
+  them, so do not flag their absence or re-enable them.
 - **Deploy only through the GitHub Actions robots** (`deploy-prod.yml` on push to `main`,
   `deploy-dev.yml` on push to `dev`). Never a manual `wrangler deploy` outside CI.
 - **Date-only freshness proposals auto-apply by design** (Kyle, 2026-09-15) — not a

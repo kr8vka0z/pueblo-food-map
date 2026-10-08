@@ -1,0 +1,89 @@
+# Daily security fix, about 17:00 UTC (10-11am Mountain; GitHub starts this repo's
+# schedules several hours late), still after Monday's 9am Dependabot run and
+# before the Saturday-night release cut. All logic is in
+# scripts/security/audit-fix.sh (tested in audit-fix.test.mjs): it patches what
+# `npm audit` can patch in package-lock.json, opens an auto-merging PR into `dev`,
+# and keeps one open issue while dev's own lockfile fails the required
+# "Dependency CVE Audit" check.
+#
+# WHY this exists instead of Dependabot security updates: those always open
+# against the default branch (`main`) and ignore `target-branch`, so they could
+# never satisfy main-source-guard and their fixes never reached `dev` (#737,
+# #746). They are switched off in repo settings; alerts and the weekly version
+# updates stay on. Dependabot also never raised an alert for the advisory that
+# turned the audit check red on 2026-10-06, so this job is driven by `npm audit`
+# itself, not by Dependabot alerts. A fix reaches production with the next
+# weekly release (AGENTS.md "Release schedule").
+#
+# WHY the push and PR use a GitHub App token, not GITHUB_TOKEN: pushes and PRs
+# made with the built-in token deliberately fire no workflows (#367), so the PR
+# would sit with no CI and could never satisfy `dev`'s required checks. Same App
+# as release.yml; its RELEASE_PLEASE_APP_* secret names are historical. The App
+# is only proven to hold contents + pull-requests write, so issues use
+# GITHUB_TOKEN (`issues: write`, job level) via a separate ISSUE_TOKEN.
+#
+# WHY this only registers once it is on `main`: GitHub runs `schedule` and
+# `workflow_dispatch` only from the default branch's copy of a workflow. It
+# always checks out `dev` on purpose — a scheduled run's default checkout would
+# be `main`.
+#
+# WHY the lockfile is written with npm 11 (inside the script, not set up here):
+# Node 22's bundled npm 10 flags production-reachable packages `"dev": true` and
+# blinds `npm audit --omit=dev` (#752/#753). The version is pinned exactly
+# (npm@11.21.0): registry-fetched code runs beside a repo-write token and a
+# published version is immutable; bump it by hand in the script, since Dependabot
+# cannot see it. `--omit=dev` repairs only what the required check audits, so a
+# build-tool bump cannot break lint/build and block the production fix.
+# `--min-release-age=3` never locks a version published in the last 3 days, because
+# this PR merges with no human. No `npm ci` is needed: audit and audit fix work
+# from the lockfile alone.
+name: Security fixes
+
+on:
+  schedule:
+    - cron: "23 17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-fix
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    name: Patch security advisories
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Mint a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          # Least privilege: by default the token inherits everything the installation has.
+          permission-contents: write
+          permission-pull-requests: write
+
+      # The script's `git push` relies on checkout's default persist-credentials: true
+      # (it leaves the App token in git config).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: dev
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      # GITHUB_REPOSITORY is a runner default; the script reads it for the push-target check.
+      - name: Patch advisories and report
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ISSUE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/security/audit-fix.sh

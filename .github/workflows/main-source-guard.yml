@@ -5,9 +5,9 @@
 # Everything else ships via `dev` and the next weekly release; a stray
 # dev -> main "promotion" would put unreleased, unversioned work on prod.
 #
-# The job name `main-source-guard` is deliberately stable: it is meant to be
-# added to the `main` ruleset's required checks (a manual settings change, not
-# something a workflow can do). Until then it is advisory.
+# The job name `main-source-guard` is deliberately stable: it is a required
+# check in the `main` ruleset (17480895), so renaming it blocks every PR into
+# `main`. The ruleset is a settings change, not something a workflow can do.
 #
 # Head ref goes through `env`, not `${{ }}` in `run:` — branch names are
 # attacker-chosen text.

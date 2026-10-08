@@ -13,10 +13,15 @@ version: 2
 # (#375). Targeting `dev` puts dependency updates on the same dev -> main
 # promotion path as every other change in this repo.
 #
-# The trade this accepts: a security bump now reaches production one promotion
-# later than it used to. That is the intended shape — this repo is dev-first,
-# and `dev` auto-deploys to dev.pueblofoodmap.com, so a bump gets real staging
-# exposure before it can reach the public site.
+# `target-branch` governs VERSION updates only. Dependabot SECURITY updates always
+# open against the default branch (`main`) and ignore it, with no setting to
+# change that, so they are switched off in repo settings (2026-10-08: #737 and
+# #746 could never merge, because main-source-guard rejects them). Alerts stay
+# on. security-fix.yml replaces them: it patches the lockfile on `dev`, and the
+# fix reaches production with the next weekly release. This is the intended
+# shape: this repo is dev-first, and `dev` auto-deploys to dev.pueblofoodmap.com,
+# so a fix gets real staging exposure before it can reach the public site. Do not
+# switch security updates back on.
 #
 # Load-bearing companion, NOT in this file: the `dev` branch ruleset requires
 # the same four status checks `main` does ("Lint, typecheck, build", Semgrep,

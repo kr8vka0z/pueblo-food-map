@@ -792,6 +792,17 @@ dependency bump, security bumps included, waits on `dev` until the next
 weekly release. Any new workflow that pushes to `main` must avoid `GITHUB_TOKEN`. Incident history:
 atlas-kb "PFM ARCHITECTURE History — 2026-09-24 Trim".
 
+**Security fixes.** Dependabot *security* updates always target `main` (they
+ignore `target-branch`), so they are off in repo settings and `security-fix.yml`
+replaces them: daily it runs `scripts/security/audit-fix.sh` on `dev`, which
+applies `npm audit fix --package-lock-only` with npm 11 (npm 10 hides production
+packages from the audit, #752/#753) and, if a version changed, opens an
+auto-merging `fix/security-advisories` PR into `dev` with an App token. It then
+re-runs the required "Dependency CVE Audit" command; if that still fails
+(usually an exact-pinned direct dependency, out of `audit fix`'s reach) it keeps
+one open issue, "Security check is failing and cannot be fixed automatically",
+and closes it when the check passes. The run stays green; the issue is the signal.
+
 **Environment variables:** `NEXT_PUBLIC_*` vars are baked into the client
 bundle at build time, so they are GitHub Actions repo secrets injected into
 the `deploy-prod.yml`/`deploy-dev.yml` build (not Cloudflare dashboard build

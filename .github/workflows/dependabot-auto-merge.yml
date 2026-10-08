@@ -26,6 +26,19 @@ name: Dependabot auto-merge
 # out the PR: it only reads Dependabot metadata and calls the `gh` CLI against
 # the PR URL. No untrusted code executes here.
 #
+# WHY there is a repository Actions policy for this file: from 2026-11-02 GitHub
+# blocks the `pull_request_target` event in public repositories unless an
+# Actions policy explicitly allows it. This repo has policy id 6930, "Allow
+# pull_request_target for the two API-only workflows" (Settings -> Actions ->
+# Policies; REST `repos/kr8vka0z/pueblo-food-map/actions/policies`, header
+# `X-GitHub-Api-Version: 2026-03-10`), created 2026-10-08. It is scoped to
+# exactly this file and request-review.yml and allow-lists exactly one event,
+# `pull_request_target`. Consequences: adding any other trigger here (e.g.
+# `workflow_dispatch`) is blocked until the policy's allowed events are updated,
+# and deleting the policy stops this workflow (and request-review.yml) from
+# running. A new workflow that needs `pull_request_target` must be added to the
+# policy's file list.
+#
 # RELEASE_PLEASE_APP_* secret names are historical: the release-please workflow
 # and config that first provisioned this GitHub App were retired 2026-09-23
 # (deploys are continuous on push to `main`, so a changelog-PR/versioning bot

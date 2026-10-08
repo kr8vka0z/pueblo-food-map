@@ -63,24 +63,38 @@ jobs:
 
       # One open release PR at a time: cutting a second while last week's is
       # unreviewed would ship two overlapping changelogs.
-      # Also skips while a main -> dev sync PR is still open: cutting from a dev
-      # that doesn't yet contain main would base the release on stale history
-      # and the release PR would conflict.
-      - name: Skip if a release or sync PR is already open
+      # Also refuses to cut while a main -> dev sync PR is still open: cutting
+      # from a dev that doesn't yet contain main would base the release on stale
+      # history and the release PR would conflict.
+      #
+      # WHY the two cases differ (green skip vs red failure): an open release PR
+      # is just Kyle not having merged last week's yet, an expected state, so the
+      # run skips quietly. A sync PR is opened by a bot after every push to main
+      # and auto-merges within minutes; still open at the weekly cut means it is
+      # stuck (a conflict or a failing check) with nobody looking, and a green
+      # skip would let the release silently not happen. So that case fails the run.
+      #
+      # --limit 100 on the dev call: gh's default of 30 could push an old stuck
+      # sync PR off the list behind a busy week of Dependabot/feature PRs.
+      - name: Skip if a release PR is open, fail if a sync PR is stuck
         id: open
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           n=$(gh pr list --base main --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("release/"))] | length')
-          s=$(gh pr list --base dev --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("sync/main-"))] | length')
+          sync_urls=$(gh pr list --base dev --state open --limit 100 --json headRefName,url --jq '[.[] | select(.headRefName | startswith("sync/main-")) | .url] | join(" ")')
+          s=0
+          [ -z "$sync_urls" ] || s=1
           echo "open=$((n + s))" >> "$GITHUB_OUTPUT"
           if [ "$n" != "0" ]; then
             echo "::warning::A release PR is already open; skipping this cut."
             echo "Weekly release skipped: a release PR is already open." >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "$s" != "0" ]; then
-            echo "::warning::A main -> dev sync PR is still open; skipping this cut until it merges."
-            echo "Weekly release skipped: an open sync/main-* PR into dev must merge first." >> "$GITHUB_STEP_SUMMARY"
+            msg="Weekly release NOT cut: the main -> dev sync PR is still open ($sync_urls) and must merge first. Resolve any conflicts on the sync/* branch, keeping the merge commit (AGENTS.md \"Back-sync\"), then run the Weekly release workflow again."
+            echo "::error::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
       # --dry-run: only picks the version and writes the PR list. The version

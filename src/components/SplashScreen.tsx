@@ -35,11 +35,13 @@ import { t } from '@/lib/i18n';
 interface SplashScreenProps {
   /** Called after geo request resolves (granted → 'located') or is denied → 'pueblo-center' */
   onPrimary: (mode: 'located' | 'pueblo-center') => void;
+  /** "Take a tour" (#159): dismiss the splash and start the guided tour. Omit to hide the button. */
+  onTour?: () => void;
 }
 
 // ─── SplashScreen ──────────────────────────────────────────────────────────────
 
-export default function SplashScreen({ onPrimary }: SplashScreenProps) {
+export default function SplashScreen({ onPrimary, onTour }: SplashScreenProps) {
   const geo = useGeolocation();
   const { locale, setLocale } = useLocale();
 
@@ -194,6 +196,28 @@ export default function SplashScreen({ onPrimary }: SplashScreenProps) {
             >
               {t('splash.cta.primary', 'es')}
             </button>
+
+            {/* Take a tour (#159) — outlined sage, not orange: DESIGN.md
+                reserves orange for the find-food CTAs above. Doesn't ask for
+                location; the tour explains "Near me" instead. */}
+            {onTour && (
+              <button
+                type="button"
+                onClick={onTour}
+                className={[
+                  'w-full min-h-12 rounded-[var(--radius-md)] px-4 py-3',
+                  'text-lg font-semibold leading-tight',
+                  'bg-[var(--color-bone-50)] text-[var(--color-sage-700)]',
+                  'border-2 border-[var(--color-sage-600)]',
+                  'hover:bg-[var(--color-bone-100)] active:brightness-95',
+                  'transition-colors duration-150',
+                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+                  'focus-visible:outline-[var(--color-sage-500)]',
+                ].join(' ')}
+              >
+                {t('splash.tour', locale)}
+              </button>
+            )}
           </div>
 
           {/* Microcopy */}

@@ -18,6 +18,7 @@
  *                    false here — the item can never show "on" until the
  *                    map applies the filter and the resident is back on it.
  *   - A saved place — the map, opened on that pin (/?venue=<id>).
+ *   - "Learn how to use this map" (#159) — the map, starting the tour (/?tour=1).
  * "Show welcome screen" is map-only (the splash lives there), so the drawer
  * omits it here.
  *
@@ -101,6 +102,9 @@ export default function PageNav({ locale, backHref = "/" }: { locale: Locale; ba
         view={section ?? "top"}
         savedVenues={savedVenues}
         onSelectVenue={(id) => router.push(`/?venue=${encodeURIComponent(id)}`)}
+        // The tour runs on the map, so from here it goes there (#159;
+        // read once by HomePageClient, same shape as ?near=1).
+        onStartTour={() => router.push("/?tour=1")}
         ignoreOutsideRef={navRef}
       />
 

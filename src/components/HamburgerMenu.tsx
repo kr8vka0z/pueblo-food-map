@@ -34,7 +34,7 @@
  */
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Star, History } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Star, History, Compass } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
@@ -73,6 +73,8 @@ interface HamburgerMenuProps {
   onToggleView?: () => void;
   /** #165 — true while the map can't mount; hides the line rather than showing a dead action. */
   mapDisabled?: boolean;
+  /** "Learn how to use this map" (#159) — starts the guided tour. Omit to hide the item. */
+  onStartTour?: () => void;
 }
 
 // All focusable elements inside the panel for tab-trap.
@@ -91,6 +93,7 @@ export default function HamburgerMenu({
   viewMode,
   onToggleView,
   mapDisabled = false,
+  onStartTour,
 }: HamburgerMenuProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -465,6 +468,21 @@ export default function HamburgerMenu({
                       onToggleView();
                     }}
                     icon={viewMode === "map" ? <List size={14} /> : <MapIcon size={14} />}
+                  />
+                )}
+                {/* Learn how to use this map (#159) — the guided tour.
+                    onClose(), not close(): close() queues a focus hop back
+                    to the nav button, which would land mid-tour and pull
+                    focus out of the tour's dialog. The tour returns focus
+                    to that same button itself when it ends. */}
+                {onStartTour && (
+                  <HamburgerMenuItem
+                    label={t("menu.tour", locale)}
+                    onClick={() => {
+                      onClose();
+                      onStartTour();
+                    }}
+                    icon={<Compass size={14} />}
                   />
                 )}
                 {/* Show welcome screen (#99) — re-shows splash without clearing localStorage */}

@@ -127,6 +127,9 @@ const en: Record<string, string> = {
   "splash.purpose": "A free, community-built map of food resources across Pueblo County.",
   "splash.cta.primary": "Find food near me",
   "splash.microcopy": "We only use your location to show food nearby. Nothing is saved.",
+  // Guided tour triggers (#159). The tour's own step copy lives in
+  // src/lib/guidedTour.ts (lazy-loaded with the tour, see its header).
+  "splash.tour": "Take a tour",
 
   // Location denied banner (#68)
   "banner.title": "Location turned off",
@@ -174,6 +177,7 @@ const en: Record<string, string> = {
   "menu.suggest": "Suggest a venue",
   "menu.sponsoredBy": "Sponsored by",
   "menu.showWelcome": "Show welcome screen",
+  "menu.tour": "Learn how to use this map",
   "menu.language": "Language / Idioma",
   // Map/List entry point (#514) — top of the Menu, for anyone who never taps
   // search. Reads the OPPOSITE of the current view (the destination, same
@@ -1022,6 +1026,7 @@ const es: Record<string, string> = {
   "splash.purpose": "Un mapa comunitario y gratuito de recursos alimentarios en el condado de Pueblo.",
   "splash.cta.primary": "Encuentra comida cerca de mí",
   "splash.microcopy": "Solo usamos tu ubicación para mostrar alimentos cercanos. Nada se guarda.",
+  "splash.tour": "Ver cómo funciona", // [CHECK]
 
   // Location denied banner (#68)
   "banner.title": "Ubicación desactivada",
@@ -1063,6 +1068,7 @@ const es: Record<string, string> = {
   "menu.suggest": "Sugerir un lugar",
   "menu.sponsoredBy": "Patrocinado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
+  "menu.tour": "Aprende a usar este mapa", // [CHECK]
   "menu.language": "Language / Idioma",
   "menu.listView": "Vista de lista",
   "menu.mapView": "Vista de mapa",

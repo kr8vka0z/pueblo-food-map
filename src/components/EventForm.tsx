@@ -27,6 +27,11 @@
  * is refreshed from each successful save, so consecutive saves don't 409
  * against the admin's own previous save; a real 409 shows the server message
  * and a Reload button, leaving the admin's unsaved edits on screen.
+ *
+ * Suggest Spanish: one button asks POST /api/admin/events/translate for a
+ * machine draft of the Spanish boxes. It fills ONLY boxes that are empty (also
+ * re-checked when the answer lands, in case the admin typed meanwhile), so
+ * Spanish someone wrote is never overwritten. Nothing is saved by it.
  */
 
 import { useState } from "react";
@@ -183,6 +188,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
   const [status, setStatus] = useState<EventStatus>(initialStatus ?? "draft");
   const [version, setVersion] = useState(expectedUpdatedAt);
   const [cancelling, setCancelling] = useState(false);
+  const [suggest, setSuggest] = useState<"idle" | "busy" | "done" | "none" | "full" | "error">("idle");
   const [placeMode, setPlaceMode] = useState<"venue" | "address">(initialValues?.venueId ? "venue" : "address");
   const [venueQuery, setVenueQuery] = useState("");
   const [geo, setGeo] = useState<{ state: "idle" | "loading" | "found" | "none" | "error" | "multiple"; message: string; options: GeocodeMatch[] }>({
@@ -281,6 +287,48 @@ export default function EventForm({ venues, eventId, initialValues, status: init
     }
   }
 
+  async function suggestSpanish() {
+    // Only fields with English text and a still-empty Spanish box are worth asking for.
+    const pairs: [string, keyof EventFormValues, keyof EventFormValues][] = [
+      ["name", "name", "nameEs"],
+      ["host", "host", "hostEs"],
+      ["description", "description", "descriptionEs"],
+      ["what_to_bring", "whatToBring", "whatToBringEs"],
+      ...(showCancelNote ? ([["cancel_note", "cancelNote", "cancelNoteEs"]] as [string, keyof EventFormValues, keyof EventFormValues][]) : []),
+    ];
+    if (!pairs.some(([, en]) => values[en].trim())) {
+      setSuggest("none");
+      return;
+    }
+    const ask = pairs.filter(([, en, es]) => values[en].trim() && !values[es].trim());
+    if (ask.length === 0) {
+      setSuggest("full");
+      return;
+    }
+    setSuggest("busy");
+    try {
+      const res = await fetch("/api/admin/events/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(ask.map(([key, en]) => [key, values[en]]))),
+      });
+      if (res.status !== 200) throw new Error("translate");
+      const { suggestions } = (await res.json()) as { suggestions: Record<string, string> };
+      setValues((p) => {
+        const next = { ...p };
+        for (const [key, en, es] of ask) {
+          const text = suggestions[`${key}_es`];
+          // Skip a field whose English changed in flight: the draft is for the old English.
+          if (typeof text === "string" && !p[es].trim() && p[en] === values[en]) next[es] = text;
+        }
+        return next;
+      });
+      setSuggest("done");
+    } catch {
+      setSuggest("error");
+    }
+  }
+
   async function archive() {
     if (!window.confirm("Archive this event? It leaves the map and the list of live events, and stays in the admin history.")) return;
     setBusy(true);
@@ -348,6 +396,19 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       <p className="text-sm text-[var(--color-ink-500)]">
         Spanish is optional. Where it is blank, visitors see the English text.
       </p>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" disabled={suggest === "busy"} onClick={() => void suggestSpanish()} className={secondaryButtonClass}>
+          {suggest === "busy" ? "Suggesting…" : "Suggest Spanish"}
+        </button>
+        <p aria-live="polite" className={`text-sm ${suggest === "error" ? "text-[var(--color-danger)]" : "text-[var(--color-ink-500)]"}`}>
+          {suggest === "busy" && "Suggesting Spanish…"}
+          {suggest === "done" && "Spanish suggested by a machine. Read it before publishing."}
+          {suggest === "error" && "The Spanish suggestion could not be made. You can type the Spanish by hand."}
+          {suggest === "none" && "Add some English text first, then ask for a Spanish suggestion."}
+          {suggest === "full" && "The Spanish boxes are already filled, so nothing was changed."}
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <TextField id="event-name" label="Name (English)" required value={values.name} onChange={(v) => set("name", v)} max={FIELD_LIMITS.SUGGEST_VENUE_NAME} error={errors.name} />

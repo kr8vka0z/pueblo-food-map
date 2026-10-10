@@ -1008,6 +1008,25 @@ no map pin, no public card, no flyer upload yet (slices #758–#760).
   their own try/catch, so a missing table shows a "Couldn't load, Retry" panel.
   The place is a picked venue (address and coordinates copied) or a typed
   address located with the venue form's `/api/admin/geocode`.
+- **Suggest Spanish** (`POST /api/admin/events/translate`,
+  `src/lib/eventTranslate.ts`). The owner does not write Spanish, so the form's
+  "Suggest Spanish" button sends the English values and fills **only the
+  Spanish boxes that are empty**. The route gates like the other event routes
+  (`authorizeEventRequest`), checks the same `FIELD_LIMITS` caps, asks Workers
+  AI through the `AI` binding (declared in `wrangler.jsonc` for production and
+  `env.staging`; no key, secret or npm dependency), and returns
+  `{ suggestions: { name_es, … } }`. It reads and writes no row and no audit
+  entry. **The text is machine-made and unreviewed**: the form says so and the
+  admin edits it before saving. The model's reply is untrusted: fields not
+  asked for are dropped and every value is trimmed and cut to its cap. A model
+  error, bad JSON, empty answer or timeout (25 s) is a 502, a missing binding
+  (local dev, tests) a 503, both with a message the form shows. The prompt asks
+  for Mexican / Latin American Spanish (above) and keeps names, addresses,
+  times, URLs and SNAP / WIC / EBT as written; the English is passed as JSON data,
+  not instructions. Model: `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (on
+  Cloudflare's JSON-mode list); a four-field call measured about 33 neurons
+  against the free 10,000 per day (roughly 300 clicks), and usage past that bills at Workers Paid
+  rates. Only `EventForm` (admin tree) reaches this; nothing public imports it.
 - **Tests** run the routes and the feed against real SQLite built from the
   migration files (`src/lib/sqliteD1.testutil.ts`).
 

@@ -32,6 +32,7 @@ import type {
   D1Database as CFD1Database,
   R2Bucket as CFR2Bucket,
 } from "@cloudflare/workers-types/experimental";
+import type { AiBinding } from "@/lib/eventTranslate";
 
 declare global {
   type D1Database = CFD1Database;
@@ -62,6 +63,13 @@ declare global {
     // #679 — the one account that sees /admin/activity (src/lib/adminOwner.ts).
     // Same "plain var, declared by hand" rationale as the two above.
     ADMIN_OWNER_EMAIL?: string;
+    // #757 Workers AI binding ("Suggest Spanish" on the admin event form,
+    // src/lib/eventTranslate.ts). Typed by hand with the one method used,
+    // for the same reason as D1Database above: a regenerated `AI: Ai` needs
+    // the full runtime types, which collide with lib.dom. Optional because
+    // local dev and tests have no binding and the route treats that as a
+    // clean 503.
+    AI?: AiBinding;
     // #681 (admin Dashboard "What people do on the map") — POSTHOG_PROJECT_ID
     // and POSTHOG_API_HOST are declared once, in worker-configuration.d.ts's
     // hand-patched `Env` (see that file's header), and reach this interface

@@ -63,6 +63,8 @@ import {
 import { useMapFilters } from "@/lib/useMapFilters";
 import { haversineMiles } from "@/lib/distance";
 import { useBoxesList } from "@/lib/useBoxesList";
+import { useEvents } from "@/lib/useEvents";
+import { syncEventParam } from "@/lib/eventPins";
 import { toVenue } from "@/lib/useBoxVenues";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 import { useMapUI, type ViewMode } from "@/lib/useMapUI";
@@ -441,6 +443,8 @@ interface MapWrapperProps {
   onShowWelcome?: () => void;
   /** Deep link (#132): venue id from a ?venue=<id> URL to open on load. */
   initialVenueId?: string | null;
+  /** Deep link (#758): event id from a ?event=<id> URL; that star pin starts selected. */
+  initialEventId?: string | null;
   /**
    * Boxes (#516): true when the resident arrived via a Menu page's "Boxes"
    * link (/?boxes=1, read once by HomePageClient). Applies the blessing_box
@@ -464,6 +468,7 @@ export default function MapWrapper({
   splashLocationFailure = null,
   onShowWelcome,
   initialVenueId,
+  initialEventId = null,
   initialBoxesFilter = false,
   holdMapLoad = false,
 }: MapWrapperProps) {
@@ -495,6 +500,8 @@ export default function MapWrapper({
   const {
     selectedVenueId,
     setSelectedVenueId,
+    selectedEventId,
+    setSelectedEventId,
     viewMode,
     setViewMode,
     mapUnavailable,
@@ -505,7 +512,7 @@ export default function MapWrapper({
     setWindowExpanded,
     mapboxMap,
     setMapboxMap,
-  } = useMapUI();
+  } = useMapUI(initialEventId);
 
   // ── Deferred map load (#226, held behind the splash by #588) ────────────────
   // Perf: mapbox-gl is a large WebGL payload that used to fire the instant
@@ -520,7 +527,7 @@ export default function MapWrapper({
   // idle/timeout trigger while a first-time visitor's splash is up — see
   // useDeferredMapLoad's module doc for why the interaction listeners stay
   // live regardless (a real splash-CTA tap still starts the load right away).
-  const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId), holdMapLoad);
+  const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId || initialEventId), holdMapLoad);
 
   // ── Location help card (#739; replaced PR 7's denied-only banner) ───────────
   // Explains a locate attempt that gave no position, so the visitor isn't left
@@ -1181,13 +1188,37 @@ export default function MapWrapper({
   const selectVenue = useCallback(
     (id: string, from?: "saved") => {
       setSelectedVenueId(id);
+      setSelectedEventId(null); // one selection at a time (#758)
       if (!isMobile) {
         setSidePanelView({ kind: "venue", id, from });
         setWindowExpanded(false);
       }
     },
-    [isMobile, setSelectedVenueId, setWindowExpanded],
+    [isMobile, setSelectedVenueId, setSelectedEventId, setWindowExpanded],
   );
+
+  // ── Special events (#758) ───────────────────────────────────────────────────
+  // Live feed, fetched once like boxes. Selecting an event pin only selects and
+  // centers it (the event card is #759): it drops any open place card so the
+  // two selections never show at once, and the id is mirrored into ?event=<id>
+  // (replace, never push) so the address bar always names the selected event.
+  // Deselecting (null) removes the parameter. syncEventParam is a no-op when
+  // the URL already agrees, which keeps a shared link's own ?event= intact on
+  // the first render.
+  const events = useEvents();
+  const selectEvent = useCallback(
+    (id: string | null) => {
+      setSelectedEventId(id);
+      if (id !== null) {
+        setSelectedVenueId(null);
+        if (!isMobile) setSidePanelView((v) => (v?.kind === "venue" ? null : v));
+      }
+    },
+    [isMobile, setSelectedEventId, setSelectedVenueId],
+  );
+  useEffect(() => {
+    syncEventParam(selectedEventId);
+  }, [selectedEventId]);
 
   // ── Origin — user position or Pueblo center fallback ─────────────────────────
   const origin = userLocation ?? PUEBLO_CENTER;
@@ -1922,6 +1953,9 @@ export default function MapWrapper({
             userDistances={userDistances}
             recenterRequestId={recenterRequestId}
             onSelectVenue={handleSelectVenueFromMap}
+            events={events}
+            selectedEventId={selectedEventId}
+            onSelectEvent={selectEvent}
             onMapReady={handleMapReady}
             onMoveEnd={handleMoveEnd}
             walkingRoute={walkingRouteVenueId === selectedVenueId ? walkingRoute : null}

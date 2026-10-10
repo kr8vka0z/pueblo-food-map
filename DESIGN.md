@@ -39,6 +39,8 @@ colors:
   catLandscape: "#58772B"
   catMeal: "#6B3FA0"
   catBlessing: "#C2447B"
+  eventPin: "#F7943C"
+  eventOutline: "#190F3F"
 
 typography:
   fontDisplay: "'Fraunces', Georgia, serif"
@@ -321,7 +323,7 @@ y=729 └───────────────────────�
 
 **Sage is the primary interactive color.** Every link, focus ring, active filter chip, selected marker ring, and interactive affordance uses sage — NOT blue. `sage-600` (#2C5F4F) is the primary color, used for the "Show details" toggle text, operator links on hover, and the Plentiful CTA hover state. `sage-500` (#4A8466) is the focus ring and selected marker ring color. `sage-100` + `sage-700` form the SNAP/WIC benefit badge pairing (calm, not urgent).
 
-**Orange and navy are the brand colors** from Pueblo Food Project (`pueblofoodproject.org`). Orange (#F7943C) appears on the splash CTA buttons, and — added by #513, Kyle's explicit call on the mockup — the Filters button's active-count badge and FilterPanel's "Show N places" button, its one live-count call-to-action. (The orange LocateButton pill on the map was retired for the bottom nav's "Near me" item, docs/bottom-nav-spec.md §6.) Navy (#190F3F) is the wordmark color and the text rendered on orange-background controls. These are the loudest, most declarative elements. Do not apply them anywhere else — no other secondary action, metadata, or hover state — with ONE further owner-approved exception: the admin's "Add place" button (`AdminNav.tsx`, admin dashboard build), matching the approved mockup exactly, since it is the admin shell's one equivalent primary call-to-action.
+**Orange and navy are the brand colors** from Pueblo Food Project (`pueblofoodproject.org`). Orange (#F7943C) appears on the splash CTA buttons, and — added by #513, Kyle's explicit call on the mockup — the Filters button's active-count badge and FilterPanel's "Show N places" button, its one live-count call-to-action. (The orange LocateButton pill on the map was retired for the bottom nav's "Near me" item, docs/bottom-nav-spec.md §6.) Navy (#190F3F) is the wordmark color and the text rendered on orange-background controls. These are the loudest, most declarative elements. Do not apply them anywhere else — no other secondary action, metadata, or hover state — with ONE further owner-approved exception: the admin's "Add place" button (`AdminNav.tsx`, admin dashboard build), matching the approved mockup exactly, since it is the admin shell's one equivalent primary call-to-action. A second owner-approved exception (Kyle, 2026-10-10, #156/#758): the **special-event star pin** on the public map (`EventMarker.tsx`) is orange with a navy outline and navy star, so an event reads as different from every place at arm's length. It has its own tokens, `eventPin` (#F7943C) and `eventOutline` (#190F3F), so the exception is greppable and orange stays out of everything else.
 
 **Yellow (#FFD166)** is for support/classification badges only. It does not appear as a button, interactive state, or background fill.
 
@@ -391,10 +393,11 @@ DesktopSidePanel uses a heavier hand-written shadow `0 8px 32px rgba(0,0,0,0.18)
 
 Easing: `--ease-out-circ` (`cubic-bezier(0.32, 0.72, 0, 1)`) is registered in `@theme` for spec compliance. Most transitions use standard `ease` at `duration-150ms` (color / filter changes on button hover/active).
 
-Two deliberate animations in the product:
+Three deliberate animations in the product:
 
 1. **`pfm-pulse`** (2s, ease-in-out, infinite) — the user-location dot breathes gently: scale 1 → 1.2, opacity 1 → 0.7. Communicates "live GPS" without demanding attention.
 2. **Vaul drawer drag** — the BottomSheet uses vaul's native momentum physics for drag-to-dismiss. No custom easing needed.
+3. **`pfm-event-ring`** (2.4s, ease-out, infinite; #758) — two rings, half a cycle apart, expand and fade from a special-event pin while that event is going on. One keyframe, `transform` and `opacity` only so it stays on the GPU. Under reduced motion the rings stop and fall back to a still halo; the NOW label is text and always shows.
 
 All animations collapse to `0.01ms !important` via the global `prefers-reduced-motion: reduce` block. No per-component reduced-motion guards are needed — the cascade handles it.
 
@@ -440,6 +443,8 @@ The status pill itself (`bone-50` chip on the photo, or a plain `bone-100` inlin
 **Desktop (`DesktopVenueWindow`) and `/box/<id>/history` (`BoxHistoryContent`)** both still render `layout="default"` (the prop's own default) — photo first with the overlaid pill, then sponsor band, then badge/name/address/most-needed/host-note/check-in/footer, unchanged from the redesign above. `DesktopVenueWindow`'s header Show/Hide-details slot is a "History" link instead, same position/classes/weight the ordinary-venue toggle used (the in-card footer "History" link `BoxCardBody` renders elsewhere is suppressed there so the two never duplicate).
 
 **VenueMarker**: Lucide `MapPin` SVG filled with category accent color, `stroke: #FFFFFF`, `strokeWidth: 1.5`, `filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25))`. Default 28px / selected 36px. Selected state: an outer SVG `circle` with `sage-500` stroke (4px, no fill) wrapping the pin. Hover: `scale(1.15)` inline transform.
+
+**EventMarker** (special-event star pin, #758): a map-pin outline filled `eventPin` with an `eventOutline` stroke and an `eventOutline` five-point star in the head, same drop-shadow as VenueMarker. 44px coming up, 52px going on now, inside an invisible button at least 48px square (bottom-anchored, so the tip stays on the coordinate), drawn above every place pin. A small label sits above the pin: `bone-50` with an `eventOutline` border and text while coming up ("Sat 2 PM", "Today 2 PM"); `eventOutline` fill with `bone-50` text and an `eventPin` border while live ("NOW, until 2 PM"), 12px bold. While live, two `pfm-event-ring` rings pulse from the head (see Motion). Selected: the same `sage-500` 3px ring place pins use, plus `scale(1.12)`. Times are always Pueblo time (America/Denver), whatever the phone's timezone.
 
 **BottomNav**: see docs/bottom-nav-spec.md for geometry and stacking order (the fade band that spec once described was deleted with the bottom-nav rework — `.nav-fade-band` no longer exists in globals.css).
 
@@ -550,7 +555,7 @@ Every state says what happened in plain words and offers a next step. Never a bl
 **Don't:**
 - Don't introduce cool or neutral grays anywhere. Bone and ink are warm-tinted; a neutral gray creates a visible temperature mismatch.
 - Don't use `catGrocery` (`#1F4E8C`) for links, buttons, or any interactive state. It is a data color reserved for the grocery category pin only — the only blue in the system.
-- Don't use orange for secondary actions, hover states, or metadata. Orange is reserved for the splash CTAs plus the Filters button's count badge and FilterPanel's "Show N places" button (#513, Kyle's call) — nowhere else.
+- Don't use orange for secondary actions, hover states, or metadata. Orange is reserved for the splash CTAs plus the Filters button's count badge and FilterPanel's "Show N places" button (#513, Kyle's call), plus the special-event star pin (`eventPin`, Kyle 2026-10-10) — nowhere else.
 - Don't use yellow (`#FFD166`) for anything other than support/classification badges.
 - Don't use Fraunces for body text, button labels, form inputs, or any running text at 16px or smaller. Its variable weight range is seductive, but it is a display serif built for headlines.
 - Don't add a sidebar. The v1 360px categories rail + 280px detail panel were removed in v2. A sidebar competes with the map for viewport space and violates the chrome budget.

@@ -14,7 +14,7 @@
  * we take the first (earlier) occurrence so the answer is deterministic.
  */
 
-const TIME_ZONE = "America/Denver";
+export const TIME_ZONE = "America/Denver";
 const LOCAL_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 const MS_PER_MIN = 60_000;
 const MS_PER_DAY = 86_400_000;
@@ -30,7 +30,8 @@ const partsFormatter = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 
-function puebloParts(instantMs: number): { y: number; mo: number; d: number; h: number; mi: number } {
+/** Pueblo wall-clock parts at an instant; also read by the map pins (src/lib/eventPins.ts). */
+export function puebloParts(instantMs: number): { y: number; mo: number; d: number; h: number; mi: number } {
   const get = (type: string) => Number(partsFormatter.formatToParts(new Date(instantMs)).find((p) => p.type === type)?.value);
   return { y: get("year"), mo: get("month"), d: get("day"), h: get("hour"), mi: get("minute") };
 }

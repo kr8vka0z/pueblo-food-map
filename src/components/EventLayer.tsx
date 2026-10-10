@@ -1,0 +1,74 @@
+"use client";
+
+/**
+ * EventLayer — every special-event star pin on the map, plus the one clock that
+ * keeps them honest (#758, umbrella #156).
+ *
+ * Rendered inside <MapGL> by Map.tsx after the place pins, so event markers sit
+ * above them. It owns the minute clock (useMinuteClock) on purpose: the tick
+ * re-renders THIS component only, never Map or the place pins, and EventMarker
+ * is memoized on primitive props, so a minute that changes nothing repaints
+ * nothing. One timer for the whole map, not one per pin. Map.tsx mounts this
+ * only when there is at least one event, so an empty, failed or not-yet-loaded
+ * feed means no timer and no DOM at all.
+ *
+ * Selecting a pin only selects and centers it. The event card is slice #759.
+ */
+
+import { useCallback, useEffect, useMemo } from "react";
+import { useMap } from "react-map-gl/mapbox";
+import EventMarker from "@/components/EventMarker";
+import type { PublicEvent } from "@/lib/events";
+import type { Locale } from "@/lib/i18n";
+import { pinAriaLabel, pinLabel, pinsAt } from "@/lib/eventPins";
+import { useMinuteClock } from "@/lib/useMinuteClock";
+
+interface EventLayerProps {
+  events: readonly PublicEvent[];
+  selectedEventId: string | null;
+  /** Pass null to deselect (tapping the selected pin again). */
+  onSelectEvent: (id: string | null) => void;
+  locale: Locale;
+}
+
+export default function EventLayer({ events, selectedEventId, onSelectEvent, locale }: EventLayerProps) {
+  const { current: map } = useMap();
+  const now = useMinuteClock();
+  const pins = useMemo(() => pinsAt(events, now), [events, now]);
+
+  // Centering depends on the selected pin's id and position, not on `pins`
+  // itself, so the minute tick never re-centers a map the visitor has panned.
+  const selected = pins.find((p) => p.event.id === selectedEventId)?.event;
+  const selId = selected?.id;
+  const selLng = selected?.lng;
+  const selLat = selected?.lat;
+  useEffect(() => {
+    if (!map || selId === undefined || selLng === undefined || selLat === undefined) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const target = { center: [selLng, selLat] as [number, number] };
+    if (reduced) map.jumpTo(target);
+    else map.flyTo({ ...target, duration: 800 });
+  }, [map, selId, selLng, selLat]);
+
+  // A second tap on the selected pin deselects it.
+  const handleSelect = useCallback(
+    (id: string) => onSelectEvent(id === selectedEventId ? null : id),
+    [onSelectEvent, selectedEventId],
+  );
+
+  return (
+    <>
+      {pins.map((pin) => (
+        <EventMarker
+          key={pin.event.id}
+          event={pin.event}
+          live={pin.live}
+          selected={pin.event.id === selectedEventId}
+          label={pinLabel(pin, locale)}
+          ariaLabel={pinAriaLabel(pin, locale)}
+          onSelect={handleSelect}
+        />
+      ))}
+    </>
+  );
+}

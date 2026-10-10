@@ -391,6 +391,12 @@ const en: Record<string, string> = {
   "marker.category.meal_site": "Meal site",
   "marker.category.blessing_box": "Blessing box",
 
+  // Special-event map pins (#758). {time} is a Pueblo-time clock like "2 PM".
+  "events.pin.today": "Today",
+  "events.pin.nowUntil": "NOW, until {time}",
+  "events.pin.ariaLive": "{name}, special event, happening now, until {time}",
+  "events.pin.ariaUpcoming": "{name}, special event, {day} {time}",
+
   // External links (#162)
   "menu.opensInNewTab": "(opens in new tab)",
 
@@ -1485,6 +1491,12 @@ const es: Record<string, string> = {
   "marker.category.edible_landscape": "Paisaje comestible",
   "marker.category.meal_site": "Comedor",
   "marker.category.blessing_box": "Caja de bendiciones", // [CHECK]
+
+  // Special-event map pins (#758).
+  "events.pin.today": "Hoy", // [CHECK]
+  "events.pin.nowUntil": "AHORA, hasta {time}", // [CHECK]
+  "events.pin.ariaLive": "{name}, evento especial, en curso, hasta {time}", // [CHECK]
+  "events.pin.ariaUpcoming": "{name}, evento especial, {day} {time}", // [CHECK]
 
   // External links (#162)
   "menu.opensInNewTab": "(se abre en una pestaña nueva)",

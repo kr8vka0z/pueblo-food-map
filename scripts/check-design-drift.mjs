@@ -190,6 +190,12 @@ function colorKeyToCssVar(key) {
     return `--color-cat-${key.slice(3).toLowerCase()}`;
   }
 
+  // Special-event pin tokens (#758): eventPin -> --color-event-pin,
+  // eventOutline -> --color-event-outline.
+  if (/^event[A-Z]/.test(key)) {
+    return `--color-event-${key.slice(5).toLowerCase()}`;
+  }
+
   // Scale tokens: bone50 -> --color-bone-50, ink700 -> --color-ink-700
   // Pattern: one or more lowercase letters followed by one or more digits.
   const scaleMatch = key.match(/^([a-z]+)(\d+)$/);

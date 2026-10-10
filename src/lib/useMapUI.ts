@@ -27,9 +27,16 @@ export type ViewMode = "map" | "list";
 /** Why the map is replaced by the list fallback (see mapUnavailableReason). */
 export type MapUnavailableReason = "webgl" | "offline";
 
-export function useMapUI() {
+export function useMapUI(initialEventId: string | null = null) {
   // ── Selected venue ────────────────────────────────────────────────────────────
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
+
+  // ── Selected special event (#758) ─────────────────────────────────────────────
+  // Starts from a shared /?event=<id> link. Seeding the state (rather than
+  // selecting in an effect once the map is ready) means the address bar and the
+  // selection agree from the first render, and EventLayer centers the pin as
+  // soon as the feed delivers it. MapWrapper mirrors this back into the URL.
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(initialEventId);
 
   // ── View mode (#129) — map (default) or full-screen list ───────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("map");
@@ -86,6 +93,8 @@ export function useMapUI() {
     // State
     selectedVenueId,
     setSelectedVenueId,
+    selectedEventId,
+    setSelectedEventId,
     viewMode,
     setViewMode,
     mapUnavailable,

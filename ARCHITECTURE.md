@@ -34,6 +34,9 @@ Browser
   └── MapWrapper   (all state + interaction logic)
         ├── Map.tsx          (Mapbox GL canvas; SSR-skipped via dynamic import)
         ├── VenueMarker.tsx  (Lucide MapPin button inside each Mapbox Marker)
+        ├── EventLayer.tsx   (special-event star pins, drawn after the place
+        │     pins; owns the once-a-minute clock — see "Events" → "Map pins")
+        │     └── EventMarker.tsx  (one star pin; NOW rings + label while live)
         ├── BottomSheet.tsx  (mobile: vaul bottom sheet)
         ├── DesktopSidePanel.tsx  (desktop: fixed right-hand panel shell —
         │     inset/size/chrome, Escape, focus-to-heading + focus-return,
@@ -327,6 +330,7 @@ Key state atoms and their roles:
 | State | Type | Purpose |
 |---|---|---|
 | `selectedVenueId` | `string \| null` | Which venue card is open |
+| `selectedEventId` | `string \| null` | Which special-event star pin is selected (#758, from `useMapUI`); mirrored into `?event=<id>`, mutually exclusive with `selectedVenueId` |
 | `viewport` | `'located' \| 'pueblo-center'` | Splash exit mode; determines initial map center |
 | `viewMode` | `'map' \| 'list'` | Map canvas vs. full-screen list |
 | `query` | `string` | Text search input |
@@ -967,8 +971,9 @@ Migrations, R2 buckets and dedicated secrets: AGENTS.md "Blessing Boxes".
 ## Events
 
 One-off special events (a produce giveaway, a turkey drive), plan in issue
-#156. **Slice 1 (#757) is storage, the public read and the admin screens only**:
-no map pin, no public card, no flyer upload yet (slices #758–#760).
+#156. **Slice 1 (#757) is storage, the public read and the admin screens;
+slice 2 (#758) adds the map pin** (see "Map pins" below). No public card
+(#759) and no flyer upload (#760) yet.
 
 - **Live, never published.** Like boxes, events are read from D1 at request
   time and are not part of the venue Publish snapshot.
@@ -1029,6 +1034,46 @@ no map pin, no public card, no flyer upload yet (slices #758–#760).
   rates. Only `EventForm` (admin tree) reaches this; nothing public imports it.
 - **Tests** run the routes and the feed against real SQLite built from the
   migration files (`src/lib/sqliteD1.testutil.ts`).
+
+### Map pins (#758)
+
+- **Data path.** `MapWrapper` calls `useEvents()` (`src/lib/useEvents.ts`), which
+  fetches `/api/public/events` once on mount, like `useBoxesList`. A failed,
+  non-OK or malformed response leaves the list `[]` and the state is never
+  written for an empty list, so the map is byte-for-byte what it was before
+  events. `Map.tsx` mounts `EventLayer` only when the list is non-empty, so
+  "no events" also means no timer and no DOM.
+- **Which events draw** (`src/lib/eventPins.ts`, pure). Going on now
+  (`now >= starts_at && now < ends_at`, absolute UTC instants) or starting
+  within `EVENT_PIN_WINDOW_DAYS` (7, the one constant). Everything else,
+  including a malformed date, is skipped. Labels are formatted in
+  America/Denver with `Intl` via `eventTime.ts`'s `TIME_ZONE` / `puebloParts`
+  (shared with the admin form, not copied), so a phone set to another timezone
+  reads the same label. Place hours still use the phone's clock (`hours.ts`).
+- **The clock.** `EventLayer` calls `useMinuteClock()` (`src/lib/useMinuteClock.ts`):
+  one `setInterval` of 60 s plus a `visibilitychange` listener that re-reads
+  the time when the tab comes back (background timers are throttled). The tick
+  re-renders `EventLayer` only. `Map` and the place pins are not re-rendered,
+  and `EventMarker` is `memo`'d on primitive props, so a minute that changes no
+  pin repaints no pin. A pin flips to NOW at its start and disappears at its end
+  with no reload (up to 60 s late, by design).
+- **Pin.** `EventMarker` is a DOM `<Marker>` + `<button>` (like `VenueMarker`):
+  orange star pin 44 px coming up, 52 px live, inside a >= 48 px target,
+  `zIndex` above place pins. Styles are `.pfm-event-*` in `globals.css` using
+  the `--color-event-pin` / `--color-event-outline` tokens (DESIGN.md has the
+  owner-approved orange exception). The NOW rings are one keyframe
+  (`pfm-event-ring`, transform + opacity) covered by the global
+  reduced-motion block; the static halo and the label remain.
+- **Selection and `?event=<id>`.** `selectedEventId` lives in `useMapUI`.
+  Tapping a pin selects it and centers the map on it (`EventLayer`; camera
+  jumps under reduced motion); tapping it again deselects. Selecting an event
+  clears the selected venue and vice versa. `MapWrapper` mirrors the id into
+  the address bar with `replaceState` (`syncEventParam`, a no-op when the URL
+  already agrees). A shared `/?event=<id>` is read once by `HomePageClient`
+  and seeds the state (and loads the map eagerly, like `?venue=`); unlike
+  `?near=`/`?boxes=` it is not stripped. There is no card yet: #759 adds it
+  and will hang on `selectedEventId`. The splash gate does not treat `?event=`
+  as a skip-splash link yet (also #759).
 
 ---
 

@@ -24,6 +24,8 @@ export interface BestEffortResult<T> {
   data: T;
   /** true when `data` is a fallback produced after a read failure — never cache this. */
   degraded: boolean;
+  /** HTTP status to answer with; default 200. Anything but 200 is never cached (a 404 for an id that is published a minute later must not stick). */
+  status?: number;
 }
 
 /**
@@ -66,27 +68,43 @@ export async function bustEdgeCache(req: Request, paths: readonly string[]): Pro
   );
 }
 
+export interface EdgeCacheOptions {
+  /**
+   * Key the cache entry on the URL WITHOUT its query string. Only the public
+   * events routes turn this on (#759): their purge deletes the bare path, so
+   * a `?x=N` variant keyed on the full URL would hold a stale 200 the purge
+   * can never reach. The blessing-box routes keep the full-URL key.
+   */
+  ignoreQuery?: boolean;
+}
+
 export async function respondWithEdgeCache<T>(
   req: Request,
   load: () => Promise<BestEffortResult<T>>,
+  { ignoreQuery = false }: EdgeCacheOptions = {},
 ): Promise<Response> {
   // caches.default is a Workers-runtime extension to the standard
   // CacheStorage interface — absent in vitest/node, so route tests stub it;
   // absent here degrades to "always compute fresh" rather than throwing.
   const cache: Cache | undefined = (globalThis as { caches?: { default?: Cache } }).caches?.default;
-  const cacheKey = new Request(req.url, req);
+  const { origin, pathname } = new URL(req.url);
+  const cacheKey = new Request(ignoreQuery ? origin + pathname : req.url, req);
 
   if (cache) {
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
   }
 
-  const { data, degraded } = await load();
+  const { data, degraded, status = 200 } = await load();
   const response = NextResponse.json(data, {
-    headers: { "Cache-Control": `public, max-age=${CACHE_TTL_SECONDS}` },
+    status,
+    // A non-200 (404 for a not-yet-published event, or a degraded read) must
+    // not sit in a browser cache for a minute: the admin purge can't reach
+    // it, so a link shared just before publishing would look dead.
+    headers: { "Cache-Control": status === 200 ? `public, max-age=${CACHE_TTL_SECONDS}` : "no-store" },
   });
 
-  if (cache && !degraded) {
+  if (cache && !degraded && status === 200) {
     try {
       const { ctx } = getCloudflareContext();
       ctx.waitUntil(cache.put(cacheKey, response.clone()));

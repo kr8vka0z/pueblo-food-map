@@ -40,17 +40,37 @@ interface ShareVenueOptions {
 }
 
 /**
+ * The link to a special event's card (#759): the map home with `?event=<id>`,
+ * on /es for a Spanish page so the shared page opens in Spanish. The map, not
+ * a per-event page (that is a later slice), so it needs no new route.
+ */
+export function eventShareUrl(eventId: string, locale: "en" | "es" = "en"): string {
+  const origin =
+    typeof window !== "undefined" && window.location?.origin
+      ? window.location.origin
+      : "https://pueblofoodmap.com";
+  return `${origin}${locale === "es" ? "/es" : "/"}?event=${encodeURIComponent(eventId)}`;
+}
+
+/** Share a venue: the same mechanics as shareLink, pointed at the venue's page. */
+export function shareVenue({ venueId, title, text, isBox = false }: ShareVenueOptions): Promise<ShareResult> {
+  return shareLink({ url: venueShareUrl(venueId, isBox), title, text });
+}
+
+/**
  * Try the native share sheet first; if it's absent or fails (other than the
  * user dismissing it), copy the link instead. Returns what happened so the UI
  * can show a "Link copied" confirmation only when appropriate.
  */
-export async function shareVenue({
-  venueId,
+export async function shareLink({
+  url,
   title,
   text,
-  isBox = false,
-}: ShareVenueOptions): Promise<ShareResult> {
-  const url = venueShareUrl(venueId, isBox);
+}: {
+  url: string;
+  title: string;
+  text?: string;
+}): Promise<ShareResult> {
   const nav = typeof navigator !== "undefined" ? navigator : undefined;
 
   // Preferred: native share sheet (mobile + some desktop browsers).

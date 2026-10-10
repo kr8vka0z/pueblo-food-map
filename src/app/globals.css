@@ -63,7 +63,8 @@
   --color-cat-blessing:    #C2447B;
 
   /* Special-event star pin (#758) — the owner-approved exception to the
-     orange-is-reserved rule (Kyle, 2026-10-10), for the event pin ONLY. Same
+     orange-is-reserved rule (Kyle, 2026-10-10), for the event pin and the event
+     card's Get directions button (#759) ONLY. Same
      hex values as brand-orange / brand-navy, named separately so the exception
      is greppable and can change without touching the splash or Filters buttons. */
   --color-event-pin:     #F7943C;

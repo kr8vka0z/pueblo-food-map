@@ -9,8 +9,9 @@
  * re-judges the SAME list, so an event published mid-session appears on the
  * next page load (the feed's own cache is 60s).
  *
- * The state is only written when there is something to show, so an empty or
- * failed feed costs no re-render.
+ * The `events` state is only written when there is something to show, so an
+ * empty or failed feed leaves it untouched (`useEventsFeed`'s one-time
+ * `loaded` flag aside, see below).
  */
 
 import { useEffect, useState } from "react";
@@ -31,8 +32,16 @@ function drawable(raw: unknown): PublicEvent[] {
   );
 }
 
-export function useEvents(): PublicEvent[] {
+/**
+ * The feed plus whether the request has FINISHED (success or failure). A
+ * shared `?event=<id>` link needs the second part (#759): only once the feed
+ * has answered without that id is it worth asking the single-event route.
+ * `loaded` is one extra state write per page load; `events` keeps the rule
+ * above (written only when there is something to show).
+ */
+export function useEventsFeed(): { events: PublicEvent[]; loaded: boolean } {
   const [events, setEvents] = useState<PublicEvent[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +55,9 @@ export function useEvents(): PublicEvent[] {
       })
       .catch(() => {
         // Network/parse failure — leave events at [], the map still works.
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
       });
 
     return () => {
@@ -53,5 +65,9 @@ export function useEvents(): PublicEvent[] {
     };
   }, []);
 
-  return events;
+  return { events, loaded };
+}
+
+export function useEvents(): PublicEvent[] {
+  return useEventsFeed().events;
 }

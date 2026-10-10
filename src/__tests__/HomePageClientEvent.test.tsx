@@ -2,8 +2,8 @@
  * HomePageClient -> MapWrapper -> Map for a shared /?event=<id> link (#758).
  * A regression in the read would break shared event links silently, so this
  * goes through the real HomePageClient and MapWrapper; only Map (WebGL) is a
- * sentinel. The map loads on the first interaction: ?event= is deliberately
- * not eager yet, so it must not defeat the splash hold (#588).
+ * sentinel. Since #759 ?event= skips the splash and loads the map eagerly,
+ * like ?venue=.
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
@@ -84,11 +84,13 @@ describe("shared /?event=<id> link through HomePageClient", () => {
       rerender(makeTree());
     }
     await settle();
-    expect(screen.queryByTestId("map-canvas")).toBeNull(); // not eager: no map before interaction
-
-    await act(async () => {
-      window.dispatchEvent(new Event("pointerdown"));
-    });
+    // Eager (#759): the event link skips the splash, so the map loads with no interaction.
+    for (let i = 0; i < 100 && !screen.queryByTestId("map-canvas"); i++) {
+      await act(async () => {
+        await new Promise<void>((r) => setTimeout(r, 100));
+      });
+      rerender(makeTree());
+    }
     await settle();
     expect(screen.getByTestId("map-canvas")).toHaveAttribute("data-selected-event-id", "evt-1");
     expect(window.location.search).toBe("?event=evt-1");

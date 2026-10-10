@@ -61,6 +61,6 @@ export async function POST(
   }
   if (results[0].meta.changes === 0) return eventConflictResponse();
 
-  await purgeEventsFeed(req);
+  await purgeEventsFeed(req, id);
   return NextResponse.json({ ok: true, id, status: "archived", updated_at: now });
 }

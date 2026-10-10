@@ -129,7 +129,8 @@ describe("POST /api/admin/events", () => {
     expect(sqlite.prepare("SELECT entity, entity_id, action, actor_email, session_id FROM audit_log").all()).toEqual([
       { entity: "event", entity_id: out.id, action: "create", actor_email: ADMIN_EMAIL, session_id: "sess-1" },
     ]);
-    expect(cacheDelete).toHaveBeenCalledTimes(1);
+    expect(cacheDelete).toHaveBeenCalledTimes(2);
+    expect(String((cacheDelete.mock.calls[1][0] as Request).url)).toBe("https://pueblofoodmap.com/api/public/events/" + out.id);
     expect(String((cacheDelete.mock.calls[0][0] as Request).url)).toBe("https://pueblofoodmap.com/api/public/events");
   });
 
@@ -166,7 +167,8 @@ describe("PATCH /api/admin/events/[id]", () => {
     expect(res.status).toBe(200);
     expect(rowOf(created.id)).toMatchObject({ name: "Renamed", status: "draft" });
     expect(auditCount()).toBe(2);
-    expect(cacheDelete).toHaveBeenCalledTimes(1);
+    expect(cacheDelete).toHaveBeenCalledTimes(2);
+    expect(String((cacheDelete.mock.calls[1][0] as Request).url)).toBe("https://pueblofoodmap.com/api/public/events/" + created.id);
   });
 
   test("a stale updated_at -> 409 conflict, the row is unchanged and NO audit row is written", async () => {
@@ -241,7 +243,8 @@ describe("POST /api/admin/events/[id]/archive", () => {
     expect(res.status).toBe(200);
     expect(rowOf(created.id).status).toBe("archived");
     expect(sqlite.prepare("SELECT action FROM audit_log ORDER BY id DESC LIMIT 1").get()).toEqual({ action: "archive" });
-    expect(cacheDelete).toHaveBeenCalledTimes(1);
+    expect(cacheDelete).toHaveBeenCalledTimes(2);
+    expect(String((cacheDelete.mock.calls[1][0] as Request).url)).toBe("https://pueblofoodmap.com/api/public/events/" + created.id);
   });
 
   test("a stale expectedUpdatedAt -> 409, not archived, no audit row", async () => {

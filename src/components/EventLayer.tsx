@@ -12,7 +12,8 @@
  * only when there is at least one event, so an empty, failed or not-yet-loaded
  * feed means no timer and no DOM at all.
  *
- * Selecting a pin only selects and centers it. The event card is slice #759.
+ * Selecting a pin selects and centers it; the card itself is opened by
+ * MapWrapper off the selection (#759).
  */
 
 import { useCallback, useEffect, useMemo } from "react";
@@ -22,6 +23,7 @@ import type { PublicEvent } from "@/lib/events";
 import type { Locale } from "@/lib/i18n";
 import { pinAriaLabel, pinLabel, pinsAt } from "@/lib/eventPins";
 import { useMinuteClock } from "@/lib/useMinuteClock";
+import { MOBILE_QUERY } from "@/lib/useMediaQuery";
 
 interface EventLayerProps {
   events: readonly PublicEvent[];
@@ -45,7 +47,14 @@ export default function EventLayer({ events, selectedEventId, onSelectEvent, loc
   useEffect(() => {
     if (!map || selId === undefined || selLng === undefined || selLat === undefined) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const target = { center: [selLng, selLat] as [number, number] };
+    // On a phone the event card (#759) covers the lower ~45% of the screen, so
+    // a pin centered on the map would sit under it: lift the target into the
+    // visible strip above. The desktop panel is at the side and needs none.
+    const phone = window.matchMedia(MOBILE_QUERY).matches;
+    const target = {
+      center: [selLng, selLat] as [number, number],
+      ...(phone ? { offset: [0, -Math.round(window.innerHeight * 0.22)] as [number, number] } : {}),
+    };
     if (reduced) map.jumpTo(target);
     else map.flyTo({ ...target, duration: 800 });
   }, [map, selId, selLng, selLat]);

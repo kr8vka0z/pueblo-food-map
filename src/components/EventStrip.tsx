@@ -80,7 +80,7 @@ export default function EventStrip({ events, locale, onOpen, onMore, rightInset 
         <button
           type="button"
           onClick={() => onOpen(pin.event.id)}
-          className={`flex-1 min-w-0 flex items-center gap-2.5 pl-3 pr-1 text-left ${PRESS_FEEDBACK} ${FOCUS}`}
+          className={`flex-1 min-w-0 flex items-center gap-2 pl-2.5 pr-1 text-left ${PRESS_FEEDBACK} ${FOCUS}`}
         >
           <svg width="20" height="20" viewBox="6 3.6 12 12" aria-hidden="true" className="shrink-0">
             <polygon points={STAR_POINTS} fill="var(--color-event-pin)" />
@@ -96,7 +96,7 @@ export default function EventStrip({ events, locale, onOpen, onMore, rightInset 
             type="button"
             onClick={onMore}
             aria-label={t("events.strip.moreAria", locale, { count: String(more) })}
-            className={`shrink-0 px-2.5 border-l border-white/20 text-xs font-semibold underline underline-offset-2 ${PRESS_FEEDBACK} ${FOCUS}`}
+            className={`shrink-0 px-2 border-l border-white/20 text-[11px] font-semibold underline underline-offset-2 ${PRESS_FEEDBACK} ${FOCUS}`}
           >
             {t("events.strip.more", locale, { count: String(more) })}
           </button>

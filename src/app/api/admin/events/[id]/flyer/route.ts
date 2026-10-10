@@ -36,7 +36,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { authorizeEventRequest, eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
 import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { publicFlyerOf, type EventRow } from "@/lib/events";
+import { isMissingColumnError, publicFlyerOf, type EventRow } from "@/lib/events";
 import { flyerKey, FLYER_CONTENT_TYPES, inspectFlyer, MAX_FLYER_BYTES, type FlyerExt } from "@/lib/eventFlyers";
 
 export const dynamic = "force-dynamic";
@@ -113,10 +113,15 @@ async function commit(
     .bind(identity.email, existing.id, "update", JSON.stringify(existing), JSON.stringify(after), now, identity.sessionId ?? null, existing.id, now);
 
   // update MUST stay statement index 0 — the 409 check reads results[0].
-  const results = await db.batch([update, audit]).catch(() => null);
-  if (results === null) {
+  let results: Awaited<ReturnType<typeof db.batch>>;
+  try {
+    results = await db.batch([update, audit]);
+  } catch (err) {
     await deleteQuietly(r2, uploaded);
-    return flyerUnavailable();
+    // Only a missing flyer column means "migration 0019 not applied yet";
+    // anything else is a real failure and keeps its normal error handling.
+    if (isMissingColumnError(err)) return flyerUnavailable();
+    throw err;
   }
   if (results[0].meta.changes === 0) {
     await deleteQuietly(r2, uploaded);
@@ -185,6 +190,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const existing = await access.db.prepare("SELECT * FROM events WHERE id = ?").bind(id).first<EventRow>();
   if (!existing) return fail(404, "not_found", "Not found");
   if (existing.status === "archived") return archivedResponse();
+  // A stale write must not even store an object. The batch below still decides
+  // real races (a save landing between this read and the write).
+  if (existing.updated_at !== expectedUpdatedAt) return eventConflictResponse();
 
   const file = form.get("flyer");
   const r2 = await bucket();
@@ -206,7 +214,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   const inspected = inspectFlyer(await file.arrayBuffer());
   if (!inspected) {
-    return fail(422, "unsupported_image", "That file isn't a supported image.", { flyer: "That file isn't a JPEG, PNG or WebP image." });
+    return fail(422, "unsupported_image", "That file isn't a supported image.", { flyer: "That file isn't a JPEG image. (The form converts JPEG, PNG and WebP for you.)" });
   }
 
   const key = flyerKey(existing.id, inspected.ext);

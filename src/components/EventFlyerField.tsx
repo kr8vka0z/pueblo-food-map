@@ -113,7 +113,9 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
 
   async function choose(file: File | undefined) {
     if (!file) return;
-    if (!ACCEPTED.includes(file.type)) {
+    // Some Android pickers report no type at all; only refuse a type that is present and wrong.
+    // A non-image with a blank type still fails at decode, with its own message below.
+    if (file.type && !ACCEPTED.includes(file.type)) {
       setError(WRONG_TYPE);
       return;
     }
@@ -208,7 +210,9 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
           <input id="event-flyer-alt-es" type="text" lang="es" value={altEs} maxLength={200} onChange={(e) => setAltEs(e.target.value)} className={inputClass} />
         </div>
       </div>
-      <p className="text-xs text-[var(--color-ink-500)]">If left blank, the event name is read out instead.</p>
+      <p className="text-xs text-[var(--color-ink-500)]">
+        If left blank, the event name is read out instead. Descriptions are saved with the picture or the Save description button, not the Save buttons below.
+      </p>
       {flyer && (
         <button
           type="button"

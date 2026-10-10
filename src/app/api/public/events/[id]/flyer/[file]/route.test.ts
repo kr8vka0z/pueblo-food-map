@@ -22,7 +22,7 @@ vi.mock("@opennextjs/cloudflare", () => ({
 import { GET } from "@/app/api/public/events/[id]/flyer/[file]/route";
 
 const ID = "11111111-1111-4111-8111-111111111111";
-const FILE = "22222222-2222-4222-8222-222222222222.png";
+const FILE = "22222222-2222-4222-8222-222222222222.jpg";
 const KEY = `${ID}/${FILE}`;
 
 let sqlite: Database.Database;
@@ -61,7 +61,7 @@ describe("GET /api/public/events/[id]/flyer/[file]", () => {
   test("serves a published event's flyer with its content type, nosniff and a year-long immutable cache", async () => {
     const res = await get(ID, FILE);
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
@@ -81,7 +81,7 @@ describe("GET /api/public/events/[id]/flyer/[file]", () => {
   });
 
   test("an old key after a replace or remove is a 404", async () => {
-    setStatus("published", `${ID}/33333333-3333-4333-8333-333333333333.png`);
+    setStatus("published", `${ID}/33333333-3333-4333-8333-333333333333.jpg`);
     expect((await get(ID, FILE)).status).toBe(404);
     setStatus("published", null);
     expect((await get(ID, FILE)).status).toBe(404);
@@ -91,8 +91,10 @@ describe("GET /api/public/events/[id]/flyer/[file]", () => {
     [ID, "../0001.png"],
     [ID, "..%2f..%2fx.png"],
     [ID, "22222222-2222-4222-8222-222222222222.svg"],
-    [ID, "22222222-2222-4222-8222-222222222222.png.html"],
-    [ID, "22222222-2222-4222-8222-222222222222.PNG"],
+    [ID, "22222222-2222-4222-8222-222222222222.png"],
+    [ID, "22222222-2222-4222-8222-222222222222.webp"],
+    [ID, "22222222-2222-4222-8222-222222222222.jpg.html"],
+    [ID, "22222222-2222-4222-8222-222222222222.JPG"],
     ["../other", FILE],
     ["a/b", FILE],
     ["box-photos", FILE],

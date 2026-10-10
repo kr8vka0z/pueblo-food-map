@@ -19,7 +19,7 @@ import Database from "better-sqlite3";
 import { AccessDeniedError, ADMIN_ORIGIN } from "@/lib/adminOrigin";
 import { sqliteD1 } from "@/lib/sqliteD1.testutil";
 import { MAX_FLYER_BYTES, FLYER_FILE_RE } from "@/lib/eventFlyers";
-import { htmlBytes, jpegBytes, pngBytes, svgBytes } from "@/lib/eventFlyers.testutil";
+import { htmlBytes, jpegBytes, pngBytes, svgBytes, webpBytes } from "@/lib/eventFlyers.testutil";
 
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 const EVENT_ID = "11111111-1111-4111-8111-111111111111";
@@ -171,15 +171,17 @@ describe("upload", () => {
   });
 
   test("a client-chosen file name or content type changes nothing about the key or stored type", async () => {
-    await upload({ file: { bytes: pngBytes(100, 200), name: "../../evil.html", type: "text/html" } });
+    await upload({ file: { bytes: jpegBytes(100, 200), name: "../../evil.html", type: "text/html" } });
     const key = row().flyer_key as string;
-    expect(key).toMatch(new RegExp(`^${EVENT_ID}/[0-9a-f-]{36}\\.png$`));
-    expect(objects.get(key)?.contentType).toBe("image/png");
+    expect(key).toMatch(new RegExp(`^${EVENT_ID}/[0-9a-f-]{36}\\.jpg$`));
+    expect(objects.get(key)?.contentType).toBe("image/jpeg");
   });
 
   test.each([
     ["an SVG named .jpg", svgBytes(), "x.jpg", "image/jpeg"],
     ["an HTML file named .jpg", htmlBytes(), "x.jpg", "image/jpeg"],
+    ["a real PNG (the server only stores JPEG, whose metadata it can strip)", pngBytes(10, 10), "x.png", "image/png"],
+    ["a real WebP", webpBytes("lossless"), "x.webp", "image/webp"],
     ["random bytes", new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]), "x.png", "image/png"],
   ])("%s is rejected with an image content type, and nothing is stored", async (_n, bytes, name, type) => {
     const res = await upload({ file: { bytes, name, type } });
@@ -200,11 +202,11 @@ describe("upload", () => {
     expect(row().flyer_key).toBeNull();
   });
 
-  test("a stale expectedUpdatedAt -> 409, the upload is cleaned out of storage, no audit row", async () => {
+  test("a stale expectedUpdatedAt -> 409 before anything is stored, no audit row", async () => {
     const res = await upload({ expected: "2020-01-01T00:00:00.000Z" });
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: string }).error).toBe("conflict");
-    expect(objects.size).toBe(0);
+    expect(r2Calls).toEqual([]);
     expect(row().flyer_key).toBeNull();
     expect(auditRows()).toEqual([]);
   });
@@ -212,7 +214,7 @@ describe("upload", () => {
   test("replacing deletes the old object; the new file is the only one left", async () => {
     await upload({ file: { bytes: jpegBytes(100, 100) } });
     const oldKey = row().flyer_key as string;
-    await upload({ file: { bytes: pngBytes(200, 300) } });
+    await upload({ file: { bytes: jpegBytes(200, 300) } });
     const newKey = row().flyer_key as string;
 
     expect(newKey).not.toBe(oldKey);
@@ -235,6 +237,30 @@ describe("upload", () => {
     sqlite.prepare("UPDATE events SET status = 'archived' WHERE id = ?").run(EVENT_ID);
     expect((await upload()).status).toBe(409);
     expect(r2Calls).toEqual([]);
+  });
+
+  test("a write that loses a real race (row changed after the check) deletes the object it stored", async () => {
+    const real = sqliteD1(sqlite);
+    const racing = {
+      ...real,
+      batch: async (stmts: unknown[]) => {
+        sqlite.prepare("UPDATE events SET updated_at = '2030-01-01T00:00:00.000Z' WHERE id = ?").run(EVENT_ID);
+        return (real as unknown as { batch: (s: unknown[]) => Promise<unknown> }).batch(stmts);
+      },
+    };
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: racing, EVENT_FLYERS: fakeR2() } });
+    const res = await upload();
+    expect(res.status).toBe(409);
+    expect(objects.size).toBe(0);
+    expect(row().flyer_key).toBeNull();
+  });
+
+  test("a database error that is NOT a missing column is not reported as 'flyers unavailable': the object is removed and the error propagates", async () => {
+    const real = sqliteD1(sqlite);
+    const broken = { ...real, batch: async () => { throw new Error("D1_ERROR: network connection lost"); } };
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: broken, EVENT_FLYERS: fakeR2() } });
+    await expect(upload()).rejects.toThrow("network connection lost");
+    expect(objects.size).toBe(0);
   });
 
   test("migration 0019 not applied -> clean 503, the uploaded object is removed, nothing else breaks", async () => {
@@ -277,10 +303,10 @@ describe("remove", () => {
 
 describe("admin preview", () => {
   test("needs a session, serves the stored image with nosniff and no-store", async () => {
-    await upload({ file: { bytes: pngBytes(10, 10) } });
+    await upload({ file: { bytes: jpegBytes(10, 10) } });
     const ok = await previewFlyer(new NextRequest("https://pueblofoodmap.com/x"), ctx);
     expect(ok.status).toBe(200);
-    expect(ok.headers.get("content-type")).toBe("image/png");
+    expect(ok.headers.get("content-type")).toBe("image/jpeg");
     expect(ok.headers.get("x-content-type-options")).toBe("nosniff");
     expect(ok.headers.get("cache-control")).toBe("no-store");
 

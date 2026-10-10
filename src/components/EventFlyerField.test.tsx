@@ -37,6 +37,13 @@ describe("EventFlyerField", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  test("a file with a blank reported type (some Android pickers) is still tried, not refused up front", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: false, errors: { flyer: "nope" } }), { status: 422 }));
+    render(<EventFlyerField eventId="e1" version="v1" onVersion={vi.fn()} />);
+    pick(new File(["x"], "photo", { type: "" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  });
+
   test("a good upload posts the shrunk file with the version, then reports the new version and shows the preview", async () => {
     const onVersion = vi.fn();
     fetchMock.mockResolvedValue(

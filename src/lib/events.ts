@@ -106,13 +106,11 @@ export const PUBLIC_EVENTS_SQL = `SELECT id, name, name_es, host, host_es, descr
 // The same query plus the flyer columns (#760). The one above stays valid on a
 // database that has not applied migration 0019: the loaders try this one first
 // and fall back, so a deploy that reaches production before its migration
-// still serves every event, just without flyers.
-export const PUBLIC_EVENTS_WITH_FLYER_SQL = `SELECT id, name, name_es, host, host_es, description, description_es,
-    what_to_bring, what_to_bring_es, starts_at, ends_at, lat, lng, address, venue_id, link_url,
-    flyer_key, flyer_width, flyer_height, flyer_alt, flyer_alt_es
-  FROM events
-  WHERE status = 'published' AND ends_at > ?
-  ORDER BY starts_at ASC`;
+// still serves every event, just without flyers. It is DERIVED from the older
+// string (columns spliced in before FROM), so the two WHERE clauses can never drift.
+const FLYER_COLUMNS = "flyer_key, flyer_width, flyer_height, flyer_alt, flyer_alt_es";
+const withFlyerColumns = (sql: string): string => sql.replace("\n  FROM events", `,\n    ${FLYER_COLUMNS}\n  FROM events`);
+export const PUBLIC_EVENTS_WITH_FLYER_SQL = withFlyerColumns(PUBLIC_EVENTS_SQL);
 
 interface FlyerColumns {
   flyer_key?: string | null;
@@ -120,6 +118,15 @@ interface FlyerColumns {
   flyer_height?: number | null;
   flyer_alt?: string | null;
   flyer_alt_es?: string | null;
+}
+
+/**
+ * True only for the database's "that column isn't there" error, i.e. migration
+ * 0019 has not been applied. Callers fall back only on this and rethrow
+ * everything else.
+ */
+export function isMissingColumnError(err: unknown): boolean {
+  return err instanceof Error && /no such column|has no column/i.test(err.message);
 }
 
 /** The card-ready flyer for a row's five flyer columns, or null (none stored, columns missing, or a key outside our shape). */
@@ -142,9 +149,11 @@ export async function loadPublicEvents(db: D1Database, now: Date = new Date()): 
   try {
     const { results } = await db.prepare(PUBLIC_EVENTS_WITH_FLYER_SQL).bind(iso).all<PublicEvent & FlyerColumns>();
     return results.map(withPublicFlyer) as PublicEvent[];
-  } catch {
-    // Migration 0019 not applied yet. If the table itself is missing this
-    // throws too, and the route turns that into its empty fail-soft answer.
+  } catch (err) {
+    // Migration 0019 not applied yet. Any other error (a transient D1 failure,
+    // a missing table) is rethrown: the route turns it into its degraded,
+    // uncached answer instead of silently serving flyer-less data as healthy.
+    if (!isMissingColumnError(err)) throw err;
     const { results } = await db.prepare(PUBLIC_EVENTS_SQL).bind(iso).all<PublicEvent>();
     return results;
   }
@@ -160,11 +169,7 @@ export const PUBLIC_EVENT_BY_ID_SQL = `SELECT id, name, name_es, host, host_es, 
   FROM events
   WHERE id = ? AND status IN ('published', 'cancelled')`;
 
-export const PUBLIC_EVENT_BY_ID_WITH_FLYER_SQL = `SELECT id, name, name_es, host, host_es, description, description_es,
-    what_to_bring, what_to_bring_es, starts_at, ends_at, lat, lng, address, venue_id, link_url,
-    status, cancel_note, cancel_note_es, flyer_key, flyer_width, flyer_height, flyer_alt, flyer_alt_es
-  FROM events
-  WHERE id = ? AND status IN ('published', 'cancelled')`;
+export const PUBLIC_EVENT_BY_ID_WITH_FLYER_SQL = withFlyerColumns(PUBLIC_EVENT_BY_ID_SQL);
 
 /** One event for a shared link, or null (unknown, draft, archived). Throws on a D1 failure (the route turns that into an uncached 404). */
 export async function loadPublicEventById(db: D1Database, id: string): Promise<PublicEventDetail | null> {
@@ -172,8 +177,9 @@ export async function loadPublicEventById(db: D1Database, id: string): Promise<P
   try {
     const found = await db.prepare(PUBLIC_EVENT_BY_ID_WITH_FLYER_SQL).bind(id).first<PublicEventDetail & FlyerColumns>();
     row = found ? (withPublicFlyer(found) as PublicEventDetail) : null;
-  } catch {
+  } catch (err) {
     // Migration 0019 not applied yet — see loadPublicEvents.
+    if (!isMissingColumnError(err)) throw err;
     row = await db.prepare(PUBLIC_EVENT_BY_ID_SQL).bind(id).first<PublicEventDetail>();
   }
   if (!row) return null;

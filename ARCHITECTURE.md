@@ -1150,16 +1150,18 @@ One image per event, shown at the top of the card.
 
 - **Storage.** R2 bucket binding `EVENT_FLYERS` (`pfm-event-flyers`; staging
   `pfm-event-flyers-staging`, declared separately because `env.staging` inherits
-  no bindings). Key `<eventId>/<uuid>.<jpg|png|webp>`, made on the server; a
+  no bindings). Key `<eventId>/<uuid>.jpg`, made on the server; a
   replaced flyer gets a new key and the old object is deleted. D1 keeps
   `flyer_key` (0018) plus `flyer_width`, `flyer_height`, `flyer_alt`,
   `flyer_alt_es` (migration `0019_event_flyer`, nullable ADD COLUMNs).
 - **Upload** `POST /api/admin/events/[id]/flyer` (also `DELETE`, and `GET` for
   the admin preview, since a draft has no public URL). Gate: session, then
   `requireAdminOrigin`, before the body is read. The file is judged on its
-  bytes (`src/lib/eventFlyers.ts`: JPEG / PNG / WebP signatures, width and
-  height read from the header, 200 KB hard cap, no side over 4096 px; a JPEG
-  also has its EXIF stripped). Order: put the new object, then one `db.batch()`
+  bytes (`src/lib/eventFlyers.ts`: JPEG only, because the server can strip
+  metadata only from a JPEG and the form always re-encodes to JPEG; width and
+  height read from the header, EXIF stripped, 200 KB hard cap, no side over
+  4096 px). A stale `updated_at` is refused (409) before anything is stored.
+  Order: put the new object, then one `db.batch()`
   (`UPDATE ... WHERE updated_at = ?` + the `WHERE EXISTS`-gated audit row,
   action `update`), then delete the old object. A lost `updated_at` race (409)
   or a failed batch deletes the object just uploaded. Every change purges the
@@ -1174,7 +1176,8 @@ One image per event, shown at the top of the card.
 - **Public data.** The feed and the single-event read carry
   `flyer: { src, width, height, alt, alt_es } | null`, never the raw key.
   `loadPublicEvents` / `loadPublicEventById` try the flyer-column query first and
-  fall back to the pre-0019 query, so code that reaches production before the
+  fall back to the pre-0019 query (only for a "no such column" error; any other
+  error propagates to the route's degraded answer), so code that reaches production before the
   migration still lists every event.
 - **Card.** `EventFlyer.tsx` reserves the box from the stored size (capped at
   `min(55vh, 28rem)`), `loading="lazy"`, `decoding="async"`, alt = the admin's

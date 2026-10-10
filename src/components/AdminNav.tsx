@@ -26,7 +26,7 @@
 import Link from "next/link";
 import type { AdminNavCounts } from "@/lib/adminNavCounts";
 
-export type AdminActiveTab = "dashboard" | "boxes" | "places" | "activity";
+export type AdminActiveTab = "dashboard" | "boxes" | "places" | "events" | "activity";
 
 export interface AdminNavProps {
   email: string;
@@ -73,6 +73,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/admin" },
   { key: "boxes", label: "Blessing Boxes", href: "/admin/boxes", countKeys: ["photos", "adopters"] },
   { key: "places", label: "Places", href: "/admin/places", countKeys: ["proposals", "submissions"] },
+  // #757: special events (one-off, live like boxes — not part of Publish). No pending-count pill.
+  { key: "events", label: "Events", href: "/admin/events" },
 ];
 
 // #679 — owner only; appended to NAV_ITEMS only when `showActivity` is true.

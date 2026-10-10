@@ -69,6 +69,21 @@ export function puebloLocalToUtcIso(local: string): string | null {
   return new Date(Math.min(...candidates)).toISOString();
 }
 
+const whenFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: TIME_ZONE,
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+/** "Sat, Nov 21, 2026, 10:00 AM" in Pueblo time, whatever the viewer's own timezone (admin list). */
+export function formatEventWhen(iso: string): string {
+  return whenFormatter.format(new Date(iso));
+}
+
 /** "2026-11-21T17:00:00.000Z" -> "2026-11-21T10:00" (Pueblo wall clock, for pre-filling the edit form). */
 export function utcIsoToPuebloLocal(iso: string): string {
   const p = puebloParts(Date.parse(iso));

@@ -144,11 +144,9 @@ export async function PATCH(
       identity.sessionId ?? null, id, now,
     );
 
-  let results: D1Result[];
-  try {
-    // updateEvent MUST stay statement index 0 — the 409 check reads results[0].
-    results = await db.batch([updateEvent, insertAudit]);
-  } catch {
+  // updateEvent MUST stay statement index 0 — the 409 check reads results[0].
+  const results = await db.batch([updateEvent, insertAudit]).catch(() => null);
+  if (results === null) {
     return NextResponse.json({ ok: false, error: "write_failed", message: "The event was not saved. Try again." }, { status: 500 });
   }
   if (results[0].meta.changes === 0) return eventConflictResponse();

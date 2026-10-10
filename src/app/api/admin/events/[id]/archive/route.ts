@@ -55,10 +55,8 @@ export async function POST(
     .prepare(EVENT_AUDIT_INSERT_SQL)
     .bind(identity.email, id, "archive", JSON.stringify(existing), JSON.stringify(after), now, identity.sessionId ?? null, id, now);
 
-  let results: D1Result[];
-  try {
-    results = await db.batch([archiveEvent, insertAudit]);
-  } catch {
+  const results = await db.batch([archiveEvent, insertAudit]).catch(() => null);
+  if (results === null) {
     return NextResponse.json({ ok: false, error: "write_failed", message: "The event was not archived. Try again." }, { status: 500 });
   }
   if (results[0].meta.changes === 0) return eventConflictResponse();

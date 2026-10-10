@@ -7,7 +7,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { puebloLocalToUtcIso, utcIsoToPuebloLocal } from "@/lib/eventTime";
+import { formatEventWhen, puebloLocalToUtcIso, utcIsoToPuebloLocal } from "@/lib/eventTime";
 
 const originalTz = process.env.TZ;
 beforeAll(() => {
@@ -42,6 +42,13 @@ describe("puebloLocalToUtcIso", () => {
     for (const bad of ["", "2026-13-01T10:00", "2026-02-30T10:00", "2026-01-15 10:00", "2026-01-15T25:00", "tomorrow"]) {
       expect(puebloLocalToUtcIso(bad)).toBeNull();
     }
+  });
+});
+
+describe("formatEventWhen", () => {
+  test("shows Pueblo wall-clock time regardless of the viewer's own timezone", () => {
+    expect(formatEventWhen("2026-11-21T17:00:00.000Z")).toBe("Sat, Nov 21, 2026, 10:00 AM");
+    expect(formatEventWhen("2026-07-15T06:00:00.000Z")).toBe("Wed, Jul 15, 2026, 12:00 AM");
   });
 });
 

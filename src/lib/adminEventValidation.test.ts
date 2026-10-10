@@ -24,7 +24,7 @@ function valid(over: Record<string, unknown> = {}): Record<string, unknown> {
   };
 }
 
-function errorsOf(body: unknown, actions = SAVE) {
+function errorsOf(body: unknown, actions: readonly string[] = SAVE) {
   const result = validateEventPayload(body, actions);
   if (result.ok) throw new Error("expected validation to fail");
   return result.errors;

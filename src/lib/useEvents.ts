@@ -9,8 +9,9 @@
  * re-judges the SAME list, so an event published mid-session appears on the
  * next page load (the feed's own cache is 60s).
  *
- * The state is only written when there is something to show, so an empty or
- * failed feed costs no re-render.
+ * The `events` state is only written when there is something to show, so an
+ * empty or failed feed leaves it untouched (`useEventsFeed`'s one-time
+ * `loaded` flag aside, see below).
  */
 
 import { useEffect, useState } from "react";
@@ -34,19 +35,16 @@ function drawable(raw: unknown): PublicEvent[] {
 /**
  * The feed plus whether the request has FINISHED (success or failure). A
  * shared `?event=<id>` link needs the second part (#759): only once the feed
- * has answered without that id is it worth asking the single-event route. It
- * is opt-in (`trackLoaded`) so the common visit, with no event link, keeps the
- * property above: an empty or failed feed costs no re-render.
+ * has answered without that id is it worth asking the single-event route.
+ * `loaded` is one extra state write per page load; `events` keeps the rule
+ * above (written only when there is something to show).
  */
-export function useEventsFeed(trackLoaded = false): { events: PublicEvent[]; loaded: boolean } {
+export function useEventsFeed(): { events: PublicEvent[]; loaded: boolean } {
   const [events, setEvents] = useState<PublicEvent[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const finish = () => {
-      if (!cancelled && trackLoaded) setLoaded(true);
-    };
 
     fetch("/api/public/events")
       .then((res) => (res.ok ? (res.json() as Promise<{ events?: unknown }>) : null))
@@ -58,12 +56,14 @@ export function useEventsFeed(trackLoaded = false): { events: PublicEvent[]; loa
       .catch(() => {
         // Network/parse failure — leave events at [], the map still works.
       })
-      .finally(finish);
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [trackLoaded]);
+  }, []);
 
   return { events, loaded };
 }

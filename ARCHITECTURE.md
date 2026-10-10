@@ -332,7 +332,7 @@ Key state atoms and their roles:
 | State | Type | Purpose |
 |---|---|---|
 | `selectedVenueId` | `string \| null` | Which venue card is open |
-| `selectedEventId` | `string \| null` | Which special-event star pin is selected (#758, from `useMapUI`); mirrored into `?event=<id>`, mutually exclusive with `selectedVenueId` |
+| `selectedEventId` | `string \| null` | Which special-event star pin is selected (#758, from `useMapUI`); opens the event card (#759); mirrored into `?event=<id>`, mutually exclusive with `selectedVenueId` |
 | `viewport` | `'located' \| 'pueblo-center'` | Splash exit mode; determines initial map center |
 | `viewMode` | `'map' \| 'list'` | Map canvas vs. full-screen list |
 | `query` | `string` | Text search input |
@@ -1109,7 +1109,7 @@ adds the event card** (see "Event card" below). No flyer upload (#760) yet.
   caller (the pins, the card) and stopped with the last, so the card adds no
   second timer. The badge is plain text, deliberately not a live region, so the
   once-a-minute change is never announced.
-- **Data for the card.** `useEventsFeed(trackLoaded)` / `useEventDetail()`
+- **Data for the card.** `useEventsFeed()` (feed + a `loaded` flag) and `useEventDetail()`
   (`src/lib/useEventDetail.ts`): the card reads the feed `MapWrapper` already
   holds; only when the feed has answered without the selected id (an ended or
   cancelled event opened from a shared link) does it make one request to the

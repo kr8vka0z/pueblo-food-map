@@ -1215,10 +1215,10 @@ export default function MapWrapper({
   // Deselecting (null) removes the parameter. syncEventParam is a no-op when
   // the URL already agrees, which keeps a shared link's own ?event= intact on
   // the first render.
-  // `eventsLoaded` is tracked only for a shared ?event= link (#759): it tells
-  // useEventDetail when the feed has answered without that id, so the single-
-  // event read is made only for an event that has ended or been cancelled.
-  const { events, loaded: eventsLoaded } = useEventsFeed(Boolean(initialEventId));
+  // `eventsLoaded` (#759) tells useEventDetail when the feed has answered
+  // without a shared link's id, so the single-event read is made only for an
+  // event that has ended or been cancelled.
+  const { events, loaded: eventsLoaded } = useEventsFeed();
   const selectEvent = useCallback(
     (id: string | null) => {
       setSelectedEventId(id);

@@ -1122,13 +1122,13 @@ adds the event card** (see "Event card" below). No flyer upload (#760) yet.
   `cancel_note(_es)` (null on any other status). Draft, archived, unknown ids
   and a missing table all answer the same `404 { event: null }`, so the response
   never reveals that a draft exists. Same 60 s edge cache as the feed, but only
-  a 200 is stored (`BestEffortResult.status`), and every admin events write
+  a 200 is stored (`BestEffortResult.status`), non-200s are sent `Cache-Control: no-store` so a browser can't keep a 404 past the purge, both events routes key the cache on the bare path (`ignoreQuery`, so `?x=N` variants can't hold a stale 200 the purge misses), and every admin events write
   purges both the feed and `/api/public/events/<id>` (`purgeEventsFeed(req, id)`).
 - **Ended / cancelled card.** "This event has ended" or "Cancelled" + the
   admin's note, a button that turns on the existing Open-now filter, and no Get
   directions, Share or Add to calendar.
 - **Share** is `shareLink()` in `share.ts` (the native share sheet, else copy
-  with a confirmation; `shareVenue` now calls it too) with `eventShareUrl()`:
+  with a confirmation, or, with neither, the link shown as selectable text; `shareVenue` now calls it too) with `eventShareUrl()`:
   `/?event=<id>`, or `/es?event=<id>` on a Spanish page.
 - **Add to calendar** is `eventIcs.ts` (no dependency): CRLF, RFC 5545 text
   escaping, 75-octet folding by bytes, `UID:event-<id>@pueblofoodmap.com`, and

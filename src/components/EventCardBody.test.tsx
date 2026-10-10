@@ -141,7 +141,22 @@ describe("Share", () => {
 
     expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/?event=evt-1`);
     // The confirmation is announced once, not on every clock tick.
-    expect(screen.getByRole("status")).toBeTruthy();
+    // A live region OUTSIDE the button, whose text changes when copied.
+    const status = screen.getByRole("status");
+    expect(status.textContent).toBe(t("events.card.shareCopied", "en"));
+    expect(status.closest("button")).toBeNull();
+  });
+
+  test("with no share sheet and no clipboard the link is shown to copy by hand", async () => {
+    vi.setSystemTime(START);
+    renderCard(makeEvent());
+
+    await act(async () => {
+      shareButton()!.click();
+    });
+
+    expect(screen.getByText(`${window.location.origin}/?event=evt-1`)).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("");
   });
 
   test("shares the /es link on a Spanish page", async () => {

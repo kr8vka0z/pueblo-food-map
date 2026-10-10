@@ -41,5 +41,5 @@ async function loadEventsBestEffort(): Promise<BestEffortResult<{ events: Public
 }
 
 export async function GET(req: NextRequest): Promise<Response> {
-  return respondWithEdgeCache(req, loadEventsBestEffort);
+  return respondWithEdgeCache(req, loadEventsBestEffort, { ignoreQuery: true });
 }

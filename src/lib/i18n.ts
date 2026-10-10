@@ -423,6 +423,7 @@ const en: Record<string, string> = {
   "events.card.directionsAria": "Get directions to {name} (opens in a new tab)",
   "events.card.share": "Share",
   "events.card.shareCopied": "Link copied",
+  "events.card.shareManual": "Sharing isn't available here. Copy this link:",
   "events.card.calendar": "Add to calendar",
   "events.card.moreInfo": "More information",
   "events.card.seeOpenNow": "See places open now",
@@ -1560,6 +1561,7 @@ const es: Record<string, string> = {
   "events.card.directionsAria": "Cómo llegar a {name} (se abre en una pestaña nueva)", // [CHECK]
   "events.card.share": "Compartir", // [CHECK]
   "events.card.shareCopied": "Enlace copiado", // [CHECK]
+  "events.card.shareManual": "Aquí no se puede compartir. Copia este enlace:", // [CHECK]
   "events.card.calendar": "Agregar al calendario", // [CHECK]
   "events.card.moreInfo": "Más información", // [CHECK]
   "events.card.seeOpenNow": "Ver lugares abiertos ahora", // [CHECK]

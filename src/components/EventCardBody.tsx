@@ -135,16 +135,17 @@ export default function EventCardBody({
 
   // ── Share ─────────────────────────────────────────────────────────────────
   const [copied, setCopied] = useState(false);
+  const [manualLink, setManualLink] = useState<string | null>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
   }, []);
   async function handleShare() {
-    const result = await shareLink({
-      url: eventShareUrl(event.id, locale),
-      title: text.name,
-      text: `${text.name} — Pueblo Food Map`,
-    });
+    const url = eventShareUrl(event.id, locale);
+    const result = await shareLink({ url, title: text.name, text: `${text.name} — Pueblo Food Map` });
+    // Neither a share sheet nor a clipboard: show the link to copy by hand
+    // instead of a button that silently does nothing.
+    if (result === "unsupported") setManualLink(url);
     if (result !== "copied") return;
     if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
     setCopied(true);
@@ -301,16 +302,26 @@ export default function EventCardBody({
   ) : null;
 
   const secondaryButtons = active ? (
-    <div className="flex gap-2">
-      <button type="button" onClick={handleShare} className={SECONDARY_BUTTON}>
-        {copied ? <Check size={16} aria-hidden /> : <Share2 size={16} aria-hidden />}
-        {copied ? t("events.card.shareCopied", locale) : t("events.card.share", locale)}
-        {copied && <span className="sr-only" role="status">{t("events.card.shareCopied", locale)}</span>}
-      </button>
-      <button type="button" onClick={handleCalendar} className={SECONDARY_BUTTON}>
-        <CalendarPlus size={16} aria-hidden />
-        {t("events.card.calendar", locale)}
-      </button>
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-2">
+        <button type="button" onClick={handleShare} className={SECONDARY_BUTTON}>
+          {copied ? <Check size={16} aria-hidden /> : <Share2 size={16} aria-hidden />}
+          {copied ? t("events.card.shareCopied", locale) : t("events.card.share", locale)}
+        </button>
+        <button type="button" onClick={handleCalendar} className={SECONDARY_BUTTON}>
+          <CalendarPlus size={16} aria-hidden />
+          {t("events.card.calendar", locale)}
+        </button>
+      </div>
+      {/* Always mounted, outside the button: a live region that appears together
+          with its text is announced unreliably; one whose text changes is not. */}
+      <span className="sr-only" role="status">{copied ? t("events.card.shareCopied", locale) : ""}</span>
+      {manualLink && (
+        <p className="text-sm text-[var(--color-ink-700)]">
+          {t("events.card.shareManual", locale)}{" "}
+          <span className="break-all font-mono text-xs select-all">{manualLink}</span>
+        </p>
+      )}
     </div>
   ) : null;
 

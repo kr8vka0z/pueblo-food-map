@@ -50,5 +50,5 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id } = await params;
-  return respondWithEdgeCache(req, () => loadEvent(id));
+  return respondWithEdgeCache(req, () => loadEvent(id), { ignoreQuery: true });
 }

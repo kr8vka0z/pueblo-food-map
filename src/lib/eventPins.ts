@@ -44,14 +44,21 @@ function sameDenverDay(aMs: number, bMs: number): boolean {
  * An unparseable date drops the event instead of throwing: one bad row must
  * not take the map down.
  */
-export function pinsAt(events: readonly PublicEvent[], nowMs: number): EventPin[] {
+export function pinsAt(
+  events: readonly PublicEvent[],
+  nowMs: number,
+  // The one window, as a parameter: the Events filter passes Infinity so the
+  // map draws every upcoming event its count includes (#761); default is the
+  // 7-day rule.
+  windowMs: number = EVENT_PIN_WINDOW_MS,
+): EventPin[] {
   const pins: EventPin[] = [];
   for (const event of events) {
     const start = Date.parse(event.starts_at);
     const end = Date.parse(event.ends_at);
     if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
     const live = nowMs >= start && nowMs < end;
-    const comingUp = nowMs < start && start - nowMs <= EVENT_PIN_WINDOW_MS;
+    const comingUp = nowMs < start && start - nowMs <= windowMs;
     if (!live && !comingUp) continue;
     pins.push({ event, live, today: sameDenverDay(start, nowMs) });
   }

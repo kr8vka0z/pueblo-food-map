@@ -68,6 +68,7 @@ import { useEventDetail } from "@/lib/useEventDetail";
 import { pinsAt, listOrder, syncEventParam, eventHereLabel } from "@/lib/eventPins";
 import { toVenue } from "@/lib/useBoxVenues";
 import EventStrip from "@/components/EventStrip";
+import EventsEmptyNotice from "@/components/EventsEmptyNotice";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 import { useMapUI, type ViewMode } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
@@ -2032,6 +2033,7 @@ export default function MapWrapper({
             events={events}
             selectedEventId={selectedEventId}
             onSelectEvent={selectEvent}
+            allUpcomingEvents={filterEvents}
             // WHY here (#758): Map defaults locale to "en" and nothing passed it,
             // so on /es every pin label and tooltip stayed English. Event pins
             // need the visitor's language; place pins' aria/tooltips now follow it too.
@@ -2175,14 +2177,31 @@ export default function MapWrapper({
       {/* "Happening today" strip (#761). Map view only, once the map has loaded:
           the list view lists events itself, and before the map loads the
           list stands in for it (same z-700 rung, so the two must not coexist).
+          Hidden while any place or event card is open (phone sheet or desktop
+          panel): the open card already names what the strip points at, and a
+          tall sheet reaches up under it. It returns when the card closes.
           Hidden with no events, so an empty or failed feed changes nothing. */}
-      {viewMode === "map" && mapLoadTriggered && events.length > 0 && (
+      {viewMode === "map" && mapLoadTriggered && events.length > 0 && selectedVenue === null && selectedEvent === null && (
         <EventStrip
           events={events}
           locale={locale}
           onOpen={selectEvent}
           onMore={() => handleViewModeChange("list")}
           rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
+        />
+      )}
+
+      {/* Events filter on and nothing left to show (#761): say so on the map too, with a way out. */}
+      {viewMode === "map" && filterEvents && (
+        <EventsEmptyNotice
+          events={events}
+          locale={locale}
+          onShowPlaces={() => setFilterEvents(false)}
+          bottom={
+            isBelow2xl
+              ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 8px + 26px + 12px + env(safe-area-inset-bottom))`
+              : 24 + 52 + 12
+          }
         />
       )}
 

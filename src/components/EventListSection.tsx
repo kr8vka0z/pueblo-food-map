@@ -38,12 +38,12 @@ export default function EventListSection({ events, locale, onSelectEvent, showEm
 
   if (items.length === 0) {
     return showEmpty ? (
-      <p className="px-6 pt-16 text-center text-base text-[var(--color-ink-500)]">{t("events.list.empty", locale)}</p>
+      <p data-testid="events-empty" className="px-6 pt-16 text-center text-base text-[var(--color-ink-500)]">{t("events.list.empty", locale)}</p>
     ) : null;
   }
 
   return (
-    <section aria-labelledby="event-list-heading" className="pb-2">
+    <section aria-labelledby="event-list-heading" data-testid="event-list" className="pb-2">
       <h2 id="event-list-heading" className="px-4 pt-1 pb-2 text-xs text-[var(--color-ink-400)]">
         {t("events.list.heading", locale)} · {items.length}
       </h2>
@@ -56,6 +56,7 @@ export default function EventListSection({ events, locale, onSelectEvent, showEm
               <button
                 type="button"
                 onClick={() => onSelectEvent(event.id)}
+                data-testid={`event-row-${event.id}`}
                 className="w-full min-h-16 flex items-start gap-3 px-4 py-3 text-left hover:bg-[var(--color-bone-100)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-sage-500)]"
               >
                 {/* The owner-approved event colors (DESIGN.md): the orange disc with a navy star. */}

@@ -444,7 +444,9 @@ const en: Record<string, string> = {
   "events.list.heading": "Events",
   "events.list.empty": "No events coming up",
   "events.filter.label": "Events",
-  "events.filter.showResults": "Show {count} events",
+  "events.filter.showResults.one": "Show {count} event",
+  "events.filter.showResults.other": "Show {count} events",
+  "events.list.emptyAction": "Show places again",
 
   // External links (#162)
   "menu.opensInNewTab": "(opens in new tab)",
@@ -1593,7 +1595,9 @@ const es: Record<string, string> = {
   "events.list.heading": "Eventos", // [CHECK]
   "events.list.empty": "No hay eventos próximos", // [CHECK]
   "events.filter.label": "Eventos", // [CHECK]
-  "events.filter.showResults": "Mostrar {count} eventos", // [CHECK]
+  "events.filter.showResults.one": "Mostrar {count} evento", // [CHECK]
+  "events.filter.showResults.other": "Mostrar {count} eventos", // [CHECK]
+  "events.list.emptyAction": "Volver a mostrar lugares", // [CHECK]
 
   // External links (#162)
   "menu.opensInNewTab": "(se abre en una pestaña nueva)",

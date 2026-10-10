@@ -6,7 +6,7 @@
  */
 
 import { describe, test, expect, vi, afterEach } from "vitest";
-import { denverDayKey, listOrder, stripAt } from "@/lib/eventPins";
+import { denverDayKey, listOrder, pinsAt, stripAt } from "@/lib/eventPins";
 import { dismissEvent, readEventDismissals } from "@/lib/eventStripDismissals";
 import type { PublicEvent } from "@/lib/events";
 
@@ -80,6 +80,17 @@ describe("stripAt", () => {
   test("a row with an unparseable date is dropped, not thrown", () => {
     const bad = { ...ev("bad", NOW, NOW), starts_at: "soon" };
     expect(stripAt([bad, ev("ok", NOW + HOUR, NOW + 2 * HOUR)], NOW, none)?.pin.event.id).toBe("ok");
+  });
+});
+
+describe("pinsAt window", () => {
+  const tenDays = ev("ten", NOW + 10 * 24 * HOUR, NOW + 10 * 24 * HOUR + HOUR);
+  test("an event 10 days out has no pin by default, and has one when the window is lifted for the Events filter", () => {
+    expect(pinsAt([tenDays], NOW)).toHaveLength(0);
+    expect(pinsAt([tenDays], NOW, Infinity)).toHaveLength(1);
+  });
+  test("lifting the window never revives an ended event", () => {
+    expect(pinsAt([ev("old", NOW - 2 * HOUR, NOW - HOUR)], NOW, Infinity)).toHaveLength(0);
   });
 });
 

@@ -98,7 +98,9 @@ function SwitchRow({
   count,
   checked,
   onClick,
+  testId,
 }: {
+  testId?: string;
   icon: React.ReactNode;
   label: string;
   count?: number;
@@ -120,6 +122,7 @@ function SwitchRow({
         role="switch"
         aria-checked={checked}
         aria-label={label}
+        data-testid={testId}
         onClick={onClick}
         className={
           "inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-150 " +
@@ -340,6 +343,7 @@ export default function FilterPanel({
           {onToggleEvents && (eventsCount > 0 || filterEvents) && (
             <SwitchRow
               icon={<Star aria-hidden size={14} className="text-[var(--color-event-outline)] shrink-0" fill="var(--color-event-pin)" />}
+              testId="filter-events-switch"
               label={t("events.filter.label", locale)}
               count={eventsCount}
               checked={filterEvents}
@@ -434,7 +438,9 @@ export default function FilterPanel({
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-brand-orange)]"
             }
           >
-            {t(filterEvents ? "events.filter.showResults" : "filters.panel.showResults", locale, { count: String(resultCount) })}
+            {filterEvents
+              ? t(resultCount === 1 ? "events.filter.showResults.one" : "events.filter.showResults.other", locale, { count: String(resultCount) })
+              : t("filters.panel.showResults", locale, { count: String(resultCount) })}
           </button>
         </div>
       </div>

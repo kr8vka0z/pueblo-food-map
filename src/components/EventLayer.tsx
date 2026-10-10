@@ -31,12 +31,14 @@ interface EventLayerProps {
   /** Pass null to deselect (tapping the selected pin again). */
   onSelectEvent: (id: string | null) => void;
   locale: Locale;
+  /** The Events filter is on: pin every upcoming event, not just those within the 7-day window (#761). */
+  allUpcoming?: boolean;
 }
 
-export default function EventLayer({ events, selectedEventId, onSelectEvent, locale }: EventLayerProps) {
+export default function EventLayer({ events, selectedEventId, onSelectEvent, locale, allUpcoming = false }: EventLayerProps) {
   const { current: map } = useMap();
   const now = useMinuteClock();
-  const pins = useMemo(() => pinsAt(events, now), [events, now]);
+  const pins = useMemo(() => pinsAt(events, now, allUpcoming ? Infinity : undefined), [events, now, allUpcoming]);
 
   // Centering depends on the selected pin's id and position, not on `pins`
   // itself, so the minute tick never re-centers a map the visitor has panned.

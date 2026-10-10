@@ -11,8 +11,9 @@
  * SearchBar's wrapper (same gutters, same desktop width, same `rightInset`),
  * directly below it, so it never enters layout flow and cannot move the map or
  * jump when it arrives after the events fetch. z-700 on purpose: above the map,
- * below the venue card (800) so a tall open card wins the overlap, and below
- * the search popovers (999) that drop into this same strip of screen.
+ * below the venue card (800), and below the search popovers (999) that drop
+ * into this same strip of screen. MapWrapper does not render it at all while a
+ * place or event card is open.
  *
  * WHY it owns the minute clock (useMinuteClock): the strip appears, changes and
  * disappears on the shared once-a-minute tick, and keeping the tick here
@@ -69,9 +70,12 @@ export default function EventStrip({ events, locale, onOpen, onMore, rightInset 
 
   return (
     <div
-      // Below the 48px search bar plus an 8px gap; side gutters mirror SearchBar.
-      className="absolute top-[calc(max(1rem,env(safe-area-inset-top))+56px)] left-0 right-0 flex justify-center transition-[padding] duration-300"
+      // 8px below the search bar, which is 48px tall on phones and 52px from
+      // `md` up (SearchBar's h-12 / md:h-[52px]); side gutters mirror SearchBar.
+      className="absolute top-[calc(max(1rem,env(safe-area-inset-top))+56px)] md:top-[calc(max(1rem,env(safe-area-inset-top))+60px)] left-0 right-0 flex justify-center transition-[padding] duration-300"
       style={{ zIndex: 700, pointerEvents: "none", paddingRight: rightInset }}
+      data-testid="event-strip"
+      data-live={pin.live ? "true" : "false"}
     >
       <div
         className="w-full ml-[max(1rem,env(safe-area-inset-left))] mr-[max(1rem,env(safe-area-inset-right))] md:ml-0 md:mr-0 md:w-[520px] flex items-stretch h-12 rounded-[var(--radius-md)] bg-[var(--color-event-outline)] text-white elevation-2 overflow-hidden"
@@ -80,6 +84,7 @@ export default function EventStrip({ events, locale, onOpen, onMore, rightInset 
         <button
           type="button"
           onClick={() => onOpen(pin.event.id)}
+          data-testid="event-strip-open"
           className={`flex-1 min-w-0 flex items-center gap-2 pl-2.5 pr-1 text-left ${PRESS_FEEDBACK} ${FOCUS}`}
         >
           <svg width="20" height="20" viewBox="6 3.6 12 12" aria-hidden="true" className="shrink-0">
@@ -95,14 +100,19 @@ export default function EventStrip({ events, locale, onOpen, onMore, rightInset 
           <button
             type="button"
             onClick={onMore}
+            data-testid="event-strip-more"
             aria-label={t("events.strip.moreAria", locale, { count: String(more) })}
-            className={`shrink-0 px-2 border-l border-white/20 text-[11px] font-semibold underline underline-offset-2 ${PRESS_FEEDBACK} ${FOCUS}`}
+            className={`shrink-0 px-2 min-w-9 text-center border-l border-white/20 text-[11px] font-semibold underline underline-offset-2 ${PRESS_FEEDBACK} ${FOCUS}`}
           >
-            {t("events.strip.more", locale, { count: String(more) })}
+            {/* Below 360px the full wording would squeeze the hours off the status line, so it
+                shortens to "+N"; the aria-label above always carries the whole phrase. */}
+            <span aria-hidden className="hidden min-[360px]:inline">{t("events.strip.more", locale, { count: String(more) })}</span>
+            <span aria-hidden className="min-[360px]:hidden">+{more}</span>
           </button>
         )}
         <button
           type="button"
+          data-testid="event-strip-dismiss"
           onClick={() => setDismissals((cur) => dismissEvent(cur, pin.event.id, day))}
           aria-label={t("events.strip.dismissAria", locale, { name })}
           className={`shrink-0 w-12 flex items-center justify-center text-white/80 ${PRESS_FEEDBACK} ${FOCUS}`}

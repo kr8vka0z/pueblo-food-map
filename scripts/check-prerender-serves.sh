@@ -29,10 +29,10 @@ if [ -z "$VENUE_ID" ]; then
 fi
 
 cleanup() {
-  # `preview` spawns wrangler -> workerd as children; kill the whole tree.
-  pkill -P "${PREVIEW_PID:-0}" 2>/dev/null || true
-  kill "${PREVIEW_PID:-0}" 2>/dev/null || true
-  rm -f "$CONFIG"
+  # `preview` spawns wrangler -> workerd; setsid below made it a process-group
+  # leader, so signalling the negative PID takes the whole tree down.
+  if [ -n "${PREVIEW_PID:-}" ]; then kill -- "-${PREVIEW_PID}" 2>/dev/null || true; fi
+  rm -f "$CONFIG" "$LOG"
 }
 trap cleanup EXIT
 
@@ -43,7 +43,7 @@ if grep -q '"ai"' "$CONFIG"; then
 fi
 
 npx opennextjs-cloudflare build
-npx opennextjs-cloudflare preview --port "$PORT" --config "$CONFIG" > "$LOG" 2>&1 &
+setsid npx opennextjs-cloudflare preview --port "$PORT" --config "$CONFIG" > "$LOG" 2>&1 &
 PREVIEW_PID=$!
 
 ready=0

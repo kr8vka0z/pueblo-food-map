@@ -19,7 +19,7 @@ import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { loadAdminNavCounts, type AdminNavCounts } from "@/lib/adminNavCounts";
 import { loadEvent, loadVenueChoices, type VenueChoice } from "@/lib/adminEventReads";
 import { utcIsoToPuebloLocal } from "@/lib/eventTime";
-import type { EventRow } from "@/lib/events";
+import { publicFlyerOf, type EventRow } from "@/lib/events";
 import AdminNav from "@/components/AdminNav";
 import EventForm, { type EventFormValues } from "@/components/EventForm";
 import EventsList from "@/components/EventsList";
@@ -100,6 +100,7 @@ export default async function EditEventPage({
             initialValues={toFormValues(event)}
             status={event.status}
             expectedUpdatedAt={event.updated_at}
+            initialFlyer={publicFlyerOf(event)}
             justSaved={saved === "1"}
           />
         )}

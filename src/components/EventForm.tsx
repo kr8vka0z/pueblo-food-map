@@ -38,6 +38,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
+import EventFlyerField from "@/components/EventFlyerField";
+import type { PublicFlyer } from "@/lib/events";
 import type { VenueChoice } from "@/lib/adminEventReads";
 import type { EventStatus } from "@/lib/adminEventValidation";
 
@@ -72,6 +74,8 @@ export interface EventFormProps {
   expectedUpdatedAt?: string;
   /** Show the "Saved" banner on first render (set after a create redirects to the edit page). */
   justSaved?: boolean;
+  /** Edit mode: the event's current flyer, if any (#760). */
+  initialFlyer?: PublicFlyer | null;
 }
 
 // Keys match the server's error map (adminEventValidation.ts): snake_case field names, `place`, `starts_at`, `ends_at`, `_form`.
@@ -177,7 +181,7 @@ function validateClient(v: EventFormValues, cancelling: boolean): FieldErrors {
   return e;
 }
 
-export default function EventForm({ venues, eventId, initialValues, status: initialStatus, expectedUpdatedAt, justSaved }: EventFormProps) {
+export default function EventForm({ venues, eventId, initialValues, status: initialStatus, expectedUpdatedAt, justSaved, initialFlyer }: EventFormProps) {
   const router = useRouter();
   const isEdit = eventId !== undefined;
   const [values, setValues] = useState<EventFormValues>({ ...EMPTY, ...initialValues });
@@ -551,6 +555,9 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       </div>
 
       <TextField id="event-link" type="url" label="Link" hint="optional, starts with https://" value={values.linkUrl} onChange={(v) => set("linkUrl", v)} max={FIELD_LIMITS.SUGGEST_CONTACT} error={errors.link_url} />
+
+      {/* Saves on its own; hands the new `updated_at` up so the next Save doesn't 409 (#760). */}
+      <EventFlyerField eventId={eventId} version={version} onVersion={setVersion} initialFlyer={initialFlyer} />
 
       {showCancelNote && (
         <fieldset className="rounded-[var(--radius-lg)] border border-[var(--color-clay-500)] p-4">

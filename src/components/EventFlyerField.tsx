@@ -193,7 +193,8 @@ export default function EventFlyerField({ eventId, version, onVersion, initialFl
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* items-end: the two labels can wrap differently; keep the boxes level. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
         <div>
           <label htmlFor="event-flyer-alt" className="mb-1 block text-sm font-medium text-[var(--color-ink-700)]">
             Describe the picture (English) <span className="font-normal text-[var(--color-ink-400)]">for screen readers</span>

@@ -170,14 +170,18 @@ export function buildEventJsonLd(event: PublicEventDetail, locale: Locale): Reco
     // Every event on this site is free to attend; the zero-price Offer is what
     // Google's Event result looks for to show "Free".
     isAccessibleForFree: true,
-    offers: {
+  };
+  // WHY no offer when cancelled: an InStock offer on a cancelled event would
+  // tell a search engine admission is still available.
+  if (event.status !== "cancelled") {
+    result.offers = {
       "@type": "Offer",
       price: "0",
       priceCurrency: "USD",
       availability: "https://schema.org/InStock",
       url: pageUrl,
-    },
-  };
+    };
+  }
   if (flyerUrl) result.image = [flyerUrl];
   return result;
 }

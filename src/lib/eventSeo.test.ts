@@ -99,6 +99,8 @@ describe("buildEventJsonLd", () => {
     expect(cancelled.eventStatus).toBe("https://schema.org/EventCancelled");
     expect(cancelled.startDate).toBe("2026-11-21T10:00:00-07:00");
     expect(cancelled.location).toBeTruthy();
+    expect(cancelled).not.toHaveProperty("offers");
+    expect(buildEventJsonLd(makeEvent(), "en")).toHaveProperty("offers");
     expect(buildEventJsonLd(makeEvent(), "en").eventStatus).toBe("https://schema.org/EventScheduled");
   });
 

@@ -92,25 +92,30 @@ export default function EventPage({
       <main className="flex min-h-screen flex-col bg-[var(--color-bone-50)]">
         <nav
           aria-label={t("breadcrumb.label", locale)}
-          className="flex min-h-12 shrink-0 items-center justify-between gap-3 border-b border-[var(--color-bone-200)] px-4"
+          className="shrink-0 border-b border-[var(--color-bone-200)]"
         >
-          <ol className="flex min-w-0 items-center gap-x-2 text-sm">
-            <li>
-              <a href={homeHref} className={CRUMB_LINK}>{t("breadcrumb.map", locale)}</a>
-            </li>
-            <li aria-hidden className="text-[var(--color-ink-400)]">›</li>
-            <li aria-current="page" className="max-w-[10rem] truncate text-[var(--color-ink-500)] sm:max-w-[16rem]">
-              {text.name}
-            </li>
-          </ol>
-          <a
-            href={eventPagePath(event.id, otherLocale)}
-            lang={otherLocale}
-            hrefLang={otherLocale}
-            className={"inline-flex min-h-11 shrink-0 items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 " + FOCUS}
-          >
-            {t("events.page.otherLanguage", locale)}
-          </a>
+          {/* Same column and side gutters as the body below (max-w-lg, px-4); the breadcrumb takes the
+              leftover width and truncates the event name, so a long name can never push the language
+              link off-screen or cause sideways scroll at 320px. */}
+          <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-3 px-4">
+            <ol className="flex min-w-0 flex-1 items-center gap-x-2 text-sm">
+              <li className="shrink-0">
+                <a href={homeHref} className={CRUMB_LINK}>{t("breadcrumb.map", locale)}</a>
+              </li>
+              <li aria-hidden className="shrink-0 text-[var(--color-ink-400)]">›</li>
+              <li aria-current="page" className="min-w-0 truncate text-[var(--color-ink-500)]">
+                {text.name}
+              </li>
+            </ol>
+            <a
+              href={eventPagePath(event.id, otherLocale)}
+              lang={otherLocale}
+              hrefLang={otherLocale}
+              className={"inline-flex min-h-12 shrink-0 items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 " + FOCUS}
+            >
+              {t("events.page.otherLanguage", locale)}
+            </a>
+          </div>
         </nav>
 
         <div className="mx-auto w-full max-w-lg flex-1 space-y-5 px-4 py-6">

@@ -1294,7 +1294,7 @@ list it as an event and a shared link previews the flyer.
   (`EventScheduled` / `EventCancelled`), `eventAttendanceMode` offline, `location`
   (`Place` with the venue's name when `venue_id` is a known place, else the street
   line; `PostalAddress`; `geo`), `description`, `image` (flyer), `organizer` (the host,
-  else the site), `isAccessibleForFree`, a zero-price `Offer`, `inLanguage`, `url`; plus
+  else the site), `isAccessibleForFree`, a zero-price `Offer` (dropped when cancelled, so no InStock offer on a cancelled event), `inLanguage`, `url`; plus
   a `BreadcrumbList` (Map › name) matching the visible breadcrumb.
 - **Crawl paths.** The sitemap (`src/app/sitemap.ts`, now `force-dynamic`) lists
   published events that have not ended, EN + `/es`, with `alternates.languages`;

@@ -24,7 +24,10 @@ function drawable(raw: unknown): PublicEvent[] {
       typeof e === "object" && e !== null &&
       typeof e.id === "string" && typeof e.name === "string" &&
       typeof e.starts_at === "string" && typeof e.ends_at === "string" &&
-      Number.isFinite(e.lat) && Number.isFinite(e.lng),
+      // Range-checked too: mapbox throws on an impossible coordinate, which would
+      // swap the whole map for the list fallback over one hand-edited bad row.
+      Number.isFinite(e.lat) && Math.abs(e.lat) <= 90 &&
+      Number.isFinite(e.lng) && Math.abs(e.lng) <= 180,
   );
 }
 

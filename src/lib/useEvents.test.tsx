@@ -49,7 +49,9 @@ describe("useEvents", () => {
   test("drops a row the map cannot draw and keeps the rest", async () => {
     const noCoords = { ...good, id: "e2", lat: null };
     const noDates = { ...good, id: "e3", starts_at: undefined };
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ events: [noCoords, good, noDates, null] }) }));
+    const badLat = { ...good, id: "e4", lat: 91 };
+    const badLng = { ...good, id: "e5", lng: -181 };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ events: [noCoords, good, noDates, badLat, badLng, null] }) }));
     const { result } = renderHook(() => useEvents());
     await waitFor(() => expect(result.current.map((e) => e.id)).toEqual(["e1"]));
   });

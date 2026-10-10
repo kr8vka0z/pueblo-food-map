@@ -84,6 +84,12 @@ async function mount(props: React.ComponentProps<typeof MapWrapper>, initialLoca
     );
     await new Promise<void>((r) => setTimeout(r, 0));
   });
+  // ?event= is not eager (the splash is not skipped for it yet), so the map
+  // loads on the first interaction, like for any visitor.
+  await act(async () => {
+    window.dispatchEvent(new Event("pointerdown"));
+    await new Promise<void>((r) => setTimeout(r, 0));
+  });
 }
 
 beforeEach(() => {

@@ -502,6 +502,7 @@ One ladder for everything that floats. A new floating element joins an existing 
 | z | What | Where |
 |---|---|---|
 | 2 | Mapbox's own control corners (attribution, logo) — set by `mapbox-gl.css`, sitting on the map canvas | `Map.tsx` |
+| 2 / 3 / 4 | Special-event star pins on the map canvas (#758): coming up / going on now / selected. Place pins use the default stacking, so every event pin sits above them | `EventMarker.tsx` |
 | 700 | List view (replaces the map in list mode) | `ListView.tsx`, `MapWrapper.tsx` |
 | 800 | Mobile venue card | `BottomSheet.tsx`, `DirectionButtons.tsx` |
 | 900 | Desktop side panel (venue/box card content); walking-route strip | `DesktopSidePanel.tsx`, `DesktopVenueWindow.tsx`, `RouteStrip.tsx` |

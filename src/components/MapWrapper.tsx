@@ -527,7 +527,11 @@ export default function MapWrapper({
   // idle/timeout trigger while a first-time visitor's splash is up — see
   // useDeferredMapLoad's module doc for why the interaction listeners stay
   // live regardless (a real splash-CTA tap still starts the load right away).
-  const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId || initialEventId), holdMapLoad);
+  const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId), holdMapLoad)
+  // WHY not initialEventId: ?event= does not skip the splash yet, so making it
+  // eager would load mapbox-gl behind a first-time visitor's splash and defeat
+  // the #588 hold. The pin is still selected once the map loads (the id seeds
+  // state). When #759 adds the splash skip, the event case becomes eager too.;
 
   // ── Location help card (#739; replaced PR 7's denied-only banner) ───────────
   // Explains a locate attempt that gave no position, so the visitor isn't left

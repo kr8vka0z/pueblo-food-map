@@ -56,4 +56,10 @@ export const FIELD_LIMITS = {
   // free-text field above (#297), this ships into the public
   // published-venues.ts bundle on Publish, so it gets the same cap.
   IRREGULAR_SCHEDULE_NOTE: 280,
+
+  // Admin events (#757). name/host/address/link reuse SUGGEST_* of the same
+  // semantic length class (see adminEventValidation.ts); description reuses
+  // SUGGEST_NOTES. What-to-bring and the cancel note are a few sentences at
+  // most, longer than a check-in note but far shorter than a description.
+  EVENT_SHORT_TEXT: 500,
 } as const;

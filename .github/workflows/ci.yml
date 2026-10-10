@@ -187,6 +187,16 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
+      - name: Prerendered venue pages serve (OpenNext build + local Worker)
+        # `next build` happily lists every /venue/<id> as prerendered while the
+        # Worker 404s them all at request time (next 16.3.8 + OpenNext 1.20.7 did
+        # exactly that on staging after the 2026-10-05 dependency bump). Only requesting the pages
+        # from the real OpenNext bundle proves they work, so a next /
+        # @opennextjs/cloudflare bump that breaks them goes red here, on the PR.
+        # See the script header. Runs AFTER the artifact upload on purpose: it
+        # rebuilds .next, and the lighthouse job must audit the plain `next build`.
+        run: bash scripts/check-prerender-serves.sh
+
   # Was its own workflow (lighthouse.yml) with an independent `npm ci` +
   # `npm run build` of the same commit — doubling the build portion of every
   # PR's CI minutes (#292). Now a dependent job that reuses the `ci` job's

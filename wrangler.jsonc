@@ -41,6 +41,11 @@
       "bucket_name": "pfm-box-photos"
     }
   ],
+  // Workers AI (#757) — "Suggest Spanish" on the admin event form
+  // (src/lib/eventTranslate.ts). No key or secret: the binding is the
+  // credential. Like the bindings above it is NOT inherited by env.staging,
+  // which declares its own below.
+  "ai": { "binding": "AI" },
   // Uptime dead-man's-switch (Phase 2 slice 2, mirrors ToastHoster's design).
   // custom-worker.ts's scheduled() pings a Healthchecks.io check (env.HC_PING_URL)
   // every 5 min; HC.io itself alerts (Telegram via n8n webhook, same channel
@@ -179,6 +184,8 @@
           "bucket_name": "pfm-box-photos-staging"
         }
       ],
+      // Workers AI twin of the top-level binding (#757); bindings are not inherited.
+      "ai": { "binding": "AI" },
       // Explicit no-op override — NOT redundant. `triggers` IS inheritable (unlike the
       // bindings above); omitting this would silently inherit the prod cron. See the
       // top-level `triggers` comment for the full WHY. dev.pueblofoodmap.com is a

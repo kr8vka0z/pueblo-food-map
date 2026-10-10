@@ -76,7 +76,7 @@ function formatter(locale: Locale, shape: "hour" | "hourMinute" | "weekdayShort"
 }
 
 /** "2 PM" on the hour, "2:30 PM" otherwise, in Pueblo time. */
-function clock(iso: string, locale: Locale): string {
+export function clock(iso: string, locale: Locale): string {
   const ms = Date.parse(iso);
   return formatter(locale, puebloParts(ms).mi === 0 ? "hour" : "hourMinute").format(ms);
 }
@@ -94,6 +94,17 @@ export function pinAriaLabel(pin: EventPin, locale: Locale): string {
   if (pin.live) return t("events.pin.ariaLive", locale, { name, time: clock(pin.event.ends_at, locale) });
   const day = pin.today ? t("events.pin.today", locale) : formatter(locale, "weekdayLong").format(Date.parse(pin.event.starts_at));
   return t("events.pin.ariaUpcoming", locale, { name, day, time: clock(pin.event.starts_at, locale) });
+}
+
+/**
+ * The one line a place's own card shows when an upcoming or live event is
+ * tied to it (#759): "Event here now" / "Event here today" / "Event here
+ * Saturday" (Pueblo weekday).
+ */
+export function eventHereLabel(pin: EventPin, locale: Locale): string {
+  if (pin.live) return t("events.here.now", locale);
+  if (pin.today) return t("events.here.today", locale);
+  return t("events.here.day", locale, { day: formatter(locale, "weekdayLong").format(Date.parse(pin.event.starts_at)) });
 }
 
 /**

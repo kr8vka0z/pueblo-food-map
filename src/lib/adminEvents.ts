@@ -45,9 +45,9 @@ export function eventConflictResponse(): NextResponse {
   );
 }
 
-/** Purges the public feed on this colo so a publish/cancel/edit shows without waiting out the 60s TTL. */
-export function purgeEventsFeed(req: Request): Promise<void> {
-  return bustEdgeCache(req, [PUBLIC_EVENTS_PATH]);
+/** Purges the public feed and this event's single-event read (#759, shared links) on this colo so a publish/cancel/edit shows without waiting out the 60s TTL. */
+export function purgeEventsFeed(req: Request, eventId: string): Promise<void> {
+  return bustEdgeCache(req, [PUBLIC_EVENTS_PATH, `${PUBLIC_EVENTS_PATH}/${encodeURIComponent(eventId)}`]);
 }
 
 /**

@@ -172,8 +172,8 @@ export default function HomePageClient() {
     // Unlike near/boxes above, ?event= is NOT stripped: MapWrapper keeps it in
     // step with the selected pin, so a refresh reopens on the same event.
     setInitialEventId(params.get('event') || null);
-    // A shared venue link, Near me and Boxes (both from inside the app, via
-    // PageNav) all skip the splash, as does a visitor who already saw it.
+    // A shared venue or event link, Near me and Boxes (both from inside the
+    // app, via PageNav) all skip the splash, as does a visitor who already saw it.
     setSplashShown(!shouldSkipSplash({ search, hash, gateSeen: readSplashGate() }));
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */

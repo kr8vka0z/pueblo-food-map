@@ -151,6 +151,6 @@ export async function PATCH(
   }
   if (results[0].meta.changes === 0) return eventConflictResponse();
 
-  await purgeEventsFeed(req);
+  await purgeEventsFeed(req, id);
   return NextResponse.json({ ok: true, id, status, updated_at: now });
 }

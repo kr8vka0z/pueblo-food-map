@@ -37,6 +37,8 @@ Browser
         ├── EventLayer.tsx   (special-event star pins, drawn after the place
         │     pins; owns the once-a-minute clock — see "Events" → "Map pins")
         │     └── EventMarker.tsx  (one star pin; NOW rings + label while live)
+        ├── EventCardBody.tsx  (the event card, lazy; phone = inside BottomSheet,
+        │     desktop = inside DesktopSidePanel via EventPanel.tsx — "Event card")
         ├── BottomSheet.tsx  (mobile: vaul bottom sheet)
         ├── DesktopSidePanel.tsx  (desktop: fixed right-hand panel shell —
         │     inset/size/chrome, Escape, focus-to-heading + focus-return,
@@ -972,8 +974,8 @@ Migrations, R2 buckets and dedicated secrets: AGENTS.md "Blessing Boxes".
 
 One-off special events (a produce giveaway, a turkey drive), plan in issue
 #156. **Slice 1 (#757) is storage, the public read and the admin screens;
-slice 2 (#758) adds the map pin** (see "Map pins" below). No public card
-(#759) and no flyer upload (#760) yet.
+slice 2 (#758) adds the map pin** (see "Map pins" below); **slice 3 (#759)
+adds the event card** (see "Event card" below). No flyer upload (#760) yet.
 
 - **Live, never published.** Like boxes, events are read from D1 at request
   time and are not part of the venue Publish snapshot.
@@ -1052,7 +1054,8 @@ slice 2 (#758) adds the map pin** (see "Map pins" below). No public card
   reads the same label. Place hours still use the phone's clock (`hours.ts`).
 - **The clock.** `EventLayer` calls `useMinuteClock()` (`src/lib/useMinuteClock.ts`):
   one `setInterval` of 60 s plus a `visibilitychange` listener that re-reads
-  the time when the tab comes back (background timers are throttled). The tick
+  the time when the tab comes back (background timers are throttled); shared
+  with the event card since #759 (see "Event card"). The tick
   re-renders `EventLayer` only. `Map` and the place pins are not re-rendered,
   and `EventMarker` is `memo`'d on primitive props, so a minute that changes no
   pin repaints no pin. A pin flips to NOW at its start and disappears at its end
@@ -1070,10 +1073,75 @@ slice 2 (#758) adds the map pin** (see "Map pins" below). No public card
   clears the selected venue and vice versa. `MapWrapper` mirrors the id into
   the address bar with `replaceState` (`syncEventParam`, a no-op when the URL
   already agrees). A shared `/?event=<id>` is read once by `HomePageClient`
-  and seeds the state (and loads the map eagerly, like `?venue=`); unlike
-  `?near=`/`?boxes=` it is not stripped. There is no card yet: #759 adds it
-  and will hang on `selectedEventId`. The splash gate does not treat `?event=`
-  as a skip-splash link yet (also #759).
+  and seeds the state; unlike `?near=`/`?boxes=` it is not stripped. Since #759
+  `?event=<id>` also skips the first-visit splash (`splashGate.ts`:
+  `shouldSkipSplash` and `SPLASH_GATE_SCRIPT` both test it, and `splashSsr.test`
+  / `eventSplash.test` keep them in step) and loads the map eagerly, like
+  `?venue=`.
+
+### Event card (#759)
+
+- **One body, two shells.** `EventCardBody.tsx` is the card; it is rendered in
+  the phone `BottomSheet` (new optional `event` prop, `layout="sheet"`, same
+  vaul sheet, grab bar, Escape and swipe paths as the place card) and, on
+  desktop, in `DesktopSidePanel` through the small `EventPanel.tsx` wrapper
+  (dialog role + scroller). `DesktopVenueWindow` is the *place* card and needs
+  a place, so it is not used (refactoring it is #725). Both entry points load
+  the card with `next/dynamic` (`ssr: false`), so a visitor who never opens an
+  event downloads none of it. The desktop event view is derived from
+  `selectedEventId` (shown while `sidePanelView` is null), not a `sidePanelView`
+  kind: a shared link seeds the selection before `isMobile` settles, and a
+  handler-set view would miss it. Opening a place, Saved or Menu clears the
+  event and vice versa; closing clears `?event=`.
+- **Order** (owner-approved mockup): flyer slot (empty until #760), status
+  badge, name, "Hosted by", When, Where (+ distance when the visitor's real
+  position is known), About, a highlighted "What to bring" box, the orange Get
+  directions button, Share and Add to calendar, then the optional link. On a
+  phone the first, always-visible view is badge, name, When and Get directions,
+  so there Get directions sits above Where/About; the rest is the clipped
+  "peek" section under the grab bar, as on the box card.
+- **Badge and the clock.** `eventBadge()` (`src/lib/eventCard.ts`, pure) turns
+  `(event, nowMs)` into the stage and the countdown ("Starts in 2 days / 2
+  hours / 20 min", "Happening now, ends in 40 min"; more than 7 days out reads
+  "Starts Sat, Nov 21"). Minutes round up so it never says "0 min". `now`
+  comes from `useMinuteClock()`, which is now ONE shared timer: the interval and
+  `visibilitychange` listener are module-level, started by the first mounted
+  caller (the pins, the card) and stopped with the last, so the card adds no
+  second timer. The badge is plain text, deliberately not a live region, so the
+  once-a-minute change is never announced.
+- **Data for the card.** `useEventsFeed(trackLoaded)` / `useEventDetail()`
+  (`src/lib/useEventDetail.ts`): the card reads the feed `MapWrapper` already
+  holds; only when the feed has answered without the selected id (an ended or
+  cancelled event opened from a shared link) does it make one request to the
+  single-event read. A dead link resolves to "missing" and just deselects. The
+  fetched event is held apart from the feed array, so an ended or cancelled
+  event never reaches `pinsAt()` and gets no pin.
+- **Single-event read** `GET /api/public/events/[id]`
+  (`PUBLIC_EVENT_BY_ID_SQL`): `status IN ('published','cancelled')` so a
+  published event stays readable after it ends and a cancelled one carries
+  `cancel_note(_es)` (null on any other status). Draft, archived, unknown ids
+  and a missing table all answer the same `404 { event: null }`, so the response
+  never reveals that a draft exists. Same 60 s edge cache as the feed, but only
+  a 200 is stored (`BestEffortResult.status`), and every admin events write
+  purges both the feed and `/api/public/events/<id>` (`purgeEventsFeed(req, id)`).
+- **Ended / cancelled card.** "This event has ended" or "Cancelled" + the
+  admin's note, a button that turns on the existing Open-now filter, and no Get
+  directions, Share or Add to calendar.
+- **Share** is `shareLink()` in `share.ts` (the native share sheet, else copy
+  with a confirmation; `shareVenue` now calls it too) with `eventShareUrl()`:
+  `/?event=<id>`, or `/es?event=<id>` on a Spanish page.
+- **Add to calendar** is `eventIcs.ts` (no dependency): CRLF, RFC 5545 text
+  escaping, 75-octet folding by bytes, `UID:event-<id>@pueblofoodmap.com`, and
+  DTSTART/DTEND as absolute UTC (`...Z`), which a calendar shows correctly in
+  any zone with no daylight-saving math here.
+- **Event on a place's card.** `MapWrapper` finds an upcoming or live event
+  (pin window) whose `venue_id` is the selected place and passes one
+  `{label, onOpen}` line ("Event here Saturday", `EventHereLine.tsx`) to
+  `BottomSheet` / `DesktopVenueWindow`. Blessing-box cards do not show it.
+- **Text.** All event text is rendered as plain React text. The optional link
+  renders only if `safeUrl()` accepts it (http/https), with
+  `rel="noopener noreferrer"`. Spanish is used on a Spanish page when that
+  column is non-blank, otherwise English (`eventText()`).
 
 ---
 

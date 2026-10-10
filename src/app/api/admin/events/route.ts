@@ -100,6 +100,6 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json({ ok: false, error: "write_failed", message: "The event was not saved. Try again." }, { status: 500 });
   }
 
-  await purgeEventsFeed(req);
+  await purgeEventsFeed(req, id);
   return NextResponse.json({ ok: true, id, updated_at: now, status }, { status: 201 });
 }

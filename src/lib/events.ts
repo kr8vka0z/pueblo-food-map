@@ -61,6 +61,18 @@ export interface PublicEvent {
   link_url: string | null;
 }
 
+/**
+ * What GET /api/public/events/[id] returns (#759): the feed's fields plus the
+ * two things a shared link to a finished event needs — whether it was
+ * cancelled, and the admin's note. `cancel_note*` is null unless the event is
+ * cancelled, so a stale note on a republished event can never surface.
+ */
+export interface PublicEventDetail extends PublicEvent {
+  status: "published" | "cancelled";
+  cancel_note: string | null;
+  cancel_note_es: string | null;
+}
+
 // Explicit column list (never SELECT *) so a future internal column can't
 // leak into the public response by accident. `ends_at > ?` compares ISO-8601
 // UTC text, which sorts chronologically (eventTime.ts always writes that shape).
@@ -74,4 +86,21 @@ export const PUBLIC_EVENTS_SQL = `SELECT id, name, name_es, host, host_es, descr
 export async function loadPublicEvents(db: D1Database, now: Date = new Date()): Promise<PublicEvent[]> {
   const { results } = await db.prepare(PUBLIC_EVENTS_SQL).bind(now.toISOString()).all<PublicEvent>();
   return results;
+}
+
+// Same explicit column list as the feed plus the three detail columns. Only
+// 'published' (including after it ended) and 'cancelled' are readable: a draft
+// or archived row answers exactly like an unknown id, so the response never
+// reveals that a draft exists.
+export const PUBLIC_EVENT_BY_ID_SQL = `SELECT id, name, name_es, host, host_es, description, description_es,
+    what_to_bring, what_to_bring_es, starts_at, ends_at, lat, lng, address, venue_id, link_url,
+    status, cancel_note, cancel_note_es
+  FROM events
+  WHERE id = ? AND status IN ('published', 'cancelled')`;
+
+/** One event for a shared link, or null (unknown, draft, archived). Throws on a D1 failure (the route turns that into an uncached 404). */
+export async function loadPublicEventById(db: D1Database, id: string): Promise<PublicEventDetail | null> {
+  const row = await db.prepare(PUBLIC_EVENT_BY_ID_SQL).bind(id).first<PublicEventDetail>();
+  if (!row) return null;
+  return row.status === "cancelled" ? row : { ...row, cancel_note: null, cancel_note_es: null };
 }

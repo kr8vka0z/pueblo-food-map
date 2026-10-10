@@ -24,6 +24,8 @@ export interface BestEffortResult<T> {
   data: T;
   /** true when `data` is a fallback produced after a read failure — never cache this. */
   degraded: boolean;
+  /** HTTP status to answer with; default 200. Anything but 200 is never cached (a 404 for an id that is published a minute later must not stick). */
+  status?: number;
 }
 
 /**
@@ -81,12 +83,13 @@ export async function respondWithEdgeCache<T>(
     if (cached) return cached;
   }
 
-  const { data, degraded } = await load();
+  const { data, degraded, status = 200 } = await load();
   const response = NextResponse.json(data, {
+    status,
     headers: { "Cache-Control": `public, max-age=${CACHE_TTL_SECONDS}` },
   });
 
-  if (cache && !degraded) {
+  if (cache && !degraded && status === 200) {
     try {
       const { ctx } = getCloudflareContext();
       ctx.waitUntil(cache.put(cacheKey, response.clone()));

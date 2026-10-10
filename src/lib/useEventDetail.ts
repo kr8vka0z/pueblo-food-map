@@ -11,8 +11,8 @@
  * an in-feed event costs no extra request.
  *
  * Returns `missing: true` when neither source has it (unknown/draft/archived
- * id, network failure): MapWrapper then simply deselects, so a dead link
- * leaves the map exactly as it would be without the parameter (fail-soft).
+ * id, network failure): no card opens, so a dead link leaves the map exactly
+ * as it would be without the parameter (fail-soft).
  *
  * The fetched event is kept apart from the feed array that feeds the pins: a
  * cancelled or ended event must never reach pinsAt() ("no pin").

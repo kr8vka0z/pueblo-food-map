@@ -1581,18 +1581,10 @@ export default function MapWrapper({
   // ── Event card (#759) ────────────────────────────────────────────────────────
   // The event the card shows: from the feed, or (a shared link to an event that
   // has ended or been cancelled) from the single-event read. A link that
-  // resolves to nothing just deselects, so the map is exactly as it would be
-  // without the parameter. Ended/cancelled events never reach `events`, so they
-  // get no pin.
-  const { event: selectedEvent, missing: selectedEventMissing } = useEventDetail(
-    selectedEventId,
-    events,
-    eventsLoaded,
-  );
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to an async lookup result, not deriving state
-    if (selectedEventMissing) selectEvent(null);
-  }, [selectedEventMissing, selectEvent]);
+  // resolves to nothing shows no card and the map is exactly as it would be
+  // without the parameter (the selection stays inert: no pin matches it).
+  // Ended/cancelled events never reach `events`, so they get no pin.
+  const { event: selectedEvent } = useEventDetail(selectedEventId, events, eventsLoaded);
 
   // "See places open now" on an ended/cancelled card: the existing Open-now filter.
   const handleSeeOpenNow = useCallback(() => {

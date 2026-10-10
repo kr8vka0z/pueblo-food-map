@@ -1113,7 +1113,7 @@ adds the event card** (see "Event card" below). No flyer upload (#760) yet.
   (`src/lib/useEventDetail.ts`): the card reads the feed `MapWrapper` already
   holds; only when the feed has answered without the selected id (an ended or
   cancelled event opened from a shared link) does it make one request to the
-  single-event read. A dead link resolves to "missing" and just deselects. The
+  single-event read. A dead link resolves to "missing": no card opens and the map is as it would be without the parameter. The
   fetched event is held apart from the feed array, so an ended or cancelled
   event never reaches `pinsAt()` and gets no pin.
 - **Single-event read** `GET /api/public/events/[id]`

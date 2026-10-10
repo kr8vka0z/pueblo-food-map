@@ -45,6 +45,7 @@ vi.mock("@/components/Map", async () => {
       "div",
       { "data-testid": "map-canvas" },
       React.createElement("button", { "data-testid": "pin-event", onClick: () => onSelectEvent?.("live") }),
+      React.createElement("button", { "data-testid": "pin-event-other", onClick: () => onSelectEvent?.("other") }),
       React.createElement("button", { "data-testid": "pin-event-clear", onClick: () => onSelectEvent?.(null) }),
     );
   }
@@ -131,6 +132,16 @@ describe("search popover closes on outside interaction", () => {
     fireEvent.click(row()!);
     expect(row()).toBeNull();
     expect(screen.getByText(/sorted by/i)).toBeTruthy();
+  });
+
+  test("with a card already open, focusing the search box opens it and it stays open; a different selection then closes it", async () => {
+    await mount();
+    fireEvent.click(screen.getByTestId("pin-event"));
+    openSearch();
+    // The selection effect must not re-close a popover opened after the selection.
+    expect(row()).not.toBeNull();
+    fireEvent.click(screen.getByTestId("pin-event-other"));
+    expect(row()).toBeNull();
   });
 
   test("typing keeps it open", async () => {

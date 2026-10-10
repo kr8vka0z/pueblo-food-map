@@ -1227,7 +1227,8 @@ renders anything, so the screen is exactly as before events existed.
   coexists with the list (same z-700 rung). The search popover itself closes on
   any press outside the search area (capture-phase `pointerdown`, because a map
   pin or the Mapbox canvas never moves focus off the input) and whenever a
-  place or event becomes selected, via `closeSearchPopover` in MapWrapper. Position and z-index: DESIGN.md "Safe zones".
+  place or event becomes selected, via `closeSearchPopover` in MapWrapper.
+  Position and z-index: DESIGN.md "Safe zones".
 - **Dismissal** (`src/lib/eventStripDismissals.ts`): localStorage
   `pfm.eventStrip.dismissed.v1`, `{ eventId: "<Pueblo day>" }`. A dismissed event
   is skipped (and not counted in "and N more") until the Pueblo day changes;

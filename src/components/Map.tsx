@@ -12,6 +12,7 @@
  *       is now the only thing that sets the starting view — a fixed constant,
  *       so it no longer drifts with the venue set (matches the logo/wordmark
  *       reset). Deep-link and geolocation flyTo/jumpTo are unaffected.
+ * #758: Special-event star pins (EventLayer) drawn after the place pins.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
@@ -29,6 +30,8 @@ import type { Venue } from "@/types/venue";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import VenueMarker from "@/components/VenueMarker";
+import EventLayer from "@/components/EventLayer";
+import type { PublicEvent } from "@/lib/events";
 import type mapboxgl from "mapbox-gl";
 import {
   PUEBLO_COUNTY_BBOX,
@@ -230,7 +233,18 @@ interface MapProps {
    * for the locate button.
    */
   focusRequestId?: number;
+  /**
+   * Live special events from /api/public/events (#758). Empty (the default, and
+   * what a failed feed leaves) draws nothing and the map is exactly as before.
+   */
+  events?: readonly PublicEvent[];
+  selectedEventId?: string | null;
+  onSelectEvent?: (id: string | null) => void;
 }
+
+// Stable defaults so an omitted prop never changes identity between renders.
+const NO_EVENTS: readonly PublicEvent[] = [];
+const noopSelectEvent = () => {};
 
 /** One camera move target: where to end up, at what zoom. */
 type CameraTarget = { center: [number, number]; zoom: number };
@@ -269,6 +283,9 @@ export default function Map({
   walkingRoute = null,
   focusPoint = null,
   focusRequestId = 0,
+  events = NO_EVENTS,
+  selectedEventId = null,
+  onSelectEvent = noopSelectEvent,
 }: MapProps) {
   // Centralized hover state — one Popup for the whole map avoids per-marker mount churn.
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
@@ -526,6 +543,18 @@ export default function Map({
           locale={locale}
         />
       ))}
+
+      {/* Special-event star pins (#758) — after the place pins so they draw above them.
+          Not mounted at all with no events, so an empty or failed feed adds no
+          hooks, timer or DOM. */}
+      {events.length > 0 && (
+        <EventLayer
+          events={events}
+          selectedEventId={selectedEventId}
+          onSelectEvent={onSelectEvent}
+          locale={locale}
+        />
+      )}
 
       {/* Hover tooltip — single Popup rendered for the currently-hovered venue */}
       {hoveredVenue && (

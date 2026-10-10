@@ -452,6 +452,8 @@ body {
   background: none;
   cursor: pointer;
   line-height: 0;
+  /* Drops the double-tap-to-zoom wait on a pin tap (mobile review). */
+  touch-action: manipulation;
 }
 
 .pfm-event-pin:focus-visible {
@@ -467,7 +469,12 @@ body {
   transition: transform 0.1s ease;
 }
 
-.pfm-event-pin:hover .pfm-event-pin__body { transform: scale(1.08); }
+/* Hover only where a real pointer exists: touch phones fire :hover on tap and
+   would leave a pin stuck enlarged. :active gives the finger its press feedback. */
+@media (hover: hover) and (pointer: fine) {
+  .pfm-event-pin:hover .pfm-event-pin__body { transform: scale(1.08); }
+}
+.pfm-event-pin:active .pfm-event-pin__body { transform: scale(0.96); }
 .pfm-event-pin[data-selected="true"] .pfm-event-pin__body { transform: scale(1.12); }
 
 /* position:relative keeps the pin painted above the (absolutely positioned)
@@ -519,10 +526,10 @@ body {
 
 /* Selected: the same sage ring place pins use for selection. */
 .pfm-event-selected {
-  width: calc(var(--pin) * 0.95);
-  height: calc(var(--pin) * 0.95);
-  margin: calc(var(--pin) * -0.475) 0 0 calc(var(--pin) * -0.475);
-  border: 3px solid var(--color-sage-500);
+  width: calc(var(--pin) * 1.2);
+  height: calc(var(--pin) * 1.2);
+  margin: calc(var(--pin) * -0.6) 0 0 calc(var(--pin) * -0.6);
+  border: 4px solid var(--color-sage-500);
 }
 
 .pfm-event-label {

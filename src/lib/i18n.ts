@@ -448,6 +448,17 @@ const en: Record<string, string> = {
   "events.filter.showResults.other": "Show {count} events",
   "events.list.emptyAction": "Show places again",
 
+  // Event page (#762, /event/<id>). {abbr} is the Pueblo zone abbreviation (MST/MDT).
+  "events.page.statusUpcoming": "Coming up",
+  "events.page.statusLive": "Happening now",
+  "events.page.timeZoneNote": "{abbr}, Pueblo time",
+  "events.page.openOnMap": "Open on the map",
+  "events.page.findFood": "Find food on the map",
+  "events.page.otherLanguage": "Ver en español",
+  "events.page.metaCancelled": "Cancelled.",
+  "events.page.metaWhen": "{day}, {time} {abbr}, at {address}.",
+  "events.page.metaCancelledTitle": "Cancelled: {name}",
+
   // External links (#162)
   "menu.opensInNewTab": "(opens in new tab)",
 
@@ -1598,6 +1609,17 @@ const es: Record<string, string> = {
   "events.filter.showResults.one": "Mostrar {count} evento", // [CHECK]
   "events.filter.showResults.other": "Mostrar {count} eventos", // [CHECK]
   "events.list.emptyAction": "Volver a mostrar lugares", // [CHECK]
+
+  // Event page (#762)
+  "events.page.statusUpcoming": "Próximamente", // [CHECK]
+  "events.page.statusLive": "En curso", // [CHECK]
+  "events.page.timeZoneNote": "{abbr}, hora de Pueblo", // [CHECK]
+  "events.page.openOnMap": "Abrir en el mapa", // [CHECK]
+  "events.page.findFood": "Encontrar comida en el mapa", // [CHECK]
+  "events.page.otherLanguage": "View in English", // [CHECK]
+  "events.page.metaCancelled": "Cancelado.", // [CHECK]
+  "events.page.metaWhen": "{day}, {time} {abbr}, en {address}.", // [CHECK]
+  "events.page.metaCancelledTitle": "Cancelado: {name}", // [CHECK]
 
   // External links (#162)
   "menu.opensInNewTab": "(se abre en una pestaña nueva)",

@@ -159,6 +159,21 @@ export async function loadPublicEvents(db: D1Database, now: Date = new Date()): 
   }
 }
 
+/**
+ * The events the sitemap lists (#762): published and not yet ended (upcoming
+ * and live), soonest first, with `updated_at` as the sitemap's last-modified.
+ * Cancelled, draft and archived events are never listed. Throws on a D1
+ * failure; the sitemap catches it and lists no events. Reads only columns that
+ * exist since migration 0018, so it also works before 0019 is applied.
+ */
+export async function loadSitemapEvents(db: D1Database, now: Date = new Date()): Promise<{ id: string; updated_at: string }[]> {
+  const { results } = await db
+    .prepare("SELECT id, updated_at FROM events WHERE status = 'published' AND ends_at > ? ORDER BY starts_at ASC")
+    .bind(now.toISOString())
+    .all<{ id: string; updated_at: string }>();
+  return results;
+}
+
 // Same explicit column list as the feed plus the three detail columns. Only
 // 'published' (including after it ended) and 'cancelled' are readable: a draft
 // or archived row answers exactly like an unknown id, so the response never

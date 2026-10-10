@@ -11,9 +11,18 @@
  * `/box/<id>` is a client-side redirect shell into the map card (see
  * src/app/(site)/box/[id]/page.tsx), not a page worth indexing — it's `noindex` now.
  * Boxes are in the sitemap as the read-only `/blessing-boxes` list (+ /es twin,
- * #709 PR B; REVIEW.md). That page reads D1 itself; this file does not. With the live D1 read gone, this file is build-time data
- * only again and no longer `force-dynamic`. src/__tests__/seo.test.ts checks
- * that every static URL below maps to a real page.tsx.
+ * #709 PR B; REVIEW.md). That page reads D1 itself; this file does not.
+ * src/__tests__/seo.test.ts checks that every static URL below maps to a real
+ * page.tsx.
+ *
+ * #762 (event pages): this file is `force-dynamic` again, ONLY so the
+ * published upcoming and live events can be listed (/event/<id> + /es twin,
+ * each carrying hreflang like venues). Without it Next prerenders the sitemap
+ * once at build and an event added later would never appear. The D1 read is
+ * wrapped so ANY failure — no `events` table yet (production gets this code
+ * before its migrations), a D1 outage, no Cloudflare context in a test — lists
+ * no events and the rest of the sitemap is served unchanged: the sitemap must
+ * never fail because of events. Ended and cancelled events are not listed.
  *
  * #689 PR 2 (design decision 10): every MIRRORED route (/, /venues,
  * /venue/<id>, /resources, /about, plus the #709 hubs) gets a matching /es entry, and EACH of
@@ -25,8 +34,13 @@
  */
 
 import type { MetadataRoute } from "next";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { SITE_URL } from "@/lib/site";
 import { venues } from "@/data/venues";
+import { loadSitemapEvents } from "@/lib/events";
+import { logEventsReadFailure } from "@/lib/logger";
+
+export const dynamic = "force-dynamic";
 
 /**
  * Build the {en, es, x-default} alternates.languages block Next expects,
@@ -41,7 +55,39 @@ function esAlternates(enPath: string): { languages: { en: string; es: string; "x
   return { languages: { en: enUrl, es: esUrl, "x-default": enUrl } };
 }
 
-export default function sitemap(): MetadataRoute.Sitemap {
+/** Event URLs (EN + /es, hreflang pairs), or none on any failure — see the header. */
+async function eventRoutes(): Promise<MetadataRoute.Sitemap> {
+  let db: D1Database;
+  try {
+    db = getCloudflareContext().env.ADMIN_DB;
+  } catch {
+    return []; // no Cloudflare context (unit tests, a local `next` run): nothing to list, nothing to report
+  }
+  try {
+    const rows = await loadSitemapEvents(db);
+    return rows.flatMap((row) => {
+      const enPath = `/event/${encodeURIComponent(row.id)}`;
+      const alternates = esAlternates(enPath);
+      const lastModified = new Date(row.updated_at);
+      const entry = {
+        lastModified: Number.isNaN(lastModified.getTime()) ? undefined : lastModified,
+        // Events are short-lived and change when an admin edits or cancels them.
+        changeFrequency: "daily" as const,
+        priority: 0.6,
+        alternates,
+      };
+      return [
+        { url: `${SITE_URL}${enPath}`, ...entry },
+        { url: `${SITE_URL}/es${enPath}`, ...entry },
+      ];
+    });
+  } catch (err) {
+    logEventsReadFailure(err instanceof Error ? err.message : "unknown error");
+    return [];
+  }
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: SITE_URL,
@@ -199,5 +245,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ];
   });
 
-  return [...staticRoutes, ...venueRoutes];
+  return [...staticRoutes, ...venueRoutes, ...(await eventRoutes())];
 }

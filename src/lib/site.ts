@@ -172,8 +172,14 @@ export function buildPageMetadata(opts: {
   path: string;
   locale?: Locale;
   mirrored?: boolean;
+  /**
+   * The share-preview image, absolute URL. Defaults to the brand image; an
+   * event page passes its flyer so a shared link previews the flyer (#762).
+   */
+  image?: { url: string; width: number; height: number; alt: string };
 }): Metadata {
   const locale = opts.locale ?? "en";
+  const image = opts.image ?? OG_IMAGE;
   const mirrored = opts.mirrored ?? false;
   const url = `${SITE_URL}${opts.path}`;
   const ogLocale = OG_LOCALE[locale];
@@ -203,13 +209,13 @@ export function buildPageMetadata(opts: {
       url,
       locale: ogLocale,
       alternateLocale: [ogAlternateLocale],
-      images: [OG_IMAGE],
+      images: [image],
     },
     twitter: {
       card: "summary_large_image",
       title: opts.title,
       description: opts.description,
-      images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
+      images: [{ url: image.url, alt: image.alt }],
     },
   };
 }

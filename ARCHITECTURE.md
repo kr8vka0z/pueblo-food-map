@@ -93,13 +93,15 @@ Next.js App Router (Cloudflare Worker)
         venues/, venue/[id]/) each pass locale: "es" to buildPageMetadata and
         the venueSchema.ts builders, and render the SAME client "Content"
         components as their (site)/ counterparts — no page logic duplicated.
-        No es/not-found.tsx: dynamicParams=false on es/venue/[id] means an
-        unknown id 404s at Next's ROUTING level, before that page's own
-        notFound() call ever runs — there is no in-tree notFound() call
-        anywhere under /es to catch. Unmatched /es/* URLs (including an
-        unknown venue id) fall through to the EN app/global-not-found.tsx —
-        an accepted tradeoff; see "i18n model" below for why a catch-all
-        route meant to fix that measured worse, not better.
+        es/not-found.tsx exists only for the dynamic /es/event/[id] (#762),
+        the one in-tree notFound() under /es: dynamicParams=false on
+        es/venue/[id] means an unknown venue id 404s at Next's ROUTING level,
+        before that page's own notFound() call ever runs. Unmatched /es/* URLs
+        (including an unknown venue id) fall through to the EN
+        app/global-not-found.tsx — an accepted tradeoff; see "i18n model"
+        below for why a catch-all route meant to fix that measured worse, not
+        better. The event pages (event/[id], es/event/[id]) are dynamic —
+        see "Event page" under "Events".
   └── src/components/RootShell.tsx — the shared <html>/<body> shell (font
         preload, WebSite JSON-LD, LocaleProvider, Analytics, SW register)
         (site)/layout.tsx, es/layout.tsx and global-not-found.tsx (below) all
@@ -534,8 +536,11 @@ The rules it sets:
 - **`/venue/<id>`** has a visible breadcrumb (Map › All places › name) plus a
   matching `BreadcrumbList` JSON-LD (`buildVenueBreadcrumbJsonLd`). The page's
   ODbL credit comes from `SiteFooter`.
-- **The sitemap is build-time data only**: the static routes plus the published
-  venues. `src/__tests__/seo.test.ts` fails if a static sitemap URL has no
+- **The sitemap is build-time data plus one live read**: the static routes plus
+  the published venues, plus (since #762, `force-dynamic`) the published
+  upcoming and live events read from D1 per request, in both languages; any
+  failure of that read lists no events and never fails the sitemap (see
+  "Event page"). `src/__tests__/seo.test.ts` fails if a static sitemap URL has no
   `page.tsx`. That's how the old `/boxes` entry 404'd unnoticed. Blessing
   Boxes aren't in it: `/box/<id>` is a `noindex` redirect shell into the map
   card. Boxes come back through the planned read-only `/blessing-boxes` list
@@ -980,7 +985,8 @@ One-off special events (a produce giveaway, a turkey drive), plan in issue
 #156. **Slice 1 (#757) is storage, the public read and the admin screens;
 slice 2 (#758) adds the map pin** (see "Map pins" below); **slice 3 (#759)
 adds the event card** (see "Event card" below); **slice 4 (#760) adds the
-flyer image** (see "Event flyer" below).
+flyer image** (see "Event flyer" below); **slice 6 (#762) adds a web page per
+event** (see "Event page" below).
 
 - **Live, never published.** Like boxes, events are read from D1 at request
   time and are not part of the venue Publish snapshot.
@@ -1134,7 +1140,9 @@ flyer image** (see "Event flyer" below).
   directions, Share or Add to calendar.
 - **Share** is `shareLink()` in `share.ts` (the native share sheet, else copy
   with a confirmation, or, with neither, the link shown as selectable text; `shareVenue` now calls it too) with `eventShareUrl()`:
-  `/?event=<id>`, or `/es?event=<id>` on a Spanish page.
+  the event's page, `/event/<id>`, or `/es/event/<id>` on a Spanish page (#762;
+  before that it was the map link `/?event=<id>`, which still works and is what
+  the page's "Open on the map" button uses). The `.ics` `URL:` is the same link.
 - **Add to calendar** is `eventIcs.ts` (no dependency): CRLF, RFC 5545 text
   escaping, 75-octet folding by bytes, `UID:event-<id>@pueblofoodmap.com`, and
   DTSTART/DTEND as absolute UTC (`...Z`), which a calendar shows correctly in
@@ -1240,6 +1248,65 @@ renders anything, so the screen is exactly as before events existed.
   hours) from `eventCard.ts`. The section has its own `useMinuteClock`
   subscription so an ended event leaves the list on the tick. With the Events
   filter on and nothing upcoming it shows "No events coming up".
+
+### Event page (#762)
+
+`/event/[id]` and `/es/event/[id]`: one web page per event, so search engines can
+list it as an event and a shared link previews the flyer.
+
+- **Dynamic, per request** (`export const dynamic = "force-dynamic"`, like
+  `/box/[id]`; events are not in the Publish snapshot, so there is no id list to
+  prerender and a cancel or edit must show without a rebuild). No Cache-Control is
+  added (neither does `/box/[id]`): Next sends `private, no-cache, no-store`, so an
+  edit, a cancel, and a not-found are current on the next request. The
+  `generateStaticParams` + `dynamicParams = false` pairing and its `open-next.config.ts`
+  trap (AGENTS.md) do not apply.
+- **Thin page files over shared code.** Both `page.tsx` files call
+  `src/lib/eventPageData.ts` (`loadEventForPage`, React `cache()` so metadata and
+  body share one read; `eventPageMetadata(id, locale)`) and render
+  `src/components/EventPage.tsx`, a plain SERVER component taking `locale` (like
+  `HubPages`): full content in the server HTML, nothing fetched client-side, works with
+  JavaScript off. The only client code is `EventAddToCalendar`, which calls
+  `src/lib/eventCalendar.ts` (the same file builder the map card now uses).
+  Directions use `googleMapsUrl`, moved to `src/lib/googleMapsUrl.ts` because a
+  function imported from the "use client" `DirectionButtons` cannot be called from a
+  server component (DirectionButtons re-exports it).
+- **Visibility.** The read is `loadPublicEventById` (published, including ended, and
+  cancelled). Draft, archived, unknown ids, a missing `events` table, a D1 error and
+  a missing Cloudflare context all return `null` -> `notFound()` -> HTTP 404, so a
+  draft is indistinguishable from an id that never existed. Flyer columns missing
+  (0019 not applied): the event renders without a flyer, as in the feed. Status words
+  on the page are "Coming up", "Happening now", "This event has ended", "Cancelled"
+  + note: no countdown, so a cached or back-navigated copy is never wrong.
+- **Metadata** goes through `buildPageMetadata` (`mirrored: true`: self-canonical,
+  hreflang en / es / x-default, `og:locale` per language); the new optional `image`
+  option carries the flyer as an absolute URL with width, height and alt, otherwise
+  the site default. Title "Name – Sat, Nov 21", description "Sat, Nov 21, 10 AM – 2 PM
+  MDT, at <address>. <about>" cut at 160 characters (`src/lib/eventSeo.ts`).
+- **Indexing.** An event stays indexable until `EVENT_INDEX_GRACE_MS` (7 days) after
+  its end, then the page sends `robots: noindex, follow`. Cancelled events follow the
+  same clock (indexable, showing Cancelled, so a search engine learns of the
+  cancellation, then dropped with the rest). Non-production hosts are noindexed by
+  `custom-worker.ts` as for every page.
+- **Structured data** (`buildEventJsonLd`, through `serializeJsonLd`): schema.org
+  `Event` with `startDate` / `endDate` as ISO 8601 carrying the Denver offset in force
+  that day (`utcIsoToPuebloOffsetIso`, `eventTime.ts`), `eventStatus`
+  (`EventScheduled` / `EventCancelled`), `eventAttendanceMode` offline, `location`
+  (`Place` with the venue's name when `venue_id` is a known place, else the street
+  line; `PostalAddress`; `geo`), `description`, `image` (flyer), `organizer` (the host,
+  else the site), `isAccessibleForFree`, a zero-price `Offer`, `inLanguage`, `url`; plus
+  a `BreadcrumbList` (Map › name) matching the visible breadcrumb.
+- **Crawl paths.** The sitemap (`src/app/sitemap.ts`, now `force-dynamic`) lists
+  published events that have not ended, EN + `/es`, with `alternates.languages`;
+  `loadSitemapEvents` is wrapped so ANY failure (no table yet, D1 down, no context)
+  lists no events and the rest of the sitemap is served. Each page links to its other
+  language, and the map link goes to `/?event=<id>`. There is no visible link from the
+  map card (it only gains the Share target change). `robots.ts` allows
+  `/api/public/events/*/flyer/` (longest match beats the `/api/` disallow) so Google
+  may fetch the flyer named in the structured data and the preview.
+- **404 body.** A dynamic `notFound()` ships Next's blank `__next_error__` first
+  paint with a real 404 status and `noindex`, exactly like `/box/[id]`; `es/not-found.tsx`
+  gives the `/es` one a Spanish body once JavaScript runs.
 
 ---
 

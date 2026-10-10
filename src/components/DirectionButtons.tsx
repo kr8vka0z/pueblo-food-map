@@ -58,6 +58,7 @@ import type { WalkStep } from "@/components/Map";
 import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { track, EVENTS } from "@/lib/analytics";
+import { googleMapsUrl } from "@/lib/googleMapsUrl";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -119,28 +120,9 @@ interface DirectionButtonsProps {
 
 // ─── Google Maps deeplink builder ────────────────────────────────────────────
 
-// Exported (2026-09-19, Blessing Box card redesign) so BoxCardBody's plain
-// address-as-directions-link can build the same deeplink this component's own
-// Bus/Drive buttons use — one URL builder, not a second copy of the
-// query-string logic. `travelmode` is OPTIONAL (fix pass, 2026-09-19): a box
-// card omits it entirely rather than forcing "driving" — many box visitors
-// walk or ride the bus, and Google Maps' own destination-only deeplink
-// already lets the person pick a mode once it opens.
-export function googleMapsUrl(
-  lat: number,
-  lng: number,
-  travelmode?: "transit" | "driving" | "walking",
-): string {
-  // WHY URLSearchParams: avoids manual encoding bugs (e.g. commas in destination).
-  // Using a base URL + params avoids the OpenNext routing trap of server-side
-  // redirects on "/" — this is purely a client-side href value.
-  const params = new URLSearchParams({
-    api: "1",
-    destination: `${lat},${lng}`,
-    ...(travelmode ? { travelmode } : {}),
-  });
-  return `https://www.google.com/maps/dir/?${params.toString()}`;
-}
+// The builder moved to src/lib/googleMapsUrl.ts (#762) so the server-rendered
+// event page can call it; re-exported so every existing import still works.
+export { googleMapsUrl };
 
 // ─── Per-step distance formatter ─────────────────────────────────────────────
 

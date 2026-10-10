@@ -36,7 +36,12 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: "/",
+        // Event flyers (#762) are served from under /api/, which is disallowed
+        // below. Google only counts an Event's image (and a link preview only
+        // reliably shows it) if the crawler may fetch it, and the longest
+        // matching rule wins, so this narrow Allow beats the /api/ Disallow
+        // for flyer files and nothing else under /api/.
+        allow: ["/", "/api/public/events/*/flyer/"],
         disallow: ["/api/", "/admin/", "/alerts/"],
       },
       {

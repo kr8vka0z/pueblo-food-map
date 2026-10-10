@@ -1703,6 +1703,46 @@ export default function MapWrapper({
   }, []);
 
   /**
+   * Close the popover for good: state down AND the input blurred.
+   * WHY blur: if the input stays focused, tapping it again fires no `focus`
+   * event, so the popover could never reopen (see handleViewSuggestionSelect).
+   */
+  const closeSearchPopover = useCallback(() => {
+    if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+    setIsPopoverOpen(false);
+    setActiveIndex(-1);
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && searchAreaRef.current?.contains(active)) {
+      active.blur();
+    }
+  }, []);
+
+  // Outside-press close. WHY not blur alone: a map pin / the Mapbox canvas
+  // does not move focus (marker press, canvas drag), so the input never
+  // blurred and the popover stayed open beside the opened place card. A
+  // capture-phase pointerdown on the document sees the press before Mapbox
+  // or a marker can stop it; presses inside the search area (input, filters
+  // button, popover rows) are left alone so row clicks still land.
+  useEffect(() => {
+    if (!isPopoverOpen) return;
+    const onPress = (e: PointerEvent) => {
+      const target = e.target;
+      if (target instanceof Node && searchAreaRef.current?.contains(target)) return;
+      closeSearchPopover();
+    };
+    document.addEventListener("pointerdown", onPress, true);
+    return () => document.removeEventListener("pointerdown", onPress, true);
+  }, [isPopoverOpen, closeSearchPopover]);
+
+  // Selection by ANY route (pin, list row, strip, deep link, saved list)
+  // closes it too — the card now owns the screen.
+  const anythingSelected = selectedVenueId !== null || selectedEventId !== null;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to selection from many call sites; one place beats patching each
+    if (anythingSelected) closeSearchPopover();
+  }, [anythingSelected, selectedVenueId, selectedEventId, closeSearchPopover]);
+
+  /**
    * Keyboard handler forwarded from SearchBar: ArrowDown/Up/Enter/Escape.
    * Tab is deliberately NOT handled here — it used to force-close the
    * popover on every Tab press, which raced (and usually won against) the
@@ -2180,8 +2220,10 @@ export default function MapWrapper({
           Hidden while any place or event card is open (phone sheet or desktop
           panel): the open card already names what the strip points at, and a
           tall sheet reaches up under it. It returns when the card closes.
+          Hidden while the search popover or Filters panel is open: the popover sits in
+          the strip's exact spot and the strip's navy edge poked out around it.
           Hidden with no events, so an empty or failed feed changes nothing. */}
-      {viewMode === "map" && mapLoadTriggered && events.length > 0 && selectedVenue === null && selectedEvent === null && (
+      {viewMode === "map" && mapLoadTriggered && events.length > 0 && selectedVenue === null && selectedEvent === null && !isPopoverOpen && !filterPanelOpen && (
         <EventStrip
           events={events}
           locale={locale}

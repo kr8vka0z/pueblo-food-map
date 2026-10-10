@@ -316,9 +316,10 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       const { suggestions } = (await res.json()) as { suggestions: Record<string, string> };
       setValues((p) => {
         const next = { ...p };
-        for (const [key, , es] of ask) {
+        for (const [key, en, es] of ask) {
           const text = suggestions[`${key}_es`];
-          if (typeof text === "string" && !p[es].trim()) next[es] = text;
+          // Skip a field whose English changed in flight: the draft is for the old English.
+          if (typeof text === "string" && !p[es].trim() && p[en] === values[en]) next[es] = text;
         }
         return next;
       });
@@ -397,10 +398,11 @@ export default function EventForm({ venues, eventId, initialValues, status: init
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={suggest === "busy"} aria-busy={suggest === "busy"} onClick={() => void suggestSpanish()} className={secondaryButtonClass}>
+        <button type="button" disabled={suggest === "busy"} onClick={() => void suggestSpanish()} className={secondaryButtonClass}>
           {suggest === "busy" ? "Suggesting…" : "Suggest Spanish"}
         </button>
         <p aria-live="polite" className={`text-sm ${suggest === "error" ? "text-[var(--color-danger)]" : "text-[var(--color-ink-500)]"}`}>
+          {suggest === "busy" && "Suggesting Spanish…"}
           {suggest === "done" && "Spanish suggested by a machine. Read it before publishing."}
           {suggest === "error" && "The Spanish suggestion could not be made. You can type the Spanish by hand."}
           {suggest === "none" && "Add some English text first, then ask for a Spanish suggestion."}

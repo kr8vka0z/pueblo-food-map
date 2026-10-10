@@ -64,6 +64,19 @@ describe("Suggest Spanish", () => {
     expect(field(/^Name \(Spanish\)/).value).toBe("Escrito a mano");
   });
 
+  test("English edited while the request is in flight: that field's Spanish is not filled, the others are", async () => {
+    render(<EventForm venues={[]} initialValues={{ name: "Turkey drive", host: "Pueblo Food Project" }} />);
+    let release!: (v: unknown) => void;
+    fetchMock.mockReturnValue(new Promise((r) => (release = r)));
+
+    await userEvent.click(suggestButton());
+    fireEvent.change(field(/^Name \(English\)/), { target: { value: "Pie drive" } });
+    release(ok({ name_es: "Colecta de pavos", host_es: "Proyecto Alimentario de Pueblo" }));
+
+    await waitFor(() => expect(field(/^Host \(Spanish\)/).value).toBe("Proyecto Alimentario de Pueblo"));
+    expect(field(/^Name \(Spanish\)/).value).toBe("");
+  });
+
   test("no English text -> no request", async () => {
     render(<EventForm venues={[]} />);
     await userEvent.click(suggestButton());

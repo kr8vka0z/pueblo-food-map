@@ -65,8 +65,9 @@ import { haversineMiles } from "@/lib/distance";
 import { useBoxesList } from "@/lib/useBoxesList";
 import { useEventsFeed } from "@/lib/useEvents";
 import { useEventDetail } from "@/lib/useEventDetail";
-import { pinsAt, syncEventParam, eventHereLabel } from "@/lib/eventPins";
+import { pinsAt, listOrder, syncEventParam, eventHereLabel } from "@/lib/eventPins";
 import { toVenue } from "@/lib/useBoxVenues";
+import EventStrip from "@/components/EventStrip";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 import { useMapUI, type ViewMode } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
@@ -1250,6 +1251,8 @@ export default function MapWrapper({
     setFilterSnap,
     filterWic,
     setFilterWic,
+    filterEvents,
+    setFilterEvents,
     venuesWithDistance,
     filteredVenues,
     savedVenues,
@@ -1320,7 +1323,18 @@ export default function MapWrapper({
     (selectedCategories?.size ?? 0) +
     (filterOpenNow ? 1 : 0) +
     (filterSnap ? 1 : 0) +
-    (filterWic ? 1 : 0);
+    (filterWic ? 1 : 0) +
+    (filterEvents ? 1 : 0);
+
+  // Events still to come, for the Filters panel's Events row and its footer
+  // count (#761). Only read while the panel is open (it renders nothing
+  // otherwise), which keeps MapWrapper off the minute clock: the strip and the
+  // list each subscribe to it themselves.
+  // Judged at render time from the wall clock, like eventHereFor below.
+  const upcomingEventCount = () =>
+    // eslint-disable-next-line react-hooks/purity -- wall clock on purpose; see above
+    listOrder(events, Date.now()).length;
+  const filterEventsCount = filterPanelOpen ? upcomingEventCount() : 0;
 
   // ── Typeahead popover state (issue #67) ──────────────────────────────────────
   // isPopoverOpen: true when input is focused + query is non-empty + matches exist.
@@ -1778,6 +1792,15 @@ export default function MapWrapper({
   // opens the same BottomSheet/DesktopVenueWindow card ON TOP of the list
   // (the render guards below key off mapUnavailable too, not only
   // viewMode === "map").
+  // An event row in the list opens its card over the map, like a place row.
+  const handleSelectEventFromList = useCallback(
+    (id: string) => {
+      selectEvent(id);
+      showVenueOnMap();
+    },
+    [selectEvent, showVenueOnMap],
+  );
+
   const handleSelectFromList = useCallback(
     (venueId: string) => {
       selectVenue(venueId);
@@ -2039,6 +2062,9 @@ export default function MapWrapper({
           onSelect={handleSelectFromList}
           onClearFilters={handleClearAllFilters}
           showClearFilters={anyFilterActive || query.trim() !== ""}
+          events={events}
+          onSelectEvent={handleSelectEventFromList}
+          eventsOnly={filterEvents}
           notice={
             mapUnavailable ? (
               <div
@@ -2146,13 +2172,27 @@ export default function MapWrapper({
         )}
       </div>
 
+      {/* "Happening today" strip (#761). Map view only, once the map has loaded:
+          the list view lists events itself, and before the map loads the
+          list stands in for it (same z-700 rung, so the two must not coexist).
+          Hidden with no events, so an empty or failed feed changes nothing. */}
+      {viewMode === "map" && mapLoadTriggered && events.length > 0 && (
+        <EventStrip
+          events={events}
+          locale={locale}
+          onOpen={selectEvent}
+          onMore={() => handleViewModeChange("list")}
+          rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
+        />
+      )}
+
       {/* FilterPanel (#513) — the left side panel opened by SearchBar's Filters
           button. Not tied to search focus (replaces CategoryDropdown, #95). */}
       <FilterPanel
         open={filterPanelOpen}
         onClose={() => setFilterPanelOpen(false)}
         locale={locale}
-        resultCount={filteredVenues.length}
+        resultCount={filterEvents ? filterEventsCount : filteredVenues.length}
         filterOpenNow={filterOpenNow}
         onToggleOpenNow={() => setFilterOpenNow((v) => !v)}
         openNowCount={openNowCount}
@@ -2165,6 +2205,9 @@ export default function MapWrapper({
         selectedCategories={selectedCategories}
         onToggleCategory={toggleCategory}
         onClearAll={clearFilters}
+        filterEvents={filterEvents}
+        onToggleEvents={() => setFilterEvents((v) => !v)}
+        eventsCount={filterEventsCount}
       />
 
       {/* EmptySearchPopover — shown when query is non-empty but yields no results.

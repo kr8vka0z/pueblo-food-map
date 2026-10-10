@@ -110,6 +110,62 @@ jobs:
       # (no `--` separator needed, unlike a generic passthrough CLI).
       - run: npx opennextjs-cloudflare build --env staging
       - run: npx opennextjs-cloudflare deploy --env staging
+      # Post-deploy smoke check, the staging twin of deploy-prod.yml's. Staging
+      # had none, so a next / OpenNext bump that 404'd every prerendered venue
+      # page sat live on dev.pueblofoodmap.com for days with every run green,
+      # and the release to prod was one merge away from inheriting it. Staging
+      # has no workers.dev origin (it answers 404), so this hits the zone host.
+      # Same retry as prod: `deploy` returning is not the new version serving,
+      # and static assets (where the prerendered pages live) lag the Worker.
+      # A red run here is the signal; a failure never rolls anything back.
+      - name: Smoke test staging (post-deploy)
+        run: |
+          set -e
+          ORIGIN="https://dev.pueblofoodmap.com"
+          VENUE_ID=$(grep -m1 '"id":' src/data/published-venues.ts | sed -E 's/.*"id": *"([^"]+)".*/\1/')
+          if [ -z "$VENUE_ID" ]; then
+            echo "Smoke check failed: could not read a venue id from src/data/published-venues.ts" >&2
+            exit 1
+          fi
+          attempts=6
+          status=0
+          for path in "/" "/venues" "/venue/${VENUE_ID}" "/es" "/es/venues" "/es/venue/${VENUE_ID}" "/report/${VENUE_ID}" "/sitemap.xml"; do
+            code=""
+            for i in $(seq 1 "$attempts"); do
+              code=$(curl -sS -o /dev/null -w "%{http_code}" "${ORIGIN}${path}" || echo "000")
+              [ "$code" = "200" ] && break
+              if [ "$i" -lt "$attempts" ]; then
+                echo "GET ${ORIGIN}${path} -> ${code} (attempt ${i}/${attempts}, retrying in 10s)"
+                sleep 10
+              fi
+            done
+            echo "GET ${ORIGIN}${path} -> ${code}"
+            if [ "$code" != "200" ]; then
+              echo "Smoke check failed: ${path} returned ${code}, expected 200" >&2
+              status=1
+            fi
+          done
+          # /es must be the /es tree (a 200 alone would also pass for the EN page).
+          body=$(curl -sS "${ORIGIN}/es/venue/${VENUE_ID}" || echo "")
+          if ! printf '%s' "$body" | grep -q '<html lang="es"'; then
+            echo "Smoke check failed: /es/venue/${VENUE_ID} body is missing <html lang=\"es\">" >&2
+            status=1
+          fi
+          # Unmatched URLs must be a real 404 (not a soft 200, not a 500). Retried
+          # only past a failed fetch (000), never past a wrong status.
+          for missing in "/smoke-check-no-such-page" "/venue/smoke-check-no-such-venue" "/es/venue/smoke-check-no-such-venue" "/event/smoke-check-no-such-event"; do
+            for i in $(seq 1 "$attempts"); do
+              code=$(curl -sS -o /dev/null -w "%{http_code}" "${ORIGIN}${missing}" || echo "000")
+              [ "$code" != "000" ] && break
+              if [ "$i" -lt "$attempts" ]; then sleep 10; fi
+            done
+            echo "GET ${ORIGIN}${missing} -> ${code}"
+            if [ "$code" != "404" ]; then
+              echo "Smoke check failed: ${missing} returned ${code}, expected 404" >&2
+              status=1
+            fi
+          done
+          exit $status
       # NO HC.io /fail step here (deploy-prod.yml has one): the only check is the
       # PROD dead-man's-switch, and a staging-only deploy failure must not page the
       # prod alert channel — a red Actions run is the right signal for dev

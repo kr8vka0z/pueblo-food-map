@@ -129,7 +129,7 @@ describe("active event", () => {
 });
 
 describe("Share", () => {
-  test("copies the ?event= map link when there is no share sheet", async () => {
+  test("copies the event page link when there is no share sheet", async () => {
     vi.setSystemTime(START);
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
@@ -139,7 +139,7 @@ describe("Share", () => {
       shareButton()!.click();
     });
 
-    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/?event=evt-1`);
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/event/evt-1`);
     // The confirmation is announced once, not on every clock tick.
     // A live region OUTSIDE the button, whose text changes when copied.
     const status = screen.getByRole("status");
@@ -155,7 +155,7 @@ describe("Share", () => {
       shareButton()!.click();
     });
 
-    expect(screen.getByText(`${window.location.origin}/?event=evt-1`)).toBeTruthy();
+    expect(screen.getByText(`${window.location.origin}/event/evt-1`)).toBeTruthy();
     expect(screen.getByRole("status").textContent).toBe("");
   });
 
@@ -169,7 +169,7 @@ describe("Share", () => {
       screen.getByRole("button", { name: t("events.card.share", "es") }).click();
     });
 
-    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/es?event=evt-1`);
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/es/event/evt-1`);
   });
 });
 
@@ -186,7 +186,7 @@ describe("Add to calendar", () => {
     expect(content).toContain("DTSTART:20261121T170000Z\r\n");
     expect(content).toContain("DTEND:20261121T210000Z\r\n");
     expect(content).toContain("LOCATION:1 Main St\\, Pueblo\\, CO\r\n");
-    expect(content).toContain(`URL:${window.location.origin}/?event=evt-1\r\n`);
+    expect(content).toContain(`URL:${window.location.origin}/event/evt-1\r\n`);
   });
 });
 

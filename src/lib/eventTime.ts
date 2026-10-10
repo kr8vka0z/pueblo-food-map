@@ -85,6 +85,25 @@ export function formatEventWhen(iso: string): string {
   return whenFormatter.format(new Date(iso));
 }
 
+/**
+ * An instant as ISO 8601 with Pueblo's own UTC offset on it:
+ * "2026-11-21T17:00:00.000Z" -> "2026-11-21T10:00:00-07:00". The offset is the
+ * one in force AT THAT instant, so events on either side of a daylight-saving
+ * change carry -06:00 or -07:00 correctly. Search engines read the offset
+ * (Google's Event guidance), so structured data never relies on a guessed
+ * timezone. Returns "" for an unparseable instant.
+ */
+export function utcIsoToPuebloOffsetIso(iso: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return "";
+  const off = offsetMinutesAt(ms);
+  const p = puebloParts(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const abs = Math.abs(off);
+  // Minute resolution: events are stored at whole minutes (the admin form has no seconds).
+  return `${p.y}-${pad(p.mo)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}:00${off < 0 ? "-" : "+"}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+}
+
 /** "2026-11-21T17:00:00.000Z" -> "2026-11-21T10:00" (Pueblo wall clock, for pre-filling the edit form). */
 export function utcIsoToPuebloLocal(iso: string): string {
   const p = puebloParts(Date.parse(iso));

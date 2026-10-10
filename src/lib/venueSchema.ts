@@ -64,7 +64,7 @@ const SCHEMA_DAY: Record<string, string> = {
  * zip, when present, is always the LAST 5-digit group in the string (it
  * comes after the city/state); a leading 5-digit house number never does.
  */
-function extractPostalCode(address: string): string | undefined {
+export function extractPostalCode(address: string): string | undefined {
   const matches = [...address.matchAll(/\b(\d{5})(?:-\d{4})?\b/g)];
   return matches.length > 0 ? matches[matches.length - 1][1] : undefined;
 }
@@ -88,7 +88,7 @@ const URL_COUNTS: Map<string, number> = (() => {
 })();
 
 /** Extract the street portion (up to the first comma) from an address. */
-function extractStreetAddress(address: string): string {
+export function extractStreetAddress(address: string): string {
   return address.split(",")[0].trim();
 }
 

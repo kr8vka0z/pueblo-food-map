@@ -19,9 +19,9 @@ afterEach(() => {
 });
 
 describe("eventShareUrl", () => {
-  test("is the map URL with ?event=<id>, and the /es URL on a Spanish page", () => {
-    expect(eventShareUrl("abc 1", "en")).toBe(`${window.location.origin}/?event=abc%201`);
-    expect(eventShareUrl("abc", "es")).toBe(`${window.location.origin}/es?event=abc`);
+  test("is the event page URL (#762), and the /es page on a Spanish page", () => {
+    expect(eventShareUrl("abc 1", "en")).toBe(`${window.location.origin}/event/abc%201`);
+    expect(eventShareUrl("abc", "es")).toBe(`${window.location.origin}/es/event/abc`);
   });
 });
 

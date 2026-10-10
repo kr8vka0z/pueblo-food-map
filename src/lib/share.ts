@@ -40,16 +40,18 @@ interface ShareVenueOptions {
 }
 
 /**
- * The link to a special event's card (#759): the map home with `?event=<id>`,
- * on /es for a Spanish page so the shared page opens in Spanish. The map, not
- * a per-event page (that is a later slice), so it needs no new route.
+ * The link to a special event (#759, retargeted by #762): the event's own page,
+ * /event/<id>, or /es/event/<id> for a Spanish card. WHY the page and not the
+ * map: a shared link now previews the flyer and reads as an event to search
+ * engines; the page's "Open on the map" button leads to the old
+ * `/?event=<id>` map link, which keeps working for links already shared.
  */
 export function eventShareUrl(eventId: string, locale: "en" | "es" = "en"): string {
   const origin =
     typeof window !== "undefined" && window.location?.origin
       ? window.location.origin
       : "https://pueblofoodmap.com";
-  return `${origin}${locale === "es" ? "/es" : "/"}?event=${encodeURIComponent(eventId)}`;
+  return `${origin}${locale === "es" ? "/es" : ""}/event/${encodeURIComponent(eventId)}`;
 }
 
 /** Share a venue: the same mechanics as shareLink, pointed at the venue's page. */

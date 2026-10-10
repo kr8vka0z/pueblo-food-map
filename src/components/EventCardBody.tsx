@@ -46,7 +46,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { googleMapsUrl } from "@/components/DirectionButtons";
 import { formatMiles, haversineMiles } from "@/lib/distance";
 import { eventBadge, eventText, eventWhen, localizeEvent } from "@/lib/eventCard";
-import { buildIcs, downloadIcs } from "@/lib/eventIcs";
+import { downloadEventCalendar } from "@/lib/eventCalendar";
 import EventFlyer from "@/components/EventFlyer";
 import type { PublicEventDetail } from "@/lib/events";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
@@ -83,12 +83,6 @@ const SECONDARY_BUTTON =
   " focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
 
 const SECTION_HEADING = "mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]";
-
-// ASCII-only so every OS accepts the download name; the real name is in the file.
-function icsFilename(name: string): string {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
-  return `${slug || "event"}.ics`;
-}
 
 export default function EventCardBody({
   event,
@@ -163,21 +157,7 @@ export default function EventCardBody({
 
   // ── Add to calendar ────────────────────────────────────────────────────────
   function handleCalendar() {
-    const parts = [text.description];
-    if (text.whatToBring) parts.push(`${t("events.card.bring", locale)}: ${text.whatToBring}`);
-    if (moreInfo) parts.push(`${t("events.card.moreInfo", locale)}: ${moreInfo}`);
-    downloadIcs(
-      icsFilename(text.name),
-      buildIcs({
-        id: event.id,
-        summary: text.name,
-        description: parts.filter(Boolean).join("\n\n"),
-        location: event.address,
-        startsAt: event.starts_at,
-        endsAt: event.ends_at,
-        url: eventShareUrl(event.id, locale),
-      }),
-    );
+    downloadEventCalendar(event, locale);
   }
 
   // ── Pieces ─────────────────────────────────────────────────────────────────

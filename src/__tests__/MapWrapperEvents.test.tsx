@@ -33,7 +33,9 @@ vi.mock("@/components/Map", async () => {
     selectedEventId,
     onSelectEvent,
     onMapReady,
+    locale,
   }: {
+    locale?: string;
     events?: Array<{ id: string }>;
     selectedEventId?: string | null;
     onSelectEvent?: (id: string | null) => void;
@@ -45,7 +47,7 @@ vi.mock("@/components/Map", async () => {
     }, []);
     return React.createElement(
       "div",
-      { "data-testid": "map-canvas", "data-event-count": events?.length ?? 0, "data-selected-event-id": selectedEventId ?? "" },
+      { "data-testid": "map-canvas", "data-event-count": events?.length ?? 0, "data-selected-event-id": selectedEventId ?? "", "data-locale": locale ?? "" },
       React.createElement("button", { onClick: () => onSelectEvent?.("e2") }, "tap e2"),
       React.createElement("button", { onClick: () => onSelectEvent?.(null) }, "deselect"),
     );
@@ -73,10 +75,10 @@ function stubFeed(feed: () => Promise<unknown>) {
   );
 }
 
-async function mount(props: React.ComponentProps<typeof MapWrapper>) {
+async function mount(props: React.ComponentProps<typeof MapWrapper>, initialLocale?: "en" | "es") {
   await act(async () => {
     render(
-      <LocaleProvider>
+      <LocaleProvider initialLocale={initialLocale}>
         <MapWrapper {...props} />
       </LocaleProvider>,
     );
@@ -106,6 +108,12 @@ describe("MapWrapper special events (#758)", () => {
     stubFeed(async () => ({ ok: true, json: async () => ({ events: [EVENT] }) }));
     await mount({ initialEventId: "e1" });
     expect(screen.getByTestId("map-canvas")).toHaveAttribute("data-event-count", "1");
+  });
+
+  test("the visitor's language reaches the map, so pin labels are Spanish on /es", async () => {
+    stubFeed(async () => ({ ok: true, json: async () => ({ events: [EVENT] }) }));
+    await mount({ initialEventId: "e1" }, "es");
+    expect(screen.getByTestId("map-canvas")).toHaveAttribute("data-locale", "es");
   });
 
   test("a failed feed hands the map no events and raises no error", async () => {

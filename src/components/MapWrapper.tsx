@@ -1956,6 +1956,10 @@ export default function MapWrapper({
             events={events}
             selectedEventId={selectedEventId}
             onSelectEvent={selectEvent}
+            // WHY here (#758): Map defaults locale to "en" and nothing passed it,
+            // so on /es every pin label and tooltip stayed English. Event pins
+            // need the visitor's language; place pins' aria/tooltips now follow it too.
+            locale={locale}
             onMapReady={handleMapReady}
             onMoveEnd={handleMoveEnd}
             walkingRoute={walkingRouteVenueId === selectedVenueId ? walkingRoute : null}

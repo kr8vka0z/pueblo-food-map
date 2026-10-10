@@ -208,17 +208,23 @@ jobs:
           # #689). A soft-200 here would let crawlers index junk URLs; a 500
           # means the experimental globalNotFound path broke on the Worker.
           # Retried only past a failed fetch (000), never past a wrong status.
-          missing="/smoke-check-no-such-page"
-          for i in $(seq 1 "$attempts"); do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" "${ORIGIN}${missing}" || echo "000")
-            [ "$code" != "000" ] && break
-            if [ "$i" -lt "$attempts" ]; then sleep 10; fi
+          # /event/<unknown> and /es/event/<unknown> (#762) join it: those pages
+          # read D1 per request, and production runs this code before it has
+          # migration 0018 (the `events` table). They must answer 404 then,
+          # never a 500. (A 404 cannot tell a deployed route from a missing
+          # one; it does tell 404 from 500, which is this page's prod risk.)
+          for missing in "/smoke-check-no-such-page" "/event/smoke-check-no-such-event" "/es/event/smoke-check-no-such-event"; do
+            for i in $(seq 1 "$attempts"); do
+              code=$(curl -sS -o /dev/null -w "%{http_code}" "${ORIGIN}${missing}" || echo "000")
+              [ "$code" != "000" ] && break
+              if [ "$i" -lt "$attempts" ]; then sleep 10; fi
+            done
+            echo "GET ${ORIGIN}${missing} -> ${code}"
+            if [ "$code" != "404" ]; then
+              echo "Smoke check failed: ${missing} returned ${code}, expected 404" >&2
+              status=1
+            fi
           done
-          echo "GET ${ORIGIN}${missing} -> ${code}"
-          if [ "$code" != "404" ]; then
-            echo "Smoke check failed: ${missing} returned ${code}, expected 404" >&2
-            status=1
-          fi
           # Indexing policy (SEO/AEO plan Phase 0, src/lib/indexingHost.ts):
           # only pueblofoodmap.com may be indexed. A noindex leaking onto the
           # canonical host would quietly deindex the whole site, so that's a

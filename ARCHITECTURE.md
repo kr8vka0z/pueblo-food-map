@@ -80,7 +80,7 @@ Next.js App Router (Cloudflare Worker)
           JSON-LD, LocaleProvider — reads no cookie, ServiceWorkerRegister →
           public/sw.js, see "Offline / installable app", #130 — and Analytics)
     └── not-found.tsx   (branded 404 for an explicit notFound() call inside this
-          route tree — venue/[id], box/[id], report/[venueId])
+          route tree — venue/[id], box/[id], event/[id], report/[venueId])
     └── forbidden.tsx   (branded 403 for next/navigation's forbidden(), admin/page.tsx)
     └── page.tsx        (Server Component: venue-index JSON-LD, metadata;
           mounts HomePageClient.tsx — splash gate + MapWrapper)

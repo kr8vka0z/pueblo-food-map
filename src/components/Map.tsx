@@ -240,6 +240,8 @@ interface MapProps {
   events?: readonly PublicEvent[];
   selectedEventId?: string | null;
   onSelectEvent?: (id: string | null) => void;
+  /** Events filter on (#761): pin every upcoming event, beyond the 7-day window. */
+  allUpcomingEvents?: boolean;
 }
 
 // Stable defaults so an omitted prop never changes identity between renders.
@@ -286,6 +288,7 @@ export default function Map({
   events = NO_EVENTS,
   selectedEventId = null,
   onSelectEvent = noopSelectEvent,
+  allUpcomingEvents = false,
 }: MapProps) {
   // Centralized hover state — one Popup for the whole map avoids per-marker mount churn.
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
@@ -552,6 +555,7 @@ export default function Map({
           events={events}
           selectedEventId={selectedEventId}
           onSelectEvent={onSelectEvent}
+          allUpcoming={allUpcomingEvents}
           locale={locale}
         />
       )}

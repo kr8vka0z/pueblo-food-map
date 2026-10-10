@@ -17,7 +17,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { TIME_ZONE, puebloParts } from "@/lib/eventTime";
 import type { PublicEvent } from "@/lib/events";
 
-/** Events starting further out than this stay off the map (they are listed elsewhere, slice #761). */
+/** Events starting further out than this stay off the map (the list view still shows them, #761). */
 export const EVENT_PIN_WINDOW_DAYS = 7;
 const EVENT_PIN_WINDOW_MS = EVENT_PIN_WINDOW_DAYS * 86_400_000;
 
@@ -44,18 +44,81 @@ function sameDenverDay(aMs: number, bMs: number): boolean {
  * An unparseable date drops the event instead of throwing: one bad row must
  * not take the map down.
  */
-export function pinsAt(events: readonly PublicEvent[], nowMs: number): EventPin[] {
+export function pinsAt(
+  events: readonly PublicEvent[],
+  nowMs: number,
+  // The one window, as a parameter: the Events filter passes Infinity so the
+  // map draws every upcoming event its count includes (#761); default is the
+  // 7-day rule.
+  windowMs: number = EVENT_PIN_WINDOW_MS,
+): EventPin[] {
   const pins: EventPin[] = [];
   for (const event of events) {
     const start = Date.parse(event.starts_at);
     const end = Date.parse(event.ends_at);
     if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
     const live = nowMs >= start && nowMs < end;
-    const comingUp = nowMs < start && start - nowMs <= EVENT_PIN_WINDOW_MS;
+    const comingUp = nowMs < start && start - nowMs <= windowMs;
     if (!live && !comingUp) continue;
     pins.push({ event, live, today: sameDenverDay(start, nowMs) });
   }
   return pins;
+}
+
+/** Pueblo calendar day of an instant as "2026-10-10": the key the strip's dismissals are filed under (#761). */
+export function denverDayKey(ms: number): string {
+  const p = puebloParts(ms);
+  return `${p.y}-${String(p.mo).padStart(2, "0")}-${String(p.d).padStart(2, "0")}`;
+}
+
+export interface EventStripPick {
+  /** The event the strip names: the one going on now, else the next to start today. */
+  pin: EventPin;
+  /** Other events today or on now (after dismissals), for the "and N more" part. */
+  more: number;
+}
+
+/**
+ * What the "happening today" strip shows at `nowMs` (#761), or null for no strip.
+ * Candidates are events going on now plus events that start on today's Pueblo
+ * calendar day and have not started; the feed arrives soonest-first, so the
+ * first live one wins, else the first upcoming. "Today" is Pueblo's day, so an
+ * event that is tomorrow in Denver never shows on a phone whose own clock is
+ * already on the next date. A dismissed event is left out entirely (it is also
+ * not counted in "and N more"). Built on pinsAt, so the strip can never name an
+ * event the map would not also be pinning.
+ */
+export function stripAt(
+  events: readonly PublicEvent[],
+  nowMs: number,
+  isDismissed: (id: string) => boolean,
+): EventStripPick | null {
+  const candidates = pinsAt(events, nowMs).filter((p) => (p.live || p.today) && !isDismissed(p.event.id));
+  const pin = candidates.find((p) => p.live) ?? candidates[0];
+  return pin ? { pin, more: candidates.length - 1 } : null;
+}
+
+export interface EventListItem {
+  event: PublicEvent;
+  live: boolean;
+}
+
+/**
+ * The events list (#761): everything not yet over, going-on-now first, then
+ * soonest start. Unlike pinsAt there is NO 7-day window: the list is where an
+ * event more than a week out lives until it joins the map. An unparseable date
+ * drops the row instead of throwing.
+ */
+export function listOrder(events: readonly PublicEvent[], nowMs: number): EventListItem[] {
+  const items: Array<EventListItem & { start: number }> = [];
+  for (const event of events) {
+    const start = Date.parse(event.starts_at);
+    const end = Date.parse(event.ends_at);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || nowMs >= end) continue;
+    items.push({ event, live: nowMs >= start, start });
+  }
+  items.sort((a, b) => Number(b.live) - Number(a.live) || a.start - b.start);
+  return items.map(({ event, live }) => ({ event, live }));
 }
 
 // Intl formatters are costly to build; one per (locale, shape), made on first use.

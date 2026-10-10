@@ -37,6 +37,10 @@ Browser
         ├── EventLayer.tsx   (special-event star pins, drawn after the place
         │     pins; owns the once-a-minute clock — see "Events" → "Map pins")
         │     └── EventMarker.tsx  (one star pin; NOW rings + label while live)
+        ├── EventStrip.tsx   ("happening today" strip under the search bar;
+        │     map view only; owns its own minute-clock subscription — "Events"
+        │     → "Strip, filter and list")
+        ├── EventListSection.tsx  (events above the places in ListView)
         ├── EventCardBody.tsx  (the event card, lazy; phone = inside BottomSheet,
         │     desktop = inside DesktopSidePanel via EventPanel.tsx — "Event card")
         ├── BottomSheet.tsx  (mobile: vaul bottom sheet)
@@ -1187,6 +1191,55 @@ One image per event, shown at the top of the card.
 - **Admin form.** `EventFlyerField.tsx`, edit mode only (a new event has no id
   yet); each action saves by itself and hands the new `updated_at` up to the form.
   "Suggest Spanish" does not cover the alt text.
+
+### Strip, filter and list (#761)
+
+Three ways to find an event without hunting for its pin. All three read the
+same feed (`useEventsFeed`) and the same one shared minute clock; none adds a
+timer. With no events (empty, failed or not-yet-loaded feed) none of them
+renders anything, so the screen is exactly as before events existed.
+
+- **Which event the strip names** (`stripAt`, `src/lib/eventPins.ts`, pure and
+  clock-as-argument): candidates are events going on now plus events that start
+  on today's *Pueblo* calendar day and have not started, built on `pinsAt` so
+  the strip never names something the map would not pin. First live wins, else
+  the first upcoming; `more` is the remaining count. "Today" is the Pueblo day
+  (`denverDayKey`), never the phone's date, so an event that is tomorrow in
+  Denver is not shown to a phone already on the next date, and the reverse.
+- **`EventStrip.tsx`** is a navy bar with an orange star, three sibling
+  buttons (open the event / "and N more" / close), each at the 48px floor. Open
+  = `selectEvent`, the same call a pin tap makes. "and N more" switches to the
+  list view (the events sit at the top of it); it does not turn the Events
+  filter on, so the visitor's filters are untouched. It subscribes to
+  `useMinuteClock` itself, so the tick re-renders the strip, never MapWrapper,
+  and has no `aria-live` (a screen reader is not told every minute). MapWrapper
+  mounts it only in map view after the map has loaded and while no place or
+  event card is open, so it never coexists
+  with the list (same z-700 rung). Position and z-index: DESIGN.md "Safe zones".
+- **Dismissal** (`src/lib/eventStripDismissals.ts`): localStorage
+  `pfm.eventStrip.dismissed.v1`, `{ eventId: "<Pueblo day>" }`. A dismissed event
+  is skipped (and not counted in "and N more") until the Pueblo day changes;
+  other days' entries are dropped on every write. Unavailable storage fails
+  soft: the strip's in-memory copy still hides it until reload.
+- **Events filter.** `useMapFilters` gains `filterEvents`, a switch under "Show
+  only" in `FilterPanel` (not a category: it is exclusive). On, `filteredVenues`
+  is `[]`, which empties place pins, box pins, the search popovers and the
+  list's places in one step (boxes are merged into that pool). Event pins keep
+  drawing, and the 7-day pin window is lifted while it is on (`pinsAt`'s
+  `windowMs` parameter, passed `Infinity` through `Map` -> `EventLayer`'s
+  `allUpcoming`), so the count the row shows and the pins on the map agree.
+  With it on and no event left, `EventsEmptyNotice` shows "No events coming
+  up" on the map with a button that turns the filter off. It counts toward the Filters badge, "Clear all" resets it, the
+  footer reads "Show N events", and it is not in the URL (no filter is). The
+  row is offered only while there are events (or while it is already on, so it
+  can be turned off).
+- **List.** `ListView` takes `events` / `onSelectEvent` / `eventsOnly` and
+  renders `EventListSection` above the places: `listOrder` = going on now first,
+  then soonest, *including* events more than 7 days out (no `EVENT_PIN_WINDOW_DAYS`
+  cut). Each row reuses `eventBadge` (countdown wording) and `eventWhen` (Pueblo
+  hours) from `eventCard.ts`. The section has its own `useMinuteClock`
+  subscription so an ended event leaves the list on the tick. With the Events
+  filter on and nothing upcoming it shows "No events coming up".
 
 ---
 

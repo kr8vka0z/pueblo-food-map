@@ -434,6 +434,20 @@ const en: Record<string, string> = {
   "events.here.today": "Event here today",
   "events.here.day": "Event here {day}",
 
+  // "Happening today" strip, Events filter and list (#761). {time} is a Pueblo-time
+  // clock like "2 PM" (strip.today: a range like "2 PM – 4 PM").
+  "events.strip.liveUntil": "Happening now, until {time}",
+  "events.strip.today": "Today {time}",
+  "events.strip.more": "and {count} more",
+  "events.strip.moreAria": "and {count} more, show the events list",
+  "events.strip.dismissAria": "Hide {name} for today",
+  "events.list.heading": "Events",
+  "events.list.empty": "No events coming up",
+  "events.filter.label": "Events",
+  "events.filter.showResults.one": "Show {count} event",
+  "events.filter.showResults.other": "Show {count} events",
+  "events.list.emptyAction": "Show places again",
+
   // External links (#162)
   "menu.opensInNewTab": "(opens in new tab)",
 
@@ -1571,6 +1585,19 @@ const es: Record<string, string> = {
   "events.here.now": "Evento aquí ahora", // [CHECK]
   "events.here.today": "Evento aquí hoy", // [CHECK]
   "events.here.day": "Evento aquí el {day}", // [CHECK]
+
+  // "Happening today" strip, Events filter and list (#761)
+  "events.strip.liveUntil": "En curso, hasta {time}", // [CHECK]
+  "events.strip.today": "Hoy {time}", // [CHECK]
+  "events.strip.more": "y {count} más", // [CHECK]
+  "events.strip.moreAria": "y {count} más, ver la lista de eventos", // [CHECK]
+  "events.strip.dismissAria": "Ocultar {name} por hoy", // [CHECK]
+  "events.list.heading": "Eventos", // [CHECK]
+  "events.list.empty": "No hay eventos próximos", // [CHECK]
+  "events.filter.label": "Eventos", // [CHECK]
+  "events.filter.showResults.one": "Mostrar {count} evento", // [CHECK]
+  "events.filter.showResults.other": "Mostrar {count} eventos", // [CHECK]
+  "events.list.emptyAction": "Volver a mostrar lugares", // [CHECK]
 
   // External links (#162)
   "menu.opensInNewTab": "(se abre en una pestaña nueva)",

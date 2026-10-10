@@ -10,9 +10,10 @@
  * Order, top to bottom (the owner-approved mockup): flyer slot, status badge,
  * name, "Hosted by", When, Where, About, a highlighted "What to bring" box, a
  * large orange Get directions button, Share + Add to calendar, then the
- * optional link. The flyer image is the NEXT slice (#760): there is no flyer
- * field on the public event yet, so the card starts at the badge and is
- * complete without it.
+ * optional link. The flyer (#760) is EventFlyer: absent when the event has
+ * none or it fails to load, and the card is complete without it. On the phone
+ * it shows only once the sheet is expanded (see "Phone"), which also keeps the
+ * image from loading until the visitor asks for the whole card.
  *
  * Phone: the sheet's first, always-visible view must show the badge, name,
  * When and Get directions, so in `layout="sheet"` the Where / About / What to
@@ -44,8 +45,9 @@ import { CalendarPlus, Check, ExternalLink, MapPin, Navigation, Share2, X } from
 import { t, type Locale } from "@/lib/i18n";
 import { googleMapsUrl } from "@/components/DirectionButtons";
 import { formatMiles, haversineMiles } from "@/lib/distance";
-import { eventBadge, eventWhen, localizeEvent } from "@/lib/eventCard";
+import { eventBadge, eventText, eventWhen, localizeEvent } from "@/lib/eventCard";
 import { buildIcs, downloadIcs } from "@/lib/eventIcs";
+import EventFlyer from "@/components/EventFlyer";
 import type { PublicEventDetail } from "@/lib/events";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { safeUrl } from "@/lib/safeUrl";
@@ -109,6 +111,10 @@ export default function EventCardBody({
   const when = eventWhen(event, locale);
   const moreInfo = safeUrl(event.link_url);
   const isSheet = layout === "sheet";
+  // Alt: the admin's text in the page's language, else their English text, else the event name.
+  const flyer = event.flyer ? (
+    <EventFlyer key={event.flyer.src} flyer={event.flyer} alt={eventText(event.flyer.alt, event.flyer.alt_es, locale) || text.name} />
+  ) : null;
 
   // ── Focus (sheet only; DesktopSidePanel does this itself for the panel) ────
   // On open, move focus to the heading so a keyboard / screen-reader user lands
@@ -356,8 +362,11 @@ export default function EventCardBody({
   if (isSheet) {
     return (
       <div className={`flex flex-col ${className}`}>
-        {/* First view (always visible): badge, name, When, Get directions. */}
+        {/* First view (always visible): badge, name, When, Get directions. The flyer joins
+            above the badge only once expanded, so it can never push those four out of
+            the collapsed sheet. */}
         <div className="flex flex-col gap-3 px-5 pt-2">
+          {expanded && flyer}
           {topRow}
           {heading}
           {statusNote}
@@ -393,7 +402,7 @@ export default function EventCardBody({
 
   return (
     <div className={`flex flex-col gap-4 p-4 ${className}`}>
-      {/* Flyer slot (#760): renders here, above the badge, once events carry a flyer. */}
+      {flyer}
       {topRow}
       {heading}
       {statusNote}

@@ -975,7 +975,8 @@ Migrations, R2 buckets and dedicated secrets: AGENTS.md "Blessing Boxes".
 One-off special events (a produce giveaway, a turkey drive), plan in issue
 #156. **Slice 1 (#757) is storage, the public read and the admin screens;
 slice 2 (#758) adds the map pin** (see "Map pins" below); **slice 3 (#759)
-adds the event card** (see "Event card" below). No flyer upload (#760) yet.
+adds the event card** (see "Event card" below); **slice 4 (#760) adds the
+flyer image** (see "Event flyer" below).
 
 - **Live, never published.** Like boxes, events are read from D1 at request
   time and are not part of the venue Publish snapshot.
@@ -983,8 +984,8 @@ adds the event card** (see "Event card" below). No flyer upload (#760) yet.
   nullable `_es` twins (Spanish falls back to English), `starts_at` / `ends_at`
   as absolute UTC ISO text (`CHECK ends_at > starts_at`), its own `lat` / `lng` /
   `address` plus an optional `venue_id` (plain TEXT, no foreign key — the
-  event keeps its own coordinates), `link_url`, `flyer_key` (reserved for
-  slice 4, unused), `status` draft / published / cancelled / archived and
+  event keeps its own coordinates), `link_url`, `flyer_key` (slice 4, see
+  "Event flyer"), `status` draft / published / cancelled / archived and
   created / updated / published stamps. Nothing is deleted.
 - **Pueblo time.** Admins type America/Denver wall-clock time; the **server**
   converts to UTC (`src/lib/eventTime.ts`, `Intl` only, DST-correct: a
@@ -1093,8 +1094,8 @@ adds the event card** (see "Event card" below). No flyer upload (#760) yet.
   kind: a shared link seeds the selection before `isMobile` settles, and a
   handler-set view would miss it. Opening a place, Saved or Menu clears the
   event and vice versa; closing clears `?event=`.
-- **Order** (owner-approved mockup): flyer slot (empty until #760), status
-  badge, name, "Hosted by", When, Where (+ distance when the visitor's real
+- **Order** (owner-approved mockup): the flyer (#760, `EventFlyer.tsx`; absent
+  when the event has none), status badge, name, "Hosted by", When, Where (+ distance when the visitor's real
   position is known), About, a highlighted "What to bring" box, the orange Get
   directions button, Share and Add to calendar, then the optional link. On a
   phone the first, always-visible view is badge, name, When and Get directions,
@@ -1142,6 +1143,50 @@ adds the event card** (see "Event card" below). No flyer upload (#760) yet.
   renders only if `safeUrl()` accepts it (http/https), with
   `rel="noopener noreferrer"`. Spanish is used on a Spanish page when that
   column is non-blank, otherwise English (`eventText()`).
+
+### Event flyer (#760)
+
+One image per event, shown at the top of the card.
+
+- **Storage.** R2 bucket binding `EVENT_FLYERS` (`pfm-event-flyers`; staging
+  `pfm-event-flyers-staging`, declared separately because `env.staging` inherits
+  no bindings). Key `<eventId>/<uuid>.jpg`, made on the server; a
+  replaced flyer gets a new key and the old object is deleted. D1 keeps
+  `flyer_key` (0018) plus `flyer_width`, `flyer_height`, `flyer_alt`,
+  `flyer_alt_es` (migration `0019_event_flyer`, nullable ADD COLUMNs).
+- **Upload** `POST /api/admin/events/[id]/flyer` (also `DELETE`, and `GET` for
+  the admin preview, since a draft has no public URL). Gate: session, then
+  `requireAdminOrigin`, before the body is read. The file is judged on its
+  bytes (`src/lib/eventFlyers.ts`: JPEG only, because the server can strip
+  metadata only from a JPEG and the form always re-encodes to JPEG; width and
+  height read from the header, EXIF stripped, 200 KB hard cap, no side over
+  4096 px). A stale `updated_at` is refused (409) before anything is stored.
+  Order: put the new object, then one `db.batch()`
+  (`UPDATE ... WHERE updated_at = ?` + the `WHERE EXISTS`-gated audit row,
+  action `update`), then delete the old object. A lost `updated_at` race (409)
+  or a failed batch deletes the object just uploaded. Every change purges the
+  events caches. The browser shrinks to about 150 KB first
+  (`shrinkFlyerToJpeg`, a size-and-quality ladder, no crop, white background).
+- **Serving** `GET /api/public/events/[id]/flyer/[file]`: both segments must match
+  strict patterns, the key must be the one currently stored on a `published` or
+  `cancelled` event (a draft's, an archived event's or a replaced flyer 404s),
+  `Content-Type` from the extension, `nosniff`, `Cache-Control: public,
+  max-age=31536000, immutable` (safe because the URL changes with the picture).
+  No Workers Cache layer, deliberately (see the file header).
+- **Public data.** The feed and the single-event read carry
+  `flyer: { src, width, height, alt, alt_es } | null`, never the raw key.
+  `loadPublicEvents` / `loadPublicEventById` try the flyer-column query first and
+  fall back to the pre-0019 query (only for a "no such column" error; any other
+  error propagates to the route's degraded answer), so code that reaches production before the
+  migration still lists every event.
+- **Card.** `EventFlyer.tsx` reserves the box from the stored size (capped at
+  `min(55vh, 28rem)`), `loading="lazy"`, `decoding="async"`, alt = the admin's
+  text in the page language, else their English text, else the event name; a
+  failed image renders nothing. It is only inside the card, so it never loads
+  with the map. On the phone sheet it renders only when the sheet is expanded.
+- **Admin form.** `EventFlyerField.tsx`, edit mode only (a new event has no id
+  yet); each action saves by itself and hands the new `updated_at` up to the form.
+  "Suggest Spanish" does not cover the alt text.
 
 ---
 

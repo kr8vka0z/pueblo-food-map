@@ -85,3 +85,58 @@ export async function shrinkImageToJpeg(file: File | Blob): Promise<Blob> {
     );
   });
 }
+
+/**
+ * Event flyers (#760): fit within a box and aim for a byte budget instead of
+ * a fixed quality. A flyer is often a portrait page with small print, so it
+ * is never cropped; instead the encoder walks down a ladder of (longest side,
+ * JPEG quality) until the file is small enough. The first rung that fits wins,
+ * so a simple graphic keeps its sharpness and a busy photo gets squeezed only
+ * as far as it must. The server's hard cap (MAX_FLYER_BYTES, eventFlyers.ts)
+ * backstops a file that never fits.
+ */
+export const FLYER_TARGET_BYTES = 150 * 1024;
+
+/** [longest side px, quality], best first. Exported so the walk is testable without a canvas. */
+export const FLYER_LADDER: ReadonlyArray<readonly [number, number]> = [
+  [1400, 0.85], [1400, 0.75], [1400, 0.65],
+  [1200, 0.7], [1200, 0.6],
+  [1000, 0.6], [1000, 0.5],
+  [800, 0.5], [800, 0.4],
+];
+
+/**
+ * Decodes `file` once and returns the first JPEG at or under `targetBytes`
+ * (else the smallest one tried). The canvas is filled white first: a
+ * transparent PNG would otherwise turn black when flattened to JPEG.
+ */
+export async function shrinkFlyerToJpeg(file: File | Blob, targetBytes = FLYER_TARGET_BYTES): Promise<Blob> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    throw new UnsupportedImageError();
+  }
+  try {
+    let smallest: Blob | null = null;
+    for (const [maxSide, quality] of FLYER_LADDER) {
+      const { width, height } = fitWithin(bitmap.width, bitmap.height, maxSide);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas 2D context unavailable");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("canvas.toBlob produced no blob"))), "image/jpeg", quality);
+      });
+      if (blob.size <= targetBytes) return blob;
+      if (!smallest || blob.size < smallest.size) smallest = blob;
+    }
+    return smallest as Blob;
+  } finally {
+    bitmap.close();
+  }
+}

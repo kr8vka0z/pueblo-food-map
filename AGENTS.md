@@ -87,7 +87,7 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 
 1. See what's pending: `npx wrangler d1 migrations list pueblo-food-map-admin --remote`.
 2. **Export first:** `wrangler d1 export pueblo-food-map-admin --remote --output <file>`, saved to `~/Backups/pfm-prod-d1/` on the Mac. A rollback can't undo a migration.
-3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, `0016`, and `0017` are not idempotent (they fail with "duplicate column" on a re-run).
+3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, `0016`, `0017`, and `0019` are not idempotent (they fail with "duplicate column" on a re-run).
 4. Confirm the Worker has every runtime secret in the table above, then merge the release (the sync back to `dev` is automatic).
 5. If a migration changed published venue fields, the public map only updates at the next admin **Publish**. The Publish bar only shows when `updated_at > published_at`, so data migrations must set `updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')` on the rows they change.
 
@@ -131,6 +131,7 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
   - Box alert sends never block a check-in.
 - **Events (#156, slice 1 #757):**
   - Live like boxes, never in the Publish snapshot. Mechanism: ARCHITECTURE.md "Events".
+  - **Flyers (#760):** images go to R2 (`EVENT_FLYERS`: `pfm-event-flyers`, staging `pfm-event-flyers-staging`, both created by hand with `wrangler r2 bucket create`, empty). D1 holds only the key, size and alt text (migration `0019_event_flyer`, ADD COLUMN only). The code fails soft until `0019` is applied: events still load without flyers and the upload route answers 503 `flyer_unavailable`. Mechanism: ARCHITECTURE.md "Event flyer".
   - **Migration `0018_events` reaches a database before the code that uses it.** Staging gets it from `deploy-dev.yml`; production is the manual step above. Until then `/api/public/events` returns an empty 200, `/api/public/events/[id]` a 404, and the admin Events tab shows "Couldn't load", by design.
   - **"Suggest Spanish"** uses the Workers AI binding `AI` (`wrangler.jsonc`, prod and `env.staging`; no secret). A missing binding is a clean 503, never a crash. Suggestions are machine-made and unreviewed; the form fills only empty Spanish boxes.
   - Times are entered in America/Denver and converted to UTC on the server (`src/lib/eventTime.ts`); never use the browser's timezone for an event.

@@ -964,6 +964,55 @@ Migrations, R2 buckets and dedicated secrets: AGENTS.md "Blessing Boxes".
 
 ---
 
+## Events
+
+One-off special events (a produce giveaway, a turkey drive), plan in issue
+#156. **Slice 1 (#757) is storage, the public read and the admin screens only**:
+no map pin, no public card, no flyer upload yet (slices #758–#760).
+
+- **Live, never published.** Like boxes, events are read from D1 at request
+  time and are not part of the venue Publish snapshot.
+- **Table `events`** (`migrations/0018_events.sql`). English text columns with
+  nullable `_es` twins (Spanish falls back to English), `starts_at` / `ends_at`
+  as absolute UTC ISO text (`CHECK ends_at > starts_at`), its own `lat` / `lng` /
+  `address` plus an optional `venue_id` (plain TEXT, no foreign key — the
+  event keeps its own coordinates), `link_url`, `flyer_key` (reserved for
+  slice 4, unused), `status` draft / published / cancelled / archived and
+  created / updated / published stamps. Nothing is deleted.
+- **Pueblo time.** Admins type America/Denver wall-clock time; the **server**
+  converts to UTC (`src/lib/eventTime.ts`, `Intl` only, DST-correct: a
+  time inside the spring-forward gap is rejected, the repeated fall-back hour
+  resolves to its first occurrence). The browser sends the raw
+  `datetime-local` string, so its timezone never matters. This is
+  deliberately unlike place hours (`src/lib/hours.ts`), which use the phone's clock.
+- **Public feed** `GET /api/public/events` (`src/lib/events.ts`
+  `PUBLIC_EVENTS_SQL`): `status = 'published' AND ends_at > now`, soonest first,
+  explicit column list (no internal fields). 60-second `caches.default` entry
+  through `respondWithEdgeCache()`, purged by every admin events write
+  (`purgeEventsFeed()`, this colo only — the TTL bounds the rest). **Fails
+  soft:** a missing table or any D1 error answers `{ events: [] }` with a 200
+  and is never cached, because this code can reach production before the
+  manual production migration does.
+- **Admin** (`/admin/events`, `/admin/events/new`, `/admin/events/[id]/edit`;
+  `EventsList`, `EventForm`). Same shape as the venue screens: server page
+  gate → client form → route handler write. Routes: `POST /api/admin/events`
+  (save draft | publish), `PATCH /api/admin/events/[id]` (save | publish |
+  cancel — cancel needs a note and a published event; nothing re-opens a
+  cancelled one), `POST /api/admin/events/[id]/archive`. Each is
+  `getAdminDb()` → `requireAdminOrigin()` → one `db.batch()` with a
+  `WHERE EXISTS`-gated `audit_log` row (entity `event`; `audit_log.action` is
+  CHECK-limited, so cancel is logged as `update` with the new status in
+  `after_json`) → feed purge. PATCH requires `expectedUpdatedAt`; a stale one
+  is a 409 and writes no audit row. Validation is hand-rolled
+  (`src/lib/adminEventValidation.ts`). The list/edit pages read events inside
+  their own try/catch, so a missing table shows a "Couldn't load, Retry" panel.
+  The place is a picked venue (address and coordinates copied) or a typed
+  address located with the venue form's `/api/admin/geocode`.
+- **Tests** run the routes and the feed against real SQLite built from the
+  migration files (`src/lib/sqliteD1.testutil.ts`).
+
+---
+
 ## Admin panel
 
 Design spec: `docs/admin/cloudflare-native-admin-spec.md`. Per-slice build
@@ -1012,6 +1061,9 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   includes an unknown venue id on the edit page). It carries no admin data.
 
 ### Surfaces
+
+- **`/admin/events` — Events tab** (#757). Live special events, no Publish
+  step; see "Events" above for the table, routes and fail-soft behavior.
 
 - **`/admin/activity` — Activity log, owner only** (#679). Every admin
   sign-in, failed attempt and action, newest first, grouped by day, then by

@@ -55,7 +55,10 @@ export function purgeEventsFeed(req: Request): Promise<void> {
  * The audit-row guard above is "updated_at = the new timestamp", so if a stale
  * write landed in the same millisecond as the row's last save, the guard would
  * pass on an UNCHANGED row and record an action that never happened. Bumping
- * by 1ms in that collision makes the guard sound without any extra read.
+ * by 1ms in that collision only closes that one gap (a stale write against the
+ * row's own last save). Two admins writing in the same millisecond can still
+ * leave one phantom audit row (the loser still gets its 409); the venue routes
+ * have the same gap.
  */
 export function nextTimestamp(previous: string): string {
   const now = new Date().toISOString();

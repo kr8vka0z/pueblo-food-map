@@ -11,6 +11,7 @@
  */
 
 import type { EventStatus } from "@/lib/adminEventValidation";
+import { flyerPublicPath } from "@/lib/eventFlyers";
 
 /** One row of the `events` table, as admin pages read it. */
 export interface EventRow {
@@ -33,12 +34,30 @@ export interface EventRow {
   venue_id: string | null;
   link_url: string | null;
   flyer_key: string | null;
+  // Added by migration 0019; absent on a database that has not applied it yet.
+  flyer_width?: number | null;
+  flyer_height?: number | null;
+  flyer_alt?: string | null;
+  flyer_alt_es?: string | null;
   status: EventStatus;
   created_at: string;
   created_by: string;
   updated_at: string;
   updated_by: string;
   published_at: string | null;
+}
+
+/**
+ * What the card needs to show the flyer (#760): where to load it, the stored
+ * size (so the space is reserved before it loads), and the admin's alt text.
+ * `src` is a path on this site, never the raw R2 key.
+ */
+export interface PublicFlyer {
+  src: string;
+  width: number;
+  height: number;
+  alt: string | null;
+  alt_es: string | null;
 }
 
 /** What GET /api/public/events returns per event. */
@@ -59,6 +78,8 @@ export interface PublicEvent {
   address: string;
   venue_id: string | null;
   link_url: string | null;
+  /** Absent or null when the event has no flyer, or migration 0019 is not applied yet. */
+  flyer?: PublicFlyer | null;
 }
 
 /**
@@ -82,10 +103,51 @@ export const PUBLIC_EVENTS_SQL = `SELECT id, name, name_es, host, host_es, descr
   WHERE status = 'published' AND ends_at > ?
   ORDER BY starts_at ASC`;
 
+// The same query plus the flyer columns (#760). The one above stays valid on a
+// database that has not applied migration 0019: the loaders try this one first
+// and fall back, so a deploy that reaches production before its migration
+// still serves every event, just without flyers.
+export const PUBLIC_EVENTS_WITH_FLYER_SQL = `SELECT id, name, name_es, host, host_es, description, description_es,
+    what_to_bring, what_to_bring_es, starts_at, ends_at, lat, lng, address, venue_id, link_url,
+    flyer_key, flyer_width, flyer_height, flyer_alt, flyer_alt_es
+  FROM events
+  WHERE status = 'published' AND ends_at > ?
+  ORDER BY starts_at ASC`;
+
+interface FlyerColumns {
+  flyer_key?: string | null;
+  flyer_width?: number | null;
+  flyer_height?: number | null;
+  flyer_alt?: string | null;
+  flyer_alt_es?: string | null;
+}
+
+/** The card-ready flyer for a row's five flyer columns, or null (none stored, columns missing, or a key outside our shape). */
+export function publicFlyerOf(row: FlyerColumns): PublicFlyer | null {
+  const src = row.flyer_key ? flyerPublicPath(row.flyer_key) : null;
+  return src && row.flyer_width && row.flyer_height
+    ? { src, width: row.flyer_width, height: row.flyer_height, alt: row.flyer_alt ?? null, alt_es: row.flyer_alt_es ?? null }
+    : null;
+}
+
+/** Folds the five flyer columns into one `flyer` object (or null), so the raw R2 key never reaches the public JSON. */
+function withPublicFlyer<T extends FlyerColumns>(row: T): Omit<T, keyof FlyerColumns> & { flyer: PublicFlyer | null } {
+  const { flyer_key, flyer_width, flyer_height, flyer_alt, flyer_alt_es, ...rest } = row;
+  return { ...rest, flyer: publicFlyerOf({ flyer_key, flyer_width, flyer_height, flyer_alt, flyer_alt_es }) };
+}
+
 /** Published events that have not ended, soonest first. Throws on a D1 failure (the route turns that into an uncached empty list). */
 export async function loadPublicEvents(db: D1Database, now: Date = new Date()): Promise<PublicEvent[]> {
-  const { results } = await db.prepare(PUBLIC_EVENTS_SQL).bind(now.toISOString()).all<PublicEvent>();
-  return results;
+  const iso = now.toISOString();
+  try {
+    const { results } = await db.prepare(PUBLIC_EVENTS_WITH_FLYER_SQL).bind(iso).all<PublicEvent & FlyerColumns>();
+    return results.map(withPublicFlyer) as PublicEvent[];
+  } catch {
+    // Migration 0019 not applied yet. If the table itself is missing this
+    // throws too, and the route turns that into its empty fail-soft answer.
+    const { results } = await db.prepare(PUBLIC_EVENTS_SQL).bind(iso).all<PublicEvent>();
+    return results;
+  }
 }
 
 // Same explicit column list as the feed plus the three detail columns. Only
@@ -98,9 +160,22 @@ export const PUBLIC_EVENT_BY_ID_SQL = `SELECT id, name, name_es, host, host_es, 
   FROM events
   WHERE id = ? AND status IN ('published', 'cancelled')`;
 
+export const PUBLIC_EVENT_BY_ID_WITH_FLYER_SQL = `SELECT id, name, name_es, host, host_es, description, description_es,
+    what_to_bring, what_to_bring_es, starts_at, ends_at, lat, lng, address, venue_id, link_url,
+    status, cancel_note, cancel_note_es, flyer_key, flyer_width, flyer_height, flyer_alt, flyer_alt_es
+  FROM events
+  WHERE id = ? AND status IN ('published', 'cancelled')`;
+
 /** One event for a shared link, or null (unknown, draft, archived). Throws on a D1 failure (the route turns that into an uncached 404). */
 export async function loadPublicEventById(db: D1Database, id: string): Promise<PublicEventDetail | null> {
-  const row = await db.prepare(PUBLIC_EVENT_BY_ID_SQL).bind(id).first<PublicEventDetail>();
+  let row: PublicEventDetail | null;
+  try {
+    const found = await db.prepare(PUBLIC_EVENT_BY_ID_WITH_FLYER_SQL).bind(id).first<PublicEventDetail & FlyerColumns>();
+    row = found ? (withPublicFlyer(found) as PublicEventDetail) : null;
+  } catch {
+    // Migration 0019 not applied yet — see loadPublicEvents.
+    row = await db.prepare(PUBLIC_EVENT_BY_ID_SQL).bind(id).first<PublicEventDetail>();
+  }
   if (!row) return null;
   return row.status === "cancelled" ? row : { ...row, cancel_note: null, cancel_note_es: null };
 }

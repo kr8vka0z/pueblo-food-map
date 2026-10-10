@@ -8,6 +8,7 @@
 // same hand patch).
 interface __BaseEnv_Env {
 	BOX_PHOTOS: R2Bucket;
+	EVENT_FLYERS: R2Bucket;
 	ADMIN_DB: D1Database;
 	ASSETS: Fetcher;
 	BETTER_AUTH_RP_ID?: "dev.pueblofoodmap.com";
@@ -26,6 +27,7 @@ declare namespace Cloudflare {
 	}
 	interface StagingEnv {
 		BOX_PHOTOS: R2Bucket;
+		EVENT_FLYERS: R2Bucket;
 		ADMIN_DB: D1Database;
 		ASSETS: Fetcher;
 		BETTER_AUTH_RP_ID: "dev.pueblofoodmap.com";

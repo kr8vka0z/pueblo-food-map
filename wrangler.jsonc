@@ -39,6 +39,12 @@
     {
       "binding": "BOX_PHOTOS",
       "bucket_name": "pfm-box-photos"
+    },
+    // Event flyers (#760) — one image per event, keyed "<eventId>/<uuid>.<ext>".
+    // Same no-inheritance rule as BOX_PHOTOS: env.staging declares its own.
+    {
+      "binding": "EVENT_FLYERS",
+      "bucket_name": "pfm-event-flyers"
     }
   ],
   // Workers AI (#757) — "Suggest Spanish" on the admin event form
@@ -182,6 +188,11 @@
         {
           "binding": "BOX_PHOTOS",
           "bucket_name": "pfm-box-photos-staging"
+        },
+        // Staging twin of EVENT_FLYERS (#760) — never the production bucket.
+        {
+          "binding": "EVENT_FLYERS",
+          "bucket_name": "pfm-event-flyers-staging"
         }
       ],
       // Workers AI twin of the top-level binding (#757); bindings are not inherited.

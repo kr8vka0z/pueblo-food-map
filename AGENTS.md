@@ -129,6 +129,10 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
   - Boxes are live: admin edits show immediately, with no Publish.
   - Photos go to R2 (`pfm-box-photos`, with its own staging bucket). D1 holds metadata only.
   - Box alert sends never block a check-in.
+- **Events (#156, slice 1 #757):**
+  - Live like boxes, never in the Publish snapshot. Mechanism: ARCHITECTURE.md "Events".
+  - **Migration `0018_events` reaches a database before the code that uses it.** Staging gets it from `deploy-dev.yml`; production is the manual step above. Until then `/api/public/events` returns an empty 200 and the admin Events tab shows "Couldn't load", by design.
+  - Times are entered in America/Denver and converted to UTC on the server (`src/lib/eventTime.ts`); never use the browser's timezone for an event.
 
 ---
 

@@ -21,7 +21,8 @@ export default function StyxCredit({ locale, className = "" }: { locale: Locale;
         href="https://thestyxgroup.com"
         target="_blank"
         rel="noopener noreferrer"
-        className="underline hover:text-[var(--color-ink-700)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
+        // whitespace-nowrap: in the 280-288px Menu the name split across two lines.
+        className="whitespace-nowrap underline hover:text-[var(--color-ink-700)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] rounded"
       >
         The Styx Group
       </a>

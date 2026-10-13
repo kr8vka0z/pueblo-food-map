@@ -219,6 +219,8 @@ const en: Record<string, string> = {
   "menu.title": "Pueblo Food Map",
   "menu.suggest": "Suggest a place",
   "menu.sponsoredBy": "Sponsored by",
+  // Agency credit (StyxCredit.tsx) — followed by the linked name "The Styx Group".
+  "credit.builtBy": "Designed, built and managed by",
   "menu.showWelcome": "Show welcome screen",
   "menu.language": "Language / Idioma",
   // #689 PR 2, design decision 2 / Kyle's 2026-09-28 decision 2: shown in the
@@ -1404,6 +1406,7 @@ const es: Record<string, string> = {
   "menu.title": "Pueblo Food Map",
   "menu.suggest": "Sugerir un lugar",
   "menu.sponsoredBy": "Patrocinado por",
+  "credit.builtBy": "Diseñado, creado y administrado por", // [CHECK]
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.language": "Language / Idioma",
   "menu.verEnEspanol": "Ver en español →",

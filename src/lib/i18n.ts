@@ -1406,7 +1406,7 @@ const es: Record<string, string> = {
   "menu.title": "Pueblo Food Map",
   "menu.suggest": "Sugerir un lugar",
   "menu.sponsoredBy": "Patrocinado por",
-  "credit.builtBy": "Diseñado, creado y administrado por", // [CHECK]
+  "credit.builtBy": "Diseñado, creado y administrado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.language": "Language / Idioma",
   "menu.verEnEspanol": "Ver en español →",

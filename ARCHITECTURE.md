@@ -1221,9 +1221,14 @@ renders anything, so the screen is exactly as before events existed.
   filter on, so the visitor's filters are untouched. It subscribes to
   `useMinuteClock` itself, so the tick re-renders the strip, never MapWrapper,
   and has no `aria-live` (a screen reader is not told every minute). MapWrapper
-  mounts it only in map view after the map has loaded and while no place or
-  event card is open, so it never coexists
-  with the list (same z-700 rung). Position and z-index: DESIGN.md "Safe zones".
+  mounts it only in map view after the map has loaded, while no place or
+  event card is open, and while neither the search popover nor the Filters
+  panel is open (the popover sits in the strip's exact spot), so it never
+  coexists with the list (same z-700 rung). The search popover itself closes on
+  any press outside the search area (capture-phase `pointerdown`, because a map
+  pin or the Mapbox canvas never moves focus off the input) and whenever a
+  place or event becomes selected, via `closeSearchPopover` in MapWrapper.
+  Position and z-index: DESIGN.md "Safe zones".
 - **Dismissal** (`src/lib/eventStripDismissals.ts`): localStorage
   `pfm.eventStrip.dismissed.v1`, `{ eventId: "<Pueblo day>" }`. A dismissed event
   is skipped (and not counted in "and N more") until the Pueblo day changes;

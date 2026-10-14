@@ -32,6 +32,7 @@ import Link from "next/link";
 import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Star, History } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
+import StyxCredit from "./StyxCredit";
 import type { MenuSection } from "./BottomNav";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
@@ -320,6 +321,12 @@ export default function HamburgerMenuContent({
                 </Link>
               </div>
             )}
+            {/* Agency credit — last thing in the Menu, the far end from the
+                sponsor card at the top, so it never competes with it. */}
+            <StyxCredit
+              locale={locale}
+              className="px-5 py-3 border-t border-[var(--color-bone-200)]"
+            />
           </>
         )}
       </div>

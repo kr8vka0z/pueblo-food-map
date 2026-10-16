@@ -83,16 +83,6 @@ updates:
       - dependency-name: better-sqlite3
         update-types:
           - version-update:semver-major
-      # next 16.4 is held at 16.3.x until @opennextjs/cloudflare supports it. The
-      # 16.3.8 -> 16.4.0 bump (PR #780) built green but every page 500'd in
-      # check-prerender-serves.sh with `Unexpected loadManifest(
-      # /.next/server/preview-props.json) call!` on OpenNext 1.20.10 and 1.20.11
-      # (upstream opennextjs-cloudflare#1355, fix PR #1356 unmerged as of
-      # 2026-10-14). 16.3.x patches still flow. Drop this entry once an OpenNext
-      # release ships that fix, and bump the two packages together.
-      - dependency-name: next
-        versions:
-          - ">=16.4.0"
     labels:
       - dependencies
       - npm

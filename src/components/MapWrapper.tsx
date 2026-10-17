@@ -2605,6 +2605,7 @@ export default function MapWrapper({
           onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
           // The tour's box steps hold the sheet open (#159); undefined otherwise.
           forceExpanded={tour ? tourCardExpanded : undefined}
+          inert={tour !== null}
           onClose={() => {
             setSelectedVenueId(null);
             closeEventCard();
@@ -2639,7 +2640,13 @@ export default function MapWrapper({
           HamburgerMenu renders, different shell, see that component's own
           header for why). `panelHeadingId` names whichever view's own
           focusable heading DesktopSidePanel should focus on view change. */}
-      <DesktopSidePanel open={desktopPanelOpen} onClose={closeDesktopPanel} headingId={panelHeadingId}>
+      <DesktopSidePanel
+        open={desktopPanelOpen}
+        onClose={closeDesktopPanel}
+        headingId={panelHeadingId}
+        // The tour (#159) shows cards here; nothing on them may be pressed.
+        inert={tour !== null}
+      >
         {(close) => {
           if (eventPanelOpen && selectedEvent) {
             return (

@@ -983,8 +983,11 @@ Map Menu item (phone drawer or desktop side panel) → MapWrapper.startTour dire
     open with trapFocus off; the box steps hold the Boxes view on (the same
     blessing_box category the nav button sets), open the nearest live box's
     card (BottomSheet `forceExpanded` for its lower buttons on a phone) and
-    only point at its buttons: the tour's full-screen layer takes every tap,
-    so no check-in, photo, sponsor request or alert signup can be sent.
+    only point at its buttons. While a tour runs, the phone card
+    (BottomSheet), the desktop side panel and the held-open FilterPanel are
+    `inert`, so no finger, keyboard or screen-reader double-tap can press
+    anything on them (the tour's full-screen layer alone only stops
+    hit-tested taps): no check-in, photo, sponsor request or alert signup.
     Leaving a demo's steps undoes it.
   → end (Done / Skip / Escape): camera restored, MapWrapper restores the
     snapshot (search included) and unpauses analytics, focus returns to the

@@ -93,6 +93,11 @@ async function flush() {
   });
 }
 const boxesOn = () => screen.getByTestId("nav-boxes").getAttribute("aria-pressed");
+/** The box card's check-in buttons (status trio + "took"), found by their tour hook. */
+const checkinButtons = () =>
+  [...document.querySelectorAll<HTMLButtonElement>(
+    '[data-tour="box-checkin-choices"] button, button[data-tour="box-checkin-choices"]',
+  )];
 const stepIndex = (id: string) => TOUR_STEPS.findIndex((s) => s.id === id);
 function next(times = 1) {
   for (let i = 0; i < times; i++) fireEvent.click(screen.getByRole("button", { name: EN.next }));
@@ -125,7 +130,7 @@ describe("Blessing Box steps", () => {
     expect(boxesOn()).toBe("true");
 
     next(); // boxCheckin: the box's card is open on its check-in buttons
-    await waitFor(() => expect(screen.getByRole("heading", { name: /update this box/i })).toBeTruthy());
+    await waitFor(() => expect(checkinButtons().length).toBeGreaterThan(0));
     next(2); // photo, then the sponsor/alerts step (sheet held open)
     await waitFor(() => expect(document.querySelector('[data-tour="box-alerts"]')).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: EN.back }));
@@ -134,7 +139,7 @@ describe("Blessing Box steps", () => {
     fireEvent.click(screen.getByRole("button", { name: EN.skip }));
     await waitFor(() => expect(screen.queryByTestId("guided-tour")).toBeNull());
     expect(boxesOn()).toBe("false");
-    expect(screen.queryByRole("heading", { name: /update this box/i })).toBeNull();
+    expect(checkinButtons()).toHaveLength(0);
     expect(writes()).toEqual([]);
   });
 
@@ -151,11 +156,45 @@ describe("Blessing Box steps", () => {
     // The tour lifted the visitor's filters at start.
     expect(boxesOn()).toBe("false");
     next(stepIndex("boxCheckin"));
-    await waitFor(() => expect(screen.getByRole("heading", { name: /update this box/i })).toBeTruthy());
+    await waitFor(() => expect(checkinButtons().length).toBeGreaterThan(0));
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByTestId("guided-tour")).toBeNull());
     expect(boxesOn()).toBe("true");
-    expect(screen.queryByRole("heading", { name: /update this box/i })).toBeNull();
+    expect(checkinButtons()).toHaveLength(0);
+  });
+
+  test("the box card is inert while the tour shows it, and its buttons work again after", async () => {
+    // A Turnstile that hands out a token at once, so a real check-in tap POSTs.
+    vi.stubGlobal("turnstile", {
+      render: vi.fn((_el: HTMLElement, opts: { callback?: (t: string) => void }) => {
+        opts.callback?.("test-turnstile-token");
+        return "widget-1";
+      }),
+      reset: vi.fn(),
+      remove: vi.fn(),
+    });
+    await renderThenTour();
+    next(stepIndex("boxCheckin"));
+    await waitFor(() => expect(checkinButtons().length).toBeGreaterThan(0));
+    // inert is what stops every way in (a finger, a keyboard, a screen
+    // reader's double-tap). jsdom doesn't enforce inert, so a click
+    // dispatched here would still run; the browser check covers that half.
+    for (const b of checkinButtons()) expect(b.closest("[inert]")).not.toBeNull();
+    expect(screen.getByRole("dialog", { name: EN.dialogLabel }).closest("[inert]")).toBeNull();
+    expect(writes()).toEqual([]);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("guided-tour")).toBeNull());
+    // The visitor opens the same box themselves (search, then its result row).
+    const input = screen.getByTestId("search-input");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: BOX.name } });
+    fireEvent.click(await screen.findByRole("option", { name: new RegExp(BOX.name) }));
+    await waitFor(() => expect(checkinButtons().length).toBeGreaterThan(0));
+    for (const b of checkinButtons()) expect(b.closest("[inert]")).toBeNull();
+    const took = checkinButtons().find((b) => b.tagName === "BUTTON" && b.dataset.tour === "box-checkin-choices")!;
+    fireEvent.click(took);
+    await waitFor(() => expect(writes().length).toBe(1));
   });
 
   test("no box in the live feed: the box pin/card steps are left out, the tour still ends cleanly", async () => {

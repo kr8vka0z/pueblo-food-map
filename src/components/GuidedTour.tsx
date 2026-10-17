@@ -17,11 +17,14 @@
  * sample venue for the pin step, then polls for the step's target element
  * each animation frame until its box stops moving (the card slides in, the
  * bottom nav remounts after the card closes) and draws the highlight there.
- * Two steps run a live demo: the search step types a sample word into the
- * real search box (results showing, input never focused) and the filters
- * step holds the real Filters panel open; both are undone when the step is
- * left. On close it restores the camera; MapWrapper restores the selection,
- * Map/List view and the visitor's own search it snapshotted at start.
+ * Three live demos: the search step types a sample word into the real
+ * search box (results showing, input never focused), the filter-choices
+ * step holds the real Filters panel open, and the box steps hold the map's
+ * Boxes view on; each is undone when its steps are left. Cards and the
+ * panel the tour opens are `inert` while it runs (MapWrapper), so nothing
+ * on them can be pressed. On close it restores the camera; MapWrapper
+ * restores the selection, Map/List view, search and filters it snapshotted
+ * at start.
  *
  * A11y: role="dialog" + aria-modal, focus starts on Next and is trapped in
  * the tooltip (DesktopVenueWindow focuses itself when the card step opens it

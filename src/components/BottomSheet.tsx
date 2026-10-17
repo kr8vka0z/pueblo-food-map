@@ -161,6 +161,13 @@ interface BottomSheetProps {
    * buttons. Undefined (the normal case) leaves the grab bar in charge.
    */
   forceExpanded?: boolean;
+  /**
+   * Guided tour (#159): the tour shows a card here but nothing on it may be
+   * pressed, by any means. `inert` also stops a screen reader's double-tap,
+   * which reaches the button directly: the tour's tap-catching layer only
+   * blocks hit-tested taps, and vaul never passes modal={false} to Radix.
+   */
+  inert?: boolean;
   /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
   /** Called when the user taps the Walk direction button. MapWrapper fetches the route. */
@@ -198,6 +205,7 @@ export default function BottomSheet({
   onClose,
   onExpandedChange,
   forceExpanded,
+  inert,
   locale: localeProp,
   onWalkRoute,
   isWalkRouteActive = false,
@@ -475,6 +483,7 @@ export default function BottomSheet({
       <Drawer.Portal>
         <Drawer.Content
           key={venue?.id ?? event?.id ?? "empty"}
+          inert={inert || undefined}
           // Composed with vaul's OWN internal `drawerRef` (vaul's `Content`
           // does `useComposedRefs(ref, drawerRef)` — confirmed in source, so
           // passing a ref here doesn't replace vaul's, it runs alongside

@@ -20,7 +20,14 @@ function makeMap() {
     getCenter: vi.fn(() => ({ lng: -104.1, lat: 38.1 })),
     getZoom: vi.fn(() => 11),
     jumpTo: vi.fn(),
+    // `idle` never fires on its own here; tests that need it call fireIdle().
+    once: vi.fn(),
+    off: vi.fn(),
+    triggerRepaint: vi.fn(),
   };
+}
+function fireIdle(map: ReturnType<typeof makeMap>) {
+  for (const [event, cb] of map.once.mock.calls) if (event === "idle") (cb as () => void)();
 }
 
 function renderTour(overrides: Partial<React.ComponentProps<typeof GuidedTour>> = {}) {
@@ -117,6 +124,50 @@ describe("GuidedTour — puts the UI in each step's state, then restores it", ()
     fireEvent.click(screen.getByRole("button", { name: EN.skip }));
     expect(map.jumpTo).toHaveBeenLastCalledWith({ center: [-104.1, 38.1], zoom: 11 });
     expect(props.onClose).toHaveBeenCalled();
+  });
+
+  test("the camera to restore is read once the map settles (first idle), not when it first appears", () => {
+    const map = makeMap();
+    renderTour({ mapboxMap: map as never });
+    // The map's initial fit lands after the tour mounted.
+    map.getCenter.mockReturnValue({ lng: -104.6, lat: 38.27 });
+    map.getZoom.mockReturnValue(12);
+    fireIdle(map);
+    fireEvent.click(screen.getByRole("button", { name: EN.skip }));
+    expect(map.jumpTo).toHaveBeenLastCalledWith({ center: [-104.6, 38.27], zoom: 12 });
+  });
+
+  test("map arriving mid-tour (slow phone): the pin step moves the camera and finds the pin", () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    try {
+      const props = {
+        locale: "en" as const,
+        sampleVenue: SAMPLE,
+        onShowVenue: vi.fn(),
+        onClose: vi.fn(),
+        returnFocusSelector: "body",
+      };
+      const { rerender } = render(<GuidedTour {...props} mapboxMap={null} />);
+      clickNext(pinIndex);
+      // No map yet, so no pin: the target search runs out and gives up.
+      act(() => vi.advanceTimersByTime(5000));
+      expect(screen.queryByTestId("tour-highlight")).toBeNull();
+
+      // The map (and with it the pins) arrives.
+      const pin = document.createElement("button");
+      pin.setAttribute("data-venue-id", SAMPLE.id);
+      pin.getBoundingClientRect = () => ({ top: 300, left: 150, width: 40, height: 40 }) as DOMRect;
+      document.body.appendChild(pin);
+      const map = makeMap();
+      rerender(<GuidedTour {...props} mapboxMap={map as never} />);
+      act(() => vi.advanceTimersByTime(1000));
+
+      expect(map.jumpTo).toHaveBeenCalledWith(expect.objectContaining({ center: [SAMPLE.lng, SAMPLE.lat] }));
+      expect(screen.getByTestId("tour-highlight")).toBeTruthy();
+      pin.remove();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

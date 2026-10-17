@@ -36,13 +36,17 @@ import { claimEscape, raiseOverlay, useOverlayStackId } from "@/lib/overlayRegis
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { TOUR_COPY, TOUR_STEPS, placeTooltip, tourReducer, type Rect } from "@/lib/guidedTour";
 
-type MapLike = Pick<mapboxgl.Map, "getCenter" | "getZoom" | "jumpTo">;
+type MapLike = Pick<mapboxgl.Map, "getCenter" | "getZoom" | "jumpTo" | "once" | "off" | "triggerRepaint">;
 
 interface GuidedTourProps {
   locale: Locale;
   /** The venue the pin and card steps show. Null skips straight to a centered tooltip. */
   sampleVenue: { id: string; lng: number; lat: number } | null;
-  /** Null while the map hasn't loaded (or can't): the pin step just doesn't move the camera. */
+  /**
+   * Null while the map hasn't loaded (or can't). On the splash path the map
+   * chunk only starts loading when the tour starts, so on a slow phone it can
+   * arrive mid-tour: the pin step re-runs its camera move and target search then.
+   */
   mapboxMap: MapLike | null;
   /** Open this venue's card (id) or close any open card (null). */
   onShowVenue: (id: string | null) => void;
@@ -93,12 +97,25 @@ export default function GuidedTour({
   }));
 
   // Camera at tour start, restored on close so the tour leaves the map where it found it.
+  // Taken on the map's first `idle`, not the moment it's ready: MapWrapper's
+  // initial fit runs in its own (parent, so later) effect and animates, and a
+  // snapshot before it settles would restore the pre-fit view. triggerRepaint
+  // guarantees an `idle` even when nothing is moving. Also taken right before
+  // the tour's own first camera move, in case the pin step beats that `idle`.
   const cameraRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
-  useEffect(() => {
+  const snapshotCamera = useCallback(() => {
     if (!mapboxMap || cameraRef.current) return;
     const c = mapboxMap.getCenter();
     cameraRef.current = { center: [c.lng, c.lat], zoom: mapboxMap.getZoom() };
   }, [mapboxMap]);
+  useEffect(() => {
+    if (!mapboxMap || cameraRef.current) return;
+    mapboxMap.once("idle", snapshotCamera);
+    mapboxMap.triggerRepaint();
+    return () => {
+      mapboxMap.off("idle", snapshotCamera);
+    };
+  }, [mapboxMap, snapshotCamera]);
 
   // ── Finish ──────────────────────────────────────────────────────────────────
   const finish = useCallback(() => {
@@ -129,21 +146,31 @@ export default function GuidedTour({
   // ── Put the UI into this step's state ────────────────────────────────────────
   useEffect(() => {
     onShowVenue(step.showsCard && sampleVenue ? sampleVenue.id : null);
-    if (step.id === "pin" && sampleVenue && mapboxMap) {
-      mapboxMap.jumpTo({
-        center: [sampleVenue.lng, sampleVenue.lat],
-        zoom: Math.max(mapboxMap.getZoom(), PIN_ZOOM),
-      });
-    }
-    // onShowVenue/mapboxMap are stable for the tour's life; re-run per step only.
+    // onShowVenue is stable for the tour's life; re-run per step only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
+
+  // The pin step's camera move — re-run too when the map arrives mid-step.
+  const isPinStep = step.id === "pin";
+  useEffect(() => {
+    if (!isPinStep || !sampleVenue || !mapboxMap) return;
+    snapshotCamera();
+    mapboxMap.jumpTo({
+      center: [sampleVenue.lng, sampleVenue.lat],
+      zoom: Math.max(mapboxMap.getZoom(), PIN_ZOOM),
+    });
+    // sampleVenue is fixed for the tour's life.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPinStep, mapboxMap, snapshotCamera]);
 
   // ── Track the target's box ───────────────────────────────────────────────────
   const selector =
     step.id === "pin" && sampleVenue
       ? `[data-venue-id="${CSS.escape(sampleVenue.id)}"]`
       : step.target;
+  // Pins exist only once the map does: restart the search when it arrives,
+  // or a pin step that already gave up (MISSING_FRAMES) never finds its pin.
+  const mapReady = mapboxMap !== null;
 
   useEffect(() => {
     let raf = 0;
@@ -185,7 +212,7 @@ export default function GuidedTour({
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
     };
-  }, [selector]);
+  }, [selector, mapReady]);
 
   // ── Measure the tooltip so it can be placed clear of the target ──────────────
   useLayoutEffect(() => {

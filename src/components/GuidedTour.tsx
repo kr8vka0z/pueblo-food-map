@@ -196,9 +196,14 @@ export default function GuidedTour({
   }, [index, locale, viewport]);
 
   // ── Focus: start on Next, stay inside the tooltip ────────────────────────────
+  // Keyed on the first measurement, not on mount: until then the dialog is
+  // `visibility: hidden` (see the layout below), and a browser silently
+  // refuses focus() on a hidden element — focus stayed on <body> and the
+  // arrow keys did nothing (found in Chrome; jsdom ignores visibility).
+  const measured = tipSize !== null;
   useEffect(() => {
-    nextRef.current?.focus();
-  }, []);
+    if (measured) nextRef.current?.focus();
+  }, [measured]);
 
   useEffect(() => {
     function onFocusIn(e: FocusEvent) {

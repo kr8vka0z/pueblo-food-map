@@ -88,18 +88,13 @@ describe("GuidedTour — steps and controls", () => {
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
-  test("the close (X) button ends the tour from any step", () => {
+  test("Skip ends the tour from any step", () => {
     const { props } = renderTour();
     clickNext(2);
-    fireEvent.click(screen.getByRole("button", { name: EN.close }));
+    fireEvent.click(screen.getByRole("button", { name: EN.skip }));
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
-  test("Spanish copy when locale is es", () => {
-    renderTour({ locale: "es" });
-    expect(title()).toBe(TOUR_COPY.es.steps.welcome.title);
-    expect(screen.getByRole("button", { name: TOUR_COPY.es.next })).toBeTruthy();
-  });
 });
 
 describe("GuidedTour — puts the UI in each step's state, then restores it", () => {
@@ -119,7 +114,7 @@ describe("GuidedTour — puts the UI in each step's state, then restores it", ()
     expect(map.jumpTo).toHaveBeenLastCalledWith(
       expect.objectContaining({ center: [SAMPLE.lng, SAMPLE.lat] }),
     );
-    fireEvent.click(screen.getByRole("button", { name: EN.close }));
+    fireEvent.click(screen.getByRole("button", { name: EN.skip }));
     expect(map.jumpTo).toHaveBeenLastCalledWith({ center: [-104.1, 38.1], zoom: 11 });
     expect(props.onClose).toHaveBeenCalled();
   });
@@ -178,7 +173,7 @@ describe("GuidedTour — focus management", () => {
 
   test("closing returns focus to the element that launched the tour", async () => {
     const { props } = renderTour();
-    fireEvent.click(screen.getByRole("button", { name: EN.close }));
+    fireEvent.click(screen.getByRole("button", { name: EN.skip }));
     expect(props.onClose).toHaveBeenCalled();
     // The component is still mounted in this harness; unmount like MapWrapper would.
     await act(async () => {

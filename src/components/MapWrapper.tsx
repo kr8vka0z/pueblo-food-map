@@ -1989,7 +1989,7 @@ export default function MapWrapper({
       setTour({ returnFocusSelector, prevSelectedId: selectedVenueId, prevViewMode: viewMode, sampleVenue });
       handleViewModeChange("map");
     },
-    [filteredVenues, allVenues, selectedVenueId, viewMode, handleViewModeChange, setSelectedEventId],
+    [filteredVenues, selectedVenueId, viewMode, handleViewModeChange, setSelectedEventId],
   );
   // One path for "show this venue's card / close any card" on both
   // platforms: selectVenue opens the desktop side panel too (a bare

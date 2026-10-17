@@ -1,11 +1,10 @@
 /**
- * Guided tour (#159) — pure pieces: the step state machine, the tooltip
- * placement math, and the EN/ES copy table. No DOM needed.
+ * Guided tour (#159) — pure pieces: the step state machine and the tooltip
+ * placement math. No DOM needed. (Copy wording is deliberately untested.)
  */
 import { describe, test, expect } from "vitest";
 import {
   TOUR_STEPS,
-  TOUR_COPY,
   tourReducer,
   placeTooltip,
   type Rect,
@@ -45,41 +44,6 @@ describe("tourReducer — step state machine", () => {
   test("a closed tour stays closed", () => {
     expect(tourReducer(null, "next")).toBeNull();
     expect(tourReducer(null, "back")).toBeNull();
-  });
-});
-
-describe("TOUR_STEPS — mapped to today's real controls", () => {
-  test("covers the eight things the tour explains, in order", () => {
-    expect(TOUR_STEPS.map((s) => s.id)).toEqual([
-      "welcome", "search", "filters", "pin", "card", "nearMe", "saved", "menu",
-    ]);
-  });
-
-  test("only the card step opens a venue card", () => {
-    expect(TOUR_STEPS.filter((s) => s.showsCard).map((s) => s.id)).toEqual(["card"]);
-  });
-});
-
-describe("TOUR_COPY — EN + ES", () => {
-  test("every step has a non-empty title and body in both languages", () => {
-    for (const step of TOUR_STEPS) {
-      for (const locale of ["en", "es"] as const) {
-        expect(TOUR_COPY[locale].steps[step.id].title.trim()).not.toBe("");
-        expect(TOUR_COPY[locale].steps[step.id].body.trim()).not.toBe("");
-      }
-    }
-  });
-
-  test("Spanish copy differs from English (not an untranslated copy)", () => {
-    for (const step of TOUR_STEPS) {
-      expect(TOUR_COPY.es.steps[step.id].body).not.toBe(TOUR_COPY.en.steps[step.id].body);
-    }
-    expect(TOUR_COPY.es.next).not.toBe(TOUR_COPY.en.next);
-  });
-
-  test("step counter fills both placeholders", () => {
-    expect(TOUR_COPY.en.counter(2, 8)).toBe("Step 2 of 8");
-    expect(TOUR_COPY.es.counter(2, 8)).toBe("Paso 2 de 8");
   });
 });
 

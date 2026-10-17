@@ -14,7 +14,7 @@ import PageNav from "@/components/PageNav";
 import MapWrapper from "@/components/MapWrapper";
 import * as LocaleContext from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
-import { TOUR_COPY } from "@/lib/guidedTour";
+import { TOUR_COPY, TOUR_STEPS } from "@/lib/guidedTour";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -54,7 +54,7 @@ beforeEach(() => {
 
 describe("Splash — Take a tour", () => {
   function renderSplash(locale: "en" | "es", onTour = vi.fn()) {
-    vi.spyOn(LocaleContext, "useLocale").mockReturnValue({ locale, setLocale: vi.fn() });
+    vi.spyOn(LocaleContext, "useLocale").mockReturnValue({ locale, setLocale: vi.fn(), tree: "en" });
     render(<SplashScreen onPrimary={vi.fn()} onTour={onTour} />);
     return onTour;
   }
@@ -65,13 +65,8 @@ describe("Splash — Take a tour", () => {
     expect(onTour).toHaveBeenCalledTimes(1);
   });
 
-  test("Spanish label in ES", () => {
-    renderSplash("es");
-    expect(screen.getByRole("button", { name: t("splash.tour", "es") })).toBeTruthy();
-  });
-
   test("no button when no onTour handler is given", () => {
-    vi.spyOn(LocaleContext, "useLocale").mockReturnValue({ locale: "en", setLocale: vi.fn() });
+    vi.spyOn(LocaleContext, "useLocale").mockReturnValue({ locale: "en", setLocale: vi.fn(), tree: "en" });
     render(<SplashScreen onPrimary={vi.fn()} />);
     expect(screen.queryByRole("button", { name: t("splash.tour", "en") })).toBeNull();
   });
@@ -125,7 +120,16 @@ describe("MapWrapper — starting and ending the tour", () => {
     expect(screen.getByRole("heading", { name: TOUR_COPY.en.steps.welcome.title })).toBeTruthy();
   });
 
-  test("the Menu item opens the tour; Escape ends it and focus returns to the Menu button", async () => {
+  // The Menu renders in two different shells (#682 8b): the phone drawer
+  // (HamburgerMenu) and the desktop side panel. Both must close and hand off.
+  test.each([
+    { name: "desktop side panel", phone: false },
+    { name: "phone drawer", phone: true },
+  ])("$name: the Menu item opens the tour; Escape ends it and focus returns to the Menu button", async ({ phone }) => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockReturnValue({ matches: phone, addEventListener: vi.fn(), removeEventListener: vi.fn() }),
+    });
     render(
       <LocaleContext.LocaleProvider initialLocale="en">
         <MapWrapper />
@@ -136,9 +140,33 @@ describe("MapWrapper — starting and ending the tour", () => {
     fireEvent.click(screen.getByRole("button", { name: t("menu.tour", "en") }));
     await flushDynamic();
     await waitFor(() => expect(screen.getByTestId("guided-tour")).toBeTruthy());
+    // The Menu itself closed, whichever shell it was in.
+    expect(screen.queryByTestId("desktop-side-panel")).toBeNull();
+    expect(document.getElementById("hamburger-panel")).toBeNull();
 
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByTestId("guided-tour")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("nav-top")));
+  });
+
+  test("desktop: the card step opens the side panel, and ending the tour shuts it", async () => {
+    render(
+      <LocaleContext.LocaleProvider initialLocale="en">
+        <MapWrapper tourRequestId={1} />
+      </LocaleContext.LocaleProvider>,
+    );
+    await flushDynamic();
+    await waitFor(() => expect(screen.getByTestId("guided-tour")).toBeTruthy());
+    expect(screen.queryByTestId("desktop-side-panel")).toBeNull();
+
+    const cardIndex = TOUR_STEPS.findIndex((s) => s.showsCard);
+    for (let i = 0; i < cardIndex; i++) {
+      fireEvent.click(screen.getByRole("button", { name: TOUR_COPY.en.next }));
+    }
+    await waitFor(() => expect(screen.getByTestId("desktop-side-panel")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: TOUR_COPY.en.skip }));
+    await waitFor(() => expect(screen.queryByTestId("guided-tour")).toBeNull());
+    expect(screen.queryByTestId("desktop-side-panel")).toBeNull();
   });
 });

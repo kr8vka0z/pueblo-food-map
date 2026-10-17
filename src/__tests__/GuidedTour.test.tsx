@@ -9,6 +9,7 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import GuidedTour from "@/components/GuidedTour";
 import { useOverlayEscape } from "@/lib/overlayRegistry";
 import { TOUR_STEPS, TOUR_COPY } from "@/lib/guidedTour";
+import { hideOthers } from "aria-hidden";
 
 const SAMPLE = { id: "pantry-sample", lng: -104.6, lat: 38.26 };
 const EN = TOUR_COPY.en;
@@ -211,6 +212,28 @@ describe("GuidedTour — Escape goes through the claim-once overlay stack", () =
     fireEvent.keyDown(document, { key: "Escape" });
     expect(tourClose).toHaveBeenCalledTimes(1);
     expect(cardEscape).not.toHaveBeenCalled();
+  });
+});
+
+describe("GuidedTour — stays reachable over the phone card", () => {
+  // vaul is mocked repo-wide, so this calls the real aria-hidden library the
+  // way Radix's modal Dialog does when the phone card opens (vaul 1.1.2 never
+  // hands modal={false} on to Radix — see GuidedTour.tsx's live-region note).
+  test("Radix's hideOthers() for an open card leaves the tooltip's buttons exposed", () => {
+    renderTour();
+    clickNext();
+    const card = document.createElement("div");
+    document.body.appendChild(card);
+    const undo = hideOthers(card);
+    try {
+      for (const name of [EN.next, EN.back, EN.skip]) {
+        const button = screen.getByRole("button", { name, hidden: true });
+        expect(button.closest('[aria-hidden="true"]')).toBeNull();
+      }
+    } finally {
+      undo();
+      card.remove();
+    }
   });
 });
 

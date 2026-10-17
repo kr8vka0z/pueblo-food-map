@@ -23,7 +23,7 @@
  * A11y: role="dialog" + aria-modal, focus starts on Next and is trapped in
  * the tooltip (DesktopVenueWindow focuses itself when the card step opens it
  * — the focusin trap pulls focus back), Next/Back/Done/Skip buttons plus
- * ArrowRight/ArrowLeft, a polite live region that reads each new step, and
+ * ArrowRight/ArrowLeft, the dialog as a polite live region reading each new step, and
  * Escape through overlayRegistry's claimEscape so it closes only the tour.
  * Motion is limited to a short highlight move, which globals.css's
  * prefers-reduced-motion block already collapses.
@@ -318,6 +318,17 @@ export default function GuidedTour({
         aria-modal="true"
         aria-label={copy.dialogLabel}
         aria-describedby="tour-step-body"
+        // Focus stays on Next as steps change, so the dialog itself is the
+        // live region: each new step's counter/title/body is read out.
+        // WHY on the dialog and not a separate sr-only region: the phone
+        // card (BottomSheet) is a vaul drawer, and vaul 1.1.2 never passes
+        // its modal={false} on to Radix, so an open card runs Radix's modal
+        // hideOthers(), which sets aria-hidden on everything outside the card
+        // except aria-live regions (whole subtree) and their ancestors (not
+        // their siblings). A live region beside or inside the tooltip left
+        // the buttons aria-hidden on the card step: gone for screen readers
+        // and role lookups (found on real Android Chrome, PR #785).
+        aria-live="polite"
         onKeyDown={onDialogKeyDown}
         className="absolute flex flex-col gap-2 p-4 bg-[var(--color-bone-50)] border border-[var(--color-bone-200)] rounded-[var(--radius-lg)] elevation-2 text-[var(--color-ink-700)]"
         style={{
@@ -382,11 +393,6 @@ export default function GuidedTour({
           </button>
         </div>
       </div>
-
-      {/* Focus stays on Next as steps change, so the new step is read out here. */}
-      <p className="sr-only" aria-live="polite">
-        {`${counter}. ${stepCopy.title}. ${stepCopy.body}`}
-      </p>
     </div>
   );
 }

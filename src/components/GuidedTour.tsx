@@ -201,9 +201,12 @@ export default function GuidedTour({
   // refuses focus() on a hidden element — focus stayed on <body> and the
   // arrow keys did nothing (found in Chrome; jsdom ignores visibility).
   const measured = tipSize !== null;
+  // Re-run per step too: Back on step 2, or ArrowRight onto the last step
+  // while Skip has focus, unmounts the focused button, which drops focus to
+  // <body> without a focusin for the trap below.
   useEffect(() => {
-    if (measured) nextRef.current?.focus();
-  }, [measured]);
+    if (measured && !dialogRef.current?.contains(document.activeElement)) nextRef.current?.focus();
+  }, [index, measured]);
 
   useEffect(() => {
     function onFocusIn(e: FocusEvent) {

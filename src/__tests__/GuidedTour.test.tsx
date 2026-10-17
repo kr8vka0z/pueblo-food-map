@@ -171,6 +171,16 @@ describe("GuidedTour — focus management", () => {
     expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(true);
   });
 
+  test("Back onto step 1 (Back disappears) keeps focus in the dialog", () => {
+    renderTour();
+    clickNext();
+    const back = screen.getByRole("button", { name: EN.back });
+    act(() => back.focus());
+    fireEvent.click(back);
+    expect(screen.queryByRole("button", { name: EN.back })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: EN.next }));
+  });
+
   test("closing returns focus to the element that launched the tour", async () => {
     const { props } = renderTour();
     fireEvent.click(screen.getByRole("button", { name: EN.skip }));

@@ -17,8 +17,11 @@
  * sample venue for the pin step, then polls for the step's target element
  * each animation frame until its box stops moving (the card slides in, the
  * bottom nav remounts after the card closes) and draws the highlight there.
- * On close it restores the camera; MapWrapper restores the selection and
- * Map/List view it snapshotted at start.
+ * Two steps run a live demo: the search step types a sample word into the
+ * real search box (results showing, input never focused) and the filters
+ * step holds the real Filters panel open; both are undone when the step is
+ * left. On close it restores the camera; MapWrapper restores the selection,
+ * Map/List view and the visitor's own search it snapshotted at start.
  *
  * A11y: role="dialog" + aria-modal, focus starts on Next and is trapped in
  * the tooltip (DesktopVenueWindow focuses itself when the card step opens it
@@ -50,6 +53,14 @@ interface GuidedTourProps {
   mapboxMap: MapLike | null;
   /** Open this venue's card (id) or close any open card (null). */
   onShowVenue: (id: string | null) => void;
+  /**
+   * Search step demo: show this text in the real search box with its results
+   * (never focusing the input, so no phone keyboard), or null to put back
+   * whatever the visitor had before the tour.
+   */
+  onDemoSearch: (text: string | null) => void;
+  /** Filters step demo: hold the real Filters panel open (true) or close it. */
+  onShowFilters: (open: boolean) => void;
   /** The tour finished or was dismissed. */
   onClose: () => void;
   /** Where focus goes when the tour ends (the Menu nav button, or the map container). */
@@ -65,6 +76,10 @@ const MISSING_FRAMES = 90;
 const FOCUSABLE = "button:not([disabled])";
 // Zoom the pin step uses so the sample pin sits alone, clear of neighbours.
 const PIN_ZOOM = 15;
+// Typing demo pace: a beat for the highlight to land, then one letter at a
+// time — slow enough to read on a phone, done in about a second.
+const TYPE_START_MS = 400;
+const TYPE_LETTER_MS = 140;
 
 function sameRect(a: Rect | null, b: Rect | null) {
   if (!a || !b) return a === b;
@@ -76,6 +91,8 @@ export default function GuidedTour({
   sampleVenue,
   mapboxMap,
   onShowVenue,
+  onDemoSearch,
+  onShowFilters,
   onClose,
   returnFocusSelector,
 }: GuidedTourProps) {
@@ -150,6 +167,39 @@ export default function GuidedTour({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
+  // ── Live demos (Kyle: "show typing … and what the filter menu looks like") ──
+  // Each runs only while its step is open; the cleanup undoes it on every way
+  // out (Next, Back, Skip, Escape, Done — the last three via unmount).
+  const demo = step.demo;
+  useEffect(() => {
+    if (demo === "filters") {
+      onShowFilters(true);
+      return () => onShowFilters(false);
+    }
+    if (demo !== "search") return;
+    const word = copy.searchWord;
+    // Reduced motion: the whole word at once, no letter-by-letter typing.
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let typed = 0;
+    // Start from an empty box (the visitor's own search comes back after).
+    onDemoSearch("");
+    const typeNext = () => {
+      typed++;
+      onDemoSearch(word.slice(0, typed));
+      if (typed < word.length) timer = setTimeout(typeNext, TYPE_LETTER_MS);
+    };
+    if (reduce) onDemoSearch(word);
+    else timer = setTimeout(typeNext, TYPE_START_MS);
+    return () => {
+      clearTimeout(timer);
+      onDemoSearch(null);
+    };
+    // The callbacks are stable for the tour's life and the word is fixed per
+    // locale; re-run per demo step only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demo]);
+
   // The pin step's camera move — re-run too when the map arrives mid-step.
   const isPinStep = step.id === "pin";
   useEffect(() => {
@@ -178,17 +228,31 @@ export default function GuidedTour({
     let stable = 0;
     let last: Rect | null = null;
     const tick = () => {
-      const el = selector ? document.querySelector(selector) : null;
-      const r = el?.getBoundingClientRect();
-      const rect: Rect | null =
-        r && r.width > 0 && r.height > 0
-          ? {
-              top: Math.round(r.top) - HIGHLIGHT_PAD,
-              left: Math.round(r.left) - HIGHLIGHT_PAD,
-              width: Math.round(r.width) + HIGHLIGHT_PAD * 2,
-              height: Math.round(r.height) + HIGHLIGHT_PAD * 2,
-            }
-          : null;
+      // Every match, unioned: the search step highlights the box AND the
+      // results list under it, the filters step the whole group of switches.
+      let r: { top: number; left: number; right: number; bottom: number } | null = null;
+      if (selector) {
+        for (const el of document.querySelectorAll(selector)) {
+          const b = el.getBoundingClientRect();
+          if (b.width <= 0 || b.height <= 0) continue;
+          r = r
+            ? {
+                top: Math.min(r.top, b.top),
+                left: Math.min(r.left, b.left),
+                right: Math.max(r.right, b.right),
+                bottom: Math.max(r.bottom, b.bottom),
+              }
+            : { top: b.top, left: b.left, right: b.right, bottom: b.bottom };
+        }
+      }
+      const rect: Rect | null = r
+        ? {
+            top: Math.round(r.top) - HIGHLIGHT_PAD,
+            left: Math.round(r.left) - HIGHLIGHT_PAD,
+            width: Math.round(r.right - r.left) + HIGHLIGHT_PAD * 2,
+            height: Math.round(r.bottom - r.top) + HIGHLIGHT_PAD * 2,
+          }
+        : null;
       if (sameRect(rect, last)) stable++;
       else {
         stable = 0;
@@ -196,7 +260,12 @@ export default function GuidedTour({
         setTarget(rect);
       }
       frames++;
-      const done = rect ? stable >= STABLE_FRAMES : !selector || frames >= MISSING_FRAMES;
+      // A demo step's target keeps changing (results grow as letters land),
+      // so it is tracked for as long as the step is open.
+      // ponytail: one rAF loop per demo step (a querySelectorAll + a few
+      // getBoundingClientRect calls a frame) — fine for a step a visitor
+      // reads for seconds; upgrade path is a ResizeObserver on the matches.
+      const done = demo ? false : rect ? stable >= STABLE_FRAMES : !selector || frames >= MISSING_FRAMES;
       if (!done) raf = requestAnimationFrame(tick);
     };
     tick();
@@ -212,7 +281,7 @@ export default function GuidedTour({
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
     };
-  }, [selector, mapReady]);
+  }, [selector, mapReady, demo]);
 
   // ── Measure the tooltip so it can be placed clear of the target ──────────────
   useLayoutEffect(() => {

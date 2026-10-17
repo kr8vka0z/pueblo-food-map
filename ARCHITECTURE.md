@@ -966,21 +966,31 @@ place card, Near me, Saved, Menu. Hand-rolled, no tour library.
 Splash "Take a tour"      → HomePageClient bumps tourRequestId (gate set, no location prompt)
 /?tour=1 (PageNav Menu)   → HomePageClient reads + strips it, bumps tourRequestId
 Map Menu item (phone drawer or desktop side panel) → MapWrapper.startTour directly
-  → MapWrapper snapshots selection + Map/List view, closes Menu/Filters/search/
-    event card, forces Map view, mounts GuidedTour (next/dynamic)
+  → MapWrapper snapshots selection + Map/List view + the visitor's own search,
+    pauses search_used analytics, closes Menu/Filters/search/event card,
+    forces Map view, mounts GuidedTour (next/dynamic)
   → each step: GuidedTour asks MapWrapper to open/close the sample venue's card
     (selectVenue, so desktop opens its side panel), jumps the camera for the pin
     step, then polls the target's box per frame until it stops moving
+  → demo steps: search types the locale's sample word into the real query and
+    opens its results without focusing the input (no phone keyboard; whole
+    word at once under reduced motion); filters holds the real FilterPanel
+    open with trapFocus off. Leaving either step undoes it.
   → end (Done / Skip / Escape): camera restored, MapWrapper restores the
-    snapshot, focus returns to the Menu button or the map container
+    snapshot (search included) and unpauses analytics, focus returns to the
+    Menu button or the map container
 ```
 
 - **Cost on first load: none.** `GuidedTour.tsx` and `src/lib/guidedTour.ts`
   (steps, placement math, the EN/ES step copy) load only when a tour starts;
-  only the two trigger labels live in `i18n.ts`.
+  only the two trigger labels live in `i18n.ts`. The demos add only small
+  plumbing to the main bundle (MapWrapper's demo handlers, FilterPanel's
+  `trapFocus` prop, two `data-tour` attributes).
 - **Targets** are existing hooks (`data-testid` on SearchBar/BottomNav,
   `data-venue-id` on VenueMarker, `[data-bottom-sheet]` / the desktop card's
-  `aria-labelledby`). A missing target falls back to a centered tooltip.
+  `aria-labelledby`, `data-tour` on SearchResultsPopover and FilterPanel's
+  switch rows). Every match of a step's selector is unioned into one
+  highlight. A missing target falls back to a centered tooltip.
 - **Escape** goes through `overlayRegistry`'s claim-once stack; `raiseOverlay`
   keeps the tour on top of the card it opened itself.
 - Not built: auto-launch on a first visit (optional in the issue).

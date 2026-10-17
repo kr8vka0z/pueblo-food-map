@@ -37,6 +37,8 @@ function renderTour(overrides: Partial<React.ComponentProps<typeof GuidedTour>> 
     sampleVenue: SAMPLE,
     mapboxMap: null,
     onShowVenue: vi.fn(),
+    onDemoSearch: vi.fn(),
+    onShowFilters: vi.fn(),
     onClose: vi.fn(),
     returnFocusSelector: '[data-testid="return-here"]',
     ...overrides,
@@ -145,6 +147,8 @@ describe("GuidedTour — puts the UI in each step's state, then restores it", ()
         locale: "en" as const,
         sampleVenue: SAMPLE,
         onShowVenue: vi.fn(),
+        onDemoSearch: vi.fn(),
+        onShowFilters: vi.fn(),
         onClose: vi.fn(),
         returnFocusSelector: "body",
       };
@@ -196,6 +200,8 @@ describe("GuidedTour — Escape goes through the claim-once overlay stack", () =
               sampleVenue={SAMPLE}
               mapboxMap={null}
               onShowVenue={(id) => setCardOpen(id !== null)}
+              onDemoSearch={() => {}}
+              onShowFilters={() => {}}
               onClose={() => {
                 tourClose();
                 setTourOpen(false);

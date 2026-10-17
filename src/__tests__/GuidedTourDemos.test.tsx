@@ -201,7 +201,7 @@ describe("filters step — the real panel, open", () => {
     next(searchIndex);
     await waitFor(() => expect(input().value).toBe(EN.searchWord));
     expect(document.getElementById("search-results-listbox")).toBeTruthy();
-    next();
+    next(filtersIndex - searchIndex);
     await waitFor(() => expect(filterPanel()).toBeTruthy());
     expect(
       [...filterPanel()!.querySelectorAll('[role="switch"], input[type="checkbox"]')].some(

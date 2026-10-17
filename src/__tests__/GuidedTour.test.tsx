@@ -38,6 +38,9 @@ function renderTour(overrides: Partial<React.ComponentProps<typeof GuidedTour>> 
     mapboxMap: null,
     onShowVenue: vi.fn(),
     onDemoSearch: vi.fn(),
+    // A box, so every step (box steps included) is in the tour.
+    sampleBox: { id: "box-sample" } as { id: string } | null,
+    onDemoBoxes: vi.fn(),
     onShowFilters: vi.fn(),
     onClose: vi.fn(),
     returnFocusSelector: '[data-testid="return-here"]',
@@ -148,6 +151,8 @@ describe("GuidedTour — puts the UI in each step's state, then restores it", ()
         sampleVenue: SAMPLE,
         onShowVenue: vi.fn(),
         onDemoSearch: vi.fn(),
+        sampleBox: null,
+        onDemoBoxes: vi.fn(),
         onShowFilters: vi.fn(),
         onClose: vi.fn(),
         returnFocusSelector: "body",
@@ -201,6 +206,8 @@ describe("GuidedTour — Escape goes through the claim-once overlay stack", () =
               mapboxMap={null}
               onShowVenue={(id) => setCardOpen(id !== null)}
               onDemoSearch={() => {}}
+              sampleBox={null}
+              onDemoBoxes={() => {}}
               onShowFilters={() => {}}
               onClose={() => {
                 tourClose();

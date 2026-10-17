@@ -959,8 +959,12 @@ Residual: returning visitors still see nothing until the map chunk loads
 
 ## Guided tour
 
-An eight-step walkthrough (#159): welcome, search, Filters, a pin, the
-place card, Near me, Saved, Menu. Hand-rolled, no tour library.
+A 14-step walkthrough (#159): welcome, search, the Filters button, the open
+Filters panel, a pin, the place card, then Blessing Boxes (the Boxes button,
+box pins, a sample box's check-in buttons, Add a photo, sponsor + alerts),
+then Near me, Saved, Menu. Hand-rolled, no tour library. With no box in the
+live feed when the tour starts (empty, or not loaded yet) the four box
+pin/card steps are left out and it runs 10 steps.
 
 ```
 Splash "Take a tour"      → HomePageClient bumps tourRequestId (gate set, no location prompt)
@@ -976,7 +980,12 @@ Map Menu item (phone drawer or desktop side panel) → MapWrapper.startTour dire
   → demo steps: search types the locale's sample word into the real query and
     opens its results without focusing the input (no phone keyboard; whole
     word at once under reduced motion); filters holds the real FilterPanel
-    open with trapFocus off. Leaving either step undoes it.
+    open with trapFocus off; the box steps hold the Boxes view on (the same
+    blessing_box category the nav button sets), open the nearest live box's
+    card (BottomSheet `forceExpanded` for its lower buttons on a phone) and
+    only point at its buttons: the tour's full-screen layer takes every tap,
+    so no check-in, photo, sponsor request or alert signup can be sent.
+    Leaving a demo's steps undoes it.
   → end (Done / Skip / Escape): camera restored, MapWrapper restores the
     snapshot (search included) and unpauses analytics, focus returns to the
     Menu button or the map container

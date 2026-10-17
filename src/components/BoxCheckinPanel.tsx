@@ -828,8 +828,9 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
           rendered alongside them. */}
       {!needsAsk && (
         <>
-          {/* Status trio — colored dot above the label (mockup's ".tri"). */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* Status trio — colored dot above the label (mockup's ".tri").
+              data-tour: the guided tour points at the trio + "took" (#159). */}
+          <div data-tour="box-checkin-choices" className="grid grid-cols-3 gap-2">
             {STATUS_KINDS.map((kind) => (
               <button
                 key={kind}
@@ -849,6 +850,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
+              data-tour="box-checkin-choices"
               className={buttonBase}
               disabled={busy}
               aria-disabled={busy}
@@ -859,6 +861,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
             {/* Slice 5 — opens the standalone photo form below rather than submitting anything itself. */}
             <button
               type="button"
+              data-tour="box-photo"
               className={buttonBase}
               disabled={busy}
               aria-disabled={busy}

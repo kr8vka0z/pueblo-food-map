@@ -77,7 +77,7 @@
  * simpler than vaul's snap-point internals to get provably right.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
 import { X, MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
@@ -155,6 +155,12 @@ interface BottomSheetProps {
   onClose: () => void;
   /** Called when expanded state changes — e.g. to hide overlapping UI when expanded. */
   onExpandedChange?: (expanded: boolean) => void;
+  /**
+   * Guided tour (#159) only: while set, the card is held expanded (true) or
+   * collapsed (false) so the tour can point at a box's below-the-fold
+   * buttons. Undefined (the normal case) leaves the grab bar in charge.
+   */
+  forceExpanded?: boolean;
   /** Override locale for testing. If omitted, reads from LocaleContext. */
   locale?: Locale;
   /** Called when the user taps the Walk direction button. MapWrapper fetches the route. */
@@ -191,6 +197,7 @@ export default function BottomSheet({
   onCheckinSuccess,
   onClose,
   onExpandedChange,
+  forceExpanded,
   locale: localeProp,
   onWalkRoute,
   isWalkRouteActive = false,
@@ -219,6 +226,12 @@ export default function BottomSheet({
   function toggleExpanded() {
     setExpandedState(!expanded);
   }
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a prop-driven override, applied when it changes
+    if (forceExpanded !== undefined) setExpandedState(forceExpanded);
+    // setExpandedState is a plain function re-made per render; the override is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceExpanded]);
   // Swipe is start/end delta only (no onPointerMove) — a real touch swipe
   // vs. a tap already differ enough in clientY at pointerup, and the browser
   // itself suppresses the synthetic click after a dragged touch, so there's

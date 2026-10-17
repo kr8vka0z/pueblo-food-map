@@ -123,6 +123,20 @@ export type DesktopSidePanelView =
   | { kind: "menu" }
   | null;
 
+// Guided tour (#159) — fetched only when a tour starts (it renders only
+// while `tour` is non-null below), so its code and its EN/ES step copy never
+// touch a visitor's first load. Same pattern as DesktopVenueWindow above.
+const GuidedTour = dynamic(() => import("./GuidedTour"), { ssr: false });
+
+/** What a running tour must give back when it ends (#159). */
+interface TourSession {
+  /** Where focus returns when the tour ends: the Menu nav button, or the map container (splash). */
+  returnFocusSelector: string;
+  prevSelectedId: string | null;
+  prevViewMode: ViewMode;
+  sampleVenue: Venue | null;
+}
+
 /**
  * Drift-detection padding (in degrees).
  * The "Re-center" button appears when the user-location dot is this far
@@ -468,6 +482,11 @@ interface MapWrapperProps {
    * file that doesn't pass it.
    */
   holdMapLoad?: boolean;
+  /**
+   * Guided tour (#159): each new non-zero value starts the tour — bumped by
+   * HomePageClient for the splash's "Take a tour" button and /?tour=1.
+   */
+  tourRequestId?: number;
 }
 
 export default function MapWrapper({
@@ -478,6 +497,7 @@ export default function MapWrapper({
   initialEventId = null,
   initialBoxesFilter = false,
   holdMapLoad = false,
+  tourRequestId = 0,
 }: MapWrapperProps) {
   // ── Locale — from context ─────────────────────────────────────────────────────
   const { locale } = useLocale();
@@ -1938,6 +1958,74 @@ export default function MapWrapper({
     handleLocateRequest();
   }, [handleViewModeChange, handleLocateRequest]);
 
+  // ── Guided tour (#159) ───────────────────────────────────────────────────────
+  // Snapshot what the tour will change (selection, Map/List view), close
+  // anything that would sit over it, and force the map view so pins and the
+  // card exist to point at. GuidedTour.tsx drives each step's own state
+  // through onShowVenue; endTour hands the snapshot back.
+  // Desktop (#682 8b): venue selection goes through `selectVenue` and the
+  // side panel, so the tour opens/closes the card the same way a pin click
+  // does; the Saved/Menu panel it closes on start is not reopened at the end.
+  // ponytail: an active walking route and a selected event are NOT restored
+  // — selecting the sample venue clears both, and a tour mid-route is rare.
+  // Upgrade path: snapshot + refetch the route / reselect the event in endTour.
+  const [tour, setTour] = useState<TourSession | null>(null);
+  const startTour = useCallback(
+    (returnFocusSelector: string) => {
+      setMenuSection(null);
+      setSidePanelView(null);
+      setSelectedEventId(null);
+      setFilterPanelOpen(false);
+      setIsPopoverOpen(false);
+      // The nearest pantry that's on the map right now (filteredVenues is
+      // distance-sorted): a pantry card is the typical one, and a box has a
+      // different card entirely. Falls back to any listed place, then to any
+      // pantry at all when filters hide every one.
+      const sampleVenue =
+        filteredVenues.find((v) => v.category === "pantry") ??
+        filteredVenues.find((v) => v.category !== "blessing_box") ??
+        allVenues.find((v) => v.category === "pantry") ??
+        null;
+      setTour({ returnFocusSelector, prevSelectedId: selectedVenueId, prevViewMode: viewMode, sampleVenue });
+      handleViewModeChange("map");
+    },
+    [filteredVenues, selectedVenueId, viewMode, handleViewModeChange, setSelectedEventId],
+  );
+  // One path for "show this venue's card / close any card" on both
+  // platforms: selectVenue opens the desktop side panel too (a bare
+  // setSelectedVenueId would leave the panel shut and the card step with
+  // nothing to point at).
+  const handleTourShowVenue = useCallback(
+    (id: string | null) => {
+      if (id) {
+        selectVenue(id);
+        return;
+      }
+      setSelectedVenueId(null);
+      if (!isMobile) setSidePanelView(null);
+    },
+    [isMobile, selectVenue, setSelectedVenueId],
+  );
+  const endTour = useCallback(() => {
+    if (!tour) return;
+    handleTourShowVenue(tour.prevSelectedId);
+    setViewMode(tour.prevViewMode);
+    setTour(null);
+  }, [tour, handleTourShowVenue, setViewMode]);
+  const handleMenuStartTour = useCallback(
+    () => startTour('[data-testid="nav-top"]'),
+    [startTour],
+  );
+  // Splash / ?tour=1 requests (HomePageClient). Focus returns to the map
+  // container (<main tabIndex=-1>), where dismissing the splash normally puts it.
+  const handledTourRequestRef = useRef(0);
+  useEffect(() => {
+    if (!tourRequestId || tourRequestId === handledTourRequestRef.current) return;
+    handledTourRequestRef.current = tourRequestId;
+    queueMicrotask(() => startTour("main"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tourRequestId]);
+
   // §10: the venue sheet (phone only) covers the bottom edge; the nav steps
   // aside for as long as a venue is selected — the FULL CARD (unchanged,
   // #509) or the collapsed route strip alike. #531 (Kyle, 2026-09-19) had
@@ -2300,6 +2388,7 @@ export default function MapWrapper({
           viewMode={viewMode}
           onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map")}
           mapDisabled={mapUnavailable}
+          onStartTour={handleMenuStartTour}
         />
       )}
 
@@ -2495,6 +2584,10 @@ export default function MapWrapper({
                 mapDisabled={mapUnavailable}
                 onClose={close}
                 headingId={panelHeadingId}
+                // Not wrapped in close(): startTour shuts this panel itself,
+                // and close()'s focus hop back to the nav item would pull
+                // focus out of the tour (#159).
+                onStartTour={handleMenuStartTour}
               />
             );
           }
@@ -2534,6 +2627,21 @@ export default function MapWrapper({
         navRef={navRef}
         rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
       />
+
+      {/* Guided tour (#159) — after BottomNav so it's the last thing in the
+          DOM and paints over everything. Deliberately NOT in the
+          useOverlayRegistration set: that would hide BottomNav, and the tour
+          points at its Near me / Saved / Menu items. */}
+      {tour && (
+        <GuidedTour
+          locale={locale}
+          sampleVenue={tour.sampleVenue}
+          mapboxMap={mapboxMap}
+          onShowVenue={handleTourShowVenue}
+          onClose={endTour}
+          returnFocusSelector={tour.returnFocusSelector}
+        />
+      )}
     </div>
   );
 }

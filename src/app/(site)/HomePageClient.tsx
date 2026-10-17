@@ -121,6 +121,11 @@ export default function HomePageClient() {
   // own) links to /?boxes=1 — read once below, same as ?near=1, and applied
   // by MapWrapper's own one-shot effect.
   const [initialBoxesFilter, setInitialBoxesFilter] = useState(false);
+  // Guided tour (#159): bumped by the splash's "Take a tour" button or a
+  // /?tour=1 link (the Menu's tour item on a Menu page); MapWrapper starts
+  // the tour on each new value. A counter, not a boolean, so a second
+  // request after the first tour ended still reads as a change.
+  const [tourRequestId, setTourRequestId] = useState(0);
 
   // Ref to the map container element — focus moves here on splash dismiss.
   const mapContainerRef = useRef<HTMLElement | null>(null);
@@ -162,6 +167,14 @@ export default function HomePageClient() {
       const qs = params.toString();
       window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
     }
+    // "Learn how to use this map" from a Menu page (PageNav) links to
+    // /?tour=1 (#159): same read-once-then-strip shape.
+    if (params.get('tour') === '1') {
+      setTourRequestId(1);
+      params.delete('tour');
+      const qs = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    }
     // ?venue=<id> and the #venue=<id> fragment (used by /venue/[id]'s "View on
     // the map" CTA) both land here. There's no /?venue= → /venue/<id> redirect
     // to bypass (next.config.ts removed it — a `has`-query redirect on "/"
@@ -172,8 +185,8 @@ export default function HomePageClient() {
     // Unlike near/boxes above, ?event= is NOT stripped: MapWrapper keeps it in
     // step with the selected pin, so a refresh reopens on the same event.
     setInitialEventId(params.get('event') || null);
-    // A shared venue or event link, Near me and Boxes (both from inside the
-    // app, via PageNav) all skip the splash, as does a visitor who already saw it.
+    // A shared venue or event link, Near me, Boxes and the tour (all from
+    // inside the app, via PageNav) skip the splash, as does a visitor who already saw it.
     setSplashShown(!shouldSkipSplash({ search, hash, gateSeen: readSplashGate() }));
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -188,6 +201,18 @@ export default function HomePageClient() {
     setTimeout(() => {
       mapContainerRef.current?.focus();
     }, 0);
+  }, []);
+
+  /**
+   * Splash "Take a tour" (#159): dismiss like the CTAs (gate set, Pueblo
+   * center — no location prompt) but skip dismissSplash's focus hop to the
+   * map container; the tour takes focus itself and returns it there at the end.
+   */
+  const startTourFromSplash = useCallback(() => {
+    markSplashSeen();
+    setViewport('pueblo-center');
+    setSplashShown(false);
+    setTourRequestId((n) => n + 1);
   }, []);
 
   /**
@@ -224,6 +249,7 @@ export default function HomePageClient() {
             initialEventId={initialEventId}
             initialBoxesFilter={initialBoxesFilter}
             holdMapLoad={splashShown === true}
+            tourRequestId={tourRequestId}
           />
         </main>
       )}
@@ -235,6 +261,7 @@ export default function HomePageClient() {
         <SplashScreen
           pending={splashShown === null}
           onPrimary={dismissSplash}
+          onTour={startTourFromSplash}
         />
       )}
     </>

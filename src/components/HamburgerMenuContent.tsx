@@ -29,7 +29,7 @@
  */
 
 import Link from "next/link";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Star, History } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Star, History, Compass } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import StyxCredit from "./StyxCredit";
@@ -58,6 +58,13 @@ export interface HamburgerMenuContentProps {
   mapDisabled?: boolean;
   /** When set, the title is a real `<h2 id tabIndex={-1}>` — see file header. */
   headingId?: string;
+  /**
+   * "Learn how to use this map" (#159) — starts the guided tour. Called
+   * directly, no implicit onClose() first (same as onSelectVenue): each shell
+   * closes itself without its usual focus-return hop, which would pull focus
+   * out of the tour. Omit to hide the item.
+   */
+  onStartTour?: () => void;
 }
 
 export default function HamburgerMenuContent({
@@ -71,6 +78,7 @@ export default function HamburgerMenuContent({
   onToggleView,
   mapDisabled = false,
   headingId,
+  onStartTour,
 }: HamburgerMenuContentProps) {
   const { locale: ctxLocale, tree } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -210,6 +218,14 @@ export default function HamburgerMenuContent({
                     onToggleView();
                   }}
                   icon={viewMode === "map" ? <List size={14} /> : <MapIcon size={14} />}
+                />
+              )}
+              {/* Learn how to use this map (#159) — the guided tour. */}
+              {onStartTour && (
+                <HamburgerMenuItem
+                  label={t("menu.tour", locale)}
+                  onClick={onStartTour}
+                  icon={<Compass size={14} />}
                 />
               )}
               {/* Show welcome screen (#99) — re-shows splash without clearing localStorage */}

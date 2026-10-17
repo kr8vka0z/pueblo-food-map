@@ -124,6 +124,7 @@ describe("SPLASH_GATE_SCRIPT parity with shouldSkipSplash", () => {
     { name: "?venue=&x=1#venue=abc", url: "/?venue=&x=1#venue=abc", gate: false, skip: false },
     { name: "?near=1", url: "/?near=1", gate: false, skip: true },
     { name: "?boxes=1", url: "/?boxes=1", gate: false, skip: true },
+    { name: "?tour=1", url: "/?tour=1", gate: false, skip: true },
     { name: "?near=0", url: "/?near=0", gate: false, skip: false },
   ];
 

@@ -223,6 +223,8 @@ export default function SearchBar({
             type="button"
             onClick={filtersButton.onClick}
             aria-label={filtersButton.ariaLabel}
+            // Guided tour target (#159) — the label changes with the count/locale.
+            data-testid="filters-button"
             className={
               "absolute right-0 top-1/2 -translate-y-1/2 " +
               "flex items-center gap-1.5 h-11 pl-2.5 pr-3.5 " +
@@ -274,6 +276,7 @@ export default function SearchBar({
           onBlur={onBlur}
           placeholder={placeholder}
           aria-label={ariaLabel}
+          data-testid="search-input"
           enterKeyHint="search"
           {...comboboxAttrs}
           className={

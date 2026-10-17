@@ -66,6 +66,8 @@ Browser
         │     renders inside DesktopSidePanel on the map page's desktop
         │     layout, above. Opened by BottomNav at a section)
         ├── ListView         (full-screen nearest-first list, map mode off)
+        ├── GuidedTour.tsx   (lazy, #159: step overlay pointing at the real
+        │     controls — see "Guided tour")
         └── BottomNav        (Near me · Saved · Boxes · Help · Menu — bar below
               2xl (1536px), floating pill at 2xl+; Boxes toggles the
               blessing_box filter, #516; docs/bottom-nav-spec.md)
@@ -927,6 +929,7 @@ setState flushes before the browser paints, so no pending-splash flash
   → if set:      unmount the splash, mount the interactive map
   → if ?venue=<id> or #venue=<id> in URL: skip splash, open deep-linked venue
   → if ?near=1 or ?boxes=1 (PageNav hops): skip splash, locate / filter boxes
+  → if ?tour=1 (PageNav's "Learn how to use this map"): skip splash, start the tour
 
 SplashScreen CTA "Find food near me"
   → requests geolocation
@@ -951,6 +954,36 @@ screen-reader users cannot reach the map. `<html>` carries
 
 Residual: returning visitors still see nothing until the map chunk loads
 (the splash is hidden, and `<main>` mounts only after hydration).
+
+---
+
+## Guided tour
+
+An eight-step walkthrough (#159): welcome, search, Filters, a pin, the
+place card, Near me, Saved, Menu. Hand-rolled, no tour library.
+
+```
+Splash "Take a tour"      → HomePageClient bumps tourRequestId (gate set, no location prompt)
+/?tour=1 (PageNav Menu)   → HomePageClient reads + strips it, bumps tourRequestId
+Map Menu item (phone drawer or desktop side panel) → MapWrapper.startTour directly
+  → MapWrapper snapshots selection + Map/List view, closes Menu/Filters/search/
+    event card, forces Map view, mounts GuidedTour (next/dynamic)
+  → each step: GuidedTour asks MapWrapper to open/close the sample venue's card
+    (selectVenue, so desktop opens its side panel), jumps the camera for the pin
+    step, then polls the target's box per frame until it stops moving
+  → end (Done / Skip / Escape): camera restored, MapWrapper restores the
+    snapshot, focus returns to the Menu button or the map container
+```
+
+- **Cost on first load: none.** `GuidedTour.tsx` and `src/lib/guidedTour.ts`
+  (steps, placement math, the EN/ES step copy) load only when a tour starts;
+  only the two trigger labels live in `i18n.ts`.
+- **Targets** are existing hooks (`data-testid` on SearchBar/BottomNav,
+  `data-venue-id` on VenueMarker, `[data-bottom-sheet]` / the desktop card's
+  `aria-labelledby`). A missing target falls back to a centered tooltip.
+- **Escape** goes through `overlayRegistry`'s claim-once stack; `raiseOverlay`
+  keeps the tour on top of the card it opened itself.
+- Not built: auto-launch on a first visit (optional in the issue).
 
 ---
 

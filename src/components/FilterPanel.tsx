@@ -282,7 +282,10 @@ export default function FilterPanel({
       <div
         ref={panelRef}
         role="dialog"
-        aria-modal="true"
+        // Not modal while the tour (#159) holds it open: two aria-modal dialogs
+        // at once let a screen reader scope itself to this panel and lose the
+        // tour's Next/Skip.
+        aria-modal={trapFocus ? "true" : undefined}
         aria-labelledby={TITLE_ID}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}

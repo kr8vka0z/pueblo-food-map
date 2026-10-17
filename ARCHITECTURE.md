@@ -966,7 +966,8 @@ place card, Near me, Saved, Menu. Hand-rolled, no tour library.
 Splash "Take a tour"      → HomePageClient bumps tourRequestId (gate set, no location prompt)
 /?tour=1 (PageNav Menu)   → HomePageClient reads + strips it, bumps tourRequestId
 Map Menu item (phone drawer or desktop side panel) → MapWrapper.startTour directly
-  → MapWrapper snapshots selection + Map/List view + the visitor's own search,
+  → MapWrapper snapshots selection + Map/List view + the visitor's own search
+    and filters (cleared for the tour, no category zoom either way),
     pauses search_used analytics, closes Menu/Filters/search/event card,
     forces Map view, mounts GuidedTour (next/dynamic)
   → each step: GuidedTour asks MapWrapper to open/close the sample venue's card

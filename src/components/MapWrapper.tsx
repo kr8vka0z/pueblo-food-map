@@ -48,7 +48,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { venues as allVenues } from "@/data/venues";
-import type { Venue } from "@/types/venue";
+import type { Venue, VenueCategory } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
 import HamburgerMenuContent from "./HamburgerMenuContent";
 import DesktopSidePanel, {
@@ -135,6 +135,18 @@ interface TourSession {
   prevSelectedId: string | null;
   prevViewMode: ViewMode;
   sampleVenue: Venue | null;
+  /**
+   * The visitor's filters, lifted for the tour: with Open now on at night (or
+   * SNAP/WIC) the search demo could find nothing, and the Filters step must
+   * show every switch off. Handed back in endTour.
+   */
+  prevFilters: {
+    categories: Set<VenueCategory> | null;
+    openNow: boolean;
+    snap: boolean;
+    wic: boolean;
+    events: boolean;
+  };
 }
 
 /**
@@ -1267,6 +1279,7 @@ export default function MapWrapper({
     commitSearch,
     setSearchTrackingPaused,
     selectedCategories,
+    setSelectedCategories,
     filterOpenNow,
     setFilterOpenNow,
     filterSnap,
@@ -1469,6 +1482,8 @@ export default function MapWrapper({
   // different one) must still compare equal when the resulting membership is
   // equal — a plain string key gives that for free.
   const prevCategoriesKeyRef = useRef<string | null | undefined>(undefined);
+  // Set by the guided tour right before it changes the categories itself.
+  const skipCategoryFitRef = useRef(false);
 
   useEffect(() => {
     if (!mapboxMap) return;
@@ -1483,6 +1498,13 @@ export default function MapWrapper({
     // touching the ref.
     const prevCategoriesKey = prevCategoriesKeyRef.current;
     prevCategoriesKeyRef.current = categoriesKey;
+    // The guided tour (#159) lifts the visitor's categories for the tour and
+    // hands them back at the end; neither is a visitor's choice to zoom on,
+    // and the tour restores the camera itself.
+    if (skipCategoryFitRef.current) {
+      skipCategoryFitRef.current = false;
+      return;
+    }
 
     const reducedMotion =
       typeof window !== "undefined" &&
@@ -1995,14 +2017,31 @@ export default function MapWrapper({
         filteredVenues.find((v) => v.category !== "blessing_box") ??
         allVenues.find((v) => v.category === "pantry") ??
         null;
-      setTour({ returnFocusSelector, prevSelectedId: selectedVenueId, prevViewMode: viewMode, sampleVenue });
+      setTour({
+        returnFocusSelector,
+        prevSelectedId: selectedVenueId,
+        prevViewMode: viewMode,
+        sampleVenue,
+        prevFilters: {
+          categories: selectedCategories,
+          openNow: filterOpenNow,
+          snap: filterSnap,
+          wic: filterWic,
+          events: filterEvents,
+        },
+      });
+      if (selectedCategories && selectedCategories.size > 0) skipCategoryFitRef.current = true;
+      clearFilters();
       // The search demo borrows the real query; keep the visitor's own to
       // hand back, and keep the demo word out of search_used analytics.
       tourPrevQueryRef.current = query;
       setSearchTrackingPaused(true);
       handleViewModeChange("map");
     },
-    [filteredVenues, selectedVenueId, viewMode, query, handleViewModeChange, setSelectedEventId, setSearchTrackingPaused],
+    [
+      filteredVenues, selectedVenueId, viewMode, query, handleViewModeChange, setSelectedEventId, setSearchTrackingPaused,
+      selectedCategories, filterOpenNow, filterSnap, filterWic, filterEvents, clearFilters,
+    ],
   );
   // Search step demo (#159): set the real query and show its results without
   // focusing the input (so a phone keyboard never opens); null puts the
@@ -2046,9 +2085,19 @@ export default function MapWrapper({
     // keeps the restore in the same render as the rest of the snapshot.
     handleTourDemoSearch(null);
     setFilterPanelOpen(false);
+    const f = tour.prevFilters;
+    if (f.categories && f.categories.size > 0) skipCategoryFitRef.current = true;
+    setSelectedCategories(f.categories);
+    setFilterOpenNow(f.openNow);
+    setFilterSnap(f.snap);
+    setFilterWic(f.wic);
+    setFilterEvents(f.events);
     setSearchTrackingPaused(false);
     setTour(null);
-  }, [tour, handleTourShowVenue, handleTourDemoSearch, setViewMode, setSearchTrackingPaused]);
+  }, [
+    tour, handleTourShowVenue, handleTourDemoSearch, setViewMode, setSearchTrackingPaused,
+    setSelectedCategories, setFilterOpenNow, setFilterSnap, setFilterWic, setFilterEvents,
+  ]);
   const handleMenuStartTour = useCallback(
     () => startTour('[data-testid="nav-top"]'),
     [startTour],

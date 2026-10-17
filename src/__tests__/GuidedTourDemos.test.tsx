@@ -12,6 +12,7 @@ import MapWrapper from "@/components/MapWrapper";
 import * as LocaleContext from "@/lib/LocaleContext";
 import { TOUR_COPY, TOUR_STEPS } from "@/lib/guidedTour";
 import { track, EVENTS } from "@/lib/analytics";
+import { t } from "@/lib/i18n";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -68,7 +69,7 @@ const input = () => screen.getByTestId("search-input") as HTMLInputElement;
 const filterPanel = () => document.querySelector('[aria-labelledby="filter-panel-title"]');
 
 /** The visitor types their own search (the real input path), leaves the box, then starts the tour. */
-async function renderWithOwnSearchThenTour(own = "garden") {
+async function renderWithOwnSearchThenTour(own = "garden", before?: () => void) {
   const { rerender } = render(
     <LocaleContext.LocaleProvider initialLocale="en">
       <MapWrapper />
@@ -78,6 +79,7 @@ async function renderWithOwnSearchThenTour(own = "garden") {
   fireEvent.focus(input());
   fireEvent.change(input(), { target: { value: own } });
   fireEvent.blur(input());
+  before?.();
   rerender(
     <LocaleContext.LocaleProvider initialLocale="en">
       <MapWrapper tourRequestId={1} />
@@ -131,8 +133,19 @@ describe("search step — typing demo", () => {
     next(searchIndex);
     await waitFor(() => expect(input().value).toBe(EN.searchWord));
     act(() => vi.advanceTimersByTime(5000));
-    const searches = vi.mocked(track).mock.calls.filter(([event]) => event === EVENTS.SEARCH_USED);
-    expect(searches.map(([, props]) => (props as { term: string }).term)).not.toContain(EN.searchWord);
+    const sentTerms = () =>
+      vi.mocked(track).mock.calls
+        .filter(([event]) => event === EVENTS.SEARCH_USED)
+        .map(([, props]) => (props as { term: string }).term);
+    expect(sentTerms()).not.toContain(EN.searchWord);
+
+    // After the tour, the visitor's own searches are sent again (the pause
+    // must not outlive the tour). The idle timer path, no blur: SEARCH_TRACK_IDLE_MS is 2 s.
+    fireEvent.click(screen.getByRole("button", { name: EN.skip }));
+    await waitFor(() => expect(screen.queryByTestId("guided-tour")).toBeNull());
+    fireEvent.change(input(), { target: { value: "bread" } });
+    act(() => vi.advanceTimersByTime(2100));
+    expect(sentTerms()).toContain("bread");
   });
 });
 
@@ -142,7 +155,12 @@ describe("filters step — the real panel, open", () => {
     const filtersLabel = screen.getByTestId("filters-button").getAttribute("aria-label");
     next(filtersIndex);
     await waitFor(() => expect(filterPanel()).toBeTruthy());
-    expect(screen.getByRole("dialog", { name: EN.dialogLabel }).contains(document.activeElement)).toBe(true);
+    const tourDialog = screen.getByRole("dialog", { name: EN.dialogLabel });
+    expect(tourDialog.contains(document.activeElement)).toBe(true);
+    // One modal dialog at a time: the held-open panel is not aria-modal, and
+    // nothing hides the tour's tooltip from assistive tech.
+    expect(filterPanel()!.getAttribute("aria-modal")).toBeNull();
+    expect(tourDialog.closest('[aria-hidden="true"]')).toBeNull();
     expect(screen.getAllByRole("switch").every((s) => s.getAttribute("aria-checked") === "false")).toBe(true);
     // Tab still moves within the tour (Next wraps to Skip) — the panel's own
     // Tab trap must not pull focus into the panel.
@@ -155,6 +173,45 @@ describe("filters step — the real panel, open", () => {
     await waitFor(() => expect(filterPanel()).toBeNull());
     // Same label = same (zero) active-filter count as before the tour.
     expect(screen.getByTestId("filters-button").getAttribute("aria-label")).toBe(filtersLabel);
+
+    // After the tour the panel is its normal modal self again: focus moves in.
+    fireEvent.click(screen.getByRole("button", { name: EN.skip }));
+    await waitFor(() => expect(screen.queryByTestId("guided-tour")).toBeNull());
+    fireEvent.click(screen.getByTestId("filters-button"));
+    await waitFor(() => expect(filterPanel()).toBeTruthy());
+    expect(filterPanel()!.getAttribute("aria-modal")).toBe("true");
+    expect(filterPanel()!.contains(document.activeElement)).toBe(true);
+  });
+
+  test("the visitor's filters are lifted for the tour and handed back after Skip", async () => {
+    const activeLabel = t("filters.button.labelActive", "en", { count: "3" });
+    // The visitor turns filters on through the real panel: switches plus a
+    // non-pantry kind of place, so without lifting them "pantry" finds nothing.
+    await renderWithOwnSearchThenTour("", () => {
+      fireEvent.click(screen.getByTestId("filters-button"));
+      fireEvent.click(screen.getByRole("switch", { name: t("filter.openNow", "en") }));
+      fireEvent.click(screen.getByRole("switch", { name: t("filter.wic", "en") }));
+      fireEvent.click(screen.getByRole("checkbox", { name: new RegExp(t("category.full.garden", "en")) }));
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.getByTestId("filters-button").getAttribute("aria-label")).toBe(activeLabel);
+    });
+    // The tour has started and lifted them.
+    expect(screen.getByTestId("filters-button").getAttribute("aria-label")).not.toBe(activeLabel);
+
+    next(searchIndex);
+    await waitFor(() => expect(input().value).toBe(EN.searchWord));
+    expect(document.getElementById("search-results-listbox")).toBeTruthy();
+    next();
+    await waitFor(() => expect(filterPanel()).toBeTruthy());
+    expect(
+      [...filterPanel()!.querySelectorAll('[role="switch"], input[type="checkbox"]')].some(
+        (el) => el.getAttribute("aria-checked") === "true" || (el as HTMLInputElement).checked,
+      ),
+    ).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: EN.skip }));
+    await waitFor(() => expect(screen.queryByTestId("guided-tour")).toBeNull());
+    expect(screen.getByTestId("filters-button").getAttribute("aria-label")).toBe(activeLabel);
   });
 
   test.each([

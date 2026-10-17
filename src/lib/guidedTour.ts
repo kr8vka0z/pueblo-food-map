@@ -17,8 +17,14 @@ export type TourStepId =
   | "welcome"
   | "search"
   | "filters"
+  | "filterChoices"
   | "pin"
   | "card"
+  | "boxesNav"
+  | "boxesMap"
+  | "boxCheckin"
+  | "boxPhoto"
+  | "boxHelp"
   | "nearMe"
   | "saved"
   | "menu";
@@ -27,18 +33,27 @@ export interface TourStep {
   id: TourStepId;
   /**
    * CSS selector for the element this step points at, or null for a centered
-   * card with no highlight. The "pin" step's target depends on the sample
-   * venue, so GuidedTour.tsx builds it at runtime.
+   * card with no highlight. The "pin" and "boxesMap" steps' targets depend on
+   * the sample venue / box, so GuidedTour.tsx builds them at runtime.
    */
   target: string | null;
   /** True for the one step that opens the sample venue's card. */
   showsCard?: boolean;
+  /** True for the steps that open the sample Blessing Box's card. */
+  showsBox?: boolean;
+  /** Open the card fully (the phone sheet's below-the-fold part holds it). */
+  cardExpanded?: boolean;
+  /** Scroll the target into view inside its card before pointing at it. */
+  scrollTarget?: boolean;
+  /** Skipped when there's no sample box (live box feed empty or not loaded). */
+  needsBox?: boolean;
   /**
    * A live demo the step runs while it is open: "search" types the sample
-   * word into the real search box, "filters" opens the real Filters panel.
-   * MapWrapper undoes either when the step is left.
+   * word into the real search box, "filters" opens the real Filters panel,
+   * "boxes" turns the map's Boxes view on (held across the box steps).
+   * MapWrapper undoes each when its steps are left.
    */
-  demo?: "search" | "filters";
+  demo?: "search" | "filters" | "boxes";
 }
 
 // Mapped to today's controls (the issue's list predates the bottom nav, the
@@ -52,13 +67,39 @@ export const TOUR_STEPS: readonly TourStep[] = [
   // The search box plus the results popover the typing demo brings up;
   // GuidedTour highlights the union of matches.
   { id: "search", target: '[data-testid="search-input"], [data-tour="search-results"]', demo: "search" },
-  // The open panel's "Show only" rows (FilterPanel's SwitchRow): the tooltip
-  // lands below them and leaves the panel's header and those choices in view.
-  { id: "filters", target: '[data-tour="filter-switch-row"]', demo: "filters" },
+  // Two beats for Filters: the button that opens the panel, then the open
+  // panel's "Show only" rows (FilterPanel's SwitchRow), with the tooltip
+  // below them so the panel's header and those choices stay in view.
+  { id: "filters", target: '[data-testid="filters-button"]' },
+  { id: "filterChoices", target: '[data-tour="filter-switch-row"]', demo: "filters" },
   { id: "pin", target: null },
   // BottomSheet (phone) / DesktopVenueWindow (desktop) — both already carry
   // these attributes; no tour-only hook needed on either.
   { id: "card", target: '[data-bottom-sheet], [aria-labelledby^="venue-window-title-"]', showsCard: true },
+  // Blessing Boxes, after the place card (BottomNav is back once the card
+  // closes on a phone) and before the other nav items. The tour only points
+  // at the box card's buttons: its full-screen layer swallows every tap, so
+  // nothing on the card can be pressed and nothing is ever sent.
+  { id: "boxesNav", target: '[data-testid="nav-boxes"]' },
+  { id: "boxesMap", target: null, demo: "boxes", needsBox: true },
+  {
+    id: "boxCheckin",
+    target: '[data-tour="box-checkin-choices"]',
+    demo: "boxes",
+    showsBox: true,
+    needsBox: true,
+    scrollTarget: true,
+  },
+  { id: "boxPhoto", target: '[data-tour="box-photo"]', demo: "boxes", showsBox: true, needsBox: true, scrollTarget: true },
+  {
+    id: "boxHelp",
+    target: '[data-tour="box-adopt"], [data-tour="box-alerts"]',
+    demo: "boxes",
+    showsBox: true,
+    cardExpanded: true,
+    needsBox: true,
+    scrollTarget: true,
+  },
   { id: "nearMe", target: '[data-testid="nav-near-me"]' },
   { id: "saved", target: '[data-testid="nav-saved"]' },
   { id: "menu", target: '[data-testid="nav-top"]' },
@@ -66,11 +107,19 @@ export const TOUR_STEPS: readonly TourStep[] = [
 
 export type TourAction = "next" | "back" | "close";
 
-/** Step index while running, null once finished or closed. */
-export function tourReducer(index: number | null, action: TourAction): number | null {
+/**
+ * Step index while running, null once finished or closed. `total` is the
+ * length of the step list actually shown (box steps drop out with no box).
+ */
+export function tourReducer(index: number | null, action: TourAction, total = TOUR_STEPS.length): number | null {
   if (index === null || action === "close") return null;
   if (action === "back") return Math.max(0, index - 1);
-  return index + 1 < TOUR_STEPS.length ? index + 1 : null;
+  return index + 1 < total ? index + 1 : null;
+}
+
+/** The steps a tour shows: the box steps only when there's a box to show. */
+export function tourSteps(hasBox: boolean): readonly TourStep[] {
+  return hasBox ? TOUR_STEPS : TOUR_STEPS.filter((s) => !s.needsBox);
 }
 
 export interface Rect {
@@ -157,9 +206,11 @@ interface TourCopy {
   steps: Record<TourStepId, StepCopy>;
 }
 
-// Short sentences, everyday words, one idea per step — many visitors read
-// under stress or in a second language. Control names match the on-screen
-// labels exactly (i18n.ts's nav.* / filters.* values) so people can find them.
+// Everyday words, one idea per step — many visitors read under stress or in
+// a second language. Sentences are joined with commas and "and"/"so" rather
+// than cut into rows of short ones (Kyle finds those clipped; atlas-kb
+// Writing Standard). Control names match the on-screen labels exactly
+// (i18n.ts's nav.* / filters.* / box.* values) so people can find them.
 export const TOUR_COPY: Record<Locale, TourCopy> = {
   en: {
     dialogLabel: "How to use this map",
@@ -172,7 +223,7 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
     steps: {
       welcome: {
         title: "Welcome!",
-        body: "This map shows places to get food in Pueblo County. Here is a quick look at how it works.",
+        body: "This map shows places to get food across Pueblo County, and many of them are run by neighbors and local groups: food pantries, meal sites, community gardens and Blessing Boxes. Here's a quick look at how it works.",
       },
       search: {
         title: "Search",
@@ -180,7 +231,11 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
       },
       filters: {
         title: "Filters",
-        body: "Tap Filters to open this list, then turn on a choice to see only places that are open now, take SNAP or WIC, or are one kind of place.",
+        body: "Tap Filters to choose which places the map shows, like the ones open now or the ones that take SNAP or WIC.",
+      },
+      filterChoices: {
+        title: "Filter choices",
+        body: "These are the choices, so turn one on to see only places that are open now, take SNAP or WIC, or are one kind of place.",
       },
       pin: {
         title: "Pins",
@@ -189,6 +244,26 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
       card: {
         title: "Place details",
         body: "Tap a pin to see its hours, address, and directions. Tap the star to save it.",
+      },
+      boxesNav: {
+        title: "Boxes",
+        body: "Tap Boxes to see only the Blessing Boxes, small food boxes that neighbors fill and anyone can take from.",
+      },
+      boxesMap: {
+        title: "Blessing Boxes",
+        body: "Each of these pins is a Blessing Box, and you can tap one to see what's in it and when someone last filled it.",
+      },
+      boxCheckin: {
+        title: "Say what's in it",
+        body: "When you visit a box, tap I filled it, I used this box or It's empty, so the next neighbor knows what to expect.",
+      },
+      boxPhoto: {
+        title: "Add a photo",
+        body: "You can add a photo of the box, so people can see what's inside before they go.",
+      },
+      boxHelp: {
+        title: "Help a box",
+        body: "Apply to sponsor a box you'd like to look after, or ask for an email when it needs filling.",
       },
       nearMe: {
         title: "Near me",
@@ -215,7 +290,7 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
     steps: {
       welcome: {
         title: "¡Bienvenidos!", // [CHECK]
-        body: "Este mapa muestra lugares para conseguir comida en el condado de Pueblo. Aquí te mostramos cómo funciona.", // [CHECK]
+        body: "Este mapa muestra lugares para conseguir comida en todo el condado de Pueblo, y muchos los manejan vecinos y grupos locales: despensas, comedores comunitarios, huertos comunitarios y Cajas de bendiciones. Aquí te mostramos cómo funciona.", // [CHECK]
       },
       search: {
         title: "Buscar",
@@ -223,7 +298,11 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
       },
       filters: {
         title: "Filtros",
-        body: "Toca Filtros para abrir esta lista y activa una opción para ver solo lugares abiertos ahora, que aceptan SNAP o WIC, o de un solo tipo.", // [CHECK]
+        body: "Toca Filtros para elegir qué lugares muestra el mapa, como los que están abiertos ahora o los que aceptan SNAP o WIC.", // [CHECK]
+      },
+      filterChoices: {
+        title: "Opciones de filtro", // [CHECK]
+        body: "Estas son las opciones, así que activa una para ver solo lugares abiertos ahora, que aceptan SNAP o WIC, o de un solo tipo.", // [CHECK]
       },
       pin: {
         title: "Marcadores", // [CHECK]
@@ -232,6 +311,27 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
       card: {
         title: "Detalles del lugar", // [CHECK]
         body: "Toca un marcador para ver su horario, dirección y cómo llegar. Toca la estrella para guardarlo.", // [CHECK]
+      },
+      boxesNav: {
+        // Matches the ES bottom-nav label (i18n.ts nav.boxes = "Cajas").
+        title: "Cajas",
+        body: "Toca Cajas para ver solo las Cajas de bendiciones, pequeñas cajas de comida que los vecinos llenan y de las que cualquiera puede tomar.", // [CHECK]
+      },
+      boxesMap: {
+        title: "Cajas de bendiciones", // [CHECK]
+        body: "Cada uno de estos marcadores es una Caja de bendiciones, y puedes tocar uno para ver qué tiene y cuándo la surtieron por última vez.", // [CHECK]
+      },
+      boxCheckin: {
+        title: "Cuenta qué tiene", // [CHECK]
+        body: "Cuando visites una caja, toca La surtí, Usé esta caja o Está vacía, para que el próximo vecino sepa qué esperar.", // [CHECK]
+      },
+      boxPhoto: {
+        title: "Agregar una foto", // [CHECK]
+        body: "Puedes agregar una foto de la caja, para que la gente vea qué tiene antes de ir.", // [CHECK]
+      },
+      boxHelp: {
+        title: "Ayuda a una caja", // [CHECK]
+        body: "Solicita ser patrocinador de una caja que quieras cuidar, o pide un correo cuando necesite surtido.", // [CHECK]
       },
       nearMe: {
         // Matches the ES bottom-nav label (i18n.ts nav.nearMe = "Cercanos").

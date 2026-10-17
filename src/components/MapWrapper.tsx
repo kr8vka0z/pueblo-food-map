@@ -135,6 +135,8 @@ interface TourSession {
   prevSelectedId: string | null;
   prevViewMode: ViewMode;
   sampleVenue: Venue | null;
+  /** The nearest live Blessing Box, for the box steps; null drops those steps. */
+  sampleBox: Venue | null;
   /**
    * The visitor's filters, lifted for the tour: with Open now on at night (or
    * SNAP/WIC) the search demo could find nothing, and the Filters step must
@@ -2001,6 +2003,11 @@ export default function MapWrapper({
   // A ref, not TourSession: the demo's unmount cleanup runs after endTour
   // has already cleared `tour`, and must still restore the same query.
   const tourPrevQueryRef = useRef("");
+  // True from startTour to endTour. The demos' unmount cleanups run after
+  // endTour has already handed the visitor's state back; they must not undo it.
+  const tourActiveRef = useRef(false);
+  // Phone only: the tour holds a box card's sheet open to show its lower buttons.
+  const [tourCardExpanded, setTourCardExpanded] = useState(false);
   const startTour = useCallback(
     (returnFocusSelector: string) => {
       setMenuSection(null);
@@ -2017,11 +2024,22 @@ export default function MapWrapper({
         filteredVenues.find((v) => v.category !== "blessing_box") ??
         allVenues.find((v) => v.category === "pantry") ??
         null;
+      // The nearest live box (the feed may still be loading or empty: then
+      // there's no box to show and GuidedTour leaves those steps out).
+      let sampleBox: Venue | null = null;
+      for (const v of venuesWithDistance) {
+        if (v.category !== "blessing_box" || !getBoxById(v.id)) continue;
+        if (!sampleBox || (v.distanceMiles ?? Infinity) < ((sampleBox as typeof v).distanceMiles ?? Infinity)) {
+          sampleBox = v;
+        }
+      }
+      tourActiveRef.current = true;
       setTour({
         returnFocusSelector,
         prevSelectedId: selectedVenueId,
         prevViewMode: viewMode,
         sampleVenue,
+        sampleBox,
         prevFilters: {
           categories: selectedCategories,
           openNow: filterOpenNow,
@@ -2040,8 +2058,19 @@ export default function MapWrapper({
     },
     [
       filteredVenues, selectedVenueId, viewMode, query, handleViewModeChange, setSelectedEventId, setSearchTrackingPaused,
-      selectedCategories, filterOpenNow, filterSnap, filterWic, filterEvents, clearFilters,
+      selectedCategories, filterOpenNow, filterSnap, filterWic, filterEvents, clearFilters, venuesWithDistance, getBoxById,
     ],
+  );
+  // Box steps demo (#159): the same Boxes view the bottom-nav button gives
+  // (blessing_box only), off again once the box steps are left. The tour
+  // cleared the visitor's own filters at start, so "off" is no filter at all;
+  // theirs come back in endTour.
+  const handleTourDemoBoxes = useCallback(
+    (on: boolean) => {
+      if (!tourActiveRef.current) return;
+      setSelectedCategories(on ? new Set<VenueCategory>(["blessing_box"]) : null);
+    },
+    [setSelectedCategories],
   );
   // Search step demo (#159): set the real query and show its results without
   // focusing the input (so a phone keyboard never opens); null puts the
@@ -2067,7 +2096,9 @@ export default function MapWrapper({
   // setSelectedVenueId would leave the panel shut and the card step with
   // nothing to point at).
   const handleTourShowVenue = useCallback(
-    (id: string | null) => {
+    (id: string | null, expanded = false) => {
+      // The desktop box card has no folded part (DesktopVenueWindow's boxBody).
+      setTourCardExpanded(expanded);
       if (id) {
         selectVenue(id);
         return;
@@ -2079,6 +2110,7 @@ export default function MapWrapper({
   );
   const endTour = useCallback(() => {
     if (!tour) return;
+    tourActiveRef.current = false;
     handleTourShowVenue(tour.prevSelectedId);
     setViewMode(tour.prevViewMode);
     // The demo steps undo themselves on unmount too; doing it here as well
@@ -2086,7 +2118,11 @@ export default function MapWrapper({
     handleTourDemoSearch(null);
     setFilterPanelOpen(false);
     const f = tour.prevFilters;
-    if (f.categories && f.categories.size > 0) skipCategoryFitRef.current = true;
+    // Any change of categories here (the box steps' Boxes view, or the
+    // visitor's own being handed back) must not re-zoom: the tour has just
+    // put the camera back itself.
+    const key = (c: Set<VenueCategory> | null) => (c && c.size > 0 ? [...c].sort().join(",") : "");
+    if (key(f.categories) !== key(selectedCategories)) skipCategoryFitRef.current = true;
     setSelectedCategories(f.categories);
     setFilterOpenNow(f.openNow);
     setFilterSnap(f.snap);
@@ -2096,7 +2132,7 @@ export default function MapWrapper({
     setTour(null);
   }, [
     tour, handleTourShowVenue, handleTourDemoSearch, setViewMode, setSearchTrackingPaused,
-    setSelectedCategories, setFilterOpenNow, setFilterSnap, setFilterWic, setFilterEvents,
+    selectedCategories, setSelectedCategories, setFilterOpenNow, setFilterSnap, setFilterWic, setFilterEvents,
   ]);
   const handleMenuStartTour = useCallback(
     () => startTour('[data-testid="nav-top"]'),
@@ -2567,6 +2603,9 @@ export default function MapWrapper({
           eventHere={eventHereFor(selectedVenueId)}
           box={getBoxById(selectedVenueId)}
           onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
+          // The tour's box steps hold the sheet open (#159); undefined otherwise.
+          forceExpanded={tour ? tourCardExpanded : undefined}
+          inert={tour !== null}
           onClose={() => {
             setSelectedVenueId(null);
             closeEventCard();
@@ -2601,7 +2640,13 @@ export default function MapWrapper({
           HamburgerMenu renders, different shell, see that component's own
           header for why). `panelHeadingId` names whichever view's own
           focusable heading DesktopSidePanel should focus on view change. */}
-      <DesktopSidePanel open={desktopPanelOpen} onClose={closeDesktopPanel} headingId={panelHeadingId}>
+      <DesktopSidePanel
+        open={desktopPanelOpen}
+        onClose={closeDesktopPanel}
+        headingId={panelHeadingId}
+        // The tour (#159) shows cards here; nothing on them may be pressed.
+        inert={tour !== null}
+      >
         {(close) => {
           if (eventPanelOpen && selectedEvent) {
             return (
@@ -2724,6 +2769,8 @@ export default function MapWrapper({
         <GuidedTour
           locale={locale}
           sampleVenue={tour.sampleVenue}
+          sampleBox={tour.sampleBox}
+          onDemoBoxes={handleTourDemoBoxes}
           mapboxMap={mapboxMap}
           onShowVenue={handleTourShowVenue}
           onDemoSearch={handleTourDemoSearch}

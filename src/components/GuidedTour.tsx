@@ -17,11 +17,14 @@
  * sample venue for the pin step, then polls for the step's target element
  * each animation frame until its box stops moving (the card slides in, the
  * bottom nav remounts after the card closes) and draws the highlight there.
- * Two steps run a live demo: the search step types a sample word into the
- * real search box (results showing, input never focused) and the filters
- * step holds the real Filters panel open; both are undone when the step is
- * left. On close it restores the camera; MapWrapper restores the selection,
- * Map/List view and the visitor's own search it snapshotted at start.
+ * Three live demos: the search step types a sample word into the real
+ * search box (results showing, input never focused), the filter-choices
+ * step holds the real Filters panel open, and the box steps hold the map's
+ * Boxes view on; each is undone when its steps are left. Cards and the
+ * panel the tour opens are `inert` while it runs (MapWrapper), so nothing
+ * on them can be pressed. On close it restores the camera; MapWrapper
+ * restores the selection, Map/List view, search and filters it snapshotted
+ * at start.
  *
  * A11y: role="dialog" + aria-modal, focus starts on Next and is trapped in
  * the tooltip (DesktopVenueWindow focuses itself when the card step opens it
@@ -37,7 +40,7 @@ import type mapboxgl from "mapbox-gl";
 import type { Locale } from "@/lib/i18n";
 import { claimEscape, raiseOverlay, useOverlayStackId } from "@/lib/overlayRegistry";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
-import { TOUR_COPY, TOUR_STEPS, placeTooltip, tourReducer, type Rect } from "@/lib/guidedTour";
+import { TOUR_COPY, placeTooltip, tourReducer, tourSteps, type Rect } from "@/lib/guidedTour";
 
 type MapLike = Pick<mapboxgl.Map, "getCenter" | "getZoom" | "jumpTo" | "once" | "off" | "triggerRepaint">;
 
@@ -46,13 +49,23 @@ interface GuidedTourProps {
   /** The venue the pin and card steps show. Null skips straight to a centered tooltip. */
   sampleVenue: { id: string; lng: number; lat: number } | null;
   /**
+   * The Blessing Box the box steps show, picked when the tour starts. Null
+   * (live box feed empty or not loaded yet) drops the box pin/card steps.
+   */
+  sampleBox: { id: string } | null;
+  /**
    * Null while the map hasn't loaded (or can't). On the splash path the map
    * chunk only starts loading when the tour starts, so on a slow phone it can
    * arrive mid-tour: the pin step re-runs its camera move and target search then.
    */
   mapboxMap: MapLike | null;
-  /** Open this venue's card (id) or close any open card (null). */
-  onShowVenue: (id: string | null) => void;
+  /**
+   * Open this venue's card (id) or close any open card (null); `expanded`
+   * holds the phone sheet fully open (a box's below-the-fold buttons).
+   */
+  onShowVenue: (id: string | null, expanded?: boolean) => void;
+  /** Box steps demo: turn the map's Boxes view on (true) or back off. */
+  onDemoBoxes: (on: boolean) => void;
   /**
    * Search step demo: show this text in the real search box with its results
    * (never focusing the input, so no phone keyboard), or null to put back
@@ -89,8 +102,10 @@ function sameRect(a: Rect | null, b: Rect | null) {
 export default function GuidedTour({
   locale,
   sampleVenue,
+  sampleBox,
   mapboxMap,
   onShowVenue,
+  onDemoBoxes,
   onDemoSearch,
   onShowFilters,
   onClose,
@@ -98,9 +113,14 @@ export default function GuidedTour({
 }: GuidedTourProps) {
   const copy = TOUR_COPY[locale];
   const [index, setIndex] = useState(0);
-  const step = TOUR_STEPS[index];
+  // Fixed for the tour's life (sampleBox is picked once at start), so the
+  // step count never shifts under the visitor mid-tour.
+  // ponytail: a box feed that lands after the tour started is not picked up;
+  // the box card steps just stay out of that one tour.
+  const [steps] = useState(() => tourSteps(sampleBox !== null));
+  const step = steps[index];
   const stepCopy = copy.steps[step.id];
-  const total = TOUR_STEPS.length;
+  const total = steps.length;
   const isLast = index === total - 1;
 
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -153,16 +173,19 @@ export default function GuidedTour({
 
   const go = useCallback(
     (action: "next" | "back") => {
-      const nextIndex = tourReducer(index, action);
+      const nextIndex = tourReducer(index, action, total);
       if (nextIndex === null) finish();
       else setIndex(nextIndex);
     },
-    [index, finish],
+    [index, total, finish],
   );
 
   // ── Put the UI into this step's state ────────────────────────────────────────
   useEffect(() => {
-    onShowVenue(step.showsCard && sampleVenue ? sampleVenue.id : null);
+    const cardId =
+      step.showsCard && sampleVenue ? sampleVenue.id : step.showsBox && sampleBox ? sampleBox.id : null;
+    if (step.cardExpanded) onShowVenue(cardId, true);
+    else onShowVenue(cardId);
     // onShowVenue is stable for the tour's life; re-run per step only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
@@ -175,6 +198,12 @@ export default function GuidedTour({
     if (demo === "filters") {
       onShowFilters(true);
       return () => onShowFilters(false);
+    }
+    // Held across every box step (same `demo` value, so no re-run between
+    // them) and turned off once the visitor moves past the section.
+    if (demo === "boxes") {
+      onDemoBoxes(true);
+      return () => onDemoBoxes(false);
     }
     if (demo !== "search") return;
     const word = copy.searchWord;
@@ -217,7 +246,10 @@ export default function GuidedTour({
   const selector =
     step.id === "pin" && sampleVenue
       ? `[data-venue-id="${CSS.escape(sampleVenue.id)}"]`
-      : step.target;
+      : step.id === "boxesMap" && sampleBox
+        ? `[data-venue-id="${CSS.escape(sampleBox.id)}"]`
+        : step.target;
+  const scrollTarget = step.scrollTarget === true;
   // Pins exist only once the map does: restart the search when it arrives,
   // or a pin step that already gave up (MISSING_FRAMES) never finds its pin.
   const mapReady = mapboxMap !== null;
@@ -227,6 +259,7 @@ export default function GuidedTour({
     let frames = 0;
     let stable = 0;
     let last: Rect | null = null;
+    let scrolled = false;
     const tick = () => {
       // Every match, unioned: the search step highlights the box AND the
       // results list under it, the filters step the whole group of switches.
@@ -259,6 +292,14 @@ export default function GuidedTour({
         last = rect;
         setTarget(rect);
       }
+      // A box's buttons can sit below the card's visible part. Scroll once
+      // the card has settled (it slides in, then the phone sheet expands),
+      // or the scroll lands on the half-open layout; keep measuring after.
+      if (scrollTarget && !scrolled && selector && rect && stable >= STABLE_FRAMES) {
+        document.querySelector(selector)?.scrollIntoView?.({ block: "center" });
+        scrolled = true;
+        stable = 0;
+      }
       frames++;
       // A demo step's target keeps changing (results grow as letters land),
       // so it is tracked for as long as the step is open.
@@ -281,7 +322,7 @@ export default function GuidedTour({
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
     };
-  }, [selector, mapReady, demo]);
+  }, [selector, mapReady, demo, scrollTarget]);
 
   // ── Measure the tooltip so it can be placed clear of the target ──────────────
   useLayoutEffect(() => {

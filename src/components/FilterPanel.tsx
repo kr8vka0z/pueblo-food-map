@@ -286,6 +286,9 @@ export default function FilterPanel({
         // at once let a screen reader scope itself to this panel and lose the
         // tour's Next/Skip.
         aria-modal={trapFocus ? "true" : undefined}
+        // Held open by the tour: shown, never pressable (no filter can be
+        // toggled, not even by a screen reader's double-tap).
+        inert={!trapFocus || undefined}
         aria-labelledby={TITLE_ID}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}

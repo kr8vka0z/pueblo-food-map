@@ -33,6 +33,12 @@ export interface TourStep {
   target: string | null;
   /** True for the one step that opens the sample venue's card. */
   showsCard?: boolean;
+  /**
+   * A live demo the step runs while it is open: "search" types the sample
+   * word into the real search box, "filters" opens the real Filters panel.
+   * MapWrapper undoes either when the step is left.
+   */
+  demo?: "search" | "filters";
 }
 
 // Mapped to today's controls (the issue's list predates the bottom nav, the
@@ -43,8 +49,12 @@ export interface TourStep {
 // (MapWrapper's venueSheetOpen), and closing the card first brings it back.
 export const TOUR_STEPS: readonly TourStep[] = [
   { id: "welcome", target: null },
-  { id: "search", target: '[data-testid="search-input"]' },
-  { id: "filters", target: '[data-testid="filters-button"]' },
+  // The search box plus the results popover the typing demo brings up;
+  // GuidedTour highlights the union of matches.
+  { id: "search", target: '[data-testid="search-input"], [data-tour="search-results"]', demo: "search" },
+  // The open panel's "Show only" rows (FilterPanel's SwitchRow): the tooltip
+  // lands below them and leaves the panel's header and those choices in view.
+  { id: "filters", target: '[data-tour="filter-switch-row"]', demo: "filters" },
   { id: "pin", target: null },
   // BottomSheet (phone) / DesktopVenueWindow (desktop) — both already carry
   // these attributes; no tour-only hook needed on either.
@@ -142,6 +152,8 @@ interface TourCopy {
   done: string;
   skip: string;
   counter: (n: number, total: number) => string;
+  /** Typed into the search box by the search step; must match places in the data. */
+  searchWord: string;
   steps: Record<TourStepId, StepCopy>;
 }
 
@@ -156,6 +168,7 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
     done: "Done",
     skip: "Skip",
     counter: (n, total) => `Step ${n} of ${total}`,
+    searchWord: "pantry",
     steps: {
       welcome: {
         title: "Welcome!",
@@ -163,11 +176,11 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
       },
       search: {
         title: "Search",
-        body: "Type the name of a place, or a kind of place like pantry.",
+        body: "Type the name of a place, or a kind of place like pantry, and the places that match show up as you type.",
       },
       filters: {
         title: "Filters",
-        body: "Tap here to see only places that are open now, take SNAP or WIC, or are one kind of place.",
+        body: "Tap Filters to open this list, then turn on a choice to see only places that are open now, take SNAP or WIC, or are one kind of place.",
       },
       pin: {
         title: "Pins",
@@ -198,6 +211,7 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
     done: "Listo", // [CHECK]
     skip: "Saltar", // [CHECK]
     counter: (n, total) => `Paso ${n} de ${total}`,
+    searchWord: "despensa",
     steps: {
       welcome: {
         title: "¡Bienvenidos!", // [CHECK]
@@ -205,11 +219,11 @@ export const TOUR_COPY: Record<Locale, TourCopy> = {
       },
       search: {
         title: "Buscar",
-        body: "Escribe el nombre de un lugar o un tipo de lugar, como despensa.", // [CHECK]
+        body: "Escribe el nombre de un lugar o un tipo de lugar, como despensa, y los lugares que coinciden aparecen mientras escribes.", // [CHECK]
       },
       filters: {
         title: "Filtros",
-        body: "Toca aquí para ver solo lugares abiertos ahora, que aceptan SNAP o WIC, o de un solo tipo.", // [CHECK]
+        body: "Toca Filtros para abrir esta lista y activa una opción para ver solo lugares abiertos ahora, que aceptan SNAP o WIC, o de un solo tipo.", // [CHECK]
       },
       pin: {
         title: "Marcadores", // [CHECK]

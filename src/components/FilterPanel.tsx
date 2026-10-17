@@ -89,6 +89,13 @@ interface FilterPanelProps {
 
   /** "Clear all" — categories + the three switches only, never the search query. */
   onClearAll: () => void;
+
+  /**
+   * False while the guided tour (#159) holds the panel open to show it: the
+   * tour's own dialog owns focus and Tab then, and this panel's initial focus
+   * and Tab trap would pull focus out of it. Default true.
+   */
+  trapFocus?: boolean;
 }
 
 /** One "Show only" toggle row: label (+ optional count) and a switch control. */
@@ -111,7 +118,8 @@ function SwitchRow({
     // #233: the row is the switch's hit area — `relative` here (not on the
     // switch) makes the switch's `before:inset-0` overlay span the full
     // 48px row, so a thumb on the label toggles it like the checkbox rows.
-    <div className="relative flex items-center gap-3 px-5 py-2.5 min-h-12">
+    // data-tour: the guided tour's Filters step highlights these rows (#159).
+    <div data-tour="filter-switch-row" className="relative flex items-center gap-3 px-5 py-2.5 min-h-12">
       {icon}
       <span className="flex-1 text-sm font-medium text-[var(--color-ink-700)]">{label}</span>
       {count !== undefined && (
@@ -163,6 +171,7 @@ export default function FilterPanel({
   filterEvents = false,
   onToggleEvents,
   eventsCount = 0,
+  trapFocus = true,
 }: FilterPanelProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -196,7 +205,7 @@ export default function FilterPanel({
   // Recipe mirrors HamburgerMenu.tsx (see its own comments for the "why" of
   // each step) — this app's other full-height overlay panel.
   useEffect(() => {
-    if (!open || !panelRef.current) return;
+    if (!open || !trapFocus || !panelRef.current) return;
 
     // Unlike HamburgerMenu.tsx's own version of this capture (#545), no
     // `!== document.body` guard is needed here: this panel's opener (the
@@ -237,7 +246,7 @@ export default function FilterPanel({
     }
     document.addEventListener("keydown", handleTab);
     return () => document.removeEventListener("keydown", handleTab);
-  }, [open]);
+  }, [open, trapFocus]);
 
   // #527: shared, ref-counted with every other overlay that wants the lock
   // (see overlayRegistry.ts's own header) — replaces this panel's own
@@ -273,7 +282,10 @@ export default function FilterPanel({
       <div
         ref={panelRef}
         role="dialog"
-        aria-modal="true"
+        // Not modal while the tour (#159) holds it open: two aria-modal dialogs
+        // at once let a screen reader scope itself to this panel and lose the
+        // tour's Next/Skip.
+        aria-modal={trapFocus ? "true" : undefined}
         aria-labelledby={TITLE_ID}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}

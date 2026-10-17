@@ -48,7 +48,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { venues as allVenues } from "@/data/venues";
-import type { Venue } from "@/types/venue";
+import type { Venue, VenueCategory } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
 import HamburgerMenuContent from "./HamburgerMenuContent";
 import DesktopSidePanel, {
@@ -135,6 +135,18 @@ interface TourSession {
   prevSelectedId: string | null;
   prevViewMode: ViewMode;
   sampleVenue: Venue | null;
+  /**
+   * The visitor's filters, lifted for the tour: with Open now on at night (or
+   * SNAP/WIC) the search demo could find nothing, and the Filters step must
+   * show every switch off. Handed back in endTour.
+   */
+  prevFilters: {
+    categories: Set<VenueCategory> | null;
+    openNow: boolean;
+    snap: boolean;
+    wic: boolean;
+    events: boolean;
+  };
 }
 
 /**
@@ -1265,7 +1277,9 @@ export default function MapWrapper({
     query,
     setQuery,
     commitSearch,
+    setSearchTrackingPaused,
     selectedCategories,
+    setSelectedCategories,
     filterOpenNow,
     setFilterOpenNow,
     filterSnap,
@@ -1363,6 +1377,9 @@ export default function MapWrapper({
   // blurTimerRef: grace timer so mousedown-inside-popover doesn't lose the click.
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  // Guided tour session (#159) — the tour's own logic sits with startTour
+  // below; declared up here because the outside-press effect needs it.
+  const [tour, setTour] = useState<TourSession | null>(null);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // searchAreaRef: wraps SearchBar + ViewSuggestion + SearchResultsPopover
   // (display:contents — adds no box, purely a containment check target).
@@ -1465,6 +1482,8 @@ export default function MapWrapper({
   // different one) must still compare equal when the resulting membership is
   // equal — a plain string key gives that for free.
   const prevCategoriesKeyRef = useRef<string | null | undefined>(undefined);
+  // Set by the guided tour right before it changes the categories itself.
+  const skipCategoryFitRef = useRef(false);
 
   useEffect(() => {
     if (!mapboxMap) return;
@@ -1479,6 +1498,13 @@ export default function MapWrapper({
     // touching the ref.
     const prevCategoriesKey = prevCategoriesKeyRef.current;
     prevCategoriesKeyRef.current = categoriesKey;
+    // The guided tour (#159) lifts the visitor's categories for the tour and
+    // hands them back at the end; neither is a visitor's choice to zoom on,
+    // and the tour restores the camera itself.
+    if (skipCategoryFitRef.current) {
+      skipCategoryFitRef.current = false;
+      return;
+    }
 
     const reducedMotion =
       typeof window !== "undefined" &&
@@ -1744,7 +1770,10 @@ export default function MapWrapper({
   // or a marker can stop it; presses inside the search area (input, filters
   // button, popover rows) are left alone so row clicks still land.
   useEffect(() => {
-    if (!isPopoverOpen) return;
+    // Not while a tour runs (#159): the tour's search demo opens these
+    // results itself, and every tap then lands on the tour's own layer —
+    // closing them would wipe the demo mid-step.
+    if (!isPopoverOpen || tour) return;
     const onPress = (e: PointerEvent) => {
       const target = e.target;
       if (target instanceof Node && searchAreaRef.current?.contains(target)) return;
@@ -1752,7 +1781,7 @@ export default function MapWrapper({
     };
     document.addEventListener("pointerdown", onPress, true);
     return () => document.removeEventListener("pointerdown", onPress, true);
-  }, [isPopoverOpen, closeSearchPopover]);
+  }, [isPopoverOpen, tour, closeSearchPopover]);
 
   // Selection by ANY route (pin, list row, strip, deep link, saved list)
   // closes it too — the card now owns the screen.
@@ -1969,7 +1998,9 @@ export default function MapWrapper({
   // ponytail: an active walking route and a selected event are NOT restored
   // — selecting the sample venue clears both, and a tour mid-route is rare.
   // Upgrade path: snapshot + refetch the route / reselect the event in endTour.
-  const [tour, setTour] = useState<TourSession | null>(null);
+  // A ref, not TourSession: the demo's unmount cleanup runs after endTour
+  // has already cleared `tour`, and must still restore the same query.
+  const tourPrevQueryRef = useRef("");
   const startTour = useCallback(
     (returnFocusSelector: string) => {
       setMenuSection(null);
@@ -1986,10 +2017,50 @@ export default function MapWrapper({
         filteredVenues.find((v) => v.category !== "blessing_box") ??
         allVenues.find((v) => v.category === "pantry") ??
         null;
-      setTour({ returnFocusSelector, prevSelectedId: selectedVenueId, prevViewMode: viewMode, sampleVenue });
+      setTour({
+        returnFocusSelector,
+        prevSelectedId: selectedVenueId,
+        prevViewMode: viewMode,
+        sampleVenue,
+        prevFilters: {
+          categories: selectedCategories,
+          openNow: filterOpenNow,
+          snap: filterSnap,
+          wic: filterWic,
+          events: filterEvents,
+        },
+      });
+      if (selectedCategories && selectedCategories.size > 0) skipCategoryFitRef.current = true;
+      clearFilters();
+      // The search demo borrows the real query; keep the visitor's own to
+      // hand back, and keep the demo word out of search_used analytics.
+      tourPrevQueryRef.current = query;
+      setSearchTrackingPaused(true);
       handleViewModeChange("map");
     },
-    [filteredVenues, selectedVenueId, viewMode, handleViewModeChange, setSelectedEventId],
+    [
+      filteredVenues, selectedVenueId, viewMode, query, handleViewModeChange, setSelectedEventId, setSearchTrackingPaused,
+      selectedCategories, filterOpenNow, filterSnap, filterWic, filterEvents, clearFilters,
+    ],
+  );
+  // Search step demo (#159): set the real query and show its results without
+  // focusing the input (so a phone keyboard never opens); null puts the
+  // visitor's own query back with the results closed, as before the tour.
+  const handleTourDemoSearch = useCallback(
+    (text: string | null) => {
+      // A blur's pending 150ms close (handleSearchBlur) would shut the demo's
+      // results the moment they open.
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+      setActiveIndex(-1);
+      if (text === null) {
+        setQuery(tourPrevQueryRef.current);
+        setIsPopoverOpen(false);
+        return;
+      }
+      setQuery(text);
+      setIsPopoverOpen(text !== "");
+    },
+    [setQuery],
   );
   // One path for "show this venue's card / close any card" on both
   // platforms: selectVenue opens the desktop side panel too (a bare
@@ -2010,8 +2081,23 @@ export default function MapWrapper({
     if (!tour) return;
     handleTourShowVenue(tour.prevSelectedId);
     setViewMode(tour.prevViewMode);
+    // The demo steps undo themselves on unmount too; doing it here as well
+    // keeps the restore in the same render as the rest of the snapshot.
+    handleTourDemoSearch(null);
+    setFilterPanelOpen(false);
+    const f = tour.prevFilters;
+    if (f.categories && f.categories.size > 0) skipCategoryFitRef.current = true;
+    setSelectedCategories(f.categories);
+    setFilterOpenNow(f.openNow);
+    setFilterSnap(f.snap);
+    setFilterWic(f.wic);
+    setFilterEvents(f.events);
+    setSearchTrackingPaused(false);
     setTour(null);
-  }, [tour, handleTourShowVenue, setViewMode]);
+  }, [
+    tour, handleTourShowVenue, handleTourDemoSearch, setViewMode, setSearchTrackingPaused,
+    setSelectedCategories, setFilterOpenNow, setFilterSnap, setFilterWic, setFilterEvents,
+  ]);
   const handleMenuStartTour = useCallback(
     () => startTour('[data-testid="nav-top"]'),
     [startTour],
@@ -2357,6 +2443,8 @@ export default function MapWrapper({
         filterEvents={filterEvents}
         onToggleEvents={() => setFilterEvents((v) => !v)}
         eventsCount={filterEventsCount}
+        // The tour (#159) holds the panel open as a demo; its dialog owns focus then.
+        trapFocus={tour === null}
       />
 
       {/* EmptySearchPopover — shown when query is non-empty but yields no results.
@@ -2638,6 +2726,8 @@ export default function MapWrapper({
           sampleVenue={tour.sampleVenue}
           mapboxMap={mapboxMap}
           onShowVenue={handleTourShowVenue}
+          onDemoSearch={handleTourDemoSearch}
+          onShowFilters={setFilterPanelOpen}
           onClose={endTour}
           returnFocusSelector={tour.returnFocusSelector}
         />

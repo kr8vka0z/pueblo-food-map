@@ -202,8 +202,16 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     queryRef.current = query;
   }, [query]);
   const lastSentTermRef = useRef<string | null>(null);
+  // The guided tour (#159) types a sample word into this same query to show
+  // search working; that is not a visitor's search and must never be sent.
+  // A ref, so pausing takes effect before the next idle timer can fire.
+  const searchTrackingPausedRef = useRef(false);
+  const setSearchTrackingPaused = useCallback((paused: boolean) => {
+    searchTrackingPausedRef.current = paused;
+  }, []);
 
   const commitSearch = useCallback(() => {
+    if (searchTrackingPausedRef.current) return;
     const term = queryRef.current.trim().toLowerCase();
     if (term === "" || term === lastSentTermRef.current) return;
     lastSentTermRef.current = term;
@@ -272,6 +280,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     query,
     setQuery,
     commitSearch,
+    setSearchTrackingPaused,
     selectedCategories,
     setSelectedCategories,
     filterOpenNow,

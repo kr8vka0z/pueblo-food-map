@@ -55,7 +55,9 @@ export function resolveVenueId(search: string, hash: string): string | null {
 }
 
 /**
- * True when the splash must not show: a shared venue link, an in-app
+ * True when the splash must not show: a shared venue link, a shared event
+ * link (`?event=<id>`, #759 — an empty `?event=` is no link and does not skip),
+ * an in-app
  * ?near=1 / ?boxes=1 hop (PageNav — the splash was already seen), or a
  * visitor who already dismissed it.
  */
@@ -71,6 +73,7 @@ export function shouldSkipSplash({
   const params = new URLSearchParams(search);
   return (
     Boolean(resolveVenueId(search, hash)) ||
+    Boolean(params.get("event")) ||
     params.get("near") === "1" ||
     params.get("boxes") === "1" ||
     gateSeen
@@ -90,7 +93,7 @@ export const SPLASH_GATE_SCRIPT =
   "(function(){try{" +
   "var p=new URLSearchParams(location.search),v=p.get('venue'),h=location.hash," +
   "r=v!==null?v:(h.indexOf('#venue=')===0?h.slice(7):null);" +
-  "if(r||p.get('near')==='1'||p.get('boxes')==='1'||" +
+  "if(r||p.get('event')||p.get('near')==='1'||p.get('boxes')==='1'||" +
   `localStorage.getItem(${JSON.stringify(GATE_KEY)})==='1')` +
   `document.documentElement.setAttribute(${JSON.stringify(SPLASH_SEEN_ATTR)},'')` +
   "}catch(e){}})();";

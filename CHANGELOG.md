@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-11
+
+### New
+
+- Special events like food drives now show on the map with their own pin, a details card with an optional flyer photo, a "happening today" alert, an Events filter and list, and a page you can share. ([#764](https://github.com/kr8vka0z/pueblo-food-map/pull/764)) ([#765](https://github.com/kr8vka0z/pueblo-food-map/pull/765)) ([#766](https://github.com/kr8vka0z/pueblo-food-map/pull/766)) ([#767](https://github.com/kr8vka0z/pueblo-food-map/pull/767)) ([#768](https://github.com/kr8vka0z/pueblo-food-map/pull/768)) ([#769](https://github.com/kr8vka0z/pueblo-food-map/pull/769)) ([#770](https://github.com/kr8vka0z/pueblo-food-map/pull/770))
+
+### Improved
+
+- Security updates. ([#749](https://github.com/kr8vka0z/pueblo-food-map/pull/749)) ([#752](https://github.com/kr8vka0z/pueblo-food-map/pull/752))
+
 ## [1.1.0] - 2026-10-04
 
 ### New

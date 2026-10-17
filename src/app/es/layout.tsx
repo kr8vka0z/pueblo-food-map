@@ -36,6 +36,13 @@
  * notFound() call is ever added later (a route that can legitimately
  * throw it after matching), es/not-found.tsx should come back at that
  * point, not before.
+ *
+ * #762 is that point: /es/event/[id] is dynamic and throws notFound() for a
+ * draft, archived or unknown event, so es/not-found.tsx is back (Spanish
+ * body for that 404 only; unmatched /es/* URLs still fall through to the
+ * English global-not-found, as above). The event 404 has the same blank
+ * `__next_error__` first paint described above, exactly like /box/[id] does
+ * in the EN tree; it is a real HTTP 404 with noindex either way.
  */
 import "../globals.css";
 import RootShell from "@/components/RootShell";

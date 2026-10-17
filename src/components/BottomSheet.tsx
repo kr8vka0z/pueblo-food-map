@@ -78,6 +78,7 @@
  */
 
 import { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
 import { X, MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import type { Venue } from "@/types/venue";
@@ -100,6 +101,13 @@ import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/Di
 import BoxCardBody from "@/components/BoxCardBody";
 import RouteStrip, { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
+import type { PublicEventDetail } from "@/lib/events";
+import { eventText } from "@/lib/eventCard";
+import EventHereLine, { type EventHere } from "@/components/EventHereLine";
+
+// The special-event card (#759) loads only when an event is opened, so a
+// visitor who never taps an event pin downloads none of it.
+const EventCardBody = dynamic(() => import("@/components/EventCardBody"), { ssr: false });
 
 // #549: the map-peek gap deliberately left visible above the drawer at rest
 // (100px, matches the non-route maxHeight below). Named so the height calc
@@ -121,6 +129,18 @@ const FULL_CARD_SNAP = 1;
 
 interface BottomSheetProps {
   venue: (Venue & { distanceMiles?: number }) | null;
+  /**
+   * A special event's card (#759) instead of a place's: mutually exclusive with
+   * `venue` (MapWrapper keeps one selection at a time). Same sheet, grab bar
+   * and dismissal paths; only the body differs.
+   */
+  event?: PublicEventDetail | null;
+  /** The visitor's real position for the event card's distance line, or null. */
+  userLocation?: { lat: number; lng: number } | null;
+  /** Event card, ended/cancelled: "See places open now". */
+  onSeeOpenNow?: () => void;
+  /** An upcoming/live event tied to this place (#759): one line that opens its card. */
+  eventHere?: EventHere | null;
   /**
    * Full blessing-box record when `venue.category === "blessing_box"` —
    * `venue` itself only carries the plain-Venue fields every marker uses
@@ -163,6 +183,10 @@ interface BottomSheetProps {
 
 export default function BottomSheet({
   venue,
+  event = null,
+  userLocation = null,
+  onSeeOpenNow = () => {},
+  eventHere = null,
   box,
   onCheckinSuccess,
   onClose,
@@ -315,7 +339,7 @@ export default function BottomSheet({
     setCardRevealed(!isWalkRouteActive);
   }
 
-  const open = venue !== null;
+  const open = venue !== null || event !== null;
   // #527: registers this sheet into the shared overlay-escape stack (see
   // overlayRegistry.ts's own header) so `onEscapeKeyDown` below can tell
   // whether a higher overlay (Filters, the Menu) is open on top of it.
@@ -333,7 +357,7 @@ export default function BottomSheet({
   // actually loaded (the `box.cardLoading` fallback below has no content to
   // peek at, so it keeps today's no-bar behavior rather than a bar that
   // toggles nothing).
-  const showGrabBar = venue !== null && !showStrip && (!isBox || box != null);
+  const showGrabBar = (venue !== null || event !== null) && !showStrip && (!isBox || box != null);
 
   function handleOpenChange(isOpen: boolean) {
     if (isOpen) return;
@@ -437,7 +461,7 @@ export default function BottomSheet({
     >
       <Drawer.Portal>
         <Drawer.Content
-          key={venue?.id ?? "empty"}
+          key={venue?.id ?? event?.id ?? "empty"}
           // Composed with vaul's OWN internal `drawerRef` (vaul's `Content`
           // does `useComposedRefs(ref, drawerRef)` — confirmed in source, so
           // passing a ref here doesn't replace vaul's, it runs alongside
@@ -591,7 +615,11 @@ export default function BottomSheet({
         >
           {/* Drawer.Title — required by Radix to fix a11y missing-title violation */}
           <Drawer.Title className="sr-only">
-            {venue ? `${venue.name} ${t("detail.venueDetails", locale)}` : t("detail.venueDetailsPanel", locale)}
+            {venue
+              ? `${venue.name} ${t("detail.venueDetails", locale)}`
+              : event
+              ? eventText(event.name, event.name_es, locale)
+              : t("detail.venueDetailsPanel", locale)}
           </Drawer.Title>
 
           {/* Drawer.Description (#590 follow-up): vaul's Drawer.Content forwards
@@ -617,6 +645,8 @@ export default function BottomSheet({
                     ? `${venue.lat}, ${venue.lng}`
                     : venue.address
                 }`
+              : event
+              ? event.address
               : t("detail.venueDetailsPanel", locale)}
           </Drawer.Description>
 
@@ -675,6 +705,26 @@ export default function BottomSheet({
               activeStepIndex={activeStepIndex}
               onStepChange={onStepChange}
             />
+          )}
+
+          {event && !venue && (
+            // Special-event card (#759). Same scroller as the place card
+            // below, so the swipe/overscroll behavior (#553) is identical.
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              <EventCardBody
+                event={event}
+                locale={locale}
+                userLocation={userLocation}
+                headingId={`event-card-title-${event.id}`}
+                onClose={onClose}
+                onSeeOpenNow={onSeeOpenNow}
+                layout="sheet"
+                expanded={expanded}
+                onRequestExpand={() => setExpandedState(true)}
+                detailSectionId={DETAIL_SECTION_ID}
+                className="pb-[max(1rem,env(safe-area-inset-bottom))]"
+              />
+            </div>
           )}
 
           {venue && !showStrip && (
@@ -793,6 +843,8 @@ export default function BottomSheet({
                     <X size={18} aria-hidden />
                   </button>
                 </div>
+
+                {eventHere && <EventHereLine {...eventHere} />}
 
                 {/* Operator attribution */}
                 {venue.operator && (

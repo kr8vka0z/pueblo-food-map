@@ -34,6 +34,15 @@ Browser
   └── MapWrapper   (all state + interaction logic)
         ├── Map.tsx          (Mapbox GL canvas; SSR-skipped via dynamic import)
         ├── VenueMarker.tsx  (Lucide MapPin button inside each Mapbox Marker)
+        ├── EventLayer.tsx   (special-event star pins, drawn after the place
+        │     pins; owns the once-a-minute clock — see "Events" → "Map pins")
+        │     └── EventMarker.tsx  (one star pin; NOW rings + label while live)
+        ├── EventStrip.tsx   ("happening today" strip under the search bar;
+        │     map view only; owns its own minute-clock subscription — "Events"
+        │     → "Strip, filter and list")
+        ├── EventListSection.tsx  (events above the places in ListView)
+        ├── EventCardBody.tsx  (the event card, lazy; phone = inside BottomSheet,
+        │     desktop = inside DesktopSidePanel via EventPanel.tsx — "Event card")
         ├── BottomSheet.tsx  (mobile: vaul bottom sheet)
         ├── DesktopSidePanel.tsx  (desktop: fixed right-hand panel shell —
         │     inset/size/chrome, Escape, focus-to-heading + focus-return,
@@ -71,7 +80,7 @@ Next.js App Router (Cloudflare Worker)
           JSON-LD, LocaleProvider — reads no cookie, ServiceWorkerRegister →
           public/sw.js, see "Offline / installable app", #130 — and Analytics)
     └── not-found.tsx   (branded 404 for an explicit notFound() call inside this
-          route tree — venue/[id], box/[id], report/[venueId])
+          route tree — venue/[id], box/[id], event/[id], report/[venueId])
     └── forbidden.tsx   (branded 403 for next/navigation's forbidden(), admin/page.tsx)
     └── page.tsx        (Server Component: venue-index JSON-LD, metadata;
           mounts HomePageClient.tsx — splash gate + MapWrapper)
@@ -84,13 +93,15 @@ Next.js App Router (Cloudflare Worker)
         venues/, venue/[id]/) each pass locale: "es" to buildPageMetadata and
         the venueSchema.ts builders, and render the SAME client "Content"
         components as their (site)/ counterparts — no page logic duplicated.
-        No es/not-found.tsx: dynamicParams=false on es/venue/[id] means an
-        unknown id 404s at Next's ROUTING level, before that page's own
-        notFound() call ever runs — there is no in-tree notFound() call
-        anywhere under /es to catch. Unmatched /es/* URLs (including an
-        unknown venue id) fall through to the EN app/global-not-found.tsx —
-        an accepted tradeoff; see "i18n model" below for why a catch-all
-        route meant to fix that measured worse, not better.
+        es/not-found.tsx exists only for the dynamic /es/event/[id] (#762),
+        the one in-tree notFound() under /es: dynamicParams=false on
+        es/venue/[id] means an unknown venue id 404s at Next's ROUTING level,
+        before that page's own notFound() call ever runs. Unmatched /es/* URLs
+        (including an unknown venue id) fall through to the EN
+        app/global-not-found.tsx — an accepted tradeoff; see "i18n model"
+        below for why a catch-all route meant to fix that measured worse, not
+        better. The event pages (event/[id], es/event/[id]) are dynamic —
+        see "Event page" under "Events".
   └── src/components/RootShell.tsx — the shared <html>/<body> shell (font
         preload, WebSite JSON-LD, LocaleProvider, Analytics, SW register)
         (site)/layout.tsx, es/layout.tsx and global-not-found.tsx (below) all
@@ -327,6 +338,7 @@ Key state atoms and their roles:
 | State | Type | Purpose |
 |---|---|---|
 | `selectedVenueId` | `string \| null` | Which venue card is open |
+| `selectedEventId` | `string \| null` | Which special-event star pin is selected (#758, from `useMapUI`); opens the event card (#759); mirrored into `?event=<id>`, mutually exclusive with `selectedVenueId` |
 | `viewport` | `'located' \| 'pueblo-center'` | Splash exit mode; determines initial map center |
 | `viewMode` | `'map' \| 'list'` | Map canvas vs. full-screen list |
 | `query` | `string` | Text search input |
@@ -524,8 +536,11 @@ The rules it sets:
 - **`/venue/<id>`** has a visible breadcrumb (Map › All places › name) plus a
   matching `BreadcrumbList` JSON-LD (`buildVenueBreadcrumbJsonLd`). The page's
   ODbL credit comes from `SiteFooter`.
-- **The sitemap is build-time data only**: the static routes plus the published
-  venues. `src/__tests__/seo.test.ts` fails if a static sitemap URL has no
+- **The sitemap is build-time data plus one live read**: the static routes plus
+  the published venues, plus (since #762, `force-dynamic`) the published
+  upcoming and live events read from D1 per request, in both languages; any
+  failure of that read lists no events and never fails the sitemap (see
+  "Event page"). `src/__tests__/seo.test.ts` fails if a static sitemap URL has no
   `page.tsx`. That's how the old `/boxes` entry 404'd unnoticed. Blessing
   Boxes aren't in it: `/box/<id>` is a `noindex` redirect shell into the map
   card. Boxes come back through the planned read-only `/blessing-boxes` list
@@ -759,7 +774,9 @@ titles). `release.yml` (cron Sun 02:00 UTC = Saturday evening Mountain, or
 `workflow_dispatch`) runs `scripts/release/prepare.mjs` (dry run: next version
 from the merged-PR titles — `feat` → minor, else patch, major only via a forced
 version — plus the PR list), has Claude write the plain-language CHANGELOG.md
-section (the run fails unless that is the only file changed), then bumps
+section (the run fails unless that is the only file changed, and unless
+`scripts/release/check-push-target.sh` confirms `origin` still pushes to this
+repo — the model step shares the checkout that holds the write token), then bumps
 `package.json`/lock itself and opens `Release vX.Y.Z` from `release/vX.Y.Z`
 into `main`. `main` requires linear history, so it is squash-merged; that
 triggers `deploy-prod.yml`. Once the smoke checks pass, two independent jobs
@@ -789,6 +806,24 @@ ruleset and auto-merge silently becomes merge-on-open). A consequence: a
 dependency bump, security bumps included, waits on `dev` until the next
 weekly release. Any new workflow that pushes to `main` must avoid `GITHUB_TOKEN`. Incident history:
 atlas-kb "PFM ARCHITECTURE History — 2026-09-24 Trim".
+
+**Security fixes.** Dependabot *security* updates always target `main` (they
+ignore `target-branch`), so they are off in repo settings and `security-fix.yml`
+replaces them: daily it runs `scripts/security/audit-fix.sh` on `dev`, which
+applies `npm audit fix --package-lock-only --omit=dev --min-release-age=3` with a
+pinned npm 11 (npm 10 hides production packages from the audit, #752/#753;
+build tools are left to Dependabot; a version under 3 days old is never locked,
+since the PR merges with no human). If the required "Dependency CVE Audit"
+command passes on the fixed lockfile it opens an auto-merging
+`fix/security-advisories` PR into `dev` with an App token, reusing only a
+same-repo PR (`--head` matches by branch name, so a fork PR could otherwise be
+adopted). A fix that would still leave the check red is not shipped: while the
+check is red nothing merges unless one PR turns it green, so a partial PR could
+never land. Issue state follows dev's own lockfile: one bot-authored issue,
+"Security check is failing and cannot be fixed automatically", is created or
+edited while dev fails (not when the PR was just created and is minutes from
+merging) and closed when dev passes. The run is green when the result was
+reported (fixed, or issue raised) and red when the job itself could not run.
 
 **Environment variables:** `NEXT_PUBLIC_*` vars are baked into the client
 bundle at build time, so they are GitHub Actions repo secrets injected into
@@ -944,6 +979,337 @@ Migrations, R2 buckets and dedicated secrets: AGENTS.md "Blessing Boxes".
 
 ---
 
+## Events
+
+One-off special events (a produce giveaway, a turkey drive), plan in issue
+#156. **Slice 1 (#757) is storage, the public read and the admin screens;
+slice 2 (#758) adds the map pin** (see "Map pins" below); **slice 3 (#759)
+adds the event card** (see "Event card" below); **slice 4 (#760) adds the
+flyer image** (see "Event flyer" below); **slice 6 (#762) adds a web page per
+event** (see "Event page" below).
+
+- **Live, never published.** Like boxes, events are read from D1 at request
+  time and are not part of the venue Publish snapshot.
+- **Table `events`** (`migrations/0018_events.sql`). English text columns with
+  nullable `_es` twins (Spanish falls back to English), `starts_at` / `ends_at`
+  as absolute UTC ISO text (`CHECK ends_at > starts_at`), its own `lat` / `lng` /
+  `address` plus an optional `venue_id` (plain TEXT, no foreign key — the
+  event keeps its own coordinates), `link_url`, `flyer_key` (slice 4, see
+  "Event flyer"), `status` draft / published / cancelled / archived and
+  created / updated / published stamps. Nothing is deleted.
+- **Pueblo time.** Admins type America/Denver wall-clock time; the **server**
+  converts to UTC (`src/lib/eventTime.ts`, `Intl` only, DST-correct: a
+  time inside the spring-forward gap is rejected, the repeated fall-back hour
+  resolves to its first occurrence). The browser sends the raw
+  `datetime-local` string, so its timezone never matters. This is
+  deliberately unlike place hours (`src/lib/hours.ts`), which use the phone's clock.
+- **Public feed** `GET /api/public/events` (`src/lib/events.ts`
+  `PUBLIC_EVENTS_SQL`): `status = 'published' AND ends_at > now`, soonest first,
+  explicit column list (no internal fields). 60-second `caches.default` entry
+  through `respondWithEdgeCache()`, purged by every admin events write
+  (`purgeEventsFeed()`, this colo only — the TTL bounds the rest). **Fails
+  soft:** a missing table or any D1 error answers `{ events: [] }` with a 200
+  and is never cached, because this code can reach production before the
+  manual production migration does.
+- **Admin** (`/admin/events`, `/admin/events/new`, `/admin/events/[id]/edit`;
+  `EventsList`, `EventForm`). Same shape as the venue screens: server page
+  gate → client form → route handler write. Routes: `POST /api/admin/events`
+  (save draft | publish), `PATCH /api/admin/events/[id]` (save | publish |
+  cancel — cancel needs a note and a published event; nothing re-opens a
+  cancelled one), `POST /api/admin/events/[id]/archive`. Each is
+  `getAdminDb()` → `requireAdminOrigin()` → one `db.batch()` with a
+  `WHERE EXISTS`-gated `audit_log` row (entity `event`; `audit_log.action` is
+  CHECK-limited, so cancel is logged as `update` with the new status in
+  `after_json`) → feed purge. PATCH requires `expectedUpdatedAt`; a stale one
+  is a 409 and writes no audit row. Validation is hand-rolled
+  (`src/lib/adminEventValidation.ts`). The list/edit pages read events inside
+  their own try/catch, so a missing table shows a "Couldn't load, Retry" panel.
+  The place is a picked venue (address and coordinates copied) or a typed
+  address located with the venue form's `/api/admin/geocode`.
+- **Suggest Spanish** (`POST /api/admin/events/translate`,
+  `src/lib/eventTranslate.ts`). The owner does not write Spanish, so the form's
+  "Suggest Spanish" button sends the English values and fills **only the
+  Spanish boxes that are empty**. The route gates like the other event routes
+  (`authorizeEventRequest`), checks the same `FIELD_LIMITS` caps, asks Workers
+  AI through the `AI` binding (declared in `wrangler.jsonc` for production and
+  `env.staging`; no key, secret or npm dependency), and returns
+  `{ suggestions: { name_es, … } }`. It reads and writes no row and no audit
+  entry. **The text is machine-made and unreviewed**: the form says so and the
+  admin edits it before saving. The model's reply is untrusted: fields not
+  asked for are dropped and every value is trimmed and cut to its cap. A model
+  error, bad JSON, empty answer or timeout (25 s) is a 502, a missing binding
+  (local dev, tests) a 503, both with a message the form shows. The prompt asks
+  for Mexican / Latin American Spanish (above) and keeps names, addresses,
+  times, URLs and SNAP / WIC / EBT as written; the English is passed as JSON data,
+  not instructions. Model: `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (on
+  Cloudflare's JSON-mode list); a four-field call measured about 33 neurons
+  against the free 10,000 per day (roughly 300 clicks), and usage past that bills at Workers Paid
+  rates. Only `EventForm` (admin tree) reaches this; nothing public imports it.
+- **Tests** run the routes and the feed against real SQLite built from the
+  migration files (`src/lib/sqliteD1.testutil.ts`).
+
+### Map pins (#758)
+
+- **Data path.** `MapWrapper` calls `useEvents()` (`src/lib/useEvents.ts`), which
+  fetches `/api/public/events` once on mount, like `useBoxesList`. A failed,
+  non-OK or malformed response leaves the list `[]` and the state is never
+  written for an empty list, so the map is byte-for-byte what it was before
+  events. `Map.tsx` mounts `EventLayer` only when the list is non-empty, so
+  "no events" also means no timer and no DOM.
+- **Which events draw** (`src/lib/eventPins.ts`, pure). Going on now
+  (`now >= starts_at && now < ends_at`, absolute UTC instants) or starting
+  within `EVENT_PIN_WINDOW_DAYS` (7, the one constant). Everything else,
+  including a malformed date, is skipped. Labels are formatted in
+  America/Denver with `Intl` via `eventTime.ts`'s `TIME_ZONE` / `puebloParts`
+  (shared with the admin form, not copied), so a phone set to another timezone
+  reads the same label. Place hours still use the phone's clock (`hours.ts`).
+- **The clock.** `EventLayer` calls `useMinuteClock()` (`src/lib/useMinuteClock.ts`):
+  one `setInterval` of 60 s plus a `visibilitychange` listener that re-reads
+  the time when the tab comes back (background timers are throttled); shared
+  with the event card since #759 (see "Event card"). The tick
+  re-renders `EventLayer` only. `Map` and the place pins are not re-rendered,
+  and `EventMarker` is `memo`'d on primitive props, so a minute that changes no
+  pin repaints no pin. A pin flips to NOW at its start and disappears at its end
+  with no reload (up to 60 s late, by design).
+- **Pin.** `EventMarker` is a DOM `<Marker>` + `<button>` (like `VenueMarker`):
+  orange star pin 44 px coming up, 52 px live, inside a >= 48 px target,
+  `zIndex` above place pins. Styles are `.pfm-event-*` in `globals.css` using
+  the `--color-event-pin` / `--color-event-outline` tokens (DESIGN.md has the
+  owner-approved orange exception). The NOW rings are one keyframe
+  (`pfm-event-ring`, transform + opacity) covered by the global
+  reduced-motion block; the static halo and the label remain.
+- **Selection and `?event=<id>`.** `selectedEventId` lives in `useMapUI`.
+  Tapping a pin selects it and centers the map on it (`EventLayer`; camera
+  jumps under reduced motion); tapping it again deselects. Selecting an event
+  clears the selected venue and vice versa. `MapWrapper` mirrors the id into
+  the address bar with `replaceState` (`syncEventParam`, a no-op when the URL
+  already agrees). A shared `/?event=<id>` is read once by `HomePageClient`
+  and seeds the state; unlike `?near=`/`?boxes=` it is not stripped. Since #759
+  `?event=<id>` also skips the first-visit splash (`splashGate.ts`:
+  `shouldSkipSplash` and `SPLASH_GATE_SCRIPT` both test it, and `splashSsr.test`
+  / `eventSplash.test` keep them in step) and loads the map eagerly, like
+  `?venue=`.
+
+### Event card (#759)
+
+- **One body, two shells.** `EventCardBody.tsx` is the card; it is rendered in
+  the phone `BottomSheet` (new optional `event` prop, `layout="sheet"`, same
+  vaul sheet, grab bar, Escape and swipe paths as the place card) and, on
+  desktop, in `DesktopSidePanel` through the small `EventPanel.tsx` wrapper
+  (dialog role + scroller). `DesktopVenueWindow` is the *place* card and needs
+  a place, so it is not used (refactoring it is #725). Both entry points load
+  the card with `next/dynamic` (`ssr: false`), so a visitor who never opens an
+  event downloads none of it. The desktop event view is derived from
+  `selectedEventId` (shown while `sidePanelView` is null), not a `sidePanelView`
+  kind: a shared link seeds the selection before `isMobile` settles, and a
+  handler-set view would miss it. Opening a place, Saved or Menu clears the
+  event and vice versa; closing clears `?event=`.
+- **Order** (owner-approved mockup): the flyer (#760, `EventFlyer.tsx`; absent
+  when the event has none), status badge, name, "Hosted by", When, Where (+ distance when the visitor's real
+  position is known), About, a highlighted "What to bring" box, the orange Get
+  directions button, Share and Add to calendar, then the optional link. On a
+  phone the first, always-visible view is badge, name, When and Get directions,
+  so there Get directions sits above Where/About; the rest is the clipped
+  "peek" section under the grab bar, as on the box card.
+- **Badge and the clock.** `eventBadge()` (`src/lib/eventCard.ts`, pure) turns
+  `(event, nowMs)` into the stage and the countdown ("Starts in 2 days / 2
+  hours / 20 min", "Happening now, ends in 40 min"; more than 7 days out reads
+  "Starts Sat, Nov 21"). Minutes round up so it never says "0 min". `now`
+  comes from `useMinuteClock()`, which is now ONE shared timer: the interval and
+  `visibilitychange` listener are module-level, started by the first mounted
+  caller (the pins, the card) and stopped with the last, so the card adds no
+  second timer. The badge is plain text, deliberately not a live region, so the
+  once-a-minute change is never announced.
+- **Data for the card.** `useEventsFeed()` (feed + a `loaded` flag) and `useEventDetail()`
+  (`src/lib/useEventDetail.ts`): the card reads the feed `MapWrapper` already
+  holds; only when the feed has answered without the selected id (an ended or
+  cancelled event opened from a shared link) does it make one request to the
+  single-event read. A dead link resolves to "missing": no card opens and the map is as it would be without the parameter. The
+  fetched event is held apart from the feed array, so an ended or cancelled
+  event never reaches `pinsAt()` and gets no pin.
+- **Single-event read** `GET /api/public/events/[id]`
+  (`PUBLIC_EVENT_BY_ID_SQL`): `status IN ('published','cancelled')` so a
+  published event stays readable after it ends and a cancelled one carries
+  `cancel_note(_es)` (null on any other status). Draft, archived, unknown ids
+  and a missing table all answer the same `404 { event: null }`, so the response
+  never reveals that a draft exists. Same 60 s edge cache as the feed, but only
+  a 200 is stored (`BestEffortResult.status`), non-200s are sent `Cache-Control: no-store` so a browser can't keep a 404 past the purge, both events routes key the cache on the bare path (`ignoreQuery`, so `?x=N` variants can't hold a stale 200 the purge misses), and every admin events write
+  purges both the feed and `/api/public/events/<id>` (`purgeEventsFeed(req, id)`).
+- **Ended / cancelled card.** "This event has ended" or "Cancelled" + the
+  admin's note, a button that turns on the existing Open-now filter, and no Get
+  directions, Share or Add to calendar.
+- **Share** is `shareLink()` in `share.ts` (the native share sheet, else copy
+  with a confirmation, or, with neither, the link shown as selectable text; `shareVenue` now calls it too) with `eventShareUrl()`:
+  the event's page, `/event/<id>`, or `/es/event/<id>` on a Spanish page (#762;
+  before that it was the map link `/?event=<id>`, which still works and is what
+  the page's "Open on the map" button uses). The `.ics` `URL:` is the same link.
+- **Add to calendar** is `eventIcs.ts` (no dependency): CRLF, RFC 5545 text
+  escaping, 75-octet folding by bytes, `UID:event-<id>@pueblofoodmap.com`, and
+  DTSTART/DTEND as absolute UTC (`...Z`), which a calendar shows correctly in
+  any zone with no daylight-saving math here.
+- **Event on a place's card.** `MapWrapper` finds an upcoming or live event
+  (pin window) whose `venue_id` is the selected place and passes one
+  `{label, onOpen}` line ("Event here Saturday", `EventHereLine.tsx`) to
+  `BottomSheet` / `DesktopVenueWindow`. Blessing-box cards do not show it.
+- **Text.** All event text is rendered as plain React text. The optional link
+  renders only if `safeUrl()` accepts it (http/https), with
+  `rel="noopener noreferrer"`. Spanish is used on a Spanish page when that
+  column is non-blank, otherwise English (`eventText()`).
+
+### Event flyer (#760)
+
+One image per event, shown at the top of the card.
+
+- **Storage.** R2 bucket binding `EVENT_FLYERS` (`pfm-event-flyers`; staging
+  `pfm-event-flyers-staging`, declared separately because `env.staging` inherits
+  no bindings). Key `<eventId>/<uuid>.jpg`, made on the server; a
+  replaced flyer gets a new key and the old object is deleted. D1 keeps
+  `flyer_key` (0018) plus `flyer_width`, `flyer_height`, `flyer_alt`,
+  `flyer_alt_es` (migration `0019_event_flyer`, nullable ADD COLUMNs).
+- **Upload** `POST /api/admin/events/[id]/flyer` (also `DELETE`, and `GET` for
+  the admin preview, since a draft has no public URL). Gate: session, then
+  `requireAdminOrigin`, before the body is read. The file is judged on its
+  bytes (`src/lib/eventFlyers.ts`: JPEG only, because the server can strip
+  metadata only from a JPEG and the form always re-encodes to JPEG; width and
+  height read from the header, EXIF stripped, 200 KB hard cap, no side over
+  4096 px). A stale `updated_at` is refused (409) before anything is stored.
+  Order: put the new object, then one `db.batch()`
+  (`UPDATE ... WHERE updated_at = ?` + the `WHERE EXISTS`-gated audit row,
+  action `update`), then delete the old object. A lost `updated_at` race (409)
+  or a failed batch deletes the object just uploaded. Every change purges the
+  events caches. The browser shrinks to about 150 KB first
+  (`shrinkFlyerToJpeg`, a size-and-quality ladder, no crop, white background).
+- **Serving** `GET /api/public/events/[id]/flyer/[file]`: both segments must match
+  strict patterns, the key must be the one currently stored on a `published` or
+  `cancelled` event (a draft's, an archived event's or a replaced flyer 404s),
+  `Content-Type` from the extension, `nosniff`, `Cache-Control: public,
+  max-age=31536000, immutable` (safe because the URL changes with the picture).
+  No Workers Cache layer, deliberately (see the file header).
+- **Public data.** The feed and the single-event read carry
+  `flyer: { src, width, height, alt, alt_es } | null`, never the raw key.
+  `loadPublicEvents` / `loadPublicEventById` try the flyer-column query first and
+  fall back to the pre-0019 query (only for a "no such column" error; any other
+  error propagates to the route's degraded answer), so code that reaches production before the
+  migration still lists every event.
+- **Card.** `EventFlyer.tsx` reserves the box from the stored size (capped at
+  `min(55vh, 28rem)`), `loading="lazy"`, `decoding="async"`, alt = the admin's
+  text in the page language, else their English text, else the event name; a
+  failed image renders nothing. It is only inside the card, so it never loads
+  with the map. On the phone sheet it renders only when the sheet is expanded.
+- **Admin form.** `EventFlyerField.tsx`, edit mode only (a new event has no id
+  yet); each action saves by itself and hands the new `updated_at` up to the form.
+  "Suggest Spanish" does not cover the alt text.
+
+### Strip, filter and list (#761)
+
+Three ways to find an event without hunting for its pin. All three read the
+same feed (`useEventsFeed`) and the same one shared minute clock; none adds a
+timer. With no events (empty, failed or not-yet-loaded feed) none of them
+renders anything, so the screen is exactly as before events existed.
+
+- **Which event the strip names** (`stripAt`, `src/lib/eventPins.ts`, pure and
+  clock-as-argument): candidates are events going on now plus events that start
+  on today's *Pueblo* calendar day and have not started, built on `pinsAt` so
+  the strip never names something the map would not pin. First live wins, else
+  the first upcoming; `more` is the remaining count. "Today" is the Pueblo day
+  (`denverDayKey`), never the phone's date, so an event that is tomorrow in
+  Denver is not shown to a phone already on the next date, and the reverse.
+- **`EventStrip.tsx`** is a navy bar with an orange star, three sibling
+  buttons (open the event / "and N more" / close), each at the 48px floor. Open
+  = `selectEvent`, the same call a pin tap makes. "and N more" switches to the
+  list view (the events sit at the top of it); it does not turn the Events
+  filter on, so the visitor's filters are untouched. It subscribes to
+  `useMinuteClock` itself, so the tick re-renders the strip, never MapWrapper,
+  and has no `aria-live` (a screen reader is not told every minute). MapWrapper
+  mounts it only in map view after the map has loaded and while no place or
+  event card is open, so it never coexists
+  with the list (same z-700 rung). Position and z-index: DESIGN.md "Safe zones".
+- **Dismissal** (`src/lib/eventStripDismissals.ts`): localStorage
+  `pfm.eventStrip.dismissed.v1`, `{ eventId: "<Pueblo day>" }`. A dismissed event
+  is skipped (and not counted in "and N more") until the Pueblo day changes;
+  other days' entries are dropped on every write. Unavailable storage fails
+  soft: the strip's in-memory copy still hides it until reload.
+- **Events filter.** `useMapFilters` gains `filterEvents`, a switch under "Show
+  only" in `FilterPanel` (not a category: it is exclusive). On, `filteredVenues`
+  is `[]`, which empties place pins, box pins, the search popovers and the
+  list's places in one step (boxes are merged into that pool). Event pins keep
+  drawing, and the 7-day pin window is lifted while it is on (`pinsAt`'s
+  `windowMs` parameter, passed `Infinity` through `Map` -> `EventLayer`'s
+  `allUpcoming`), so the count the row shows and the pins on the map agree.
+  With it on and no event left, `EventsEmptyNotice` shows "No events coming
+  up" on the map with a button that turns the filter off. It counts toward the Filters badge, "Clear all" resets it, the
+  footer reads "Show N events", and it is not in the URL (no filter is). The
+  row is offered only while there are events (or while it is already on, so it
+  can be turned off).
+- **List.** `ListView` takes `events` / `onSelectEvent` / `eventsOnly` and
+  renders `EventListSection` above the places: `listOrder` = going on now first,
+  then soonest, *including* events more than 7 days out (no `EVENT_PIN_WINDOW_DAYS`
+  cut). Each row reuses `eventBadge` (countdown wording) and `eventWhen` (Pueblo
+  hours) from `eventCard.ts`. The section has its own `useMinuteClock`
+  subscription so an ended event leaves the list on the tick. With the Events
+  filter on and nothing upcoming it shows "No events coming up".
+
+### Event page (#762)
+
+`/event/[id]` and `/es/event/[id]`: one web page per event, so search engines can
+list it as an event and a shared link previews the flyer.
+
+- **Dynamic, per request** (`export const dynamic = "force-dynamic"`, like
+  `/box/[id]`; events are not in the Publish snapshot, so there is no id list to
+  prerender and a cancel or edit must show without a rebuild). No Cache-Control is
+  added (neither does `/box/[id]`): Next sends `private, no-cache, no-store`, so an
+  edit, a cancel, and a not-found are current on the next request. The
+  `generateStaticParams` + `dynamicParams = false` pairing and its `open-next.config.ts`
+  trap (AGENTS.md) do not apply.
+- **Thin page files over shared code.** Both `page.tsx` files call
+  `src/lib/eventPageData.ts` (`loadEventForPage`, React `cache()` so metadata and
+  body share one read; `eventPageMetadata(id, locale)`) and render
+  `src/components/EventPage.tsx`, a plain SERVER component taking `locale` (like
+  `HubPages`): full content in the server HTML, nothing fetched client-side, works with
+  JavaScript off. The only client code is `EventAddToCalendar`, which calls
+  `src/lib/eventCalendar.ts` (the same file builder the map card now uses).
+  Directions use `googleMapsUrl`, moved to `src/lib/googleMapsUrl.ts` because a
+  function imported from the "use client" `DirectionButtons` cannot be called from a
+  server component (DirectionButtons re-exports it).
+- **Visibility.** The read is `loadPublicEventById` (published, including ended, and
+  cancelled). Draft, archived, unknown ids, a missing `events` table, a D1 error and
+  a missing Cloudflare context all return `null` -> `notFound()` -> HTTP 404, so a
+  draft is indistinguishable from an id that never existed. Flyer columns missing
+  (0019 not applied): the event renders without a flyer, as in the feed. Status words
+  on the page are "Coming up", "Happening now", "This event has ended", "Cancelled"
+  + note: no countdown, so a cached or back-navigated copy is never wrong.
+- **Metadata** goes through `buildPageMetadata` (`mirrored: true`: self-canonical,
+  hreflang en / es / x-default, `og:locale` per language); the new optional `image`
+  option carries the flyer as an absolute URL with width, height and alt, otherwise
+  the site default. Title "Name – Sat, Nov 21", description "Sat, Nov 21, 10 AM – 2 PM
+  MDT, at <address>. <about>" cut at 160 characters (`src/lib/eventSeo.ts`).
+- **Indexing.** An event stays indexable until `EVENT_INDEX_GRACE_MS` (7 days) after
+  its end, then the page sends `robots: noindex, follow`. Cancelled events follow the
+  same clock (indexable, showing Cancelled, so a search engine learns of the
+  cancellation, then dropped with the rest). Non-production hosts are noindexed by
+  `custom-worker.ts` as for every page.
+- **Structured data** (`buildEventJsonLd`, through `serializeJsonLd`): schema.org
+  `Event` with `startDate` / `endDate` as ISO 8601 carrying the Denver offset in force
+  that day (`utcIsoToPuebloOffsetIso`, `eventTime.ts`), `eventStatus`
+  (`EventScheduled` / `EventCancelled`), `eventAttendanceMode` offline, `location`
+  (`Place` with the venue's name when `venue_id` is a known place, else the street
+  line; `PostalAddress`; `geo`), `description`, `image` (flyer), `organizer` (the host,
+  else the site), `isAccessibleForFree`, a zero-price `Offer` (dropped when cancelled, so no InStock offer on a cancelled event), `inLanguage`, `url`; plus
+  a `BreadcrumbList` (Map › name) matching the visible breadcrumb.
+- **Crawl paths.** The sitemap (`src/app/sitemap.ts`, now `force-dynamic`) lists
+  published events that have not ended, EN + `/es`, with `alternates.languages`;
+  `loadSitemapEvents` is wrapped so ANY failure (no table yet, D1 down, no context)
+  lists no events and the rest of the sitemap is served. Each page links to its other
+  language, and the map link goes to `/?event=<id>`. There is no visible link from the
+  map card (it only gains the Share target change). `robots.ts` allows
+  `/api/public/events/*/flyer/` (longest match beats the `/api/` disallow) so Google
+  may fetch the flyer named in the structured data and the preview.
+- **404 body.** A dynamic `notFound()` ships Next's blank `__next_error__` first
+  paint with a real 404 status and `noindex`, exactly like `/box/[id]`; `es/not-found.tsx`
+  gives the `/es` one a Spanish body once JavaScript runs.
+
+---
+
 ## Admin panel
 
 Design spec: `docs/admin/cloudflare-native-admin-spec.md`. Per-slice build
@@ -992,6 +1358,9 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   includes an unknown venue id on the edit page). It carries no admin data.
 
 ### Surfaces
+
+- **`/admin/events` — Events tab** (#757). Live special events, no Publish
+  step; see "Events" above for the table, routes and fail-soft behavior.
 
 - **`/admin/activity` — Activity log, owner only** (#679). Every admin
   sign-in, failed attempt and action, newest first, grouped by day, then by

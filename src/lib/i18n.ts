@@ -391,6 +391,74 @@ const en: Record<string, string> = {
   "marker.category.meal_site": "Meal site",
   "marker.category.blessing_box": "Blessing box",
 
+  // Special-event map pins (#758). {time} is a Pueblo-time clock like "2 PM".
+  "events.pin.today": "Today",
+  "events.pin.nowUntil": "NOW, until {time}",
+  "events.pin.ariaLive": "{name}, special event, happening now, until {time}",
+  "events.pin.ariaUpcoming": "{name}, special event, {day} {time}",
+
+  // Special-event card (#759). {n} is a whole number; "one" is the n === 1 form.
+  "events.card.startsIn.min.one": "Starts in {n} min",
+  "events.card.startsIn.min.other": "Starts in {n} min",
+  "events.card.startsIn.hour.one": "Starts in {n} hour",
+  "events.card.startsIn.hour.other": "Starts in {n} hours",
+  "events.card.startsIn.day.one": "Starts in {n} day",
+  "events.card.startsIn.day.other": "Starts in {n} days",
+  "events.card.endsIn.min.one": "{n} min",
+  "events.card.endsIn.min.other": "{n} min",
+  "events.card.endsIn.hour.one": "{n} hour",
+  "events.card.endsIn.hour.other": "{n} hours",
+  "events.card.endsIn.day.one": "{n} day",
+  "events.card.endsIn.day.other": "{n} days",
+  "events.card.liveEndsIn": "Happening now, ends in {remaining}",
+  "events.card.startsOn": "Starts {date}",
+  "events.card.ended": "This event has ended",
+  "events.card.cancelled": "Cancelled",
+  "events.card.hostedBy": "Hosted by {host}",
+  "events.card.when": "When",
+  "events.card.where": "Where",
+  "events.card.about": "About",
+  "events.card.bring": "What to bring",
+  "events.card.directions": "Get directions",
+  "events.card.directionsAria": "Get directions to {name} (opens in a new tab)",
+  "events.card.share": "Share",
+  "events.card.shareCopied": "Link copied",
+  "events.card.shareManual": "Sharing isn't available here. Copy this link:",
+  "events.card.calendar": "Add to calendar",
+  "events.card.moreInfo": "More information",
+  "events.card.seeOpenNow": "See places open now",
+  "events.card.endedHelp": "Looking for food today? See what is open right now.",
+  "events.card.cancelledNoNote": "This event will not take place.",
+  "events.card.closeAria": "Close event details",
+  "events.here.now": "Event here now",
+  "events.here.today": "Event here today",
+  "events.here.day": "Event here {day}",
+
+  // "Happening today" strip, Events filter and list (#761). {time} is a Pueblo-time
+  // clock like "2 PM" (strip.today: a range like "2 PM – 4 PM").
+  "events.strip.liveUntil": "Happening now, until {time}",
+  "events.strip.today": "Today {time}",
+  "events.strip.more": "and {count} more",
+  "events.strip.moreAria": "and {count} more, show the events list",
+  "events.strip.dismissAria": "Hide {name} for today",
+  "events.list.heading": "Events",
+  "events.list.empty": "No events coming up",
+  "events.filter.label": "Events",
+  "events.filter.showResults.one": "Show {count} event",
+  "events.filter.showResults.other": "Show {count} events",
+  "events.list.emptyAction": "Show places again",
+
+  // Event page (#762, /event/<id>). {abbr} is the Pueblo zone abbreviation (MST/MDT).
+  "events.page.statusUpcoming": "Coming up",
+  "events.page.statusLive": "Happening now",
+  "events.page.timeZoneNote": "{abbr}, Pueblo time",
+  "events.page.openOnMap": "Open on the map",
+  "events.page.findFood": "Find food on the map",
+  "events.page.otherLanguage": "Ver en español",
+  "events.page.metaCancelled": "Cancelled.",
+  "events.page.metaWhen": "{day}, {time} {abbr}, at {address}.",
+  "events.page.metaCancelledTitle": "Cancelled: {name}",
+
   // External links (#162)
   "menu.opensInNewTab": "(opens in new tab)",
 
@@ -1485,6 +1553,73 @@ const es: Record<string, string> = {
   "marker.category.edible_landscape": "Paisaje comestible",
   "marker.category.meal_site": "Comedor",
   "marker.category.blessing_box": "Caja de bendiciones", // [CHECK]
+
+  // Special-event map pins (#758).
+  "events.pin.today": "Hoy", // [CHECK]
+  "events.pin.nowUntil": "AHORA, hasta {time}", // [CHECK]
+  "events.pin.ariaLive": "{name}, evento especial, en curso, hasta {time}", // [CHECK]
+  "events.pin.ariaUpcoming": "{name}, evento especial, {day} {time}", // [CHECK]
+
+  // Special-event card (#759).
+  "events.card.startsIn.min.one": "Empieza en {n} min", // [CHECK]
+  "events.card.startsIn.min.other": "Empieza en {n} min", // [CHECK]
+  "events.card.startsIn.hour.one": "Empieza en {n} hora", // [CHECK]
+  "events.card.startsIn.hour.other": "Empieza en {n} horas", // [CHECK]
+  "events.card.startsIn.day.one": "Empieza en {n} día", // [CHECK]
+  "events.card.startsIn.day.other": "Empieza en {n} días", // [CHECK]
+  "events.card.endsIn.min.one": "{n} minuto", // [CHECK]
+  "events.card.endsIn.min.other": "{n} minutos", // [CHECK]
+  "events.card.endsIn.hour.one": "{n} hora", // [CHECK]
+  "events.card.endsIn.hour.other": "{n} horas", // [CHECK]
+  "events.card.endsIn.day.one": "{n} día", // [CHECK]
+  "events.card.endsIn.day.other": "{n} días", // [CHECK]
+  "events.card.liveEndsIn": "En curso, termina en {remaining}", // [CHECK]
+  "events.card.startsOn": "Empieza el {date}", // [CHECK]
+  "events.card.ended": "Este evento ya terminó", // [CHECK]
+  "events.card.cancelled": "Cancelado", // [CHECK]
+  "events.card.hostedBy": "Organiza: {host}", // [CHECK]
+  "events.card.when": "Cuándo", // [CHECK]
+  "events.card.where": "Dónde", // [CHECK]
+  "events.card.about": "Acerca del evento", // [CHECK]
+  "events.card.bring": "Qué llevar", // [CHECK]
+  "events.card.directions": "Cómo llegar", // [CHECK]
+  "events.card.directionsAria": "Cómo llegar a {name} (se abre en una pestaña nueva)", // [CHECK]
+  "events.card.share": "Compartir", // [CHECK]
+  "events.card.shareCopied": "Enlace copiado", // [CHECK]
+  "events.card.shareManual": "Aquí no se puede compartir. Copia este enlace:", // [CHECK]
+  "events.card.calendar": "Agregar al calendario", // [CHECK]
+  "events.card.moreInfo": "Más información", // [CHECK]
+  "events.card.seeOpenNow": "Ver lugares abiertos ahora", // [CHECK]
+  "events.card.endedHelp": "¿Buscas comida hoy? Mira qué está abierto ahora mismo.", // [CHECK]
+  "events.card.cancelledNoNote": "Este evento no se llevará a cabo.", // [CHECK]
+  "events.card.closeAria": "Cerrar los detalles del evento", // [CHECK]
+  "events.here.now": "Evento aquí ahora", // [CHECK]
+  "events.here.today": "Evento aquí hoy", // [CHECK]
+  "events.here.day": "Evento aquí el {day}", // [CHECK]
+
+  // "Happening today" strip, Events filter and list (#761)
+  "events.strip.liveUntil": "En curso, hasta {time}", // [CHECK]
+  "events.strip.today": "Hoy {time}", // [CHECK]
+  "events.strip.more": "y {count} más", // [CHECK]
+  "events.strip.moreAria": "y {count} más, ver la lista de eventos", // [CHECK]
+  "events.strip.dismissAria": "Ocultar {name} por hoy", // [CHECK]
+  "events.list.heading": "Eventos", // [CHECK]
+  "events.list.empty": "No hay eventos próximos", // [CHECK]
+  "events.filter.label": "Eventos", // [CHECK]
+  "events.filter.showResults.one": "Mostrar {count} evento", // [CHECK]
+  "events.filter.showResults.other": "Mostrar {count} eventos", // [CHECK]
+  "events.list.emptyAction": "Volver a mostrar lugares", // [CHECK]
+
+  // Event page (#762)
+  "events.page.statusUpcoming": "Próximamente", // [CHECK]
+  "events.page.statusLive": "En curso", // [CHECK]
+  "events.page.timeZoneNote": "{abbr}, hora de Pueblo", // [CHECK]
+  "events.page.openOnMap": "Abrir en el mapa", // [CHECK]
+  "events.page.findFood": "Encontrar comida en el mapa", // [CHECK]
+  "events.page.otherLanguage": "View in English", // [CHECK]
+  "events.page.metaCancelled": "Cancelado.", // [CHECK]
+  "events.page.metaWhen": "{day}, {time} {abbr}, en {address}.", // [CHECK]
+  "events.page.metaCancelledTitle": "Cancelado: {name}", // [CHECK]
 
   // External links (#162)
   "menu.opensInNewTab": "(se abre en una pestaña nueva)",

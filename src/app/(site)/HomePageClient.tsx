@@ -113,6 +113,10 @@ export default function HomePageClient() {
   const [splashLocationFailure, setSplashLocationFailure] = useState<LocationFailure | null>(null);
   // Deep link (#132): a ?venue=<id> URL opens straight to that pin.
   const [initialVenueId, setInitialVenueId] = useState<string | null>(null);
+  // Deep link (#758): a ?event=<id> URL opens with that event's star pin selected.
+  // Read here with plain URLSearchParams (not src/lib/eventPins.ts) because this
+  // file is the route's blocking bundle and eventPins pulls in the i18n dictionary.
+  const [initialEventId, setInitialEventId] = useState<string | null>(null);
   // Boxes (#516): "Boxes" on a Menu page (PageNav, no map/filter state of its
   // own) links to /?boxes=1 — read once below, same as ?near=1, and applied
   // by MapWrapper's own one-shot effect.
@@ -165,8 +169,11 @@ export default function HomePageClient() {
     // PageNav's saved-venue links use the plain query form instead, and both
     // are read client-side.
     setInitialVenueId(resolveVenueId(search, hash));
-    // A shared venue link, Near me and Boxes (both from inside the app, via
-    // PageNav) all skip the splash, as does a visitor who already saw it.
+    // Unlike near/boxes above, ?event= is NOT stripped: MapWrapper keeps it in
+    // step with the selected pin, so a refresh reopens on the same event.
+    setInitialEventId(params.get('event') || null);
+    // A shared venue or event link, Near me and Boxes (both from inside the
+    // app, via PageNav) all skip the splash, as does a visitor who already saw it.
     setSplashShown(!shouldSkipSplash({ search, hash, gateSeen: readSplashGate() }));
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -214,6 +221,7 @@ export default function HomePageClient() {
             splashLocationFailure={splashLocationFailure}
             onShowWelcome={showSplashAgain}
             initialVenueId={initialVenueId}
+            initialEventId={initialEventId}
             initialBoxesFilter={initialBoxesFilter}
             holdMapLoad={splashShown === true}
           />

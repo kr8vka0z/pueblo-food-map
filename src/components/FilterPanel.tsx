@@ -25,7 +25,7 @@
  */
 
 import { useCallback, useEffect, useRef } from "react";
-import { X, Clock, CreditCard, Apple } from "lucide-react";
+import { X, Clock, CreditCard, Apple, Star } from "lucide-react";
 import { categoryColors } from "@/data/venues";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
@@ -78,6 +78,15 @@ interface FilterPanelProps {
   selectedCategories: Set<VenueCategory> | null;
   onToggleCategory: (cat: VenueCategory) => void;
 
+  /**
+   * "Events" switch (#761): show only special events. Optional so the panel is
+   * unchanged for any caller without events; the row appears only when there
+   * are events to show (or the filter is somehow still on, so it can be turned off).
+   */
+  filterEvents?: boolean;
+  onToggleEvents?: () => void;
+  eventsCount?: number;
+
   /** "Clear all" — categories + the three switches only, never the search query. */
   onClearAll: () => void;
 }
@@ -89,7 +98,9 @@ function SwitchRow({
   count,
   checked,
   onClick,
+  testId,
 }: {
+  testId?: string;
   icon: React.ReactNode;
   label: string;
   count?: number;
@@ -111,6 +122,7 @@ function SwitchRow({
         role="switch"
         aria-checked={checked}
         aria-label={label}
+        data-testid={testId}
         onClick={onClick}
         className={
           "inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-150 " +
@@ -148,6 +160,9 @@ export default function FilterPanel({
   selectedCategories,
   onToggleCategory,
   onClearAll,
+  filterEvents = false,
+  onToggleEvents,
+  eventsCount = 0,
 }: FilterPanelProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -325,6 +340,19 @@ export default function FilterPanel({
           <div className="px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
             {t("filters.panel.showOnly", locale)}
           </div>
+          {onToggleEvents && (eventsCount > 0 || filterEvents) && (
+            <SwitchRow
+              icon={<Star aria-hidden size={14} className="text-[var(--color-event-outline)] shrink-0" fill="var(--color-event-pin)" />}
+              testId="filter-events-switch"
+              label={t("events.filter.label", locale)}
+              count={eventsCount}
+              checked={filterEvents}
+              onClick={() => {
+                void track(EVENTS.FILTER_TOGGLED, { filter: "events", on: !filterEvents });
+                onToggleEvents();
+              }}
+            />
+          )}
           <SwitchRow
             icon={<Clock aria-hidden size={14} className="text-[var(--color-ink-500)] shrink-0" />}
             label={t("filter.openNow", locale)}
@@ -410,7 +438,9 @@ export default function FilterPanel({
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-brand-orange)]"
             }
           >
-            {t("filters.panel.showResults", locale, { count: String(resultCount) })}
+            {filterEvents
+              ? t(resultCount === 1 ? "events.filter.showResults.one" : "events.filter.showResults.other", locale, { count: String(resultCount) })
+              : t("filters.panel.showResults", locale, { count: String(resultCount) })}
           </button>
         </div>
       </div>

@@ -184,10 +184,20 @@ export function activityBounds(filters: ActivityFilters): { lower: string; upper
 // Which place/box an audit row is about. Box rows reference their own table's
 // id; everything else about a place uses the venue id directly. Publish rows
 // (entity_id = the publish timestamp) match nothing, by design.
-const ACTION_SELECT_SQL = `
+// Event rows (entity 'event', #757) have no venue: venue_name carries the
+// event's English name instead (venue_id stays null, so the page shows it as
+// plain text, not a venue link). The name falls back to the audit row's own
+// JSON when the event row is gone or the `events` table doesn't exist yet.
+const EVENT_NAME_FROM_AUDIT_SQL = "COALESCE(json_extract(a.after_json, '$.name'), json_extract(a.before_json, '$.name'))";
+const EVENT_NAME_FROM_TABLE_SQL = `COALESCE((SELECT name FROM events WHERE id = a.entity_id), ${EVENT_NAME_FROM_AUDIT_SQL})`;
+
+function actionSelectSql(eventsTable: boolean): string {
+  const eventName = eventsTable ? EVENT_NAME_FROM_TABLE_SQL : EVENT_NAME_FROM_AUDIT_SQL;
+  return `
 SELECT * FROM (
   SELECT a.id, a.actor_email, a.entity, a.entity_id, a.action, a.before_json, a.after_json,
-         a.timestamp, a.session_id, v.id AS venue_id, v.name AS venue_name,
+         a.timestamp, a.session_id, v.id AS venue_id,
+         COALESCE(v.name, CASE a.entity WHEN 'event' THEN ${eventName} END) AS venue_name,
          EXISTS (
            SELECT 1 FROM change_proposals cp
            WHERE cp.target_venue_id = a.entity_id AND cp.status = 'approved'
@@ -203,6 +213,7 @@ SELECT * FROM (
   END
   WHERE a.timestamp >= ? AND a.timestamp <= ?
 ) x`;
+}
 
 const ACTION_KIND_SQL = `CASE
     WHEN action = 'publish' THEN 'publish'
@@ -238,12 +249,20 @@ export async function loadActivityActions(db: D1Database, filters: ActivityFilte
     where.push("venue_name LIKE ? ESCAPE '\\'");
     args.push(`%${filters.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
   }
-  const sql = `SELECT *, ${ACTION_KIND_SQL} AS kind FROM (${ACTION_SELECT_SQL}) y
+  args.push(limit);
+  const sqlFor = (eventsTable: boolean) => `SELECT *, ${ACTION_KIND_SQL} AS kind FROM (${actionSelectSql(eventsTable)}) y
     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
     ORDER BY timestamp DESC, id DESC LIMIT ?`;
-  args.push(limit);
-  const result = await db.prepare(sql).bind(...args).all<AuditActionRow>();
-  return result.results ?? [];
+  try {
+    const result = await db.prepare(sqlFor(true)).bind(...args).all<AuditActionRow>();
+    return result.results ?? [];
+  } catch (err) {
+    // Production gets this code before migration 0018 creates `events`; one
+    // missing table must not take down the page for every other entity.
+    if (!/no such table: events/i.test(String(err instanceof Error ? err.message : err))) throw err;
+    const result = await db.prepare(sqlFor(false)).bind(...args).all<AuditActionRow>();
+    return result.results ?? [];
+  }
 }
 
 export async function loadActivityAuthEvents(db: D1Database, filters: ActivityFilters, limit = ACTIVITY_PAGE_SIZE): Promise<AuthEventRow[]> {
@@ -496,6 +515,11 @@ export function summarizeAction(row: AuditActionRow): ActionSummary {
     };
   }
   if (row.action === "archive") return { tag: "Removed", tone: "bad", ...base };
+  // A cancel is logged as an 'update' (audit_log.action is CHECK-limited), so
+  // the status in after_json is the only thing that tells it from an edit.
+  if (row.entity === "event" && row.action === "update" && after.status === "cancelled" && diff.changes.some((c) => c.field === "status")) {
+    return { tag: "Cancelled event", tone: "bad", ...base };
+  }
   if (row.action === "create") return { tag: "Added", tone: "good", changes: [], moreChanges: 0 };
   if (row.entity === "box_photo" || row.entity === "box_adopter") {
     const what = row.entity === "box_photo" ? "photo" : "sponsor";

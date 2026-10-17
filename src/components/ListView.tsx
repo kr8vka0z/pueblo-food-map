@@ -7,6 +7,8 @@ import { publishedAt } from "@/data/published-venues";
 import { formatPublishedDate } from "@/lib/dataFreshness";
 import { OSM_COPYRIGHT_URL } from "@/lib/osmAttribution";
 import VenueCard from "@/components/VenueCard";
+import EventListSection from "@/components/EventListSection";
+import type { PublicEvent } from "@/lib/events";
 import { useLocale } from "@/lib/LocaleContext";
 
 interface ListViewProps {
@@ -19,6 +21,11 @@ interface ListViewProps {
   locale?: Locale;
   /** Optional notice banner rendered below the floating chrome spacer, above the scroll container. */
   notice?: ReactNode;
+  /** Special events (#761), listed above the places. Omitted or empty: no events section at all. */
+  events?: readonly PublicEvent[];
+  onSelectEvent?: (id: string) => void;
+  /** The Events filter is on: only events are listed, and an empty list says "No events coming up". */
+  eventsOnly?: boolean;
 }
 
 export default function ListView({
@@ -29,6 +36,9 @@ export default function ListView({
   showClearFilters = false,
   locale: localeProp,
   notice,
+  events = [],
+  onSelectEvent,
+  eventsOnly = false,
 }: ListViewProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -60,7 +70,10 @@ export default function ListView({
           bottom padding lets the final card scroll fully clear of it
           (docs/bottom-nav-spec.md §10 — fails only on the last row, easy to miss). */}
       <div className="flex-1 overflow-y-auto overscroll-contain pb-[calc(var(--bottom-nav-clearance)+env(safe-area-inset-bottom)+24px)] 2xl:pb-6">
-        {venues.length === 0 ? (
+        {onSelectEvent && (events.length > 0 || eventsOnly) && (
+          <EventListSection events={events} locale={locale} onSelectEvent={onSelectEvent} showEmpty={eventsOnly} />
+        )}
+        {eventsOnly ? null : venues.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 px-6 pt-16 text-center">
             <p className="text-base text-[var(--color-ink-500)]">{t("empty.title", locale)}</p>
             {showClearFilters && onClearFilters && (

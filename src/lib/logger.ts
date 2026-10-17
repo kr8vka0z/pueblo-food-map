@@ -172,6 +172,15 @@ export function logBlessingBoxesReadFailure(message: string): void {
 }
 
 /**
+ * GET /api/public/events (#757) degraded to an empty list. Expected exactly
+ * while the `events` migration hasn't reached an environment yet (the
+ * production migration is a manual step), so the message names the cause.
+ */
+export function logEventsReadFailure(message: string): void {
+  console.error(JSON.stringify({ event: "events_read_failure", message }));
+}
+
+/**
  * Emit a single-line JSON structured log entry for the daily refresh-
  * pipeline alert check (#238 pending-age, #234 per-source staleness —
  * src/lib/refreshAlerts.ts). Counts/source names only — matches this

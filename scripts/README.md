@@ -87,6 +87,7 @@ unfamiliar reader doesn't mistake them for part of the flow above:
 | `seed-dev.sql` | Fake venue rows for the staging admin D1 database's UI states |
 | `auth-cli.config.ts` | CLI-only Better Auth config for `@better-auth/cli generate`/`migrate` — never imported by the app |
 | `check-banned.mjs` | Banned-string lint (old font names, retired Tailwind palettes) — wired into `npm run lint` |
+| `check-prerender-serves.sh` | Builds with OpenNext, serves in the local Worker, and requests the prerendered venue pages (must be 200) — `ci.yml` runs it so a `next` / OpenNext bump that 404s them fails its PR |
 | `check-design-drift.mjs` | Token parity check between `globals.css` and `DESIGN.md` — `npm run design:drift`, a blocking CI gate |
 
 ## Not built: GTFS transit data

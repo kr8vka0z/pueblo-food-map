@@ -9,7 +9,7 @@
  * rendering, which a branded error page shouldn't need.
  *
  * This handles notFound() thrown from within the (site) route tree
- * (venue/[id], box/[id], report/[venueId]) — it composes with
+ * (venue/[id], box/[id], event/[id], report/[venueId]) — it composes with
  * (site)/layout.tsx as before. A truly unmatched URL, with no route in the
  * tree at all, is handled by app/global-not-found.tsx instead (#689 PR 1;
  * required once (site)/ became a route group with no top-level

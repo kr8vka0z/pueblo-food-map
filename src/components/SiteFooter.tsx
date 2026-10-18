@@ -17,6 +17,7 @@ import { t } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
 import { OSM_COPYRIGHT_URL } from "@/lib/osmAttribution";
+import StyxCredit from "./StyxCredit";
 
 export default function SiteFooter() {
   const { locale, tree } = useLocale();
@@ -135,6 +136,8 @@ export default function SiteFooter() {
         >
           {t("osm.attribution", locale)}
         </a>
+        {/* w-full: its own line under the wrapping row of links. */}
+        <StyxCredit locale={locale} className="w-full" />
       </div>
     </footer>
   );

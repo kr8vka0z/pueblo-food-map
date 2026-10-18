@@ -1,0 +1,508 @@
+"use client";
+
+/**
+ * GuidedTour (#159) — a step-by-step overlay that points at the map's real
+ * controls. Started from the splash's "Take a tour" button or the Menu's
+ * "Learn how to use this map" item; MapWrapper loads this file with
+ * next/dynamic only when a tour starts, so it costs nothing on first load.
+ *
+ * Hand-rolled rather than Driver.js (the issue's suggestion): the whole
+ * overlay is one highlight box + one tooltip, and Driver.js would still need
+ * its keyboard handling switched off (its Escape bypasses the claim-once
+ * overlay stack below), its styles overridden to DESIGN.md tokens, and our
+ * own ES copy — a new dependency for less than it saves.
+ *
+ * How a step works: the tour asks MapWrapper to put the UI in the step's
+ * state (open the sample venue's card, or close it), centers the map on the
+ * sample venue for the pin step, then polls for the step's target element
+ * each animation frame until its box stops moving (the card slides in, the
+ * bottom nav remounts after the card closes) and draws the highlight there.
+ * Three live demos: the search step types a sample word into the real
+ * search box (results showing, input never focused), the filter-choices
+ * step holds the real Filters panel open, and the box steps hold the map's
+ * Boxes view on; each is undone when its steps are left. Cards and the
+ * panel the tour opens are `inert` while it runs (MapWrapper), so nothing
+ * on them can be pressed. On close it restores the camera; MapWrapper
+ * restores the selection, Map/List view, search and filters it snapshotted
+ * at start.
+ *
+ * A11y: role="dialog" + aria-modal, focus starts on Next and is trapped in
+ * the tooltip (DesktopVenueWindow focuses itself when the card step opens it
+ * — the focusin trap pulls focus back), Next/Back/Done/Skip buttons plus
+ * ArrowRight/ArrowLeft, the dialog as a polite live region reading each new step, and
+ * Escape through overlayRegistry's claimEscape so it closes only the tour.
+ * Motion is limited to a short highlight move, which globals.css's
+ * prefers-reduced-motion block already collapses.
+ */
+
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type mapboxgl from "mapbox-gl";
+import type { Locale } from "@/lib/i18n";
+import { claimEscape, raiseOverlay, useOverlayStackId } from "@/lib/overlayRegistry";
+import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { TOUR_COPY, placeTooltip, tourReducer, tourSteps, type Rect } from "@/lib/guidedTour";
+
+type MapLike = Pick<mapboxgl.Map, "getCenter" | "getZoom" | "jumpTo" | "once" | "off" | "triggerRepaint">;
+
+interface GuidedTourProps {
+  locale: Locale;
+  /** The venue the pin and card steps show. Null skips straight to a centered tooltip. */
+  sampleVenue: { id: string; lng: number; lat: number } | null;
+  /**
+   * The Blessing Box the box steps show, picked when the tour starts. Null
+   * (live box feed empty or not loaded yet) drops the box pin/card steps.
+   */
+  sampleBox: { id: string } | null;
+  /**
+   * Null while the map hasn't loaded (or can't). On the splash path the map
+   * chunk only starts loading when the tour starts, so on a slow phone it can
+   * arrive mid-tour: the pin step re-runs its camera move and target search then.
+   */
+  mapboxMap: MapLike | null;
+  /**
+   * Open this venue's card (id) or close any open card (null); `expanded`
+   * holds the phone sheet fully open (a box's below-the-fold buttons).
+   */
+  onShowVenue: (id: string | null, expanded?: boolean) => void;
+  /** Box steps demo: turn the map's Boxes view on (true) or back off. */
+  onDemoBoxes: (on: boolean) => void;
+  /**
+   * Search step demo: show this text in the real search box with its results
+   * (never focusing the input, so no phone keyboard), or null to put back
+   * whatever the visitor had before the tour.
+   */
+  onDemoSearch: (text: string | null) => void;
+  /** Filters step demo: hold the real Filters panel open (true) or close it. */
+  onShowFilters: (open: boolean) => void;
+  /** The tour finished or was dismissed. */
+  onClose: () => void;
+  /** Where focus goes when the tour ends (the Menu nav button, or the map container). */
+  returnFocusSelector: string;
+}
+
+const HIGHLIGHT_PAD = 6;
+// Keep polling this many frames after the target's box stops changing, or
+// this many frames for a target that hasn't appeared yet (a lazy desktop card
+// chunk, the nav remounting on a slow phone) before settling on "no target".
+const STABLE_FRAMES = 10;
+const MISSING_FRAMES = 90;
+const FOCUSABLE = "button:not([disabled])";
+// Zoom the pin step uses so the sample pin sits alone, clear of neighbours.
+const PIN_ZOOM = 15;
+// Typing demo pace: a beat for the highlight to land, then one letter at a
+// time — slow enough to read on a phone, done in about a second.
+const TYPE_START_MS = 400;
+const TYPE_LETTER_MS = 140;
+
+function sameRect(a: Rect | null, b: Rect | null) {
+  if (!a || !b) return a === b;
+  return a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height;
+}
+
+export default function GuidedTour({
+  locale,
+  sampleVenue,
+  sampleBox,
+  mapboxMap,
+  onShowVenue,
+  onDemoBoxes,
+  onDemoSearch,
+  onShowFilters,
+  onClose,
+  returnFocusSelector,
+}: GuidedTourProps) {
+  const copy = TOUR_COPY[locale];
+  const [index, setIndex] = useState(0);
+  // Fixed for the tour's life (sampleBox is picked once at start), so the
+  // step count never shifts under the visitor mid-tour.
+  // ponytail: a box feed that lands after the tour started is not picked up;
+  // the box card steps just stay out of that one tour.
+  const [steps] = useState(() => tourSteps(sampleBox !== null));
+  const step = steps[index];
+  const stepCopy = copy.steps[step.id];
+  const total = steps.length;
+  const isLast = index === total - 1;
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
+  const closedRef = useRef(false);
+  const [target, setTarget] = useState<Rect | null>(null);
+  const [tipSize, setTipSize] = useState<{ width: number; height: number } | null>(null);
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window === "undefined" ? 360 : window.innerWidth,
+    height: typeof window === "undefined" ? 740 : window.innerHeight,
+  }));
+
+  // Camera at tour start, restored on close so the tour leaves the map where it found it.
+  // Taken on the map's first `idle`, not the moment it's ready: MapWrapper's
+  // initial fit runs in its own (parent, so later) effect and animates, and a
+  // snapshot before it settles would restore the pre-fit view. triggerRepaint
+  // guarantees an `idle` even when nothing is moving. Also taken right before
+  // the tour's own first camera move, in case the pin step beats that `idle`.
+  const cameraRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
+  const snapshotCamera = useCallback(() => {
+    if (!mapboxMap || cameraRef.current) return;
+    const c = mapboxMap.getCenter();
+    cameraRef.current = { center: [c.lng, c.lat], zoom: mapboxMap.getZoom() };
+  }, [mapboxMap]);
+  useEffect(() => {
+    if (!mapboxMap || cameraRef.current) return;
+    mapboxMap.once("idle", snapshotCamera);
+    mapboxMap.triggerRepaint();
+    return () => {
+      mapboxMap.off("idle", snapshotCamera);
+    };
+  }, [mapboxMap, snapshotCamera]);
+
+  // ── Finish ──────────────────────────────────────────────────────────────────
+  const finish = useCallback(() => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    if (mapboxMap && cameraRef.current) mapboxMap.jumpTo(cameraRef.current);
+    onClose();
+    // The launcher may not exist yet (BottomNav remounts a frame or more after
+    // the card closes on a phone) — retry per frame, same pattern as
+    // HamburgerMenu's restoreFocus.
+    const restore = (framesLeft: number) => {
+      const el = document.querySelector<HTMLElement>(returnFocusSelector);
+      if (el) el.focus();
+      else if (framesLeft > 0) requestAnimationFrame(() => restore(framesLeft - 1));
+    };
+    requestAnimationFrame(() => restore(20));
+  }, [mapboxMap, onClose, returnFocusSelector]);
+
+  const go = useCallback(
+    (action: "next" | "back") => {
+      const nextIndex = tourReducer(index, action, total);
+      if (nextIndex === null) finish();
+      else setIndex(nextIndex);
+    },
+    [index, total, finish],
+  );
+
+  // ── Put the UI into this step's state ────────────────────────────────────────
+  useEffect(() => {
+    const cardId =
+      step.showsCard && sampleVenue ? sampleVenue.id : step.showsBox && sampleBox ? sampleBox.id : null;
+    if (step.cardExpanded) onShowVenue(cardId, true);
+    else onShowVenue(cardId);
+    // onShowVenue is stable for the tour's life; re-run per step only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+
+  // ── Live demos (Kyle: "show typing … and what the filter menu looks like") ──
+  // Each runs only while its step is open; the cleanup undoes it on every way
+  // out (Next, Back, Skip, Escape, Done — the last three via unmount).
+  const demo = step.demo;
+  useEffect(() => {
+    if (demo === "filters") {
+      onShowFilters(true);
+      return () => onShowFilters(false);
+    }
+    // Held across every box step (same `demo` value, so no re-run between
+    // them) and turned off once the visitor moves past the section.
+    if (demo === "boxes") {
+      onDemoBoxes(true);
+      return () => onDemoBoxes(false);
+    }
+    if (demo !== "search") return;
+    const word = copy.searchWord;
+    // Reduced motion: the whole word at once, no letter-by-letter typing.
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let typed = 0;
+    // Start from an empty box (the visitor's own search comes back after).
+    onDemoSearch("");
+    const typeNext = () => {
+      typed++;
+      onDemoSearch(word.slice(0, typed));
+      if (typed < word.length) timer = setTimeout(typeNext, TYPE_LETTER_MS);
+    };
+    if (reduce) onDemoSearch(word);
+    else timer = setTimeout(typeNext, TYPE_START_MS);
+    return () => {
+      clearTimeout(timer);
+      onDemoSearch(null);
+    };
+    // The callbacks are stable for the tour's life and the word is fixed per
+    // locale; re-run per demo step only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demo]);
+
+  // The pin step's camera move — re-run too when the map arrives mid-step.
+  const isPinStep = step.id === "pin";
+  useEffect(() => {
+    if (!isPinStep || !sampleVenue || !mapboxMap) return;
+    snapshotCamera();
+    mapboxMap.jumpTo({
+      center: [sampleVenue.lng, sampleVenue.lat],
+      zoom: Math.max(mapboxMap.getZoom(), PIN_ZOOM),
+    });
+    // sampleVenue is fixed for the tour's life.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPinStep, mapboxMap, snapshotCamera]);
+
+  // ── Track the target's box ───────────────────────────────────────────────────
+  const selector =
+    step.id === "pin" && sampleVenue
+      ? `[data-venue-id="${CSS.escape(sampleVenue.id)}"]`
+      : step.id === "boxesMap" && sampleBox
+        ? `[data-venue-id="${CSS.escape(sampleBox.id)}"]`
+        : step.target;
+  const scrollTarget = step.scrollTarget === true;
+  // Pins exist only once the map does: restart the search when it arrives,
+  // or a pin step that already gave up (MISSING_FRAMES) never finds its pin.
+  const mapReady = mapboxMap !== null;
+
+  useEffect(() => {
+    let raf = 0;
+    let frames = 0;
+    let stable = 0;
+    let last: Rect | null = null;
+    let scrolled = false;
+    const tick = () => {
+      // Every match, unioned: the search step highlights the box AND the
+      // results list under it, the filters step the whole group of switches.
+      let r: { top: number; left: number; right: number; bottom: number } | null = null;
+      if (selector) {
+        for (const el of document.querySelectorAll(selector)) {
+          const b = el.getBoundingClientRect();
+          if (b.width <= 0 || b.height <= 0) continue;
+          r = r
+            ? {
+                top: Math.min(r.top, b.top),
+                left: Math.min(r.left, b.left),
+                right: Math.max(r.right, b.right),
+                bottom: Math.max(r.bottom, b.bottom),
+              }
+            : { top: b.top, left: b.left, right: b.right, bottom: b.bottom };
+        }
+      }
+      const rect: Rect | null = r
+        ? {
+            top: Math.round(r.top) - HIGHLIGHT_PAD,
+            left: Math.round(r.left) - HIGHLIGHT_PAD,
+            width: Math.round(r.right - r.left) + HIGHLIGHT_PAD * 2,
+            height: Math.round(r.bottom - r.top) + HIGHLIGHT_PAD * 2,
+          }
+        : null;
+      if (sameRect(rect, last)) stable++;
+      else {
+        stable = 0;
+        last = rect;
+        setTarget(rect);
+      }
+      // A box's buttons can sit below the card's visible part. Scroll once
+      // the card has settled (it slides in, then the phone sheet expands),
+      // or the scroll lands on the half-open layout; keep measuring after.
+      if (scrollTarget && !scrolled && selector && rect && stable >= STABLE_FRAMES) {
+        document.querySelector(selector)?.scrollIntoView?.({ block: "center" });
+        scrolled = true;
+        stable = 0;
+      }
+      frames++;
+      // A demo step's target keeps changing (results grow as letters land),
+      // so it is tracked for as long as the step is open.
+      // ponytail: one rAF loop per demo step (a querySelectorAll + a few
+      // getBoundingClientRect calls a frame) — fine for a step a visitor
+      // reads for seconds; upgrade path is a ResizeObserver on the matches.
+      const done = demo ? false : rect ? stable >= STABLE_FRAMES : !selector || frames >= MISSING_FRAMES;
+      if (!done) raf = requestAnimationFrame(tick);
+    };
+    tick();
+    const onResize = () => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+      cancelAnimationFrame(raf);
+      frames = 0;
+      stable = 0;
+      tick();
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [selector, mapReady, demo, scrollTarget]);
+
+  // ── Measure the tooltip so it can be placed clear of the target ──────────────
+  useLayoutEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+    const size = { width: el.offsetWidth, height: el.offsetHeight };
+    setTipSize((prev) => (prev && prev.width === size.width && prev.height === size.height ? prev : size));
+  }, [index, locale, viewport]);
+
+  // ── Focus: start on Next, stay inside the tooltip ────────────────────────────
+  // Keyed on the first measurement, not on mount: until then the dialog is
+  // `visibility: hidden` (see the layout below), and a browser silently
+  // refuses focus() on a hidden element — focus stayed on <body> and the
+  // arrow keys did nothing (found in Chrome; jsdom ignores visibility).
+  const measured = tipSize !== null;
+  // Re-run per step too: Back on step 2, or ArrowRight onto the last step
+  // while Skip has focus, unmounts the focused button, which drops focus to
+  // <body> without a focusin for the trap below.
+  useEffect(() => {
+    if (measured && !dialogRef.current?.contains(document.activeElement)) nextRef.current?.focus();
+  }, [index, measured]);
+
+  useEffect(() => {
+    function onFocusIn(e: FocusEvent) {
+      if (closedRef.current || !dialogRef.current) return;
+      if (dialogRef.current.contains(e.target as Node)) return;
+      nextRef.current?.focus();
+    }
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, []);
+
+  // ── Escape: claim-once overlay stack ─────────────────────────────────────────
+  // Window CAPTURE phase so this runs before BottomSheet's (Radix, document
+  // capture) and every bubble-phase overlay listener. raiseOverlay first: the
+  // card this tour opened pushed onto the stack after the tour did, but the
+  // tour is still the layer on top (see raiseOverlay's own comment).
+  const stackId = useOverlayStackId(true);
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      raiseOverlay(stackId);
+      if (!claimEscape(stackId, e)) return;
+      e.preventDefault();
+      finish();
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [stackId, finish]);
+
+  function onDialogKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      go("next");
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      go("back");
+    } else if (e.key === "Tab" && dialogRef.current) {
+      const items = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
+  // ── Layout ──────────────────────────────────────────────────────────────────
+  const tipWidth = Math.min(340, viewport.width - 24);
+  const place = tipSize ? placeTooltip(target, { width: tipWidth, height: tipSize.height }, viewport) : null;
+  const counter = copy.counter(index + 1, total);
+
+  return (
+    // Full-screen layer: dims the page and swallows taps so the map can't be
+    // panned out from under a highlight mid-tour. z above every app layer
+    // (splash is 9000, and is always gone before a tour starts).
+    <div className="fixed inset-0 z-[9500]" data-testid="guided-tour">
+      {target ? (
+        <div
+          aria-hidden
+          data-testid="tour-highlight"
+          className="absolute pointer-events-none rounded-[var(--radius-lg)] ring-2 ring-[var(--color-sage-500)] transition-[top,left,width,height] duration-200"
+          style={{
+            top: target.top,
+            left: target.left,
+            width: target.width,
+            height: target.height,
+            boxShadow: "0 0 0 9999px rgba(26,24,23,0.55)",
+          }}
+        />
+      ) : (
+        <div aria-hidden className="absolute inset-0 bg-[rgba(26,24,23,0.55)]" />
+      )}
+
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={copy.dialogLabel}
+        aria-describedby="tour-step-body"
+        // Focus stays on Next as steps change, so the dialog itself is the
+        // live region: each new step's counter/title/body is read out.
+        // WHY on the dialog and not a separate sr-only region: the phone
+        // card (BottomSheet) is a vaul drawer, and vaul 1.1.2 never passes
+        // its modal={false} on to Radix, so an open card runs Radix's modal
+        // hideOthers(), which sets aria-hidden on everything outside the card
+        // except aria-live regions (whole subtree) and their ancestors (not
+        // their siblings). A live region beside or inside the tooltip left
+        // the buttons aria-hidden on the card step: gone for screen readers
+        // and role lookups (found on real Android Chrome, PR #785).
+        aria-live="polite"
+        onKeyDown={onDialogKeyDown}
+        className="absolute flex flex-col gap-2 p-4 bg-[var(--color-bone-50)] border border-[var(--color-bone-200)] rounded-[var(--radius-lg)] elevation-2 text-[var(--color-ink-700)]"
+        style={{
+          width: tipWidth,
+          top: place ? place.top : 0,
+          left: place ? place.left : 0,
+          // Hidden until measured, so it never flashes in the wrong spot.
+          visibility: place ? "visible" : "hidden",
+        }}
+      >
+        <div className="flex items-center justify-between min-h-10 -mt-1 -mr-2">
+          <span className="text-sm text-[var(--color-ink-500)]">{counter}</span>
+          {/* Skip (#159 "Next / Back / Skip"): a worded button, not an X, so
+              the way out reads plainly. Hidden on the last step, where Done
+              does the same thing. */}
+          {!isLast && (
+            <button
+              type="button"
+              onClick={finish}
+              className={
+                "min-h-12 px-3 -my-2 rounded-[var(--radius-md)] text-base font-medium text-[var(--color-ink-700)] underline underline-offset-2 " +
+                "hover:bg-[var(--color-bone-100)] hover:text-[var(--color-ink-900)] " +
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+                PRESS_FEEDBACK
+              }
+            >
+              {copy.skip}
+            </button>
+          )}
+        </div>
+        <h2 className="text-lg font-semibold leading-snug text-[var(--color-ink-900)]">{stepCopy.title}</h2>
+        <p id="tour-step-body" className="text-base leading-relaxed">
+          {stepCopy.body}
+        </p>
+        <div className="flex items-center justify-end gap-2 mt-1">
+          {index > 0 && (
+            <button
+              type="button"
+              onClick={() => go("back")}
+              className={
+                "min-h-12 px-4 rounded-[var(--radius-md)] text-base font-semibold text-[var(--color-sage-700)] " +
+                "hover:bg-[var(--color-bone-100)] " +
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
+                PRESS_FEEDBACK
+              }
+            >
+              {copy.back}
+            </button>
+          )}
+          <button
+            ref={nextRef}
+            type="button"
+            onClick={() => go("next")}
+            className={
+              "min-h-12 px-5 rounded-[var(--radius-md)] text-base font-semibold " +
+              "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-sage-500)] " +
+              PRESS_FEEDBACK
+            }
+          >
+            {isLast ? copy.done : copy.next}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

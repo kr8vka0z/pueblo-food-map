@@ -63,6 +63,7 @@ Unchanged from v1. They're the test set for every phase and for measurement (§4
 | Specific place | "[pantry name] hours", "[church] food bank Pueblo" | `/venue/[id]` |
 | SNAP / WIC | "stores that take EBT Pueblo", "does [store] take EBT", "how to apply for SNAP Pueblo County" | `/snap-wic-stores`, `/venue/[id]`, `/resources` |
 | Category | "blessing box Pueblo", "community gardens Pueblo", "soup kitchen Pueblo" | category hubs |
+| A one-off event | "free turkey giveaway Pueblo", "pueblo food event this weekend", a shared flyer link | `/event/[id]` (+ `/es`, #762: Event structured data, dynamic, in the sitemap while upcoming, `noindex` a week after it ends) |
 | Area | "food pantry Pueblo West", "food bank 81001" | deferred (see Phase 3) |
 | Eligibility | "do I need ID for a food pantry in Pueblo" | `/about` and `/resources` FAQ |
 

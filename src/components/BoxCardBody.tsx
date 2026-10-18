@@ -486,6 +486,7 @@ export default function BoxCardBody({
                 {t("box.sponsor.wantToHelp", locale)}
                 <button
                   type="button"
+                  data-tour="box-adopt"
                   aria-expanded={adoptOpen}
                   onClick={() => setAdoptOpen((open) => !open)}
                   className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
@@ -605,6 +606,7 @@ export default function BoxCardBody({
             {t("box.sponsor.wantToHelp", locale)}
             <button
               type="button"
+              data-tour="box-adopt"
               aria-expanded={adoptOpen}
               onClick={() => setAdoptOpen((open) => !open)}
               className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"

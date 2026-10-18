@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-18
+
+### New
+
+- A guided tour walks you through the map: how to search, use Filters, open a place's card, find food near you, see your Saved places, and check in at a Blessing Box. Start it from the welcome screen's "Take a tour" button or from the Menu. ([#785](https://github.com/kr8vka0z/pueblo-food-map/pull/785)) ([#786](https://github.com/kr8vka0z/pueblo-food-map/pull/786)) ([#787](https://github.com/kr8vka0z/pueblo-food-map/pull/787))
+- A credit line for The Styx Group, who designed, built and manage Pueblo Food Map, now appears in the footer and in the Menu. ([#776](https://github.com/kr8vka0z/pueblo-food-map/pull/776)) ([#777](https://github.com/kr8vka0z/pueblo-food-map/pull/777))
+
+### Improved
+
+- Security updates. ([#784](https://github.com/kr8vka0z/pueblo-food-map/pull/784))
+
+### Fixed
+
+- Clicking a map pin now closes the "see all places as a list" search popup instead of leaving it open next to the place card, and the "Happening now" banner no longer pokes out from behind it. ([#774](https://github.com/kr8vka0z/pueblo-food-map/pull/774))
+
 ## [1.1.0] - 2026-10-04
 
 ### New

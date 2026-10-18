@@ -48,7 +48,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { venues as allVenues } from "@/data/venues";
-import type { Venue } from "@/types/venue";
+import type { Venue, VenueCategory } from "@/types/venue";
 import HamburgerMenu from "./HamburgerMenu";
 import HamburgerMenuContent from "./HamburgerMenuContent";
 import DesktopSidePanel, {
@@ -63,7 +63,12 @@ import {
 import { useMapFilters } from "@/lib/useMapFilters";
 import { haversineMiles } from "@/lib/distance";
 import { useBoxesList } from "@/lib/useBoxesList";
+import { useEventsFeed } from "@/lib/useEvents";
+import { useEventDetail } from "@/lib/useEventDetail";
+import { pinsAt, listOrder, syncEventParam, eventHereLabel } from "@/lib/eventPins";
 import { toVenue } from "@/lib/useBoxVenues";
+import EventStrip from "@/components/EventStrip";
+import EventsEmptyNotice from "@/components/EventsEmptyNotice";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 import { useMapUI, type ViewMode } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
@@ -96,6 +101,10 @@ const DesktopVenueWindow = dynamic(() => import("./DesktopVenueWindow"), {
   ssr: false,
 });
 
+// The desktop event card (#759): same lazy rule, so a visitor who never opens
+// an event downloads none of it (the phone sheet loads EventCardBody itself).
+const EventPanel = dynamic(() => import("./EventPanel"), { ssr: false });
+
 /**
  * The desktop side panel's single render driver (#682 8b — coordinator:
  * "MapWrapper owns one desktop sidePanelView union ... replacing separate
@@ -113,6 +122,34 @@ export type DesktopSidePanelView =
   | { kind: "saved" }
   | { kind: "menu" }
   | null;
+
+// Guided tour (#159) — fetched only when a tour starts (it renders only
+// while `tour` is non-null below), so its code and its EN/ES step copy never
+// touch a visitor's first load. Same pattern as DesktopVenueWindow above.
+const GuidedTour = dynamic(() => import("./GuidedTour"), { ssr: false });
+
+/** What a running tour must give back when it ends (#159). */
+interface TourSession {
+  /** Where focus returns when the tour ends: the Menu nav button, or the map container (splash). */
+  returnFocusSelector: string;
+  prevSelectedId: string | null;
+  prevViewMode: ViewMode;
+  sampleVenue: Venue | null;
+  /** The nearest live Blessing Box, for the box steps; null drops those steps. */
+  sampleBox: Venue | null;
+  /**
+   * The visitor's filters, lifted for the tour: with Open now on at night (or
+   * SNAP/WIC) the search demo could find nothing, and the Filters step must
+   * show every switch off. Handed back in endTour.
+   */
+  prevFilters: {
+    categories: Set<VenueCategory> | null;
+    openNow: boolean;
+    snap: boolean;
+    wic: boolean;
+    events: boolean;
+  };
+}
 
 /**
  * Drift-detection padding (in degrees).
@@ -441,6 +478,8 @@ interface MapWrapperProps {
   onShowWelcome?: () => void;
   /** Deep link (#132): venue id from a ?venue=<id> URL to open on load. */
   initialVenueId?: string | null;
+  /** Deep link (#758): event id from a ?event=<id> URL; that star pin starts selected. */
+  initialEventId?: string | null;
   /**
    * Boxes (#516): true when the resident arrived via a Menu page's "Boxes"
    * link (/?boxes=1, read once by HomePageClient). Applies the blessing_box
@@ -457,6 +496,11 @@ interface MapWrapperProps {
    * file that doesn't pass it.
    */
   holdMapLoad?: boolean;
+  /**
+   * Guided tour (#159): each new non-zero value starts the tour — bumped by
+   * HomePageClient for the splash's "Take a tour" button and /?tour=1.
+   */
+  tourRequestId?: number;
 }
 
 export default function MapWrapper({
@@ -464,8 +508,10 @@ export default function MapWrapper({
   splashLocationFailure = null,
   onShowWelcome,
   initialVenueId,
+  initialEventId = null,
   initialBoxesFilter = false,
   holdMapLoad = false,
+  tourRequestId = 0,
 }: MapWrapperProps) {
   // ── Locale — from context ─────────────────────────────────────────────────────
   const { locale } = useLocale();
@@ -495,6 +541,8 @@ export default function MapWrapper({
   const {
     selectedVenueId,
     setSelectedVenueId,
+    selectedEventId,
+    setSelectedEventId,
     viewMode,
     setViewMode,
     mapUnavailable,
@@ -505,7 +553,7 @@ export default function MapWrapper({
     setWindowExpanded,
     mapboxMap,
     setMapboxMap,
-  } = useMapUI();
+  } = useMapUI(initialEventId);
 
   // ── Deferred map load (#226, held behind the splash by #588) ────────────────
   // Perf: mapbox-gl is a large WebGL payload that used to fire the instant
@@ -520,7 +568,10 @@ export default function MapWrapper({
   // idle/timeout trigger while a first-time visitor's splash is up — see
   // useDeferredMapLoad's module doc for why the interaction listeners stay
   // live regardless (a real splash-CTA tap still starts the load right away).
-  const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId), holdMapLoad);
+  // A shared event link (?event=<id>) is eager too (#759): it skips the splash
+  // exactly like ?venue= (splashGate.ts), so there is no splash hold to protect
+  // and the star pin should be on screen at once.
+  const mapLoadTriggered = useDeferredMapLoad(Boolean(initialVenueId) || Boolean(initialEventId), holdMapLoad);
 
   // ── Location help card (#739; replaced PR 7's denied-only banner) ───────────
   // Explains a locate attempt that gave no position, so the visitor isn't left
@@ -1132,9 +1183,10 @@ export default function MapWrapper({
       // the coder's report; the `selectedVenueId !== walkingRouteVenueId`
       // effect below already clears a stale route once this fires).
       setSelectedVenueId(null);
+      setSelectedEventId(null); // the panel now shows a different view (#759)
       setWindowExpanded(false);
     },
-    [isMobile, setSelectedVenueId, setWindowExpanded],
+    [isMobile, setSelectedVenueId, setSelectedEventId, setWindowExpanded],
   );
   const handleMenuClose = useCallback(() => setMenuSection(null), []);
   // Closes whatever the desktop panel is showing (#682 8b) — Escape, the
@@ -1151,8 +1203,9 @@ export default function MapWrapper({
   const closeDesktopPanel = useCallback(() => {
     setSidePanelView(null);
     setSelectedVenueId(null);
+    setSelectedEventId(null); // the event card shares this panel (#759)
     setWindowExpanded(false);
-  }, [setSelectedVenueId, setWindowExpanded]);
+  }, [setSelectedVenueId, setSelectedEventId, setWindowExpanded]);
 
   // "← Saved" (#682 8b) — the back-link on a venue card opened FROM the
   // Saved list. A pure navigation within the panel, not a close: the venue
@@ -1181,13 +1234,42 @@ export default function MapWrapper({
   const selectVenue = useCallback(
     (id: string, from?: "saved") => {
       setSelectedVenueId(id);
+      setSelectedEventId(null); // one selection at a time (#758)
       if (!isMobile) {
         setSidePanelView({ kind: "venue", id, from });
         setWindowExpanded(false);
       }
     },
-    [isMobile, setSelectedVenueId, setWindowExpanded],
+    [isMobile, setSelectedVenueId, setSelectedEventId, setWindowExpanded],
   );
+
+  // ── Special events (#758) ───────────────────────────────────────────────────
+  // Live feed, fetched once like boxes. Selecting an event pin selects and
+  // centers it and opens its card (#759): it drops any open place card so the
+  // two selections never show at once, and the id is mirrored into ?event=<id>
+  // (replace, never push) so the address bar always names the selected event.
+  // Deselecting (null) removes the parameter. syncEventParam is a no-op when
+  // the URL already agrees, which keeps a shared link's own ?event= intact on
+  // the first render.
+  // `eventsLoaded` (#759) tells useEventDetail when the feed has answered
+  // without a shared link's id, so the single-event read is made only for an
+  // event that has ended or been cancelled.
+  const { events, loaded: eventsLoaded } = useEventsFeed();
+  const selectEvent = useCallback(
+    (id: string | null) => {
+      setSelectedEventId(id);
+      if (id !== null) {
+        setSelectedVenueId(null);
+        // The event card takes the desktop panel over (#759): drop the venue
+        // card, Saved or Menu view it replaces.
+        if (!isMobile) setSidePanelView(null);
+      }
+    },
+    [isMobile, setSelectedEventId, setSelectedVenueId],
+  );
+  useEffect(() => {
+    syncEventParam(selectedEventId);
+  }, [selectedEventId]);
 
   // ── Origin — user position or Pueblo center fallback ─────────────────────────
   const origin = userLocation ?? PUEBLO_CENTER;
@@ -1197,13 +1279,17 @@ export default function MapWrapper({
     query,
     setQuery,
     commitSearch,
+    setSearchTrackingPaused,
     selectedCategories,
+    setSelectedCategories,
     filterOpenNow,
     setFilterOpenNow,
     filterSnap,
     setFilterSnap,
     filterWic,
     setFilterWic,
+    filterEvents,
+    setFilterEvents,
     venuesWithDistance,
     filteredVenues,
     savedVenues,
@@ -1274,7 +1360,18 @@ export default function MapWrapper({
     (selectedCategories?.size ?? 0) +
     (filterOpenNow ? 1 : 0) +
     (filterSnap ? 1 : 0) +
-    (filterWic ? 1 : 0);
+    (filterWic ? 1 : 0) +
+    (filterEvents ? 1 : 0);
+
+  // Events still to come, for the Filters panel's Events row and its footer
+  // count (#761). Only read while the panel is open (it renders nothing
+  // otherwise), which keeps MapWrapper off the minute clock: the strip and the
+  // list each subscribe to it themselves.
+  // Judged at render time from the wall clock, like eventHereFor below.
+  const upcomingEventCount = () =>
+    // eslint-disable-next-line react-hooks/purity -- wall clock on purpose; see above
+    listOrder(events, Date.now()).length;
+  const filterEventsCount = filterPanelOpen ? upcomingEventCount() : 0;
 
   // ── Typeahead popover state (issue #67) ──────────────────────────────────────
   // isPopoverOpen: true when input is focused + query is non-empty + matches exist.
@@ -1282,6 +1379,9 @@ export default function MapWrapper({
   // blurTimerRef: grace timer so mousedown-inside-popover doesn't lose the click.
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  // Guided tour session (#159) — the tour's own logic sits with startTour
+  // below; declared up here because the outside-press effect needs it.
+  const [tour, setTour] = useState<TourSession | null>(null);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // searchAreaRef: wraps SearchBar + ViewSuggestion + SearchResultsPopover
   // (display:contents — adds no box, purely a containment check target).
@@ -1384,6 +1484,8 @@ export default function MapWrapper({
   // different one) must still compare equal when the resulting membership is
   // equal — a plain string key gives that for free.
   const prevCategoriesKeyRef = useRef<string | null | undefined>(undefined);
+  // Set by the guided tour right before it changes the categories itself.
+  const skipCategoryFitRef = useRef(false);
 
   useEffect(() => {
     if (!mapboxMap) return;
@@ -1398,6 +1500,13 @@ export default function MapWrapper({
     // touching the ref.
     const prevCategoriesKey = prevCategoriesKeyRef.current;
     prevCategoriesKeyRef.current = categoriesKey;
+    // The guided tour (#159) lifts the visitor's categories for the tour and
+    // hands them back at the end; neither is a visitor's choice to zoom on,
+    // and the tour restores the camera itself.
+    if (skipCategoryFitRef.current) {
+      skipCategoryFitRef.current = false;
+      return;
+    }
 
     const reducedMotion =
       typeof window !== "undefined" &&
@@ -1532,6 +1641,35 @@ export default function MapWrapper({
     [filteredVenues, venuesWithDistance, selectedVenueId],
   );
 
+  // ── Event card (#759) ────────────────────────────────────────────────────────
+  // The event the card shows: from the feed, or (a shared link to an event that
+  // has ended or been cancelled) from the single-event read. A link that
+  // resolves to nothing shows no card and the map is exactly as it would be
+  // without the parameter (the selection stays inert: no pin matches it).
+  // Ended/cancelled events never reach `events`, so they get no pin.
+  const { event: selectedEvent } = useEventDetail(selectedEventId, events, eventsLoaded);
+
+  // "See places open now" on an ended/cancelled card: the existing Open-now filter.
+  const handleSeeOpenNow = useCallback(() => {
+    setFilterOpenNow(true);
+    selectEvent(null);
+  }, [setFilterOpenNow, selectEvent]);
+
+  // Closing the card from the phone sheet or the panel deselects the pin and
+  // (via syncEventParam) clears ?event=.
+  const closeEventCard = useCallback(() => selectEvent(null), [selectEvent]);
+
+  // An upcoming or live event tied to the selected place (#759): one line on
+  // that place's own card that opens the event. Judged at render time from the
+  // feed (no timer of its own): the card is only on screen briefly, and a pin
+  // that has just expired disappears from the map on the shared minute tick.
+  const eventHereFor = (venueId: string | null) => {
+    if (venueId === null || events.length === 0) return null;
+    // eslint-disable-next-line react-hooks/purity -- wall clock on purpose; see above
+    const pin = pinsAt(events, Date.now()).find((p) => p.event.venue_id === venueId);
+    return pin ? { label: eventHereLabel(pin, locale), onOpen: () => selectEvent(pin.event.id) } : null;
+  };
+
   // ── venue_opened analytics (#485 PR 2) ───────────────────────────────────────
   //
   // ONE choke point for every selection path (map pin, list row, search
@@ -1611,6 +1749,49 @@ export default function MapWrapper({
       setActiveIndex(-1);
     }, 150);
   }, []);
+
+  /**
+   * Close the popover for good: state down AND the input blurred.
+   * WHY blur: if the input stays focused, tapping it again fires no `focus`
+   * event, so the popover could never reopen (see handleViewSuggestionSelect).
+   */
+  const closeSearchPopover = useCallback(() => {
+    if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+    setIsPopoverOpen(false);
+    setActiveIndex(-1);
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && searchAreaRef.current?.contains(active)) {
+      active.blur();
+    }
+  }, []);
+
+  // Outside-press close. WHY not blur alone: a map pin / the Mapbox canvas
+  // does not move focus (marker press, canvas drag), so the input never
+  // blurred and the popover stayed open beside the opened place card. A
+  // capture-phase pointerdown on the document sees the press before Mapbox
+  // or a marker can stop it; presses inside the search area (input, filters
+  // button, popover rows) are left alone so row clicks still land.
+  useEffect(() => {
+    // Not while a tour runs (#159): the tour's search demo opens these
+    // results itself, and every tap then lands on the tour's own layer —
+    // closing them would wipe the demo mid-step.
+    if (!isPopoverOpen || tour) return;
+    const onPress = (e: PointerEvent) => {
+      const target = e.target;
+      if (target instanceof Node && searchAreaRef.current?.contains(target)) return;
+      closeSearchPopover();
+    };
+    document.addEventListener("pointerdown", onPress, true);
+    return () => document.removeEventListener("pointerdown", onPress, true);
+  }, [isPopoverOpen, tour, closeSearchPopover]);
+
+  // Selection by ANY route (pin, list row, strip, deep link, saved list)
+  // closes it too — the card now owns the screen.
+  const anythingSelected = selectedVenueId !== null || selectedEventId !== null;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to selection from many call sites; one place beats patching each
+    if (anythingSelected) closeSearchPopover();
+  }, [anythingSelected, selectedVenueId, selectedEventId, closeSearchPopover]);
 
   /**
    * Keyboard handler forwarded from SearchBar: ArrowDown/Up/Enter/Escape.
@@ -1703,6 +1884,15 @@ export default function MapWrapper({
   // opens the same BottomSheet/DesktopVenueWindow card ON TOP of the list
   // (the render guards below key off mapUnavailable too, not only
   // viewMode === "map").
+  // An event row in the list opens its card over the map, like a place row.
+  const handleSelectEventFromList = useCallback(
+    (id: string) => {
+      selectEvent(id);
+      showVenueOnMap();
+    },
+    [selectEvent, showVenueOnMap],
+  );
+
   const handleSelectFromList = useCallback(
     (venueId: string) => {
       selectVenue(venueId);
@@ -1799,6 +1989,165 @@ export default function MapWrapper({
     handleLocateRequest();
   }, [handleViewModeChange, handleLocateRequest]);
 
+  // ── Guided tour (#159) ───────────────────────────────────────────────────────
+  // Snapshot what the tour will change (selection, Map/List view), close
+  // anything that would sit over it, and force the map view so pins and the
+  // card exist to point at. GuidedTour.tsx drives each step's own state
+  // through onShowVenue; endTour hands the snapshot back.
+  // Desktop (#682 8b): venue selection goes through `selectVenue` and the
+  // side panel, so the tour opens/closes the card the same way a pin click
+  // does; the Saved/Menu panel it closes on start is not reopened at the end.
+  // ponytail: an active walking route and a selected event are NOT restored
+  // — selecting the sample venue clears both, and a tour mid-route is rare.
+  // Upgrade path: snapshot + refetch the route / reselect the event in endTour.
+  // A ref, not TourSession: the demo's unmount cleanup runs after endTour
+  // has already cleared `tour`, and must still restore the same query.
+  const tourPrevQueryRef = useRef("");
+  // True from startTour to endTour. The demos' unmount cleanups run after
+  // endTour has already handed the visitor's state back; they must not undo it.
+  const tourActiveRef = useRef(false);
+  // Phone only: the tour holds a box card's sheet open to show its lower buttons.
+  const [tourCardExpanded, setTourCardExpanded] = useState(false);
+  const startTour = useCallback(
+    (returnFocusSelector: string) => {
+      setMenuSection(null);
+      setSidePanelView(null);
+      setSelectedEventId(null);
+      setFilterPanelOpen(false);
+      setIsPopoverOpen(false);
+      // The nearest pantry that's on the map right now (filteredVenues is
+      // distance-sorted): a pantry card is the typical one, and a box has a
+      // different card entirely. Falls back to any listed place, then to any
+      // pantry at all when filters hide every one.
+      const sampleVenue =
+        filteredVenues.find((v) => v.category === "pantry") ??
+        filteredVenues.find((v) => v.category !== "blessing_box") ??
+        allVenues.find((v) => v.category === "pantry") ??
+        null;
+      // The nearest live box (the feed may still be loading or empty: then
+      // there's no box to show and GuidedTour leaves those steps out).
+      let sampleBox: Venue | null = null;
+      for (const v of venuesWithDistance) {
+        if (v.category !== "blessing_box" || !getBoxById(v.id)) continue;
+        if (!sampleBox || (v.distanceMiles ?? Infinity) < ((sampleBox as typeof v).distanceMiles ?? Infinity)) {
+          sampleBox = v;
+        }
+      }
+      tourActiveRef.current = true;
+      setTour({
+        returnFocusSelector,
+        prevSelectedId: selectedVenueId,
+        prevViewMode: viewMode,
+        sampleVenue,
+        sampleBox,
+        prevFilters: {
+          categories: selectedCategories,
+          openNow: filterOpenNow,
+          snap: filterSnap,
+          wic: filterWic,
+          events: filterEvents,
+        },
+      });
+      if (selectedCategories && selectedCategories.size > 0) skipCategoryFitRef.current = true;
+      clearFilters();
+      // The search demo borrows the real query; keep the visitor's own to
+      // hand back, and keep the demo word out of search_used analytics.
+      tourPrevQueryRef.current = query;
+      setSearchTrackingPaused(true);
+      handleViewModeChange("map");
+    },
+    [
+      filteredVenues, selectedVenueId, viewMode, query, handleViewModeChange, setSelectedEventId, setSearchTrackingPaused,
+      selectedCategories, filterOpenNow, filterSnap, filterWic, filterEvents, clearFilters, venuesWithDistance, getBoxById,
+    ],
+  );
+  // Box steps demo (#159): the same Boxes view the bottom-nav button gives
+  // (blessing_box only), off again once the box steps are left. The tour
+  // cleared the visitor's own filters at start, so "off" is no filter at all;
+  // theirs come back in endTour.
+  const handleTourDemoBoxes = useCallback(
+    (on: boolean) => {
+      if (!tourActiveRef.current) return;
+      setSelectedCategories(on ? new Set<VenueCategory>(["blessing_box"]) : null);
+    },
+    [setSelectedCategories],
+  );
+  // Search step demo (#159): set the real query and show its results without
+  // focusing the input (so a phone keyboard never opens); null puts the
+  // visitor's own query back with the results closed, as before the tour.
+  const handleTourDemoSearch = useCallback(
+    (text: string | null) => {
+      // A blur's pending 150ms close (handleSearchBlur) would shut the demo's
+      // results the moment they open.
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+      setActiveIndex(-1);
+      if (text === null) {
+        setQuery(tourPrevQueryRef.current);
+        setIsPopoverOpen(false);
+        return;
+      }
+      setQuery(text);
+      setIsPopoverOpen(text !== "");
+    },
+    [setQuery],
+  );
+  // One path for "show this venue's card / close any card" on both
+  // platforms: selectVenue opens the desktop side panel too (a bare
+  // setSelectedVenueId would leave the panel shut and the card step with
+  // nothing to point at).
+  const handleTourShowVenue = useCallback(
+    (id: string | null, expanded = false) => {
+      // The desktop box card has no folded part (DesktopVenueWindow's boxBody).
+      setTourCardExpanded(expanded);
+      if (id) {
+        selectVenue(id);
+        return;
+      }
+      setSelectedVenueId(null);
+      if (!isMobile) setSidePanelView(null);
+    },
+    [isMobile, selectVenue, setSelectedVenueId],
+  );
+  const endTour = useCallback(() => {
+    if (!tour) return;
+    tourActiveRef.current = false;
+    handleTourShowVenue(tour.prevSelectedId);
+    setViewMode(tour.prevViewMode);
+    // The demo steps undo themselves on unmount too; doing it here as well
+    // keeps the restore in the same render as the rest of the snapshot.
+    handleTourDemoSearch(null);
+    setFilterPanelOpen(false);
+    const f = tour.prevFilters;
+    // Any change of categories here (the box steps' Boxes view, or the
+    // visitor's own being handed back) must not re-zoom: the tour has just
+    // put the camera back itself.
+    const key = (c: Set<VenueCategory> | null) => (c && c.size > 0 ? [...c].sort().join(",") : "");
+    if (key(f.categories) !== key(selectedCategories)) skipCategoryFitRef.current = true;
+    setSelectedCategories(f.categories);
+    setFilterOpenNow(f.openNow);
+    setFilterSnap(f.snap);
+    setFilterWic(f.wic);
+    setFilterEvents(f.events);
+    setSearchTrackingPaused(false);
+    setTour(null);
+  }, [
+    tour, handleTourShowVenue, handleTourDemoSearch, setViewMode, setSearchTrackingPaused,
+    selectedCategories, setSelectedCategories, setFilterOpenNow, setFilterSnap, setFilterWic, setFilterEvents,
+  ]);
+  const handleMenuStartTour = useCallback(
+    () => startTour('[data-testid="nav-top"]'),
+    [startTour],
+  );
+  // Splash / ?tour=1 requests (HomePageClient). Focus returns to the map
+  // container (<main tabIndex=-1>), where dismissing the splash normally puts it.
+  const handledTourRequestRef = useRef(0);
+  useEffect(() => {
+    if (!tourRequestId || tourRequestId === handledTourRequestRef.current) return;
+    handledTourRequestRef.current = tourRequestId;
+    queueMicrotask(() => startTour("main"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tourRequestId]);
+
   // §10: the venue sheet (phone only) covers the bottom edge; the nav steps
   // aside for as long as a venue is selected — the FULL CARD (unchanged,
   // #509) or the collapsed route strip alike. #531 (Kyle, 2026-09-19) had
@@ -1814,7 +2163,7 @@ export default function MapWrapper({
   // case too (see its own render guard below), so the nav must step aside
   // there as well.
   const venueSheetOpen =
-    isMobile && (viewMode === "map" || mapUnavailable) && selectedVenue !== null;
+    isMobile && (viewMode === "map" || mapUnavailable) && (selectedVenue !== null || selectedEvent !== null);
   // #542: feeds the same shared registry every other full-surface overlay
   // uses — BottomNav hides itself (overlayRegistry.ts) instead of this
   // component wrapping <BottomNav/> in a `{!venueSheetOpen && ...}` JSX
@@ -1829,17 +2178,26 @@ export default function MapWrapper({
   // dropdown worked over the list view too, and #682 doesn't ask to take
   // that away. `viewMode`/`mapUnavailable` are read directly (not via
   // `selectedVenue`, which is null while `sidePanelView.kind !== "venue"`).
+  // The event card (#759) is derived from `selectedEventId` rather than being a
+  // `sidePanelView` kind: a shared ?event= link seeds the selection on the first
+  // render, before `isMobile` settles, and a view kind set by a handler would
+  // miss that. It shows only while no venue/Saved/Menu view holds the panel.
+  const eventPanelOpen =
+    !isMobile && selectedEvent !== null && sidePanelView === null && (viewMode === "map" || mapUnavailable);
   const desktopPanelOpen =
-    !isMobile &&
-    sidePanelView !== null &&
-    (sidePanelView.kind !== "venue" || viewMode === "map" || mapUnavailable);
+    eventPanelOpen ||
+    (!isMobile &&
+      sidePanelView !== null &&
+      (sidePanelView.kind !== "venue" || viewMode === "map" || mapUnavailable));
 
   // Stable ids for HamburgerMenuContent's Saved/Menu headings — the venue
   // view reuses DesktopVenueWindow's own existing heading id. Only read
   // while `desktopPanelOpen` (DesktopSidePanel unmounts otherwise), so the
   // fallback empty string here is never actually passed to a mounted panel.
   const panelHeadingId =
-    sidePanelView?.kind === "venue"
+    eventPanelOpen && selectedEvent
+      ? `event-card-title-${selectedEvent.id}`
+      : sidePanelView?.kind === "venue"
       ? `venue-window-title-${sidePanelView.id}`
       : sidePanelView?.kind === "saved"
       ? "desktop-panel-saved-heading"
@@ -1922,6 +2280,14 @@ export default function MapWrapper({
             userDistances={userDistances}
             recenterRequestId={recenterRequestId}
             onSelectVenue={handleSelectVenueFromMap}
+            events={events}
+            selectedEventId={selectedEventId}
+            onSelectEvent={selectEvent}
+            allUpcomingEvents={filterEvents}
+            // WHY here (#758): Map defaults locale to "en" and nothing passed it,
+            // so on /es every pin label and tooltip stayed English. Event pins
+            // need the visitor's language; place pins' aria/tooltips now follow it too.
+            locale={locale}
             onMapReady={handleMapReady}
             onMoveEnd={handleMoveEnd}
             walkingRoute={walkingRouteVenueId === selectedVenueId ? walkingRoute : null}
@@ -1948,6 +2314,9 @@ export default function MapWrapper({
           onSelect={handleSelectFromList}
           onClearFilters={handleClearAllFilters}
           showClearFilters={anyFilterActive || query.trim() !== ""}
+          events={events}
+          onSelectEvent={handleSelectEventFromList}
+          eventsOnly={filterEvents}
           notice={
             mapUnavailable ? (
               <div
@@ -2055,13 +2424,46 @@ export default function MapWrapper({
         )}
       </div>
 
+      {/* "Happening today" strip (#761). Map view only, once the map has loaded:
+          the list view lists events itself, and before the map loads the
+          list stands in for it (same z-700 rung, so the two must not coexist).
+          Hidden while any place or event card is open (phone sheet or desktop
+          panel): the open card already names what the strip points at, and a
+          tall sheet reaches up under it. It returns when the card closes.
+          Hidden while the search popover or Filters panel is open: the popover sits in
+          the strip's exact spot and the strip's navy edge poked out around it.
+          Hidden with no events, so an empty or failed feed changes nothing. */}
+      {viewMode === "map" && mapLoadTriggered && events.length > 0 && selectedVenue === null && selectedEvent === null && !isPopoverOpen && !filterPanelOpen && (
+        <EventStrip
+          events={events}
+          locale={locale}
+          onOpen={selectEvent}
+          onMore={() => handleViewModeChange("list")}
+          rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
+        />
+      )}
+
+      {/* Events filter on and nothing left to show (#761): say so on the map too, with a way out. */}
+      {viewMode === "map" && filterEvents && (
+        <EventsEmptyNotice
+          events={events}
+          locale={locale}
+          onShowPlaces={() => setFilterEvents(false)}
+          bottom={
+            isBelow2xl
+              ? `calc(${BOTTOM_NAV_HEIGHT_PX}px + 8px + 26px + 12px + env(safe-area-inset-bottom))`
+              : 24 + 52 + 12
+          }
+        />
+      )}
+
       {/* FilterPanel (#513) — the left side panel opened by SearchBar's Filters
           button. Not tied to search focus (replaces CategoryDropdown, #95). */}
       <FilterPanel
         open={filterPanelOpen}
         onClose={() => setFilterPanelOpen(false)}
         locale={locale}
-        resultCount={filteredVenues.length}
+        resultCount={filterEvents ? filterEventsCount : filteredVenues.length}
         filterOpenNow={filterOpenNow}
         onToggleOpenNow={() => setFilterOpenNow((v) => !v)}
         openNowCount={openNowCount}
@@ -2074,6 +2476,11 @@ export default function MapWrapper({
         selectedCategories={selectedCategories}
         onToggleCategory={toggleCategory}
         onClearAll={clearFilters}
+        filterEvents={filterEvents}
+        onToggleEvents={() => setFilterEvents((v) => !v)}
+        eventsCount={filterEventsCount}
+        // The tour (#159) holds the panel open as a demo; its dialog owns focus then.
+        trapFocus={tour === null}
       />
 
       {/* EmptySearchPopover — shown when query is non-empty but yields no results.
@@ -2105,6 +2512,7 @@ export default function MapWrapper({
           viewMode={viewMode}
           onToggleView={() => handleViewModeChange(viewMode === "map" ? "list" : "map")}
           mapDisabled={mapUnavailable}
+          onStartTour={handleMenuStartTour}
         />
       )}
 
@@ -2187,11 +2595,21 @@ export default function MapWrapper({
           regardless of whether a venue is currently selected. */}
       {isMobile && (viewMode === "map" || mapUnavailable) && (
         <BottomSheet
-          key={selectedVenueId ?? "empty"}
+          key={selectedVenueId ?? selectedEvent?.id ?? "empty"}
           venue={selectedVenue}
+          event={selectedVenue ? null : selectedEvent}
+          userLocation={userLocation}
+          onSeeOpenNow={handleSeeOpenNow}
+          eventHere={eventHereFor(selectedVenueId)}
           box={getBoxById(selectedVenueId)}
           onCheckinSuccess={(result) => handleBoxCheckinSuccess(selectedVenueId, result)}
-          onClose={() => setSelectedVenueId(null)}
+          // The tour's box steps hold the sheet open (#159); undefined otherwise.
+          forceExpanded={tour ? tourCardExpanded : undefined}
+          inert={tour !== null}
+          onClose={() => {
+            setSelectedVenueId(null);
+            closeEventCard();
+          }}
           onWalkRoute={handleWalkRoute}
           isWalkRouteActive={
             selectedVenueId !== null && walkingRouteVenueId === selectedVenueId
@@ -2222,8 +2640,27 @@ export default function MapWrapper({
           HamburgerMenu renders, different shell, see that component's own
           header for why). `panelHeadingId` names whichever view's own
           focusable heading DesktopSidePanel should focus on view change. */}
-      <DesktopSidePanel open={desktopPanelOpen} onClose={closeDesktopPanel} headingId={panelHeadingId}>
+      <DesktopSidePanel
+        open={desktopPanelOpen}
+        onClose={closeDesktopPanel}
+        headingId={panelHeadingId}
+        // The tour (#159) shows cards here; nothing on them may be pressed.
+        inert={tour !== null}
+      >
         {(close) => {
+          if (eventPanelOpen && selectedEvent) {
+            return (
+              <EventPanel
+                key={selectedEvent.id}
+                event={selectedEvent}
+                locale={locale}
+                userLocation={userLocation}
+                headingId={`event-card-title-${selectedEvent.id}`}
+                onClose={close}
+                onSeeOpenNow={handleSeeOpenNow}
+              />
+            );
+          }
           if (sidePanelView?.kind === "venue") {
             if (!selectedVenue) return null;
             return (
@@ -2236,6 +2673,7 @@ export default function MapWrapper({
                 onExpand={() => setWindowExpanded(true)}
                 onCollapse={() => setWindowExpanded(false)}
                 onClose={close}
+                eventHere={eventHereFor(sidePanelView.id)}
                 // "← Saved" (#682 8b) — a back-navigation, NOT a close: uses
                 // `backToSaved` (keeps the venue selected), never `close`
                 // (a real, full close — same for every card, coordinator
@@ -2279,6 +2717,10 @@ export default function MapWrapper({
                 mapDisabled={mapUnavailable}
                 onClose={close}
                 headingId={panelHeadingId}
+                // Not wrapped in close(): startTour shuts this panel itself,
+                // and close()'s focus hop back to the nav item would pull
+                // focus out of the tour (#159).
+                onStartTour={handleMenuStartTour}
               />
             );
           }
@@ -2318,6 +2760,25 @@ export default function MapWrapper({
         navRef={navRef}
         rightInset={desktopPanelOpen ? DESKTOP_PANEL_RIGHT_CLEARANCE_PX : 0}
       />
+
+      {/* Guided tour (#159) — after BottomNav so it's the last thing in the
+          DOM and paints over everything. Deliberately NOT in the
+          useOverlayRegistration set: that would hide BottomNav, and the tour
+          points at its Near me / Saved / Menu items. */}
+      {tour && (
+        <GuidedTour
+          locale={locale}
+          sampleVenue={tour.sampleVenue}
+          sampleBox={tour.sampleBox}
+          onDemoBoxes={handleTourDemoBoxes}
+          mapboxMap={mapboxMap}
+          onShowVenue={handleTourShowVenue}
+          onDemoSearch={handleTourDemoSearch}
+          onShowFilters={setFilterPanelOpen}
+          onClose={endTour}
+          returnFocusSelector={tour.returnFocusSelector}
+        />
+      )}
     </div>
   );
 }

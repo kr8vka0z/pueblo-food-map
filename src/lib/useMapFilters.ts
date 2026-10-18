@@ -59,6 +59,10 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
   const [filterOpenNow, setFilterOpenNow] = useState(false);
   const [filterSnap, setFilterSnap] = useState(false);
   const [filterWic, setFilterWic] = useState(false);
+  // "Events" (#761): show only special events. Venues and boxes are one pool
+  // here, so emptying it hides both place pins and box pins; MapWrapper keeps
+  // drawing the event pins (and the list its events section) on its own.
+  const [filterEvents, setFilterEvents] = useState(false);
 
   // ── Favorites ────────────────────────────────────────────────────────────────
   const favoriteIds = useFavorites();
@@ -123,6 +127,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
   //   4. Apply text search (searchVenues)
   //   Result: filteredVenues — the only venue list passed to Map and ListView
   const filteredVenues = useMemo(() => {
+    if (filterEvents) return [];
     const now = new Date();
 
     const afterFilters = venuesWithDistance
@@ -170,6 +175,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     filterOpenNow,
     filterSnap,
     filterWic,
+    filterEvents,
     query,
   ]);
 
@@ -196,8 +202,16 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     queryRef.current = query;
   }, [query]);
   const lastSentTermRef = useRef<string | null>(null);
+  // The guided tour (#159) types a sample word into this same query to show
+  // search working; that is not a visitor's search and must never be sent.
+  // A ref, so pausing takes effect before the next idle timer can fire.
+  const searchTrackingPausedRef = useRef(false);
+  const setSearchTrackingPaused = useCallback((paused: boolean) => {
+    searchTrackingPausedRef.current = paused;
+  }, []);
 
   const commitSearch = useCallback(() => {
+    if (searchTrackingPausedRef.current) return;
     const term = queryRef.current.trim().toLowerCase();
     if (term === "" || term === lastSentTermRef.current) return;
     lastSentTermRef.current = term;
@@ -218,7 +232,8 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     (selectedCategories !== null && selectedCategories.size > 0) ||
     filterOpenNow ||
     filterSnap ||
-    filterWic;
+    filterWic ||
+    filterEvents;
 
   // ── Category checkbox toggle (#513 — Filters panel, multi-select) ───────────
   // Replaces the old single-select handleCategoryBrowseSelect: the panel
@@ -247,6 +262,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     setFilterOpenNow(false);
     setFilterSnap(false);
     setFilterWic(false);
+    setFilterEvents(false);
   }, []);
 
   // ── Clear ALL filters + search ────────────────────────────────────────────────
@@ -255,6 +271,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     setFilterOpenNow(false);
     setFilterSnap(false);
     setFilterWic(false);
+    setFilterEvents(false);
     setQuery("");
   }, []);
 
@@ -263,6 +280,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     query,
     setQuery,
     commitSearch,
+    setSearchTrackingPaused,
     selectedCategories,
     setSelectedCategories,
     filterOpenNow,
@@ -271,6 +289,8 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     setFilterSnap,
     filterWic,
     setFilterWic,
+    filterEvents,
+    setFilterEvents,
     // Derived
     venuesWithDistance,
     filteredVenues,

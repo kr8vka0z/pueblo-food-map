@@ -122,6 +122,8 @@ export default function SearchResultsPopover({
 
   return (
     <div
+      // The guided tour's search step highlights the whole popover (#159).
+      data-tour="search-results"
       className={
         // Identical anchor to EmptySearchPopover
         "absolute left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[520px] " +

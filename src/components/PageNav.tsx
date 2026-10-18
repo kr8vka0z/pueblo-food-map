@@ -18,7 +18,8 @@
  *                    false here — the item can never show "on" until the
  *                    map applies the filter and the resident is back on it.
  *   - A saved place — the map, opened on that pin (/?venue=<id>).
- * All three targets above go through localizedHref(path, tree) (#689 PR 2
+ *   - "Learn how to use this map" (#159) — the map, starting the tour (/?tour=1).
+ * Every map target above goes through localizedHref(path, tree) (#689 PR 2
  * review fix): this component also renders on /es/about, /es/venues and
  * /es/resources, and a bare "/?near=1" push from there would silently
  * leave the /es tree — tree (LocaleContext, NOT the switchable `locale`
@@ -115,6 +116,9 @@ export default function PageNav({ locale, backHref = "/" }: { locale: Locale; ba
         onSelectVenue={(id) =>
           router.push(localizedHref(`/?venue=${encodeURIComponent(id)}`, tree))
         }
+        // The tour runs on the map, so from here it goes there (#159;
+        // read once by HomePageClient, same shape as ?near=1).
+        onStartTour={() => router.push(localizedHref("/?tour=1", tree))}
         ignoreOutsideRef={navRef}
       />
 

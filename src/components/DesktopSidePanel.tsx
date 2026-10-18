@@ -74,20 +74,26 @@ interface DesktopSidePanelProps {
   headingId: string;
   /** Render prop: receives the wrapped closer (onClose + focus-restore) — see file header. */
   children: (close: () => void) => ReactNode;
+  /**
+   * Guided tour (#159): the tour shows a card here but nothing on it may be
+   * pressed, by any means — `inert` also stops a screen reader's double-tap,
+   * which the tour's tap-catching layer can't (it only blocks hit-tested taps).
+   */
+  inert?: boolean;
 }
 
 export const DESKTOP_PANEL_WIDTH_PX = 380;
 export const DESKTOP_PANEL_INSET_PX = 12;
 export const DESKTOP_PANEL_RIGHT_CLEARANCE_PX = DESKTOP_PANEL_WIDTH_PX + DESKTOP_PANEL_INSET_PX + 12;
 
-export default function DesktopSidePanel({ open, onClose, headingId, children }: DesktopSidePanelProps) {
+export default function DesktopSidePanel({ open, onClose, headingId, children, inert }: DesktopSidePanelProps) {
   // Rules-of-hooks: every hook below only makes sense while mounted, and
   // this component only mounts while `open` — so the early return has to
   // happen in THIS component, before any hook runs, not inside the one that
   // holds them (see DesktopSidePanelShell).
   if (!open) return null;
   return (
-    <DesktopSidePanelShell onClose={onClose} headingId={headingId}>
+    <DesktopSidePanelShell onClose={onClose} headingId={headingId} inert={inert}>
       {children}
     </DesktopSidePanelShell>
   );
@@ -97,6 +103,7 @@ function DesktopSidePanelShell({
   onClose,
   headingId,
   children,
+  inert,
 }: Omit<DesktopSidePanelProps, "open">) {
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -153,6 +160,7 @@ function DesktopSidePanelShell({
     <div
       ref={panelRef}
       data-testid="desktop-side-panel"
+      inert={inert || undefined}
       className={
         // Absolute within MapWrapper's full-viewport `relative` root (same
         // containing block DesktopVenueWindow used to position itself

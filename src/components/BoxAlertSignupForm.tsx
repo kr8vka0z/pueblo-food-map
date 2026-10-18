@@ -150,6 +150,8 @@ export default function BoxAlertSignupForm({ boxId }: BoxAlertSignupFormProps) {
       <>
         <button
           type="button"
+          // The guided tour points at this (#159); it never presses it.
+          data-tour="box-alerts"
           onClick={() => setOpen(true)}
           className="inline-flex min-h-[44px] w-fit items-center text-left text-sm font-medium text-[var(--color-sage-600)] underline hover:text-[var(--color-sage-700)]"
         >

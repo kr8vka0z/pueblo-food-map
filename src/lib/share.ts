@@ -40,17 +40,39 @@ interface ShareVenueOptions {
 }
 
 /**
+ * The link to a special event (#759, retargeted by #762): the event's own page,
+ * /event/<id>, or /es/event/<id> for a Spanish card. WHY the page and not the
+ * map: a shared link now previews the flyer and reads as an event to search
+ * engines; the page's "Open on the map" button leads to the old
+ * `/?event=<id>` map link, which keeps working for links already shared.
+ */
+export function eventShareUrl(eventId: string, locale: "en" | "es" = "en"): string {
+  const origin =
+    typeof window !== "undefined" && window.location?.origin
+      ? window.location.origin
+      : "https://pueblofoodmap.com";
+  return `${origin}${locale === "es" ? "/es" : ""}/event/${encodeURIComponent(eventId)}`;
+}
+
+/** Share a venue: the same mechanics as shareLink, pointed at the venue's page. */
+export function shareVenue({ venueId, title, text, isBox = false }: ShareVenueOptions): Promise<ShareResult> {
+  return shareLink({ url: venueShareUrl(venueId, isBox), title, text });
+}
+
+/**
  * Try the native share sheet first; if it's absent or fails (other than the
  * user dismissing it), copy the link instead. Returns what happened so the UI
  * can show a "Link copied" confirmation only when appropriate.
  */
-export async function shareVenue({
-  venueId,
+export async function shareLink({
+  url,
   title,
   text,
-  isBox = false,
-}: ShareVenueOptions): Promise<ShareResult> {
-  const url = venueShareUrl(venueId, isBox);
+}: {
+  url: string;
+  title: string;
+  text?: string;
+}): Promise<ShareResult> {
   const nav = typeof navigator !== "undefined" ? navigator : undefined;
 
   // Preferred: native share sheet (mobile + some desktop browsers).

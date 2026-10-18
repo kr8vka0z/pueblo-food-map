@@ -169,6 +169,8 @@ function VenueMarker({
       <button
         type="button"
         aria-label={ariaLabel}
+        // Guided tour (#159) finds the sample venue's pin by this.
+        data-venue-id={venue.id}
         onClick={handleAction}
         onKeyDown={handleKeyDown}
         style={{

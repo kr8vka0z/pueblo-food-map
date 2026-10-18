@@ -25,7 +25,7 @@
  */
 
 import { useCallback, useEffect, useRef } from "react";
-import { X, Clock, CreditCard, Apple } from "lucide-react";
+import { X, Clock, CreditCard, Apple, Star } from "lucide-react";
 import { categoryColors } from "@/data/venues";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
@@ -78,8 +78,24 @@ interface FilterPanelProps {
   selectedCategories: Set<VenueCategory> | null;
   onToggleCategory: (cat: VenueCategory) => void;
 
+  /**
+   * "Events" switch (#761): show only special events. Optional so the panel is
+   * unchanged for any caller without events; the row appears only when there
+   * are events to show (or the filter is somehow still on, so it can be turned off).
+   */
+  filterEvents?: boolean;
+  onToggleEvents?: () => void;
+  eventsCount?: number;
+
   /** "Clear all" — categories + the three switches only, never the search query. */
   onClearAll: () => void;
+
+  /**
+   * False while the guided tour (#159) holds the panel open to show it: the
+   * tour's own dialog owns focus and Tab then, and this panel's initial focus
+   * and Tab trap would pull focus out of it. Default true.
+   */
+  trapFocus?: boolean;
 }
 
 /** One "Show only" toggle row: label (+ optional count) and a switch control. */
@@ -89,7 +105,9 @@ function SwitchRow({
   count,
   checked,
   onClick,
+  testId,
 }: {
+  testId?: string;
   icon: React.ReactNode;
   label: string;
   count?: number;
@@ -100,7 +118,8 @@ function SwitchRow({
     // #233: the row is the switch's hit area — `relative` here (not on the
     // switch) makes the switch's `before:inset-0` overlay span the full
     // 48px row, so a thumb on the label toggles it like the checkbox rows.
-    <div className="relative flex items-center gap-3 px-5 py-2.5 min-h-12">
+    // data-tour: the guided tour's Filters step highlights these rows (#159).
+    <div data-tour="filter-switch-row" className="relative flex items-center gap-3 px-5 py-2.5 min-h-12">
       {icon}
       <span className="flex-1 text-sm font-medium text-[var(--color-ink-700)]">{label}</span>
       {count !== undefined && (
@@ -111,6 +130,7 @@ function SwitchRow({
         role="switch"
         aria-checked={checked}
         aria-label={label}
+        data-testid={testId}
         onClick={onClick}
         className={
           "inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-150 " +
@@ -148,6 +168,10 @@ export default function FilterPanel({
   selectedCategories,
   onToggleCategory,
   onClearAll,
+  filterEvents = false,
+  onToggleEvents,
+  eventsCount = 0,
+  trapFocus = true,
 }: FilterPanelProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -181,7 +205,7 @@ export default function FilterPanel({
   // Recipe mirrors HamburgerMenu.tsx (see its own comments for the "why" of
   // each step) — this app's other full-height overlay panel.
   useEffect(() => {
-    if (!open || !panelRef.current) return;
+    if (!open || !trapFocus || !panelRef.current) return;
 
     // Unlike HamburgerMenu.tsx's own version of this capture (#545), no
     // `!== document.body` guard is needed here: this panel's opener (the
@@ -222,7 +246,7 @@ export default function FilterPanel({
     }
     document.addEventListener("keydown", handleTab);
     return () => document.removeEventListener("keydown", handleTab);
-  }, [open]);
+  }, [open, trapFocus]);
 
   // #527: shared, ref-counted with every other overlay that wants the lock
   // (see overlayRegistry.ts's own header) — replaces this panel's own
@@ -258,7 +282,13 @@ export default function FilterPanel({
       <div
         ref={panelRef}
         role="dialog"
-        aria-modal="true"
+        // Not modal while the tour (#159) holds it open: two aria-modal dialogs
+        // at once let a screen reader scope itself to this panel and lose the
+        // tour's Next/Skip.
+        aria-modal={trapFocus ? "true" : undefined}
+        // Held open by the tour: shown, never pressable (no filter can be
+        // toggled, not even by a screen reader's double-tap).
+        inert={!trapFocus || undefined}
         aria-labelledby={TITLE_ID}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -325,6 +355,19 @@ export default function FilterPanel({
           <div className="px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
             {t("filters.panel.showOnly", locale)}
           </div>
+          {onToggleEvents && (eventsCount > 0 || filterEvents) && (
+            <SwitchRow
+              icon={<Star aria-hidden size={14} className="text-[var(--color-event-outline)] shrink-0" fill="var(--color-event-pin)" />}
+              testId="filter-events-switch"
+              label={t("events.filter.label", locale)}
+              count={eventsCount}
+              checked={filterEvents}
+              onClick={() => {
+                void track(EVENTS.FILTER_TOGGLED, { filter: "events", on: !filterEvents });
+                onToggleEvents();
+              }}
+            />
+          )}
           <SwitchRow
             icon={<Clock aria-hidden size={14} className="text-[var(--color-ink-500)] shrink-0" />}
             label={t("filter.openNow", locale)}
@@ -410,7 +453,9 @@ export default function FilterPanel({
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-brand-orange)]"
             }
           >
-            {t("filters.panel.showResults", locale, { count: String(resultCount) })}
+            {filterEvents
+              ? t(resultCount === 1 ? "events.filter.showResults.one" : "events.filter.showResults.other", locale, { count: String(resultCount) })
+              : t("filters.panel.showResults", locale, { count: String(resultCount) })}
           </button>
         </div>
       </div>

@@ -60,6 +60,7 @@ import VenuePopupHeader from "@/components/VenuePopupHeader";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import HoursList from "@/components/HoursList";
 import BoxCardBody from "@/components/BoxCardBody";
+import EventHereLine, { type EventHere } from "@/components/EventHereLine";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -109,6 +110,8 @@ interface DesktopVenueWindowProps {
    * venue's own map state (MapWrapper owns that decision).
    */
   backTo?: { label: string; onClick: () => void };
+  /** An upcoming/live event tied to this place (#759): one line that opens its card. */
+  eventHere?: EventHere | null;
 }
 
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
@@ -131,6 +134,7 @@ export default function DesktopVenueWindow({
   activeStepIndex = 0,
   onStepChange = () => {},
   backTo,
+  eventHere = null,
 }: DesktopVenueWindowProps) {
   const { locale: ctxLocale } = useLocale();
   const locale = localeProp ?? ctxLocale;
@@ -175,6 +179,11 @@ export default function DesktopVenueWindow({
               {venue.operator}
             </a>
           </p>
+        )}
+        {eventHere && (
+          <div className="mt-2">
+            <EventHereLine {...eventHere} />
+          </div>
         )}
       </div>
       {/* gap-4: Share/Save are 48px boxes with -m-1, so this leaves 8px

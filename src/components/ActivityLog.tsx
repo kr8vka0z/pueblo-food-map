@@ -103,6 +103,8 @@ function ActionLine({ item }: { item: ActivityItem }) {
             >
               {row.venue_name}
             </Link>
+          ) : row.venue_name ? (
+            <span className="text-sm font-medium text-[var(--color-ink-700)]">{row.venue_name}</span>
           ) : null}
           {summary.note && <span className="text-sm text-[var(--color-ink-500)]">{summary.note}</span>}
           {summary.prUrl && (

@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-19
+
+### Fixed
+
+- The admin Dashboard's visitor and map-usage numbers load reliably again, including the 90-day view, instead of showing "unavailable". ([#816](https://github.com/kr8vka0z/pueblo-food-map/pull/816))
+
 ## [1.2.0] - 2026-10-18
 
 ### New

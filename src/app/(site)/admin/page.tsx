@@ -78,6 +78,7 @@ import {
 } from "@/lib/boxStats";
 import { loadVisitorsAnalytics, DASHBOARD_PERIODS, type DashboardPeriod } from "@/lib/cfAnalytics";
 import { loadMapUsageAnalytics } from "@/lib/posthogQuery";
+import { createFetchLimiter } from "@/lib/analyticsFetch";
 import type { AdminNavCounts } from "@/lib/adminNavCounts";
 import type { AdminVenueRow } from "@/types/venue";
 import AdminNav from "@/components/AdminNav";
@@ -161,6 +162,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     const publishToken = process.env.GITHUB_PUBLISH_TOKEN;
     const periodStart = periodStartMs(period, now);
     const cutoffIso = periodStart === null ? new Date(0).toISOString() : new Date(periodStart).toISOString();
+    // One limiter for this render, shared by both analytics loaders, so their
+    // fetches together never exceed 5 open (the Worker's limit is 6 and the
+    // publish-status GitHub fetch takes one): src/lib/analyticsFetch.ts.
+    const analyticsLimit = createFetchLimiter();
 
     const [
       venuesResult,
@@ -199,15 +204,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         )
         .first<{ run_id: string; created_at: string; n: number }>(),
       // WHY these two sit in the same Promise.all as the D1 reads: Cloudflare
-      // and PostHog are independent network calls (each up to a 4s timeout,
-      // and the in-memory caches are empty on a cold Worker, the usual first
+      // and PostHog are independent network calls (8s timeout per attempt, one
+      // retry, at most 5 open at once, each loader gives up after 20s:
+      // src/lib/analyticsFetch.ts), and the
+      // in-memory caches are empty on a cold Worker, the usual first
       // visit after sign-in). Awaiting them after the D1 burst stacked their
       // latency on top of it. Neither ever rejects (both return null on any
       // failure), so they still degrade independently of every D1 read, see
       // this file's own header. PostHog's project id / API host are plain
       // wrangler vars, read via the binding per AGENTS.md "Runtime reads".
-      loadVisitorsAnalytics(period, now),
-      loadMapUsageAnalytics(period, env.POSTHOG_PROJECT_ID, env.POSTHOG_API_HOST, now),
+      loadVisitorsAnalytics(period, now, analyticsLimit),
+      loadMapUsageAnalytics(period, env.POSTHOG_PROJECT_ID, env.POSTHOG_API_HOST, now, analyticsLimit),
     ]);
     visitors = visitorsResult;
     mapUsage = mapUsageResult;

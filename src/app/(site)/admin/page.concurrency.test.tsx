@@ -1,7 +1,7 @@
 /**
  * Round-trip test for /admin (Dashboard): the Cloudflare and PostHog analytics
  * calls must start together with the D1 reads, not after them. They are
- * independent network calls (each capped at a 4s timeout, and the in-memory
+ * independent network calls (each capped at an 8s timeout per attempt, and the in-memory
  * cache is empty on a cold Worker, which is exactly what a first visit after
  * sign-in hits), so awaiting them one after another stacked their latency on
  * top of the D1 reads. D1 stays held open below until both loaders have been

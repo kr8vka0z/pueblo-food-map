@@ -1,8 +1,9 @@
 /**
  * FaqList — the visible Q&A markup for a FAQ (#709), no JSON-LD. Shared by the
- * server-only FaqSection (pantry hub) and the client ResourcesContent, which
- * must render at the visitor's locale (the /about pattern). Markup mirrors
- * AboutContent's FAQ. Imports only types, so it is safe in a client bundle.
+ * server-only FaqSection (pantry hub) and the client ResourcesContent and
+ * AboutContent, which must render at the visitor's locale while their pages
+ * build the JSON-LD server-side. Imports only types, so it is safe in a
+ * client bundle.
  */
 
 import type { FaqItem } from "@/lib/faqItems";

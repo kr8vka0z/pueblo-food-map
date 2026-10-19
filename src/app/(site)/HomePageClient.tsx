@@ -72,7 +72,7 @@
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { readSplashGate, markSplashSeen, resolveVenueId, shouldSkipSplash } from '@/lib/splashGate';
+import { readSplashGate, markSplashSeen, resolveVenueId, shouldSkipSplash, type SplashViewport } from '@/lib/splashGate';
 // WHY a static import (mobile LCP): the splash's purpose line IS the LCP
 // element. As a next/dynamic({ssr:false}) chunk it was only discovered after
 // hydration, then loaded through Turbopack's async-loader -> chunk levels, so
@@ -94,20 +94,13 @@ const MapWrapper = dynamic(() => import('@/components/MapWrapper'), {
   loading: () => null,
 });
 
-// GATE_KEY itself lives in src/lib/splashGate.ts (#689 PR 2 follow-up
-// review fix) — see that file's header for why it's not defined here:
-// SplashScreen's cross-tree CTA case needs markSplashSeen() too, and
-// SplashScreen is mounted BY this file via next/dynamic below, so a
-// shared module avoids a circular import between the two.
-
-
 export default function HomePageClient() {
   // null = not yet determined (localStorage/URL are unknown server-side). The
   // server and first client render both show the splash as `pending` and no
   // map; the layout effect then resolves the true value without a hydration
   // mismatch.
   const [splashShown, setSplashShown] = useState<boolean | null>(null);
-  const [viewport, setViewport] = useState<'located' | 'pueblo-center'>('pueblo-center');
+  const [viewport, setViewport] = useState<SplashViewport>('pueblo-center');
   // Why the splash's "Find food near me" produced no position, if it didn't (#739);
   // handed to MapWrapper, which shows LocationHelpCard for it.
   const [splashLocationFailure, setSplashLocationFailure] = useState<LocationFailure | null>(null);
@@ -148,30 +141,27 @@ export default function HomePageClient() {
     // skip decision still sees them.
     const { search, hash } = window.location;
     const params = new URLSearchParams(search);
-    // "Near me" in the bottom nav on a Menu page (PageNav) links to /?near=1:
-    // open the map and locate, as the splash's "Find food near me" does.
-    const nearParam = params.get('near') === '1';
-    if (nearParam) {
+    // Menu-page (PageNav) links, each read once then stripped from the URL so
+    // a refresh doesn't repeat it: "Near me" -> /?near=1 (open the map and
+    // locate, as the splash's "Find food near me" does), "Boxes" -> /?boxes=1,
+    // "Learn how to use this map" -> /?tour=1 (#159).
+    let stripped = false;
+    if (params.get('near') === '1') {
       setViewport('located');
-      // Strip it so a refresh doesn't locate again.
       params.delete('near');
-      const qs = params.toString();
-      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+      stripped = true;
     }
-    // "Boxes" in the bottom nav on a Menu page (PageNav) links to
-    // /?boxes=1: same read-once-then-strip shape as near, above.
-    const boxesParam = params.get('boxes') === '1';
-    if (boxesParam) {
+    if (params.get('boxes') === '1') {
       setInitialBoxesFilter(true);
       params.delete('boxes');
-      const qs = params.toString();
-      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+      stripped = true;
     }
-    // "Learn how to use this map" from a Menu page (PageNav) links to
-    // /?tour=1 (#159): same read-once-then-strip shape.
     if (params.get('tour') === '1') {
       setTourRequestId(1);
       params.delete('tour');
+      stripped = true;
+    }
+    if (stripped) {
       const qs = params.toString();
       window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
     }
@@ -191,7 +181,7 @@ export default function HomePageClient() {
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const dismissSplash = useCallback((mode: 'located' | 'pueblo-center', failure?: LocationFailure) => {
+  const dismissSplash = useCallback((mode: SplashViewport, failure?: LocationFailure) => {
     markSplashSeen();
     setViewport(mode);
     setSplashLocationFailure(failure ?? null);

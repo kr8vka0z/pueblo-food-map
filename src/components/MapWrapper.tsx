@@ -79,6 +79,7 @@ import { useMapUI, type ViewMode } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
 import { track, EVENTS } from "@/lib/analytics";
 import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY, prefersReducedMotion } from "@/lib/useMediaQuery";
+import type { SplashViewport } from "@/lib/splashGate";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
 // dynamic import here in a Client Component as required by Next.js 16
@@ -189,11 +190,6 @@ export const ROUTE_FIT_MAX_ZOOM = 17;
 // the other view — see showViewSuggestion below.
 const LISTBOX_ID = "search-results-listbox";
 
-// ─── Viewport prop (from PR 3 splash gate) ────────────────────────────────────
-// 'located'      → use the user's geolocation position as initial map center.
-// 'pueblo-center' → hardcoded Pueblo center (default).
-// PR 3 sets this when dismissing the splash. No other behaviour changes here.
-export type SplashViewport = 'located' | 'pueblo-center';
 
 // ─── MapWrapper ───────────────────────────────────────────────────────────────
 

@@ -29,6 +29,7 @@
 
 import type { AdminVenueRow, AdminVenueSourceType, Venue } from "@/types/venue";
 import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "../../scripts/refresh/diffEngine";
+import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 // ─── Row + parsed-diff shapes ───────────────────────────────────────────────
 
@@ -304,9 +305,6 @@ export interface ApprovingIdentity {
 export type ApplyApprovedProposalResult =
   | { ok: true; status: 200; targetVenueId: string; changeType: ProposalChangeType }
   | { ok: false; status: number; error: string; message?: string };
-
-const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
 // `WHERE id = ? AND status = 'pending'` closes the supersede-race window —
 // see applyApprovedProposal's own header, correctness requirement 1 in the
@@ -602,7 +600,7 @@ export async function applyApprovedProposal(
   }
 
   const insertAudit = db
-    .prepare(AUDIT_INSERT_SQL)
+    .prepare(AUDIT_INSERT_VALUES_SQL)
     .bind(identity.email, "venue", proposalRow.target_venue_id, auditAction, beforeJson, JSON.stringify(afterRowForAudit), timestamp, identity.sessionId ?? null);
   const approveProposal = db.prepare(APPROVE_PROPOSAL_SQL).bind(identity.email, timestamp, timestamp, proposalRow.id);
 

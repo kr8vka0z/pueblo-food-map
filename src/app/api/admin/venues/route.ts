@@ -53,6 +53,7 @@ import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
 import type { AdminVenueSourceType } from "@/types/venue";
 import { boxEventsForCreate, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";
+import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 // Deliberately mirrors scripts/seed-admin-db.ts's INSERT_COLUMNS list:
 // created_at/updated_at are omitted so the schema's own
@@ -66,9 +67,6 @@ const VENUES_INSERT_COLUMNS = [
 ] as const;
 
 const VENUES_INSERT_SQL = `INSERT INTO venues (${VENUES_INSERT_COLUMNS.join(", ")}) VALUES (${VENUES_INSERT_COLUMNS.map(() => "?").join(", ")})`;
-
-const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
 // Blessing Boxes slice 1: a fresh blessing_box create always inserts its
 // blessing_boxes row too (never an upsert here — the venue row is brand
@@ -300,7 +298,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     db.prepare(BOX_EVENT_INSERT_SQL).bind(id, e.kind, e.detail, timestamp),
   );
   const insertAudit = db
-    .prepare(AUDIT_INSERT_SQL)
+    .prepare(AUDIT_INSERT_VALUES_SQL)
     .bind(
       identity.email,
       "venue",

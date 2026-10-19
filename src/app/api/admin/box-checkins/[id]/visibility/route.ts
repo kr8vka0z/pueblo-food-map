@@ -30,6 +30,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
+import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 interface BoxCheckinRow {
   id: number;
@@ -41,9 +42,6 @@ interface BoxCheckinRow {
   hidden_at: string | null;
   created_at: string;
 }
-
-const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
 export async function POST(
   req: NextRequest,
@@ -87,7 +85,7 @@ export async function POST(
     .prepare("UPDATE box_checkins SET visibility = ?, hidden_by = ?, hidden_at = ? WHERE id = ?")
     .bind(visibility, hiddenBy, hiddenAt, checkinId);
   const insertAudit = db
-    .prepare(AUDIT_INSERT_SQL)
+    .prepare(AUDIT_INSERT_VALUES_SQL)
     .bind(
       identity.email,
       "box_checkin",

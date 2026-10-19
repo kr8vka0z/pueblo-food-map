@@ -16,6 +16,7 @@
 
 import { validateHoursWeekly, validateIrregularSchedule } from "@/lib/adminVenueValidation";
 import type { IrregularSchedule, Venue, VenueCategory, WeeklyHours } from "@/types/venue";
+import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 // ─── D1 row shape ───────────────────────────────────────────────────────────
 // Mirrors migrations/0001_init_admin_schema.sql's `venues` table exactly —
@@ -519,9 +520,7 @@ export async function promotePublishedDrafts(
 
   statements.push(
     db
-      .prepare(
-        "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      )
+      .prepare(AUDIT_INSERT_VALUES_SQL)
       .bind(meta.actorEmail, "venue", meta.publishedAt, "publish", null, afterJson, meta.publishedAt, meta.actorSessionId ?? null),
   );
 

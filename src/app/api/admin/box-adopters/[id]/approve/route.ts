@@ -29,9 +29,7 @@ import { sendAdopterApprovedEmail, upsertApprovedAdopterSubscriptionStatement } 
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
 import { bustEdgeCache } from "@/lib/edgeCache";
 import { logFormFailure } from "@/lib/logger";
-
-const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 export async function POST(
   req: NextRequest,
@@ -72,7 +70,7 @@ export async function POST(
     .prepare("UPDATE box_adopters SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_reason = NULL WHERE id = ?")
     .bind(identity.email, timestamp, adopterId);
   const insertAudit = db
-    .prepare(AUDIT_INSERT_SQL)
+    .prepare(AUDIT_INSERT_VALUES_SQL)
     .bind(identity.email, "box_adopter", String(adopterId), "update", JSON.stringify(existing), JSON.stringify(afterRow), timestamp, identity.sessionId ?? null);
   const upsertSubscription = upsertApprovedAdopterSubscriptionStatement(db, {
     venueId: existing.venue_id,

@@ -9,10 +9,10 @@
  * same order as before). checkFormRateLimit is mocked to always allow (same
  * convention as reportSubmitD1/suggestSubmitD1/feedbackSubmitD1.test.ts) —
  * this file's own job is #160's payload/CR-LF/venueId behavior, not rate
- * limiting (that's formRateLimit.test.ts's job). This file is otherwise
- * byte-for-byte identical to the original except for the added mocks/stub,
+ * limiting (that's formRateLimit.test.ts's job). The added mocks/stub are
  * needed in the "1.2" and "1.3" blocks only ("1.1" throws before reaching
- * the rate limiter; "1.4" doesn't touch a route at all).
+ * the rate limiter; "1.4" doesn't touch a route at all). Request/D1/Turnstile
+ * fakes come from helpers/submitRouteTestHelpers.ts.
  *
  * Covers the behaviours added in each sub-item:
  *   1.1  Missing TURNSTILE_SECRET_KEY throws (all 3 routes)
@@ -26,7 +26,8 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
+import { makeFakeD1, makeSubmitRequest, mockTurnstileSuccess } from "@/__tests__/helpers/submitRouteTestHelpers";
 
 // #587: report/suggest/feedback now fetch getCloudflareContext().env.ADMIN_DB
 // for the D1-backed rate-limit check before validation — needed only by the
@@ -42,36 +43,6 @@ const mockCheckFormRateLimit = vi.fn();
 vi.mock("@/lib/formRateLimit", () => ({
   checkFormRateLimit: (...args: unknown[]) => mockCheckFormRateLimit(...args),
 }));
-
-function makeFakeD1() {
-  const bind = () => ({ run: async () => ({ success: true, results: [], meta: {} }) });
-  const prepare = () => ({ bind });
-  return { prepare } as unknown as D1Database;
-}
-
-// ─── Shared helpers ────────────────────────────────────────────────────────────
-
-function makeReq(
-  url: string,
-  body: Record<string, unknown>,
-  ip = "1.2.3.4",
-): NextRequest {
-  return new NextRequest(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "cf-connecting-ip": ip,
-    },
-    body: JSON.stringify(body),
-  });
-}
-
-function mockTurnstileOk() {
-  return vi.fn().mockResolvedValueOnce({
-    ok: true,
-    json: async () => ({ success: true }),
-  });
-}
 
 // ─── 1.1 Missing TURNSTILE_SECRET_KEY throws ─────────────────────────────────
 
@@ -89,7 +60,7 @@ describe("1.1 — throw on missing TURNSTILE_SECRET_KEY", () => {
     const { POST } = await import("@/app/(site)/report/submit/route");
     vi.stubGlobal("fetch", vi.fn()); // should not be reached
 
-    const req = makeReq("http://localhost/report/submit", {
+    const req = makeSubmitRequest("/report/submit", {
       venueId: "garden-rmser",
       venueName: "RMSER Community Garden",
       venueAddress: "330 Lake Ave",
@@ -108,7 +79,7 @@ describe("1.1 — throw on missing TURNSTILE_SECRET_KEY", () => {
     const { POST } = await import("@/app/(site)/suggest/submit/route");
     vi.stubGlobal("fetch", vi.fn());
 
-    const req = makeReq("http://localhost/suggest/submit", {
+    const req = makeSubmitRequest("/suggest/submit", {
       venueName: "Test Pantry",
       address: "123 Main St",
       category: "pantry",
@@ -125,7 +96,7 @@ describe("1.1 — throw on missing TURNSTILE_SECRET_KEY", () => {
     const { POST } = await import("@/app/(site)/feedback/submit/route");
     vi.stubGlobal("fetch", vi.fn());
 
-    const req = makeReq("http://localhost/feedback/submit", {
+    const req = makeSubmitRequest("/feedback/submit", {
       feedbackType: "positive",
       message: "Great map!",
       contactEmail: "user@example.com",
@@ -142,7 +113,7 @@ describe("1.1 — throw on missing TURNSTILE_SECRET_KEY", () => {
 describe("1.2 — over-cap inputs rejected server-side", () => {
   beforeEach(() => {
     mockGetCloudflareContext.mockReset();
-    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeD1() } });
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeD1().db } });
     mockCheckFormRateLimit.mockReset();
     mockCheckFormRateLimit.mockResolvedValue(true);
   });
@@ -159,9 +130,9 @@ describe("1.2 — over-cap inputs rejected server-side", () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret");
     vi.stubEnv("CHECKIN_RATE_LIMIT_SECRET", "test-rate-limit-secret");
     const { POST } = await import("@/app/(site)/report/submit/route");
-    vi.stubGlobal("fetch", mockTurnstileOk());
+    vi.stubGlobal("fetch", mockTurnstileSuccess());
 
-    const req = makeReq("http://localhost/report/submit", {
+    const req = makeSubmitRequest("/report/submit", {
       venueId: "garden-rmser",
       venueName: "RMSER Community Garden",
       venueAddress: "330 Lake Ave",
@@ -183,9 +154,9 @@ describe("1.2 — over-cap inputs rejected server-side", () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret");
     vi.stubEnv("CHECKIN_RATE_LIMIT_SECRET", "test-rate-limit-secret");
     const { POST } = await import("@/app/(site)/suggest/submit/route");
-    vi.stubGlobal("fetch", mockTurnstileOk());
+    vi.stubGlobal("fetch", mockTurnstileSuccess());
 
-    const req = makeReq("http://localhost/suggest/submit", {
+    const req = makeSubmitRequest("/suggest/submit", {
       venueName: "x".repeat(201),
       address: "123 Main St",
       category: "pantry",
@@ -205,9 +176,9 @@ describe("1.2 — over-cap inputs rejected server-side", () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret");
     vi.stubEnv("CHECKIN_RATE_LIMIT_SECRET", "test-rate-limit-secret");
     const { POST } = await import("@/app/(site)/feedback/submit/route");
-    vi.stubGlobal("fetch", mockTurnstileOk());
+    vi.stubGlobal("fetch", mockTurnstileSuccess());
 
-    const req = makeReq("http://localhost/feedback/submit", {
+    const req = makeSubmitRequest("/feedback/submit", {
       feedbackType: "positive",
       message: "x".repeat(3001),
       contactEmail: "user@example.com",
@@ -233,7 +204,7 @@ describe("1.3 — CR/LF stripped; unknown venueId rejected in report route", () 
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret");
     vi.stubEnv("CHECKIN_RATE_LIMIT_SECRET", "test-rate-limit-secret");
     mockGetCloudflareContext.mockReset();
-    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeD1() } });
+    mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: makeFakeD1().db } });
     mockCheckFormRateLimit.mockReset();
     mockCheckFormRateLimit.mockResolvedValue(true);
     const mod = await import("@/app/(site)/report/submit/route");
@@ -246,9 +217,9 @@ describe("1.3 — CR/LF stripped; unknown venueId rejected in report route", () 
   });
 
   test("unknown venueId → 422 (client cannot inject arbitrary venue name)", async () => {
-    vi.stubGlobal("fetch", mockTurnstileOk());
+    vi.stubGlobal("fetch", mockTurnstileSuccess());
 
-    const req = makeReq("http://localhost/report/submit", {
+    const req = makeSubmitRequest("/report/submit", {
       venueId: "does-not-exist-999",
       issueType: "hours",
       description: "This is a long enough description.",
@@ -274,7 +245,7 @@ describe("1.3 — CR/LF stripped; unknown venueId rejected in report route", () 
       }),
     );
 
-    const req = makeReq("http://localhost/report/submit", {
+    const req = makeSubmitRequest("/report/submit", {
       venueId: "garden-rmser",
       issueType: "hours",
       description: "Issue with hours\r\nSecond line\nThird line",

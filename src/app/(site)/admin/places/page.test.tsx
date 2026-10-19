@@ -28,7 +28,7 @@
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { AccessDeniedError } from "@/lib/adminOrigin";
 import type { AdminVenueRow } from "@/types/venue";
 
@@ -183,5 +183,71 @@ describe("PlacesPage — auth guard", () => {
 
     expect(forbidden).not.toHaveBeenCalled();
     expect(logAdminAuthFailure).not.toHaveBeenCalled();
+  });
+});
+
+describe("PlacesPage — pending public submissions (#675)", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test("a report attaches to its place's row; a new-place suggestion gets its own row linking to the prefilled form", async () => {
+    const venues = [makeVenueRow(), makeVenueRow({ id: "venue-b", name: "Main Street Grocery", category: "grocery" })];
+    const submissionRows = [
+      {
+        id: 9,
+        kind: "closure",
+        payload: JSON.stringify({
+          venueId: "venue-a",
+          venueName: "Eastside Pantry",
+          venueAddress: "123 Test St",
+          issueType: "hours",
+          description: "Hours are wrong.",
+          contactEmail: "reporter@example.com",
+        }),
+        target_venue_id: "venue-a",
+        submitter_email: "reporter@example.com",
+        status: "pending",
+        created_at: "2026-09-01T12:00:00.000Z",
+        reviewed_by: null,
+        reviewed_at: null,
+        review_reason: null,
+      },
+      {
+        id: 5,
+        kind: "new_venue",
+        payload: JSON.stringify({
+          venueName: "Northside Pantry",
+          address: "900 Elm St, Pueblo, CO",
+          category: "pantry",
+          acceptsSnap: true,
+          acceptsWic: false,
+          submitterEmail: "suggester@example.com",
+        }),
+        target_venue_id: null,
+        submitter_email: "suggester@example.com",
+        status: "pending",
+        created_at: "2026-09-01T12:00:00.000Z",
+        reviewed_by: null,
+        reviewed_at: null,
+        review_reason: null,
+      },
+    ];
+    mockGetAdminDb.mockResolvedValue({
+      db: makeFakeDb(venues, [], submissionRows),
+      identity: { email: "admin@example.com" },
+    });
+    mockGetCloudflareContext.mockResolvedValue({ env: { BETTER_AUTH_RP_ID: undefined } });
+
+    render(await PlacesPage());
+
+    const table = screen.getByRole("table");
+    const reportedRow = within(table).getByRole("row", { name: /Eastside Pantry/ });
+    expect(within(reportedRow).getByText(/Public: "Hours are wrong or out of date"/)).toBeDefined();
+    const otherRow = within(table).getByRole("row", { name: /Main Street Grocery/ });
+    expect(within(otherRow).queryByText(/Public:/)).toBeNull();
+    expect(screen.getByRole("link", { name: "Northside Pantry" }).getAttribute("href")).toBe(
+      "/admin/venues/new?submission=5",
+    );
   });
 });

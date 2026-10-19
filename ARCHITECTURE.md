@@ -92,8 +92,9 @@ Next.js App Router (Cloudflare Worker)
     └── report/[venueId], suggest, feedback  (+ submit/route.ts each)
     └── admin/**  (admin panel — see "Admin panel")
   └── src/app/es/  — the /es tree's own root layout (#689 PR 2). Thin wrapper
-        pages for the five mirrored routes (page.tsx, about/, resources/,
-        venues/, venue/[id]/) each pass locale: "es" to buildPageMetadata and
+        pages for every mirrored route (page.tsx, about/, resources/, venues/,
+        venue/[id]/, the four SEO hubs and event/[id]/ — `ls src/app/es`
+        is the live list) each pass locale: "es" to buildPageMetadata and
         the venueSchema.ts builders, and render the SAME client "Content"
         components as their (site)/ counterparts — no page logic duplicated.
         es/not-found.tsx exists only for the dynamic /es/event/[id] (#762),
@@ -133,7 +134,7 @@ Data layer (static TS modules, no API calls at render time)
 
 Lib (selected)
   └── src/lib/i18n.ts, LocaleContext.tsx, useDocumentTitle.ts  (i18n)
-  └── src/lib/hours.ts, parseOsmHours.ts   (open-status logic)
+  └── src/lib/hours.ts   (open-status logic)
   └── src/lib/favorites.ts, distance.ts, searchVenues.ts
   └── src/lib/turnstile.ts, formRateLimit.ts  (form protection)
   └── src/lib/adminDb.ts, adminSession.ts, adminOrigin.ts  (admin gate)
@@ -216,8 +217,8 @@ scripts/fetch-osm-grocery.py ┤→ scripts/ingest-osm-grocery.py ─┐
 ```
 
 Runs weekly in CI (`refresh-proposals.yml`, cron changed monthly→weekly in #543); run order and local use:
-`scripts/README.md`; schedule, credentials and chunked-write gotchas:
-AGENTS.md "Automated venue-refresh pipeline".
+`scripts/README.md`; runtime secrets: AGENTS.md "Secrets"; guardrail and
+chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
 
 - **`fetch-osm-grocery.py`** is the only thing that talks to Overpass;
   `ingest-osm-grocery.py` only converts its download and is reused unmodified.
@@ -265,8 +266,10 @@ AGENTS.md "Automated venue-refresh pipeline".
   phone/url change is formatting-only once normalized AND Jev scores it
   "same value" > 0.9. This re-check is deterministic and independent of
   Jev's score, so a miscalibrated triage answer alone can't trigger a write.
-  Operational detail (secrets, cost logging, the `0016` schemaReady probe):
-  AGENTS.md "Automated venue-refresh pipeline".
+  Operational detail: the `0016` `schemaReady` probe and the per-run cost
+  line are in `scripts/refresh-ingest.ts`; `JEV_API_KEY` is in AGENTS.md
+  "Secrets"; the `REFRESH_AI_AUTO_APPLY` rule is in AGENTS.md "Automated
+  venue-refresh pipeline".
 - **`linkHealth.ts`** checks each stored `url` (HEAD, falling back to GET)
   and proposes clearing it only on 404/410 — never on 403 (often a bot-block
   of the checker), 429, 5xx or timeout, which are logged only.
@@ -462,8 +465,10 @@ visitor never half-migrates.
 **Two route trees, not one — what's mirrored and what isn't.** This is the
 one place it's stated; code comments point here.
 
-The five in-scope routes (`/`, `/venues`, `/venue/[id]`, `/resources`,
-`/about`) are **mirrored**: each has a full `/es` twin with its own root
+The in-scope routes (`/`, `/venues`, `/venue/[id]`, `/resources`,
+`/about`, the four SEO hubs `/food-pantries`, `/snap-wic-stores`,
+`/community-gardens`, `/blessing-boxes`, and `/event/[id]`; `ls src/app/es`
+is the live list) are **mirrored**: each has a full `/es` twin with its own root
 layout (`src/app/es/layout.tsx`, `lang="es"`, `LocaleProvider
 initialLocale="es"` — which also LOCKS the tree, so a stale `pfm-locale=en`
 cookie can never flip an `/es` page back to English post-hydration).
@@ -486,12 +491,12 @@ their SSR `<title>` as the venue's proper name — nothing to translate
 (#287's original reasoning still applies there, just per-tree now).
 
 **Unmatched /es/* URLs render the ENGLISH 404, not a Spanish one** — an
-accepted tradeoff (#689 PR 2 follow-up, round 2). There is no `es/not-found.tsx`
-and no `es/[...rest]` catch-all: an es/venue/[id] id outside
-`generateStaticParams` 404s at Next's ROUTING level (dynamicParams=false),
-before that page's own `notFound()` call ever runs, so no in-tree
-`notFound()` exists anywhere under `/es` to catch — both files were tried
-and removed. The catch-all's own 404 response measured WORSE on low-end
+accepted tradeoff (#689 PR 2 follow-up, round 2). There is no `es/[...rest]`
+catch-all: an es/venue/[id] id outside `generateStaticParams` 404s at Next's
+ROUTING level (dynamicParams=false), before that page's own `notFound()`
+call ever runs. The only in-tree `es/not-found.tsx` serves the dynamic
+`/es/event/[id]` (#762); it has the same blank first paint noted below. The
+catch-all (tried and removed) measured WORSE on low-end
 phones than the prerendered `app/global-not-found.tsx` it replaced:
 `notFound()` thrown from a genuinely dynamic, per-request route ships
 Next's own blank `__next_error__` shell (no CSS, no-store, fetched fresh
@@ -546,8 +551,8 @@ The rules it sets:
   "Event page"). `src/__tests__/seo.test.ts` fails if a static sitemap URL has no
   `page.tsx`. That's how the old `/boxes` entry 404'd unnoticed. Blessing
   Boxes aren't in it: `/box/<id>` is a `noindex` redirect shell into the map
-  card. Boxes come back through the planned read-only `/blessing-boxes` list
-  (REVIEW.md). Every mirrored route's entry carries `alternates.languages`
+  card. Boxes appear in the sitemap only as the read-only `/blessing-boxes` list
+  (+ its `/es` twin; REVIEW.md). Every mirrored route's entry carries `alternates.languages`
   pointing at its `/es` (or EN) counterpart, and the counterpart itself is a
   SEPARATE full entry — not just a cross-reference (#689 PR 2, `src/app/sitemap.ts`).
 - **Only `pueblofoodmap.com` is indexable.** `custom-worker.ts` adds
@@ -629,9 +634,10 @@ rank for the queries people type ("food pantry Pueblo", "SNAP stores Pueblo").
   `buildVenueListJsonLd` (ItemList) on every hub, and `FaqSection` builds the
   FAQPage from the same items array it renders, so the schema text can't drift
   from the visible text. `/resources` gets the same `FaqSection` through
-  `ResourcesFaq`, passed to the client `ResourcesContent` as its `faq` prop. The
-  official source URLs and fetch dates for those answers are in the header of
-  `src/components/ResourcesFaq.tsx`.
+  `resourcesFaqJsonLd()` (`src/lib/resourcesFaq.ts`), passed to the client
+  `ResourcesContent` as `faqJsonLd`; `ResourcesContent` renders the visible FAQ
+  with `faqItemsFor`. The official source URLs and fetch dates for those
+  answers are in the header of `src/lib/resourcesFaq.ts`.
 - **Sitemap and smoke test:** each hub has EN + ES entries with alternates;
   `deploy-prod.yml` checks all eight (incl. `/blessing-boxes`) for 200 and the `/es` ones for `<html lang="es">`.
 - **`/blessing-boxes` (+ `/es`) is the dynamic one.** Boxes live only in D1, and
@@ -713,8 +719,8 @@ performance:
   `MapWrapper.tsx` loads `Map.tsx` with `next/dynamic` + `ssr: false`. That
   must stay in a Client Component — `ssr: false` is silently ignored in
   Server Components.
-- **Code-split (#202).** `HomePageClient.tsx` also dynamic-imports
-  `MapWrapper` and `SplashScreen`, moving ~200KB of synchronous JS (vaul,
+- **Code-split (#202).** `HomePageClient.tsx` dynamic-imports `MapWrapper`
+  (`SplashScreen` is a static import since the mobile-LCP fix), moving ~200KB of synchronous JS (vaul,
   Radix, geolocation hooks, venue data) out of the blocking parse window to
   cut TBT on throttled phones.
 - **Deferred (#226).** `next/dynamic` fetches its chunk the moment the
@@ -836,8 +842,8 @@ bundle at build time, so they are GitHub Actions repo secrets injected into
 the `deploy-prod.yml`/`deploy-dev.yml` build (not Cloudflare dashboard build
 variables — that was only true under Workers Builds). Runtime secrets
 (`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, …) are `wrangler secret put` on
-the Worker and read at request time. Full list: AGENTS.md "Promotion
-checklist".
+the Worker and read at request time. Full list: the AGENTS.md "Secrets"
+table.
 
 ---
 
@@ -1027,7 +1033,7 @@ Full design: atlas-kb `projects/Pueblo Food Map/Blessing Boxes Build Plan.md`.
 - **Every interaction (check-in, photo, adopt) lives in the on-map venue
   card**, never a separate page — REVIEW.md's standing rules own that rule
   (the read-only exceptions are the `/box/<id>/history` log and the
-  planned `/blessing-boxes` list).
+  `/blessing-boxes` list).
 - **Alerts** (`src/lib/boxAlerts.ts`, roles `host`/`adopter`/`giver` in one
   `alert_subscriptions` table): empty/problem → host + adopters; empty/low →
   givers; filled → everyone subscribed. 6h cooldown per subscription, except
@@ -1035,7 +1041,9 @@ Full design: atlas-kb `projects/Pueblo Food Map/Blessing Boxes Build Plan.md`.
   Dispatch runs in `ctx.waitUntil`, never blocking the check-in; a Resend
   outage degrades to a console warning.
 
-Migrations, R2 buckets and dedicated secrets: AGENTS.md "Blessing Boxes".
+Migrations live in `migrations/`; runtime secrets are in the AGENTS.md
+"Secrets" table, and the photo bucket (`pfm-box-photos`) is noted in the
+AGENTS.md "Blessing Boxes" bullet.
 
 ---
 
@@ -1374,7 +1382,7 @@ list it as an event and a shared link previews the flyer.
 
 ## Admin panel
 
-Design spec: `docs/admin/cloudflare-native-admin-spec.md`. Per-slice build
+Original design record: `docs/admin/cloudflare-native-admin-spec.md`. Per-slice build
 narratives (#253–#259, #390): atlas-kb "PFM AGENTS History — Admin Auth"
 and "PFM ARCHITECTURE History — 2026-09-24 Trim".
 
@@ -1452,13 +1460,14 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   Below that: a `PublishPanel` (only when unpublished changes exist and this
   isn't staging — same "Test site" banner gate `/admin/places` uses), a
   `DashboardNeedsStrip` (four link cards: places to review, waiting to
-  publish, box photos & sponsor requests, boxes empty or low — two of the
-  four are temporary combined-count fallbacks until #674/#675 and #677 fold
-  their own queues into other tabs), a **Visitors** section reading
+  publish, box photos & sponsor requests, boxes empty or low; the first
+  is public submissions + refresh proposals, linking to
+  `/admin/places?show=review`, and the third is pending photos + sponsor
+  requests, linking to `/admin/boxes?show=review`), a **Visitors** section reading
   Cloudflare's GraphQL Analytics API server-side (`cfAnalytics.ts` — the
   ONLY source of unique-visitor numbers in this app; PostHog is
-  memory-only and counts every page load as a new visitor — AGENTS.md's
-  "PostHog" section), a **Blessing boxes** numbers section reusing
+  memory-only and counts every page load as a new visitor — AGENTS.md
+  "Scheduled jobs and observability", PostHog bullet), a **Blessing boxes** numbers section reusing
   `boxStats.ts` (the
   same math the public Boxes page uses), and a **Map data health** section
   (published-place counts, the count of places not checked in 90 days

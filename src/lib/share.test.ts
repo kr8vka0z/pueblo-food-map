@@ -1,10 +1,11 @@
 /**
- * share.test.ts — the event share link and the share-sheet -> copy fallback
- * (#759). shareLink is also what shareVenue now calls, so this covers both.
+ * share.test.ts — venue/box and event share links (#132, #164, #759) and the
+ * share-sheet -> copy fallback. shareLink is also what shareVenue calls, so
+ * the fallback cases cover both; one test pins that delegation.
  */
 
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { eventShareUrl, shareLink } from "@/lib/share";
+import { eventShareUrl, shareLink, shareVenue, venueShareUrl } from "@/lib/share";
 
 const nav = navigator as unknown as Record<string, unknown>;
 
@@ -16,6 +17,32 @@ function setNavigator(share: unknown, writeText: unknown) {
 afterEach(() => {
   delete nav.share;
   delete nav.clipboard;
+});
+
+describe("venueShareUrl", () => {
+  // Canonical form is /venue/<id> since #164 6.4 (was /?venue=<id>).
+  test("is the venue page URL, with the id encoded", () => {
+    expect(venueShareUrl("abc")).toBe(`${window.location.origin}/venue/abc`);
+    expect(venueShareUrl("a b")).toBe(`${window.location.origin}/venue/a%20b`);
+  });
+
+  test("a blessing box links to /box/<id>, not the static /venue/<id> page", () => {
+    expect(venueShareUrl("box 1", true)).toBe(`${window.location.origin}/box/box%201`);
+  });
+});
+
+describe("shareVenue", () => {
+  test("returns 'shared' and calls navigator.share once with url ending /venue/v1", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    setNavigator(share, vi.fn());
+
+    expect(await shareVenue({ venueId: "v1", title: "Test Venue" })).toBe("shared");
+    expect(share).toHaveBeenCalledTimes(1);
+    expect(share).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Test Venue", url: venueShareUrl("v1") }),
+    );
+    expect((share.mock.calls[0][0] as { url: string }).url.endsWith("/venue/v1")).toBe(true);
+  });
 });
 
 describe("eventShareUrl", () => {

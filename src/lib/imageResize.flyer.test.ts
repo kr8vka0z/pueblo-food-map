@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 /**
  * shrinkFlyerToJpeg (#760): the ladder walk against a stubbed canvas (jsdom
  * has no real one). Proves it stops at the first rung under the budget, never

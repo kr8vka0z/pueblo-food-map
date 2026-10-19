@@ -68,7 +68,7 @@ describe("venues data-layer invariants", () => {
 
   // Blessing Boxes slice 1 added an 8th category — categoryLabels below now
   // includes it, updated at the same time the category-picker components
-  // (formerly CategoryDropdown.tsx, now FilterPanel.tsx/CategoryChips.tsx) did.
+  // (formerly CategoryDropdown.tsx, now FilterPanel.tsx) did.
   test("categoryLabels / categoryColors are untouched by the publish refactor (blessing_box added by a later slice)", () => {
     expect(categoryLabels).toEqual({
       pantry: "Food Pantry",

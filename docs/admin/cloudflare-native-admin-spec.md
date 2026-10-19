@@ -1,5 +1,11 @@
 # Pueblo Food Map — Cloudflare-Native Admin System (Proposal)
 
+> **Historical design record — implemented in #237–#259.** Read it for the original
+> reasoning; section numbers are kept because code comments cite them. It is not the
+> current mechanism: auth is now Better Auth only (#684; there is no Cloudflare Access and
+> no `cfAccess.ts`), and phrases below such as "nothing has been implemented yet" describe
+> the day it was written. Current mechanism: ARCHITECTURE.md "Admin panel".
+
 **Status:** v2.0 — **ACCEPTED 2026-07-01.** `#178`-`#181` were closed
 not-planned the same day, each citing this document by name as their
 replacement (§1).

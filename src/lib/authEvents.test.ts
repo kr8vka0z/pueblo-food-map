@@ -13,10 +13,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
+import { sqliteD1 } from "@/lib/sqliteD1.testutil";
 import { betterAuth } from "better-auth";
 import { buildAuthOptions } from "@/lib/auth-options";
 import { signInMethodForPath, type AuthEventDeps } from "@/lib/authEvents";
-import { lastEmailedCode } from "@/__tests__/helpers/authTestHelpers";
+import { cookieHeaderFrom, lastEmailedCode } from "@/__tests__/helpers/authTestHelpers";
 
 const MIGRATIONS = [
   "0001_init_admin_schema.sql",
@@ -28,20 +29,6 @@ const MIGRATIONS = [
 const OWNER = "kysboyd@gmail.com"; // adminAllowlist.ts's default
 const ORIGIN = "https://pueblofoodmap.com";
 const CLIENT = { "cf-connecting-ip": "203.0.113.9", "user-agent": "Mozilla/5.0 (Macintosh) Safari/605.1.15" };
-
-/** D1's `prepare().bind().run()` surface over better-sqlite3 — the only one authEvents.ts uses. */
-function wrapAsD1(db: Database.Database): D1Database {
-  return {
-    prepare: (sql: string) => ({
-      bind: (...args: unknown[]) => ({
-        run: async () => {
-          const info = db.prepare(sql).run(...args);
-          return { meta: { changes: info.changes } };
-        },
-      }),
-    }),
-  } as unknown as D1Database;
-}
 
 interface EventRow {
   event: string;
@@ -67,7 +54,7 @@ function setup(deps?: (db: Database.Database) => AuthEventDeps) {
       deps
         ? deps(db)
         : {
-            db: wrapAsD1(db),
+            db: sqliteD1(db),
             getGeo: async () => ({ city: "Pueblo", region: "Colorado", country: "US" }),
           },
     ),
@@ -112,10 +99,7 @@ async function submitCode(auth: ReturnType<typeof setup>["auth"], email: string,
 async function signIn(auth: ReturnType<typeof setup>["auth"]) {
   await requestCode(auth, OWNER);
   const res = await submitCode(auth, OWNER, lastEmailedCode());
-  const cookie = (res.headers.getSetCookie?.() ?? [res.headers.get("set-cookie") ?? ""])
-    .map((c) => c.split(";")[0])
-    .join("; ");
-  return { res, cookie };
+  return { res, cookie: cookieHeaderFrom(res) };
 }
 
 describe("auth_events — sign-in record (#679, email code #684)", () => {

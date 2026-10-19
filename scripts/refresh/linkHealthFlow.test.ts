@@ -49,7 +49,7 @@ describe("link-health finding flows through to a change_proposals write", () => 
     const built = buildProposalWriteStatements(proposal, "2026-09-24T00:00:01.000Z", sqlText);
 
     // A link_health finding is never auto-applied — it always waits for a
-    // human review at /admin/flags (see proposalSql.ts's own header +
+    // human review in the Places tab's "To review" filter (see proposalSql.ts's own header +
     // adminProposals.ts's applyApprovedProposal, which refuses to apply a
     // link_health row directly).
     expect(built.autoApplied).toBe(false);

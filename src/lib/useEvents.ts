@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * useEvents — client-side fetch of the live special-event feed
+ * useEventsFeed — client-side fetch of the live special-event feed
  * (GET /api/public/events, #757) for MapWrapper, same shape and best-effort
  * convention as useBoxesList: a failed, non-OK or malformed response leaves
  * the list at [] and the map looks and behaves exactly as it did before events
@@ -10,8 +10,8 @@
  * next page load (the feed's own cache is 60s).
  *
  * The `events` state is only written when there is something to show, so an
- * empty or failed feed leaves it untouched (`useEventsFeed`'s one-time
- * `loaded` flag aside, see below).
+ * empty or failed feed leaves it untouched (the one-time `loaded` flag
+ * aside, see below).
  */
 
 import { useEffect, useState } from "react";
@@ -66,8 +66,4 @@ export function useEventsFeed(): { events: PublicEvent[]; loaded: boolean } {
   }, []);
 
   return { events, loaded };
-}
-
-export function useEvents(): PublicEvent[] {
-  return useEventsFeed().events;
 }

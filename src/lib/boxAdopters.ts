@@ -68,15 +68,6 @@ const SELECT_PENDING_ADOPTERS_SQL = `
   ORDER BY a.created_at DESC
 `;
 
-const SELECT_APPROVED_ADOPTERS_SQL = `
-  SELECT a.id, a.venue_id, v.name AS venue_name, a.display_name, a.email, a.note,
-         a.status, a.email_confirmed_at, a.created_at
-  FROM box_adopters a
-  JOIN venues v ON v.id = a.venue_id
-  WHERE a.status = 'approved'
-  ORDER BY a.created_at DESC
-`;
-
 const SELECT_ADOPTER_BY_ID_SQL = "SELECT * FROM box_adopters WHERE id = ?";
 
 const SELECT_ADOPTER_BY_CONFIRM_TOKEN_SQL = "SELECT * FROM box_adopters WHERE confirm_token = ?";
@@ -108,11 +99,6 @@ function selectApprovedAdopterNamesForVenuesSql(count: number): string {
 
 export async function loadPendingAdopters(db: D1Database): Promise<AdminBoxAdopterRow[]> {
   const result = await db.prepare(SELECT_PENDING_ADOPTERS_SQL).all<AdminBoxAdopterRow>();
-  return result.results ?? [];
-}
-
-export async function loadApprovedAdopters(db: D1Database): Promise<AdminBoxAdopterRow[]> {
-  const result = await db.prepare(SELECT_APPROVED_ADOPTERS_SQL).all<AdminBoxAdopterRow>();
   return result.results ?? [];
 }
 

@@ -8,12 +8,12 @@
  *   3. Open-now filter — only currently-open venues returned
  *   4. SNAP filter — only SNAP-accepting venues returned
  *   5. WIC filter — only WIC-accepting venues returned
- *   6. Favorites — filter removed (#513); savedVenues/favoriteSet remain for
+ *   6. Favorites — filter removed (#513); savedVenues remains for
  *      HamburgerMenu's Saved view
  *   7. Text search — query narrows venue list by name/category/benefit alias
  *   8. toggleCategory — multi-select category checkboxes (#513)
  *   9. clearFilters (panel) vs. handleClearAllFilters (query + everything)
- *  10. Counts — allVenueCounts/snapCount/wicCount/openNowCount are consistent
+ *  10. Counts — snapCount/wicCount/openNowCount are consistent
  *  11. anyFilterActive — reflects true/false correctly
  *  12. Nearest-first sort — filteredVenues are in ascending distance order
  *
@@ -233,8 +233,8 @@ describe("useMapFilters — WIC filter", () => {
 
 // ── 6. Favorites ─────────────────────────────────────────────────────────────
 // The Favorites FILTER was removed (#513 — "Saved in the bottom bar already
-// covers it"). favoriteSet/savedVenues stay (HamburgerMenu's Saved view still
-// needs them); there is no longer a filterFavorites toggle to test.
+// covers it"). savedVenues stays (HamburgerMenu's Saved view still
+// needs it); there is no longer a filterFavorites toggle to test.
 
 describe("useMapFilters — favorites (filter removed, #513)", () => {
   test("no filterFavorites/setFilterFavorites on the returned API", () => {
@@ -377,15 +377,6 @@ describe("useMapFilters — counts", () => {
     const expected = allVenues.filter((v) => v.accepts_wic).length;
     expect(result.current.wicCount).toBe(expected);
   });
-
-  test("allVenueCounts totals match allVenues.length", () => {
-    const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER));
-    const total = Object.values(result.current.allVenueCounts).reduce(
-      (sum, n) => sum + (n ?? 0),
-      0,
-    );
-    expect(total).toBe(allVenues.length);
-  });
 });
 
 // ── 11. anyFilterActive ───────────────────────────────────────────────────────
@@ -466,7 +457,7 @@ describe("useMapFilters — blessing boxes via extraVenues", () => {
     expect(result.current.filteredVenues.some((v) => v.id === "box-1")).toBe(true);
   });
 
-  test("the blessing_box category filter returns only boxes, and the count matches", () => {
+  test("the blessing_box category filter returns only boxes", () => {
     const boxes = [makeBoxVenue("box-1", 38.27, -104.61), makeBoxVenue("box-2", 38.3, -104.65)];
     const { result } = renderHook(() => useMapFilters(PUEBLO_CENTER, boxes));
     act(() => {
@@ -474,7 +465,6 @@ describe("useMapFilters — blessing boxes via extraVenues", () => {
     });
     expect(result.current.filteredVenues.length).toBe(2);
     expect(result.current.filteredVenues.every((v) => v.category === "blessing_box")).toBe(true);
-    expect(result.current.allVenueCounts.blessing_box).toBe(2);
   });
 
   test("boxes sort into the nearest-first order with ordinary venues, not appended separately", () => {

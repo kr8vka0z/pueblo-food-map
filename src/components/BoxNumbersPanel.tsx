@@ -23,6 +23,7 @@
 import { t, type Locale } from "@/lib/i18n";
 import {
   formatDurationMs,
+  PERIOD_KEYS,
   type CheckinCounts,
   type NetworkOverview,
   type PairAverages,
@@ -108,10 +109,11 @@ export default function BoxNumbersPanel({
           onChange={(e) => onPeriodChange(e.target.value as PeriodKey)}
           className={SELECT_CLASS}
         >
-          <option value="7d">{t("box.stats.period.7d", locale)}</option>
-          <option value="30d">{t("box.stats.period.30d", locale)}</option>
-          <option value="90d">{t("box.stats.period.90d", locale)}</option>
-          <option value="all">{t("box.stats.period.all", locale)}</option>
+          {PERIOD_KEYS.map((k) => (
+            <option key={k} value={k}>
+              {t(`box.stats.period.${k}`, locale)}
+            </option>
+          ))}
         </select>
       </div>
 

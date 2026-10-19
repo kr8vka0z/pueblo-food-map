@@ -26,7 +26,7 @@ import {
   type SourceRecord,
 } from "../../scripts/seed-admin-db";
 import type { Venue } from "@/types/venue";
-import { pfpVenues } from "@/data/venues";
+import { pfpVenues } from "@/data/pfp-venues";
 import { groceryOsmVenues } from "@/data/grocery-osm";
 import { plentifulPantries } from "@/data/pantries-plentiful";
 

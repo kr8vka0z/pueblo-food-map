@@ -31,12 +31,13 @@
  *
  * Cached ~1h per period, module-scope. ponytail: per-isolate only — resets
  * on a Worker cold start, which just means one cache miss, fine at this
- * traffic volume and well within the "loads in under 2s" budget since a
- * miss is one Cloudflare round trip. Upgrade path if this ever needs
+ * traffic volume since a miss is one Cloudflare round trip (two calls in
+ * parallel, each with analyticsFetch.ts's 8s timeout and one retry). Upgrade path if this ever needs
  * cross-isolate consistency: a KV or D1-backed cache keyed the same way.
  */
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { fetchWithRetry } from "@/lib/analyticsFetch";
 
 export type DashboardPeriod = "7d" | "30d" | "90d";
 export const DASHBOARD_PERIODS: readonly DashboardPeriod[] = ["7d", "30d", "90d"];
@@ -47,8 +48,6 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const SITE_TAG = "2e9e3476ebf0467ca1485c9a363d4c1d";
 const HOST = "pueblofoodmap.com";
 const CF_GRAPHQL_URL = "https://api.cloudflare.com/client/v4/graphql";
-/** A hanging Cloudflare call must degrade to "unavailable", never hang the page past its own 2s budget. */
-const FETCH_TIMEOUT_MS = 4000;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 export interface DailyVisitorsPoint {
@@ -94,11 +93,11 @@ function dateOnly(ms: number): string {
 }
 
 async function graphqlFetch<T>(token: string, query: string, variables: Record<string, unknown>): Promise<T> {
-  const res = await fetch(CF_GRAPHQL_URL, {
+  // Timeout + one retry on a timeout/5xx live in analyticsFetch.ts, shared with posthogQuery.ts.
+  const res = await fetchWithRetry(CF_GRAPHQL_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Cloudflare GraphQL responded ${res.status}`);
   const json = (await res.json()) as GraphQlResponse<T>;

@@ -87,115 +87,38 @@ async function eventRoutes(): Promise<MetadataRoute.Sitemap> {
   }
 }
 
+type ChangeFrequency = MetadataRoute.Sitemap[number]["changeFrequency"];
+
+/** A mirrored route as its [EN, /es] pair, both carrying the same hreflang alternates. */
+function mirrored(enPath: string, changeFrequency: ChangeFrequency, priority: number): MetadataRoute.Sitemap {
+  const alternates = esAlternates(enPath);
+  return [
+    { url: alternates.languages.en, changeFrequency, priority, alternates },
+    { url: alternates.languages.es, changeFrequency, priority, alternates },
+  ];
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
-    {
-      url: SITE_URL,
-      changeFrequency: "weekly",
-      priority: 1.0,
-      alternates: esAlternates("/"),
-    },
-    {
-      url: `${SITE_URL}/es`,
-      changeFrequency: "weekly",
-      priority: 1.0,
-      alternates: esAlternates("/"),
-    },
-    {
-      // WHY 0.8: About is the primary discovery page for new visitors — higher
-      // than the utility forms (suggest/feedback/privacy) but below the homepage.
-      url: `${SITE_URL}/about`,
-      changeFrequency: "monthly",
-      priority: 0.8,
-      alternates: esAlternates("/about"),
-    },
-    {
-      url: `${SITE_URL}/es/about`,
-      changeFrequency: "monthly",
-      priority: 0.8,
-      alternates: esAlternates("/about"),
-    },
-    {
-      // WHY 0.8: same tier as /about — a discovery page people search for
-      // ("how to get SNAP in Pueblo"), not a utility form.
-      url: `${SITE_URL}/resources`,
-      changeFrequency: "monthly",
-      priority: 0.8,
-      alternates: esAlternates("/resources"),
-    },
-    {
-      url: `${SITE_URL}/es/resources`,
-      changeFrequency: "monthly",
-      priority: 0.8,
-      alternates: esAlternates("/resources"),
-    },
+    ...mirrored("/", "weekly", 1.0),
+    // WHY 0.8: About is the primary discovery page for new visitors — higher
+    // than the utility forms (suggest/feedback/privacy) but below the homepage.
+    ...mirrored("/about", "monthly", 0.8),
+    // WHY 0.8: same tier as /about — a discovery page people search for
+    // ("how to get SNAP in Pueblo"), not a utility form.
+    ...mirrored("/resources", "monthly", 0.8),
     // WHY 0.8 / weekly: the SEO Phase 3 hub pages (#709) are the pages meant to
     // rank for "food pantry Pueblo", "SNAP stores Pueblo" etc. — same tier as
     // /about and /resources, and the lists change with each Publish.
-    {
-      url: `${SITE_URL}/food-pantries`,
-      changeFrequency: "weekly",
-      priority: 0.8,
-      alternates: esAlternates("/food-pantries"),
-    },
-    {
-      url: `${SITE_URL}/es/food-pantries`,
-      changeFrequency: "weekly",
-      priority: 0.8,
-      alternates: esAlternates("/food-pantries"),
-    },
-    {
-      url: `${SITE_URL}/snap-wic-stores`,
-      changeFrequency: "weekly",
-      priority: 0.8,
-      alternates: esAlternates("/snap-wic-stores"),
-    },
-    {
-      url: `${SITE_URL}/es/snap-wic-stores`,
-      changeFrequency: "weekly",
-      priority: 0.8,
-      alternates: esAlternates("/snap-wic-stores"),
-    },
-    {
-      url: `${SITE_URL}/community-gardens`,
-      changeFrequency: "weekly",
-      priority: 0.8,
-      alternates: esAlternates("/community-gardens"),
-    },
-    {
-      url: `${SITE_URL}/es/community-gardens`,
-      changeFrequency: "weekly",
-      priority: 0.8,
-      alternates: esAlternates("/community-gardens"),
-    },
+    ...mirrored("/food-pantries", "weekly", 0.8),
+    ...mirrored("/snap-wic-stores", "weekly", 0.8),
+    ...mirrored("/community-gardens", "weekly", 0.8),
     // /blessing-boxes (#709 PR B): rendered per request from D1 (not part of
     // the Publish snapshot), so the list is always current; same tier as the hubs.
-    {
-      url: `${SITE_URL}/blessing-boxes`,
-      changeFrequency: "weekly",
-      priority: 0.8,
-      alternates: esAlternates("/blessing-boxes"),
-    },
-    {
-      url: `${SITE_URL}/es/blessing-boxes`,
-      changeFrequency: "weekly",
-      priority: 0.8,
-      alternates: esAlternates("/blessing-boxes"),
-    },
-    {
-      // WHY 0.7: a browse/discovery page (the crawlable counterpart to the
-      // JS-only homepage map) — below /about's 0.8, above the utility forms.
-      url: `${SITE_URL}/venues`,
-      changeFrequency: "weekly",
-      priority: 0.7,
-      alternates: esAlternates("/venues"),
-    },
-    {
-      url: `${SITE_URL}/es/venues`,
-      changeFrequency: "weekly",
-      priority: 0.7,
-      alternates: esAlternates("/venues"),
-    },
+    ...mirrored("/blessing-boxes", "weekly", 0.8),
+    // WHY 0.7: a browse/discovery page (the crawlable counterpart to the
+    // JS-only homepage map) — below /about's 0.8, above the utility forms.
+    ...mirrored("/venues", "weekly", 0.7),
     {
       // WHY 0.5/"hourly": live content (Blessing Boxes slice 3), but a
       // secondary/watcher-audience page — below the browse/discovery pages

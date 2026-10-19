@@ -58,7 +58,7 @@ USER_AGENT = "pueblo-food-map/osm-grocery-fetch (kysboyd@gmail.com)"
 # twice on GitHub-hosted runners with a bare HTTP 504 ~10s after the
 # request, while the identical query from a home PC returns 200 in ~5s with
 # 81 elements — so the 504 is a transient upstream/runner-side blip, not a
-# bad query, and an unattended monthly cron can't die on a 10-second blip.
+# bad query, and an unattended weekly cron can't die on a 10-second blip.
 # ponytail: fixed doubling, no jitter, no cap beyond 4 attempts — enough for
 # a gateway blip; if Overpass ever needs longer backoff, add jitter/a cap
 # then, not speculatively now.

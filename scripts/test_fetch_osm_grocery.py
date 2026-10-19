@@ -43,7 +43,7 @@ class OverpassRetryTest(unittest.TestCase):
     """2026-09-07: the scheduled refresh workflow died twice on GitHub-hosted
     runners with a bare HTTP 504 ~10s after the request, while the identical
     query from a home PC returns 200 in ~5s — a transient upstream/runner-side
-    blip, not a bad query. An unattended monthly cron can't die on that."""
+    blip, not a bad query. An unattended weekly cron can't die on that."""
 
     def test_retries_on_transient_5xx_then_succeeds(self) -> None:
         errors = [

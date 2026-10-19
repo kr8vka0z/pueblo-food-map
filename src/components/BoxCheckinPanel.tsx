@@ -85,7 +85,7 @@
  * the plain red error exactly as before this change.
  *
  * onCheckinSuccess lifts the POST response's fresh status/lastFilledAt
- * straight into BoxContent's own state — no refetch, no dependency on the
+ * straight into the on-map card's state (MapWrapper's handleBoxCheckinSuccess) — no refetch, no dependency on the
  * list endpoint's 60s cache (see the route handler's own header for the
  * full freshness story).
  *

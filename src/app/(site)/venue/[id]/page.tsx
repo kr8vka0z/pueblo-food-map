@@ -1,5 +1,5 @@
 /**
- * /venue/[id] — per-venue dynamically rendered page with structured data.
+ * /venue/[id] — per-venue statically generated page with structured data.
  *
  * WHY: Gives each venue its own crawlable URL with a venue-specific title,
  * meta description, Open Graph tags, and LocalBusiness/FoodEstablishment

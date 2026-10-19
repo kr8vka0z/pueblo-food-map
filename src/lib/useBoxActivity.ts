@@ -7,7 +7,7 @@
  * on unmount) with one addition: the fetch re-runs whenever `filters`
  * changes, since this hook backs both the global /boxes/activity page
  * (filters change as the visitor picks a box/kind/date range) and
- * BoxContent's own small per-box panel (a fixed `{venueId, pageSize}`).
+ * BoxHistoryContent's per-box log (a fixed `{venueId, pageSize}`).
  *
  * WHY this fetches the PUBLIC API route rather than reading D1 directly:
  * unlike /box/[id]'s Server Component (which reads D1 directly because it

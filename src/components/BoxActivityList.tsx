@@ -2,8 +2,8 @@
 
 /**
  * BoxActivityList — the shared rendering of an ActivityItem[] into readable
- * lines, used by both /boxes/activity (the global feed) and BoxContent's
- * own per-box "recent activity" panel (Discovery story D3). Kept as one
+ * lines, used by both /boxes/activity (the global feed) and the per-box
+ * activity log on /box/<id>/history (BoxHistoryContent). Kept as one
  * component, not two, so the line template, timestamp formatting, and
  * empty-state copy can never drift between the two surfaces.
  *
@@ -49,7 +49,7 @@ function formatWhen(iso: string, locale: Locale, now: Date): string {
 
 interface BoxActivityListProps {
   items: ActivityItem[];
-  /** True on the global /boxes/activity feed (many boxes at once); false on BoxContent's own per-box embed, where the venue name is already the page's own heading and repeating it on every line would be noise. */
+  /** True on the global /boxes/activity feed (many boxes at once); false on BoxHistoryContent's per-box log, where the venue name is already the page's own heading and repeating it on every line would be noise. */
   showVenueName: boolean;
   /** i18n key for the empty state — the global feed and the per-box embed word it slightly differently ("no activity yet" vs. "no activity at this box yet"). */
   emptyMessageKey?: string;

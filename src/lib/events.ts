@@ -7,7 +7,8 @@
  * The public shape deliberately omits every internal column (created_by /
  * updated_by, timestamps, status, cancel notes, flyer_key): the feed only
  * ever carries published events that have not ended, so the extra fields
- * would either be constant (status) or belong to a later slice (flyer).
+ * would be constant (status) or internal. The flyer reaches the public shape
+ * only as PublicFlyer (a site path, never the raw R2 key).
  */
 
 import type { EventStatus } from "@/lib/adminEventValidation";

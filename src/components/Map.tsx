@@ -3,16 +3,16 @@
 /**
  * Map — Mapbox GL JS basemap via react-map-gl v8.
  *
- * #44: Bare basemap.
- * #45: Venue markers wired (VenueMarker SVG pins, selection ring, click handler).
- * #46: Hover tooltips, user-location dot, attribution control.
- * #47: flyTo / fitBounds / locate flow + reduced-motion guards (this PR).
- * #62: Pan/zoom constraint (maxBounds + minZoom) + inverted county mask layer.
- * #231: Removed the mount-time fitBounds-to-venues effect. initialViewState
- *       is now the only thing that sets the starting view — a fixed constant,
- *       so it no longer drifts with the venue set (matches the logo/wordmark
- *       reset). Deep-link and geolocation flyTo/jumpTo are unaffected.
- * #758: Special-event star pins (EventLayer) drawn after the place pins.
+ * Renders the basemap, venue markers (VenueMarker SVG pins, selection ring,
+ * click handler), hover tooltips, the user-location dot, the attribution
+ * control, and the special-event star pins (EventLayer, drawn after the place
+ * pins). Also owns the flyTo / fitBounds / locate flow, with
+ * prefers-reduced-motion guards, and the pan/zoom constraint (maxBounds +
+ * minZoom) with an inverted county mask layer.
+ *
+ * initialViewState is the only thing that sets the starting view: a fixed
+ * constant, so it does not drift with the venue set (matches the
+ * logo/wordmark reset). Deep-link and geolocation flyTo/jumpTo are separate.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";

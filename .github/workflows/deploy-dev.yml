@@ -1,45 +1,38 @@
 # DEV ONLY. Prod (`main`) deploys via deploy-prod.yml in this same
-# directory — once Workers Builds is disconnected (see that file's header),
-# both envs deploy via GitHub Actions, never the CF dashboard.
+# directory. Both envs deploy via GitHub Actions, never the Cloudflare
+# dashboard: Workers Builds must stay disconnected (AGENTS.md "Hosting and
+# deploys"), or every push double-deploys.
 #
 # Deploys the `dev` branch to the `pueblo-food-map-staging` Worker at
-# dev.pueblofoodmap.com (/admin gated by Better Auth alone — magic link +
-# passkey, own allowlist and rpID; see AGENTS.md "Admin authentication —
-# Better Auth is the sole gate"). Gated by
-# the same fast checks deploy-prod.yml runs, plus a staging-D1
-# remote-migration step: unlike a Worker deploy, a D1 schema migration is a
-# separate database operation that never auto-applies on `wrangler deploy`
-# (AGENTS.md "Applying the migration — NOT part of a Worker deploy").
+# dev.pueblofoodmap.com (/admin gated by Better Auth alone — email code +
+# passkey, own allowlist and rpID; see AGENTS.md "Admin authentication and
+# data"). Gated by the same fast checks deploy-prod.yml runs, plus a
+# staging-D1 remote-migration step: unlike a Worker deploy, a D1 schema
+# migration is a separate database operation that never auto-applies on
+# `wrangler deploy` (production's is the manual AGENTS.md "Promotion
+# checklist — D1 migrations").
 #
 # Auth: same CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID repo secrets as
-# deploy-prod.yml — this repo doesn't yet have a narrower per-env token
-# minted (ToastHoster's deploy-dev.yml uses a Worker/D1/zone-scoped token;
-# see PR description for the same follow-up here).
+# deploy-prod.yml (AGENTS.md "Secrets"); no narrower per-env token is used.
 #
 # Build-time NEXT_PUBLIC_MAPBOX_TOKEN: the SAME URL-restricted public token
 # deploy-prod.yml uses. `dev.pueblofoodmap.com` is on that token's Mapbox URL
-# allowlist (added 2026-07-03), so it authorizes here — the restriction that
-# makes it safe also makes it usable on staging, and no second token is needed.
-#
-# It used to read MAPBOX_PREVIEW_TOKEN — lighthouse.yml's separate, deliberately
-# UNRESTRICTED build token, since retired along with that secret (AGENTS.md
-# "Lighthouse CI build token — RETIRED"). `NEXT_PUBLIC_*` is inlined into the
-# client bundle by `next build`, and this workflow's bundle is served publicly at
-# dev.pueblofoodmap.com, so pointing it at the unrestricted token published an
-# any-domain Mapbox key that anyone could lift and bill against Kyle's account
-# (#304 — measured live 2026-09-02: dev served token cmqo2jc6i1o7b2ton2ify1ly2
-# with allowedUrls null, while prod served the restricted one). Cloudflare
-# Access gates the dev PAGES, never the static JS assets, so gating is not a
-# substitute for restricting the token. Never point this at an unrestricted
-# token again.
+# allowlist, so it authorizes here — the restriction that makes it safe also
+# makes it usable on staging, and no second token is needed. Never point this
+# at an unrestricted token: `NEXT_PUBLIC_*` is inlined into the client bundle
+# by `next build`, and this workflow's bundle is served publicly at
+# dev.pueblofoodmap.com, so an unrestricted key would be liftable by anyone
+# and billable to Kyle's account (#304). The static JS assets are public
+# whatever gates the pages, so gating is not a substitute for restricting the
+# token.
 # NEXT_PUBLIC_TURNSTILE_SITE_KEY reuses the same secret as prod (Turnstile
 # widgets support multiple allowed hostnames on one sitekey, unlike Mapbox's
 # no-wildcard restriction) — Kyle should confirm dev.pueblofoodmap.com is an
 # allowed hostname on that widget.
 #
-# NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY (2026-09-18): the second, invisible-mode
-# key blessing-box check-ins use instead of the managed-mode key above — see
-# AGENTS.md's "Blessing boxes — card polish" section. Same reuse convention.
+# NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY: the second, invisible-mode key
+# blessing-box check-ins use instead of the managed-mode key above (AGENTS.md
+# "Secrets"). Same reuse convention.
 name: Deploy Dev
 
 on:
@@ -66,12 +59,11 @@ jobs:
       NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
       NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY }}
-      # #485 (PostHog analytics) — the secret POSTHOG_PROJECT_KEY does not
-      # exist yet (Kyle is signing up as of 2026-09-26). GitHub resolves a
-      # missing repo secret to an empty string, never a build failure, and
-      # analytics.ts's initAnalytics() already treats an empty/unset key as
-      # a total no-op — so this build succeeds today and starts sending once
-      # Kyle adds the secret, with no code change needed then.
+      # #485 (PostHog analytics) — POSTHOG_PROJECT_KEY is a GitHub Actions
+      # secret (AGENTS.md "Secrets"). GitHub resolves a missing repo secret
+      # to an empty string, never a build failure, and analytics.ts's
+      # initAnalytics() treats an empty/unset key as a total no-op, so an
+      # empty key is a supported state, not an error.
       NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
     steps:
       # Same pinned-SHA third-party actions as deploy-prod.yml — a mutable

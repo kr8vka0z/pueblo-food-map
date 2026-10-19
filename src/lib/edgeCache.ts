@@ -15,6 +15,14 @@
  * caller's load() reports whether its result is a degraded fallback, and
  * this helper skips the cache.put() (never the response itself, which is
  * always returned) whenever it is.
+ *
+ * PER-COLO CACHE: `caches.default` is per Cloudflare data center (colo), not
+ * zone-wide, and a Worker has no zone-wide purge API without an
+ * account-scoped token this app doesn't use elsewhere. So bustEdgeCache()
+ * below can only delete the entry in the colo that handled the write; every
+ * other colo keeps serving its copy until the 60s CACHE_TTL_SECONDS (or the
+ * route's own Cache-Control) expires. That TTL, not the purge, is the real
+ * freshness bound across colos.
  */
 
 import { NextResponse } from "next/server";
@@ -78,7 +86,7 @@ export async function serveFromEdgeCache(
 /**
  * Deletes one or more Cloudflare Workers-edge cache entries for the CURRENT
  * colo only (`caches.default` is per-colo, not zone-wide — see
- * respondWithEdgeCache's own header) — best-effort, a delete failure must
+ * this file's header) — best-effort, a delete failure must
  * never fail the write that triggered it.
  *
  * Slice 5 (photos) made this a shared helper, because a check-in or needs

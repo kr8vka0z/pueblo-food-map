@@ -2,7 +2,7 @@
 /**
  * Tests for BoxActivityList (Blessing Boxes slice 3) — EN/ES line rendering,
  * the recent/older timestamp switch, detail-line rendering, and the empty
- * state. Same LocaleProvider pattern as BoxContent.test.tsx.
+ * state. Same LocaleProvider pattern as BoxHistoryContent.test.tsx.
  */
 
 import { describe, expect, test } from "vitest";

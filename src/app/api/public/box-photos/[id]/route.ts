@@ -15,7 +15,7 @@
  * max-age: unlike a venue's static assets, an approved photo can be
  * FLAGGED or REJECTED later and must stop serving promptly — the approve/
  * reject/flag routes all bustEdgeCache() this exact path on any status
- * change, but that purge is per-colo (see respondWithEdgeCache's own
+ * change, but that purge is per-colo (see src/lib/edgeCache.ts's file
  * header), so the Cache-Control TTL is the real cross-colo bound. 5 minutes
  * (fix, 2026-09-18, PR #490 review; was 1 hour) is the deliberate choice: a
  * flagged/rejected photo can now only ever linger on an un-purged colo (or

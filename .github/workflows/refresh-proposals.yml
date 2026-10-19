@@ -23,12 +23,11 @@
 # unit-tested in scripts/refresh/*.test.ts) are the actual implementation;
 # this file is just the schedule + credentials wrapper around them.
 #
-# A human reviewing/approving a REAL change proposal is a SEPARATE, LATER
-# slice (the admin's /admin/flags review queue,
-# docs/admin/cloudflare-native-admin-spec.md §6.6) — a date-only bump is the
-# one exception (it lands in the admin's venue list immediately, and on the
-# public map on the next Publish click); every other proposal this workflow
-# writes stays invisible until that review ships and an admin acts.
+# A human approves every REAL change proposal in the admin review queue
+# (/admin/places?show=review, docs/admin/cloudflare-native-admin-spec.md
+# §6.6) — a date-only bump is the one exception (it lands in the admin's
+# venue list immediately, and on the public map on the next Publish click);
+# every other proposal this workflow writes waits there until an admin acts.
 #
 # Credentials: this job has its OWN CLOUDFLARE_D1_TOKEN secret (D1 Write
 # only, account-scoped, #403) mapped into the CLOUDFLARE_API_TOKEN env var
@@ -40,19 +39,13 @@
 name: Venue Data Refresh
 
 on:
-  # THE MONTHLY CRON IS NOW ENABLED (#403). It was held back on the two
-  # conditions the prior revision of this comment named: the /admin/flags
-  # review UI shipped to production 2026-09-07 (#401, promotion PR #404),
-  # and this job now runs on its own least-privilege CLOUDFLARE_D1_TOKEN
-  # (#403) instead of the deploy token. The first watched production run
-  # (2026-09-07, run 34107550551, 107 proposals) tripped no guardrail.
-  # WEEKLY since #543 (was monthly): the cost of a run is review labour, not
-  # money, and Jev triage + rename pairing (scripts/refresh/triage.ts) now
-  # sort the queue so four runs a month don't mean four times the clicking.
-  # Nominatim only geocodes genuinely new venues, so the politeness maths is
-  # unchanged. 06:00 UTC Monday is outside any US business day, so an admin
-  # never opens a queue the same run is still writing. One combined run for
-  # both sources is still the deliberate simplification over
+  # Weekly, Monday 06:00 UTC. The cost of a run is review labour, not
+  # money, and Jev triage + rename pairing (scripts/refresh/triage.ts) sort
+  # the queue so a weekly run doesn't mean a pile of clicking. Nominatim only
+  # geocodes genuinely new venues, which keeps the request volume polite.
+  # 06:00 UTC Monday is outside any US business day, so an admin never opens
+  # a queue the same run is still writing. One combined run for both sources
+  # is the deliberate simplification over
   # docs/admin/cloudflare-native-admin-spec.md §6.2's per-source cadences.
   schedule:
     - cron: "0 6 * * 1" # 06:00 UTC every Monday
@@ -115,8 +108,8 @@ jobs:
       # (pueblo-food-map-admin). The other two modes exist for humans, not
       # this workflow: `local` targets Miniflare's on-disk SQLite, and
       # `staging` targets the separate pueblo-food-map-admin-staging database
-      # dev.pueblofoodmap.com binds (see AGENTS.md's "--db-mode has three
-      # values" table). Never swap either one in here.
+      # dev.pueblofoodmap.com binds (see scripts/refresh-ingest.ts's file
+      # header and DATABASE_NAMES). Never swap either one in here.
       #
       # `--no-install`, not `npx tsx`: `tsx` is a pinned devDependency
       # (package.json) as of this fix — `npm ci` above already installed

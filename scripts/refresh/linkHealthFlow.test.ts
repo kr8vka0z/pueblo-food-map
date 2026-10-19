@@ -7,7 +7,7 @@
  * again) and was closed, so it can no longer prove anything. This file
  * proves the same claim with a MOCKED response — no real third-party URL,
  * no dependency on any site staying broken forever — by driving the exact
- * three functions a real monthly run chains together (linkHealth.ts's
+ * three functions a real weekly run chains together (linkHealth.ts's
  * checkUrl -> diffEngine.ts's buildLinkHealthProposal ->
  * proposalSql.ts's buildProposalWriteStatements), the same sequence
  * scripts/refresh-ingest.ts's own step 4/6 run (see that file's header).

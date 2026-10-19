@@ -17,16 +17,9 @@
  * a separate grid section, and an approved sponsor is now a log entry
  * ("<name> became a sponsor") instead of a card band.
  *
- * KNOWN REGRESSION, not fixed here (see this PR's own report to Atlas):
- * BoxCardBody's check-in panel was this page's own PR-review fix
- * (2026-09-18) for a no-WebGL visitor — MapWrapper.tsx's mapUnavailable
- * branch routes every box tap straight to `/box/<id>/history` with no other
- * check-in surface. Removing BoxCardBody here removes that visitor's only
- * way to check in, adopt, or even read the address. #511's own acceptance
- * criteria explicitly name "check-in buttons" as removed, so this is a
- * scoped, spec'd tradeoff — not an oversight — but it needs its own
- * decision (accept the loss, or a follow-up issue for a no-WebGL check-in
- * path), which is Kyle's/Atlas's to make, not this slice's.
+ * This page is read-only: no check-in, adopt or address. No-WebGL visitors
+ * are not sent here; they get the same in-list BottomSheet card as everyone
+ * else (#524, see MapWrapper.tsx's mapUnavailable branch).
  *
  * Reuses the SAME activity read path slice 3 built (useBoxActivity ->
  * GET /api/public/blessing-boxes/activity), filtered to this one box via

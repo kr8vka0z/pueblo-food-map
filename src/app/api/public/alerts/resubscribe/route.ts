@@ -1,10 +1,13 @@
 /**
  * POST /api/public/alerts/resubscribe — the "that was a mistake, turn it
- * back on" undo button on /alerts/stop (Blessing Boxes slice 6). Mirrors
- * ./stop/route.ts exactly, one function swapped
- * (resubscribeByToken/src/lib/boxAlerts.ts) — see that file's own header
- * for why re-subscribing skips re-confirming the email (they already
- * proved the address once).
+ * back on" undo button on /alerts/stop (Blessing Boxes slice 6). Shares
+ * ./stop/route.ts's neutral folding of not_found/rate_limited into one
+ * "invalid_token" answer, but is JSON-only (a non-JSON Content-Type is a
+ * 400, the token is read only from the body's `token`, no HTML response),
+ * because its only caller is AlertsStopContent's undo button; stop also
+ * serves mail-client one-click POSTs and the <noscript> form. See
+ * resubscribeByToken in src/lib/boxAlerts.ts for why re-subscribing skips
+ * re-confirming the email (they already proved the address once).
  */
 
 import { NextRequest, NextResponse } from "next/server";

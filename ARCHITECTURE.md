@@ -84,7 +84,8 @@ Next.js App Router (Cloudflare Worker)
     └── not-found.tsx   (branded 404 for an explicit notFound() call inside this
           route tree — venue/[id], box/[id], event/[id], report/[venueId])
     └── forbidden.tsx   (branded 403 for next/navigation's forbidden(), admin/page.tsx)
-    └── page.tsx        (Server Component: venue-index JSON-LD, metadata;
+    └── page.tsx        (Server Component: metadata + src/components/HomeShell.tsx,
+          shared with /es — venue-index JSON-LD, sr-only <h1>, crawl links;
           mounts HomePageClient.tsx — splash gate + MapWrapper)
     └── about, privacy, resources, venues, venue/[id], box/[id] …
           (public pages; each localized body is a client "Content" component)

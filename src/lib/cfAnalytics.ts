@@ -24,20 +24,24 @@
  *     "`?from=` gets its own referrer row for QR flyers" ask is NOT
  *     achievable from this API. Deferred — see the parent report.
  *
- * One GraphQL call per metric covers TWO periods at once (current + the
- * immediately preceding period of the same length) by widening the date
- * filter to 2x the period and splitting client-side (buildVisitorsAnalytics)
- * on the boundary date, instead of two separate queries.
+ * One page-load call covers TWO periods at once (current + the immediately
+ * preceding period of the same length) by widening the date filter to 2x
+ * the period and splitting client-side (buildVisitorsAnalytics) on the
+ * boundary date. Cloudflare refuses any range wider than 13w2d (93 days)
+ * with a "quota" error, so the 90d view (181 days) instead makes one call
+ * per period and combines the rows; 7d/30d keep the single call because
+ * these "Adaptive" datasets are sampled per query, and one query keeps both
+ * periods on the same sample (a narrower query can return a different count).
  *
  * Cached ~1h per period, module-scope. ponytail: per-isolate only — resets
  * on a Worker cold start, which just means one cache miss, fine at this
- * traffic volume since a miss is one Cloudflare round trip (two calls in
- * parallel, each with analyticsFetch.ts's 8s timeout and one retry). Upgrade path if this ever needs
+ * traffic volume since a miss is 2-3 Cloudflare calls (through
+ * analyticsFetch.ts's limiter, 8s timeout and one retry). Upgrade path if this ever needs
  * cross-isolate consistency: a KV or D1-backed cache keyed the same way.
  */
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { fetchWithRetry } from "@/lib/analyticsFetch";
+import { createFetchLimiter, fetchWithRetry, startDeadline, type FetchLimiter } from "@/lib/analyticsFetch";
 
 export type DashboardPeriod = "7d" | "30d" | "90d";
 export const DASHBOARD_PERIODS: readonly DashboardPeriod[] = ["7d", "30d", "90d"];
@@ -48,6 +52,8 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const SITE_TAG = "2e9e3476ebf0467ca1485c9a363d4c1d";
 const HOST = "pueblofoodmap.com";
 const CF_GRAPHQL_URL = "https://api.cloudflare.com/client/v4/graphql";
+/** Widest date range (inclusive days) one RUM query may span: Cloudflare's "13w2d" quota, confirmed live 2026-10-19. */
+const CF_MAX_RANGE_DAYS = 93;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 export interface DailyVisitorsPoint {
@@ -92,13 +98,17 @@ function dateOnly(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-async function graphqlFetch<T>(token: string, query: string, variables: Record<string, unknown>): Promise<T> {
+async function graphqlFetch<T>(token: string, query: string, variables: Record<string, unknown>, deadline: AbortSignal): Promise<T> {
   // Timeout + one retry on a timeout/5xx live in analyticsFetch.ts, shared with posthogQuery.ts.
-  const res = await fetchWithRetry(CF_GRAPHQL_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ query, variables }),
-  });
+  const res = await fetchWithRetry(
+    CF_GRAPHQL_URL,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables }),
+    },
+    deadline,
+  );
   if (!res.ok) throw new Error(`Cloudflare GraphQL responded ${res.status}`);
   const json = (await res.json()) as GraphQlResponse<T>;
   if (json.errors?.length) throw new Error(json.errors.map((e) => e.message).join("; "));
@@ -107,7 +117,7 @@ async function graphqlFetch<T>(token: string, query: string, variables: Record<s
 }
 
 /** siteTag/requestHost are fixed constants (never user input), inlined directly in the query text — only the date range and account vary per call. */
-async function fetchPageloadRows(token: string, accountTag: string, since: string, until: string): Promise<RumPageloadRow[]> {
+async function fetchPageloadRows(token: string, accountTag: string, since: string, until: string, deadline: AbortSignal): Promise<RumPageloadRow[]> {
   const query = `
     query($accountTag: String!, $since: Date!, $until: Date!) {
       viewer {
@@ -129,11 +139,12 @@ async function fetchPageloadRows(token: string, accountTag: string, since: strin
     token,
     query,
     { accountTag, since, until },
+    deadline,
   );
   return data.viewer.accounts[0]?.rumPageloadEventsAdaptiveGroups ?? [];
 }
 
-async function fetchMobileLcpP75(token: string, accountTag: string, since: string, until: string): Promise<number | null> {
+async function fetchMobileLcpP75(token: string, accountTag: string, since: string, until: string, deadline: AbortSignal): Promise<number | null> {
   const query = `
     query($accountTag: String!, $since: Date!, $until: Date!) {
       viewer {
@@ -150,7 +161,7 @@ async function fetchMobileLcpP75(token: string, accountTag: string, since: strin
   `;
   const data = await graphqlFetch<{
     viewer: { accounts: { rumWebVitalsEventsAdaptiveGroups: { quantiles: { largestContentfulPaintP75: number } }[] }[] };
-  }>(token, query, { accountTag, since, until });
+  }>(token, query, { accountTag, since, until }, deadline);
   const p75 = data.viewer.accounts[0]?.rumWebVitalsEventsAdaptiveGroups[0]?.quantiles.largestContentfulPaintP75;
   // Cloudflare's own "too few samples" sentinel (confirmed live) — never rendered as a literal -1ms.
   if (p75 === undefined || p75 < 0) return null;
@@ -228,9 +239,15 @@ export function _clearVisitorsAnalyticsCacheForTests(): void {
  * network error, a timeout, or a malformed Cloudflare response — which is
  * the page's own signal to render "Visitor numbers are unavailable right
  * now" and render everything else regardless (issue #680's "Done when").
- * Never throws.
+ * Never throws. `limit` is the render's shared limiter from page.tsx
+ * (analyticsFetch.ts); the default is a private one for callers that run
+ * this alone. Gives up with null once ANALYTICS_DEADLINE_MS has passed.
  */
-export async function loadVisitorsAnalytics(period: DashboardPeriod, now: Date = new Date()): Promise<VisitorsAnalytics | null> {
+export async function loadVisitorsAnalytics(
+  period: DashboardPeriod,
+  now: Date = new Date(),
+  limit: FetchLimiter = createFetchLimiter(),
+): Promise<VisitorsAnalytics | null> {
   const cached = cache.get(period);
   if (cached && cached.expiresAt > now.getTime()) return cached.data;
 
@@ -255,17 +272,30 @@ export async function loadVisitorsAnalytics(period: DashboardPeriod, now: Date =
   const previousStartMs = currentStartMs - days * MS_PER_DAY;
   const currentStartStr = dateOnly(currentStartMs);
   const previousStartStr = dateOnly(previousStartMs);
+  const previousEndStr = dateOnly(currentStartMs - MS_PER_DAY);
   const todayStr = dateOnly(todayUTC);
+  const deadline = startDeadline();
 
   try {
-    const [rows, phoneLcpMs] = await Promise.all([
-      fetchPageloadRows(token, accountTag, previousStartStr, todayStr),
-      fetchMobileLcpP75(token, accountTag, currentStartStr, todayStr),
+    // One page-load query over both periods when it fits Cloudflare's range cap,
+    // else one per period: see this file's header.
+    const pageloadRanges: [string, string][] =
+      2 * days + 1 <= CF_MAX_RANGE_DAYS
+        ? [[previousStartStr, todayStr]]
+        : [
+            [previousStartStr, previousEndStr],
+            [currentStartStr, todayStr],
+          ];
+    const [rowSets, phoneLcpMs] = await Promise.all([
+      Promise.all(pageloadRanges.map(([since, until]) => limit(() => fetchPageloadRows(token, accountTag, since, until, deadline.signal)))),
+      limit(() => fetchMobileLcpP75(token, accountTag, currentStartStr, todayStr, deadline.signal)),
     ]);
-    const data = buildVisitorsAnalytics(rows, currentStartStr, phoneLcpMs);
+    const data = buildVisitorsAnalytics(rowSets.flat(), currentStartStr, phoneLcpMs);
     cache.set(period, { expiresAt: now.getTime() + CACHE_TTL_MS, data });
     return data;
   } catch {
     return null;
+  } finally {
+    deadline.clear();
   }
 }

@@ -64,13 +64,15 @@
 
 import type { DashboardPeriod } from "@/lib/cfAnalytics";
 import { EVENTS } from "@/lib/analytics";
-import { fetchWithRetry, mapWithConcurrency, POSTHOG_CONCURRENCY } from "@/lib/analyticsFetch";
+import { createFetchLimiter, fetchWithRetry, startDeadline, type FetchLimiter } from "@/lib/analyticsFetch";
 
 const PERIOD_DAYS: Record<DashboardPeriod, number> = { "7d": 7, "30d": 30, "90d": 90 };
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 /** Same production host cfAnalytics.ts reads, even from staging — see this file's own header. */
 const HOST = "pueblofoodmap.com";
 const DEFAULT_API_HOST = "https://us.posthog.com";
+/** PostHog's per-project cap on HogQL queries running at once (Query API docs, checked 2026-10-19). */
+const POSTHOG_MAX_CONCURRENT_QUERIES = 3;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 /** Only terms searched at least this many times are shown — issue's own "only terms seen >= 3 times" (never a single visitor's one-off typo). */
 const MIN_SEARCH_TERM_COUNT = 3;
@@ -177,13 +179,18 @@ async function runHogQlQuery(
   apiHost: string,
   query: string,
   values: Record<string, unknown>,
+  deadline: AbortSignal,
 ): Promise<unknown[][]> {
   // Timeout + one retry on a timeout/5xx live in analyticsFetch.ts, shared with cfAnalytics.ts.
-  const res = await fetchWithRetry(`${apiHost}/api/projects/${projectId}/query/`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ query: { kind: "HogQLQuery", query, values } }),
-  });
+  const res = await fetchWithRetry(
+    `${apiHost}/api/projects/${projectId}/query/`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: { kind: "HogQLQuery", query, values } }),
+    },
+    deadline,
+  );
   if (!res.ok) throw new Error(`PostHog Query API responded ${res.status}`);
   const json = (await res.json()) as PostHogQueryResponse;
   if (json.error) throw new Error(typeof json.error === "string" ? json.error : "PostHog Query API returned an error");
@@ -379,13 +386,17 @@ export function _clearMapUsageAnalyticsCacheForTests(): void {
  * fixture-testable async function — same split cfAnalytics.ts's own
  * loadVisitorsAnalytics() uses internally, made an explicit parameter here
  * since the caller (page.tsx) already reads the Cloudflare env binding for
- * the Visitors section right next to this one.
+ * the Visitors section right next to this one. `limit` is the render's
+ * shared limiter from page.tsx (analyticsFetch.ts); the default is a private
+ * one for callers that run this alone. Gives up with null once
+ * ANALYTICS_DEADLINE_MS has passed.
  */
 export async function loadMapUsageAnalytics(
   period: DashboardPeriod,
   projectId: string | undefined,
   apiHost: string | undefined,
   now: Date = new Date(),
+  limit: FetchLimiter = createFetchLimiter(),
 ): Promise<MapUsageAnalytics | null> {
   const cached = cache.get(period);
   if (cached && cached.expiresAt > now.getTime()) return cached.data;
@@ -396,10 +407,11 @@ export async function loadMapUsageAnalytics(
   const host = apiHost || DEFAULT_API_HOST;
   const { since, previousSince, until } = periodBounds(period, now);
   const commonValues = { host: HOST, since, previousSince, until };
+  const deadline = startDeadline();
 
   try {
-    // WHY a concurrency limit, not Promise.all: page.tsx runs this alongside
-    // cfAnalytics.ts's 2 calls, and 10 fetches at once overflowed the Worker's
+    // WHY every query goes through `limit`: page.tsx runs this alongside
+    // cfAnalytics.ts's calls, and 11+ fetches at once overflowed the Worker's
     // 6 open connections, so queued queries timed out while waiting
     // (analyticsFetch.ts's header). Results come back in this order.
     const queries: [string, Record<string, unknown>][] = [
@@ -412,10 +424,15 @@ export async function loadMapUsageAnalytics(
       [LOCATION_PERMISSION_QUERY, { ...commonValues, event: EVENTS.LOCATION_PERMISSION }],
       [UTM_SOURCES_QUERY, commonValues],
     ];
-    const [headlineRows, localeEsRows, topPlaceRows, topSearchRows, cardActionRows, filterRows, locationRows, utmRows] = await mapWithConcurrency(
-      queries,
-      POSTHOG_CONCURRENCY,
-      ([query, values]) => runHogQlQuery(token, projectId, host, query, values),
+    // PostHog also runs only 3 queries at once per project and queues the rest
+    // on its side (docs: "3 queries running concurrently"), where they burn
+    // our timeout the same way, so no more than 3 are sent at a time. The
+    // PostHog slot is taken first so a waiting query never holds a shared one.
+    const posthogLimit = createFetchLimiter(POSTHOG_MAX_CONCURRENT_QUERIES);
+    const [headlineRows, localeEsRows, topPlaceRows, topSearchRows, cardActionRows, filterRows, locationRows, utmRows] = await Promise.all(
+      queries.map(([query, values]) =>
+        posthogLimit(() => limit(() => runHogQlQuery(token, projectId, host, query, values, deadline.signal))),
+      ),
     );
 
     const [localeEsCurrent, localeEsPrevious] = (localeEsRows[0] as [number, number] | undefined) ?? [0, 0];
@@ -433,5 +450,7 @@ export async function loadMapUsageAnalytics(
     return data;
   } catch {
     return null;
+  } finally {
+    deadline.clear();
   }
 }

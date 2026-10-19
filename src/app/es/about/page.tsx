@@ -15,6 +15,7 @@ import { buildPageMetadata } from "@/lib/site";
 import { venues } from "@/data/venues";
 import { publishedAt } from "@/data/published-venues";
 import { serializeJsonLd, buildFaqJsonLd } from "@/lib/venueSchema";
+import { ABOUT_FAQ_COUNT, faqItemsFor } from "@/lib/faqItems";
 import AboutContent from "@/components/AboutContent";
 
 export const metadata: Metadata = buildPageMetadata({
@@ -26,12 +27,7 @@ export const metadata: Metadata = buildPageMetadata({
 });
 
 export default function EsAboutPage() {
-  const faqNums = [1, 2, 3, 4, 5, 6] as const;
-  const faqItems = faqNums.map((n) => ({
-    question: t(`about.faq.q${n}`, "es"),
-    answer: t(`about.faq.a${n}`, "es"),
-  }));
-  const faqJsonLd = serializeJsonLd(buildFaqJsonLd(faqItems, "es"));
+  const faqJsonLd = serializeJsonLd(buildFaqJsonLd(faqItemsFor("about.faq", ABOUT_FAQ_COUNT, "es"), "es"));
 
   return (
     <AboutContent faqJsonLd={faqJsonLd} venueCount={venues.length} publishedAt={publishedAt} />

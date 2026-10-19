@@ -24,10 +24,10 @@ import { localizedHref } from "@/lib/localizedHref";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { pageDocumentTitle, SITE_CONTACT_EMAIL } from "@/lib/site";
 import { formatPublishedDate } from "@/lib/dataFreshness";
+import { ABOUT_FAQ_COUNT, faqItemsFor } from "@/lib/faqItems";
 import SiteFooter from "@/components/SiteFooter";
+import FaqList from "@/components/FaqList";
 import PageNav, { PAGE_NAV_CLEARANCE } from "./PageNav";
-
-const FAQ_NUMS = [1, 2, 3, 4, 5, 6] as const;
 
 interface AboutContentProps {
   /** Pre-serialized FAQPage JSON-LD, matching the caller's tree (#689). */
@@ -140,24 +140,14 @@ export default function AboutContent({ faqJsonLd, venueCount, publishedAt }: Abo
         </section>
 
         {/* FAQ — approved copy (PR4 S8); the JSON-LD above mirrors this text
-            verbatim, in whichever tree served this page (#689) */}
-        <section aria-labelledby="faq-heading">
-          <h2 id="faq-heading" className="text-lg font-semibold text-[var(--color-ink-700)] mb-3">
-            {t("about.faq.heading", locale)}
-          </h2>
-          <div className="space-y-5">
-            {FAQ_NUMS.map((n) => (
-              <div key={n}>
-                <h3 className="text-base font-semibold text-[var(--color-ink-700)] mb-1">
-                  {t(`about.faq.q${n}`, locale)}
-                </h3>
-                <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">
-                  {t(`about.faq.a${n}`, locale)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
+            verbatim, in whichever tree served this page (#689). FaqList, not
+            FaqSection: that one emits its own JSON-LD, and this one is built
+            server-side per tree (the /resources split). */}
+        <FaqList
+          id="faq-heading"
+          heading={t("about.faq.heading", locale)}
+          items={faqItemsFor("about.faq", ABOUT_FAQ_COUNT, locale)}
+        />
 
         {/* Contact: one shared address, no personal name (trust signal, SEO plan) */}
         <p className="text-sm text-[var(--color-ink-700)] leading-relaxed">

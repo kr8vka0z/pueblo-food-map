@@ -21,6 +21,7 @@ import { buildPageMetadata } from "@/lib/site";
 import { venues } from "@/data/venues";
 import { publishedAt } from "@/data/published-venues";
 import { serializeJsonLd, buildFaqJsonLd } from "@/lib/venueSchema";
+import { ABOUT_FAQ_COUNT, faqItemsFor } from "@/lib/faqItems";
 import AboutContent from "@/components/AboutContent";
 
 export const metadata: Metadata = buildPageMetadata({
@@ -35,12 +36,7 @@ export default function AboutPage() {
   // FAQPage JSON-LD is machine-readable metadata, built in English here
   // (this EN-tree page; /es/about's page.tsx builds it in Spanish — #689
   // supersedes #386's old "always English" rule).
-  const faqNums = [1, 2, 3, 4, 5, 6] as const;
-  const faqItems = faqNums.map((n) => ({
-    question: t(`about.faq.q${n}`, "en"),
-    answer: t(`about.faq.a${n}`, "en"),
-  }));
-  const faqJsonLd = serializeJsonLd(buildFaqJsonLd(faqItems));
+  const faqJsonLd = serializeJsonLd(buildFaqJsonLd(faqItemsFor("about.faq", ABOUT_FAQ_COUNT, "en")));
 
   return (
     <AboutContent faqJsonLd={faqJsonLd} venueCount={venues.length} publishedAt={publishedAt} />

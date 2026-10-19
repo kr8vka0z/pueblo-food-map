@@ -25,10 +25,6 @@
  * an unreferenced file, never a broken event). The audit row is the same
  * `WHERE EXISTS`-gated insert the other event writes use, action `update`
  * (audit_log.action is CHECK-limited, migrations/0001).
- *
- * FAIL SOFT: this code can reach production before migration 0019 (the new
- * flyer columns). The UPDATE then throws, and the answer is a clean 503
- * `flyer_unavailable`; nothing else about events is affected.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -36,7 +32,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { authorizeEventRequest, eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
 import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { isMissingColumnError, publicFlyerOf, type EventRow } from "@/lib/events";
+import { publicFlyerOf, type EventRow } from "@/lib/events";
 import { flyerKey, FLYER_CONTENT_TYPES, inspectFlyer, MAX_FLYER_BYTES, type FlyerExt } from "@/lib/eventFlyers";
 
 export const dynamic = "force-dynamic";
@@ -51,9 +47,6 @@ const UPDATE_FLYER_SQL = `UPDATE events SET flyer_key = ?, flyer_width = ?, flye
 function fail(status: number, error: string, message: string, errors?: Record<string, string>): NextResponse {
   return NextResponse.json({ ok: false, error, message, ...(errors ? { errors } : {}) }, { status });
 }
-
-const flyerUnavailable = () =>
-  fail(503, "flyer_unavailable", "Flyers aren't available yet in this environment. Try again after the next update.");
 
 /** Trimmed text or null; anything over the cap is reported rather than silently cut. */
 function altText(value: FormDataEntryValue | null, key: string, errors: Record<string, string>): string | null {
@@ -118,9 +111,6 @@ async function commit(
     results = await db.batch([update, audit]);
   } catch (err) {
     await deleteQuietly(r2, uploaded);
-    // Only a missing flyer column means "migration 0019 not applied yet";
-    // anything else is a real failure and keeps its normal error handling.
-    if (isMissingColumnError(err)) return flyerUnavailable();
     throw err;
   }
   if (results[0].meta.changes === 0) {

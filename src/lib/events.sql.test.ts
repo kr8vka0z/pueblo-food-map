@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Real-SQLite proof for the events table (migrations/0018_events.sql) and
+ * Real-SQLite proof for the events table (migrations/0018_events.sql + 0019) and
  * the public feed's query (PUBLIC_EVENTS_SQL, src/lib/events.ts). A fake-D1
  * mock can't catch a wrong WHERE clause, so this runs the actual exported
  * query string against a schema built from the real migration files (same
@@ -15,7 +15,7 @@ import { PUBLIC_EVENTS_SQL } from "@/lib/events";
 
 function buildDb(): Database.Database {
   const db = new Database(":memory:");
-  db.exec(readFileSync(join(process.cwd(), "migrations", "0018_events.sql"), "utf-8"));
+  for (const f of ["0018_events.sql", "0019_event_flyer.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
   return db;
 }
 
@@ -58,7 +58,9 @@ describe("PUBLIC_EVENTS_SQL — real SQLite", () => {
 
     const row = db.prepare(PUBLIC_EVENTS_SQL).get(NOW) as Record<string, unknown>;
 
-    for (const internal of ["created_by", "updated_by", "created_at", "updated_at", "status", "cancel_note", "flyer_key"]) {
+    // flyer_key IS selected (the loaders fold it into `flyer`); that it never
+    // reaches the public JSON is asserted in events.flyer.sql.test.ts.
+    for (const internal of ["created_by", "updated_by", "created_at", "updated_at", "status", "cancel_note"]) {
       expect(row).not.toHaveProperty(internal);
     }
   });

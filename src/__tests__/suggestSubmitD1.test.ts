@@ -96,6 +96,29 @@ describe("POST /suggest/submit", () => {
     expect(res.status).toBe(422);
   });
 
+  // Object.prototype keys must not pass the category check (an `in` test
+  // against a plain object accepted them).
+  test.each(["constructor", "toString", "__proto__", "hasOwnProperty"])(
+    "prototype key %s as category → 422",
+    async (category) => {
+      vi.stubGlobal("fetch", mockTurnstileSuccess());
+      const res = await POST(makeRequest({ ...validBody, category }));
+      expect(res.status).toBe(422);
+    },
+  );
+
+  test("real category other than pantry (blessing_box) is accepted → 200", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({}) }),
+    );
+    const res = await POST(makeRequest({ ...validBody, category: "blessing_box" }));
+    expect(res.status).toBe(200);
+  });
+
   // #232: submitterEmail is required (was optional).
   test("missing submitterEmail → 422", async () => {
     vi.stubGlobal("fetch", mockTurnstileSuccess());

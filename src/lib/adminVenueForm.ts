@@ -161,18 +161,6 @@ export function mapVenueRowToFormValues(row: AdminVenueRow): Partial<AddVenueFor
  * `<AddVenueForm initialValues={...} />` identically regardless of which
  * mapper filled it in.
  *
- * Category reconciliation: the public suggest form's category comes from
- * VENUE_CATEGORIES / VenueCategoryKey (src/lib/suggestTypes.ts) — a
- * separately-maintained 7-value map that happens to match VenueCategory
- * (src/types/venue.ts) key-for-key today (both files' own comments say so),
- * but the two are independent sources with no shared import, so nothing
- * stops them from drifting apart later. Passing through blindly risks
- * validateCreateVenuePayload() (src/lib/adminVenueValidation.ts) rejecting
- * the create outright the moment they ever do — checking against
- * VALID_CATEGORIES and falling back to "" (the form's own "select a
- * category" empty state) instead means a future drift degrades to "admin
- * picks the category," never a broken pre-fill.
- *
  * ponytail: the notes prefill is lossy-but-safe — hours/contact/
  * submitterEmail have no dedicated AddVenueForm fields of their own (hours
  * here is unstructured submitter text, not the per-day WeeklyHours shape

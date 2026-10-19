@@ -60,19 +60,17 @@
  * it's always exactly what PATCH itself will re-check against.
  *
  * Blessing Boxes slice 2: when `venue.category === 'blessing_box'`,
- * resolveBoxCheckins() loads every check-in for this box (visible, hidden,
- * and 'problem' reports alike — see loadAllCheckinsForBox's own header) and
+ * loadAllCheckinsForBox() loads every check-in for this box (visible, hidden,
+ * and 'problem' reports alike — see that function's own header) and
  * renders BoxCheckinsAdminPanel below the form, so hide/unhide and
  * 'problem' report review live on the same screen as the rest of a box's
- * admin data. Wrapped in the same try/catch-degrades-to-empty shape as
- * resolveLinkHealthProposalContext() above —
- * a D1 read failure here must never take down the whole edit page.
+ * admin data. It degrades to [] like the other resolvers — a D1 read
+ * failure here must never take down the whole edit page.
  *
  * #677: for the same `blessing_box` check, resolveBoxReviewItems() loads
  * this box's own pending/flagged photos and pending sponsor requests, shown
- * right under the title in BoxReviewBox.tsx's "Things to review" box — the
- * on-page home for what used to live only on the now-folded-away
- * /admin/box-photos and /admin/box-adopters tabs. See that resolver's own
+ * right under the title in BoxReviewBox.tsx's "Things to review" box. See
+ * that resolver's own
  * header for why this reuses the tab's existing loaders rather than a new
  * query.
  *
@@ -114,7 +112,7 @@ import { loadAllCheckinsForBox, type AdminCheckinRow } from "@/lib/blessingBoxes
 import { loadHostSubscriptions } from "@/lib/boxAlerts";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
-import { loadVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
+import { toVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
 import {
   displayStatusOf,
   diffPublishedFields,
@@ -169,30 +167,6 @@ async function resolveLinkHealthProposalContext(
 }
 
 /**
- * Loads every check-in for this box (all visibilities, all kinds) for
- * BoxCheckinsAdminPanel — see that function's own header in
- * src/lib/blessingBoxes.ts. Only called for a blessing_box venue; degrades
- * to [] on any D1 failure so this optional admin panel can never take down
- * the rest of the edit page.
- */
-async function resolveBoxCheckins(db: D1Database, venueId: string): Promise<AdminCheckinRow[]> {
-  try {
-    return await loadAllCheckinsForBox(db, venueId);
-  } catch {
-    return [];
-  }
-}
-
-/** Same degrade-to-empty shape as resolveBoxCheckins() above — a missing alert_subscriptions table (migration 0010 not yet applied) must never take down the edit page. */
-async function resolveHostAlerts(db: D1Database, venueId: string): Promise<{ id: number; email: string }[]> {
-  try {
-    return await loadHostSubscriptions(db, venueId);
-  } catch {
-    return [];
-  }
-}
-
-/**
  * #677: this box's own pending/flagged photos and pending sponsor requests,
  * for the "Things to review" box (BoxReviewBox.tsx). Reuses the SAME
  * loaders the /admin/boxes tab's summary and column read
@@ -223,8 +197,7 @@ async function resolveBoxReviewItems(
 /**
  * #674: every PENDING `change_proposals` row targeting this venue, newest
  * first — the SuggestionsBox at the top of this page. Same degrade-to-empty
- * shape as this file's other optional resolvers (resolveBoxCheckins,
- * resolveHostAlerts above) — a D1 failure here must never take down the
+ * shape as this file's other optional resolvers — a D1 failure here must never take down the
  * rest of the edit page, and a plain [] is exactly what SuggestionsBox
  * already renders nothing for.
  */
@@ -347,9 +320,8 @@ export default async function EditVenuePage({
     showActivity = identity.isOwner === true;
     // WHY Promise.all throughout (was ~10 awaits in a row): every D1 call is
     // an edge -> primary round trip, so a serial chain cost the SUM of them.
-    // Only real dependencies stay sequential: the venue row gates the rest
-    // (an unknown id still 404s with no extra reads), and the VenueLookup
-    // read needs to know whether any suggestion exists. Every resolver below
+    // Only the venue row stays sequential: it gates the rest (an unknown id
+    // still 404s with no extra reads). Every resolver below
     // already degrades to an empty value instead of rejecting, and
     // loadAdminNavCounts never rejects, so overlapping them changes no
     // failure behavior. The session check above still runs first and alone.
@@ -372,8 +344,14 @@ export default async function EditVenuePage({
       const [linkHealth, checkins, alerts, reviewItems, proposals, pendingSubmissions, waiting, counts] =
         await Promise.all([
           resolveLinkHealthProposalContext(db, id, proposal),
-          isBox ? resolveBoxCheckins(db, id) : Promise.resolve([] as AdminCheckinRow[]),
-          isBox ? resolveHostAlerts(db, id) : Promise.resolve([] as { id: number; email: string }[]),
+          // Fail soft to []: a D1 failure, or a missing alert_subscriptions
+          // table (migration 0010 not applied), must not break the edit page.
+          isBox
+            ? loadAllCheckinsForBox(db, id).catch(() => [] as AdminCheckinRow[])
+            : Promise.resolve([] as AdminCheckinRow[]),
+          isBox
+            ? loadHostSubscriptions(db, id).catch(() => [] as { id: number; email: string }[])
+            : Promise.resolve([] as { id: number; email: string }[]),
           isBox ? resolveBoxReviewItems(db, id) : Promise.resolve(noReviewItems),
           // #674: "Suggestions to review" box — every pending change_proposals
           // row targeting this venue (an archived venue can have one too: a
@@ -400,13 +378,8 @@ export default async function EditVenuePage({
         ...pendingProposals.map((proposal): ReviewItem => ({ kind: "proposal", proposal })),
         ...pendingSubmissions.map((submission): ReviewItem => ({ kind: "submission", submission })),
       ];
-      // Only bothers loading the venue's VenueLookup context (a second, tiny
-      // SELECT) when there's actually something to show it to — the common
-      // case (an unedited place) skips this entirely.
-      if (suggestionItems.length > 0) {
-        const lookup = await loadVenueLookup(db, [id]);
-        suggestionsVenue = lookup[id] ?? null;
-      }
+      // Mapped from the row already loaded above, so no second venues read.
+      if (suggestionItems.length > 0) suggestionsVenue = toVenueLookup(venue);
     } else {
       navCounts = await navCountsPromise;
     }

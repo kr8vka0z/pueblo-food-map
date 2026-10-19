@@ -14,7 +14,6 @@
 
 import { describe, test, expect, vi } from "vitest";
 import {
-  STATUS_LABELS,
   DISPLAY_STATUS_LABELS,
   DISPLAY_STATUS_KEY,
   displayStatusOf,
@@ -86,14 +85,6 @@ function makeRow(overrides: Partial<AdminVenueRow> = {}): AdminVenueRow {
     ...overrides,
   };
 }
-
-describe("STATUS_LABELS", () => {
-  test("maps every admin status to its human label", () => {
-    expect(STATUS_LABELS.published).toBe("Live");
-    expect(STATUS_LABELS.draft).toBe("Draft");
-    expect(STATUS_LABELS.archived).toBe("Removed");
-  });
-});
 
 describe("DISPLAY_STATUS_LABELS / DISPLAY_STATUS_KEY", () => {
   test("maps every AdminDisplayStatus to its human label", () => {

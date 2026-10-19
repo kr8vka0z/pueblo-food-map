@@ -234,6 +234,7 @@ describe("EditVenuePage — blessing box check-ins panel (slice 2)", () => {
             return venueRow;
           },
           all: async () => {
+            if (!sql.includes("box_checkins")) return { results: [] };
             if (typeof checkinRows === "function") return checkinRows();
             return { results: checkinRows };
           },

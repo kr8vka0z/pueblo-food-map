@@ -9,17 +9,10 @@
  * (see adminVenues.test.ts).
  */
 
-import type { AdminVenueRow, AdminVenueStatus } from "@/types/venue";
+import type { AdminVenueRow } from "@/types/venue";
 import type { Venue } from "@/types/venue";
 import { validateAndMapRow, type VenueRow } from "@/lib/publishVenues";
 import { publishedVenues } from "@/data/published-venues";
-
-/** Human labels for each admin venue status — Status column badge + status filter select. */
-export const STATUS_LABELS: Record<AdminVenueStatus, string> = {
-  published: "Live",
-  draft: "Draft",
-  archived: "Removed",
-};
 
 // ─── #673: one status per place ─────────────────────────────────────────────
 

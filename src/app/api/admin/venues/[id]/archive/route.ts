@@ -62,14 +62,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import type { AdminVenueRow } from "@/types/venue";
-
-// #265: SELECT-form (not VALUES) so the WHERE EXISTS guard can skip the
-// insert entirely when the archive UPDATE below didn't actually apply —
-// same shape and reasoning as the sibling edit route's own AUDIT_INSERT_SQL.
-// Trailing two bind params (id, the new timestamp) are the guard.
-const AUDIT_INSERT_SQL = `INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id)
-  SELECT ?, ?, ?, ?, ?, ?, ?, ?
-  WHERE EXISTS (SELECT 1 FROM venues WHERE id = ? AND updated_at = ?)`;
+// #265: the edit route's SELECT-form insert. Its WHERE EXISTS guard skips the
+// audit row when the archive UPDATE below didn't apply; the trailing two bind
+// params (id, the new timestamp) are the guard.
+import { AUDIT_INSERT_SQL } from "@/lib/adminVenueEditSql";
 
 export async function POST(
   req: NextRequest,

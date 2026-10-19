@@ -11,6 +11,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
+import { loadEvent } from "@/lib/adminEventReads";
 import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import type { EventRow } from "@/lib/events";
 
@@ -36,7 +37,7 @@ export async function POST(
   const { db, identity } = access;
   const { id } = await params;
 
-  const existing = await db.prepare("SELECT * FROM events WHERE id = ?").bind(id).first<EventRow>();
+  const existing = await loadEvent(db, id);
   if (!existing) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }

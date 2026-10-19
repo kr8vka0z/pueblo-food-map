@@ -1,8 +1,8 @@
 /**
  * /admin/flags — redirect regression test (#674, "fold the Data refresh
- * tab into Places"). The queue this page used to render was deleted along
- * with ProposalsReviewView.tsx; see page.tsx's own header for why this
- * stays a redirect (bookmarks, the refresh-alert email) rather than a 404.
+ * tab into Places"). See page.tsx's own header for why this stays a
+ * redirect (bookmarks, refresh-alert emails sent before the alert link
+ * moved) rather than a 404.
  *
  * next/navigation's real `redirect()` throws internally to unwind to
  * Next's router (same control-flow-by-throw shape as `forbidden()`/

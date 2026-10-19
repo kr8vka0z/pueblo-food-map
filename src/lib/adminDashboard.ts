@@ -1,78 +1,44 @@
 /**
- * adminDashboard.ts — pure helpers for the /admin Dashboard's "Places due
- * for a check" panel and the /admin/boxes tab's "Box reports, last 8
+ * adminDashboard.ts — pure helpers for the /admin Dashboard's stale-places
+ * count and the /admin/boxes tab's "Box reports, last 8
  * weeks" chart. Kept free of D1 (same split adminVenues.ts / adminProposals.ts
  * already use for this admin surface) so every branch — a fresh venue with
  * no stale rows at all, a week-bucket boundary, an all-zero week — is
  * directly testable with plain fixtures instead of a live binding.
  */
 
-import type { AdminVenueRow, VenueCategory } from "@/types/venue";
+import type { AdminVenueRow } from "@/types/venue";
 import type { CheckinKind } from "@/lib/blessingBoxes";
 import type { TopPlaceUsageRow } from "@/lib/posthogQuery";
 
 // ─── Stale places ───────────────────────────────────────────────────────────
 
-export interface StalePlace {
-  id: string;
-  name: string;
-  category: VenueCategory;
-  lastVerified: string;
-  monthsSince: number;
-}
-
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // Average calendar-month length — good enough for a "roughly N months"
-// display column, not a billing or legal calculation.
+// threshold, not a billing or legal calculation.
 const AVG_DAYS_PER_MONTH = 30.44;
 
-type StaleSourceRow = Pick<AdminVenueRow, "id" | "name" | "category" | "status" | "last_verified">;
+type StaleSourceRow = Pick<AdminVenueRow, "category" | "status" | "last_verified">;
 
 /**
- * Published venues whose `last_verified` is at least `months` old, oldest
- * first — the Dashboard's "Places due for a check" panel. Blessing boxes
- * are excluded: their health signal is check-ins (src/lib/boxHealth.ts),
- * not a hand-verified `last_verified` date, so lumping them in here would
- * flag every box as "due" the moment it's created (boxes are never
- * re-verified the way a pantry/grocery listing is). UTC date math, same
- * convention as adminVenues.ts's formatLastVerified — this can run from a
- * Mountain-time laptop or Cloudflare's UTC edge, and `last_verified`
- * carries no time component of its own.
- *
- * `totalCount` is the full matching count (for a "See all N" link) even
- * when `items` is capped by `opts.limit`.
+ * How many published venues have a `last_verified` at least `months` old —
+ * the Dashboard's "Not checked in 90+ days" card. Blessing boxes are
+ * excluded: their health signal is check-ins (src/lib/boxHealth.ts), not a
+ * hand-verified `last_verified` date, so lumping them in here would flag
+ * every box as "due" the moment it's created (boxes are never re-verified
+ * the way a pantry/grocery listing is). UTC date math, same convention as
+ * adminVenues.ts's formatLastVerified — this can run from a Mountain-time
+ * laptop or Cloudflare's UTC edge, and `last_verified` carries no time
+ * component of its own.
  */
-export function selectStalePlaces(
-  rows: StaleSourceRow[],
-  now: Date,
-  opts: { months?: number; limit?: number } = {},
-): { items: StalePlace[]; totalCount: number } {
-  const months = opts.months ?? 12;
+export function countStalePlaces(rows: StaleSourceRow[], now: Date, months = 12): number {
   const cutoffDays = months * AVG_DAYS_PER_MONTH;
-
-  const stale = rows
-    .filter((r) => r.status === "published" && r.category !== "blessing_box")
-    .map((r) => {
-      const days = (now.getTime() - new Date(r.last_verified).getTime()) / MS_PER_DAY;
-      return { row: r, days };
-    })
-    .filter((r) => r.days >= cutoffDays)
-    // Oldest last_verified first — string comparison is safe since
-    // last_verified is a plain ISO/date-only string (same "compare the
-    // stored string directly" convention adminVenues.ts's updated_at >
-    // published_at check already relies on).
-    .sort((a, b) => a.row.last_verified.localeCompare(b.row.last_verified));
-
-  const limited = typeof opts.limit === "number" ? stale.slice(0, opts.limit) : stale;
-  const items: StalePlace[] = limited.map(({ row, days }) => ({
-    id: row.id,
-    name: row.name,
-    category: row.category,
-    lastVerified: row.last_verified,
-    monthsSince: Math.floor(days / AVG_DAYS_PER_MONTH),
-  }));
-
-  return { items, totalCount: stale.length };
+  return rows.filter(
+    (r) =>
+      r.status === "published" &&
+      r.category !== "blessing_box" &&
+      (now.getTime() - new Date(r.last_verified).getTime()) / MS_PER_DAY >= cutoffDays,
+  ).length;
 }
 
 // ─── PostHog "most opened places" name resolution (#681) ───────────────────

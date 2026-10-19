@@ -125,10 +125,8 @@ export async function loadAdopterByConfirmToken(db: D1Database, token: string): 
  *
  * D1_MAX_BOUND_PARAMS-chunked (#568 item 7 — one bound parameter per venue
  * id used to be a single unbatched `IN (...)`, which throws past D1's
- * 100-bound-param ceiling; same fix/helper adminVenueLookup.ts's
- * loadVenueLookup already applies, extracted to src/lib/d1.ts precisely so
- * a second call site like this one reuses it instead of re-deriving the
- * limit). Fine at Pueblo's real box count today (well under 100 boxes), but
+ * 100-bound-param ceiling; src/lib/d1.ts holds the shared chunker so this
+ * call site reuses it instead of re-deriving the limit). Fine at Pueblo's real box count today (well under 100 boxes), but
  * no longer silently drops caretaker names once it isn't.
  */
 export async function loadApprovedAdopterNamesForVenues(

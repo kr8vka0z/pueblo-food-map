@@ -1,12 +1,13 @@
 /**
- * useEvents tests (#758) — the fail-soft contract: a failed, non-OK or
+ * useEventsFeed tests (#758) — the fail-soft contract: a failed, non-OK or
  * malformed feed leaves the list empty (the map then looks exactly as it did
- * before events existed), and one bad row never hides the good ones.
+ * before events existed), one bad row never hides the good ones, and `loaded`
+ * turns true once the request has finished either way (#759 relies on it).
  */
 
 import { describe, test, expect, vi, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { useEvents } from "@/lib/useEvents";
+import { useEventsFeed } from "@/lib/useEvents";
 
 const good = {
   id: "e1", name: "Turkey drive", name_es: null, host: null, host_es: null, description: null,
@@ -25,11 +26,13 @@ async function settle() {
   });
 }
 
-describe("useEvents", () => {
-  test("returns the feed's events", async () => {
+describe("useEventsFeed", () => {
+  test("returns the feed's events and marks the feed loaded", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ events: [good] }) }));
-    const { result } = renderHook(() => useEvents());
-    await waitFor(() => expect(result.current).toHaveLength(1));
+    const { result } = renderHook(() => useEventsFeed());
+    expect(result.current.loaded).toBe(false);
+    await waitFor(() => expect(result.current.events).toHaveLength(1));
+    await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(fetch).toHaveBeenCalledWith("/api/public/events");
   });
 
@@ -39,11 +42,12 @@ describe("useEvents", () => {
     ["an unparseable body", () => vi.fn().mockResolvedValue({ ok: true, json: async () => { throw new Error("bad json"); } })],
     ["a body without an events list", () => vi.fn().mockResolvedValue({ ok: true, json: async () => ({ boxes: [] }) })],
     ["an empty feed", () => vi.fn().mockResolvedValue({ ok: true, json: async () => ({ events: [] }) })],
-  ])("%s leaves the list empty, no error", async (_name, makeFetch) => {
+  ])("%s leaves the list empty, no error, and still marks the feed loaded", async (_name, makeFetch) => {
     vi.stubGlobal("fetch", makeFetch());
-    const { result } = renderHook(() => useEvents());
+    const { result } = renderHook(() => useEventsFeed());
     await settle();
-    expect(result.current).toEqual([]);
+    expect(result.current.events).toEqual([]);
+    expect(result.current.loaded).toBe(true);
   });
 
   test("drops a row the map cannot draw and keeps the rest", async () => {
@@ -52,7 +56,7 @@ describe("useEvents", () => {
     const badLat = { ...good, id: "e4", lat: 91 };
     const badLng = { ...good, id: "e5", lng: -181 };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ events: [noCoords, good, noDates, badLat, badLng, null] }) }));
-    const { result } = renderHook(() => useEvents());
-    await waitFor(() => expect(result.current.map((e) => e.id)).toEqual(["e1"]));
+    const { result } = renderHook(() => useEventsFeed());
+    await waitFor(() => expect(result.current.events.map((e) => e.id)).toEqual(["e1"]));
   });
 });

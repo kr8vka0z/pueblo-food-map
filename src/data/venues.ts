@@ -1,24 +1,8 @@
 import type { Venue } from "@/types/venue";
 import { publishedVenues } from "@/data/published-venues";
 
-// The 10 hand-curated Pueblo Food Project (CGSP) records. Re-exported here
-// unchanged for backward compatibility — scripts/seed-admin-db.ts and two
-// existing tests (OperatorAttribution.test.tsx, seed-admin-db.test.ts)
-// import pfpVenues from this module specifically. The literal data now
-// lives in src/data/pfp-venues.ts (#237 checkpoint d, the published-venues.ts
-// refactor) — see that file's header for why it had to move out of here
-// (avoids a circular import with published-venues.ts, which this module
-// now imports from, below).
-export { pfpVenues } from "@/data/pfp-venues";
-
-// Public venue list, sourced directly from the last published snapshot
-// (published-venues.ts — see that file's header for what it is and how it's
-// regenerated). D1's accepts_snap/accepts_wic are the sole source of truth
-// for SNAP/WIC (#597): migration 0014 copied the old static overlay's
-// matches into D1 and shipped to production via the 2026-09-25 Publish, so
-// the overlay that used to backfill NULLs at runtime (benefit-flags.ts,
-// withBenefitFlagsOverlay) is gone — an admin can permanently edit either
-// field in D1 with no fallback data to reconcile against.
+// Public venue list, straight from the last published snapshot (see
+// published-venues.ts's header); D1 is the sole SNAP/WIC source (#597).
 export const venues: Venue[] = publishedVenues;
 
 export const categoryLabels: Record<Venue["category"], string> = {
@@ -47,15 +31,4 @@ export const categoryColors: Record<Venue["category"], string> = {
   edible_landscape: "#58772B", // olive
   meal_site: "#6B3FA0",    // plum
   blessing_box: "#C2447B", // raspberry
-};
-
-export const categoryIcon: Record<Venue["category"], string> = {
-  pantry: "ShoppingBasket",
-  grocery: "ShoppingCart",
-  convenience: "Store",
-  farm: "Tractor",
-  garden: "Sprout",
-  edible_landscape: "Leaf",
-  meal_site: "Utensils",
-  blessing_box: "Gift",
 };

@@ -8,7 +8,7 @@
  *      is undefined (pantry, grocery, etc.)
  *   3. BottomSheet quick-summary and full-detail both render the operator line.
  *   4. BottomSheet omits the line when venue.operator is undefined.
- *   5. All 10 pfpVenues in venues.ts have operator: "Pueblo Food Project".
+ *   5. All 10 pfpVenues (pfp-venues.ts) have operator: "Pueblo Food Project".
  *   6. No non-PFP venue in the combined venues list has an operator field.
  *   7. i18n: ES locale shows "Operado por Pueblo Food Project".
  *
@@ -47,7 +47,8 @@ beforeAll(() => {
 
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
 import BottomSheet from "@/components/BottomSheet";
-import { pfpVenues, venues } from "@/data/venues";
+import { venues } from "@/data/venues";
+import { pfpVenues } from "@/data/pfp-venues";
 import type { Venue } from "@/types/venue";
 
 // ─── Shared fixtures ──────────────────────────────────────────────────────────

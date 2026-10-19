@@ -27,26 +27,12 @@
  * function so the rule can never drift between call sites.
  */
 
-import type { Venue, VenueCategory } from "@/types/venue";
+import type { Venue } from "@/types/venue";
 import { loadLatestApprovedPhotosForVenues, type PublicBoxPhoto } from "@/lib/boxPhotos";
 import { loadApprovedAdopterNamesForVenues } from "@/lib/boxAdopters";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
 
 // ─── D1 row shapes ──────────────────────────────────────────────────────────
-
-/** Mirrors migrations/0005_blessing_boxes.sql's `blessing_boxes` table exactly. */
-export interface BlessingBoxRow {
-  venue_id: string;
-  host_name: string | null;
-  host_note: string | null;
-  host_contact: string | null; // PRIVATE — read by admin code only, never mapped into a public shape.
-  most_needed: string | null;
-  installed_on: string | null;
-  removed_on: string | null;
-  qr_code_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
 /** The subset of a `venues` row a blessing_box join needs — same shape family as publishVenues.ts's VenueRow. */
 export interface BoxVenueRow {
@@ -75,9 +61,6 @@ export type CheckinKind = "filled" | "took" | "low" | "empty" | "problem";
 
 /** A box's real status, computed by computeBoxStatus() below — never stored. */
 export type BoxStatus = "stocked" | "low" | "empty" | "unknown" | "out_of_service";
-
-/** Retained as an alias so any lingering "unknown" literal comparison still reads correctly — "unknown" is BoxStatus's own no-signal value, not a slice-1-only placeholder anymore. */
-export const BOX_STATUS_PLACEHOLDER: BoxStatus = "unknown";
 
 /** The minimal shape computeBoxStatus()/computeLastFilledAt() need — deliberately narrower than the full box_checkins row (no id/note/hidden_by), so a caller can build this from either a D1 row or a test fixture with no adapter. */
 export interface CheckinStatusInput {
@@ -432,39 +415,11 @@ export function mapRowToPublicBox(
   };
 }
 
-export function mapRowsToPublicBoxes(rows: BoxJoinRow[]): PublicBlessingBox[] {
-  return rows.map((row) => mapRowToPublicBox(row));
-}
+// ─── Shared UI constants ───────────────────────────────────────────────────
+// Plain Tailwind class strings, no JSX/framework import, so they fit this
+// file's "pure" convention (see header).
 
-/**
- * Type guard for the merged venue list. Map-first rework (2026-09-18): a
- * box click now opens the SAME in-map card every other venue uses
- * (BottomSheet/DesktopVenueWindow), just with box-specific content
- * (BoxCardBody) instead of routing to a separate page — this guard is what
- * those components use (`venue.category === "blessing_box"` inline, or via
- * this function) to pick which body to render, and what MapWrapper uses to
- * look up the matching PublicBlessingBox record for the card.
- */
-export function isBlessingBox(category: VenueCategory): category is "blessing_box" {
-  return category === "blessing_box";
-}
-
-// ─── Shared UI constant (slice 2, relocated here slice 4) ──────────────────
-// Moved out of BoxContent.tsx so /boxes' row list (slice 4) can share it
-// instead of a second copy drifting out of sync with the detail page's
-// badge. Plain Tailwind class strings, no JSX/framework import — still
-// fits this file's own "pure" convention (see header), same as i18n.ts
-// living in lib/ with no React import either.
-/** Semantic-token color pairing per status — success/warning/danger are DESIGN.md's general status tokens, not admin-only (see AGENTS.md's own note on --color-danger, which is about ONE admin button's rationale, not a restriction on this token's normal error/status use elsewhere). Unknown/out_of_service intentionally reuse the same muted neutral treatment slice 1 already used for the placeholder — neither is an alarming state. */
-export const STATUS_BADGE_CLASS: Record<BoxStatus, string> = {
-  stocked: "bg-[var(--color-success)]/10 text-[var(--color-success)]",
-  low: "bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
-  empty: "bg-[var(--color-danger)]/10 text-[var(--color-danger)]",
-  unknown: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
-  out_of_service: "bg-[var(--color-bone-100)] text-[var(--color-ink-500)]",
-};
-
-/** Card-redesign (2026-09-19) — the small solid dot on the status pill/check-in buttons. Same semantic-token pairing as STATUS_BADGE_CLASS above, just a solid fill instead of a 10%-tint background. */
+/** The small solid dot on the status pill/check-in buttons. success/warning/danger are DESIGN.md's general status tokens; unknown and out_of_service share a muted neutral because neither is an alarming state. */
 export const STATUS_DOT_CLASS: Record<BoxStatus, string> = {
   stocked: "bg-[var(--color-success)]",
   low: "bg-[var(--color-warning)]",

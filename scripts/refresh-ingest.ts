@@ -177,8 +177,8 @@ function d1Query<T>(dbMode: DbMode, sql: string): T[] {
  * cli.js, `executeSql`/`executeRemotely`) branches on `input.file` — when
  * set, it skips the query path ENTIRELY and instead uploads the file to R2
  * and polls a D1 "import" job, printing "your D1 database will be
- * unavailable to serve queries" while it runs. That's fine for a one-time
- * schema seed (scripts/seed-admin-db.ts) but this job runs monthly against
+ * unavailable to serve queries" while it runs. An import outage on a
+ * remote database is never acceptable here: this job runs monthly against
  * the SAME database that also holds Better Auth sessions, the auth
  * rate-limit table, and public_submissions — a brief outage here logs the
  * admin out and silently drops any public form submission landing in that

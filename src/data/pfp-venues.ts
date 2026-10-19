@@ -2,20 +2,8 @@
  * pfp-venues.ts — the 10 hand-curated Pueblo Food Project (CGSP) venue
  * records: community gardens and edible landscapes.
  *
- * Extracted out of venues.ts (#237 checkpoint d, the published-venues.ts
- * refactor — spec §7 step 1) so this data can live in a leaf module with no
- * dependency on venues.ts or published-venues.ts. WHY that matters: after
- * this refactor venues.ts imports FROM published-venues.ts, and
- * published-venues.ts needs pfpVenues — if pfpVenues stayed defined inside
- * venues.ts, that would be a circular import (venues.ts -> published-venues.ts
- * -> venues.ts) and published-venues.ts would read pfpVenues while it's
- * still in the temporal dead zone (venues.ts's own top-level code wouldn't
- * have reached the pfpVenues declaration yet), throwing at module load.
- * Moving the data here breaks the cycle. venues.ts re-exports pfpVenues
- * from here unchanged, so every existing importer keeps working with zero
- * changes: scripts/seed-admin-db.ts, src/__tests__/OperatorAttribution.test.tsx,
- * and src/__tests__/seed-admin-db.test.ts all still do
- * import { pfpVenues } from "@/data/venues" with no edits needed.
+ * A leaf module (no dependency on venues.ts or published-venues.ts): import
+ * pfpVenues from "@/data/pfp-venues" directly.
  *
  * v1 seed data — Pueblo Food Project Community Garden Sustainability Project (CGSP)
  * and edible landscapes. Source: https://pueblofoodproject.org/cgsp/ (verified 2026-05-12).

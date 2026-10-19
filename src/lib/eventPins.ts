@@ -184,12 +184,6 @@ export function eventSearchWith(search: string, id: string | null): string {
   return qs ? `?${qs}` : "";
 }
 
-/** The event id a shared `/?event=<id>` link points at, or null. */
-export function readEventParam(search: string): string | null {
-  const id = new URLSearchParams(search).get(EVENT_PARAM);
-  return id ? id : null;
-}
-
 /** Mirrors the selected event into the address bar (replace, not push: selecting is not navigation). */
 export function syncEventParam(id: string | null): void {
   if (typeof window === "undefined") return;

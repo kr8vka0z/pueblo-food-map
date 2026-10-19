@@ -470,25 +470,3 @@ export async function runTriagePass(input: TriagePassInput): Promise<TriagePassO
 
   return { proposals: out, triage, renamePairs: replaced.size / 2, extraSupersedeKeys };
 }
-
-// ─── LLM text-rewrite hook (issue #543 step 4) — OFF, no producer yet ─────
-
-export interface TextRewriteRequest {
-  field: string;
-  value: string;
-  context: string;
-}
-
-/**
- * Hook for the issue's "LLM pass only where text must be written" (Jev
- * generates nothing). Deliberately not wired to a model: nothing this
- * pipeline produces today needs text written — scrape-plentiful.py drops an
- * unparseable hours string to null before it reaches a proposal (and
- * diffEngine's destructive-clear guard keeps that from erasing real hours),
- * and a rename proposal's own before/after already describes itself. A
- * future producer swaps `noopTextRewriter` for a Claude-backed one whose
- * output lands as a proposal, never a direct write.
- */
-export type TextRewriter = (request: TextRewriteRequest) => Promise<string | null>;
-
-export const noopTextRewriter: TextRewriter = async () => null;

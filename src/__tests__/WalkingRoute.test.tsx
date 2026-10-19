@@ -24,7 +24,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
 import MapComponent from "@/components/Map";
-import { buildWalkingRouteUrl, parseWalkSteps, decideWalkResume } from "@/components/MapWrapper";
+import { buildWalkingRouteUrl, parseWalkSteps, decideWalkResume } from "@/lib/walkRoute";
 import type { Venue } from "@/types/venue";
 import type { GeoState } from "@/lib/useGeolocation";
 import { PUEBLO_CENTER } from "@/data/pueblo-bbox";

@@ -11,7 +11,7 @@
  * captured 2026-09-19 for a short walk in downtown Pueblo (Arkansas River
  * Multi-Use Path -> Stanton Avenue, ~1226m), using this repo's own
  * production Mapbox public token (`Mapbox - Public Token - Pueblo Food
- * Map`, 1Password) and `steps=true` (the same param MapWrapper.tsx's
+ * Map`, 1Password) and `steps=true` (the same param walkRoute.ts's
  * `buildWalkingRouteUrl` always sends — there is no code path that omits
  * it). Every `maneuver.instruction` and `distance` value below is verbatim
  * from that response; `intersections`/`geometry`/`mode`/etc. are trimmed
@@ -32,7 +32,7 @@
 import { describe, test, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import RouteStrip from "@/components/RouteStrip";
-import { parseWalkSteps } from "@/components/MapWrapper";
+import { parseWalkSteps } from "@/lib/walkRoute";
 
 // Real captured response (see file header) — trimmed of fields
 // parseWalkSteps doesn't read.

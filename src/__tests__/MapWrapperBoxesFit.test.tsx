@@ -23,10 +23,8 @@ import { render, screen, fireEvent, act, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { LocaleProvider } from "@/lib/LocaleContext";
-import MapWrapper, {
-  computeCategoryBounds,
-  nearestBoundsAround,
-} from "@/components/MapWrapper";
+import MapWrapper from "@/components/MapWrapper";
+import { computeCategoryBounds, nearestBoundsAround } from "@/lib/mapBounds";
 import { venues as allRealVenues } from "@/data/venues";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 

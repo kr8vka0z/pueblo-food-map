@@ -83,19 +83,6 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
       .sort((a, b) => a.distanceMiles - b.distanceMiles);
   }, [favoriteIds, venuesWithDistance]);
 
-  const favoriteSet = useMemo(() => new Set(savedVenues.map((v) => v.id)), [savedVenues]);
-
-  // ── Derived: filter badge counts (computed from all venues, not filtered) ────
-  const allVenueCounts = useMemo(() => {
-    return combinedVenues.reduce<Partial<Record<VenueCategory, number>>>(
-      (acc, v) => {
-        acc[v.category] = (acc[v.category] ?? 0) + 1;
-        return acc;
-      },
-      {},
-    );
-  }, [combinedVenues]);
-
   // WHY confirmed-open only, deliberately NOT matching the filtered list below:
   // the "Open now" filter itself lets "no_hours" venues survive (board review
   // finding #1) so the pantry majority isn't hidden, but this badge counts only
@@ -267,13 +254,9 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
 
   // ── Clear ALL filters + search ────────────────────────────────────────────────
   const handleClearAllFilters = useCallback(() => {
-    setSelectedCategories(null);
-    setFilterOpenNow(false);
-    setFilterSnap(false);
-    setFilterWic(false);
-    setFilterEvents(false);
+    clearFilters();
     setQuery("");
-  }, []);
+  }, [clearFilters]);
 
   return {
     // State
@@ -295,9 +278,7 @@ export function useMapFilters(origin: LatLng, extraVenues: Venue[] = []) {
     venuesWithDistance,
     filteredVenues,
     savedVenues,
-    favoriteSet,
     anyFilterActive,
-    allVenueCounts,
     openNowCount,
     snapCount,
     wicCount,

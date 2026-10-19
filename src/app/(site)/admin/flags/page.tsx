@@ -1,16 +1,16 @@
 /**
  * /admin/flags — retired (#674, "fold the Data refresh tab into Places").
- * The change-proposal review queue this page used to render
- * (ProposalsReviewView.tsx, deleted) is now part of the Places tab itself:
+ * The change-proposal review queue this page used to render is now part of
+ * the Places tab itself:
  * every pending proposal shows on its target venue's own row (or a
  * "Suggested new place" row for a brand-new `add`), with a "To review"
  * summary box, quick-filter chips, and the source/lane filters this page's
  * queue used to own — see src/components/VenueListView.tsx and
  * src/app/(site)/admin/places/page.tsx.
  *
- * Kept as a redirect rather than deleted outright: the nightly refresh
- * pipeline's alert email (src/lib/refreshAlerts.ts) and any admin's
- * existing bookmark/muscle-memory both still point here. A plain Server
+ * Kept as a redirect rather than deleted outright: refresh alert emails sent
+ * before the alert link moved to /admin/places?show=review (they still sit
+ * in inboxes) and any admin's existing bookmark both still point here. A plain Server
  * Component `redirect()` — not a `next.config.ts` `redirects()` rule or
  * `proxy.ts` — is safe at a non-root path; AGENTS.md's "no server-side
  * redirect" footgun is specifically about `/` (Next 16 `proxy.ts` fails the

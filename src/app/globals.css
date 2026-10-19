@@ -213,15 +213,6 @@ body {
   letter-spacing: 0.04em;
 }
 
-/* Hide scrollbars in chip rows while keeping scroll functional */
-@utility no-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

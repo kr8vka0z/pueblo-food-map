@@ -1,17 +1,17 @@
 /**
  * POST /api/admin/submissions/[id]/done — resolve a pending closure/problem
  * report (#675, "fold the Review queue into Places"): the admin has already
- * fixed the reported venue's fields (AddVenueForm's own PATCH, a separate
- * request) or removed it (ArchiveVenueButton's existing `?submission=`
- * archive-and-resolve batch, unchanged by this route) and is telling this
- * report "handled" without either of those.
+ * fixed the reported venue's fields (AddVenueForm's own PATCH) or removed it
+ * (ArchiveVenueButton's plain archive), each a separate request, and is now
+ * telling this report "handled". This is the only route that marks a
+ * closure report handled (approved).
  *
  * No route resolved a submission without archiving it before this one
  * existed — checked first (POST /api/admin/venues, POST
  * /api/admin/venues/[id]/archive, POST .../submissions/[id]/reject all
  * inspected). `status='approved'` (not a new enum value) is the "resolved"
- * value the create/archive routes already use for a submission that got a
- * matching venue write — migrations/0002_public_submissions.sql's CHECK
+ * value the create route already uses for a submission that got a matching
+ * venue write — migrations/0002_public_submissions.sql's CHECK
  * constraint has no 'done' state, and adding one is a migration, out of
  * scope for this slice. A future column distinguishing "resolved via
  * archive/create" from "marked done by hand" is the upgrade path if that
@@ -41,8 +41,8 @@
  * create/update/archive for the same reason (migrations/0001's own
  * audit_log comment).
  *
- * `WHERE EXISTS` on the audit insert (SELECT-form, same shape the archive
- * route's own AUDIT_INSERT_SQL uses) gates it on THIS request's own UPDATE
+ * `WHERE EXISTS` on the audit insert (SELECT-form, same shape as the venue
+ * edit/archive routes' AUDIT_INSERT_SQL) gates it on THIS request's own UPDATE
  * having actually applied — checked by re-reading `status = 'approved'` for
  * this id inside the same `db.batch()`, so a concurrent/stale double-click
  * (0 rows updated) never writes a misleading audit entry either.
@@ -60,8 +60,8 @@ const DONE_SUBMISSION_SQL =
   "UPDATE public_submissions SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending' AND kind = 'closure'";
 
 // SELECT-form so the guard can skip the insert entirely when the UPDATE
-// above didn't actually apply — same shape as the archive route's own
-// AUDIT_INSERT_SQL.
+// above didn't actually apply — same shape as the venue edit/archive
+// routes' AUDIT_INSERT_SQL (src/lib/adminVenueEditSql.ts).
 const AUDIT_INSERT_SQL = `INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id)
   SELECT ?, 'venue', ?, 'update', NULL, ?, ?, ?
   WHERE EXISTS (SELECT 1 FROM public_submissions WHERE id = ? AND status = 'approved')`;

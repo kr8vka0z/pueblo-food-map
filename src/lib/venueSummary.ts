@@ -139,10 +139,9 @@ const BRAND_SUFFIX = ` · ${SITE_NAME}`;
  * venue's own name (issue #704 Decisions: "never truncate the name") —
  * venueSummary.test.ts checks this ladder holds (full rendered <title> ≤ 70
  * chars) over every published venue. The second rung uses
- * `summary.title.category.*` (short, natural NOUN phrases written for a
- * title, e.g. "Store" not the filter-chip label "Convenience") rather than
- * the existing `category.*` short labels, which read awkwardly stripped of
- * their filter-chip context ("Corner Store – Convenience in...").
+ * `summary.title.category.*`: short, natural NOUN phrases written for a
+ * title (e.g. "Store", not a filter-chip style label like "Convenience",
+ * which reads awkwardly out of context: "Corner Store – Convenience in...").
  */
 export function buildVenueTitle(venue: Venue, locale: Locale = "en"): string {
   const city = parseVenueCity(venue.address, locale);

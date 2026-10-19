@@ -2,8 +2,7 @@
  * Tests for src/lib/blessingBoxes.ts (Blessing Boxes slice 1, extended in
  * slice 2).
  *
- * Covers the pure mapping logic (mapRowToPublicBox/mapRowsToPublicBoxes),
- * the isBlessingBox type guard, and — the one privacy-load-bearing
+ * Covers the pure mapping logic (mapRowToPublicBox) and — the one privacy-load-bearing
  * assertion in this file — that host_contact never appears anywhere on the
  * mapped public shape, even when the source row carries one. D1-backed
  * reads (loadLiveBoxes/loadLiveBoxById) are proved against a fake
@@ -18,12 +17,9 @@
 
 import { describe, test, expect } from "vitest";
 import {
-  BOX_STATUS_PLACEHOLDER,
-  isBlessingBox,
   computeBoxStatus,
   computeLastFilledAt,
   mapRowToPublicBox,
-  mapRowsToPublicBoxes,
   loadLiveBoxes,
   loadLiveBoxesForHub,
   loadLiveBoxById,
@@ -72,10 +68,9 @@ describe("mapRowToPublicBox", () => {
     expect(box.box.removedOn).toBeNull();
   });
 
-  test("status is 'unknown' when no check-ins are passed (slice 2: no signal -> BOX_STATUS_PLACEHOLDER's value)", () => {
+  test("status is 'unknown' when no check-ins are passed", () => {
     const box = mapRowToPublicBox(makeRow());
-    expect(box.box.status).toBe(BOX_STATUS_PLACEHOLDER);
-    expect(BOX_STATUS_PLACEHOLDER).toBe("unknown");
+    expect(box.box.status).toBe("unknown");
     expect(box.box.lastFilledAt).toBeNull();
     expect(box.box.recentCheckins).toEqual([]);
   });
@@ -177,22 +172,6 @@ describe("mapRowToPublicBox", () => {
   });
 });
 
-describe("mapRowsToPublicBoxes", () => {
-  test("maps a list in order, empty list -> empty list", () => {
-    const rows = [makeRow({ id: "a" }), makeRow({ id: "b" })];
-    const boxes = mapRowsToPublicBoxes(rows);
-    expect(boxes.map((b) => b.id)).toEqual(["a", "b"]);
-    expect(mapRowsToPublicBoxes([])).toEqual([]);
-  });
-});
-
-describe("isBlessingBox", () => {
-  test("true only for the literal blessing_box category", () => {
-    expect(isBlessingBox("blessing_box")).toBe(true);
-    expect(isBlessingBox("pantry")).toBe(false);
-    expect(isBlessingBox("garden")).toBe(false);
-  });
-});
 
 // ─── computeBoxStatus / computeLastFilledAt (slice 2) ───────────────────────
 // Every branch of the state diagram (Blessing Boxes - 2 Box Status.html),

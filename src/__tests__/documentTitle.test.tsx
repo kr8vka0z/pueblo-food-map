@@ -56,7 +56,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   return { ...actual, useSearchParams: () => new URLSearchParams() };
 });
 
-// BoxesActivityContent's data hooks (useBoxVenues/useBoxActivity/
+// BoxesActivityContent's data hooks (useBoxesList/useBoxActivity/
 // useBoxNetworkStats) all fetch on mount. A resolved-but-not-ok response
 // makes each hook settle on its own empty-state default (see their own
 // headers) rather than throwing — document.title doesn't depend on the

@@ -48,17 +48,6 @@ const en: Record<string, string> = {
   "search.aria": "Search places",
   "search.shortcut": "⌘K",
 
-  // Category labels
-  "category.all": "All",
-  "category.pantry": "Pantry",
-  "category.grocery": "Grocery",
-  "category.convenience": "Convenience",
-  "category.farm": "Farm",
-  "category.garden": "Garden",
-  "category.edible_landscape": "Edible Landscape",
-  "category.meal_site": "Meal Site",
-  "category.blessing_box": "Blessing Box",
-
   // Category labels (full)
   "category.full.pantry": "Food Pantry",
   "category.full.grocery": "Grocery / Supermarket",
@@ -100,7 +89,6 @@ const en: Record<string, string> = {
   "detail.contact": "CONTACT",
   "detail.about": "ABOUT",
   "detail.sources": "SOURCES & DATA",
-  "detail.lastVerified": "Last verified",
   "detail.acceptsSnap": "Accepts SNAP",
   "detail.acceptsWic": "Accepts WIC",
   "detail.plentifulLink": "See hours, eligibility & what to bring on Plentiful",
@@ -822,8 +810,6 @@ const en: Record<string, string> = {
   "box.photo.reportConfirm": "Hide this photo and send it for review?",
   "box.photo.reportThanks": "Thanks — this photo has been hidden pending review.",
   "box.photo.reportError": "That didn't go through. Please try again.",
-  "box.photo.morePhotos": "Show more photos",
-  "box.photo.none": "No photos yet",
 
   // "box.recentCheckin.heading"/"box.recentCheckin.none" deleted (card
   // redesign, 2026-09-19) — the standalone "Most recent check-in" line is
@@ -1253,17 +1239,6 @@ const es: Record<string, string> = {
   "search.aria": "Buscar lugares",
   "search.shortcut": "⌘K",
 
-  // Category labels
-  "category.all": "Todos",
-  "category.pantry": "Despensa",
-  "category.grocery": "Supermercado",
-  "category.convenience": "Conveniencia",
-  "category.farm": "Granja",
-  "category.garden": "Huerto",
-  "category.edible_landscape": "Paisaje comestible", // [CHECK]
-  "category.meal_site": "Comedor",
-  "category.blessing_box": "Caja de bendiciones", // [CHECK]
-
   // Category labels (full)
   "category.full.pantry": "Despensa de alimentos",
   "category.full.grocery": "Supermercado",
@@ -1301,7 +1276,6 @@ const es: Record<string, string> = {
   "detail.contact": "CONTACTO",
   "detail.about": "ACERCA DE",
   "detail.sources": "FUENTES Y DATOS",
-  "detail.lastVerified": "Última verificación",
   "detail.acceptsSnap": "Acepta SNAP",
   "detail.acceptsWic": "Acepta WIC",
   "detail.plentifulLink": "Ver horarios, elegibilidad y qué llevar en Plentiful",
@@ -1886,8 +1860,6 @@ const es: Record<string, string> = {
   "box.photo.reportConfirm": "¿Ocultar esta foto y enviarla para revisión?", // [CHECK]
   "box.photo.reportThanks": "Gracias — esta foto se ha ocultado en espera de revisión.", // [CHECK]
   "box.photo.reportError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
-  "box.photo.morePhotos": "Mostrar más fotos", // [CHECK]
-  "box.photo.none": "Aún no hay fotos", // [CHECK]
 
   "box.history.link": "Historial", // [CHECK]
 

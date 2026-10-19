@@ -31,6 +31,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
+import { loadEvent } from "@/lib/adminEventReads";
 import { authorizeAdminWrite, getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
 import { publicFlyerOf, type EventRow } from "@/lib/events";
 import { flyerKey, FLYER_CONTENT_TYPES, inspectFlyer, MAX_FLYER_BYTES, type FlyerExt } from "@/lib/eventFlyers";
@@ -177,7 +178,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const altEs = altText(form.get("alt_es"), "flyer_alt_es", errors);
   if (Object.keys(errors).length > 0) return fail(422, "invalid", "Check the alt text.", errors);
 
-  const existing = await access.db.prepare("SELECT * FROM events WHERE id = ?").bind(id).first<EventRow>();
+  const existing = await loadEvent(access.db, id);
   if (!existing) return fail(404, "not_found", "Not found");
   if (existing.status === "archived") return archivedResponse();
   // A stale write must not even store an object. The batch below still decides
@@ -240,7 +241,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return fail(422, "invalid", "expectedUpdatedAt is required.", { _form: "expectedUpdatedAt is required." });
   }
 
-  const existing = await access.db.prepare("SELECT * FROM events WHERE id = ?").bind(id).first<EventRow>();
+  const existing = await loadEvent(access.db, id);
   if (!existing) return fail(404, "not_found", "Not found");
   if (existing.status === "archived") return archivedResponse();
   if (!existing.flyer_key) return fail(404, "no_flyer", "This event has no flyer.");

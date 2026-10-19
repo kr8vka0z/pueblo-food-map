@@ -44,9 +44,7 @@ import {
   removeHostSubscriptionStatement,
   sendHostWelcomeEmail,
 } from "@/lib/boxAlerts";
-
-const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 /** Normalizes ONCE at this route's boundary (item 3) — every lookup/write below reuses this same value, so "Foo@X.com" and "foo@x.com" are always the same row. */
 function parseEmail(raw: unknown): string | null {
@@ -95,7 +93,7 @@ export async function POST(
   const timestamp = new Date().toISOString();
   const insertStatement = insertHostSubscriptionStatement(db, { venueId, email, lang }, new Date(timestamp));
   const insertAudit = db
-    .prepare(AUDIT_INSERT_SQL)
+    .prepare(AUDIT_INSERT_VALUES_SQL)
     .bind(
       identity.email,
       "box_host_alert",
@@ -161,7 +159,7 @@ export async function DELETE(
   const timestamp = new Date().toISOString();
   const removeStatement = removeHostSubscriptionStatement(db, venueId, email, new Date(timestamp));
   const insertAudit = db
-    .prepare(AUDIT_INSERT_SQL)
+    .prepare(AUDIT_INSERT_VALUES_SQL)
     .bind(
       identity.email,
       "box_host_alert",

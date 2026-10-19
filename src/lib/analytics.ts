@@ -100,7 +100,6 @@ export const EVENTS = {
   FILTER_TOGGLED: "filter_toggled",
   LOCALE_SWITCHED: "locale_switched",
   SEARCH_USED: "search_used",
-  FORM_SUBMITTED: "form_submitted",
 } as const;
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];

@@ -25,19 +25,11 @@
  * confirm() dialog client-side, then POSTs with no body at all, so by the
  * time this route runs, confirmation has already happened.
  *
- * #259 review-queue extension: an OPTIONAL JSON body `{ submissionId }`
- * (sent by ArchiveVenueButton — src/components/ArchiveVenueButton.tsx —
- * when it's rendered from /admin/venues/[id]/edit's `?submission=<id>`
- * closure-report context, #270) appends a THIRD statement to the same
- * atomic `db.batch()` below, flipping that submission to `status='approved'`
- * — same technique and same reasoning as POST /api/admin/venues's own
- * (#259) submissionId extension. Parsing the body is defensive (empty/
- * missing/non-JSON body never throws) specifically so ArchiveVenueButton's
- * plain, no-submission call (the common case) keeps working unchanged.
- * (Before #270, this body was sent one level up, directly from
- * SubmissionsReviewView's own one-click closure-approve button — that
- * action now opens the edit page first instead; this route's own logic is
- * unchanged either way, since it never cared who calls it.)
+ * A closure report is no longer resolved through this route: the old
+ * optional `{ submissionId }` body (archive-and-approve in one batch) was
+ * removed once nothing linked to the edit page's closure context any more —
+ * closure reports are now resolved by SubmissionCard's "Mark done"
+ * (POST /api/admin/submissions/[id]/done).
  *
  * #265: the audit row's after_json used to spread the pre-fetched `existing`
  * row, so if PATCH /api/admin/venues/[id] raced this route (changed some
@@ -56,8 +48,7 @@
  * batch), `results[0].meta.changes === 0` and the route returns 409 rather
  * than writing a stale audit snapshot — ArchiveVenueButton's existing
  * generic non-200 handling covers this (a plain "try again" retry re-reads
- * fresh). The audit insert and (#259) submission-approve statements carry
- * the same `WHERE EXISTS (SELECT 1 FROM venues WHERE id = ? AND
+ * fresh). The audit insert carries the same `WHERE EXISTS (SELECT 1 FROM venues WHERE id = ? AND
  * updated_at = ?)` guard as the sibling edit route, for the same
  * dependent-write reasoning that route's own header explains in full —
  * RETURNING the actually-written row was considered and rejected here: a
@@ -71,46 +62,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import type { AdminVenueRow } from "@/types/venue";
-
-// #265: SELECT-form (not VALUES) so the WHERE EXISTS guard can skip the
-// insert entirely when the archive UPDATE below didn't actually apply —
-// same shape and reasoning as the sibling edit route's own AUDIT_INSERT_SQL.
-// Trailing two bind params (id, the new timestamp) are the guard.
-const AUDIT_INSERT_SQL = `INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id)
-  SELECT ?, ?, ?, ?, ?, ?, ?, ?
-  WHERE EXISTS (SELECT 1 FROM venues WHERE id = ? AND updated_at = ?)`;
-
-// The `AND kind = 'closure' AND target_venue_id = ?` guard (mirrors the
-// create route's own `kind = 'new_venue'` guard) closes a cross-kind/
-// cross-target approval gap: a closure approval must target the very venue
-// being archived, so a submissionId pointing at a 'new_venue' row, or at a
-// closure report for a DIFFERENT venue, now affects 0 rows here — the
-// archive still succeeds, but the wrong submission is never silently
-// marked approved. #265 adds `AND EXISTS (...)` (trailing two bind params)
-// so a STALE archive (its own precondition failed) can't mark the
-// submission approved for a removal that was never actually written.
-const APPROVE_SUBMISSION_SQL = `UPDATE public_submissions SET status = 'approved', reviewed_by = ?, reviewed_at = ?
-  WHERE id = ? AND status = 'pending' AND kind = 'closure' AND target_venue_id = ?
-  AND EXISTS (SELECT 1 FROM venues WHERE id = ? AND updated_at = ?)`;
-
-/**
- * Reads an optional `{ submissionId }` from the request body without ever
- * throwing — ArchiveVenueButton's real call sends no body at all (see this
- * file's header), so a missing/empty/non-JSON body must degrade to "no
- * submission to approve," not a crash. Mirrors POST /api/admin/venues's own
- * (#259) `readOptionalSubmissionId`, but that route always has a real JSON
- * body (validateCreateVenuePayload already required one); this one doesn't,
- * hence the try/catch here instead of a plain field read there.
- */
-async function readOptionalSubmissionId(req: NextRequest): Promise<number | null> {
-  try {
-    const body: unknown = await req.json();
-    const rawSid = (body as { submissionId?: unknown })?.submissionId;
-    return typeof rawSid === "number" && Number.isInteger(rawSid) && rawSid > 0 ? rawSid : null;
-  } catch {
-    return null; // no/empty/non-JSON body — the established bodyless call shape
-  }
-}
+// #265: the edit route's SELECT-form insert. Its WHERE EXISTS guard skips the
+// audit row when the archive UPDATE below didn't apply; the trailing two bind
+// params (id, the new timestamp) are the guard.
+import { AUDIT_INSERT_SQL } from "@/lib/adminVenueEditSql";
 
 export async function POST(
   req: NextRequest,
@@ -130,8 +85,6 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
-  const submissionId = await readOptionalSubmissionId(req);
-
   const timestamp = new Date().toISOString();
   const afterRow: AdminVenueRow = {
     ...existing,
@@ -147,8 +100,8 @@ export async function POST(
   const archiveVenue = db
     .prepare("UPDATE venues SET status = 'archived', updated_by = ?, updated_at = ? WHERE id = ? AND updated_at = ?")
     .bind(identity.email, timestamp, id, existing.updated_at);
-  // #265: every dependent statement below binds this SAME pair
-  // (id, timestamp) as its own WHERE EXISTS guard.
+  // #265: the dependent audit insert binds this pair (id, timestamp) as its
+  // WHERE EXISTS guard.
   const dependentGuardArgs = [id, timestamp] as const;
   const insertAudit = db
     .prepare(AUDIT_INSERT_SQL)
@@ -165,22 +118,10 @@ export async function POST(
       ...dependentGuardArgs,
     );
 
-  // ponytail: same `AND status = 'pending'` idempotency ceiling as POST
-  // /api/admin/venues's (#259) approveSubmission — a double-approve or a
-  // stale card silently no-ops on the submission row (0 rows affected)
-  // rather than erroring, while the archive itself still succeeds either
-  // way. Acceptable for this single-admin internal tool; surfacing
-  // D1Result.meta.changes to flag a stale card is the upgrade path.
-  const approveSubmission =
-    submissionId !== null
-      ? db.prepare(APPROVE_SUBMISSION_SQL).bind(identity.email, timestamp, submissionId, id, ...dependentGuardArgs)
-      : null;
-
-  // Atomic: the status flip, its own audit trail, and (#259) the
-  // originating submission's approval either all land together or none
-  // does. archiveVenue MUST stay statement index 0 — the 409 check below
-  // reads results[0].
-  const results = await db.batch([archiveVenue, insertAudit, ...(approveSubmission !== null ? [approveSubmission] : [])]);
+  // Atomic: the status flip and its own audit trail either both land or
+  // neither does. archiveVenue MUST stay statement index 0 — the 409 check
+  // below reads results[0].
+  const results = await db.batch([archiveVenue, insertAudit]);
 
   // #265: 0 rows matched means a concurrent write (most likely a PATCH edit)
   // landed between this route's own SELECT and this UPDATE — see this

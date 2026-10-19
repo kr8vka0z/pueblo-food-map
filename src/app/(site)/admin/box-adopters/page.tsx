@@ -1,8 +1,7 @@
 /**
  * /admin/box-adopters — retired (#677, "fold Photo review and Sponsor
  * requests into the Blessing Boxes tab"). The sponsor-request moderation
- * queue this page used to render (BoxAdoptersReviewView.tsx, now deleted)
- * is folded into the Blessing Boxes tab: every pending request shows on its
+ * queue this page used to render is folded into the Blessing Boxes tab: every pending request shows on its
  * box's own row (the "To review" column, AllBoxesTable.tsx) and resolves
  * from that box's own edit page (BoxReviewBox.tsx).
  *

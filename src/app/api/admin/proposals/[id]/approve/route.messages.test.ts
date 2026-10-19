@@ -9,11 +9,10 @@
  * enough fixture/mock setup to stand alone from).
  *
  * Root cause (adminProposals.ts's applyApprovedProposal): both 422s used to
- * return `{ok: false, error}` with no `message`. BOTH review surfaces that
- * read this response already fall back to a generic "Try again"/"Something
- * went wrong" when `message` is absent (NeedsDecisionPanel.tsx's
- * defaultInterpretApproveError, ProposalsReviewView.tsx's ApproveAction) —
- * so adding `message` at the shared source fixes both UIs at once, with no
+ * return `{ok: false, error}` with no `message`. ProposalCard.tsx (rendered
+ * on the Places tab and in the edit page's SuggestionsBox) falls back to a
+ * generic "Something went wrong" when `message` is absent — so adding
+ * `message` at the shared source fixes every surface at once, with no
  * component change needed.
  */
 

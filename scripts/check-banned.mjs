@@ -31,7 +31,7 @@ const PATTERNS = [
   // buttons use sage-600 (DESIGN.md Forms > Submit). Only non-text marks may
   // use it as a fill — listed in allowFiles.
   { name: 'sage-500 fill (fails AA behind text)', re: /\bbg-\[var\(--color-sage-500\)\]/,
-    allowFiles: ['src/components/BoxReportsChart.tsx', 'src/components/BoxHealthList.tsx'] },
+    allowFiles: ['src/components/BoxReportsChart.tsx'] },
 ];
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '').replace(/^\/([A-Z]:)/, '$1');

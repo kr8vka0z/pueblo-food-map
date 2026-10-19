@@ -43,7 +43,7 @@ import SearchResultsPopover, {
 } from "./SearchResultsPopover";
 import LocationHelpCard from "./LocationHelpCard";
 import MapErrorBoundary from "./MapErrorBoundary";
-import { useGeolocation, type GeoState, type LocationFailure } from "@/lib/useGeolocation";
+import { useGeolocation, type LocationFailure } from "@/lib/useGeolocation";
 import { useLocale } from "@/lib/LocaleContext";
 import { t } from "@/lib/i18n";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -56,24 +56,29 @@ import DesktopSidePanel, {
 } from "./DesktopSidePanel";
 import ListView from "./ListView";
 import { useOverlayRegistration } from "@/lib/overlayRegistry";
-import {
-  PUEBLO_COUNTY_BBOX,
-  PUEBLO_CENTER,
-} from "@/data/pueblo-bbox";
+import { PUEBLO_CENTER } from "@/data/pueblo-bbox";
 import { useMapFilters } from "@/lib/useMapFilters";
-import { haversineMiles } from "@/lib/distance";
-import { useBoxesList } from "@/lib/useBoxesList";
+import {
+  isPointInBounds,
+  isOutsideCounty,
+  CATEGORY_FIT_PADDING_MOBILE,
+  CATEGORY_FIT_PADDING_DESKTOP,
+  CATEGORY_FIT_MAX_ZOOM,
+  computeCategoryBounds,
+  nearestBoundsAround,
+} from "@/lib/mapBounds";
+import { buildWalkingRouteUrl, parseWalkSteps, decideWalkResume } from "@/lib/walkRoute";
+import { useBoxesList, toVenue } from "@/lib/useBoxesList";
 import { useEventsFeed } from "@/lib/useEvents";
 import { useEventDetail } from "@/lib/useEventDetail";
 import { pinsAt, listOrder, syncEventParam, eventHereLabel } from "@/lib/eventPins";
-import { toVenue } from "@/lib/useBoxVenues";
 import EventStrip from "@/components/EventStrip";
 import EventsEmptyNotice from "@/components/EventsEmptyNotice";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 import { useMapUI, type ViewMode } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
 import { track, EVENTS } from "@/lib/analytics";
-import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
+import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY, prefersReducedMotion } from "@/lib/useMediaQuery";
 import type { SplashViewport } from "@/lib/splashGate";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
@@ -152,65 +157,6 @@ interface TourSession {
   };
 }
 
-/**
- * Drift-detection padding (in degrees).
- * The "Re-center" button appears when the user-location dot is this far
- * outside the visible map viewport. 0.002° ≈ 220m — gives the dot a small
- * inset buffer so the button doesn't flicker at the exact edge.
- * Easy to tune for live review: increase for more generous hide threshold.
- */
-export const DRIFT_PAD_DEG = 0.002;
-
-/**
- * Checks whether a lat/lng point is inside the given viewport bounds,
- * shrunk by DRIFT_PAD_DEG on every edge.
- */
-export function isPointInBounds(
-  point: { lat: number; lng: number },
-  bounds: mapboxgl.LngLatBounds,
-): boolean {
-  const sw = bounds.getSouthWest();
-  const ne = bounds.getNorthEast();
-  return (
-    point.lng >= sw.lng + DRIFT_PAD_DEG &&
-    point.lng <= ne.lng - DRIFT_PAD_DEG &&
-    point.lat >= sw.lat + DRIFT_PAD_DEG &&
-    point.lat <= ne.lat - DRIFT_PAD_DEG
-  );
-}
-
-/**
- * Returns true if the resolved position is outside the Pueblo County maxBounds.
- * Tied to the same bbox constant used by Map.tsx so they stay in sync.
- */
-export function isOutsideCounty(point: { lat: number; lng: number }): boolean {
-  const [[lngWest, latSouth], [lngEast, latNorth]] = PUEBLO_COUNTY_BBOX;
-  return (
-    point.lng < lngWest ||
-    point.lng > lngEast ||
-    point.lat < latSouth ||
-    point.lat > latNorth
-  );
-}
-
-// ─── Category autozoom constants (#111) ───────────────────────────────────────
-//
-// Padding (px) around the fitBounds result so pins aren't hidden behind chrome.
-// Mobile: extra bottom clearance for the bottom-sheet peek bar (≈88px) + some top
-//   clearance for the search bar (≈72px). Desktop: extra top clearance for the
-//   search bar (≈72px) and right clearance for the control stack (≈60px).
-//
-// Tune these values during live review — they are the first thing to eyeball.
-export const CATEGORY_FIT_PADDING_MOBILE = { top: 80, bottom: 120, left: 40, right: 40 };
-export const CATEGORY_FIT_PADDING_DESKTOP = { top: 80, bottom: 60, left: 60, right: 80 };
-
-/**
- * Maximum zoom level applied when fitting a category's bounds.
- * Prevents sparse categories (2–3 venues in a tight cluster) from slamming
- * to street level. Tune during live review.
- */
-export const CATEGORY_FIT_MAX_ZOOM = 14;
-
 // Padding (px) around a walking-route fitBounds (#509) — mobile (BottomSheet)
 // only, since the route strip is a phone-only concept (desktop's
 // DesktopVenueWindow keeps its own unchanged layout, out of scope for #509).
@@ -236,83 +182,6 @@ export const ROUTE_FIT_PADDING_MOBILE = {
 };
 export const ROUTE_FIT_MAX_ZOOM = 17;
 
-/**
- * Compute the [[lngW, latS], [lngE, latN]] bounding box for a list of venues.
- * Returns null if the array is empty.
- */
-export function computeCategoryBounds(
-  venues: Pick<Venue, "lat" | "lng">[],
-): [[number, number], [number, number]] | null {
-  if (venues.length === 0) return null;
-  let lngW = Infinity, latS = Infinity, lngE = -Infinity, latN = -Infinity;
-  for (const v of venues) {
-    if (v.lng < lngW) lngW = v.lng;
-    if (v.lng > lngE) lngE = v.lng;
-    if (v.lat < latS) latS = v.lat;
-    if (v.lat > latN) latN = v.lat;
-  }
-  return [[lngW, latS], [lngE, latN]];
-}
-
-// Miles-per-degree constants for nearestBoundsAround's mile→degree conversion
-// below. Latitude is ~constant (69.0 mi/degree everywhere); longitude shrinks
-// toward the poles by cos(latitude), which is why LNG needs the extra factor
-// and LAT doesn't. Precise enough for a map fit box — not routing math.
-const MILES_PER_DEGREE_LAT = 69.0;
-const MILES_PER_DEGREE_LNG_AT_EQUATOR = 69.172;
-
-/**
- * Compute a symmetric [[lngW, latS], [lngE, latN]] bounding box centered on
- * `origin`, sized to just cover the `n` nearest of `venues` (#670: the Boxes
- * bottom-nav button, tapped on with a known visitor location, zooms to the
- * visitor's 5 nearest boxes rather than every box in the county).
- *
- * WHY centered-and-symmetric rather than a tight bbox around just the n
- * venues: a plain bbox over N points is usually off-center from the visitor
- * (whichever side has a farther point pulls the box that way), so the
- * visitor's own dot could land near an edge instead of the middle. Fitting a
- * box built from the single farthest-of-the-n distance, in every direction,
- * guarantees the visitor is dead center — matching the issue's "centered on
- * the visitor" requirement exactly, at the cost of sometimes including a few
- * venues beyond the nearest n on the box's shorter axis. That's an accepted
- * tradeoff (a slightly wider view with a couple of "free" extra pins beats a
- * center-line the button interaction requires).
- *
- * WHY plain mile/degree ratios rather than a haversine-based box (matching
- * the ratios computeCategoryBounds's lat/lng-only math already uses): this
- * box only needs to be "just far enough to show 5 pins," not chart-accurate;
- * the padding + CATEGORY_FIT_MAX_ZOOM cap the caller already applies absorbs
- * the small ellipsoidal error.
- *
- * Returns null for an empty venue list, same contract as computeCategoryBounds.
- */
-export function nearestBoundsAround(
-  origin: { lat: number; lng: number },
-  venues: Pick<Venue, "lat" | "lng">[],
-  n: number,
-): [[number, number], [number, number]] | null {
-  if (venues.length === 0) return null;
-
-  const nearest = [...venues]
-    .sort((a, b) => haversineMiles(origin, a) - haversineMiles(origin, b))
-    .slice(0, n);
-
-  // Half-size of the box: distance to the farthest of the nearest n (the
-  // "5th-nearest box" the issue names, or the farthest available if fewer
-  // than n exist).
-  const halfSizeMiles = Math.max(...nearest.map((v) => haversineMiles(origin, v)));
-
-  const latDelta = halfSizeMiles / MILES_PER_DEGREE_LAT;
-  const milesPerDegreeLng =
-    MILES_PER_DEGREE_LNG_AT_EQUATOR * Math.cos((origin.lat * Math.PI) / 180);
-  const lngDelta = halfSizeMiles / milesPerDegreeLng;
-
-  return [
-    [origin.lng - lngDelta, origin.lat - latDelta],
-    [origin.lng + lngDelta, origin.lat + latDelta],
-  ];
-}
-
 // Stable listbox id — used for aria-controls on the search input and id on the
 // results listbox. The old category-browse listbox (CategoryDropdown, #95)
 // was removed by #513 — search focus no longer opens a category list; the
@@ -321,139 +190,6 @@ export function nearestBoundsAround(
 // the other view — see showViewSuggestion below.
 const LISTBOX_ID = "search-results-listbox";
 
-// ─── Walking route URL builder (pure, exported for unit tests) ───────────────
-
-/**
- * Build the Mapbox Directions API URL for a walking route.
- * Exported so tests can assert on URL params (steps=true, language=) without
- * needing to mount MapWrapper (which requires WebGL / Mapbox GL).
- */
-export function buildWalkingRouteUrl(
-  originLng: number,
-  originLat: number,
-  destLng: number,
-  destLat: number,
-  token: string,
-  locale: string,
-): string {
-  return [
-    "https://api.mapbox.com/directions/v5/mapbox/walking",
-    `${originLng},${originLat};${destLng},${destLat}`,
-    `?geometries=geojson&overview=full&steps=true&language=${locale}&access_token=${token}`,
-  ].join("/");
-}
-
-// ─── Walking step parser (pure, exported for unit tests) ─────────────────────
-
-/**
- * Parse turn-by-turn steps from a Mapbox Directions API route object.
- *
- * Exported as a pure function so tests can exercise the parse logic without
- * mounting MapWrapper (same pattern as buildWalkingRouteUrl). This mirrors the
- * existing exported-pure-function convention in this module.
- *
- * WHY defensive access (s.maneuver?.instruction): the Mapbox API response is
- * consumed via an `as` cast — there is no runtime guarantee that every step
- * has `maneuver` or `instruction`. A missing field would throw inside a
- * `.map()` and be caught by the surrounding try/catch, silently discarding
- * the ENTIRE route (line + info + steps). Defensive access + empty-string
- * filter lets valid steps through while dropping malformed ones.
- *
- * WHY filter distance === 0 separately: the arrival step always has distance 0
- * and an empty or trivial instruction. It is kept here (dropped in formatting
- * via formatStepDistance) rather than filtered at parse time so callers that
- * want to show the arrival step can still do so.
- *
- * WHY also drop a step with no valid maneuver.location (#555, step-through
- * directions): the stepper flies the camera to a step's own coordinate on
- * every arrow tap (Map.tsx's focus effect). A step missing that coordinate —
- * same "malformed API response" category as a missing instruction — would
- * step the camera to `undefined` and throw, so it is dropped here rather
- * than defended against at every later read site.
- */
-export function parseWalkSteps(
-  route: {
-    legs?: Array<{
-      steps?: Array<{
-        maneuver?: {
-          instruction?: string;
-          location?: unknown;
-          type?: string;
-          modifier?: string;
-        };
-        distance: number;
-      }>;
-    }>;
-  },
-): WalkStep[] {
-  const rawSteps = route.legs?.[0]?.steps ?? [];
-  return rawSteps.flatMap((s) => {
-    const instruction = s.maneuver?.instruction ?? "";
-    // Drop steps whose instruction is missing or empty — they are malformed
-    // API responses that would render as blank list items.
-    if (!instruction) return [];
-    // WHY a malformed location is dropped but the STEP is kept (#555): the
-    // written turn list is the older, more-relied-on half of this feature.
-    // Dropping the whole step would delete a readable instruction to protect
-    // a camera hop — the stepper simply doesn't move the map for a step it
-    // has no coordinate for (handleStepChange guards on it). The live API
-    // supplies `location` on every step (measured 2026-09-20), so this only
-    // ever fires on a malformed response.
-    const raw = s.maneuver?.location;
-    const location =
-      Array.isArray(raw) && raw.length === 2 &&
-      typeof raw[0] === "number" && typeof raw[1] === "number"
-        ? ([raw[0], raw[1]] as [number, number])
-        : undefined;
-    return [{
-      instruction,
-      distance: s.distance,
-      location,
-      maneuverType: s.maneuver?.type,
-      maneuverModifier: s.maneuver?.modifier,
-    }];
-  });
-}
-
-// ─── Walk-resume decision (#207, pure) ────────────────────────────────────────
-
-/** Outcome of a Walk-triggered geolocation request once it has resolved. */
-export type WalkResumeAction =
-  | { kind: "fetch"; origin: { lat: number; lng: number } }
-  | { kind: "show-hint" }
-  | { kind: "noop" };
-
-/**
- * Decide what to do once a Walk-triggered geolocation request has resolved
- * (i.e. geoState.permission is no longer "prompt").
- *
- * Extracted as a pure function — same pattern as buildWalkingRouteUrl /
- * parseWalkSteps above — so the decision matrix is unit-testable without
- * mounting MapWrapper (WebGL is unavailable in jsdom).
- *
- * WHY the stale-selection check: if the user switches to a different venue
- * while the browser's permission prompt is still open, the eventual grant or
- * denial belongs to the venue that asked, not whatever is selected when it
- * resolves. Drawing a route (or showing a hint) for the wrong venue would be
- * the same "whose route is this?" bug the walkingRouteVenueId/selectedVenueId
- * render-gate already guards against for the fetch path (#208).
- */
-export function decideWalkResume(
-  awaitingVenueId: string,
-  selectedVenueId: string | null,
-  geoState: GeoState,
-): WalkResumeAction {
-  if (awaitingVenueId !== selectedVenueId) return { kind: "noop" };
-
-  if (geoState.permission === "granted" && geoState.position !== null) {
-    return { kind: "fetch", origin: geoState.position };
-  }
-
-  // Denied, or the fix failed (permission "failed": timeout/unavailable, #738).
-  // Never fall back to PUEBLO_CENTER (#207):
-  // a walking route drawn from downtown when the user is elsewhere is misleading.
-  return { kind: "show-hint" };
-}
 
 // ─── MapWrapper ───────────────────────────────────────────────────────────────
 
@@ -950,8 +686,8 @@ export default function MapWrapper({
 
   // ── Blessing boxes (slice 1, map-first rework 2026-09-18) — live layer,
   // fetched ONCE client-side (useBoxesList's full PublicBlessingBox shape,
-  // not useBoxVenues' second fetch of the same endpoint — see toVenue's own
-  // header in useBoxVenues.ts) and merged into the same filter/count/marker
+  // stripped to plain Venues by its toVenue for the pins) and merged into
+  // the same filter/count/marker
   // pipeline every other venue flows through (useMapFilters' own header
   // explains why). boxIdSet lets the mapUnavailable deep-link effect below
   // tell "this id is a box" apart from an unknown id with one Set lookup —
@@ -1503,9 +1239,7 @@ export default function MapWrapper({
       return;
     }
 
-    const reducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = prefersReducedMotion();
 
     // The bottom nav covers the map's bottom edge — the bar below 2xl, the
     // floating pill (24px up + 52px tall) at 2xl — so pad by it and fitted pins
@@ -1602,9 +1336,7 @@ export default function MapWrapper({
   useEffect(() => {
     if (!mapboxMap || !isMobile || !walkingRoute) return;
 
-    const reducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = prefersReducedMotion();
 
     const routeBounds = computeCategoryBounds(
       walkingRoute.geometry.coordinates.map(([lng, lat]) => ({ lat, lng })),
@@ -2251,9 +1983,7 @@ export default function MapWrapper({
     const visibleRight = container.offsetWidth - DESKTOP_PANEL_RIGHT_CLEARANCE_PX;
     const overflow = pt.x - visibleRight;
     if (overflow <= 0) return;
-    const reducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = prefersReducedMotion();
     mapboxMap.panBy([overflow, 0], { duration: reducedMotion ? 0 : 300 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVenueId, mapboxMap, isMobile, desktopPanelOpen]);

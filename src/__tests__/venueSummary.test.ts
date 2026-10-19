@@ -341,8 +341,7 @@ describe("buildVenueTitle — length budget over all published venues", () => {
       }
     }
     // Sanity: at least confirms the loop ran and recorded something.
-    expect(longest).toBeGreaterThan(0);
-    console.log(`Longest rendered venue <title> (${longest} chars): ${longestTitle}`);
+    expect(longest, `longest rendered title: ${longestTitle}`).toBeGreaterThan(0);
   });
 });
 

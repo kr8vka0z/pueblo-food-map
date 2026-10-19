@@ -4,7 +4,7 @@
  * both real implementations that need Next router context this jsdom
  * render doesn't provide — same "PageNav needs usePathname" reasoning
  * PageNav.test.tsx's own local override documents) and global fetch is
- * stubbed (same convention as BoxContent.test.tsx / BoxCheckinsAdminPanel.test.tsx)
+ * stubbed (same convention as BoxCheckinsAdminPanel.test.tsx)
  * so nothing here makes a real network call.
  */
 

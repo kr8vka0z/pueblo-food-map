@@ -31,7 +31,7 @@ export default defineConfig({
       exclude: [
         "src/**/*.test.{ts,tsx}",
         "src/__tests__/**",
-        "src/**/vitest.setup.ts",
+        "src/**/*.testutil.ts",
       ],
     },
   },

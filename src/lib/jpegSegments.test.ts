@@ -8,25 +8,17 @@
 
 import { describe, expect, test } from "vitest";
 import { InvalidJpegError, readJpegDimensions, stripMetadataSegments, verifyJpegMagic } from "@/lib/jpegSegments";
-
-/** Builds one marker segment's bytes: 0xFF, marker, 2-byte big-endian length (2 + payload.length), then the payload. */
-function segment(marker: number, payload: number[]): number[] {
-  const length = 2 + payload.length;
-  return [0xff, marker, (length >> 8) & 0xff, length & 0xff, ...payload];
-}
+import { ascii, segment } from "@/lib/eventFlyers.testutil";
 
 const GPS_MARKER_TEXT = "GPS_LAT_LONG_SECRET_LOCATION";
-function textBytes(s: string): number[] {
-  return Array.from(new TextEncoder().encode(s));
-}
 
 /** A structurally valid JPEG: SOI, APP0 (JFIF), APP1 (fake EXIF carrying a GPS-looking marker string), SOF0 (200x100, 1 component), SOS, some fake scan bytes (including a stuffed 0xFF 0x00), EOI. */
 function buildFakeJpeg(): Uint8Array {
   const bytes = [
     0xff,
     0xd8, // SOI
-    ...segment(0xe0, [...textBytes("JFIF\0"), 1, 1, 0, 0, 1, 0, 1, 0, 0]), // APP0
-    ...segment(0xe1, textBytes(`Exif\0\0${GPS_MARKER_TEXT}`)), // APP1 — EXIF, must be stripped
+    ...segment(0xe0, [...ascii("JFIF\0"), 1, 1, 0, 0, 1, 0, 1, 0, 0]), // APP0
+    ...segment(0xe1, ascii(`Exif\0\0${GPS_MARKER_TEXT}`)), // APP1 — EXIF, must be stripped
     ...segment(0xc0, [8, 0, 100, 0, 200, 1, 1, 0x11, 0]), // SOF0: precision=8, height=100, width=200, 1 component
     ...segment(0xda, [1, 1, 0, 0, 63, 0]), // SOS: 1 component
     0x12,
@@ -116,7 +108,7 @@ describe("stripMetadataSegments", () => {
     const trailer = new Uint8Array([
       0xff,
       0xd8, // SOI
-      ...segment(0xe1, textBytes(`Exif\0\0${appendedSecretMarker}`)), // APP1 in the appended blob
+      ...segment(0xe1, ascii(`Exif\0\0${appendedSecretMarker}`)), // APP1 in the appended blob
       0xff,
       0xd9, // its own EOI
     ]);

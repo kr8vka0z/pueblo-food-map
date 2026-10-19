@@ -1,45 +1,35 @@
-# PROD deploy via GitHub Actions robot. REPLACES Cloudflare Workers Builds.
-# Workers Builds MUST be disconnected on the pueblo-food-map Worker (CF
-# dashboard -> Workers & Pages -> pueblo-food-map -> Settings -> Builds)
-# BEFORE the first main push after this workflow merges, or a push to main
-# will double-deploy (Workers Builds AND this workflow both firing on the
-# same push).
+# PROD deploy via GitHub Actions. Cloudflare Workers Builds must stay
+# disconnected on the pueblo-food-map Worker (CF dashboard -> Workers & Pages
+# -> pueblo-food-map -> Settings -> Builds), or a push to main double-deploys
+# (Workers Builds AND this workflow both firing on the same push). AGENTS.md
+# "Hosting and deploys".
 #
 # Deploys the TOP-LEVEL wrangler.jsonc config (prod worker `pueblo-food-map`,
 # route pueblofoodmap.com) via opennextjs-cloudflare build + deploy (no
-# --env) — the repo's documented manual deploy path (AGENTS.md "Build and
-# preview locally"). A functional superset of Workers Builds' bare
-# `npx wrangler deploy` (adds OpenNext's cache-populate step). Gated by
-# lint, design:drift and typecheck here; the full test suite already ran as
-# the PR's required ci.yml check (2026-09-23). Mirrors deploy-dev.yml's
-# structure and pinned-action SHAs (matches the pattern proven in
-# ToastHoster's deploy-prod.yml/deploy-dev.yml) so prod and dev stay easy to
-# diff against each other.
+# --env). A functional superset of a bare `npx wrangler deploy` (adds
+# OpenNext's cache-populate step). Gated by lint, design:drift and typecheck
+# here; the full test suite already ran as the PR's required ci.yml check.
+# Mirrors deploy-dev.yml's structure and pinned-action SHAs so prod and dev
+# stay easy to diff against each other.
 #
-# NOT included: a D1 remote-migrate step. AGENTS.md's "Applying the
-# migration — NOT part of a Worker deploy" section documents prod D1
-# migration as a manual step run separately at merge time
-# (`npx wrangler d1 migrations apply pueblo-food-map-admin --remote`) — this
-# workflow reproduces that existing behavior exactly rather than inventing a
-# migration step Workers Builds never had either.
+# NOT included: a D1 remote-migrate step. Prod D1 migration is a manual step
+# run separately before the release merge (AGENTS.md "Promotion checklist —
+# D1 migrations"); this workflow deliberately has no migration step.
 #
 # Build-time NEXT_PUBLIC_* vars: `next build` inlines these into the client
-# bundle at BUILD time, not runtime (AGENTS.md "Environment variables — two
-# kinds, two places"). Workers Builds ran this build inside Cloudflare's own
-# environment, where its Build variables live; moving the build onto a
-# GitHub runner means these values must come from GH secrets instead, or the
+# bundle at BUILD time, not runtime, and the build runs on the GitHub runner,
+# so the values must be GitHub Actions secrets (AGENTS.md "Secrets"), or the
 # deployed bundle ships with an undefined Mapbox token (blank "not
 # authorized" map) and an undefined Turnstile sitekey (forms' bot-check
-# widget fails to render). Two NEW secrets must exist BEFORE this workflow's
-# first prod run: NEXT_PUBLIC_MAPBOX_TOKEN (the real production-scoped
-# public token — see AGENTS.md "Mapbox Token Management") and
-# NEXT_PUBLIC_TURNSTILE_SITE_KEY (see .env.example).
+# widget fails to render). Required: NEXT_PUBLIC_MAPBOX_TOKEN (the
+# production-scoped public token) and NEXT_PUBLIC_TURNSTILE_SITE_KEY (see
+# .env.example).
 #
-# NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY (2026-09-18): a THIRD build secret, the
+# NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY: a third build secret, the
 # invisible-mode key blessing-box check-ins verify against instead of the
-# managed-mode key above (AGENTS.md "Blessing boxes — card polish"). Missing
-# it degrades the same way a missing NEXT_PUBLIC_TURNSTILE_SITE_KEY does —
-# the check-in widget fails to render — never a build failure.
+# managed-mode key above. Missing it degrades the same way a missing
+# NEXT_PUBLIC_TURNSTILE_SITE_KEY does — the check-in widget fails to render —
+# never a build failure.
 name: Deploy Prod
 
 on:
@@ -71,10 +61,9 @@ jobs:
       NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
       NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY }}
-      # #485 (PostHog analytics) — same reasoning as deploy-dev.yml: the
-      # secret POSTHOG_PROJECT_KEY doesn't exist yet, resolves empty, and
-      # analytics.ts's initAnalytics() no-ops on an empty key, so this build
-      # succeeds today and starts sending once Kyle adds the secret.
+      # #485 (PostHog analytics) — same as deploy-dev.yml: empty/unset
+      # POSTHOG_PROJECT_KEY is a supported no-op (analytics.ts's
+      # initAnalytics() loads nothing without a key), never a build failure.
       NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
     steps:
       # Same pinned-SHA third-party actions as deploy-dev.yml — a mutable
@@ -104,13 +93,12 @@ jobs:
       # `pueblo-food-map`, route pueblofoodmap.com). Do not add --env here.
       - run: npx opennextjs-cloudflare build
       - run: npx opennextjs-cloudflare deploy
-      # Post-deploy smoke check. AGENTS.md's "Per-venue pages" section
-      # states the lesson this codifies: "a green build / CF-check does
-      # NOT prove the page works on this stack" (learned 2026-06-20, a
-      # `redirects()` rule that built clean and passed CI 500'd the live
-      # homepage) — that lesson was never automated until now. Curls the
-      # direct Worker origin (bypasses the zone/CDN cache, per AGENTS.md
-      # "Direct Worker URL") for the homepage, the venues directory, and
+      # Post-deploy smoke check, because a green build / CF-check does NOT
+      # prove the page works on this stack (a `redirects()` rule that built
+      # clean and passed CI 500'd the live homepage; AGENTS.md "Hosting and
+      # deploys", Discoverability / SEO traps). Curls the direct Worker
+      # origin (bypasses the zone/CDN cache, AGENTS.md "Hosting and
+      # deploys") for the homepage, the venues directory, and
       # one real per-venue page. The 10-day 2026-08-24 to 2026-09-02
       # outage (218/230 public URLs 404ing) is exactly the class of
       # failure this would have caught on deploy #1 instead of deploy #19.

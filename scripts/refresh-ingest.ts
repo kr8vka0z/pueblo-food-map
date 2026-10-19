@@ -56,13 +56,19 @@
  * WHY shell out to `wrangler d1 execute` instead of a D1Database binding:
  * this runs as a plain Node process (GitHub Actions runner or a local
  * terminal), not inside a Cloudflare Worker — there's no binding to inject.
- * Reuses the exact CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID credentials
- * deploy-prod.yml already uses for `wrangler deploy` (AGENTS.md's
- * established secret names) — no new secret introduced by this pipeline.
+ * wrangler reads the CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID env vars.
+ * In the workflow, refresh-proposals.yml fills CLOUDFLARE_API_TOKEN from the
+ * D1-Write-only CLOUDFLARE_D1_TOKEN secret (#403), never from the deploy
+ * token (AGENTS.md "Secrets").
  *
  * Usage:
  *   npx tsx scripts/refresh-ingest.ts --db-mode local    # local D1 (npm run preview's Miniflare SQLite)
+ *   npx tsx scripts/refresh-ingest.ts --db-mode staging  # pueblo-food-map-admin-staging (dev.pueblofoodmap.com's database)
  *   npx tsx scripts/refresh-ingest.ts --db-mode remote   # PRODUCTION D1 — only ever run by the real workflow
+ *
+ * `local` and `remote` share the database name pueblo-food-map-admin and
+ * differ only by wrangler's --local/--remote flag; `staging` is a separate
+ * database. See DATABASE_NAMES below for why there is no free-form name flag.
  */
 
 import { execFileSync } from "node:child_process";
@@ -178,7 +184,7 @@ function d1Query<T>(dbMode: DbMode, sql: string): T[] {
  * set, it skips the query path ENTIRELY and instead uploads the file to R2
  * and polls a D1 "import" job, printing "your D1 database will be
  * unavailable to serve queries" while it runs. An import outage on a
- * remote database is never acceptable here: this job runs monthly against
+ * remote database is never acceptable here: this job runs weekly against
  * the SAME database that also holds Better Auth sessions, the auth
  * rate-limit table, and public_submissions — a brief outage here logs the
  * admin out and silently drops any public form submission landing in that

@@ -1,27 +1,19 @@
 'use client';
 
 /**
- * SplashScreen — v3 refresh (issue #100).
+ * SplashScreen — the first-visit welcome overlay on the home page.
  *
- * Changes from v2:
- *   - Removed: CATEGORIES array, CategorySwatch, CategoryCard, mobile category
- *     color-dot list, desktop 2-column "WHAT YOU'LL FIND" grid, "How it works"
- *     stub tile, ComingSoonToast, handleHowItWorksClick, toast timer state/effect.
- *   - Added: purpose line (splash.purpose), sponsor credit with hyperlink
- *     (splash.sponsor.prefix → "Pueblo Food Project" → pueblofoodproject.org).
- *   - Layout: single centered column, mobile-first, no-scroll at 375×812.
- *     Desktop: same column, max-w 520px, vertically centered with generous spacing.
+ * Single centered column (mobile-first, no scroll at 375×812; max-w 520px on
+ * desktop): wordmark, a one-line purpose (splash.purpose), and one "Find food
+ * near me" CTA per language (English / Spanish). Each CTA sets the site
+ * language, then runs the geolocation flow; if location is denied or
+ * dismissed it falls back to the Pueblo-centre view via
+ * onPrimary('pueblo-center'). An optional "Take a tour" button (onTour)
+ * dismisses the splash and starts the guided tour. The sponsor credit lives
+ * only in the Menu drawer, not here.
  *
- * v3 review changes:
- *   - Removed secondary CTA ("Show the Pueblo map") — primary CTA is now the
- *     only entry point. Fallback to pueblo-center still applies when geo is
- *     denied or dismissed (existing onPrimary('pueblo-center') path unchanged).
- *   - Sponsor credit moved to bottom-right corner. Removed entirely 2026-09-16
- *     (Kyle): the sponsor credit lives only at the top of the Menu drawer now.
- *   - Removed hairline divider (no longer needed without in-column credit).
- *   - onSecondary prop removed.
- *
- * Props interface and localStorage gate (pfm.splash.seen.v2) are unchanged.
+ * HomePageClient decides when the splash shows, using the localStorage gate
+ * (pfm.splash.seen.v2) in src/lib/splashGate.ts.
  */
 
 import { useCallback, useEffect, useState } from 'react';

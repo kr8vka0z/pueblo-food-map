@@ -1,6 +1,6 @@
 /**
  * relativeTime.ts — "3 hours ago" / "hace 3 horas" formatting for
- * BoxContent's "last filled" line (Blessing Boxes slice 2).
+ * the box card's "last filled" line (Blessing Boxes slice 2).
  *
  * Uses the standard library's Intl.RelativeTimeFormat — no new dependency,
  * bilingual for free ("en"/"es" are both valid BCP 47 tags Intl already

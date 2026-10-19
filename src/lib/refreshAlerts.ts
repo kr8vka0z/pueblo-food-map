@@ -219,7 +219,7 @@ export async function runRefreshAlertsCheck(
         s.lastRunAt
           ? `The last successful ${s.source} refresh completed ${s.lastRunAt} (${s.daysSinceLastRun} day(s) ago).`
           : `No successful ${s.source} refresh run has ever been recorded.`,
-        `The "Venue Data Refresh" cron runs monthly — this source should be completing well inside the ${STALENESS_ALERT_DAYS}-day threshold.`,
+        `The "Venue Data Refresh" cron runs weekly — this source should be completing well inside the ${STALENESS_ALERT_DAYS}-day threshold.`,
         "",
         "Check the workflow: https://github.com/kr8vka0z/pueblo-food-map/actions/workflows/refresh-proposals.yml",
       ],

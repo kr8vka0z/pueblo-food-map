@@ -1,16 +1,12 @@
 /**
  * DashboardNeedsStrip — the admin Dashboard's "Needs you" strip (#680),
- * four link cards replacing today's NeedsDecisionPanel / needs-help list /
- * stale-places blocks (issue #680's own Layout item 2). Each card is a
- * plain navigation Link to the queue it summarizes — no client state, no
- * mutation here, this strip only counts and points.
+ * link cards (issue #680's Layout item 2). Each card is a plain navigation
+ * Link to the queue it summarizes — no client state, no mutation here, this
+ * strip only counts and points.
  *
- * Two of the four cards are TEMPORARY fallbacks until #674/#675 (fold Data
- * refresh + Review queue into the Places list) and #677 (fold Photo review
- * + Sponsor requests into the Blessing Boxes tab) land — see each card's
- * own `detail` string, built by the caller (src/app/(site)/admin/page.tsx), not
- * hardcoded here, so this component doesn't need to know which upstream
- * issue is open.
+ * The cards, their counts, hrefs and optional `detail` breakdown strings are
+ * all built by the caller (src/app/(site)/admin/page.tsx), not hardcoded
+ * here, so this component doesn't need to know which queues exist.
  */
 
 import Link from "next/link";

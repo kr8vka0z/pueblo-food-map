@@ -1192,7 +1192,7 @@ const en: Record<string, string> = {
   "hubs.gardens.section.edible_landscape": "Edible landscapes",
   "hubs.gardens.introFree": "There are {count} free community gardens and edible landscapes on the map in Pueblo County, CO. Each one is listed below with its address and hours where we have them.",
   "hubs.gardens.introPlain": "There are {count} community gardens and edible landscapes on the map in Pueblo County, CO. Each one is listed below with its address and hours where we have them.",
-  // /resources FAQ (#709). Sources and fetch dates: src/components/ResourcesFaq.tsx.
+  // /resources FAQ (#709). Sources and fetch dates: src/lib/resourcesFaq.ts.
   "resources.faq.heading": "Common questions",
   "resources.faq.q1": "How do I apply for SNAP in Pueblo County?",
   "resources.faq.a1": "You can apply online with Colorado PEAK or the MyCOBenefits app, or fill out a paper application and return it to your county human services office. The county decides who qualifies, based on income, resources and household size. The Food Resource Hotline at 855-855-4626 can help you apply by phone.",

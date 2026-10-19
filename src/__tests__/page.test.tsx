@@ -15,20 +15,20 @@
  *     that resolves later (the bug this PR fixes).
  *
  * MapWrapper is mocked because it depends on next/dynamic + mapbox WebGL.
- * SplashScreen is rendered real (no mock) so we can verify its overlay role
- * and trigger dismiss.
+ * SplashScreen is mocked too (a dialog with a "Find food near me" button): the
+ * real one pulls in useGeolocation, useLocale and i18n, which are complex to
+ * wire in jsdom, and these tests only need its overlay role and dismiss CTA.
  *
  * navigator.permissions is stubbed so useGeolocation doesn't throw.
  *
  * WHY next/dynamic is mocked: HomePageClient.tsx uses next/dynamic
- * (ssr:false) to code-split MapWrapper and SplashScreen for TBT reduction
- * (#202). In Vitest (jsdom, no Next.js runtime), next/dynamic's lazy
+ * (ssr:false) to code-split MapWrapper for TBT reduction (#202). In Vitest (jsdom, no Next.js runtime), next/dynamic's lazy
  * resolution never settles — components render null and tests see an empty
  * DOM. The mock makes dynamic() behave like a synchronous require() so tests
- * exercise the real render path. Only the ssr:false dynamic() calls in this
- * test's subject (HomePageClient.tsx, rendered by page.tsx) need this;
- * nested dynamic() calls inside MapWrapper/SplashScreen are already covered
- * by their own module mocks.
+ * exercise the real render path. Only the ssr:false dynamic() call in this
+ * test's subject (HomePageClient.tsx, rendered by page.tsx) needs this;
+ * nested dynamic() calls inside MapWrapper are already covered by its own
+ * module mock.
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
@@ -41,7 +41,7 @@ import type { SplashViewport } from "@/lib/splashGate";
 // WHY: next/dynamic's real implementation relies on webpack/Turbopack chunk
 // loading that doesn't exist in Vitest. Without this mock, dynamic()'d
 // components render null indefinitely and all overlay-architecture assertions
-// fail (#202 made MapWrapper + SplashScreen dynamic for TBT reduction).
+// fail (#202 made MapWrapper dynamic for TBT reduction).
 //
 // The mock calls the import factory immediately, resolves in a microtask, and
 // returns a wrapper that re-evaluates on each render. The setTimeout(0) in
@@ -86,8 +86,7 @@ vi.mock("@/components/MapWrapper", () => ({
 }));
 
 // ─── Mock SplashScreen — renders dialog role + dismiss CTA sentinel ───────────
-// WHY: SplashScreen is now dynamically imported (ssr:false) for TBT reduction
-// (#202). The real component depends on useGeolocation, useLocale, and i18n
+// WHY: the real component depends on useGeolocation, useLocale, and i18n
 // which are complex to wire in jsdom. The mock preserves the interface that
 // matters for these tests: role="dialog" overlay + "Find food near me" CTA.
 vi.mock("@/components/SplashScreen", () => ({

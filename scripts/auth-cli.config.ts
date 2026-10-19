@@ -10,11 +10,12 @@
  * diff it against the target migrations directory.
  *
  * WHY an in-memory better-sqlite3 database, not a raw D1Database (stub or
- * real): `@better-auth/cli@1.4.21` bundles its OWN pinned copy of
- * `better-auth@1.4.21` (node_modules/@better-auth/cli/node_modules/
- * better-auth) — released before D1 support existed — and its internal
+ * real): the `@better-auth/cli` release this was verified against (1.4.21)
+ * bundles its OWN pinned copy of `better-auth` (node_modules/@better-auth/cli/node_modules/better-auth)
+ * from before D1 support existed — and its internal
  * `getAdapter()`/`getMigrations()` calls resolve `better-auth/db` against
- * THAT nested copy, not this project's top-level `better-auth@1.6.23`. Its
+ * THAT nested copy, not this project's top-level `better-auth`. (The CLI is
+ * not a dependency of this repo; npx fetches whatever version is current.) Its
  * structural database-type detection (createKyselyAdapter in that old
  * copy's dialect.mjs) has no D1 branch at all, so handing it a raw
  * D1Database — real or stubbed — always throws "Failed to initialize
@@ -27,9 +28,8 @@
  * driver — D1 IS SQLite-compatible SQL, so a plain in-memory SQLite
  * (better-sqlite3, `:memory:`, thrown away after generation) produces
  * identical "sqlite"-flavored CREATE TABLE output to what a live D1
- * connection would. `better-sqlite3` is already present in node_modules
- * (a transitive dependency of `better-auth`'s own devDependency graph) and
- * pinned here explicitly as a devDependency for stability. Runtime
+ * connection would. `better-sqlite3` is a direct devDependency of this repo
+ * (the src tests use it too). Runtime
  * behavior — actually applying/executing against D1 via `db.batch()`, never
  * raw transactions — is unaffected; only THIS generation step routes around
  * the CLI's stale nested dependency.

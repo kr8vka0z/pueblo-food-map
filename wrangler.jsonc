@@ -109,11 +109,10 @@
     "POSTHOG_PROJECT_ID": "630731",
     "ADMIN_OWNER_EMAIL": "kysboyd@gmail.com"
   },
-  // Staging (#223 step 1): repo-config only, NOT yet wired to a deploy pipeline
-  // or DNS route. Named environments do not inherit bindings (assets,
-  // services, d1_databases) from the top level in wrangler — only `main`,
-  // `compatibility_date`, and `compatibility_flags` are inherited — so every
-  // binding below is redeclared for this environment.
+  // Staging (dev.pueblofoodmap.com, deployed by deploy-dev.yml). Named
+  // environments do not inherit bindings (assets, services, d1_databases) or
+  // vars from the top level in wrangler, so each is redeclared below;
+  // `triggers` is the exception (see the top-level `triggers` comment).
   "env": {
     "staging": {
       "name": "pueblo-food-map-staging",
@@ -201,7 +200,7 @@
       // bindings above); omitting this would silently inherit the prod cron. See the
       // top-level `triggers` comment for the full WHY. dev.pueblofoodmap.com is a
       // low-traffic staging site, low-value to monitor via cron anyway — the health
-      // endpoint (AGENTS.md "Observability") is a better fit for staging if that's ever
+      // endpoint (AGENTS.md "Scheduled jobs and observability") is a better fit for staging if that's ever
       // wanted.
       "triggers": {
         "crons": []

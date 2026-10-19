@@ -71,9 +71,8 @@
  * Cloudflare edge for 60s via the Workers Cache API (that route's own
  * header). After a successful insert, this route deletes that route's
  * cache entry for the CURRENT colo only (`caches.default` is per-colo, not
- * global — there is no zone-wide purge API available to a Worker without an
- * Account-scoped token this app doesn't use elsewhere; see src/lib/
- * edgeCache.ts) — so the visitor who just checked in sees the change on
+ * global — see src/lib/edgeCache.ts's file header for why a Worker has no
+ * zone-wide purge) — so the visitor who just checked in sees the change on
  * their own next fetch, and every colo is bounded at 60s regardless. The
  * response body ALSO carries the box's fresh status/lastFilledAt directly
  * (2026-09-17 review correction — this comment previously claimed a

@@ -404,6 +404,7 @@ export function describeLocation(row: Pick<AuthEventRow, "city" | "region" | "co
 
 export const METHOD_LABELS: Record<string, string> = {
   passkey: "passkey",
+  // Rows written before #684 keep "email_link"; nothing writes it any more.
   email_link: "sign-in link",
   email_code: "email code",
 };

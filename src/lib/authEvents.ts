@@ -33,6 +33,8 @@ export type AuthEventKind =
   | "passkey_added"
   | "passkey_removed";
 
+// "email_link" is never written now (no magic link since #684); it stays so
+// rows written before #684 still type-check and render (activityLog.ts).
 export type SignInMethod = "passkey" | "email_link" | "email_code";
 
 /** Cloudflare's per-request geo (the `request.cf` object), narrowed to the fields this table keeps. */
@@ -76,8 +78,6 @@ export function signInMethodForPath(path: string | undefined): SignInMethod | nu
   if (path.startsWith("/passkey/")) return "passkey";
   // #684: the 6-digit email code replaced the sign-in link.
   if (path.includes("email-otp")) return "email_code";
-  // Rows written before #684 keep "email_link" (activityLog.ts still labels it).
-  if (path.startsWith("/magic-link/")) return "email_link";
   return null;
 }
 

@@ -58,7 +58,7 @@ function buildFakeJpegBlob(extraScanBytes = 0): Blob {
 }
 
 interface FakeDbOptions {
-  boxRow?: { id: string } | null;
+  boxRow?: { name: string } | null;
   checkinRow?: { id: number; venue_id: string } | null;
   insertMeta?: { last_row_id?: number };
   insertShouldThrow?: boolean;
@@ -67,7 +67,7 @@ interface FakeDbOptions {
 
 function makeFakeDb(opts: FakeDbOptions = {}) {
   const {
-    boxRow = { id: BOX_ID },
+    boxRow = { name: "216 W Routt Blessing Box" },
     checkinRow = null,
     insertMeta = { last_row_id: 99 },
     insertShouldThrow = false,
@@ -78,9 +78,6 @@ function makeFakeDb(opts: FakeDbOptions = {}) {
   const prepare = (sql: string) => {
     if (sql.includes("FROM venues WHERE id = ? AND category")) {
       return { bind: (...args: unknown[]) => ({ first: async () => (args[0] === BOX_ID ? boxRow : null) }) };
-    }
-    if (sql.includes("SELECT name FROM venues")) {
-      return { bind: () => ({ first: async () => ({ name: "216 W Routt Blessing Box" }) }) };
     }
     if (sql.includes("FROM box_checkins WHERE id")) {
       return { bind: () => ({ first: async () => checkinRow }) };
@@ -423,6 +420,8 @@ describe("POST /api/public/blessing-boxes/[id]/photos", () => {
     // #677: /admin/box-photos now redirects — this alert links straight at
     // the Blessing Boxes tab's own "To review" filter instead.
     expect(body.text).toContain("/admin/boxes?show=review");
+    // The name comes from the one live-box read the upload already does.
+    expect(body.subject).toBe("[PFM Blessing Box] New photo to review — 216 W Routt Blessing Box");
   });
 
   test("a failed alert email does not fail the upload itself", async () => {

@@ -181,13 +181,13 @@ describe("BottomSheet — OSM notes guard", () => {
   });
 
   test("DOES render clean notes in quick snap", () => {
-    const venue = makeVenue({ notes: "Convenience Store" });
+    const venue = makeVenue({ notes: "surcharge for using cards" });
     render(
       <BottomSheet venue={venue} onClose={vi.fn()} />
     );
-    // The sheet renders at SNAP_PEEK by default — notes appear in SNAP_QUICK
-    // but since vaul is mocked and the sheet is open, content is available
-    // (the mock renders all children regardless of snap state)
+    // The vaul mock renders all children regardless of snap state, so the
+    // quick-snap notes are in the DOM.
+    expect(screen.getByText("surcharge for using cards")).toBeDefined();
   });
 });
 
@@ -209,7 +209,8 @@ describe("BottomSheet — address placeholder guard (full snap)", () => {
     render(
       <BottomSheet venue={venue} onClose={vi.fn()} />
     );
-    // Address appears in the full-snap content
-    // With our vaul mock the sheet renders all content as open
+    // The vaul mock renders all children regardless of snap state, so the
+    // full-snap address is in the DOM.
+    expect(screen.getByText("601 West US Highway 50, Pueblo, CO 81008")).toBeDefined();
   });
 });

@@ -12,7 +12,6 @@ import {
   pinAriaLabel,
   pinLabel,
   pinsAt,
-  readEventParam,
   syncEventParam,
 } from "@/lib/eventPins";
 
@@ -135,7 +134,7 @@ describe("?event= URL parameter", () => {
 
   test("round trip through the address bar: read on load, set on tap, cleared on deselect", () => {
     window.history.replaceState(null, "", "/?event=e1&x=2#top");
-    expect(readEventParam(window.location.search)).toBe("e1");
+    expect(new URLSearchParams(window.location.search).get("event")).toBe("e1");
 
     syncEventParam("e2");
     expect(window.location.search).toBe("?event=e2&x=2");
@@ -143,7 +142,7 @@ describe("?event= URL parameter", () => {
 
     syncEventParam(null);
     expect(window.location.search).toBe("?x=2");
-    expect(readEventParam(window.location.search)).toBeNull();
+    expect(new URLSearchParams(window.location.search).get("event")).toBeNull();
   });
 
   test("does not touch history when the URL already agrees (a shared link survives first render)", () => {

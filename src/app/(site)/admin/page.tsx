@@ -55,7 +55,7 @@ import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { summarizePublishChanges } from "@/lib/adminVenues";
 import { rankNeedsHelp } from "@/lib/boxHealth";
 import { loadBoxHealthEntries } from "@/lib/adminBoxes";
-import { selectStalePlaces, resolvePlaceUsageRows } from "@/lib/adminDashboard";
+import { countStalePlaces, resolvePlaceUsageRows } from "@/lib/adminDashboard";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
 import { fetchPublishBotPrStatus, isProductionWorker, type PublishBotPrStatus } from "@/lib/publishVenues";
@@ -340,7 +340,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // ─── Map data health ────────────────────────────────────────────────────
   const publishedVenues = venues.filter((v) => v.status === "published");
   const newPlacesThisPeriod = filterByPeriod(publishedVenues, period, now).length;
-  const staleThreeMonths = selectStalePlaces(venues, now, { months: 3 });
+  const staleThreeMonths = countStalePlaces(venues, now, 3);
   const problemCounts = computeProblemReportCounts(problemReportRows, period, now);
 
   return (
@@ -610,7 +610,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <KpiCard label="Places on the map" displayValue={String(publishedVenues.length)} value={publishedVenues.length} previousValue={publishedVenues.length - newPlacesThisPeriod} />
             <KpiCard label="New this period" displayValue={String(newPlacesThisPeriod)} value={newPlacesThisPeriod} />
-            <KpiCard label="Not checked in 90+ days" displayValue={String(staleThreeMonths.totalCount)} value={staleThreeMonths.totalCount} />
+            <KpiCard label="Not checked in 90+ days" displayValue={String(staleThreeMonths)} value={staleThreeMonths} />
             <KpiCard label="Problem reports (open / fixed)" displayValue={`${problemCounts.open} / ${problemCounts.fixed}`} value={problemCounts.open} />
           </div>
           <p className="mt-3 text-sm text-[var(--color-ink-500)]">
@@ -625,7 +625,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               "No automated data refresh has run yet."
             )}
           </p>
-          {staleThreeMonths.totalCount > 0 && (
+          {staleThreeMonths > 0 && (
             <Link href="/admin/places" className="mt-1 inline-block text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2">
               See places due for a check →
             </Link>

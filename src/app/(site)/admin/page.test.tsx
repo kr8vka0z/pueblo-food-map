@@ -1,14 +1,6 @@
 /**
- * DashboardPage (/admin) test — rewritten for #680 ("Admin Dashboard
- * overhaul"), whose own Layout item 2 states: "This replaces today's
- * NeedsDecisionPanel / needs-help list / stale list blocks." The previous
- * version of this file asserted on those three retired blocks by name
- * (NeedsDecisionPanel's empty-state copy, BoxHealthList's "Every box is
- * doing fine.", StalePlacesList's "Every published place has been checked
- * recently."); none of that markup exists on the page anymore, so this file
- * is rewritten rather than patched — covering criterion: issue #680's own
- * Layout item 2, "This replaces today's NeedsDecisionPanel / needs-help
- * list / stale list blocks."
+ * DashboardPage (/admin) test — the #680 Dashboard ("Admin Dashboard
+ * overhaul").
  *
  * Still covers the SAME auth-guard contract every other admin page's own
  * page.test.tsx pins (this page's getAdminDb() -> forbidden() fail-closed

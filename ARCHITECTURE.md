@@ -1460,8 +1460,8 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   "PostHog" section), a **Blessing boxes** numbers section reusing
   `boxStats.ts` (the
   same math the public Boxes page uses), and a **Map data health** section
-  (published-place counts, `StalePlacesList`'s data at a 90-day/3-month
-  threshold, the latest automated data-refresh run, and box problem-report
+  (published-place counts, the count of places not checked in 90 days
+  (`countStalePlaces`), the latest automated data-refresh run, and box problem-report
   counts). `KpiCard`/`BarList`/`DailyBars` render every number as plain
   SVG/CSS — no chart library. A Cloudflare API failure or missing token
   degrades ONLY the Visitors section to "unavailable right now"; every

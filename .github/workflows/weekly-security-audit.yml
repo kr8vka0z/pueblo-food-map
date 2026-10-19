@@ -5,22 +5,21 @@
 # of that diff. A CVE published against a dependency this repo already
 # shipped needs a second, independent trigger that fires on the world's
 # schedule, not just on pushes — that's the failure the cron catches that
-# PR-time scanning cannot. Required-check enforcement is a separate, later
-# decision — this PR only makes the checks exist to be required.
+# PR-time scanning cannot. All three jobs are required checks on main and dev
+# (the branch rulesets match them by job name), so never rename a job.
 name: Weekly Security Audit
 
 on:
   pull_request:
     branches: [main, dev]
   schedule:
-    # Runs every Sunday at 06:00 UTC (12:00 AM MST)
+    # Runs every Sunday at 06:00 UTC (23:00 MST Saturday / 00:00 MDT Sunday)
     - cron: '0 6 * * 0'
   workflow_dispatch:
 
+# Read-only: no step uploads SARIF, comments, or opens issues; each job only passes or fails.
 permissions:
   contents: read
-  security-events: write
-  issues: write
 
 jobs:
   semgrep-sast:
@@ -32,7 +31,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run Semgrep SAST Scan
-        uses: semgrep/semgrep-action@v1
+        uses: semgrep/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e5d # v1
         with:
           config: p/default p/owasp-top-ten p/security-code-scan
         env:
@@ -74,9 +73,8 @@ jobs:
         # "publish-bot" would silently skip the CVE gate); the real safety
         # property is the DIFF -- data_only=true only when the PR is really
         # publish-bot -> main/dev, from this repo (not a fork), AND its full
-        # base...head diff touches EXACTLY the one generated file the
-        # publish engine writes (src/lib/publishVenues.ts, AGENTS.md
-        # "Publish -> static") (#336).
+        # base...head diff touches EXACTLY src/data/published-venues.ts, the
+        # one file the publish engine (src/lib/publishVenues.ts) writes (#336).
         #
         # Diffed from the MERGE-BASE of base/head, not a raw two-dot diff
         # (PR review on #383) -- see ci.yml's matching step for the full WHY:
@@ -133,9 +131,9 @@ jobs:
         run: node scripts/security/check-lockfile-flags.mjs
 
       - name: Run NPM Dependency Audit (production only, blocking)
-        # Skipped for a data-only publish PR (#336) -- same reasoning as
-        # ci.yml's "npm audit (production deps, high/critical only)" step: a
-        # newly-published CVE against an unrelated transitive dependency
+        # The only production-CVE gate (ci.yml no longer repeats it).
+        # Skipped for a data-only publish PR (#336): a newly-published CVE
+        # against an unrelated transitive dependency
         # must not block real venue data from reaching the live map. The CVE
         # is still reported (the informational step above, this same job,
         # every run) and still enforced on every non-publish PR and by this

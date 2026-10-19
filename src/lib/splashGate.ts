@@ -7,9 +7,9 @@
  * itself: SplashScreen.tsx needs markSplashSeen() for its cross-tree CTA
  * case (picking English on the /es splash navigates to "/?near=1" instead
  * of calling HomePageClient's own dismissSplash), and HomePageClient.tsx
- * mounts SplashScreen via next/dynamic — importing HomePageClient FROM
- * SplashScreen would be a circular import between the two. A tiny shared
- * module both sides import from avoids that.
+ * imports SplashScreen — importing HomePageClient FROM SplashScreen would be
+ * a circular import between the two. A tiny shared module both sides import
+ * from avoids that.
  *
  * Also owns the "skip the splash?" decision, in two forms that must agree:
  * shouldSkipSplash() (React, after hydration) and SPLASH_GATE_SCRIPT (inline,
@@ -17,6 +17,12 @@
  * client-side navigations resolve in HomePageClient's layout effect).
  * splashSsr.test.tsx asserts they match.
  */
+
+/**
+ * Where the map opens once the splash is dismissed: 'located' centres on the
+ * visitor's position, 'pueblo-center' on the fixed Pueblo centre (default).
+ */
+export type SplashViewport = "located" | "pueblo-center";
 
 const GATE_KEY = "pfm.splash.seen.v2";
 

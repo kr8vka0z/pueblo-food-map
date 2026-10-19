@@ -35,6 +35,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, fireEvent, within } from "@testing-library/react";
 import React from "react";
 import HomePage from "@/app/(site)/page";
+import type { SplashViewport } from "@/lib/splashGate";
 
 // ─── Mock next/dynamic — resolve synchronously in Vitest/jsdom ───────────────
 // WHY: next/dynamic's real implementation relies on webpack/Turbopack chunk
@@ -90,7 +91,7 @@ vi.mock("@/components/MapWrapper", () => ({
 // which are complex to wire in jsdom. The mock preserves the interface that
 // matters for these tests: role="dialog" overlay + "Find food near me" CTA.
 vi.mock("@/components/SplashScreen", () => ({
-  default: vi.fn(({ onPrimary }: { onPrimary?: (mode: "located" | "pueblo-center") => void }) => (
+  default: vi.fn(({ onPrimary }: { onPrimary?: (mode: SplashViewport) => void }) => (
     <div role="dialog" aria-modal="true" data-testid="splash-screen">
       <button
         type="button"
@@ -372,5 +373,18 @@ describe("Boxes from a Menu page (/?boxes=1, #516)", () => {
     localStorage.setItem(GATE_KEY, "1");
     await renderPage();
     expect(screen.getByTestId("map-wrapper").getAttribute("data-initial-boxes-filter")).toBe("0");
+  });
+});
+
+describe("Menu-page params together (near + boxes + tour)", () => {
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  test("applies each, strips only those three, and keeps other params and the hash", async () => {
+    window.history.replaceState(null, "", "/?near=1&event=e1&boxes=1&tour=1#x");
+    await renderPage();
+    const map = screen.getByTestId("map-wrapper");
+    expect(map.getAttribute("data-viewport")).toBe("located");
+    expect(map.getAttribute("data-initial-boxes-filter")).toBe("1");
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe("/?event=e1#x");
   });
 });

@@ -28,7 +28,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Wordmark from './Wordmark';
 import { useGeolocation, type LocationFailure } from '@/lib/useGeolocation';
 import { useLocale, writeLocaleCookie } from '@/lib/LocaleContext';
-import { markSplashSeen } from '@/lib/splashGate';
+import { markSplashSeen, type SplashViewport } from '@/lib/splashGate';
 import { track, EVENTS } from '@/lib/analytics';
 import { t } from '@/lib/i18n';
 
@@ -40,7 +40,7 @@ interface SplashScreenProps {
    * `failure` is set on the failing path so the map can explain it (#739):
    * MapWrapper runs its own geolocation hook and never sees this one's result.
    */
-  onPrimary: (mode: 'located' | 'pueblo-center', failure?: LocationFailure) => void;
+  onPrimary: (mode: SplashViewport, failure?: LocationFailure) => void;
   /**
    * True while HomePageClient hasn't resolved the gate yet (server HTML and
    * first client render). Marks the root so globals.css can hide it for
@@ -65,7 +65,7 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
     if (!geoRequested) return;
     if (geo.state.permission === 'prompt') return;
 
-    const mode: 'located' | 'pueblo-center' =
+    const mode: SplashViewport =
       geo.state.permission === 'granted' && geo.state.position !== null
         ? 'located'
         : 'pueblo-center';

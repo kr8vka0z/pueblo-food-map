@@ -292,7 +292,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       label: "Places to review",
       count: submissionsTotal + proposalsTotal,
       href: "/admin/places?show=review",
-      detail: `${submissionsTotal} review queue, ${proposalsTotal} data refresh`,
+      detail: `${submissionsTotal} from the public, ${proposalsTotal} from data refresh`,
     },
     {
       key: "publish",

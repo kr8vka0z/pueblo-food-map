@@ -1243,10 +1243,8 @@ One image per event, shown at the top of the card.
   No Workers Cache layer, deliberately (see the file header).
 - **Public data.** The feed and the single-event read carry
   `flyer: { src, width, height, alt, alt_es } | null`, never the raw key.
-  `loadPublicEvents` / `loadPublicEventById` try the flyer-column query first and
-  fall back to the pre-0019 query (only for a "no such column" error; any other
-  error propagates to the route's degraded answer), so code that reaches production before the
-  migration still lists every event.
+  `loadPublicEvents` / `loadPublicEventById` select the five flyer columns and
+  fold them into that object; a D1 error propagates to the route's degraded answer.
 - **Card.** `EventFlyer.tsx` reserves the box from the stored size (capped at
   `min(55vh, 28rem)`), `loading="lazy"`, `decoding="async"`, alt = the admin's
   text in the page language, else their English text, else the event name; a
@@ -1335,8 +1333,7 @@ list it as an event and a shared link previews the flyer.
 - **Visibility.** The read is `loadPublicEventById` (published, including ended, and
   cancelled). Draft, archived, unknown ids, a missing `events` table, a D1 error and
   a missing Cloudflare context all return `null` -> `notFound()` -> HTTP 404, so a
-  draft is indistinguishable from an id that never existed. Flyer columns missing
-  (0019 not applied): the event renders without a flyer, as in the feed. Status words
+  draft is indistinguishable from an id that never existed. Status words
   on the page are "Coming up", "Happening now", "This event has ended", "Cancelled"
   + note: no countdown, so a cached or back-navigated copy is never wrong.
 - **Metadata** goes through `buildPageMetadata` (`mirrored: true`: self-canonical,

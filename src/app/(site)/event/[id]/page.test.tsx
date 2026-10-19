@@ -25,10 +25,9 @@ import EsEventRoute, { generateMetadata as generateEsMetadata } from "@/app/es/e
 const NOW = new Date("2026-11-20T18:00:00.000Z"); // Fri Nov 20 2026, 11 AM in Pueblo
 const KEY = "up/22222222-2222-4222-8222-222222222222.jpg";
 
-function migrate(withFlyerColumns: boolean) {
+function migrate() {
   const db = new Database(":memory:");
-  db.exec(readFileSync(join(process.cwd(), "migrations", "0018_events.sql"), "utf-8"));
-  if (withFlyerColumns) db.exec(readFileSync(join(process.cwd(), "migrations", "0019_event_flyer.sql"), "utf-8"));
+  for (const f of ["0018_events.sql", "0019_event_flyer.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
   return db;
 }
 
@@ -49,9 +48,9 @@ function insert(db: Database.Database, row: Record<string, unknown>) {
   db.prepare(`INSERT INTO events (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...Object.values(all));
 }
 
-function seed(db: Database.Database, withFlyerColumns = true) {
-  insert(db, { id: "up", name: "Turkey drive", name_es: "Entrega de pavos", host: "Pueblo Food Project", description: "Free turkeys.", flyer_key: withFlyerColumns ? KEY : null });
-  if (withFlyerColumns) db.prepare("UPDATE events SET flyer_width = 300, flyer_height = 420, flyer_alt = 'A flyer' WHERE id = 'up'").run();
+function seed(db: Database.Database) {
+  insert(db, { id: "up", name: "Turkey drive", name_es: "Entrega de pavos", host: "Pueblo Food Project", description: "Free turkeys.", flyer_key: KEY });
+  db.prepare("UPDATE events SET flyer_width = 300, flyer_height = 420, flyer_alt = 'A flyer' WHERE id = 'up'").run();
   insert(db, { id: "ended-recent", name: "Last week", starts_at: "2026-11-19T17:00:00.000Z", ends_at: "2026-11-19T21:00:00.000Z" });
   insert(db, { id: "ended-old", name: "Long ago", starts_at: "2026-10-01T17:00:00.000Z", ends_at: "2026-10-01T21:00:00.000Z" });
   insert(db, { id: "cancelled", name: "Called off", status: "cancelled", cancel_note: "Snow day", cancel_note_es: "Día de nieve" });
@@ -86,7 +85,7 @@ afterEach(() => {
 
 describe("visibility", () => {
   test("draft, archived and unknown ids all answer with the same 404", async () => {
-    mockContext.mockReturnValue({ env: { ADMIN_DB: sqliteD1(seed(migrate(true))) } });
+    mockContext.mockReturnValue({ env: { ADMIN_DB: sqliteD1(seed(migrate())) } });
     const digests = await Promise.all(["draft", "archived", "no-such-id"].map((id) => notFoundDigest(id)));
     expect(digests[0]).toContain("404");
     expect(new Set(digests).size).toBe(1);
@@ -108,18 +107,11 @@ describe("visibility", () => {
     });
     expect(await notFoundDigest("up")).toContain("404");
   });
-
-  test("flyer columns missing (migration 0019 not applied): the event still renders, without a flyer", async () => {
-    mockContext.mockReturnValue({ env: { ADMIN_DB: sqliteD1(seed(migrate(false), false)) } });
-    const page = await html("up");
-    expect(page).toContain("Turkey drive");
-    expect(page).not.toContain("<img");
-  });
 });
 
 describe("page states (server HTML)", () => {
   beforeEach(() => {
-    mockContext.mockReturnValue({ env: { ADMIN_DB: sqliteD1(seed(migrate(true))) } });
+    mockContext.mockReturnValue({ env: { ADMIN_DB: sqliteD1(seed(migrate())) } });
   });
 
   test("an upcoming event shows the flyer with its size, a map link with ?event=, directions and the h1", async () => {
@@ -162,7 +154,7 @@ describe("page states (server HTML)", () => {
 
   test("hostile event text is escaped in the HTML, and both JSON-LD blocks stay valid JSON", async () => {
     const evil = `</script><script>alert(1)</script>"><img src=x onerror=alert(1)>`;
-    const db = migrate(true);
+    const db = migrate();
     insert(db, { id: "evil", name: evil, host: evil, description: evil, what_to_bring: evil, address: evil, link_url: "javascript:alert(1)" });
     mockContext.mockReturnValue({ env: { ADMIN_DB: sqliteD1(db) } });
 
@@ -178,7 +170,7 @@ describe("page states (server HTML)", () => {
   });
 
   test("only an http(s) link is offered, and with rel=noopener noreferrer", async () => {
-    const db = migrate(true);
+    const db = migrate();
     insert(db, { id: "linked", link_url: "https://example.org/info" });
     mockContext.mockReturnValue({ env: { ADMIN_DB: sqliteD1(db) } });
     const page = await html("linked");
@@ -188,7 +180,7 @@ describe("page states (server HTML)", () => {
 
 describe("metadata", () => {
   beforeEach(() => {
-    mockContext.mockReturnValue({ env: { ADMIN_DB: sqliteD1(seed(migrate(true))) } });
+    mockContext.mockReturnValue({ env: { ADMIN_DB: sqliteD1(seed(migrate())) } });
   });
 
   test("EN: self-canonical, hreflang pair, flyer as the share image, indexable", async () => {

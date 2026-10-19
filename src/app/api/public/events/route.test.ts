@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
  * GET /api/public/events (#757). Runs the real route against real SQLite
- * (schema from migrations/0018_events.sql) so the feed filter, the privacy
+ * (schema from migrations/0018_events.sql + 0019) so the feed filter, the privacy
  * of the response and — the production-safety requirement — the missing-table
  * fail-soft path are proved with real SQL errors, not a mock.
  */
@@ -25,7 +25,7 @@ const req = () => new NextRequest("https://pueblofoodmap.com/api/public/events")
 
 function dbWithMigration(): Database.Database {
   const db = new Database(":memory:");
-  db.exec(readFileSync(join(process.cwd(), "migrations", "0018_events.sql"), "utf-8"));
+  for (const f of ["0018_events.sql", "0019_event_flyer.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
   return db;
 }
 

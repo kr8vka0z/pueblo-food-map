@@ -7,8 +7,8 @@
  * call, so "storage was not touched" is a checkable fact. Covers the risky
  * behavior only: access gate before storage, real-bytes type check, the size
  * cap, server-made keys, replace/remove delete the old object, the stale-write
- * 409 (and that it cleans up its upload), the audit row, and fail-soft when
- * migration 0019 has not been applied.
+ * 409 (and that it cleans up its upload), the audit row, and cleanup when the
+ * database write fails.
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -255,21 +255,12 @@ describe("upload", () => {
     expect(row().flyer_key).toBeNull();
   });
 
-  test("a database error that is NOT a missing column is not reported as 'flyers unavailable': the object is removed and the error propagates", async () => {
+  test("a database error removes the object just stored and propagates", async () => {
     const real = sqliteD1(sqlite);
     const broken = { ...real, batch: async () => { throw new Error("D1_ERROR: network connection lost"); } };
     mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: broken, EVENT_FLYERS: fakeR2() } });
     await expect(upload()).rejects.toThrow("network connection lost");
     expect(objects.size).toBe(0);
-  });
-
-  test("migration 0019 not applied -> clean 503, the uploaded object is removed, nothing else breaks", async () => {
-    setup(freshDb(["0001_init_admin_schema.sql", "0017_auth_events.sql", "0018_events.sql"]));
-    const res = await upload();
-    expect(res.status).toBe(503);
-    expect(((await res.json()) as { error: string }).error).toBe("flyer_unavailable");
-    expect(objects.size).toBe(0);
-    expect(row().flyer_key).toBeNull();
   });
 });
 

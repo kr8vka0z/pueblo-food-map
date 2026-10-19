@@ -1,6 +1,7 @@
 /**
- * adminEventReads.ts — the admin Events pages' D1 reads (#757). Each throws
- * on a D1 failure; the PAGE decides what that means (the list and edit pages
+ * adminEventReads.ts — the admin Events pages' D1 reads (#757); the event
+ * write routes reuse loadEvent. Each throws on a D1 failure; the caller
+ * decides what that means (the list and edit pages
  * catch it and render a "couldn't load, retry" panel, because the `events`
  * table may not exist yet in an environment whose migration hasn't been
  * applied — see src/app/api/public/events/route.ts for the same reason).

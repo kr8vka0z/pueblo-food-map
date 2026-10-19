@@ -114,7 +114,7 @@ import { loadAllCheckinsForBox, type AdminCheckinRow } from "@/lib/blessingBoxes
 import { loadHostSubscriptions } from "@/lib/boxAlerts";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
-import { loadVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
+import { toVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
 import {
   displayStatusOf,
   diffPublishedFields,
@@ -347,9 +347,8 @@ export default async function EditVenuePage({
     showActivity = identity.isOwner === true;
     // WHY Promise.all throughout (was ~10 awaits in a row): every D1 call is
     // an edge -> primary round trip, so a serial chain cost the SUM of them.
-    // Only real dependencies stay sequential: the venue row gates the rest
-    // (an unknown id still 404s with no extra reads), and the VenueLookup
-    // read needs to know whether any suggestion exists. Every resolver below
+    // Only the venue row stays sequential: it gates the rest (an unknown id
+    // still 404s with no extra reads). Every resolver below
     // already degrades to an empty value instead of rejecting, and
     // loadAdminNavCounts never rejects, so overlapping them changes no
     // failure behavior. The session check above still runs first and alone.
@@ -400,13 +399,8 @@ export default async function EditVenuePage({
         ...pendingProposals.map((proposal): ReviewItem => ({ kind: "proposal", proposal })),
         ...pendingSubmissions.map((submission): ReviewItem => ({ kind: "submission", submission })),
       ];
-      // Only bothers loading the venue's VenueLookup context (a second, tiny
-      // SELECT) when there's actually something to show it to — the common
-      // case (an unedited place) skips this entirely.
-      if (suggestionItems.length > 0) {
-        const lookup = await loadVenueLookup(db, [id]);
-        suggestionsVenue = lookup[id] ?? null;
-      }
+      // Mapped from the row already loaded above, so no second venues read.
+      if (suggestionItems.length > 0) suggestionsVenue = toVenueLookup(venue);
     } else {
       navCounts = await navCountsPromise;
     }

@@ -823,6 +823,15 @@ export async function loadRecentCheckinsAllBoxes(db: D1Database, sinceIso: strin
   }
 }
 
+/** The name of a live (non-archived) blessing box, or null when `id` is not one — the existence check the public box write routes run before writing. Throws on a D1 error; each caller decides how to answer that. */
+export async function loadLiveBoxName(db: D1Database, id: string): Promise<string | null> {
+  const row = await db
+    .prepare("SELECT name FROM venues WHERE id = ? AND category = 'blessing_box' AND status != 'archived'")
+    .bind(id)
+    .first<{ name: string }>();
+  return row ? row.name : null;
+}
+
 export async function loadLiveBoxById(
   db: D1Database,
   id: string,

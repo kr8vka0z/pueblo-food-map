@@ -41,7 +41,7 @@ export interface PublicBoxPhoto {
   createdAt: string;
 }
 
-/** One row for the admin review queue (`/admin/box-photos`) — everything an admin needs to decide, joined once rather than N+1. */
+/** One row for the admin review list (`/admin/boxes?show=review`, and BoxReviewBox on the box's edit page) — everything an admin needs to decide, joined once rather than N+1. */
 export interface AdminBoxPhotoRow {
   id: number;
   venue_id: string;

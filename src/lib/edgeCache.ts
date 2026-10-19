@@ -43,15 +43,13 @@ export interface BestEffortResult<T> {
  * respondWithEdgeCache's own header) — best-effort, a delete failure must
  * never fail the write that triggered it.
  *
- * Slice 5 (photos) generalizes the checkins route's own single-path
- * `bustListCache` into this shared helper, because a photo's moderation
- * decision (approve/reject/flag) now needs to bust THREE cache entries, not
- * one: the box list (`/api/public/blessing-boxes`, whose response embeds
- * `latestPhoto`), that box's photo history list
- * (`/api/public/blessing-boxes/<id>/photos`), and the photo's own serve
- * route (`/api/public/box-photos/<id>`) — a flagged photo must actually
- * stop being servable, not just drop off the two list views. One shared
- * function means that "bust every affected cache key" rule lives in exactly
+ * Slice 5 (photos) made this a shared helper, because a check-in or needs
+ * write busts only the box list, but a photo's moderation decision
+ * (approve/reject/flag) needs to bust TWO cache entries: the box list
+ * (`/api/public/blessing-boxes`, whose response embeds `latestPhoto`) and
+ * the photo's own serve route (`/api/public/box-photos/<id>`) — a flagged
+ * photo must actually stop being servable, not just drop off the list. One
+ * shared function means that "bust every affected cache key" rule lives in exactly
  * one place rather than being re-derived per caller.
  */
 export async function bustEdgeCache(req: Request, paths: readonly string[]): Promise<void> {

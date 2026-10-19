@@ -63,6 +63,9 @@ import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { insertPendingPhoto, MAX_PHOTO_BYTES } from "@/lib/boxPhotos";
 import { InvalidJpegError, readJpegDimensions, stripMetadataSegments, verifyJpegMagic } from "@/lib/jpegSegments";
 import { logFormFailure } from "@/lib/logger";
+import { requestIp } from "@/lib/publicRequest";
+import { loadLiveBoxName } from "@/lib/blessingBoxes";
+import { sendAdminNotice } from "@/lib/emailSend";
 
 export const dynamic = "force-dynamic";
 
@@ -91,41 +94,23 @@ function parsePositiveContentLength(header: string | null): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-interface BoxLookupRow {
-  id: string;
-}
-
 interface CheckinLookupRow {
   id: number;
   venue_id: string;
 }
 
 async function sendNewPhotoEmail(boxId: string, boxName: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY not configured");
-  }
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from: "Pueblo Food Map <noreply@pueblofoodmap.com>",
-      to: ["issues@pueblofoodmap.com"],
-      subject: `[PFM Blessing Box] New photo to review — ${boxName}`,
-      text: [
-        `A new photo was uploaded for ${boxName} and is waiting for review.`,
-        ``,
-        `Box: ${boxName}`,
-        `Box ID: ${boxId}`,
-        ``,
-        `Review it at https://pueblofoodmap.com/admin/boxes?show=review`,
-      ].join("\n"),
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    throw new Error(`Resend API error ${res.status}: ${body}`);
-  }
+  await sendAdminNotice(
+    `[PFM Blessing Box] New photo to review — ${boxName}`,
+    [
+      `A new photo was uploaded for ${boxName} and is waiting for review.`,
+      ``,
+      `Box: ${boxName}`,
+      `Box ID: ${boxId}`,
+      ``,
+      `Review it at https://pueblofoodmap.com/admin/boxes?show=review`,
+    ].join("\n"),
+  );
 }
 
 export async function POST(
@@ -159,8 +144,7 @@ export async function POST(
     return NextResponse.json({ ok: true }); // bots think it worked
   }
 
-  const ip =
-    req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = requestIp(req);
 
   const turnstileKey = resolveBoxTurnstileKey(form.get("turnstileKey"));
   const checkinRateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
@@ -208,11 +192,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "rate_limit_box" }, { status: 429 });
   }
 
-  const box = await db
-    .prepare("SELECT id FROM venues WHERE id = ? AND category = 'blessing_box' AND status != 'archived'")
-    .bind(boxId)
-    .first<BoxLookupRow>();
-  if (!box) {
+  if ((await loadLiveBoxName(db, boxId)) === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 

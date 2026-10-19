@@ -24,7 +24,7 @@
  * IS rate-limited (CI review addition) — unlike the three public forms,
  * this fires from every page load with a violation, not from a human
  * filling out a text field, so nothing here gates volume the way Turnstile
- * gates them. The field-length cap above only bounds the SIZE of an
+ * gates them. The field-length cap below only bounds the SIZE of an
  * abusive line, not the COUNT — an unrate-limited flood could still emit
  * unlimited fake csp_violation_report lines, which would make the
  * report-only period's silence untrustworthy well before storage/cost
@@ -52,10 +52,12 @@ import { NextRequest } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { logCspViolation } from "@/lib/logger";
+import { requestIp } from "@/lib/publicRequest";
 
 // Caps how much of any one field reaches Workers Logs. Nothing authenticates
-// or rate-limits this endpoint (see the header above), so without a cap a
-// single POST could log an arbitrarily large string, repeatably — bloating
+// this endpoint and the rate limit below bounds only the COUNT of reports
+// (see the header above), so without a cap each POST could log an
+// arbitrarily large string — bloating
 // Workers Logs and undermining the one thing this endpoint exists to give:
 // a trustworthy "dev ran quiet" signal before flipping to an enforcing CSP.
 const MAX_FIELD_LENGTH = 500;
@@ -100,10 +102,7 @@ async function underCspReportRateLimit(req: NextRequest): Promise<boolean> {
   const secret = process.env.CHECKIN_RATE_LIMIT_SECRET;
   if (!secret) return false;
 
-  const ip =
-    req.headers.get("cf-connecting-ip") ??
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    "unknown";
+  const ip = requestIp(req);
 
   const underIpCap = await checkAndIncrement(
     db,

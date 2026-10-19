@@ -21,7 +21,7 @@
 
 import { isWithinConfirmWindow, randomHexToken } from "@/lib/alertTokens";
 import { D1_MAX_BOUND_PARAMS, chunkArray } from "@/lib/d1";
-import { composeEmail, sendResendEmail } from "@/lib/emailSend";
+import { composeEmail, sendAdminNotice, sendResendEmail } from "@/lib/emailSend";
 import type { Locale } from "@/lib/i18n";
 
 // ─── D1 row shapes ──────────────────────────────────────────────────────────
@@ -248,7 +248,7 @@ export async function sendAdopterConfirmEmail(opts: {
  * for review — sent by POST /api/public/alerts/confirm only on the FIRST
  * confirm of a given application (markAdopterEmailConfirmed's own
  * idempotency), never on a re-click of an already-confirmed link. Plain
- * internal text mail, same shape/recipient as the checkins route's own
+ * internal text mail via sendAdminNotice, like the checkins route's
  * problem-report and photo-upload admin notices — an internal admin email,
  * not a member-of-the-public one, so it stays plain English regardless of
  * the applicant's own lang and doesn't go through composeEmail.
@@ -257,10 +257,6 @@ export async function sendAdopterConfirmedAdminEmail(
   db: D1Database,
   adopter: Pick<BoxAdopterRow, "venue_id" | "display_name" | "email" | "note">,
 ): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY not configured");
-  }
   const boxName =
     (await db.prepare("SELECT name FROM venues WHERE id = ?").bind(adopter.venue_id).first<{ name: string }>())
       ?.name ?? adopter.venue_id;
@@ -274,18 +270,5 @@ export async function sendAdopterConfirmedAdminEmail(
     ``,
     `Review it at https://pueblofoodmap.com/admin/boxes?show=review`,
   ];
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from: "Pueblo Food Map <noreply@pueblofoodmap.com>",
-      to: ["issues@pueblofoodmap.com"],
-      subject: `[PFM Blessing Box] New adoption application — ${boxName}`,
-      text: lines.join("\n"),
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    throw new Error(`Resend API error ${res.status}: ${body}`);
-  }
+  await sendAdminNotice(`[PFM Blessing Box] New adoption application — ${boxName}`, lines.join("\n"));
 }

@@ -192,7 +192,9 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "rate_limit_box" }, { status: 429 });
   }
 
-  if ((await loadLiveBoxName(db, boxId)) === null) {
+  // Kept for the admin email below, so the upload reads the box once.
+  const boxName = await loadLiveBoxName(db, boxId);
+  if (boxName === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
@@ -273,9 +275,6 @@ export async function POST(
   }
 
   try {
-    const boxName =
-      (await db.prepare("SELECT name FROM venues WHERE id = ?").bind(boxId).first<{ name: string }>())?.name ??
-      boxId;
     await sendNewPhotoEmail(boxId, boxName);
   } catch (err) {
     // Same "already-durable write, best-effort alert on top" posture as the

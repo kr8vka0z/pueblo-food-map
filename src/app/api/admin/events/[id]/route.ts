@@ -12,7 +12,7 @@
  * revived from cancelled, and an archived event is final (same rule as
  * venues — archived rows are read-only).
  *
- * Auth: authorizeEventRequest (session, then CSRF). Concurrency: the body
+ * Auth: authorizeAdminWrite (session, then CSRF). Concurrency: the body
  * must carry `expectedUpdatedAt`, bound into the UPDATE's
  * `WHERE id = ? AND updated_at = ?`; 0 rows changed => 409 `conflict`. The
  * audit_log row is `WHERE EXISTS`-gated on the new updated_at, so a rejected
@@ -23,9 +23,9 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-import { authorizeEventRequest, eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
+import { eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
 import { validateEventPayload, type EventStatus } from "@/lib/adminEventValidation";
-import type { AdminDbAccess } from "@/lib/adminDb";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import type { EventRow } from "@/lib/events";
 
 const UPDATE_EVENT_SQL = `UPDATE events SET name = ?, name_es = ?, host = ?, host_es = ?, description = ?, description_es = ?,
@@ -48,7 +48,7 @@ export async function PATCH(
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizeEventRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

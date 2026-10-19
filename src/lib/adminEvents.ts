@@ -2,24 +2,15 @@
  * adminEvents.ts — pieces the three admin events write routes share (#757):
  * POST /api/admin/events, PATCH /api/admin/events/[id] and
  * POST /api/admin/events/[id]/archive. Mirrors the venue routes' shape
- * (getAdminDb -> requireAdminOrigin -> one db.batch() with an audit_log row
- * -> updated_at precondition) but keeps the repeated bits in one place.
+ * (authorizeAdminWrite -> one db.batch() with an audit_log row -> updated_at
+ * precondition) but keeps the repeated bits in one place.
  */
 
 import { NextResponse } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
 import { bustEdgeCache } from "@/lib/edgeCache";
 
 /** The public feed's path — every events write purges this edge-cache entry. */
 export const PUBLIC_EVENTS_PATH = "/api/public/events";
-
-/** getAdminDb() FIRST (session), THEN the CSRF/Origin check — same order as the venue routes. */
-export async function authorizeEventRequest(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
 
 /**
  * SELECT-form so `WHERE EXISTS` can skip the audit row when the event UPDATE

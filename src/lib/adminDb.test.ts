@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Tests for getAdminDb() — the single choke point for the ADMIN_DB D1
+ * Tests for getAdminDb() and authorizeAdminWrite() — the single choke point for the ADMIN_DB D1
  * binding (#237 checkpoint c; Better Auth sole-gate cutover,
  * auth/betterauth-sole-gate).
  *
@@ -13,7 +13,7 @@
  */
 
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { AccessDeniedError } from "@/lib/adminOrigin";
+import { AccessDeniedError, ADMIN_ORIGIN } from "@/lib/adminOrigin";
 
 // Vitest hoists vi.mock() calls above other top-level code (including this
 // module's own imports below), so getAdminDb() below picks up the mocked
@@ -30,7 +30,7 @@ vi.mock("@/lib/adminSession", () => ({
   requireAdminSession: (...args: unknown[]) => mockRequireAdminSession(...args),
 }));
 
-import { getAdminDb } from "@/lib/adminDb";
+import { authorizeAdminWrite, getAdminDb } from "@/lib/adminDb";
 
 function headersWith(cookie: string | null) {
   return {
@@ -102,5 +102,34 @@ describe("getAdminDb", () => {
 
     mockRequireAdminSession.mockResolvedValue({ email: "other-admin@example.com" });
     expect((await getAdminDb(headersWith("session=abc"))).identity.isOwner).toBe(false);
+  });
+});
+
+// Every non-GET /api/admin/* route gates through authorizeAdminWrite(). The
+// first row proves ORDER: no session AND a foreign Origin must come back as
+// no_session (401), never bad_origin. requireAdminOrigin() runs for real.
+describe("authorizeAdminWrite — session first, then Origin", () => {
+  beforeEach(() => {
+    mockGetCloudflareContext.mockReset();
+    mockRequireAdminSession.mockReset();
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: { __fake: "d1" } } });
+  });
+
+  test.each([
+    { name: "no session + foreign Origin -> no_session", session: false, origin: "https://evil.example", reason: "no_session" },
+    { name: "session + foreign Origin -> bad_origin", session: true, origin: "https://evil.example", reason: "bad_origin" },
+    { name: "session + admin Origin -> returns access", session: true, origin: ADMIN_ORIGIN, reason: null },
+  ])("$name", async ({ session, origin, reason }) => {
+    if (session) mockRequireAdminSession.mockResolvedValue({ email: "admin@pueblofoodmap.com" });
+    else mockRequireAdminSession.mockRejectedValue(new AccessDeniedError("no_session"));
+    const headers = { get: (name: string) => (name === "Origin" ? origin : null) };
+
+    if (reason) {
+      await expect(authorizeAdminWrite(headers)).rejects.toMatchObject({ reason });
+    } else {
+      const access = await authorizeAdminWrite(headers);
+      expect(access.db).toEqual({ __fake: "d1" });
+      expect(access.identity.email).toBe("admin@pueblofoodmap.com");
+    }
   });
 });

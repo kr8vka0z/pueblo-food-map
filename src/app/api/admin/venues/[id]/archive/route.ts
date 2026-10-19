@@ -59,16 +59,9 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import type { AdminVenueRow } from "@/types/venue";
-
-async function authorizeArchiveRequest(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
 
 // #265: SELECT-form (not VALUES) so the WHERE EXISTS guard can skip the
 // insert entirely when the archive UPDATE below didn't actually apply —
@@ -84,7 +77,7 @@ export async function POST(
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizeArchiveRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

@@ -48,24 +48,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
 import type { AdminVenueSourceType } from "@/types/venue";
 import { boxEventsForCreate, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";
-
-/**
- * getAdminDb() FIRST (identity/JWT), THEN the CSRF/Origin check — same
- * order and reasoning as publish/route.ts's authorizePublishRequest. Both
- * throw AccessDeniedError so POST's catch block handles either with one
- * 403 response shape.
- */
-async function authorizeCreateRequest(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
 
 // Deliberately mirrors scripts/seed-admin-db.ts's INSERT_COLUMNS list:
 // created_at/updated_at are omitted so the schema's own
@@ -218,7 +205,7 @@ async function resolveAddProposalTarget(db: D1Database, proposalId: number): Pro
 export async function POST(req: NextRequest): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizeCreateRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

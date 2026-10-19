@@ -49,15 +49,8 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-
-async function authorizeDoneRequest(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
 
 interface PendingClosureRow {
   target_venue_id: string | null;
@@ -79,7 +72,7 @@ export async function POST(
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizeDoneRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

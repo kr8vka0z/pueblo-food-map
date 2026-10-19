@@ -25,8 +25,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { loadBoxPhotoById, type BoxPhotoRow } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";
@@ -34,19 +33,13 @@ import { bustEdgeCache } from "@/lib/edgeCache";
 const AUDIT_INSERT_SQL =
   "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
-async function authorize(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorize(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

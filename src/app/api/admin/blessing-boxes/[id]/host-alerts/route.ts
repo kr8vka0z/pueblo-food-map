@@ -30,8 +30,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
@@ -49,12 +48,6 @@ import {
 const AUDIT_INSERT_SQL =
   "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
-async function authorize(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
-
 /** Normalizes ONCE at this route's boundary (item 3) — every lookup/write below reuses this same value, so "Foo@X.com" and "foo@x.com" are always the same row. */
 function parseEmail(raw: unknown): string | null {
   const email = typeof raw === "string" ? normalizeEmail(raw) : "";
@@ -68,7 +61,7 @@ export async function POST(
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorize(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }
@@ -147,7 +140,7 @@ export async function DELETE(
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorize(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

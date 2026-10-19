@@ -1089,7 +1089,7 @@ event** (see "Event page" below).
   `src/lib/eventTranslate.ts`). The owner does not write Spanish, so the form's
   "Suggest Spanish" button sends the English values and fills **only the
   Spanish boxes that are empty**. The route gates like the other event routes
-  (`authorizeEventRequest`), checks the same `FIELD_LIMITS` caps, asks Workers
+  (`authorizeAdminWrite`), checks the same `FIELD_LIMITS` caps, asks Workers
   AI through the `AI` binding (declared in `wrangler.jsonc` for production and
   `env.staging`; no key, secret or npm dependency), and returns
   `{ suggestions: { name_es, … } }`. It reads and writes no row and no audit
@@ -1384,7 +1384,9 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   reach the `ADMIN_DB` binding** and calls `requireAdminSession()` first, so
   no page or route — including a client-side navigation a layout guard would
   miss — reads admin data without a live session. Mutating `/api/admin/*`
-  routes also call `requireAdminOrigin()` (CSRF, `src/lib/adminOrigin.ts`).
+  routes also call `requireAdminOrigin()` (CSRF, `src/lib/adminOrigin.ts`),
+  through the shared `authorizeAdminWrite()` (`adminDb.ts`: session first,
+  then Origin).
   Failures map to a login redirect / 401 (no session) or 403 via
   `src/lib/adminAuthErrors.ts` (for admin *pages* the status is 200, see
   "Admin page speed" below). Cookie, allowlist and rate-limit gotchas:

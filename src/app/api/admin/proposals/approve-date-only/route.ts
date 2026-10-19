@@ -59,17 +59,10 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { applyApprovedProposal, isDateOnlyUpdateProposal, parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
 import { D1_MAX_BOUND_PARAMS, chunkArray } from "@/lib/d1";
-
-async function authorizeBulkApproveRequest(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
 
 /** Cap chosen well above any real /admin/flags queue's date-only subset (the first production run's whole queue was 107 proposals total) while still bounding one request's worth of sequential db.batch() calls. */
 const MAX_IDS_PER_REQUEST = 200;
@@ -106,7 +99,7 @@ async function loadProposalsByIds(db: D1Database, ids: number[]): Promise<Map<nu
 export async function POST(req: NextRequest): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizeBulkApproveRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

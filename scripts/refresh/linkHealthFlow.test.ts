@@ -7,7 +7,7 @@
  * again) and was closed, so it can no longer prove anything. This file
  * proves the same claim with a MOCKED response — no real third-party URL,
  * no dependency on any site staying broken forever — by driving the exact
- * three functions a real monthly run chains together (linkHealth.ts's
+ * three functions a real weekly run chains together (linkHealth.ts's
  * checkUrl -> diffEngine.ts's buildLinkHealthProposal ->
  * proposalSql.ts's buildProposalWriteStatements), the same sequence
  * scripts/refresh-ingest.ts's own step 4/6 run (see that file's header).
@@ -49,7 +49,7 @@ describe("link-health finding flows through to a change_proposals write", () => 
     const built = buildProposalWriteStatements(proposal, "2026-09-24T00:00:01.000Z", sqlText);
 
     // A link_health finding is never auto-applied — it always waits for a
-    // human review at /admin/flags (see proposalSql.ts's own header +
+    // human review in the Places tab's "To review" filter (see proposalSql.ts's own header +
     // adminProposals.ts's applyApprovedProposal, which refuses to apply a
     // link_health row directly).
     expect(built.autoApplied).toBe(false);

@@ -3,8 +3,9 @@
  * route test can run its real SQL (WHERE clauses, the updated_at
  * precondition, the batch) against a schema built from the real migration
  * files instead of a hand-written mock that can't catch a wrong query.
- * Implements only what the events code calls: prepare().bind().first/all/run
- * and batch() (atomic, like D1's). Never imported by production code.
+ * Implements only prepare().bind().first/all/run and batch() (atomic, like
+ * D1's). Errors surface when a statement runs, not at prepare(), as on real
+ * D1. Never imported by production code.
  */
 
 import Database from "better-sqlite3";

@@ -12,32 +12,13 @@ import { describe, test, expect, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
+import { sqliteD1 } from "@/lib/sqliteD1.testutil";
 import {
   runEmailRetentionCleanup,
   retentionCutoffIso,
   EMAIL_RETENTION_DAYS,
   EmailRetentionPartialFailure,
 } from "@/lib/emailRetention";
-
-// D1Database's real shape is a thin promise-returning wrapper around
-// better-sqlite3's synchronous API — this fake matches the one surface
-// runEmailRetentionCleanup uses (`prepare().bind().run()`, with
-// `result.meta.changes`), same convention as this repo's other D1 fakes.
-function wrapAsD1(db: Database.Database): D1Database {
-  return {
-    prepare: (sql: string) => {
-      const stmt = db.prepare(sql);
-      return {
-        bind: (...args: unknown[]) => ({
-          run: async () => {
-            const info = stmt.run(...args);
-            return { meta: { changes: info.changes } };
-          },
-        }),
-      };
-    },
-  } as unknown as D1Database;
-}
 
 function buildDb(): Database.Database {
   const db = new Database(":memory:");
@@ -97,7 +78,7 @@ describe("runEmailRetentionCleanup — real SQLite", () => {
 
   beforeEach(() => {
     sqlite = buildDb();
-    db = wrapAsD1(sqlite);
+    db = sqliteD1(sqlite);
   });
 
   test("blanks a 91-day-old submission's column AND strips the email out of payload", async () => {

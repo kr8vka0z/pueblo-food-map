@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
+import { sqliteD1 } from "@/lib/sqliteD1.testutil";
 import {
   buildActivityDays,
   describeDevice,
@@ -32,15 +33,6 @@ const MIGRATIONS = [
   "0010_box_adopters_alerts.sql",
   "0017_auth_events.sql",
 ];
-
-/** D1's `prepare().bind().all()` surface over better-sqlite3. */
-function wrapAsD1(db: Database.Database): D1Database {
-  const statement = (sql: string, args: unknown[] = []) => ({
-    bind: (...next: unknown[]) => statement(sql, next),
-    all: async () => ({ results: db.prepare(sql).all(...args) }),
-  });
-  return { prepare: (sql: string) => statement(sql) } as unknown as D1Database;
-}
 
 const OWNER = "kysboyd@gmail.com";
 const OTHER = "helper@example.com";
@@ -101,7 +93,7 @@ function audit(row: {
 beforeEach(() => {
   sqlite = new Database(":memory:");
   for (const m of MIGRATIONS) sqlite.exec(readFileSync(join(process.cwd(), "migrations", m), "utf-8"));
-  db = wrapAsD1(sqlite);
+  db = sqliteD1(sqlite);
   venue("v-pantry", "Eastside Pantry");
   venue("v-box", "Mesa Blessing Box");
 });

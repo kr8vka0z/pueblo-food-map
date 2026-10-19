@@ -1,14 +1,17 @@
 /**
- * Tests for VenueListView's name-as-edit-link affordance (#255, moved onto
- * the name and the separate Actions column removed by #672). Pre-#255
- * rendering (search/filter behavior) shipped in #253 with no dedicated test
- * file of its own; this file covers only the per-row name link rather than
- * retroactively writing full regression coverage for #253's own behavior —
- * out of scope for this slice.
+ * VenueListView tests — the admin's searchable/filterable Places table (#253):
+ * rendering, the status key and badges (#673), search, the quick-filter chips
+ * (#674, formerly a status <select>), the category filter, the empty state,
+ * the result count, the name-as-edit-link (#255, moved onto the name and the
+ * separate Actions column removed by #672), and the review items folded in
+ * from the Data refresh tab (#674) and the public Review queue (#675). The
+ * Server Component page that fetches D1 rows (src/app/(site)/admin/places/
+ * page.tsx) has its own page.test.tsx; this file covers the presentational
+ * component.
  */
 
 import { describe, test, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import VenueListView from "@/components/VenueListView";
 import type { AdminVenueRow } from "@/types/venue";
@@ -56,6 +59,24 @@ function makeStatusMap(venues: AdminVenueRow[], status: AdminDisplayStatus = "dr
   return Object.fromEntries(venues.map((v) => [v.id, status]));
 }
 
+// A four-row table, one per #673 status. last_verified is pinned so the
+// date-format case has a known value.
+const VENUES: AdminVenueRow[] = [
+  makeVenue({ id: "v1", name: "Eastside Pantry", category: "pantry", address: "101 E 5th St, Pueblo, CO 81001", status: "published", last_verified: "2026-01-01" }),
+  makeVenue({ id: "v2", name: "Main Street Grocery", category: "grocery", address: "200 N Main St, Pueblo, CO 81003", status: "published", last_verified: "2026-01-01" }),
+  makeVenue({ id: "v3", name: "Westside Garden", category: "garden", address: "300 W 4th St, Pueblo, CO 81003", status: "draft", last_verified: "2026-01-01" }),
+  makeVenue({ id: "v4", name: "Old Convenience Stop", category: "convenience", address: "400 S Elm St, Pueblo, CO 81003", status: "archived", last_verified: "2026-01-01" }),
+];
+
+// v1: unedited (live). v2: edited since publish (live · edits waiting).
+// v3: draft. v4: archived (removed).
+const STATUS_BY_ID: Record<string, AdminDisplayStatus> = {
+  v1: "live",
+  v2: "live_edits_waiting",
+  v3: "draft",
+  v4: "removed",
+};
+
 describe("VenueListView — name-as-edit-link affordance (#255, #672)", () => {
   test("each row's name links to /admin/venues/<id>/edit", () => {
     const venues = [makeVenue({ id: "manual-abc" }), makeVenue({ id: "manual-xyz", name: "Westside Grocery" })];
@@ -72,17 +93,200 @@ describe("VenueListView — name-as-edit-link affordance (#255, #672)", () => {
       "/admin/venues/manual-xyz/edit",
     );
   });
+});
 
-  test("no name link is rendered when the filtered list is empty", () => {
-    render(<VenueListView venues={[]} statusByVenueId={{}} />);
-    expect(screen.queryByRole("link")).toBeNull();
+// ─── Rendering ───────────────────────────────────────────────────────────────
+
+describe("VenueListView — renders venue table", () => {
+  test("renders a row for every venue", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    expect(screen.getByText("Eastside Pantry")).toBeDefined();
+    expect(screen.getByText("Main Street Grocery")).toBeDefined();
+    expect(screen.getByText("Westside Garden")).toBeDefined();
+    expect(screen.getByText("Old Convenience Stop")).toBeDefined();
   });
 
-  test("there is no separate Edit column or link — the name IS the link", () => {
-    const venues = [makeVenue()];
-    render(<VenueListView venues={venues} statusByVenueId={makeStatusMap(venues)} />);
-    expect(screen.queryByText(/^Edit$/)).toBeNull();
+  test("renders a real table with column headers, and no Actions/Edit column (#672)", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    expect(screen.getByRole("table")).toBeDefined();
+    expect(screen.getByRole("columnheader", { name: /name/i })).toBeDefined();
+    expect(screen.getByRole("columnheader", { name: /category/i })).toBeDefined();
+    expect(screen.getByRole("columnheader", { name: /status/i })).toBeDefined();
+    expect(screen.getByRole("columnheader", { name: /address/i })).toBeDefined();
+    expect(screen.getByRole("columnheader", { name: /last verified/i })).toBeDefined();
     expect(screen.queryByRole("columnheader", { name: /actions/i })).toBeNull();
+    // The name IS the edit link — no separate Edit text either.
+    expect(screen.queryByText(/^Edit$/)).toBeNull();
+  });
+
+  test("renders the human category label, not the raw category key", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    // Scoped to the table: "Grocery / Supermarket" / "grocery" also appear as
+    // an <option> in the category filter select, which would otherwise make
+    // this query ambiguous.
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Grocery / Supermarket")).toBeDefined();
+    expect(within(table).queryByText("grocery")).toBeNull();
+  });
+
+  test("renders one status badge per row, with human labels (#673)", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    const table = screen.getByRole("table");
+    expect(within(within(table).getByRole("row", { name: /Eastside Pantry/i })).getByText("Live")).toBeDefined();
+    expect(
+      within(within(table).getByRole("row", { name: /Main Street Grocery/i })).getByText("Live · edits waiting"),
+    ).toBeDefined();
+    expect(within(within(table).getByRole("row", { name: /Westside Garden/i })).getByText("Draft")).toBeDefined();
+    expect(
+      within(within(table).getByRole("row", { name: /Old Convenience Stop/i })).getByText("Removed"),
+    ).toBeDefined();
+  });
+
+  test("formats last_verified readably", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    expect(screen.getAllByText("Jan 1, 2026").length).toBeGreaterThan(0);
+  });
+});
+
+// ─── Status key (#673 pt.2) ──────────────────────────────────────────────────
+
+describe("VenueListView — status key", () => {
+  test("shows one line per status above the table", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    expect(screen.getByText("New, not on the public map yet.")).toBeDefined();
+    expect(screen.getByText("On the public map, exactly as shown.")).toBeDefined();
+    expect(screen.getByText("Approved or saved changes the map doesn't show until Publish.")).toBeDefined();
+    expect(screen.getByText("Taken off the map, kept for the record.")).toBeDefined();
+  });
+});
+
+// ─── Search ──────────────────────────────────────────────────────────────────
+
+describe("VenueListView — search", () => {
+  test("has an accessible search input", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    expect(screen.getByLabelText(/search/i)).toBeDefined();
+  });
+
+  test("narrows results by name", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    fireEvent.change(screen.getByLabelText(/search/i), { target: { value: "garden" } });
+    expect(screen.getByText("Westside Garden")).toBeDefined();
+    expect(screen.queryByText("Eastside Pantry")).toBeNull();
+    expect(screen.queryByText("Main Street Grocery")).toBeNull();
+    expect(screen.queryByText("Old Convenience Stop")).toBeNull();
+  });
+
+  test("narrows results by address", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    fireEvent.change(screen.getByLabelText(/search/i), { target: { value: "Elm" } });
+    expect(screen.getByText("Old Convenience Stop")).toBeDefined();
+    expect(screen.queryByText("Eastside Pantry")).toBeNull();
+  });
+
+  test("search is case-insensitive", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    fireEvent.change(screen.getByLabelText(/search/i), { target: { value: "GARDEN" } });
+    expect(screen.getByText("Westside Garden")).toBeDefined();
+  });
+});
+
+// ─── Filters ─────────────────────────────────────────────────────────────────
+//
+// #674 replaced the status <select> with quick-filter chips (the issue's own
+// spec: "quick-filter chips with counts (All / To review / Waiting to
+// publish / Draft / Live / Removed)") — these cases are rewritten, not just
+// added to, to exercise that new control instead of a dropdown that no
+// longer exists.
+
+describe("VenueListView — quick-filter chips (#674, formerly a status <select>)", () => {
+  test("has an accessible chip for every #673 status plus 'All places' and 'To review'", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    for (const label of ["All places", "To review", "Live · edits waiting", "Draft", "Removed"]) {
+      expect(screen.getByRole("button", { name: new RegExp(`^${label}`) })).toBeDefined();
+    }
+    // Exact match for "Live" — "Live · edits waiting" also starts with "Live ".
+    expect(screen.getByRole("button", { name: "Live (1)" })).toBeDefined();
+  });
+
+  test("filtering to Draft shows only draft venues", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Draft/ }));
+    expect(screen.getByText("Westside Garden")).toBeDefined();
+    expect(screen.queryByText("Eastside Pantry")).toBeNull();
+    expect(screen.queryByText("Main Street Grocery")).toBeNull();
+    expect(screen.queryByText("Old Convenience Stop")).toBeNull();
+  });
+
+  test("filtering to Live shows only unedited live venues", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    // Exact match, not a `/^Live/` regex — "Live · edits waiting" also
+    // starts with "Live " and would otherwise match too.
+    fireEvent.click(screen.getByRole("button", { name: "Live (1)" }));
+    expect(screen.getByText("Eastside Pantry")).toBeDefined();
+    expect(screen.queryByText("Main Street Grocery")).toBeNull();
+    expect(screen.queryByText("Westside Garden")).toBeNull();
+    expect(screen.queryByText("Old Convenience Stop")).toBeNull();
+  });
+
+  test("filtering to Live · edits waiting shows only that status", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Live · edits waiting/ }));
+    expect(screen.getByText("Main Street Grocery")).toBeDefined();
+    expect(screen.queryByText("Eastside Pantry")).toBeNull();
+  });
+
+  test("filtering to Removed shows only archived venues", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Removed/ }));
+    expect(screen.getByText("Old Convenience Stop")).toBeDefined();
+    expect(screen.queryByText("Eastside Pantry")).toBeNull();
+  });
+});
+
+describe("VenueListView — category filter", () => {
+  test("has an accessible category filter", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    expect(screen.getByLabelText(/category/i)).toBeDefined();
+  });
+
+  test("filtering to Grocery / Supermarket shows only that category", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    fireEvent.change(screen.getByLabelText(/category/i), { target: { value: "grocery" } });
+    expect(screen.getByText("Main Street Grocery")).toBeDefined();
+    expect(screen.queryByText("Eastside Pantry")).toBeNull();
+    expect(screen.queryByText("Westside Garden")).toBeNull();
+  });
+});
+
+// ─── Empty state ─────────────────────────────────────────────────────────────
+
+describe("VenueListView — empty state", () => {
+  test("shows a friendly message when no venues match", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    fireEvent.change(screen.getByLabelText(/search/i), { target: { value: "no-such-venue-xyz" } });
+    expect(screen.getByText(/no venues match your search/i)).toBeDefined();
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  test("renders the empty state, and no name link, when the venues prop itself is empty", () => {
+    render(<VenueListView venues={[]} statusByVenueId={{}} />);
+    expect(screen.getByText(/no venues match your search/i)).toBeDefined();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+});
+
+// ─── Count summary ───────────────────────────────────────────────────────────
+
+describe("VenueListView — result count", () => {
+  // #674: the count now reads "places" (rows can also be a synthetic
+  // "Suggested new place" row, not only a real venue) — see this file's own
+  // header note on the chip-filter rewrite above for why.
+  test("shows a count of filtered vs total places that updates on filter", () => {
+    render(<VenueListView venues={VENUES} statusByVenueId={STATUS_BY_ID} />);
+    expect(screen.getByText(/4 of 4 places/i)).toBeDefined();
+    fireEvent.change(screen.getByLabelText(/search/i), { target: { value: "garden" } });
+    expect(screen.getByText(/1 of 4 places/i)).toBeDefined();
   });
 });
 
@@ -270,6 +474,7 @@ describe("VenueListView — an archived venue's name stays a link when it has a 
     const venues = [makeVenue({ id: "manual-abc", status: "archived" })];
     render(<VenueListView venues={venues} statusByVenueId={{ "manual-abc": "removed" }} />);
     expect(screen.queryByRole("link", { name: "Eastside Pantry" })).toBeNull();
+    expect(screen.getByText("Eastside Pantry")).toBeDefined();
   });
 
   test("archived + a pending restore proposal -> stays a real link (its edit page's Suggestions box is a real action)", () => {

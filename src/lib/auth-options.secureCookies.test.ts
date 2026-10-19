@@ -21,7 +21,7 @@ import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getCookies, createCookieGetter } from "better-auth/cookies";
 import { buildAuthOptions } from "@/lib/auth-options";
-import { signInWithEmailCode } from "@/__tests__/helpers/authTestHelpers";
+import { authRequestHeaders, signInWithEmailCode } from "@/__tests__/helpers/authTestHelpers";
 
 describe("non-session cookies also get Secure restored (#595)", () => {
   test("session_data, account_data, and dont_remember all resolve secure:true", () => {
@@ -75,16 +75,6 @@ describe("passkey WebAuthn challenge cookie — real ceremony (#595, PR #614 rev
   ].join("\n");
   const ALLOWLISTED_EMAIL = "kysboyd@gmail.com"; // matches adminAllowlist.ts's default
 
-  function requestHeaders(extra?: Record<string, string>): Headers {
-    return new Headers({ host: "pueblofoodmap.com", ...extra });
-  }
-
-  async function signInAndGetSessionCookie(
-    auth: ReturnType<typeof betterAuth<ReturnType<typeof buildAuthOptions>>>,
-  ): Promise<string> {
-  return signInWithEmailCode(auth, ALLOWLISTED_EMAIL);
-  }
-
   beforeEach(() => {
     process.env.BETTER_AUTH_SECRET = "test-secret-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     process.env.RESEND_API_KEY = "test-resend-key";
@@ -99,10 +89,10 @@ describe("passkey WebAuthn challenge cookie — real ceremony (#595, PR #614 rev
     const db = new Database(":memory:");
     db.exec(MIGRATION_SQL);
     const auth = betterAuth(buildAuthOptions(db));
-    const cookieHeader = await signInAndGetSessionCookie(auth);
+    const cookieHeader = await signInWithEmailCode(auth, ALLOWLISTED_EMAIL);
 
     const response = await auth.api.generatePasskeyRegistrationOptions({
-      headers: requestHeaders({ cookie: cookieHeader }),
+      headers: authRequestHeaders({ cookie: cookieHeader }),
       asResponse: true,
     });
 

@@ -18,7 +18,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { NextRequest } from "next/server";
+import { makeFakeD1, makeSubmitRequest, mockTurnstileSuccess } from "@/__tests__/helpers/submitRouteTestHelpers";
 
 const mockCheckFormRateLimit = vi.fn();
 vi.mock("@/lib/formRateLimit", () => ({
@@ -33,37 +33,6 @@ const mockGetCloudflareContext = vi.fn();
 vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
-
-/**
- * A fake D1Database whose prepare/bind calls are spies, so tests can assert
- * on the exact bound values (not string interpolation) without a real DB.
- * `failRun: true` makes the eventual .run() reject, simulating a D1 outage.
- */
-function makeFakeD1(opts: { failRun?: boolean } = {}) {
-  const runMock = vi.fn(async () => {
-    if (opts.failRun) throw new Error("D1 write failed (simulated)");
-    return { success: true, results: [], meta: {} };
-  });
-  const bindMock = vi.fn<(...args: unknown[]) => { run: typeof runMock }>(() => ({ run: runMock }));
-  const prepareMock = vi.fn<(...args: unknown[]) => { bind: typeof bindMock }>(() => ({ bind: bindMock }));
-  const db = { prepare: prepareMock } as unknown as D1Database;
-  return { db, prepareMock, bindMock, runMock };
-}
-
-function makeRequest(body: Record<string, unknown>, ip = "127.0.0.1") {
-  return new NextRequest("http://localhost/report/submit", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "cf-connecting-ip": ip,
-    },
-    body: JSON.stringify(body),
-  });
-}
-
-function mockTurnstileSuccess() {
-  return vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
-}
 
 // garden-rmser is a real seed id (src/data/venues.ts) — required so
 // validate()'s server-side venue lookup passes.
@@ -99,7 +68,7 @@ describe("POST /report/submit", () => {
 
   test("honeypot filled → returns 200 {ok:true} silently (bot trap)", async () => {
     vi.stubGlobal("fetch", mockTurnstileSuccess());
-    const res = await POST(makeRequest({ ...validBody, website: "http://spam.example.com" }));
+    const res = await POST(makeSubmitRequest("/report/submit", { ...validBody, website: "http://spam.example.com" }));
     expect(res.status).toBe(200);
     const data = (await res.json()) as { ok: boolean };
     expect(data.ok).toBe(true);
@@ -109,15 +78,31 @@ describe("POST /report/submit", () => {
 
   test("honeypot empty → proceeds to validation (real user path)", async () => {
     vi.stubGlobal("fetch", mockTurnstileSuccess());
-    const res = await POST(makeRequest({ ...validBody, issueType: "", description: "short" }));
+    const res = await POST(makeSubmitRequest("/report/submit", { ...validBody, issueType: "", description: "short" }));
     expect(res.status).toBe(422);
+  });
+
+  // #595: a non-string contactEmail used to reach isValidEmail()'s .slice()
+  // and throw an unhandled 500 instead of the intended 422.
+  test.each([
+    ["a number", 12345],
+    ["an object", { foo: "bar" }],
+  ])("contactEmail as %s → 422 Invalid email format, not a 500 (#595)", async (_label, contactEmail) => {
+    vi.stubGlobal("fetch", mockTurnstileSuccess());
+
+    const res = await POST(makeSubmitRequest("/report/submit", { ...validBody, contactEmail }));
+
+    expect(res.status).toBe(422);
+    const data = (await res.json()) as { ok: boolean; error: string };
+    expect(data.ok).toBe(false);
+    expect(data.error).toBe("Invalid email format");
   });
 
   describe("Turnstile verification", () => {
     test("missing turnstileToken → 400 turnstile_failed, never calls the rate limiter", async () => {
       const mockFetch = vi.fn();
       vi.stubGlobal("fetch", mockFetch);
-      const res = await POST(makeRequest({ ...validBody, turnstileToken: undefined }));
+      const res = await POST(makeSubmitRequest("/report/submit", { ...validBody, turnstileToken: undefined }));
       expect(res.status).toBe(400);
       const data = (await res.json()) as { error: string };
       expect(data.error).toBe("turnstile_failed");
@@ -130,7 +115,7 @@ describe("POST /report/submit", () => {
         "fetch",
         vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ success: false }) }),
       );
-      const res = await POST(makeRequest(validBody));
+      const res = await POST(makeSubmitRequest("/report/submit", validBody));
       expect(res.status).toBe(400);
     });
   });
@@ -141,7 +126,7 @@ describe("POST /report/submit", () => {
       const { db } = makeFakeD1();
       mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
 
-      await POST(makeRequest(validBody, "198.51.100.7"));
+      await POST(makeSubmitRequest("/report/submit", validBody, "198.51.100.7"));
 
       expect(mockCheckFormRateLimit).toHaveBeenCalledTimes(1);
       const [passedDb, passedSecret, passedForm, passedIp] = mockCheckFormRateLimit.mock.calls[0];
@@ -155,7 +140,7 @@ describe("POST /report/submit", () => {
       vi.stubGlobal("fetch", mockTurnstileSuccess());
       mockCheckFormRateLimit.mockResolvedValueOnce(false);
 
-      const res = await POST(makeRequest(validBody));
+      const res = await POST(makeSubmitRequest("/report/submit", validBody));
 
       expect(res.status).toBe(429);
       const data = (await res.json()) as { ok: boolean; error: string };
@@ -169,7 +154,7 @@ describe("POST /report/submit", () => {
       mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
       mockCheckFormRateLimit.mockResolvedValueOnce(false);
 
-      const res = await POST(makeRequest(validBody));
+      const res = await POST(makeSubmitRequest("/report/submit", validBody));
 
       expect(res.status).toBe(429);
       expect(prepareMock).not.toHaveBeenCalled();
@@ -182,7 +167,7 @@ describe("POST /report/submit", () => {
         throw new Error("no cloudflare context");
       });
 
-      const res = await POST(makeRequest(validBody));
+      const res = await POST(makeSubmitRequest("/report/submit", validBody));
 
       expect(res.status).toBe(503);
       const data = (await res.json()) as { ok: boolean; error: string };
@@ -196,7 +181,7 @@ describe("POST /report/submit", () => {
       vi.stubEnv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA");
       vi.stubGlobal("fetch", mockTurnstileSuccess());
 
-      await expect(POST(makeRequest(validBody))).rejects.toThrow("CHECKIN_RATE_LIMIT_SECRET not configured");
+      await expect(POST(makeSubmitRequest("/report/submit", validBody))).rejects.toThrow("CHECKIN_RATE_LIMIT_SECRET not configured");
     });
   });
 
@@ -213,7 +198,7 @@ describe("POST /report/submit", () => {
       mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
       vi.stubGlobal("fetch", mockTurnstileAndResendSuccess());
 
-      const res = await POST(makeRequest(validBody));
+      const res = await POST(makeSubmitRequest("/report/submit", validBody));
 
       expect(res.status).toBe(200);
       const data = (await res.json()) as { ok: boolean };
@@ -251,7 +236,7 @@ describe("POST /report/submit", () => {
         website: validBody.website,
         turnstileToken: validBody.turnstileToken,
       };
-      const res = await POST(makeRequest(bodyWithoutEmail));
+      const res = await POST(makeSubmitRequest("/report/submit", bodyWithoutEmail));
 
       expect(res.status).toBe(200);
       const [, , , submitterEmail] = bindMock.mock.calls[0];
@@ -264,7 +249,7 @@ describe("POST /report/submit", () => {
       vi.stubGlobal("fetch", mockTurnstileAndResendSuccess());
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      const res = await POST(makeRequest(validBody));
+      const res = await POST(makeSubmitRequest("/report/submit", validBody));
 
       expect(res.status).toBe(200);
       const data = (await res.json()) as { ok: boolean };
@@ -285,7 +270,7 @@ describe("POST /report/submit", () => {
         "fetch",
         vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ success: false }) }),
       );
-      const res = await POST(makeRequest({ ...validBody, turnstileToken: "bad-token" }));
+      const res = await POST(makeSubmitRequest("/report/submit", { ...validBody, turnstileToken: "bad-token" }));
       expect(res.status).toBe(400);
       expect(mockGetCloudflareContext).not.toHaveBeenCalled();
     });
@@ -295,7 +280,7 @@ describe("POST /report/submit", () => {
         "fetch",
         vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) }),
       );
-      const res = await POST(makeRequest({ ...validBody, website: "http://spam.example.com" }));
+      const res = await POST(makeSubmitRequest("/report/submit", { ...validBody, website: "http://spam.example.com" }));
       expect(res.status).toBe(200);
       expect(mockGetCloudflareContext).not.toHaveBeenCalled();
     });
@@ -308,7 +293,7 @@ describe("POST /report/submit", () => {
         vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) }),
       );
 
-      const res = await POST(makeRequest({ ...validBody, description: "short" }));
+      const res = await POST(makeSubmitRequest("/report/submit", { ...validBody, description: "short" }));
 
       expect(res.status).toBe(422);
       expect(mockGetCloudflareContext).toHaveBeenCalled(); // rate-limit check runs before validation

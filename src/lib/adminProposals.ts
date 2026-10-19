@@ -152,15 +152,15 @@ export function renameMetaOf(diff: ProposedDiff | null): { from_id: string; to_i
   return r && typeof r.from_id === "string" && typeof r.to_id === "string" ? { from_id: r.from_id, to_id: r.to_id } : null;
 }
 
-// ─── Shared diff-field selection (admin dashboard build, NeedsDecisionPanel) ─
+// ─── Shared diff-field selection ────────────────────────────────────────────
 
 /**
  * Fields worth showing in a before/after diff view — `last_verified` is a
  * pure freshness stamp (every add/update proposal carries it, but it isn't
  * something an admin needs to eyeball) and `id` is already shown elsewhere as
  * the card's own venue identifier. Exported so ProposalCard.tsx's
- * full FieldDiff table AND NeedsDecisionPanel's compact one-line summary
- * (Dashboard's "Needs a decision" panel) read the SAME set — a second,
+ * full FieldDiff table AND VenueListView.tsx's compact one-line summary
+ * (the Places tab row) read the SAME set — a second,
  * independently-filtered list here would risk the two screens disagreeing
  * about which fields "changed" for the same proposal.
  */
@@ -378,12 +378,11 @@ export async function applyApprovedProposal(
 
   const parsed = parseProposalRow(proposalRow);
   if (parsed.parseError) {
-    // #568 item 3: no `message` here used to mean both review surfaces
-    // (NeedsDecisionPanel.tsx's ApproveButton, ProposalCard.tsx)
-    // fell back to their own generic "Try again"/"Something went wrong" —
-    // for a corrupted row, retrying can never succeed, so that copy was
-    // actively misleading. Fixed at the shared source both surfaces
-    // already read `body.message` from, not duplicated in either.
+    // #568 item 3: without a `message` here, ProposalCard.tsx (on the Places
+    // tab and in the edit page's SuggestionsBox) falls back to its generic
+    // "Try again" copy — for a corrupted row, retrying can never succeed, so
+    // that copy would be actively misleading. Set at the shared source the
+    // card already reads `body.message` from.
     return {
       ok: false,
       status: 422,

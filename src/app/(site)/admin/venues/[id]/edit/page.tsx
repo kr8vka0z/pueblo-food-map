@@ -69,9 +69,8 @@
  *
  * #677: for the same `blessing_box` check, resolveBoxReviewItems() loads
  * this box's own pending/flagged photos and pending sponsor requests, shown
- * right under the title in BoxReviewBox.tsx's "Things to review" box — the
- * on-page home for what used to live only on the now-folded-away
- * /admin/box-photos and /admin/box-adopters tabs. See that resolver's own
+ * right under the title in BoxReviewBox.tsx's "Things to review" box. See
+ * that resolver's own
  * header for why this reuses the tab's existing loaders rather than a new
  * query.
  *

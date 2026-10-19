@@ -1,10 +1,6 @@
 /**
- * /admin — the Dashboard. Overhauled for #680 ("Admin Dashboard overhaul:
- * needs-you strip, visitors (Cloudflare), blessing box numbers, map data
- * health"): replaces the earlier "to-do list first" build's
- * NeedsDecisionPanel / "Boxes that need help" / "Places due for a check"
- * blocks (issue #680's own Layout item 2: "This replaces today's
- * NeedsDecisionPanel / needs-help list / stale list blocks") with a
+ * /admin — the Dashboard (#680, "Admin Dashboard overhaul: needs-you strip,
+ * visitors (Cloudflare), blessing box numbers, map data health"): a
  * greeting + 7/30/90-day period switch, a 4-card "Needs you" strip, a
  * Cloudflare Web Analytics Visitors section, a Blessing Boxes numbers
  * section (reusing src/lib/boxStats.ts, the SAME math the public Boxes page
@@ -285,15 +281,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const showPublishBar = !isStaging && (publishSummary.newDrafts > 0 || publishSummary.editedSincePublish > 0 || publishSummary.archived > 0);
   const waitingToPublishCount = publishSummary.newDrafts + publishSummary.editedSincePublish + publishSummary.archived;
 
-  const needsHelpBoxes = rankNeedsHelp(boxHealthEntries); // unlimited — same predicate #671's own "Needs help" filter will use
+  const needsHelpBoxes = rankNeedsHelp(boxHealthEntries); // same NEEDS_HELP_STATUSES as the Boxes tab's "Needs help" filter
 
   // ─── "Needs you" strip (#680 Layout item 2) ────────────────────────────
-  // Card 1 is a TEMPORARY combined-count fallback until #675 lands (folding
-  // the public Review queue into Places too) — see this file's own header.
-  // Card 3's own combined-count fallback ended with #677 (Photo review +
-  // Sponsor requests folded into the Blessing Boxes tab) — its href now
-  // points at that tab's own "To review" filter instead of the retired
-  // /admin/box-photos queue.
+  // Cards 1 and 3 each combine two counts and link to their tab's own
+  // "To review" filter.
   const needsCards: NeedsCardData[] = [
     {
       key: "review",

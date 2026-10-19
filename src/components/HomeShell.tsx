@@ -111,13 +111,16 @@ export default function HomeShell({ locale }: { locale: Locale }) {
         {/* list-none explicitly, rather than relying on Tailwind Preflight, so
             no bullet can ever show over the map. */}
         <ul className="list-none">
-          {HOME_CRAWL_LINKS.map(({ href, label }) => (
-            <li key={href}>
-              <Link href={localizedHref(href, locale)} className={HOME_CRAWL_LINK_CLASS}>
-                {label[locale]}
-              </Link>
-            </li>
-          ))}
+          {HOME_CRAWL_LINKS.map(({ href, label }) => {
+            const treeHref = localizedHref(href, locale);
+            return (
+              <li key={treeHref}>
+                <Link href={treeHref} className={HOME_CRAWL_LINK_CLASS}>
+                  {label[locale]}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </nav>
       {/* Must sit right before HomePageClient: runs before the splash markup is

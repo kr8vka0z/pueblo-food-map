@@ -881,7 +881,7 @@ therefore fetches the three shell pages itself and caches every
 `/_next/static` and `/fonts` URL their HTML references. The venue dataset is
 compiled into those pages and bundles (`src/data/published-venues.ts`), so
 the list and the in-map venue card work offline. Live blessing-box status
-(`/api/public/blessing-boxes`) does not — `useBoxVenues` already treats a
+(`/api/public/blessing-boxes`) does not — `useBoxesList` already treats a
 failed fetch as "no boxes". `/venue/<id>` detail pages and other routes are
 not cached.
 

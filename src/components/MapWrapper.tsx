@@ -62,11 +62,10 @@ import {
 } from "@/data/pueblo-bbox";
 import { useMapFilters } from "@/lib/useMapFilters";
 import { haversineMiles } from "@/lib/distance";
-import { useBoxesList } from "@/lib/useBoxesList";
+import { useBoxesList, toVenue } from "@/lib/useBoxesList";
 import { useEventsFeed } from "@/lib/useEvents";
 import { useEventDetail } from "@/lib/useEventDetail";
 import { pinsAt, listOrder, syncEventParam, eventHereLabel } from "@/lib/eventPins";
-import { toVenue } from "@/lib/useBoxVenues";
 import EventStrip from "@/components/EventStrip";
 import EventsEmptyNotice from "@/components/EventsEmptyNotice";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
@@ -955,8 +954,8 @@ export default function MapWrapper({
 
   // ── Blessing boxes (slice 1, map-first rework 2026-09-18) — live layer,
   // fetched ONCE client-side (useBoxesList's full PublicBlessingBox shape,
-  // not useBoxVenues' second fetch of the same endpoint — see toVenue's own
-  // header in useBoxVenues.ts) and merged into the same filter/count/marker
+  // stripped to plain Venues by its toVenue for the pins) and merged into
+  // the same filter/count/marker
   // pipeline every other venue flows through (useMapFilters' own header
   // explains why). boxIdSet lets the mapUnavailable deep-link effect below
   // tell "this id is a box" apart from an unknown id with one Set lookup —

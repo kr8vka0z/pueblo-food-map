@@ -3,8 +3,12 @@
 **Status:** v1.0 — design approved by Kyle 2026-09-16. **Implemented** in #449 (PR to `dev`).
 **Amended 2026-09-19** (#516, Kyle): 5th item "Boxes", "Resources" renamed "Help", Spanish
 "Cerca de mí" → "Cercanos" — see the dated amendment blocks in §3, §3.2, §11, §12, §13.
-**§5 amended 2026-09-16 by Kyle:** cutover moved from `2xl` (1280px) to `2xl` (1536px) —
+**§5 amended 2026-09-16 by Kyle:** cutover moved from `xl` (1280px) to `2xl` (1536px) —
 at 1280 the pill measured wider than the space beside the search box.
+**Amended 2026-10-19 (documentation only):** `ViewToggle` was replaced by `ViewSuggestion`
+in #514 (2026-09-19) and `SponsorCredit` was removed (its line moved into the Menu drawer
+in #459, component deleted in #461, 2026-09-16). Sections still describing either are
+history, marked where they appear.
 **Author:** Atlas (Claude Opus 5), 2026-09-16.
 **Scope:** Replaces the floating navy hamburger button, the orange "Find food near me"
 map banner, and the desktop "Pueblo Food Map" wordmark with a single persistent
@@ -13,7 +17,7 @@ Map/List switch inside the search box with both labels visible. Adds a fade band
 Mapbox attribution and the sponsor line stay readable above the bar.
 **Deliverable:** Component-level specification precise enough to implement without
 further design decisions. Supersedes the mobile chrome described in
-`docs/design-spec.md` §5 where the two conflict.
+the original design-spec (see git history) §5 where the two conflict.
 
 This document is the source of truth for this change. Each section states **the
 decision** first, then **the rationale**.
@@ -75,7 +79,7 @@ thumb-reachable region was unused.
 | `src/components/HamburgerMenu.tsx` | Keep the drawer, delete its trigger button and its duplicate Map/List row; add an `initialSection` prop. |
 | `src/components/LocateButton.tsx` | **Deleted.** Its state machine moves into `BottomNav`'s "Near me" item. |
 | `src/components/ListView.tsx` | Bottom padding so the last card clears the bar. |
-| `src/components/SponsorCredit.tsx` | Bottom offset clears the bar. |
+| `src/components/SponsorCredit.tsx` | Bottom offset clears the bar. *(Removed 2026-09-16, #459/#461; the sponsor line now lives in the Menu drawer.)* |
 | `src/app/globals.css` | Mapbox attribution control offset; fade-band custom properties. |
 | `src/lib/i18n.ts` | Four new keys, EN + ES. |
 
@@ -227,6 +231,12 @@ section, "Saved" is active and that statement is accurate.
 
 ## 4. The search-box view switch
 
+> **Superseded (#514, 2026-09-19):** `ViewToggle` no longer exists. The Map/List switch left
+> the search box; `ViewSuggestion` (a one-row popup under the focused, empty search bar)
+> replaced it, and `HamburgerMenu` regained a "List view" / "Map view" line (it had lost its
+> Map/List row in this change). See DESIGN.md "ViewSuggestion". Everything below in §4 is
+> the original, pre-#514 decision record.
+
 > **Amendment (Kyle, 2026-09-16):** §4.1 and §4.3 are superseded. The switch is now
 > icons only under `md` (768px) and shows "Map / List" words from `md` up, chip or no
 > chip. On a phone the words cost the search box typing room (~65px in Spanish), and the
@@ -295,7 +305,7 @@ controls for one piece of state that can disagree visually is a bug waiting to b
 
 ## 5. Breakpoints
 
-**The decision:** the cutover is Tailwind `2xl` (1536px). *(Amended 2026-09-16 — was `2xl`, 1280px.)*
+**The decision:** the cutover is Tailwind `2xl` (1536px). *(Amended 2026-09-16 — was `xl`, 1280px.)*
 
 - Below `2xl`: bottom bar (`2xl:hidden`), fade band, credits lifted.
 - `2xl` and above: no bar, no band, credits untouched in their existing corners. The four
@@ -306,7 +316,7 @@ controls for one piece of state that can disagree visually is a bug waiting to b
 **The rationale:** the search pill is a fixed 520px wide and centred, and the nav pill
 starts 12px to its right (x = 50% + 272px). Measured on dev.pueblofoodmap.com after #449,
 the pill is 387px wide in English and 414px in Spanish. At 1280px only 352px is free
-(1280 − 912 − 16), so the original `2xl` cutover overflowed the screen — "Menu" cut off in
+(1280 − 912 − 16), so the original `xl` cutover overflowed the screen — "Menu" cut off in
 English, "Menú" gone in Spanish. At 1536px the pill starts at x1040 and 480px is free, so
 both languages fit. At 820px (tablet) the gap is ~134px, so the tablet keeps the bar.
 Cost accepted by Kyle: 1280–1535px laptops get the bottom bar.
@@ -448,7 +458,7 @@ z-index: 999;
 
 `aria-hidden="true"`. Rendered only below `2xl`, **and only in map mode** — in list mode
 the band would be blurring a list of cards for no benefit at a per-frame cost.
-`SponsorCredit` is already map-mode-only for the same reason (#129).
+`SponsorCredit` was already map-mode-only for the same reason (#129; the component was later removed, see the 2026-10-19 note at the top).
 
 **The three presets that were rendered and compared:**
 
@@ -503,6 +513,9 @@ machinery than the problem is worth.
 ---
 
 ## 9. Credits above the bar
+
+> **Note (2026-10-19):** `SponsorCredit` was removed (#459/#461, 2026-09-16), so its bullet
+> below is history. The Mapbox attribution rule is the part that still applies.
 
 **The decision:**
 
@@ -560,6 +573,9 @@ modal (in front of it). Neither is right. The sheet already hides `SponsorCredit
 fully expanded for the same reason; this extends the existing rule rather than adding a
 new one.
 
+> **Historical (2026-10-19 note):** `SponsorCredit` no longer exists (removed #459/#461);
+> the paragraph above and the amendment below that mention it are kept as the original record.
+>
 > **Amended 2026-09-16 by Kyle:** `SponsorCredit` now hides at every detent too, not just
 > fully expanded. It sits above the sheet's z-index, so at the peek detent "Sponsored by
 > Pueblo Food Project" printed across the Walk / Bus / Drive buttons (seen on an iPhone).
@@ -649,14 +665,13 @@ geometry above.
 3. Opening the Saved panel sets `aria-current` on Saved and on nothing else.
 4. "Near me" is disabled and shows the spinner while `isLocating` is true.
 5. The band carries `aria-hidden="true"` and `pointer-events: none`.
-6. `ViewToggle` at `size="md"` renders both labels as visible text (not `sr-only`) in the default case.
-7. `HamburgerMenu` no longer renders a Map/List row.
-8. `SponsorCredit`'s computed bottom offset includes the bar height below `2xl`.
+6. *(Superseded, #514: `ViewToggle` no longer exists.)* `ViewToggle` at `size="md"` renders both labels as visible text (not `sr-only`) in the default case.
+7. *(Superseded, #514: `HamburgerMenu` has a List view / Map view line again.)* `HamburgerMenu` no longer renders a Map/List row.
+8. *(Superseded, #459/#461: `SponsorCredit` was removed.)* `SponsorCredit`'s computed bottom offset includes the bar height below `2xl`.
 9. **(#516)** Boxes carries `aria-pressed` matching `boxesActive`, and tapping it calls `onBoxesToggle` — not `onSectionTap` (it never opens the drawer).
 10. **(#670)** Boxes' heart path fills `currentColor` only when `boxesActive`, the house paths never fill, and the button carries no inline background style either way (`BottomNav.test.tsx`); every bar item suppresses the native tap-highlight overlay (`-webkit-tap-highlight-color`). `nearestBoundsAround` (centered on origin, exactly the nearest n, fewer-than-n, zero venues) is covered on its own in `nearestBoundsAround.test.ts`; MapWrapper's wiring (Boxes-on with a known location fits the nearest-5 bounds, unknown fits all, never calls `getCurrentPosition`, Boxes-off restores the all-venues fit, and the `/?boxes=1` hand-off follows the same known/unknown rule without waiting on geolocation) is covered in `MapWrapperBoxesFit.test.tsx`.
 
-Test 6 is the regression guard for the whole §4 premise — if a future change reinstates
-`sr-only` on the inactive segment, that test fails.
+Test 6 was the regression guard for the whole §4 premise; it went away with `ViewToggle`.
 
 ---
 
@@ -689,7 +704,7 @@ Kyle sees it on dev before anything is promoted to production.
 
 ## 15. What this supersedes
 
-- `docs/design-spec.md` §5 (mobile layout) where it describes the top-left hamburger
+- The original design-spec (see git history) §5 (mobile layout) where it describes the top-left hamburger
   and the floating locate banner.
 - The stale comments in `MapWrapper.tsx` (file header, and line ~1236) describing the
   locate button as "top-right" and "bottom-center". Both were wrong before this change —

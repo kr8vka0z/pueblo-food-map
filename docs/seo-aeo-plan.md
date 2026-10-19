@@ -1,9 +1,10 @@
 # SEO / AEO plan
 
-Status: **draft v2** (2026-09-28). Kyle's decisions are in §6. v1 was written from the code
-alone; v2 adds a live audit of pueblofoodmap.com, the non-prod hosts, search
-results and competing directories. Nothing here is scheduled yet; each phase
-becomes one issue (and, where it's code, one PR into `dev`) once agreed.
+Status (2026-10-19): **Phases 0, 2, 3 and 4 have shipped; Phases 1 and 5 are ongoing
+(Kyle).** Kyle's decisions are in §6. v1 was written from the code alone; v2 (2026-09-28)
+added a live audit of pueblofoodmap.com, the non-prod hosts, search results and
+competing directories. Each phase's own **Status** line below records what shipped
+and where.
 
 **Goal:** when someone in Pueblo County searches, or asks an AI assistant, "where
 can I get free food near me / today / that takes SNAP", the answer names a
@@ -73,8 +74,8 @@ Unchanged from v1. They're the test set for every phase and for measurement (§4
 
 ### Phase 0: Get crawled and measured (one small PR + dashboard tasks, do first)
 
-**Status:** code items 1–4 are built on `claude/seo-aeo-plan-review-ss66kh`
-(PR into `dev`). Items 5–7 are done (2026-09-29). Item 8 is Kyle's.
+**Status:** code items 1–4 shipped (#692, promoted to prod in #694). Items 5–7 are
+done (2026-09-29). Item 8 is Kyle's.
 
 Code (one PR into `dev`):
 

@@ -21,12 +21,11 @@ const en: Record<string, string> = {
   "jsonld.website.description":
     "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores.",
 
-  // Per-page <title>/<meta description> for the /es tree's thin wrapper
-  // pages (#689 PR 2, src/app/es/**/page.tsx). Their EN counterparts keep
-  // hand-written literals in page.tsx (unchanged, #287's original design) —
-  // these keys exist so the ES side gets the same native-speaker [CHECK]
-  // review as every other locale-facing string, instead of a raw literal
-  // buried in a page file.
+  // Per-page <title>/<meta description> for /, /about, /resources and
+  // /venues. Both trees read these keys (the EN page.tsx with "en", the /es
+  // thin wrapper with "es", #689 PR 2), the same way the SEO hub pages do,
+  // so the two languages can't drift apart and the ES side gets the same
+  // native-speaker [CHECK] review as every other locale-facing string.
   "meta.home.title": "Pueblo Food Map — Food Resources in Pueblo County, CO",
   "meta.home.description":
     "Find free and low-cost food near you in Pueblo County, CO — pantries, community gardens, grocery stores, and meal sites, with SNAP/WIC info and directions.",
@@ -48,17 +47,6 @@ const en: Record<string, string> = {
   "search.placeholder": "Search",
   "search.aria": "Search places",
   "search.shortcut": "⌘K",
-
-  // Category labels
-  "category.all": "All",
-  "category.pantry": "Pantry",
-  "category.grocery": "Grocery",
-  "category.convenience": "Convenience",
-  "category.farm": "Farm",
-  "category.garden": "Garden",
-  "category.edible_landscape": "Edible Landscape",
-  "category.meal_site": "Meal Site",
-  "category.blessing_box": "Blessing Box",
 
   // Category labels (full)
   "category.full.pantry": "Food Pantry",
@@ -101,7 +89,6 @@ const en: Record<string, string> = {
   "detail.contact": "CONTACT",
   "detail.about": "ABOUT",
   "detail.sources": "SOURCES & DATA",
-  "detail.lastVerified": "Last verified",
   "detail.acceptsSnap": "Accepts SNAP",
   "detail.acceptsWic": "Accepts WIC",
   "detail.plentifulLink": "See hours, eligibility & what to bring on Plentiful",
@@ -482,9 +469,6 @@ const en: Record<string, string> = {
   // LanguageToggle group aria-label (#i18n-leaks)
   "lang.toggle.label": "Language selection",
 
-  // CategoryChips group aria-label (#i18n-leaks)
-  "chips.filterByCategory": "Filter by category",
-
   // SuggestForm SNAP/WIC fieldset legend — WCAG 1.3.1 (#i18n-leaks)
   "suggest.benefits.legend": "Accepted benefits",
 
@@ -778,7 +762,7 @@ const en: Record<string, string> = {
   "box.needs.diapers": "Diapers",
   "box.needs.hygiene": "Hygiene items",
   "box.needs.pet_food": "Pet food",
-  "box.needs.drinks": "Water / drinks",
+  "box.needs.drinks": "Drinks",
   "box.needs.warm_clothing": "Warm clothing",
   // The self-filling "Most needed" label (BoxCardBody.tsx) when no admin
   // most_needed text is set — distinguishes visitor-sourced data from the
@@ -823,8 +807,6 @@ const en: Record<string, string> = {
   "box.photo.reportConfirm": "Hide this photo and send it for review?",
   "box.photo.reportThanks": "Thanks — this photo has been hidden pending review.",
   "box.photo.reportError": "That didn't go through. Please try again.",
-  "box.photo.morePhotos": "Show more photos",
-  "box.photo.none": "No photos yet",
 
   // "box.recentCheckin.heading"/"box.recentCheckin.none" deleted (card
   // redesign, 2026-09-19) — the standalone "Most recent check-in" line is
@@ -1207,7 +1189,7 @@ const en: Record<string, string> = {
   "hubs.gardens.section.edible_landscape": "Edible landscapes",
   "hubs.gardens.introFree": "There are {count} free community gardens and edible landscapes on the map in Pueblo County, CO. Each one is listed below with its address and hours where we have them.",
   "hubs.gardens.introPlain": "There are {count} community gardens and edible landscapes on the map in Pueblo County, CO. Each one is listed below with its address and hours where we have them.",
-  // /resources FAQ (#709). Sources and fetch dates: src/components/ResourcesFaq.tsx.
+  // /resources FAQ (#709). Sources and fetch dates: src/lib/resourcesFaq.ts.
   "resources.faq.heading": "Common questions",
   "resources.faq.q1": "How do I apply for SNAP in Pueblo County?",
   "resources.faq.a1": "You can apply online with Colorado PEAK or the MyCOBenefits app, or fill out a paper application and return it to your county human services office. The county decides who qualifies, based on income, resources and household size. The Food Resource Hotline at 855-855-4626 can help you apply by phone.",
@@ -1254,17 +1236,6 @@ const es: Record<string, string> = {
   "search.aria": "Buscar lugares",
   "search.shortcut": "⌘K",
 
-  // Category labels
-  "category.all": "Todos",
-  "category.pantry": "Despensa",
-  "category.grocery": "Supermercado",
-  "category.convenience": "Conveniencia",
-  "category.farm": "Granja",
-  "category.garden": "Huerto",
-  "category.edible_landscape": "Paisaje comestible", // [CHECK]
-  "category.meal_site": "Comedor",
-  "category.blessing_box": "Caja de bendiciones", // [CHECK]
-
   // Category labels (full)
   "category.full.pantry": "Despensa de alimentos",
   "category.full.grocery": "Supermercado",
@@ -1302,7 +1273,6 @@ const es: Record<string, string> = {
   "detail.contact": "CONTACTO",
   "detail.about": "ACERCA DE",
   "detail.sources": "FUENTES Y DATOS",
-  "detail.lastVerified": "Última verificación",
   "detail.acceptsSnap": "Acepta SNAP",
   "detail.acceptsWic": "Acepta WIC",
   "detail.plentifulLink": "Ver horarios, elegibilidad y qué llevar en Plentiful",
@@ -1647,9 +1617,6 @@ const es: Record<string, string> = {
   // LanguageToggle group aria-label (#i18n-leaks)
   "lang.toggle.label": "Selección de idioma",
 
-  // CategoryChips group aria-label (#i18n-leaks)
-  "chips.filterByCategory": "Filtrar por categoría",
-
   // SuggestForm SNAP/WIC fieldset legend (#i18n-leaks)
   "suggest.benefits.legend": "Beneficios aceptados",
 
@@ -1860,7 +1827,7 @@ const es: Record<string, string> = {
   "box.needs.diapers": "Pañales", // [CHECK]
   "box.needs.hygiene": "Artículos de higiene", // [CHECK]
   "box.needs.pet_food": "Comida para mascotas", // [CHECK]
-  "box.needs.drinks": "Agua / bebidas", // [CHECK]
+  "box.needs.drinks": "Bebidas", // [CHECK]
   "box.needs.warm_clothing": "Ropa de abrigo", // [CHECK]
   "box.mostNeeded.fromVisitors": "Lo más necesitado · según quienes usan esta caja", // [CHECK]
 
@@ -1887,8 +1854,6 @@ const es: Record<string, string> = {
   "box.photo.reportConfirm": "¿Ocultar esta foto y enviarla para revisión?", // [CHECK]
   "box.photo.reportThanks": "Gracias — esta foto se ha ocultado en espera de revisión.", // [CHECK]
   "box.photo.reportError": "Eso no se pudo enviar. Por favor intenta de nuevo.", // [CHECK]
-  "box.photo.morePhotos": "Mostrar más fotos", // [CHECK]
-  "box.photo.none": "Aún no hay fotos", // [CHECK]
 
   "box.history.link": "Historial", // [CHECK]
 

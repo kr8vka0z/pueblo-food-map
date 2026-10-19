@@ -369,12 +369,12 @@ export interface DiffSourceResult {
  *
  * Guardrail behavior is stricter than the original design doc's: that doc
  * still writes anomaly-flagged removal proposals for a human to see (§6.4).
- * This job runs unattended on a monthly cron with no review UI live yet
- * (slice 2) — so here, tripping EITHER the zero-record guard or the sanity
- * guardrail means this source writes NOTHING at all, not "writes removals
- * flagged for extra scrutiny." A human isn't watching a queue yet; a
- * scraper glitch proposing 20%+ of a source's venues gone is safer held
- * entirely than half-written for nobody to catch.
+ * This job runs unattended on a weekly cron — so here, tripping EITHER the
+ * zero-record guard or the sanity guardrail means this source writes NOTHING
+ * at all, not "writes removals flagged for extra scrutiny." A half-written
+ * batch from an anomalous scrape is worse than none: a scraper glitch
+ * proposing 20%+ of a source's venues gone is safer held entirely than
+ * mixed in with real proposals in the review queue.
  */
 export function diffSource(params: DiffSourceParams): DiffSourceResult {
   const { source, currentRows, incoming, runId, today, rejectedKeys } = params;

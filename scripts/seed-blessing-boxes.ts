@@ -21,19 +21,27 @@
  * the PUBLISHED map; nothing stops it from being live-readable on staging,
  * so the names themselves are the safety net.
  *
- * RUN — same one-time, human-reviewed convention as seed-admin-db.ts: this
+ * RUN — same human-reviewed convention as seed-admin-db.ts: this
  * only WRITES the two .sql files below (gitignored — derivable from this
  * committed script); it never touches D1 itself.
  *   npx tsx scripts/seed-blessing-boxes.ts
- * Then apply the one you want with wrangler, same as any other admin
- * schema/data file in this repo (staging = dev.pueblofoodmap.com's DB):
- *   npx wrangler d1 execute pueblo-food-map-admin-staging --remote --file=scripts/generated/seed-blessing-boxes.sql
- *   npx wrangler d1 execute pueblo-food-map-admin-staging --remote --file=scripts/generated/remove-blessing-boxes.sql
- * (or --local against Miniflare's on-disk DB for `npm run preview`).
- * NEVER pass `pueblo-food-map-admin` (no `-staging` suffix, i.e.
- * production) to either command — see AGENTS.md's `--db-mode` table for why
- * a name flag with no fixed-mode guard is exactly how a script accidentally
- * targets prod.
+ * Then apply the one you want:
+ *   - Local (Miniflare's on-disk DB for `npm run preview`):
+ *       npx wrangler d1 execute pueblo-food-map-admin --local --file=scripts/generated/seed-blessing-boxes.sql
+ *     `--local` is what makes that database name safe: the same name with
+ *     `--remote` is PRODUCTION (see refresh-ingest.ts's DATABASE_NAMES).
+ *   - Staging (dev.pueblofoodmap.com's DB, pueblo-food-map-admin-staging):
+ *     do NOT use `d1 execute --remote --file`. A remote `--file` goes through
+ *     D1's import API, which takes the database offline while it runs
+ *     (AGENTS.md "Promotion checklist — D1 migrations" and "Automated
+ *     venue-refresh pipeline" forbid it for the same reason). Send the file's
+ *     statements with `--remote --command` in chunks instead, the way
+ *     scripts/refresh-ingest.ts's d1ApplyFile does (chunking helper:
+ *     scripts/refresh/sqlChunks.ts).
+ * NEVER point either command at production: `pueblo-food-map-admin` with
+ * `--remote` is prod, and a free-form name flag with no fixed-mode guard is
+ * exactly how a script accidentally targets it (refresh-ingest.ts's file
+ * header and DATABASE_NAMES explain the fixed `--db-mode` choice).
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";

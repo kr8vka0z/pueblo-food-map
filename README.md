@@ -43,8 +43,9 @@ Open <http://localhost:3000>. Hot-reloads on save (Turbopack).
 | `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
 | `npm run test` | Unit tests (vitest, watch mode) |
 | `npm run test:ci` | Unit tests, CI mode (single run) |
+| `npm run test:coverage` | Unit tests with a V8 coverage report |
+| `npm start` | Serve the production build |
 | `npm run preview` | OpenNext build + local Worker emulator at :8788 |
-| `npm run deploy` | Manual OpenNext build + `wrangler deploy` of the production Worker — don't use it; deploys go only through CI (see below) |
 | `npm run design:lint` | design.md CLI lint on DESIGN.md (report-only) |
 | `npm run design:drift` | Token parity check: globals.css vs DESIGN.md (blocking) |
 
@@ -58,11 +59,11 @@ conventions.
 ```
 src/
   app/             Next.js App Router pages and API route handlers
-    page.tsx         Root page (splash gate + map)
-    layout.tsx       Root layout (metadata, font preload, LocaleProvider)
-    report/          Venue issue-report form + POST handler
-    suggest/         Suggest-a-venue form + POST handler
-    feedback/        General feedback form + POST handler
+    (site)/          English tree: root layout, home page (splash gate + map),
+                     and the public pages (venues, venue/[id], resources,
+                     report/, suggest/, feedback/, admin/, ...)
+    es/              Spanish twin of the mirrored pages, with its own root layout
+    api/             Route handlers (public/, admin/, auth/, health, csp-report)
   components/      React components (map canvas, bottom sheet, search, etc.)
   data/            Static venue data (committed TypeScript modules)
     venues.ts        Public venue list — single import for all components
@@ -86,7 +87,7 @@ scripts/           Data pipeline, seed, and lint scripts (never imported by the 
 
 ## Stack
 
-- **Next.js 16.2** (App Router) + TypeScript
+- **Next.js 16** (App Router) + TypeScript
 - **Tailwind CSS v4**
 - **Mapbox GL JS v3** + `react-map-gl` v8 (vector tiles, `streets-v12` basemap)
 - **vaul** (bottom sheet on mobile)
@@ -99,11 +100,15 @@ scripts/           Data pipeline, seed, and lint scripts (never imported by the 
 
 ## Deploy and infrastructure
 
-- **CI:** `lint → design:lint → design:drift → typecheck → test → audit →
-  build` on every PR into `main` or `dev`, and every push to `main`
-  ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
-- **AI review:** CodeRabbit reviews human-authored pull requests targeting
-  `dev` or `main` using the low-noise settings in [`.coderabbit.yaml`](.coderabbit.yaml).
+- **CI:** runs on every PR into `main` or `dev`, and every push to `main`;
+  the steps (lint, design checks, typecheck, tests, build, a check that
+  prerendered pages serve, Lighthouse) are in
+  [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+- **AI review:** a Claude reviewer
+  ([`claude-code-review.yml`](.github/workflows/claude-code-review.yml))
+  reviews every human-authored pull request into `dev` against [REVIEW.md](REVIEW.md), and
+  CodeRabbit reviews human-authored pull requests targeting `dev` or `main`
+  using the low-noise settings in [`.coderabbit.yaml`](.coderabbit.yaml).
 - **Deploys:** GitHub Actions
   ([`deploy-prod.yml`](.github/workflows/deploy-prod.yml) /
   [`deploy-dev.yml`](.github/workflows/deploy-dev.yml)), not Cloudflare
@@ -175,8 +180,9 @@ proposal still needs a human to review and approve it from the Places tab's
 retired standalone `/admin/flags` queue by #674) before it reaches the
 public map. See
 `scripts/refresh-ingest.ts`'s own file header for the full mechanism, and
-AGENTS.md's "Automated venue-refresh pipeline" section for operational
-detail (guardrails, credentials, local testing).
+AGENTS.md's "Automated venue-refresh pipeline" section for the guardrails,
+AGENTS.md's "Secrets" table for credentials, and `scripts/README.md` for
+local runs.
 
 ---
 

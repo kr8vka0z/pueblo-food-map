@@ -19,7 +19,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { BoxHealthEntry, BoxHealthStatus } from "@/lib/boxHealth";
+import { NEEDS_HELP_STATUSES, type BoxHealthEntry, type BoxHealthStatus } from "@/lib/boxHealth";
 import type { BoxReviewSummary } from "@/lib/adminBoxes";
 
 export interface AllBoxesTableProps {
@@ -30,8 +30,8 @@ export interface AllBoxesTableProps {
   initialShowReview?: boolean;
 }
 
-// Same label/color pairing as BoxHealthList.tsx's STATUS_META, as a badge
-// rather than a dot — a table row has room to spell the status out.
+// One label/color badge per status — a table row has room to spell the
+// status out.
 const STATUS_BADGE: Record<BoxHealthStatus, { label: string; className: string }> = {
   ok: { label: "OK", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   low: { label: "Low", className: "bg-[var(--color-clay-100)] text-[var(--color-warning)]" },
@@ -47,8 +47,6 @@ const STATUS_BADGE: Record<BoxHealthStatus, { label: string; className: string }
 type StatusFilter = "all" | "needs-help" | "review" | BoxHealthStatus;
 type SponsorFilter = "any" | "has" | "needs";
 type SortKey = "attention" | "oldest" | "newest" | "name";
-
-const NEEDS_HELP_STATUSES: ReadonlySet<BoxHealthStatus> = new Set(["low", "empty", "problem"]);
 
 // Default sort order (task spec): Empty -> Problem -> Low -> Quiet -> OK.
 const ATTENTION_PRIORITY: Record<BoxHealthStatus, number> = { empty: 0, problem: 1, low: 2, quiet: 3, ok: 4 };

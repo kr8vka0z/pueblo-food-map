@@ -4,8 +4,7 @@
  * adminOrigin.ts (renamed from cfAccess.ts, #596) after the Better Auth
  * sole-gate cutover (auth/betterauth-sole-gate). This file used to test
  * requireAccessIdentity() (the removed Cloudflare Access JWT verifier) —
- * see git history / adminOrigin.ts's own header for what used to live here
- * and why it's gone. requireAdminOrigin() is otherwise exercised
+ * see git history for what used to live here and why it's gone. requireAdminOrigin() is otherwise exercised
  * end-to-end by every /api/admin/* route's own test file (e.g.
  * src/app/api/admin/venues/route.test.ts's "wrong/missing Origin" case);
  * these are its direct unit tests.

@@ -217,6 +217,70 @@ function StatusPill({ box, locale, overlay }: { box: PublicBlessingBox; locale: 
   );
 }
 
+/**
+ * The box's latest photo, full-bleed, shared by both layouts: a button that
+ * opens PhotoViewer, a caption chip, and the viewer itself. `children` is the
+ * overlay slot (the default layout's StatusPill), rendered right after the
+ * button and before the caption chip so DOM and focus order match the markup
+ * this replaced. Viewer open state stays in BoxCardBody.
+ */
+function BoxPhotoHero({
+  photo,
+  boxName,
+  locale,
+  photoRadiusClassName,
+  open,
+  onOpen,
+  onClose,
+  children,
+}: {
+  photo: NonNullable<PublicBlessingBox["box"]["latestPhoto"]>;
+  boxName: string;
+  locale: Locale;
+  photoRadiusClassName: string;
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  children?: React.ReactNode;
+}) {
+  const src = `/api/public/box-photos/${photo.id}`;
+  const time = formatRelativeTime(photo.createdAt, locale);
+  const alt = t("box.photo.altText", locale, { name: boxName, time });
+  const caption = t("box.photo.caption", locale, { time });
+  return (
+    <div className="relative">
+      {/* #508: the photo is a button that opens PhotoViewer full-screen
+          — the alt text (name + relative time) IS the photo's
+          accessible description; the button's own label just states
+          the action ("View photo full size"), same separation of
+          concerns as any other icon-only trigger on this card. */}
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={t("box.photo.viewFullSize", locale)}
+        className="block w-full"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- a runtime, R2-backed image via our own serve route, not a build-time/static asset next/image can optimize */}
+        <img
+          src={src}
+          alt={alt}
+          className={`block h-[170px] w-full object-cover bg-[var(--color-bone-200)] ${photoRadiusClassName}`}
+        />
+      </button>
+      {children}
+      {/* Caption chip moved to top-right (fix pass, item 2) — see
+          StatusPill's own header for why it used to collide with the
+          status pill sharing the bottom edge. pointer-events-none: the
+          chip overlays the photo BUTTON above, and per #508's own risk
+          note this chip must not block the tap that opens the viewer. */}
+      <div className="pointer-events-none absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 shadow-sm">
+        <span className="block truncate text-xs font-medium text-[var(--color-ink-500)]">{caption}</span>
+      </div>
+      <PhotoViewer src={src} alt={alt} caption={caption} open={open} onClose={onClose} locale={locale} />
+    </div>
+  );
+}
+
 /** "Sponsored by A", "A and B", or "A, B +N more" — mockup v2/v3's own three states, always paired with a "Want to help too?" / adopt-application link. */
 function formatSponsorNames(names: string[], locale: Locale): React.ReactNode {
   if (names.length === 1) return <strong className="font-semibold">{names[0]}</strong>;
@@ -267,7 +331,6 @@ export default function BoxCardBody({
   // identical field. Always called (Rules of Hooks) even in link mode
   // (onWalkRoute absent); unused in that branch.
   const walkLocationHintId = useId();
-  const hasPhoto = box.box.latestPhoto != null;
   const hasSponsors = box.box.adopters.length > 0;
   const mostNeededChips = box.box.mostNeeded
     ? box.box.mostNeeded
@@ -292,7 +355,8 @@ export default function BoxCardBody({
   // const across both branches would mean any change made for one layout's
   // needs risks silently altering the other's — the two orders diverge too
   // much (name-first vs. photo-first) for a shared middle ground to stay
-  // simple. Small and boring beats clever here.
+  // simple. Small and boring beats clever here. The one shared piece is
+  // BoxPhotoHero (the photo block, identical in both, with an overlay slot).
   if (layout === "sheet") {
     return (
       <div className={`flex flex-col gap-3 ${className}`}>
@@ -425,43 +489,16 @@ export default function BoxCardBody({
               Tab or a screen reader, and a tap still falls through to the
               wrapper's expand handler. */}
           <div className="contents" inert={!expanded}>
-          {hasPhoto && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setPhotoViewerOpen(true)}
-                aria-label={t("box.photo.viewFullSize", locale)}
-                className="block w-full"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- a runtime, R2-backed image via our own serve route, not a build-time/static asset next/image can optimize */}
-                <img
-                  src={`/api/public/box-photos/${box.box.latestPhoto!.id}`}
-                  alt={t("box.photo.altText", locale, {
-                    name: box.name,
-                    time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale),
-                  })}
-                  className={`block h-[170px] w-full object-cover bg-[var(--color-bone-200)] ${photoRadiusClassName}`}
-                />
-              </button>
-              <div className="pointer-events-none absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 shadow-sm">
-                <span className="block truncate text-xs font-medium text-[var(--color-ink-500)]">
-                  {t("box.photo.caption", locale, { time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale) })}
-                </span>
-              </div>
-              <PhotoViewer
-                src={`/api/public/box-photos/${box.box.latestPhoto!.id}`}
-                alt={t("box.photo.altText", locale, {
-                  name: box.name,
-                  time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale),
-                })}
-                caption={t("box.photo.caption", locale, {
-                  time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale),
-                })}
-                open={photoViewerOpen}
-                onClose={() => setPhotoViewerOpen(false)}
-                locale={locale}
-              />
-            </div>
+          {box.box.latestPhoto && (
+            <BoxPhotoHero
+              photo={box.box.latestPhoto}
+              boxName={box.name}
+              locale={locale}
+              photoRadiusClassName={photoRadiusClassName}
+              open={photoViewerOpen}
+              onOpen={() => setPhotoViewerOpen(true)}
+              onClose={() => setPhotoViewerOpen(false)}
+            />
           )}
 
           <div className="flex flex-col gap-3 px-4">
@@ -524,58 +561,25 @@ export default function BoxCardBody({
     );
   }
 
-  // ── Default layout — UNCHANGED from before #667, byte-for-byte. ────────
+  // ── Default layout — unchanged from before #667 (its photo block now ────
+  // ── renders through BoxPhotoHero, same markup). ─────────────────────────
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
       {/* Photo, full-bleed, with the status pill and (when there's a photo)
           a caption chip overlaid. No photo -> a plain inline pill instead —
           never a placeholder image. */}
-      {hasPhoto ? (
-        <div className="relative">
-          {/* #508: the photo is a button that opens PhotoViewer full-screen
-              — the alt text (name + relative time) IS the photo's
-              accessible description; the button's own label just states
-              the action ("View photo full size"), same separation of
-              concerns as any other icon-only trigger on this card. */}
-          <button
-            type="button"
-            onClick={() => setPhotoViewerOpen(true)}
-            aria-label={t("box.photo.viewFullSize", locale)}
-            className="block w-full"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element -- a runtime, R2-backed image via our own serve route, not a build-time/static asset next/image can optimize */}
-            <img
-              src={`/api/public/box-photos/${box.box.latestPhoto!.id}`}
-              alt={t("box.photo.altText", locale, {
-                name: box.name,
-                time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale),
-              })}
-              className={`block h-[170px] w-full object-cover bg-[var(--color-bone-200)] ${photoRadiusClassName}`}
-            />
-          </button>
+      {box.box.latestPhoto ? (
+        <BoxPhotoHero
+          photo={box.box.latestPhoto}
+          boxName={box.name}
+          locale={locale}
+          photoRadiusClassName={photoRadiusClassName}
+          open={photoViewerOpen}
+          onOpen={() => setPhotoViewerOpen(true)}
+          onClose={() => setPhotoViewerOpen(false)}
+        >
           <StatusPill box={box} locale={locale} overlay />
-          {/* Caption chip moved to top-right (fix pass, item 2) — see
-              StatusPill's own header for why it used to collide with the
-              status pill sharing the bottom edge. pointer-events-none: the
-              chip overlays the photo BUTTON above, and per #508's own risk
-              note this chip must not block the tap that opens the viewer. */}
-          <div className="pointer-events-none absolute right-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-[var(--color-bone-50)] px-3 py-1.5 shadow-sm">
-            <span className="block truncate text-xs font-medium text-[var(--color-ink-500)]">
-              {t("box.photo.caption", locale, { time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale) })}
-            </span>
-          </div>
-          <PhotoViewer
-            src={`/api/public/box-photos/${box.box.latestPhoto!.id}`}
-            alt={t("box.photo.altText", locale, {
-              name: box.name,
-              time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale),
-            })}
-            caption={t("box.photo.caption", locale, { time: formatRelativeTime(box.box.latestPhoto!.createdAt, locale) })}
-            open={photoViewerOpen}
-            onClose={() => setPhotoViewerOpen(false)}
-            locale={locale}
-          />
-        </div>
+        </BoxPhotoHero>
       ) : (
         <div className="px-4 pt-3">
           <StatusPill box={box} locale={locale} overlay={false} />

@@ -144,7 +144,7 @@ interface BottomSheetProps {
   /**
    * Full blessing-box record when `venue.category === "blessing_box"` —
    * `venue` itself only carries the plain-Venue fields every marker uses
-   * (see useBoxVenues.ts's own header), so the box-specific card body
+   * (see toVenue in useBoxesList.ts), so the box-specific card body
    * (status, host note, most-needed, check-ins) needs this separately.
    * `null`/`undefined` while MapWrapper's box fetch hasn't resolved yet —
    * BoxCardBody isn't rendered until it has (see the render below).

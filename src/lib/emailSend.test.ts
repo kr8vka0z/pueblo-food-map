@@ -1,6 +1,13 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { composeEmail, escapeHtml, sendResendBatch, sendResendEmail, unsubscribeHeaders } from "@/lib/emailSend";
+import {
+  composeEmail,
+  escapeHtml,
+  sendAdminNotice,
+  sendResendBatch,
+  sendResendEmail,
+  unsubscribeHeaders,
+} from "@/lib/emailSend";
 
 describe("escapeHtml", () => {
   test("escapes the five HTML-significant characters", () => {
@@ -161,6 +168,20 @@ describe("sendResendEmail / sendResendBatch", () => {
     await expect(sendResendEmail({ to: "a@example.com", subject: "s", text: "t", html: "<p>t</p>" })).rejects.toThrow(
       "Resend API error 500",
     );
+  });
+
+  test("sendAdminNotice sends text-only to the admin inbox — no html part, so user free text never becomes HTML", async () => {
+    mockFetch.mockResolvedValue(new Response("{}", { status: 200 }));
+    await sendAdminNotice("subj", "line 1\n<b>user note</b>");
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe("https://api.resend.com/emails");
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body).toEqual({
+      from: "Pueblo Food Map <noreply@pueblofoodmap.com>",
+      to: ["issues@pueblofoodmap.com"],
+      subject: "subj",
+      text: "line 1\n<b>user note</b>",
+    });
   });
 
   test("sendResendBatch does nothing (no fetch) for an empty array", async () => {

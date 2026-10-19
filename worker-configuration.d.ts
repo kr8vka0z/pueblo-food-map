@@ -6,6 +6,9 @@
 // comment above is now stale for these two lines specifically; regenerate
 // only once a wider wrangler.jsonc change forces it, then re-apply this
 // same hand patch).
+// HAND-PATCHED: HC_PING_URL is typed `string` like the other runtime
+// secrets. A local .dev.vars holding it makes `wrangler types` write its
+// value in as a literal type; re-apply this line after any regeneration.
 interface __BaseEnv_Env {
 	BOX_PHOTOS: R2Bucket;
 	EVENT_FLYERS: R2Bucket;
@@ -19,7 +22,7 @@ interface __BaseEnv_Env {
 	NEXT_PUBLIC_MAPBOX_TOKEN: string;
 	RESEND_API_KEY: string;
 	WORKER_SELF_REFERENCE: Fetcher /* pueblo-food-map-staging */ | Service<typeof import("./custom-worker").default>;
-	HC_PING_URL?: "https://hc-ping.com/3d8c7693-8506-49d3-a4a4-d34426f3ea9a";
+	HC_PING_URL?: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {

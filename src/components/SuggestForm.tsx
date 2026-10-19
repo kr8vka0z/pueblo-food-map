@@ -30,7 +30,8 @@ import Script from "next/script";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
-import { VENUE_CATEGORIES, type VenueCategoryKey } from "@/lib/suggestTypes";
+import { categoryLabels } from "@/data/venues";
+import type { VenueCategory } from "@/types/venue";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 
 const {
@@ -353,7 +354,7 @@ export default function SuggestForm() {
           className={`${inputBase} ${inputBorder(!!errors.category)}`}
         >
           <option value="">{t("suggest.category.placeholder", locale)}</option>
-          {(Object.keys(VENUE_CATEGORIES) as VenueCategoryKey[]).map((key) => (
+          {(Object.keys(categoryLabels) as VenueCategory[]).map((key) => (
             <option key={key} value={key}>
               {t(`suggest.category.${key}`, locale)}
             </option>

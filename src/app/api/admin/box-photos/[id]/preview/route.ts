@@ -11,10 +11,10 @@
  * (loadApprovedBoxPhotoById's own header) can never be weakened by a
  * future edit to this one.
  *
- * Auth: getAdminDb() only — a GET with no mutation, same "read-only admin
- * page needs no requireAdminOrigin() CSRF check" convention as
- * /api/admin/whoami and the admin venue-list read (AGENTS.md "Admin
- * authentication").
+ * Auth: getAdminDb() only — a GET with no mutation, so no
+ * requireAdminOrigin() CSRF check: that guard is only required on non-GET
+ * /api/admin/* routes (AGENTS.md "Admin authentication"), the same
+ * convention GET /api/admin/geocode follows.
  *
  * No Cache-Control / Workers Cache API — this is an admin-only, low-volume
  * read; caching would risk an admin seeing a stale image after a re-upload,

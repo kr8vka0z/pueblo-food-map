@@ -5,14 +5,15 @@
  * this file no longer pins its exact contents (that was a one-time #237
  * extraction proof, now discharged). What it still guards: that venues.ts
  * exposes publishedVenues unchanged (#597 — the old benefit-flag overlay is
- * gone, D1 is the sole SNAP/WIC source), the seed-array split, the pfpVenues
- * re-export matching its leaf module, and the untouched category maps.
+ * gone, D1 is the sole SNAP/WIC source), the seed-array split, and the
+ * untouched category maps.
  */
 
 import { describe, test, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { venues, pfpVenues, categoryLabels, categoryColors, categoryIcon } from "@/data/venues";
+import { venues, categoryLabels, categoryColors } from "@/data/venues";
+import { pfpVenues } from "@/data/pfp-venues";
 import { publishedVenues, publishedAt } from "@/data/published-venues";
 import { serializePublishedVenuesFile } from "@/lib/publishVenues";
 import { groceryOsmVenues } from "@/data/grocery-osm";
@@ -65,20 +66,10 @@ describe("venues data-layer invariants", () => {
     expect(plentifulPantries).toHaveLength(36);
   });
 
-  test("pfpVenues re-exported from venues.ts matches the leaf module used to build publishedVenues", async () => {
-    // Guards specifically against a transcription slip when the pfpVenues
-    // literal was extracted into its own file (src/data/pfp-venues.ts) —
-    // if that copy ever drifted from what venues.ts re-exports, this would
-    // be the first thing to catch it (the two tests above would also fail,
-    // but less directly).
-    const { pfpVenues: leafPfpVenues } = await import("@/data/pfp-venues");
-    expect(JSON.stringify(pfpVenues)).toBe(JSON.stringify(leafPfpVenues));
-  });
-
   // Blessing Boxes slice 1 added an 8th category — categoryLabels below now
   // includes it, updated at the same time the category-picker components
-  // (formerly CategoryDropdown.tsx, now FilterPanel.tsx/CategoryChips.tsx) did.
-  test("categoryLabels / categoryColors / categoryIcon are untouched by the publish refactor (blessing_box added by a later slice)", () => {
+  // (formerly CategoryDropdown.tsx, now FilterPanel.tsx) did.
+  test("categoryLabels / categoryColors are untouched by the publish refactor (blessing_box added by a later slice)", () => {
     expect(categoryLabels).toEqual({
       pantry: "Food Pantry",
       grocery: "Grocery / Supermarket",
@@ -90,6 +81,5 @@ describe("venues data-layer invariants", () => {
       blessing_box: "Blessing Box",
     });
     expect(categoryColors.pantry).toBe("#BE2D45");
-    expect(categoryIcon.pantry).toBe("ShoppingBasket");
   });
 });

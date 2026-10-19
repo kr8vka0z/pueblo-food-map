@@ -2,7 +2,7 @@
  * POST /api/admin/events — create an event as a draft, or publish it on
  * creation (#757). "Save draft" and "Publish" are the only create actions.
  *
- * Auth: getAdminDb() then requireAdminOrigin() (authorizeEventRequest), both
+ * Auth: getAdminDb() then requireAdminOrigin() (authorizeAdminWrite), both
  * throwing AccessDeniedError into one 401/403 shape. Validation is the
  * authoritative pass (adminEventValidation.ts); times arrive as Pueblo wall
  * clock and are stored as UTC.
@@ -15,9 +15,9 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-import { authorizeEventRequest, EVENT_AUDIT_INSERT_SQL, purgeEventsFeed } from "@/lib/adminEvents";
+import { EVENT_AUDIT_INSERT_SQL, purgeEventsFeed } from "@/lib/adminEvents";
 import { validateEventPayload } from "@/lib/adminEventValidation";
-import type { AdminDbAccess } from "@/lib/adminDb";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import type { EventRow } from "@/lib/events";
 
 const INSERT_EVENT_SQL = `INSERT INTO events (id, name, name_es, host, host_es, description, description_es,
@@ -28,7 +28,7 @@ const INSERT_EVENT_SQL = `INSERT INTO events (id, name, name_es, host, host_es, 
 export async function POST(req: NextRequest): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizeEventRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

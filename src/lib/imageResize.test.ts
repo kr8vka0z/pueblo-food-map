@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 /**
  * imageResize.test.ts — fitWithin is tested directly (pure math).
  * shrinkImageToJpeg is tested against a STUBBED createImageBitmap/canvas

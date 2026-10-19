@@ -4,7 +4,8 @@
  * "PUBLISH PATH", §5 step 5, §8 NB1).
  *
  * Kept separate from src/app/api/admin/publish/route.ts (same pattern as
- * adminOrigin.ts/adminDb.ts vs. whoami/route.ts) so the validation, D1, and
+ * adminOrigin.ts/adminDb.ts vs. the admin route handlers that call them) so
+ * the validation, D1, and
  * GitHub-commit logic are unit-testable with plain fixtures and mocked
  * fetch/D1, without needing a live D1 binding or a real GitHub token.
  *
@@ -16,6 +17,7 @@
 
 import { validateHoursWeekly, validateIrregularSchedule } from "@/lib/adminVenueValidation";
 import type { IrregularSchedule, Venue, VenueCategory, WeeklyHours } from "@/types/venue";
+import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 // ─── D1 row shape ───────────────────────────────────────────────────────────
 // Mirrors migrations/0001_init_admin_schema.sql's `venues` table exactly —
@@ -519,9 +521,7 @@ export async function promotePublishedDrafts(
 
   statements.push(
     db
-      .prepare(
-        "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      )
+      .prepare(AUDIT_INSERT_VALUES_SQL)
       .bind(meta.actorEmail, "venue", meta.publishedAt, "publish", null, afterJson, meta.publishedAt, meta.actorSessionId ?? null),
   );
 

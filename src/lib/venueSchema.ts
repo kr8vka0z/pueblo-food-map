@@ -310,20 +310,31 @@ export function buildVenueJsonLd(
   return result;
 }
 
-export function buildVenueListJsonLd(
-  venueList: Venue[],
-  locale: Locale = "en",
+/**
+ * The house ItemList shape: positions 1..n, absolute URLs. `pathFor` returns
+ * the item's site-relative path (SITE_URL is prefixed here).
+ */
+export function buildItemListJsonLd<T extends { name: string }>(
+  items: T[],
+  pathFor: (item: T) => string,
 ): Record<string, unknown> {
   return {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    itemListElement: venueList.map((v, i) => ({
+    itemListElement: items.map((item, i) => ({
       "@type": "ListItem",
       position: i + 1,
-      url: `${SITE_URL}${venuePath(v.id, locale)}`,
-      name: v.name,
+      url: `${SITE_URL}${pathFor(item)}`,
+      name: item.name,
     })),
   };
+}
+
+export function buildVenueListJsonLd(
+  venueList: Venue[],
+  locale: Locale = "en",
+): Record<string, unknown> {
+  return buildItemListJsonLd(venueList, (v) => venuePath(v.id, locale));
 }
 
 /**

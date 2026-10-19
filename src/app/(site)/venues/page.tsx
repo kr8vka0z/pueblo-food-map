@@ -9,9 +9,9 @@
  * and answer engines get a crawlable index and users get a no-map way to
  * browse every resource. SEO/AEO PR4 item S5.
  *
- * Static server component with a static English `metadata` export (crawler
- * metadata stays English-only, ARCHITECTURE.md "i18n model",
- * #287). The visible body is VenuesDirectoryContent — a client component
+ * Static server component with a static English `metadata` export (this is
+ * the EN tree; the /es/venues twin carries Spanish metadata, ARCHITECTURE.md
+ * "i18n model", #287). The visible body is VenuesDirectoryContent — a client component
  * reading the visitor's locale via useLocale() (#289) — so this route never
  * reads cookies() itself and keeps its 100% static caching.
  *
@@ -21,15 +21,15 @@
  */
 
 import type { Metadata } from "next";
+import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
 import { venues, categoryLabels } from "@/data/venues";
 import type { Venue, VenueCategory } from "@/types/venue";
 import VenuesDirectoryContent from "@/components/VenuesDirectoryContent";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "All Food Resources",
-  description:
-    "Browse every food resource on the Pueblo Food Map — food pantries, grocery stores, community gardens, farms, and meal sites across Pueblo County, CO, with addresses and hours.",
+  title: t("meta.venues.title", "en"),
+  description: t("meta.venues.description", "en"),
   path: "/venues",
   // #689 PR 2: this page has an /es counterpart — carries hreflang now.
   mirrored: true,

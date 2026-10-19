@@ -93,8 +93,8 @@ function makeFakeDb(venueRows: AdminVenueRow[], proposalRows: ChangeProposalRow[
         success: true,
         // #675: this page now also queries public_submissions — always
         // empty here, since this file covers change_proposals grouping
-        // only (public_submissions grouping has its own test file,
-        // page.reviewSubmissions.test.tsx).
+        // only (public_submissions grouping is covered by page.test.tsx's
+        // "pending public submissions" case).
         results: sql.includes("FROM change_proposals") ? proposalRows : sql.includes("FROM public_submissions") ? [] : venueRows,
         meta: {},
       }),

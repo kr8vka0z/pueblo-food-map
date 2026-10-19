@@ -29,6 +29,7 @@
 
 import type { AdminVenueRow, AdminVenueSourceType, Venue } from "@/types/venue";
 import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "../../scripts/refresh/diffEngine";
+import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 // ─── Row + parsed-diff shapes ───────────────────────────────────────────────
 
@@ -127,13 +128,10 @@ export function isDateOnlyUpdateProposal(
   return diff.fields_changed.length === 1 && diff.fields_changed[0] === "last_verified";
 }
 
-// ─── Triage lanes at /admin/flags (#543) ────────────────────────────────────
+// ─── Triage lanes (#543) ────────────────────────────────────────────────────
 
 /** The three lanes a reviewer filters/sorts by. */
 export type ReviewLane = "likely_noise" | "needs_human" | "likely_rename";
-
-/** Sort order for "needs a human first": what most needs eyes comes first, noise last. */
-export const REVIEW_LANE_ORDER: Record<ReviewLane, number> = { needs_human: 0, likely_rename: 1, likely_noise: 2 };
 
 /**
  * Which lane a pending row shows under. A rename proposal is always "likely
@@ -154,15 +152,15 @@ export function renameMetaOf(diff: ProposedDiff | null): { from_id: string; to_i
   return r && typeof r.from_id === "string" && typeof r.to_id === "string" ? { from_id: r.from_id, to_id: r.to_id } : null;
 }
 
-// ─── Shared diff-field selection (admin dashboard build, NeedsDecisionPanel) ─
+// ─── Shared diff-field selection ────────────────────────────────────────────
 
 /**
  * Fields worth showing in a before/after diff view — `last_verified` is a
  * pure freshness stamp (every add/update proposal carries it, but it isn't
  * something an admin needs to eyeball) and `id` is already shown elsewhere as
  * the card's own venue identifier. Exported so ProposalCard.tsx's
- * full FieldDiff table AND NeedsDecisionPanel's compact one-line summary
- * (Dashboard's "Needs a decision" panel) read the SAME set — a second,
+ * full FieldDiff table AND VenueListView.tsx's compact one-line summary
+ * (the Places tab row) read the SAME set — a second,
  * independently-filtered list here would risk the two screens disagreeing
  * about which fields "changed" for the same proposal.
  */
@@ -305,9 +303,6 @@ export type ApplyApprovedProposalResult =
   | { ok: true; status: 200; targetVenueId: string; changeType: ProposalChangeType }
   | { ok: false; status: number; error: string; message?: string };
 
-const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-
 // `WHERE id = ? AND status = 'pending'` closes the supersede-race window —
 // see applyApprovedProposal's own header, correctness requirement 1 in the
 // original route's design (still true here: a later pipeline run may flip
@@ -383,12 +378,11 @@ export async function applyApprovedProposal(
 
   const parsed = parseProposalRow(proposalRow);
   if (parsed.parseError) {
-    // #568 item 3: no `message` here used to mean both review surfaces
-    // (NeedsDecisionPanel.tsx's ApproveButton, ProposalCard.tsx)
-    // fell back to their own generic "Try again"/"Something went wrong" —
-    // for a corrupted row, retrying can never succeed, so that copy was
-    // actively misleading. Fixed at the shared source both surfaces
-    // already read `body.message` from, not duplicated in either.
+    // #568 item 3: without a `message` here, ProposalCard.tsx (on the Places
+    // tab and in the edit page's SuggestionsBox) falls back to its generic
+    // "Try again" copy — for a corrupted row, retrying can never succeed, so
+    // that copy would be actively misleading. Set at the shared source the
+    // card already reads `body.message` from.
     return {
       ok: false,
       status: 422,
@@ -602,7 +596,7 @@ export async function applyApprovedProposal(
   }
 
   const insertAudit = db
-    .prepare(AUDIT_INSERT_SQL)
+    .prepare(AUDIT_INSERT_VALUES_SQL)
     .bind(identity.email, "venue", proposalRow.target_venue_id, auditAction, beforeJson, JSON.stringify(afterRowForAudit), timestamp, identity.sessionId ?? null);
   const approveProposal = db.prepare(APPROVE_PROPOSAL_SQL).bind(identity.email, timestamp, timestamp, proposalRow.id);
 

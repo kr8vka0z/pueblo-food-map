@@ -21,12 +21,11 @@ import {
   loadAdopterByConfirmToken,
   loadAdopterById,
   loadApprovedAdopterNamesForVenues,
-  loadApprovedAdopters,
   loadPendingAdopters,
   sendAdopterConfirmEmail,
 } from "@/lib/boxAdopters";
 
-describe("loadPendingAdopters / loadApprovedAdopters", () => {
+describe("loadPendingAdopters", () => {
   test("loadPendingAdopters returns [] with no rows", async () => {
     const db = { prepare: () => ({ all: async () => ({ results: [] }) }) } as unknown as D1Database;
     expect(await loadPendingAdopters(db)).toEqual([]);
@@ -43,18 +42,6 @@ describe("loadPendingAdopters / loadApprovedAdopters", () => {
     await loadPendingAdopters(db);
     expect(seenSql).toContain("status = 'pending'");
     expect(seenSql).toContain("venue_name");
-  });
-
-  test("loadApprovedAdopters queries status = 'approved'", async () => {
-    let seenSql = "";
-    const db = {
-      prepare: (sql: string) => {
-        seenSql = sql;
-        return { all: async () => ({ results: [] }) };
-      },
-    } as unknown as D1Database;
-    await loadApprovedAdopters(db);
-    expect(seenSql).toContain("status = 'approved'");
   });
 });
 

@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
+import { sqliteD1 } from "@/lib/sqliteD1.testutil";
 import { loadActivityPage, parseActivityFilters, summarizeAction } from "@/lib/activityLog";
 
 const BASE = [
@@ -22,14 +23,6 @@ const BASE = [
   "0010_box_adopters_alerts.sql",
   "0017_auth_events.sql",
 ];
-
-function wrapAsD1(db: Database.Database): D1Database {
-  const statement = (sql: string, args: unknown[] = []) => ({
-    bind: (...next: unknown[]) => statement(sql, next),
-    all: async () => ({ results: db.prepare(sql).all(...args) }),
-  });
-  return { prepare: (sql: string) => statement(sql) } as unknown as D1Database;
-}
 
 const NOW = new Date("2026-09-27T20:00:00.000Z");
 const filters = () => parseActivityFilters({}, NOW);
@@ -82,7 +75,7 @@ describe("event rows in the Activity log", () => {
       at: "2026-09-27T17:00:00.000Z",
     });
 
-    const { actions } = await loadActivityPage(wrapAsD1(sqlite), filters());
+    const { actions } = await loadActivityPage(sqliteD1(sqlite), filters());
     const byTime = [...actions].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
     expect(byTime.map((a) => a.venue_name)).toEqual(["Harvest Fair", "Harvest Fair", "Harvest Fair"]);
@@ -92,7 +85,7 @@ describe("event rows in the Activity log", () => {
   test("falls back to the name in the audit JSON when the event row is gone", async () => {
     audit(sqlite, { entity: "event", entityId: "gone", action: "archive", before: { name: "Gone Fair" }, after: { name: "Gone Fair", status: "archived" }, at: "2026-09-27T15:00:00.000Z" });
 
-    const { actions } = await loadActivityPage(wrapAsD1(sqlite), filters());
+    const { actions } = await loadActivityPage(sqliteD1(sqlite), filters());
 
     expect(actions[0].venue_name).toBe("Gone Fair");
   });
@@ -110,7 +103,7 @@ describe("Activity log before migration 0018 is applied", () => {
     audit(sqlite, { entity: "venue", entityId: "v1", action: "update", before: { name: "Eastside Pantry" }, after: { name: "Eastside Pantry" }, at: "2026-09-27T15:00:00.000Z" });
     audit(sqlite, { entity: "event", entityId: "e1", action: "create", after: { name: "Harvest Fair" }, at: "2026-09-27T16:00:00.000Z" });
 
-    const { actions } = await loadActivityPage(wrapAsD1(sqlite), filters());
+    const { actions } = await loadActivityPage(sqliteD1(sqlite), filters());
 
     expect(actions.map((a) => a.venue_name).sort()).toEqual(["Eastside Pantry", "Harvest Fair"]);
   });

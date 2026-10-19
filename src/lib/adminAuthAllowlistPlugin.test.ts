@@ -38,7 +38,13 @@ import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { buildAuthOptions } from "@/lib/auth-options";
 import { adminAuthAllowlistPlugin, REFUSED_EMAIL_OTP_PATHS } from "@/lib/adminAuthAllowlistPlugin";
-import { cookieHeaderFrom, lastEmailedCode, signInWithEmailCode } from "@/__tests__/helpers/authTestHelpers";
+// requestHeaders = the minimum headers every direct auth.api call in this file needs — see file header WHY.
+import {
+  authRequestHeaders as requestHeaders,
+  cookieHeaderFrom,
+  lastEmailedCode,
+  signInWithEmailCode,
+} from "@/__tests__/helpers/authTestHelpers";
 
 const MIGRATION_SQL = [
   readFileSync(
@@ -61,11 +67,6 @@ function buildTestAuthWithDb() {
 
 function buildTestAuth() {
   return buildTestAuthWithDb().auth;
-}
-
-/** Minimum headers every direct auth.api call in this file needs — see file header WHY. */
-function requestHeaders(extra?: Record<string, string>): Headers {
-  return new Headers({ host: "pueblofoodmap.com", ...extra });
 }
 
 describe("email-code allowlist gate (#684)", () => {

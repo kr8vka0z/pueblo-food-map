@@ -1,9 +1,8 @@
 /**
  * app/(site)/not-found.tsx — branded 404 page (#288).
  *
- * Stays a Server Component with a static English `metadata` export (crawler
- * metadata is deliberately English-only, ARCHITECTURE.md "Known bilingual
- * limitation", #287). The visible body is NotFoundContent — a client
+ * Stays a Server Component with a static English `metadata` export (this is
+ * the EN tree; see ARCHITECTURE.md "i18n model", #287). The visible body is NotFoundContent — a client
  * component reading the visitor's locale via useLocale() (#289) — because
  * this file must not read cookies() itself: that would force dynamic
  * rendering, which a branded error page shouldn't need.

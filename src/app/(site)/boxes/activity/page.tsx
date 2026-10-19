@@ -3,15 +3,15 @@
  * slice 3, Discovery stories D1/D2).
  *
  * Static server shell + English `metadata` export, same split as /venues'
- * page.tsx: crawler metadata stays static/English (ARCHITECTURE.md "Known
- * bilingual limitation", #287), the actual live/localized content is a
+ * page.tsx: crawler metadata stays static/English (ARCHITECTURE.md
+ * "i18n model", #287), the actual live/localized content is a
  * client component (BoxesActivityContent) that fetches
  * GET /api/public/blessing-boxes/activity itself — this route never reads
  * D1 or cookies() directly, so it stays trivially static.
  *
  * Suspense boundary: BoxesActivityContent reads the initial `?box=<id>`
- * query param via useSearchParams() (so BoxContent's "See full activity"
- * link, D3, lands pre-filtered) — Next requires any useSearchParams() call
+ * query param via useSearchParams() (so an old /boxes/activity?box=<id>
+ * link lands pre-filtered) — Next requires any useSearchParams() call
  * to sit under a <Suspense> boundary so the rest of this otherwise-static
  * route can still prerender.
  */

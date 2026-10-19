@@ -3,8 +3,9 @@
 Every script's own header comment is the primary source of truth (what it
 reads, what it writes, why it exists) — this file is the map between them:
 run order, what's automated vs. by-hand, and the shared dependency pin.
-Deeper operational detail (guardrails, credentials, alerts) lives in
-[`AGENTS.md`](../AGENTS.md)'s "Automated venue-refresh pipeline" section;
+Deeper operational detail lives in [`AGENTS.md`](../AGENTS.md): the
+"Automated venue-refresh pipeline" section (guardrails, chunked writes) and
+the "Secrets" table (credentials). Local runs are below;
 the product-level story (why the pipeline exists, what it fixed) is in
 [`README.md`](../README.md)'s "Data sources" section. Read those, not this
 file, for the *why* — this file is only the *what runs when*.
@@ -25,7 +26,8 @@ the named script UNMODIFIED:
 
 Step 2's diff/guardrail/link-health logic isn't inline in `refresh-ingest.ts`
 — it's the pure, unit-tested modules in `scripts/refresh/` (`diffEngine.ts`,
-`linkHealth.ts`, `proposalSql.ts`, `sqlChunks.ts`). None of those run
+`linkHealth.ts`, `proposalSql.ts`, `sqlChunks.ts`, plus `triage.ts` and
+`renamePairs.ts` from #543, the Jev triage and rename pairing). None of those run
 standalone; `refresh-ingest.ts` is the only entry point that imports them.
 
 `fetch-osm-grocery.py` → `ingest-osm-grocery.py` is a fixed pair: the first
@@ -58,6 +60,8 @@ header, and AGENTS.md's "Automated venue-refresh pipeline" bullet on
 
 ### Self-checks (no network, run after touching the parsers)
 
+`ci.yml` runs both on every PR; run them locally before pushing a parser change.
+
 ```
 python3 scripts/scrape-plentiful.py --self-check   # hours-card parser, fixture-based
 python3 scripts/test_fetch_osm_grocery.py           # Overpass partial-result guard
@@ -74,6 +78,22 @@ automated diff:
 | `geocode-pfp.py` | Geocodes the 10 hand-curated Pueblo Food Project venues against Nominatim | Only if a PFP address changes — last run 2026-05-14 |
 | `geocode-osm-missing.py` | Reverse-geocodes OSM venues missing an address (Nominatim, falling back to Mapbox, then raw coordinates) | After an OSM ingest leaves new venues with no address |
 
+## Release and security automation
+
+Run by workflows, not by hand (except the manual cut in AGENTS.md "Release
+schedule"). Each has a `.test.mjs` beside it except `section.sh`.
+
+| Script | Purpose | Run by |
+|---|---|---|
+| `release/prepare.mjs` | Picks the next version, bumps it, and lists the PRs merged since the last release | `release.yml` |
+| `release/section.sh` | Extracts one version's CHANGELOG section (the GitHub Release notes; proves the section parses) | `release.yml`, `deploy-prod.yml` |
+| `release/check-push-target.sh` | Refuses to push unless `origin` still points at this repo | `release.yml`, and `security/audit-fix.sh` (so `security-fix.yml`) |
+| `security/audit-fix.sh` | Patches production-dependency advisories in `package-lock.json` on `dev` | `security-fix.yml` |
+| `security/check-lockfile-flags.mjs` | Fails when the lockfile marks a production-reachable package as dev-only | `weekly-security-audit.yml` |
+
+`prepare.mjs` reads PR titles as Conventional Commits; `pr-title.yml` is the
+check that enforces that on PRs into `dev`.
+
 ## Not part of the data pipeline
 
 Present in this directory but not "venue data ingestion" — listed so an
@@ -81,7 +101,7 @@ unfamiliar reader doesn't mistake them for part of the flow above:
 
 | Script | Purpose |
 |---|---|
-| `seed-admin-db.ts` | One-time: generates the SQL that seeded all current venues into D1 on the #237 admin cutover (`npm run seed:admin`) |
+| `seed-admin-db.ts` | Local only: generates SQL that loads the real venue source records into a fresh local D1 (`npm run seed:admin`). Never apply it with `--remote`; remote databases change only through `wrangler d1 migrations apply` |
 | `seed-blessing-boxes.ts` | Dev-only: generates throwaway fake blessing-box SQL for staging/dev |
 | `load-real-blessing-boxes.ts` | Generates ready-to-apply SQL for Kyle's real blessing-box address list |
 | `seed-dev.sql` | Fake venue rows for the staging admin D1 database's UI states |

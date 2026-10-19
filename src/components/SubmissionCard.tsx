@@ -21,10 +21,9 @@
  *     migrations/0002's `kind` column predates the report form's issue-type
  *     picker and was never renamed): **Mark done** (POST
  *     .../submissions/<id>/done — the admin already fixed the venue's
- *     fields via AddVenueForm's own save, or removed it via
- *     ArchiveVenueButton's existing `?submission=` archive-and-resolve
- *     path, a SEPARATE action this card doesn't render) or **Reject**
- *     (optional reason).
+ *     fields via AddVenueForm's own save, or removed it with the edit
+ *     page's plain "Remove from map" — Mark done is the only way a closure
+ *     report gets resolved) or **Reject** (optional reason).
  *   - "new_venue": a plain navigation Link to
  *     /admin/venues/new?submission=<id> (unchanged from #259/#270 — the
  *     actual approve happens inside POST /api/admin/venues's existing

@@ -44,6 +44,7 @@ import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { loadApprovedBoxPhotoById } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";
 import { logFormFailure } from "@/lib/logger";
+import { sendAdminNotice } from "@/lib/emailSend";
 
 /** A handful per visitor per hour — the task's own suggested figure; this is a low-stakes one-tap action, not worth a tighter cap. */
 const MAX_FLAGS_PER_VISITOR_PER_HOUR = 5;
@@ -53,30 +54,16 @@ const MAX_FLAGS_SITE_WIDE_PER_HOUR = 30;
 const GLOBAL_FLAG_RATE_LIMIT_ID = "all-photos";
 
 async function sendFlagEmail(photoId: number, boxName: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY not configured");
-  }
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from: "Pueblo Food Map <noreply@pueblofoodmap.com>",
-      to: ["issues@pueblofoodmap.com"],
-      subject: `[PFM Blessing Box] Photo reported — ${boxName}`,
-      text: [
-        `A photo for ${boxName} was reported and has been hidden pending review.`,
-        ``,
-        `Photo ID: ${photoId}`,
-        ``,
-        `Review it at https://pueblofoodmap.com/admin/boxes?show=review`,
-      ].join("\n"),
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    throw new Error(`Resend API error ${res.status}: ${body}`);
-  }
+  await sendAdminNotice(
+    `[PFM Blessing Box] Photo reported — ${boxName}`,
+    [
+      `A photo for ${boxName} was reported and has been hidden pending review.`,
+      ``,
+      `Photo ID: ${photoId}`,
+      ``,
+      `Review it at https://pueblofoodmap.com/admin/boxes?show=review`,
+    ].join("\n"),
+  );
 }
 
 export async function POST(
@@ -143,7 +130,6 @@ export async function POST(
 
   await bustEdgeCache(req, [
     "/api/public/blessing-boxes",
-    `/api/public/blessing-boxes/${existing.venue_id}/photos`,
     `/api/public/box-photos/${photoId}`,
   ]);
 

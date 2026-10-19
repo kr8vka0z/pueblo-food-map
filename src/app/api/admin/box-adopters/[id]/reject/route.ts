@@ -18,24 +18,15 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { loadAdopterById, type BoxAdopterRow } from "@/lib/boxAdopters";
 import { unsubscribeAdopterSubscriptionStatement } from "@/lib/boxAlerts";
 import { bustEdgeCache } from "@/lib/edgeCache";
-
-const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 /** Reviewer-entered reason, capped generously — internal admin note, not public-facing copy. Same convention/limit as box-photos' own reject route. */
 const MAX_REVIEW_REASON_LENGTH = 500;
-
-async function authorize(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
 
 export async function POST(
   req: NextRequest,
@@ -43,7 +34,7 @@ export async function POST(
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorize(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }
@@ -85,7 +76,7 @@ export async function POST(
     .prepare("UPDATE box_adopters SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, review_reason = ? WHERE id = ?")
     .bind(identity.email, timestamp, reviewReason, adopterId);
   const insertAudit = db
-    .prepare(AUDIT_INSERT_SQL)
+    .prepare(AUDIT_INSERT_VALUES_SQL)
     .bind(identity.email, "box_adopter", String(adopterId), "update", JSON.stringify(existing), JSON.stringify(afterRow), timestamp, identity.sessionId ?? null);
   const unsubscribeStatement = unsubscribeAdopterSubscriptionStatement(db, adopterId, timestamp);
 

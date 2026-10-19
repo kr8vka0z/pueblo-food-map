@@ -43,11 +43,12 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import React from "react";
 import { LocaleProvider } from "@/lib/LocaleContext";
-import MapWrapper, {
+import MapWrapper from "@/components/MapWrapper";
+import {
   CATEGORY_FIT_MAX_ZOOM,
   CATEGORY_FIT_PADDING_DESKTOP,
   computeCategoryBounds,
-} from "@/components/MapWrapper";
+} from "@/lib/mapBounds";
 import { venues as allRealVenues } from "@/data/venues";
 
 // ─── Stub mapbox-gl CSS (no-op in jsdom) ─────────────────────────────────────

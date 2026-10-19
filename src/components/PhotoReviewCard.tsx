@@ -110,7 +110,7 @@ export default function PhotoReviewCard({ photo }: PhotoReviewCardProps) {
     <div className={cardClass}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          {/* clay-100/700: this codebase's established "informational emphasis" badge pairing — same as SubmissionsReviewView's closure-report badge. */}
+          {/* clay-100/700: this codebase's established "informational emphasis" badge pairing — same as SubmissionCard's "Public report" badge. */}
           {isFlagged && (
             <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-[var(--color-clay-100)] text-[var(--color-clay-700)]">
               Photo reported ({photo.flag_count}×)

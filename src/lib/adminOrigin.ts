@@ -7,25 +7,10 @@
  * `AccessDeniedReason`, `AdminIdentity`, and `HeaderSource` are imported
  * project-wide (adminDb.ts, adminSession.ts, adminAuthErrors.ts, every
  * /api/admin/* route, every /admin/** page) — the exported names keep their
- * `Access`-prefixed history (see below) since renaming THEM is a bigger,
- * unrelated diff than #596's scope; only the file itself was renamed, since
- * Cloudflare Access is gone and `requireAdminOrigin` (not access) is what
- * this file's own name should describe now.
- *
- * WHAT USED TO LIVE HERE: `requireAccessIdentity()` verified the
- * `Cf-Access-Jwt-Assertion` header against Cloudflare's JWKS (jose's
- * `jwtVerify`, signature/issuer/audience/expiry) as a second, in-app layer on
- * top of the edge-level Access application gating `/admin*` +
- * `/api/admin*`. Kyle cut the admin surface over to Better Auth as the SOLE
- * identity gate (the Cloudflare Access application itself is removed from
- * infrastructure in the same change) — `getAdminDb()` (adminDb.ts) now calls
- * only `requireAdminSession()` (adminSession.ts). Grep git history for
- * `requireAccessIdentity` if the JWKS-verification code is ever needed again
- * (e.g. bench a hostname without Better Auth's own baseURL coverage) — it is
- * NOT restored here; the removed helper's fail-closed reasons
- * (`missing_assertion` / `invalid_token` / `no_email_claim` / `misconfigured`)
- * are gone from `AccessDeniedReason` below along with it, since nothing in
- * this codebase throws them anymore.
+ * `Access`-prefixed names from the Cloudflare Access era since renaming THEM
+ * is a bigger, unrelated diff than #596's scope; only the file itself was
+ * renamed, since Cloudflare Access is gone and `requireAdminOrigin` (not
+ * access) is what this file's own name should describe now.
  */
 
 export type AccessDeniedReason =
@@ -94,8 +79,7 @@ export const ADMIN_ORIGINS = [
 export const ADMIN_ORIGIN = ADMIN_ORIGINS[0];
 
 /**
- * CSRF defense for non-GET /api/admin/* mutations (spec §8, "I7") —
- * independent of, and unaffected by, the Cloudflare Access cutover above.
+ * CSRF defense for non-GET /api/admin/* mutations (spec §8, "I7").
  *
  * WHY needed on top of the Better Auth session check: the session cookie is
  * ambient — a browser attaches it automatically to same-site requests, so an
@@ -103,11 +87,8 @@ export const ADMIN_ORIGIN = ADMIN_ORIGINS[0];
  * mutating request without their intent. requireAdminSession() proves the
  * CALLER holds a valid session; it says nothing about WHERE the request
  * originated. This is a second, independent layer: every non-GET
- * /api/admin/* handler EXCEPT /api/admin/refresh/ingest must additionally
- * call this before mutating. (refresh/ingest does not exist in this repo yet
- * — the spec reserves it for a future GitHub-Actions-triggered ingest route
- * authenticated by its own bearer token, never a browser, so CSRF wouldn't
- * apply there either way.)
+ * /api/admin/* handler must additionally call this before mutating (they
+ * do, through authorizeAdminWrite() in adminDb.ts).
  *
  * Throws the SAME AccessDeniedError used by requireAdminSession() (new
  * reason: "bad_origin") so every /api/admin/* route handler can share one

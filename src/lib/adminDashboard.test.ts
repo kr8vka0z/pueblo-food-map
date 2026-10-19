@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, test } from "vitest";
-import { selectStalePlaces, bucketCheckinsByWeek, resolvePlaceUsageRows } from "@/lib/adminDashboard";
+import { countStalePlaces, bucketCheckinsByWeek, resolvePlaceUsageRows } from "@/lib/adminDashboard";
 import type { AdminVenueRow } from "@/types/venue";
 
 const NOW = new Date("2026-09-21T12:00:00.000Z");
@@ -19,35 +19,19 @@ function venueRow(overrides: Partial<AdminVenueRow> = {}): Pick<AdminVenueRow, "
   };
 }
 
-describe("selectStalePlaces", () => {
-  test("excludes anything under the month threshold", () => {
+describe("countStalePlaces", () => {
+  test("counts only rows at/over the month threshold", () => {
     const fresh = venueRow({ id: "fresh", last_verified: "2026-09-01" }); // ~3 weeks old
-    const { items } = selectStalePlaces([fresh], NOW, { months: 12 });
-    expect(items).toHaveLength(0);
-  });
-
-  test("includes rows at/over the month threshold, oldest first", () => {
-    const old1 = venueRow({ id: "old1", name: "Old One", last_verified: "2025-01-01" });
-    const old2 = venueRow({ id: "old2", name: "Old Two", last_verified: "2024-06-01" });
-    const { items, totalCount } = selectStalePlaces([old1, old2], NOW, { months: 12 });
-    expect(totalCount).toBe(2);
-    expect(items.map((i) => i.id)).toEqual(["old2", "old1"]); // oldest last_verified first
-    expect(items[0].monthsSince).toBeGreaterThanOrEqual(12);
+    const old1 = venueRow({ id: "old1", last_verified: "2025-01-01" });
+    const old2 = venueRow({ id: "old2", last_verified: "2024-06-01" });
+    expect(countStalePlaces([fresh, old1, old2], NOW, 12)).toBe(2);
   });
 
   test("excludes draft/archived rows and blessing boxes even when stale", () => {
     const draft = venueRow({ id: "draft", status: "draft", last_verified: "2020-01-01" });
     const archived = venueRow({ id: "archived", status: "archived", last_verified: "2020-01-01" });
     const box = venueRow({ id: "box", category: "blessing_box", last_verified: "2020-01-01" });
-    const { items } = selectStalePlaces([draft, archived, box], NOW, { months: 12 });
-    expect(items).toHaveLength(0);
-  });
-
-  test("totalCount reflects every stale row even when items is capped by limit", () => {
-    const rows = Array.from({ length: 5 }, (_, i) => venueRow({ id: `v${i}`, last_verified: "2024-01-01" }));
-    const { items, totalCount } = selectStalePlaces(rows, NOW, { months: 12, limit: 2 });
-    expect(items).toHaveLength(2);
-    expect(totalCount).toBe(5);
+    expect(countStalePlaces([draft, archived, box], NOW, 12)).toBe(0);
   });
 });
 

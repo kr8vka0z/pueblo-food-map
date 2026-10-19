@@ -4,7 +4,7 @@
  * both real implementations that need Next router context this jsdom
  * render doesn't provide — same "PageNav needs usePathname" reasoning
  * PageNav.test.tsx's own local override documents) and global fetch is
- * stubbed (same convention as BoxContent.test.tsx / BoxCheckinsAdminPanel.test.tsx)
+ * stubbed (same convention as BoxCheckinsAdminPanel.test.tsx)
  * so nothing here makes a real network call.
  */
 
@@ -46,7 +46,7 @@ beforeEach(() => {
     if (url.includes("/network-stats")) {
       return Promise.resolve(jsonResponse({ boxes: [], checkins: [], photos: [] }));
     }
-    // useBoxVenues() -> GET /api/public/blessing-boxes
+    // useBoxesList() -> GET /api/public/blessing-boxes
     return Promise.resolve(jsonResponse({ boxes: [] }));
   });
   vi.stubGlobal("fetch", mockFetch);
@@ -83,7 +83,7 @@ describe("BoxesActivityContent", () => {
     });
     render(<BoxesActivityContent />);
     // A native <select> ignores a `value` with no matching <option> yet —
-    // wait for useBoxVenues' own fetch to populate the box-1 option before
+    // wait for useBoxesList's own fetch to populate the box-1 option before
     // asserting the select actually reflects it.
     await waitFor(() => {
       const select = screen.getByLabelText(t("activity.filters.box", "en")) as HTMLSelectElement;

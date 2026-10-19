@@ -1,7 +1,6 @@
 /**
  * /admin/submissions — retired (#675, "fold the Review queue into Places").
- * The review queue this page used to render (SubmissionsReviewView.tsx, now
- * deleted) is folded into the Places tab: every pending public submission
+ * The review queue this page used to render is folded into the Places tab: every pending public submission
  * shows on its reported place's own row (a closure/problem report) or as
  * its own "Suggested new place" row (a new_venue suggestion), both tagged
  * "Public" — and resolves from that place's own edit page

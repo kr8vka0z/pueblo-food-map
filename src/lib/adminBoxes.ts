@@ -1,7 +1,7 @@
 /**
  * adminBoxes.ts — assembles src/lib/boxHealth.ts's BoxHealthEntry[] from D1
- * for the admin surfaces that show it: the /admin Dashboard's "Boxes that
- * need help" panel and the /admin/boxes tab's all-boxes table. ONE loader so
+ * for the admin surfaces that show it: the /admin Dashboard's "Boxes empty
+ * or low" count and the /admin/boxes tab's all-boxes table. ONE loader so
  * both pages read the exact same box set, latest check-in, and sponsor
  * names — the task spec's own requirement that both screens use "the SAME
  * function" for status extends naturally to the query that feeds it; two

@@ -386,7 +386,7 @@ function mapRowToItem(row: ActivityRow): ActivityItem {
   };
 }
 
-/** Reads one page of the combined feed off D1. Never throws its own errors — a D1 failure propagates to the caller (the public route and BoxContent's activity panel both catch it, matching every other blessing-box read path's best-effort convention). */
+/** Reads one page of the combined feed off D1. Never throws its own errors — a D1 failure propagates to the caller (the public activity route, its only caller, catches it, matching every other blessing-box read path's best-effort convention). */
 export async function loadBoxActivity(db: D1Database, filters: ActivityFilters): Promise<ActivityPage> {
   const page = clampPage(filters.page);
   const pageSize = clampPageSize(filters.pageSize);

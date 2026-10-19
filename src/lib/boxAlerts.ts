@@ -73,6 +73,41 @@ import type { BoxStatus, CheckinKind } from "@/lib/blessingBoxes";
 export const ALERT_COOLDOWN_HOURS = 6;
 const ALERT_COOLDOWN_MS = ALERT_COOLDOWN_HOURS * 60 * 60 * 1000;
 
+/** Per recipient address, per hour — shared by the adopt and giver-alert sign-up routes. */
+const MAX_EMAIL_TARGET_PER_HOUR = 3;
+/**
+ * Site-wide, per hour, shared by the same two routes. 2026-09-18 security
+ * review, item 5: raised 60 -> 300 — 60/hour across both routes was tight
+ * enough to plausibly false-positive during ordinary sitewide traffic; 300
+ * keeps the "catch a real flood" purpose without that risk, matching the
+ * checkins route's own 300/hour reasoning.
+ */
+const MAX_EMAIL_GLOBAL_PER_HOUR = 300;
+
+/**
+ * The email-flood caps for the two public routes that send a confirm email
+ * to a caller-supplied address (POST /api/public/blessing-boxes/[id]/adopt
+ * and .../alerts). Both draw from ONE combined budget, so the scopes and caps
+ * live here once. Per-address cap first, then the site-wide cap; a rejected
+ * per-address check never touches the site-wide counter. Returns the error
+ * code the caller answers with (429), or null when both caps allow the send.
+ * Callers run this only after validation and the box lookup — see the adopt
+ * route's header, item 5.
+ */
+export async function checkAlertEmailFloodCaps(
+  db: D1Database,
+  secret: string,
+  email: string,
+): Promise<null | "rate_limit_email" | "rate_limit_global"> {
+  if (!(await checkAndIncrement(db, secret, { scope: "alert-email-target", id: email }, MAX_EMAIL_TARGET_PER_HOUR))) {
+    return "rate_limit_email";
+  }
+  if (!(await checkAndIncrement(db, secret, { scope: "alert-email-global", id: "global" }, MAX_EMAIL_GLOBAL_PER_HOUR))) {
+    return "rate_limit_global";
+  }
+  return null;
+}
+
 /** ponytail: a hard, inline cap on recipients per event rather than a queue — fine at Pueblo's real subscriber volume; if a box ever legitimately needs to alert more than 200 people from one check-in, the upgrade path is a durable queue (e.g. a D1-backed outbox table drained by a scheduled worker) instead of this synchronous batch send. */
 export const MAX_ALERT_RECIPIENTS_PER_EVENT = 200;
 

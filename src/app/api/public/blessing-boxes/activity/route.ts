@@ -2,8 +2,8 @@
  * GET /api/public/blessing-boxes/activity — the combined public activity
  * feed (Blessing Boxes slice 3, Discovery stories D1-D3): a single,
  * newest-first list mixing check-ins and box lifecycle events. Powers both
- * /boxes/activity (the global feed, D1/D2) and BoxContent's own per-box
- * "recent activity" panel (D3, `?box=<id>&limit=5`).
+ * /boxes/activity (the global feed, D1/D2) and the per-box log on
+ * /box/<id>/history (`?box=<id>`).
  *
  * Query params, all optional: `box` (a venue id), `kind` (one of
  * src/lib/boxActivity.ts's ACTIVITY_KINDS — an unrecognized value returns

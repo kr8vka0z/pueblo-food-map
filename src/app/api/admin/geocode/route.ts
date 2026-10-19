@@ -8,8 +8,7 @@
  * (src/lib/adminDb.ts) — but NOT requireAdminOrigin(). That CSRF guard
  * exists for non-GET /api/admin/* mutations (an ambient session cookie
  * being ridden cross-site); this route only reads a public address and
- * writes nothing, so it has nothing for CSRF to protect (same reasoning
- * as GET /api/admin/whoami).
+ * writes nothing, so it has nothing for CSRF to protect.
  *
  * Provider: the free US Census Bureau geocoder, not Mapbox. Admin now
  * serves at the apex `/admin` path, which the app's Mapbox public token
@@ -32,10 +31,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 
-// WHY force-dynamic: same reasoning as GET /api/admin/whoami — this route
-// reads req.headers directly (not next/headers), so without this Next may
-// statically optimize it and cache a stale 200 or 403 for every caller
-// regardless of their own Access token.
+// WHY force-dynamic: this route reads req.headers directly (not
+// next/headers), so without this Next may statically optimize the GET
+// handler and cache a stale 200 or 403 for every caller regardless of
+// their own session. It must evaluate fresh on every request.
 export const dynamic = "force-dynamic";
 
 const CENSUS_GEOCODER_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress";

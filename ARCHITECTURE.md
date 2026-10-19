@@ -1565,9 +1565,9 @@ and "PFM ARCHITECTURE History — 2026-09-24 Trim".
   `/admin/venues/new?submission=<id>` (prefilled by
   `mapSubmissionPayloadToFormValues()`); the optional `submissionId` rides
   the create route's own `db.batch()` so the venue insert and the approval
-  land together. A `closure` report that says the place is really gone
-  still uses the pre-existing `?submission=<id>` edit-page banner +
-  `ArchiveVenueButton` remove-and-resolve batch (#270), unchanged. Each row's
+  land together. A `closure` report that says the place is really gone is
+  handled the same way: remove it with the edit page's plain "Remove from
+  map", then **Mark done** the report. Each row's
   JSON `payload` is parsed on its own (`parseSubmissionRow`,
   `src/lib/publicSubmissions.ts`), so one bad row degrades to a
   still-rejectable "couldn't read details" card. The payload mapper's

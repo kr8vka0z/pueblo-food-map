@@ -164,22 +164,4 @@ describe("POST /api/admin/venues/[id]/archive — optimistic concurrency (#265)"
     // column (see route.ts's own header, "correct by construction").
     expect(afterJson.phone).toBe("719-555-0199");
   });
-
-  test("submissionId's approve statement is ALSO EXISTS-gated — a stale archive must not approve a closure report for a removal that never wrote", async () => {
-    const { db, batch } = makeFakeDb(makeExistingRow(), 0);
-    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: db } });
-
-    const req = new NextRequest(`https://pueblofoodmap.com/api/admin/venues/${VENUE_ID}/archive`, {
-      method: "POST",
-      headers: { Origin: ADMIN_ORIGIN, "Content-Type": "application/json" },
-      body: JSON.stringify({ submissionId: 7 }),
-    });
-
-    await callArchive(req);
-
-    const stmts = batch.mock.calls[0][0] as BoundStatement[];
-    const approveStmt = stmts.find((s) => s.sql.includes("UPDATE public_submissions"));
-    expect(approveStmt).toBeDefined();
-    expect(approveStmt!.sql).toContain("AND EXISTS (SELECT 1 FROM venues WHERE id = ? AND updated_at = ?)");
-  });
 });

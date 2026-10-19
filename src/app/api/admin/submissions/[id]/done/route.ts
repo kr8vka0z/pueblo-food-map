@@ -1,17 +1,17 @@
 /**
  * POST /api/admin/submissions/[id]/done — resolve a pending closure/problem
  * report (#675, "fold the Review queue into Places"): the admin has already
- * fixed the reported venue's fields (AddVenueForm's own PATCH, a separate
- * request) or removed it (ArchiveVenueButton's existing `?submission=`
- * archive-and-resolve batch, unchanged by this route) and is telling this
- * report "handled" without either of those.
+ * fixed the reported venue's fields (AddVenueForm's own PATCH) or removed it
+ * (ArchiveVenueButton's plain archive), each a separate request, and is now
+ * telling this report "handled". This is the only route that marks a
+ * closure report handled (approved).
  *
  * No route resolved a submission without archiving it before this one
  * existed — checked first (POST /api/admin/venues, POST
  * /api/admin/venues/[id]/archive, POST .../submissions/[id]/reject all
  * inspected). `status='approved'` (not a new enum value) is the "resolved"
- * value the create/archive routes already use for a submission that got a
- * matching venue write — migrations/0002_public_submissions.sql's CHECK
+ * value the create route already uses for a submission that got a matching
+ * venue write — migrations/0002_public_submissions.sql's CHECK
  * constraint has no 'done' state, and adding one is a migration, out of
  * scope for this slice. A future column distinguishing "resolved via
  * archive/create" from "marked done by hand" is the upgrade path if that

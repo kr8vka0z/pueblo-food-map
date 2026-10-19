@@ -11,7 +11,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { NextRequest } from "next/server";
+import { makeSubmitRequest, mockTurnstileSuccess } from "@/__tests__/helpers/submitRouteTestHelpers";
 
 const mockCheckFormRateLimit = vi.fn();
 vi.mock("@/lib/formRateLimit", () => ({
@@ -22,18 +22,6 @@ const mockGetCloudflareContext = vi.fn();
 vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
-
-function makeRequest(body: Record<string, unknown>, ip = "127.0.0.1") {
-  return new NextRequest("http://localhost/feedback/submit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "cf-connecting-ip": ip },
-    body: JSON.stringify(body),
-  });
-}
-
-function mockTurnstileSuccess() {
-  return vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
-}
 
 const validBody = {
   feedbackType: "feature",
@@ -66,32 +54,32 @@ describe("POST /feedback/submit", () => {
 
   test("honeypot filled → returns 200 {ok:true} silently (bot trap)", async () => {
     vi.stubGlobal("fetch", mockTurnstileSuccess());
-    const res = await POST(makeRequest({ ...validBody, website: "http://spam.example.com" }));
+    const res = await POST(makeSubmitRequest("/feedback/submit", { ...validBody, website: "http://spam.example.com" }));
     expect(res.status).toBe(200);
     expect(mockCheckFormRateLimit).not.toHaveBeenCalled();
   });
 
   test("honeypot empty → proceeds to validation (real user path)", async () => {
     vi.stubGlobal("fetch", mockTurnstileSuccess());
-    const res = await POST(makeRequest({ ...validBody, feedbackType: "", message: "" }));
+    const res = await POST(makeSubmitRequest("/feedback/submit", { ...validBody, feedbackType: "", message: "" }));
     expect(res.status).toBe(422);
   });
 
   test("missing contactEmail → 422", async () => {
     vi.stubGlobal("fetch", mockTurnstileSuccess());
-    const res = await POST(makeRequest({ ...validBody, contactEmail: "" }));
+    const res = await POST(makeSubmitRequest("/feedback/submit", { ...validBody, contactEmail: "" }));
     expect(res.status).toBe(422);
   });
 
   test("invalid feedbackType → 422", async () => {
     vi.stubGlobal("fetch", mockTurnstileSuccess());
-    const res = await POST(makeRequest({ ...validBody, feedbackType: "not_a_valid_type" }));
+    const res = await POST(makeSubmitRequest("/feedback/submit", { ...validBody, feedbackType: "not_a_valid_type" }));
     expect(res.status).toBe(422);
   });
 
   test("missing message → 422", async () => {
     vi.stubGlobal("fetch", mockTurnstileSuccess());
-    const res = await POST(makeRequest({ ...validBody, message: "  " }));
+    const res = await POST(makeSubmitRequest("/feedback/submit", { ...validBody, message: "  " }));
     expect(res.status).toBe(422);
   });
 
@@ -99,7 +87,7 @@ describe("POST /feedback/submit", () => {
     test("missing turnstileToken → 400 turnstile_failed, never calls the rate limiter", async () => {
       const mockFetch = vi.fn();
       vi.stubGlobal("fetch", mockFetch);
-      const res = await POST(makeRequest({ ...validBody, turnstileToken: undefined }));
+      const res = await POST(makeSubmitRequest("/feedback/submit", { ...validBody, turnstileToken: undefined }));
       expect(res.status).toBe(400);
       expect(mockFetch).not.toHaveBeenCalled();
       expect(mockCheckFormRateLimit).not.toHaveBeenCalled();
@@ -110,7 +98,7 @@ describe("POST /feedback/submit", () => {
         "fetch",
         vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ success: false }) }),
       );
-      const res = await POST(makeRequest(validBody));
+      const res = await POST(makeSubmitRequest("/feedback/submit", validBody));
       expect(res.status).toBe(400);
     });
 
@@ -122,7 +110,7 @@ describe("POST /feedback/submit", () => {
           .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) })
           .mockResolvedValueOnce({ ok: true, text: async () => "{}" }),
       );
-      const res = await POST(makeRequest(validBody));
+      const res = await POST(makeSubmitRequest("/feedback/submit", validBody));
       expect(res.status).toBe(200);
       const data = (await res.json()) as { ok: boolean };
       expect(data.ok).toBe(true);
@@ -136,7 +124,7 @@ describe("POST /feedback/submit", () => {
           .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) })
           .mockResolvedValueOnce({ ok: false, text: async () => "resend error" }),
       );
-      const res = await POST(makeRequest(validBody));
+      const res = await POST(makeSubmitRequest("/feedback/submit", validBody));
       expect(res.status).toBe(502);
       const data = (await res.json()) as { error: string };
       expect(data.error).toBe("send_failed");
@@ -149,7 +137,7 @@ describe("POST /feedback/submit", () => {
       const db = {} as D1Database;
       mockGetCloudflareContext.mockReturnValue({ env: { ADMIN_DB: db } });
 
-      await POST(makeRequest(validBody, "198.51.100.9"));
+      await POST(makeSubmitRequest("/feedback/submit", validBody, "198.51.100.9"));
 
       expect(mockCheckFormRateLimit).toHaveBeenCalledTimes(1);
       const [passedDb, passedSecret, passedForm, passedIp] = mockCheckFormRateLimit.mock.calls[0];
@@ -163,7 +151,7 @@ describe("POST /feedback/submit", () => {
       vi.stubGlobal("fetch", mockTurnstileSuccess());
       mockCheckFormRateLimit.mockResolvedValueOnce(false);
 
-      const res = await POST(makeRequest(validBody));
+      const res = await POST(makeSubmitRequest("/feedback/submit", validBody));
 
       expect(res.status).toBe(429);
       const data = (await res.json()) as { ok: boolean; error: string };
@@ -179,7 +167,7 @@ describe("POST /feedback/submit", () => {
         throw new Error("no cloudflare context");
       });
 
-      const res = await POST(makeRequest(validBody));
+      const res = await POST(makeSubmitRequest("/feedback/submit", validBody));
 
       expect(res.status).toBe(503);
       const data = (await res.json()) as { ok: boolean; error: string };
@@ -193,7 +181,7 @@ describe("POST /feedback/submit", () => {
       vi.stubEnv("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA");
       vi.stubGlobal("fetch", mockTurnstileSuccess());
 
-      await expect(POST(makeRequest(validBody))).rejects.toThrow("CHECKIN_RATE_LIMIT_SECRET not configured");
+      await expect(POST(makeSubmitRequest("/feedback/submit", validBody))).rejects.toThrow("CHECKIN_RATE_LIMIT_SECRET not configured");
     });
   });
 });

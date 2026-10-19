@@ -5,7 +5,7 @@
  * for the fields sent. The text is machine-made and unreviewed; this route
  * saves nothing, reads no event row and writes no audit entry.
  *
- * Auth: same as the other event routes (authorizeEventRequest: session, then
+ * Auth: same as the other event routes (authorizeAdminWrite: session, then
  * Origin check). A model failure is 502 and a missing AI binding (local dev)
  * is 503, both `{ ok: false, error, message }` so the form can show `message`.
  */
@@ -13,12 +13,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-import { authorizeEventRequest } from "@/lib/adminEvents";
+import { authorizeAdminWrite } from "@/lib/adminDb";
 import { suggestSpanish, TranslateError, validateTranslateRequest } from "@/lib/eventTranslate";
 
 export async function POST(req: NextRequest): Promise<Response> {
   try {
-    await authorizeEventRequest(req.headers);
+    await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

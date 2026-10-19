@@ -10,8 +10,8 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-import { authorizeEventRequest, eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
-import type { AdminDbAccess } from "@/lib/adminDb";
+import { eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import type { EventRow } from "@/lib/events";
 
 async function readExpectedUpdatedAt(req: NextRequest): Promise<string | null> {
@@ -29,7 +29,7 @@ export async function POST(
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizeEventRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

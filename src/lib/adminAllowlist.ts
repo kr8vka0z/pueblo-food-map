@@ -1,7 +1,7 @@
 /**
  * Admin allowlist (#315 Phase 2) — the single source of truth for "who is
  * allowed to hold an admin session at all," enforced at every Better Auth
- * hook that can mint or extend one (see auth-options.ts's allowlist plugin).
+ * hook that can mint or extend one (see adminAuthAllowlistPlugin.ts).
  *
  * WHY a standalone module, not inlined in auth-options.ts: both the plugin
  * hooks AND their unit tests need the same `isAllowlistedEmail()` check —

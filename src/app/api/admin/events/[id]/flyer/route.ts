@@ -11,7 +11,7 @@
  *            flyer already there.
  *   DELETE — JSON `{ expectedUpdatedAt }`: remove the flyer.
  *
- * Writes are gated exactly like the other event writes (authorizeEventRequest:
+ * Writes are gated exactly like the other event writes (authorizeAdminWrite:
  * admin session, then requireAdminOrigin) BEFORE any body is read or any
  * storage touched. The file is judged on its bytes (src/lib/eventFlyers.ts),
  * never on the client's Content-Type or name, and the storage key is made
@@ -30,8 +30,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
-import { authorizeEventRequest, eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
+import { eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
+import { authorizeAdminWrite, getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
 import { publicFlyerOf, type EventRow } from "@/lib/events";
 import { flyerKey, FLYER_CONTENT_TYPES, inspectFlyer, MAX_FLYER_BYTES, type FlyerExt } from "@/lib/eventFlyers";
 
@@ -145,7 +145,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizeEventRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }
@@ -223,7 +223,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizeEventRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

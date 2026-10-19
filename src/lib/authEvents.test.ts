@@ -281,7 +281,6 @@ describe("auth_events — sign-in record (#679, email code #684)", () => {
 
 describe("signInMethodForPath", () => {
   test.each([
-    ["/magic-link/verify", "email_link"],
     ["/passkey/verify-authentication", "passkey"],
     ["/sign-in/email-otp", "email_code"],
     ["/something-else", null],

@@ -21,8 +21,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { loadBoxPhotoById, type BoxPhotoRow } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";
@@ -34,19 +33,13 @@ const AUDIT_INSERT_SQL =
 /** Reviewer-entered reason, capped generously — this is an internal admin note, not public-facing copy, so no i18n and no tight limit. */
 const MAX_REVIEW_REASON_LENGTH = 500;
 
-async function authorize(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorize(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

@@ -83,7 +83,7 @@ unfamiliar reader doesn't mistake them for part of the flow above:
 
 | Script | Purpose |
 |---|---|
-| `seed-admin-db.ts` | One-time: generates the SQL that seeded all current venues into D1 on the #237 admin cutover (`npm run seed:admin`) |
+| `seed-admin-db.ts` | Local only: generates SQL that loads the real venue source records into a fresh local D1 (`npm run seed:admin`). Never apply it with `--remote`; remote databases change only through `wrangler d1 migrations apply` |
 | `seed-blessing-boxes.ts` | Dev-only: generates throwaway fake blessing-box SQL for staging/dev |
 | `load-real-blessing-boxes.ts` | Generates ready-to-apply SQL for Kyle's real blessing-box address list |
 | `seed-dev.sql` | Fake venue rows for the staging admin D1 database's UI states |

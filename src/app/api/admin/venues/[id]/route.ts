@@ -125,7 +125,7 @@ async function authorizeEditRequest(headers: HeaderSource): Promise<AdminDbAcces
   return access;
 }
 
-/** Mirrors readOptionalSubmissionId's convention in the sibling create/archive routes. */
+/** Mirrors readOptionalSubmissionId's convention in the sibling create route. */
 function readOptionalProposalId(body: unknown): number | null {
   const raw = (body as { proposalId?: unknown })?.proposalId;
   return typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : null;

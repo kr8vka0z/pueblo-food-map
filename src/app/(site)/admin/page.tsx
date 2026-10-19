@@ -78,7 +78,7 @@ import {
 } from "@/lib/boxStats";
 import { loadVisitorsAnalytics, DASHBOARD_PERIODS, type DashboardPeriod } from "@/lib/cfAnalytics";
 import { loadMapUsageAnalytics } from "@/lib/posthogQuery";
-import type { AdminNavCounts } from "@/lib/adminNavCounts";
+import { countPendingProposals, countPendingSubmissions, type AdminNavCounts } from "@/lib/adminNavCounts";
 import type { AdminVenueRow } from "@/types/venue";
 import AdminNav from "@/components/AdminNav";
 import PublishPanel from "@/components/PublishPanel";
@@ -164,8 +164,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
     const [
       venuesResult,
-      submissionsTotalRow,
-      proposalsTotalRow,
+      submissionsTotalResult,
+      proposalsTotalResult,
       photosAll,
       adoptersAll,
       boxHealth,
@@ -178,8 +178,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       mapUsageResult,
     ] = await Promise.all([
       db.prepare("SELECT * FROM venues ORDER BY name COLLATE NOCASE ASC").all<AdminVenueRow>(),
-      db.prepare("SELECT COUNT(*) AS n FROM public_submissions WHERE status = 'pending'").first<{ n: number }>(),
-      db.prepare("SELECT COUNT(*) AS n FROM change_proposals WHERE status = 'pending'").first<{ n: number }>(),
+      countPendingSubmissions(db),
+      countPendingProposals(db),
       loadReviewQueue(db).catch(() => [] as AdminBoxPhotoRow[]),
       loadPendingAdopters(db).catch(() => [] as AdminBoxAdopterRow[]),
       loadBoxHealthEntries(db).catch(() => [] as Awaited<ReturnType<typeof loadBoxHealthEntries>>),
@@ -213,8 +213,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     mapUsage = mapUsageResult;
 
     venues = venuesResult.results;
-    submissionsTotal = submissionsTotalRow?.n ?? 0;
-    proposalsTotal = proposalsTotalRow?.n ?? 0;
+    submissionsTotal = submissionsTotalResult;
+    proposalsTotal = proposalsTotalResult;
     photos = photosAll;
     adopters = adoptersAll;
     boxHealthEntries = boxHealth;

@@ -84,7 +84,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         } catch (err) {
           // Best-effort — the confirm itself already succeeded and is durable;
           // a missed admin notice just means the queue is discovered a little
-          // later (the /admin/box-adopters list still shows it).
+          // later (the "To review" list at /admin/boxes?show=review still shows it).
           logFormFailure("adopt", "send_failed", {
             message: err instanceof Error ? err.message : "unknown error",
           });

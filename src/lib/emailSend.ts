@@ -2,10 +2,11 @@
  * emailSend.ts — shared Resend HTTP + single-language-email-composition
  * helpers for the adopt-a-box and email-alert flows (Blessing Boxes slice 6).
  *
- * WHY this exists: every other Resend send in this app (report/suggest/
- * feedback forms, check-in problem reports, photo moderation alerts) is a
- * one-off inline `fetch()` sending TEXT-ONLY mail to a single internal admin
- * address. This slice is the first to (a) send HTML mail to real site
+ * WHY this exists: the report/suggest/feedback forms each send a one-off
+ * inline `fetch()` of TEXT-ONLY mail to a single internal admin address; the
+ * Blessing Box admin notices (problem report, new/flagged photo, confirmed
+ * adoption) send the same kind of mail through sendAdminNotice below. This
+ * slice is the first to (a) send HTML mail to real site
  * visitors, (b) need the identical composition (in the recipient's OWN
  * language — see composeEmail's own header) across six different email
  * kinds (adopt confirm, adoption-approved, giver confirm, host welcome, and
@@ -75,8 +76,9 @@ export interface OutboundEmail {
   to: string;
   subject: string;
   text: string;
-  html: string;
-  /** RFC 8058 one-click unsubscribe headers — see unsubscribeHeaders() below. Every email this slice sends to a real subscriber carries these; the two internal admin-only notification emails (new adoption request, new photo/problem report) do not. */
+  /** Omitted only by sendAdminNotice: the internal admin notices are text-only, so the user free text in them (problem note, applicant name/note) never goes into HTML. Every email to a member of the public sets it, via composeEmail. JSON.stringify drops an undefined value, so no `html` key is sent at all. */
+  html?: string;
+  /** RFC 8058 one-click unsubscribe headers — see unsubscribeHeaders() below. Every email this slice sends to a real subscriber carries these; the internal admin notices (sendAdminNotice) do not. */
   headers?: Record<string, string>;
 }
 
@@ -135,6 +137,14 @@ export async function sendResendEmail(email: OutboundEmail): Promise<void> {
     const body = await res.text().catch(() => "(unreadable)");
     throw new Error(`Resend API error ${res.status}: ${body}`);
   }
+}
+
+/** Address every internal admin notice goes to — never a member of the public. */
+const ADMIN_NOTICE_TO = "issues@pueblofoodmap.com";
+
+/** Sends one internal, plain-English, TEXT-ONLY notice to the admin inbox (new problem report, new/flagged photo, confirmed adoption application). Throws like sendResendEmail; every caller treats it as best-effort. */
+export async function sendAdminNotice(subject: string, text: string): Promise<void> {
+  await sendResendEmail({ to: ADMIN_NOTICE_TO, subject, text });
 }
 
 /**

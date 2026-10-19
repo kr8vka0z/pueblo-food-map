@@ -5,8 +5,9 @@
  * Same anti-abuse ORDER as every other public form in this app (report/
  * submit, suggest/submit, feedback/submit): Content-Type/JSON parse ->
  * Turnstile -> honeypot -> rate limit -> field validation -> write. See
- * AGENTS.md's public-submissions section and src/lib/turnstile.ts /
- * src/lib/formRateLimit.ts for the established shape this route reuses
+ * ARCHITECTURE.md's "Form-route triad" and "Blessing Boxes" sections and
+ * src/lib/turnstile.ts / src/lib/formRateLimit.ts for the established shape
+ * this route reuses
  * (as of #587, the three public forms also moved onto this file's own
  * checkAndIncrement, via formRateLimit.ts's thin per-form wrapper).
  *
@@ -57,12 +58,11 @@
  * when a usable checkinId exists — see boxNeedsToken.ts's own header for
  * why this is a stateless capability, never a stored client-token hash.
  *
-
  * WHY 'problem' reports never touch the public read path: the INSERT below
  * is identical for every kind, but every public SELECT elsewhere in this
  * app (src/lib/blessingBoxes.ts) filters `kind != 'problem'` at the query —
  * this route's only 'problem'-specific behavior is emailing the admin
- * (mirrors report/submit's sendReportEmail shape) and never recomputing the
+ * (a text-only notice via sendAdminNotice, src/lib/emailSend.ts) and never recomputing the
  * response's status/lastFilled from a 'problem' row (it cannot,
  * structurally — computeBoxStatus/computeLastFilledAt both exclude that
  * kind by construction).
@@ -72,14 +72,14 @@
  * header). After a successful insert, this route deletes that route's
  * cache entry for the CURRENT colo only (`caches.default` is per-colo, not
  * global — there is no zone-wide purge API available to a Worker without an
- * Account-scoped token this app doesn't use elsewhere, see AGENTS.md's
- * Cloudflare notes) — so the visitor who just checked in sees the change on
+ * Account-scoped token this app doesn't use elsewhere; see src/lib/
+ * edgeCache.ts) — so the visitor who just checked in sees the change on
  * their own next fetch, and every colo is bounded at 60s regardless. The
  * response body ALSO carries the box's fresh status/lastFilledAt directly
  * (2026-09-17 review correction — this comment previously claimed a
  * `recentCheckins` field that the response never actually returns), so
- * BoxContent's panel can update immediately without waiting on any fetch at
- * all — see BoxContent.tsx's own header.
+ * BoxCheckinPanel (in the on-map BoxCardBody) can update immediately without
+ * waiting on any fetch at all — see BoxCheckinPanel.tsx's own header.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -100,11 +100,13 @@ import {
 } from "@/lib/blessingBoxes";
 import { notifyBoxAlerts } from "@/lib/boxAlerts";
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
+import { requestIp } from "@/lib/publicRequest";
+import { sendAdminNotice } from "@/lib/emailSend";
 
 export const dynamic = "force-dynamic";
 
 const CHECKIN_KINDS: readonly CheckinKind[] = ["filled", "took", "low", "empty", "problem"];
-/** Only these two kinds may carry a note — matches the panel's own UI (BoxContent.tsx: "optional short note on filled and problem"). A note sent alongside any other kind is silently dropped, not rejected — harmless either way, and rejecting it would punish a client that sent extra data by mistake. */
+/** Only these two kinds may carry a note — matches the panel's own UI (BoxCheckinPanel.tsx: "optional short note on filled and problem"). A note sent alongside any other kind is silently dropped, not rejected — harmless either way, and rejecting it would punish a client that sent extra data by mistake. */
 const KINDS_ALLOWING_NOTE: ReadonlySet<CheckinKind> = new Set(["filled", "problem"]);
 
 /**
@@ -121,8 +123,8 @@ const KINDS_ALLOWING_NOTE: ReadonlySet<CheckinKind> = new Set(["filled", "proble
  * plausibly sees from honest use in an hour, while a scripted flood still
  * blows past 300 in well under a minute and gets caught.
  */
-export const MAX_PER_BOX_PER_HOUR = 300;
-export const MAX_PER_VISITOR_PER_BOX_PER_HOUR = 6;
+const MAX_PER_BOX_PER_HOUR = 300;
+const MAX_PER_VISITOR_PER_BOX_PER_HOUR = 6;
 
 interface CheckinPayload {
   kind?: string;
@@ -152,33 +154,8 @@ interface BoxLookupRow {
 }
 
 async function sendProblemReportEmail(boxId: string, boxName: string, note: string | null): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY not configured");
-  }
-
   const lines = [`Box: ${boxName}`, `Box ID: ${boxId}`, ``, `Problem reported:`, note || "(no note provided)"];
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from: "Pueblo Food Map <noreply@pueblofoodmap.com>",
-      to: ["issues@pueblofoodmap.com"],
-      subject: `[PFM Blessing Box] Problem reported — ${boxName}`,
-      text: lines.join("\n"),
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    throw new Error(`Resend API error ${res.status}: ${body}`);
-  }
-}
-
-/** Deletes GET /api/public/blessing-boxes' cache entry for the CURRENT colo — see this file's header for why this is a partial, not zone-wide, purge, and why that's still enough. Thin wrapper over the shared bustEdgeCache() (src/lib/edgeCache.ts) — slice 5's photo moderation routes reuse that same helper for their own, wider set of cache keys. */
-async function bustListCache(req: NextRequest): Promise<void> {
-  await bustEdgeCache(req, ["/api/public/blessing-boxes"]);
+  await sendAdminNotice(`[PFM Blessing Box] Problem reported — ${boxName}`, lines.join("\n"));
 }
 
 export async function POST(
@@ -201,8 +178,7 @@ export async function POST(
 
   // IP is used ONLY for Turnstile's optional remoteip validation — never
   // stored, never used as a rate-limit key (see checkinRateLimit.ts header).
-  const ip =
-    req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = requestIp(req);
 
   // Which secret to verify against depends on which widget produced the
   // token (2026-09-18 follow-up — the client can now fall back to the
@@ -320,7 +296,7 @@ export async function POST(
       const priorCheckins = await loadVisibleCheckins(db, boxId);
       prevStatus = computeBoxStatus(priorCheckins, new Date(), outOfService);
     } catch (err) {
-      logFormFailure("checkin", "send_failed", {
+      logFormFailure("checkin", "db_unavailable", {
         message: err instanceof Error ? err.message : "unknown error",
       });
     }
@@ -363,7 +339,8 @@ export async function POST(
     }
   }
 
-  await bustListCache(req);
+  // Current colo only — see this file's header for why that partial purge is enough.
+  await bustEdgeCache(req, ["/api/public/blessing-boxes"]);
 
   // Slice 6 (alerts): never blocks or fails the check-in response — see
   // boxAlerts.ts's own header, "NEVER BLOCKS THE CHECK-IN." Runs via
@@ -392,9 +369,9 @@ export async function POST(
     // is already caught; nothing further to do here.
   }
 
-  // Recompute this box's own status/lastFilled/recentCheckins from the
+  // Recompute this box's own status/lastFilledAt from the
   // check-ins table (including the row just inserted) so the response — and
-  // therefore BoxContent's panel — reflects the write immediately, with no
+  // therefore BoxCheckinPanel — reflects the write immediately, with no
   // second fetch and no dependency on the 60s list cache at all.
   const checkins: CheckinStatusInput[] = await loadVisibleCheckins(db, boxId);
   const now = new Date();

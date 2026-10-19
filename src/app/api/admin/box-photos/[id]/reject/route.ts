@@ -108,7 +108,6 @@ export async function POST(
 
   await bustEdgeCache(req, [
     "/api/public/blessing-boxes",
-    `/api/public/blessing-boxes/${existing.venue_id}/photos`,
     `/api/public/box-photos/${photoId}`,
   ]);
 

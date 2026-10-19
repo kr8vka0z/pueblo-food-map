@@ -19,10 +19,9 @@
  * than widening audit_log.action's CHECK constraint for one more value).
  *
  * Cache-busting: an approve can newly surface this photo in the box list's
- * `latestPhoto` field, the box's own photo-history list, AND make its own
- * serve route servable for the first time — bustEdgeCache() clears all
- * three paths (see edgeCache.ts's own header for why a photo moderation
- * decision needs three, not one).
+ * `latestPhoto` field AND make its own serve route servable for the first
+ * time — bustEdgeCache() clears both paths (see edgeCache.ts's own header
+ * for why a photo moderation decision needs two, not one).
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -93,7 +92,6 @@ export async function POST(
 
   await bustEdgeCache(req, [
     "/api/public/blessing-boxes",
-    `/api/public/blessing-boxes/${existing.venue_id}/photos`,
     `/api/public/box-photos/${photoId}`,
   ]);
 

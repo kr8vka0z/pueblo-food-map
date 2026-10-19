@@ -1,7 +1,7 @@
 /**
  * POST /api/public/blessing-boxes/[id]/alerts — a giver subscribes to email
  * alerts for ONE specific box ("near me" v1 — no radius, no stored
- * location; see AGENTS.md's Blessing Boxes slice 6 section). Blessing Boxes
+ * location; see ARCHITECTURE.md's "Blessing Boxes" section). Blessing Boxes
  * slice 6.
  *
  * Guard ORDER, same shared convention as the adopt route (see that file's
@@ -58,6 +58,8 @@ import { resolveEmailOrigin } from "@/lib/alertOrigin";
 import { logFormFailure } from "@/lib/logger";
 import { sendGiverConfirmEmail, upsertGiverSubscription } from "@/lib/boxAlerts";
 import { resolveEmailLang } from "@/lib/i18n";
+import { requestIp } from "@/lib/publicRequest";
+import { loadLiveBoxName } from "@/lib/blessingBoxes";
 
 export const dynamic = "force-dynamic";
 
@@ -78,11 +80,6 @@ interface AlertSignupPayload {
   clientToken?: string;
 }
 
-interface BoxLookupRow {
-  id: string;
-  name: string;
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -101,8 +98,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
 
-  const ip =
-    req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = requestIp(req);
   const turnstileKey = resolveBoxTurnstileKey(body.turnstileKey);
   const rateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
   if (!rateLimitSecret) {
@@ -146,17 +142,14 @@ export async function POST(
   }
   const lang = resolveEmailLang(body.lang);
 
-  let box: BoxLookupRow | null;
+  let boxName: string | null;
   try {
-    box = await db
-      .prepare("SELECT id, name FROM venues WHERE id = ? AND category = 'blessing_box' AND status != 'archived'")
-      .bind(boxId)
-      .first<BoxLookupRow>();
+    boxName = await loadLiveBoxName(db, boxId);
   } catch (err) {
     logFormFailure("alerts", "db_unavailable", { message: err instanceof Error ? err.message : "unknown error" });
     return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 502 });
   }
-  if (!box) {
+  if (boxName === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
@@ -198,7 +191,7 @@ export async function POST(
   if (action !== "noop" && confirmToken) {
     const emailPromise = sendGiverConfirmEmail({
       to: email,
-      boxName: box.name,
+      boxName,
       origin: resolveEmailOrigin(req),
       confirmToken,
       lang,

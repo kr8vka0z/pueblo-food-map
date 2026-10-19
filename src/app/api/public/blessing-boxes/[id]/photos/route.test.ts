@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Route-level tests for POST/GET /api/public/blessing-boxes/[id]/photos
+ * Route-level tests for POST /api/public/blessing-boxes/[id]/photos
  * (Blessing Boxes slice 5). Same layered-mock convention as the checkins
  * route's own tests: mocks boxTurnstile, the rate limiter,
  * @opennextjs/cloudflare's getCloudflareContext (D1 + R2 + fetch for the

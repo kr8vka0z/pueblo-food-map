@@ -3,7 +3,7 @@
  * (Blessing Boxes slice 6). Writes a pending, unconfirmed application
  * immediately; nothing about it is public ("Cared for by ...") until BOTH
  * the applicant confirms their email (POST /api/public/alerts/confirm) AND
- * an admin approves it (/admin/box-adopters).
+ * an admin approves it (/admin/boxes?show=review).
  *
  * Guard ORDER, same shared convention as every other public write on this
  * box surface (see the checkins route's own header): Content-Type ->
@@ -48,6 +48,8 @@ import { logFormFailure } from "@/lib/logger";
 import { insertAdopterApplication, sendAdopterConfirmEmail } from "@/lib/boxAdopters";
 import { sanitizeDisplayName } from "@/lib/displayNameHygiene";
 import { resolveEmailLang } from "@/lib/i18n";
+import { requestIp } from "@/lib/publicRequest";
+import { loadLiveBoxName } from "@/lib/blessingBoxes";
 
 export const dynamic = "force-dynamic";
 
@@ -71,11 +73,6 @@ interface AdoptPayload {
   clientToken?: string;
 }
 
-interface BoxLookupRow {
-  id: string;
-  name: string;
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -94,8 +91,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
 
-  const ip =
-    req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = requestIp(req);
   const turnstileKey = resolveBoxTurnstileKey(body.turnstileKey);
   const rateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
   if (!rateLimitSecret) {
@@ -167,17 +163,14 @@ export async function POST(
     note = trimmed;
   }
 
-  let box: BoxLookupRow | null;
+  let boxName: string | null;
   try {
-    box = await db
-      .prepare("SELECT id, name FROM venues WHERE id = ? AND category = 'blessing_box' AND status != 'archived'")
-      .bind(boxId)
-      .first<BoxLookupRow>();
+    boxName = await loadLiveBoxName(db, boxId);
   } catch (err) {
     logFormFailure("adopt", "db_unavailable", { message: err instanceof Error ? err.message : "unknown error" });
     return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 502 });
   }
-  if (!box) {
+  if (boxName === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
@@ -216,7 +209,7 @@ export async function POST(
   }
 
   try {
-    await sendAdopterConfirmEmail({ to: email, boxName: box.name, origin: resolveEmailOrigin(req), confirmToken, lang });
+    await sendAdopterConfirmEmail({ to: email, boxName, origin: resolveEmailOrigin(req), confirmToken, lang });
   } catch (err) {
     // Fatal per the task's own spec — see this file's header. The row
     // stays (it's a real, reviewable application either way), but the

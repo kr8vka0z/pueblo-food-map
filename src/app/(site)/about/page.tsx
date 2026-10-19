@@ -24,9 +24,8 @@ import { serializeJsonLd, buildFaqJsonLd } from "@/lib/venueSchema";
 import AboutContent from "@/components/AboutContent";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "About",
-  description:
-    "About Pueblo Food Map — our mission to connect Pueblo County residents with free and low-cost food resources, and how venue data is sourced.",
+  title: t("meta.about.title", "en"),
+  description: t("meta.about.description", "en"),
   path: "/about",
   // #689 PR 2: this page has an /es counterpart — carries hreflang now.
   mirrored: true,

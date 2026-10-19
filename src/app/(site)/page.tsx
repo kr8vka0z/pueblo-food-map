@@ -21,15 +21,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildVenueListJsonLd, serializeJsonLd } from "@/lib/venueSchema";
+import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
 import { SPLASH_GATE_SCRIPT } from "@/lib/splashGate";
 import { venues } from "@/data/venues";
 import HomePageClient from "./HomePageClient";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Pueblo Food Map — Food Resources in Pueblo County, CO",
-  description:
-    "Find free and low-cost food near you in Pueblo County, CO — pantries, community gardens, grocery stores, and meal sites, with SNAP/WIC info and directions.",
+  title: t("meta.home.title", "en"),
+  description: t("meta.home.description", "en"),
   path: "/",
   // #689 PR 2: this page has an /es counterpart — carries hreflang now.
   mirrored: true,

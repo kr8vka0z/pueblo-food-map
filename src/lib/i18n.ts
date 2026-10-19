@@ -21,12 +21,11 @@ const en: Record<string, string> = {
   "jsonld.website.description":
     "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores.",
 
-  // Per-page <title>/<meta description> for the /es tree's thin wrapper
-  // pages (#689 PR 2, src/app/es/**/page.tsx). Their EN counterparts keep
-  // hand-written literals in page.tsx (unchanged, #287's original design) —
-  // these keys exist so the ES side gets the same native-speaker [CHECK]
-  // review as every other locale-facing string, instead of a raw literal
-  // buried in a page file.
+  // Per-page <title>/<meta description> for /, /about, /resources and
+  // /venues. Both trees read these keys (the EN page.tsx with "en", the /es
+  // thin wrapper with "es", #689 PR 2), the same way the SEO hub pages do,
+  // so the two languages can't drift apart and the ES side gets the same
+  // native-speaker [CHECK] review as every other locale-facing string.
   "meta.home.title": "Pueblo Food Map — Food Resources in Pueblo County, CO",
   "meta.home.description":
     "Find free and low-cost food near you in Pueblo County, CO — pantries, community gardens, grocery stores, and meal sites, with SNAP/WIC info and directions.",

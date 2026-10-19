@@ -9,14 +9,14 @@
  */
 
 import type { Metadata } from "next";
+import { t } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
 import ResourcesContent from "@/components/ResourcesContent";
 import { resourcesFaqJsonLd } from "@/lib/resourcesFaq";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Food help programs",
-  description:
-    "How to get SNAP, WIC, Double Up Food Bucks, 2-1-1 Colorado, the Food Resource Hotline and senior food boxes in Pueblo County, CO — what each is for and how to sign up.",
+  title: t("meta.resources.title", "en"),
+  description: t("meta.resources.description", "en"),
   path: "/resources",
   // #689 PR 2: this page has an /es counterpart — carries hreflang now.
   mirrored: true,

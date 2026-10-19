@@ -16,11 +16,9 @@ export type VenueCategory =
   | "meal_site"
   | "blessing_box";
 
-export type WeeklyHours = Partial<
-  Record<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun", string[]>
->;
-
 export type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+export type WeeklyHours = Partial<Record<DayKey, string[]>>;
 
 /**
  * Non-weekly recurrences `hours_weekly` cannot express (#400) — e.g. "4th

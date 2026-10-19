@@ -363,7 +363,7 @@ Key state atoms and their roles:
 | `activeStepIndex` | `number` | Turn the stepper shows — one source of truth for the phone RouteStrip, the full card and `DesktopVenueWindow`; reset on every new route, venue switch and clear |
 | `focusPoint` / `focusRequestId` | `{lng, lat} \| null` / `number` | The stepper's camera target and its own "fire again" counter (#555) — separate from `recenterRequestId` so a step tap doesn't also re-fire the user-location flyTo |
 
-**Walking directions.** `parseWalkSteps(route)` (exported, pure) turns the
+**Walking directions.** `parseWalkSteps(route)` (pure, `src/lib/walkRoute.ts`) turns the
 Directions API legs into `WalkStep[]`, dropping any step with no instruction
 or a malformed `maneuver.location` — the stepper flies the camera to that
 coordinate, so a locationless step would crash it. `WalkStepper`
@@ -390,7 +390,7 @@ Walk tapped, userLocation === null
       stale (venue no longer selected) → noop, nothing drawn or shown
 ```
 
-`decideWalkResume` is exported and pure. The effect also waits out the
+`decideWalkResume` is pure and lives in `src/lib/walkRoute.ts`. The effect also waits out the
 transient `{granted, position:null}` state (the Permissions API can fire
 before `getCurrentPosition` succeeds) so a real grant isn't read as a denial.
 `fetchWalkingRoute` takes `origin` as a parameter so the effect can pass the
@@ -430,7 +430,7 @@ User taps "Near me" (BottomNav)
 on the user without a second tap (#141; see `autoLocateDoneRef`).
 
 **Drift detection:** `handleMoveEnd` checks whether the user-location dot is
-inside the viewport shrunk by `DRIFT_PAD_DEG` (0.002°, ~220 m) on every
+inside the viewport shrunk by `DRIFT_PAD_DEG` (`src/lib/mapBounds.ts`; 0.002°, ~220 m) on every
 edge, so "Re-center" doesn't flicker when the dot sits on the edge.
 
 ---
@@ -881,7 +881,7 @@ therefore fetches the three shell pages itself and caches every
 `/_next/static` and `/fonts` URL their HTML references. The venue dataset is
 compiled into those pages and bundles (`src/data/published-venues.ts`), so
 the list and the in-map venue card work offline. Live blessing-box status
-(`/api/public/blessing-boxes`) does not — `useBoxVenues` already treats a
+(`/api/public/blessing-boxes`) does not — `useBoxesList` already treats a
 failed fetch as "no boxes". `/venue/<id>` detail pages and other routes are
 not cached.
 

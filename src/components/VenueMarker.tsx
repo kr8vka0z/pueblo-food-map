@@ -15,32 +15,16 @@
  *   - aria-label: "<name>, <readable-category>[, <distance>]"
  *   - Keyboard: Enter/Space fires onClick via onKeyDown handler.
  *   - The <button> element provides native role="button" — no ARIA role needed.
- *
- * #44 stub files removed in this PR:
- *   - src/types/leaflet.d.ts
- *   - src/__mocks__/leaflet.ts
- *   - vitest.config.mts leaflet alias
  */
 
 import { memo, useRef, type KeyboardEvent } from "react";
 import { Marker } from "react-map-gl/mapbox";
 import { MapPin } from "lucide-react";
-import type { Venue, VenueCategory } from "@/types/venue";
+import type { Venue } from "@/types/venue";
+// Plain hex map (no DOM/CSSOM lookup), so the pin renders anywhere.
+import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
 import { t, type Locale } from "@/lib/i18n";
-
-// ─── Category color map (mirrors --color-cat-* tokens in globals.css) ─────────
-// Hardcoded hex values so the icon is renderable without DOM/CSSOM.
-const CATEGORY_COLORS: Record<VenueCategory, string> = {
-  pantry: "#BE2D45",
-  grocery: "#1F4E8C",
-  convenience: "#0F6573",
-  farm: "#92591D",
-  garden: "#2C5F4F",
-  edible_landscape: "#58772B",
-  meal_site: "#6B3FA0",
-  blessing_box: "#C2447B",
-};
 
 // ─── Sage selected ring color (--color-sage-500) ──────────────────────────────
 const SAGE_500 = "#4A8466";
@@ -84,7 +68,7 @@ function VenueMarker({
   onLeave,
   locale = "en",
 }: VenueMarkerProps) {
-  const color = CATEGORY_COLORS[venue.category];
+  const color = categoryColors[venue.category];
   // marker.category.* stays short; category.full.* is for chips and detail panels (#162).
   const readableName = t(`marker.category.${venue.category}`, locale);
   const pinSize = selected ? SIZE_SELECTED : SIZE_DEFAULT;

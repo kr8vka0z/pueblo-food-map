@@ -22,13 +22,13 @@
 
 import { t, type Locale } from "@/lib/i18n";
 import {
-  formatDurationMs,
   PERIOD_KEYS,
   type CheckinCounts,
   type NetworkOverview,
   type PairAverages,
   type PeriodKey,
 } from "@/lib/boxStats";
+import { formatDurationLabel } from "@/lib/formatDurationLabel";
 
 const FIELD_LABEL = "block text-xs font-medium text-[var(--color-ink-700)] mb-1";
 // text-base md:text-sm — iOS Safari auto-zooms on focusing a field under 16px
@@ -36,12 +36,6 @@ const FIELD_LABEL = "block text-xs font-medium text-[var(--color-ink-700)] mb-1"
 const SELECT_CLASS =
   "w-full rounded-[var(--radius-md)] border border-[var(--color-bone-300)] px-3 py-2 text-base md:text-sm " +
   "text-[var(--color-ink-900)] bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]";
-
-function formatDuration(ms: number | null, locale: Locale): string {
-  if (ms === null) return t("box.stats.noData", locale);
-  const { value, unit } = formatDurationMs(ms);
-  return t(`box.stats.duration.${unit}`, locale, { value: String(value) });
-}
 
 interface RowProps {
   label: string;
@@ -129,9 +123,9 @@ export default function BoxNumbersPanel({
       <div>
         <h3 className="text-sm font-medium text-[var(--color-ink-900)] mb-1">{t("box.stats.avgHeading", locale)}</h3>
         <dl>
-          <Row label={t("box.stats.avg.emptyToFill", locale)} value={formatDuration(pairAverages.emptyToFillMs, locale)} />
-          <Row label={t("box.stats.avg.fillToFill", locale)} value={formatDuration(pairAverages.fillToFillMs, locale)} />
-          <Row label={t("box.stats.avg.fillToEmpty", locale)} value={formatDuration(pairAverages.fillToEmptyMs, locale)} />
+          <Row label={t("box.stats.avg.emptyToFill", locale)} value={formatDurationLabel(pairAverages.emptyToFillMs, locale)} />
+          <Row label={t("box.stats.avg.fillToFill", locale)} value={formatDurationLabel(pairAverages.fillToFillMs, locale)} />
+          <Row label={t("box.stats.avg.fillToEmpty", locale)} value={formatDurationLabel(pairAverages.fillToEmptyMs, locale)} />
         </dl>
       </div>
 

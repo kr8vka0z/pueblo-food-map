@@ -2,7 +2,7 @@
  * WalkStepper tests — issue #555 step-through walking directions.
  *
  * Two units, both new in this issue:
- *   1. `parseWalkSteps` (MapWrapper.tsx) dropping any step whose
+ *   1. `parseWalkSteps` (src/lib/walkRoute.ts) dropping any step whose
  *      `maneuver.location` is missing or malformed — the stepper flies the
  *      map's camera to that coordinate on every arrow tap, so a step without
  *      one can't be shown safely. See WalkingRoute.test.tsx for this
@@ -37,7 +37,7 @@ vi.mock("react-map-gl/mapbox", async () => {
   };
 });
 
-import { parseWalkSteps } from "@/components/MapWrapper";
+import { parseWalkSteps } from "@/lib/walkRoute";
 import { WalkStepper, type WalkStepperProps } from "@/components/DirectionButtons";
 
 // ─── parseWalkSteps — location-drop behavior (#555) ───────────────────────────

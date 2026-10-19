@@ -38,7 +38,7 @@
  * walking route. Evidence gathered before touching this file: a real Mapbox
  * Directions API walking response captured for a short Pueblo route
  * (test/fixture data, see RouteStripStepsEvidence.test.tsx) returned 7 usable steps —
- * `parseWalkSteps` (MapWrapper.tsx) keeps all 7 — and the prop chain from
+ * `parseWalkSteps` (src/lib/walkRoute.ts) keeps all 7 — and the prop chain from
  * there (MapWrapper's `walkingRouteSteps` -> BottomSheet's `walkRouteSteps`
  * -> here) has no additional gate beyond `walkingRouteVenueId ===
  * selectedVenueId`, the same one that already has to pass for the strip

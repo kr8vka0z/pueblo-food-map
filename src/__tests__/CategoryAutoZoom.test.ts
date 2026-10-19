@@ -1,7 +1,7 @@
 /**
  * CategoryAutoZoom tests — issue #111
  *
- * Tests the pure utilities exported from MapWrapper:
+ * Tests the pure utilities in src/lib/mapBounds.ts:
  *   - computeCategoryBounds: bounds computation from venue lat/lng
  *   - CATEGORY_FIT_MAX_ZOOM: cap value guard for sparse categories
  *   - CATEGORY_FIT_PADDING_MOBILE / CATEGORY_FIT_PADDING_DESKTOP: padding shapes
@@ -19,7 +19,7 @@ import {
   CATEGORY_FIT_MAX_ZOOM,
   CATEGORY_FIT_PADDING_MOBILE,
   CATEGORY_FIT_PADDING_DESKTOP,
-} from "@/components/MapWrapper";
+} from "@/lib/mapBounds";
 import type { Venue } from "@/types/venue";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────

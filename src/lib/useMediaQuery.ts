@@ -18,6 +18,18 @@ export const MOBILE_QUERY = "(max-width: 767px)";
 /** Below Tailwind `2xl` (1536px) — bottom nav bar instead of the inline nav pill (spec §5). */
 export const BELOW_2XL_QUERY = "(max-width: 1535px)";
 
+/**
+ * One-shot read of the user's reduced-motion setting, for camera moves that
+ * pick a duration at call time (no re-render needed). SSR-safe, and the
+ * optional chaining keeps it safe in jsdom tests that never stub matchMedia.
+ */
+export function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true
+  );
+}
+
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(false);
 

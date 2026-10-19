@@ -19,12 +19,9 @@ export const categoryLabels: Record<Venue["category"], string> = {
 // Blessing Boxes slice 1 (Build Plan / DESIGN.md "Category colors"): picked
 // raspberry #C2447B — the one hue bucket (magenta/berry) not already used by
 // the other 7 (red/blue/teal/brown/green/olive/purple), so a box pin stays
-// instantly distinguishable at a glance. Kept in parity across THREE places
-// per this repo's existing convention (checked 2026-09-17, all three already
-// duplicated the other 7): this map, VenueMarker.tsx's own CATEGORY_COLORS
-// copy, and globals.css's --color-cat-blessing var (+ DESIGN.md's catBlessing
-// token) — design:drift only checks the CSS-var<->DESIGN.md pair, not this
-// data map, so this one is a plain literal like its 7 siblings.
+// instantly distinguishable at a glance. Every hex here must match its
+// globals.css --color-cat-* var (+ DESIGN.md's cat* token): design:drift only
+// checks the CSS-var<->DESIGN.md pair, not this data map.
 export const categoryColors: Record<Venue["category"], string> = {
   pantry: "#BE2D45",       // cranberry — spec §3.1
   grocery: "#1F4E8C",      // deep blue

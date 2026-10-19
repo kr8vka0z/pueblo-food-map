@@ -9,7 +9,7 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { nearestBoundsAround } from "@/components/MapWrapper";
+import { nearestBoundsAround } from "@/lib/mapBounds";
 import { haversineMiles } from "@/lib/distance";
 import type { Venue } from "@/types/venue";
 
@@ -54,7 +54,7 @@ describe("nearestBoundsAround", () => {
     const fifthNearestDistance = haversineMiles(ORIGIN, venues[4]); // v4 = 5th nearest
     const sixthNearestDistance = haversineMiles(ORIGIN, venues[5]);
     // 1 decimal (0.05mi tolerance): the box is built from flat mile/degree
-    // ratios (see MapWrapper.tsx's WHY comment on nearestBoundsAround), so a
+    // ratios (see mapBounds.ts's WHY comment on nearestBoundsAround), so a
     // haversine re-measurement of its edge won't match to haversine precision
     // — only close enough that the right box was picked.
     const halfSizeMiles = haversineMiles(ORIGIN, { lat: latN, lng: ORIGIN.lng });

@@ -3,7 +3,7 @@
 /**
  * useBoxNetworkStats — client-side fetch of the network-wide raw data
  * (GET /api/public/blessing-boxes/network-stats, Blessing Boxes slice 7).
- * Fetch-once, no filters — mirrors useBoxVenues.ts's exact shape (fetch on
+ * Fetch-once, no filters — mirrors useBoxesList.ts's exact shape (fetch on
  * mount, best-effort, cancel-flag on unmount). Unlike useBoxActivity.ts, this
  * hook never re-fetches when the period picker changes: the period filter is
  * applied CLIENT-SIDE by boxStats.ts's pure functions over this one payload,

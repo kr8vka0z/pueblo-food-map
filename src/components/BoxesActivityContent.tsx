@@ -41,7 +41,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { pageDocumentTitle } from "@/lib/site";
 import { useBoxActivity } from "@/lib/useBoxActivity";
-import { useBoxVenues } from "@/lib/useBoxVenues";
+import { useBoxesList, toVenue } from "@/lib/useBoxesList";
 import { useBoxNetworkStats } from "@/lib/useBoxNetworkStats";
 import { ACTIVITY_KINDS, ACTIVITY_PAGE_SIZE_DEFAULT } from "@/lib/boxActivity";
 import {
@@ -75,7 +75,8 @@ export default function BoxesActivityContent() {
   // <title> follows locale client-side (#589) — activity.documentTitle
   // matches page.tsx's metadata title exactly ("Blessing Box Activity").
   useDocumentTitle(pageDocumentTitle(t("activity.documentTitle", locale)));
-  const boxVenues = useBoxVenues();
+  const { boxes } = useBoxesList();
+  const boxVenues = useMemo(() => boxes.map(toVenue), [boxes]);
   const searchParams = useSearchParams();
 
   // Initial value only (a lazy useState initializer runs once, on mount) —

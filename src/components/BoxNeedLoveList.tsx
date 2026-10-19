@@ -19,12 +19,8 @@
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { formatRelativeTime } from "@/lib/relativeTime";
-import { formatDurationMs, type LastFillEntry, type EmptyReportEntry, type SlowRefillEntry } from "@/lib/boxStats";
-
-function formatDuration(ms: number, locale: Locale): string {
-  const { value, unit } = formatDurationMs(ms);
-  return t(`box.stats.duration.${unit}`, locale, { value: String(value) });
-}
+import type { LastFillEntry, EmptyReportEntry, SlowRefillEntry } from "@/lib/boxStats";
+import { formatDurationLabel } from "@/lib/formatDurationLabel";
 
 const LIST_CLASS = "space-y-1";
 const ITEM_CLASS = "flex items-center justify-between gap-3 py-1 text-sm";
@@ -116,7 +112,7 @@ export default function BoxNeedLoveList({
                 <Link href={`/box/${entry.id}/history`} className={LINK_CLASS}>
                   {entry.name}
                 </Link>
-                <span className={VALUE_CLASS}>{formatDuration(entry.avgRefillMs, locale)}</span>
+                <span className={VALUE_CLASS}>{formatDurationLabel(entry.avgRefillMs, locale)}</span>
               </li>
             ))}
           </ol>

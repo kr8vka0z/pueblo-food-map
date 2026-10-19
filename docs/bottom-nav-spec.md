@@ -91,7 +91,7 @@ or any data path.
 > location is already known (`geo.state.position` set — Near me was already
 > granted, or #670-2 below already resolved it), the map centers on the visitor
 > and zooms to show their 5 nearest boxes, via a new pure helper
-> `nearestBoundsAround(origin, venues, n)` (MapWrapper.tsx, next to
+> `nearestBoundsAround(origin, venues, n)` (src/lib/mapBounds.ts, next to
 > `computeCategoryBounds`) — a symmetric box around the visitor sized to the
 > distance to the 5th-nearest box (or however many exist, under 5). If the
 > location is off or unknown, tapping Boxes fits every box in the county, same

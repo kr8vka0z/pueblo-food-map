@@ -151,6 +151,7 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { getCheckinClientToken } from "@/lib/checkinClientToken";
 import { shrinkImageToJpeg, UnsupportedImageError } from "@/lib/imageResize";
 import ReportPhotoButton from "@/components/ReportPhotoButton";
+import type { BoxTurnstileMode } from "@/lib/useBoxTurnstileWidget";
 import { NEED_KEYS, type BoxStatus, type CheckinKind, type NeedKey } from "@/lib/blessingBoxes";
 
 const { BOX_CHECKIN_NOTE } = FIELD_LIMITS;
@@ -314,8 +315,8 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   // registered once at mount and must read the CURRENT mode synchronously
   // (a second error-callback firing before a re-render would otherwise see
   // a stale "box" and try to switch again).
-  const [turnstileMode, setTurnstileModeState] = useState<"box" | "fallback">("box");
-  const turnstileModeRef = useRef<"box" | "fallback">("box");
+  const [turnstileMode, setTurnstileModeState] = useState<BoxTurnstileMode>("box");
+  const turnstileModeRef = useRef<BoxTurnstileMode>("box");
   function setTurnstileMode(mode: "box" | "fallback") {
     turnstileModeRef.current = mode;
     setTurnstileModeState(mode);

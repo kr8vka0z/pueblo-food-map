@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-19
+
+### Fixed
+
+- The admin Dashboard's visitor and map-usage numbers load reliably again, instead of showing "unavailable" on some visits.
+
 ## [1.2.0] - 2026-10-18
 
 ### New

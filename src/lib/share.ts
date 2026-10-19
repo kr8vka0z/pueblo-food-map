@@ -4,7 +4,14 @@
  * capabilities (and test mocks) are evaluated per call, not at module load.
  */
 
+import { SITE_URL } from "@/lib/site";
+
 export type ShareResult = "shared" | "copied" | "cancelled" | "unsupported";
+
+/** The current origin (so dev/staging shares stay on their host); SITE_URL during SSR. */
+function shareOrigin(): string {
+  return typeof window !== "undefined" && window.location?.origin ? window.location.origin : SITE_URL;
+}
 
 /**
  * Build the canonical share URL for a venue: /venue/<id>, or /box/<id> for a
@@ -12,7 +19,8 @@ export type ShareResult = "shared" | "copied" | "cancelled" | "unsupported";
  *
  * WHY: Changed from /?venue=<id> to /venue/<id> in PR2 (#164 6.4). The new
  * form is the rich per-venue page — better crawlability, better link previews,
- * and a permanent redirect from the old form covers legacy shares.
+ * and legacy /?venue=<id> links still work: the homepage opens them
+ * client-side (there is no server redirect on `/`, see AGENTS.md).
  *
  * WHY /box/<id> instead of /venue/<id> for a box (map-first rework,
  * 2026-09-18): /venue/[id]/page.tsx is a STATIC route restricted to known
@@ -23,12 +31,8 @@ export type ShareResult = "shared" | "copied" | "cancelled" | "unsupported";
  * the extra hop is the price of keeping a real per-box link preview.
  */
 export function venueShareUrl(venueId: string, isBox = false): string {
-  const origin =
-    typeof window !== "undefined" && window.location?.origin
-      ? window.location.origin
-      : "https://pueblofoodmap.com";
   const path = isBox ? "box" : "venue";
-  return `${origin}/${path}/${encodeURIComponent(venueId)}`;
+  return `${shareOrigin()}/${path}/${encodeURIComponent(venueId)}`;
 }
 
 interface ShareVenueOptions {
@@ -47,11 +51,7 @@ interface ShareVenueOptions {
  * `/?event=<id>` map link, which keeps working for links already shared.
  */
 export function eventShareUrl(eventId: string, locale: "en" | "es" = "en"): string {
-  const origin =
-    typeof window !== "undefined" && window.location?.origin
-      ? window.location.origin
-      : "https://pueblofoodmap.com";
-  return `${origin}${locale === "es" ? "/es" : ""}/event/${encodeURIComponent(eventId)}`;
+  return `${shareOrigin()}${locale === "es" ? "/es" : ""}/event/${encodeURIComponent(eventId)}`;
 }
 
 /** Share a venue: the same mechanics as shareLink, pointed at the venue's page. */

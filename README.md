@@ -106,7 +106,7 @@ scripts/           Data pipeline, seed, and lint scripts (never imported by the 
   [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 - **AI review:** a Claude reviewer
   ([`claude-code-review.yml`](.github/workflows/claude-code-review.yml))
-  reviews every pull request against [REVIEW.md](REVIEW.md), and
+  reviews every human-authored pull request into `dev` against [REVIEW.md](REVIEW.md), and
   CodeRabbit reviews human-authored pull requests targeting `dev` or `main`
   using the low-noise settings in [`.coderabbit.yaml`](.coderabbit.yaml).
 - **Deploys:** GitHub Actions

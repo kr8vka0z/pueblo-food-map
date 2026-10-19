@@ -469,7 +469,6 @@ const en: Record<string, string> = {
   // LanguageToggle group aria-label (#i18n-leaks)
   "lang.toggle.label": "Language selection",
 
-
   // SuggestForm SNAP/WIC fieldset legend — WCAG 1.3.1 (#i18n-leaks)
   "suggest.benefits.legend": "Accepted benefits",
 
@@ -1617,7 +1616,6 @@ const es: Record<string, string> = {
 
   // LanguageToggle group aria-label (#i18n-leaks)
   "lang.toggle.label": "Selección de idioma",
-
 
   // SuggestForm SNAP/WIC fieldset legend (#i18n-leaks)
   "suggest.benefits.legend": "Beneficios aceptados",

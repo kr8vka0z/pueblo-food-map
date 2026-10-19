@@ -1,13 +1,11 @@
 /**
- * Tests for the four hardcoded English strings that leaked in ES mode.
+ * Tests for the three hardcoded English strings that leaked in ES mode.
  *
  * Each test is written BEFORE the fix (TDD), verifying the expected i18n
  * behavior that will be correct after the fix. Tests confirm:
  *   1. MapWrapper map-loading fallback renders ES text when locale=es
  *   2. LanguageToggle aria-label on the group uses i18n (EN and ES)
  *   3. SuggestForm SNAP/WIC fieldset has a non-empty translated legend
- *
- * There is no block 3: its component (CategoryChips) and i18n key are gone.
  */
 
 import { describe, test, expect, vi } from "vitest";

@@ -49,7 +49,7 @@ const NEED_LABEL: Record<NeedKey, string> = {
   diapers: "Diapers",
   hygiene: "Hygiene items",
   pet_food: "Pet food",
-  drinks: "Water / drinks",
+  drinks: "Drinks",
   warm_clothing: "Warm clothing",
 };
 

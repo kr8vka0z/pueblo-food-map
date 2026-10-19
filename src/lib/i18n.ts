@@ -762,7 +762,7 @@ const en: Record<string, string> = {
   "box.needs.diapers": "Diapers",
   "box.needs.hygiene": "Hygiene items",
   "box.needs.pet_food": "Pet food",
-  "box.needs.drinks": "Water / drinks",
+  "box.needs.drinks": "Drinks",
   "box.needs.warm_clothing": "Warm clothing",
   // The self-filling "Most needed" label (BoxCardBody.tsx) when no admin
   // most_needed text is set — distinguishes visitor-sourced data from the
@@ -1827,7 +1827,7 @@ const es: Record<string, string> = {
   "box.needs.diapers": "Pañales", // [CHECK]
   "box.needs.hygiene": "Artículos de higiene", // [CHECK]
   "box.needs.pet_food": "Comida para mascotas", // [CHECK]
-  "box.needs.drinks": "Agua / bebidas", // [CHECK]
+  "box.needs.drinks": "Bebidas", // [CHECK]
   "box.needs.warm_clothing": "Ropa de abrigo", // [CHECK]
   "box.mostNeeded.fromVisitors": "Lo más necesitado · según quienes usan esta caja", // [CHECK]
 

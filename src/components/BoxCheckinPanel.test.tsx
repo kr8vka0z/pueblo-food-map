@@ -792,7 +792,7 @@ describe("BoxCheckinPanel — needs ask after 'took'", () => {
       "Diapers",
       "Hygiene items",
       "Pet food",
-      "Water / drinks",
+      "Drinks",
       "Warm clothing",
     ]) {
       const chip = screen.getByRole("button", { name: label });

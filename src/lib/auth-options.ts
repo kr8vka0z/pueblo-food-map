@@ -62,10 +62,8 @@ import {
  * NOT included: Workers version-preview URLs (`<version-prefix>-pueblo-food-
  * map.kyle-boyd.workers.dev`) — those are dynamic per-deploy and can't be
  * exact-matched, and this option supports only exact/wildcard hostnames,
- * not a fully dynamic predicate. Phase 2/3 (real login UI + route gating)
- * is the right place to decide whether a wildcard pattern is worth adding;
- * Phase 1 only needs the engine to construct URLs correctly on the
- * hostnames real login traffic will actually use.
+ * not a fully dynamic predicate. No wildcard pattern is listed, so admin
+ * sign-in works only on the hostnames real login traffic uses (below).
  */
 const ADMIN_ALLOWED_HOSTS = [
   "dev.pueblofoodmap.com",
@@ -125,7 +123,7 @@ export function buildAuthOptions(
       // fallback should rarely be hit in practice — it exists as the second
       // half of a belt-and-suspenders fix so a header-stripped caller can
       // never throw instead of cleanly resolving to "no session". Points at
-      // the public apex (first entry in ADMIN_ALLOWED_HOSTS above), not a
+      // the prod apex (pueblofoodmap.com in ADMIN_ALLOWED_HOSTS above), not a
       // staging/workers.dev host, since a fallback is inherently a single
       // choice and prod is the canonical default.
       fallback: "https://pueblofoodmap.com",

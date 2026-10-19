@@ -73,7 +73,7 @@ import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBo
 import { useMapUI, type ViewMode } from "@/lib/useMapUI";
 import { useDeferredMapLoad } from "@/lib/useDeferredMapLoad";
 import { track, EVENTS } from "@/lib/analytics";
-import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY } from "@/lib/useMediaQuery";
+import { useMediaQuery, MOBILE_QUERY, BELOW_2XL_QUERY, prefersReducedMotion } from "@/lib/useMediaQuery";
 
 // mapbox-gl must not run on the server (uses WebGL + globalThis) — keep the
 // dynamic import here in a Client Component as required by Next.js 16
@@ -1508,9 +1508,7 @@ export default function MapWrapper({
       return;
     }
 
-    const reducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = prefersReducedMotion();
 
     // The bottom nav covers the map's bottom edge — the bar below 2xl, the
     // floating pill (24px up + 52px tall) at 2xl — so pad by it and fitted pins
@@ -1607,9 +1605,7 @@ export default function MapWrapper({
   useEffect(() => {
     if (!mapboxMap || !isMobile || !walkingRoute) return;
 
-    const reducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = prefersReducedMotion();
 
     const routeBounds = computeCategoryBounds(
       walkingRoute.geometry.coordinates.map(([lng, lat]) => ({ lat, lng })),
@@ -2256,9 +2252,7 @@ export default function MapWrapper({
     const visibleRight = container.offsetWidth - DESKTOP_PANEL_RIGHT_CLEARANCE_PX;
     const overflow = pt.x - visibleRight;
     if (overflow <= 0) return;
-    const reducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = prefersReducedMotion();
     mapboxMap.panBy([overflow, 0], { duration: reducedMotion ? 0 : 300 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVenueId, mapboxMap, isMobile, desktopPanelOpen]);

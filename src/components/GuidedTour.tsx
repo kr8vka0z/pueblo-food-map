@@ -40,6 +40,7 @@ import type mapboxgl from "mapbox-gl";
 import type { Locale } from "@/lib/i18n";
 import { claimEscape, raiseOverlay, useOverlayStackId } from "@/lib/overlayRegistry";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { prefersReducedMotion } from "@/lib/useMediaQuery";
 import { TOUR_COPY, placeTooltip, tourReducer, tourSteps, type Rect } from "@/lib/guidedTour";
 
 type MapLike = Pick<mapboxgl.Map, "getCenter" | "getZoom" | "jumpTo" | "once" | "off" | "triggerRepaint">;
@@ -208,7 +209,7 @@ export default function GuidedTour({
     if (demo !== "search") return;
     const word = copy.searchWord;
     // Reduced motion: the whole word at once, no letter-by-letter typing.
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+    const reduce = prefersReducedMotion();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let typed = 0;
     // Start from an empty box (the visitor's own search comes back after).

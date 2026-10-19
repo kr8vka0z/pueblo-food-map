@@ -81,7 +81,7 @@ automated diff:
 ## Release and security automation
 
 Run by workflows, not by hand (except the manual cut in AGENTS.md "Release
-schedule"). Each has a `.test.mjs` beside it.
+schedule"). Each has a `.test.mjs` beside it except `section.sh`.
 
 | Script | Purpose | Run by |
 |---|---|---|

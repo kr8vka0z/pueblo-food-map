@@ -576,7 +576,7 @@ const SELECT_ALL_CHECKINS_FOR_VENUE_SQL = `
   ORDER BY created_at DESC, id DESC
 `;
 
-/** Every check-in for ONE box — visible + hidden, including 'problem' — newest first. Feeds BoxCheckinsAdminPanel via the venue edit page's resolveBoxCheckins(). */
+/** Every check-in for ONE box — visible + hidden, including 'problem' — newest first. Feeds BoxCheckinsAdminPanel via the venue edit page, which degrades a failure to []. */
 export async function loadAllCheckinsForBox(db: D1Database, venueId: string): Promise<AdminCheckinRow[]> {
   const result = await db.prepare(SELECT_ALL_CHECKINS_FOR_VENUE_SQL).bind(venueId).all<AdminCheckinRow>();
   return result.results ?? [];

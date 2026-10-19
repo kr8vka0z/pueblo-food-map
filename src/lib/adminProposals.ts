@@ -128,13 +128,10 @@ export function isDateOnlyUpdateProposal(
   return diff.fields_changed.length === 1 && diff.fields_changed[0] === "last_verified";
 }
 
-// ─── Triage lanes at /admin/flags (#543) ────────────────────────────────────
+// ─── Triage lanes (#543) ────────────────────────────────────────────────────
 
 /** The three lanes a reviewer filters/sorts by. */
 export type ReviewLane = "likely_noise" | "needs_human" | "likely_rename";
-
-/** Sort order for "needs a human first": what most needs eyes comes first, noise last. */
-export const REVIEW_LANE_ORDER: Record<ReviewLane, number> = { needs_human: 0, likely_rename: 1, likely_noise: 2 };
 
 /**
  * Which lane a pending row shows under. A rename proposal is always "likely

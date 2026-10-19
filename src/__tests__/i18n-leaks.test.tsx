@@ -7,11 +7,7 @@
  *   2. LanguageToggle aria-label on the group uses i18n (EN and ES)
  *   3. SuggestForm SNAP/WIC fieldset has a non-empty translated legend
  *
- * Block 3 (CategoryChips group aria-label) was removed by #596 —
- * CategoryChips.tsx was deleted as dead code (component built, never wired
- * into MapWrapper; only this test and two source-scan tests imported it).
- * Its i18n key `chips.filterByCategory` stays in src/lib/i18n.ts — #596
- * left unused i18n keys to the mobile-performance issue that owns them.
+ * There is no block 3: its component (CategoryChips) and i18n key are gone.
  */
 
 import { describe, test, expect, vi } from "vitest";

@@ -58,6 +58,8 @@ header, and AGENTS.md's "Automated venue-refresh pipeline" bullet on
 
 ### Self-checks (no network, run after touching the parsers)
 
+`ci.yml` runs both on every PR; run them locally before pushing a parser change.
+
 ```
 python3 scripts/scrape-plentiful.py --self-check   # hours-card parser, fixture-based
 python3 scripts/test_fetch_osm_grocery.py           # Overpass partial-result guard

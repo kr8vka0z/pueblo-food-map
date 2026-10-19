@@ -44,7 +44,6 @@ Open <http://localhost:3000>. Hot-reloads on save (Turbopack).
 | `npm run test` | Unit tests (vitest, watch mode) |
 | `npm run test:ci` | Unit tests, CI mode (single run) |
 | `npm run preview` | OpenNext build + local Worker emulator at :8788 |
-| `npm run deploy` | Manual OpenNext build + `wrangler deploy` of the production Worker — don't use it; deploys go only through CI (see below) |
 | `npm run design:lint` | design.md CLI lint on DESIGN.md (report-only) |
 | `npm run design:drift` | Token parity check: globals.css vs DESIGN.md (blocking) |
 

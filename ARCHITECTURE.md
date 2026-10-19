@@ -757,8 +757,10 @@ only receives the weekly release PR, `hotfix/*` and `publish-bot` (below). Only
 `deploy-prod.yml` has a `workflow_dispatch` recovery trigger.
 
 **CI is the gate.** `ci.yml` runs `lint → design:lint → design:drift →
-typecheck → test:ci → npm audit → build` on every PR into `main`/`dev` and
-every push to `main`, and is a required check on both branches. The deploy
+typecheck → test:ci → Python scraper self-tests → build` on every PR into
+`main`/`dev` and every push to `main`, and is a required check on both
+branches. Production-dependency CVEs are gated by the required "Dependency CVE
+Audit" job in `weekly-security-audit.yml`. The deploy
 workflows re-run only lint, design:drift and typecheck, since nothing
 reaches either branch without that check (changed 2026-09-23: the full
 re-run cost ~3 min per deploy and let flaky tests block green changes).
@@ -766,7 +768,8 @@ re-run cost ~3 min per deploy and let flaky tests block green changes).
 **One scoped exception:** a `publish-bot` PR whose merge-base diff touches
 *exactly* `src/data/published-venues.ts` skips lint, design:lint,
 design:drift, the full test suite (replaced by a published-data/venue-shape
-subset) and `npm audit`; typecheck and build always run. The diff check, not
+subset), the Python scraper self-tests, and the blocking production `npm audit`
+in "Dependency CVE Audit"; typecheck and build always run. The diff check, not
 the branch name, is the safety property — see `ci.yml`'s "Detect data-only
 publish-bot PR" step comment.
 

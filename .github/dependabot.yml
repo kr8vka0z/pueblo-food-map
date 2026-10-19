@@ -31,7 +31,7 @@ version: 2
 # turn auto-merge into merge-on-open.
 
 updates:
-  # npm packages (Next.js, React, Leaflet, ESLint, TypeScript, etc.)
+  # npm packages (Next.js, React, Mapbox GL, ESLint, TypeScript, etc.)
   - package-ecosystem: npm
     directory: "/"
     target-branch: dev

@@ -24,8 +24,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { logPublishResult } from "@/lib/logger";
 import {
@@ -39,21 +38,10 @@ import {
   isProductionWorker,
 } from "@/lib/publishVenues";
 
-/**
- * getAdminDb() FIRST (identity/JWT), THEN the CSRF/Origin check (spec §8
- * "I7") — same order the issue spec describes. Both throw AccessDeniedError
- * so POST's catch block handles either with one 403 response shape.
- */
-async function authorizePublishRequest(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
-
 export async function POST(req: NextRequest): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizePublishRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

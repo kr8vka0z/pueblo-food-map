@@ -18,8 +18,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { loadAdopterById, type BoxAdopterRow } from "@/lib/boxAdopters";
 import { unsubscribeAdopterSubscriptionStatement } from "@/lib/boxAlerts";
@@ -31,19 +30,13 @@ const AUDIT_INSERT_SQL =
 /** Reviewer-entered reason, capped generously — internal admin note, not public-facing copy. Same convention/limit as box-photos' own reject route. */
 const MAX_REVIEW_REASON_LENGTH = 500;
 
-async function authorize(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorize(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

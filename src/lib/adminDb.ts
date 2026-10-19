@@ -29,7 +29,7 @@
  */
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import type { AdminIdentity, HeaderSource } from "./adminOrigin";
+import { requireAdminOrigin, type AdminIdentity, type HeaderSource } from "./adminOrigin";
 import { requireAdminSession } from "./adminSession";
 import { isOwnerEmail } from "./adminOwner";
 
@@ -57,4 +57,19 @@ export async function getAdminDb(
     db: env.ADMIN_DB,
     identity: { ...identity, isOwner: isOwnerEmail(identity.email, env.ADMIN_OWNER_EMAIL) },
   };
+}
+
+/**
+ * The gate every non-GET /api/admin/* route calls before mutating:
+ * getAdminDb() FIRST (Better Auth session + allowlist), THEN
+ * requireAdminOrigin() (CSRF, spec §8 "I7"). Session first so a caller
+ * without a session always gets the 401 `no_session` answer whatever its
+ * Origin header says (adminAuthErrors.ts). Both throw AccessDeniedError, so a
+ * route's one catch block (adminAuthErrorResponse) turns either into its
+ * response.
+ */
+export async function authorizeAdminWrite(headers: HeaderSource): Promise<AdminDbAccess> {
+  const access = await getAdminDb(headers);
+  requireAdminOrigin(headers);
+  return access;
 }

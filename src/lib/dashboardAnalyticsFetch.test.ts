@@ -25,7 +25,7 @@ const CF_BODY = { data: { viewer: { accounts: [{ rumPageloadEventsAdaptiveGroups
 const CF_MAX_RANGE_DAYS = 93;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-describe("Dashboard analytics — shared limit, one retry, Cloudflare range cap, deadline", () => {
+describe("incident-2026-10-19-dashboard-analytics-timeouts: Dashboard analytics — shared limit, one retry, Cloudflare range cap, deadline", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();

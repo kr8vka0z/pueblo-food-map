@@ -11,6 +11,22 @@
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
+  // Workers Logs, privacy-safe mode: keeps the app's own console lines and
+  // uncaught exceptions for debugging. invocation_logs is OFF because those
+  // per-request records store every request header, including the client IP
+  // (cf-connecting-ip), and ARCHITECTURE.md's PII policy plus the public
+  // privacy page promise IP addresses are never saved. Measured on a probe
+  // Worker 2026-10-22: with this setting, stored console/exception events
+  // carry the request method and URL (path + query string), but no headers
+  // and no IP. redact_query_string strips the query string from that URL:
+  // alert confirm/stop links carry a live subscription token in `?t=` (the
+  // same reason logger.ts strips query strings from CSP reports).
+  // Redeclared in env.staging below.
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "invocation_logs": false }
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -116,6 +132,13 @@
   "env": {
     "staging": {
       "name": "pueblo-food-map-staging",
+      // Same privacy-safe Workers Logs mode as prod (see the top-level
+      // `observability` comment); declared explicitly, not left to inheritance.
+      "observability": {
+        "enabled": true,
+        "redact_query_string": true,
+        "logs": { "invocation_logs": false }
+      },
       "routes": [
         // Admin serves at /admin on this same apex host — gated by Better
         // Auth alone (email code + passkey; Cloudflare Access has been fully

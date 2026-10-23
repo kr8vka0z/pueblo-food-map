@@ -311,10 +311,10 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
 
 ## Scheduled jobs
 
-`custom-worker.ts` wraps the OpenNext fetch handler and adds `scheduled()`,
+`custom-worker.ts` wraps vinext's fetch handler and adds `scheduled()`,
 driven by one prod-only 5-minute cron. All the branching lives in
 `src/lib/scheduledTasks.ts`'s `runScheduledTasks` (testable, unlike
-`custom-worker.ts`, which imports build output — see that file's header):
+`custom-worker.ts`, which imports a Vite virtual module — see that file's header):
 
 - **Heartbeat** — pings Healthchecks.io every tick (a dead-man's switch:
   Healthchecks.io alerts when the pings stop).
@@ -653,8 +653,7 @@ rank for the queries people type ("food pantry Pueblo", "SNAP stores Pueblo").
   map link (never "0 boxes"), no JSON-LD, and the metadata adds
   `robots: { index: false, follow: true }`. Each box links to the map card at
   `/?venue=<id>` (`/es?venue=<id>`). Read-only per REVIEW.md: no check-in,
-  photo, adopt or alert controls. No page caching (OpenNext's incremental cache
-  can't revalidate); the cost is 2 D1 reads (~30 box rows, then their check-ins) per page
+  photo, adopt or alert controls. No page caching (`force-dynamic`); the cost is 2 D1 reads (~30 box rows, then their check-ins) per page
   view, and the upgrade path is an edge-cached read like `src/lib/edgeCache.ts`.
 
 ## Form-route triad
@@ -749,11 +748,17 @@ See [AGENTS.md](AGENTS.md) for rotation procedure and URL restrictions.
 
 ---
 
-## Hosting — Cloudflare Workers via OpenNext
+## Hosting — Cloudflare Workers via vinext
 
-The app is a Next.js App Router project compiled for Cloudflare Workers by
-`@opennextjs/cloudflare` (`open-next.config.ts`). It moved off Vercel in May
-2026 (#42/#53); the reason isn't recorded.
+The app is a Next.js App Router project built for Cloudflare Workers by
+vinext (Cloudflare's Next.js API on Vite): `vite build` with `vite.config.ts`
+(vinext + `@cloudflare/vite-plugin`) writes the Worker to `dist/server` and the
+public assets to `dist/client`, and `custom-worker.ts` wraps vinext's handler.
+Nothing is prerendered at build time; `generateStaticParams` pages render on
+first request per Worker instance and are then served from memory. Bindings
+come from `cloudflare:workers` through `src/lib/cloudflareContext.ts`. It moved
+off Vercel in May 2026 (#42/#53; the reason isn't recorded) and from OpenNext
+(`@opennextjs/cloudflare`) to vinext in October 2026.
 
 **Deploys run through GitHub Actions only.** Workers Builds is disconnected
 (`deploy-prod.yml`'s header explains why the two must never run together).
@@ -1330,8 +1335,7 @@ list it as an event and a shared link previews the flyer.
   prerender and a cancel or edit must show without a rebuild). No Cache-Control is
   added (neither does `/box/[id]`): Next sends `private, no-cache, no-store`, so an
   edit, a cancel, and a not-found are current on the next request. The
-  `generateStaticParams` + `dynamicParams = false` pairing and its `open-next.config.ts`
-  trap (AGENTS.md) do not apply.
+  `generateStaticParams` + `dynamicParams = false` pairing (AGENTS.md) does not apply.
 - **Thin page files over shared code.** Both `page.tsx` files call
   `src/lib/eventPageData.ts` (`loadEventForPage`, React `cache()` so metadata and
   body share one read; `eventPageMetadata(id, locale)`) and render

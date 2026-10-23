@@ -16,8 +16,7 @@ export default defineConfig({
     cloudflare({
       // WHY: the Workers AI binding (`ai` in wrangler.jsonc) has no local emulation, so by default `vite dev` /
       // `vite preview` open a remote proxy session to the Cloudflare account (and fail without an API token). Local
-      // runs must never reach real Cloudflare resources; with this off, "Suggest Spanish" is unavailable locally.
-      // Affects dev/preview only, not the deployed Worker.
+      // runs must never reach real Cloudflare resources. Affects dev/preview only, not the deployed Worker.
       remoteBindings: false,
       viteEnvironment: {
         name: "rsc",

@@ -18,9 +18,13 @@
   // privacy page promise IP addresses are never saved. Measured on a probe
   // Worker 2026-10-22: with this setting, stored console/exception events
   // carry the request method and URL (path + query string), but no headers
-  // and no IP. Redeclared in env.staging below.
+  // and no IP. redact_query_string strips the query string from that URL:
+  // alert confirm/stop links carry a live subscription token in `?t=` (the
+  // same reason logger.ts strips query strings from CSP reports).
+  // Redeclared in env.staging below.
   "observability": {
     "enabled": true,
+    "redact_query_string": true,
     "logs": { "invocation_logs": false }
   },
   "assets": {
@@ -132,6 +136,7 @@
       // `observability` comment); declared explicitly, not left to inheritance.
       "observability": {
         "enabled": true,
+        "redact_query_string": true,
         "logs": { "invocation_logs": false }
       },
       "routes": [

@@ -4,7 +4,7 @@
  * follow-up).
  *
  * Same auth-mock pattern as src/app/api/admin/venues/route.test.ts: mocks
- * @opennextjs/cloudflare's getCloudflareContext (this route never reads
+ * @/lib/cloudflareContext's getCloudflareContext (this route never reads
  * ADMIN_DB itself, but getAdminDb() always resolves it as part of verifying
  * identity) and requireAdminSession() (src/lib/adminSession.ts, the sole
  * identity check post Better-Auth-sole-gate cutover —
@@ -18,7 +18,7 @@ import { NextRequest } from "next/server";
 import { AccessDeniedError } from "@/lib/adminOrigin";
 
 // Vitest hoists vi.mock() above this file's own imports, so route.ts (via
-// adminDb.ts) picks up the mocked @opennextjs/cloudflare with no dynamic
+// adminDb.ts) picks up the mocked @/lib/cloudflareContext with no dynamic
 // import needed — same pattern as venues/route.test.ts.
 const mockGetCloudflareContext = vi.fn();
 vi.mock("@/lib/cloudflareContext", () => ({

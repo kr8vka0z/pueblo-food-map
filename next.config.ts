@@ -44,8 +44,9 @@ import type { NextConfig } from "next";
 // dev (zero violations across /, venue card, filters, /resources, /suggest
 // with Turnstile, /venues, /admin/login), then flipped to enforcing.
 // Violations still post to /api/csp-report via report-uri. No nonce: this app's static
-// rendering depends on NOT using proxy.ts (Next 16 proxy.ts fails the build
-// on this OpenNext/Cloudflare stack — see the "Footgun" note on `/` above),
+// rendering depends on NOT using proxy.ts (Next 16 proxy.ts failed the build
+// on the OpenNext stack this site ran on before vinext — see the "Footgun"
+// note on `/` above),
 // and Next's own CSP guide requires proxy-generated nonces to force every
 // page into dynamic rendering — incompatible with this app's static +
 // dynamicParams=false pages (the 10-day outage footgun this file already

@@ -2,7 +2,7 @@
 /**
  * Route-level tests for POST /api/admin/venues (#254).
  *
- * Mocks @opennextjs/cloudflare's getCloudflareContext for a fake D1 binding
+ * Mocks @/lib/cloudflareContext's getCloudflareContext for a fake D1 binding
  * and requireAdminSession() (src/lib/adminSession.ts, the sole identity
  * check getAdminDb() runs post Better-Auth-sole-gate cutover —
  * auth/betterauth-sole-gate) as a controllable mock, then inspects
@@ -22,7 +22,7 @@ import { AccessDeniedError, ADMIN_ORIGIN } from "@/lib/adminOrigin";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 
 // Vitest hoists vi.mock() above this file's own imports, so route.ts (via
-// adminDb.ts) picks up the mocked @opennextjs/cloudflare with no dynamic
+// adminDb.ts) picks up the mocked @/lib/cloudflareContext with no dynamic
 // import needed.
 const mockGetCloudflareContext = vi.fn();
 vi.mock("@/lib/cloudflareContext", () => ({

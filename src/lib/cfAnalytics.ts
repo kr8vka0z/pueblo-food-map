@@ -258,7 +258,7 @@ export async function loadVisitorsAnalytics(
   try {
     // CF_ANALYTICS_ACCOUNT_ID is a plain wrangler `var`, not a secret — read
     // via the Cloudflare env binding, never process.env (AGENTS.md
-    // "Runtime reads": OpenNext doesn't populate vars into process.env).
+    // "Runtime reads": the binding is where vars are defined to live).
     const { env } = await getCloudflareContext({ async: true });
     accountTag = env.CF_ANALYTICS_ACCOUNT_ID;
   } catch {

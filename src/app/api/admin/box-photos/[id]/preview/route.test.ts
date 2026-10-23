@@ -3,7 +3,7 @@
  * Route-level tests for GET /api/admin/box-photos/[id]/preview (Blessing
  * Boxes slice 5). Same full-stack mock pattern as
  * box-checkins/[id]/visibility/route.test.ts: mocks
- * @opennextjs/cloudflare and requireAdminSession() directly.
+ * @/lib/cloudflareContext and requireAdminSession() directly.
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";

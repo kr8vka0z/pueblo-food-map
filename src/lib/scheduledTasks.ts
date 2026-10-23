@@ -9,9 +9,9 @@
  * those domain modules (plus logger.ts), and doing that from inside either
  * one would make that module responsible for a sibling feature it has
  * nothing to do with. custom-worker.ts can never carry test coverage for
- * this branching directly — it imports `.open-next/worker.js`, gitignored
- * build output that doesn't exist until `opennextjs-cloudflare build` runs,
- * so vitest can never resolve it — so the actual `if`/`ctx.waitUntil` wiring
+ * this branching directly — it imports vinext's handler
+ * (`vinext/server/fetch-handler`), a Vite virtual module that only exists
+ * inside `vite build`, so vitest can never resolve it — so the actual `if`/`ctx.waitUntil` wiring
  * lives here instead, where it's a plain function testable with a mock
  * `env`/`ctx` (see scheduledTasks.test.ts). custom-worker.ts's `scheduled()`
  * is a one-line call into runScheduledTasks below.

@@ -43,11 +43,12 @@
  * WHY `resendApiKey` is passed in rather than read from
  * `process.env.RESEND_API_KEY` (the convention every OTHER Resend send in
  * this app uses, e.g. src/lib/boxAdopters.ts's
- * sendAdopterConfirmedAdminEmail): those all run inside a Next.js request,
- * where OpenNext's AsyncLocalStorage shim populates `process.env` for the
- * duration of that one request. scheduled() is not a request — no such
- * shim runs there, so `process.env.RESEND_API_KEY` would read undefined
- * (or a stale value left over from a prior request on the same isolate).
+ * sendAdopterConfirmedAdminEmail): those all run inside a Next.js request.
+ * This code dates from OpenNext, which populated `process.env` only for the
+ * duration of a request, so inside scheduled() it read undefined. (Under
+ * vinext, workerd fills `process.env` from the bindings everywhere —
+ * `nodejs_compat` with a compatibility date after 2025-04-01 — but the
+ * binding stays the one source scheduled() is handed directly.)
  * The raw Workers binding (`env.RESEND_API_KEY`, worker-configuration.d.ts)
  * is always populated regardless — the same reasoning custom-worker.ts's
  * existing `env.HC_PING_URL` read already established for this exact

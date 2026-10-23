@@ -4,7 +4,7 @@
  * binding (#237 checkpoint c; Better Auth sole-gate cutover,
  * auth/betterauth-sole-gate).
  *
- * Only @opennextjs/cloudflare's getCloudflareContext() and
+ * Only @/lib/cloudflareContext's getCloudflareContext() and
  * requireAdminSession() (src/lib/adminSession.ts) are mocked — the two I/O
  * boundaries this file's own logic sits between. requireAdminSession()'s own
  * session/allowlist logic is covered on its own by adminSession.test.ts;
@@ -17,7 +17,7 @@ import { AccessDeniedError, ADMIN_ORIGIN } from "@/lib/adminOrigin";
 
 // Vitest hoists vi.mock() calls above other top-level code (including this
 // module's own imports below), so getAdminDb() below picks up the mocked
-// @opennextjs/cloudflare without any dynamic-import dance. Referencing a
+// @/lib/cloudflareContext without any dynamic-import dance. Referencing a
 // variable inside the factory requires the "mock" name prefix so Vitest's
 // hoisting-safety check allows it.
 const mockGetCloudflareContext = vi.fn();

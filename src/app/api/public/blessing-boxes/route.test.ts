@@ -3,7 +3,7 @@
  * Route-level tests for GET /api/public/blessing-boxes (Blessing Boxes
  * slice 1).
  *
- * Mocks @opennextjs/cloudflare's getCloudflareContext (same pattern as
+ * Mocks @/lib/cloudflareContext's getCloudflareContext (same pattern as
  * src/app/api/admin/venues/route.test.ts) and src/lib/blessingBoxes'
  * loadLiveBoxes, then stubs globalThis.caches (absent in vitest/node —
  * route.ts's own header notes this) to prove both the cache-miss-then-put

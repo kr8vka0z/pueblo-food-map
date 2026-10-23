@@ -2,7 +2,7 @@
 /**
  * Route-level tests for POST /api/admin/publish (#237 checkpoint d).
  *
- * Full-stack: mocks @opennextjs/cloudflare's getCloudflareContext (the one
+ * Full-stack: mocks @/lib/cloudflareContext's getCloudflareContext (the one
  * true I/O boundary reaching Cloudflare's request context outside a real
  * Worker — same seam src/lib/adminDb.test.ts uses) to supply a fake D1
  * binding, mocks requireAdminSession() (src/lib/adminSession.ts, the sole
@@ -26,7 +26,7 @@ import type { VenueRow } from "@/lib/publishVenues";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 
 // Vitest hoists vi.mock() above this file's own imports, so route.ts (via
-// adminDb.ts) picks up the mocked @opennextjs/cloudflare with no dynamic
+// adminDb.ts) picks up the mocked @/lib/cloudflareContext with no dynamic
 // import needed — same pattern as src/lib/adminDb.test.ts.
 const mockGetCloudflareContext = vi.fn();
 vi.mock("@/lib/cloudflareContext", () => ({

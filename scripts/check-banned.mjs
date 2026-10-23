@@ -36,7 +36,8 @@ const PATTERNS = [
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '').replace(/^\/([A-Z]:)/, '$1');
 
-// .wrangler/dist/.vinext/.open-next/coverage are build/output dirs (see .gitignore) — they
+// .wrangler/dist/.vinext/coverage are build/output dirs (see .gitignore; .open-next is the old
+// OpenNext output dir, still skipped because check-banned.test.mjs pins it) — they
 // can contain vendored/bundled copies of banned strings (old font names,
 // stale Tailwind palette utilities) that were never written by hand in this
 // repo. Scanning them produces false BANNED hits against generated code,

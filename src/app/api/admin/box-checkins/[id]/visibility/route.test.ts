@@ -4,7 +4,7 @@
  * (Blessing Boxes slice 2, Discovery C7/C9 — admin hide/unhide).
  *
  * Same full-stack pattern as archive/route.test.ts: mocks
- * @opennextjs/cloudflare for a fake D1 binding and requireAdminSession()
+ * @/lib/cloudflareContext for a fake D1 binding and requireAdminSession()
  * as a controllable mock, then inspects db.batch()'s bound statements
  * directly. Proves: the visibility flip, the atomic audit_log write
  * (action='update', entity='box_checkin'), and that both land together or

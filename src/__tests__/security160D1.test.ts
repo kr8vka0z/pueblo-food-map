@@ -3,7 +3,7 @@
  *
  * Supersedes the old security160.test.ts: its "1.2" and "1.3" blocks call
  * report/suggest/feedback's POST handler past the honeypot check without
- * mocking @opennextjs/cloudflare, @/lib/formRateLimit, or stubbing
+ * mocking @/lib/cloudflareContext, @/lib/formRateLimit, or stubbing
  * CHECKIN_RATE_LIMIT_SECRET — all now required before those routes reach
  * validation (#587's D1-backed rate limit runs before field validation,
  * same order as before). checkFormRateLimit is mocked to always allow (same

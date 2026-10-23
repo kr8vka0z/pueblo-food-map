@@ -39,7 +39,6 @@ yarn-error.log*
 # filename prefix: "dev" not "env"). Never commit a real secret value.
 .dev.vars
 
-.open-next
 # cloudflare / vinext build output
 /dist/
 .vinext/

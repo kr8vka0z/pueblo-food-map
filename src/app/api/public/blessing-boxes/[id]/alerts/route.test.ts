@@ -3,7 +3,7 @@
  * Route-level tests for POST /api/public/blessing-boxes/[id]/alerts (the
  * giver alert sign-up route, Blessing Boxes slice 6). Same layered-mock
  * convention as the adopt route's own tests (that file's header) — mocks
- * src/lib/boxTurnstile, src/lib/checkinRateLimit, @opennextjs/cloudflare,
+ * src/lib/boxTurnstile, src/lib/checkinRateLimit, @/lib/cloudflareContext,
  * global fetch (Resend), and a fake D1Database.
  */
 

@@ -12,7 +12,7 @@
  *
  * ponytail: 2 D1 reads per page view (~30 box rows, then their check-ins for
  * status; loadLiveBoxesForHub skips the photo/adopter/needs reads), no page
- * caching (OpenNext's staticAssetsIncrementalCache can't revalidate).
+ * caching (force-dynamic, so every view reads D1).
  * Ceiling: traffic. Upgrade path: an edge-cached read like src/lib/edgeCache.ts
  * does for the public API route.
  */

@@ -85,8 +85,8 @@
   // secret, matching Kyle's own call: it's an account identifier, not a
   // credential (the actual read-scoped token, CF_ANALYTICS_API_TOKEN, IS a
   // Worker secret — see AGENTS.md's Secrets table). Read via the Cloudflare
-  // env binding at request time, never process.env (named environments
-  // don't populate wrangler `var`s into process.env under OpenNext).
+  // env binding at request time, never process.env (AGENTS.md "Runtime
+  // reads": the binding is where vars are defined to live).
   // #681 (admin Dashboard "What people do on the map") — PostHog project id
   // for the Query API (src/lib/posthogQuery.ts). A plain var, not a secret,
   // same call as CF_ANALYTICS_ACCOUNT_ID above (an identifier, not a

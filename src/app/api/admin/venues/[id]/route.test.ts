@@ -3,7 +3,7 @@
  * Route-level tests for PATCH /api/admin/venues/[id] (#255).
  *
  * Same full-stack pattern as src/app/api/admin/venues/route.test.ts (the
- * #254 create route this one mirrors): mocks @opennextjs/cloudflare for a
+ * #254 create route this one mirrors): mocks @/lib/cloudflareContext for a
  * fake D1 binding and requireAdminSession() (src/lib/adminSession.ts, the
  * sole identity check post Better-Auth-sole-gate cutover —
  * auth/betterauth-sole-gate) as a controllable mock, then inspects
@@ -24,7 +24,7 @@ const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 const VENUE_ID = "manual-existing-1";
 
 // Vitest hoists vi.mock() above this file's own imports, so route.ts (via
-// adminDb.ts) picks up the mocked @opennextjs/cloudflare with no dynamic
+// adminDb.ts) picks up the mocked @/lib/cloudflareContext with no dynamic
 // import needed — same pattern as venues/route.test.ts.
 const mockGetCloudflareContext = vi.fn();
 vi.mock("@/lib/cloudflareContext", () => ({

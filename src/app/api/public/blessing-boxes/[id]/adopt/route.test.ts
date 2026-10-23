@@ -3,7 +3,7 @@
  * Route-level tests for POST /api/public/blessing-boxes/[id]/adopt
  * (Blessing Boxes slice 6). Same layered-mock convention as the checkins
  * route's own tests: mocks src/lib/boxTurnstile, src/lib/checkinRateLimit,
- * @opennextjs/cloudflare, global fetch (Resend), and a fake D1Database.
+ * @/lib/cloudflareContext, global fetch (Resend), and a fake D1Database.
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";

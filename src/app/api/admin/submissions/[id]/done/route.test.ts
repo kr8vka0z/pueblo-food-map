@@ -4,7 +4,7 @@
  *
  * Same full-stack pattern as the sibling reject route's own test file
  * (src/app/api/admin/submissions/[id]/reject/route.test.ts): mocks
- * @opennextjs/cloudflare for a fake D1 binding and requireAdminSession()
+ * @/lib/cloudflareContext for a fake D1 binding and requireAdminSession()
  * as a controllable mock. Unlike reject, this route reads the row first
  * (for the audit row's entity_id) then runs a db.batch() of two statements
  * (the status flip + the audit insert), so the fake DB exposes both

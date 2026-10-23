@@ -39,8 +39,10 @@ yarn-error.log*
 # filename prefix: "dev" not "env"). Never commit a real secret value.
 .dev.vars
 
-# cloudflare / opennext
 .open-next
+# cloudflare / vinext build output
+/dist/
+.vinext/
 .wrangler
 
 # temp config scripts/check-prerender-serves.sh writes at the repo root; its

@@ -1,9 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Points at the wrapper worker (custom-worker.ts), not .open-next/worker.js directly —
-  // @opennextjs/cloudflare only exports a fetch handler by default; the wrapper re-exports
-  // it and adds scheduled() for the uptime dead-man's-switch below. See custom-worker.ts
-  // header comment for the official how-to this follows.
+  // Points at the wrapper worker (custom-worker.ts), not vinext's default entry:
+  // vinext's handler only has fetch(), so the wrapper delegates to it and adds the
+  // /ingest proxy, noindex policy and scheduled(). See custom-worker.ts. `vite build`
+  // flattens this file (one env, CLOUDFLARE_ENV picks it) into dist/server/wrangler.json.
   "main": "custom-worker.ts",
   "name": "pueblo-food-map",
   "compatibility_date": "2025-12-01",
@@ -12,15 +12,9 @@
     "global_fetch_strictly_public"
   ],
   "assets": {
-    "directory": ".open-next/assets",
+    "directory": "dist/client",
     "binding": "ASSETS"
   },
-  "services": [
-    {
-      "binding": "WORKER_SELF_REFERENCE",
-      "service": "pueblo-food-map"
-    }
-  ],
   "d1_databases": [
     {
       "binding": "ADMIN_DB",
@@ -155,18 +149,9 @@
         "ADMIN_OWNER_EMAIL": "kysboyd@gmail.com"
       },
       "assets": {
-        "directory": ".open-next/assets",
+        "directory": "dist/client",
         "binding": "ASSETS"
       },
-      // Self-reference must point at the staging Worker, not prod — OpenNext
-      // uses this binding for internal self-calls, so pointing it at prod
-      // would make staging silently call into production.
-      "services": [
-        {
-          "binding": "WORKER_SELF_REFERENCE",
-          "service": "pueblo-food-map-staging"
-        }
-      ],
       "d1_databases": [
         {
           "binding": "ADMIN_DB",

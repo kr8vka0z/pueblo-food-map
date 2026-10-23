@@ -31,7 +31,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>. Hot-reloads on save (Turbopack).
+Open <http://localhost:3000>. Hot-reloads on save (`vite dev`, vinext).
 
 ### Key scripts
 

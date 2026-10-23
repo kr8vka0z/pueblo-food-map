@@ -8,6 +8,9 @@ export default defineConfig({
   // pass). The real hosts let a local run be asked as them, so the noindex rule in custom-worker.ts can be checked;
   // ".trycloudflare.com" (leading dot = any subdomain, Vite's only wildcard form) lets a quick Cloudflare tunnel put
   // the preview on a phone.
+  // WHY 3000: localhost:3000 is the only local origin on the Mapbox token's URL allowlist, so on any other port the
+  // map renders blank. strictPort fails loudly instead of drifting to the next free port.
+  server: { port: 3000, strictPort: true },
   preview: {
     allowedHosts: ["pueblofoodmap.com", "dev.pueblofoodmap.com", ".trycloudflare.com"],
   },

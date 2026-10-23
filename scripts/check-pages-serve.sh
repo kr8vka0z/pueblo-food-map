@@ -25,7 +25,7 @@ read -r VENUE_ID VENUE_NAME < <(npx tsx -e '
   import("./src/data/published-venues.ts").then(({ publishedVenues }) => {
     const v = publishedVenues.find((x) => /^[A-Za-z0-9 .,-]+$/.test(x.name));
     if (v) console.log(v.id, v.name);
-  });')
+  });') || true  # read fails on empty input; the check below reports it
 if [ -z "${VENUE_ID:-}" ] || [ -z "${VENUE_NAME:-}" ]; then
   echo "check-pages-serve: could not pick a venue from src/data/published-venues.ts" >&2
   exit 1

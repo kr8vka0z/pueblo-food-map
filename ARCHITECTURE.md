@@ -703,6 +703,14 @@ populations that may distrust Google tracking.
 persisted. Contact emails go to Resend in the email body; the route handlers
 do not log them.
 
+**What Cloudflare Workers Logs keeps:** logs are on for prod and staging
+(`wrangler.jsonc` `observability`) with `invocation_logs: false`. Only the
+app's own console lines (`src/lib/logger.ts`) and uncaught exceptions are
+stored, each tagged with the request method, URL (path and query string) and
+Ray ID. Cloudflare's per-request invocation records are off, because they
+store every request header, client IP included. Measured on a probe Worker
+2026-10-22: no headers and no IP appear in the stored events.
+
 ---
 
 ## Map library — Mapbox GL JS via react-map-gl

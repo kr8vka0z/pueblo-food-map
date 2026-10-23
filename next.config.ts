@@ -114,10 +114,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  // Dev-only: lets `next dev` accept hot-reload requests from Kyle's Mac's
+  // Dev-only: lets `vite dev` (vinext honours this list) accept hot-reload requests from Kyle's Mac's
   // private tailnet address, so a local change can be checked on his iPhone
   // over https (`tailscale serve --bg 3000`) — https is what lets "find food
-  // near me" ask for location. Next blocks dev resources from unlisted hosts;
+  // near me" ask for location. The dev server blocks unlisted hosts;
   // this setting does nothing in production builds.
   allowedDevOrigins: ["kyles-macbook-air.tail433d07.ts.net"],
   experimental: {
@@ -151,8 +151,8 @@ const nextConfig: NextConfig = {
   // the live homepage failed (not the build/tests). Legacy ?venue= links
   // still work: the homepage reads the query param client-side and opens that
   // pin. Do NOT re-add a `source: "/"` redirect without verifying the LIVE
-  // homepage (a green build is not enough). A proper OpenNext-compatible
-  // legacy redirect is a deferred follow-up.
+  // homepage (a green build is not enough). A proper legacy redirect is a
+  // deferred follow-up.
   async headers() {
     return [
       {

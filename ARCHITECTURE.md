@@ -869,7 +869,7 @@ connection — minus the map itself (Mapbox tiles are out of scope).
 - `src/components/ServiceWorkerRegister.tsx` (mounted in `layout.tsx`) —
   registers `/sw.js` in production builds only, after `load` and then browser
   idle, so it never competes with first paint. In dev it unregisters any
-  worker left over from a local `next start`.
+  worker left over from a local `vite preview`.
 - Offline notice — `useMapUI`'s map-unavailable fallback (#165) now carries a
   reason. WebGL missing → "Map unavailable" (unchanged). WebGL fine but
   `navigator.onLine` false at mount → list view with "Map needs a connection.

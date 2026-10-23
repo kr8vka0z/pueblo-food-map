@@ -44,10 +44,6 @@ yarn-error.log*
 .vinext/
 .wrangler
 
-# temp config scripts/check-prerender-serves.sh writes at the repo root; its
-# cleanup trap removes it, but a killed run can leave it behind
-wrangler.ci-preview.jsonc
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts

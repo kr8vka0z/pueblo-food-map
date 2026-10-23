@@ -35,7 +35,7 @@ import { makeFakeD1, makeSubmitRequest, mockTurnstileSuccess } from "@/__tests__
 // "1.1" (throws earlier on a missing Turnstile secret) and "1.4" (doesn't
 // call a route at all).
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

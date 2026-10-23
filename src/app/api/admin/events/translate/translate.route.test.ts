@@ -16,7 +16,7 @@ import { AccessDeniedError, ADMIN_ORIGIN } from "@/lib/adminOrigin";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 const mockRequireAdminSession = vi.fn();

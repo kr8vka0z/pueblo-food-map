@@ -28,7 +28,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { eventConflictResponse, EVENT_AUDIT_INSERT_SQL, nextTimestamp, purgeEventsFeed } from "@/lib/adminEvents";
 import { loadEvent } from "@/lib/adminEventReads";

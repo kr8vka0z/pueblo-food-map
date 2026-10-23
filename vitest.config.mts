@@ -7,6 +7,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // workerd's built-in module doesn't exist in Node; see the stub's header.
+      "cloudflare:workers": path.resolve(__dirname, "./src/lib/testing/cloudflareWorkersStub.ts"),
     },
   },
   test: {

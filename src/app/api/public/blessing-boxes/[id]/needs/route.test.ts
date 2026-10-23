@@ -24,7 +24,7 @@ vi.mock("@/lib/checkinRateLimit", async (importOriginal) => {
 });
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

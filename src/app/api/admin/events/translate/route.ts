@@ -11,7 +11,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { authorizeAdminWrite } from "@/lib/adminDb";
 import { suggestSpanish, TranslateError, validateTranslateRequest } from "@/lib/eventTranslate";

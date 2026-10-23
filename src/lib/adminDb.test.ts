@@ -21,7 +21,7 @@ import { AccessDeniedError, ADMIN_ORIGIN } from "@/lib/adminOrigin";
 // variable inside the factory requires the "mock" name prefix so Vitest's
 // hoisting-safety check allows it.
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

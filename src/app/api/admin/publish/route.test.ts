@@ -29,7 +29,7 @@ const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 // adminDb.ts) picks up the mocked @opennextjs/cloudflare with no dynamic
 // import needed — same pattern as src/lib/adminDb.test.ts.
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

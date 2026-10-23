@@ -14,7 +14,7 @@ import Database from "better-sqlite3";
 import { sqliteD1 } from "@/lib/sqliteD1.testutil";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

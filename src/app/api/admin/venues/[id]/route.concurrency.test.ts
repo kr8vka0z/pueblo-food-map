@@ -23,7 +23,7 @@ const VENUE_ID = "manual-existing-1";
 const EXISTING_UPDATED_AT = "2026-01-01T00:00:00.000Z";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

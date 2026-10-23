@@ -21,7 +21,7 @@ import { AccessDeniedError } from "@/lib/adminOrigin";
 // adminDb.ts) picks up the mocked @opennextjs/cloudflare with no dynamic
 // import needed — same pattern as venues/route.test.ts.
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

@@ -30,7 +30,7 @@ vi.mock("@/lib/formRateLimit", () => ({
 // hoists vi.mock() above this file's own imports/dynamic imports, so every
 // (re-)import of the route module below picks up this fake.
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

@@ -17,7 +17,7 @@ import { sqliteD1 } from "@/lib/sqliteD1.testutil";
 import { OG_IMAGE, SITE_URL } from "@/lib/site";
 
 const mockContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: () => mockContext() }));
+vi.mock("@/lib/cloudflareContext", () => ({ getCloudflareContext: () => mockContext() }));
 
 import EventRoute, { generateMetadata } from "@/app/(site)/event/[id]/page";
 import EsEventRoute, { generateMetadata as generateEsMetadata } from "@/app/es/event/[id]/page";

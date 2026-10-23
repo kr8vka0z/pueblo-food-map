@@ -12,7 +12,7 @@
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: async () => ({ env: { CF_ANALYTICS_ACCOUNT_ID: "acct" } }),
 }));
 

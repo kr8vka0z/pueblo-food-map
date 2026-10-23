@@ -15,7 +15,7 @@
  */
 
 import { betterAuth } from "better-auth";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { buildAuthOptions } from "./auth-options";
 
 // WHY a named function instead of inlining `betterAuth(buildAuthOptions(db))`

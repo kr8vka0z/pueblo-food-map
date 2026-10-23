@@ -11,7 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { resubscribeByToken } from "@/lib/boxAlerts";
 
 export const dynamic = "force-dynamic";

@@ -40,7 +40,7 @@
  * cross-isolate consistency: a KV or D1-backed cache keyed the same way.
  */
 
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { createFetchLimiter, fetchWithRetry, startDeadline, type FetchLimiter } from "@/lib/analyticsFetch";
 
 export type DashboardPeriod = "7d" | "30d" | "90d";

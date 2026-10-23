@@ -21,7 +21,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { t, type Locale } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { loadLiveBoxesForHub, type PublicBlessingBox } from "@/lib/blessingBoxes";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
 

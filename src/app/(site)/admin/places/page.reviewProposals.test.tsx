@@ -21,7 +21,7 @@ vi.mock("@/lib/adminDb", () => ({
 
 const mockGetCloudflareContext = vi.fn();
 mockGetCloudflareContext.mockResolvedValue({ env: { BETTER_AUTH_RP_ID: undefined } });
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

@@ -1,16 +1,12 @@
-// cloudflare-env.d.ts — bridges the wrangler-generated `Env` interface into
-// the `CloudflareEnv` global interface that @opennextjs/cloudflare's
-// getCloudflareContext() reads, and supplies the one Workers runtime type
-// (`D1Database`) this project's own .ts files reference directly.
+// cloudflare-env.d.ts — gives the project a typed `CloudflareEnv` (bindings
+// and vars) for src/lib/cloudflareContext.ts's getCloudflareContext(), and
+// supplies the Workers runtime types this project's own .ts files reference
+// directly.
 //
-// WHY this file exists: @opennextjs/cloudflare ships its own ambient
-// `CloudflareEnv` (dist/api/cloudflare-context.d.ts) containing only the
-// bindings IT knows about (ISR cache, ASSETS, etc.) — it has no way to know
-// about this project's own bindings like ADMIN_DB. `npx wrangler types`
-// (run against wrangler.jsonc) generates worker-configuration.d.ts with the
-// real `Env` interface, e.g. `ADMIN_DB: D1Database`. TypeScript interface
-// declaration merging combines this file's `CloudflareEnv extends Env` with
-// @opennextjs/cloudflare's own `CloudflareEnv` declaration, so
+// WHY this file exists: `npx wrangler types` (run against wrangler.jsonc)
+// writes worker-configuration.d.ts with the real `Env` interface (ADMIN_DB,
+// BOX_PHOTOS, ASSETS, vars) but no secrets or hand-typed vars;
+// `CloudflareEnv extends Env` below adds those, so
 // `getCloudflareContext().env.ADMIN_DB` type-checks (src/lib/adminDb.ts).
 //
 // WHY `D1Database` is imported here from @cloudflare/workers-types rather
@@ -41,11 +37,6 @@ declare global {
   // include would reintroduce the HTMLRewriter `Element`/lib.dom `Element`
   // collision this file's own header warns about.
   type R2Bucket = CFR2Bucket;
-  // This MUST stay an `interface` (not eslint's suggested `type` alias) so
-  // it declaration-merges with @opennextjs/cloudflare's own
-  // `declare global { interface CloudflareEnv {...} }` — a `type` alias
-  // cannot merge with an existing interface of the same name and would fail
-  // to compile (duplicate identifier) once both are in scope.
   interface CloudflareEnv extends Env {
     // #318 passkey isolation — staging-only override of auth-options.ts's
     // rpID (unset/undefined on prod). Declared here rather than regenerated

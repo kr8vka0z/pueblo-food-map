@@ -561,13 +561,18 @@ export function WalkRouteStatus({
           double as the clear affordance (see onClearRoute's own doc above).
           Same visual weight as the steps toggle above it. */}
       {isRouteActive && onClearRoute && (
-        <div className="mt-2">
+        <div className="mt-2 flex">
           <button
             type="button"
             data-testid="walk-clear-route"
             onClick={onClearRoute}
             className={
-              "py-1.5 text-sm font-medium text-[var(--color-sage-600)] " +
+              // #711: 48px-tall hit area, same 32px footprint as the old
+              // py-1.5 — min-h-12 grows the box, -my-2 hands 16px back. The
+              // 8px reaching up stops at the edge of the control above (mt-2);
+              // the 8px reaching down is why the Google Maps row below sits
+              // at mt-4. Flex item so the negative margins are exact.
+              "inline-flex items-center min-h-12 -my-2 text-sm font-medium text-[var(--color-sage-600)] " +
               "hover:text-[var(--color-sage-700)] underline-offset-2 hover:underline " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
@@ -584,7 +589,7 @@ export function WalkRouteStatus({
           fallback for users who want native GPS turn-by-turn on their phone.
           WHY origin is omitted: same as Bus/Drive — Google uses device location automatically. */}
       {isRouteActive && (
-        <div className="mt-3 flex justify-center">
+        <div className="mt-4 flex justify-center">
           <a
             data-testid="walk-googlemaps-link"
             href={walkGoogleUrl}
@@ -592,17 +597,16 @@ export function WalkRouteStatus({
             rel="noopener noreferrer"
             aria-label={t("directions.openInGoogleMapsAria", locale, { name: venue.name })}
             className={
-              // #711: a 48px-tall hit area (DESIGN.md floor) on a link that
-              // still takes up the old 28px: min-h-12 grows the box, the
-              // negative margins (12px up, 8px down) hand 20px back to the
-              // layout so the card looks the same. Lopsided on purpose: the
-              // wrapper's mt-3 means the upward 12px only reaches the edge
-              // of the control above, and 8px down leaves room for the
+              // #711: a 48px-tall hit area (DESIGN.md floor): min-h-12 grows
+              // the box, -my-2 hands 16px back, so it takes up 32px (was 28px).
+              // The wrapper's mt-4 is exactly the 8px Clear route reaches down
+              // plus the 8px this reaches up, so the two hit areas meet edge
+              // to edge without overlapping. 8px down leaves room for the
               // Report link's own overlay in DesktopVenueWindow (space-y-4).
               // Flex item, not inline: negative margins on a flex item are
               // exact; on an inline box the line's strut can add height.
               // Same type size/color as before (mobile review #10).
-              "inline-flex items-center min-h-12 -mt-3 -mb-2 text-xs text-[var(--color-ink-500)] underline underline-offset-2 " +
+              "inline-flex items-center min-h-12 -my-2 text-xs text-[var(--color-ink-500)] underline underline-offset-2 " +
               "hover:text-[var(--color-ink-700)] " +
               PRESS_FEEDBACK + " " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"

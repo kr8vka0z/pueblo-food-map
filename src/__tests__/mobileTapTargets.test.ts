@@ -51,7 +51,7 @@ describe("mobile review #9 — DirectionButtons walk-steps toggle (~20px -> >=24
 describe("mobile review #10 (superseded by #711) — DirectionButtons \"Open in Google Maps\" link", () => {
   test("link is a 48px-tall box", () => {
     const src = readSource("src/components/DirectionButtons.tsx");
-    expect(src).toMatch(/inline-flex items-center min-h-12 -mt-3 -mb-2 text-xs text-\[var\(--color-ink-500\)\]/);
+    expect(src).toMatch(/inline-flex items-center min-h-12 -my-2 text-xs text-\[var\(--color-ink-500\)\]/);
   });
 });
 

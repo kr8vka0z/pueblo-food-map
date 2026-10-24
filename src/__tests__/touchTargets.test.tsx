@@ -23,7 +23,7 @@ import LanguageToggle from "@/components/LanguageToggle";
 import ListView from "@/components/ListView";
 import ShareButton from "@/components/ShareButton";
 import FavoriteButton from "@/components/FavoriteButton";
-import DirectionButtons from "@/components/DirectionButtons";
+import DirectionButtons, { WalkRouteStatus } from "@/components/DirectionButtons";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import BottomSheet from "@/components/BottomSheet";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
@@ -256,10 +256,18 @@ describe("Venue card controls", () => {
     for (const el of [walk, bus, drive]) expect(classes(el)).toContain("min-h-12");
   });
 
-  test("Open in Google Maps keeps its 28px footprint but is 48px tall (#711)", () => {
-    render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} isRouteActive locale="en" />);
-    const link = screen.getByTestId("walk-googlemaps-link");
-    expect(classes(link)).toEqual(expect.arrayContaining(["min-h-12", "-mt-3", "-mb-2"]));
+  // Clear route only renders where the trigger doesn't clear the route itself
+  // (box cards, via WalkRouteStatus). The two stack, so their 8px negative
+  // margins plus the 16px gap between them (mt-4) keep the enlarged areas
+  // edge to edge, never overlapping.
+  test("Clear route and Open in Google Maps are 48px tall without overlapping (#711)", () => {
+    render(
+      <WalkRouteStatus venue={makeVenue()} locale="en" isRouteActive locationHintId="hint" onClearRoute={vi.fn()} />,
+    );
+    const clear = screen.getByTestId("walk-clear-route");
+    const gmaps = screen.getByTestId("walk-googlemaps-link");
+    for (const el of [clear, gmaps]) expect(classes(el)).toEqual(expect.arrayContaining(["min-h-12", "-my-2"]));
+    expect(classes(gmaps.parentElement)).toContain("mt-4");
   });
 
   test("Report an issue keeps its 36px look with a 48px-tall overlay", () => {

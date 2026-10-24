@@ -28,7 +28,7 @@
  * verifies — see AGENTS.md "Admin authentication" for the full picture.
  */
 
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { requireAdminOrigin, type AdminIdentity, type HeaderSource } from "./adminOrigin";
 import { requireAdminSession } from "./adminSession";
 import { isOwnerEmail } from "./adminOwner";

@@ -3,7 +3,7 @@
  * Route-level tests for POST /api/admin/proposals/[id]/approve.
  *
  * Same full-stack pattern as src/app/api/admin/venues/[id]/archive/route.test.ts:
- * mocks @opennextjs/cloudflare for a fake D1 binding and requireAdminSession()
+ * mocks @/lib/cloudflareContext for a fake D1 binding and requireAdminSession()
  * as a controllable mock, then inspects db.batch()'s bound statements
  * directly. The fake DB's `.first()` is keyed by SQL prefix so the same
  * fake can answer both the change_proposals lookup and the venues lookup
@@ -31,7 +31,7 @@ const PROPOSAL_ID = 7;
 const VENUE_ID = "osm-node-1";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

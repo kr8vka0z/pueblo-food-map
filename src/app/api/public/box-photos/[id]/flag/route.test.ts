@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
  * Route-level tests for POST /api/public/box-photos/[id]/flag (Blessing
- * Boxes slice 5). Mocks the rate limiter, @opennextjs/cloudflare, and
+ * Boxes slice 5). Mocks the rate limiter, @/lib/cloudflareContext, and
  * global fetch (the best-effort admin alert email) — same layered-mock
  * convention as the checkins route's own test file.
  */
@@ -15,7 +15,7 @@ vi.mock("@/lib/checkinRateLimit", () => ({
 }));
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

@@ -23,7 +23,7 @@
 
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { buildPageMetadata } from "@/lib/site";
 import { loadLiveBoxById, loadVisibleCheckins, type CheckinStatusInput } from "@/lib/blessingBoxes";
 import { loadApprovedPhotosForVenue } from "@/lib/boxPhotos";

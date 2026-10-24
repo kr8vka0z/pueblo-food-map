@@ -9,7 +9,7 @@
  * every OTHER test in that file (a real D1 batch's meta shape simply isn't
  * exercised there) and must stay that way.
  *
- * Same auth-mock pattern as route.test.ts (@opennextjs/cloudflare + the
+ * Same auth-mock pattern as route.test.ts (@/lib/cloudflareContext + the
  * requireAdminSession() identity gate) — see that file's own header.
  */
 
@@ -23,7 +23,7 @@ const VENUE_ID = "manual-existing-1";
 const EXISTING_UPDATED_AT = "2026-01-01T00:00:00.000Z";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

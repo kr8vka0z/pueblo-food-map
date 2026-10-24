@@ -31,21 +31,20 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>. Hot-reloads on save (Turbopack).
+Open <http://localhost:3000>. Hot-reloads on save (`vite dev`, vinext).
 
 ### Key scripts
 
 | Script | Purpose |
 |---|---|
 | `npm run dev` | Dev server with hot reload |
-| `npm run build` | Production build |
+| `npm run build` | Production build (`vite build` via vinext → `dist/`) |
 | `npm run lint` | ESLint check |
 | `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
 | `npm run test` | Unit tests (vitest, watch mode) |
 | `npm run test:ci` | Unit tests, CI mode (single run) |
 | `npm run test:coverage` | Unit tests with a V8 coverage report |
-| `npm start` | Serve the production build |
-| `npm run preview` | OpenNext build + local Worker emulator at :8788 |
+| `npm run preview` | `vite build` + the built Worker in local workerd at :8788 |
 | `npm run design:lint` | design.md CLI lint on DESIGN.md (report-only) |
 | `npm run design:drift` | Token parity check: globals.css vs DESIGN.md (blocking) |
 
@@ -94,7 +93,7 @@ scripts/           Data pipeline, seed, and lint scripts (never imported by the 
 - **lucide-react** (icons)
 - **Cloudflare Turnstile** (bot protection on submission forms)
 - **Resend** (transactional email for form submissions)
-- **Deployed to Cloudflare Workers** via `@opennextjs/cloudflare`
+- **Deployed to Cloudflare Workers** via [vinext](https://github.com/cloudflare/vinext) (Next.js API on Vite)
 
 ---
 

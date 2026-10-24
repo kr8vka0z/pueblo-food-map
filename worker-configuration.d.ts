@@ -21,7 +21,6 @@ interface __BaseEnv_Env {
 	POSTHOG_API_HOST?: string;
 	NEXT_PUBLIC_MAPBOX_TOKEN: string;
 	RESEND_API_KEY: string;
-	WORKER_SELF_REFERENCE: Fetcher /* pueblo-food-map-staging */ | Service<typeof import("./custom-worker").default>;
 	HC_PING_URL?: string;
 }
 declare namespace Cloudflare {
@@ -40,7 +39,6 @@ declare namespace Cloudflare {
 		POSTHOG_API_HOST?: string;
 		NEXT_PUBLIC_MAPBOX_TOKEN: string;
 		RESEND_API_KEY: string;
-		WORKER_SELF_REFERENCE: Fetcher /* pueblo-food-map-staging */;
 	}
 	interface Env extends __BaseEnv_Env {}
 }

@@ -3,8 +3,8 @@
  * (#485 comment, 2026-09-26: "exclude Kyle's own visits from all analytics").
  *
  * WHY this lives in src/lib/ instead of custom-worker.ts: that file imports
- * from the gitignored, build-generated .open-next/worker.js and can't be
- * unit-tested (see its own header comment) — this is the testable half the
+ * vinext's handler, a Vite virtual module that only exists inside
+ * `vite build`, and can't be unit-tested (see its own header comment) — this is the testable half the
  * /ingest proxy calls into.
  *
  * WHY it never throws: ANALYTICS_EXCLUDED_IPS is a plain Worker var, hand-

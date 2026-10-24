@@ -7,7 +7,7 @@
  * because this guard's acceptance criterion — "staging refuses, no GitHub
  * call made; production proceeds as before" — is a distinct, narrow
  * assertion from that file's broader NB1/ordering coverage. Mocking setup
- * mirrors route.test.ts exactly (same seam: @opennextjs/cloudflare's
+ * mirrors route.test.ts exactly (same seam: @/lib/cloudflareContext's
  * getCloudflareContext, the one I/O boundary reaching Cloudflare's env
  * outside a real Worker).
  */
@@ -20,7 +20,7 @@ import type { VenueRow } from "@/lib/publishVenues";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

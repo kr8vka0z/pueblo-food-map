@@ -167,9 +167,10 @@ describe("audit-fix.sh: nothing worth shipping", () => {
     expect(r.calls(PR_WRITES)).toEqual([]);
     expect(r.calls(ISSUE_WRITES)).toEqual([]);
     expect(r.dirty()).toBe("");
-    // Pinned npm 11 for the write (#752/#753), production deps only, 3-day release age; the check runs as CI runs it, once.
+    // Pinned npm 11 for the write (#752/#753), production deps only, 3-day release age; the check runs as CI runs it
+    // (through audit-prod.mjs, the one gate both share), once.
     expect(r.calls(/^npx/)).toEqual(["npx -y npm@11.21.0 audit fix --package-lock-only --ignore-scripts --omit=dev --min-release-age=3"]);
-    expect(r.calls(/^npm/)).toEqual(["npm audit --audit-level=high --omit=dev"]);
+    expect(r.calls(/^npm/)).toEqual(["npm audit --omit=dev --json"]);
     // The open-PR lookup must ask for this branch into dev (a wrong --head would miss the bot's own PR).
     const listed = r.calls(/ pr list /);
     expect(listed).toHaveLength(1);
@@ -344,5 +345,36 @@ describe("audit-fix.sh: the failing-check issue", () => {
     const r = run({ issues: [humanIssue(5)] });
     expect(r.status).toBe(0);
     expect(r.calls(ISSUE_WRITES)).toEqual([]);
+  });
+});
+
+describe("audit-prod.mjs: the shared gate's ignore list", () => {
+  // Runs the real gate against a stub `npm` printing a fixed audit report shaped like npm's (advisory objects on the
+  // vulnerable package, package names up the chain).
+  const gateOn = (vulnerabilities) => {
+    const bin = mkdtempSync(join(tmpdir(), "audit-prod-"));
+    writeFileSync(join(bin, "report.json"), JSON.stringify({ vulnerabilities }));
+    writeFileSync(join(bin, "npm"), `#!/usr/bin/env bash\ncat "${join(bin, "report.json")}"\nexit 1\n`);
+    chmodSync(join(bin, "npm"), 0o755);
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+    return spawnSync("node", [resolve(import.meta.dirname, "audit-prod.mjs")], { env, encoding: "utf8" });
+  };
+  const ignored = { url: "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm", severity: "high" };
+  const chain = {
+    micromatch: { name: "micromatch", severity: "high", via: ["braces"] },
+    vinext: { name: "vinext", severity: "high", via: ["micromatch"] },
+  };
+
+  test("an ignored advisory passes; an un-ignored high on the same package still fails", () => {
+    const pass = gateOn({ braces: { name: "braces", severity: "high", via: [ignored] }, ...chain });
+    expect(pass.status).toBe(0);
+    expect(pass.stdout).toBe("");
+
+    const other = { url: "https://github.com/advisories/GHSA-test-new1-high", severity: "high" };
+    const fail = gateOn({ braces: { name: "braces", severity: "high", via: [ignored, other] }, ...chain });
+    expect(fail.status).toBe(1);
+    expect(fail.stdout).toContain("- braces (high): https://github.com/advisories/GHSA-test-new1-high");
+    expect(fail.stdout).not.toContain("GHSA-vfj7-8cjw-p6xm");
+    expect(fail.stdout).toContain("- vinext (high)");
   });
 });

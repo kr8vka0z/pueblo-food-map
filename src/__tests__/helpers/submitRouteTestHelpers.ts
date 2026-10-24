@@ -2,7 +2,7 @@
  * Shared fakes for the public form-submit route tests (report / suggest /
  * feedback submit). Test-only.
  *
- * The vi.mock() blocks for @/lib/formRateLimit and @opennextjs/cloudflare are
+ * The vi.mock() blocks for @/lib/formRateLimit and @/lib/cloudflareContext are
  * NOT here: vitest hoists vi.mock() to the top of the file that calls it, so
  * each test file keeps its own.
  */

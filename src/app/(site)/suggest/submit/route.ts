@@ -24,7 +24,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { categoryLabels } from "@/data/venues";
 import type { VenueCategory } from "@/types/venue";
 import { verifyTurnstileToken } from "@/lib/turnstile";

@@ -9,9 +9,9 @@
  * browser to go idle (setTimeout fallback where requestIdleCallback is
  * missing, e.g. Safari).
  *
- * WHY production only: `next dev` serves unhashed, constantly-changing
- * chunks; a caching worker there just serves stale code. Outside production
- * this also unregisters any worker left behind by a local `next start` run
+ * WHY production only: `vite dev` serves unhashed, constantly-changing
+ * modules; a caching worker there just serves stale code. Outside production
+ * this also unregisters any worker left behind by a local `vite preview` run
  * on the same origin, for the same reason.
  *
  * `updateViaCache: "none"` makes the browser skip its HTTP cache when

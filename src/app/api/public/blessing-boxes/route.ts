@@ -22,7 +22,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { loadLiveBoxes, type PublicBlessingBox } from "@/lib/blessingBoxes";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
 import { respondWithEdgeCache, type BestEffortResult } from "@/lib/edgeCache";

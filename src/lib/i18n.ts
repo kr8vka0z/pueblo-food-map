@@ -209,6 +209,10 @@ const en: Record<string, string> = {
   "menu.title": "Pueblo Food Map",
   "menu.suggest": "Suggest a place",
   "menu.sponsoredBy": "Sponsored by",
+  // Donate card (#736). Never "sponsor" here: on this site that word means
+  // adopting a blessing box. No tax claim; PFP's own page covers that.
+  "menu.donate": "Donate",
+  "menu.donateSub": "Supports this map and Pueblo Food Project's other work",
   // Agency credit (StyxCredit.tsx) — followed by the linked name "The Styx Group".
   "credit.builtBy": "Designed, built and managed by",
   "menu.showWelcome": "Show welcome screen",
@@ -1381,6 +1385,8 @@ const es: Record<string, string> = {
   "menu.title": "Pueblo Food Map",
   "menu.suggest": "Sugerir un lugar",
   "menu.sponsoredBy": "Patrocinado por",
+  "menu.donate": "Donar",
+  "menu.donateSub": "Apoya este mapa y otros proyectos de Pueblo Food Project",
   "credit.builtBy": "Diseñado, creado y administrado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
   "menu.tour": "Aprende a usar este mapa", // [CHECK]

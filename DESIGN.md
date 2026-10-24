@@ -484,15 +484,14 @@ The status pill itself (`bone-50` chip on the photo, or a plain `bone-100` inlin
 
 **SplashScreen** (first visit): the full-screen `z-[9000]` layer over the live map, on the frosted scrim (see Map Chrome). Centred column, max 820px: the `wordmark` at `text-4xl`/`md:text-6xl` in `brand-navy`, a `text-2xl md:text-3xl font-semibold brand-navy` purpose line, `text-base md:text-lg ink-500` microcopy, then the orange/navy ButtonPrimary CTAs. The wordmark and purpose line carry the `splash-text-outline` white halo, the microcopy the thinner `splash-text-outline-sm`; the CTA labels get none (they sit on solid orange).
 
-**SiteFooter** (content pages only, never the map): a `bone-200` top rule, the `max-w-lg` column, `text-xs ink-400` links (Back to map, About, Privacy, Suggest) wrapping with `gap-x-6 gap-y-2`, then the OSM attribution link at `min-h-11` (44px).
+**SiteFooter** (content pages only, never the map): a `bone-200` top rule, the `max-w-lg` column, `text-xs ink-400` links (map, directory, topic hubs, About, Privacy, Suggest) and the OSM attribution link, each a `min-h-12` (48px) row (#711), wrapping with `gap-x-4` and no row gap in a `py-2` column, then the Styx credit line (an inline-sentence link, exempt).
 
 **Known deviations** — the code differs from the rules above in three places; fix them when you're in the file rather than copying them:
 - `HoursList` marks today with a coloured left rule, which Do's and Don'ts bans ("no colored border stripes"). A `sage-50` row fill would say the same thing.
 - `HoursList` sets times in `font-mono`, beyond Typography's "mono only for raw coordinates". Public Sans' tabular numerals (`tabular-nums`) would keep the columns aligned.
 - The Menu panel is `white` with black `rgba(0,0,0,…)` shadows and, as a dropdown, an 8px radius — not `bone-50`, the warm `elevation-*` shadows, or a radius token.
 
-The #659 home/map touch-target audit (#233) brought every control on `/` up to the 48×48 floor — card-header icon buttons, Menu rows, LanguageToggle, FilterPanel, BottomSheet, ListView and the SearchBar/Filters control are all covered now (see each component's own note above and `touchTargets.test.tsx`). Two things it deliberately left alone:
-- `SiteFooter` (content pages only — never `/`, so outside that audit's scope): its OSM link (`min-h-11`, 44px) and its four internal links (bare `text-xs` lines, ~16px) still sit below the floor.
+The #659 home/map touch-target audit (#233) brought every control on `/` up to the 48×48 floor — card-header icon buttons, Menu rows, LanguageToggle, FilterPanel, BottomSheet, ListView and the SearchBar/Filters control are all covered now (see each component's own note above and `touchTargets.test.tsx`). #711 later brought `SiteFooter`'s links and the venue card's "Open in Google Maps" link (`min-h-12` with `-mt-3 -mb-2`, so its footprint stays 28px) up too. One thing still left alone:
 - `DesktopVenueWindow`'s own chrome (its Close button, Show/Hide details toggle, phone link) — unlike the mobile `BottomSheet` it wraps, these weren't touched; desktop is pointer-first, but they're worth a pass if this card ever needs to feel finger-friendly on a touchscreen laptop.
 
 ## Iconography

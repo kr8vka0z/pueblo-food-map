@@ -27,6 +27,7 @@ import DirectionButtons from "@/components/DirectionButtons";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import BottomSheet from "@/components/BottomSheet";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
+import SiteFooter from "@/components/SiteFooter";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 
@@ -225,6 +226,17 @@ describe("ListView", () => {
   });
 });
 
+describe("SiteFooter (#711)", () => {
+  // StyxCredit's link sits inside a sentence (WCAG 2.5.8 inline exemption,
+  // see its own header), so it is the one footer link left out.
+  test("every nav link and the OSM credit are at least 48px tall", () => {
+    render(<SiteFooter />);
+    const links = screen.getAllByRole("link").filter((a) => a.textContent !== "The Styx Group");
+    expect(links.length).toBe(11);
+    for (const a of links) expect(classes(a)).toContain("min-h-12");
+  });
+});
+
 describe("Venue card controls", () => {
   test("Share and Save are 48×48 boxes", () => {
     render(
@@ -242,6 +254,12 @@ describe("Venue card controls", () => {
     const bus = screen.getByRole("link", { name: /Bus directions/ });
     const drive = screen.getByRole("link", { name: /Drive directions/ });
     for (const el of [walk, bus, drive]) expect(classes(el)).toContain("min-h-12");
+  });
+
+  test("Open in Google Maps keeps its 28px footprint but is 48px tall (#711)", () => {
+    render(<DirectionButtons venue={makeVenue()} onWalk={vi.fn()} isRouteActive locale="en" />);
+    const link = screen.getByTestId("walk-googlemaps-link");
+    expect(classes(link)).toEqual(expect.arrayContaining(["min-h-12", "-mt-3", "-mb-2"]));
   });
 
   test("Report an issue keeps its 36px look with a 48px-tall overlay", () => {

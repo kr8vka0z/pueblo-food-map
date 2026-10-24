@@ -24,6 +24,13 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import { LocaleProvider } from "@/lib/LocaleContext";
+import { track, EVENTS } from "@/lib/analytics";
+
+// #736: mock the whole module so EVENTS keeps its real allowlist values.
+vi.mock("@/lib/analytics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/analytics")>()),
+  track: vi.fn(),
+}));
 
 // Mock next/link — renders a plain <a> in tests.
 // WHY spread rest: HamburgerMenuItem now places role="menuitem" on the <Link>;
@@ -266,6 +273,32 @@ describe("HamburgerMenu — sponsor card (Kyle, 2026-09-16)", () => {
   test("not shown in the Saved view", () => {
     render(<HamburgerMenu locale="en" open onClose={vi.fn()} view="saved" savedVenues={[]} />);
     expect(screen.queryByTestId("menu-sponsor")).toBeNull();
+  });
+});
+
+// ─── #736: Donate card ────────────────────────────────────────────────────────
+
+describe("HamburgerMenu — donate card (#736)", () => {
+  test.each([
+    ["en", "Donate", "(opens in new tab)"],
+    ["es", "Donar", "(se abre en una pestaña nueva)"],
+  ] as const)("%s: links to PFP's donation page in a new tab and fires donate_clicked", (locale, title, newTab) => {
+    vi.mocked(track).mockClear();
+    render(<HamburgerMenu locale={locale} open onClose={vi.fn()} />);
+    const card = screen.getByTestId("menu-donate");
+    expect(card.getAttribute("href")).toBe("https://app.impactgraph.ai/donation-page/12");
+    expect(card.getAttribute("target")).toBe("_blank");
+    expect(card.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(card.getAttribute("aria-label")?.startsWith(title)).toBe(true);
+    expect(card.getAttribute("aria-label")?.endsWith(newTab)).toBe(true);
+    fireEvent.click(card);
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledWith(EVENTS.DONATE_CLICKED);
+  });
+
+  test("not shown in the Saved view", () => {
+    render(<HamburgerMenu locale="en" open onClose={vi.fn()} view="saved" savedVenues={[]} />);
+    expect(screen.queryByTestId("menu-donate")).toBeNull();
   });
 });
 

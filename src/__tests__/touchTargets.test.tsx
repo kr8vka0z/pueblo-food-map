@@ -23,10 +23,11 @@ import LanguageToggle from "@/components/LanguageToggle";
 import ListView from "@/components/ListView";
 import ShareButton from "@/components/ShareButton";
 import FavoriteButton from "@/components/FavoriteButton";
-import DirectionButtons from "@/components/DirectionButtons";
+import DirectionButtons, { WalkRouteStatus } from "@/components/DirectionButtons";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import BottomSheet from "@/components/BottomSheet";
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
+import SiteFooter from "@/components/SiteFooter";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 
@@ -225,6 +226,17 @@ describe("ListView", () => {
   });
 });
 
+describe("SiteFooter (#711)", () => {
+  // StyxCredit's link sits inside a sentence (WCAG 2.5.8 inline exemption,
+  // see its own header), so it is the one footer link left out.
+  test("every nav link and the OSM credit are at least 48px tall", () => {
+    render(<SiteFooter />);
+    const links = screen.getAllByRole("link").filter((a) => a.textContent !== "The Styx Group");
+    expect(links.length).toBe(11);
+    for (const a of links) expect(classes(a)).toContain("min-h-12");
+  });
+});
+
 describe("Venue card controls", () => {
   test("Share and Save are 48×48 boxes", () => {
     render(
@@ -242,6 +254,20 @@ describe("Venue card controls", () => {
     const bus = screen.getByRole("link", { name: /Bus directions/ });
     const drive = screen.getByRole("link", { name: /Drive directions/ });
     for (const el of [walk, bus, drive]) expect(classes(el)).toContain("min-h-12");
+  });
+
+  // Clear route only renders where the trigger doesn't clear the route itself
+  // (box cards, via WalkRouteStatus). The two stack, so their 8px negative
+  // margins plus the 16px gap between them (mt-4) keep the enlarged areas
+  // edge to edge, never overlapping.
+  test("Clear route and Open in Google Maps are 48px tall without overlapping (#711)", () => {
+    render(
+      <WalkRouteStatus venue={makeVenue()} locale="en" isRouteActive locationHintId="hint" onClearRoute={vi.fn()} />,
+    );
+    const clear = screen.getByTestId("walk-clear-route");
+    const gmaps = screen.getByTestId("walk-googlemaps-link");
+    for (const el of [clear, gmaps]) expect(classes(el)).toEqual(expect.arrayContaining(["min-h-12", "-my-2"]));
+    expect(classes(gmaps.parentElement)).toContain("mt-4");
   });
 
   test("Report an issue keeps its 36px look with a 48px-tall overlay", () => {

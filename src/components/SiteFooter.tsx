@@ -19,13 +19,14 @@ import { localizedHref } from "@/lib/localizedHref";
 import { OSM_COPYRIGHT_URL } from "@/lib/osmAttribution";
 import StyxCredit from "./StyxCredit";
 
-// #711: every link is a 48px-tall row (DESIGN.md touch-target floor). The
+// #711: every link is at least 48×48 (DESIGN.md touch-target floor; short
+// labels like "About" get the width from min-w-12). The
 // rows carry their own height, so the wrapper has no vertical gap and less
 // padding, and a 16px column gap (still well over the 8px between hit areas)
 // fits more links per row at 360px — otherwise the footer would roughly
 // double in height.
 const LINK_CLASS =
-  "inline-flex items-center min-h-12 " +
+  "inline-flex items-center justify-center min-h-12 min-w-12 " +
   "hover:text-[var(--color-ink-700)] transition-colors " +
   "focus-visible:outline-none focus-visible:underline";
 

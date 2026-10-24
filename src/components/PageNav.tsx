@@ -98,7 +98,8 @@ export default function PageNav({ locale, backHref = "/" }: { locale: Locale; ba
         <Link
           href={backHref}
           className={
-            "text-sm font-medium text-[var(--color-sage-600)] " +
+            // #711: fill the 48px bar so the tap area meets the floor.
+            "inline-flex items-center min-h-12 text-sm font-medium text-[var(--color-sage-600)] " +
             "hover:text-[var(--color-sage-700)] transition-colors rounded " +
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
           }

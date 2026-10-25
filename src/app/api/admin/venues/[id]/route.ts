@@ -121,6 +121,7 @@ import {
   pinWrites,
 } from "@/lib/adminVenueEditSql";
 import type { AdminVenueRow } from "@/types/venue";
+import { RECENT_APPLIED_FOR_VENUE_SQL, resetsForEdit, SWITCH_RESET_INSERT_SQL } from "@/lib/sourceSwitch";
 
 /** Mirrors readOptionalSubmissionId's convention in the sibling create route. */
 function readOptionalProposalId(body: unknown): number | null {
@@ -388,6 +389,21 @@ export async function PATCH(
         )
       : [];
 
+  // The automatic switch (src/lib/sourceSwitch.ts): editing a value a
+  // switchable source's applied change put there restarts that (source,
+  // field) count — this is how an "approve, then fix it" or an undone
+  // automatic change shows up. Read fail-soft: the reset is a side record,
+  // and an edit must never fail because it couldn't be computed.
+  let insertSwitchResets: ReturnType<D1Database["prepare"]>[] = [];
+  try {
+    const recent = await db.prepare(RECENT_APPLIED_FOR_VENUE_SQL).bind(id).all<{ source: string; proposed_diff: string; applied_at: string | null }>();
+    insertSwitchResets = resetsForEdit(existing as unknown as Record<string, unknown>, afterRow as unknown as Record<string, unknown>, recent.results ?? []).map(
+      (r) => db.prepare(SWITCH_RESET_INSERT_SQL).bind(r.source, r.field, id, updatedAt, identity.email, ...dependentGuardArgs),
+    );
+  } catch (err) {
+    console.error("switch reset check failed; edit saved without it", err instanceof Error ? err.message : String(err));
+  }
+
   // Atomic: the update, the box row delete+reinsert (only when relevant —
   // see needsBoxTouch above), its box_events lifecycle row(s) (if any), its
   // own audit trail, and (when present) the originating link_health
@@ -401,6 +417,7 @@ export async function PATCH(
     insertAudit,
     ...(approveProposal !== null ? [approveProposal] : []),
     ...insertPins,
+    ...insertSwitchResets,
   ]);
 
   // #265: the WHERE id = ? AND updated_at = ? precondition is the

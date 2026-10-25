@@ -52,6 +52,11 @@ export const RECENT_APPLIED_FOR_VENUE_SQL =
   `WHERE target_venue_id = ? AND source IN (${SOURCE_IN}) AND change_type = 'update' AND status = 'approved' AND applied_at IS NOT NULL ` +
   "ORDER BY applied_at DESC LIMIT 50";
 
+/** One reset row, behind the PATCH route's usual WHERE EXISTS guard (a stale edit writes no reset). */
+export const SWITCH_RESET_INSERT_SQL =
+  "INSERT INTO source_switch_resets (source, field, venue_id, reset_at, reset_by) SELECT ?, ?, ?, ?, ? " +
+  "WHERE EXISTS (SELECT 1 FROM venues WHERE id = ? AND updated_at = ?)";
+
 export interface SwitchHistoryRow {
   source: string;
   change_type: string;

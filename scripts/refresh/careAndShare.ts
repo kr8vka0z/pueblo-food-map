@@ -33,6 +33,7 @@ import { slotToIsoTimes } from "@/lib/hours";
 import {
   computeDiffHash,
   excludeBlessingBoxes,
+  rejectionKey,
   type CurrentVenueRow,
   type ProposalDraft,
 } from "./diffEngine";
@@ -540,29 +541,41 @@ export function buildCareAndShareProposals(params: CareAndShareBuildParams): Car
 
   for (const [venueId, group] of claimsByVenue) {
     const current = group[0].venue;
-    if (group.length > 1) {
-      // Two listings for one place (Care and Share lists Lynn Gardens twice):
-      // which one is right is a person's call, so no field is diffed.
+    const sortedGroup = [...group].sort((a, b) => a.loc.locationId - b.loc.locationId);
+    let alsoListedAs: number[] | undefined;
+    if (group.length > 1 && group.every((c) => c.kind === "known")) {
+      // Kyle already confirmed every listing as this venue (Care and Share
+      // lists Lynn Gardens twice): read them as one, against the lowest id.
+      alsoListedAs = sortedGroup.slice(1).map((c) => c.loc.locationId);
+    } else if (group.length > 1) {
+      // Several listings look like one place: which is right is a person's
+      // call, so no field is diffed. meta.match carries every unconfirmed
+      // listing id, and approving records them all as this venue, so the
+      // card converges (next run they are all "known") instead of returning.
       stats.duplicates++;
-      const ids = group.map((c) => c.loc.locationId).sort((a, b) => a - b);
+      const ids = sortedGroup.map((c) => c.loc.locationId);
+      const unconfirmed = sortedGroup.filter((c) => c.kind !== "known");
       const meta = {
         locationIds: ids,
         fetched_at: fetchedAt,
-        needs_review: [`Care and Share lists ${group.length} places that look like this one: ${group.map((c) => `"${c.loc.name}" (${c.loc.locationId})`).join(", ")}`],
-        schedule_text: group.map((c) => `${c.loc.name}: ${scheduleText(schedulesById.get(c.loc.locationId) ?? []) || "(no hours listed)"}`).join("\n"),
+        match: {
+          upstream_ids: unconfirmed.map((c) => upstreamIdOf(c.loc)),
+          listings: sortedGroup.map((c) => ({ upstream_id: upstreamIdOf(c.loc), name: c.loc.name, address: casAddress(c.loc), ...c.evidence })),
+        },
+        schedule_text: sortedGroup.map((c) => `${c.loc.name}: ${scheduleText(schedulesById.get(c.loc.locationId) ?? []) || "(no hours listed)"}`).join("\n"),
       };
       proposals.push(dateOnlyShaped(current, today, runId, meta, { duplicates: ids }));
       report.push(`  duplicate listings ${ids.join(", ")} -> ${venueId} (review)`);
       continue;
     }
-    const claim = group[0];
+    const claim = sortedGroup[0];
     if (claim.kind === "ambiguous") stats.ambiguous++;
     else stats.strong++;
     if (claim.kind === "strong") aliasWrites.push({ upstreamId: upstreamIdOf(claim.loc), venueId });
 
     const diff = diffLocation(claim.loc, schedulesById.get(claim.loc.locationId) ?? [], current, today, fetchedAt);
     if (diff.unconvertible) stats.unconvertible++;
-    const meta: Record<string, unknown> = { ...diff.meta };
+    const meta: Record<string, unknown> = { ...diff.meta, ...(alsoListedAs ? { also_listed_as: alsoListedAs } : {}) };
     let hashExtra: Record<string, unknown> | undefined;
     if (claim.kind === "ambiguous") {
       meta.match = { upstream_id: upstreamIdOf(claim.loc), name: claim.loc.name, ...claim.evidence };
@@ -637,6 +650,26 @@ export function buildCareAndShareProposals(params: CareAndShareBuildParams): Car
   }
 
   return { proposals, aliasWrites, stats, report };
+}
+
+/**
+ * Drops a review-only card (no field change; meta.needs_review or
+ * meta.match) whose exact content Kyle already approved — `approvedKeys`
+ * holds (source, target, diff_hash) of human-approved care_and_share rows.
+ * Without this, approving "their schedule says 'And 4 to 6'" would bring
+ * the same card back every Monday, since approval of a review-only card
+ * changes nothing the next diff can see. The hash includes the schedule
+ * text, so a new schedule still comes back. Real field changes are never
+ * dropped here (an approved change no longer differs next week anyway).
+ */
+export function dropAlreadyReviewed(proposals: ProposalDraft[], approvedKeys: ReadonlySet<string>): ProposalDraft[] {
+  return proposals.filter((p) => {
+    const reviewOnly =
+      p.changeType === "update" &&
+      p.proposedDiff.fields_changed.every((f) => f === "last_verified") &&
+      (p.proposedDiff.meta?.needs_review || p.proposedDiff.meta?.match);
+    return !(reviewOnly && approvedKeys.has(rejectionKey(p.source, p.targetVenueId, p.diffHash)));
+  });
 }
 
 /** A proposal with no field change: date-only when meta is plain, a review card when meta carries match/needs_review. */

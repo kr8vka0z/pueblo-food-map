@@ -55,6 +55,21 @@ describe("Care and Share approvals", () => {
     expect(db.prepare("SELECT phone FROM venues WHERE id = 'plentiful-x'").get()).toEqual({ phone: "719-555-0100" });
   });
 
+  test("approving a duplicate-listing card records every listed id as this venue", async () => {
+    const db = buildDb();
+    const row = proposal(db, "plentiful-x", "update", {
+      before: { last_verified: "2026-05-14" },
+      after: { last_verified: "2026-10-26" },
+      fields_changed: ["last_verified"],
+      meta: { match: { upstream_ids: ["cas-7", "cas-8"] } },
+    });
+    expect((await applyApprovedProposal(sqliteD1(db), row, { email: "kyle@example.com" })).ok).toBe(true);
+    expect(db.prepare("SELECT upstream_id FROM venue_id_aliases ORDER BY upstream_id").all()).toEqual([
+      { upstream_id: "cas-7" },
+      { upstream_id: "cas-8" },
+    ]);
+  });
+
   test("approving a Care and Share add creates a 'manual' venue (venues.source_type has no care_and_share)", async () => {
     const db = buildDb();
     const after = { id: "cas-9", name: "New Pantry", category: "pantry", lat: 38.25, lng: -104.6, address: "2 Main St, Pueblo, CO 81003", source: "careandshare.org/findfood", last_verified: "2026-10-26" };

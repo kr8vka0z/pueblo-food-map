@@ -107,7 +107,7 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
 - Guardrails must fail loudly (non-zero exit), never silently do nothing.
 - Date-only updates auto-apply and never touch `venues` (a fetch is not a confirmation; `last_verified` moves only on a human approve or edit). The one other automatic write is the source switch (`src/lib/sourceSwitch.ts`): a `care_and_share` (source, field) pair applies its own plain changes after Kyle approved 5 in a row unedited — never adds, removals, clears, or `needs_review`/unconfirmed-match cards, and it doesn't move `last_verified`. A field the venue told us (a `venue_direct` pin in `venue_observations`) never auto-applies through any lane. `REFRESH_AI_AUTO_APPLY` stays `"false"` until Kyle has checked a watched run's triage lanes against real decisions.
 - **Care and Share is read slowly or not at all** (Kyle): one request every 3.5 s, and any refusal/non-2xx/timeout stops that source for the run with zero writes — never add a retry loop. Never store or log its contact names, emails or phones (`toCasLocation` drops them), and never contact venues.
-- It only proposes changes to `SOURCE_OWNED_FIELDS`, and never to `notes`.
+- It only proposes changes to `SOURCE_OWNED_FIELDS` (Care and Share: address, phone, website, hours — `scripts/refresh/careAndShare.ts`), and never to `notes`.
 - Scraper self-check after touching the hours parser: `python3 scripts/scrape-plentiful.py --self-check` (needs `beautifulsoup4==4.14.3`).
 
 ## Scheduled jobs and observability

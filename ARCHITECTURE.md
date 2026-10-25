@@ -323,7 +323,12 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   match**: a normal proposal with `meta.match`, which approving records as
   the alias (`applyApprovedProposal`). Two listings on one of our venues
   (Care and Share lists Lynn Gardens twice) become one review card with no
-  field diff. A listing with no candidate is an `add` (always Kyle; created
+  field diff, whose `meta.match.upstream_ids` approving records as aliases,
+  after which the listings read as one (diffed against the lowest id). A
+  review-only card (no field change; `match`/`needs_review`) whose exact
+  content Kyle already approved is not re-proposed (`dropAlreadyReviewed`),
+  and rejection memory covers rejects, so neither returns weekly; its hash
+  includes the schedule text, so a new schedule does come back. A listing with no candidate is an `add` (always Kyle; created
   as `source_type` `manual`, because `venues.source_type`'s CHECK has no
   `care_and_share`: `venueSourceTypeFor` in `adminProposals.ts`). Diffs
   compare canonical forms (24h sorted slots, abbreviated street line, phone

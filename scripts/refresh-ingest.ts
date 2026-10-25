@@ -89,7 +89,7 @@ import {
 import { checkUrl } from "./refresh/linkHealth";
 import { buildProposalWriteStatements, type PinRow } from "./refresh/proposalSql";
 import { applyIdAliases, type IdAliasRow } from "./refresh/renamePairs";
-import { buildCareAndShareProposals, CAS_SOURCE, fetchCareAndShare } from "./refresh/careAndShare";
+import { buildCareAndShareProposals, CAS_SOURCE, dropAlreadyReviewed, fetchCareAndShare } from "./refresh/careAndShare";
 import {
   computeSwitchStates,
   SWITCH_HISTORY_SQL,
@@ -500,7 +500,17 @@ async function main(): Promise<void> {
       today,
       fetchedAt: cas.fetchedAt,
     });
-    const casProposals = built.proposals.filter((p) => !rejectedKeys.has(rejectionKey(p.source, p.targetVenueId, p.diffHash)));
+    const approvedCasKeys = new Set(
+      d1Query<RejectedRow>(
+        dbMode,
+        `SELECT source, target_venue_id, diff_hash FROM change_proposals WHERE source = '${CAS_SOURCE}' AND status = 'approved' ` +
+          "AND reviewed_by NOT IN ('refresh-pipeline','refresh-pipeline-ai','refresh-pipeline-auto')",
+      ).map((r) => rejectionKey(r.source as RefreshSource, r.target_venue_id, r.diff_hash)),
+    );
+    const casProposals = dropAlreadyReviewed(
+      built.proposals.filter((p) => !rejectedKeys.has(rejectionKey(p.source, p.targetVenueId, p.diffHash))),
+      approvedCasKeys,
+    );
     console.log(
       `\ncare_and_share: locations=${cas.locations.length} requests=${cas.requests} strong=${built.stats.strong} ` +
         `ambiguous=${built.stats.ambiguous} duplicates=${built.stats.duplicates} adds=${built.stats.adds} ` +

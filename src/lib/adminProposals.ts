@@ -168,10 +168,12 @@ export function renameMetaOf(diff: ProposedDiff | null): { from_id: string; to_i
   return r && typeof r.from_id === "string" && typeof r.to_id === "string" ? { from_id: r.from_id, to_id: r.to_id } : null;
 }
 
-/** `meta.match.upstream_id` on an unconfirmed Care and Share match, or null. */
-export function matchUpstreamIdOf(diff: ProposedDiff | null): string | null {
-  const m = diff?.meta?.match as { upstream_id?: unknown } | undefined;
-  return m && typeof m.upstream_id === "string" ? m.upstream_id : null;
+/** Listing ids an unconfirmed Care and Share match asks about: `meta.match.upstream_id`, or `upstream_ids` for a listed-twice card. */
+export function matchUpstreamIdsOf(diff: ProposedDiff | null): string[] {
+  const m = diff?.meta?.match as { upstream_id?: unknown; upstream_ids?: unknown } | undefined;
+  if (!m) return [];
+  const ids = Array.isArray(m.upstream_ids) ? m.upstream_ids : [m.upstream_id];
+  return ids.filter((id): id is string => typeof id === "string");
 }
 
 /**
@@ -655,11 +657,10 @@ export async function applyApprovedProposal(
   // Same for a Care and Share match the pipeline wasn't sure of
   // (meta.match, scripts/refresh/careAndShare.ts): approving it is the
   // confirmation, so record the listing's id and it never asks again.
-  const matchUpstreamId = changeType === "update" ? matchUpstreamIdOf(diff) : null;
-  const aliasTo = rename?.to_id ?? matchUpstreamId;
-  const extra = aliasTo
-    ? [db.prepare(ALIAS_UPSERT_SQL).bind(proposalRow.source, aliasTo, proposalRow.target_venue_id, timestamp, identity.email)]
-    : [];
+  const aliasIds = changeType !== "update" ? [] : rename ? [rename.to_id] : matchUpstreamIdsOf(diff);
+  const extra = aliasIds.map((upstreamId) =>
+    db.prepare(ALIAS_UPSERT_SQL).bind(proposalRow.source, upstreamId, proposalRow.target_venue_id, timestamp, identity.email),
+  );
 
   const results = await db.batch([venueStmt, insertAudit, approveProposal, ...extra]);
   const approveResult = results[2];

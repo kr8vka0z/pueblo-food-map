@@ -6,9 +6,10 @@ import { describe, expect, test, vi } from "vitest";
 import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { CurrentVenueRow } from "./diffEngine";
+import { rejectionKey, type CurrentVenueRow } from "./diffEngine";
 import {
   buildCareAndShareProposals,
+  dropAlreadyReviewed,
   convertSchedules,
   fetchCareAndShare,
   REQUEST_GAP_MS,
@@ -275,7 +276,24 @@ describe("matching — strong vs ambiguous", () => {
     expect(r.aliasWrites).toEqual([]);
     expect(r.proposals).toHaveLength(1);
     expect(r.proposals[0].proposedDiff.fields_changed).toEqual(["last_verified"]);
-    expect(r.proposals[0].proposedDiff.meta?.needs_review).toBeDefined();
+    // Approving it records every listing as this venue (adminProposals' alias write).
+    expect(r.proposals[0].proposedDiff.meta?.match).toMatchObject({ upstream_ids: ["cas-1", "cas-2"] });
+  });
+
+  test("once both listings are on file they read as one: diffed against the lower id, no review card", () => {
+    const r = build({
+      locations: [loc(), loc({ locationId: 2 })],
+      schedules: [sched(), sched({ locationId: 2, dayOfWeek: 3 })],
+      venues: [venue()],
+      aliases: [
+        { source: "care_and_share", upstream_id: "cas-1", venue_id: "plentiful-praise" },
+        { source: "care_and_share", upstream_id: "cas-2", venue_id: "plentiful-praise" },
+      ],
+    });
+    expect(r.proposals).toHaveLength(1);
+    expect(r.proposals[0].proposedDiff.fields_changed).toEqual(["last_verified"]);
+    expect(r.proposals[0].proposedDiff.meta?.match).toBeUndefined();
+    expect(r.proposals[0].proposedDiff.meta?.also_listed_as).toEqual([2]);
   });
 
   test("no candidate at all -> an 'add' proposal for Kyle", () => {
@@ -340,5 +358,21 @@ describe("diffs for matched venues", () => {
   test("an empty Care and Share phone or website never clears ours", () => {
     const r = build({ locations: [loc({ website: "None" })], schedules: [sched()], venues: [venue({ url: "https://praise.example" })] });
     expect(r.proposals[0].proposedDiff.fields_changed).toEqual(["last_verified"]);
+  });
+});
+
+describe("review cards Kyle already approved don't come back every week", () => {
+  test("an approved schedule-review card with the same content is dropped; a changed schedule comes back", () => {
+    const first = build({ locations: [loc()], schedules: [sched({ notes: "And 4 to 6" })], venues: [venue()] }).proposals;
+    const approved = new Set(first.map((p) => rejectionKey(p.source, p.targetVenueId, p.diffHash)));
+    expect(dropAlreadyReviewed(first, approved)).toEqual([]);
+    const changed = build({ locations: [loc()], schedules: [sched({ notes: "And 5 to 7" })], venues: [venue()] }).proposals;
+    expect(dropAlreadyReviewed(changed, approved)).toHaveLength(1);
+  });
+
+  test("real field changes are never dropped by an earlier approval", () => {
+    const p = build({ locations: [loc()], schedules: [sched({ dayOfWeek: 3 })], venues: [venue()] }).proposals;
+    const approved = new Set(p.map((x) => rejectionKey(x.source, x.targetVenueId, x.diffHash)));
+    expect(dropAlreadyReviewed(p, approved)).toHaveLength(1);
   });
 });

@@ -2,7 +2,7 @@
 /**
  * Route-level tests for POST /api/csp-report (#593 CI-review follow-up —
  * Content-Security-Policy-Report-Only has no observer without somewhere to
- * POST to). Mocks the rate limiter and @opennextjs/cloudflare — same
+ * POST to). Mocks the rate limiter and @/lib/cloudflareContext — same
  * layered-mock convention as the box-photos flag route's own test file.
  */
 
@@ -15,7 +15,7 @@ vi.mock("@/lib/checkinRateLimit", () => ({
 }));
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

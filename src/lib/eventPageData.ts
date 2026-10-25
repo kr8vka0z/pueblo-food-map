@@ -14,7 +14,7 @@
 
 import { cache } from "react";
 import type { Metadata } from "next";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { loadPublicEventById, type PublicEventDetail } from "@/lib/events";
 import { logEventsReadFailure } from "@/lib/logger";
 import { buildPageMetadata } from "@/lib/site";

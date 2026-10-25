@@ -41,7 +41,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { stopSubscriptionByToken } from "@/lib/boxAlerts";
 import { escapeHtml } from "@/lib/emailSend";
 import { t } from "@/lib/i18n";

@@ -1,6 +1,14 @@
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
 
+# vinext's JS and CSS: every file name is a content hash (a changed file gets a new name), so a browser may keep
+# them forever. Only these two folders: HTML, /sw.js and the per-build /_next/static/<build-id>/ manifests stay out.
+/_next/static/chunks/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/_next/static/css/*
+  Cache-Control: public, max-age=31536000, immutable
+
 /data/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 

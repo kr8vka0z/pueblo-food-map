@@ -12,7 +12,7 @@ import type { AdminVenueRow } from "@/types/venue";
 
 const mockGetAdminDb = vi.fn();
 vi.mock("@/lib/adminDb", () => ({ getAdminDb: (...a: unknown[]) => mockGetAdminDb(...a) }));
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: async () => ({ env: { BETTER_AUTH_RP_ID: undefined } }),
 }));
 vi.mock("next/headers", () => ({ headers: vi.fn(async () => ({ get: () => null })) }));

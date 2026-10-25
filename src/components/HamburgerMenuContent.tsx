@@ -29,7 +29,7 @@
  */
 
 import Link from "next/link";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Star, History, Compass } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Star, History, Compass, Heart } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import StyxCredit from "./StyxCredit";
@@ -38,6 +38,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { localizedHref } from "@/lib/localizedHref";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
+import { track, EVENTS } from "@/lib/analytics";
 import type { Venue } from "@/types/venue";
 import { categoryColors } from "@/data/venues";
 import { formatMiles } from "@/lib/distance";
@@ -203,6 +204,39 @@ export default function HamburgerMenuContent({
                 </span>
               </span>
               <ExternalLink size={18} aria-hidden className="shrink-0 text-[var(--color-sage-700)]" />
+            </a>
+            {/* Donate card (#736, mockup approved by Kyle 2026-09-29) — PFP's
+                own donation page, so money, receipts and tax paperwork stay
+                with them. Deliberately quieter than the sponsor card above.
+                Outside role="menu" for the same reason as the sponsor card.
+                A plain <a>: no third-party widget on the low-end-Android budget. */}
+            <a
+              href="https://app.impactgraph.ai/donation-page/12"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="menu-donate"
+              onClick={() => void track(EVENTS.DONATE_CLICKED)}
+              aria-label={`${t("menu.donate", locale)}. ${t("menu.donateSub", locale)} ${t("menu.opensInNewTab", locale)}`}
+              className={
+                "flex items-center gap-3 min-h-12 mx-4 mt-2 mb-1 px-3.5 py-2.5 rounded-[var(--radius-lg)] " +
+                "border border-[var(--color-bone-300)] bg-white " +
+                "hover:border-[var(--color-ink-400)] transition-colors duration-100 " +
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
+                PRESS_FEEDBACK
+              }
+            >
+              <span className="flex items-center justify-center w-8 h-8 shrink-0 rounded-full bg-[var(--color-clay-100)]">
+                <Heart size={16} aria-hidden className="text-[var(--color-clay-500)]" />
+              </span>
+              <span className="flex flex-col flex-1 min-w-0">
+                <span className="text-base font-semibold text-[var(--color-ink-900)]">
+                  {t("menu.donate", locale)}
+                </span>
+                <span className="text-xs text-[var(--color-ink-500)]">
+                  {t("menu.donateSub", locale)}
+                </span>
+              </span>
+              <ExternalLink size={18} aria-hidden className="shrink-0 text-[var(--color-ink-500)]" />
             </a>
             {/* Menu item list */}
             <ul role="menu" aria-label={menuLabel} className="py-2">

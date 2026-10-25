@@ -25,7 +25,7 @@ All work merges to `dev` all week. Saturday night (`release.yml`, Sun 02:00 UTC)
 
 ---
 
-## Hosting and deploys — Cloudflare Workers via OpenNext
+## Hosting and deploys — Cloudflare Workers via vinext
 
 - Prod: https://pueblofoodmap.com/. Staging: https://dev.pueblofoodmap.com/. The direct Worker, which bypasses the CDN, is https://pueblo-food-map.kyle-boyd.workers.dev/.
 - **Deploys go only through GitHub Actions.** A push to `main` runs `deploy-prod.yml`; a push to `dev` runs `deploy-dev.yml`. Never run `wrangler deploy` by hand. Workers Builds must stay disconnected, because reconnecting it double-deploys every push. `deploy-prod.yml` smoke-tests `/`, `/venues`, one `/venue/<id>`, `/es`, `/es/venues`, one `/es/venue/<id>`, the four SEO hubs (`/food-pantries`, `/snap-wic-stores`, `/community-gardens`, `/blessing-boxes`) and their `/es` twins, `/sitemap.xml`, `/robots.txt` and `/llms.txt` (200), the `/es` pages for `<html lang="es">` in the response body, an unmatched URL and an unknown `/event/<id>` and `/es/event/<id>` (all 404, so a missing `events` table can never surface as a 500), and the noindex header policy after each deploy. `deploy-dev.yml` smoke-tests staging the same way (`/`, `/venues`, one `/venue/<id>`, `/es`, `/es/venues`, one `/es/venue/<id>`, `/report/<id>`, `/sitemap.xml` at 200; unmatched page, venue and event URLs at 404; `<html lang="es">`), so a broken staging deploy turns its run red.
@@ -34,13 +34,14 @@ All work merges to `dev` all week. Saturday night (`release.yml`, Sun 02:00 UTC)
 - **Actions policy for `pull_request_target`:** from 2026-11-02 GitHub blocks that event in public repos unless an Actions policy allows it. Repo policy id 6930, "Allow pull_request_target for the two API-only workflows" (Settings → Actions → Policies; REST `repos/kr8vka0z/pueblo-food-map/actions/policies`, header `X-GitHub-Api-Version: 2026-03-10`; created 2026-10-08), covers exactly `dependabot-auto-merge.yml` and `request-review.yml` and allow-lists only `pull_request_target`. Adding another trigger (e.g. `workflow_dispatch`) to either file is blocked until the policy's allowed events change; deleting the policy stops both workflows; a new workflow that needs `pull_request_target` must be added to the policy's file list. It is a repo setting, so it is invisible in diffs.
 - **Rollback (code only):** `bunx wrangler deployments list --name <worker>`, then `bunx wrangler rollback <id> --name <worker> -y`. The worker is `pueblo-food-map` for prod or `pueblo-food-map-staging` for staging. You can also use Dashboard → Workers & Pages → `pueblo-food-map` → Deployments, which also has the build logs. Rollback does not undo D1 migrations, and `main` still holds the bad commit, so follow up with a `git revert` PR into `dev`; it ships in the next release, or as a `hotfix/*` if prod is broken now.
 - **Discoverability / SEO traps — a green build doesn't prove a page works on this stack:**
-  - Static pages with `dynamicParams = false` need `open-next.config.ts`'s `staticAssetsIncrementalCache` override. Without it every prerendered dynamic path 404s; this caused a 10-day outage.
-  - **A `next` or `@opennextjs/cloudflare` bump can 404 every prerendered page with a green build** (2026-10-05: `next` 16.3.8 changed the prerender cache keys and OpenNext 1.20.7 could not read them; 1.20.8 can, and requires `next` 16.3.8 or newer). `ci.yml` runs `scripts/check-prerender-serves.sh` (OpenNext build, local Worker, real requests) so such a bump goes red on its PR. Run it by hand after bumping either package; keep the two in step.
+  - Pages with `generateStaticParams` + `dynamicParams = false` (venue, `/es` venue, report) are not prerendered: vinext renders each on its first request in a Worker and serves it from memory after. Under OpenNext (before vinext, 2026-10) this pairing 404'd every venue in production for 10 days.
+  - **A green build does not prove those pages serve** (OpenNext 404'd them twice with green builds: the outage above, and staging after a 2026-10-05 `next` bump). `ci.yml` runs `scripts/check-pages-serve.sh` (`vite build`, local workerd, real and unknown ids) so a breaking `next` / `vinext` / `vite` bump goes red on its PR. Run it by hand after bumping any of them.
   - Only `pueblofoodmap.com` may be indexed: `custom-worker.ts` noindexes every other host (`src/lib/indexingHost.ts`), and `deploy-prod.yml` fails if the canonical host ever gets the header. Keep venue pages reachable through server-rendered links, not just the sitemap (ARCHITECTURE.md "Crawlability and indexing").
   - Never add a server-side redirect on `/`. Next 16 `proxy.ts` fails the build, and a `next.config` `redirects()` `has` rule 500'd the live homepage. Legacy `?venue=`/`#venue=` links are handled client-side.
 - **`env.staging` inherits almost nothing** from the top level of `wrangler.jsonc`. Every new binding, var or secret needs its staging twin. `triggers` is the exception: it does inherit (see Scheduled jobs).
-- Don't run bare `wrangler types`, which corrupts the DOM types. Use `npx wrangler types --include-runtime=false`.
-- Local preview: `npm run preview` (Worker emulator at http://127.0.0.1:8788).
+- Don't run bare `wrangler types`, which corrupts the DOM types. Use `npm run cf-typegen` (`--include-runtime=false -c wrangler.jsonc`; without `-c`, wrangler follows the build's `.wrangler/deploy/config.json` to the flattened `dist/server/wrangler.json`). `worker-configuration.d.ts` is hand-patched: re-apply its header's patches after regenerating.
+- Local preview: `npm run preview` (`vite build`, then the built Worker in local workerd at http://127.0.0.1:8788, local D1/R2 under `.wrangler/state`). `vite.config.ts` keeps remote bindings off, so nothing local reaches Cloudflare.
+- **One environment per build.** `vite build` reads `wrangler.jsonc` and writes a flattened `dist/server/wrangler.json` for ONE environment (`CLOUDFLARE_ENV=staging` picks staging) plus `.wrangler/deploy/config.json` pointing at it, so `wrangler deploy` takes no `--env`. `wrangler d1 ...` still reads `wrangler.jsonc`.
 
 ## Secrets
 
@@ -48,7 +49,7 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 
 | Secret | Lives in | Gotcha |
 |---|---|---|
-| `NEXT_PUBLIC_MAPBOX_TOKEN`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY` | GitHub Actions secrets | Build-time, inlined by `next build` on the runner. Not a Cloudflare Build variable. |
+| `NEXT_PUBLIC_MAPBOX_TOKEN`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY` | GitHub Actions secrets | Build-time, inlined by `vite build` (vinext) on the runner. Not a Cloudflare Build variable. |
 | `POSTHOG_PROJECT_KEY` (build var `NEXT_PUBLIC_POSTHOG_KEY`) | GitHub Actions secrets | #485. Empty/unset is supported — `src/lib/analytics.ts` never loads posthog-js without a key. |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | GitHub Actions secrets | Deploy workflows. |
 | `CLOUDFLARE_D1_TOKEN` | GitHub Actions secrets | Refresh pipeline only, D1 Write only. Never share it with deploys, because that job parses untrusted HTML. |
@@ -62,8 +63,8 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 | `BETTER_AUTH_SECRET`, `ADMIN_ALLOWLIST` | Worker runtime | See Admin. |
 | `HC_PING_URL` | Worker runtime, **prod only** | Never set it on staging. |
 
-- **Runtime reads:** use `process.env` inside a request. In `scheduled()`, and for any wrangler `var`, read the Cloudflare env **binding**, because OpenNext doesn't populate `process.env` there.
-- **Local dev:** `op run --env-file=.env.local -- npm run dev`. The submit routes throw without `TURNSTILE_SECRET_KEY` and `CHECKIN_RATE_LIMIT_SECRET`.
+- **Runtime reads:** use `process.env` for secrets inside a request. In `scheduled()`, and for any wrangler `var`, read the Cloudflare env **binding** (through `src/lib/cloudflareContext.ts`). Under vinext workerd also mirrors secrets and vars into `process.env` everywhere (`nodejs_compat`, compatibility date after 2025-04-01), but the binding is where vars are defined and the one source `scheduled()` is handed, and the code relies on it (the staging-only `BETTER_AUTH_RP_ID` must never silently read undefined).
+- **Local dev:** `CLOUDFLARE_INCLUDE_PROCESS_ENV=true op run --env-file=.env.local -- npm run dev` (`vite dev` runs the Worker in workerd, which sees shell variables only with that flag; a `.dev.vars` file works too). The submit routes throw without `TURNSTILE_SECRET_KEY` and `CHECKIN_RATE_LIMIT_SECRET`.
 - **Mapbox:** one URL-restricted `pk.*` token covers prod, dev, localhost, and the workers.dev URL. **Never create a second, unrestricted token** for CI or previews; one leaked for 45 days (#304). PR preview subdomains aren't on the allowlist, so demo from prod. The `sk.*` token is for API ops only and never goes in client code. New `pk` tokens can only be made in the Studio dashboard. Rotate: Studio → 1Password → the GitHub Actions secret → redeploy.
 - **Resend rotation:** create a new sending-only key → 1Password → `wrangler secret put` → verify a live form send → revoke the old key.
 
@@ -88,7 +89,7 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 
 1. See what's pending: `npx wrangler d1 migrations list pueblo-food-map-admin --remote`.
 2. **Export first:** `wrangler d1 export pueblo-food-map-admin --remote --output <file>`, saved to `~/Backups/pfm-prod-d1/` on the Mac. A rollback can't undo a migration.
-3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, `0016`, `0017`, and `0019` are not idempotent (they fail with "duplicate column" on a re-run).
+3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, `0016`, `0017`, `0019`, and `0020` are not idempotent (they fail with "duplicate column" on a re-run).
 4. Confirm the Worker has every runtime secret in the table above, then merge the release (the sync back to `dev` is automatic).
 5. If a migration changed published venue fields, the public map only updates at the next admin **Publish**. The Publish bar only shows when `updated_at > published_at`, so data migrations must set `updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')` on the rows they change.
 
@@ -105,8 +106,9 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
 - **`--db-mode remote` is PRODUCTION.**
 - Remote writes are chunked `wrangler d1 execute --command` calls, never `--file`. If a chunk fails partway, recover with a fresh `workflow_dispatch`, not a re-run, because a re-run exits early on the idempotency guard.
 - Guardrails must fail loudly (non-zero exit), never silently do nothing.
-- Only date-only updates auto-apply. `REFRESH_AI_AUTO_APPLY` stays `"false"` until Kyle has checked a watched run's triage lanes against real decisions.
-- It only proposes changes to `SOURCE_OWNED_FIELDS`, and never to `notes`.
+- Date-only updates auto-apply and never touch `venues` (a fetch is not a confirmation; `last_verified` moves only on a human approve or edit). The one other automatic write is the source switch (`src/lib/sourceSwitch.ts`): a `care_and_share` (source, field) pair applies its own plain changes after Kyle approved 5 in a row unedited — never adds, removals, clears, or `needs_review`/unconfirmed-match cards, and it doesn't move `last_verified`. A field the venue told us (a `venue_direct` pin in `venue_observations`) never auto-applies through any lane. `REFRESH_AI_AUTO_APPLY` stays `"false"` until Kyle has checked a watched run's triage lanes against real decisions.
+- **Care and Share is read slowly or not at all** (Kyle): one request every 3.5 s, and any refusal/non-2xx/timeout stops that source for the run with zero writes — never add a retry loop. Never store or log its contact names, emails or phones (`toCasLocation` drops them), and never contact venues.
+- It only proposes changes to `SOURCE_OWNED_FIELDS` (Care and Share: address, phone, website, hours — `scripts/refresh/careAndShare.ts`), and never to `notes`.
 - Scraper self-check after touching the hours parser: `python3 scripts/scrape-plentiful.py --self-check` (needs `beautifulsoup4==4.14.3`).
 
 ## Scheduled jobs and observability
@@ -136,7 +138,7 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
   - **Migration `0018_events` reaches a database before the code that uses it.** Staging gets it from `deploy-dev.yml`; production is the manual step above. Until then `/api/public/events` returns an empty 200, `/api/public/events/[id]` a 404, and the admin Events tab shows "Couldn't load", by design.
   - **"Suggest Spanish"** uses the Workers AI binding `AI` (`wrangler.jsonc`, prod and `env.staging`; no secret). A missing binding is a clean 503, never a crash. Suggestions are machine-made and unreviewed; the form fills only empty Spanish boxes.
   - Times are entered in America/Denver and converted to UTC on the server (`src/lib/eventTime.ts`); never use the browser's timezone for an event.
-  - **Event pages (#762):** `/event/[id]` and `/es/event/[id]` are `force-dynamic` and read D1 per request. Keep them dynamic: events are not in the build snapshot, so the venue pages' `generateStaticParams` + `dynamicParams = false` pattern (and its `open-next.config.ts` trap) would 404 every event. Draft, archived, unknown and unreadable all end in the same `notFound()`. Their JSON-LD (`src/lib/eventSeo.ts`) must carry the Denver offset for that date, and the share image is the flyer, which lives under `/api/`, so `robots.ts` has a narrow Allow for `/api/public/events/*/flyer/`: keep it. `sitemap.ts` is `force-dynamic` only to list upcoming events; its D1 read must stay fail-soft. The card's Share link is the page URL (`eventShareUrl`); `/?event=<id>` is what the page's "Open on the map" button uses. Mechanism: ARCHITECTURE.md "Event page".
+  - **Event pages (#762):** `/event/[id]` and `/es/event/[id]` are `force-dynamic` and read D1 per request. Keep them dynamic: events are not in the build snapshot, so the venue pages' `generateStaticParams` + `dynamicParams = false` pattern would 404 every event. Draft, archived, unknown and unreadable all end in the same `notFound()`. Their JSON-LD (`src/lib/eventSeo.ts`) must carry the Denver offset for that date, and the share image is the flyer, which lives under `/api/`, so `robots.ts` has a narrow Allow for `/api/public/events/*/flyer/`: keep it. `sitemap.ts` is `force-dynamic` only to list upcoming events; its D1 read must stay fail-soft. The card's Share link is the page URL (`eventShareUrl`); `/?event=<id>` is what the page's "Open on the map" button uses. Mechanism: ARCHITECTURE.md "Event page".
 
 ---
 

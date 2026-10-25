@@ -31,7 +31,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { loadApprovedBoxPhotoById } from "@/lib/boxPhotos";
 import { serveFromEdgeCache } from "@/lib/edgeCache";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";

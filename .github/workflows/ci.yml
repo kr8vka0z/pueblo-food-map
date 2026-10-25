@@ -146,7 +146,7 @@ jobs:
       # Skipped for a data-only publish PR like the other code checks.
       - name: Set up Python (scraper self-tests)
         if: steps.detect.outputs.data_only != 'true'
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
@@ -159,8 +159,9 @@ jobs:
 
       - name: Build
         # Always runs, even for a data-only publish PR — proves the
-        # regenerated data file still statically generates every venue page
-        # (opennext/Next static export, #336).
+        # regenerated data file still builds into the Worker bundle
+        # (`vite build`, vinext, #336). The serve check below proves the
+        # venue pages actually answer.
         run: npm run build
         env:
           # Real map token so the Lighthouse job below (which reuses THIS
@@ -175,32 +176,32 @@ jobs:
       - name: Upload build output
         # Shares this one build with the lighthouse job below instead of
         # each workflow running its own `npm run build` (#292 — CI used to
-        # build the app twice per PR). .next/cache is excluded: it only
-        # speeds up a FUTURE `next build`, `next start` never reads it, and
-        # it's usually the bulk of .next's size. include-hidden-files is
-        # REQUIRED: upload-artifact treats any dot-prefixed path as hidden
-        # and silently uploads zero files without it -- .next itself is one
-        # (confirmed: the first version of this step without the flag
-        # uploaded an empty artifact and failed the lighthouse job's
-        # download step).
+        # build the app twice per PR). `vite preview` needs both: dist/
+        # (dist/client assets, dist/server Worker + its flattened
+        # wrangler.json) and .wrangler/deploy/config.json, the pointer the
+        # build writes to that wrangler.json (preview fails with ENOENT
+        # without it). Two paths upload relative to the repo root, so the
+        # download below restores them to `.`. include-hidden-files is
+        # REQUIRED: .wrangler and dist/server/.vite are dot-prefixed, and
+        # upload-artifact silently drops hidden paths without it.
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: nextjs-build
+          name: vite-build
           path: |
-            .next
-            !.next/cache
+            dist
+            .wrangler/deploy/config.json
           include-hidden-files: true
           retention-days: 1
 
-      - name: Prerendered venue pages serve (OpenNext build + local Worker)
-        # `next build` happily lists every /venue/<id> as prerendered while the
-        # Worker 404s them all at request time (next 16.3.8 + OpenNext 1.20.7 did
-        # exactly that on staging after the 2026-10-05 dependency bump). Only requesting the pages
-        # from the real OpenNext bundle proves they work, so a next /
-        # @opennextjs/cloudflare bump that breaks them goes red here, on the PR.
-        # See the script header. Runs AFTER the artifact upload on purpose: it
-        # rebuilds .next, and the lighthouse job must audit the plain `next build`.
-        run: bash scripts/check-prerender-serves.sh
+      - name: Venue pages serve (vite build + local Worker)
+        # A green build does not prove the pages serve: under OpenNext every
+        # /venue/<id> once 404'd at request time while the build listed them
+        # all (the 2026-08 outage, again on staging after the 2026-10-05 bump).
+        # Requesting real and unknown ids from the built Worker in workerd
+        # turns a next / vinext / vite bump that breaks them red here, on the
+        # PR. See the script header. Runs AFTER the artifact upload on purpose:
+        # it rebuilds dist/, and the lighthouse job must audit the build above.
+        run: bash scripts/check-pages-serve.sh
 
   # Was its own workflow (lighthouse.yml) with an independent `npm ci` +
   # `npm run build` of the same commit — doubling the build portion of every
@@ -225,7 +226,7 @@ jobs:
       - name: Set up Node.js
         # 22, not the old lighthouse.yml's 20 — the build artifact below was
         # produced under Node 22 (the `ci` job, matching .node-version), so
-        # `next start` needs a matching node_modules install rather than the
+        # `vite preview` needs a matching node_modules install rather than the
         # pre-existing 20 pin the standalone workflow happened to carry.
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -238,12 +239,15 @@ jobs:
       - name: Download build output
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: nextjs-build
-          path: .next
+          name: vite-build
+          path: .
 
       - name: Start the app and wait until it responds
+        # `vite preview` runs the built Worker in workerd. Port 3000 is
+        # required: it is the only localhost port on the Mapbox token's URL
+        # allowlist, so any other port renders a blank map.
         run: |
-          npm run start &
+          npx vite preview --port 3000 --strictPort &
           # Poll the local server; fail loudly after ~60s instead of letting
           # Lighthouse hit a dead port and report a misleading 404/error.
           for i in $(seq 1 30); do

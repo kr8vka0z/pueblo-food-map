@@ -87,3 +87,16 @@ describe("SOURCE_STALENESS_SQL — real SQLite", () => {
     expect(rows).toEqual([]);
   });
 });
+
+describe("SOURCE_STALENESS_SQL — care_and_share rows count", () => {
+  test("a care_and_share row is reported", () => {
+    const db = buildDb();
+    // 0020 widened change_proposals.source (it copies 0016's triage columns).
+    for (const m of ["0016_proposal_triage.sql", "0020_proposal_sources.sql"]) {
+      db.exec(readFileSync(join(process.cwd(), "migrations", m), "utf-8"));
+    }
+    insertProposal(db, { source: "care_and_share", createdAt: "2026-10-26T00:00:00.000Z" });
+    const rows = db.prepare(SOURCE_STALENESS_SQL).all() as Array<{ source: string }>;
+    expect(rows.map((r) => r.source)).toEqual(["care_and_share"]);
+  });
+});

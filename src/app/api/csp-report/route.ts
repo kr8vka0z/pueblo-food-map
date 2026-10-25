@@ -49,7 +49,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { logCspViolation } from "@/lib/logger";
 import { requestIp } from "@/lib/publicRequest";

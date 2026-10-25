@@ -39,7 +39,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { loadApprovedBoxPhotoById } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";

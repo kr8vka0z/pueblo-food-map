@@ -86,7 +86,7 @@
  */
 
 import { headers } from "next/headers";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { getAdminDb } from "@/lib/adminDb";
 import { handlePageAuthError } from "@/lib/adminAuthErrors";
 import { summarizePublishChanges, displayStatusOf, type AdminDisplayStatus } from "@/lib/adminVenues";
@@ -97,6 +97,7 @@ import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@
 import { parseSubmissionRow, type PublicSubmissionRow, type ReviewItem, type ReviewSubmission } from "@/lib/publicSubmissions";
 import VenueListView from "@/components/VenueListView";
 import ToReviewSummaryBox from "@/components/ToReviewSummaryBox";
+import SourceSwitchPanel from "@/components/SourceSwitchPanel";
 import PublishPanel from "@/components/PublishPanel";
 import AdminNav from "@/components/AdminNav";
 import type { AdminVenueRow } from "@/types/venue";
@@ -193,6 +194,7 @@ export default async function PlacesPage({
       <AdminNav email={email} active="places" counts={navCounts} showActivity={showActivity} />
       <div className="px-4 py-6 sm:px-6">
         <ToReviewSummaryBox reviewRowCount={reviewRowCount} proposals={proposals} submissionCount={submissions.length} />
+        <SourceSwitchPanel />
         {isStaging ? (
           // #673 pt.6: staging can never Publish (isProductionWorker() is
           // false there) — a Publish panel that always no-ops, next to

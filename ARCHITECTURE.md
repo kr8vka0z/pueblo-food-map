@@ -238,10 +238,15 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   clearing it) and normalized for equality (sorted keys, slots and entries)
   so a re-scrape of an unchanged schedule proposes nothing.
 - **Freshness:** a venue whose source-owned fields are unchanged still gets a
-  `last_verified` refresh (unless already stamped today). That exact
-  "date-only" shape **auto-applies** (Kyle, 2026-09-15): `proposalSql.ts`'s
-  `buildProposalWriteStatements()` writes the `venues.last_verified` UPDATE,
-  an `audit_log` row, and an already-`approved` proposal row. It uses the
+  "date-only" proposal (unless already stamped today). It needs no click
+  (Kyle, 2026-09-15), and since the Venue Data Rebuild step 1 (2026-10-25)
+  it **no longer moves `venues.last_verified`**: a download is not a
+  confirmation. `proposalSql.ts`'s `buildProposalWriteStatements()` writes a
+  `listed` fetch row to `venue_observations` (migration `0021`) and an
+  already-`approved` proposal row with `applied_at` NULL (kept because
+  `refreshAlerts.ts`'s staleness check reads it); no `venues` or `audit_log`
+  write. `last_verified` now moves only when a person approves a real change
+  or edits the venue. It uses the
   same `isDateOnlyUpdateProposal()` predicate as the Places tab's
   `ToReviewSummaryBox`'s bulk-approve (`src/lib/adminProposals.ts` — #674
   folded the standalone `/admin/flags` queue that used to own this button
@@ -270,6 +275,95 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   line are in `scripts/refresh-ingest.ts`; `JEV_API_KEY` is in AGENTS.md
   "Secrets"; the `REFRESH_AI_AUTO_APPLY` rule is in AGENTS.md "Automated
   venue-refresh pipeline".
+- **Observations and venue pins (Venue Data Rebuild step 1).**
+  `venue_observations` (migration `0021`) records what a source said about one
+  field of one venue and when, apart from the published record: fetch rows
+  from the refresh job, and **pins** — source `venue_direct`, written when an
+  admin saves the edit form with "The venue told us" ticked (PATCH
+  `/api/admin/venues/[id]`, `pinWrites` in `adminVenueEditSql.ts`: the
+  hours/contact fields the save changed, or every filled one if none did;
+  never for blessing boxes). The newest pin per (venue, field) is live. A
+  refresh proposal touching a pinned field never auto-applies through any
+  lane (checked first in `buildProposalWriteStatements`) and carries the pin
+  in `proposed_diff.meta.pins` (with `age_days` and `stale` past 12 months),
+  which `ProposalCard.tsx` shows beside the change. Rejecting it once
+  silences it: rejection memory keys on `diff_hash`, which ignores `meta`.
+  Friendly Harbor's hours are pinned by the migration itself. Migration `0020`
+  widened `change_proposals.source` for the rebuild's new sources
+  (`care_and_share`, `website`, `usda_snap`, `cdphe_wic`); `venues.source_type`
+  is unchanged until a new source creates venues. `0022` loaded the
+  2026-10-25 hand-checked fixes as pending `website` proposals (`meta` holds
+  `source_url` and `summary`; `notes` is appliable for `website` proposals only).
+- **Care and Share reader (Venue Data Rebuild step 2,
+  `scripts/refresh/careAndShare.ts`).** Care and Share is the named authority
+  for hours, address, phone and website of its partner pantries and meal
+  sites. `fetchCareAndShare` pages the Vivery "AccessFood" JSON behind
+  careandshare.org/findfood (`LocationSearch` from the Pueblo County box's
+  centre, radius to its corners, kept to the real county outline
+  `public/data/pueblo-county-boundary.geojson` by point-in-polygon; then
+  `LocationSchedules`),
+  one request every 3.5 s. Any refusal, non-2xx, timeout, bad JSON or zero
+  in-county result stops the source for that run: nothing from it is
+  written and the job fails loudly; a missing listing never reads as a
+  closure, and venues Care and Share doesn't list get nothing. Contact
+  names/emails/phones are dropped at the parse boundary (`toCasLocation`'s
+  field allowlist), so they reach no proposal, cache or log.
+  `convertSchedules` turns Vivery rows (`dayOfWeek` 1 = Sunday; `daysOfMonth`
+  "3rd" = a `monthly_ordinal`) into `hours_weekly`/`hours_irregular`, or
+  refuses on anything it can't express exactly (a free-text note such as
+  "And 4 to 6", every-other-week, `weeksOfMonth`, "call for hours"): then no
+  hours change is proposed, the raw schedule text goes in `meta.schedule_text`
+  and `meta.needs_review`, and the card always reads "needs a human".
+  Matching runs only over our `pantry`/`meal_site` rows of any
+  `source_type` (blessing boxes stripped by `excludeBlessingBoxes`): an alias
+  on file or our venue with id `cas-<locationId>` first; then **strong** =
+  name overlap ≥ 0.75, within 150 m, AND the same phone (renamePairs'
+  `haversineDistanceKm`/`normalizedPhoneTail`), or — when Care and Share's
+  listing has no phone at all — an identical name (1.0) within 150 m,
+  unless our address is a venue pin. A strong match **writes
+  `venue_id_aliases` itself** (`created_by` `refresh-pipeline`) — until this
+  step aliases were only written on a human approval (migration `0016`'s
+  comment predates this). That run's proposal carries `meta.new_alias`:
+  the switch never applies it, the card says "New link", and rejecting it
+  deletes the alias (trigger `trg_reject_undoes_new_alias`, migration
+  `0024`; a future rebuild of `change_proposals` must re-create it), and
+  that listing→venue pair is never auto-linked again (`REJECTED_LINKS_SQL`;
+  the listing drops out rather than coming back as an add). Anything weaker but close is an **unconfirmed
+  match**: a normal proposal with `meta.match`, which approving records as
+  the alias (`applyApprovedProposal`). Two listings on one of our venues
+  (Care and Share lists Lynn Gardens twice) become one review card with no
+  field diff, whose `meta.match.upstream_ids` approving records as aliases,
+  after which the listings read as one (diffed against the lowest id's
+  address/phone/website, with every listing's schedule rows merged). A
+  review-only card (no field change; `match`/`needs_review`) whose exact
+  content Kyle already approved is not re-proposed (`dropAlreadyReviewed`),
+  and rejection memory covers rejects, so neither returns weekly; its hash
+  includes the schedule text, so a new schedule does come back. A listing with no candidate is an `add` (always Kyle; created
+  as `source_type` `manual`, because `venues.source_type`'s CHECK has no
+  `care_and_share`: `venueSourceTypeFor` in `adminProposals.ts`). Diffs
+  compare canonical forms (24h sorted slots, abbreviated street line, phone
+  digits, bare host+path), and an empty field on their side never clears
+  ours. Identical = the date-only "still listed" path. Watch it without
+  writing: `--only care_and_share --dry-run` (scripts/README.md).
+- **The automatic switch (`src/lib/sourceSwitch.ts`, migration `0023`).**
+  Per (source, field), counted from `change_proposals` history: each
+  human-approved update that applied something adds one per field;
+  a rejection, or a `source_switch_resets` row, restarts it; automatic rows
+  (pipeline actors, or approved with nothing applied) neither count nor
+  break. A reset is written by PATCH `/api/admin/venues/[id]` when an edit
+  changes a field whose current value is exactly what that source's newest
+  applied change wrote (`resetsForEdit`): that is how "approve, then fix
+  it" and undoing an automatic change show up, since Approve itself applies
+  unedited. At 5 the pair is on, and `proposalSql.ts`'s switch lane applies
+  a plain update whose every field is switched on — never an add, remove,
+  clear, rename, unconfirmed match, `needs_review` card, or pinned field
+  (pins are checked first) — under `refresh-pipeline-auto`, with an
+  `audit_log` row and an accepted `venue_observations` row per field, and
+  **without** moving `last_verified`. Only `care_and_share` is switchable
+  for now (`SWITCH_SOURCES`): Plentiful/OSM are narrowed in step 5 and the
+  website reader is step 3. The review queue shows each pair's count via
+  `SourceSwitchPanel` (`GET /api/admin/source-switch`, a separate fetch so
+  the Places page's own reads stay one parallel batch).
 - **`linkHealth.ts`** checks each stored `url` (HEAD, falling back to GET)
   and proposes clearing it only on 404/410 — never on 403 (often a bot-block
   of the checker), 429, 5xx or timeout, which are logged only.
@@ -311,10 +405,10 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
 
 ## Scheduled jobs
 
-`custom-worker.ts` wraps the OpenNext fetch handler and adds `scheduled()`,
+`custom-worker.ts` wraps vinext's fetch handler and adds `scheduled()`,
 driven by one prod-only 5-minute cron. All the branching lives in
 `src/lib/scheduledTasks.ts`'s `runScheduledTasks` (testable, unlike
-`custom-worker.ts`, which imports build output — see that file's header):
+`custom-worker.ts`, which imports a Vite virtual module — see that file's header):
 
 - **Heartbeat** — pings Healthchecks.io every tick (a dead-man's switch:
   Healthchecks.io alerts when the pings stop).
@@ -653,8 +747,7 @@ rank for the queries people type ("food pantry Pueblo", "SNAP stores Pueblo").
   map link (never "0 boxes"), no JSON-LD, and the metadata adds
   `robots: { index: false, follow: true }`. Each box links to the map card at
   `/?venue=<id>` (`/es?venue=<id>`). Read-only per REVIEW.md: no check-in,
-  photo, adopt or alert controls. No page caching (OpenNext's incremental cache
-  can't revalidate); the cost is 2 D1 reads (~30 box rows, then their check-ins) per page
+  photo, adopt or alert controls. No page caching (`force-dynamic`); the cost is 2 D1 reads (~30 box rows, then their check-ins) per page
   view, and the upgrade path is an edge-cached read like `src/lib/edgeCache.ts`.
 
 ## Form-route triad
@@ -759,11 +852,17 @@ See [AGENTS.md](AGENTS.md) for rotation procedure and URL restrictions.
 
 ---
 
-## Hosting — Cloudflare Workers via OpenNext
+## Hosting — Cloudflare Workers via vinext
 
-The app is a Next.js App Router project compiled for Cloudflare Workers by
-`@opennextjs/cloudflare` (`open-next.config.ts`). It moved off Vercel in May
-2026 (#42/#53); the reason isn't recorded.
+The app is a Next.js App Router project built for Cloudflare Workers by
+vinext (Cloudflare's Next.js API on Vite): `vite build` with `vite.config.ts`
+(vinext + `@cloudflare/vite-plugin`) writes the Worker to `dist/server` and the
+public assets to `dist/client`, and `custom-worker.ts` wraps vinext's handler.
+Nothing is prerendered at build time; `generateStaticParams` pages render on
+first request per Worker instance and are then served from memory. Bindings
+come from `cloudflare:workers` through `src/lib/cloudflareContext.ts`. It moved
+off Vercel in May 2026 (#42/#53; the reason isn't recorded) and from OpenNext
+(`@opennextjs/cloudflare`) to vinext in October 2026.
 
 **Deploys run through GitHub Actions only.** Workers Builds is disconnected
 (`deploy-prod.yml`'s header explains why the two must never run together).
@@ -874,7 +973,7 @@ connection — minus the map itself (Mapbox tiles are out of scope).
 - `src/components/ServiceWorkerRegister.tsx` (mounted in `layout.tsx`) —
   registers `/sw.js` in production builds only, after `load` and then browser
   idle, so it never competes with first paint. In dev it unregisters any
-  worker left over from a local `next start`.
+  worker left over from a local `vite preview`.
 - Offline notice — `useMapUI`'s map-unavailable fallback (#165) now carries a
   reason. WebGL missing → "Map unavailable" (unchanged). WebGL fine but
   `navigator.onLine` false at mount → list view with "Map needs a connection.
@@ -1340,8 +1439,7 @@ list it as an event and a shared link previews the flyer.
   prerender and a cancel or edit must show without a rebuild). No Cache-Control is
   added (neither does `/box/[id]`): Next sends `private, no-cache, no-store`, so an
   edit, a cancel, and a not-found are current on the next request. The
-  `generateStaticParams` + `dynamicParams = false` pairing and its `open-next.config.ts`
-  trap (AGENTS.md) do not apply.
+  `generateStaticParams` + `dynamicParams = false` pairing (AGENTS.md) does not apply.
 - **Thin page files over shared code.** Both `page.tsx` files call
   `src/lib/eventPageData.ts` (`loadEventForPage`, React `cache()` so metadata and
   body share one read; `eventPageMetadata(id, locale)`) and render

@@ -55,12 +55,13 @@ cp package-lock.json "$tmp/after.json"
 
 # Booleans are the strings true/false, run as commands. `named` exits non-zero when npm audit fails
 # without naming a high or critical package (registry down?): a red run, not a finding.
-gate() { npm audit --audit-level=high --omit=dev; }
+# Both go through audit-prod.mjs, the same gate CI runs (its ignore list of build-only advisories included),
+# so this job never disagrees with the required check.
+audit_prod="$(cd "$(dirname "$0")" && pwd)/audit-prod.mjs"
+gate() { node "$audit_prod" > /dev/null; }
 named() {
-  npm audit --omit=dev --json > "$tmp/audit.json" || true
   local l
-  l=$(jq -r '.vulnerabilities // {} | .[] | select(.severity == "high" or .severity == "critical")
-    | "- \(.name) (\(.severity)): " + ([.via[]? | select(type == "object") | .url] | unique | join(", "))' "$tmp/audit.json")
+  l=$(node "$audit_prod") || true
   [ -n "$l" ] || { echo "npm audit failed without naming a high or critical package" >&2; exit 1; }
   printf '%s' "$l"
 }

@@ -12,7 +12,7 @@ import { NextRequest } from "next/server";
 import type { ActivityPage } from "@/lib/boxActivity";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

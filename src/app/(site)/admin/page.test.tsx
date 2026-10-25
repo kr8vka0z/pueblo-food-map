@@ -37,7 +37,7 @@ vi.mock("@/lib/adminDb", () => ({
 // default that file uses; the dedicated staging behavior is unit-tested at
 // isProductionWorker()'s own call sites, not re-proven here.
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

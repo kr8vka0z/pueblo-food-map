@@ -238,10 +238,15 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   clearing it) and normalized for equality (sorted keys, slots and entries)
   so a re-scrape of an unchanged schedule proposes nothing.
 - **Freshness:** a venue whose source-owned fields are unchanged still gets a
-  `last_verified` refresh (unless already stamped today). That exact
-  "date-only" shape **auto-applies** (Kyle, 2026-09-15): `proposalSql.ts`'s
-  `buildProposalWriteStatements()` writes the `venues.last_verified` UPDATE,
-  an `audit_log` row, and an already-`approved` proposal row. It uses the
+  "date-only" proposal (unless already stamped today). It needs no click
+  (Kyle, 2026-09-15), and since the Venue Data Rebuild step 1 (2026-10-25)
+  it **no longer moves `venues.last_verified`**: a download is not a
+  confirmation. `proposalSql.ts`'s `buildProposalWriteStatements()` writes a
+  `listed` fetch row to `venue_observations` (migration `0021`) and an
+  already-`approved` proposal row with `applied_at` NULL (kept because
+  `refreshAlerts.ts`'s staleness check reads it); no `venues` or `audit_log`
+  write. `last_verified` now moves only when a person approves a real change
+  or edits the venue. It uses the
   same `isDateOnlyUpdateProposal()` predicate as the Places tab's
   `ToReviewSummaryBox`'s bulk-approve (`src/lib/adminProposals.ts` — #674
   folded the standalone `/admin/flags` queue that used to own this button
@@ -270,6 +275,25 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   line are in `scripts/refresh-ingest.ts`; `JEV_API_KEY` is in AGENTS.md
   "Secrets"; the `REFRESH_AI_AUTO_APPLY` rule is in AGENTS.md "Automated
   venue-refresh pipeline".
+- **Observations and venue pins (Venue Data Rebuild step 1).**
+  `venue_observations` (migration `0021`) records what a source said about one
+  field of one venue and when, apart from the published record: fetch rows
+  from the refresh job, and **pins** — source `venue_direct`, written when an
+  admin saves the edit form with "The venue told us" ticked (PATCH
+  `/api/admin/venues/[id]`, `pinWrites` in `adminVenueEditSql.ts`: the
+  hours/contact fields the save changed, or every filled one if none did;
+  never for blessing boxes). The newest pin per (venue, field) is live. A
+  refresh proposal touching a pinned field never auto-applies through any
+  lane (checked first in `buildProposalWriteStatements`) and carries the pin
+  in `proposed_diff.meta.pins` (with `age_days` and `stale` past 12 months),
+  which `ProposalCard.tsx` shows beside the change. Rejecting it once
+  silences it: rejection memory keys on `diff_hash`, which ignores `meta`.
+  Friendly Harbor's hours are pinned by the migration itself. Migration `0020`
+  widened `change_proposals.source` for the rebuild's new sources
+  (`care_and_share`, `website`, `usda_snap`, `cdphe_wic`); `venues.source_type`
+  is unchanged until a new source creates venues. `0022` loaded the
+  2026-10-25 hand-checked fixes as pending `website` proposals (`meta` holds
+  `source_url` and `summary`; `notes` is appliable for `website` proposals only).
 - **`linkHealth.ts`** checks each stored `url` (HEAD, falling back to GET)
   and proposes clearing it only on 404/410 — never on 403 (often a bot-block
   of the checker), 429, 5xx or timeout, which are logged only.

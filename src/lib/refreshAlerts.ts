@@ -15,10 +15,11 @@
  * WHY no new migration/table for staleness: every successful, non-aborted
  * refresh run for a source writes at least one change_proposals row for
  * that source — an unchanged, still-present venue still gets a pure
- * last_verified freshness-bump proposal every run
- * (scripts/refresh/diffEngine.ts's `else if (current.last_verified !==
- * today)` branch), auto-applied and written as an already-'approved' row
- * (scripts/refresh/proposalSql.ts) — so MAX(created_at) per source IS
+ * "still listed" proposal every run (scripts/refresh/diffEngine.ts's
+ * `else if (current.last_verified !== today)` branch), written as an
+ * already-'approved' row (scripts/refresh/proposalSql.ts; since the Venue
+ * Data Rebuild step 1 it no longer bumps venues.last_verified, but the row
+ * is still written for exactly this check) — so MAX(created_at) per source IS
  * "when this source last completed a run that wrote anything," and a
  * zero-record or abnormal-drop abort (diffEngine.ts's own guardrails)
  * writes NOTHING for that source, which is exactly the silence this alert

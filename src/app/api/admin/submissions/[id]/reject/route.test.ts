@@ -4,7 +4,7 @@
  *
  * Same full-stack pattern as the sibling venues/archive route's own test
  * file (src/app/api/admin/venues/[id]/archive/route.test.ts): mocks
- * @opennextjs/cloudflare for a fake D1 binding and requireAdminSession()
+ * @/lib/cloudflareContext for a fake D1 binding and requireAdminSession()
  * (src/lib/adminSession.ts, the sole identity check post
  * Better-Auth-sole-gate cutover — auth/betterauth-sole-gate) as a
  * controllable mock. Unlike the venue mutation routes, this one has no
@@ -22,7 +22,7 @@ const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 const SUBMISSION_ID = 42;
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

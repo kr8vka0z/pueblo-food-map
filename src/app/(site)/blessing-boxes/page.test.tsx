@@ -10,7 +10,7 @@ import { render, screen } from "@testing-library/react";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

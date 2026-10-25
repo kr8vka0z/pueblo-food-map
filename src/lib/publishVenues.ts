@@ -534,8 +534,8 @@ export async function promotePublishedDrafts(
  * True only on the production Worker. `BETTER_AUTH_RP_ID` is the app's
  * existing staging-only signal (#318 passkey isolation) — set via
  * `wrangler.jsonc`'s `env.staging.vars`, absent on production, read via the
- * Cloudflare env BINDING (never `process.env` — a wrangler `var` isn't
- * guaranteed to surface into `process.env` under OpenNext, see auth.ts).
+ * Cloudflare env BINDING (never `process.env` — the binding is where a
+ * wrangler `var` is defined to live, see auth.ts).
  * Reused here rather than hostname sniffing or a second staging-only var:
  * it's the one config value that already tells staging and prod apart.
  *

@@ -5,9 +5,9 @@
 # "Hosting and deploys".
 #
 # Deploys the TOP-LEVEL wrangler.jsonc config (prod worker `pueblo-food-map`,
-# route pueblofoodmap.com) via opennextjs-cloudflare build + deploy (no
-# --env). A functional superset of a bare `npx wrangler deploy` (adds
-# OpenNext's cache-populate step). Gated by lint, design:drift and typecheck
+# route pueblofoodmap.com) via `vite build` (vinext), which flattens the
+# top-level config into dist/server/wrangler.json, then a plain
+# `npx wrangler deploy` (no --env). Gated by lint, design:drift and typecheck
 # here; the full test suite already ran as the PR's required ci.yml check.
 # Mirrors deploy-dev.yml's structure and pinned-action SHAs so prod and dev
 # stay easy to diff against each other.
@@ -16,7 +16,7 @@
 # run separately before the release merge (AGENTS.md "Promotion checklist —
 # D1 migrations"); this workflow deliberately has no migration step.
 #
-# Build-time NEXT_PUBLIC_* vars: `next build` inlines these into the client
+# Build-time NEXT_PUBLIC_* vars: `vite build` (vinext) inlines these into the client
 # bundle at BUILD time, not runtime, and the build runs on the GitHub runner,
 # so the values must be GitHub Actions secrets (AGENTS.md "Secrets"), or the
 # deployed bundle ships with an undefined Mapbox token (blank "not
@@ -56,7 +56,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      # Consumed by `next build` inside `npx opennextjs-cloudflare build` below — see the
+      # Consumed by `vite build` below (vinext inlines NEXT_PUBLIC_*) — see the
       # file-header comment on why these must be GH secrets now.
       NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
@@ -89,10 +89,12 @@ jobs:
       # (ci.yml, full suite) passed — ruleset 17480895. Re-running it cost ~3
       # min per deploy and let a flaky test block an already-green change.
       - run: npm run lint && npm run design:drift && npm run typecheck
-      # No --env: resolves the top-level wrangler.jsonc config (prod worker
-      # `pueblo-food-map`, route pueblofoodmap.com). Do not add --env here.
-      - run: npx opennextjs-cloudflare build
-      - run: npx opennextjs-cloudflare deploy
+      # No CLOUDFLARE_ENV: the build flattens the top-level wrangler.jsonc config
+      # (prod worker `pueblo-food-map`, route pueblofoodmap.com) into
+      # dist/server/wrangler.json, and `wrangler deploy` finds it through
+      # .wrangler/deploy/config.json. Do not add --env or CLOUDFLARE_ENV here.
+      - run: npx vite build
+      - run: npx wrangler deploy
       # Post-deploy smoke check, because a green build / CF-check does NOT
       # prove the page works on this stack (a `redirects()` rule that built
       # clean and passed CI 500'd the live homepage; AGENTS.md "Hosting and
@@ -115,10 +117,10 @@ jobs:
           # version serving. Its first run (2026-09-03) went red against a
           # deployment that was in fact correct: `/` and `/venues` answered 200
           # while `/venue/<id>` still 404'd, and the same URL served 200 a couple
-          # of minutes later with nothing redeployed in between. Static assets —
-          # which is where the prerendered venue pages now live, see
-          # open-next.config.ts — become reachable slightly after the Worker
-          # itself does. Without a retry this step reports every good deploy as a
+          # of minutes later with nothing redeployed in between (then on OpenNext,
+          # whose prerendered pages lived in static assets; venue pages now
+          # render in the Worker on first request, but a fresh deployment still
+          # takes a moment to reach every location). Without a retry this step reports every good deploy as a
           # failure, and a check that cries wolf gets deleted, taking the real
           # signal with it.
           #
@@ -137,7 +139,7 @@ jobs:
           # tree (a 200 alone would also pass if they quietly served English).
           # SEO Phase 3 (#709): the three hub pages join, EN + ES. They are
           # plain static routes, and a 200 here proves the deploy shipped them
-          # (static assets can lag the Worker, hence the retry loop below).
+          # (a new deployment can lag, hence the retry loop below).
           # PR B adds /blessing-boxes (+ /es): that one is dynamic (D1 read),
           # and a D1 failure still answers 200 (degraded page, noindex), so a
           # 200 proves the route deployed, not that D1 is healthy.

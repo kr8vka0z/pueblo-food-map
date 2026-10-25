@@ -15,7 +15,7 @@
  */
 
 import { betterAuth } from "better-auth";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { buildAuthOptions } from "./auth-options";
 
 // WHY a named function instead of inlining `betterAuth(buildAuthOptions(db))`
@@ -54,9 +54,9 @@ export async function getAuth(): Promise<Auth> {
   if (cached) return cached;
   const { env } = await getCloudflareContext({ async: true });
   // #318 passkey isolation — read from the Cloudflare env BINDING, not
-  // process.env: a wrangler `var` isn't guaranteed to surface in
-  // process.env under OpenNext, and a silently-undefined override here
-  // would break staging passkey isolation without erroring. env.BETTER_AUTH_RP_ID
+  // process.env: the binding is where wrangler `var`s are defined to live
+  // (process.env is only workerd's mirror of it), and a silently-undefined
+  // override here would break staging passkey isolation without erroring. env.BETTER_AUTH_RP_ID
   // is undefined on prod (buildAuthOptions defaults to "pueblofoodmap.com")
   // and set to "dev.pueblofoodmap.com" only via wrangler.jsonc's
   // env.staging.vars.

@@ -12,7 +12,7 @@
  *
  * ponytail: 2 D1 reads per page view (~30 box rows, then their check-ins for
  * status; loadLiveBoxesForHub skips the photo/adopter/needs reads), no page
- * caching (OpenNext's staticAssetsIncrementalCache can't revalidate).
+ * caching (force-dynamic, so every view reads D1).
  * Ceiling: traffic. Upgrade path: an edge-cached read like src/lib/edgeCache.ts
  * does for the public API route.
  */
@@ -21,7 +21,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { t, type Locale } from "@/lib/i18n";
 import { buildPageMetadata } from "@/lib/site";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { loadLiveBoxesForHub, type PublicBlessingBox } from "@/lib/blessingBoxes";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
 

@@ -207,7 +207,7 @@ the #689 `[CHECK]` review list. Follow-up: footer tap targets (#711).
 
 Static, server-rendered, `buildPageMetadata`, ItemList JSON-LD, a short FAQ,
 linked from `/venues`, the footer and the `/` nav block, and in the sitemap.
-Verify each on staging (the `staticAssetsIncrementalCache` trap).
+Verify each on staging (a green build doesn't prove a page serves).
 
 1. **`/food-pantries`**: all pantries with the day/time summary from Phase 2,
    and a "how pantries work" FAQ. This is the page meant to beat feedam.org.
@@ -302,8 +302,8 @@ doing the outreach.
 ## 5. Guardrails (from AGENTS.md / ARCHITECTURE.md / REVIEW.md)
 
 - `buildPageMetadata` for every page; `serializeJsonLd` for every JSON-LD block.
-- New static dynamic-route pages depend on `staticAssetsIncrementalCache`.
-  Verify on staging, and add to the `deploy-prod.yml` smoke test.
+- New `generateStaticParams` pages: verify on staging (a green build doesn't
+  prove they serve), and add to the `deploy-prod.yml` smoke test.
 - No server-side redirect on `/`.
 - The non-prod `noindex` must be host-checked and smoke-tested on prod; getting
   it wrong deindexes the site.

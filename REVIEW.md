@@ -58,5 +58,5 @@ rationale in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Skip
 
-Generated files, lockfiles, `.open-next/`, anything CI already enforces (lint, types,
+Generated files, lockfiles, `dist/`, anything CI already enforces (lint, types,
 format), `migrations/` files that are already applied (immutable history).

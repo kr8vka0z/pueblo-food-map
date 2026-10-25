@@ -70,7 +70,8 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { Venue } from "@/types/venue";
 import {
@@ -92,6 +93,9 @@ import { applyIdAliases, type IdAliasRow } from "./refresh/renamePairs";
 import { chunkSqlStatements } from "./refresh/sqlChunks";
 import { createTriageSession, runTriagePass, USD_PER_INPUT_TOKEN } from "./refresh/triage";
 
+// WHY import.meta.url: package.json is `"type": "module"` (vinext), so tsx runs this as ESM, where `__dirname` is
+// undefined. Same pattern as the other seed/load scripts.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..");
 // wrangler.jsonc's two D1 bindings, keyed by --db-mode. `local` and `remote`
 // are the SAME database name (top-level d1_databases[0]) differing only by

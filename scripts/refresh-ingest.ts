@@ -89,7 +89,14 @@ import {
 import { checkUrl } from "./refresh/linkHealth";
 import { buildProposalWriteStatements, type PinRow } from "./refresh/proposalSql";
 import { applyIdAliases, type IdAliasRow } from "./refresh/renamePairs";
-import { buildCareAndShareProposals, CAS_SOURCE, dropAlreadyReviewed, fetchCareAndShare } from "./refresh/careAndShare";
+import {
+  buildCareAndShareProposals,
+  CAS_SOURCE,
+  dropAlreadyReviewed,
+  fetchCareAndShare,
+  REJECTED_LINKS_SQL,
+  rejectedLinkKey,
+} from "./refresh/careAndShare";
 import {
   computeSwitchStates,
   SWITCH_HISTORY_SQL,
@@ -499,6 +506,11 @@ async function main(): Promise<void> {
       runId,
       today,
       fetchedAt: cas.fetchedAt,
+      rejectedLinks: new Set(
+        d1Query<{ target_venue_id: string; upstream_id: string }>(dbMode, REJECTED_LINKS_SQL).map((r) =>
+          rejectedLinkKey(r.upstream_id, r.target_venue_id),
+        ),
+      ),
       addressPinnedVenueIds: new Set(pins.filter((pin) => pin.field === "address").map((pin) => pin.venue_id)),
     });
     const approvedCasKeys = new Set(

@@ -326,7 +326,9 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   comment predates this). That run's proposal carries `meta.new_alias`:
   the switch never applies it, the card says "New link", and rejecting it
   deletes the alias (trigger `trg_reject_undoes_new_alias`, migration
-  `0024`; a future rebuild of `change_proposals` must re-create it). Anything weaker but close is an **unconfirmed
+  `0024`; a future rebuild of `change_proposals` must re-create it), and
+  that listing→venue pair is never auto-linked again (`REJECTED_LINKS_SQL`;
+  the listing drops out rather than coming back as an add). Anything weaker but close is an **unconfirmed
   match**: a normal proposal with `meta.match`, which approving records as
   the alias (`applyApprovedProposal`). Two listings on one of our venues
   (Care and Share lists Lynn Gardens twice) become one review card with no

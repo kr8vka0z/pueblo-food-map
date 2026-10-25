@@ -4,6 +4,7 @@
 // blessing boxes are never touched.
 import { describe, expect, test, vi } from "vitest";
 import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import Database from "better-sqlite3";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { rejectionKey, type CurrentVenueRow } from "./diffEngine";
@@ -12,6 +13,8 @@ import {
   dropAlreadyReviewed,
   convertSchedules,
   fetchCareAndShare,
+  REJECTED_LINKS_SQL,
+  rejectedLinkKey,
   REQUEST_GAP_MS,
   toCasLocation,
   type CasLocation,
@@ -432,5 +435,51 @@ describe("review cards Kyle already approved don't come back every week", () => 
     const p = build({ locations: [loc()], schedules: [sched({ dayOfWeek: 3 })], venues: [venue()] }).proposals;
     const approved = new Set(p.map((x) => rejectionKey(x.source, x.targetVenueId, x.diffHash)));
     expect(dropAlreadyReviewed(p, approved)).toHaveLength(1);
+  });
+});
+
+describe("a link Kyle rejected is never made again", () => {
+  test("rejected first-run link (real SQLite) -> no alias, no proposal, no add", () => {
+    const db = new Database(":memory:");
+    const dir = join(process.cwd(), "migrations");
+    for (const f of readdirSync(dir).filter((n) => n.endsWith(".sql")).sort()) db.exec(readFileSync(join(dir, f), "utf-8"));
+    const insert = db.prepare(
+      `INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, status, reviewed_by)
+       VALUES (?, ?, 'update', ?, 'h', 'r', ?, 'kyle@example.com')`,
+    );
+    const diff = (upstream: string) => JSON.stringify({ before: {}, after: {}, fields_changed: ["last_verified"], meta: { new_alias: { upstream_id: upstream } } });
+    insert.run("care_and_share", "plentiful-praise", diff("cas-1"), "rejected");
+    insert.run("care_and_share", "plentiful-praise", diff("cas-9"), "approved"); // approved: not a rejected link
+    insert.run("plentiful", "plentiful-praise", diff("cas-8"), "rejected"); // other source: ignored
+    const rows = db.prepare(REJECTED_LINKS_SQL).all() as { target_venue_id: string; upstream_id: string }[];
+    const rejectedLinks = new Set(rows.map((r) => rejectedLinkKey(r.upstream_id, r.target_venue_id)));
+    expect([...rejectedLinks]).toEqual([rejectedLinkKey("cas-1", "plentiful-praise")]);
+
+    const r = buildCareAndShareProposals({
+      locations: [loc()],
+      schedules: [sched({ dayOfWeek: 3 })],
+      venues: [venue()],
+      aliases: [],
+      runId: "run-2",
+      today: TODAY,
+      fetchedAt: FETCHED,
+      rejectedLinks,
+    });
+    expect(r.aliasWrites).toEqual([]);
+    expect(r.proposals).toEqual([]);
+  });
+
+  test("a rejected link to one venue doesn't block a different listing's strong match", () => {
+    const r = buildCareAndShareProposals({
+      locations: [loc({ locationId: 2 })],
+      schedules: [],
+      venues: [venue()],
+      aliases: [],
+      runId: "run-2",
+      today: TODAY,
+      fetchedAt: FETCHED,
+      rejectedLinks: new Set([rejectedLinkKey("cas-1", "plentiful-praise")]),
+    });
+    expect(r.aliasWrites).toEqual([{ upstreamId: "cas-2", venueId: "plentiful-praise" }]);
   });
 });

@@ -492,6 +492,21 @@ function isCandidate(e: Evidence): boolean {
   );
 }
 
+/**
+ * First-run links Kyle rejected (meta.new_alias on a rejected care_and_share
+ * proposal). Migration 0024's trigger deletes the alias on reject, but the
+ * same strong match would re-make it next run — and rejection memory would
+ * then hide its proposal, so the link would come back with no card. These
+ * pairs are never auto-linked again.
+ */
+export const REJECTED_LINKS_SQL =
+  "SELECT target_venue_id, json_extract(proposed_diff, '$.meta.new_alias.upstream_id') AS upstream_id FROM change_proposals " +
+  "WHERE source = 'care_and_share' AND status = 'rejected' AND json_extract(proposed_diff, '$.meta.new_alias.upstream_id') IS NOT NULL";
+
+export function rejectedLinkKey(upstreamId: string, venueId: string): string {
+  return `${upstreamId}->${venueId}`;
+}
+
 export function upstreamIdOf(l: CasLocation): string {
   return `cas-${l.locationId}`;
 }
@@ -507,6 +522,8 @@ export interface CareAndShareBuildParams {
   runId: string;
   today: string;
   fetchedAt: string;
+  /** rejectedLinkKey()s from REJECTED_LINKS_SQL: a strong match onto one of these is dropped, not linked. */
+  rejectedLinks?: ReadonlySet<string>;
   /** Our venues whose address is a venue_direct pin — never matched by the no-phone rule (see isStrong). */
   addressPinnedVenueIds?: ReadonlySet<string>;
 }
@@ -543,6 +560,7 @@ export function buildCareAndShareProposals(params: CareAndShareBuildParams): Car
   type Claim = { loc: CasLocation; venue: CurrentVenueRow; kind: "known" | "strong" | "ambiguous"; evidence?: Evidence };
   const claims: Claim[] = [];
   const unmatched: CasLocation[] = [];
+  const report: string[] = [];
 
   for (const loc of params.locations) {
     const up = upstreamIdOf(loc);
@@ -558,6 +576,12 @@ export function buildCareAndShareProposals(params: CareAndShareBuildParams): Car
     }
     const casHasPhone = normalizedPhoneTail(loc.phone) !== null;
     const strong = scored.filter((c) => isStrong(c.evidence, casHasPhone, params.addressPinnedVenueIds?.has(c.venue.id) ?? false));
+    if (strong.length === 1 && params.rejectedLinks?.has(rejectedLinkKey(up, strong[0].venue.id))) {
+      // Kyle rejected this exact link before: not matched, and not an add
+      // either (same as a rejected unsure match — the listing just drops out).
+      report.push(`  rejected  ${loc.locationId} "${loc.name}" -> ${strong[0].venue.id} (link rejected before; skipped)`);
+      continue;
+    }
     if (strong.length === 1) {
       claims.push({ loc, venue: strong[0].venue, kind: "strong", evidence: strong[0].evidence });
       continue;
@@ -572,7 +596,6 @@ export function buildCareAndShareProposals(params: CareAndShareBuildParams): Car
   const proposals: ProposalDraft[] = [];
   const aliasWrites: CareAndShareBuildResult["aliasWrites"] = [];
   const stats = { strong: 0, ambiguous: 0, duplicates: 0, adds: 0, unconvertible: 0 };
-  const report: string[] = [];
 
   for (const [venueId, group] of claimsByVenue) {
     const current = group[0].venue;

@@ -6,6 +6,9 @@
  * export route handlers. See the route file's header for the concurrency design.
  */
 
+import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "../../scripts/refresh/diffEngine";
+import type { Venue } from "@/types/venue";
+
 // Every editable column except `status` (see file header for why status is
 // permanently excluded) and the workflow columns an edit never touches:
 // source_type, created_at, created_by, published_at, published_by.
@@ -69,3 +72,54 @@ export const BOX_EVENT_INSERT_SQL_GUARDED = `INSERT INTO box_events (venue_id, k
 export const APPROVE_PROPOSAL_SQL = `UPDATE change_proposals SET status = 'approved', reviewed_by = ?, reviewed_at = ?, applied_at = ?
   WHERE id = ? AND status = 'pending' AND source = 'link_health' AND target_venue_id = ?
   AND EXISTS (SELECT 1 FROM venues WHERE id = ? AND updated_at = ?)`;
+
+// ─── "The venue told us" pins (Venue Data Rebuild step 1, migration 0021) ──
+
+// Guarded like every other dependent write: a stale (409) edit must not
+// record a pin for a value that was never saved. Trailing two bind params
+// (id, the NEW updatedAt) are the guard, same as the statements above.
+export const PIN_INSERT_SQL = `INSERT INTO venue_observations
+  (venue_id, field, source, value, fetched_at, is_pin, pinned_by, pin_note, accepted_at, accepted_by)
+  SELECT ?, ?, 'venue_direct', ?, ?, 1, ?, ?, ?, ?
+  WHERE EXISTS (SELECT 1 FROM venues WHERE id = ? AND updated_at = ?)`;
+
+/** Hours and contact details a venue can tell us itself (the plan's field list; name/category/location stay with the sources). */
+export const PINNABLE_FIELDS = [
+  "hours_weekly",
+  "hours_irregular",
+  "address",
+  "phone",
+  "email",
+  "url",
+  "accepts_snap",
+  "accepts_wic",
+] as const;
+type PinnableField = (typeof PINNABLE_FIELDS)[number];
+type PinnableRow = Record<PinnableField, unknown>;
+
+/** Same field equality the refresh diff uses (hours compared by content, not JSON key order). */
+function sameValue(before: PinnableRow, after: PinnableRow, field: PinnableField): boolean {
+  const key = field as keyof Venue;
+  return valuesEqual(currentFieldValue(before as unknown as CurrentVenueRow, key), currentFieldValue(after as unknown as CurrentVenueRow, key));
+}
+
+function isEmpty(v: unknown): boolean {
+  return v === null || v === undefined || v === "";
+}
+
+/**
+ * Which fields an edit saved with "The venue told us" ticked pins, and the
+ * JSON value each pin records. The fields this edit changed; if it changed
+ * none, every pinnable field that has a value — ticking the box on an
+ * unchanged form means "the venue confirmed what's here". Hours columns are
+ * already JSON text; other values are JSON-encoded.
+ */
+export function pinWrites(before: PinnableRow, after: PinnableRow): { field: PinnableField; value: string }[] {
+  const changed = PINNABLE_FIELDS.filter((f) => !sameValue(before, after, f));
+  const fields = changed.length > 0 ? changed : PINNABLE_FIELDS.filter((f) => !isEmpty(after[f]));
+  return fields.map((field) => {
+    const v = after[field];
+    const isJsonColumn = field === "hours_weekly" || field === "hours_irregular";
+    return { field, value: isJsonColumn && typeof v === "string" ? v : JSON.stringify(v ?? null) };
+  });
+}

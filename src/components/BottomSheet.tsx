@@ -82,7 +82,7 @@ import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
 import { X, MapPin, Phone, Clock, CircleHelp, ExternalLink } from "lucide-react";
 import type { Venue } from "@/types/venue";
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import { computeVenueOpenStatus, nextIrregularOccurrence, formatIrregularOccurrence } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";

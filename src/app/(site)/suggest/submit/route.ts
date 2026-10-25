@@ -25,7 +25,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { categoryLabels } from "@/data/venues";
+import { categoryLabels } from "@/lib/categories";
 import type { VenueCategory } from "@/types/venue";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { isValidEmail } from "@/lib/email";

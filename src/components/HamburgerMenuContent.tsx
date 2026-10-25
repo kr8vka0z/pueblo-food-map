@@ -40,7 +40,7 @@ import { localizedHref } from "@/lib/localizedHref";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 import { track, EVENTS } from "@/lib/analytics";
 import type { Venue } from "@/types/venue";
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import type { ViewMode } from "@/lib/useMapUI";
 

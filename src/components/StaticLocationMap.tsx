@@ -11,7 +11,7 @@
  * own call, wider than a street-level zoom, so nearby major streets and
  * landmarks give context) rather than a tight street-level view. `pin-l`
  * (large pin) colored to match the venue's category on the public map
- * (`categoryColors`, src/data/venues.ts) — the SAME color a visitor would
+ * (`categoryColors`, src/lib/categories.ts) — the SAME color a visitor would
  * see for this venue on the live map, so an admin previewing placement
  * isn't looking at an arbitrary color.
  *
@@ -22,7 +22,7 @@
  */
 
 import type { VenueCategory } from "@/types/venue";
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import { googleMapsUrl } from "@/components/DirectionButtons";
 
 export interface StaticLocationMapProps {

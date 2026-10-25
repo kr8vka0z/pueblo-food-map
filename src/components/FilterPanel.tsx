@@ -26,7 +26,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { X, Clock, CreditCard, Apple, Star } from "lucide-react";
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";

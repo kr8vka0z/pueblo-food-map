@@ -37,7 +37,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { categoryLabels } from "@/data/venues";
+import { categoryLabels } from "@/lib/categories";
 import { formatLastVerified } from "@/lib/adminVenues";
 import { describeIrregularSchedule, formatSlot } from "@/lib/hours";
 import { t } from "@/lib/i18n";

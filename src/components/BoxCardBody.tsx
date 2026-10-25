@@ -93,7 +93,7 @@ import AdoptBoxForm from "@/components/AdoptBoxForm";
 import BoxAlertSignupForm from "@/components/BoxAlertSignupForm";
 import PhotoViewer from "@/components/PhotoViewer";
 import { googleMapsUrl, WalkRouteStatus, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import {
   STATUS_DOT_CLASS,
   STATUS_TEXT_CLASS,

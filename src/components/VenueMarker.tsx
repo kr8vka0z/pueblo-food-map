@@ -22,7 +22,7 @@ import { Marker } from "react-map-gl/mapbox";
 import { MapPin } from "lucide-react";
 import type { Venue } from "@/types/venue";
 // Plain hex map (no DOM/CSSOM lookup), so the pin renders anywhere.
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import { t, type Locale } from "@/lib/i18n";
 

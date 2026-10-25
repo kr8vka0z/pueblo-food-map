@@ -20,7 +20,7 @@
 
 import type { AddVenueFormValues, IrregularEntryDraft } from "@/components/AddVenueForm";
 import { DISPLAY_DAY_KEYS, type DayKey } from "@/lib/hours";
-import { categoryLabels } from "@/data/venues";
+import { categoryLabels } from "@/lib/categories";
 import type { AdminVenueRow, IrregularSchedule, Venue, VenueCategory, WeeklyHours } from "@/types/venue";
 import type { NewVenuePayload } from "@/lib/publicSubmissions";
 

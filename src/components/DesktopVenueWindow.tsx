@@ -50,7 +50,7 @@ import { safeUrl } from "@/lib/safeUrl";
 import { track, EVENTS } from "@/lib/analytics";
 import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 import type { Venue } from "@/types/venue";
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import { computeVenueOpenStatus, nextIrregularOccurrence, formatIrregularOccurrence } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";

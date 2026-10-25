@@ -26,9 +26,17 @@
  * proposed_diff.meta.pins so the review card shows it beside the change.
  * Repeats of a rejected pinned-field proposal are already silenced by
  * rejection memory (diff_hash ignores meta), so there's no second mechanism.
+ *
+ * The automatic switch (Venue Data Rebuild step 2, src/lib/sourceSwitch.ts):
+ * once a (source, field) pair has 5 unedited approvals in a row, a plain
+ * update touching only switched-on pairs is applied here under
+ * `refresh-pipeline-auto` (isSwitchApplicable / buildSwitchApplyStatements).
+ * Order of the lanes below: pins, then the switch, then the opt-in AI lane,
+ * then date-only, else pending.
  */
 
-import { isDateOnlyUpdateProposal, reviewableDiffFields } from "@/lib/adminProposals";
+import { isDateOnlyUpdateProposal, reviewableDiffFields, toColumnValue } from "@/lib/adminProposals";
+import { AUTO_SWITCH_ACTOR, SWITCH_SOURCES, switchIsOn, type SwitchState } from "@/lib/sourceSwitch";
 import type { Venue } from "@/types/venue";
 import type { ProposalDraft } from "./diffEngine";
 import { computeAutoApplyEligibility, serializeTriageResult, type TriageResult } from "./triage";
@@ -102,6 +110,11 @@ export interface ProposalWriteOptions {
    * as a normal pending row with its lane stored.
    */
   aiAutoApply?: boolean;
+  /**
+   * The automatic switch's state per (source, field) (src/lib/sourceSwitch.ts).
+   * Absent/empty = every pair is proposal-only.
+   */
+  switchStates?: SwitchState[];
 }
 
 type SqlText = (value: string | null | undefined) => string;
@@ -134,6 +147,9 @@ export function buildProposalWriteStatements(
     // Checked BEFORE every auto-apply lane below, so no current or future
     // lane can write a pinned field without a human.
     return { autoApplied: false, statements: [pendingInsert({ ...proposal, proposedDiff: { ...proposal.proposedDiff, meta: { ...proposal.proposedDiff.meta, pins: pinned } } }, sqlText, tri)] };
+  }
+  if (isSwitchApplicable(proposal, options.switchStates ?? [])) {
+    return { autoApplied: true, statements: buildSwitchApplyStatements(proposal, now, sqlText, tri) };
   }
   if (options.aiAutoApply && options.triage?.lane === "auto_apply_candidate" && computeAutoApplyEligibility(proposal)) {
     return { autoApplied: true, statements: buildAiAutoApplyStatements(proposal, now, sqlText, tri) };
@@ -242,5 +258,88 @@ function buildAiAutoApplyStatements(
         ...tri.vals,
       ].join(", ") +
       ");",
+  ];
+}
+
+// ─── The automatic switch (Venue Data Rebuild step 2) ──────────────────────
+
+const SWITCHABLE_SOURCES: ReadonlySet<string> = new Set(SWITCH_SOURCES);
+
+/**
+ * True only for a plain update from a switchable source where EVERY field
+ * it changes has its pair switched on. Never an add or remove (closures,
+ * removals and new venues are always Kyle's), never a value clearing to
+ * empty, never a rename, an unconfirmed match or a schedule flagged for
+ * review. Pins are checked before this is ever called.
+ */
+export function isSwitchApplicable(proposal: ProposalDraft, states: SwitchState[]): boolean {
+  if (proposal.changeType !== "update" || !SWITCHABLE_SOURCES.has(proposal.source)) return false;
+  const meta = proposal.proposedDiff.meta ?? {};
+  // new_alias: the link itself was made this run — a person sees its first change.
+  if (meta.rename || meta.match || meta.needs_review || meta.new_alias) return false;
+  const fields = reviewableDiffFields(proposal.proposedDiff);
+  if (fields.length === 0) return false;
+  const after = (proposal.proposedDiff.after ?? {}) as Record<string, unknown>;
+  return fields.every((f) => {
+    const v = after[f];
+    return v !== null && v !== undefined && v !== "" && switchIsOn(states, proposal.source, f);
+  });
+}
+
+/**
+ * venues UPDATE + audit_log + an already-approved proposal row + one
+ * accepted observation per field. Unlike the older AI lane it does NOT move
+ * last_verified: AGENTS.md (step 1) — last_verified moves only on a human
+ * approve or edit; a source applying its own change is not a confirmation.
+ * The accepted observation is what records which source backs the value.
+ */
+function buildSwitchApplyStatements(proposal: ProposalDraft, now: string, sqlText: SqlText, tri: { cols: string; vals: string[] }): string[] {
+  const fields = reviewableDiffFields(proposal.proposedDiff) as (keyof Venue)[];
+  const before = (proposal.proposedDiff.before ?? {}) as Record<string, unknown>;
+  const after = (proposal.proposedDiff.after ?? {}) as Record<string, unknown>;
+  const literal = (f: keyof Venue, v: unknown) => {
+    const col = toColumnValue(f, v);
+    return typeof col === "number" ? String(col) : sqlText(col === null || col === undefined ? null : String(col));
+  };
+  const sets = fields.map((f) => `${f} = ${literal(f, after[f])}`).join(", ");
+  const pick = (o: Record<string, unknown>) => Object.fromEntries(fields.map((f) => [f, o[f] ?? null]));
+  const observations = fields.map((f) => {
+    const col = toColumnValue(f, after[f]);
+    const value = (f === "hours_weekly" || f === "hours_irregular") && typeof col === "string" ? col : JSON.stringify(col ?? null);
+    return (
+      "INSERT INTO venue_observations (venue_id, field, source, value, fetched_at, accepted_at, accepted_by) VALUES (" +
+      [sqlText(proposal.targetVenueId), sqlText(f), sqlText(proposal.source), sqlText(value), sqlText(now), sqlText(now), sqlText(AUTO_SWITCH_ACTOR)].join(", ") +
+      ");"
+    );
+  });
+  return [
+    `UPDATE venues SET ${sets}, updated_by = ${sqlText(AUTO_SWITCH_ACTOR)}, updated_at = ${sqlText(now)} WHERE id = ${sqlText(proposal.targetVenueId)};`,
+    "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (" +
+      [
+        sqlText(AUTO_SWITCH_ACTOR),
+        sqlText("venue"),
+        sqlText(proposal.targetVenueId),
+        sqlText("update"),
+        sqlText(JSON.stringify(pick(before))),
+        sqlText(JSON.stringify(pick(after))),
+        sqlText(now),
+      ].join(", ") +
+      ");",
+    `INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id, status, reviewed_by, reviewed_at, applied_at${tri.cols}) VALUES (` +
+      [
+        sqlText(proposal.source),
+        sqlText(proposal.targetVenueId),
+        sqlText(proposal.changeType),
+        sqlText(JSON.stringify(proposal.proposedDiff)),
+        sqlText(proposal.diffHash),
+        sqlText(proposal.runId),
+        sqlText("approved"),
+        sqlText(AUTO_SWITCH_ACTOR),
+        sqlText(now),
+        sqlText(now),
+        ...tri.vals,
+      ].join(", ") +
+      ");",
+    ...observations,
   ];
 }

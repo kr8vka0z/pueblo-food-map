@@ -236,7 +236,7 @@ const REVIEW_FIELD_WORD: Record<string, string> = {
   operator: "operator",
 };
 
-function summarizeProposalForRow(p: Extract<ReviewItem, { kind: "proposal" }>["proposal"]): string {
+export function summarizeProposalForRow(p: Extract<ReviewItem, { kind: "proposal" }>["proposal"]): string {
   if (p.parseError) return "Suggested change — couldn't read details";
   const { row, diff } = p;
   if (row.source === "link_health") return "Website link broken";
@@ -244,6 +244,9 @@ function summarizeProposalForRow(p: Extract<ReviewItem, { kind: "proposal" }>["p
   if (row.change_type === "remove") return "Looks closed — suggests removal";
   if (row.change_type === "add") return "Suggested new place";
   const fields = reviewableDiffFields(diff);
+  // Care and Share review-only cards (scripts/refresh/careAndShare.ts) — not "still current".
+  if (fields.length === 0 && diff.meta?.match) return "Care and Share listing — same place?";
+  if (fields.length === 0 && diff.meta?.needs_review) return "Hours need a look";
   if (fields.length === 0) return "Confirmed still current";
   if (fields.length === 1) return `New ${REVIEW_FIELD_WORD[fields[0]] ?? fieldLabel(fields[0]).toLowerCase()}`;
   return `${fields.length} fields changed`;

@@ -96,12 +96,21 @@ export async function checkPendingAge(db: D1Database, now: Date = new Date()): P
 
 // ─── Per-source staleness (#234) ────────────────────────────────────────────
 
-const REFRESH_ALERT_SOURCES = ["plentiful", "osm"] as const;
+const REFRESH_ALERT_SOURCES = ["plentiful", "osm", "care_and_share"] as const;
+/**
+ * Sources that alert even when they have NEVER written a row. care_and_share
+ * (Venue Data Rebuild step 2) is left out on purpose: it starts writing only
+ * once its reader reaches production, and a never-run alert would email
+ * every day until then. A first run that fails is already loud (the refresh
+ * job exits non-zero when a source aborts); once it has run once, the normal
+ * 40-day rule applies to it like the others.
+ */
+const NEVER_RUN_ALERT_SOURCES: ReadonlySet<string> = new Set(["plentiful", "osm"]);
 export type RefreshAlertSource = (typeof REFRESH_ALERT_SOURCES)[number];
 
 /** Hardcoded IN-list, not a bound placeholder loop — REFRESH_ALERT_SOURCES is a fixed, small, compile-time set (ponytail: one string beats a dynamic placeholder builder for two known values). */
 export const SOURCE_STALENESS_SQL =
-  "SELECT source, MAX(created_at) AS last FROM change_proposals WHERE source IN ('plentiful','osm') GROUP BY source";
+  "SELECT source, MAX(created_at) AS last FROM change_proposals WHERE source IN ('plentiful','osm','care_and_share') GROUP BY source";
 
 export interface SourceStalenessCheck {
   source: RefreshAlertSource;
@@ -114,7 +123,9 @@ export async function checkSourceStaleness(db: D1Database, now: Date = new Date(
   const result = await db.prepare(SOURCE_STALENESS_SQL).all<{ source: string; last: string | null }>();
   const lastBySource = new Map(result.results.map((r) => [r.source, r.last]));
 
-  return REFRESH_ALERT_SOURCES.map((source) => {
+  // A source outside NEVER_RUN_ALERT_SOURCES is only checked once it has a row.
+  const tracked = REFRESH_ALERT_SOURCES.filter((s) => NEVER_RUN_ALERT_SOURCES.has(s) || lastBySource.has(s));
+  return tracked.map((source) => {
     const last = lastBySource.get(source) ?? null;
     const daysSinceLastRun = last ? Math.floor((now.getTime() - new Date(last).getTime()) / MS_PER_DAY) : null;
     // `last === null` (a source with NO change_proposals row at all, ever —

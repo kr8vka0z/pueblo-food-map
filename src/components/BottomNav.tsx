@@ -315,6 +315,10 @@ export default function BottomNav({
         <li className="flex flex-1 2xl:flex-none 2xl:h-11">
           <Link
             href={localizedHref("/resources", tree)}
+            // #721: this link is on screen on every map and content page, so
+            // the default viewport prefetch fetched /resources' data and code
+            // in the background for every visitor, most of whom never tap it.
+            prefetch={false}
             data-testid="nav-resources"
             aria-current={onResourcesPage ? "page" : undefined}
             className={ITEM_CLASS + " " + colorFor(onResourcesPage)}

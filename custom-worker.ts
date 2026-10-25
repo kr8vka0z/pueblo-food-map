@@ -27,7 +27,7 @@ import { applyHostIndexingPolicy } from "./src/lib/indexingHost";
 //
 // WHY `@ts-ignore` (not `@ts-expect-error`) on the imports below: .open-next/worker.js
 // is produced by `opennextjs-cloudflare build` and does not exist in a fresh checkout —
-// `npm run typecheck` / `predeploy` run BEFORE any build step in both CI (ci.yml) and
+// `npm run typecheck` runs BEFORE any build step in both CI (ci.yml) and
 // the deploy workflows, so the module genuinely does not resolve at typecheck time.
 // `@ts-expect-error` would fail typecheck locally (after a build already populated
 // .open-next) because the error it expects is no longer there. `@ts-ignore` suppresses

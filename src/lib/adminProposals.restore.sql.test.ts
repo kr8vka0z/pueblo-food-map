@@ -12,6 +12,7 @@ import { describe, test, expect } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
+import { sqliteD1 } from "@/lib/sqliteD1.testutil";
 import { applyApprovedProposal, type ChangeProposalRow } from "@/lib/adminProposals";
 
 const MONTHLY = '[{"ordinal":4,"recurrence":"monthly_ordinal","slots":["11:00 AM - 12:00 PM"],"weekday":"tue"}]';
@@ -27,23 +28,6 @@ function buildDb(): Database.Database {
      VALUES ('plentiful-x', 'X Pantry', 'pantry', 38.2, -104.6, '1 Main St, Pueblo, CO', ?, 'plentiful', '2026-05-14', 'archived', 'plentiful', 'seed', 'seed')`,
   ).run(MONTHLY);
   return db;
-}
-
-/** Just enough of D1Database for applyApprovedProposal: prepare/bind/first/run + batch. */
-function d1(db: Database.Database): D1Database {
-  const stmt = (sql: string, params: unknown[] = []) => ({
-    bind: (...p: unknown[]) => stmt(sql, p),
-    first: async () => db.prepare(sql).get(...params) ?? null,
-    run: async () => ({ meta: { changes: db.prepare(sql).run(...params).changes } }),
-  });
-  return {
-    prepare: (sql: string) => stmt(sql),
-    batch: async (stmts: Array<{ run: () => Promise<unknown> }>) => {
-      const out: unknown[] = [];
-      for (const s of stmts) out.push(await s.run());
-      return out;
-    },
-  } as unknown as D1Database;
 }
 
 function addProposal(db: Database.Database, after: Record<string, unknown>): ChangeProposalRow {
@@ -72,7 +56,7 @@ const BASE_AFTER = {
 describe("applyApprovedProposal restore path — hours_irregular (#400)", () => {
   test("incoming record without hours_irregular keeps the stored schedule", async () => {
     const db = buildDb();
-    const result = await applyApprovedProposal(d1(db), addProposal(db, BASE_AFTER), { email: "a@b.c" });
+    const result = await applyApprovedProposal(sqliteD1(db), addProposal(db, BASE_AFTER), { email: "a@b.c" });
     expect(result.ok).toBe(true);
     const row = db.prepare("SELECT status, hours_irregular FROM venues WHERE id = 'plentiful-x'").get();
     expect(row).toEqual({ status: "draft", hours_irregular: MONTHLY });
@@ -81,7 +65,7 @@ describe("applyApprovedProposal restore path — hours_irregular (#400)", () => 
   test("incoming record with hours_irregular overwrites it", async () => {
     const db = buildDb();
     const next = [{ recurrence: "monthly_ordinal", ordinal: 2, weekday: "thu", slots: ["11:00 AM - 12:45 PM"] }];
-    const result = await applyApprovedProposal(d1(db), addProposal(db, { ...BASE_AFTER, hours_irregular: next }), {
+    const result = await applyApprovedProposal(sqliteD1(db), addProposal(db, { ...BASE_AFTER, hours_irregular: next }), {
       email: "a@b.c",
     });
     expect(result.ok).toBe(true);

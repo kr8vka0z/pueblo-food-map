@@ -1,14 +1,15 @@
 /**
  * POST /api/public/blessing-boxes/[id]/alerts — a giver subscribes to email
  * alerts for ONE specific box ("near me" v1 — no radius, no stored
- * location; see AGENTS.md's Blessing Boxes slice 6 section). Blessing Boxes
+ * location; see ARCHITECTURE.md's "Blessing Boxes" section). Blessing Boxes
  * slice 6.
  *
  * Guard ORDER, same shared convention as the adopt route (see that file's
  * own header): Content-Type -> Turnstile -> honeypot -> per-visitor rate
  * limit -> field validation -> box lookup -> email-flood rate limit ->
  * write -> confirm email. The email-flood scopes
- * (alert-email-target/alert-email-global) are SHARED with the adopt route —
+ * (alert-email-target/alert-email-global, checkAlertEmailFloodCaps in
+ * src/lib/boxAlerts.ts) are SHARED with the adopt route —
  * a flood of signups (this route) and adoption applications (../adopt) both
  * draw from one combined email-abuse budget. 2026-09-18 security review,
  * item 5: those two scopes moved to run just before the write/send (after
@@ -56,15 +57,14 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
 import { logFormFailure } from "@/lib/logger";
-import { sendGiverConfirmEmail, upsertGiverSubscription } from "@/lib/boxAlerts";
+import { checkAlertEmailFloodCaps, sendGiverConfirmEmail, upsertGiverSubscription } from "@/lib/boxAlerts";
 import { resolveEmailLang } from "@/lib/i18n";
+import { requestIp } from "@/lib/publicRequest";
+import { loadLiveBoxName } from "@/lib/blessingBoxes";
 
 export const dynamic = "force-dynamic";
 
 const MAX_ALERT_SIGNUPS_PER_VISITOR_PER_HOUR = 5;
-/** Shared with the adopt-a-box route — see this file's own header. */
-const MAX_EMAIL_TARGET_PER_HOUR = 3;
-const MAX_EMAIL_GLOBAL_PER_HOUR = 300;
 
 interface AlertSignupPayload {
   email?: string;
@@ -76,11 +76,6 @@ interface AlertSignupPayload {
   turnstileKey?: string;
   /** Opaque, non-identifying per-browser token from src/lib/checkinClientToken.ts — rate-limit key only, never persisted. */
   clientToken?: string;
-}
-
-interface BoxLookupRow {
-  id: string;
-  name: string;
 }
 
 export async function POST(
@@ -101,8 +96,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
 
-  const ip =
-    req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = requestIp(req);
   const turnstileKey = resolveBoxTurnstileKey(body.turnstileKey);
   const rateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
   if (!rateLimitSecret) {
@@ -146,39 +140,21 @@ export async function POST(
   }
   const lang = resolveEmailLang(body.lang);
 
-  let box: BoxLookupRow | null;
+  let boxName: string | null;
   try {
-    box = await db
-      .prepare("SELECT id, name FROM venues WHERE id = ? AND category = 'blessing_box' AND status != 'archived'")
-      .bind(boxId)
-      .first<BoxLookupRow>();
+    boxName = await loadLiveBoxName(db, boxId);
   } catch (err) {
     logFormFailure("alerts", "db_unavailable", { message: err instanceof Error ? err.message : "unknown error" });
     return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 502 });
   }
-  if (!box) {
+  if (boxName === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
   // Email-flood scopes moved here (item 5, see this file's own header).
-  const emailTargetCap = await checkAndIncrement(
-    db,
-    rateLimitSecret,
-    { scope: "alert-email-target", id: email },
-    MAX_EMAIL_TARGET_PER_HOUR,
-  );
-  if (!emailTargetCap) {
-    return NextResponse.json({ ok: false, error: "rate_limit_email" }, { status: 429 });
-  }
-
-  const globalCap = await checkAndIncrement(
-    db,
-    rateLimitSecret,
-    { scope: "alert-email-global", id: "global" },
-    MAX_EMAIL_GLOBAL_PER_HOUR,
-  );
-  if (!globalCap) {
-    return NextResponse.json({ ok: false, error: "rate_limit_global" }, { status: 429 });
+  const floodCap = await checkAlertEmailFloodCaps(db, rateLimitSecret, email);
+  if (floodCap) {
+    return NextResponse.json({ ok: false, error: floodCap }, { status: 429 });
   }
 
   let action: Awaited<ReturnType<typeof upsertGiverSubscription>>["action"];
@@ -198,7 +174,7 @@ export async function POST(
   if (action !== "noop" && confirmToken) {
     const emailPromise = sendGiverConfirmEmail({
       to: email,
-      boxName: box.name,
+      boxName,
       origin: resolveEmailOrigin(req),
       confirmToken,
       lang,

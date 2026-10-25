@@ -35,6 +35,7 @@ import {
   ALERT_FILLED_SUB_RATE_SCOPE,
   MAX_ALERT_RECIPIENTS_PER_EVENT,
   MAX_FILLED_ALERTS_PER_SUB_PER_HOUR,
+  checkAlertEmailFloodCaps,
   findHostSubscription,
   insertHostSubscriptionStatement,
   claimAlertRecipients,
@@ -60,6 +61,24 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe("checkAlertEmailFloodCaps — shared adopt/alerts email-flood caps", () => {
+  const TARGET = [{ scope: "alert-email-target", id: "giver@example.com" }, 3];
+  const GLOBAL = [{ scope: "alert-email-global", id: "global" }, 300];
+
+  // A failed per-address check returns before the site-wide counter is
+  // touched — that one-call row is the "target checked before global" proof.
+  test.each([
+    { name: "both under cap", results: [true, true], expected: null, calls: [TARGET, GLOBAL] },
+    { name: "per-address cap hit", results: [false, true], expected: "rate_limit_email", calls: [TARGET] },
+    { name: "site-wide cap hit", results: [true, false], expected: "rate_limit_global", calls: [TARGET, GLOBAL] },
+  ])("$name -> $expected", async ({ results, expected, calls }) => {
+    for (const r of results) mockCheckAndIncrement.mockResolvedValueOnce(r);
+    const db = {} as D1Database;
+    expect(await checkAlertEmailFloodCaps(db, "secret", "giver@example.com")).toBe(expected);
+    expect(mockCheckAndIncrement.mock.calls).toEqual(calls.map(([scope, max]) => [db, "secret", scope, max]));
+  });
 });
 
 describe("rolesToNotify — who gets what", () => {

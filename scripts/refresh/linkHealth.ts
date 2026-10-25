@@ -13,7 +13,7 @@
  *
  * ponytail: the design doc's fuller version requires the SAME failure on
  * two consecutive weekly checks before proposing anything (persisted
- * cross-run state, absorbs a transient blip). This pipeline runs monthly
+ * cross-run state, absorbs a transient blip). This pipeline runs weekly
  * and has no persisted per-venue check history yet — shipping the
  * single-check version first is what the doc itself recommends ("ship the
  * simple version first... ratchet up if false positives show up in

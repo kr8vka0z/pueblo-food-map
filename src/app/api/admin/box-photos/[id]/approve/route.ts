@@ -19,27 +19,17 @@
  * than widening audit_log.action's CHECK constraint for one more value).
  *
  * Cache-busting: an approve can newly surface this photo in the box list's
- * `latestPhoto` field, the box's own photo-history list, AND make its own
- * serve route servable for the first time — bustEdgeCache() clears all
- * three paths (see edgeCache.ts's own header for why a photo moderation
- * decision needs three, not one).
+ * `latestPhoto` field AND make its own serve route servable for the first
+ * time — bustEdgeCache() clears both paths (see edgeCache.ts's own header
+ * for why a photo moderation decision needs two, not one).
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { loadBoxPhotoById, type BoxPhotoRow } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";
-
-const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-
-async function authorize(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
+import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 export async function POST(
   req: NextRequest,
@@ -47,7 +37,7 @@ export async function POST(
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorize(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }
@@ -76,7 +66,7 @@ export async function POST(
     .prepare("UPDATE box_photos SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ?")
     .bind(identity.email, timestamp, photoId);
   const insertAudit = db
-    .prepare(AUDIT_INSERT_SQL)
+    .prepare(AUDIT_INSERT_VALUES_SQL)
     .bind(
       identity.email,
       "box_photo",
@@ -93,7 +83,6 @@ export async function POST(
 
   await bustEdgeCache(req, [
     "/api/public/blessing-boxes",
-    `/api/public/blessing-boxes/${existing.venue_id}/photos`,
     `/api/public/box-photos/${photoId}`,
   ]);
 

@@ -21,24 +21,15 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { loadBoxPhotoById, type BoxPhotoRow } from "@/lib/boxPhotos";
 import { bustEdgeCache } from "@/lib/edgeCache";
 import { logFormFailure } from "@/lib/logger";
-
-const AUDIT_INSERT_SQL =
-  "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 /** Reviewer-entered reason, capped generously — this is an internal admin note, not public-facing copy, so no i18n and no tight limit. */
 const MAX_REVIEW_REASON_LENGTH = 500;
-
-async function authorize(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
 
 export async function POST(
   req: NextRequest,
@@ -46,7 +37,7 @@ export async function POST(
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorize(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }
@@ -91,7 +82,7 @@ export async function POST(
     )
     .bind(identity.email, timestamp, reviewReason, photoId);
   const insertAudit = db
-    .prepare(AUDIT_INSERT_SQL)
+    .prepare(AUDIT_INSERT_VALUES_SQL)
     .bind(
       identity.email,
       "box_photo",
@@ -108,7 +99,6 @@ export async function POST(
 
   await bustEdgeCache(req, [
     "/api/public/blessing-boxes",
-    `/api/public/blessing-boxes/${existing.venue_id}/photos`,
     `/api/public/box-photos/${photoId}`,
   ]);
 

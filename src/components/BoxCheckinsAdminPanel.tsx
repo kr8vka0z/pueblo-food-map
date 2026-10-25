@@ -5,7 +5,7 @@
  * screen (Blessing Boxes slice 2, Discovery C7/C9: "As the admin, I want to
  * hide any check-in or note after the fact"). Rendered only when
  * `venue.category === 'blessing_box'` (see
- * src/app/(site)/admin/venues/[id]/edit/page.tsx's resolveBoxCheckins()) — an
+ * src/app/(site)/admin/venues/[id]/edit/page.tsx) — an
  * ordinary venue has no box_checkins rows to show.
  *
  * Shows EVERY check-in — hidden ones and 'problem' reports included, unlike
@@ -49,7 +49,7 @@ const NEED_LABEL: Record<NeedKey, string> = {
   diapers: "Diapers",
   hygiene: "Hygiene items",
   pet_food: "Pet food",
-  drinks: "Water / drinks",
+  drinks: "Drinks",
   warm_clothing: "Warm clothing",
 };
 

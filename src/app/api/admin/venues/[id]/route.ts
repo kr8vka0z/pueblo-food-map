@@ -99,8 +99,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adminVenueValidation";
 import { computeBoxEventWrites } from "@/lib/boxEvents";
@@ -115,17 +114,7 @@ import {
 } from "@/lib/adminVenueEditSql";
 import type { AdminVenueRow } from "@/types/venue";
 
-/**
- * getAdminDb() FIRST (identity/JWT), THEN the CSRF/Origin check — same order
- * and reasoning as venues/route.ts's authorizeCreateRequest.
- */
-async function authorizeEditRequest(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
-
-/** Mirrors readOptionalSubmissionId's convention in the sibling create/archive routes. */
+/** Mirrors readOptionalSubmissionId's convention in the sibling create route. */
 function readOptionalProposalId(body: unknown): number | null {
   const raw = (body as { proposalId?: unknown })?.proposalId;
   return typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : null;
@@ -222,7 +211,7 @@ export async function PATCH(
 ): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizeEditRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

@@ -3,17 +3,17 @@
 /**
  * useBoxActivity — client-side fetch of the combined activity feed
  * (GET /api/public/blessing-boxes/activity, Blessing Boxes slice 3).
- * Mirrors useBoxVenues.ts's shape (fetch-on-mount, best-effort, cancel flag
+ * Mirrors useBoxesList.ts's shape (fetch-on-mount, best-effort, cancel flag
  * on unmount) with one addition: the fetch re-runs whenever `filters`
  * changes, since this hook backs both the global /boxes/activity page
  * (filters change as the visitor picks a box/kind/date range) and
- * BoxContent's own small per-box panel (a fixed `{venueId, pageSize}`).
+ * BoxHistoryContent's per-box log (a fixed `{venueId, pageSize}`).
  *
  * WHY this fetches the PUBLIC API route rather than reading D1 directly:
  * unlike /box/[id]'s Server Component (which reads D1 directly because it
  * renders once per request with no filter UI), this hook backs interactive
  * filter controls that change the URL client-side — a browser fetch here
- * is the same pattern useBoxVenues already established, and it's what lets
+ * is the same pattern useBoxesList already established, and it's what lets
  * the route's own 60s Cache API layer actually do its job (a Worker
  * self-fetching its own domain during SSR risks tripping Cloudflare's loop
  * guard — see AGENTS.md's Healthchecks.io dead-man's-switch section for

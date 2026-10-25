@@ -11,6 +11,22 @@
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
+  // Workers Logs, privacy-safe mode: keeps the app's own console lines and
+  // uncaught exceptions for debugging. invocation_logs is OFF because those
+  // per-request records store every request header, including the client IP
+  // (cf-connecting-ip), and ARCHITECTURE.md's PII policy plus the public
+  // privacy page promise IP addresses are never saved. Measured on a probe
+  // Worker 2026-10-22: with this setting, stored console/exception events
+  // carry the request method and URL (path + query string), but no headers
+  // and no IP. redact_query_string strips the query string from that URL:
+  // alert confirm/stop links carry a live subscription token in `?t=` (the
+  // same reason logger.ts strips query strings from CSP reports).
+  // Redeclared in env.staging below.
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "invocation_logs": false }
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -109,14 +125,20 @@
     "POSTHOG_PROJECT_ID": "630731",
     "ADMIN_OWNER_EMAIL": "kysboyd@gmail.com"
   },
-  // Staging (#223 step 1): repo-config only, NOT yet wired to a deploy pipeline
-  // or DNS route. Named environments do not inherit bindings (assets,
-  // services, d1_databases) from the top level in wrangler — only `main`,
-  // `compatibility_date`, and `compatibility_flags` are inherited — so every
-  // binding below is redeclared for this environment.
+  // Staging (dev.pueblofoodmap.com, deployed by deploy-dev.yml). Named
+  // environments do not inherit bindings (assets, services, d1_databases) or
+  // vars from the top level in wrangler, so each is redeclared below;
+  // `triggers` is the exception (see the top-level `triggers` comment).
   "env": {
     "staging": {
       "name": "pueblo-food-map-staging",
+      // Same privacy-safe Workers Logs mode as prod (see the top-level
+      // `observability` comment); declared explicitly, not left to inheritance.
+      "observability": {
+        "enabled": true,
+        "redact_query_string": true,
+        "logs": { "invocation_logs": false }
+      },
       "routes": [
         // Admin serves at /admin on this same apex host — gated by Better
         // Auth alone (email code + passkey; Cloudflare Access has been fully
@@ -201,7 +223,7 @@
       // bindings above); omitting this would silently inherit the prod cron. See the
       // top-level `triggers` comment for the full WHY. dev.pueblofoodmap.com is a
       // low-traffic staging site, low-value to monitor via cron anyway — the health
-      // endpoint (AGENTS.md "Observability") is a better fit for staging if that's ever
+      // endpoint (AGENTS.md "Scheduled jobs and observability") is a better fit for staging if that's ever
       // wanted.
       "triggers": {
         "crons": []

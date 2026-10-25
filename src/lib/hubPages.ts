@@ -7,10 +7,11 @@
  * a page file, and both trees (EN + /es) plus the tests import these. No
  * Date/random/locale-dependent state, so they run against synthetic fixtures.
  *
- * ItemList / FAQPage JSON-LD are NOT rebuilt here: buildVenueListJsonLd and
- * buildFaqJsonLd (venueSchema.ts) are the house shapes; the hub components
- * feed them the lists these functions return, so schema and visible list
- * can't drift.
+ * ItemList / FAQPage JSON-LD are NOT rebuilt here: buildItemListJsonLd,
+ * buildVenueListJsonLd and buildFaqJsonLd (venueSchema.ts) are the house
+ * shapes (buildBoxListJsonLd below only supplies the box deep-link URL); the
+ * hub components feed them the lists these functions return, so schema and
+ * visible list can't drift.
  *
  * Truth rules (same as venueSummary.ts): SNAP/WIC only on `=== true` (a
  * truthy check would let the string "true" through); "free" wording only for
@@ -20,7 +21,7 @@
 import type { Venue } from "@/types/venue";
 import type { Locale } from "@/lib/i18n";
 import { localizedHref } from "@/lib/localizedHref";
-import { SITE_URL } from "@/lib/site";
+import { buildItemListJsonLd } from "@/lib/venueSchema";
 import { FREE_CATEGORIES, PLACEHOLDER_ADDRESS, buildHoursSentence } from "@/lib/venueSummary";
 
 const byName = (a: Venue, b: Venue) => a.name.localeCompare(b.name);
@@ -96,14 +97,5 @@ export function buildBoxListJsonLd(
   boxes: { id: string; name: string }[],
   locale: Locale,
 ): Record<string, unknown> {
-  return {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    itemListElement: boxes.map((b, i) => ({
-      "@type": "ListItem",
-      position: i + 1,
-      url: `${SITE_URL}${boxDeepLink(b.id, locale)}`,
-      name: b.name,
-    })),
-  };
+  return buildItemListJsonLd(boxes, (b) => boxDeepLink(b.id, locale));
 }

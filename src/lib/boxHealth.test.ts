@@ -108,9 +108,9 @@ describe("rankNeedsHelp", () => {
     expect(result.map((e) => e.venueId)).toEqual(["empty", "low"]);
   });
 
-  // Item 2 regression: a removed box needing help must not show up on "Boxes
-  // that need help" / "Needs help now" — it's out of service, nobody is
-  // going to go check on it.
+  // Item 2 regression: a removed box needing help must not count toward
+  // "Boxes empty or low" — it's out of service, nobody is going to go check
+  // on it.
   test("excludes a removed box even when its status is empty/low/problem", () => {
     const removedEmpty = entry({
       venueId: "removed-empty",
@@ -124,15 +124,5 @@ describe("rankNeedsHelp", () => {
     });
     const result = rankNeedsHelp([removedEmpty, activeEmpty]);
     expect(result.map((e) => e.venueId)).toEqual(["active-empty"]);
-  });
-
-  test("respects an optional limit", () => {
-    const entries = Array.from({ length: 5 }, (_, i) =>
-      entry({
-        venueId: `v${i}`,
-        health: { status: "empty", latest: checkin({ kind: "empty", createdAt: `2026-09-${10 + i}T00:00:00.000Z` }), daysSinceLastReport: i },
-      }),
-    );
-    expect(rankNeedsHelp(entries, 2)).toHaveLength(2);
   });
 });

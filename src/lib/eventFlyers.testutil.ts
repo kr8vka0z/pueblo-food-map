@@ -4,14 +4,15 @@
  * fixture binaries are needed). Test-only; never imported by production code.
  */
 
-function segment(marker: number, payload: number[]): number[] {
+/** One JPEG marker segment: 0xFF, marker, 2-byte big-endian length (2 + payload.length), then the payload. */
+export function segment(marker: number, payload: number[]): number[] {
   const length = 2 + payload.length;
   return [0xff, marker, (length >> 8) & 0xff, length & 0xff, ...payload];
 }
 
 const u16be = (n: number) => [(n >> 8) & 0xff, n & 0xff];
 const u32be = (n: number) => [(n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff];
-const ascii = (s: string) => Array.from(s, (c) => c.charCodeAt(0));
+export const ascii = (s: string) => Array.from(s, (c) => c.charCodeAt(0));
 
 /** JPEG with a fake EXIF segment (must be stripped), an SOF of width x height, a tiny scan and EOI. */
 export function jpegBytes(width = 10, height = 10, padding = 2): Uint8Array {

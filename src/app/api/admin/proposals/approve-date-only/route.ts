@@ -1,10 +1,8 @@
 /**
  * POST /api/admin/proposals/approve-date-only — bulk-approve the
  * "confirmed still present, nothing else changed" shape of `update`
- * proposal in one click, instead of one Approve click per card. Originally
- * the /admin/flags queue's own button (ProposalsReviewView.tsx); #674
- * folded that queue into Places, and src/components/ToReviewSummaryBox.tsx
- * is this route's caller now — same button, same route, new home. The
+ * proposal in one click, instead of one Approve click per card. Its caller
+ * is src/components/ToReviewSummaryBox.tsx on the Places tab. The
  * first real venue-refresh pipeline run wrote 107 proposals; 89 were
  * exactly this shape.
  *
@@ -49,9 +47,7 @@
  * **D1's 100-bound-parameter ceiling (#397)** means the pre-validation
  * `SELECT * FROM change_proposals WHERE id IN (...)` can't bind more than
  * 100 ids in one statement — src/lib/d1.ts's chunkArray()/D1_MAX_BOUND_PARAMS
- * (extracted from src/app/(site)/admin/flags/page.tsx's own venue-lookup batching)
- * split the request's id list into ≤100-id chunks the same way that lookup
- * already does. The per-request cap below (200) is comfortably above what a
+ * split the request's id list into ≤100-id chunks. The per-request cap below (200) is comfortably above what a
  * single admin's filtered "date-only" queue is ever likely to hold in one
  * sitting, but still finite — an unbounded `ids` array would otherwise let
  * one request bind an arbitrarily large batch of small per-proposal
@@ -59,19 +55,12 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { getAdminDb, type AdminDbAccess } from "@/lib/adminDb";
-import { requireAdminOrigin, type HeaderSource } from "@/lib/adminOrigin";
+import { authorizeAdminWrite, type AdminDbAccess } from "@/lib/adminDb";
 import { adminAuthErrorResponse } from "@/lib/adminAuthErrors";
 import { applyApprovedProposal, isDateOnlyUpdateProposal, parseProposalRow, type ChangeProposalRow } from "@/lib/adminProposals";
 import { D1_MAX_BOUND_PARAMS, chunkArray } from "@/lib/d1";
 
-async function authorizeBulkApproveRequest(headers: HeaderSource): Promise<AdminDbAccess> {
-  const access = await getAdminDb(headers);
-  requireAdminOrigin(headers);
-  return access;
-}
-
-/** Cap chosen well above any real /admin/flags queue's date-only subset (the first production run's whole queue was 107 proposals total) while still bounding one request's worth of sequential db.batch() calls. */
+/** Cap chosen well above any real review queue's date-only subset (the first production run's whole queue was 107 proposals total) while still bounding one request's worth of sequential db.batch() calls. */
 const MAX_IDS_PER_REQUEST = 200;
 
 /** `null` on any shape the client should never legitimately send — missing/non-array `ids`, an empty array, or a non-positive-integer entry — collapsed to one 400, distinct from a request that's shaped correctly but simply too long (checked separately by the caller so that case gets its own, more specific handling). */
@@ -106,7 +95,7 @@ async function loadProposalsByIds(db: D1Database, ids: number[]): Promise<Map<nu
 export async function POST(req: NextRequest): Promise<Response> {
   let access: AdminDbAccess;
   try {
-    access = await authorizeBulkApproveRequest(req.headers);
+    access = await authorizeAdminWrite(req.headers);
   } catch (err) {
     return adminAuthErrorResponse(err);
   }

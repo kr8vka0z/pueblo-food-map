@@ -113,9 +113,10 @@ export function buildProposalWriteStatements(
 
   const statements = [
     `UPDATE venues SET last_verified = ${sqlText(newLastVerified)}, updated_by = ${sqlText(AUTO_APPLY_ACTOR)}, updated_at = ${sqlText(now)} WHERE id = ${sqlText(proposal.targetVenueId)};`,
-    // Mirrors applyApprovedProposal()'s AUDIT_INSERT_SQL shape exactly
-    // (src/lib/adminProposals.ts) — same column order/meaning, so this
-    // auto-applied row is indistinguishable in audit_log from one a human
+    // Same column order/meaning as the shared AUDIT_INSERT_VALUES_SQL
+    // (src/lib/auditLog.ts), except it binds only the first seven columns:
+    // no session_id, because the refresh job has no admin session, so that
+    // column is left NULL. Otherwise the row looks like one a human
     // reviewer's Approve click would have written.
     "INSERT INTO audit_log (actor_email, entity, entity_id, action, before_json, after_json, timestamp) VALUES (" +
       [

@@ -25,7 +25,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { VENUE_CATEGORIES, type VenueCategoryKey } from "@/lib/suggestTypes";
+import { categoryLabels } from "@/data/venues";
+import type { VenueCategory } from "@/types/venue";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { isValidEmail } from "@/lib/email";
 import { checkFormRateLimit } from "@/lib/formRateLimit";
@@ -43,7 +44,7 @@ function stripLineBreaks(s: string): string {
 async function sendSuggestionEmail(payload: {
   venueName: string;
   address: string;
-  category: VenueCategoryKey;
+  category: VenueCategory;
   hours?: string;
   contact?: string;
   acceptsSnap: boolean;
@@ -56,8 +57,7 @@ async function sendSuggestionEmail(payload: {
     throw new Error("RESEND_API_KEY not configured");
   }
 
-  const categoryLabel =
-    VENUE_CATEGORIES[payload.category] ?? payload.category;
+  const categoryLabel = categoryLabels[payload.category] ?? payload.category;
 
   const lines: string[] = [
     `Venue name: ${payload.venueName}`,
@@ -138,7 +138,9 @@ function validate(body: SubmitPayload): string | null {
   if (body.address.length > FIELD_LIMITS.SUGGEST_ADDRESS) {
     return `Address must be ${FIELD_LIMITS.SUGGEST_ADDRESS} characters or fewer`;
   }
-  if (!body.category || !(body.category in VENUE_CATEGORIES)) {
+  // Object.hasOwn, not `in`: `in` also matches Object.prototype keys, so
+  // "constructor" or "toString" used to pass as a category.
+  if (typeof body.category !== "string" || !Object.hasOwn(categoryLabels, body.category)) {
     return "Invalid category";
   }
   if (body.hours && body.hours.length > FIELD_LIMITS.SUGGEST_HOURS) {
@@ -248,7 +250,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const sanitized = {
     venueName: stripLineBreaks(body.venueName.trim()),
     address: stripLineBreaks(body.address.trim()),
-    category: body.category as VenueCategoryKey,
+    category: body.category as VenueCategory,
     hours: body.hours ? stripLineBreaks(body.hours) : undefined,
     contact: body.contact ? stripLineBreaks(body.contact) : undefined,
     acceptsSnap: Boolean(body.acceptsSnap),

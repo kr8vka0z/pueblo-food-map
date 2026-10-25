@@ -18,10 +18,10 @@
  *
  * Reuses src/lib/adminBoxes.ts's loadBoxHealthEntries() — the SAME loader
  * (and therefore the same box set + status math, via boxHealth.ts's
- * computeBoxHealth) the Dashboard's "Boxes that need help" panel already
- * uses, so the two screens can never disagree about a box's status.
+ * computeBoxHealth) the Dashboard's "Boxes empty or low" count uses, so the
+ * two screens can never disagree about a box's status.
  * loadReviewQueue/loadPendingAdopters' FULL pending arrays (same loaders
- * /admin/box-photos and /admin/box-adopters already call) feed BOTH the
+ * the Dashboard and the venue edit page call) feed BOTH the
  * "To review" summary box's X/Y/Z counts (their own `.length`s, no extra
  * COUNT query — same reasoning the Dashboard's own navCounts construction
  * gives) AND, via adminBoxes.ts's groupBoxReviewItems(), AllBoxesTable's own

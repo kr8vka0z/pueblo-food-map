@@ -3,7 +3,8 @@
  *
  * computeOpenStatus() takes a Venue's hours_weekly map and a Date, and returns
  * a discriminated-union status: "open", "opens_at", "closed_today", or
- * "no_hours". Components use this to render the open/closed badge.
+ * "no_hours". Components render the open/closed badge from
+ * computeVenueOpenStatus(), which combines it with the irregular schedules.
  *
  * formatSlot() converts a slot string to a human-readable "9am – 5pm" form for
  * the hours panel in BottomSheet / DesktopVenueWindow. Accepts both the 24h
@@ -19,7 +20,9 @@
  * local time (see "Irregular (monthly-ordinal, etc.)" section below for
  * why) and combined with the weekly logic above by computeVenueOpenStatus().
  */
-import type { IrregularSchedule, Venue, WeeklyHours } from "@/types/venue";
+import type { DayKey, IrregularSchedule, Venue, WeeklyHours } from "@/types/venue";
+
+export type { DayKey };
 
 export type OpenStatus =
   | { state: "open"; time: string }
@@ -42,15 +45,11 @@ export const DISPLAY_DAY_KEYS = [
   "fri",
   "sat",
   "sun",
-] as const;
-
-export type DayKey = (typeof DISPLAY_DAY_KEYS)[number];
+] as const satisfies readonly DayKey[];
 
 /** The DayKey for today (local time), e.g. to highlight the current row. */
 export function todayKey(): DayKey {
-  const idx = new Date().getDay(); // 0=Sun
-  const map: DayKey[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-  return map[idx] ?? "mon";
+  return DAY_KEYS[new Date().getDay()];
 }
 
 /**
@@ -156,28 +155,24 @@ export function computeOpenStatus(
   // Check if currently open
   for (const parsed of parsedSlots) {
     if (nowMinutes >= parsed.open && nowMinutes < parsed.close) {
-      // Format closing time as "h:mma"
-      const closeHour = Math.floor(parsed.close / 60);
-      const closeMin = parsed.close % 60;
-      const label = formatTime(closeHour, closeMin);
-      return { state: "open", time: label };
+      return { state: "open", time: formatTime(parsed.close) };
     }
   }
 
   // Check if a slot starts later today (sorted, so first match = soonest)
   for (const parsed of parsedSlots) {
     if (nowMinutes < parsed.open) {
-      const openHour = Math.floor(parsed.open / 60);
-      const openMin = parsed.open % 60;
-      const label = formatTime(openHour, openMin);
-      return { state: "opens_at", time: label };
+      return { state: "opens_at", time: formatTime(parsed.open) };
     }
   }
 
   return { state: "closed_today" };
 }
 
-function formatTime(hour: number, min: number): string {
+/** Minutes since midnight → "9am" / "10:30am". */
+function formatTime(minutes: number): string {
+  const hour = Math.floor(minutes / 60);
+  const min = minutes % 60;
   // hour can be 24 — a slot closing at "24:00" (midnight), e.g. OSM's
   // "00:00-24:00" 24-hour venues. Normalize into 0–23 so 24:00 renders as
   // "12am" (midnight), not "12pm": without the %24, a full-day close read as
@@ -207,11 +202,7 @@ export function formatSlot(slot: string): string {
   // this function's existing locale-agnostic output (slot times always render
   // as English am/pm regardless of page locale).
   if (parsed.close - parsed.open >= 24 * 60) return "Open 24 hours";
-  const openHour = Math.floor(parsed.open / 60);
-  const openMin = parsed.open % 60;
-  const closeHour = Math.floor(parsed.close / 60);
-  const closeMin = parsed.close % 60;
-  return `${formatTime(openHour, openMin)} – ${formatTime(closeHour, closeMin)}`;
+  return `${formatTime(parsed.open)} – ${formatTime(parsed.close)}`;
 }
 
 /**
@@ -245,8 +236,7 @@ export function slotToIsoTimes(
 // WHY Denver time, computed via Intl rather than a date library: this app
 // serves one physical city (Pueblo, CO — America/Denver), and the platform
 // (Intl.DateTimeFormat) already does correct DST-aware timezone conversion
-// natively — no new dependency needed (see AGENTS.md/RULES.md "no new
-// dependencies unless unavoidable"). Only ONE step touches a timezone —
+// natively — no date library needed. Only ONE step touches a timezone —
 // getDenverDateTime() below, converting the caller's `now: Date` (a real
 // UTC instant) into Denver calendar/clock fields. Every downstream
 // computation (nth-weekday-of-month, day-of-month, "next occurrence" month
@@ -370,7 +360,7 @@ export function computeIrregularOpenStatus(
       const parsed = parseSlot(slotStr);
       if (!parsed) continue;
       if (denverNow.minutes >= parsed.open && denverNow.minutes < parsed.close) {
-        return { state: "open", time: formatTime(Math.floor(parsed.close / 60), parsed.close % 60) };
+        return { state: "open", time: formatTime(parsed.close) };
       }
       if (parsed.open > denverNow.minutes && (opensAtCandidate === null || parsed.open < opensAtCandidate)) {
         opensAtCandidate = parsed.open;
@@ -378,7 +368,7 @@ export function computeIrregularOpenStatus(
     }
   }
   if (opensAtCandidate !== null) {
-    return { state: "opens_at", time: formatTime(Math.floor(opensAtCandidate / 60), opensAtCandidate % 60) };
+    return { state: "opens_at", time: formatTime(opensAtCandidate) };
   }
   return { state: "closed_today" };
 }
@@ -530,7 +520,7 @@ export function formatIrregularOccurrence(
     day: "numeric",
   }).format(carrier);
   const parsed = parseSlot(occurrence.slot);
-  const timeLabel = parsed ? formatTime(Math.floor(parsed.open / 60), parsed.open % 60) : occurrence.slot;
+  const timeLabel = parsed ? formatTime(parsed.open) : occurrence.slot;
   return `${dateLabel}, ${timeLabel}`;
 }
 

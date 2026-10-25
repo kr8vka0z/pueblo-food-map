@@ -1,9 +1,8 @@
 /**
  * boxHealth.ts — the ADMIN triage read of a blessing box's status, used by
- * the /admin Dashboard's "Boxes that need help" panel and the /admin/boxes
+ * the /admin Dashboard's "Boxes empty or low" count and the /admin/boxes
  * tab's all-boxes table (status filter counts, "Needs attention first"
- * sort — #671 removed that tab's dedicated "Needs help now" / "Gone quiet"
- * lists and status map in favor of the table's own filters). Deliberately a
+ * sort). Deliberately a
  * SEPARATE function from blessingBoxes.ts's
  * computeBoxStatus(): that one is the PUBLIC map's contract (7-day fade
  * window, 'took'/'problem' never set a status, an out-of-service override)
@@ -104,8 +103,7 @@ export interface BoxHealthEntry {
    * flag, NOT a query filter: a removed box still appears here, same as it
    * still appears on the public map marked out-of-service, rather than
    * disappearing from admin management entirely). Feeds the Boxes tab's
-   * "N in service" count (src/app/(site)/admin/boxes/page.tsx); unused by the
-   * Dashboard's "Boxes that need help" panel, which doesn't distinguish it.
+   * "N in service" count (src/app/(site)/admin/boxes/page.tsx).
    */
   removedOn: string | null;
 }
@@ -113,8 +111,8 @@ export interface BoxHealthEntry {
 /**
  * Boxes still in service — `removed_on` is a display flag on
  * BoxHealthEntry, not a query filter (see that field's own doc comment), so
- * every "needs attention" surface (Dashboard's help panel — see
- * src/app/(site)/admin/page.tsx) filters it out HERE, in one shared place, rather
+ * every "needs attention" surface (the Dashboard's "Boxes empty or low"
+ * count — see src/app/(site)/admin/page.tsx) filters it out HERE, in one shared place, rather
  * than each caller re-deriving the
  * same `removedOn === null` check. A removed box is out of service; nobody
  * needs to go check on it or see it flagged "gone quiet." It still appears
@@ -126,26 +124,23 @@ export function activeBoxes(entries: BoxHealthEntry[]): BoxHealthEntry[] {
 }
 
 /**
- * Boxes needing help right now (status low/empty/problem), most recent
- * report first — feeds BOTH the Dashboard's compact "Boxes that need help"
- * panel and the Boxes tab's fuller "Needs help now" list, same ranking
- * either way so the two screens never disagree about which box is most
- * urgent. Removed boxes are excluded (activeBoxes) — see that function's
- * own header.
+ * The statuses that mean "someone should go check on this box" — shared by
+ * rankNeedsHelp (the Dashboard's "Boxes empty or low" count) and
+ * AllBoxesTable's "Needs help" filter, so the two screens never disagree.
  */
-export function rankNeedsHelp(entries: BoxHealthEntry[], limit?: number): BoxHealthEntry[] {
-  const needing = activeBoxes(entries)
-    .filter((e) => e.health.status === "low" || e.health.status === "empty" || e.health.status === "problem")
+export const NEEDS_HELP_STATUSES: ReadonlySet<BoxHealthStatus> = new Set(["low", "empty", "problem"]);
+
+/**
+ * Boxes needing help right now (NEEDS_HELP_STATUSES), most recent report
+ * first — the Dashboard's "Boxes empty or low" count. Removed boxes are
+ * excluded (activeBoxes) — see that function's own header.
+ */
+export function rankNeedsHelp(entries: BoxHealthEntry[]): BoxHealthEntry[] {
+  return activeBoxes(entries)
+    .filter((e) => NEEDS_HELP_STATUSES.has(e.health.status))
     .sort((a, b) => {
       const at = a.health.latest?.createdAt ?? "";
       const bt = b.health.latest?.createdAt ?? "";
       return at < bt ? 1 : at > bt ? -1 : 0;
     });
-  return typeof limit === "number" ? needing.slice(0, limit) : needing;
 }
-
-// rankQuiet (the old "Gone quiet" list's ranking) was removed here in #671 —
-// the Boxes tab's own "Quiet" status filter + "Needs attention first" sort
-// (src/components/AllBoxesTable.tsx) replaced that dedicated list, and
-// nothing else called this function (unlike rankNeedsHelp, which the
-// Dashboard's "Boxes that need help" panel still uses).

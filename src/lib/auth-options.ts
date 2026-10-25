@@ -48,24 +48,18 @@ import {
  * Every hostname this Worker answers admin traffic on (mirrors
  * adminOrigin.ts's ADMIN_ORIGINS + the hostname list documented in that file's
  * header comment: the public apex — where admin now serves at the `/admin`
- * path, gated by Better Auth alone (email code + passkey; Cloudflare Access
- * has been fully removed from this path) — the staging apex, and the bare
- * workers.dev fallback). Better Auth needs this to
+ * path, gated by Better Auth alone (email code + passkey) — the staging
+ * apex, and the bare workers.dev fallback). Better Auth needs this to
  * construct correct absolute callback/redirect URLs regardless of which
- * hostname a request arrives on — the same multi-hostname reality
- * adminOrigin.ts's (formerly cfAccess.ts's) in-app JWT re-verification used to cover, for the same
- * underlying reason (Cloudflare Workers answer on more hostnames than a
- * single custom domain). The admin.pueblofoodmap.com /
- * dev.admin.pueblofoodmap.com subdomains are retired — admin is a path on
- * these same apex hosts, not a separate hostname.
+ * hostname a request arrives on (Cloudflare Workers answer on more
+ * hostnames than a single custom domain). Admin is a path on these apex
+ * hosts, not a separate hostname.
  *
  * NOT included: Workers version-preview URLs (`<version-prefix>-pueblo-food-
  * map.kyle-boyd.workers.dev`) — those are dynamic per-deploy and can't be
  * exact-matched, and this option supports only exact/wildcard hostnames,
- * not a fully dynamic predicate. Phase 2/3 (real login UI + route gating)
- * is the right place to decide whether a wildcard pattern is worth adding;
- * Phase 1 only needs the engine to construct URLs correctly on the
- * hostnames real login traffic will actually use.
+ * not a fully dynamic predicate. No wildcard pattern is listed, so admin
+ * sign-in works only on the hostnames real login traffic uses (below).
  */
 const ADMIN_ALLOWED_HOSTS = [
   "dev.pueblofoodmap.com",
@@ -125,7 +119,7 @@ export function buildAuthOptions(
       // fallback should rarely be hit in practice — it exists as the second
       // half of a belt-and-suspenders fix so a header-stripped caller can
       // never throw instead of cleanly resolving to "no session". Points at
-      // the public apex (first entry in ADMIN_ALLOWED_HOSTS above), not a
+      // the prod apex (pueblofoodmap.com in ADMIN_ALLOWED_HOSTS above), not a
       // staging/workers.dev host, since a fallback is inherently a single
       // choice and prod is the canonical default.
       fallback: "https://pueblofoodmap.com",

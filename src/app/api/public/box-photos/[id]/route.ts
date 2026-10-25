@@ -15,7 +15,7 @@
  * max-age: unlike a venue's static assets, an approved photo can be
  * FLAGGED or REJECTED later and must stop serving promptly — the approve/
  * reject/flag routes all bustEdgeCache() this exact path on any status
- * change, but that purge is per-colo (see respondWithEdgeCache's own
+ * change, but that purge is per-colo (see src/lib/edgeCache.ts's file
  * header), so the Cache-Control TTL is the real cross-colo bound. 5 minutes
  * (fix, 2026-09-18, PR #490 review; was 1 hour) is the deliberate choice: a
  * flagged/rejected photo can now only ever linger on an un-purged colo (or
@@ -25,14 +25,15 @@
  * straight off this same Cache-Control header, so one constant governs both.
  *
  * A 404 (bad id, no approved row, or the R2 object itself missing) is NEVER
- * cached — same "never cache a degraded/negative result" rule
- * respondWithEdgeCache() enforces for the JSON routes, applied by hand here
- * since this route serves binary bytes, not JSON.
+ * cached — serveFromEdgeCache() (src/lib/edgeCache.ts, the same step
+ * respondWithEdgeCache() uses for the JSON routes) only stores a 200. A
+ * malformed id 404s before the cache is even consulted.
  */
 
 import { NextRequest } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { loadApprovedBoxPhotoById } from "@/lib/boxPhotos";
+import { serveFromEdgeCache } from "@/lib/edgeCache";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -51,13 +52,11 @@ export async function GET(
   const photoId = Number(rawId);
   if (!Number.isInteger(photoId) || photoId <= 0) return notFound();
 
-  const cache: Cache | undefined = (globalThis as { caches?: { default?: Cache } }).caches?.default;
-  const cacheKey = new Request(req.url, req);
-  if (cache) {
-    const cached = await cache.match(cacheKey);
-    if (cached) return cached;
-  }
+  return serveFromEdgeCache(new Request(req.url, req), async () => ({ response: await loadPhoto(photoId) }));
+}
 
+/** Builds the photo response: a 404 on any miss, otherwise the JPEG bytes with the 5-minute Cache-Control. */
+async function loadPhoto(photoId: number): Promise<Response> {
   let db: D1Database;
   let bucket: R2Bucket;
   try {
@@ -79,22 +78,11 @@ export async function GET(
   if (!object) return notFound(); // D1 row exists but the R2 object is gone — never crash a public image request over it
 
   const bytes = await object.arrayBuffer();
-  const response = new Response(bytes, {
+  return new Response(bytes, {
     status: 200,
     headers: {
       "Content-Type": "image/jpeg",
       "Cache-Control": `public, max-age=${CACHE_TTL_SECONDS}`,
     },
   });
-
-  if (cache) {
-    try {
-      const { ctx } = getCloudflareContext();
-      ctx.waitUntil(cache.put(cacheKey, response.clone()));
-    } catch {
-      // No live ExecutionContext — caching is a performance nicety only.
-    }
-  }
-
-  return response;
 }

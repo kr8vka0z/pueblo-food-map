@@ -3,7 +3,7 @@
  * (Blessing Boxes slice 6). Writes a pending, unconfirmed application
  * immediately; nothing about it is public ("Cared for by ...") until BOTH
  * the applicant confirms their email (POST /api/public/alerts/confirm) AND
- * an admin approves it (/admin/box-adopters).
+ * an admin approves it (/admin/boxes?show=review).
  *
  * Guard ORDER, same shared convention as every other public write on this
  * box surface (see the checkins route's own header): Content-Type ->
@@ -11,19 +11,19 @@
  * per-visitor/per-box rate limit -> field validation -> box lookup ->
  * email-flood rate limit -> write -> confirm email.
  *
- * 2026-09-18 security review, item 5: the two email-flood scopes below
- * (alert-email-target/alert-email-global) used to run BEFORE field
+ * 2026-09-18 security review, item 5: the two email-flood scopes
+ * (alert-email-target/alert-email-global, checked by
+ * checkAlertEmailFloodCaps in src/lib/boxAlerts.ts, which this route shares
+ * with the giver alert route) used to run BEFORE field
  * validation and the box lookup, alongside the per-visitor/per-box caps —
  * so a burst of requests with an INVALID displayName/email/note, or an
  * unknown box id, still counted against the shared email-abuse budget even
  * though no email was ever going to be sent. Moved to run immediately
  * before the write/send below (the only place they still guard something
  * real) — the per-visitor/per-box scopes stay where they were, since those
- * exist to cap the WRITE attempt itself, not the email. MAX_EMAIL_GLOBAL_PER_HOUR
- * also raised 60 -> 300 (item 5): 60/hour shared across this route AND the
- * giver alert route was tight enough to plausibly false-positive during
- * ordinary sitewide traffic; 300 keeps the "catch a real flood" purpose
- * without that risk, matching the checkins route's own 300/hour reasoning.
+ * exist to cap the WRITE attempt itself, not the email. The site-wide cap
+ * was also raised 60 -> 300 in item 5; the reason sits next to the constant
+ * in boxAlerts.ts.
  *
  * A confirm-email send failure is FATAL to the response here (unlike the
  * checkins route's best-effort problem-report email) — per the task's own
@@ -46,16 +46,16 @@ import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { resolveEmailOrigin } from "@/lib/alertOrigin";
 import { logFormFailure } from "@/lib/logger";
 import { insertAdopterApplication, sendAdopterConfirmEmail } from "@/lib/boxAdopters";
+import { checkAlertEmailFloodCaps } from "@/lib/boxAlerts";
 import { sanitizeDisplayName } from "@/lib/displayNameHygiene";
 import { resolveEmailLang } from "@/lib/i18n";
+import { requestIp } from "@/lib/publicRequest";
+import { loadLiveBoxName } from "@/lib/blessingBoxes";
 
 export const dynamic = "force-dynamic";
 
 const MAX_ADOPT_APPLICATIONS_PER_VISITOR_PER_HOUR = 3;
 const MAX_ADOPT_APPLICATIONS_PER_BOX_PER_HOUR = 10;
-/** Shared with the giver alert sign-up route — see this file's own header. */
-const MAX_EMAIL_TARGET_PER_HOUR = 3;
-const MAX_EMAIL_GLOBAL_PER_HOUR = 300;
 
 interface AdoptPayload {
   displayName?: string;
@@ -69,11 +69,6 @@ interface AdoptPayload {
   turnstileKey?: string;
   /** Opaque, non-identifying per-browser token from src/lib/checkinClientToken.ts — rate-limit key only, never persisted. */
   clientToken?: string;
-}
-
-interface BoxLookupRow {
-  id: string;
-  name: string;
 }
 
 export async function POST(
@@ -94,8 +89,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
 
-  const ip =
-    req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = requestIp(req);
   const turnstileKey = resolveBoxTurnstileKey(body.turnstileKey);
   const rateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
   if (!rateLimitSecret) {
@@ -167,17 +161,14 @@ export async function POST(
     note = trimmed;
   }
 
-  let box: BoxLookupRow | null;
+  let boxName: string | null;
   try {
-    box = await db
-      .prepare("SELECT id, name FROM venues WHERE id = ? AND category = 'blessing_box' AND status != 'archived'")
-      .bind(boxId)
-      .first<BoxLookupRow>();
+    boxName = await loadLiveBoxName(db, boxId);
   } catch (err) {
     logFormFailure("adopt", "db_unavailable", { message: err instanceof Error ? err.message : "unknown error" });
     return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 502 });
   }
-  if (!box) {
+  if (boxName === null) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
@@ -185,24 +176,9 @@ export async function POST(
   // only a request that already passed field validation and found a live
   // box reaches these, since only such a request is ever actually going to
   // send an email.
-  const emailTargetCap = await checkAndIncrement(
-    db,
-    rateLimitSecret,
-    { scope: "alert-email-target", id: email },
-    MAX_EMAIL_TARGET_PER_HOUR,
-  );
-  if (!emailTargetCap) {
-    return NextResponse.json({ ok: false, error: "rate_limit_email" }, { status: 429 });
-  }
-
-  const globalCap = await checkAndIncrement(
-    db,
-    rateLimitSecret,
-    { scope: "alert-email-global", id: "global" },
-    MAX_EMAIL_GLOBAL_PER_HOUR,
-  );
-  if (!globalCap) {
-    return NextResponse.json({ ok: false, error: "rate_limit_global" }, { status: 429 });
+  const floodCap = await checkAlertEmailFloodCaps(db, rateLimitSecret, email);
+  if (floodCap) {
+    return NextResponse.json({ ok: false, error: floodCap }, { status: 429 });
   }
 
   let confirmToken: string;
@@ -216,7 +192,7 @@ export async function POST(
   }
 
   try {
-    await sendAdopterConfirmEmail({ to: email, boxName: box.name, origin: resolveEmailOrigin(req), confirmToken, lang });
+    await sendAdopterConfirmEmail({ to: email, boxName, origin: resolveEmailOrigin(req), confirmToken, lang });
   } catch (err) {
     // Fatal per the task's own spec — see this file's header. The row
     // stays (it's a real, reviewable application either way), but the

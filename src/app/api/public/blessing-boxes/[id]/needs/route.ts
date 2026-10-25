@@ -67,15 +67,16 @@ import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
 import { bustEdgeCache } from "@/lib/edgeCache";
 import { parseNeedsField } from "@/lib/blessingBoxes";
+import { requestIp } from "@/lib/publicRequest";
 
 export const dynamic = "force-dynamic";
 
 /** Same caps as a check-in itself (checkins/route.ts) — the needs ask is 1:1 with a 'took' check-in (replace-on-repeat), not a distinct per-tap action, so it shares that route's own order-of-magnitude reasoning rather than photos' tighter per-upload caps. */
-export const MAX_PER_BOX_PER_HOUR = 300;
-export const MAX_PER_VISITOR_PER_BOX_PER_HOUR = 6;
+const MAX_PER_BOX_PER_HOUR = 300;
+const MAX_PER_VISITOR_PER_BOX_PER_HOUR = 6;
 
 /** How long after a 'took' check-in its needs ask can still be attached — the task's own fallback ("reuse whatever window photo-attach uses, else 15 minutes"); photo-attach (src/app/api/public/blessing-boxes/[id]/photos/route.ts) turned out to have NO time window at all (only a box-match check), so this is a genuinely new constraint, not a mirrored one. */
-export const NEEDS_ATTACH_WINDOW_MS = 15 * 60 * 1000;
+const NEEDS_ATTACH_WINDOW_MS = 15 * 60 * 1000;
 
 interface NeedsPayload {
   checkinId?: number;
@@ -108,8 +109,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
 
-  const ip =
-    req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = requestIp(req);
 
   const turnstileKey = resolveBoxTurnstileKey(body.turnstileKey);
   const checkinRateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;

@@ -4,8 +4,8 @@
  * same rationale page.waitingToPublish.test.tsx already established for
  * this page: covers ONLY the "Suggestions to review" box's D1 wiring
  * (resolvePendingProposals/resolvePendingSubmissions — the change_proposals
- * and public_submissions SELECTs, and the VenueLookup fetch either gates on
- * having something to show). ProposalCard's/SubmissionCard's own
+ * and public_submissions SELECTs; the box's venue context is mapped from
+ * the page's own venue row, never a second read). ProposalCard's/SubmissionCard's own
  * rendering/actions are covered in their own test files; this file only
  * proves the page loads the right rows and passes them through.
  */
@@ -123,8 +123,7 @@ function makePendingSubmissionRow(overrides: Partial<PublicSubmissionRow> = {}):
  * Dispatches on SQL text: venues SELECT (.first), the "pending proposals for
  * this venue" SELECT (.all, WHERE change_proposals ... status = 'pending'),
  * the "pending public reports for this venue" SELECT (.all, WHERE
- * public_submissions ... status = 'pending'), the venueLookup SELECT (.all,
- * id IN (...)) — same "one fake, branch on SQL text" pattern
+ * public_submissions ... status = 'pending') — same "one fake, branch on SQL text" pattern
  * page.waitingToPublish.test.tsx already established for this page.
  */
 function makeDb(
@@ -132,27 +131,27 @@ function makeDb(
   pendingProposalRows: ChangeProposalRow[] = [],
   pendingSubmissionRows: PublicSubmissionRow[] = [],
 ) {
+  const venueReads: string[] = [];
   return {
-    prepare: (sql: string) => ({
-      bind: (...args: unknown[]) => ({
-        first: async () => (sql.includes("FROM venues") ? venueRow : null),
-        all: async () => {
-          if (sql.includes("FROM change_proposals") && sql.includes("status = 'pending'")) {
-            return { results: pendingProposalRows };
-          }
-          if (sql.includes("FROM public_submissions") && sql.includes("status = 'pending'")) {
-            return { results: pendingSubmissionRows };
-          }
-          if (sql.includes("FROM venues WHERE id IN")) {
-            return {
-              results: venueRow && args[0] === venueRow.id ? [{ ...venueRow }] : [],
-            };
-          }
-          return { results: [] };
-        },
-      }),
-    }),
-  } as unknown as object;
+    venueReads,
+    prepare: (sql: string) => {
+      if (sql.includes("FROM venues")) venueReads.push(sql);
+      return {
+        bind: () => ({
+          first: async () => (sql.includes("FROM venues") ? venueRow : null),
+          all: async () => {
+            if (sql.includes("FROM change_proposals") && sql.includes("status = 'pending'")) {
+              return { results: pendingProposalRows };
+            }
+            if (sql.includes("FROM public_submissions") && sql.includes("status = 'pending'")) {
+              return { results: pendingSubmissionRows };
+            }
+            return { results: [] };
+          },
+        }),
+      };
+    },
+  };
 }
 
 describe("EditVenuePage — Suggestions to review box (#674)", () => {
@@ -160,7 +159,7 @@ describe("EditVenuePage — Suggestions to review box (#674)", () => {
     vi.clearAllMocks();
   });
 
-  test("no pending proposals -> no box, and the venueLookup query never runs", async () => {
+  test("no pending proposals -> no box", async () => {
     mockGetAdminDb.mockResolvedValue({
       db: makeDb(makeRow()),
       identity: { email: "admin@example.com" },
@@ -177,8 +176,9 @@ describe("EditVenuePage — Suggestions to review box (#674)", () => {
   });
 
   test("pending proposals for this venue render one card each under 'Suggestions to review'", async () => {
+    const db = makeDb(makeRow(), [makePendingProposalRow({ id: 1 }), makePendingProposalRow({ id: 2 })]);
     mockGetAdminDb.mockResolvedValue({
-      db: makeDb(makeRow(), [makePendingProposalRow({ id: 1 }), makePendingProposalRow({ id: 2 })]),
+      db,
       identity: { email: "admin@example.com" },
     });
 
@@ -191,6 +191,8 @@ describe("EditVenuePage — Suggestions to review box (#674)", () => {
 
     expect(screen.getByText("Suggestions to review (2)")).toBeDefined();
     expect(screen.getAllByTestId("proposal-detail")).toHaveLength(2);
+    // The box's venue context comes from the row the page already loaded.
+    expect(db.venueReads).toHaveLength(1);
   });
 
   test("a pending public report for this venue joins the SAME box, rendering a Mark done card (#675)", async () => {

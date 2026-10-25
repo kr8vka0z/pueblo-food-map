@@ -25,8 +25,9 @@ export const OG_IMAGE = {
   alt: "Pueblo Food Map — find food pantries, gardens, grocery & meal sites in Pueblo County, Colorado",
 } as const;
 
-export const ROOT_DESCRIPTION =
-  "A community-built map of food resources in Pueblo County, Colorado — community gardens, edible landscapes, food pantries, and grocery stores — with walking and bus directions via Pueblo Transit.";
+// WHY: the site-wide fallback description is the homepage's description (owner
+// decision), read from the same i18n key the homepage uses so the two can't drift.
+export const ROOT_DESCRIPTION = t("meta.home.description", "en");
 
 /**
  * The root layout's metadata object (src/app/(site)/layout.tsx), also

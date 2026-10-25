@@ -36,14 +36,14 @@ jobs:
         id: detect
         # A branch-name check ALONE would be unsafe: anything pushed to a
         # branch literally named "publish-bot" in this repo would silently
-        # skip lint/tests/audit. The real safety property is the DIFF --
-        # this only reports data_only=true when the PR both (a) really is
-        # publish-bot -> main/dev, from this repo (not a fork), AND
-        # (b) its full base...head diff touches EXACTLY the one generated
-        # file the publish engine writes (src/lib/publishVenues.ts,
-        # AGENTS.md "Publish -> static"). Any other change on that branch
-        # -- code, a workflow file, a second file alongside the data file --
-        # fails this check and gets the full pipeline below (#336).
+        # skip lint/tests. The real safety property is the DIFF -- this only
+        # reports data_only=true when the PR both (a) really is
+        # publish-bot -> main/dev, from this repo (not a fork), AND (b) its
+        # full base...head diff touches EXACTLY src/data/published-venues.ts,
+        # the one file the publish engine (src/lib/publishVenues.ts) writes.
+        # Any other change on that branch -- code, a workflow file, a second
+        # file alongside the data file -- fails this check and gets the full
+        # pipeline below (#336).
         #
         # Diffed from the MERGE-BASE of base/head, not a raw two-dot diff
         # (PR review on #383): a two-dot diff only equals "this PR's change"
@@ -130,27 +130,32 @@ jobs:
       - name: Test — published data / venue shape only (data-only publish PR)
         # A scoped-down substitute for the full suite above, not a silent
         # skip (#336): still proves the regenerated published-venues.ts is
-        # structurally sound (row shape, benefit-flag overlay wiring, every
-        # venue's lat/lng inside the county bbox, hours parsing, JSON-LD
-        # schema built from real venue data) without paying for every
-        # UI/i18n/a11y test a pure data change can't affect.
+        # structurally sound (row shape, every venue's lat/lng inside the
+        # county bbox, hours parsing, JSON-LD schema built from real venue
+        # data) without paying for every UI/i18n/a11y test a pure data
+        # change can't affect.
         if: steps.detect.outputs.data_only == 'true'
         run: npx vitest run src/lib/publishVenues.test.ts src/__tests__/publishedVenues.test.ts src/__tests__/pueblo-bbox.test.ts src/__tests__/hours.test.ts src/__tests__/venueSchema.test.ts
 
-      - name: npm audit (production deps, high/critical only)
-        # Only production deps are shipped to the Worker; dev CVEs stay local.
-        # --audit-level=high skips moderate/low. --omit=dev excludes dev deps.
-        #
-        # Skipped for a data-only publish PR (#336): a newly-published CVE
-        # against an unrelated transitive dependency must not block real
-        # venue data from reaching the live map. The CVE doesn't go dark --
-        # it's still caught by this same check on every non-publish PR, and
-        # independently by weekly-security-audit.yml's cron regardless of
-        # whether anyone opens a PR at all. This is a deliberate, scoped
-        # hole: the diff-scope guard above (data_only) is what keeps it from
-        # being a general audit bypass.
+      # Production-dependency CVEs are gated by the required "Dependency CVE
+      # Audit" job (weekly-security-audit.yml), not repeated here.
+
+      # The Python scrapers' offline self-tests (Plentiful hours parser
+      # fixtures, Overpass partial-result guard). No network: the self-check
+      # reads scripts/fixtures/plentiful/*.html and the unittest mocks Overpass.
+      # Skipped for a data-only publish PR like the other code checks.
+      - name: Set up Python (scraper self-tests)
         if: steps.detect.outputs.data_only != 'true'
-        run: npm audit --audit-level=high --omit=dev
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Scraper self-tests (Python, offline)
+        if: steps.detect.outputs.data_only != 'true'
+        # Same exact pin as refresh-proposals.yml, the version the scraper runs against.
+        run: |
+          pip install beautifulsoup4==4.14.3
+          python3 scripts/scrape-plentiful.py --self-check && python3 scripts/test_fetch_osm_grocery.py
 
       - name: Build
         # Always runs, even for a data-only publish PR — proves the

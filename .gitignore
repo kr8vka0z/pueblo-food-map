@@ -39,16 +39,13 @@ yarn-error.log*
 # filename prefix: "dev" not "env"). Never commit a real secret value.
 .dev.vars
 
-# vercel
-.vercel
-
 # cloudflare / opennext
 .open-next
 .wrangler
 
-# wrangler dry-run validation outdirs (#223 step 1 — never a real deploy)
-.wrangler-dryrun/
-.wrangler-dryrun-prod/
+# temp config scripts/check-prerender-serves.sh writes at the repo root; its
+# cleanup trap removes it, but a killed run can leave it behind
+wrangler.ci-preview.jsonc
 
 # typescript
 *.tsbuildinfo

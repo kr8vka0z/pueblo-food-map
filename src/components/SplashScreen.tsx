@@ -1,34 +1,26 @@
 'use client';
 
 /**
- * SplashScreen — v3 refresh (issue #100).
+ * SplashScreen — the first-visit welcome overlay on the home page.
  *
- * Changes from v2:
- *   - Removed: CATEGORIES array, CategorySwatch, CategoryCard, mobile category
- *     color-dot list, desktop 2-column "WHAT YOU'LL FIND" grid, "How it works"
- *     stub tile, ComingSoonToast, handleHowItWorksClick, toast timer state/effect.
- *   - Added: purpose line (splash.purpose), sponsor credit with hyperlink
- *     (splash.sponsor.prefix → "Pueblo Food Project" → pueblofoodproject.org).
- *   - Layout: single centered column, mobile-first, no-scroll at 375×812.
- *     Desktop: same column, max-w 520px, vertically centered with generous spacing.
+ * Single centered column (mobile-first, no scroll at 375×812; max-w 520px on
+ * desktop): wordmark, a one-line purpose (splash.purpose), and one "Find food
+ * near me" CTA per language (English / Spanish). Each CTA sets the site
+ * language, then runs the geolocation flow; if location is denied or
+ * dismissed it falls back to the Pueblo-centre view via
+ * onPrimary('pueblo-center'). An optional "Take a tour" button (onTour)
+ * dismisses the splash and starts the guided tour. The sponsor credit lives
+ * only in the Menu drawer, not here.
  *
- * v3 review changes:
- *   - Removed secondary CTA ("Show the Pueblo map") — primary CTA is now the
- *     only entry point. Fallback to pueblo-center still applies when geo is
- *     denied or dismissed (existing onPrimary('pueblo-center') path unchanged).
- *   - Sponsor credit moved to bottom-right corner. Removed entirely 2026-09-16
- *     (Kyle): the sponsor credit lives only at the top of the Menu drawer now.
- *   - Removed hairline divider (no longer needed without in-column credit).
- *   - onSecondary prop removed.
- *
- * Props interface and localStorage gate (pfm.splash.seen.v2) are unchanged.
+ * HomePageClient decides when the splash shows, using the localStorage gate
+ * (pfm.splash.seen.v2) in src/lib/splashGate.ts.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import Wordmark from './Wordmark';
 import { useGeolocation, type LocationFailure } from '@/lib/useGeolocation';
 import { useLocale, writeLocaleCookie } from '@/lib/LocaleContext';
-import { markSplashSeen } from '@/lib/splashGate';
+import { markSplashSeen, type SplashViewport } from '@/lib/splashGate';
 import { track, EVENTS } from '@/lib/analytics';
 import { t } from '@/lib/i18n';
 
@@ -40,7 +32,7 @@ interface SplashScreenProps {
    * `failure` is set on the failing path so the map can explain it (#739):
    * MapWrapper runs its own geolocation hook and never sees this one's result.
    */
-  onPrimary: (mode: 'located' | 'pueblo-center', failure?: LocationFailure) => void;
+  onPrimary: (mode: SplashViewport, failure?: LocationFailure) => void;
   /**
    * True while HomePageClient hasn't resolved the gate yet (server HTML and
    * first client render). Marks the root so globals.css can hide it for
@@ -65,7 +57,7 @@ export default function SplashScreen({ onPrimary, pending, onTour }: SplashScree
     if (!geoRequested) return;
     if (geo.state.permission === 'prompt') return;
 
-    const mode: 'located' | 'pueblo-center' =
+    const mode: SplashViewport =
       geo.state.permission === 'granted' && geo.state.position !== null
         ? 'located'
         : 'pueblo-center';

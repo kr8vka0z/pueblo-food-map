@@ -1,6 +1,8 @@
 /**
- * seed-admin-db.ts — one-time seed of all 108 current venues into the
- * Cloudflare D1 "pueblo-food-map-admin" database (#237 checkpoint b).
+ * seed-admin-db.ts — loads the real venue source records into a LOCAL,
+ * fresh (empty) copy of the "pueblo-food-map-admin" D1 database, e.g. for
+ * `npm run preview`. It began as the one-time #237 cutover seed, which is
+ * done; production and staging already hold their venues.
  *
  * WHAT: reads the three RAW venue source arrays — pfpVenues, groceryOsmVenues,
  * plentifulPantries — and generates scripts/generated/seed-admin.sql: one
@@ -12,31 +14,23 @@
  * docs/admin/cloudflare-native-admin-spec.md §7 step 3, the acceptance spec
  * this script implements.
  *
- * WHY raw arrays, not venues.ts's combined `venues` export (historical, at
- * the time this ran): venues.ts's export then baked in a runtime
- * benefit-flags.ts SNAP/WIC overlay, and D1's accepts_snap/accepts_wic
- * needed to hold only genuinely source-authored values so the tri-state
- * NULL = "no opinion yet" was meaningful — the overlay (spec §7 step 1, the
- * "NB4" fix) only ever filled a NULL, and only ever won once an admin could
- * edit D1 directly. Seeding the overlay's guesses as if they were explicit
- * source values would have made every one of those fields look admin-set on
- * day one and permanently blocked the overlay from ever applying again.
- * That overlay was deleted in #597 once migration 0014 copied its matches
- * into D1 and a Publish shipped them — D1 is now the sole SNAP/WIC source,
- * but this script is a one-time historical seed and is unaffected either way.
+ * Reads the raw source arrays (not venues.ts's published `venues`) because
+ * those are the source-authored values; the old benefit-flags.ts overlay
+ * that once made this distinction matter was removed in #597.
  *
- * RUN — one-time, by a human with `wrangler d1 execute` access. NOT part of
- * CI and not imported by app code.
+ * RUN — by hand, local only. NOT part of CI and not imported by app code.
  *   bun run scripts/seed-admin-db.ts
  *   # bun unavailable? fall back to: npx tsx scripts/seed-admin-db.ts
  * This only WRITES scripts/generated/seed-admin.sql (gitignored — derivable
  * from the committed .ts data files) and prints the report; it does not
- * itself touch D1. Review the generated file, then apply with:
- *   npx wrangler d1 execute pueblo-food-map-admin --local  --file=scripts/generated/seed-admin.sql
- *   npx wrangler d1 execute pueblo-food-map-admin --remote --file=scripts/generated/seed-admin.sql
- * `id` is a PRIMARY KEY, so re-applying against an already-seeded table
- * conflicts — see the spec's `DELETE FROM venues` recovery command if a
- * clean re-apply is needed while debugging.
+ * itself touch D1. Apply the schema with
+ * `npx wrangler d1 migrations apply pueblo-food-map-admin --local`, review
+ * the generated file, then load it into the local database:
+ *   npx wrangler d1 execute pueblo-food-map-admin --local --file=scripts/generated/seed-admin.sql
+ * Never run it with --remote: remote databases change only through
+ * `wrangler d1 migrations apply`, never `d1 execute --file` (AGENTS.md,
+ * "Promotion checklist"). `id` is a PRIMARY KEY, so loading it into an
+ * already-seeded table conflicts; start from a fresh local database.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -44,7 +38,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { Venue } from "@/types/venue";
-import { pfpVenues } from "@/data/venues";
+import { pfpVenues } from "@/data/pfp-venues";
 import { groceryOsmVenues } from "@/data/grocery-osm";
 import { plentifulPantries } from "@/data/pantries-plentiful";
 import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
@@ -327,9 +321,8 @@ async function main(): Promise<void> {
   writeFileSync(OUT_FILE, header + statements.join("\n") + "\n", "utf-8");
 
   console.log(`Wrote ${statements.length} INSERT statements to ${OUT_FILE}`);
-  console.log("\nNext steps (apply manually, review the file first):");
-  console.log("  npx wrangler d1 execute pueblo-food-map-admin --local  --file=scripts/generated/seed-admin.sql");
-  console.log("  npx wrangler d1 execute pueblo-food-map-admin --remote --file=scripts/generated/seed-admin.sql");
+  console.log("\nNext step (local, fresh database only; review the file first):");
+  console.log("  npx wrangler d1 execute pueblo-food-map-admin --local --file=scripts/generated/seed-admin.sql");
 }
 
 if (isMainModule) {

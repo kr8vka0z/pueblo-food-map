@@ -12,9 +12,10 @@
  * filtered link is a real nicety, but round-tripping every filter change
  * through router.replace is more machinery than this "browse recent
  * activity" screen needs — see the PR body). The ONE URL param this page
- * does read is `?box=<id>` on initial load, so BoxContent's own "See full
- * activity" link (D3) actually lands pre-filtered to that box — read once
- * via useSearchParams()'s initial value, never written back.
+ * does read is `?box=<id>` on initial load, so a link to /boxes/activity?box=<id>
+ * lands pre-filtered to that box — read once via useSearchParams()'s initial
+ * value, never written back. Nothing in the app links there now (a box's
+ * history is /box/<id>/history); the param is kept for old external links.
  *
  * Slice 7 (Numbers) — the "Network numbers" section above the filters is a
  * SEPARATE data source from the activity feed below it: useBoxNetworkStats()
@@ -41,7 +42,7 @@ import { useLocale } from "@/lib/LocaleContext";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { pageDocumentTitle } from "@/lib/site";
 import { useBoxActivity } from "@/lib/useBoxActivity";
-import { useBoxVenues } from "@/lib/useBoxVenues";
+import { useBoxesList, toVenue } from "@/lib/useBoxesList";
 import { useBoxNetworkStats } from "@/lib/useBoxNetworkStats";
 import { ACTIVITY_KINDS, ACTIVITY_PAGE_SIZE_DEFAULT } from "@/lib/boxActivity";
 import {
@@ -75,7 +76,8 @@ export default function BoxesActivityContent() {
   // <title> follows locale client-side (#589) — activity.documentTitle
   // matches page.tsx's metadata title exactly ("Blessing Box Activity").
   useDocumentTitle(pageDocumentTitle(t("activity.documentTitle", locale)));
-  const boxVenues = useBoxVenues();
+  const { boxes } = useBoxesList();
+  const boxVenues = useMemo(() => boxes.map(toVenue), [boxes]);
   const searchParams = useSearchParams();
 
   // Initial value only (a lazy useState initializer runs once, on mount) —

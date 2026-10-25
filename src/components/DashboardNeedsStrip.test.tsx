@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import DashboardNeedsStrip, { type NeedsCardData } from "@/components/DashboardNeedsStrip";
 
 const cards: NeedsCardData[] = [
-  { key: "review", label: "Places to review", count: 5, href: "/admin/submissions", detail: "3 review queue, 2 data refresh" },
+  { key: "review", label: "Places to review", count: 5, href: "/admin/submissions", detail: "3 from the public, 2 from data refresh" },
   { key: "publish", label: "Waiting to publish", count: 0, href: "/admin/places" },
   { key: "boxes-content", label: "Box photos & sponsor requests", count: 2, href: "/admin/box-photos" },
   { key: "boxes-help", label: "Boxes empty or low", count: 1, href: "/admin/boxes" },
@@ -17,7 +17,7 @@ describe("DashboardNeedsStrip", () => {
       expect(link.getAttribute("href")).toBe(card.href);
     }
     expect(screen.getByText("5")).toBeDefined();
-    expect(screen.getByText("3 review queue, 2 data refresh")).toBeDefined();
+    expect(screen.getByText("3 from the public, 2 from data refresh")).toBeDefined();
   });
 
   test("a zero-count card still renders (no hiding, per #680: an empty queue is real information)", () => {

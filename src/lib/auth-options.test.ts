@@ -31,7 +31,7 @@ import Database from "better-sqlite3";
 import { betterAuth } from "better-auth";
 import { getCookies } from "better-auth/cookies";
 import { buildAuthOptions } from "@/lib/auth-options";
-import { signInWithEmailCode } from "@/__tests__/helpers/authTestHelpers";
+import { authRequestHeaders, signInWithEmailCode } from "@/__tests__/helpers/authTestHelpers";
 
 // Full migrated schema (user/session/verification/passkey/rateLimit tables)
 // — needed only by the rpID-isolation describe block below, which drives a
@@ -190,20 +190,6 @@ describe("passkey rpID — per-environment isolation (#318)", () => {
     return betterAuth(buildAuthOptions(db, rpID));
   }
 
-  function requestHeaders(extra?: Record<string, string>): Headers {
-    return new Headers({ host: "pueblofoodmap.com", ...extra });
-  }
-
-  /** Signs in with an emailed code and returns a real, usable session cookie
-   * header — the only legitimate way to obtain an authenticated session in
-   * this system (emailAndPassword.enabled is false). Mirrors
-   * adminAuthAllowlistPlugin.test.ts's own bootstrap exactly. */
-  async function signInAndGetSessionCookie(
-    auth: ReturnType<typeof buildTestAuth>,
-  ): Promise<string> {
-  return signInWithEmailCode(auth, ALLOWLISTED_EMAIL);
-  }
-
   beforeEach(() => {
     process.env.BETTER_AUTH_SECRET =
       "test-secret-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -219,10 +205,10 @@ describe("passkey rpID — per-environment isolation (#318)", () => {
 
   test("with no override, the passkey ceremony's rpID is the prod default", async () => {
     const auth = buildTestAuth(); // no rpID argument — prod's real call shape
-    const cookieHeader = await signInAndGetSessionCookie(auth);
+    const cookieHeader = await signInWithEmailCode(auth, ALLOWLISTED_EMAIL);
 
     const options = await auth.api.generatePasskeyRegistrationOptions({
-      headers: requestHeaders({ cookie: cookieHeader }),
+      headers: authRequestHeaders({ cookie: cookieHeader }),
     });
 
     expect(options.rp.id).toBe("pueblofoodmap.com");
@@ -230,10 +216,10 @@ describe("passkey rpID — per-environment isolation (#318)", () => {
 
   test("with a staging override, the passkey ceremony's rpID is the override", async () => {
     const auth = buildTestAuth("dev.pueblofoodmap.com");
-    const cookieHeader = await signInAndGetSessionCookie(auth);
+    const cookieHeader = await signInWithEmailCode(auth, ALLOWLISTED_EMAIL);
 
     const options = await auth.api.generatePasskeyRegistrationOptions({
-      headers: requestHeaders({ cookie: cookieHeader }),
+      headers: authRequestHeaders({ cookie: cookieHeader }),
     });
 
     expect(options.rp.id).toBe("dev.pueblofoodmap.com");

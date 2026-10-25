@@ -43,8 +43,8 @@ import { LocaleProvider } from "@/lib/LocaleContext";
 import MapWrapper, {
   ROUTE_FIT_PADDING_MOBILE,
   ROUTE_FIT_MAX_ZOOM,
-  computeCategoryBounds,
 } from "@/components/MapWrapper";
+import { computeCategoryBounds } from "@/lib/mapBounds";
 import { MOBILE_QUERY } from "@/lib/useMediaQuery";
 import { venues as allRealVenues } from "@/data/venues";
 

@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-10-25
+
+### Improved
+
+- The Blessing Box need is now labeled "Drinks" (Bebidas in Spanish) everywhere, including the admin check-ins list. ([#812](https://github.com/kr8vka0z/pueblo-food-map/pull/812))
+- The admin Dashboard's "Places to review" card now says how many items came from the public and how many from the data refresh. ([#813](https://github.com/kr8vka0z/pueblo-food-map/pull/813))
+- Pages without their own description, such as the "not found" page, now show the homepage description when shared or searched. ([#814](https://github.com/kr8vka0z/pueblo-food-map/pull/814))
+- Security updates. ([#819](https://github.com/kr8vka0z/pueblo-food-map/pull/819), [#821](https://github.com/kr8vka0z/pueblo-food-map/pull/821), [#828](https://github.com/kr8vka0z/pueblo-food-map/pull/828))
+
+### Fixed
+
+- The "Suggest a place" form now rejects invalid category values instead of accepting them. ([#796](https://github.com/kr8vka0z/pueblo-food-map/pull/796))
+
 ## [1.2.1] - 2026-10-19
 
 ### Fixed

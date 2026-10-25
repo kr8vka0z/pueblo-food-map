@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
  * GET /api/public/events/[id] (#759). Real route over real SQLite (schema from
- * migrations/0018_events.sql), so the privacy rule (never a draft or archived
+ * migrations/0018_events.sql + 0019), so the privacy rule (never a draft or archived
  * row, indistinguishable from an unknown id) and the fail-soft path are proved
  * with real SQL, not a mock.
  */
@@ -26,7 +26,7 @@ const call = (id: string) =>
 
 function dbWithMigration(): Database.Database {
   const db = new Database(":memory:");
-  db.exec(readFileSync(join(process.cwd(), "migrations", "0018_events.sql"), "utf-8"));
+  for (const f of ["0018_events.sql", "0019_event_flyer.sql"]) db.exec(readFileSync(join(process.cwd(), "migrations", f), "utf-8"));
   return db;
 }
 

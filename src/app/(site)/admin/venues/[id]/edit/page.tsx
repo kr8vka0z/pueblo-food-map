@@ -1,8 +1,7 @@
 /**
  * /admin/venues/[id]/edit — admin-gated "Edit a venue" page,
- * plus the "Remove from map" (archive) action (#255); `?submission=<id>`
- * closure-report review context added #270; `?proposal=<id>` link_health
- * review context added #390.
+ * plus the "Remove from map" (archive) action (#255); `?proposal=<id>`
+ * link_health review context added #390.
  *
  * Same auth chain as /admin and /admin/venues/new (AGENTS.md "Admin
  * authentication"): getAdminDb() verifies the caller's Better Auth session
@@ -20,23 +19,6 @@
  * and its own success/error/redirect handling; this Server Component's only
  * job is the auth gate, the row fetch, and page chrome.
  *
- * #270: closures used to approve in one click straight from the review
- * queue (POST the archive route, no intermediate page) — this page is
- * where that flow now lands instead, so a closure report gets the same
- * edit-before-approve review a new_venue suggestion already gets (a report
- * may only mean "the hours changed," not "this place is really gone").
- * `?submission=<id>` is resolved by resolveClosureReportContext() below,
- * mirroring /admin/venues/new's own resolveSubmissionPrefill() (#259) —
- * same defensive "any failure mode degrades to the plain page, never a 404
- * or 500" shape — but matched against THIS venue specifically
- * (`target_venue_id === id`) rather than just id+kind+pending, since unlike
- * a new_venue create there IS an existing venue here to cross-check a
- * mismatched or stale link against. When accepted, the submission id
- * reaches ArchiveVenueButton as its own new `submissionId` prop (that
- * component's header explains the rest of the loop), and a clay-accented
- * banner shows the report's details so the admin has context before
- * deciding to edit, archive, or leave it and reject the report instead.
- *
  * params and searchParams are both Promises in Next.js 16 App Router — must
  * be awaited (same convention as /venue/[id]/page.tsx and
  * /admin/venues/new/page.tsx).
@@ -50,9 +32,9 @@
  * every pending proposal targeting this venue, not just a link_health one);
  * resolveLinkHealthProposalContext() below is a SEPARATE, narrower resolver
  * that only powers the banner + AddVenueForm's `proposalId` prop for the
- * ONE proposal `?proposal=` names — mirrors resolveClosureReportContext()
- * exactly — same match-against-THIS-venue check, same "any failure degrades
- * to the plain page" shape — and when accepted threads the proposal id
+ * ONE proposal `?proposal=` names — matched against THIS venue
+ * (`target_venue_id === id`), any failure degrading to the plain page —
+ * and when accepted threads the proposal id
  * through as AddVenueForm's `proposalId` prop (that component's header
  * explains the PATCH-time approval), plus renders the dead URL + last-seen
  * HTTP status in a banner so the admin has context before editing.
@@ -67,12 +49,9 @@
  * submission never targets an existing venue (target_venue_id is NULL for
  * that kind) so it can never appear here; it keeps its own
  * /admin/venues/new?submission=<id> hand-off unchanged (VenueListView.tsx's
- * "Suggested new place" row). `?submission=<id>` still separately resolves
- * a CLOSURE-REPORT BANNER + ArchiveVenueButton's submissionId (see
- * resolveClosureReportContext below, unchanged) — that is the
- * remove-and-resolve path for a report that says the place is really gone;
- * this box is for reading every OPEN report/proposal on the page, whether
- * or not one of them happens to be the one `?submission=` names.
+ * "Suggested new place" row). A closure report is resolved from its own
+ * card in this box (SubmissionCard's "Mark done"); removing the place, if
+ * the report says it's really gone, is the plain "Remove from map" below.
  *
  * #265: passes `venue.updated_at` straight through to AddVenueForm's
  * `expectedUpdatedAt` prop — the optimistic-concurrency precondition PATCH
@@ -81,19 +60,17 @@
  * it's always exactly what PATCH itself will re-check against.
  *
  * Blessing Boxes slice 2: when `venue.category === 'blessing_box'`,
- * resolveBoxCheckins() loads every check-in for this box (visible, hidden,
- * and 'problem' reports alike — see loadAllCheckinsForBox's own header) and
+ * loadAllCheckinsForBox() loads every check-in for this box (visible, hidden,
+ * and 'problem' reports alike — see that function's own header) and
  * renders BoxCheckinsAdminPanel below the form, so hide/unhide and
  * 'problem' report review live on the same screen as the rest of a box's
- * admin data. Wrapped in the same try/catch-degrades-to-empty shape as
- * resolveClosureReportContext()/resolveLinkHealthProposalContext() above —
- * a D1 read failure here must never take down the whole edit page.
+ * admin data. It degrades to [] like the other resolvers — a D1 read
+ * failure here must never take down the whole edit page.
  *
  * #677: for the same `blessing_box` check, resolveBoxReviewItems() loads
  * this box's own pending/flagged photos and pending sponsor requests, shown
- * right under the title in BoxReviewBox.tsx's "Things to review" box — the
- * on-page home for what used to live only on the now-folded-away
- * /admin/box-photos and /admin/box-adopters tabs. See that resolver's own
+ * right under the title in BoxReviewBox.tsx's "Things to review" box. See
+ * that resolver's own
  * header for why this reuses the tab's existing loaders rather than a new
  * query.
  *
@@ -129,14 +106,13 @@ import WaitingToPublishBox, { type WaitingToPublishChange } from "@/components/W
 import SuggestionsBox from "@/components/SuggestionsBox";
 import BoxReviewBox from "@/components/BoxReviewBox";
 import { mapVenueRowToFormValues } from "@/lib/adminVenueForm";
-import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import { parseProposalRow, type ChangeProposalRow, type ParsedProposal } from "@/lib/adminProposals";
 import { parseSubmissionRow, type ReviewItem } from "@/lib/publicSubmissions";
 import { loadAllCheckinsForBox, type AdminCheckinRow } from "@/lib/blessingBoxes";
 import { loadHostSubscriptions } from "@/lib/boxAlerts";
 import { loadReviewQueue, type AdminBoxPhotoRow } from "@/lib/boxPhotos";
 import { loadPendingAdopters, type AdminBoxAdopterRow } from "@/lib/boxAdopters";
-import { loadVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
+import { toVenueLookup, type VenueLookup } from "@/lib/adminVenueLookup";
 import {
   displayStatusOf,
   diffPublishedFields,
@@ -147,70 +123,18 @@ import {
 import { isProductionWorker } from "@/lib/publishVenues";
 import { publishedVenues } from "@/data/published-venues";
 import type { AdminVenueRow } from "@/types/venue";
-import type { ClosurePayload, PublicSubmissionRow } from "@/lib/publicSubmissions";
-
-interface ClosureReportContext {
-  submissionId: number;
-  /** null when the stored payload failed to parse — target_venue_id (the
-   *  match this context was accepted on) is a real column independent of
-   *  that payload, so the submissionId itself is still good; only the
-   *  banner's descriptive text degrades to generic copy. Same
-   *  parseError-tolerant reasoning as SubmissionCard's closure
-   *  card. */
-  detail: { issueLabel: string; description: string } | null;
-}
-
-/**
- * Resolves `?submission=<id>` to a closure-report context, or null on ANY
- * failure mode: param absent/non-integer, no matching pending closure row,
- * or — the one check with no new_venue equivalent — a `target_venue_id`
- * that doesn't match THIS venue (`venueId`), closing off a mismatched or
- * copy-pasted link wiring an unrelated report's approval to this page.
- * Wrapped in its own try/catch so a D1 read failure here degrades to the
- * plain edit page rather than 500ing it — this banner is a nice-to-have,
- * unlike the venue row itself (whose own SELECT failure is allowed to
- * throw, same as before #270).
- */
-async function resolveClosureReportContext(
-  db: D1Database,
-  venueId: string,
-  rawSubmissionParam: string | undefined,
-): Promise<ClosureReportContext | null> {
-  if (!rawSubmissionParam) return null;
-
-  const submissionId = Number(rawSubmissionParam);
-  if (!Number.isInteger(submissionId) || submissionId <= 0) return null;
-
-  try {
-    const row = await db
-      .prepare("SELECT * FROM public_submissions WHERE id = ? AND kind = 'closure' AND status = 'pending'")
-      .bind(submissionId)
-      .first<PublicSubmissionRow>();
-    if (!row || row.target_venue_id !== venueId) return null;
-
-    try {
-      const payload = JSON.parse(row.payload) as ClosurePayload;
-      const issueLabel = ISSUE_TYPES[payload.issueType as IssueTypeKey] ?? payload.issueType;
-      return { submissionId, detail: { issueLabel, description: payload.description } };
-    } catch {
-      return { submissionId, detail: null }; // malformed stored JSON — banner falls back to generic copy
-    }
-  } catch {
-    return null; // a D1 failure here must never crash the edit page itself
-  }
-}
+import type { PublicSubmissionRow } from "@/lib/publicSubmissions";
 
 interface LinkHealthProposalContext {
   proposalId: number;
-  /** null when the stored diff failed to parse, or carried no url/http_status — the banner falls back to generic copy, same parseError-tolerant shape as ClosureReportContext.detail above. */
+  /** null when the stored diff failed to parse, or carried no url/http_status — the banner falls back to generic copy. */
   deadUrl: string | null;
   httpStatus: number | null;
 }
 
 /**
  * Resolves `?proposal=<id>` to a link_health review context, or null on ANY
- * failure mode — same shape as resolveClosureReportContext() above: param
- * absent/non-integer, no matching pending link_health row, a
+ * failure mode: param absent/non-integer, no matching pending link_health row, a
  * `target_venue_id` that doesn't match THIS venue, or a D1 read failure
  * (wrapped so it degrades to the plain edit page rather than 500ing it).
  */
@@ -239,30 +163,6 @@ async function resolveLinkHealthProposalContext(
     return { proposalId, deadUrl, httpStatus };
   } catch {
     return null; // a D1 failure here must never crash the edit page itself
-  }
-}
-
-/**
- * Loads every check-in for this box (all visibilities, all kinds) for
- * BoxCheckinsAdminPanel — see that function's own header in
- * src/lib/blessingBoxes.ts. Only called for a blessing_box venue; degrades
- * to [] on any D1 failure so this optional admin panel can never take down
- * the rest of the edit page.
- */
-async function resolveBoxCheckins(db: D1Database, venueId: string): Promise<AdminCheckinRow[]> {
-  try {
-    return await loadAllCheckinsForBox(db, venueId);
-  } catch {
-    return [];
-  }
-}
-
-/** Same degrade-to-empty shape as resolveBoxCheckins() above — a missing alert_subscriptions table (migration 0010 not yet applied) must never take down the edit page. */
-async function resolveHostAlerts(db: D1Database, venueId: string): Promise<{ id: number; email: string }[]> {
-  try {
-    return await loadHostSubscriptions(db, venueId);
-  } catch {
-    return [];
   }
 }
 
@@ -297,8 +197,7 @@ async function resolveBoxReviewItems(
 /**
  * #674: every PENDING `change_proposals` row targeting this venue, newest
  * first — the SuggestionsBox at the top of this page. Same degrade-to-empty
- * shape as this file's other optional resolvers (resolveBoxCheckins,
- * resolveHostAlerts above) — a D1 failure here must never take down the
+ * shape as this file's other optional resolvers — a D1 failure here must never take down the
  * rest of the edit page, and a plain [] is exactly what SuggestionsBox
  * already renders nothing for.
  */
@@ -398,13 +297,12 @@ export default async function EditVenuePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ submission?: string; proposal?: string }>;
+  searchParams: Promise<{ proposal?: string }>;
 }) {
   const { id } = await params;
   let email: string;
   let showActivity = false;
   let venue: AdminVenueRow | null;
-  let closureContext: ClosureReportContext | null = null;
   let linkHealthContext: LinkHealthProposalContext | null = null;
   let boxCheckins: AdminCheckinRow[] = [];
   let hostAlerts: { id: number; email: string }[] = [];
@@ -422,9 +320,8 @@ export default async function EditVenuePage({
     showActivity = identity.isOwner === true;
     // WHY Promise.all throughout (was ~10 awaits in a row): every D1 call is
     // an edge -> primary round trip, so a serial chain cost the SUM of them.
-    // Only real dependencies stay sequential: the venue row gates the rest
-    // (an unknown id still 404s with no extra reads), and the VenueLookup
-    // read needs to know whether any suggestion exists. Every resolver below
+    // Only the venue row stays sequential: it gates the rest (an unknown id
+    // still 404s with no extra reads). Every resolver below
     // already degrades to an empty value instead of rejecting, and
     // loadAdminNavCounts never rejects, so overlapping them changes no
     // failure behavior. The session check above still runs first and alone.
@@ -433,7 +330,7 @@ export default async function EditVenuePage({
     const navCountsPromise = loadAdminNavCounts(db);
     venue = await db.prepare("SELECT * FROM venues WHERE id = ?").bind(id).first<AdminVenueRow>();
     if (venue) {
-      const { submission, proposal } = await searchParams;
+      const { proposal } = await searchParams;
       // #673 pt.3: only fetch/compute the diff for a place actually waiting
       // — displayStatusOf() is the single source of truth for that (never a
       // box, a draft, an unedited live place, or — on staging — anything at
@@ -444,12 +341,17 @@ export default async function EditVenuePage({
       const status = displayStatusOf(venue, publishedById.get(venue.id), { isStaging });
       const isBox = venue.category === "blessing_box";
       const noReviewItems = { photos: [] as AdminBoxPhotoRow[], adopters: [] as AdminBoxAdopterRow[] };
-      const [closure, linkHealth, checkins, alerts, reviewItems, proposals, pendingSubmissions, waiting, counts] =
+      const [linkHealth, checkins, alerts, reviewItems, proposals, pendingSubmissions, waiting, counts] =
         await Promise.all([
-          resolveClosureReportContext(db, id, submission),
           resolveLinkHealthProposalContext(db, id, proposal),
-          isBox ? resolveBoxCheckins(db, id) : Promise.resolve([] as AdminCheckinRow[]),
-          isBox ? resolveHostAlerts(db, id) : Promise.resolve([] as { id: number; email: string }[]),
+          // Fail soft to []: a D1 failure, or a missing alert_subscriptions
+          // table (migration 0010 not applied), must not break the edit page.
+          isBox
+            ? loadAllCheckinsForBox(db, id).catch(() => [] as AdminCheckinRow[])
+            : Promise.resolve([] as AdminCheckinRow[]),
+          isBox
+            ? loadHostSubscriptions(db, id).catch(() => [] as { id: number; email: string }[])
+            : Promise.resolve([] as { id: number; email: string }[]),
           isBox ? resolveBoxReviewItems(db, id) : Promise.resolve(noReviewItems),
           // #674: "Suggestions to review" box — every pending change_proposals
           // row targeting this venue (an archived venue can have one too: a
@@ -465,7 +367,6 @@ export default async function EditVenuePage({
           navCountsPromise,
         ]);
       navCounts = counts;
-      closureContext = closure;
       linkHealthContext = linkHealth;
       boxCheckins = checkins;
       hostAlerts = alerts;
@@ -477,13 +378,8 @@ export default async function EditVenuePage({
         ...pendingProposals.map((proposal): ReviewItem => ({ kind: "proposal", proposal })),
         ...pendingSubmissions.map((submission): ReviewItem => ({ kind: "submission", submission })),
       ];
-      // Only bothers loading the venue's VenueLookup context (a second, tiny
-      // SELECT) when there's actually something to show it to — the common
-      // case (an unedited place) skips this entirely.
-      if (suggestionItems.length > 0) {
-        const lookup = await loadVenueLookup(db, [id]);
-        suggestionsVenue = lookup[id] ?? null;
-      }
+      // Mapped from the row already loaded above, so no second venues read.
+      if (suggestionItems.length > 0) suggestionsVenue = toVenueLookup(venue);
     } else {
       navCounts = await navCountsPromise;
     }
@@ -505,19 +401,6 @@ export default async function EditVenuePage({
           <SuggestionsBox items={suggestionItems} venue={suggestionsVenue} />
         )}
         <WaitingToPublishBox changes={waitingToPublish} />
-        {closureContext && (
-          <div className="max-w-2xl rounded-[var(--radius-lg)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
-            <p className="font-semibold">Reviewing a closure report</p>
-            <p className="mt-1">
-              {closureContext.detail
-                ? `${closureContext.detail.issueLabel} — ${closureContext.detail.description}`
-                : "A closure report was submitted for this venue."}
-            </p>
-            <Link href="/admin/places?show=review&from=public" className="mt-2 inline-block font-medium underline underline-offset-2">
-              Back to Places
-            </Link>
-          </div>
-        )}
         {linkHealthContext && (
           <div className="max-w-2xl rounded-[var(--radius-lg)] bg-[var(--color-clay-100)] px-4 py-3 text-sm text-[var(--color-clay-700)]">
             <p className="font-semibold">Reviewing a dead link</p>
@@ -561,7 +444,6 @@ export default async function EditVenuePage({
             venueId={venue.id}
             venueName={venue.name}
             alreadyArchived={venue.status === "archived"}
-            submissionId={closureContext?.submissionId}
           />
         </div>
       </div>

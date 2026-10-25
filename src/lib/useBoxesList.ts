@@ -2,25 +2,42 @@
 
 /**
  * useBoxesList — client-side fetch of the FULL live blessing-box layer
- * (GET /api/public/blessing-boxes). Originally built for the now-deleted
- * /boxes directory page (Blessing Boxes slice 4); its one consumer today is
- * MapWrapper.tsx, which needs the FULL PublicBlessingBox (status,
- * lastFilledAt, mostNeeded, recentCheckins, host note) to render the open
- * box card, not just the plain Venue shape.
+ * (GET /api/public/blessing-boxes), plus `toVenue` to strip a box down to the
+ * plain Venue shape. Consumers: MapWrapper.tsx (the open box card needs the
+ * full PublicBlessingBox — status, lastFilledAt, mostNeeded, recentCheckins,
+ * host note — and the pin/filter pipeline gets `boxes.map(toVenue)` from the
+ * same single fetch) and BoxesActivityContent.tsx (its box filter dropdown).
  *
- * WHY a separate hook from useBoxVenues.ts, not a shared one with an
- * options flag: useBoxVenues deliberately strips every box down to a plain
- * Venue (see its own header) so it slots into useMapFilters' pipeline with
- * zero adapter code — the right shape for the MAP's marker/filter pipeline.
- * This hook fetches the SAME endpoint and keeps the full shape instead for
- * the card. Same fetch, same best-effort-on-failure convention; not worth a
- * shared options param for what's really two different return types serving
- * two different consumers (MapWrapper.tsx's card vs. BoxesActivityContent.tsx's
- * filter dropdown, via useBoxVenues).
+ * WHY a client fetch rather than baking boxes into venues.ts's build-time
+ * snapshot: boxes are live, not published (Build Plan architecture call #1)
+ * — a box an admin just added must show up on the map without a rebuild.
+ *
+ * Best-effort: a fetch failure leaves `boxes` at [] rather than throwing —
+ * the map is fully usable with zero box pins, same resilience convention as
+ * the route's own D1-read fallback (src/app/api/public/blessing-boxes/route.ts).
  */
 
 import { useEffect, useState } from "react";
+import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+
+/**
+ * Drops the `box` sub-object: useMapFilters' filter/marker pipeline only
+ * reads plain Venue fields (id/name/category/lat/lng/address/source/
+ * last_verified), so a box slots in with zero adapter code.
+ */
+export function toVenue(b: PublicBlessingBox): Venue {
+  return {
+    id: b.id,
+    name: b.name,
+    category: b.category,
+    lat: b.lat,
+    lng: b.lng,
+    address: b.address,
+    source: b.source,
+    last_verified: b.last_verified,
+  };
+}
 
 export interface UseBoxesListResult {
   boxes: PublicBlessingBox[];
@@ -44,8 +61,7 @@ export function useBoxesList(): UseBoxesListResult {
       })
       .catch(() => {
         // Network/parse failure, or a D1-degraded {boxes: []} response —
-        // either way this is the same "no boxes this request" fallback
-        // useBoxVenues.ts already established; the map/list stays fully
+        // either way "no boxes this request"; the map/list stays fully
         // usable, just with nothing to show.
         if (cancelled) return;
         setBoxes([]);

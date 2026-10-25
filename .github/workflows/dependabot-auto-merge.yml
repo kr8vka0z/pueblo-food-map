@@ -4,19 +4,19 @@ name: Dependabot auto-merge
 # bumps (including the grouped minor/patch PRs). Major bumps are left open and
 # labelled for a human, because majors can carry breaking changes.
 #
-# Why this is safe: a repository ruleset on `main` requires the "Lint, typecheck,
-# build" and "Workers Builds: pueblo-food-map" status checks, so `gh pr merge
-# --auto` waits for green CI before it merges — it never merges a red build.
+# Why this is safe: Dependabot PRs target `dev` (dependabot.yml), whose branch
+# ruleset requires four status checks ("Lint, typecheck, build", Semgrep,
+# TruffleHog, Dependency CVE Audit), so `gh pr merge --auto` waits for green CI
+# before it merges — it never merges a red build.
 #
 # WHY NOT GITHUB_TOKEN FOR THE MERGE: GitHub deliberately does not start new
 # workflow runs for pushes made with the built-in GITHUB_TOKEN (its recursion
 # guard). Auto-merge is attributed to whoever enabled it, so enabling it with
-# GITHUB_TOKEN meant the resulting push to `main` fired NO Deploy Prod run at
-# all — production silently kept serving the older build while `main` moved
-# ahead. Observed 2026-08-28: PR #361 merged as 6ce2737 with zero deploy-prod
-# runs for that SHA. The failure leaves no red mark anywhere, because the run
-# simply never exists. An installation token from a GitHub App is not covered by
-# the guard, so the merge it produces does trigger Deploy Prod.
+# GITHUB_TOKEN meant the resulting push fired NO deploy run at all — the
+# deployed site silently kept serving the older build while the branch moved
+# ahead, with no red mark anywhere, because the run simply never exists. An
+# installation token from a GitHub App is not covered by the guard, so the
+# merge it produces does trigger Deploy Dev.
 #
 # WHY pull_request_target: on plain `pull_request`, a Dependabot PR is given the
 # *Dependabot* secret store, which does not hold RELEASE_PLEASE_APP_* — the App
@@ -39,12 +39,10 @@ name: Dependabot auto-merge
 # running. A new workflow that needs `pull_request_target` must be added to the
 # policy's file list.
 #
-# RELEASE_PLEASE_APP_* secret names are historical: the release-please workflow
-# and config that first provisioned this GitHub App were retired 2026-09-23
-# (deploys are continuous on push to `main`, so a changelog-PR/versioning bot
-# added nothing on top of that). The App itself and its two secrets
-# (contents + pull-requests write, proven by this workflow) still back this
-# job — only the release-please workflow/config files were deleted.
+# RELEASE_PLEASE_APP_* secret names are historical (the GitHub App behind them
+# once backed release-please, which no longer exists). The App and its two
+# secrets (contents + pull-requests write, proven by this workflow) still back
+# this job.
 
 on: pull_request_target
 
@@ -63,13 +61,13 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Same App that used to back release-please (see the top-of-file WHY) —
-      # it demonstrably holds contents + pull-requests write on this repo.
+      # The GitHub App behind the historical RELEASE_PLEASE_APP_* secrets (see
+      # the top-of-file note) — it demonstrably holds contents + pull-requests write on this repo.
       # Minted per-run and short-lived; nothing long-lived is stored.
       - name: Mint a GitHub App token
         id: app-token
         if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}

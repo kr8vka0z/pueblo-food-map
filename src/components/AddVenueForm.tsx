@@ -396,6 +396,13 @@ export default function AddVenueForm({
   // for #568's "archived" 409 (where reloading can't help; there's no
   // restore/edit path) or any other error.
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  // "The venue told us" (Venue Data Rebuild step 1): edit mode only, never
+  // for a blessing box. Ticked, the PATCH pins the hours/contact fields this
+  // save sets (all filled ones if none changed) as venue-confirmed, so no
+  // automatic source can overwrite them. Not part of AddVenueFormValues: it
+  // describes this one save, not the venue, so it always starts unticked.
+  const [venueToldUs, setVenueToldUs] = useState(false);
+  const [venueToldUsNote, setVenueToldUsNote] = useState("");
   const [geocodeStatus, setGeocodeStatus] = useState<GeocodeStatus>("idle");
   const [geocodeMessage, setGeocodeMessage] = useState("");
   const [geocodeCandidates, setGeocodeCandidates] = useState<GeocodeMatch[]>([]);
@@ -559,6 +566,9 @@ export default function AddVenueForm({
       // #265: the optimistic-concurrency precondition — see this prop's own
       // doc comment above. Edit mode only; sent verbatim, no reformatting.
       ...(isEditMode && expectedUpdatedAt != null ? { expectedUpdatedAt } : {}),
+      ...(isEditMode && venueToldUs && values.category !== "blessing_box"
+        ? { venueToldUs: true, venueToldUsNote: venueToldUsNote.trim() }
+        : {}),
     };
 
     // Create POSTs /api/admin/venues (201 on success); edit PATCHes
@@ -1321,6 +1331,46 @@ export default function AddVenueForm({
         />
         Outside Pueblo County
       </label>
+
+      {/* The venue told us — edit mode only, not for blessing boxes */}
+      {isEditMode && values.category !== "blessing_box" && (
+        <div className="space-y-2">
+          <label className="flex items-start gap-2 text-sm text-[var(--color-ink-700)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={venueToldUs}
+              onChange={(e) => setVenueToldUs(e.target.checked)}
+              aria-describedby="venue-told-us-help"
+              className={
+                "mt-0.5 w-4 h-4 rounded border-[var(--color-bone-300)] text-[var(--color-sage-500)] " +
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+              }
+            />
+            The venue told us
+          </label>
+          <p id="venue-told-us-help" className="text-xs text-[var(--color-ink-400)]">
+            Tick this when the venue itself gave you these details (feedback form, email, in person). The hours and
+            contact details you change here are then locked: automatic data checks will only suggest changes to them,
+            never make them. If you changed none, everything filled in is locked.
+          </p>
+          {venueToldUs && (
+            <div>
+              <label htmlFor="venue-told-us-note" className={labelClass}>
+                Who told us, and how <span className="font-normal text-[var(--color-ink-400)]">(optional)</span>
+              </label>
+              <input
+                type="text"
+                id="venue-told-us-note"
+                value={venueToldUsNote}
+                maxLength={500}
+                onChange={(e) => setVenueToldUsNote(e.target.value)}
+                placeholder="e.g. Heather, admin assistant, by email"
+                className={`${inputBase} ${inputBorder(false)}`}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Submit */}
       <button

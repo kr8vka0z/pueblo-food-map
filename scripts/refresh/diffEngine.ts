@@ -430,11 +430,10 @@ export function diffSource(params: DiffSourceParams): DiffSourceResult {
       }
       proposals.push(buildProposal(source, inc.id, "update", before, after, [...changedFields, "last_verified"], runId));
     } else if (current.last_verified !== today) {
-      // Confirmed present, source-owned fields unchanged — this run's only
-      // job here is refreshing the freshness signal. NOT a direct D1 write:
-      // like every other proposal, this still needs a human approve before
-      // `venues.last_verified` actually moves (the pipeline's guardrail:
-      // "proposes only," no exception for a field this trivial).
+      // Still listed, source-owned fields unchanged. proposalSql.ts records
+      // this as a fetch observation; it no longer moves
+      // `venues.last_verified` (Venue Data Rebuild step 1: a download is not
+      // a confirmation).
       proposals.push(
         buildProposal(
           source,
@@ -447,11 +446,10 @@ export function diffSource(params: DiffSourceParams): DiffSourceResult {
         ),
       );
     }
-    // else: already verified today AND nothing else changed — genuinely
-    // nothing to propose. Without this branch, running this pipeline twice
-    // in one day (a manual dispatch alongside the scheduled run, say) would
-    // write an identical last_verified-refresh proposal twice; a truly
-    // no-op record must produce zero proposals, not a trivial one.
+    // else: already verified today AND nothing else changed — nothing to
+    // propose. Since last_verified stopped auto-bumping (Venue Data Rebuild
+    // step 1) this only skips venues a person verified today, so two runs in
+    // one day each write a "still listed" row per venue: harmless duplicates.
   }
 
   const removalCandidateIds = currentRows.filter((r) => !seenIds.has(r.id)).map((r) => r.id);

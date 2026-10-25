@@ -66,6 +66,10 @@ export const SOURCE_BADGE: Record<ProposalSourceValue, { label: string; classNam
   plentiful: { label: "Plentiful", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   gtfs: { label: "GTFS", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   link_health: { label: "Broken link", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
+  care_and_share: { label: "Care and Share", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
+  website: { label: "Venue website", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
+  usda_snap: { label: "USDA SNAP list", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
+  cdphe_wic: { label: "Colorado WIC list", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
 };
 
 // Triage lanes (#543) — existing badge colour pairs only, no new tokens.
@@ -149,6 +153,8 @@ const FIELD_LABELS: Record<string, string> = {
   phone: "Phone",
   url: "Website",
   hours_weekly: "Hours",
+  hours_irregular: "Monthly hours",
+  notes: "Notes",
   operator: "Operator",
   last_verified: "Last verified",
 };
@@ -331,12 +337,13 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
           ) : source === "link_health" ? (
             <LinkHealthDetails diff={proposal.diff} />
           ) : changeType === "remove" ? (
-            <RemoveDetails name={venueName} venue={venue} sourceLabel={sourceBadge.label} />
+            <RemoveDetails name={venueName} venue={venue} sourceLabel={sourceBadge.label} reason={metaSummaryOf(proposal.diff)} />
           ) : changeType === "add" ? (
             <AddDetails diff={proposal.diff} sourceLabel={sourceBadge.label} isRestore={isRestore} />
           ) : (
             <FieldDiff diff={proposal.diff} sourceLabel={sourceBadge.label} />
           )}
+          {!proposal.parseError && <ProposalSourceNotes diff={proposal.diff} showSummary={changeType !== "remove"} />}
         </div>
 
         {!proposal.parseError && source !== "link_health" && (
@@ -507,13 +514,24 @@ function DetailRow({ label, value, field }: { label: string; value: string; fiel
  * the old source-less "this source" — a reviewer with several sources in
  * the queue at once needs to know which one dropped it.
  */
-function RemoveDetails({ name, venue, sourceLabel }: { name: string; venue: VenueLookup | undefined; sourceLabel: string }) {
+function RemoveDetails({
+  name,
+  venue,
+  sourceLabel,
+  reason,
+}: {
+  name: string;
+  venue: VenueLookup | undefined;
+  sourceLabel: string;
+  /** meta.summary, when the proposal says WHY (a hand-checked 'website' fix) instead of "no longer listed". */
+  reason?: string;
+}) {
   return (
     <div className="mt-2 space-y-1">
       {venue && <DetailRow label="Category" value={categoryLabels[venue.category as VenueCategory] ?? venue.category} />}
       <p className="text-sm text-[var(--color-ink-700)]">
-        {sourceLabel} no longer lists &ldquo;{name}&rdquo;. Archiving keeps its record — it stops appearing on the
-        public map but is never deleted.
+        {reason ?? <>{sourceLabel} no longer lists &ldquo;{name}&rdquo;.</>} Archiving keeps its record — it stops
+        appearing on the public map but is never deleted.
       </p>
     </div>
   );
@@ -628,6 +646,64 @@ function FieldDiff({ diff, sourceLabel }: { diff: ProposedDiff; sourceLabel: str
         </div>
       ))}
     </dl>
+  );
+}
+
+// ─── Source notes + venue pins (Venue Data Rebuild step 1) ─────────────────
+
+/** meta.summary as a string, or undefined. */
+function metaSummaryOf(diff: ProposedDiff): string | undefined {
+  return typeof diff.meta?.summary === "string" ? diff.meta.summary : undefined;
+}
+
+interface PinNote {
+  field: string;
+  pinned_at: string;
+  note: string | null;
+  age_days: number;
+  stale: boolean;
+}
+
+/** meta.pins (scripts/refresh/proposalSql.ts's PinMeta), defensively read: a malformed entry is skipped, never thrown on. */
+function pinsOf(diff: ProposedDiff): PinNote[] {
+  const raw = diff.meta?.pins;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (p): p is PinNote => !!p && typeof p.field === "string" && typeof p.pinned_at === "string" && typeof p.age_days === "number",
+  );
+}
+
+/**
+ * Why this change was proposed (meta.summary + meta.source_url, on
+ * hand-checked fixes) and, more importantly, any detail the venue itself
+ * told us that this change would overwrite (meta.pins) — shown beside the
+ * change so Kyle weighs the venue's word against the source's.
+ */
+function ProposalSourceNotes({ diff, showSummary }: { diff: ProposedDiff; showSummary: boolean }) {
+  const summary = showSummary ? metaSummaryOf(diff) : undefined;
+  const sourceUrl = typeof diff.meta?.source_url === "string" ? diff.meta.source_url : undefined;
+  const pins = pinsOf(diff);
+  if (!summary && !sourceUrl && pins.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-1.5">
+      {summary && <p className="text-sm text-[var(--color-ink-700)]">{summary}</p>}
+      {sourceUrl && (
+        <p className="text-xs text-[var(--color-ink-500)]">
+          Source: {renderFieldValue("url", sourceUrl)}
+        </p>
+      )}
+      {pins.map((p) => (
+        <p
+          key={p.field}
+          className="rounded-[var(--radius-md)] bg-[var(--color-clay-100)] px-2 py-1.5 text-sm text-[var(--color-clay-700)]"
+        >
+          <span className="font-medium">The venue told us the {fieldLabel(p.field).toLowerCase()}</span> on{" "}
+          {formatLastVerified(p.pinned_at.slice(0, 10))}
+          {p.note ? ` (${p.note})` : ""}.
+          {p.stale ? " That was over a year ago, so this change may be right; renew the pin if the venue confirms again." : " Approve only if you trust this source over the venue."}
+        </p>
+      ))}
+    </div>
   );
 }
 

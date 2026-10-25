@@ -27,19 +27,30 @@ function dateOnlyProposal(overrides: Partial<ProposalDraft> = {}): ProposalDraft
 }
 
 describe("buildProposalWriteStatements", () => {
-  test("a date-only osm/plentiful update auto-applies: venues UPDATE + audit_log INSERT + already-approved change_proposals row", () => {
+  // Venue Data Rebuild step 1: "Stop the automatic 'last checked' bump from
+  // counting a download as a confirmation." A date-only run records a fetch
+  // observation; venues and audit_log are not written.
+  test("a date-only osm/plentiful update records a fetch observation and never touches venues.last_verified", () => {
     const result = buildProposalWriteStatements(dateOnlyProposal(), "2026-09-15T12:00:00.000Z", sqlText);
 
     expect(result.autoApplied).toBe(true);
-    expect(result.statements).toHaveLength(3);
+    expect(result.statements).toHaveLength(2);
+    expect(result.statements.join("\n")).not.toContain("UPDATE venues");
+    expect(result.statements.join("\n")).not.toContain("audit_log");
     expect(result.statements[0]).toBe(
-      "UPDATE venues SET last_verified = '2026-09-15', updated_by = 'refresh-pipeline', updated_at = '2026-09-15T12:00:00.000Z' WHERE id = 'osm-node-123';",
+      "INSERT INTO venue_observations (venue_id, field, source, value, fetched_at) VALUES ('osm-node-123', 'listed', 'osm', 'true', '2026-09-15T12:00:00.000Z');",
     );
-    expect(result.statements[1]).toContain("INSERT INTO audit_log");
-    expect(result.statements[1]).toContain("'refresh-pipeline'");
-    expect(result.statements[2]).toContain("INSERT INTO change_proposals");
-    expect(result.statements[2]).toContain("'approved'");
-    expect(result.statements[2]).toContain("'refresh-pipeline'");
+    // Kept for refreshAlerts.ts's per-source staleness check; applied_at
+    // stays NULL because nothing was applied.
+    expect(result.statements[1]).toContain("INSERT INTO change_proposals");
+    expect(result.statements[1]).toContain("'approved'");
+    expect(result.statements[1]).not.toContain("applied_at");
+  });
+
+  test("without migration 0021 the date-only path skips the observation instead of failing the batch", () => {
+    const result = buildProposalWriteStatements(dateOnlyProposal(), "2026-09-15T12:00:00.000Z", sqlText, { observationsReady: false });
+    expect(result.statements).toHaveLength(1);
+    expect(result.statements[0]).toContain("INSERT INTO change_proposals");
   });
 
   test("a real change (fields_changed includes more than last_verified) writes only a pending change_proposals row — no venues write", () => {

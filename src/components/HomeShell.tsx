@@ -115,7 +115,11 @@ export default function HomeShell({ locale }: { locale: Locale }) {
             const treeHref = localizedHref(href, locale);
             return (
               <li key={treeHref}>
-                <Link href={treeHref} className={HOME_CRAWL_LINK_CLASS}>
+                {/* prefetch={false} (#721): these links are visually hidden
+                    but count as on screen, so each one prefetched its page's
+                    data in the background on every map visit (the /resources
+                    prefetch among them) for links almost nobody uses. */}
+                <Link href={treeHref} prefetch={false} className={HOME_CRAWL_LINK_CLASS}>
                   {label[locale]}
                 </Link>
               </li>

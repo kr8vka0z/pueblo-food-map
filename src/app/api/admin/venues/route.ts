@@ -54,6 +54,7 @@ import { validateCreateVenuePayload, type ValidatedVenueFields } from "@/lib/adm
 import type { AdminVenueSourceType } from "@/types/venue";
 import { boxEventsForCreate, BOX_EVENT_INSERT_SQL } from "@/lib/boxEvents";
 import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
+import { venueSourceTypeFor } from "@/lib/adminProposals";
 
 // Deliberately mirrors scripts/seed-admin-db.ts's INSERT_COLUMNS list:
 // created_at/updated_at are omitted so the schema's own
@@ -197,7 +198,9 @@ async function resolveAddProposalTarget(db: D1Database, proposalId: number): Pro
   const existing = await db.prepare("SELECT id FROM venues WHERE id = ?").bind(proposal.target_venue_id).first<{ id: string }>();
   if (existing) return { ok: false };
 
-  return { ok: true, targetVenueId: proposal.target_venue_id, sourceType: proposal.source as AdminVenueSourceType };
+  // venueSourceTypeFor: a new-source add (care_and_share) is created as
+  // 'manual' — venues.source_type's CHECK has no value for it.
+  return { ok: true, targetVenueId: proposal.target_venue_id, sourceType: venueSourceTypeFor(proposal.source) };
 }
 
 export async function POST(req: NextRequest): Promise<Response> {

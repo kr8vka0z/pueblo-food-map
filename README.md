@@ -172,10 +172,11 @@ editing it by hand in the admin panel (`/admin/places`).
 runs weekly (and on manual dispatch), re-scrapes Plentiful and OSM, diffs
 the result against D1's current venues, and writes one `change_proposals`
 row per detected difference — including a link-health pass that flags dead
-outbound `url`s. It writes to `venues` in exactly one bounded case: a
-"date-only" proposal (nothing changed but the last-checked date) auto-
-applies rather than waiting on a click (Kyle, 2026-09-15). Every other
-proposal still needs a human to review and approve it from the Places tab's
+outbound `url`s. A "date-only" proposal (the venue is still listed and
+nothing changed) needs no click, but since 2026-10-25 it only records that
+the source still lists the venue; it no longer changes the venue's
+"last verified" date, which now moves only when a person confirms something.
+Every other proposal still needs a human to review and approve it from the Places tab's
 "To review" filter (`/admin/places?show=review` — folded in from the
 retired standalone `/admin/flags` queue by #674) before it reaches the
 public map. See

@@ -88,7 +88,7 @@ The 1Password refs are in the gitignored `OPS-SECRETS.local.md`. This repo is pu
 
 1. See what's pending: `npx wrangler d1 migrations list pueblo-food-map-admin --remote`.
 2. **Export first:** `wrangler d1 export pueblo-food-map-admin --remote --output <file>`, saved to `~/Backups/pfm-prod-d1/` on the Mac. A rollback can't undo a migration.
-3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, `0016`, `0017`, and `0019` are not idempotent (they fail with "duplicate column" on a re-run).
+3. Apply: `npx wrangler d1 migrations apply pueblo-food-map-admin --remote`. **Never use `d1 execute --file`**: it routes through the import API, and `0011`, `0012`, `0015`, `0016`, `0017`, `0019`, and `0020` are not idempotent (they fail with "duplicate column" on a re-run).
 4. Confirm the Worker has every runtime secret in the table above, then merge the release (the sync back to `dev` is automatic).
 5. If a migration changed published venue fields, the public map only updates at the next admin **Publish**. The Publish bar only shows when `updated_at > published_at`, so data migrations must set `updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')` on the rows they change.
 
@@ -105,7 +105,7 @@ This is `.github/workflows/refresh-proposals.yml` (weekly). The mechanism is des
 - **`--db-mode remote` is PRODUCTION.**
 - Remote writes are chunked `wrangler d1 execute --command` calls, never `--file`. If a chunk fails partway, recover with a fresh `workflow_dispatch`, not a re-run, because a re-run exits early on the idempotency guard.
 - Guardrails must fail loudly (non-zero exit), never silently do nothing.
-- Only date-only updates auto-apply. `REFRESH_AI_AUTO_APPLY` stays `"false"` until Kyle has checked a watched run's triage lanes against real decisions.
+- Only date-only updates auto-apply, and they never touch `venues` (a fetch is not a confirmation; `last_verified` moves only on a human approve or edit). A field the venue told us (a `venue_direct` pin in `venue_observations`) never auto-applies through any lane. `REFRESH_AI_AUTO_APPLY` stays `"false"` until Kyle has checked a watched run's triage lanes against real decisions.
 - It only proposes changes to `SOURCE_OWNED_FIELDS`, and never to `notes`.
 - Scraper self-check after touching the hours parser: `python3 scripts/scrape-plentiful.py --self-check` (needs `beautifulsoup4==4.14.3`).
 

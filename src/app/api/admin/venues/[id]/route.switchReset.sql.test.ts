@@ -18,7 +18,7 @@ const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 const VENUE_ID = "plentiful-x";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 const mockRequireAdminSession = vi.fn();

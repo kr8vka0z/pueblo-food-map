@@ -15,7 +15,7 @@ import { ADMIN_ORIGIN } from "@/lib/adminOrigin";
 import { sqliteD1 } from "@/lib/sqliteD1.testutil";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 vi.mock("@/lib/adminSession", () => ({ requireAdminSession: async () => ({ email: "admin@pueblofoodmap.com" }) }));

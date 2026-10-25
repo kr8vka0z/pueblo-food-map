@@ -1,17 +1,22 @@
 "use client";
 
 /**
- * useMediaQuery — true while `query` matches. SSR-safe: starts false on both
- * server and first client render (no hydration mismatch), then syncs.
+ * useMediaQuery — true while `query` matches. One hook for every breakpoint
+ * (it replaced copies of `useIsMobile` in MapWrapper and HamburgerMenu when
+ * the bottom nav, docs/bottom-nav-spec.md, needed a second breakpoint).
  *
- * WHY the setTimeout for the initial sync: calling setState synchronously in
- * the effect body trips the react-hooks/set-state-in-effect lint rule
- * (cascading render). This was copy-pasted in MapWrapper and HamburgerMenu as
- * `useIsMobile` before the bottom nav (docs/bottom-nav-spec.md) needed a
- * second breakpoint — one hook now serves both.
+ * WHY useSyncExternalStore (#721): the old useState(false) + effect version
+ * returned false on the first client render and synced a tick later, so on
+ * a phone MapWrapper's "not mobile → prefetch DesktopVenueWindow" effect ran
+ * once and downloaded the desktop card. A component that mounts on the
+ * client (MapWrapper is ssr:false) now reads the real value straight away.
+ * During hydration of a server-rendered page React uses the server snapshot
+ * (`false`, what the server rendered) and re-renders with the real value
+ * right after, so there is no hydration mismatch (HamburgerMenu on content
+ * pages).
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 /** Phone: below Tailwind `md` — BottomSheet instead of the desktop venue window. */
 export const MOBILE_QUERY = "(max-width: 767px)";
@@ -30,19 +35,19 @@ export function prefersReducedMotion(): boolean {
   );
 }
 
+const serverSnapshot = () => false;
+
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia(query);
-    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
-    mql.addEventListener("change", handler);
-    const syncId = setTimeout(() => setMatches(mql.matches), 0);
-    return () => {
-      clearTimeout(syncId);
-      mql.removeEventListener("change", handler);
-    };
-  }, [query]);
-
-  return matches;
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      // Optional chaining: jsdom has no matchMedia, and many tests render
+      // these components without stubbing it (same as prefersReducedMotion).
+      const mql = window.matchMedia?.(query);
+      mql?.addEventListener("change", onChange);
+      return () => mql?.removeEventListener("change", onChange);
+    },
+    [query],
+  );
+  const getSnapshot = () => window.matchMedia?.(query)?.matches === true;
+  return useSyncExternalStore(subscribe, getSnapshot, serverSnapshot);
 }

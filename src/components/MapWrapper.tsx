@@ -1959,18 +1959,15 @@ export default function MapWrapper({
     // selection existing: a future path that selects without showing the map
     // must never pan a hidden map.
     if (isMobile || !mapboxMap || !selectedVenue || !desktopPanelOpen) return;
-    // `project`/`panBy` guard: real mapboxgl.Map always has both, but
-    // `isMobile` starts `false` (useMediaQuery's SSR-safe default) and only
-    // flips true via a deferred setTimeout — a lint-rule artifact (setState
-    // can't run synchronously in an effect body), never an issue in a real
-    // browser, where a user can't click anything before that timeout fires.
-    // A test that pre-selects a venue via `initialVenueId` (a synchronous
-    // prop, no real user delay) CAN hit this effect on that same first tick,
-    // before isMobile has synced — with a minimal test map mock that only
-    // stubs the methods ITS OWN scenario needs (fitBounds/flyTo/jumpTo, not
-    // project/panBy, since every other desktop-only code path is already
-    // gated by the JSX `!isMobile` render conditional, which this effect —
-    // deliberately independent of what actually renders — is not).
+    // `project`/`panBy` guard: real mapboxgl.Map always has both. It exists
+    // for tests: a test whose matchMedia stub (or lack of one) reads as
+    // desktop, and that pre-selects a venue via `initialVenueId`, reaches
+    // this effect with a minimal test map mock that only stubs the methods
+    // ITS OWN scenario needs (fitBounds/flyTo/jumpTo, not project/panBy,
+    // since every other desktop-only code path is already gated by the JSX
+    // `!isMobile` render conditional, which this effect — deliberately
+    // independent of what actually renders — is not). (Until #721,
+    // useMediaQuery also started `false` for a tick on phones.)
     if (
       typeof mapboxMap.project !== "function" ||
       typeof mapboxMap.getContainer !== "function" ||

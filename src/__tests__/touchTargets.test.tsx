@@ -30,6 +30,7 @@ import DesktopVenueWindow from "@/components/DesktopVenueWindow";
 import SiteFooter from "@/components/SiteFooter";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
 
 // Box cards mount BoxCheckinPanel's Turnstile widget — same stub as the
 // BoxCardBody/DesktopVenueWindow tests.
@@ -357,8 +358,9 @@ describe("Share/Save rows elsewhere keep 8px between the enlarged hit areas", ()
     expect(classes(share.parentElement)).toContain("gap-4");
   });
 
-  test("box card actions row (BoxCardBody — phone sheet and desktop window both use it)", () => {
+  test("box card actions row (BoxCardBody — phone sheet and desktop window both use it)", async () => {
     render(<DesktopVenueWindow venue={box} box={box} {...windowProps} />);
+    await waitForBoxCard();
     const share = screen.getByRole("button", { name: /Share TT Box/ });
     expect(classes(share.parentElement)).toContain("gap-4");
   });

@@ -19,6 +19,7 @@ import userEvent from "@testing-library/user-event";
 import BottomSheet from "@/components/BottomSheet";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
 
 const mockTurnstile = {
   render: vi.fn((_container: HTMLElement, opts: { callback?: (t: string) => void }) => {
@@ -107,13 +108,15 @@ describe("BottomSheet — forwards walk props into BoxCardBody", () => {
     render(
       <BottomSheet venue={makeBoxVenue()} box={box} onClose={() => {}} onWalkRoute={onWalkRoute} />,
     );
+    await waitForBoxCard();
     await user.click(screen.getByText("123 Test St, Pueblo, CO"));
     expect(onWalkRoute).toHaveBeenCalledTimes(1);
     expect(onWalkRoute).toHaveBeenCalledWith(box);
   });
 
-  test("no onWalkRoute prop -> address stays a plain link (unchanged pre-restore behavior)", () => {
+  test("no onWalkRoute prop -> address stays a plain link (unchanged pre-restore behavior)", async () => {
     render(<BottomSheet venue={makeBoxVenue()} box={makeBox()} onClose={() => {}} />);
+    await waitForBoxCard();
     const trigger = screen.getByText("123 Test St, Pueblo, CO");
     expect(trigger.tagName).toBe("A");
   });
@@ -155,6 +158,7 @@ describe("BottomSheet — forwards walk props into BoxCardBody", () => {
       />,
     );
     await user.click(screen.getByTestId("route-strip-show-card"));
+    await waitForBoxCard();
     expect(screen.queryByTestId("route-strip")).toBeNull();
     expect(screen.getByTestId("walking-route-info")).toBeDefined();
   });

@@ -98,7 +98,6 @@ import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
 import HoursList from "@/components/HoursList";
 import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
-import BoxCardBody from "@/components/BoxCardBody";
 import RouteStrip, { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
 import type { PublicEventDetail } from "@/lib/events";
@@ -108,6 +107,30 @@ import EventHereLine, { type EventHere } from "@/components/EventHereLine";
 // The special-event card (#759) loads only when an event is opened, so a
 // visitor who never taps an event pin downloads none of it.
 const EventCardBody = dynamic(() => import("@/components/EventCardBody"), { ssr: false });
+
+/** "Loading…" line shown while the box record or the box card's code is on its way. */
+function BoxCardLoading({ locale: localeProp }: { locale?: Locale }) {
+  // The dynamic() fallback below gets no props, so it reads the context locale
+  // (the same value MapWrapper passes down as BottomSheet's `locale`).
+  const { locale: ctxLocale } = useLocale();
+  const locale = localeProp ?? ctxLocale;
+  return (
+    <div className="px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
+    </div>
+  );
+}
+
+// #721: the box card (check-in, adopt, photo resize, Turnstile) loads only
+// when a box is opened, so a visitor who never taps a box downloads none of
+// it. Module-level on purpose: a dynamic() made inside render would be a new
+// component each render and remount the card, wiping a half-typed check-in.
+// No `ssr: false`: this sheet only ever renders inside the client-only
+// MapWrapper, and ssr:false would show "Loading…" for a frame on EVERY box
+// open (it waits for a mount effect), not just the first.
+const BoxCardBody = dynamic(() => import("@/components/BoxCardBody"), {
+  loading: () => <BoxCardLoading />,
+});
 
 // #549: the map-peek gap deliberately left visible above the drawer at rest
 // (100px, matches the non-route maxHeight below). Named so the height calc
@@ -826,9 +849,7 @@ export default function BottomSheet({
                     }
                   />
                 ) : (
-                  <div className="px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                    <p className="text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
-                  </div>
+                  <BoxCardLoading locale={locale} />
                 )
               ) : (
               <div className="flex flex-col px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3">

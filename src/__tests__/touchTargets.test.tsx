@@ -229,11 +229,12 @@ describe("ListView", () => {
 describe("SiteFooter (#711)", () => {
   // StyxCredit's link sits inside a sentence (WCAG 2.5.8 inline exemption,
   // see its own header), so it is the one footer link left out.
-  test("every nav link and the OSM credit are at least 48px tall", () => {
-    render(<SiteFooter />);
+  test("every nav link and the OSM credit are at least 48×48, with 8px between rows", () => {
+    const { container } = render(<SiteFooter />);
     const links = screen.getAllByRole("link").filter((a) => a.textContent !== "The Styx Group");
     expect(links.length).toBe(11);
-    for (const a of links) expect(classes(a)).toContain("min-h-12");
+    for (const a of links) expect(classes(a)).toEqual(expect.arrayContaining(["min-h-12", "min-w-12"]));
+    expect(classes(container.querySelector("footer > div"))).toContain("gap-y-2");
   });
 });
 

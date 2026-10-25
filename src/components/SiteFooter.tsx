@@ -20,11 +20,10 @@ import { OSM_COPYRIGHT_URL } from "@/lib/osmAttribution";
 import StyxCredit from "./StyxCredit";
 
 // #711: every link is at least 48×48 (DESIGN.md touch-target floor; short
-// labels like "About" get the width from min-w-12). The
-// rows carry their own height, so the wrapper has no vertical gap and less
-// padding, and a 16px column gap (still well over the 8px between hit areas)
-// fits more links per row at 360px — otherwise the footer would roughly
-// double in height.
+// labels like "About" get the width from min-w-12). The rows carry their own
+// height, so the wrapper needs only an 8px row gap (DESIGN.md's space between
+// hit areas) and less padding, and a 16px column gap fits more links per row
+// at 360px — otherwise the footer would roughly double in height.
 const LINK_CLASS =
   "inline-flex items-center justify-center min-h-12 min-w-12 " +
   "hover:text-[var(--color-ink-700)] transition-colors " +
@@ -35,7 +34,7 @@ export default function SiteFooter() {
 
   return (
     <footer className="border-t border-[var(--color-bone-200)] bg-[var(--color-bone-50)]">
-      <div className="max-w-lg mx-auto px-4 py-2 flex flex-wrap gap-x-4 text-xs text-[var(--color-ink-400)]">
+      <div className="max-w-lg mx-auto px-4 py-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--color-ink-400)]">
         <Link
           href={localizedHref("/", tree)}
           className={LINK_CLASS}

@@ -243,7 +243,7 @@ export async function fetchCareAndShare(deps: CasFetchDeps): Promise<CasFetchRes
       writeFileSync(join(deps.cacheDir, "care-and-share-locations.json"), JSON.stringify(locations, null, 1));
       writeFileSync(join(deps.cacheDir, "care-and-share-schedules.json"), JSON.stringify(schedules, null, 1));
     }
-    deps.log(`care_and_share: ${locations.length} Pueblo County location(s), ${schedules.length} schedule row(s), ${requests} request(s)`);
+    deps.log(`care_and_share: ${all.length} listed in the search area, ${locations.length} inside the Pueblo County box, ${schedules.length} schedule row(s), ${requests} request(s)`);
     return { ok: true, locations, schedules, requests, fetchedAt };
   } catch (err) {
     if (err instanceof CasStop) return { ok: false, reason: err.message, requests };

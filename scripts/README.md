@@ -22,6 +22,7 @@ the named script UNMODIFIED:
 | 1a | `scrape-plentiful.py` | `directory.plentiful.org/colorado/pueblo` (live HTTP) | `data/raw/pueblo-pantries.json`, `src/data/pantries-plentiful.ts` |
 | 1b | `fetch-osm-grocery.py` | Overpass API (live HTTP) | `data/raw/pueblo-grocery.json` |
 | 1c | `ingest-osm-grocery.py` | `data/raw/pueblo-grocery.json` + `public/data/pueblo-county-boundary.geojson` | `src/data/grocery-osm.ts` |
+| 1d | `refresh/careAndShare.ts` (inside `refresh-ingest.ts`) | Care and Share's Find Food map API (`api.accessfood.org`, live HTTP, one request every 3.5 s) | nothing on disk in the repo; a contact-free cache in a temp dir per run |
 | 2 | `refresh-ingest.ts` itself | current D1 `venues` rows + the freshly-regenerated files above | `change_proposals` rows (one exception: a pure "date-only" proposal auto-applies to `venues.last_verified`) |
 
 Step 2's diff/guardrail/link-health logic isn't inline in `refresh-ingest.ts`
@@ -41,6 +42,14 @@ production):
 
 ```
 npx tsx scripts/refresh-ingest.ts --db-mode local
+```
+
+Watch only the Care and Share reader, writing nothing (reads the live API
+at its slow pace, diffs against the chosen database, prints every match and
+change):
+
+```
+npx tsx scripts/refresh-ingest.ts --db-mode local --only care_and_share --dry-run
 ```
 
 `--db-mode <local|staging|remote>` picks the DATABASE, not just a flag —

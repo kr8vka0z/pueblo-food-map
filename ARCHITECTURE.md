@@ -294,6 +294,61 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   is unchanged until a new source creates venues. `0022` loaded the
   2026-10-25 hand-checked fixes as pending `website` proposals (`meta` holds
   `source_url` and `summary`; `notes` is appliable for `website` proposals only).
+- **Care and Share reader (Venue Data Rebuild step 2,
+  `scripts/refresh/careAndShare.ts`).** Care and Share is the named authority
+  for hours, address, phone and website of its partner pantries and meal
+  sites. `fetchCareAndShare` pages the Vivery "AccessFood" JSON behind
+  careandshare.org/findfood (`LocationSearch` from the Pueblo County box's
+  centre, radius to its corners, kept to the box; then `LocationSchedules`),
+  one request every 3.5 s. Any refusal, non-2xx, timeout, bad JSON or zero
+  in-county result stops the source for that run: nothing from it is
+  written and the job fails loudly; a missing listing never reads as a
+  closure, and venues Care and Share doesn't list get nothing. Contact
+  names/emails/phones are dropped at the parse boundary (`toCasLocation`'s
+  field allowlist), so they reach no proposal, cache or log.
+  `convertSchedules` turns Vivery rows (`dayOfWeek` 1 = Sunday; `daysOfMonth`
+  "3rd" = a `monthly_ordinal`) into `hours_weekly`/`hours_irregular`, or
+  refuses on anything it can't express exactly (a free-text note such as
+  "And 4 to 6", every-other-week, `weeksOfMonth`, "call for hours"): then no
+  hours change is proposed, the raw schedule text goes in `meta.schedule_text`
+  and `meta.needs_review`, and the card always reads "needs a human".
+  Matching runs only over our `pantry`/`meal_site` rows of any
+  `source_type` (blessing boxes stripped by `excludeBlessingBoxes`): an alias
+  on file or our venue with id `cas-<locationId>` first; then **strong** =
+  name overlap ≥ 0.75, within 150 m, AND the same phone (renamePairs'
+  `haversineDistanceKm`/`normalizedPhoneTail`). A strong match **writes
+  `venue_id_aliases` itself** (`created_by` `refresh-pipeline`) — until this
+  step aliases were only written on a human approval (migration `0016`'s
+  comment predates this). Anything weaker but close is an **unconfirmed
+  match**: a normal proposal with `meta.match`, which approving records as
+  the alias (`applyApprovedProposal`). Two listings on one of our venues
+  (Care and Share lists Lynn Gardens twice) become one review card with no
+  field diff. A listing with no candidate is an `add` (always Kyle; created
+  as `source_type` `manual`, because `venues.source_type`'s CHECK has no
+  `care_and_share`: `venueSourceTypeFor` in `adminProposals.ts`). Diffs
+  compare canonical forms (24h sorted slots, abbreviated street line, phone
+  digits, bare host+path), and an empty field on their side never clears
+  ours. Identical = the date-only "still listed" path. Watch it without
+  writing: `--only care_and_share --dry-run` (scripts/README.md).
+- **The automatic switch (`src/lib/sourceSwitch.ts`, migration `0023`).**
+  Per (source, field), counted from `change_proposals` history: each
+  human-approved update that applied something adds one per field;
+  a rejection, or a `source_switch_resets` row, restarts it; automatic rows
+  (pipeline actors, or approved with nothing applied) neither count nor
+  break. A reset is written by PATCH `/api/admin/venues/[id]` when an edit
+  changes a field whose current value is exactly what that source's newest
+  applied change wrote (`resetsForEdit`): that is how "approve, then fix
+  it" and undoing an automatic change show up, since Approve itself applies
+  unedited. At 5 the pair is on, and `proposalSql.ts`'s switch lane applies
+  a plain update whose every field is switched on — never an add, remove,
+  clear, rename, unconfirmed match, `needs_review` card, or pinned field
+  (pins are checked first) — under `refresh-pipeline-auto`, with an
+  `audit_log` row and an accepted `venue_observations` row per field, and
+  **without** moving `last_verified`. Only `care_and_share` is switchable
+  for now (`SWITCH_SOURCES`): Plentiful/OSM are narrowed in step 5 and the
+  website reader is step 3. The review queue shows each pair's count via
+  `SourceSwitchPanel` (`GET /api/admin/source-switch`, a separate fetch so
+  the Places page's own reads stay one parallel batch).
 - **`linkHealth.ts`** checks each stored `url` (HEAD, falling back to GET)
   and proposes clearing it only on 404/410 — never on 403 (often a bot-block
   of the checker), 429, 5xx or timeout, which are logged only.

@@ -185,3 +185,42 @@ describe("sw.js activate (#130)", () => {
     expect(respondWith).not.toHaveBeenCalled();
   });
 });
+
+// #721: install used to precache all six shell pages (both languages) and
+// their chunks for every visitor; now only the open page's tree.
+describe("sw.js install precaches one language tree (#721)", () => {
+  async function install(clientUrls: string[]) {
+    const env = loadSw();
+    const put = vi.fn(async () => {});
+    env.caches.open = vi.fn(async () => ({ put, add: vi.fn(async () => {}) }));
+    env.context.fetch = vi.fn(async () => ({
+      ok: true,
+      type: "basic",
+      redirected: false,
+      clone: () => ({ text: async () => "<html></html>" }),
+    }));
+    Object.assign(env.self.clients, {
+      matchAll: vi.fn(async () => clientUrls.map((url) => ({ url }))),
+    });
+    let done: Promise<unknown> = Promise.resolve();
+    env.listeners.install({ waitUntil: (p: Promise<unknown>) => (done = p) });
+    await done;
+    return (env.context.fetch as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]).sort();
+  }
+
+  test("an English page precaches only the English shells", async () => {
+    expect(await install([`${ORIGIN}/about`])).toEqual(["/", "/resources", "/venues"]);
+  });
+
+  test("a Spanish page precaches only the Spanish shells", async () => {
+    expect(await install([`${ORIGIN}/es/venues`])).toEqual(["/es", "/es/resources", "/es/venues"]);
+  });
+
+  test("no known window falls back to English", async () => {
+    expect(await install([])).toEqual(["/", "/resources", "/venues"]);
+  });
+
+  test("the cache version moved on from v2, so installed workers drop the two-tree cache", () => {
+    expect(vm.runInContext("CACHE_VERSION", loadSw().context)).not.toBe("v2");
+  });
+});

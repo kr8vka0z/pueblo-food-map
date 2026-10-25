@@ -246,6 +246,18 @@ describe("matching — strong vs ambiguous", () => {
     expect(r.proposals).toHaveLength(1);
     expect(r.proposals[0].proposedDiff.fields_changed).toEqual(["last_verified"]); // identical -> "still listed"
     expect(r.proposals[0].proposedDiff.meta?.match).toBeUndefined();
+    // First run of this link: marked, so the switch won't apply it and rejecting undoes the link.
+    expect(r.proposals[0].proposedDiff.meta?.new_alias).toMatchObject({ upstream_id: "cas-1" });
+  });
+
+  test("a link already on file carries no new_alias marker", () => {
+    const r = build({
+      locations: [loc()],
+      schedules: [sched({ dayOfWeek: 3 })],
+      venues: [venue()],
+      aliases: [{ source: "care_and_share", upstream_id: "cas-1", venue_id: "plentiful-praise" }],
+    });
+    expect(r.proposals[0].proposedDiff.meta?.new_alias).toBeUndefined();
   });
 
   test("a close but not identical name with no phone on the Care and Share side is only ambiguous", () => {
@@ -325,7 +337,7 @@ describe("matching — strong vs ambiguous", () => {
     expect(r.proposals[0].proposedDiff.meta?.match).toMatchObject({ upstream_ids: ["cas-1", "cas-2"] });
   });
 
-  test("once both listings are on file they read as one: diffed against the lower id, no review card", () => {
+  test("once both listings are on file they read as one: every listing's hours merged, no review card", () => {
     const r = build({
       locations: [loc(), loc({ locationId: 2 })],
       schedules: [sched(), sched({ locationId: 2, dayOfWeek: 3 })],
@@ -336,7 +348,8 @@ describe("matching — strong vs ambiguous", () => {
       ],
     });
     expect(r.proposals).toHaveLength(1);
-    expect(r.proposals[0].proposedDiff.fields_changed).toEqual(["last_verified"]);
+    expect(r.proposals[0].proposedDiff.fields_changed).toEqual(["hours_weekly", "last_verified"]);
+    expect(r.proposals[0].proposedDiff.after?.hours_weekly).toBe(JSON.stringify({ mon: ["10:00-12:00"], tue: ["10:00-12:00"] }));
     expect(r.proposals[0].proposedDiff.meta?.match).toBeUndefined();
     expect(r.proposals[0].proposedDiff.meta?.also_listed_as).toEqual([2]);
   });

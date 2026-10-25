@@ -275,7 +275,8 @@ const SWITCHABLE_SOURCES: ReadonlySet<string> = new Set(SWITCH_SOURCES);
 export function isSwitchApplicable(proposal: ProposalDraft, states: SwitchState[]): boolean {
   if (proposal.changeType !== "update" || !SWITCHABLE_SOURCES.has(proposal.source)) return false;
   const meta = proposal.proposedDiff.meta ?? {};
-  if (meta.rename || meta.match || meta.needs_review) return false;
+  // new_alias: the link itself was made this run — a person sees its first change.
+  if (meta.rename || meta.match || meta.needs_review || meta.new_alias) return false;
   const fields = reviewableDiffFields(proposal.proposedDiff);
   if (fields.length === 0) return false;
   const after = (proposal.proposedDiff.after ?? {}) as Record<string, unknown>;

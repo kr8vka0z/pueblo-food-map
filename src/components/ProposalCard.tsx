@@ -758,15 +758,19 @@ function describeListing(l: CasListing): string {
 function careAndShareNotesOf(diff: ProposedDiff): React.ReactNode {
   const meta = diff.meta ?? {};
   const match = (meta.match ?? null) as (CasListing & { listings?: CasListing[] }) | null;
+  const newAlias = (meta.new_alias ?? null) as CasListing | null;
   const reasons = Array.isArray(meta.needs_review) ? meta.needs_review.filter((r): r is string => typeof r === "string") : [];
   const scheduleText = typeof meta.schedule_text === "string" && meta.schedule_text ? meta.schedule_text : null;
-  if (!match && reasons.length === 0 && !scheduleText) return null;
+  if (!match && !newAlias && reasons.length === 0 && !scheduleText) return null;
   const listings = match && Array.isArray(match.listings) ? match.listings : null;
   return (
     <>
       {match && listings && (
         <div className="text-sm text-[var(--color-ink-700)]">
-          <p>Care and Share lists {listings.length} places that look like this one. Approve if they are all this venue:</p>
+          <p>
+            Care and Share lists {listings.length} places that look like this one. Approve if they are all this venue. Rejecting means
+            neither listing is proposed again, so if one is really a separate place, add it by hand.
+          </p>
           <ul className="ml-4 list-disc">
             {listings.map((l, i) => (
               <li key={l.upstream_id ?? i}>{describeListing(l)}</li>
@@ -777,6 +781,12 @@ function careAndShareNotesOf(diff: ProposedDiff): React.ReactNode {
       {match && !listings && (
         <p className="text-sm text-[var(--color-ink-700)]">
           Is this Care and Share&apos;s listing {describeListing(match)}? Approve to link them; this change applies too.
+        </p>
+      )}
+      {newAlias && (
+        <p className="text-sm text-[var(--color-ink-700)]">
+          <span className="font-medium">New link:</span> matched to Care and Share&apos;s listing {describeListing(newAlias)} for the
+          first time. Rejecting this also removes the link.
         </p>
       )}
       {reasons.length > 0 && (

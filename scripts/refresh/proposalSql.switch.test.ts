@@ -63,6 +63,7 @@ describe("switch lane — what auto-applies", () => {
     ["clears a value", casUpdate({ hours_irregular: "" }, { hours_irregular: "[{}]" }), [on("hours_irregular")]],
     ["schedule needs review", casUpdate({ phone: "719-555-0200" }, { phone: "1" }, { proposedDiff: { ...casUpdate({ phone: "719-555-0200" }, { phone: "1" }).proposedDiff, meta: { needs_review: ["note"] } } }), [on("phone")]],
     ["unconfirmed match", casUpdate({ phone: "719-555-0200" }, { phone: "1" }, { proposedDiff: { ...casUpdate({ phone: "719-555-0200" }, { phone: "1" }).proposedDiff, meta: { match: { upstream_id: "cas-7" } } } }), [on("phone")]],
+    ["a first-run link (new_alias)", casUpdate({ phone: "719-555-0200" }, { phone: "1" }, { proposedDiff: { ...casUpdate({ phone: "719-555-0200" }, { phone: "1" }).proposedDiff, meta: { new_alias: { upstream_id: "cas-7" } } } }), [on("phone")]],
     ["an add", casUpdate({ phone: "719-555-0200" }, {}, { changeType: "add" }), [on("phone")]],
     ["a remove", { ...casUpdate({}, {}), changeType: "remove", proposedDiff: { before: { id: "venue-1" }, after: null, fields_changed: [] } }, [on("phone")]],
     ["another source, even switched on", casUpdate({ phone: "719-555-0200" }, { phone: "1" }, { source: "plentiful" }), [on("phone", "plentiful")]],

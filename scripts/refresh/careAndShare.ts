@@ -608,9 +608,17 @@ export function buildCareAndShareProposals(params: CareAndShareBuildParams): Car
     else stats.strong++;
     if (claim.kind === "strong") aliasWrites.push({ upstreamId: upstreamIdOf(claim.loc), venueId });
 
-    const diff = diffLocation(claim.loc, schedulesById.get(claim.loc.locationId) ?? [], current, today, fetchedAt);
+    // A venue listed more than once (all already confirmed) has its hours
+    // spread across the listings: read every listing's rows, not just the
+    // lowest id's.
+    const rows = sortedGroup.flatMap((c) => schedulesById.get(c.loc.locationId) ?? []);
+    const diff = diffLocation(claim.loc, rows, current, today, fetchedAt);
     if (diff.unconvertible) stats.unconvertible++;
     const meta: Record<string, unknown> = { ...diff.meta, ...(alsoListedAs ? { also_listed_as: alsoListedAs } : {}) };
+    // First run of a self-made link: marked (meta isn't hashed) so the
+    // switch never applies this proposal unattended, the card says "new
+    // link", and rejecting it deletes the alias (migration 0024's trigger).
+    if (claim.kind === "strong") meta.new_alias = { upstream_id: upstreamIdOf(claim.loc), name: claim.loc.name, ...claim.evidence };
     let hashExtra: Record<string, unknown> | undefined;
     if (claim.kind === "ambiguous") {
       meta.match = { upstream_id: upstreamIdOf(claim.loc), name: claim.loc.name, ...claim.evidence };

@@ -323,12 +323,16 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   unless our address is a venue pin. A strong match **writes
   `venue_id_aliases` itself** (`created_by` `refresh-pipeline`) — until this
   step aliases were only written on a human approval (migration `0016`'s
-  comment predates this). Anything weaker but close is an **unconfirmed
+  comment predates this). That run's proposal carries `meta.new_alias`:
+  the switch never applies it, the card says "New link", and rejecting it
+  deletes the alias (trigger `trg_reject_undoes_new_alias`, migration
+  `0024`; a future rebuild of `change_proposals` must re-create it). Anything weaker but close is an **unconfirmed
   match**: a normal proposal with `meta.match`, which approving records as
   the alias (`applyApprovedProposal`). Two listings on one of our venues
   (Care and Share lists Lynn Gardens twice) become one review card with no
   field diff, whose `meta.match.upstream_ids` approving records as aliases,
-  after which the listings read as one (diffed against the lowest id). A
+  after which the listings read as one (diffed against the lowest id's
+  address/phone/website, with every listing's schedule rows merged). A
   review-only card (no field change; `match`/`needs_review`) whose exact
   content Kyle already approved is not re-proposed (`dropAlreadyReviewed`),
   and rejection memory covers rejects, so neither returns weekly; its hash

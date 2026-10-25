@@ -59,6 +59,20 @@ describe("ProposalCard — Care and Share", () => {
     });
     render(<ProposalCard proposal={p} />);
     expect(screen.getByText(/lists 2 places/)).toBeInTheDocument();
+    expect(screen.getByText(/Rejecting means neither listing is proposed again/)).toBeInTheDocument();
     expect(screen.getByText(/Lynn gardens baptist church/)).toBeInTheDocument();
+  });
+
+  test("a first-run link says so, and that rejecting removes it", () => {
+    const p = proposal({
+      before: { phone: "", last_verified: "2026-10-01" },
+      after: { phone: "719-555-0100", last_verified: "2026-10-26" },
+      fields_changed: ["phone", "last_verified"],
+      meta: { new_alias: { upstream_id: "cas-20349", name: "Salvation Army of Pueblo", distance_m: 12, name_score: 1, same_phone: false } },
+    });
+    render(<ProposalCard proposal={p} />);
+    expect(screen.getByText(/New link/)).toBeInTheDocument();
+    expect(screen.getByText(/Salvation Army of Pueblo/)).toBeInTheDocument();
+    expect(screen.getByText(/Rejecting this also removes the link/)).toBeInTheDocument();
   });
 });

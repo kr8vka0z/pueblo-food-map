@@ -23,6 +23,7 @@ the named script UNMODIFIED:
 | 1b | `fetch-osm-grocery.py` | Overpass API (live HTTP) | `data/raw/pueblo-grocery.json` |
 | 1c | `ingest-osm-grocery.py` | `data/raw/pueblo-grocery.json` + `public/data/pueblo-county-boundary.geojson` | `src/data/grocery-osm.ts` |
 | 1d | `refresh/careAndShare.ts` (inside `refresh-ingest.ts`) | Care and Share's Find Food map API (`api.accessfood.org`, live HTTP, one request every 3.5 s) | nothing on disk in the repo; a contact-free cache in a temp dir per run |
+| — | `refresh/website.ts` | Not in this workflow: the server's weekly timer runs it (see "Venue website reader" below) | — |
 | 2 | `refresh-ingest.ts` itself | current D1 `venues` rows + the freshly-regenerated files above | `change_proposals` rows (one exception: a pure "date-only" proposal auto-applies to `venues.last_verified`) |
 
 Step 2's diff/guardrail/link-health logic isn't inline in `refresh-ingest.ts`
@@ -51,6 +52,23 @@ change):
 ```
 npx tsx scripts/refresh-ingest.ts --db-mode local --only care_and_share --dry-run
 ```
+
+## Venue website reader — weekly on the server, not in CI
+
+`refresh/website.ts` (+ `refresh/websiteIo.ts`) runs only as
+`refresh-ingest.ts --only website`, from the server's systemd timer
+(`ops/systemd/README.md`), because it needs Gemini through the Antigravity
+CLI (`agy`) logged in on that machine. It reads venue websites and the Pueblo
+Food Project gardens page (live HTTP, public addresses only, one site every
+4 s; no browser, so a JavaScript-only page is unreadable) and writes `website` proposals. Needs migration `0025` on the
+target database. Watch it without writing (real pages, real Gemini):
+
+```
+npx tsx scripts/refresh-ingest.ts --db-mode local --only website --dry-run
+```
+
+`PFM_GEMINI_MODEL` overrides the model (default `gemini-3.8-flash-medium`: Argon's quota is small and shared with other work);
+`AGY_BIN` the CLI path.
 
 `--db-mode <local|staging|remote>` picks the DATABASE, not just a flag —
 `remote` is production, only ever run by the real workflow. Full rationale

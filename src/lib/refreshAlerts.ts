@@ -96,21 +96,22 @@ export async function checkPendingAge(db: D1Database, now: Date = new Date()): P
 
 // ─── Per-source staleness (#234) ────────────────────────────────────────────
 
-const REFRESH_ALERT_SOURCES = ["plentiful", "osm", "care_and_share"] as const;
+const REFRESH_ALERT_SOURCES = ["plentiful", "osm", "care_and_share", "website"] as const;
 /**
  * Sources that alert even when they have NEVER written a row. care_and_share
  * (Venue Data Rebuild step 2) is left out on purpose: it starts writing only
  * once its reader reaches production, and a never-run alert would email
  * every day until then. A first run that fails is already loud (the refresh
  * job exits non-zero when a source aborts); once it has run once, the normal
- * 40-day rule applies to it like the others.
+ * 40-day rule applies to it like the others. `website` (step 3, the server's
+ * weekly timer, ops/systemd/) is the same: every page it reads writes a row.
  */
 const NEVER_RUN_ALERT_SOURCES: ReadonlySet<string> = new Set(["plentiful", "osm"]);
 export type RefreshAlertSource = (typeof REFRESH_ALERT_SOURCES)[number];
 
 /** Hardcoded IN-list, not a bound placeholder loop — REFRESH_ALERT_SOURCES is a fixed, small, compile-time set (ponytail: one string beats a dynamic placeholder builder for two known values). */
 export const SOURCE_STALENESS_SQL =
-  "SELECT source, MAX(created_at) AS last FROM change_proposals WHERE source IN ('plentiful','osm','care_and_share') GROUP BY source";
+  "SELECT source, MAX(created_at) AS last FROM change_proposals WHERE source IN ('plentiful','osm','care_and_share','website') GROUP BY source";
 
 export interface SourceStalenessCheck {
   source: RefreshAlertSource;

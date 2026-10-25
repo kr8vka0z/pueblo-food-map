@@ -345,6 +345,55 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   digits, bare host+path), and an empty field on their side never clears
   ours. Identical = the date-only "still listed" path. Watch it without
   writing: `--only care_and_share --dry-run` (scripts/README.md).
+- **Venue website reader (Venue Data Rebuild step 3,
+  `scripts/refresh/website.ts`, I/O in `websiteIo.ts`).** The authority for
+  hours, address, phone and open/closed of pantries and meal sites with no
+  `care_and_share` alias, and (via the Pueblo Food Project gardens page) of
+  gardens and edible landscapes. Never blessing boxes or events. Runs only
+  as `--only website`, from the server's weekly timer (`ops/systemd/`,
+  Monday 02:00 MT, a clean `origin/main` checkout), never in GitHub
+  Actions: Gemini is the Antigravity CLI `agy` under Kyle's login there
+  (`--sandbox`; model `PFM_GEMINI_MODEL`, default `gemini-3.8-flash-medium`).
+  agy starts with every `CLOUDFLARE_*`/`OP_*` variable
+  removed (`untrustedChildEnv`); the timer hands the D1 token over as a file
+  (`PFM_SECRETS_FILE`) that `refresh-ingest.ts` reads and deletes at start
+  and passes only to wrangler, so it is in no environment or file agy can
+  read.
+  Our code fetches each page itself (Node `http`/`https`, one site every
+  4 s): every hop, redirects followed by hand, must be a public name AND
+  connect through a pinned DNS lookup that refuses any loopback, private,
+  link-local, tailnet or IPv4-mapped answer (`isPublicIp`), so no page can
+  steer a request at this server's own services. There is no browser
+  fallback: a page that needs JavaScript, refuses us or is near-empty is
+  unreadable and writes nothing. Hours proposals touch only the kind of
+  schedule the quote states (weekly or monthly), never clearing the other. Gemini reads only that text (fenced as untrusted, empty
+  temp dir as cwd, no paths) and returns each field with a verbatim quote;
+  a field survives only if the quote is in our text and agrees with the
+  value (phone digits, house number, "closed"). Hours are converted by our
+  own parser (`parseHoursQuote`) and count as exact only when its reading
+  equals Gemini's AND the quote names the food service; a condition word
+  (except, appointment, office, worship…), a date, or a disagreement makes
+  a `needs_review` card with the quote instead. An address without a house
+  number never replaces ours. A stated permanent closure is a `remove`
+  (always Kyle); a page that fails or says nothing writes nothing for that
+  venue (never a closure); every page failing, or any Gemini failure
+  (quota, timeout, bad output), aborts the source with zero writes and a
+  non-zero exit. **Discovery:** a venue whose `url` is a directory
+  (Plentiful etc.) or missing, or a social page, gets ONE web search by
+  Gemini; each candidate is fetched and counts only if the venue's name
+  and house number + street are on it, then it is proposed as `url`
+  (pending url proposals are re-read; approved/rejected ones end the
+  search; "found none" is a `website_search` row in `venue_observations`,
+  retried after 90 days; candidates are stored nowhere). **Kyle's
+  rejections are field-level:** a value he rejected from this source is
+  dropped even inside a bigger proposal (`rejectedFieldValues`); migration
+  `0025` seeds one for Friendly Harbor's stale "last Friday" so it never
+  reaches the queue while any other new value does, with the pin shown. The
+  gardens page is re-read with Gemini only when its text fingerprint
+  (`page_fingerprints`, 0025) changes; places on it we don't list are only
+  logged (an add needs coordinates). The reader never supersedes 0022's
+  hand-checked `website` cards. Each run ends with one `SUMMARY
+  website-reader:` line in the journal.
 - **The automatic switch (`src/lib/sourceSwitch.ts`, migration `0023`).**
   Per (source, field), counted from `change_proposals` history: each
   human-approved update that applied something adds one per field;
@@ -359,9 +408,11 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   clear, rename, unconfirmed match, `needs_review` card, or pinned field
   (pins are checked first) — under `refresh-pipeline-auto`, with an
   `audit_log` row and an accepted `venue_observations` row per field, and
-  **without** moving `last_verified`. Only `care_and_share` is switchable
-  for now (`SWITCH_SOURCES`): Plentiful/OSM are narrowed in step 5 and the
-  website reader is step 3. The review queue shows each pair's count via
+  **without** moving `last_verified`. `care_and_share` and `website` are
+  switchable (`SWITCH_SOURCES`), except `website`'s `url` (a site the reader
+  found is always a person's call); Plentiful/OSM are narrowed in step 5.
+  Hand-loaded `website` rows (0022's fixes, 0025's seed) are not counted.
+  The review queue shows each pair's count via
   `SourceSwitchPanel` (`GET /api/admin/source-switch`, a separate fetch so
   the Places page's own reads stay one parallel batch).
 - **`linkHealth.ts`** checks each stored `url` (HEAD, falling back to GET)

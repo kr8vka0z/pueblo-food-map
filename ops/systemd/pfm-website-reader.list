@@ -1,0 +1,5 @@
+# Secrets for pfm-website-reader.service, resolved by /usr/local/sbin/claude-bot-secrets.
+# Copy to /etc/claude-bot-secrets/pfm-website-reader.list. Names and 1Password references
+# only, never values. Format: NAME required|optional REF
+CLOUDFLARE_API_TOKEN required op://Atlas/Cloudflare - D1 Write Token - pueblo-food-map refresh/credential
+CLOUDFLARE_ACCOUNT_ID required op://Atlas/Cloudflare - Account Token/username

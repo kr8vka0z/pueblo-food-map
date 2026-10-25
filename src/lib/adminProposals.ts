@@ -107,7 +107,7 @@ export function parseProposalRow(row: ChangeProposalRow): ParsedProposal {
  * qualify regardless — it is a dead-link finding routed to the venue edit
  * screen, never approved directly (see applyApprovedProposal's own header).
  */
-const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful"]);
+const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful", "care_and_share"]);
 
 /**
  * True for exactly the shape the first production pipeline run mostly
@@ -133,6 +133,11 @@ export function isDateOnlyUpdateProposal(
   // an approval records (venue_id_aliases) — auto/bulk-applying it as a bare
   // date bump would re-propose the same rename every run.
   if (diff.meta?.rename) return false;
+  // Care and Share (scripts/refresh/careAndShare.ts): an unconfirmed match
+  // carries the upstream id an approval records, and a schedule the
+  // converter couldn't read exactly must reach a person — neither is a
+  // plain "still listed".
+  if (diff.meta?.match || diff.meta?.needs_review) return false;
   return diff.fields_changed.length === 1 && diff.fields_changed[0] === "last_verified";
 }
 
@@ -150,6 +155,9 @@ export type ReviewLane = "likely_noise" | "needs_human" | "likely_rename";
  */
 export function reviewLaneOf(row: Pick<ChangeProposalRow, "triage_lane">, diff: ProposedDiff | null): ReviewLane {
   if (diff?.meta?.rename || row.triage_lane === "renamed_or_moved") return "likely_rename";
+  // A Care and Share schedule the converter couldn't read exactly, or a
+  // match it wasn't sure of, is for a person whatever Jev's lane says.
+  if (diff?.meta?.needs_review || diff?.meta?.match) return "needs_human";
   if (row.triage_lane === "likely_noise" || row.triage_lane === "auto_apply_candidate") return "likely_noise";
   return "needs_human";
 }

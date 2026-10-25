@@ -28,7 +28,10 @@ import { createHash } from "node:crypto";
 import type { IrregularSchedule, Venue, WeeklyHours } from "@/types/venue";
 
 export type RefreshSource = "osm" | "plentiful";
-export type ProposalSource = RefreshSource | "link_health";
+// care_and_share (Venue Data Rebuild step 2) proposes against our venues of
+// any source_type, so it is a ProposalSource but not a RefreshSource (it is
+// never diffed by diffSource below; scripts/refresh/careAndShare.ts owns it).
+export type ProposalSource = RefreshSource | "link_health" | "care_and_share";
 export type ChangeType = "add" | "update" | "remove";
 
 /** The subset of a D1 `venues` row (migrations/0001_init_admin_schema.sql) this engine reads. */

@@ -98,7 +98,8 @@ const AGY_PROCESS_TIMEOUT_MS = 600_000;
  * model), and the working directory is a fresh empty temp dir, removed
  * after: headless agy auto-denies shell tools, and an empty cwd leaves its
  * file tools nothing to read even if a page talks it into trying. Any
- * failure throws GeminiStop, which stops the source for the run.
+ * hard failure throws GeminiStop, which stops the source for the run; a
+ * run that answered nothing returns null.
  */
 export function makeGemini(model: string, agyBin = "agy"): (prompt: string, schema: object, opts: { search: boolean }) => Promise<unknown> {
   return async (prompt, schema) => {
@@ -119,7 +120,8 @@ export function makeGemini(model: string, agyBin = "agy"): (prompt: string, sche
       if (code !== 0 || !body || body.status !== "SUCCESS") {
         throw new GeminiStop(`agy exit ${code}: ${(body?.error ?? stderr.trim().split("\n").pop() ?? "no output").slice(0, 200)}`);
       }
-      if (!body.structured_output || typeof body.structured_output !== "object") throw new GeminiStop("agy returned no structured output");
+      // Ran but answered nothing (e.g. it reached for a tool headless mode denies): "no answer", counted by the caller.
+      if (!body.structured_output || typeof body.structured_output !== "object") return null;
       return body.structured_output;
     } finally {
       rmSync(cwd, { recursive: true, force: true });

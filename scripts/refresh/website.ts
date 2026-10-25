@@ -30,8 +30,9 @@
  * stops it, and a search that found nothing waits DISCOVERY_RETRY_DAYS.
  *
  * A failed, missing or unreadable page yields nothing for that venue — never
- * a closure. Any Gemini failure (quota, timeout, bad output) stops the whole
- * source for the run, so a half-read run never writes.
+ * a closure. A hard Gemini failure (quota, timeout, an error) stops the whole
+ * source for the run, so a half-read run never writes; a call that runs but
+ * answers nothing costs only that venue, until MAX_NO_ANSWERS_IN_A_ROW.
  *
  * The pure pieces are exported and unit-tested (website.test.ts);
  * runWebsiteReader is the only function with I/O, all of it injected.
@@ -156,6 +157,27 @@ function words(s: string): string[] {
   return s.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(Boolean);
 }
 
+/** "Veterans" and "Veteran" are the same name word (the trial run missed "Mt Carmel Veteran Center" on its own "Veterans" page). */
+function nameWord(w: string): string {
+  return w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w;
+}
+
+const CITY_STATE_ZIP = /^(pueblo|west|colorado|co|usa|us|\d{5}(-\d{4})?)$/;
+
+/**
+ * An address's street part for comparison: from the house number to the end,
+ * minus a trailing city/state/zip, words abbreviated as in streetKey. Commas
+ * don't matter, so "611 Broadway Ave. Pueblo, CO 81004" equals ours with a
+ * comma after "Ave." (both seen in the trial run).
+ */
+export function addressKey(address: string | null | undefined): string {
+  const tokens = streetKey(String(address ?? "").replace(/,/g, " ")).split(" ").filter(Boolean);
+  const start = tokens.findIndex((t) => /^\d+[a-z]?$/.test(t));
+  const out = start >= 0 ? tokens.slice(start) : tokens;
+  while (out.length > 1 && CITY_STATE_ZIP.test(out[out.length - 1])) out.pop();
+  return out.join(" ");
+}
+
 /** House number + first street-name word of our address ("2713 N Grand Ave" → 2713, grand), or null when there is no number. */
 export function streetNumberOf(address: string | null | undefined): { number: string; street: string } | null {
   const tokens = streetKey(address ?? "").split(" ").filter(Boolean);
@@ -175,8 +197,8 @@ export function pageConfirmsVenue(text: string, venue: Pick<CurrentVenueRow, "na
   if (!num) return false;
   // streetKey keeps only an address's first comma part; a page is all one "street line".
   const pageTokens = streetKey(text.replace(/,/g, " ")).split(" ");
-  const pageWords = new Set(words(text));
-  const nameWords = words(venue.name).filter((w) => !NAME_STOPWORDS.has(w));
+  const pageWords = new Set(words(text).map(nameWord));
+  const nameWords = words(venue.name).filter((w) => !NAME_STOPWORDS.has(w)).map(nameWord);
   if (nameWords.length === 0 || !nameWords.every((w) => pageWords.has(w))) return false;
   for (let i = 0; i < pageTokens.length; i++) {
     if (pageTokens[i] !== num.number) continue;
@@ -442,6 +464,8 @@ export function buildGardensPrompt(url: string, text: string): string {
 
 export function buildDiscoveryPrompt(venue: Pick<CurrentVenueRow, "name" | "address">): string {
   return [
+    // Without this line the model tried a shell command, which headless agy denies, and answered nothing (trial run 2026-10-25).
+    "Use ONLY your web search tool. Do not run any command, do not open or fetch any page, do not read or write files.",
     `Search the web for the official website of this food pantry or meal site in Pueblo County, Colorado: "${venue.name}", ${venue.address}.`,
     "Return up to 3 URLs, best first, of pages ON THE ORGANIZATION'S OWN WEBSITE — ideally the page that describes its food pantry or meal and its hours.",
     "Never return Facebook, Instagram or other social media, and never a directory or listing site (Plentiful, foodpantries.org, findhelp, 211, Care and Share, Yelp, Google Maps).",
@@ -563,7 +587,7 @@ type ComparedField = (typeof COMPARED_FIELDS)[number];
 function canonicalField(field: ComparedField, value: unknown): string {
   if (field === "hours_weekly") return canonicalWeekly(value as string | WeeklyHours | null);
   if (field === "hours_irregular") return canonicalIrregular(value as string | IrregularSchedule[] | null);
-  if (field === "address") return streetKey(String(value ?? ""));
+  if (field === "address") return addressKey(String(value ?? ""));
   if (field === "phone") return normalizedPhoneTail(String(value ?? "")) ?? "";
   return String(value ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
 }
@@ -667,7 +691,8 @@ export function buildWebsiteProposals(p: BuildParams): ProposalDraft[] {
   if (p.discoveredUrl && "url" in after) quotes.unshift(`Found the venue's own website, ${p.discoveredUrl} (its name and street number are on the page)`);
   if (verified.hours?.reviewReason) quotes.push(quoted("Hours, in their words", verified.hours.quote));
   if (verified.status?.value === "temporarily_closed") quotes.push(quoted("Their words", verified.status.quote));
-  if (verified.eligibility) quotes.push(quoted("Who it serves", verified.eligibility.quote));
+  // Shown, never proposed: our `notes` hold hand-written text a page's wording shouldn't replace.
+  if (verified.eligibility) quotes.push(quoted("Who it serves", verified.eligibility.quote.length > 300 ? `${verified.eligibility.quote.slice(0, 297)}...` : verified.eligibility.quote));
   if (quotes.length > 0) meta.summary = [...new Set(quotes)].join(" · ");
   if (review.length > 0) meta.needs_review = review;
 
@@ -706,12 +731,19 @@ export function buildWebsiteProposals(p: BuildParams): ProposalDraft[] {
 
 export type PageResult = { ok: true; text: string; finalUrl: string; via: "fetch" | "browser" } | { ok: false; reason: string };
 
-/** Thrown by deps.gemini on ANY failure (quota, timeout, non-zero exit, unreadable output): stops the source for the run. */
+/** Thrown by deps.gemini on a hard failure (quota, timeout, non-zero exit, an error status): stops the source for the run. */
 export class GeminiStop extends Error {}
+/**
+ * deps.gemini returning null = it ran but gave no answer (seen in the
+ * 2026-10-25 trial run: the model tried a tool headless mode denies). That
+ * venue gets nothing; this many in a row is no longer a one-off and stops
+ * the source like a hard failure.
+ */
+export const MAX_NO_ANSWERS_IN_A_ROW = 3;
 
 export interface WebsiteDeps {
   fetchPage: (url: string) => Promise<PageResult>;
-  /** search=false for every read of our fetched text; true only for discovery. Returns the structured output. */
+  /** search=false for every read of our fetched text; true only for discovery. Returns the structured output, or null for "no answer". */
   gemini: (prompt: string, schema: object, opts: { search: boolean }) => Promise<unknown>;
   sleep: (ms: number) => Promise<void>;
   log: (message: string) => void;
@@ -744,6 +776,8 @@ export interface WebsiteRunStats {
   fieldsConfirmed: number;
   fieldsDropped: number;
   geminiCalls: number;
+  /** Calls that ran but returned nothing usable (that venue or page got nothing). */
+  geminiNoAnswers: number;
   pfpPages: string[];
 }
 
@@ -788,7 +822,7 @@ export function pfpPagesFor(venues: CurrentVenueRow[], sources: ReadonlyMap<stri
  */
 export async function runWebsiteReader(params: WebsiteRunParams & { sources?: ReadonlyMap<string, string> }): Promise<WebsiteRunResult> {
   const { deps, runId, today } = params;
-  const stats: WebsiteRunStats = { venuesRead: 0, venuesFailed: 0, noOwnSite: 0, discovered: [], fieldsConfirmed: 0, fieldsDropped: 0, geminiCalls: 0, pfpPages: [] };
+  const stats: WebsiteRunStats = { venuesRead: 0, venuesFailed: 0, noOwnSite: 0, discovered: [], fieldsConfirmed: 0, fieldsDropped: 0, geminiCalls: 0, geminiNoAnswers: 0, pfpPages: [] };
   const report: string[] = [];
   const proposals: ProposalDraft[] = [];
   const searchedNone: string[] = [];
@@ -799,9 +833,22 @@ export async function runWebsiteReader(params: WebsiteRunParams & { sources?: Re
     if (requests++ > 0) await deps.sleep(SITE_GAP_MS);
     return deps.fetchPage(url);
   };
-  const ask = async (prompt: string, schema: object, search: boolean) => {
+  let noAnswers = 0;
+  const ask = async (prompt: string, schema: object, search: boolean): Promise<Record<string, unknown> | null> => {
     stats.geminiCalls++;
-    return deps.gemini(prompt, schema, { search });
+    const out = await deps.gemini(prompt, schema, { search });
+    if (out && typeof out === "object") {
+      noAnswers = 0;
+      return out as Record<string, unknown>;
+    }
+    stats.geminiNoAnswers++;
+    if (++noAnswers >= MAX_NO_ANSWERS_IN_A_ROW) throw new GeminiStop(`${noAnswers} calls in a row gave no answer`);
+    return null;
+  };
+  // Streamed as it goes, so a run cut off part-way still shows how far it got.
+  const note = (line: string) => {
+    report.push(line);
+    deps.log(line);
   };
 
   try {
@@ -817,10 +864,14 @@ export async function runWebsiteReader(params: WebsiteRunParams & { sources?: Re
         discoveredUrl = pageUrl;
       } else if (params.decidedUrlVenueIds.has(venue.id) || params.recentlySearchedIds.has(venue.id)) {
         stats.noOwnSite++;
-        report.push(`  no site   ${venue.id} (searched before)`);
+        note(`  no site   ${venue.id} (searched before)`);
         continue;
       } else {
-        const found = (await ask(buildDiscoveryPrompt(venue), DISCOVERY_SCHEMA, true)) as { candidates?: unknown };
+        const found = await ask(buildDiscoveryPrompt(venue), DISCOVERY_SCHEMA, true);
+        if (!found) {
+          note(`  skipped   ${venue.id} (website search gave no answer; tried again next run)`);
+          continue;
+        }
         const candidates = (Array.isArray(found?.candidates) ? found.candidates : [])
           .map((c) => str(c))
           .filter((c) => isOwnSite(c))
@@ -838,7 +889,7 @@ export async function runWebsiteReader(params: WebsiteRunParams & { sources?: Re
         if (!pageUrl) {
           searchedNone.push(venue.id);
           stats.noOwnSite++;
-          report.push(`  no site   ${venue.id} (search: ${candidates.length} candidate(s), none confirmed)`);
+          note(`  no site   ${venue.id} (search: ${candidates.length} candidate(s), none confirmed)`);
           continue;
         }
       }
@@ -846,22 +897,28 @@ export async function runWebsiteReader(params: WebsiteRunParams & { sources?: Re
       page ??= await politeFetch(pageUrl);
       if (!page.ok) {
         stats.venuesFailed++;
-        report.push(`  failed    ${venue.id} ${pageUrl}: ${page.reason}`);
+        note(`  failed    ${venue.id} ${pageUrl}: ${page.reason}`);
         continue;
       }
       // A discovered page must still prove itself on every read (it may have changed hands since).
       if (discoveredUrl && !pageConfirmsVenue(page.text, venue)) {
         stats.venuesFailed++;
-        report.push(`  failed    ${venue.id} ${pageUrl}: name and street number no longer on the page`);
+        note(`  failed    ${venue.id} ${pageUrl}: name and street number no longer on the page`);
+        continue;
+      }
+      const answer = await ask(buildExtractionPrompt(venue, pageUrl, page.text), EXTRACTION_SCHEMA, false);
+      if (!answer) {
+        stats.venuesFailed++;
+        note(`  failed    ${venue.id} ${pageUrl}: Gemini gave no answer`);
         continue;
       }
       stats.venuesRead++;
-      const verified = verifyPlace(await ask(buildExtractionPrompt(venue, pageUrl, page.text), EXTRACTION_SCHEMA, false), page.text);
+      const verified = verifyPlace(answer, page.text);
       stats.fieldsConfirmed += verified.confirmed.length;
       stats.fieldsDropped += verified.dropped.length;
       const built = buildWebsiteProposals({ venue, verified, pageUrl, discoveredUrl, fetchedAt: new Date().toISOString(), runId, today, rejected: params.rejected });
       proposals.push(...built);
-      report.push(
+      note(
         `  read      ${venue.id} via ${page.via} ${pageUrl} confirmed=[${verified.confirmed.join(",")}] dropped=[${verified.dropped.join(",")}]` +
           (built[0] ? ` -> ${built[0].changeType} ${built[0].proposedDiff.fields_changed.join("+") || "-"}${built[0].proposedDiff.meta?.needs_review ? " [review]" : ""}` : ""),
       );
@@ -884,7 +941,11 @@ export async function runWebsiteReader(params: WebsiteRunParams & { sources?: Re
         stats.pfpPages.push(`${url}: unchanged`);
         continue;
       }
-      const raw = (await ask(buildGardensPrompt(url, page.text), GARDENS_SCHEMA, false)) as { places?: unknown };
+      const raw = await ask(buildGardensPrompt(url, page.text), GARDENS_SCHEMA, false);
+      if (!raw) {
+        stats.pfpPages.push(`${url}: changed, but Gemini gave no answer (read again next run)`);
+        continue;
+      }
       const places = Array.isArray(raw?.places) ? (raw.places as Record<string, unknown>[]) : [];
       const unknownNames: string[] = [];
       for (const place of places) {

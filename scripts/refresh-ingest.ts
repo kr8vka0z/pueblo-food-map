@@ -635,7 +635,7 @@ async function main(): Promise<void> {
       const st = web.stats;
       websiteSummary =
         `venues_read=${st.venuesRead} failed=${st.venuesFailed} no_own_site=${st.noOwnSite} discovered=${st.discovered.length} ` +
-        `fields_confirmed=${st.fieldsConfirmed} fields_dropped=${st.fieldsDropped} gemini_calls=${st.geminiCalls}`;
+        `fields_confirmed=${st.fieldsConfirmed} fields_dropped=${st.fieldsDropped} gemini_calls=${st.geminiCalls} gemini_no_answer=${st.geminiNoAnswers}`;
       if (!web.ok) {
         anySourceAborted = true;
         console.error(`\nwebsite: ABORTED (writes nothing for this source): ${web.reason}`);
@@ -649,7 +649,6 @@ async function main(): Promise<void> {
         );
         const webProposals = dropAlreadyReviewed(web.proposals, approvedWebKeys);
         console.log(`\nwebsite: ${websiteSummary} proposals=${webProposals.length} searched_none=${web.searchedNone.length}`);
-        for (const line of web.report) console.log(line);
         for (const d of st.discovered) console.log(`  discovered ${d}`);
         for (const p of st.pfpPages) console.log(`  pfp ${p}`);
         allProposals = allProposals.concat(webProposals);

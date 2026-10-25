@@ -84,6 +84,18 @@ describe("quotes must be on our fetched page", () => {
     expect(v.dropped).toContain("phone");
   });
 
+  test("the same address written with other commas or no zip is not a change (trial run: Agape, New Heights)", async () => {
+    const text = "Hope Church 123 Main St. Pueblo, CO 81003";
+    const h = harness({
+      pages: { "https://hopechurch.example/": page(text) },
+      gemini: () => ({ address: { value: "123 Main St. Pueblo, CO 81003", quote: "123 Main St. Pueblo, CO 81003" } }),
+    });
+    const r = await runWebsiteReader(h.params);
+    if (!r.ok) throw new Error(r.reason);
+    expect(r.stats.fieldsConfirmed).toBe(1);
+    expect(r.proposals.map((p) => p.proposedDiff.fields_changed)).toEqual([["last_verified"]]);
+  });
+
   test("an address without a house number never replaces ours", () => {
     const text = "La Familia Community Garden, 5th and Hudson";
     const v = verifyPlace({ address: { value: "5th and Hudson", quote: "La Familia Community Garden, 5th and Hudson" } }, text);
@@ -216,6 +228,19 @@ describe("a failure says nothing about the venue", () => {
     const r = await runWebsiteReader(h.params);
     if (!r.ok) throw new Error(r.reason);
     expect(r.proposals.map((p) => [p.changeType, p.proposedDiff.fields_changed])).toEqual([["update", ["last_verified"]]]);
+  });
+
+  test("Gemini answering nothing costs only that venue; three in a row stops the source", async () => {
+    const one = harness({
+      over: { venues: [venue({ id: "quiet", url: "https://quiet.example/" }), venue()] },
+      gemini: (prompt) => (prompt.includes("quiet.example") ? null : reading()),
+    });
+    const r1 = await runWebsiteReader(one.params);
+    if (!r1.ok) throw new Error(r1.reason);
+    expect(r1.proposals.map((p) => p.targetVenueId)).toEqual(["v-1"]);
+
+    const three = harness({ over: { venues: ["a", "b", "c", "d"].map((id) => venue({ id })) }, gemini: () => null });
+    expect((await runWebsiteReader(three.params)).ok).toBe(false);
   });
 
   test("a Gemini failure stops the whole source", async () => {

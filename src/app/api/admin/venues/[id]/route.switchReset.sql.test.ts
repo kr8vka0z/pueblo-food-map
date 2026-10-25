@@ -82,4 +82,13 @@ describe("PATCH resets the switch for a field the source set", () => {
     expect(res.status).toBe(200);
     expect(db.prepare("SELECT COUNT(*) AS n FROM source_switch_resets").get()).toEqual({ n: 0 });
   });
+
+  test("a database without migration 0023 still saves the edit (the reset is skipped)", async () => {
+    const db = buildDb();
+    db.exec("DROP TABLE source_switch_resets");
+    mockGetCloudflareContext.mockResolvedValue({ env: { ADMIN_DB: sqliteD1(db) } });
+    const res = await patch({ phone: "719-555-0200" });
+    expect(res.status).toBe(200);
+    expect(db.prepare("SELECT phone FROM venues").get()).toEqual({ phone: "719-555-0200" });
+  });
 });

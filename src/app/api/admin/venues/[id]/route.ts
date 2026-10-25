@@ -396,6 +396,13 @@ export async function PATCH(
   // and an edit must never fail because it couldn't be computed.
   let insertSwitchResets: ReturnType<D1Database["prepare"]>[] = [];
   try {
+    // Probed here, inside the fail-soft block: the INSERT rides the atomic
+    // batch below, so on a database without migration 0023 it would fail
+    // the whole edit.
+    const hasResetsTable = await db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'source_switch_resets'")
+      .first<{ name: string }>();
+    if (!hasResetsTable) throw new Error("source_switch_resets missing (migration 0023 not applied)");
     const recent = await db.prepare(RECENT_APPLIED_FOR_VENUE_SQL).bind(id).all<{ source: string; proposed_diff: string; applied_at: string | null }>();
     insertSwitchResets = resetsForEdit(existing as unknown as Record<string, unknown>, afterRow as unknown as Record<string, unknown>, recent.results ?? []).map(
       (r) => db.prepare(SWITCH_RESET_INSERT_SQL).bind(r.source, r.field, id, updatedAt, identity.email, ...dependentGuardArgs),

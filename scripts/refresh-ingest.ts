@@ -61,6 +61,7 @@
  *   npx tsx scripts/refresh-ingest.ts --db-mode local    # local D1 (npm run preview's Miniflare SQLite)
  *   npx tsx scripts/refresh-ingest.ts --db-mode staging  # pueblo-food-map-admin-staging (dev.pueblofoodmap.com's database)
  *   npx tsx scripts/refresh-ingest.ts --db-mode remote   # PRODUCTION D1 — only ever run by the real workflow
+ *   ... --only website   # the venue website reader alone (server timer only, ops/systemd/; see parseFlags)
  *
  * `local` and `remote` share the database name pueblo-food-map-admin and
  * differ only by wrangler's --local/--remote flag; `staging` is a separate

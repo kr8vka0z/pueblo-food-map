@@ -35,7 +35,7 @@ export function resolveEmailOrigin(req: { url: string }): string {
   }
 
   // Local dev only — never in a deployed Worker, where NODE_ENV is always
-  // "production" (opennextjs-cloudflare's build sets it at build time).
+  // "production" (`vite build` sets it at build time).
   if (process.env.NODE_ENV !== "production" && (url.hostname === "localhost" || url.hostname === "127.0.0.1")) {
     return `${url.protocol}//${url.host}`; // keep the port for local dev
   }

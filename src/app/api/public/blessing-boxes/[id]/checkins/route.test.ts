@@ -2,7 +2,7 @@
 /**
  * Route-level tests for POST /api/public/blessing-boxes/[id]/checkins
  * (Blessing Boxes slice 2). Mocks Turnstile verification, the rate limiter,
- * @opennextjs/cloudflare's getCloudflareContext, and a fake D1Database —
+ * @/lib/cloudflareContext's getCloudflareContext, and a fake D1Database —
  * same layered-mock convention as report/submit/route.test.ts and
  * src/app/api/public/blessing-boxes/route.test.ts.
  */
@@ -29,7 +29,7 @@ vi.mock("@/lib/checkinRateLimit", async (importOriginal) => {
 });
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

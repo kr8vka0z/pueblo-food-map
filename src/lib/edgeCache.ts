@@ -26,7 +26,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 
 const CACHE_TTL_SECONDS = 60;
 

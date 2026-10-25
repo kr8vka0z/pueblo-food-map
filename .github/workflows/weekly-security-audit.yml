@@ -142,10 +142,14 @@ jobs:
         # PR -- it's a required check by its literal name ("Dependency CVE
         # Audit"), so a job-level `if:` here would leave the PR blocked
         # forever instead of passing; only this one step is conditional.
+        # scripts/security/audit-prod.mjs = `npm audit --omit=dev`, high/critical
+        # blocking, minus its short list of build-only advisories (each with a
+        # WHY and a removal condition in that file). audit-fix.sh's gate runs
+        # the same script, so the daily auto-fix job and this check agree.
         if: steps.detect.outputs.data_only != 'true'
         run: |
           echo "### Production dependency audit" >> $GITHUB_STEP_SUMMARY
-          if npm audit --audit-level=high --omit=dev; then
+          if node scripts/security/audit-prod.mjs; then
             echo "No high/critical CVEs found in production dependencies." >> $GITHUB_STEP_SUMMARY
           else
             echo "High or critical vulnerability detected in production dependencies." >> $GITHUB_STEP_SUMMARY

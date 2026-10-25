@@ -14,7 +14,7 @@ import { sqliteD1 } from "@/lib/sqliteD1.testutil";
 import { SITE_URL } from "@/lib/site";
 
 const mockContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: () => mockContext() }));
+vi.mock("@/lib/cloudflareContext", () => ({ getCloudflareContext: () => mockContext() }));
 
 import sitemap from "@/app/sitemap";
 import robots from "@/app/robots";

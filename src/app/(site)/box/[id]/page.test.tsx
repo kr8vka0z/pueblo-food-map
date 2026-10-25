@@ -2,7 +2,7 @@
 /**
  * generateMetadata + notFound tests for /box/[id] (Blessing Boxes slice 1).
  * Same mocking pattern as the public blessing-boxes route test: mocks
- * @opennextjs/cloudflare's getCloudflareContext and src/lib/blessingBoxes'
+ * @/lib/cloudflareContext's getCloudflareContext and src/lib/blessingBoxes'
  * loadLiveBoxById, so this proves the page's own best-effort loadBox() +
  * generateMetadata() logic without a live D1 binding.
  */
@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

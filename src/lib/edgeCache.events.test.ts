@@ -9,7 +9,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { bustEdgeCache, respondWithEdgeCache } from "@/lib/edgeCache";
 
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: () => ({ ctx: { waitUntil: (p: Promise<unknown>) => p } }),
 }));
 

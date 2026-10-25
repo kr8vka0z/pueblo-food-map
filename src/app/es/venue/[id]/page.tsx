@@ -1,17 +1,15 @@
 /**
  * /es/venue/[id] — Spanish twin of /venue/[id] (#689 PR 2).
  *
- * Statically generated, same as the EN route: generateStaticParams +
- * dynamicParams = false prerender every known venue id at build time. An
+ * Same pairing as the EN route: generateStaticParams + dynamicParams = false
+ * (rendered on first request under vinext, not at build time). An
  * unknown id 404s at Next's ROUTING level, before this page's own
  * `if (!v) notFound()` below ever runs (Next treats a dynamicParams=false
  * id outside generateStaticParams as "no route matched", not as an
  * in-tree notFound() call) — it falls through to app/global-not-found.tsx
  * (English), same as any other unmatched /es/* URL; see es/layout.tsx's
- * own comment for why that tradeoff is accepted. Depends on
- * open-next.config.ts's staticAssetsIncrementalCache override — that
- * override is global, not path-scoped, so it already covers this route
- * (see that file's own comment; AGENTS.md "Discoverability / SEO traps").
+ * own comment for why that tradeoff is accepted. scripts/check-pages-serve.sh
+ * checks this route too (AGENTS.md "Discoverability / SEO traps").
  *
  * VenueContent is the SAME client component the EN page mounts, already
  * reading useLocale() (#289) — under this tree's locked provider it renders

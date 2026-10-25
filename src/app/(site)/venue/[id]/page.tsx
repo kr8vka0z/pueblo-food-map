@@ -6,16 +6,14 @@
  * JSON-LD — enabling rich search results and accurate link previews for
  * shared venue links. Issue #164 item 6.4.
  *
- * This route is statically generated: generateStaticParams + dynamicParams
- * = false prerender every known venue id at build time (unknown ids 404).
- * The prior `cookies()`-based locale read that forced dynamic rendering was
- * removed in PR #351 (2026-08-24) — this comment previously described that
- * removed behavior, which is what let this route regress: on Cloudflare via
- * OpenNext, a static + dynamicParams=false route depends on the configured
- * incremental cache actually serving the prerendered HTML (open-next.config.ts).
- * With the default "dummy" cache, every request 404s (NoFallbackError on a
- * cache miss) — the 2026-08-24 to 2026-09-02 production outage. Do not
- * reintroduce cookies()/dynamic APIs here without re-checking that pairing.
+ * generateStaticParams + dynamicParams = false: only known venue ids exist
+ * (unknown ids 404). Under vinext the page renders in the Worker on its first
+ * request and is then served from the in-memory cache; nothing is
+ * prerendered at build time. On OpenNext (before vinext) this pairing
+ * depended on the incremental cache serving prerendered HTML, and its
+ * default "dummy" cache 404'd every venue — the 2026-08-24 to 2026-09-02
+ * production outage. scripts/check-pages-serve.sh (ci.yml) requests real and
+ * unknown ids from the built Worker so a regression goes red on the PR.
  *
  * The visible body now lives in VenueContent (a client component reading
  * useLocale() — #289) so the on-screen copy is bilingual; this file still

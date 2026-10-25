@@ -11,7 +11,7 @@ import { NextRequest } from "next/server";
 import type { NetworkStatsData } from "@/lib/boxStats";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

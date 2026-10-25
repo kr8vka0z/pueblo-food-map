@@ -14,12 +14,13 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Worktree build artifacts and generated files:
     ".claude/**",
-    // Cloudflare Workers / OpenNext build output.
-    // WHY: `wrangler dev` and `opennextjs-cloudflare build` write generated
-    // JS into .wrangler/ and .open-next/ respectively. These aren't source
-    // files — linting them produces hundreds of false positives and slows CI.
+    // Cloudflare Workers / vinext build output.
+    // WHY: `wrangler dev` and `vite build` write generated JS into .wrangler/
+    // and dist/ (+ .vinext/) respectively. These aren't source files —
+    // linting them produces hundreds of false positives and slows CI.
     ".wrangler/**",
-    ".open-next/**",
+    "dist/**",
+    ".vinext/**",
   ]),
 ]);
 

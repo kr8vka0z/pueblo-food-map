@@ -1,9 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Points at the wrapper worker (custom-worker.ts), not .open-next/worker.js directly —
-  // @opennextjs/cloudflare only exports a fetch handler by default; the wrapper re-exports
-  // it and adds scheduled() for the uptime dead-man's-switch below. See custom-worker.ts
-  // header comment for the official how-to this follows.
+  // Points at the wrapper worker (custom-worker.ts), not vinext's default entry:
+  // vinext's handler only has fetch(), so the wrapper delegates to it and adds the
+  // /ingest proxy, noindex policy and scheduled(). See custom-worker.ts. `vite build`
+  // flattens this file (one env, CLOUDFLARE_ENV picks it) into dist/server/wrangler.json.
   "main": "custom-worker.ts",
   "name": "pueblo-food-map",
   "compatibility_date": "2025-12-01",
@@ -28,15 +28,9 @@
     "logs": { "invocation_logs": false }
   },
   "assets": {
-    "directory": ".open-next/assets",
+    "directory": "dist/client",
     "binding": "ASSETS"
   },
-  "services": [
-    {
-      "binding": "WORKER_SELF_REFERENCE",
-      "service": "pueblo-food-map"
-    }
-  ],
   "d1_databases": [
     {
       "binding": "ADMIN_DB",
@@ -107,8 +101,8 @@
   // secret, matching Kyle's own call: it's an account identifier, not a
   // credential (the actual read-scoped token, CF_ANALYTICS_API_TOKEN, IS a
   // Worker secret — see AGENTS.md's Secrets table). Read via the Cloudflare
-  // env binding at request time, never process.env (named environments
-  // don't populate wrangler `var`s into process.env under OpenNext).
+  // env binding at request time, never process.env (AGENTS.md "Runtime
+  // reads": the binding is where vars are defined to live).
   // #681 (admin Dashboard "What people do on the map") — PostHog project id
   // for the Query API (src/lib/posthogQuery.ts). A plain var, not a secret,
   // same call as CF_ANALYTICS_ACCOUNT_ID above (an identifier, not a
@@ -178,18 +172,9 @@
         "ADMIN_OWNER_EMAIL": "kysboyd@gmail.com"
       },
       "assets": {
-        "directory": ".open-next/assets",
+        "directory": "dist/client",
         "binding": "ASSETS"
       },
-      // Self-reference must point at the staging Worker, not prod — OpenNext
-      // uses this binding for internal self-calls, so pointing it at prod
-      // would make staging silently call into production.
-      "services": [
-        {
-          "binding": "WORKER_SELF_REFERENCE",
-          "service": "pueblo-food-map-staging"
-        }
-      ],
       "d1_databases": [
         {
           "binding": "ADMIN_DB",

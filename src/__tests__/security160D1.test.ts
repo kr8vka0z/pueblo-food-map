@@ -3,7 +3,7 @@
  *
  * Supersedes the old security160.test.ts: its "1.2" and "1.3" blocks call
  * report/suggest/feedback's POST handler past the honeypot check without
- * mocking @opennextjs/cloudflare, @/lib/formRateLimit, or stubbing
+ * mocking @/lib/cloudflareContext, @/lib/formRateLimit, or stubbing
  * CHECKIN_RATE_LIMIT_SECRET — all now required before those routes reach
  * validation (#587's D1-backed rate limit runs before field validation,
  * same order as before). checkFormRateLimit is mocked to always allow (same
@@ -35,7 +35,7 @@ import { makeFakeD1, makeSubmitRequest, mockTurnstileSuccess } from "@/__tests__
 // "1.1" (throws earlier on a missing Turnstile secret) and "1.4" (doesn't
 // call a route at all).
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

@@ -30,7 +30,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { FLYER_CONTENT_TYPES, FLYER_EVENT_ID_RE, FLYER_FILE_RE, type FlyerExt } from "@/lib/eventFlyers";
 
 export const dynamic = "force-dynamic";

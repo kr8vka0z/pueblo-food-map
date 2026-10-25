@@ -34,7 +34,7 @@
  */
 
 import type { MetadataRoute } from "next";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { SITE_URL } from "@/lib/site";
 import { venues } from "@/data/venues";
 import { loadSitemapEvents } from "@/lib/events";

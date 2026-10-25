@@ -5,8 +5,8 @@
  * WHY force-dynamic (like /box/[id]): events live only in D1 and are not part
  * of the build-time Publish snapshot, so there is no fixed id list to
  * prerender, and a cancel or edit must show without a rebuild. The static
- * generateStaticParams + dynamicParams=false pairing the venue pages use (and
- * its open-next.config.ts trap, AGENTS.md "Discoverability / SEO traps") is
+ * generateStaticParams + dynamicParams=false pairing the venue pages use
+ * (AGENTS.md "Discoverability / SEO traps") is
  * deliberately NOT used here. No Cache-Control is added: /box/[id] adds none
  * either, Next marks a dynamic page non-cacheable, and a D1 point read is
  * cheap — so an edit, a cancel and a not-found are all current on the next

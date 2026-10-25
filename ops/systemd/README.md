@@ -14,7 +14,7 @@ use, and this repo is public.
 ## Install (once the code is on `main`)
 
 Needs: migration `0025` applied to production (AGENTS.md promotion checklist),
-`agy` logged in for the `atlas` user, `/usr/bin/agent-browser`.
+`agy` logged in for the `atlas` user.
 
 ```bash
 cd <a checkout of main>
@@ -31,13 +31,12 @@ First run by hand (optional, writes to production):
 
 ## How the token is kept from Gemini
 
-agy and the browser read untrusted web pages and run as `atlas`, so they must
+agy reads untrusted web pages and runs as `atlas`, so it must
 not be able to reach the D1 write token. The unit installs packages first,
 then root writes `/run/pfm-website-reader/secrets.env`, then the reader reads
 it and deletes it before anything else and hands the values only to wrangler.
 Nothing sources the file, so the token is in no process environment (a
-same-user process can read another's `/proc/<pid>/environ`), and agy and the
-browser are started with every `CLOUDFLARE_*`/`OP_*` variable removed.
+same-user process can read another's `/proc/<pid>/environ`), and agy is started with every `CLOUDFLARE_*`/`OP_*` variable removed.
 
 A run by hand with the token exported in your shell (e.g. the staging run)
 puts it in node's starting environment. To keep that path closed too, write

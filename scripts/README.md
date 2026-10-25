@@ -59,8 +59,8 @@ npx tsx scripts/refresh-ingest.ts --db-mode local --only care_and_share --dry-ru
 `refresh-ingest.ts --only website`, from the server's systemd timer
 (`ops/systemd/README.md`), because it needs Gemini through the Antigravity
 CLI (`agy`) logged in on that machine. It reads venue websites and the Pueblo
-Food Project gardens page (live HTTP, one site every 4 s; `agent-browser` as
-a fallback) and writes `website` proposals. Needs migration `0025` on the
+Food Project gardens page (live HTTP, public addresses only, one site every
+4 s; no browser, so a JavaScript-only page is unreadable) and writes `website` proposals. Needs migration `0025` on the
 target database. Watch it without writing (real pages, real Gemini):
 
 ```

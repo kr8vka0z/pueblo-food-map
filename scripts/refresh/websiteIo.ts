@@ -1,6 +1,6 @@
 /**
  * websiteIo.ts — the real I/O behind scripts/refresh/website.ts's injected
- * deps: fetching a page (plain HTTP, falling back to a headless browser) and
+ * deps: fetching a page (plain HTTP, public addresses only) and
  * asking Gemini through the Antigravity CLI (`agy`). Kept apart from
  * website.ts so that file stays testable without a network or a CLI.
  *
@@ -10,22 +10,24 @@
  */
 
 import { execFile } from "node:child_process";
+import { lookup as dnsLookup, type LookupAddress, type LookupOptions } from "node:dns";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GeminiStop, htmlToText, isPublicHttpUrl, type PageResult } from "./website";
+import { GeminiStop, htmlToText, isPublicHttpUrl, isPublicIp, type PageResult } from "./website";
 
 const FETCH_TIMEOUT_MS = 30_000;
 const MAX_HTML_BYTES = 3 * 1024 * 1024;
-/** Less visible text than this = a script-built page (or a block page): try the browser. */
+/** Less visible text than this = a script-built page (or a block page): unreadable. */
 const MIN_TEXT_CHARS = 300;
-const BROWSER_TIMEOUT_MS = 90_000;
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 (pueblofoodmap.com weekly check)";
 
 /**
- * The environment agy and agent-browser get: ours minus every Cloudflare and
- * 1Password variable. Both run code steered by untrusted page text, so they
+ * The environment agy gets: ours minus every Cloudflare and 1Password
+ * variable. It runs steered by untrusted page text, so it
  * must never hold the D1 write token (or a way to fetch more secrets), even
  * when a person runs the job by hand with the token exported in the shell.
  */
@@ -69,77 +71,111 @@ function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs: numbe
   });
 }
 
-/**
- * The browser fallback, in its OWN agent-browser session (the default one is
- * shared by every job on the machine) and always closed after.
- */
-async function browserText(url: string, session: string): Promise<PageResult> {
-  const env = { ...untrustedChildEnv(), AGENT_BROWSER_SESSION: session };
-  try {
-    const opened = await run("agent-browser", ["open", url], { timeoutMs: BROWSER_TIMEOUT_MS, env });
-    if (opened.code !== 0) return { ok: false, reason: `browser could not open the page (${opened.stderr.trim().slice(0, 120)})` };
-    const got = await run("agent-browser", ["get", "text", "body"], { timeoutMs: BROWSER_TIMEOUT_MS, env });
-    const text = got.stdout.replace(/\s+/g, " ").trim();
-    if (got.code !== 0 || text.length < MIN_TEXT_CHARS) return { ok: false, reason: "browser read almost no text" };
-    return { ok: true, text, finalUrl: url, via: "browser" };
-  } finally {
-    await run("agent-browser", ["close"], { timeoutMs: 30_000, env });
-  }
-}
-
-/**
- * One GET. 404/410 is a definite "not there" (no second try); a refusal
- * (401/403), a timeout, a 5xx or a near-empty page gets ONE browser try.
- * 429 is left alone: the site asked us to slow down. Never throws.
- */
 const MAX_REDIRECTS = 5;
 
+type LookupCallback = (err: NodeJS.ErrnoException | null, address: string | LookupAddress[], family?: number) => void;
+/** dns.lookup's shape, so tests can stand in a resolver. */
+export type Resolver = (hostname: string, options: { all: true }, cb: (err: NodeJS.ErrnoException | null, addresses: LookupAddress[]) => void) => void;
+
 /**
- * GET that follows redirects by hand, refusing any hop to a non-public host
- * (a page could otherwise bounce us to this server's own services or the
- * tailnet). ponytail: checks names, not resolved addresses, so a public
- * name that resolves to a private address still passes; the upgrade is a
- * DNS lookup per hop before connecting.
+ * The `lookup` every page request connects through: resolves the name and
+ * refuses the connection if ANY answer is non-public (isPublicIp), so a
+ * public-looking name pointed at 127.0.0.1 (this server runs 1Password
+ * Connect on 127.0.0.1:8090), the LAN or the tailnet never gets a request.
+ * The socket connects to the address checked here, not to a second lookup,
+ * so a DNS answer can't change between the check and the connection.
  */
-async function publicFetch(url: string): Promise<Response> {
-  let current = url;
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    if (!isPublicHttpUrl(current)) throw new Error(`refused non-public address ${current}`);
-    const res = await fetch(current, {
-      headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/xhtml+xml" },
-      redirect: "manual",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+export function makePinnedLookup(resolve: Resolver = dnsLookup as unknown as Resolver) {
+  return (hostname: string, options: LookupOptions | number | undefined, cb: LookupCallback): void => {
+    const wantAll = typeof options === "object" && options !== null && options.all === true;
+    resolve(hostname, { all: true }, (err, addresses) => {
+      if (err) return cb(err, wantAll ? [] : "", 4);
+      const bad = addresses.find((a) => !isPublicIp(a.address));
+      if (addresses.length === 0 || bad) {
+        const e = new Error(`refused non-public address for ${hostname}${bad ? ` (${bad.address})` : ""}`) as NodeJS.ErrnoException;
+        e.code = "ENONPUBLIC";
+        return cb(e, wantAll ? [] : "", 4);
+      }
+      if (wantAll) return cb(null, addresses);
+      cb(null, addresses[0].address, addresses[0].family);
     });
-    const next = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
-    if (!next) return res;
-    current = new URL(next, current).toString();
-  }
-  throw new Error("too many redirects");
+  };
 }
 
-export function makeFetchPage(session: string): (url: string) => Promise<PageResult> {
+interface RawResponse {
+  status: number;
+  location: string | null;
+  contentType: string;
+  body: Buffer;
+}
+
+/** One GET through the pinned lookup; reads at most MAX_HTML_BYTES of body. */
+function getOnce(url: string, lookup: ReturnType<typeof makePinnedLookup>): Promise<RawResponse> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = (u.protocol === "https:" ? httpsRequest : httpRequest)(
+      u,
+      { method: "GET", headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/xhtml+xml" }, lookup, timeout: FETCH_TIMEOUT_MS },
+      (res) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        res.on("data", (c: Buffer) => {
+          if (size < MAX_HTML_BYTES) chunks.push(c);
+          size += c.length;
+          if (size >= MAX_HTML_BYTES) res.destroy();
+        });
+        const done = () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            location: typeof res.headers.location === "string" ? res.headers.location : null,
+            contentType: String(res.headers["content-type"] ?? ""),
+            body: Buffer.concat(chunks).subarray(0, MAX_HTML_BYTES),
+          });
+        res.on("end", done);
+        res.on("close", done);
+        res.on("error", reject);
+      },
+    );
+    req.on("timeout", () => req.destroy(new Error("timed out")));
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+/**
+ * Fetches a page for the reader. Every hop (redirects followed by hand, at
+ * most MAX_REDIRECTS) must pass the name check (isPublicHttpUrl — literal
+ * addresses skip DNS, so they are checked here) and connect through the
+ * pinned lookup. No browser fallback (removed in review of PR #845: a
+ * browser follows redirects and script navigation we can't check), so a
+ * page that needs JavaScript, refuses us, or is near-empty is simply
+ * unreadable: nothing is written for that venue. 404/410 = not there; 429
+ * = asked to slow down. Never throws.
+ */
+export function makeFetchPage(resolve?: Resolver): (url: string) => Promise<PageResult> {
+  const lookup = makePinnedLookup(resolve);
   return async (url) => {
-    // Never hand a non-public address to the browser either.
-    if (!isPublicHttpUrl(url)) return { ok: false, reason: "not a public web address" };
-    let res: Response;
+    let current = url;
     try {
-      res = await publicFetch(url);
+      for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+        if (!isPublicHttpUrl(current)) return { ok: false, reason: `refused non-public address ${current}` };
+        const res = await getOnce(current, lookup);
+        if (res.status >= 300 && res.status < 400 && res.location) {
+          current = new URL(res.location, current).toString();
+          continue;
+        }
+        if (res.status === 404 || res.status === 410) return { ok: false, reason: `HTTP ${res.status}` };
+        if (res.status === 429) return { ok: false, reason: "HTTP 429 (asked to slow down)" };
+        if (res.status < 200 || res.status >= 300) return { ok: false, reason: `HTTP ${res.status}` };
+        if (!/html|text\/plain/i.test(res.contentType)) return { ok: false, reason: `not a web page (${res.contentType || "no content type"})` };
+        const text = htmlToText(res.body.toString("utf-8"));
+        if (text.length < MIN_TEXT_CHARS) return { ok: false, reason: "almost no text (a page built by JavaScript, or a block page)" };
+        return { ok: true, text, finalUrl: current, via: "fetch" };
+      }
+      return { ok: false, reason: "too many redirects" };
     } catch (err) {
-      if (err instanceof Error && /^refused non-public/.test(err.message)) return { ok: false, reason: err.message };
-      const fallback = await browserText(url, session);
-      return fallback.ok ? fallback : { ok: false, reason: `fetch failed (${err instanceof Error ? err.message : String(err)}); ${fallback.reason}` };
+      return { ok: false, reason: `fetch failed (${err instanceof Error ? err.message : String(err)})` };
     }
-    if (res.status === 404 || res.status === 410) return { ok: false, reason: `HTTP ${res.status}` };
-    if (res.status === 429) return { ok: false, reason: "HTTP 429 (asked to slow down)" };
-    const type = res.headers.get("content-type") ?? "";
-    if (res.ok && !/html|text\/plain/i.test(type)) return { ok: false, reason: `not a web page (${type || "no content type"})` };
-    if (res.ok) {
-      const buf = Buffer.from(await res.arrayBuffer());
-      const text = htmlToText(buf.subarray(0, MAX_HTML_BYTES).toString("utf-8"));
-      if (text.length >= MIN_TEXT_CHARS) return { ok: true, text, finalUrl: res.url || url, via: "fetch" };
-    }
-    const fallback = await browserText(url, session);
-    return fallback.ok ? fallback : { ok: false, reason: `HTTP ${res.status}; ${fallback.reason}` };
   };
 }
 

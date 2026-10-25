@@ -354,15 +354,19 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   Monday 02:00 MT, a clean `origin/main` checkout), never in GitHub
   Actions: Gemini is the Antigravity CLI `agy` under Kyle's login there
   (`--sandbox`; model `PFM_GEMINI_MODEL`, default `gemini-3.8-flash-medium`).
-  agy and agent-browser start with every `CLOUDFLARE_*`/`OP_*` variable
+  agy starts with every `CLOUDFLARE_*`/`OP_*` variable
   removed (`untrustedChildEnv`); the timer hands the D1 token over as a file
   (`PFM_SECRETS_FILE`) that `refresh-ingest.ts` reads and deletes at start
   and passes only to wrangler, so it is in no environment or file agy can
-  read. Fetches refuse non-public hosts (`isPublicHttpUrl`), redirects
-  included.
-  Our code fetches each page (plain GET, one `agent-browser` try in its own
-  session for a refusal or a script-built page; 404/410/429 get none), one
-  site every 4 s. Gemini reads only that text (fenced as untrusted, empty
+  read.
+  Our code fetches each page itself (Node `http`/`https`, one site every
+  4 s): every hop, redirects followed by hand, must be a public name AND
+  connect through a pinned DNS lookup that refuses any loopback, private,
+  link-local, tailnet or IPv4-mapped answer (`isPublicIp`), so no page can
+  steer a request at this server's own services. There is no browser
+  fallback: a page that needs JavaScript, refuses us or is near-empty is
+  unreadable and writes nothing. Hours proposals touch only the kind of
+  schedule the quote states (weekly or monthly), never clearing the other. Gemini reads only that text (fenced as untrusted, empty
   temp dir as cwd, no paths) and returns each field with a verbatim quote;
   a field survives only if the quote is in our text and agrees with the
   value (phone digits, house number, "closed"). Hours are converted by our

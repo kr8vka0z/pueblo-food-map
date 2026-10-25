@@ -123,7 +123,7 @@ import { makeFetchPage, makeGemini, readAndRemoveSecretsFile } from "./refresh/w
  * The server timer (ops/systemd/) passes the Cloudflare token as a FILE
  * (PFM_SECRETS_FILE), read and deleted here before anything else runs, and
  * kept only in this object: it goes to wrangler's child processes and
- * nowhere else, so agy and agent-browser (driven by untrusted page text)
+ * nowhere else, so agy (driven by untrusted page text)
  * can't reach it on disk or in any environment they can read. wrangler runs
  * synchronously, never while an agy call is in flight. The GitHub workflow
  * still sets the token in the environment as before; this adds nothing there.
@@ -620,7 +620,6 @@ async function main(): Promise<void> {
           "AND json_extract(proposed_diff, '$.after.url') IS NOT NULL",
       );
       const searchSince = new Date(Date.now() - DISCOVERY_RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
-      const session = `pfm-website-reader-${process.pid}`;
       const web = await runWebsiteReader({
         venues: webRows,
         sources: new Map(webRows.map((r) => [r.id, r.source])),
@@ -640,7 +639,7 @@ async function main(): Promise<void> {
         runId,
         today,
         deps: {
-          fetchPage: makeFetchPage(session),
+          fetchPage: makeFetchPage(),
           gemini: makeGemini(// Flash by default: Argon's quota is small and shared with other work; flash's trial run (48 calls) answered every one.
             process.env.PFM_GEMINI_MODEL || "gemini-3.8-flash-medium", process.env.AGY_BIN || "agy"),
           sleep: (ms) => new Promise((r) => setTimeout(r, ms)),

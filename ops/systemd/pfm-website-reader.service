@@ -15,7 +15,7 @@ Type=oneshot
 User=atlas
 Group=atlas
 Environment="HOME=/home/atlas"
-# ~/.local/bin for agy; /usr/bin for node, git and agent-browser.
+# ~/.local/bin for agy; /usr/bin for node and git.
 Environment="PATH=/home/atlas/.local/bin:/usr/local/bin:/usr/bin:/bin"
 # Order matters (ExecStartPre lines run top to bottom):
 #  1. update the checkout and `npm ci`, with no secret anywhere yet;

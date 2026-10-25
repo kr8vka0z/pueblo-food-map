@@ -15,6 +15,9 @@ import { buildProposalWriteStatements, type PinRow } from "../../scripts/refresh
 import { buildWebsiteProposals, REJECTED_WEBSITE_SQL, rejectedFieldValues, verifyPlace } from "../../scripts/refresh/website";
 import type { CurrentVenueRow } from "../../scripts/refresh/diffEngine";
 import { SWITCH_HISTORY_SQL } from "@/lib/sourceSwitch";
+import { applyApprovedProposal, type ChangeProposalRow } from "@/lib/adminProposals";
+import { validateAndMapRow, type VenueRow } from "@/lib/publishVenues";
+import { sqliteD1 } from "@/lib/sqliteD1.testutil";
 
 const MIGRATIONS_DIR = join(process.cwd(), "migrations");
 const ALL = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort();
@@ -89,5 +92,38 @@ describe("0025 Friendly Harbor seeded rejection", () => {
     apply("0025_website_reader.sql");
     expect((db.prepare("SELECT COUNT(*) AS n FROM change_proposals WHERE run_id = 'venue-pin-seeds-0025'").get() as { n: number }).n).toBe(1);
     expect(db.prepare(SWITCH_HISTORY_SQL).all()).toEqual([]);
+  });
+});
+
+describe("an approved website hours change still publishes", () => {
+  const sql = (v: string | null | undefined) => (v == null ? "NULL" : `'${v.replace(/'/g, "''")}'`);
+
+  // Review of PR #845: a weekly-only reading proposed hours_irregular: "" (and
+  // vice versa), which approve stored as invalid JSON and Publish refused.
+  test.each([
+    ["a weekly quote, venue with a monthly special", "Food Pantry: Tuesdays 10am-12pm", [{ weekday: "tue", ordinal: "every", opens: "10:00", closes: "12:00" }], "hours_weekly", "hours_irregular"],
+    ["a monthly quote, venue with weekly hours", "Food Pantry: the 2nd Tuesday of the month, 1-3 PM", [{ weekday: "tue", ordinal: "2", opens: "13:00", closes: "15:00" }], "hours_irregular", "hours_weekly"],
+  ])("%s: only that field changes, the other is untouched, and the row passes Publish validation", async (_label, quote, entries, changed, untouched) => {
+    const { db } = setup();
+    db.prepare("UPDATE venues SET hours_weekly = ?, hours_irregular = ? WHERE id = ?").run(
+      JSON.stringify({ wed: ["09:00-11:00"] }),
+      LAST_WEDNESDAY,
+      FH,
+    );
+    db.prepare("DELETE FROM venue_observations WHERE is_pin = 1").run(); // no pin: this is about the stored value
+    const before = db.prepare(`SELECT ${untouched} AS v FROM venues WHERE id = ?`).get(FH) as { v: string };
+    const [p] = readerProposals(db, quote, entries);
+    expect(p.proposedDiff.fields_changed).toEqual([changed, "last_verified"]);
+
+    // The real write path, then the real approve path.
+    for (const st of buildProposalWriteStatements(p, "2026-10-26T08:00:00Z", sql).statements) db.exec(st);
+    const row = db.prepare("SELECT * FROM change_proposals WHERE status = 'pending' AND source = 'website'").get() as ChangeProposalRow;
+    const result = await applyApprovedProposal(sqliteD1(db), row, { email: "admin@example.com" });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+
+    const venue = db.prepare("SELECT * FROM venues WHERE id = ?").get(FH) as VenueRow & Record<string, string>;
+    expect(venue[untouched]).toBe(before.v);
+    const published = validateAndMapRow(venue);
+    expect(published.ok, JSON.stringify(published)).toBe(true);
   });
 });

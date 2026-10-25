@@ -218,6 +218,30 @@ describe("office and worship hours never auto-apply", () => {
     expect(parseHoursQuote(quote).ok).toBe(ok);
   });
 
+  // Review of PR #845: "alternating" slipped past a whole-word "alternat".
+  test.each([
+    "Food pantry alternating Tuesdays 10am-12pm",
+    "Food pantry alternate Tuesdays 10am-12pm",
+    "Food pantry every other Tuesday 10am-12pm",
+    "Food pantry bi-weekly on Tuesdays 10am-12pm",
+    "Food pantry biweekly Tuesdays 10am-12pm",
+    "Seasonal food pantry Tuesdays 10am-12pm",
+    "Food pantry Tuesdays 10am-12pm, weather permitting",
+    "Food pantry Tuesdays 10am-12pm while supplies last",
+    "Food pantry Tuesdays 10am-12pm by appointment",
+    "Food pantry Tuesdays 10am-12pm, call ahead",
+    "Food pantry monthly on Tuesday 10am-12pm",
+    "Food pantry Tuesday of the 2nd week, 10am-12pm",
+  ])("%j is never exact hours: it goes to review", (quote) => {
+    expect(parseHoursQuote(quote).ok).toBe(false);
+    const v = verifyPlace(
+      { hours: { about: "food_service", quote, entries: [{ weekday: "tue", ordinal: "every", opens: "10:00", closes: "12:00" }] } },
+      `Hope Church. ${quote}.`,
+    );
+    expect(v.hours?.exact).toBeUndefined();
+    expect(v.hours?.reviewReason).toBeTruthy();
+  });
+
   test("when our reading and Gemini's disagree, it goes to review", () => {
     const v = verifyPlace(reading({ hours: { about: "food_service", quote: "Food Pantry: Tuesdays 10am-12pm", entries: [{ weekday: "tue", ordinal: "every", opens: "10:00", closes: "13:00" }] } }), PAGE);
     expect(v.hours?.exact).toBeUndefined();

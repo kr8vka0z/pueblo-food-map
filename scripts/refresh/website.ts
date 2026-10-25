@@ -103,14 +103,40 @@ export function isPublicHttpUrl(url: string | null | undefined): boolean {
   }
   if ((u.protocol !== "http:" && u.protocol !== "https:") || u.username || u.password) return false;
   const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host.includes(":")) return !(host === "::1" || host === "::" || /^f[cd]/.test(host) || /^fe[89ab]/.test(host) || host.startsWith("::ffff:"));
-  if (!host.includes(".") || /(^|\.)(localhost|local|internal|lan|home|arpa|ts\.net)$/.test(host)) return false;
-  const v4 = host.match(/^(\d+)\.(\d+)\.\d+\.\d+$/);
+  if (host.includes(":") || /^\d+\.\d+\.\d+\.\d+$/.test(host)) return isPublicIp(host);
+  return host.includes(".") && !/(^|\.)(localhost|local|internal|lan|home|arpa|ts\.net)$/.test(host);
+}
+
+/**
+ * A resolved address we may connect to: not loopback, private, link-local,
+ * the tailnet's 100.64/10, multicast/reserved, or IPv6 local/unique-local,
+ * including IPv4 written inside IPv6 (::ffff:127.0.0.1, ::ffff:7f00:1).
+ * Used on the name above when it is a literal address, and on every DNS
+ * answer at connect time (websiteIo.ts's pinned lookup).
+ */
+export function isPublicIp(address: string): boolean {
+  const ip = address.toLowerCase().replace(/^\[|\]$/g, "").replace(/%.*$/, "");
+  const v4 = ip.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (v4) {
     const [a, b] = [Number(v4[1]), Number(v4[2])];
-    if (a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127)) return false;
+    return !(
+      a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || (a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19))
+    );
   }
-  return true;
+  if (!ip.includes(":")) return false;
+  const mapped = ip.match(/^(?:0*:)*:?ffff:(?:0+:)?(.+)$/);
+  if (mapped) {
+    const tail = mapped[1];
+    if (tail.includes(".")) return isPublicIp(tail);
+    const hex = tail.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (!hex) return false;
+    const n = (parseInt(hex[1], 16) << 16) | parseInt(hex[2], 16);
+    return isPublicIp([n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join("."));
+  }
+  if (ip === "::" || ip === "::1" || /^0*:0*:0*:0*:0*:0*:0*:0*1?$/.test(ip)) return false;
+  // fc00::/7 unique-local, fe80::/10 link-local, ff00::/8 multicast, 64:ff9b:: NAT64 (maps to IPv4), 2001:db8:: documentation.
+  return !/^(f[cd]|fe[89ab]|ff|64:ff9b:|2001:0?db8:)/.test(ip);
 }
 
 /** True only for a public http(s) url on a host that is neither a directory nor a social network. */
@@ -258,7 +284,22 @@ const TIME_RANGE = new RegExp(`${TIME_PATTERN}\\s*(?:-|to|until|till)\\s*${TIME_
  * (or that the time isn't the food service's): any one sends the quote to a
  * person instead of being converted.
  */
-const RISKY = /\b(except|closed|holiday|appointment|appt|other week|every other|alternat|bi-?weekly|call|varies|vary|weather|summer|winter|season|school year|until further|starting|beginning|begins|effective|while supplies|office|worship|mass|sunday school|business hours|lobby|thrift)\b/i;
+// Prefixes, not whole words (\b only at the start): "alternating", "seasonal",
+// "appointments", "closing" must all match — a whole-word list let
+// "alternating Tuesdays 10am-12pm" through as exact weekly hours (review of PR #845).
+const RISKY = new RegExp(
+  "\\b(" +
+    [
+      "except", "clos", "holiday", "appoint", "appt", "reserv", "other week", "every other", "alternat",
+      // normalizeQuoteText spaces out dashes ("bi - weekly"), so allow them here.
+      "bi\\s*-?\\s*weekly", "bi\\s*-?\\s*monthly", "semi\\s*-?\\s*monthly", "twice a month", "fortnight", "odd", "even", "call", "phone ahead", "text ahead", "var(y|ies|iable)",
+      "weather", "summer", "winter", "spring", "fall hours", "season", "school", "until further", "start", "begin", "effective",
+      "while suppl", "supplies last", "first come", "cancel", "subject to change", "tbd", "tba", "office", "worship", "mass\\b",
+      "service times", "sunday school", "business hours", "lobby", "thrift", "daily", "every day", "weekday", "weekend",
+    ].join("|") +
+    ")",
+  "i",
+);
 const DATE_LIKE = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d|\b\d{1,2}\/\d{1,2}\b|\b\d{1,2}(st|nd|rd|th)\s+of\b/i;
 /** The quote has to say what the hours are FOR — office or worship hours never pass as pantry hours. */
 const FOOD_SERVICE = /\b(pantry|pantries|food|meal|meals|distribution|groceries|grocery|kitchen|lunch|dinner|breakfast|commodit|produce|market|feeding)\b/i;
@@ -383,6 +424,9 @@ export function parseHoursQuote(quote: string): HoursParse {
     for (const d of days) entries.push({ ...d, ...t });
   }
   if (entries.length === 0) return { ok: false, reason: "no day and time found" };
+  // Recurrences our fields can't hold exactly: "monthly on Tuesday" (which week?), "the 2nd week".
+  if (/\bmonth/.test(text) && entries.every((e) => e.ordinal === "every")) return { ok: false, reason: "a monthly schedule without a clear week" };
+  if (/\bweeks?\b/.test(text.replace(/\b(every|each) week\b/g, ""))) return { ok: false, reason: "the schedule names particular weeks" };
   if (parseDaySpan(text.slice(last))) return { ok: false, reason: "a day is named after the last time" };
   return { ok: true, entries };
 }
@@ -710,8 +754,17 @@ export function buildWebsiteProposals(p: BuildParams): ProposalDraft[] {
   if (verified.phone) propose("phone", venue.phone, verified.phone.value, verified.phone.quote);
   if (p.discoveredUrl) propose("url", venue.url, p.discoveredUrl);
   if (verified.hours?.exact) {
-    propose("hours_weekly", canonicalWeekly(venue.hours_weekly), canonicalWeekly(verified.hours.exact.hours_weekly), verified.hours.quote);
-    propose("hours_irregular", canonicalIrregular(venue.hours_irregular), canonicalIrregular(verified.hours.exact.hours_irregular), verified.hours.quote);
+    // Only the kind of schedule the quote states. A weekly quote says nothing
+    // about a monthly special (and vice versa), so the other field is left
+    // alone — and proposing it as "" would store invalid JSON that blocks
+    // Publish (review of PR #845).
+    const weekly = canonicalWeekly(verified.hours.exact.hours_weekly);
+    const irregular = canonicalIrregular(verified.hours.exact.hours_irregular);
+    // `before` is the value AS STORED (compared canonically inside propose):
+    // approve's stale check compares it to the row as-is, so a canonical
+    // "13:00-15:00" against a stored "1:00 PM - 3:00 PM" read as stale (409).
+    if (weekly) propose("hours_weekly", venue.hours_weekly, weekly, verified.hours.quote);
+    if (irregular) propose("hours_irregular", venue.hours_irregular, irregular, verified.hours.quote);
   }
   const review: string[] = [];
   if (verified.hours?.reviewReason) review.push(verified.hours.reviewReason);
@@ -760,7 +813,7 @@ export function buildWebsiteProposals(p: BuildParams): ProposalDraft[] {
 
 // ─── The run (all I/O injected) ────────────────────────────────────────────
 
-export type PageResult = { ok: true; text: string; finalUrl: string; via: "fetch" | "browser" } | { ok: false; reason: string };
+export type PageResult = { ok: true; text: string; finalUrl: string; via: "fetch" } | { ok: false; reason: string };
 
 /** Thrown by deps.gemini on a hard failure (quota, timeout, non-zero exit, an error status): stops the source for the run. */
 export class GeminiStop extends Error {}

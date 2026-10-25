@@ -499,6 +499,7 @@ async function main(): Promise<void> {
       runId,
       today,
       fetchedAt: cas.fetchedAt,
+      addressPinnedVenueIds: new Set(pins.filter((pin) => pin.field === "address").map((pin) => pin.venue_id)),
     });
     const approvedCasKeys = new Set(
       d1Query<RejectedRow>(

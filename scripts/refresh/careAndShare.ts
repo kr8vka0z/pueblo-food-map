@@ -25,7 +25,7 @@
  * cache, logs) can ever see them.
  */
 
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { DayKey, IrregularSchedule, Venue, WeeklyHours } from "@/types/venue";
 import { PUEBLO_COUNTY_BBOX } from "@/data/pueblo-bbox";
@@ -136,9 +136,30 @@ function toCasSchedule(raw: Record<string, unknown>): CasSchedule | null {
   };
 }
 
-function inPuebloCounty(l: { lat: number; lng: number }): boolean {
-  const [[lngWest, latSouth], [lngEast, latNorth]] = PUEBLO_COUNTY_BBOX;
-  return l.lat >= latSouth && l.lat <= latNorth && l.lng >= lngWest && l.lng <= lngEast;
+// The real county outline (Census TIGER/Line, the same file
+// scripts/ingest-osm-grocery.py filters OSM by). The bounding box alone let
+// Penrose (Fremont County) through. One polygon, exterior ring only.
+let countyRing: [number, number][] | null = null;
+function countyOutline(): [number, number][] {
+  if (!countyRing) {
+    const geo = JSON.parse(readFileSync(join(__dirname, "..", "..", "public", "data", "pueblo-county-boundary.geojson"), "utf-8")) as {
+      features: { geometry: { type: string; coordinates: [number, number][][] } }[];
+    };
+    countyRing = geo.features[0].geometry.coordinates[0];
+  }
+  return countyRing;
+}
+
+/** Ray casting over the county ring ([lng, lat] pairs), same algorithm as ingest-osm-grocery.py's point_in_polygon. */
+export function inPuebloCounty(l: { lat: number; lng: number }): boolean {
+  const ring = countyOutline();
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (yi > l.lat !== yj > l.lat && l.lng < ((xj - xi) * (l.lat - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
 }
 
 // Search from the county box's centre with a radius reaching its corners,
@@ -448,8 +469,19 @@ function evidenceFor(l: CasLocation, v: CurrentVenueRow): Evidence {
   };
 }
 
-function isStrong(e: Evidence): boolean {
-  return e.name_score >= STRONG_NAME_SCORE && e.distance_m <= STRONG_DISTANCE_M && e.same_phone;
+/**
+ * Strong = name, distance and phone agree. One relaxation (coordinator,
+ * 2026-10-25, after the first dry run found 11 of 12 Care and Share
+ * listings carry no phone): when THEIR listing has no phone at all, an
+ * identical name (score 1.0) within STRONG_DISTANCE_M also counts — unless
+ * our venue's address is a venue_direct pin, where the venue's own word
+ * outranks a name-and-place guess. A listing whose phone differs from ours
+ * is never strong.
+ */
+function isStrong(e: Evidence, casHasPhone: boolean, addressPinned: boolean): boolean {
+  if (e.distance_m > STRONG_DISTANCE_M) return false;
+  if (e.same_phone) return e.name_score >= STRONG_NAME_SCORE;
+  return !casHasPhone && !addressPinned && e.name_score === 1;
 }
 
 function isCandidate(e: Evidence): boolean {
@@ -475,6 +507,8 @@ export interface CareAndShareBuildParams {
   runId: string;
   today: string;
   fetchedAt: string;
+  /** Our venues whose address is a venue_direct pin — never matched by the no-phone rule (see isStrong). */
+  addressPinnedVenueIds?: ReadonlySet<string>;
 }
 
 export interface CareAndShareBuildResult {
@@ -522,7 +556,8 @@ export function buildCareAndShareProposals(params: CareAndShareBuildParams): Car
       unmatched.push(loc);
       continue;
     }
-    const strong = scored.filter((c) => isStrong(c.evidence));
+    const casHasPhone = normalizedPhoneTail(loc.phone) !== null;
+    const strong = scored.filter((c) => isStrong(c.evidence, casHasPhone, params.addressPinnedVenueIds?.has(c.venue.id) ?? false));
     if (strong.length === 1) {
       claims.push({ loc, venue: strong[0].venue, kind: "strong", evidence: strong[0].evidence });
       continue;

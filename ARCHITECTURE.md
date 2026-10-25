@@ -299,7 +299,9 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   for hours, address, phone and website of its partner pantries and meal
   sites. `fetchCareAndShare` pages the Vivery "AccessFood" JSON behind
   careandshare.org/findfood (`LocationSearch` from the Pueblo County box's
-  centre, radius to its corners, kept to the box; then `LocationSchedules`),
+  centre, radius to its corners, kept to the real county outline
+  `public/data/pueblo-county-boundary.geojson` by point-in-polygon; then
+  `LocationSchedules`),
   one request every 3.5 s. Any refusal, non-2xx, timeout, bad JSON or zero
   in-county result stops the source for that run: nothing from it is
   written and the job fails loudly; a missing listing never reads as a
@@ -316,7 +318,9 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   `source_type` (blessing boxes stripped by `excludeBlessingBoxes`): an alias
   on file or our venue with id `cas-<locationId>` first; then **strong** =
   name overlap ≥ 0.75, within 150 m, AND the same phone (renamePairs'
-  `haversineDistanceKm`/`normalizedPhoneTail`). A strong match **writes
+  `haversineDistanceKm`/`normalizedPhoneTail`), or — when Care and Share's
+  listing has no phone at all — an identical name (1.0) within 150 m,
+  unless our address is a venue pin. A strong match **writes
   `venue_id_aliases` itself** (`created_by` `refresh-pipeline`) — until this
   step aliases were only written on a human approval (migration `0016`'s
   comment predates this). Anything weaker but close is an **unconfirmed

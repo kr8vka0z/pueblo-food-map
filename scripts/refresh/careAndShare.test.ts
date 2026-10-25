@@ -157,6 +157,18 @@ describe("fetchCareAndShare — refusal stops the source with nothing to write",
     for (const call of sleep.mock.calls as unknown as number[][]) expect(call[0]).toBeGreaterThanOrEqual(REQUEST_GAP_MS);
   });
 
+  test("uses the real county outline: Penrose (inside the old rectangle, but Fremont County) is dropped", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(page([rawLocation(), rawLocation({ locationId: 3, latitude: 38.425138, longitude: -105.021807, city: "Penrose" })])),
+      )
+      .mockResolvedValueOnce(jsonResponse(page([])))
+      .mockResolvedValueOnce(jsonResponse([]));
+    const result = await fetchCareAndShare({ fetch: fetchMock, sleep: async () => {}, log: () => {} });
+    expect(result.ok && result.locations.map((l) => l.locationId)).toEqual([1]);
+  });
+
   test("keeps Pueblo County only", async () => {
     const fetchMock = vi
       .fn()
@@ -236,13 +248,46 @@ describe("matching — strong vs ambiguous", () => {
     expect(r.proposals[0].proposedDiff.meta?.match).toBeUndefined();
   });
 
-  test("name + distance but no phone on the Care and Share side is only ambiguous", () => {
-    const r = build({ locations: [loc({ phone: "" })], schedules: [sched()], venues: [venue()] });
+  test("a close but not identical name with no phone on the Care and Share side is only ambiguous", () => {
+    const r = build({ locations: [loc({ phone: "", locationName: "Praise Assembly Outreach" })], schedules: [sched()], venues: [venue()] });
     expect(r.stats.strong).toBe(0);
     expect(r.stats.ambiguous).toBe(1);
     expect(r.aliasWrites).toEqual([]);
     expect(r.proposals[0].targetVenueId).toBe("plentiful-praise");
     expect(r.proposals[0].proposedDiff.meta?.match).toMatchObject({ upstream_id: "cas-1" });
+  });
+
+  test("no phone on the Care and Share side + identical name + within 150 m is strong", () => {
+    const r = build({ locations: [loc({ phone: "", latitude: 38.2711 })], schedules: [sched()], venues: [venue()] }); // ~110 m
+    expect(r.stats.strong).toBe(1);
+    expect(r.aliasWrites).toEqual([{ upstreamId: "cas-1", venueId: "plentiful-praise" }]);
+    expect(r.proposals[0].proposedDiff.meta?.match).toBeUndefined();
+  });
+
+  test("no phone + identical name but over 150 m away stays ambiguous", () => {
+    const r = build({ locations: [loc({ phone: "", latitude: 38.2721 })], schedules: [sched()], venues: [venue()] }); // ~220 m
+    expect(r.stats.strong).toBe(0);
+    expect(r.stats.ambiguous).toBe(1);
+  });
+
+  test("no phone + identical name nearby stays ambiguous when our address is pinned", () => {
+    const r = buildCareAndShareProposals({
+      locations: [loc({ phone: "" })],
+      schedules: [sched()],
+      venues: [venue()],
+      aliases: [],
+      runId: "run-1",
+      today: TODAY,
+      fetchedAt: FETCHED,
+      addressPinnedVenueIds: new Set(["plentiful-praise"]),
+    });
+    expect(r.stats.strong).toBe(0);
+    expect(r.aliasWrites).toEqual([]);
+  });
+
+  test("a different Care and Share phone is never strong, even with an identical name next door", () => {
+    const r = build({ locations: [loc({ phone: "719-555-0999" })], schedules: [sched()], venues: [venue()] });
+    expect(r.stats.strong).toBe(0);
   });
 
   test("same phone and name but 1 km away is only ambiguous", () => {

@@ -107,6 +107,16 @@ import {
   type SwitchState,
 } from "@/lib/sourceSwitch";
 import { chunkSqlStatements } from "./refresh/sqlChunks";
+import {
+  DISCOVERY_RETRY_DAYS,
+  REJECTED_WEBSITE_SQL,
+  rejectedFieldValues,
+  runWebsiteReader,
+  SEARCH_OBSERVATION_FIELD,
+  WEBSITE_FIXES_RUN_ID,
+  WEBSITE_SOURCE,
+} from "./refresh/website";
+import { makeFetchPage, makeGemini } from "./refresh/websiteIo";
 import { createTriageSession, runTriagePass, USD_PER_INPUT_TOKEN } from "./refresh/triage";
 
 // WHY import.meta.url: package.json is `"type": "module"` (vinext), so tsx runs this as ESM, where `__dirname` is
@@ -152,18 +162,22 @@ type DbMode = keyof typeof DATABASE_NAMES;
 
 /**
  * `--only care_and_share` runs just the Care and Share reader (no Plentiful
- * or OSM scrape, no link-health pass). `--dry-run` reads everything, prints
+ * or OSM scrape, no link-health pass). `--only website` runs just the venue
+ * website reader (scripts/refresh/website.ts) — the ONLY way it runs: it
+ * needs Gemini through the server's Antigravity login, so the GitHub weekly
+ * job (no --only) never touches it; the server's weekly timer
+ * (ops/systemd/) runs it instead. `--dry-run` reads everything, prints
  * what it found, and writes NOTHING (no proposals, aliases or Jev calls) —
  * the way to watch a source against a local database before trusting it.
  */
-function parseFlags(argv: string[]): { onlyCareAndShare: boolean; dryRun: boolean } {
+function parseFlags(argv: string[]): { onlyCareAndShare: boolean; onlyWebsite: boolean; dryRun: boolean } {
   const idx = argv.indexOf("--only");
   const only = idx >= 0 ? argv[idx + 1] : undefined;
-  if (only !== undefined && only !== CAS_SOURCE) {
-    console.error(`FATAL: --only accepts only "${CAS_SOURCE}".`);
+  if (only !== undefined && only !== CAS_SOURCE && only !== WEBSITE_SOURCE) {
+    console.error(`FATAL: --only accepts "${CAS_SOURCE}" or "${WEBSITE_SOURCE}".`);
     process.exit(1);
   }
-  return { onlyCareAndShare: only === CAS_SOURCE, dryRun: argv.includes("--dry-run") };
+  return { onlyCareAndShare: only === CAS_SOURCE, onlyWebsite: only === WEBSITE_SOURCE, dryRun: argv.includes("--dry-run") };
 }
 
 function parseDbMode(argv: string[]): DbMode {
@@ -346,7 +360,9 @@ interface UrlRow {
 
 async function main(): Promise<void> {
   const dbMode = parseDbMode(process.argv.slice(2));
-  const { onlyCareAndShare, dryRun } = parseFlags(process.argv.slice(2));
+  const { onlyCareAndShare, onlyWebsite, dryRun } = parseFlags(process.argv.slice(2));
+  // Either single-source mode skips the Plentiful/OSM scrapes and the link-health pass.
+  const singleSource = onlyCareAndShare || onlyWebsite;
   const today = new Date().toISOString().slice(0, 10);
   // GitHub keeps run_id stable across a retried Action run (only
   // run_attempt increments) — spec §6.10d's idempotency key. Local runs get
@@ -363,6 +379,7 @@ async function main(): Promise<void> {
   }
   if (dryRun) console.log("DRY RUN — reads only; nothing will be written.");
   if (onlyCareAndShare) console.log("--only care_and_share — skipping the Plentiful/OSM scrapes and the link-health pass.");
+  if (onlyWebsite) console.log("--only website — the venue website reader only (no Plentiful/OSM/Care and Share, no link-health pass).");
 
   // Idempotency (§6.10d): a retried Action re-POSTing under the same
   // run_id must not duplicate a whole run's proposals.
@@ -378,8 +395,8 @@ async function main(): Promise<void> {
   // the two scrapes were never actually concurrent despite the old
   // Promise.all wrapping (a misleading-but-harmless read, fixed here to
   // match what actually runs).
-  const plentifulIncoming = onlyCareAndShare ? [] : await scrapePlentiful();
-  const osmIncoming = onlyCareAndShare ? [] : await scrapeOsm();
+  const plentifulIncoming = singleSource ? [] : await scrapePlentiful();
+  const osmIncoming = singleSource ? [] : await scrapeOsm();
   const currentByType: Record<RefreshSource, CurrentVenueRow[]> = {
     plentiful: loadCurrentRows(dbMode, "plentiful"),
     osm: loadCurrentRows(dbMode, "osm"),
@@ -391,9 +408,12 @@ async function main(): Promise<void> {
   );
   const rejectedKeys = new Set(rejectedRows.map((r) => rejectionKey(r.source as RefreshSource, r.target_venue_id, r.diff_hash)));
 
+  // Migration 0022's hand-checked website fixes are left out: they carry
+  // details (notes, category, closures) the reader never reproduces, so a
+  // reader proposal for the same venue must not supersede them.
   const pendingRows = d1Query<PendingRow>(
     dbMode,
-    "SELECT id, source, target_venue_id FROM change_proposals WHERE status = 'pending'",
+    `SELECT id, source, target_venue_id FROM change_proposals WHERE status = 'pending' AND run_id != '${WEBSITE_FIXES_RUN_ID}'`,
   );
 
   // ── 3: diff each source ──
@@ -453,7 +473,7 @@ async function main(): Promise<void> {
   let allProposals: ProposalDraft[] = [];
   let anySourceAborted = false;
 
-  for (const source of onlyCareAndShare ? ([] as const) : (["plentiful", "osm"] as const)) {
+  for (const source of singleSource ? ([] as const) : (["plentiful", "osm"] as const)) {
     const result = diffSource({
       source,
       currentRows: currentByType[source],
@@ -481,16 +501,20 @@ async function main(): Promise<void> {
   // any source_type, matched by alias, id, or the strong/ambiguous check in
   // scripts/refresh/careAndShare.ts. The raw-response cache lives in a temp
   // dir outside the repo and already has contact fields stripped.
-  const casCacheDir = mkdtempSync(join(tmpdir(), "pfm-care-and-share-"));
-  const cas = await fetchCareAndShare({
-    fetch: (url, init) => fetch(url, init),
-    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
-    log: (m) => console.log(m),
-    cacheDir: casCacheDir,
-  });
+  const casCacheDir = onlyWebsite ? "" : mkdtempSync(join(tmpdir(), "pfm-care-and-share-"));
+  const cas = onlyWebsite
+    ? null
+    : await fetchCareAndShare({
+        fetch: (url, init) => fetch(url, init),
+        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        log: (m) => console.log(m),
+        cacheDir: casCacheDir,
+      });
   let casCurrentRows: CurrentVenueRow[] = [];
   const aliasStatements: string[] = [];
-  if (!cas.ok) {
+  if (!cas) {
+    // --only website: Care and Share isn't read this run.
+  } else if (!cas.ok) {
     anySourceAborted = true;
     console.error(`\ncare_and_share: ABORTED after ${cas.requests} request(s) (writes nothing for this source): ${cas.reason}`);
   } else {
@@ -551,6 +575,104 @@ async function main(): Promise<void> {
     }
   }
 
+  // ── 3c: venue websites + the Pueblo Food Project page (Venue Data Rebuild
+  // step 3, scripts/refresh/website.ts) — only with --only website, run by
+  // the server's weekly timer (ops/systemd/), never by GitHub Actions. Like
+  // Care and Share, any Gemini failure aborts THIS source with zero writes,
+  // and a page that fails to load says nothing about the venue.
+  const websiteStatements: string[] = [];
+  let websiteSummary: string | null = null;
+  let websiteCurrentRows: CurrentVenueRow[] = [];
+  if (onlyWebsite) {
+    const ready0025 =
+      d1Query<{ name: string }>(dbMode, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'page_fingerprints'").length > 0;
+    if (!ready0025 || !schemaReady || !observationsReady) {
+      // Loud, not skipped: without 0025 the Friendly Harbor seed and the
+      // page fingerprints are missing, so the reader would show Kyle a
+      // known-stale value and re-read the gardens page with Gemini weekly.
+      anySourceAborted = true;
+      console.error("\nwebsite: ABORTED — apply migrations through 0025 to this database first (writes nothing for this source).");
+    } else {
+      const webRows = d1Query<CurrentVenueRow & { source: string }>(
+        dbMode,
+        `SELECT ${CURRENT_ROW_COLUMNS}, source FROM venues WHERE status IN ('draft','published') ` +
+          "AND category IN ('pantry','meal_site','garden','edible_landscape','blessing_box')",
+      );
+      websiteCurrentRows = webRows;
+      const webUrlRows = d1Query<{ target_venue_id: string; url: string; status: string }>(
+        dbMode,
+        "SELECT target_venue_id, json_extract(proposed_diff, '$.after.url') AS url, status FROM change_proposals " +
+          `WHERE source = '${WEBSITE_SOURCE}' AND status IN ('pending','approved','rejected') AND run_id != '${WEBSITE_FIXES_RUN_ID}' ` +
+          "AND json_extract(proposed_diff, '$.after.url') IS NOT NULL",
+      );
+      const searchSince = new Date(Date.now() - DISCOVERY_RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+      const session = `pfm-website-reader-${process.pid}`;
+      const web = await runWebsiteReader({
+        venues: webRows,
+        sources: new Map(webRows.map((r) => [r.id, r.source])),
+        casLinkedIds: new Set(
+          d1Query<{ venue_id: string }>(dbMode, `SELECT venue_id FROM venue_id_aliases WHERE source = '${CAS_SOURCE}'`).map((r) => r.venue_id),
+        ),
+        pendingUrlByVenue: new Map(webUrlRows.filter((r) => r.status === "pending").map((r) => [r.target_venue_id, r.url])),
+        decidedUrlVenueIds: new Set(webUrlRows.filter((r) => r.status !== "pending").map((r) => r.target_venue_id)),
+        recentlySearchedIds: new Set(
+          d1Query<{ venue_id: string }>(
+            dbMode,
+            `SELECT DISTINCT venue_id FROM venue_observations WHERE source = '${WEBSITE_SOURCE}' AND field = '${SEARCH_OBSERVATION_FIELD}' AND fetched_at > ${sqlText(searchSince)}`,
+          ).map((r) => r.venue_id),
+        ),
+        fingerprints: new Map(d1Query<{ url: string; sha256: string }>(dbMode, "SELECT url, sha256 FROM page_fingerprints").map((r) => [r.url, r.sha256])),
+        rejected: rejectedFieldValues(d1Query<{ target_venue_id: string; proposed_diff: string }>(dbMode, REJECTED_WEBSITE_SQL)),
+        runId,
+        today,
+        deps: {
+          fetchPage: makeFetchPage(session),
+          gemini: makeGemini(process.env.PFM_GEMINI_MODEL || "gemini-4-argon-medium", process.env.AGY_BIN || "agy"),
+          sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+          log: (m) => console.log(m),
+        },
+      });
+      const st = web.stats;
+      websiteSummary =
+        `venues_read=${st.venuesRead} failed=${st.venuesFailed} no_own_site=${st.noOwnSite} discovered=${st.discovered.length} ` +
+        `fields_confirmed=${st.fieldsConfirmed} fields_dropped=${st.fieldsDropped} gemini_calls=${st.geminiCalls}`;
+      if (!web.ok) {
+        anySourceAborted = true;
+        console.error(`\nwebsite: ABORTED (writes nothing for this source): ${web.reason}`);
+      } else {
+        const approvedWebKeys = new Set(
+          d1Query<RejectedRow>(
+            dbMode,
+            `SELECT source, target_venue_id, diff_hash FROM change_proposals WHERE source = '${WEBSITE_SOURCE}' AND status = 'approved' ` +
+              "AND reviewed_by NOT IN ('refresh-pipeline','refresh-pipeline-ai','refresh-pipeline-auto')",
+          ).map((r) => rejectionKey(r.source as RefreshSource, r.target_venue_id, r.diff_hash)),
+        );
+        const webProposals = dropAlreadyReviewed(web.proposals, approvedWebKeys);
+        console.log(`\nwebsite: ${websiteSummary} proposals=${webProposals.length} searched_none=${web.searchedNone.length}`);
+        for (const line of web.report) console.log(line);
+        for (const d of st.discovered) console.log(`  discovered ${d}`);
+        for (const p of st.pfpPages) console.log(`  pfp ${p}`);
+        allProposals = allProposals.concat(webProposals);
+        const now = new Date().toISOString();
+        // "Searched, found nothing" — no candidate is stored (plan: unconfirmed candidates are recorded nowhere).
+        for (const id of web.searchedNone) {
+          websiteStatements.push(
+            "INSERT INTO venue_observations (venue_id, field, source, value, fetched_at) VALUES (" +
+              [sqlText(id), sqlText(SEARCH_OBSERVATION_FIELD), sqlText(WEBSITE_SOURCE), sqlText('"none"'), sqlText(now)].join(", ") +
+              ");",
+          );
+        }
+        // Written in the same batch as the proposals, so a failed write leaves the old fingerprint and next week re-reads.
+        for (const f of web.fingerprintWrites) {
+          websiteStatements.push(
+            `INSERT INTO page_fingerprints (url, sha256, fetched_at) VALUES (${sqlText(f.url)}, ${sqlText(f.sha256)}, ${sqlText(now)}) ` +
+              "ON CONFLICT(url) DO UPDATE SET sha256 = excluded.sha256, fetched_at = excluded.fetched_at;",
+          );
+        }
+      }
+    }
+  }
+
   // The automatic switch (src/lib/sourceSwitch.ts, migration 0023). Probed
   // like 0016/0021: without the table every pair stays proposal-only.
   const switchReady =
@@ -569,7 +691,7 @@ async function main(): Promise<void> {
   // AND category != 'blessing_box': boxes produce no proposals of any kind
   // from this pipeline (same reasoning as excludeBlessingBoxes above) —
   // link_health is a separate proposal source, so it needs its own guard.
-  const urlRows = onlyCareAndShare ? [] : d1Query<UrlRow>(
+  const urlRows = singleSource ? [] : d1Query<UrlRow>(
     dbMode,
     "SELECT id, url FROM venues WHERE status IN ('draft','published') AND category != 'blessing_box' AND url IS NOT NULL AND url != ''",
   );
@@ -610,10 +732,11 @@ async function main(): Promise<void> {
     }
     console.log(`\nDRY RUN — would write ${allProposals.length} proposal(s) + ${aliasStatements.length} alias(es):`);
     for (const [k, n] of Object.entries(counts).sort()) console.log(`  ${n}  ${k}`);
-    for (const p of allProposals.filter((x) => x.source === CAS_SOURCE && x.proposedDiff.fields_changed.length > 1)) {
-      console.log(`  ${p.changeType} ${p.targetVenueId}: ${JSON.stringify({ before: p.proposedDiff.before, after: p.proposedDiff.after })}`);
+    for (const p of allProposals.filter((x) => (x.source === CAS_SOURCE || x.source === WEBSITE_SOURCE) && (x.proposedDiff.fields_changed.length > 1 || x.changeType !== "update" || x.proposedDiff.meta?.needs_review))) {
+      console.log(`  ${p.changeType} ${p.targetVenueId}: ${JSON.stringify({ before: p.proposedDiff.before, after: p.proposedDiff.after, needs_review: p.proposedDiff.meta?.needs_review, summary: p.proposedDiff.meta?.summary })}`);
     }
     console.log("Nothing written.");
+    if (websiteSummary) console.log(`SUMMARY website-reader dry-run: ${websiteSummary} proposals=${allProposals.length} status=${anySourceAborted ? "ABORTED" : "ok"}`);
     if (anySourceAborted) process.exitCode = 1;
     return;
   }
@@ -626,7 +749,7 @@ async function main(): Promise<void> {
   const triagePass = await runTriagePass({
     proposals: allProposals,
     // C&S rows overlap the plentiful ones (same venue, any source_type); dedupe by id.
-    currentRows: [...new Map([...currentByType.plentiful, ...currentByType.osm, ...casCurrentRows].map((r) => [r.id, r])).values()],
+    currentRows: [...new Map([...currentByType.plentiful, ...currentByType.osm, ...casCurrentRows, ...websiteCurrentRows].map((r) => [r.id, r])).values()],
     session,
     rejectedKeys,
     today,
@@ -642,7 +765,7 @@ async function main(): Promise<void> {
       `cost=$${(session.stats.inputTokens * USD_PER_INPUT_TOKEN).toFixed(6)}  aiAutoApply=${aiAutoApply}`,
   );
 
-  if (allProposals.length === 0) {
+  if (allProposals.length === 0 && websiteStatements.length === 0) {
     console.log("Nothing to write this run.");
   } else {
     // Auto-supersede (§6.10a): any still-pending proposal from an EARLIER
@@ -683,7 +806,7 @@ async function main(): Promise<void> {
       statements.push(...built.statements);
     }
 
-    statements.push(...aliasStatements);
+    statements.push(...aliasStatements, ...websiteStatements);
 
     // mkdtempSync already creates tmpDir — a following mkdirSync(tmpDir) was
     // a redundant no-op (recursive:true tolerates an existing dir) removed
@@ -699,6 +822,12 @@ async function main(): Promise<void> {
     );
     d1ApplyFile(dbMode, sqlFile);
     console.log("Done.");
+  }
+
+  // One line per run for the journal (ops/systemd/): what was read and what it cost.
+  if (websiteSummary !== null || onlyWebsite) {
+    const written = allProposals.filter((p) => p.source === WEBSITE_SOURCE).length;
+    console.log(`SUMMARY website-reader: ${websiteSummary ?? "not run"} proposals_written=${written} status=${anySourceAborted ? "ABORTED" : "ok"}`);
   }
 
   if (anySourceAborted) {

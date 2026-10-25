@@ -21,16 +21,28 @@
  *     how an "edited approval" or an undone automatic change shows up here —
  *     restarts the count after it.
  *
- * Only Care and Share is switchable in this step: the plan narrows Plentiful
- * and OpenStreetMap later (step 5) and the website reader is step 3, so
- * letting their pairs switch on now would let sources the plan is about to
- * demote write to the map unattended.
+ * Switchable: Care and Share (step 2) and the venue website reader (step 3).
+ * Plentiful and OpenStreetMap are narrowed later (step 5), so letting their
+ * pairs switch on now would let sources the plan is about to demote write
+ * to the map unattended. A website's `url` never switches on: a url change
+ * from the reader is a site it FOUND, which a person always confirms (plan,
+ * step 3).
+ *
+ * Hand-loaded website rows don't count: migration 0022's checked fixes and
+ * 0025's seeded rejection were not the reader's own findings, so they say
+ * nothing about how far its readings can be trusted.
  */
 
 import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "../../scripts/refresh/diffEngine";
 
-export const SWITCH_SOURCES = ["care_and_share"] as const;
+export const SWITCH_SOURCES = ["care_and_share", "website"] as const;
 export const SWITCH_FIELDS = ["address", "phone", "url", "hours_weekly", "hours_irregular"] as const;
+const FIELDS_BY_SOURCE: Record<(typeof SWITCH_SOURCES)[number], readonly string[]> = {
+  care_and_share: SWITCH_FIELDS,
+  website: SWITCH_FIELDS.filter((f) => f !== "url"),
+};
+/** run_ids of hand-loaded rows (migrations 0022, 0025) — never the switch's evidence. */
+const HAND_LOADED_RUN_IDS = "'website-fixes-2026-10-25','venue-pin-seeds-0025'";
 export const SWITCH_THRESHOLD = 5;
 /** audit_log / change_proposals actor for a change the switch applied. */
 export const AUTO_SWITCH_ACTOR = "refresh-pipeline-auto";
@@ -41,7 +53,8 @@ const SOURCE_IN = SWITCH_SOURCES.map((s) => `'${s}'`).join(",");
 /** Every decided update of a switchable source. Small: one row per real change ever reviewed. */
 export const SWITCH_HISTORY_SQL =
   "SELECT source, change_type, proposed_diff, status, reviewed_by, reviewed_at, applied_at FROM change_proposals " +
-  `WHERE source IN (${SOURCE_IN}) AND change_type = 'update' AND status IN ('approved','rejected') AND reviewed_at IS NOT NULL`;
+  `WHERE source IN (${SOURCE_IN}) AND change_type = 'update' AND status IN ('approved','rejected') AND reviewed_at IS NOT NULL ` +
+  `AND run_id NOT IN (${HAND_LOADED_RUN_IDS})`;
 
 /** Newest reset per pair (migration 0023). */
 export const SWITCH_RESETS_SQL = "SELECT source, field, MAX(reset_at) AS reset_at FROM source_switch_resets GROUP BY source, field";
@@ -99,7 +112,7 @@ export function computeSwitchStates(rows: SwitchHistoryRow[], resets: SwitchRese
 
   const states: SwitchState[] = [];
   for (const source of SWITCH_SOURCES) {
-    for (const field of SWITCH_FIELDS) {
+    for (const field of FIELDS_BY_SOURCE[source]) {
       const since = resetAt.get(`${source}:${field}`);
       let streak = 0;
       for (const r of newestFirst) {

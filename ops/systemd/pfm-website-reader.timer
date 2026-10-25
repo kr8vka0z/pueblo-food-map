@@ -1,0 +1,12 @@
+# Monday 02:00 Mountain time = 08:00 UTC (summer) / 09:00 UTC (winter): after the
+# GitHub weekly refresh (refresh-proposals.yml, Monday 06:00 UTC, 30-minute limit),
+# so the two never write the review queue at once.
+[Unit]
+Description=Pueblo Food Map venue website reader timer (Mondays 02:00 America/Denver)
+
+[Timer]
+OnCalendar=Mon *-*-* 02:00:00 America/Denver
+Persistent=true
+
+[Install]
+WantedBy=timers.target

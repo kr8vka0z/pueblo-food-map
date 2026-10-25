@@ -1,0 +1,32 @@
+# pfm-website-reader — Pueblo Food Map's weekly venue website reader (Venue Data
+# Rebuild step 3, scripts/refresh/website.ts). Reads the pantries' own websites and
+# the Pueblo Food Project gardens page, checks Gemini's findings against the pages,
+# and writes review proposals to the PRODUCTION database. Runs here, not in GitHub
+# Actions: Gemini is reached through atlas's Antigravity login, and the repo is public.
+# Install: ops/systemd/README.md.
+[Unit]
+Description=Pueblo Food Map venue website reader (weekly; writes review proposals to production D1)
+After=network-online.target
+Wants=network-online.target
+OnFailure=telegram-alert@%n.service
+
+[Service]
+Type=oneshot
+User=atlas
+Group=atlas
+Environment="HOME=/home/atlas"
+# ~/.local/bin for agy; /usr/bin for node, git and agent-browser.
+Environment="PATH=/home/atlas/.local/bin:/usr/local/bin:/usr/bin:/bin"
+# Root resolves the Cloudflare token and account id (list
+# /etc/claude-bot-secrets/pfm-website-reader.list) into
+# /run/pfm-website-reader/secrets.env (0400, atlas) before the job starts, so
+# neither value is on a command line or in sudo's logs.
+RuntimeDirectory=pfm-website-reader
+RuntimeDirectoryMode=0700
+ExecStartPre=+/usr/local/sbin/claude-bot-secrets atlas pfm-website-reader
+ExecStart=/bin/bash -c 'set -a; . /run/pfm-website-reader/secrets.env; set +a; exec /usr/local/lib/pfm-website-reader/run.sh'
+PrivateTmp=yes
+NoNewPrivileges=yes
+# ~40 venues, each a polite fetch plus up to two Gemini calls of a few minutes at most.
+TimeoutStartSec=3h
+MemoryMax=2G

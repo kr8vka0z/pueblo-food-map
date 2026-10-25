@@ -106,8 +106,10 @@ export function parseProposalRow(row: ChangeProposalRow): ParsedProposal {
  * doesn't silently gain bulk-approval by omission). `link_health` can never
  * qualify regardless — it is a dead-link finding routed to the venue edit
  * screen, never approved directly (see applyApprovedProposal's own header).
+ * `website` (step 3): a page that loaded and changed nothing is the same
+ * "still listed" fetch, recorded without a click.
  */
-const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful", "care_and_share"]);
+const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful", "care_and_share", "website"]);
 
 /**
  * True for exactly the shape the first production pipeline run mostly

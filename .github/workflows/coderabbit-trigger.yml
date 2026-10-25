@@ -1,0 +1,35 @@
+# Asks CodeRabbit to review each new pull request.
+#
+# WHY: CodeRabbit's free plan skips automatic reviews on public repositories
+# with fewer than 10 stars, so `auto_review` in .coderabbit.yaml does nothing
+# here. A `@coderabbitai review` comment still triggers a review, so this posts
+# one when a PR opens or leaves draft. Not on every push: CodeRabbit reviews only
+# commits it hasn't seen, and a comment per push would clutter the PR.
+#
+# The filters mirror .coderabbit.yaml's auto_review settings (no drafts, no bot
+# PRs, no "Publish venues update"); keep the two in step. Fork PRs are skipped
+# because their token is read-only and can't comment.
+name: CodeRabbit trigger
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+    branches: [dev, main]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  trigger:
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.type != 'Bot' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !contains(github.event.pull_request.title, 'Publish venues update')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask CodeRabbit for a review
+        run: gh pr comment "$PR_URL" --body "@coderabbitai review"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

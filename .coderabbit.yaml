@@ -14,6 +14,9 @@ reviews:
     - "!src/data/grocery-osm.ts"
     - "!src/data/pantries-plentiful.ts"
 
+  # The free plan skips automatic reviews on public repos under 10 stars, so
+  # .github/workflows/coderabbit-trigger.yml asks for each review with a comment
+  # instead, applying the same filters. Keep the two in step.
   auto_review:
     enabled: true
     drafts: false

@@ -33,9 +33,17 @@ import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 // ─── Row + parsed-diff shapes ───────────────────────────────────────────────
 
-/** Mirrors the `change_proposals` CHECK constraints (migrations/0001_init_admin_schema.sql). */
+/** Mirrors the `change_proposals` CHECK constraints (migrations/0001_init_admin_schema.sql; source widened by 0020). */
 export type ProposalStatus = "pending" | "approved" | "rejected" | "superseded";
-export type ProposalSourceValue = "osm" | "plentiful" | "gtfs" | "link_health";
+export type ProposalSourceValue =
+  | "osm"
+  | "plentiful"
+  | "gtfs"
+  | "link_health"
+  | "care_and_share"
+  | "website"
+  | "usda_snap"
+  | "cdphe_wic";
 export type ProposalChangeType = "add" | "update" | "remove";
 
 /** One full row of the D1 `change_proposals` table. */
@@ -341,6 +349,17 @@ const APPLIABLE_VENUE_FIELDS = new Set<keyof Venue>([
 ]);
 
 /**
+ * `notes` applies only for 'website' proposals: the hand-checked fixes in
+ * migration 0022 put details our fields can't hold ("bring ID and bags",
+ * "closed to new applications") there. Scraped sources never own notes
+ * (AGENTS.md: the pipeline never proposes `notes`), so for them it stays
+ * unappliable, as before.
+ */
+function isAppliableField(source: string, field: string): boolean {
+  return APPLIABLE_VENUE_FIELDS.has(field as keyof Venue) || (field === "notes" && source === "website");
+}
+
+/**
  * Applies one PENDING `change_proposals` row. Callers are responsible for
  * the two checks that precede this in every route that uses it: validating
  * the id shape, and re-SELECTing the row fresh immediately beforehand to
@@ -428,7 +447,7 @@ export async function applyApprovedProposal(
     afterRowForAudit = afterRow;
   } else if (changeType === "update") {
     const existing = currentRow!;
-    const fields = diff.fields_changed.filter((f) => APPLIABLE_VENUE_FIELDS.has(f as keyof Venue));
+    const fields = diff.fields_changed.filter((f) => isAppliableField(proposalRow.source, f));
     if (fields.length === 0) {
       // #568 item 3 (see corrupted_proposal's own comment above for the
       // shared "no message -> both surfaces show 'Try again'" root cause):

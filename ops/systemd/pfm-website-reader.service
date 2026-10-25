@@ -17,14 +17,22 @@ Group=atlas
 Environment="HOME=/home/atlas"
 # ~/.local/bin for agy; /usr/bin for node, git and agent-browser.
 Environment="PATH=/home/atlas/.local/bin:/usr/local/bin:/usr/bin:/bin"
-# Root resolves the Cloudflare token and account id (list
-# /etc/claude-bot-secrets/pfm-website-reader.list) into
-# /run/pfm-website-reader/secrets.env (0400, atlas) before the job starts, so
-# neither value is on a command line or in sudo's logs.
+# Order matters (ExecStartPre lines run top to bottom):
+#  1. update the checkout and `npm ci`, with no secret anywhere yet;
+#  2. root resolves the Cloudflare token and account id (list
+#     /etc/claude-bot-secrets/pfm-website-reader.list) into
+#     /run/pfm-website-reader/secrets.env (0400, atlas) — never on a command
+#     line or in sudo's logs;
+#  3. the reader reads that file and DELETES it before doing anything else,
+#     keeping the values in memory for wrangler only. Nothing sources the file,
+#     so the token is in no environment agy (driven by untrusted page text,
+#     running as atlas) could read, and gone from disk before agy first runs.
 RuntimeDirectory=pfm-website-reader
 RuntimeDirectoryMode=0700
+Environment="PFM_SECRETS_FILE=/run/pfm-website-reader/secrets.env"
+ExecStartPre=/usr/local/lib/pfm-website-reader/run.sh prepare
 ExecStartPre=+/usr/local/sbin/claude-bot-secrets atlas pfm-website-reader
-ExecStart=/bin/bash -c 'set -a; . /run/pfm-website-reader/secrets.env; set +a; exec /usr/local/lib/pfm-website-reader/run.sh'
+ExecStart=/usr/local/lib/pfm-website-reader/run.sh run
 PrivateTmp=yes
 NoNewPrivileges=yes
 # ~40 venues, each a polite fetch plus up to two Gemini calls of a few minutes at most.

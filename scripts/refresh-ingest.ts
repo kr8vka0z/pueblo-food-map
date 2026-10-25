@@ -117,7 +117,19 @@ import {
   WEBSITE_FIXES_RUN_ID,
   WEBSITE_SOURCE,
 } from "./refresh/website";
-import { makeFetchPage, makeGemini } from "./refresh/websiteIo";
+import { makeFetchPage, makeGemini, readAndRemoveSecretsFile } from "./refresh/websiteIo";
+
+/**
+ * The server timer (ops/systemd/) passes the Cloudflare token as a FILE
+ * (PFM_SECRETS_FILE), read and deleted here before anything else runs, and
+ * kept only in this object: it goes to wrangler's child processes and
+ * nowhere else, so agy and agent-browser (driven by untrusted page text)
+ * can't reach it on disk or in any environment they can read. wrangler runs
+ * synchronously, never while an agy call is in flight. The GitHub workflow
+ * still sets the token in the environment as before; this adds nothing there.
+ */
+const WRANGLER_SECRETS: Record<string, string> = process.env.PFM_SECRETS_FILE ? readAndRemoveSecretsFile(process.env.PFM_SECRETS_FILE) : {};
+const WRANGLER_ENV: NodeJS.ProcessEnv = { ...process.env, ...WRANGLER_SECRETS };
 import { createTriageSession, runTriagePass, USD_PER_INPUT_TOKEN } from "./refresh/triage";
 
 // WHY import.meta.url: package.json is `"type": "module"` (vinext), so tsx runs this as ESM, where `__dirname` is
@@ -210,7 +222,7 @@ interface WranglerD1Result<T> {
 /** Runs a read-only query via `wrangler d1 execute --json` and returns its rows. */
 function d1Query<T>(dbMode: DbMode, sql: string): T[] {
   const args = [WRANGLER_BIN, "d1", "execute", DATABASE_NAMES[dbMode], wranglerLocationFlag(dbMode), "--json", "--command", sql];
-  const stdout = execFileSync(process.execPath, args, { cwd: REPO_ROOT, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024 });
+  const stdout = execFileSync(process.execPath, args, { cwd: REPO_ROOT, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024, env: WRANGLER_ENV });
   // wrangler prints npm-notice/update-check noise on stdout ahead of the
   // JSON in some installs — find the JSON array by its opening bracket
   // rather than assuming stdout is pure JSON.
@@ -273,13 +285,14 @@ function d1ApplyFile(dbMode: DbMode, filePath: string): void {
       execFileSync(
         process.execPath,
         [WRANGLER_BIN, "d1", "execute", DATABASE_NAMES[dbMode], "--remote", "--command", chunk],
-        { cwd: REPO_ROOT, stdio: "inherit" },
+        { cwd: REPO_ROOT, stdio: "inherit", env: WRANGLER_ENV },
       );
     });
     return;
   }
   execFileSync(process.execPath, [WRANGLER_BIN, "d1", "execute", DATABASE_NAMES[dbMode], "--local", "--file", filePath], {
     cwd: REPO_ROOT,
+    env: WRANGLER_ENV,
     stdio: "inherit",
   });
 }
@@ -628,7 +641,8 @@ async function main(): Promise<void> {
         today,
         deps: {
           fetchPage: makeFetchPage(session),
-          gemini: makeGemini(process.env.PFM_GEMINI_MODEL || "gemini-4-argon-medium", process.env.AGY_BIN || "agy"),
+          gemini: makeGemini(// Flash by default: Argon's quota is small and shared with other work; flash's trial run (48 calls) answered every one.
+            process.env.PFM_GEMINI_MODEL || "gemini-3.8-flash-medium", process.env.AGY_BIN || "agy"),
           sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
           log: (m) => console.log(m),
         },

@@ -67,7 +67,7 @@ target database. Watch it without writing (real pages, real Gemini):
 npx tsx scripts/refresh-ingest.ts --db-mode local --only website --dry-run
 ```
 
-`PFM_GEMINI_MODEL` overrides the model (default `gemini-4-argon-medium`);
+`PFM_GEMINI_MODEL` overrides the model (default `gemini-3.8-flash-medium`: Argon's quota is small and shared with other work);
 `AGY_BIN` the CLI path.
 
 `--db-mode <local|staging|remote>` picks the DATABASE, not just a flag —

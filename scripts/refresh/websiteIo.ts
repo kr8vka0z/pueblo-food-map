@@ -10,10 +10,10 @@
  */
 
 import { execFile } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GeminiStop, htmlToText, type PageResult } from "./website";
+import { GeminiStop, htmlToText, isPublicHttpUrl, type PageResult } from "./website";
 
 const FETCH_TIMEOUT_MS = 30_000;
 const MAX_HTML_BYTES = 3 * 1024 * 1024;
@@ -23,12 +23,42 @@ const BROWSER_TIMEOUT_MS = 90_000;
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 (pueblofoodmap.com weekly check)";
 
+/**
+ * The environment agy and agent-browser get: ours minus every Cloudflare and
+ * 1Password variable. Both run code steered by untrusted page text, so they
+ * must never hold the D1 write token (or a way to fetch more secrets), even
+ * when a person runs the job by hand with the token exported in the shell.
+ */
+export function untrustedChildEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(env).filter(([k]) => !/^(CLOUDFLARE_|OP_)/.test(k))) as NodeJS.ProcessEnv;
+}
+
+/**
+ * Reads the unit's secrets file (claude-bot-secrets format, NAME='value' per
+ * line) and deletes it at once, so nothing started later (agy above all) can
+ * read it from disk. The values live only in this process's memory and are
+ * handed to wrangler's child processes alone (refresh-ingest.ts); they are
+ * never put in this process's own environment, because a same-user process
+ * can read another's /proc/<pid>/environ (it holds the environment the
+ * process STARTED with, which is why run.sh never sources the file either).
+ */
+export function readAndRemoveSecretsFile(path: string): Record<string, string> {
+  const text = readFileSync(path, "utf-8");
+  rmSync(path, { force: true });
+  const out: Record<string, string> = {};
+  for (const line of text.split("\n")) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)='(.*)'$/);
+    if (m) out[m[1]] = m[2].replace(/'\\''/g, "'");
+  }
+  return out;
+}
+
 function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs: number; env?: NodeJS.ProcessEnv }): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     const child = execFile(
       cmd,
       args,
-      { cwd: opts.cwd, timeout: opts.timeoutMs, maxBuffer: 16 * 1024 * 1024, env: opts.env ?? process.env, encoding: "utf-8" },
+      { cwd: opts.cwd, timeout: opts.timeoutMs, maxBuffer: 16 * 1024 * 1024, env: opts.env ?? untrustedChildEnv(), encoding: "utf-8" },
       (err, stdout, stderr) => {
         const code = err ? (typeof (err as { code?: unknown }).code === "number" ? ((err as { code: number }).code) : 1) : 0;
         resolve({ code, stdout: String(stdout ?? ""), stderr: String(stderr ?? "") });
@@ -44,7 +74,7 @@ function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs: numbe
  * shared by every job on the machine) and always closed after.
  */
 async function browserText(url: string, session: string): Promise<PageResult> {
-  const env = { ...process.env, AGENT_BROWSER_SESSION: session };
+  const env = { ...untrustedChildEnv(), AGENT_BROWSER_SESSION: session };
   try {
     const opened = await run("agent-browser", ["open", url], { timeoutMs: BROWSER_TIMEOUT_MS, env });
     if (opened.code !== 0) return { ok: false, reason: `browser could not open the page (${opened.stderr.trim().slice(0, 120)})` };
@@ -62,16 +92,40 @@ async function browserText(url: string, session: string): Promise<PageResult> {
  * (401/403), a timeout, a 5xx or a near-empty page gets ONE browser try.
  * 429 is left alone: the site asked us to slow down. Never throws.
  */
+const MAX_REDIRECTS = 5;
+
+/**
+ * GET that follows redirects by hand, refusing any hop to a non-public host
+ * (a page could otherwise bounce us to this server's own services or the
+ * tailnet). ponytail: checks names, not resolved addresses, so a public
+ * name that resolves to a private address still passes; the upgrade is a
+ * DNS lookup per hop before connecting.
+ */
+async function publicFetch(url: string): Promise<Response> {
+  let current = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (!isPublicHttpUrl(current)) throw new Error(`refused non-public address ${current}`);
+    const res = await fetch(current, {
+      headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/xhtml+xml" },
+      redirect: "manual",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    const next = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
+    if (!next) return res;
+    current = new URL(next, current).toString();
+  }
+  throw new Error("too many redirects");
+}
+
 export function makeFetchPage(session: string): (url: string) => Promise<PageResult> {
   return async (url) => {
+    // Never hand a non-public address to the browser either.
+    if (!isPublicHttpUrl(url)) return { ok: false, reason: "not a public web address" };
     let res: Response;
     try {
-      res = await fetch(url, {
-        headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/xhtml+xml" },
-        redirect: "follow",
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
+      res = await publicFetch(url);
     } catch (err) {
+      if (err instanceof Error && /^refused non-public/.test(err.message)) return { ok: false, reason: err.message };
       const fallback = await browserText(url, session);
       return fallback.ok ? fallback : { ok: false, reason: `fetch failed (${err instanceof Error ? err.message : String(err)}); ${fallback.reason}` };
     }
@@ -107,7 +161,8 @@ export function makeGemini(model: string, agyBin = "agy"): (prompt: string, sche
     try {
       const { code, stdout, stderr } = await run(
         agyBin,
-        ["--model", model, "--disable-slash-commands", "--print-timeout", AGY_TIMEOUT, "--output-format", "json", "--json-schema", JSON.stringify(schema), "-p", prompt],
+        // --sandbox: terminal restrictions on top of headless mode's denials (probed 2026-10-25: headless reads still work).
+        ["--sandbox", "--model", model, "--disable-slash-commands", "--print-timeout", AGY_TIMEOUT, "--output-format", "json", "--json-schema", JSON.stringify(schema), "-p", prompt],
         { cwd, timeoutMs: AGY_PROCESS_TIMEOUT_MS },
       );
       const start = stdout.indexOf('{"conversation_id"');

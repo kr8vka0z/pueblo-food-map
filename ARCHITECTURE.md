@@ -352,7 +352,14 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   gardens and edible landscapes. Never blessing boxes or events. Runs only
   as `--only website`, from the server's weekly timer (`ops/systemd/`,
   Monday 02:00 MT, a clean `origin/main` checkout), never in GitHub
-  Actions: Gemini is the Antigravity CLI `agy` under Kyle's login there.
+  Actions: Gemini is the Antigravity CLI `agy` under Kyle's login there
+  (`--sandbox`; model `PFM_GEMINI_MODEL`, default `gemini-3.8-flash-medium`).
+  agy and agent-browser start with every `CLOUDFLARE_*`/`OP_*` variable
+  removed (`untrustedChildEnv`); the timer hands the D1 token over as a file
+  (`PFM_SECRETS_FILE`) that `refresh-ingest.ts` reads and deletes at start
+  and passes only to wrangler, so it is in no environment or file agy can
+  read. Fetches refuse non-public hosts (`isPublicHttpUrl`), redirects
+  included.
   Our code fetches each page (plain GET, one `agent-browser` try in its own
   session for a refusal or a script-built page; 404/410/429 get none), one
   site every 4 s. Gemini reads only that text (fenced as untrusted, empty

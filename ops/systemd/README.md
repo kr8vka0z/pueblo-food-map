@@ -29,6 +29,25 @@ systemctl list-timers pfm-website-reader.timer   # next run: Monday 02:00 MT
 First run by hand (optional, writes to production):
 `sudo systemctl start pfm-website-reader.service`.
 
+## How the token is kept from Gemini
+
+agy and the browser read untrusted web pages and run as `atlas`, so they must
+not be able to reach the D1 write token. The unit installs packages first,
+then root writes `/run/pfm-website-reader/secrets.env`, then the reader reads
+it and deletes it before anything else and hands the values only to wrangler.
+Nothing sources the file, so the token is in no process environment (a
+same-user process can read another's `/proc/<pid>/environ`), and agy and the
+browser are started with every `CLOUDFLARE_*`/`OP_*` variable removed.
+
+A run by hand with the token exported in your shell (e.g. the staging run)
+puts it in node's starting environment. To keep that path closed too, write
+the two values to a 0600 file in the same `NAME='value'` form and pass
+`PFM_SECRETS_FILE=<file>` instead of exporting them; the reader deletes it.
+
+Model: `PFM_GEMINI_MODEL` (default `gemini-3.8-flash-medium`, since Argon's
+quota is small and shared). Set it with `systemctl edit pfm-website-reader`
+(`Environment=PFM_GEMINI_MODEL=...`).
+
 ## Watching it
 
 - `journalctl -u pfm-website-reader.service -n 200` — each run ends with one

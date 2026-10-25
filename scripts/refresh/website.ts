@@ -85,10 +85,38 @@ function hostIn(host: string, list: string[]): boolean {
   return list.some((h) => host === h || host.endsWith(`.${h}`));
 }
 
-/** True only for an http(s) url on a host that is neither a directory nor a social network. */
+/**
+ * http(s) on a public internet name or address only. A candidate url comes
+ * from Gemini or from a page (redirects), so without this a page could point
+ * the reader at this server's own services, the tailnet (100.64/10) or the
+ * router. Names with no dot ("localhost", a tailnet machine name) and
+ * local-only suffixes are refused too. Checks the name, not what it
+ * resolves to (see websiteIo.ts's publicFetch).
+ */
+export function isPublicHttpUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  let u: URL;
+  try {
+    u = new URL(url.trim());
+  } catch {
+    return false;
+  }
+  if ((u.protocol !== "http:" && u.protocol !== "https:") || u.username || u.password) return false;
+  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host.includes(":")) return !(host === "::1" || host === "::" || /^f[cd]/.test(host) || /^fe[89ab]/.test(host) || host.startsWith("::ffff:"));
+  if (!host.includes(".") || /(^|\.)(localhost|local|internal|lan|home|arpa|ts\.net)$/.test(host)) return false;
+  const v4 = host.match(/^(\d+)\.(\d+)\.\d+\.\d+$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if (a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127)) return false;
+  }
+  return true;
+}
+
+/** True only for a public http(s) url on a host that is neither a directory nor a social network. */
 export function isOwnSite(url: string | null | undefined): boolean {
   const host = hostOf(url);
-  return host !== null && !hostIn(host, DIRECTORY_HOSTS) && !hostIn(host, SOCIAL_HOSTS);
+  return host !== null && isPublicHttpUrl(url) && !hostIn(host, DIRECTORY_HOSTS) && !hostIn(host, SOCIAL_HOSTS);
 }
 
 // ─── Page text ─────────────────────────────────────────────────────────────
@@ -533,9 +561,12 @@ export function verifyPlace(raw: unknown, text: string): VerifiedPlace {
   const address = str(r.address?.value);
   if (address) {
     const quote = str(r.address?.quote);
-    const num = address.match(/\b\d+[a-z]?\b/i)?.[0];
     // No house number = a vaguer address than ours ("5th and Hudson"): never a replacement.
-    const ok = !!num && quoteFound(text, quote) && new RegExp(`\\b${num}\\b`, "i").test(quote) && streetNumberOf(address) !== null;
+    // The quote must carry the value's own house number AND street, so a
+    // quote about "623 E 4th St" can't back a claimed "623 Elm St".
+    const num = streetNumberOf(address);
+    const quoteTokens = streetKey(quote.replace(/,/g, " ")).split(" ");
+    const ok = num !== null && quoteFound(text, quote) && quoteTokens.includes(num.number) && quoteTokens.includes(num.street);
     check("address", ok);
     if (ok) out.address = { value: address, quote };
   }

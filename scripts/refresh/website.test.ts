@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { CurrentVenueRow } from "./diffEngine";
 import {
   GeminiStop,
+  isOwnSite,
   PFP_GARDENS_URL,
   parseHoursQuote,
   runWebsiteReader,
@@ -96,6 +97,14 @@ describe("quotes must be on our fetched page", () => {
     expect(r.proposals.map((p) => p.proposedDiff.fields_changed)).toEqual([["last_verified"]]);
   });
 
+  test("an address whose quote has the same house number but another street is dropped", () => {
+    const text = "Our office is at 623 E 4th St, Pueblo.";
+    const v = verifyPlace({ address: { value: "623 Elm St, Pueblo, CO", quote: "623 E 4th St, Pueblo" } }, text);
+    expect(v.address).toBeUndefined();
+    expect(v.dropped).toContain("address");
+    expect(verifyPlace({ address: { value: "623 E 4th St, Pueblo, CO", quote: "623 E 4th St, Pueblo" } }, text).address).toBeDefined();
+  });
+
   test("an address without a house number never replaces ours", () => {
     const text = "La Familia Community Garden, 5th and Hudson";
     const v = verifyPlace({ address: { value: "5th and Hudson", quote: "La Familia Community Garden, 5th and Hudson" } }, text);
@@ -104,6 +113,18 @@ describe("quotes must be on our fetched page", () => {
 });
 
 describe("whose website", () => {
+  test.each([
+    "http://localhost:8090/", "http://127.0.0.1/", "http://2130706433/", "http://10.0.0.5/", "http://192.168.1.1/", "http://172.20.0.1/",
+    "http://169.254.169.254/latest/", "http://100.104.48.90:8443/", "http://[::1]/", "http://[fe80::1]/", "http://kyles-macbook-air/",
+    "http://family-office.tail1234.ts.net/", "file:///etc/passwd", "ftp://example.org/", "javascript:alert(1)", "https://user:pw@example.org/",
+  ])("%s is never treated as a venue's own site", (url) => {
+    expect(isOwnSite(url)).toBe(false);
+  });
+
+  test("an ordinary public site is", () => {
+    expect(isOwnSite("https://www.agapepueblo.com/")).toBe(true);
+  });
+
   test("a directory url (Plentiful) is never read as the venue's own site; discovery searches instead", async () => {
     const plentiful = "https://directory.plentiful.org/colorado/pueblo/hope-church-1234";
     const h = harness({ over: { venues: [venue({ url: plentiful })] }, gemini: (_p, search) => (search ? { candidates: [] } : reading()) });

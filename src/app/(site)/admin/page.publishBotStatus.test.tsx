@@ -23,7 +23,7 @@ vi.mock("@/lib/adminDb", () => ({
 // production (BETTER_AUTH_RP_ID undefined) in every test here, same default
 // page.test.tsx uses.
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

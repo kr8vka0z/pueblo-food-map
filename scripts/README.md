@@ -22,6 +22,7 @@ the named script UNMODIFIED:
 | 1a | `scrape-plentiful.py` | `directory.plentiful.org/colorado/pueblo` (live HTTP) | `data/raw/pueblo-pantries.json`, `src/data/pantries-plentiful.ts` |
 | 1b | `fetch-osm-grocery.py` | Overpass API (live HTTP) | `data/raw/pueblo-grocery.json` |
 | 1c | `ingest-osm-grocery.py` | `data/raw/pueblo-grocery.json` + `public/data/pueblo-county-boundary.geojson` | `src/data/grocery-osm.ts` |
+| 1d | `refresh/careAndShare.ts` (inside `refresh-ingest.ts`) | Care and Share's Find Food map API (`api.accessfood.org`, live HTTP, one request every 3.5 s) | nothing on disk in the repo; a contact-free cache in a temp dir per run |
 | 2 | `refresh-ingest.ts` itself | current D1 `venues` rows + the freshly-regenerated files above | `change_proposals` rows (one exception: a pure "date-only" proposal auto-applies to `venues.last_verified`) |
 
 Step 2's diff/guardrail/link-health logic isn't inline in `refresh-ingest.ts`
@@ -41,6 +42,14 @@ production):
 
 ```
 npx tsx scripts/refresh-ingest.ts --db-mode local
+```
+
+Watch only the Care and Share reader, writing nothing (reads the live API
+at its slow pace, diffs against the chosen database, prints every match and
+change):
+
+```
+npx tsx scripts/refresh-ingest.ts --db-mode local --only care_and_share --dry-run
 ```
 
 `--db-mode <local|staging|remote>` picks the DATABASE, not just a flag —
@@ -107,7 +116,7 @@ unfamiliar reader doesn't mistake them for part of the flow above:
 | `seed-dev.sql` | Fake venue rows for the staging admin D1 database's UI states |
 | `auth-cli.config.ts` | CLI-only Better Auth config for `@better-auth/cli generate`/`migrate` — never imported by the app |
 | `check-banned.mjs` | Banned-string lint (old font names, retired Tailwind palettes) — wired into `npm run lint` |
-| `check-prerender-serves.sh` | Builds with OpenNext, serves in the local Worker, and requests the prerendered venue pages (must be 200) — `ci.yml` runs it so a `next` / OpenNext bump that 404s them fails its PR |
+| `check-pages-serve.sh` | `vite build`, serves the Worker in local workerd, and requests real venue/report pages (200 with the venue name) and unknown ids (404) — `ci.yml` runs it so a `next` / vinext / vite bump that breaks them fails its PR |
 | `check-design-drift.mjs` | Token parity check between `globals.css` and `DESIGN.md` — `npm run design:drift`, a blocking CI gate |
 
 ## Not built: GTFS transit data

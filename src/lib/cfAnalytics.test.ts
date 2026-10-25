@@ -10,7 +10,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 const mockGetCloudflareContext = vi.fn(async () => ({ env: { CF_ANALYTICS_ACCOUNT_ID: "acct123" } }));
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: () => mockGetCloudflareContext(),
 }));
 

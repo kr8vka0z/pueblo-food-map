@@ -30,7 +30,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { loadNetworkStatsData, type NetworkStatsData } from "@/lib/boxStats";
 import { logBlessingBoxesReadFailure } from "@/lib/logger";
 import { respondWithEdgeCache, type BestEffortResult } from "@/lib/edgeCache";

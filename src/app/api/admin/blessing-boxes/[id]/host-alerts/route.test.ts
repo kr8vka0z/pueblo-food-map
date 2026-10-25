@@ -19,7 +19,7 @@ const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 const BOX_ID = "test-box-1";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

@@ -118,8 +118,29 @@ Dashboard and ops (no code):
 7. **GitHub repo description** — **done 2026-09-29.** It no longer says "POC";
    it's one plain sentence about the live service.
 8. **Baseline prompt panel.** Ask ChatGPT, Perplexity, Google (AI Overview) and
-   Copilot 12 fixed questions from §2. Record who gets cited. Re-run monthly.
+   Copilot the fixed questions below, drawn from §2. Record who gets cited. Re-run monthly.
    The 2026-09-28 web-search baseline is in §1: we are cited for none of them.
+   Keep the wording fixed between runs, or month-to-month results stop being comparable.
+
+   English (12):
+   1. Where is a food pantry near me in Pueblo, CO?
+   2. Where can I get free food in Pueblo, Colorado today?
+   3. What are the hours for the Bessemer Mobile Food Pantry in Pueblo?
+   4. Which churches in Pueblo have a food bank?
+   5. Which stores in Pueblo take EBT?
+   6. Does Walmart in Pueblo take WIC?
+   7. How do I apply for SNAP in Pueblo County?
+   8. Where are the blessing boxes in Pueblo?
+   9. Are there community gardens in Pueblo, CO?
+   10. Is there a soup kitchen in Pueblo?
+   11. Are there any free food events in Pueblo this weekend?
+   12. Do I need an ID to get food from a food pantry in Pueblo?
+
+   Spanish (4; added 2026-10-25 once the `/es` pages were confirmed indexed, #763):
+   13. ¿Dónde hay una despensa de comida cerca de mí en Pueblo, Colorado?
+   14. ¿Dónde puedo conseguir comida gratis hoy en Pueblo?
+   15. ¿Qué tiendas en Pueblo aceptan EBT o WIC?
+   16. ¿Necesito identificación para recibir comida en una despensa de Pueblo?
 
 ### Phase 1: Complete the facts (admin data work, the highest AEO value)
 
@@ -186,7 +207,7 @@ the #689 `[CHECK]` review list. Follow-up: footer tap targets (#711).
 
 Static, server-rendered, `buildPageMetadata`, ItemList JSON-LD, a short FAQ,
 linked from `/venues`, the footer and the `/` nav block, and in the sitemap.
-Verify each on staging (the `staticAssetsIncrementalCache` trap).
+Verify each on staging (a green build doesn't prove a page serves).
 
 1. **`/food-pantries`**: all pantries with the day/time summary from Phase 2,
    and a "how pantries work" FAQ. This is the page meant to beat feedam.org.
@@ -232,8 +253,9 @@ keeps today's client-side Spanish plus a "Ver en español" link to `/es`.
 Prerendered paths roughly doubled (~115 → ~230); `/es` smoke tests and a
 `lang="es"` body check are in `deploy-prod.yml`.
 
-**Follow-up (not a PR):** once GSC/Bing are live, confirm the `/es` pages
-are indexed, and add 3–4 Spanish questions to the monthly AI prompt panel.
+**Follow-up:** Google indexing of the `/es` pages confirmed 2026-10-25 (#763),
+and four Spanish questions are in the Phase 0 prompt panel. Bing is not checked
+yet (Kyle deferred it).
 Native-speaker review of the `[CHECK]`-marked Spanish copy the mirrored
 pages render (see the PR 2 issue comment on #689) should land before PR 2
 promotes to `main`.
@@ -280,8 +302,8 @@ doing the outreach.
 ## 5. Guardrails (from AGENTS.md / ARCHITECTURE.md / REVIEW.md)
 
 - `buildPageMetadata` for every page; `serializeJsonLd` for every JSON-LD block.
-- New static dynamic-route pages depend on `staticAssetsIncrementalCache`.
-  Verify on staging, and add to the `deploy-prod.yml` smoke test.
+- New `generateStaticParams` pages: verify on staging (a green build doesn't
+  prove they serve), and add to the `deploy-prod.yml` smoke test.
 - No server-side redirect on `/`.
 - The non-prod `noindex` must be host-checked and smoke-tested on prod; getting
   it wrong deindexes the site.
@@ -314,7 +336,7 @@ doing the outreach.
 - **`/about` contact:** done in this PR. It now shows `hello@pueblofoodmap.com`
   (no personal name, per Kyle), and the Organization JSON-LD carries the same
   `email`. A Wikidata item for the Organization is filed as a P2 issue.
-- **First AI prompt-panel run and the `/es` indexing check** are due about
-  2026-10-13 (tracked on #689).
+- **`/es` indexing check:** Google done 2026-10-25 (#763). **First AI
+  prompt-panel run:** not yet done; the questions are in Phase 0 item 8.
 - **`/` was already indexed on 2026-09-29**, but the brand query still ranks the
   GitHub repo first. That's authority, so it's Phase 5 work, not a code fix.

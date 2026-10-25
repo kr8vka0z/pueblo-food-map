@@ -94,6 +94,7 @@ export const EVENTS = {
   DIRECTIONS_CLICKED: "directions_clicked",
   CALL_CLICKED: "call_clicked",
   WEBSITE_CLICKED: "website_clicked",
+  DONATE_CLICKED: "donate_clicked", // #736: Menu Donate card
   SHARE_CLICKED: "share_clicked",
   FAVORITE_ADDED: "favorite_added",
   REPORT_OPENED: "report_opened",

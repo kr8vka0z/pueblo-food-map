@@ -20,7 +20,7 @@
 # allowlist, so it authorizes here — the restriction that makes it safe also
 # makes it usable on staging, and no second token is needed. Never point this
 # at an unrestricted token: `NEXT_PUBLIC_*` is inlined into the client bundle
-# by `next build`, and this workflow's bundle is served publicly at
+# by `vite build` (vinext), and this workflow's bundle is served publicly at
 # dev.pueblofoodmap.com, so an unrestricted key would be liftable by anyone
 # and billable to Kyle's account (#304). The static JS assets are public
 # whatever gates the pages, so gating is not a substitute for restricting the
@@ -54,8 +54,8 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      # Consumed by `next build` inside the opennextjs-cloudflare build step
-      # below — see the file-header comment on secret choice/reuse.
+      # Consumed by the `vite build` step below (vinext inlines NEXT_PUBLIC_*)
+      # — see the file-header comment on secret choice/reuse.
       NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
       NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_BOX_SITE_KEY }}
@@ -89,26 +89,25 @@ jobs:
       # (full suite) passing first — ruleset 22116897. Re-running it cost ~3
       # min per deploy and let a flaky test block an already-green change.
       - run: npm run lint && npm run design:drift && npm run typecheck
-      # D1 remote migrations are NOT applied by `wrangler deploy` / OpenNext
-      # deploy — must run explicitly against the staging database on every
+      # D1 remote migrations are NOT applied by `wrangler deploy` — must run explicitly against the staging database on every
       # deploy that could carry a schema change. `--env staging` resolves
       # the env.staging ADMIN_DB binding (pueblo-food-map-admin-staging) via
       # wrangler.jsonc, not the top-level prod binding.
       - run: npx wrangler d1 migrations apply pueblo-food-map-admin-staging --remote --env staging
-      # `-e/--env staging` on both build and deploy resolves wrangler.jsonc's
+      # CLOUDFLARE_ENV=staging makes the build resolve wrangler.jsonc's
       # env.staging block (worker `pueblo-food-map-staging`, route
-      # dev.pueblofoodmap.com) — confirmed via `npx opennextjs-cloudflare
-      # deploy --help`, which forwards wrangler's own -c/-e flags directly
-      # (no `--` separator needed, unlike a generic passthrough CLI).
-      - run: npx opennextjs-cloudflare build --env staging
-      - run: npx opennextjs-cloudflare deploy --env staging
+      # dev.pueblofoodmap.com, staging D1/R2, no cron) and flatten it into
+      # dist/server/wrangler.json. `wrangler deploy` then reads that file via
+      # .wrangler/deploy/config.json, so it takes no --env (adding one is an error).
+      - run: CLOUDFLARE_ENV=staging npx vite build
+      - run: npx wrangler deploy
       # Post-deploy smoke check, the staging twin of deploy-prod.yml's. Staging
-      # had none, so a next / OpenNext bump that 404'd every prerendered venue
+      # had none, so a next / OpenNext bump (the stack before vinext) that 404'd every prerendered venue
       # page sat live on dev.pueblofoodmap.com for days with every run green,
       # and the release to prod was one merge away from inheriting it. Staging
       # has no workers.dev origin (it answers 404), so this hits the zone host.
       # Same retry as prod: `deploy` returning is not the new version serving,
-      # and static assets (where the prerendered pages live) lag the Worker.
+      # and a fresh deployment can take a moment to reach every location.
       # A red run here is the signal; a failure never rolls anything back.
       #
       # WHY 403 is a warning, not a failure: Cloudflare's edge answers 403 to
@@ -118,8 +117,8 @@ jobs:
       # smoke does not hit it because it uses the workers.dev origin. If EVERY
       # request is 403 the check cannot see the site at all, so it warns and
       # passes; any other mix (a 404 or 500 on a page, or a 403 on only some
-      # paths) still fails. The build-time guard in ci.yml covers the prerender
-      # bug either way. 403 is never retried: a block is not a deploy lag.
+      # paths) still fails. The build-time serve check in ci.yml
+      # (scripts/check-pages-serve.sh) covers the venue pages either way. 403 is never retried: a block is not a deploy lag.
       - name: Smoke test staging (post-deploy)
         run: |
           set -e
@@ -178,7 +177,7 @@ jobs:
             fi
           done
           if [ "$blocked" -eq "$total" ]; then
-            echo "::warning title=Staging smoke test blocked by the edge::Every request (${total}/${total}) to ${ORIGIN} returned 403, so the staging pages were NOT checked. Cloudflare is refusing GitHub runners; the ci.yml prerender guard still covers the build."
+            echo "::warning title=Staging smoke test blocked by the edge::Every request (${total}/${total}) to ${ORIGIN} returned 403, so the staging pages were NOT checked. Cloudflare is refusing GitHub runners; the ci.yml serve check still covers the build."
             exit 0
           fi
           exit $status

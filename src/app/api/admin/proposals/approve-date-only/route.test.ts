@@ -4,7 +4,7 @@
  *
  * Same full-stack mocking pattern as
  * src/app/api/admin/proposals/[id]/approve/route.test.ts: fakes
- * @opennextjs/cloudflare's D1 binding and requireAdminSession() as a
+ * @/lib/cloudflareContext's D1 binding and requireAdminSession() as a
  * controllable mock, then inspects db.batch() calls (one per approved
  * proposal — this route calls the shared applyApprovedProposal() engine
  * once per valid id, not one combined batch across ids).
@@ -24,7 +24,7 @@ import type { ChangeProposalRow, ProposedDiff } from "@/lib/adminProposals";
 const ADMIN_EMAIL = "admin@pueblofoodmap.com";
 
 const mockGetCloudflareContext = vi.fn();
-vi.mock("@opennextjs/cloudflare", () => ({
+vi.mock("@/lib/cloudflareContext", () => ({
   getCloudflareContext: (...args: unknown[]) => mockGetCloudflareContext(...args),
 }));
 

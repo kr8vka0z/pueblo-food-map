@@ -31,21 +31,20 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>. Hot-reloads on save (Turbopack).
+Open <http://localhost:3000>. Hot-reloads on save (`vite dev`, vinext).
 
 ### Key scripts
 
 | Script | Purpose |
 |---|---|
 | `npm run dev` | Dev server with hot reload |
-| `npm run build` | Production build |
+| `npm run build` | Production build (`vite build` via vinext → `dist/`) |
 | `npm run lint` | ESLint check |
 | `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
 | `npm run test` | Unit tests (vitest, watch mode) |
 | `npm run test:ci` | Unit tests, CI mode (single run) |
 | `npm run test:coverage` | Unit tests with a V8 coverage report |
-| `npm start` | Serve the production build |
-| `npm run preview` | OpenNext build + local Worker emulator at :8788 |
+| `npm run preview` | `vite build` + the built Worker in local workerd at :8788 |
 | `npm run design:lint` | design.md CLI lint on DESIGN.md (report-only) |
 | `npm run design:drift` | Token parity check: globals.css vs DESIGN.md (blocking) |
 
@@ -94,7 +93,7 @@ scripts/           Data pipeline, seed, and lint scripts (never imported by the 
 - **lucide-react** (icons)
 - **Cloudflare Turnstile** (bot protection on submission forms)
 - **Resend** (transactional email for form submissions)
-- **Deployed to Cloudflare Workers** via `@opennextjs/cloudflare`
+- **Deployed to Cloudflare Workers** via [vinext](https://github.com/cloudflare/vinext) (Next.js API on Vite)
 
 ---
 
@@ -149,7 +148,7 @@ CI enforces this automatically (blocking gate).
 | Layer | Source | Refresh |
 |---|---|---|
 | Gardens + landscapes | Pueblo Food Project CGSP page | Manual |
-| Pantries + meal sites | Plentiful public directory (`directory.plentiful.org/colorado/pueblo`) | Automated (see below) |
+| Pantries + meal sites | Plentiful public directory (`directory.plentiful.org/colorado/pueblo`); Care and Share Food Bank's Find Food map for its partner pantries (since 2026-10) | Automated (see below) |
 | Grocery / convenience / farms | OpenStreetMap Overpass API | Automated (see below) |
 | SNAP / WIC flags | USDA FNS + CDPHE public data (matched into D1 by migration `0014`, #597) | Admin-editable in D1 directly |
 
@@ -172,10 +171,11 @@ editing it by hand in the admin panel (`/admin/places`).
 runs weekly (and on manual dispatch), re-scrapes Plentiful and OSM, diffs
 the result against D1's current venues, and writes one `change_proposals`
 row per detected difference — including a link-health pass that flags dead
-outbound `url`s. It writes to `venues` in exactly one bounded case: a
-"date-only" proposal (nothing changed but the last-checked date) auto-
-applies rather than waiting on a click (Kyle, 2026-09-15). Every other
-proposal still needs a human to review and approve it from the Places tab's
+outbound `url`s. A "date-only" proposal (the venue is still listed and
+nothing changed) needs no click, but since 2026-10-25 it only records that
+the source still lists the venue; it no longer changes the venue's
+"last verified" date, which now moves only when a person confirms something.
+Every other proposal still needs a human to review and approve it from the Places tab's
 "To review" filter (`/admin/places?show=review` — folded in from the
 retired standalone `/admin/flags` queue by #674) before it reaches the
 public map. See

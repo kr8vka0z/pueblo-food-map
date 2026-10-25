@@ -33,9 +33,17 @@ import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 // ─── Row + parsed-diff shapes ───────────────────────────────────────────────
 
-/** Mirrors the `change_proposals` CHECK constraints (migrations/0001_init_admin_schema.sql). */
+/** Mirrors the `change_proposals` CHECK constraints (migrations/0001_init_admin_schema.sql; source widened by 0020). */
 export type ProposalStatus = "pending" | "approved" | "rejected" | "superseded";
-export type ProposalSourceValue = "osm" | "plentiful" | "gtfs" | "link_health";
+export type ProposalSourceValue =
+  | "osm"
+  | "plentiful"
+  | "gtfs"
+  | "link_health"
+  | "care_and_share"
+  | "website"
+  | "usda_snap"
+  | "cdphe_wic";
 export type ProposalChangeType = "add" | "update" | "remove";
 
 /** One full row of the D1 `change_proposals` table. */
@@ -99,7 +107,7 @@ export function parseProposalRow(row: ChangeProposalRow): ParsedProposal {
  * qualify regardless — it is a dead-link finding routed to the venue edit
  * screen, never approved directly (see applyApprovedProposal's own header).
  */
-const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful"]);
+const DATE_ONLY_BULK_SOURCES: ReadonlySet<string> = new Set(["osm", "plentiful", "care_and_share"]);
 
 /**
  * True for exactly the shape the first production pipeline run mostly
@@ -125,6 +133,11 @@ export function isDateOnlyUpdateProposal(
   // an approval records (venue_id_aliases) — auto/bulk-applying it as a bare
   // date bump would re-propose the same rename every run.
   if (diff.meta?.rename) return false;
+  // Care and Share (scripts/refresh/careAndShare.ts): an unconfirmed match
+  // carries the upstream id an approval records, and a schedule the
+  // converter couldn't read exactly must reach a person — neither is a
+  // plain "still listed".
+  if (diff.meta?.match || diff.meta?.needs_review) return false;
   return diff.fields_changed.length === 1 && diff.fields_changed[0] === "last_verified";
 }
 
@@ -142,6 +155,9 @@ export type ReviewLane = "likely_noise" | "needs_human" | "likely_rename";
  */
 export function reviewLaneOf(row: Pick<ChangeProposalRow, "triage_lane">, diff: ProposedDiff | null): ReviewLane {
   if (diff?.meta?.rename || row.triage_lane === "renamed_or_moved") return "likely_rename";
+  // A Care and Share schedule the converter couldn't read exactly, or a
+  // match it wasn't sure of, is for a person whatever Jev's lane says.
+  if (diff?.meta?.needs_review || diff?.meta?.match) return "needs_human";
   if (row.triage_lane === "likely_noise" || row.triage_lane === "auto_apply_candidate") return "likely_noise";
   return "needs_human";
 }
@@ -150,6 +166,27 @@ export function reviewLaneOf(row: Pick<ChangeProposalRow, "triage_lane">, diff: 
 export function renameMetaOf(diff: ProposedDiff | null): { from_id: string; to_id: string } | null {
   const r = diff?.meta?.rename as { from_id?: unknown; to_id?: unknown } | undefined;
   return r && typeof r.from_id === "string" && typeof r.to_id === "string" ? { from_id: r.from_id, to_id: r.to_id } : null;
+}
+
+/** Listing ids an unconfirmed Care and Share match asks about: `meta.match.upstream_id`, or `upstream_ids` for a listed-twice card. */
+export function matchUpstreamIdsOf(diff: ProposedDiff | null): string[] {
+  const m = diff?.meta?.match as { upstream_id?: unknown; upstream_ids?: unknown } | undefined;
+  if (!m) return [];
+  const ids = Array.isArray(m.upstream_ids) ? m.upstream_ids : [m.upstream_id];
+  return ids.filter((id): id is string => typeof id === "string");
+}
+
+/**
+ * venues.source_type for a venue created from a proposal of this source.
+ * The column's CHECK (migration 0001) only knows the original scraper
+ * sources; rebuilding `venues` to widen it is a large migration for a label
+ * nothing reads for the new sources (Care and Share matches our venues by
+ * id/alias, not by source_type), so a new-source venue is 'manual' and its
+ * provenance stays in `venues.source` (e.g. "careandshare.org/findfood").
+ */
+const VENUE_SOURCE_TYPES: ReadonlySet<string> = new Set(["pfp", "osm", "plentiful", "gtfs", "manual"]);
+export function venueSourceTypeFor(proposalSource: string): AdminVenueSourceType {
+  return (VENUE_SOURCE_TYPES.has(proposalSource) ? proposalSource : "manual") as AdminVenueSourceType;
 }
 
 // ─── Shared diff-field selection ────────────────────────────────────────────
@@ -341,6 +378,17 @@ const APPLIABLE_VENUE_FIELDS = new Set<keyof Venue>([
 ]);
 
 /**
+ * `notes` applies only for 'website' proposals: the hand-checked fixes in
+ * migration 0022 put details our fields can't hold ("bring ID and bags",
+ * "closed to new applications") there. Scraped sources never own notes
+ * (AGENTS.md: the pipeline never proposes `notes`), so for them it stays
+ * unappliable, as before.
+ */
+function isAppliableField(source: string, field: string): boolean {
+  return APPLIABLE_VENUE_FIELDS.has(field as keyof Venue) || (field === "notes" && source === "website");
+}
+
+/**
  * Applies one PENDING `change_proposals` row. Callers are responsible for
  * the two checks that precede this in every route that uses it: validating
  * the id shape, and re-SELECTing the row fresh immediately beforehand to
@@ -428,7 +476,7 @@ export async function applyApprovedProposal(
     afterRowForAudit = afterRow;
   } else if (changeType === "update") {
     const existing = currentRow!;
-    const fields = diff.fields_changed.filter((f) => APPLIABLE_VENUE_FIELDS.has(f as keyof Venue));
+    const fields = diff.fields_changed.filter((f) => isAppliableField(proposalRow.source, f));
     if (fields.length === 0) {
       // #568 item 3 (see corrupted_proposal's own comment above for the
       // shared "no message -> both surfaces show 'Try again'" root cause):
@@ -459,7 +507,7 @@ export async function applyApprovedProposal(
     // (UPDATE, §6.7's upsert semantics — every field overwritten from
     // `after`, forced status='draft').
     const isRestore = currentRow !== null; // stale-apply already proved: if present, it's archived
-    const sourceType = proposalRow.source as AdminVenueSourceType;
+    const sourceType = venueSourceTypeFor(proposalRow.source);
     const afterVenue = after as Partial<Venue>;
 
     if (isRestore) {
@@ -606,9 +654,13 @@ export async function applyApprovedProposal(
   // this table before diffing). Same batch, so it lands only with the update.
   // Appended AFTER approveProposal so results[2] below is still that row.
   const rename = changeType === "update" ? renameMetaOf(diff) : null;
-  const extra = rename
-    ? [db.prepare(ALIAS_UPSERT_SQL).bind(proposalRow.source, rename.to_id, proposalRow.target_venue_id, timestamp, identity.email)]
-    : [];
+  // Same for a Care and Share match the pipeline wasn't sure of
+  // (meta.match, scripts/refresh/careAndShare.ts): approving it is the
+  // confirmation, so record the listing's id and it never asks again.
+  const aliasIds = changeType !== "update" ? [] : rename ? [rename.to_id] : matchUpstreamIdsOf(diff);
+  const extra = aliasIds.map((upstreamId) =>
+    db.prepare(ALIAS_UPSERT_SQL).bind(proposalRow.source, upstreamId, proposalRow.target_venue_id, timestamp, identity.email),
+  );
 
   const results = await db.batch([venueStmt, insertAudit, approveProposal, ...extra]);
   const approveResult = results[2];

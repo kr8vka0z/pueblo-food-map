@@ -15,10 +15,11 @@
  * WHY no new migration/table for staleness: every successful, non-aborted
  * refresh run for a source writes at least one change_proposals row for
  * that source — an unchanged, still-present venue still gets a pure
- * last_verified freshness-bump proposal every run
- * (scripts/refresh/diffEngine.ts's `else if (current.last_verified !==
- * today)` branch), auto-applied and written as an already-'approved' row
- * (scripts/refresh/proposalSql.ts) — so MAX(created_at) per source IS
+ * "still listed" proposal every run (scripts/refresh/diffEngine.ts's
+ * `else if (current.last_verified !== today)` branch), written as an
+ * already-'approved' row (scripts/refresh/proposalSql.ts; since the Venue
+ * Data Rebuild step 1 it no longer bumps venues.last_verified, but the row
+ * is still written for exactly this check) — so MAX(created_at) per source IS
  * "when this source last completed a run that wrote anything," and a
  * zero-record or abnormal-drop abort (diffEngine.ts's own guardrails)
  * writes NOTHING for that source, which is exactly the silence this alert
@@ -43,11 +44,12 @@
  * WHY `resendApiKey` is passed in rather than read from
  * `process.env.RESEND_API_KEY` (the convention every OTHER Resend send in
  * this app uses, e.g. src/lib/boxAdopters.ts's
- * sendAdopterConfirmedAdminEmail): those all run inside a Next.js request,
- * where OpenNext's AsyncLocalStorage shim populates `process.env` for the
- * duration of that one request. scheduled() is not a request — no such
- * shim runs there, so `process.env.RESEND_API_KEY` would read undefined
- * (or a stale value left over from a prior request on the same isolate).
+ * sendAdopterConfirmedAdminEmail): those all run inside a Next.js request.
+ * This code dates from OpenNext, which populated `process.env` only for the
+ * duration of a request, so inside scheduled() it read undefined. (Under
+ * vinext, workerd fills `process.env` from the bindings everywhere —
+ * `nodejs_compat` with a compatibility date after 2025-04-01 — but the
+ * binding stays the one source scheduled() is handed directly.)
  * The raw Workers binding (`env.RESEND_API_KEY`, worker-configuration.d.ts)
  * is always populated regardless — the same reasoning custom-worker.ts's
  * existing `env.HC_PING_URL` read already established for this exact
@@ -94,12 +96,21 @@ export async function checkPendingAge(db: D1Database, now: Date = new Date()): P
 
 // ─── Per-source staleness (#234) ────────────────────────────────────────────
 
-const REFRESH_ALERT_SOURCES = ["plentiful", "osm"] as const;
+const REFRESH_ALERT_SOURCES = ["plentiful", "osm", "care_and_share"] as const;
+/**
+ * Sources that alert even when they have NEVER written a row. care_and_share
+ * (Venue Data Rebuild step 2) is left out on purpose: it starts writing only
+ * once its reader reaches production, and a never-run alert would email
+ * every day until then. A first run that fails is already loud (the refresh
+ * job exits non-zero when a source aborts); once it has run once, the normal
+ * 40-day rule applies to it like the others.
+ */
+const NEVER_RUN_ALERT_SOURCES: ReadonlySet<string> = new Set(["plentiful", "osm"]);
 export type RefreshAlertSource = (typeof REFRESH_ALERT_SOURCES)[number];
 
 /** Hardcoded IN-list, not a bound placeholder loop — REFRESH_ALERT_SOURCES is a fixed, small, compile-time set (ponytail: one string beats a dynamic placeholder builder for two known values). */
 export const SOURCE_STALENESS_SQL =
-  "SELECT source, MAX(created_at) AS last FROM change_proposals WHERE source IN ('plentiful','osm') GROUP BY source";
+  "SELECT source, MAX(created_at) AS last FROM change_proposals WHERE source IN ('plentiful','osm','care_and_share') GROUP BY source";
 
 export interface SourceStalenessCheck {
   source: RefreshAlertSource;
@@ -112,7 +123,9 @@ export async function checkSourceStaleness(db: D1Database, now: Date = new Date(
   const result = await db.prepare(SOURCE_STALENESS_SQL).all<{ source: string; last: string | null }>();
   const lastBySource = new Map(result.results.map((r) => [r.source, r.last]));
 
-  return REFRESH_ALERT_SOURCES.map((source) => {
+  // A source outside NEVER_RUN_ALERT_SOURCES is only checked once it has a row.
+  const tracked = REFRESH_ALERT_SOURCES.filter((s) => NEVER_RUN_ALERT_SOURCES.has(s) || lastBySource.has(s));
+  return tracked.map((source) => {
     const last = lastBySource.get(source) ?? null;
     const daysSinceLastRun = last ? Math.floor((now.getTime() - new Date(last).getTime()) / MS_PER_DAY) : null;
     // `last === null` (a source with NO change_proposals row at all, ever —

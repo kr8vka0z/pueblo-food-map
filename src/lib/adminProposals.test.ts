@@ -10,6 +10,7 @@ import {
   checkStaleApply,
   isDateOnlyUpdateProposal,
   parseProposalRow,
+  reviewLaneOf,
   toColumnValue,
   toTriState,
   type ChangeProposalRow,
@@ -254,5 +255,34 @@ describe("toTriState", () => {
   test("true -> 1, false -> 0", () => {
     expect(toTriState(true)).toBe(1);
     expect(toTriState(false)).toBe(0);
+  });
+});
+
+describe("isDateOnlyUpdateProposal — Care and Share (Venue Data Rebuild step 2)", () => {
+  const dateOnlyDiff: ProposedDiff = {
+    before: { last_verified: "2026-08-01" },
+    after: { last_verified: "2026-09-05" },
+    fields_changed: ["last_verified"],
+  };
+
+  test("care_and_share 'still listed' is date-only, so it never lands in the review queue", () => {
+    expect(isDateOnlyUpdateProposal({ change_type: "update", source: "care_and_share" }, dateOnlyDiff)).toBe(true);
+  });
+
+  test("an unconfirmed match (meta.match) is never date-only, even with no field changes", () => {
+    const diff = { ...dateOnlyDiff, meta: { match: { upstream_id: "cas-1" } } };
+    expect(isDateOnlyUpdateProposal({ change_type: "update", source: "care_and_share" }, diff)).toBe(false);
+  });
+
+  test("a schedule we couldn't read (meta.needs_review) is never date-only", () => {
+    const diff = { ...dateOnlyDiff, meta: { needs_review: ["schedule note"] } };
+    expect(isDateOnlyUpdateProposal({ change_type: "update", source: "care_and_share" }, diff)).toBe(false);
+  });
+});
+
+describe("reviewLaneOf — needs_review always reaches a person", () => {
+  test("Jev calling it noise doesn't hide a schedule the converter couldn't read", () => {
+    const diff: ProposedDiff = { before: {}, after: {}, fields_changed: ["last_verified"], meta: { needs_review: ["note"] } };
+    expect(reviewLaneOf({ triage_lane: "likely_noise" }, diff)).toBe("needs_human");
   });
 });

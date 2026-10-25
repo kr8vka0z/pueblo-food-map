@@ -25,7 +25,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { isValidEmail } from "@/lib/email";

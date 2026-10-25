@@ -39,10 +39,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { categoryLabels } from "@/data/venues";
 import { formatLastVerified } from "@/lib/adminVenues";
-import { formatSlot } from "@/lib/hours";
+import { describeIrregularSchedule, formatSlot } from "@/lib/hours";
+import { t } from "@/lib/i18n";
 import { safeUrl } from "@/lib/safeUrl";
 import VenueCard from "@/components/VenueCard";
-import type { Venue, VenueCategory, WeeklyHours } from "@/types/venue";
+import type { IrregularSchedule, Venue, VenueCategory, WeeklyHours } from "@/types/venue";
 import { renameMetaOf, reviewableDiffFields, reviewLaneOf } from "@/lib/adminProposals";
 import type {
   ChangeProposalRow,
@@ -66,6 +67,10 @@ export const SOURCE_BADGE: Record<ProposalSourceValue, { label: string; classNam
   plentiful: { label: "Plentiful", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   gtfs: { label: "GTFS", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   link_health: { label: "Broken link", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
+  care_and_share: { label: "Care and Share", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
+  website: { label: "Venue website", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
+  usda_snap: { label: "USDA SNAP list", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
+  cdphe_wic: { label: "Colorado WIC list", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
 };
 
 // Triage lanes (#543) — existing badge colour pairs only, no new tokens.
@@ -149,6 +154,8 @@ const FIELD_LABELS: Record<string, string> = {
   phone: "Phone",
   url: "Website",
   hours_weekly: "Hours",
+  hours_irregular: "Monthly hours",
+  notes: "Notes",
   operator: "Operator",
   last_verified: "Last verified",
 };
@@ -181,8 +188,23 @@ function formatHoursSummary(hours: WeeklyHours): string {
 /** Renders one Venue field's value for the diff view — hours_weekly gets a compact per-day summary, everything else stringifies plainly. Empty/null/undefined renders as an explicit "(empty)" so a real value clearing to nothing reads clearly, not as a blank cell. Exported for the same reuse reason as SOURCE_BADGE above. */
 export function formatFieldValue(field: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "(empty)";
+  // The refresh pipeline stores hours in proposed_diff as D1's JSON text
+  // (diffEngine's normalizers), hand-loaded proposals as parsed objects —
+  // parse the text form so both read as a schedule, never raw JSON or
+  // "[object Object]".
+  if ((field === "hours_weekly" || field === "hours_irregular") && typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return value as string;
+    }
+  }
   if (field === "hours_weekly" && typeof value === "object") {
     return formatHoursSummary(value as WeeklyHours);
+  }
+  if (field === "hours_irregular" && Array.isArray(value)) {
+    const lines = (value as IrregularSchedule[]).map((entry) => describeIrregularSchedule(entry, "en", t)).filter(Boolean);
+    return lines.length > 0 ? lines.join(" · ") : "(empty)";
   }
   if (typeof value === "boolean") return value ? "Yes" : "No";
   return String(value);
@@ -331,12 +353,13 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
           ) : source === "link_health" ? (
             <LinkHealthDetails diff={proposal.diff} />
           ) : changeType === "remove" ? (
-            <RemoveDetails name={venueName} venue={venue} sourceLabel={sourceBadge.label} />
+            <RemoveDetails name={venueName} venue={venue} sourceLabel={sourceBadge.label} reason={metaSummaryOf(proposal.diff)} />
           ) : changeType === "add" ? (
             <AddDetails diff={proposal.diff} sourceLabel={sourceBadge.label} isRestore={isRestore} />
           ) : (
             <FieldDiff diff={proposal.diff} sourceLabel={sourceBadge.label} />
           )}
+          {!proposal.parseError && <ProposalSourceNotes diff={proposal.diff} showSummary={changeType !== "remove"} />}
         </div>
 
         {!proposal.parseError && source !== "link_health" && (
@@ -507,13 +530,24 @@ function DetailRow({ label, value, field }: { label: string; value: string; fiel
  * the old source-less "this source" — a reviewer with several sources in
  * the queue at once needs to know which one dropped it.
  */
-function RemoveDetails({ name, venue, sourceLabel }: { name: string; venue: VenueLookup | undefined; sourceLabel: string }) {
+function RemoveDetails({
+  name,
+  venue,
+  sourceLabel,
+  reason,
+}: {
+  name: string;
+  venue: VenueLookup | undefined;
+  sourceLabel: string;
+  /** meta.summary, when the proposal says WHY (a hand-checked 'website' fix) instead of "no longer listed". */
+  reason?: string;
+}) {
   return (
     <div className="mt-2 space-y-1">
       {venue && <DetailRow label="Category" value={categoryLabels[venue.category as VenueCategory] ?? venue.category} />}
       <p className="text-sm text-[var(--color-ink-700)]">
-        {sourceLabel} no longer lists &ldquo;{name}&rdquo;. Archiving keeps its record — it stops appearing on the
-        public map but is never deleted.
+        {reason ?? <>{sourceLabel} no longer lists &ldquo;{name}&rdquo;.</>} Archiving keeps its record — it stops
+        appearing on the public map but is never deleted.
       </p>
     </div>
   );
@@ -590,6 +624,10 @@ function FieldDiff({ diff, sourceLabel }: { diff: ProposedDiff; sourceLabel: str
   // VenueListView.tsx's compact diff summary reads the same set.
   const reviewFields = reviewableDiffFields(diff);
 
+  // A Care and Share review-only card says what it's asking in
+  // ProposalSourceNotes; "no other details changed" would read as a plain
+  // confirmation.
+  if (reviewFields.length === 0 && (diff.meta?.match || diff.meta?.needs_review)) return null;
   if (reviewFields.length === 0) {
     // WHY name the source and date rather than the old source-less
     // "Confirmed still present at the source": that sentence is this
@@ -628,6 +666,142 @@ function FieldDiff({ diff, sourceLabel }: { diff: ProposedDiff; sourceLabel: str
         </div>
       ))}
     </dl>
+  );
+}
+
+// ─── Source notes + venue pins (Venue Data Rebuild step 1) ─────────────────
+
+/** meta.summary as a string, or undefined. */
+function metaSummaryOf(diff: ProposedDiff): string | undefined {
+  return typeof diff.meta?.summary === "string" ? diff.meta.summary : undefined;
+}
+
+interface PinNote {
+  field: string;
+  pinned_at: string;
+  note: string | null;
+  age_days: number;
+  stale: boolean;
+}
+
+/** meta.pins (scripts/refresh/proposalSql.ts's PinMeta), defensively read: a malformed entry is skipped, never thrown on. */
+function pinsOf(diff: ProposedDiff): PinNote[] {
+  const raw = diff.meta?.pins;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (p): p is PinNote => !!p && typeof p.field === "string" && typeof p.pinned_at === "string" && typeof p.age_days === "number",
+  );
+}
+
+/**
+ * Why this change was proposed (meta.summary + meta.source_url, on
+ * hand-checked fixes) and, more importantly, any detail the venue itself
+ * told us that this change would overwrite (meta.pins) — shown beside the
+ * change so Kyle weighs the venue's word against the source's.
+ */
+function ProposalSourceNotes({ diff, showSummary }: { diff: ProposedDiff; showSummary: boolean }) {
+  const summary = showSummary ? metaSummaryOf(diff) : undefined;
+  const sourceUrl = typeof diff.meta?.source_url === "string" ? diff.meta.source_url : undefined;
+  const pins = pinsOf(diff);
+  const cas = careAndShareNotesOf(diff);
+  if (!summary && !sourceUrl && pins.length === 0 && !cas) return null;
+  return (
+    <div className="mt-2 space-y-1.5">
+      {cas}
+      {summary && <p className="text-sm text-[var(--color-ink-700)]">{summary}</p>}
+      {sourceUrl && (
+        <p className="text-xs text-[var(--color-ink-500)]">
+          Source: {renderFieldValue("url", sourceUrl)}
+        </p>
+      )}
+      {pins.map((p) => (
+        <p
+          key={p.field}
+          className="rounded-[var(--radius-md)] bg-[var(--color-clay-100)] px-2 py-1.5 text-sm text-[var(--color-clay-700)]"
+        >
+          <span className="font-medium">The venue told us the {fieldLabel(p.field).toLowerCase()}</span> on{" "}
+          {formatLastVerified(p.pinned_at.slice(0, 10))}
+          {p.note ? ` (${p.note})` : ""}.
+          {p.stale ? " That was over a year ago, so this change may be right; renew the pin if the venue confirms again." : " Approve only if you trust this source over the venue."}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/** One unconfirmed Care and Share listing, as careAndShare.ts writes it into meta.match. */
+interface CasListing {
+  upstream_id?: string;
+  name?: string;
+  address?: string;
+  distance_m?: number;
+  name_score?: number;
+  same_phone?: boolean;
+}
+
+function describeListing(l: CasListing): string {
+  const parts = [
+    typeof l.distance_m === "number" ? `${l.distance_m} m away` : null,
+    typeof l.name_score === "number" ? `name match ${l.name_score}` : null,
+    l.same_phone === true ? "same phone" : l.same_phone === false ? "phone doesn't match or isn't listed" : null,
+  ].filter(Boolean);
+  return `"${l.name ?? l.upstream_id ?? "a listing"}"${l.address ? `, ${l.address}` : ""}${parts.length ? ` (${parts.join(", ")})` : ""}`;
+}
+
+/**
+ * Care and Share (Venue Data Rebuild step 2) review notes: which listing the
+ * pipeline wasn't sure is this venue (meta.match), why it couldn't read the
+ * schedule (meta.needs_review), and the schedule in Care and Share's own
+ * words (meta.schedule_text). Defensive reads — a malformed meta shows less,
+ * never throws.
+ */
+function careAndShareNotesOf(diff: ProposedDiff): React.ReactNode {
+  const meta = diff.meta ?? {};
+  const match = (meta.match ?? null) as (CasListing & { listings?: CasListing[] }) | null;
+  const newAlias = (meta.new_alias ?? null) as CasListing | null;
+  const reasons = Array.isArray(meta.needs_review) ? meta.needs_review.filter((r): r is string => typeof r === "string") : [];
+  const scheduleText = typeof meta.schedule_text === "string" && meta.schedule_text ? meta.schedule_text : null;
+  if (!match && !newAlias && reasons.length === 0 && !scheduleText) return null;
+  const listings = match && Array.isArray(match.listings) ? match.listings : null;
+  return (
+    <>
+      {match && listings && (
+        <div className="text-sm text-[var(--color-ink-700)]">
+          <p>
+            Care and Share lists {listings.length} places that look like this one. Approve if they are all this venue. Rejecting means
+            neither listing is proposed again, so if one is really a separate place, add it by hand.
+          </p>
+          <ul className="ml-4 list-disc">
+            {listings.map((l, i) => (
+              <li key={l.upstream_id ?? i}>{describeListing(l)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {match && !listings && (
+        <p className="text-sm text-[var(--color-ink-700)]">
+          Is this Care and Share&apos;s listing {describeListing(match)}? Approve to link them; this change applies too.
+        </p>
+      )}
+      {newAlias && (
+        <p className="text-sm text-[var(--color-ink-700)]">
+          <span className="font-medium">New link:</span> matched to Care and Share&apos;s listing {describeListing(newAlias)} for the
+          first time. Rejecting this also removes the link.
+        </p>
+      )}
+      {reasons.length > 0 && (
+        <p className="text-sm text-[var(--color-ink-700)]">
+          We couldn&apos;t read their hours exactly ({reasons.join("; ")}), so no hours change is proposed. Update the hours by hand
+          if needed. Approve or reject, and this won&apos;t come back until their schedule changes.
+        </p>
+      )}
+      {scheduleText && (
+        <div className="text-xs text-[var(--color-ink-500)]">
+          <p className={fieldLabelClass}>Care and Share&apos;s hours, in their words</p>
+          <p className="whitespace-pre-line">{scheduleText}</p>
+        </div>
+      )}
+    </>
   );
 }
 

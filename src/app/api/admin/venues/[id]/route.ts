@@ -54,6 +54,12 @@
  * shape as public_submissions' own `AND status = 'pending'` clause
  * (ponytail: below).
  *
+ * "The venue told us" (Venue Data Rebuild step 1): optional `venueToldUs`
+ * (true) + `venueToldUsNote` body fields. When ticked on a non-box venue the
+ * batch also writes one venue_direct pin per field from pinWrites()
+ * (adminVenueEditSql.ts), behind the same WHERE EXISTS guard as every other
+ * dependent write, so a 409'd edit pins nothing. Unticked adds no statements.
+ *
  * #265: optimistic concurrency. Two admins editing the same venue used to
  * be silent last-write-wins — whoever's PATCH committed second overwrote
  * the first admin's changes with its own stale field set. `expectedUpdatedAt`
@@ -111,13 +117,32 @@ import {
   BOX_INSERT_SQL,
   BOX_EVENT_INSERT_SQL_GUARDED,
   APPROVE_PROPOSAL_SQL,
+  PIN_INSERT_SQL,
+  pinWrites,
 } from "@/lib/adminVenueEditSql";
 import type { AdminVenueRow } from "@/types/venue";
+import { RECENT_APPLIED_FOR_VENUE_SQL, resetsForEdit, SWITCH_RESET_INSERT_SQL } from "@/lib/sourceSwitch";
 
 /** Mirrors readOptionalSubmissionId's convention in the sibling create route. */
 function readOptionalProposalId(body: unknown): number | null {
   const raw = (body as { proposalId?: unknown })?.proposalId;
   return typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : null;
+}
+
+const PIN_NOTE_MAX = 500;
+
+/**
+ * "The venue told us" (Venue Data Rebuild step 1): optional `venueToldUs`
+ * (must be exactly `true`) + `venueToldUsNote`, read beside the validated
+ * fields like `proposalId`. null = not ticked, so an ordinary edit adds no
+ * statements to the batch. A note over the cap is an error, not truncated.
+ */
+function readVenueToldUs(body: unknown): { note: string | null } | null | "too_long" {
+  const b = body as { venueToldUs?: unknown; venueToldUsNote?: unknown } | null;
+  if (b?.venueToldUs !== true) return null;
+  const note = typeof b.venueToldUsNote === "string" ? b.venueToldUsNote.trim() : "";
+  if (note.length > PIN_NOTE_MAX) return "too_long";
+  return { note: note || null };
 }
 
 /**
@@ -231,6 +256,13 @@ export async function PATCH(
   }
   const { fields } = validation;
   const proposalId = readOptionalProposalId(body);
+  const venueToldUs = readVenueToldUs(body);
+  if (venueToldUs === "too_long") {
+    return NextResponse.json(
+      { ok: false, errors: { venueToldUsNote: `Keep this under ${PIN_NOTE_MAX} characters.` } },
+      { status: 422 },
+    );
+  }
 
   const existing = await db.prepare("SELECT * FROM venues WHERE id = ?").bind(id).first<AdminVenueRow>();
   if (!existing) {
@@ -344,6 +376,41 @@ export async function PATCH(
       ? db.prepare(APPROVE_PROPOSAL_SQL).bind(identity.email, updatedAt, updatedAt, proposalId, id, ...dependentGuardArgs)
       : null;
 
+  // Pins: one venue_direct observation per field the venue told us, in the
+  // same batch and behind the same guard. Never for blessing boxes — the
+  // venue-data pipeline doesn't touch them, so a pin would mean nothing.
+  const isBoxEdit = existing.category === "blessing_box" || fields.category === "blessing_box";
+  const insertPins =
+    venueToldUs && !isBoxEdit
+      ? pinWrites(existing, afterRow).map((w) =>
+          db
+            .prepare(PIN_INSERT_SQL)
+            .bind(id, w.field, w.value, updatedAt, identity.email, venueToldUs.note, updatedAt, identity.email, ...dependentGuardArgs),
+        )
+      : [];
+
+  // The automatic switch (src/lib/sourceSwitch.ts): editing a value a
+  // switchable source's applied change put there restarts that (source,
+  // field) count — this is how an "approve, then fix it" or an undone
+  // automatic change shows up. Read fail-soft: the reset is a side record,
+  // and an edit must never fail because it couldn't be computed.
+  let insertSwitchResets: ReturnType<D1Database["prepare"]>[] = [];
+  try {
+    // Probed here, inside the fail-soft block: the INSERT rides the atomic
+    // batch below, so on a database without migration 0023 it would fail
+    // the whole edit.
+    const hasResetsTable = await db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'source_switch_resets'")
+      .first<{ name: string }>();
+    if (!hasResetsTable) throw new Error("source_switch_resets missing (migration 0023 not applied)");
+    const recent = await db.prepare(RECENT_APPLIED_FOR_VENUE_SQL).bind(id).all<{ source: string; proposed_diff: string; applied_at: string | null }>();
+    insertSwitchResets = resetsForEdit(existing as unknown as Record<string, unknown>, afterRow as unknown as Record<string, unknown>, recent.results ?? []).map(
+      (r) => db.prepare(SWITCH_RESET_INSERT_SQL).bind(r.source, r.field, id, updatedAt, identity.email, ...dependentGuardArgs),
+    );
+  } catch (err) {
+    console.error("switch reset check failed; edit saved without it", err instanceof Error ? err.message : String(err));
+  }
+
   // Atomic: the update, the box row delete+reinsert (only when relevant —
   // see needsBoxTouch above), its box_events lifecycle row(s) (if any), its
   // own audit trail, and (when present) the originating link_health
@@ -356,6 +423,8 @@ export async function PATCH(
     ...insertBoxEvents,
     insertAudit,
     ...(approveProposal !== null ? [approveProposal] : []),
+    ...insertPins,
+    ...insertSwitchResets,
   ]);
 
   // #265: the WHERE id = ? AND updated_at = ? precondition is the

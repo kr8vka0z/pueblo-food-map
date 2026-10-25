@@ -1,7 +1,7 @@
 /**
  * Unit tests for scheduledTasks.ts's runScheduledTasks — the
  * scheduled()-handler wiring custom-worker.ts itself can never carry test
- * coverage for (it imports `.open-next/worker.js`, build output vitest
+ * coverage for (it imports vinext's handler, a Vite virtual module vitest
  * cannot resolve). Each individual job's own gate boundaries and SQL are
  * proven elsewhere (emailRetention.test.ts/.sql.test.ts,
  * refreshAlerts.test.ts/.sql.test.ts) — this file only proves the THREE

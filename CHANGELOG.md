@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-25
+
+### New
+
+- The menu now has a Donate card that opens the donation page in a new tab. ([#825](https://github.com/kr8vka0z/pueblo-food-map/pull/825))
+- The weekly data refresh now also checks Care and Share listings and sends suggested changes and new places to the review queue. ([#832](https://github.com/kr8vka0z/pueblo-food-map/pull/832))
+- Admins can mark a field as "The venue told us" with a note, so automatic updates never overwrite it. ([#830](https://github.com/kr8vka0z/pueblo-food-map/pull/830))
+
+### Improved
+
+- Footer links and the "Open in Google Maps" link are bigger and easier to tap on phones. ([#825](https://github.com/kr8vka0z/pueblo-food-map/pull/825))
+- A venue's "last verified" date now changes only when a person confirms it, not when the weekly refresh simply downloads its info. ([#830](https://github.com/kr8vka0z/pueblo-food-map/pull/830))
+- Several venue website fixes, including two removals, are queued for admin review. ([#830](https://github.com/kr8vka0z/pueblo-food-map/pull/830))
+
+### Fixed
+
+- Monthly hours on admin review cards now show as readable text instead of "[object Object]". ([#832](https://github.com/kr8vka0z/pueblo-food-map/pull/832))
+
 ## [1.2.2] - 2026-10-25
 
 ### Improved

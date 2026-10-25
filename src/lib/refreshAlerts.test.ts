@@ -191,3 +191,22 @@ describe("runRefreshAlertsCheck", () => {
     await expect(runRefreshAlertsCheck(db, "test-key", NOW)).rejects.toThrow(/Resend API error/);
   });
 });
+
+describe("checkSourceStaleness — Care and Share (Venue Data Rebuild step 2)", () => {
+  test("care_and_share past 40 days alerts", async () => {
+    const last = new Date(NOW.getTime() - 41 * 24 * 60 * 60 * 1000).toISOString();
+    const db = fakeDbAll([{ source: "care_and_share", last }]);
+    const results = await checkSourceStaleness(db, NOW);
+    expect(results.find((r) => r.source === "care_and_share")!.shouldAlert).toBe(true);
+  });
+
+  test("care_and_share that has never run does not alert (the job's own red run covers a first-run failure)", async () => {
+    const recent = NOW.toISOString();
+    const db = fakeDbAll([
+      { source: "plentiful", last: recent },
+      { source: "osm", last: recent },
+    ]);
+    const results = await checkSourceStaleness(db, NOW);
+    expect(results.some((r) => r.source === "care_and_share" && r.shouldAlert)).toBe(false);
+  });
+});

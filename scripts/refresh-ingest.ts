@@ -30,25 +30,21 @@
  *      after superseding any earlier-run pending proposal for the same
  *      (source, target_venue_id).
  *
- * This script writes to `venues` in exactly ONE bounded case — everything
- * else still only ever proposes. A "date-only" proposal (change_type
- * 'update', source osm/plentiful, fields_changed EXACTLY ["last_verified"]
- * — a pure freshness confirmation, ~86 of ~104 proposals in a real run) is
- * auto-applied to `venues.last_verified` right here in step 6 (Kyle,
- * 2026-09-15: "If the only proposed change is just the 'last checked date'
- * that doesn't need a manual approval") — see scripts/refresh/proposalSql.ts
- * for the exact predicate and statements. This stays bounded: ONE column,
- * a value the job itself computed (today's date, not upstream-sourced
- * data), under the SAME least-privilege D1 token every other write in this
- * file already uses, and every auto-apply still lands a full audit_log +
- * an already-'approved' change_proposals row — no different, auditwise,
- * from a human clicking Approve. Every OTHER proposal shape (a real field
- * change, an add, a remove, any link_health finding) still only ever
- * writes a pending `change_proposals` row; a human approving one of THOSE
- * (a separate, later slice, /admin/flags) is the only other path that
- * mutates `venues` from this pipeline's output.
+ * By default this script never writes to `venues` — it only proposes. A
+ * "date-only" proposal (change_type 'update', source osm/plentiful,
+ * fields_changed EXACTLY ["last_verified"] — "still listed, nothing
+ * changed", ~86 of ~104 proposals in a real run) needs no click (Kyle,
+ * 2026-09-15), but since the Venue Data Rebuild step 1 (2026-10-25) it no
+ * longer bumps `venues.last_verified`: a download isn't a confirmation. It
+ * records a 'listed' fetch row in venue_observations (migration 0021) and
+ * an already-'approved' change_proposals row instead — see
+ * scripts/refresh/proposalSql.ts. Every OTHER proposal shape (a real field
+ * change, an add, a remove, any link_health finding) writes a pending
+ * `change_proposals` row; a human approving one of those is the path that
+ * mutates `venues`. A proposal touching a field the venue itself told us
+ * (a venue_direct pin) is always written pending, with the pin attached.
  *
- * One opt-in exception on top (#543), OFF unless the env var
+ * One opt-in exception (#543), OFF unless the env var
  * REFRESH_AI_AUTO_APPLY=true: a phone/url change that is formatting-only
  * once normalised AND that Jev scores over 90% "same value" is applied the
  * same way, under actor `refresh-pipeline-ai` (proposalSql.ts).
@@ -91,7 +87,7 @@ import {
   type RefreshSource,
 } from "./refresh/diffEngine";
 import { checkUrl } from "./refresh/linkHealth";
-import { buildProposalWriteStatements } from "./refresh/proposalSql";
+import { buildProposalWriteStatements, type PinRow } from "./refresh/proposalSql";
 import { applyIdAliases, type IdAliasRow } from "./refresh/renamePairs";
 import { chunkSqlStatements } from "./refresh/sqlChunks";
 import { createTriageSession, runTriagePass, USD_PER_INPUT_TOKEN } from "./refresh/triage";
@@ -379,6 +375,23 @@ async function main(): Promise<void> {
     d1Query<{ name: string }>(dbMode, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'venue_id_aliases'").length > 0;
   if (!schemaReady) console.log("\nmigration 0016 not applied to this database — skipping rename pairing and Jev triage.");
 
+  // Migration 0021 (venue_observations: fetch rows + venue_direct pins).
+  // Probed for the same reason as 0016 above. Without it no pin can exist,
+  // so skipping the pin lookup is honest, and date-only rows just skip
+  // their observation INSERT.
+  const observationsReady =
+    d1Query<{ name: string }>(dbMode, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'venue_observations'").length > 0;
+  if (!observationsReady) console.log("migration 0021 not applied to this database — no pins checked, no fetch observations written.");
+  // Newest pin per (venue, field) is the live one.
+  const pins = observationsReady
+    ? d1Query<PinRow>(
+        dbMode,
+        "SELECT o.venue_id, o.field, o.fetched_at, o.pinned_by, o.pin_note FROM venue_observations o " +
+          "WHERE o.is_pin = 1 AND o.id = (SELECT MAX(id) FROM venue_observations p WHERE p.is_pin = 1 AND p.venue_id = o.venue_id AND p.field = o.field)",
+      )
+    : [];
+  if (pins.length > 0) console.log(`pins: ${pins.length} venue-confirmed field(s) will only ever go to review.`);
+
   // Approved renames: map each new upstream id back onto the venue it was
   // approved as, BEFORE diffing — otherwise the renamed venue reappears as
   // the same remove+add pair every run.
@@ -503,17 +516,16 @@ async function main(): Promise<void> {
         `UPDATE change_proposals SET status = 'superseded', reviewed_at = ${sqlText(now)} WHERE id = ${row.id} AND status = 'pending';`,
       );
     }
-    // Per-proposal write: a date-only osm/plentiful freshness confirmation
-    // auto-applies (venues UPDATE + audit_log + an already-'approved' row,
-    // Kyle 2026-09-15 — see this file's own header and
-    // scripts/refresh/proposalSql.ts); every other proposal still only
-    // ever writes a plain pending row. buildProposalWriteStatements() is
+    // Per-proposal write: a date-only osm/plentiful "still listed" result
+    // records a fetch observation + an already-'approved' row (no venues
+    // write — see this file's own header and scripts/refresh/proposalSql.ts);
+    // every other proposal writes a plain pending row. buildProposalWriteStatements() is
     // the single place that decides which, so this loop can't drift from
     // the /admin/flags bulk-approve button's own isDateOnlyUpdateProposal
     // check.
     let autoAppliedCount = 0;
     for (const p of allProposals) {
-      const built = buildProposalWriteStatements(p, now, sqlText, { triage: triagePass.triage.get(p), aiAutoApply });
+      const built = buildProposalWriteStatements(p, now, sqlText, { triage: triagePass.triage.get(p), aiAutoApply, pins, observationsReady });
       if (built.autoApplied) autoAppliedCount++;
       statements.push(...built.statements);
     }
@@ -527,7 +539,7 @@ async function main(): Promise<void> {
 
     console.log(
       `Writing ${allProposals.length - autoAppliedCount} proposal(s) for review + ` +
-        `auto-applying ${autoAppliedCount} (date-only freshness bumps${aiAutoApply ? " + AI formatting fixes" : ""}) + ` +
+        `auto-recording ${autoAppliedCount} (still-listed fetches${aiAutoApply ? " + AI formatting fixes" : ""}) + ` +
         `superseding ${toSupersede.length} stale pending row(s)...`,
     );
     d1ApplyFile(dbMode, sqlFile);

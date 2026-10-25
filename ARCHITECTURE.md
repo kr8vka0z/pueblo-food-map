@@ -154,6 +154,12 @@ All venue data is served from a single export: `venues` in
 `src/data/venues.ts`. Components never import `published-venues.ts` or the
 source arrays directly.
 
+**Keep the list out of pages that don't show it (#721).** Importing anything
+from `src/data/venues.ts` in a browser component ships the whole list with it,
+so category labels and colors live in `src/lib/categories.ts`, the venue pages
+get their summary text and nearby list from the server, and `PageNav` imports
+the list (plus live boxes) only when its Saved list first opens.
+
 ```
 Cloudflare D1 `venues` (status draft/published, category != blessing_box)
            ↓  admin clicks Publish → POST /api/admin/publish

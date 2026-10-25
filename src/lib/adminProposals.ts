@@ -168,6 +168,25 @@ export function renameMetaOf(diff: ProposedDiff | null): { from_id: string; to_i
   return r && typeof r.from_id === "string" && typeof r.to_id === "string" ? { from_id: r.from_id, to_id: r.to_id } : null;
 }
 
+/** `meta.match.upstream_id` on an unconfirmed Care and Share match, or null. */
+export function matchUpstreamIdOf(diff: ProposedDiff | null): string | null {
+  const m = diff?.meta?.match as { upstream_id?: unknown } | undefined;
+  return m && typeof m.upstream_id === "string" ? m.upstream_id : null;
+}
+
+/**
+ * venues.source_type for a venue created from a proposal of this source.
+ * The column's CHECK (migration 0001) only knows the original scraper
+ * sources; rebuilding `venues` to widen it is a large migration for a label
+ * nothing reads for the new sources (Care and Share matches our venues by
+ * id/alias, not by source_type), so a new-source venue is 'manual' and its
+ * provenance stays in `venues.source` (e.g. "careandshare.org/findfood").
+ */
+const VENUE_SOURCE_TYPES: ReadonlySet<string> = new Set(["pfp", "osm", "plentiful", "gtfs", "manual"]);
+export function venueSourceTypeFor(proposalSource: string): AdminVenueSourceType {
+  return (VENUE_SOURCE_TYPES.has(proposalSource) ? proposalSource : "manual") as AdminVenueSourceType;
+}
+
 // ─── Shared diff-field selection ────────────────────────────────────────────
 
 /**
@@ -486,7 +505,7 @@ export async function applyApprovedProposal(
     // (UPDATE, §6.7's upsert semantics — every field overwritten from
     // `after`, forced status='draft').
     const isRestore = currentRow !== null; // stale-apply already proved: if present, it's archived
-    const sourceType = proposalRow.source as AdminVenueSourceType;
+    const sourceType = venueSourceTypeFor(proposalRow.source);
     const afterVenue = after as Partial<Venue>;
 
     if (isRestore) {
@@ -633,8 +652,13 @@ export async function applyApprovedProposal(
   // this table before diffing). Same batch, so it lands only with the update.
   // Appended AFTER approveProposal so results[2] below is still that row.
   const rename = changeType === "update" ? renameMetaOf(diff) : null;
-  const extra = rename
-    ? [db.prepare(ALIAS_UPSERT_SQL).bind(proposalRow.source, rename.to_id, proposalRow.target_venue_id, timestamp, identity.email)]
+  // Same for a Care and Share match the pipeline wasn't sure of
+  // (meta.match, scripts/refresh/careAndShare.ts): approving it is the
+  // confirmation, so record the listing's id and it never asks again.
+  const matchUpstreamId = changeType === "update" ? matchUpstreamIdOf(diff) : null;
+  const aliasTo = rename?.to_id ?? matchUpstreamId;
+  const extra = aliasTo
+    ? [db.prepare(ALIAS_UPSERT_SQL).bind(proposalRow.source, aliasTo, proposalRow.target_venue_id, timestamp, identity.email)]
     : [];
 
   const results = await db.batch([venueStmt, insertAudit, approveProposal, ...extra]);

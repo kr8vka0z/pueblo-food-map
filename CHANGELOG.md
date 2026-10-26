@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-25
+
+### Improved
+
+- Code changes are now reviewed by a separate Codex review, and the old automatic Claude review is switched off; nothing changes on the site. ([#849](https://github.com/kr8vka0z/pueblo-food-map/pull/849))
+
 ## [1.3.0] - 2026-10-25
 
 ### New

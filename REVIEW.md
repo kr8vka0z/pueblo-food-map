@@ -8,7 +8,8 @@ by any human or agent reviewer. One page on purpose. Operational facts live in
 
 The reviewer sees only the PR description, the diff, this file and AGENTS.md: no issue, no chat,
 no history. So the description has to carry the case on its own (template:
-`.github/pull_request_template.md`, sections Why / What changed / How it was tested / Watch for).
+`.github/pull_request_template.md`, sections Why / What changed / How it was tested / Risk /
+How to undo it / Watch for).
 
 - The diff should do what the description says, and nothing it doesn't explain. A file or change
   the description never accounts for is a finding.
@@ -89,6 +90,33 @@ This repo is public: anything committed is published.
 - **Date-only freshness proposals auto-apply by design** (Kyle, 2026-09-15) — not a
   finding. `/venue/<id>` routing (including the box-vs-venue split) is settled — don't
   re-litigate it absent a new bug report.
+
+## Sensitive paths
+
+These files hold the admin sign-in gate and admin writes, the public forms that write to D1
+and email strangers (box alerts, sign-in codes), the rate limits and Turnstile, publishing
+to the live map, the cron, the security headers, and the refresh pipeline and server timer
+that write to the production database. The review's built-in defaults apply on top.
+
+```
+src/app/api/admin/**
+src/app/api/public/**
+src/lib/admin*.ts
+src/lib/email*.ts
+src/lib/boxAlerts.ts
+src/lib/alertTokens.ts
+src/lib/checkinRateLimit.ts
+src/lib/turnstile.ts
+src/lib/boxTurnstile.ts
+src/lib/publishVenues.ts
+src/lib/scheduledTasks.ts
+custom-worker.ts
+next.config.ts
+scripts/refresh/**
+scripts/refresh-ingest.ts
+scripts/release/**
+ops/systemd/**
+```
 
 ## Skip
 

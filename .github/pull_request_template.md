@@ -8,7 +8,15 @@
 
 ## How it was tested
 
-<!-- Commands you ran and their results. For a visual change, say whether Kyle has seen the preview. -->
+<!-- Paste the real commands you ran and their actual output (trimmed to the lines that prove it), or a screenshot for a visual change; "tests pass" is not proof. For a visual change, say whether Kyle has seen the preview. -->
+
+## Risk
+
+<!-- Low, medium or high, and why: what could break, and who would notice (customers, Kyle, nobody). -->
+
+## How to undo it
+
+<!-- Revert this PR? Roll back a migration? Flip a setting or flag? Restore data? Say which, and anything a plain revert would not undo. -->
 
 ## Watch for
 

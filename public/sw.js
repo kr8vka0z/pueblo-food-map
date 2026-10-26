@@ -173,10 +173,20 @@ async function networkFirst(request) {
     if (isCacheable(res)) cache.put(key, res.clone());
     return res;
   } catch (err) {
-    const cached = await cache.match(key);
+    // #721: install precaches only the visitor's own tree, but the installed
+    // app always launches at the manifest's start_url `/`. A Spanish visitor
+    // offline holds only `/es`, so serve the same page from the other tree.
+    const cached = (await cache.match(key)) ?? (await cache.match(otherTreePath(key)));
     if (cached) return cached;
     throw err;
   }
+}
+
+/** The same page in the other language tree: `/venues` ↔ `/es/venues`, `/` ↔ `/es`. */
+function otherTreePath(pathname) {
+  if (pathname === "/es") return "/";
+  if (pathname.startsWith("/es/")) return pathname.slice(3);
+  return pathname === "/" ? "/es" : `/es${pathname}`;
 }
 
 // #130 follow-up: a navigation to a page outside SHELL_PAGES (e.g. /about,
@@ -206,7 +216,7 @@ async function networkOnlyWithShellFallback(request) {
     // offline on an English page may hold only the /es shell — better that
     // than the browser's offline error page.
     const shellFallback =
-      (await cache.match(shellPath)) ?? (await cache.match(shellPath === "/es" ? "/" : "/es"));
+      (await cache.match(shellPath)) ?? (await cache.match(otherTreePath(shellPath)));
     if (shellFallback) return shellFallback;
     throw err;
   }

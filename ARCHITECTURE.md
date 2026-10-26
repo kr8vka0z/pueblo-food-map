@@ -990,7 +990,7 @@ connection — minus the map itself (Mapbox tiles are out of scope).
 
 | Request | Strategy |
 |---|---|
-| `/`, `/venues`, `/resources` and their `/es` twins — navigations only | Network-first; the cached copy is served only when the network fails. Keyed by path, so `/?venue=x` shares `/`'s entry. |
+| `/`, `/venues`, `/resources` and their `/es` twins — navigations only | Network-first; the cached copy is served only when the network fails, else the same page from the other tree (`/` ↔ `/es`, `/venues` ↔ `/es/venues`), since only one tree is precached and the installed app always launches at `/`. Keyed by path, so `/?venue=x` shares `/`'s entry. |
 | `/_next/static/*`, `/fonts/*`, `/icons/*`, `/manifest.webmanifest` | Stale-while-revalidate. The hashed `/_next/static` files are `immutable` in the HTTP cache, so the revalidate step is normally served from disk rather than the network. |
 | Any other same-origin page navigation (e.g. `/about`, `/venue/<id>`) | Network-only — never cached itself. On a network failure it falls back to the precached shell of its own tree (`/` or `/es`, else the other one) rather than the browser's own offline error page (below), never to the requested page's real content. |
 | `/api/*`, `/admin*`, `/alerts*` (subscription token in `?t=`), `/box/*` (live D1), anything cross-origin (Mapbox, analytics, Turnstile), any non-GET | Never touched, never falls back — straight to the network. |

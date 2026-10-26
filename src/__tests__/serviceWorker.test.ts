@@ -220,6 +220,51 @@ describe("sw.js install precaches one language tree (#721)", () => {
     expect(await install([])).toEqual(["/", "/resources", "/venues"]);
   });
 
+  // Review round 1 blocker: the installed app launches at start_url `/`, so a
+  // worker installed from /es (only the /es shells cached) must still answer
+  // an offline `/` launch, and the mirror case for /es.
+  async function installThenOpenOffline(installFrom: string, open: string) {
+    const env = loadSw();
+    const store = new Map<string, { body: string }>();
+    const cache = {
+      put: vi.fn(async (key: string, res: { body: string }) => void store.set(key, res)),
+      add: vi.fn(async () => {}),
+      match: vi.fn(async (key: string) => store.get(key)),
+    };
+    env.caches.open = vi.fn(async () => cache);
+    env.context.fetch = vi.fn(async (page: string) => ({
+      ok: true,
+      type: "basic",
+      redirected: false,
+      body: `shell ${page}`,
+      clone: () => ({ text: async () => "<html></html>" }),
+    }));
+    Object.assign(env.self.clients, { matchAll: vi.fn(async () => [{ url: `${ORIGIN}${installFrom}` }]) });
+    let installed: Promise<unknown> = Promise.resolve();
+    env.listeners.install({ waitUntil: (p: Promise<unknown>) => (installed = p) });
+    await installed;
+
+    env.context.fetch = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    let served: Promise<{ body: string }> | undefined;
+    env.listeners.fetch({
+      request: { url: `${ORIGIN}${open}`, method: "GET", mode: "navigate" },
+      respondWith: (p: Promise<{ body: string }>) => (served = p),
+    });
+    return (await served!).body;
+  }
+
+  test("installed from /es, an offline launch of / gets the cached /es shell", async () => {
+    expect(await installThenOpenOffline("/es", "/")).toBe("shell /es");
+    expect(await installThenOpenOffline("/es/about", "/venues")).toBe("shell /es/venues");
+  });
+
+  test("installed from /, an offline open of /es gets the cached / shell", async () => {
+    expect(await installThenOpenOffline("/", "/es")).toBe("shell /");
+    expect(await installThenOpenOffline("/about", "/es/resources")).toBe("shell /resources");
+  });
+
   test("the cache version moved on from v2, so installed workers drop the two-tree cache", () => {
     expect(vm.runInContext("CACHE_VERSION", loadSw().context)).not.toBe("v2");
   });

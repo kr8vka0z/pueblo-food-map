@@ -441,7 +441,11 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   supersede race, stale applies and rejection memory: atlas-kb "PFM AGENTS
   History — Venue-Refresh Pipeline", "Change-proposal review queue (#390)".
   Auto-supersede (§6.10a) and rejection memory (§6.10b) stay the ingestion
-  job's concern.
+  job's concern, with one review-side exception: approving an update
+  supersedes that venue's other pending update cards whose every change is
+  now already on the venue (duplicate cards; `applyApprovedProposal`), and a
+  card the server reports as already handled leaves the list with a neutral
+  "Already handled." note, not an error.
 - **Hiding a known-dead link (#234):** while a `link_health` finding is still
   `pending`, Publish (`fetchPendingDeadLinks` + `stripDeadLinkUrls`,
   `publishVenues.ts`) drops that exact flagged `url` from the snapshot, which

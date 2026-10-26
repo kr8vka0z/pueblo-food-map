@@ -17,5 +17,5 @@ Moved verbatim from AGENTS.md, section Secrets. The hard rules stay in AGENTS.md
 | `GITHUB_PUBLISH_TOKEN` | Worker runtime | Fine-grained PAT (this repo only; Contents + Pull requests RW). If unset, Publish returns 503. |
 | `CF_ANALYTICS_API_TOKEN` | Worker runtime (`wrangler secret put`) | Account-scoped "Account Analytics: Read" only. Missing/failing → the admin Dashboard's Visitors section (`src/lib/cfAnalytics.ts`) shows "unavailable"; the rest of the page still renders. Never sent to the browser. |
 | `POSTHOG_PERSONAL_API_KEY` | Worker runtime (`wrangler secret put`) | Read-only query scope, PostHog Query API (`src/lib/posthogQuery.ts`), admin Dashboard's "What people do on the map" section (#681). Missing/failing → that section alone shows "unavailable"; the rest of the page still renders. `POSTHOG_PROJECT_ID` (630731) is a plain `vars` entry, not a secret — see `wrangler.jsonc`. Never sent to the browser. |
-| `BETTER_AUTH_SECRET`, `ADMIN_ALLOWLIST` | Worker runtime | See Admin. |
+| `BETTER_AUTH_SECRET`, `ADMIN_ALLOWLIST` | Worker runtime | See AGENTS.md → "Admin authentication and data". |
 | `HC_PING_URL` | Worker runtime, **prod only** | Never set it on staging. |

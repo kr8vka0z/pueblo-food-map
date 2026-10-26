@@ -223,6 +223,20 @@ describe("ProposalCard — update card (before/after diff)", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/changed since the proposal was generated/);
     expect(mockRefresh).not.toHaveBeenCalled();
   });
+
+  test("a 409 approve marked handled (already done/reviewed) refreshes the list and shows no error", async () => {
+    mockFetch.mockResolvedValueOnce({
+      status: 409,
+      json: async () => ({ ok: false, error: "stale", handled: true, message: "Already done — the map already has this change." }),
+    });
+    const user = userEvent.setup();
+    render(<ProposalCard proposal={makeUpdateProposal()} />);
+
+    await user.click(screen.getByRole("button", { name: /^Approve$/i }));
+
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });
 
 describe("ProposalCard — remove card (never a single click)", () => {
@@ -318,6 +332,18 @@ describe("ProposalCard — reject (every kind)", () => {
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
     expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  test("a 404 reject marked handled (already reviewed) refreshes the list and shows no error", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 404, json: async () => ({ ok: false, error: "stale", handled: true }) });
+    const user = userEvent.setup();
+    render(<ProposalCard proposal={makeUpdateProposal()} />);
+
+    await user.click(screen.getByRole("button", { name: /^Reject$/i }));
+    await user.click(screen.getByRole("button", { name: /Confirm reject/i }));
+
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
 

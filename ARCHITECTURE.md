@@ -444,8 +444,9 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   job's concern, with one review-side exception: approving an update
   supersedes that venue's other pending update cards whose every change is
   now already on the venue (duplicate cards; `applyApprovedProposal`), and a
-  card the server reports as already handled leaves the list with a neutral
-  "Already handled." note, not an error.
+  card the server reports as already handled just leaves the list, not an
+  error. Rename, match, needs_review and new_alias cards are never treated
+  as duplicates.
 - **Hiding a known-dead link (#234):** while a `link_health` finding is still
   `pending`, Publish (`fetchPendingDeadLinks` + `stripDeadLinkUrls`,
   `publishVenues.ts`) drops that exact flagged `url` from the snapshot, which

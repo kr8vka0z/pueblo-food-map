@@ -227,8 +227,21 @@ export interface StaleApplyResult {
   alreadyDone?: true;
 }
 
-/** Changed fields (minus the last_verified stamp) whose `after` value the venue already holds — true only when there is at least one and all match. */
+/**
+ * Whether a card can count as a plain duplicate at all. Excluded: rename and
+ * unconfirmed-match cards (approving records an upstream id alias), needs_review
+ * cards (they carry review notes a person must read), and new_alias cards (the
+ * link was made this run; rejecting the card is what undoes it, migration 0024).
+ * Same exclusions as scripts/refresh/proposalSql.ts's auto-apply check.
+ */
+function isPlainDuplicateCandidate(diff: ProposedDiff): boolean {
+  const meta = diff.meta ?? {};
+  return !(meta.rename || meta.match || meta.needs_review || meta.new_alias);
+}
+
+/** Changed fields (minus the last_verified stamp) whose `after` value the venue already holds — true only when there is at least one, all match, and the card is a plain duplicate candidate. */
 function venueAlreadyHasAfter(currentRow: CurrentVenueRow, diff: ProposedDiff): boolean {
+  if (!isPlainDuplicateCandidate(diff)) return false;
   const fields = diff.fields_changed.filter((f) => f !== "last_verified");
   const after = (diff.after ?? {}) as unknown as CurrentVenueRow;
   return (
@@ -723,8 +736,8 @@ export async function applyApprovedProposal(
  * whose every change is now already on the venue are duplicates (refresh-ingest
  * lets a website card sit beside a hand-checked one proposing the same phone):
  * mark them superseded so they leave the queue instead of erroring on Approve.
- * Left alone: link_health findings, freshness-only cards, and rename/unconfirmed-
- * match cards, whose approval also records an upstream id alias.
+ * Left alone: link_health findings, freshness-only cards, and anything
+ * isPlainDuplicateCandidate excludes.
  */
 async function supersedeAlreadyAppliedSiblings(db: D1Database, approved: ChangeProposalRow, timestamp: string): Promise<void> {
   const venue = await db.prepare("SELECT * FROM venues WHERE id = ?").bind(approved.target_venue_id).first<AdminVenueRow>();
@@ -737,7 +750,7 @@ async function supersedeAlreadyAppliedSiblings(db: D1Database, approved: ChangeP
     .all<ChangeProposalRow>();
   for (const row of results) {
     const parsed = parseProposalRow(row);
-    if (parsed.parseError || renameMetaOf(parsed.diff) || parsed.diff.meta?.match) continue;
+    if (parsed.parseError) continue;
     if (venueAlreadyHasAfter(venue as CurrentVenueLookup, parsed.diff)) {
       await db.prepare(SUPERSEDE_PROPOSAL_SQL).bind(timestamp, row.id).run();
     }

@@ -218,10 +218,7 @@ function formatSubmittedAt(iso: string): string {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-// "handled": the server says this card was already dealt with (approved,
-// rejected, superseded, or its change is already on the map) — not a failure,
-// so it gets a neutral note while router.refresh() drops the card.
-type ActionState = { status: "idle" } | { status: "submitting" } | { status: "handled" } | { status: "error"; message: string };
+type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };
 
 export interface ProposalCardProps {
   proposal: ParsedProposal;
@@ -273,8 +270,10 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
         return;
       }
       const data = (await res.json().catch(() => null)) as { message?: string; handled?: boolean } | null;
+      // handled: already approved, rejected, superseded or already on the
+      // map — not a failure, so drop the card like a success would.
       if (data?.handled) {
-        setApproveState({ status: "handled" });
+        setApproveState({ status: "idle" });
         router.refresh();
         return;
       }
@@ -300,8 +299,10 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
         return;
       }
       const data = (await res.json().catch(() => null)) as { message?: string; handled?: boolean } | null;
+      // handled: already approved, rejected, superseded or already on the
+      // map — not a failure, so drop the card like a success would.
       if (data?.handled) {
-        setRejectState({ status: "handled" });
+        setRejectState({ status: "idle" });
         router.refresh();
         return;
       }
@@ -427,11 +428,6 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
       {approveState.status === "error" && (
         <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
           {approveState.message}
-        </p>
-      )}
-      {(approveState.status === "handled" || rejectState.status === "handled") && (
-        <p role="status" className="mt-2 text-sm text-[var(--color-ink-500)]">
-          Already handled.
         </p>
       )}
 

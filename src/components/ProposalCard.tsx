@@ -269,7 +269,14 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
         router.refresh();
         return;
       }
-      const data = (await res.json().catch(() => null)) as { message?: string } | null;
+      const data = (await res.json().catch(() => null)) as { message?: string; handled?: boolean } | null;
+      // handled: already approved, rejected, superseded or already on the
+      // map — not a failure, so drop the card like a success would.
+      if (data?.handled) {
+        setApproveState({ status: "idle" });
+        router.refresh();
+        return;
+      }
       setApproveState({
         status: "error",
         message: data?.message ?? "Something went wrong. This wasn't applied. Try again.",
@@ -291,7 +298,14 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
         router.refresh();
         return;
       }
-      const data = (await res.json().catch(() => null)) as { message?: string } | null;
+      const data = (await res.json().catch(() => null)) as { message?: string; handled?: boolean } | null;
+      // handled: already approved, rejected, superseded or already on the
+      // map — not a failure, so drop the card like a success would.
+      if (data?.handled) {
+        setRejectState({ status: "idle" });
+        router.refresh();
+        return;
+      }
       setRejectState({
         status: "error",
         message: data?.message ?? "Something went wrong. This wasn't rejected. Try again.",

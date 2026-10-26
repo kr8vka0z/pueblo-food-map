@@ -67,7 +67,7 @@ export async function POST(
   // this row in the meantime.
   if (proposalRow.status !== "pending") {
     return NextResponse.json(
-      { ok: false, error: "stale", message: "This proposal is no longer current — it was already reviewed or superseded." },
+      { ok: false, error: "stale", handled: true, message: "This proposal is no longer current — it was already reviewed or superseded." },
       { status: 409 },
     );
   }
@@ -75,7 +75,12 @@ export async function POST(
   const outcome = await applyApprovedProposal(db, proposalRow, identity);
   if (!outcome.ok) {
     return NextResponse.json(
-      { ok: false, error: outcome.error, ...(outcome.message !== undefined ? { message: outcome.message } : {}) },
+      {
+        ok: false,
+        error: outcome.error,
+        ...(outcome.message !== undefined ? { message: outcome.message } : {}),
+        ...(outcome.handled ? { handled: true } : {}),
+      },
       { status: outcome.status },
     );
   }

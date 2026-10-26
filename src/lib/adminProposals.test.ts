@@ -151,6 +151,28 @@ describe("checkStaleApply — change_type 'update' (the scoped, per-field check)
     expect(result.reason).toMatch(/"phone"/);
   });
 
+  test("venue already holds every `after` value (a duplicate card) -> stale with the 'Already done' reason", () => {
+    const diff: ProposedDiff = {
+      before: { phone: "719-555-0100", last_verified: "2026-01-01" },
+      after: { phone: "(719) 542-1411", last_verified: "2026-10-20" },
+      fields_changed: ["phone", "last_verified"],
+    };
+    const result = checkStaleApply("update", makeVenue({ phone: "(719) 542-1411" }), diff);
+    expect(result).toMatchObject({ stale: true, reason: "Already done — the map already has this change." });
+  });
+
+  test("a needs_review card already on the map keeps the 'changed since' reason (not a plain duplicate)", () => {
+    const diff: ProposedDiff = {
+      before: { phone: "719-555-0100" },
+      after: { phone: "(719) 542-1411" },
+      fields_changed: ["phone"],
+      meta: { needs_review: ["unclear"] },
+    };
+    const result = checkStaleApply("update", makeVenue({ phone: "(719) 542-1411" }), diff);
+    expect(result.alreadyDone).toBeUndefined();
+    expect(result.reason).toMatch(/changed since/);
+  });
+
   test("scoped to fields_changed ONLY — an unrelated field diverging does NOT trip staleness (§6.10c's #235 reconciliation)", () => {
     // The proposal only asserts something about `phone`. The venue's `url`
     // has ALSO changed since (e.g. a separate link_health proposal already

@@ -105,9 +105,7 @@ scripts/           Data pipeline, seed, and lint scripts (never imported by the 
   [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 - **AI review:** a Codex review, run by the `pr-review` script on Kyle's
   server and posted as a PR comment, reviews pull requests against their
-  description and [REVIEW.md](REVIEW.md) (an agent's merge waits for a clean one), and
-  CodeRabbit reviews human-authored pull requests targeting `dev` or `main`
-  using the low-noise settings in [`.coderabbit.yaml`](.coderabbit.yaml).
+  description and [REVIEW.md](REVIEW.md) (an agent's merge waits for a clean one).
 - **Deploys:** GitHub Actions
   ([`deploy-prod.yml`](.github/workflows/deploy-prod.yml) /
   [`deploy-dev.yml`](.github/workflows/deploy-dev.yml)), not Cloudflare

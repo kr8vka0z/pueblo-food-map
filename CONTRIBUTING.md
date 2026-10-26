@@ -42,13 +42,11 @@ performance).
    work ships to production in the maintainers' weekly release (cut Saturday
    night, merged Sunday) — there is no mid-week promotion.
 
-CodeRabbit reviews pull requests into `main` and `dev` (see
-`.coderabbit.yaml`; drafts, Dependabot, the weekly release PR, and
-"Publish venues update" PRs are skipped). While the repository has fewer
-than 10 stars, CodeRabbit does not start a review on its own — comment
-`@coderabbitai review` on the pull request to request one, and again after
-pushing fixes. Address actionable findings before merge, or explain why a
-suggested change does not apply.
+A maintainer runs an AI code review (Codex) on each pull request and posts
+it as a comment, judged against the PR description and
+[REVIEW.md](REVIEW.md), so fill in the pull request template fully. Address
+its findings before merge, or reply explaining why a suggested change does
+not apply.
 
 ## Development setup
 

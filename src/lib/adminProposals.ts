@@ -223,6 +223,18 @@ export interface StaleApplyResult {
   stale: boolean;
   /** Human-readable, shown to the reviewing admin when stale — absent when stale is false. */
   reason?: string;
+  /** Stale only because the venue already carries every change this proposal makes (a duplicate card). */
+  alreadyDone?: true;
+}
+
+/** Changed fields (minus the last_verified stamp) whose `after` value the venue already holds — true only when there is at least one and all match. */
+function venueAlreadyHasAfter(currentRow: CurrentVenueRow, diff: ProposedDiff): boolean {
+  const fields = diff.fields_changed.filter((f) => f !== "last_verified");
+  const after = (diff.after ?? {}) as unknown as CurrentVenueRow;
+  return (
+    fields.length > 0 &&
+    fields.every((f) => valuesEqual(currentFieldValue(after, f as keyof Venue), currentFieldValue(currentRow, f as keyof Venue)))
+  );
 }
 
 /**
@@ -275,6 +287,13 @@ export function checkStaleApply(
         const beforeValue = currentFieldValue(before as unknown as CurrentVenueRow, key);
         const nowValue = currentFieldValue(currentRow, key);
         if (!valuesEqual(beforeValue, nowValue)) {
+          // Two cards proposing the same change (the website reader never
+          // supersedes a hand-checked card — refresh-ingest.ts) leave the
+          // second one here once the first is approved: say so plainly
+          // rather than imply someone changed the venue.
+          if (venueAlreadyHasAfter(currentRow, diff)) {
+            return { stale: true, reason: "Already done — the map already has this change.", alreadyDone: true };
+          }
           return {
             stale: true,
             reason: `This venue's "${field}" changed since the proposal was generated.`,
@@ -340,7 +359,7 @@ export interface ApprovingIdentity {
  */
 export type ApplyApprovedProposalResult =
   | { ok: true; status: 200; targetVenueId: string; changeType: ProposalChangeType }
-  | { ok: false; status: number; error: string; message?: string };
+  | { ok: false; status: number; error: string; message?: string; handled?: true };
 
 // `WHERE id = ? AND status = 'pending'` closes the supersede-race window —
 // see applyApprovedProposal's own header, correctness requirement 1 in the
@@ -452,7 +471,13 @@ export async function applyApprovedProposal(
   if (staleCheck.stale) {
     const now = new Date().toISOString();
     await db.prepare(SUPERSEDE_PROPOSAL_SQL).bind(now, proposalRow.id).run();
-    return { ok: false, status: 409, error: "stale", message: staleCheck.reason };
+    return {
+      ok: false,
+      status: 409,
+      error: "stale",
+      message: staleCheck.reason,
+      ...(staleCheck.alreadyDone ? { handled: true as const } : {}),
+    };
   }
 
   const timestamp = new Date().toISOString();
@@ -676,8 +701,45 @@ export async function applyApprovedProposal(
       status: 409,
       error: "stale",
       message: "This proposal was already reviewed by the time this request completed.",
+      handled: true,
     };
   }
 
+  if (changeType === "update") {
+    try {
+      await supersedeAlreadyAppliedSiblings(db, proposalRow, timestamp);
+    } catch (err) {
+      // The approve itself already landed; a failed tidy-up only leaves a
+      // duplicate card that says "Already done" when clicked.
+      console.error("supersedeAlreadyAppliedSiblings failed", proposalRow.id, err);
+    }
+  }
+
   return { ok: true, status: 200, targetVenueId: proposalRow.target_venue_id, changeType };
+}
+
+/**
+ * After an update is approved, other pending update cards for the same venue
+ * whose every change is now already on the venue are duplicates (refresh-ingest
+ * lets a website card sit beside a hand-checked one proposing the same phone):
+ * mark them superseded so they leave the queue instead of erroring on Approve.
+ * Left alone: link_health findings, freshness-only cards, and rename/unconfirmed-
+ * match cards, whose approval also records an upstream id alias.
+ */
+async function supersedeAlreadyAppliedSiblings(db: D1Database, approved: ChangeProposalRow, timestamp: string): Promise<void> {
+  const venue = await db.prepare("SELECT * FROM venues WHERE id = ?").bind(approved.target_venue_id).first<AdminVenueRow>();
+  if (!venue) return;
+  const { results } = await db
+    .prepare(
+      "SELECT * FROM change_proposals WHERE target_venue_id = ? AND id != ? AND status = 'pending' AND change_type = 'update' AND source != 'link_health'",
+    )
+    .bind(approved.target_venue_id, approved.id)
+    .all<ChangeProposalRow>();
+  for (const row of results) {
+    const parsed = parseProposalRow(row);
+    if (parsed.parseError || renameMetaOf(parsed.diff) || parsed.diff.meta?.match) continue;
+    if (venueAlreadyHasAfter(venue as CurrentVenueLookup, parsed.diff)) {
+      await db.prepare(SUPERSEDE_PROPOSAL_SQL).bind(timestamp, row.id).run();
+    }
+  }
 }

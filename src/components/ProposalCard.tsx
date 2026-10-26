@@ -218,7 +218,10 @@ function formatSubmittedAt(iso: string): string {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-type ActionState = { status: "idle" } | { status: "submitting" } | { status: "error"; message: string };
+// "handled": the server says this card was already dealt with (approved,
+// rejected, superseded, or its change is already on the map) — not a failure,
+// so it gets a neutral note while router.refresh() drops the card.
+type ActionState = { status: "idle" } | { status: "submitting" } | { status: "handled" } | { status: "error"; message: string };
 
 export interface ProposalCardProps {
   proposal: ParsedProposal;
@@ -269,7 +272,12 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
         router.refresh();
         return;
       }
-      const data = (await res.json().catch(() => null)) as { message?: string } | null;
+      const data = (await res.json().catch(() => null)) as { message?: string; handled?: boolean } | null;
+      if (data?.handled) {
+        setApproveState({ status: "handled" });
+        router.refresh();
+        return;
+      }
       setApproveState({
         status: "error",
         message: data?.message ?? "Something went wrong. This wasn't applied. Try again.",
@@ -291,7 +299,12 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
         router.refresh();
         return;
       }
-      const data = (await res.json().catch(() => null)) as { message?: string } | null;
+      const data = (await res.json().catch(() => null)) as { message?: string; handled?: boolean } | null;
+      if (data?.handled) {
+        setRejectState({ status: "handled" });
+        router.refresh();
+        return;
+      }
       setRejectState({
         status: "error",
         message: data?.message ?? "Something went wrong. This wasn't rejected. Try again.",
@@ -414,6 +427,11 @@ export default function ProposalCard({ proposal, venue }: ProposalCardProps) {
       {approveState.status === "error" && (
         <p role="alert" className="mt-2 text-sm text-[var(--color-danger)]">
           {approveState.message}
+        </p>
+      )}
+      {(approveState.status === "handled" || rejectState.status === "handled") && (
+        <p role="status" className="mt-2 text-sm text-[var(--color-ink-500)]">
+          Already handled.
         </p>
       )}
 

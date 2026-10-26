@@ -23,7 +23,7 @@
  * the next problem.
  */
 
-import { categoryLabels } from "@/data/venues";
+import { categoryLabels } from "@/lib/categories";
 import { DISPLAY_DAY_KEYS } from "@/lib/hours";
 import { isValidEmail } from "@/lib/email";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";

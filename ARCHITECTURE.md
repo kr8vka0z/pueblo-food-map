@@ -154,6 +154,12 @@ All venue data is served from a single export: `venues` in
 `src/data/venues.ts`. Components never import `published-venues.ts` or the
 source arrays directly.
 
+**Keep the list out of pages that don't show it (#721).** Importing anything
+from `src/data/venues.ts` in a browser component ships the whole list with it,
+so category labels and colors live in `src/lib/categories.ts`, the venue pages
+get their summary text and nearby list from the server, and `PageNav` imports
+the list (plus live boxes) only when its Saved list first opens.
+
 ```
 Cloudflare D1 `venues` (status draft/published, category != blessing_box)
            ↓  admin clicks Publish → POST /api/admin/publish
@@ -1035,9 +1041,9 @@ connection — minus the map itself (Mapbox tiles are out of scope).
 
 | Request | Strategy |
 |---|---|
-| `/`, `/venues`, `/resources` — navigations only | Network-first; the cached copy is served only when the network fails. Keyed by path, so `/?venue=x` shares `/`'s entry. |
+| `/`, `/venues`, `/resources` and their `/es` twins — navigations only | Network-first; the cached copy is served only when the network fails, else the same page from the other tree (`/` ↔ `/es`, `/venues` ↔ `/es/venues`), since only one tree is precached and the installed app always launches at `/`. Keyed by path, so `/?venue=x` shares `/`'s entry. |
 | `/_next/static/*`, `/fonts/*`, `/icons/*`, `/manifest.webmanifest` | Stale-while-revalidate. The hashed `/_next/static` files are `immutable` in the HTTP cache, so the revalidate step is normally served from disk rather than the network. |
-| Any other same-origin page navigation (e.g. `/about`, `/venue/<id>`) | Network-only — never cached itself. On a network failure it falls back to the precached `/` shell rather than the browser's own offline error page (below), never to the requested page's real content. |
+| Any other same-origin page navigation (e.g. `/about`, `/venue/<id>`) | Network-only — never cached itself. On a network failure it falls back to the precached shell of its own tree (`/` or `/es`, else the other one) rather than the browser's own offline error page (below), never to the requested page's real content. |
 | `/api/*`, `/admin*`, `/alerts*` (subscription token in `?t=`), `/box/*` (live D1), anything cross-origin (Mapbox, analytics, Turnstile), any non-GET | Never touched, never falls back — straight to the network. |
 
 **Same-session offline navigation (#130 follow-up).** A `next/link` tap (BottomNav's "Help", the Menu drawer's links) is a client-side transition, not a page load: Next fetches an RSC payload first, which the router itself falls back to a real browser navigation for when that fetch fails (its own console warning: "Failed to fetch RSC payload ... Falling back to browser navigation"). That fallback navigation used to have nowhere to land when the target page was never visited/cached offline (e.g. tapping "About" for the first time with no connection) — the browser showed its native offline error page instead of the app. Fixed by giving every other same-origin navigation a shell-fallback (table above): the visitor lands on the cached `/` map shell — a working app, not a dead end — rather than the target page's real content, since that was never fetched. `src/__tests__/serviceWorkerShellFallback.test.ts` covers the new classification and fallback function.
@@ -1045,7 +1051,10 @@ connection — minus the map itself (Mapbox tiles are out of scope).
 **Install-time precache.** On a first visit every request happens before the
 worker controls the page, so none of it passes through the worker. `install`
 therefore fetches the three shell pages itself and caches every
-`/_next/static` and `/fonts` URL their HTML references. The venue dataset is
+`/_next/static` and `/fonts` URL their HTML references. Only the open page's
+language tree is precached (`/`, `/venues`, `/resources`, or the `/es`
+three), read from the uncontrolled window that registered the worker (#721);
+the other tree's shells are cached network-first on first visit. The venue dataset is
 compiled into those pages and bundles (`src/data/published-venues.ts`), so
 the list and the in-map venue card work offline. Live blessing-box status
 (`/api/public/blessing-boxes`) does not — `useBoxesList` already treats a

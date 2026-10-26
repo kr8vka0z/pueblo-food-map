@@ -8,6 +8,7 @@ import PageNav from "@/components/PageNav";
 import { LocaleProvider } from "@/lib/LocaleContext";
 import { addFavorite, removeFavorite } from "@/lib/favorites";
 import { venues } from "@/data/venues";
+import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 
 const push = vi.fn();
 let pathname = "/about";
@@ -60,18 +61,57 @@ describe("PageNav", () => {
     expect(screen.getByText(/No saved places yet/i)).toBeDefined();
   });
 
-  test("selecting a saved place pushes /?venue=<encoded id>", () => {
+  test("selecting a saved place pushes /?venue=<encoded id>", async () => {
     const venue = venues[0];
     addFavorite(venue.id);
     try {
       render(<PageNav locale="en" />);
       fireEvent.click(screen.getByTestId("nav-saved"));
-      fireEvent.click(screen.getByText(venue.name));
+      // findBy: the list loads when Saved first opens (#721).
+      fireEvent.click(await screen.findByText(venue.name));
       expect(push).toHaveBeenCalledWith(`/?venue=${encodeURIComponent(venue.id)}`);
     } finally {
       // favorites.ts caches its snapshot at module scope — undo so later
       // tests in this file see the empty list beforeEach expects.
       removeFavorite(venue.id);
+    }
+  });
+
+  // #721 bug: saved blessing boxes never showed in Saved off the map, because
+  // boxes are live (fetched from /api/public/blessing-boxes) and never in the
+  // published venue list PageNav used to filter against.
+  test("a saved blessing box shows in Saved on a content page (#721)", async () => {
+    const box: PublicBlessingBox = {
+      id: "box-test-721",
+      name: "Test Street Blessing Box",
+      category: "blessing_box",
+      lat: 38.27,
+      lng: -104.61,
+      address: "1 Test St, Pueblo, CO",
+      source: "admin",
+      last_verified: "2026-10-01",
+      box: {
+        hostName: null, hostNote: null, mostNeeded: null, installedOn: null, removedOn: null,
+        status: "unknown", lastFilledAt: null, recentCheckins: [], latestPhoto: null, adopters: [],
+      },
+    } as PublicBlessingBox;
+    const fetchMock = vi.fn(async (url: string) =>
+      url === "/api/public/blessing-boxes"
+        ? new Response(JSON.stringify({ boxes: [box] }), { status: 200 })
+        : new Response("", { status: 404 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    addFavorite(box.id);
+    try {
+      render(<PageNav locale="en" />);
+      // Nothing is fetched until Saved opens: content pages skip the box layer.
+      expect(fetchMock).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByTestId("nav-saved"));
+      fireEvent.click(await screen.findByText(box.name));
+      expect(push).toHaveBeenCalledWith(`/?venue=${box.id}`);
+    } finally {
+      removeFavorite(box.id);
+      vi.unstubAllGlobals();
     }
   });
 
@@ -121,13 +161,13 @@ describe("PageNav on the /es tree", () => {
     return render(<LocaleProvider initialLocale="es">{ui}</LocaleProvider>);
   }
 
-  test("selecting a saved place pushes /es?venue=<encoded id>", () => {
+  test("selecting a saved place pushes /es?venue=<encoded id>", async () => {
     const venue = venues[0];
     addFavorite(venue.id);
     try {
       renderEsTree(<PageNav locale="es" />);
       fireEvent.click(screen.getByTestId("nav-saved"));
-      fireEvent.click(screen.getByText(venue.name));
+      fireEvent.click(await screen.findByText(venue.name));
       expect(push).toHaveBeenCalledWith(`/es?venue=${encodeURIComponent(venue.id)}`);
     } finally {
       removeFavorite(venue.id);

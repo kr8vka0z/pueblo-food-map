@@ -22,6 +22,7 @@ import DesktopVenueWindow from "@/components/DesktopVenueWindow";
 import DesktopSidePanel from "@/components/DesktopSidePanel";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
+import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
 
 const mockTurnstile = {
   render: vi.fn((_container: HTMLElement, opts: { callback?: (t: string) => void }) => {
@@ -108,6 +109,7 @@ describe("DesktopVenueWindow — Escape closes only the open PhotoViewer, not th
         )}
       </DesktopSidePanel>,
     );
+    await waitForBoxCard();
 
     await user.click(screen.getByRole("button", { name: "View photo full size" }));
     const photoDialog = screen.getByRole("dialog", { name: /photo of test blessing box/i }) as HTMLDialogElement;

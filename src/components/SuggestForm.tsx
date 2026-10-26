@@ -30,7 +30,7 @@ import Script from "next/script";
 import Link from "next/link";
 import { t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/lib/LocaleContext";
-import { categoryLabels } from "@/data/venues";
+import { categoryLabels } from "@/lib/categories";
 import type { VenueCategory } from "@/types/venue";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 

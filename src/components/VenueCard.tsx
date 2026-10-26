@@ -2,7 +2,7 @@
 
 import { Clock, CircleHelp } from "lucide-react";
 import type { Venue } from "@/types/venue";
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import { computeVenueOpenStatus, nextIrregularOccurrence, formatIrregularOccurrence } from "@/lib/hours";
 import { t } from "@/lib/i18n";

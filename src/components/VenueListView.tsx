@@ -65,7 +65,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { categoryLabels } from "@/data/venues";
+import { categoryLabels } from "@/lib/categories";
 import { DISPLAY_STATUS_KEY, DISPLAY_STATUS_LABELS, formatLastVerified, type AdminDisplayStatus } from "@/lib/adminVenues";
 import { SOURCE_BADGE, LANE_BADGE, fieldLabel } from "@/components/ProposalCard";
 import { summarizeSubmissionForRow } from "@/components/SubmissionCard";

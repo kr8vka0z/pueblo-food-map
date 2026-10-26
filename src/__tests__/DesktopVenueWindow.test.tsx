@@ -29,6 +29,7 @@ import DesktopSidePanel from "@/components/DesktopSidePanel";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import { track, EVENTS } from "@/lib/analytics";
+import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
 
 // #485 PR 2: mock the whole module so EVENTS keeps its real allowlist values.
 vi.mock("@/lib/analytics", async (importOriginal) => ({
@@ -387,7 +388,7 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
   // venueNameBlock's own heading — a box branch never renders that block,
   // so the dialog's accessible name dangled (pointed at no element) for
   // every box until BoxCardBody's new `nameId` prop was wired through.
-  test("the dialog's accessible name resolves to the box's own name (aria-labelledby no longer dangles)", () => {
+  test("the dialog's accessible name resolves to the box's own name (aria-labelledby no longer dangles)", async () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue()}
@@ -399,10 +400,11 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         locale="en"
       />,
     );
+    await waitForBoxCard();
     expect(screen.getByRole("dialog", { name: "Test Blessing Box" })).toBeDefined();
   });
 
-  test("host note and status render unconditionally — no 'nothing shows up' gap (Kyle, 2026-09-18)", () => {
+  test("host note and status render unconditionally — no 'nothing shows up' gap (Kyle, 2026-09-18)", async () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue()}
@@ -414,11 +416,12 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         locale="en"
       />,
     );
+    await waitForBoxCard();
     expect(screen.getByTestId("box-status-badge")).toBeDefined();
     expect(screen.getByText("Please knock if the gate is closed.")).toBeDefined();
   });
 
-  test("ordinary-venue-only sections (address, hours table, phone, Plentiful link, report) never render for a box", () => {
+  test("ordinary-venue-only sections (address, hours table, phone, Plentiful link, report) never render for a box", async () => {
     render(
       <DesktopVenueWindow
         venue={makeBoxVenue({ phone: "(719) 555-0199", address: "999 Should Not Show St" })}
@@ -430,6 +433,7 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         locale="en"
       />,
     );
+    await waitForBoxCard();
     expect(screen.queryByText("999 Should Not Show St")).toBeNull();
     expect(screen.queryByText("(719) 555-0199")).toBeNull();
     expect(screen.queryByRole("link", { name: /report/i })).toBeNull();
@@ -491,6 +495,7 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         )}
       </DesktopSidePanel>,
     );
+    await waitForBoxCard();
     // "I filled it" expands an optional-note form with a textarea (BoxCheckinPanel).
     await user.click(screen.getByRole("button", { name: "I filled it" }));
     const textarea = await screen.findByRole("textbox");
@@ -512,6 +517,7 @@ describe("DesktopVenueWindow — blessing box card (card-polish follow-up, 2026-
         locale="en"
       />,
     );
+    await waitForBoxCard();
     await user.click(screen.getByRole("button", { name: "I filled it" }));
     const textarea = await screen.findByRole("textbox");
     await user.type(textarea, "Left extra cans");

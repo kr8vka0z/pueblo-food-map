@@ -58,6 +58,8 @@ interface HamburgerMenuProps {
   onShowWelcome?: () => void;
   /** Favorited venues (nearest-first), shown in the "saved" view (#132). */
   savedVenues?: Array<Venue & { distanceMiles?: number }>;
+  /** True while PageNav is still fetching what's saved (#721) — shows "Loading…" instead of the empty state. */
+  savedLoading?: boolean;
   /** Called when a saved venue row is tapped — selects it on the map. */
   onSelectVenue?: (id: string) => void;
   /** Whether the drawer is open (controlled by MapWrapper). */
@@ -86,6 +88,7 @@ export default function HamburgerMenu({
   locale,
   onShowWelcome,
   savedVenues = [],
+  savedLoading = false,
   onSelectVenue,
   open,
   onClose,
@@ -347,6 +350,7 @@ export default function HamburgerMenu({
             view={view}
             locale={locale}
             savedVenues={savedVenues}
+            savedLoading={savedLoading}
             onSelectVenue={(id) => {
               close();
               onSelectVenue?.(id);

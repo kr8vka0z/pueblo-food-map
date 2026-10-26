@@ -50,7 +50,7 @@ import { safeUrl } from "@/lib/safeUrl";
 import { track, EVENTS } from "@/lib/analytics";
 import DirectionButtons, { type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
 import type { Venue } from "@/types/venue";
-import { categoryColors } from "@/data/venues";
+import { categoryColors } from "@/lib/categories";
 import { formatMiles } from "@/lib/distance";
 import { computeVenueOpenStatus, nextIrregularOccurrence, formatIrregularOccurrence } from "@/lib/hours";
 import { getDisplayNotes } from "@/lib/venueNotes";
@@ -59,9 +59,25 @@ import { useLocale } from "@/lib/LocaleContext";
 import VenuePopupHeader from "@/components/VenuePopupHeader";
 import ReportVenueButton from "@/components/ReportVenueButton";
 import HoursList from "@/components/HoursList";
-import BoxCardBody from "@/components/BoxCardBody";
+import dynamic from "next/dynamic";
 import EventHereLine, { type EventHere } from "@/components/EventHereLine";
 import type { BoxStatus, CheckinKind, PublicBlessingBox } from "@/lib/blessingBoxes";
+
+/** "Loading…" line shown while the box record or the box card's code is on its way. */
+function BoxCardLoading({ locale: localeProp }: { locale?: Locale }) {
+  // The dynamic() fallback below gets no props, so it reads the context locale.
+  const { locale: ctxLocale } = useLocale();
+  return (
+    <p className="px-4 py-4 text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", localeProp ?? ctxLocale)}</p>
+  );
+}
+
+// #721: the box card loads only when a box is opened — same split and the
+// same module-level rule as BottomSheet's (a dynamic() made in render would
+// remount the card and wipe a half-typed check-in).
+const BoxCardBody = dynamic(() => import("@/components/BoxCardBody"), {
+  loading: () => <BoxCardLoading />,
+});
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -483,7 +499,7 @@ export default function DesktopVenueWindow({
           }
         />
       ) : (
-        <p className="px-4 py-4 text-sm text-[var(--color-ink-500)]">{t("box.cardLoading", locale)}</p>
+        <BoxCardLoading locale={locale} />
       )}
     </div>
   );

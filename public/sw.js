@@ -12,6 +12,9 @@
  * What it does (see ARCHITECTURE.md "Offline / installable app" for the full
  * picture, including how to bust or disable it):
  *   - install: precache the app shell — the /, /venues and /resources HTML
+ *     (or /es, /es/venues, /es/resources for a visitor on the Spanish tree;
+ *     #721: only the tree(s) of the open page(s), not both, since every
+ *     visitor used to download six pages and their chunks in the background)
  *     plus every hashed /_next/static asset those pages reference. Venue data
  *     is compiled into those pages/JS (src/data/published-venues.ts), so this
  *     is also the venue dataset. Precaching at install matters because the
@@ -43,11 +46,17 @@
  * loses signal lands back on the cached /es shell, not the English one.
  */
 
-const CACHE_VERSION = "v2";
+// v3 (#721): install precaches one language tree, not both. The bump makes
+// every installed worker re-install, and activate drops the v2 cache that
+// still holds both trees.
+const CACHE_VERSION = "v3";
 const CACHE_NAME = `pfm-${CACHE_VERSION}`;
 const KILL_SWITCH = false;
 
-const SHELL_PAGES = ["/", "/venues", "/resources", "/es", "/es/venues", "/es/resources"];
+const TREE_SHELLS = { en: ["/", "/venues", "/resources"], es: ["/es", "/es/venues", "/es/resources"] };
+// All six stay network-first shell pages (classifyRequest), so the other
+// tree's shells are still cached the first time they're visited online.
+const SHELL_PAGES = [...TREE_SHELLS.en, ...TREE_SHELLS.es];
 
 // Pages that must never come out of a cache: /api (live data, auth), /admin,
 // /alerts (a subscription token rides in ?t=), /box (live D1 boxes).
@@ -102,11 +111,26 @@ function isCacheable(response) {
   return response.ok && response.type === "basic" && !response.redirected;
 }
 
+/**
+ * Shell pages to precache, from the URLs of the open windows. Pure, so it's
+ * unit-tested. One tree per language seen; English when no window is known.
+ * @param {string[]} clientUrls
+ * @returns {string[]}
+ */
+function shellPagesForClients(clientUrls) {
+  const trees = new Set(clientUrls.map((u) => (shellPathFor(new URL(u).pathname) === "/es" ? "es" : "en")));
+  if (trees.size === 0) trees.add("en");
+  return [...trees].flatMap((tree) => TREE_SHELLS[tree]);
+}
+
 async function precacheShell() {
   const cache = await caches.open(CACHE_NAME);
   const assets = new Set();
+  // During install the page that registered this worker is still an
+  // uncontrolled window, so includeUncontrolled is what finds it.
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true }).catch(() => []);
   await Promise.all(
-    SHELL_PAGES.map(async (page) => {
+    shellPagesForClients(windows.map((w) => w.url)).map(async (page) => {
       try {
         const res = await fetch(page);
         if (!isCacheable(res)) return;
@@ -149,10 +173,20 @@ async function networkFirst(request) {
     if (isCacheable(res)) cache.put(key, res.clone());
     return res;
   } catch (err) {
-    const cached = await cache.match(key);
+    // #721: install precaches only the visitor's own tree, but the installed
+    // app always launches at the manifest's start_url `/`. A Spanish visitor
+    // offline holds only `/es`, so serve the same page from the other tree.
+    const cached = (await cache.match(key)) ?? (await cache.match(otherTreePath(key)));
     if (cached) return cached;
     throw err;
   }
+}
+
+/** The same page in the other language tree: `/venues` ↔ `/es/venues`, `/` ↔ `/es`. */
+function otherTreePath(pathname) {
+  if (pathname === "/es") return "/";
+  if (pathname.startsWith("/es/")) return pathname.slice(3);
+  return pathname === "/" ? "/es" : `/es${pathname}`;
 }
 
 // #130 follow-up: a navigation to a page outside SHELL_PAGES (e.g. /about,
@@ -178,7 +212,11 @@ async function networkOnlyWithShellFallback(request) {
   } catch (err) {
     const cache = await caches.open(CACHE_NAME);
     const shellPath = shellPathFor(new URL(request.url).pathname);
-    const shellFallback = await cache.match(shellPath);
+    // #721: install precaches only the visitor's own tree, so an /es visitor
+    // offline on an English page may hold only the /es shell — better that
+    // than the browser's offline error page.
+    const shellFallback =
+      (await cache.match(shellPath)) ?? (await cache.match(otherTreePath(shellPath)));
     if (shellFallback) return shellFallback;
     throw err;
   }

@@ -1013,8 +1013,8 @@ bundle at build time, so they are GitHub Actions repo secrets injected into
 the `deploy-prod.yml`/`deploy-dev.yml` build (not Cloudflare dashboard build
 variables — that was only true under Workers Builds). Runtime secrets
 (`RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, …) are `wrangler secret put` on
-the Worker and read at request time. Full list: the AGENTS.md "Secrets"
-table.
+the Worker and read at request time. Full list: the secrets table in
+`docs/agents/secrets.md`.
 
 ---
 
@@ -1215,8 +1215,8 @@ Full design: atlas-kb `projects/Pueblo Food Map/Blessing Boxes Build Plan.md`.
   Dispatch runs in `ctx.waitUntil`, never blocking the check-in; a Resend
   outage degrades to a console warning.
 
-Migrations live in `migrations/`; runtime secrets are in the AGENTS.md
-"Secrets" table, and the photo bucket (`pfm-box-photos`) is noted in the
+Migrations live in `migrations/`; runtime secrets are in the secrets table in
+`docs/agents/secrets.md`, and the photo bucket (`pfm-box-photos`) is noted in the
 AGENTS.md "Blessing Boxes" bullet.
 
 ---

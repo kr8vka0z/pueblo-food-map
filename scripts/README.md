@@ -5,7 +5,7 @@ reads, what it writes, why it exists) — this file is the map between them:
 run order, what's automated vs. by-hand, and the shared dependency pin.
 Deeper operational detail lives in [`AGENTS.md`](../AGENTS.md): the
 "Automated venue-refresh pipeline" section (guardrails, chunked writes) and
-the "Secrets" table (credentials). Local runs are below;
+the secrets table in [`docs/agents/secrets.md`](../docs/agents/secrets.md) (credentials). Local runs are below;
 the product-level story (why the pipeline exists, what it fixed) is in
 [`README.md`](../README.md)'s "Data sources" section. Read those, not this
 file, for the *why* — this file is only the *what runs when*.

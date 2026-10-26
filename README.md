@@ -179,7 +179,7 @@ retired standalone `/admin/flags` queue by #674) before it reaches the
 public map. See
 `scripts/refresh-ingest.ts`'s own file header for the full mechanism, and
 AGENTS.md's "Automated venue-refresh pipeline" section for the guardrails,
-AGENTS.md's "Secrets" table for credentials, and `scripts/README.md` for
+`docs/agents/secrets.md` for credentials, and `scripts/README.md` for
 local runs.
 
 ---

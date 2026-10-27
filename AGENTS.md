@@ -4,7 +4,7 @@ How it's built: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md). This
 
 - **Pull requests:** make as few logical PRs as possible, and always target `dev`, never `main`. Put code, its tests, and its docs in one PR. Split only when a change needs its own review, staging check, or rollback, such as visual vs. docs-only work, or anything touching migrations or auth.
 - **Issues:** before filing, triaging, or picking one up, read the board README: `gh project view 1 --owner kr8vka0z --format json --jq .readme`. It defines the Status, Priority, and Risk fields and the labels. Priority lives only in the board field.
-- **Reviewing:** read [REVIEW.md](REVIEW.md) first. Repo review rules go in REVIEW.md. PRs are reviewed by a Codex review that the server's `pr-review` script posts as a PR comment, and the agents' pr-review guard refuses an agent's merge until the PR's latest commit has a clean review. It reads only the PR description, the diff, REVIEW.md and this file, so every PR description follows `.github/pull_request_template.md`.
+- **Reviewing:** read [REVIEW.md](REVIEW.md) first. Repo review rules go in REVIEW.md. PRs are reviewed by a Codex review that the server's `pr-review` script posts as a PR comment, and the agents' pr-review guard refuses an agent's merge until the PR's latest commit has a clean review. It reads only the PR description, the diff, the spec issue the PR links (`Spec: #<n>`), REVIEW.md and this file, so every PR description follows `.github/pull_request_template.md`.
 - **UI work:** read [DESIGN.md](DESIGN.md) first. `src/app/globals.css` `@theme` is the source of truth and DESIGN.md mirrors it; `npm run design:drift` blocks any mismatch. The CLI binary is `designmd`, never `design.md`.
 
 ---

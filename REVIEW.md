@@ -6,8 +6,8 @@ by any human or agent reviewer. One page on purpose. Operational facts live in
 
 ## Judge against the PR description
 
-The reviewer sees only the PR description, the diff, this file and AGENTS.md: no issue, no chat,
-no history. So the description has to carry the case on its own (template:
+The reviewer sees only the PR description, the diff, the spec issue the PR links (`Spec: #<n>`),
+this file and AGENTS.md: no chat, no history. So the description has to carry the case on its own (template:
 `.github/pull_request_template.md`, sections Why / What changed / How it was tested / Risk /
 How to undo it / Watch for).
 

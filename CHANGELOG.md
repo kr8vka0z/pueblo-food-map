@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-10-27
+
+### Fixed
+
+- Security updates. ([#859](https://github.com/kr8vka0z/pueblo-food-map/pull/859))
+
 ## [1.3.1] - 2026-10-25
 
 No changes for visitors or administrators.

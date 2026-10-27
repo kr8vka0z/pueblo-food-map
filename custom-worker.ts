@@ -18,7 +18,7 @@
 // scheduled()-handler signature needs — none of which is `Element` or collides with DOM.
 import type { ExecutionContext, ExportedHandler, ScheduledController } from "@cloudflare/workers-types/experimental";
 import { runScheduledTasks } from "./src/lib/scheduledTasks";
-import { ingestTarget } from "./src/lib/ingestTarget";
+import { ingestRequest, ingestTarget } from "./src/lib/ingestTarget";
 import { isExcludedIp } from "./src/lib/ipMatch";
 import { applyHostIndexingPolicy } from "./src/lib/indexingHost";
 import handler from "vinext/server/fetch-handler";
@@ -41,21 +41,22 @@ export default {
       if (isExcludedIp(request.headers.get("CF-Connecting-IP"), env.ANALYTICS_EXCLUDED_IPS)) {
         return new Response(null, { status: 204 });
       }
-      // Forward the method/body/headers as-is; only the destination host+path
-      // changes. `redirect: "manual"` isn't needed — PostHog's ingest/assets
-      // endpoints don't redirect under normal operation.
+      // Forward the method and body as-is, to the PostHog host+path, with only
+      // the allowlisted headers (#858): every incoming header used to go along,
+      // the sign-in cookie included. ingestRequest (src/lib/ingestTarget.ts)
+      // holds the list and its test. `redirect: "manual"` isn't needed —
+      // PostHog's ingest/assets endpoints don't redirect under normal operation.
       //
       // WHY the cast: `request` is typed via @cloudflare/workers-types (see
       // this file's own header on the scoped ExportedHandler import), but
-      // the bare `Request`/`RequestInit` identifiers below resolve to
-      // lib.dom's versions (this project deliberately never declares global
+      // the bare `Request` identifier below resolves to
+      // lib.dom's version (this project deliberately never declares global
       // Request/Response from workers-types — same HTMLRewriter `Element`
       // collision cloudflare-env.d.ts's header documents). Both describe the
       // exact same real Workers-runtime object; the mismatch is structural
       // typing only (their ReadableStream generics disagree), not a real
       // incompatibility.
-      const proxied = new Request(target, request as unknown as RequestInit);
-      return fetch(proxied);
+      return fetch(ingestRequest(target, request as unknown as Request));
     }
     // Every host but pueblofoodmap.com (dev., *.workers.dev) gets
     // `X-Robots-Tag: noindex` — src/lib/indexingHost.ts has the why. The

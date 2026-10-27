@@ -1,7 +1,8 @@
 /**
  * ingestTarget.ts — maps a same-origin `/ingest/*` request path to the real
  * PostHog host it proxies to (#485: "reverse proxy so ad-blockers don't hide
- * a large share of visits").
+ * a large share of visits"), and builds the outgoing request with only the
+ * headers PostHog needs (ingestRequest, #858).
  *
  * WHY a Worker-level proxy in custom-worker.ts instead of next.config.ts
  * rewrites() (the issue body's original plan): PostHog's "Discard client IP
@@ -35,6 +36,29 @@ export function ingestTarget(pathname: string, search = ""): string | null {
   return `${host}${rest || "/"}${search}`;
 }
 
+/**
+ * The only headers the relay passes on to PostHog (#858). PostHog needs the
+ * body's type and compression, content negotiation, and the browser's
+ * User-Agent; nothing else. Everything else is dropped, in particular the
+ * site's sign-in cookie, Authorization, Referer and the client-IP headers
+ * (X-Forwarded-For, CF-*).
+ */
+const FORWARDED_HEADERS = ["content-type", "content-encoding", "accept", "accept-encoding", "user-agent"];
+
+/**
+ * Builds the request sent to PostHog: same method and body as `request`, at
+ * `target` (from ingestTarget), carrying only FORWARDED_HEADERS.
+ *
+ * WHY two `new Request` calls: copying `request` first keeps its method and
+ * body stream as-is, and the second call swaps in the allowlisted headers.
+ * Passing `body: request.body` in a fresh init instead needs the non-standard
+ * `duplex: "half"` option, which neither lib.dom nor workers-types declares.
+ */
 export function ingestRequest(target: string, request: Request): Request {
-  return new Request(target, request);
+  const headers = new Headers();
+  for (const name of FORWARDED_HEADERS) {
+    const value = request.headers.get(name);
+    if (value !== null) headers.set(name, value);
+  }
+  return new Request(new Request(target, request), { headers });
 }

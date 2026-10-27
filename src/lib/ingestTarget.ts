@@ -34,3 +34,7 @@ export function ingestTarget(pathname: string, search = ""): string | null {
 
   return `${host}${rest || "/"}${search}`;
 }
+
+export function ingestRequest(target: string, request: Request): Request {
+  return new Request(target, request);
+}

@@ -55,10 +55,7 @@ const FORWARDED_HEADERS = ["content-type", "content-encoding", "accept", "accept
  * `duplex: "half"` option, which neither lib.dom nor workers-types declares.
  */
 export function ingestRequest(target: string, request: Request): Request {
-  const headers = new Headers();
-  for (const name of FORWARDED_HEADERS) {
-    const value = request.headers.get(name);
-    if (value !== null) headers.set(name, value);
-  }
+  // Headers iterates with lowercased names, so the lowercase list matches any casing.
+  const headers = new Headers([...request.headers].filter(([name]) => FORWARDED_HEADERS.includes(name)));
   return new Request(new Request(target, request), { headers });
 }

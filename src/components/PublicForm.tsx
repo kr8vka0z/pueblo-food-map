@@ -148,7 +148,7 @@ export default function PublicForm<K extends string>({
   const { locale } = useLocale();
   const [honeypot, setHoneypot] = useState("");
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
-  const turnstile = useTurnstile(turnstileContainerRef);
+  const turnstile = useTurnstile(turnstileContainerRef, { rebuildDeadWidget: false });
   const [errors, setErrors] = useState<FieldErrors<K>>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 

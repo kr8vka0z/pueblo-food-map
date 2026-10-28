@@ -1,5 +1,6 @@
 /**
- * parsePublicPost() — the anti-spam preamble seven public routes share. Each
+ * requestIp(), and parsePublicPost() — the anti-spam preamble seven public
+ * routes share. Each
  * rejection must keep the exact status and body the routes returned before
  * the helper existed, on both Turnstile lanes; the routes' own tests cover
  * what happens after it.
@@ -20,7 +21,7 @@ vi.mock("@/lib/cloudflareContext", () => ({ getCloudflareContext: () => mockCont
 const mockLog = vi.fn();
 vi.mock("@/lib/logger", () => ({ logFormFailure: (...a: unknown[]) => mockLog(...a) }));
 
-import { parsePublicPost } from "@/lib/publicRequest";
+import { parsePublicPost, requestIp } from "@/lib/publicRequest";
 
 const DB = { fake: "d1" };
 const GOOD = { turnstileToken: "tok", website: "" };
@@ -40,6 +41,18 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.clearAllMocks();
+});
+
+describe("requestIp", () => {
+  it.each([
+    ["cf-connecting-ip wins over x-forwarded-for", { "cf-connecting-ip": "1.1.1.1", "x-forwarded-for": "2.2.2.2" }, "1.1.1.1"],
+    ["first x-forwarded-for entry, trimmed", { "x-forwarded-for": " 3.3.3.3 , 4.4.4.4" }, "3.3.3.3"],
+    ["neither header -> unknown", {}, "unknown"],
+    // Matches the inline expression it replaced: an empty first entry stays "", it does not fall through.
+    ["empty first x-forwarded-for entry stays empty", { "x-forwarded-for": ", 5.5.5.5" }, ""],
+  ])("%s", (_label, headers, expected) => {
+    expect(requestIp(new Request("https://example.com", { headers }))).toBe(expected);
+  });
 });
 
 describe("parsePublicPost", () => {

@@ -15,6 +15,14 @@
  *   `turnstileKey: mode` so the route verifies against the matching secret
  *   (src/lib/boxTurnstile.ts). BoxCheckinPanel.tsx's header has the history.
  *
+ * Two reset() behaviours, one per form, never both: by default reset()
+ * rebuilds a dead widget (see reset() below) — the card forms AdoptBoxForm
+ * and BoxAlertSignupForm rely on that. `rebuildDeadWidget: false` keeps a
+ * plain reset: BoxCheckinPanel already owns its own dead-widget recovery
+ * (its 15 s timeout → switchToFallback), and two recovery paths racing would
+ * deliver two tokens to one queued tap; the page forms never had the phone
+ * bug the rebuild fixes.
+ *
  * Queued submits (a tap that lands before a token exists) stay in each form:
  * BoxCheckinPanel's queue restores a closed note form on failure and the
  * other forms' don't, so the shapes differ. `switchToFallback()` is exposed
@@ -56,7 +64,7 @@ export interface UseTurnstile {
 
 export function useTurnstile(
   containerRef: RefObject<HTMLDivElement | null>,
-  { box = false }: { box?: boolean } = {},
+  { box = false, rebuildDeadWidget = true }: { box?: boolean; rebuildDeadWidget?: boolean } = {},
 ): UseTurnstile {
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -154,14 +162,25 @@ export function useTurnstile(
   function reset() {
     setToken(null);
     if (!window.turnstile) return;
-    const container = containerRef.current;
-    if (widgetId.current) {
+    if (!rebuildDeadWidget) {
       try {
-        window.turnstile.reset(widgetId.current);
-        if (container && container.childElementCount > 0) return;
+        if (widgetId.current) window.turnstile.reset(widgetId.current);
+      } catch {
+        // A broken widget only affects the next submit, which waits for a token like the first one did.
+      }
+      return;
+    }
+    const container = containerRef.current;
+    const widgetAlive = widgetId.current !== null && container !== null && container.childElementCount > 0;
+    if (widgetAlive) {
+      try {
+        window.turnstile.reset(widgetId.current as string);
+        return;
       } catch {
         // fall through to a rebuild
       }
+    }
+    if (widgetId.current) {
       try {
         window.turnstile.remove(widgetId.current);
       } catch {

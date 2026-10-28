@@ -306,7 +306,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   // Box key with the managed fallback (this file's header, "Fallback to a
   // visible checkbox"); the widget lifecycle itself lives in useTurnstile.ts.
-  const turnstile = useTurnstile(turnstileContainerRef, { box: true });
+  const turnstile = useTurnstile(turnstileContainerRef, { box: true, rebuildDeadWidget: false });
   const turnstileToken = turnstile.token;
 
   // A tap that lands before Turnstile's invisible check resolves queues here

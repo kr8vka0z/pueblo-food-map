@@ -72,6 +72,23 @@ it.each([
   expect(venue(db)).toEqual({ hours_irregular: HOURS, last_verified: "2026-10-27" });
 });
 
+it("approving a removal card stamps the approval date too", async () => {
+  const db = buildDb("2026-10-20");
+  const id = db
+    .prepare(
+      `INSERT INTO change_proposals (source, target_venue_id, change_type, proposed_diff, diff_hash, run_id) VALUES ('osm', 'v1', 'remove', '{"fields_changed":[]}', 'h', 'r')`,
+    )
+    .run().lastInsertRowid;
+  const row = db.prepare("SELECT * FROM change_proposals WHERE id = ?").get(id) as ChangeProposalRow;
+
+  const result = await applyApprovedProposal(sqliteD1(db), row, { email: "a@b.c" });
+
+  expect(result).toMatchObject({ ok: true });
+  expect(db.prepare("SELECT status, last_verified FROM venues WHERE id = 'v1'").get()).toEqual({ status: "archived", last_verified: "2026-10-27" });
+  const audit = db.prepare("SELECT after_json FROM audit_log WHERE entity_id = 'v1'").get() as { after_json: string };
+  expect(JSON.parse(audit.after_json).last_verified).toBe("2026-10-27");
+});
+
 it("a real field that changed since the card was made still blocks it", async () => {
   const db = buildDb("2026-10-20");
   const row = card(db, { phone: null, last_verified: "2026-05-14" }, { phone: "719-555-0100", last_verified: "2026-09-25" });

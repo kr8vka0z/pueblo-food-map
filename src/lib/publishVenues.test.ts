@@ -20,7 +20,6 @@
 
 import { describe, test, expect, vi, afterEach } from "vitest";
 import type { Venue } from "@/types/venue";
-import { pfpVenues } from "@/data/pfp-venues";
 import { groceryOsmVenues } from "@/data/grocery-osm";
 import { plentifulPantries } from "@/data/pantries-plentiful";
 import {
@@ -353,14 +352,14 @@ describe("venuesToLiteralArray / serializePublishedVenuesFile", () => {
   });
 
   test("round-trip: the full venueToRow → validateSnapshot → serialize pipeline preserves the real seeded venues exactly", () => {
-    // Runs the real seed data (106 venues) through the exact publish pipeline
+    // Runs the real scraper seed data (96 venues) through the exact publish pipeline
     // and asserts it survives byte-for-byte. Anchored to the seeds themselves,
     // NOT to published-venues.ts: that file is regenerated from D1 on every
-    // admin publish (so it grows past 106), which is expected — pinning a test
+    // admin publish (so it grows), which is expected — pinning a test
     // to it blocked every real publish. This still fully exercises the
     // serializer against real venue shapes.
-    const allVenues = [...pfpVenues, ...groceryOsmVenues, ...plentifulPantries];
-    expect(allVenues).toHaveLength(106);
+    const allVenues = [...groceryOsmVenues, ...plentifulPantries];
+    expect(allVenues).toHaveLength(96);
 
     const rows = allVenues.map((v) => venueToRow(v));
     const validation = validateSnapshot(rows);

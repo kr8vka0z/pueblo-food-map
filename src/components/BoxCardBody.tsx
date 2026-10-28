@@ -362,7 +362,7 @@ export default function BoxCardBody({
           onClick={() => walk.onWalk(box)}
           aria-describedby={walk.showLocationHint ? walkLocationHintId : undefined}
           aria-label={`${box.address} — ${t("directions.walkAriaLabel", locale, { name: box.name })}`}
-          className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+          className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
         >
           {box.address}
         </button>
@@ -372,7 +372,7 @@ export default function BoxCardBody({
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`${box.address} — ${t("directions.boxAriaLabel", locale, { name: box.name })}`}
-          className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+          className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
         >
           {box.address}
         </a>
@@ -476,7 +476,7 @@ export default function BoxCardBody({
             data-tour="box-adopt"
             aria-expanded={adoptOpen}
             onClick={() => setAdoptOpen((open) => !open)}
-            className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
+            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
           >
             {t("box.adopt.linkLabel", locale)}
           </button>
@@ -494,7 +494,7 @@ export default function BoxCardBody({
         {showHistoryLink && (
           <Link
             href={`/box/${encodeURIComponent(box.id)}/history`}
-            className="inline-flex min-h-[44px] items-center text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] items-center text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
           >
             {t("box.history.link", locale)}
           </Link>

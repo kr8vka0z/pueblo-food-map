@@ -150,7 +150,7 @@ export default function PhotoViewer({ src, alt, caption, open, onClose, locale }
             type="button"
             onClick={onClose}
             aria-label={t("detail.close", locale)}
-            className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-[rgba(255,255,255,0.12)] text-2xl leading-none text-[var(--color-bone-50)] hover:bg-[rgba(255,255,255,0.2)]"
+            className="absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full bg-[rgba(255,255,255,0.12)] text-2xl leading-none text-[var(--color-bone-50)] hover:bg-[rgba(255,255,255,0.2)]"
           >
             ×
           </button>

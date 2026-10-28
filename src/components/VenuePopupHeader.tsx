@@ -31,7 +31,8 @@ export default function VenuePopupHeader({
   historyHref,
 }: VenuePopupHeaderProps) {
   const historyClassName =
-    "order-1 flex items-center h-8 px-3 -ml-1 rounded-md " +
+    // before:* — the 32px link's hit area reaches 48px inside the 44px bar (#827).
+    "order-1 relative before:absolute before:inset-x-0 before:-inset-y-2 flex items-center h-8 px-3 -ml-1 rounded-md " +
     "text-xs font-medium text-[var(--color-sage-600)] " +
     "hover:text-[var(--color-sage-700)] hover:bg-[var(--color-bone-100)] transition-colors " +
     PRESS_FEEDBACK + " " +
@@ -55,7 +56,9 @@ export default function VenuePopupHeader({
           // box fills it exactly). Negative margin folds in the pre-existing
           // -mr-1 and cancels the growth so the panel's tight header layout
           // and the icon's position don't move (mobile review #11).
-          "order-3 flex items-center justify-center w-11 h-11 " +
+          // before:* — invisible 2px-all-round overlay takes the 44px box to
+          // the 48px floor without moving the icon (#827).
+          "order-3 relative before:absolute before:-inset-0.5 flex items-center justify-center w-11 h-11 " +
           "-mt-1.5 -mb-1.5 -ml-1.5 -mr-[10px] rounded-md shrink-0 " +
           "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-100)] transition-colors " +
           PRESS_FEEDBACK + " " +

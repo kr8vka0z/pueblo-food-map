@@ -31,6 +31,12 @@ import SiteFooter from "@/components/SiteFooter";
 import type { Venue } from "@/types/venue";
 import type { PublicBlessingBox } from "@/lib/blessingBoxes";
 import { waitForBoxCard } from "@/lib/testing/waitForBoxCard.testutil";
+import BoxCardBody from "@/components/BoxCardBody";
+import VenuePopupHeader from "@/components/VenuePopupHeader";
+import LocationHelpCard from "@/components/LocationHelpCard";
+import AdoptBoxForm from "@/components/AdoptBoxForm";
+import { LocaleProvider } from "@/lib/LocaleContext";
+import { makeWalk } from "@/__tests__/helpers/walkTestHelpers";
 
 // Box cards mount BoxCheckinPanel's Turnstile widget — same stub as the
 // BoxCardBody/DesktopVenueWindow tests.
@@ -328,10 +334,7 @@ describe("Share/Save rows elsewhere keep 8px between the enlarged hit areas", ()
     off: vi.fn().mockReturnThis(),
   };
   const windowProps = {
-    expanded: false,
     mapboxMap,
-    onExpand: vi.fn(),
-    onCollapse: vi.fn(),
     onClose: vi.fn(),
     locale: "en" as const,
   };
@@ -363,5 +366,70 @@ describe("Share/Save rows elsewhere keep 8px between the enlarged hit areas", ()
     await waitForBoxCard();
     const share = screen.getByRole("button", { name: /Share TT Box/ });
     expect(classes(share.parentElement)).toContain("gap-4");
+  });
+});
+
+// #827: the controls the 44px leftovers audit lifted to 48. Boxed buttons and
+// fields grow to a real 48px; inline text links keep their look and gain the
+// same invisible overlay as the venue card's phone link (#233).
+describe("44px leftovers reach the 48px floor (#827)", () => {
+  const OVERLAY_Y = ["relative", "before:absolute", "before:inset-x-0", "before:-inset-y-0.5"];
+  const ttBox: PublicBlessingBox = {
+    ...makeVenue({ id: "tt-box-2", name: "TT Box Two" }),
+    category: "blessing_box",
+    box: {
+      hostName: null,
+      hostNote: null,
+      mostNeeded: null,
+      installedOn: "2026-01-01",
+      removedOn: null,
+      status: "stocked",
+      lastFilledAt: null,
+      recentCheckins: [],
+      latestPhoto: null,
+      adopters: [],
+    },
+  };
+  const boxCard = () =>
+    render(
+      <LocaleProvider initialLocale="en">
+        <BoxCardBody box={ttBox} walk={makeWalk()} />
+      </LocaleProvider>,
+    );
+
+  test.each<[string, () => HTMLElement, string[]]>([
+    ["box card address (Walk trigger)", () => (boxCard(), screen.getByText("1 Main St, Pueblo, CO 81003")), OVERLAY_Y],
+    ["box card sponsor link", () => (boxCard(), screen.getByRole("button", { name: "Apply to sponsor this box" })), OVERLAY_Y],
+    ["box card History link", () => (boxCard(), screen.getByRole("link", { name: "History" })), OVERLAY_Y],
+    ["box card email-alerts link", () => (boxCard(), screen.getByRole("button", { name: "Email me when it needs filling" })), OVERLAY_Y],
+    ["box check-in buttons", () => (boxCard(), screen.getByRole("button", { name: "I filled it" })), ["min-h-12"]],
+    [
+      "desktop card close",
+      () => (render(<VenuePopupHeader onClose={vi.fn()} />), screen.getByRole("button", { name: "Close" })),
+      ["relative", "before:absolute", "before:-inset-0.5"],
+    ],
+    [
+      "desktop box card History link",
+      () => (render(<VenuePopupHeader onClose={vi.fn()} historyHref="/box/x/history" />), screen.getByRole("link", { name: "History" })),
+      ["relative", "before:absolute", "before:inset-x-0", "before:-inset-y-2"],
+    ],
+    [
+      "location help card close",
+      () => (
+        render(<LocationHelpCard failure={{ permission: "denied", position: null }} onRetry={vi.fn()} onShowList={vi.fn()} onDismiss={vi.fn()} />),
+        screen.getByRole("button", { name: "Close" })
+      ),
+      ["w-12", "h-12"],
+    ],
+    [
+      "sponsor form submit",
+      () => (
+        render(<LocaleProvider initialLocale="en"><AdoptBoxForm boxId="x" open onOpenChange={vi.fn()} /></LocaleProvider>),
+        screen.getByRole("button", { name: "Send application" })
+      ),
+      ["min-h-12"],
+    ],
+  ])("%s", (_name, find, expected) => {
+    expect(classes(find())).toEqual(expect.arrayContaining(expected));
   });
 });

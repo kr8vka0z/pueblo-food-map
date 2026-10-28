@@ -80,7 +80,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             <Link
               href={localizedHref("/", tree)}
               className={
-                "inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
+                "relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
                 "hover:text-[var(--color-sage-700)] transition-colors " +
                 "focus-visible:outline-none focus-visible:ring-2 " +
                 "focus-visible:ring-[var(--color-sage-500)] rounded"
@@ -94,7 +94,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             <Link
               href={localizedHref("/venues", tree)}
               className={
-                "inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
+                "relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center min-h-11 font-medium text-[var(--color-sage-600)] " +
                 "hover:text-[var(--color-sage-700)] transition-colors " +
                 "focus-visible:outline-none focus-visible:ring-2 " +
                 "focus-visible:ring-[var(--color-sage-500)] rounded"
@@ -219,7 +219,7 @@ export default function VenueContent({ venue: v, nearby = [], summary }: VenueCo
             </h2>
             <a
               href={`tel:${v.phone}`}
-              className="inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
+              className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex items-center gap-2.5 min-h-11 text-sm font-semibold text-[var(--color-sage-700)] underline underline-offset-2 hover:text-[var(--color-sage-600)] transition-colors"
             >
               <Phone size={15} className="text-[var(--color-sage-600)]" aria-hidden />
               {v.phone}

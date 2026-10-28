@@ -104,17 +104,17 @@ const errorClass = "mt-1 text-xs text-[var(--color-danger)]";
 const labelClass = "block text-sm font-medium text-[var(--color-ink-700)] mb-1";
 const hintClass = "font-normal text-[var(--color-ink-400)]";
 const secondaryButtonClass =
-  "inline-flex min-h-11 items-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
+  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-sage-500)] " +
   "px-4 text-sm font-medium text-[var(--color-sage-600)] bg-transparent transition-colors duration-150 " +
   "hover:bg-[var(--color-sage-50)] focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
 const primaryButtonClass =
-  "inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] px-4 " +
+  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-sage-600)] px-4 " +
   "text-base font-semibold text-[var(--color-bone-50)] transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 " +
   "disabled:opacity-60 disabled:cursor-not-allowed";
 const dangerButtonClass =
-  "inline-flex min-h-11 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] px-4 " +
+  "inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] px-4 " +
   "text-sm font-medium text-[var(--color-danger)] bg-transparent transition-colors duration-150 " +
   "hover:bg-[var(--color-danger)] hover:text-[var(--color-bone-50)] focus-visible:outline-none focus-visible:ring-2 " +
   "focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
@@ -438,11 +438,11 @@ export default function EventForm({ venues, eventId, initialValues, status: init
           Where <span aria-hidden className="text-[var(--color-danger)]">*</span>
         </legend>
         <div className="mb-3 flex flex-wrap gap-4 text-sm text-[var(--color-ink-700)]">
-          <label className="flex min-h-11 cursor-pointer items-center gap-2">
+          <label className="flex min-h-12 cursor-pointer items-center gap-2">
             <input type="radio" name="place-mode" checked={placeMode === "venue"} onChange={() => { setPlaceMode("venue"); clearPlace(); }} />
             A place already on the map
           </label>
-          <label className="flex min-h-11 cursor-pointer items-center gap-2">
+          <label className="flex min-h-12 cursor-pointer items-center gap-2">
             <input type="radio" name="place-mode" checked={placeMode === "address"} onChange={() => { setPlaceMode("address"); clearPlace(); }} />
             A different address
           </label>
@@ -609,7 +609,7 @@ export default function EventForm({ venues, eventId, initialValues, status: init
             )}
           </>
         )}
-        <Link href="/admin/events" className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2">
+        <Link href="/admin/events" className="inline-flex min-h-12 items-center text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2">
           Back to events
         </Link>
       </div>

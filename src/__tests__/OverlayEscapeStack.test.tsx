@@ -171,9 +171,6 @@ describe("#527 — Escape closes only the topmost overlay; scroll lock is shared
             {(close) => (
               <DesktopVenueWindow
                 venue={venue}
-                expanded={false}
-                onExpand={() => {}}
-                onCollapse={() => {}}
                 onClose={close}
                 locale="en"
               />

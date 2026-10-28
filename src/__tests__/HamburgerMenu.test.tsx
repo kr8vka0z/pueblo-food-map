@@ -24,6 +24,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import { LocaleProvider } from "@/lib/LocaleContext";
+import { t } from "@/lib/i18n";
 import { track, EVENTS } from "@/lib/analytics";
 
 // #736: mock the whole module so EVENTS keeps its real allowlist values.
@@ -686,5 +687,17 @@ describe("HamburgerMenu — focus trap re-targeting after leaving the panel", ()
       'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
     );
     expect(document.activeElement).toBe(focusable[focusable.length - 1]);
+  });
+});
+
+// #846: same rule as the footer — /roadmap belongs to another Worker, so the
+// Spanish menu must not rewrite it to /es/roadmap.
+describe("HamburgerMenu — Roadmap item (#846)", () => {
+  test.each(["en", "es"] as const)("points at /roadmap on the %s tree", async (locale) => {
+    const user = userEvent.setup();
+    renderMenuWithLocaleProvider(locale, locale);
+    await user.click(screen.getByRole("button", { name: locale === "es" ? "Abrir menú" : "Open menu" }));
+    const link = await screen.findByRole("link", { name: t("menu.roadmap", locale) });
+    expect(link.getAttribute("href")).toBe("/roadmap");
   });
 });

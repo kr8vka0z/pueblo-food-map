@@ -40,7 +40,7 @@ const STATUS_CLASS: Record<EventStatus, string> = {
 };
 
 const primaryLinkClass =
-  "inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] " +
+  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] " +
   "bg-[var(--color-sage-600)] px-4 text-base font-semibold text-[var(--color-bone-50)] " +
   "transition-colors duration-150 hover:bg-[var(--color-sage-700)] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2";
@@ -66,7 +66,7 @@ export default function EventsList({ events }: EventsListProps) {
           type="button"
           onClick={() => startRetry(() => router.refresh())}
           className={
-            "mt-3 inline-flex min-h-11 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] " +
+            "mt-3 inline-flex min-h-12 items-center rounded-[var(--radius-md)] border border-[var(--color-danger)] " +
             "bg-white px-4 text-sm font-medium text-[var(--color-danger)] transition-colors duration-150 " +
             "hover:bg-[var(--color-bone-100)] focus-visible:outline-none focus-visible:ring-2 " +
             "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2"
@@ -122,7 +122,7 @@ export default function EventsList({ events }: EventsListProps) {
                 <td className="px-4 py-3 text-right">
                   <Link
                     href={`/admin/events/${e.id}/edit`}
-                    className="inline-flex min-h-11 items-center font-medium text-[var(--color-sage-700)] underline underline-offset-2"
+                    className="inline-flex min-h-12 items-center font-medium text-[var(--color-sage-700)] underline underline-offset-2"
                     aria-label={`Edit ${e.name}`}
                   >
                     Edit

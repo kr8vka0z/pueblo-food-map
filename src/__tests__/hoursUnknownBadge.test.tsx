@@ -90,13 +90,10 @@ describe("BottomSheet — hours-unknown label", () => {
 });
 
 describe("DesktopVenueWindow — hours-unknown label", () => {
-  test("shows 'Hours unknown — call ahead' in collapsed state", () => {
+  test("shows 'Hours unknown — call ahead'", () => {
     render(
       <DesktopVenueWindow
         venue={makeVenue()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -108,9 +105,6 @@ describe("DesktopVenueWindow — hours-unknown label", () => {
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />,
     );

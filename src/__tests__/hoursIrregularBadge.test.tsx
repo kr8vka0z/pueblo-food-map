@@ -114,9 +114,6 @@ describe("DesktopVenueWindow — irregular schedule", () => {
     render(
       <DesktopVenueWindow
         venue={makeVenue()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -127,23 +124,17 @@ describe("DesktopVenueWindow — irregular schedule", () => {
     render(
       <DesktopVenueWindow
         venue={makeVenue()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />,
     );
     expect(screen.getByText(/Next:/i)).toBeDefined();
   });
 
-  test("weekly + monthly render together in the expanded hours section", () => {
+  test("weekly + monthly render together in the hours section", () => {
     const venue = makeVenue({ hours_weekly: { thu: ["09:00-13:00"] } });
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
       />,
     );

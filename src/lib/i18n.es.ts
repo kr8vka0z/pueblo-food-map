@@ -169,6 +169,7 @@ const es: Record<string, string> = {
   "menu.suggest": "Sugerir un lugar",
   "menu.sponsoredBy": "Patrocinado por",
   "menu.donate": "Donar",
+  "menu.roadmap": "Ideas y novedades",
   "menu.donateSub": "Apoya este mapa y otros proyectos de Pueblo Food Project",
   "credit.builtBy": "Diseñado, creado y administrado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
@@ -475,6 +476,7 @@ const es: Record<string, string> = {
   "footer.about": "Acerca de",
   "footer.privacy": "Privacidad",
   "footer.suggest": "Sugerir un lugar",
+  "footer.roadmap": "Ideas y novedades",
   "footer.venues": "Todos los lugares", // [CHECK]
   "footer.resources": "Programas de ayuda alimentaria",
   "breadcrumb.label": "Ruta de navegación", // [CHECK]

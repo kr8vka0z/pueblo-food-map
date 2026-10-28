@@ -217,7 +217,7 @@ export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: Ad
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="min-h-[44px] text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline w-fit text-left"
+            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 min-h-[44px] text-sm font-medium text-[var(--color-sage-600)] hover:text-[var(--color-sage-700)] underline w-fit text-left"
           >
             {t("box.adopt.linkLabel", locale)}
           </button>
@@ -320,14 +320,14 @@ export default function AdoptBoxForm({ boxId, open: openProp, onOpenChange }: Ad
           type="submit"
           disabled={busy}
           aria-disabled={busy}
-          className="min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
+          className="min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
         >
           {busy ? t("box.adopt.submitting", locale) : t("box.adopt.submit", locale)}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+          className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
         >
           {t("box.adopt.cancel", locale)}
         </button>

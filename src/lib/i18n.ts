@@ -208,6 +208,7 @@ const enClient: Record<string, string> = {
   // Donate card (#736). Never "sponsor" here: on this site that word means
   // adopting a blessing box. No tax claim; PFP's own page covers that.
   "menu.donate": "Donate",
+  "menu.roadmap": "Roadmap",
   "menu.donateSub": "Supports this map and Pueblo Food Project's other work",
   // Agency credit (StyxCredit.tsx) — followed by the linked name "The Styx Group".
   "credit.builtBy": "Designed, built and managed by",
@@ -579,6 +580,7 @@ const enClient: Record<string, string> = {
   "footer.about": "About",
   "footer.privacy": "Privacy",
   "footer.suggest": "Suggest a place",
+  "footer.roadmap": "Roadmap",
   // SEO/AEO plan Phase 0: the footer is how crawlers reach /venues (and from
   // there every venue page) — before this, no page's server HTML linked it.
   "footer.venues": "All places",

@@ -416,7 +416,7 @@ export default function ReportForm({
         type="submit"
         disabled={status === "submitting" || !turnstileToken}
         className={
-          "w-full h-11 rounded-[var(--radius-md)] " +
+          "w-full h-12 rounded-[var(--radius-md)] " +
           "bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
           "text-base font-semibold transition-colors duration-150 " +
           "hover:bg-[var(--color-sage-700)] " +
@@ -439,7 +439,7 @@ export default function ReportForm({
           type="button"
           onClick={() => setStatus("idle")}
           className={
-            "w-full h-11 rounded-[var(--radius-md)] " +
+            "w-full h-12 rounded-[var(--radius-md)] " +
             // #534: --color-ink-300 undefined — bone-300 is the app's
             // resting-border token (see FeedbackForm's identical fix).
             "border border-[var(--color-bone-300)] text-[var(--color-ink-700)] " +

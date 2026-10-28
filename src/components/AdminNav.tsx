@@ -90,7 +90,7 @@ const ACTIVITY_ITEM: NavItem = { key: "activity", label: "Activity", href: "/adm
 const navLinkBase =
   "inline-flex items-center whitespace-nowrap rounded-[var(--radius-md)] text-sm px-3 py-2 font-medium " +
   "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 " +
-  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 min-h-11";
+  "focus-visible:ring-[var(--color-sage-500)] focus-visible:ring-offset-2 min-h-12";
 
 const navLinkActive = "bg-[var(--color-sage-600)] text-[var(--color-bone-50)]";
 const navLinkInactive = "text-[var(--color-ink-500)] hover:bg-[var(--color-bone-200)]";
@@ -105,7 +105,7 @@ const pillClass =
 // admin's one primary action, so this is a deliberate, owner-approved third
 // use, not a drift from the token rule (see DESIGN.md's own updated note).
 const primaryButtonClass =
-  "inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] " +
+  "inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] " +
   "bg-[var(--color-brand-orange)] px-4 text-sm font-bold text-[var(--color-brand-navy)] " +
   "transition-colors duration-150 hover:opacity-90 " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-orange)] " +

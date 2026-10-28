@@ -29,7 +29,7 @@
  */
 
 import Link from "next/link";
-import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Star, History, Compass, Heart } from "lucide-react";
+import { X, ExternalLink, RotateCcw, MessageSquare, MapPinPlus, Info, List, Map as MapIcon, HandHelping, Lightbulb, Star, History, Compass, Heart } from "lucide-react";
 import HamburgerMenuItem from "./HamburgerMenuItem";
 import LanguageToggle from "./LanguageToggle";
 import StyxCredit from "./StyxCredit";
@@ -334,6 +334,17 @@ export default function HamburgerMenuContent({
                 href={localizedHref("/resources", tree)}
                 onClick={onClose}
                 icon={<HandHelping size={14} />}
+              />
+
+              {/* Roadmap (#846) — the public roadmap page is served by a
+                  separate Worker on the /roadmap* route, so this is a plain
+                  link, never client routing, and the same path in Spanish. */}
+              <HamburgerMenuItem
+                label={t("menu.roadmap", locale)}
+                href="/roadmap"
+                plain
+                onClick={onClose}
+                icon={<Lightbulb size={14} />}
               />
             </ul>
             {/* Language toggle (#109) — placed OUTSIDE role="menu" because LanguageToggle

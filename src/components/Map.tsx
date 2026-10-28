@@ -120,7 +120,7 @@ export interface WalkingRouteInfo {
  * 2026-09-20, including the depart and arrive steps), so the absent case is
  * malformed-response-only; there, showing the turn and skipping the camera
  * hop beats hiding the turn. Consumers must therefore guard before reading
- * it (see MapWrapper's `handleStepChange`).
+ * it (see `useWalkingRoute`'s `stepTo`).
  *
  * `maneuverType`/`maneuverModifier` (e.g. "turn"/"left") drive the
  * stepper's turn icon (DirectionButtons.tsx's `WalkStepper`) — both stay

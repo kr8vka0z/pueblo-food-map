@@ -41,10 +41,10 @@
  * result and asked to KEEP the in-app walking route (2026-09-19, walk
  * restore pass): the address stays the one visible control (no icon, no
  * extra row) but now DOUBLES as that Walk trigger when a map is present.
- * `onWalkRoute` presence is the switch: absent (BoxHistoryContent, no map
+ * `walk` presence is the switch: absent (BoxHistoryContent, no map
  * to draw a route on) → the address is a plain external `<a>` to Google
  * Maps, unchanged from before. Present (BottomSheet/DesktopVenueWindow,
- * always forwarded from MapWrapper's own `handleWalkRoute`) → the address
+ * the `walk` object MapWrapper builds with `useWalkingRoute`'s `walkFor`) → the address
  * is a `<button>` that fires the SAME callback, geolocation-request, and
  * location-hint behavior DirectionButtons' own Walk button uses for every
  * other venue, and the active-route readout (distance/duration, steps,
@@ -92,7 +92,8 @@ import BoxCheckinPanel from "@/components/BoxCheckinPanel";
 import AdoptBoxForm from "@/components/AdoptBoxForm";
 import BoxAlertSignupForm from "@/components/BoxAlertSignupForm";
 import PhotoViewer from "@/components/PhotoViewer";
-import { googleMapsUrl, WalkRouteStatus, type RouteInfo, type WalkStep } from "@/components/DirectionButtons";
+import { googleMapsUrl, WalkRouteStatus } from "@/components/DirectionButtons";
+import type { Walk } from "@/lib/useWalkingRoute";
 import { categoryColors } from "@/lib/categories";
 import {
   STATUS_DOT_CLASS,
@@ -105,11 +106,8 @@ import {
 interface BoxCardBodyProps {
   box: PublicBlessingBox;
   /**
-   * Default "default" — today's photo-first order, rendered by an UNTOUCHED
-   * copy of this component's original return statement (see the bottom of
-   * this file) so `DesktopVenueWindow` and `BoxHistoryContent` — the two
-   * other callers, neither of which passes this prop — keep rendering
-   * byte-for-byte what they always have. "sheet" is BottomSheet's own
+   * Default "default" — the photo-first order `DesktopVenueWindow` and
+   * `BoxHistoryContent` render. "sheet" is BottomSheet's own
    * mobile redesign (#667): name -> inline status -> address -> most
    * needed -> host note -> check-in panel render first and unclipped;
    * photo, the sponsor band and the footer links move below a clipped
@@ -138,32 +136,13 @@ interface BoxCardBodyProps {
   /**
    * In-app walking directions (walk restore pass, 2026-09-19) — see this
    * file's own header for the full rationale. Absent (default): the address
-   * renders as a plain external `<a>` to Google Maps, exactly as before
-   * (BoxHistoryContent's use — no map on that page to draw a route on).
-   * Present: the address becomes a `<button>` that calls this on tap,
-   * mirroring DirectionButtons' own Walk button (same callback contract the
-   * caller already wires for ordinary venues — MapWrapper's
-   * `handleWalkRoute`, which self-toggles off on a second tap for the same
-   * venue, so this needs no separate "already active" branch here).
+   * renders as a plain external `<a>` to Google Maps (BoxHistoryContent — no
+   * map on that page to draw a route on). Present: the address becomes a
+   * `<button>` calling `walk.onWalk(box)`, the SAME callback DirectionButtons'
+   * own Walk button uses (it self-toggles off on a second tap), and the
+   * active-route readout renders below it.
    */
-  onWalkRoute?: () => void;
-  /** True when a walking route for this box is currently drawn on the map. Drives the active-route readout below the address and the address's own aria-label. */
-  isWalkRouteActive?: boolean;
-  /** Renders the readout's standalone "Clear route" control (see WalkRouteStatus's own `onClearRoute` doc for why the box card needs this while ordinary venues don't — the address stays labeled as the address, never relabels to "Clear route"). */
-  onClearWalkRoute?: () => void;
-  /** Walking route distance + duration for the in-card readout (threaded from MapWrapper via BottomSheet/DesktopVenueWindow, same as DirectionButtons' own prop). */
-  walkRouteInfo?: RouteInfo | null;
-  /**
-   * Turn-by-turn steps from Mapbox (pre-localized), same as DirectionButtons'
-   * own prop — passed straight through to WalkRouteStatus below.
-   */
-  walkRouteSteps?: WalkStep[] | null;
-  /** True when this box's Walk tap requested geolocation and it was denied or is unavailable (#207) — same as DirectionButtons' own prop. */
-  showWalkLocationHint?: boolean;
-  /** Which turn the step-through stepper is showing (#555) — same as WalkRouteStatus's own prop. */
-  activeStepIndex?: number;
-  /** Moves the stepper to a different turn (#555) — same as WalkRouteStatus's own prop. */
-  onStepChange?: (index: number) => void;
+  walk?: Walk;
 }
 
 /**
@@ -313,14 +292,7 @@ export default function BoxCardBody({
   photoRadiusClassName = "",
   actions,
   nameId,
-  onWalkRoute,
-  isWalkRouteActive = false,
-  onClearWalkRoute,
-  walkRouteInfo = null,
-  walkRouteSteps = null,
-  showWalkLocationHint = false,
-  activeStepIndex = 0,
-  onStepChange = () => {},
+  walk,
 }: BoxCardBodyProps) {
   const { locale } = useLocale();
   const [adoptOpen, setAdoptOpen] = useState(false);
@@ -329,7 +301,7 @@ export default function BoxCardBody({
   // Per-instance id for the "share your location" hint (#207) — shared with
   // WalkRouteStatus's own <p id>, same reasoning as DirectionButtons' own
   // identical field. Always called (Rules of Hooks) even in link mode
-  // (onWalkRoute absent); unused in that branch.
+  // (walk absent); unused in that branch.
   const walkLocationHintId = useId();
   const hasSponsors = box.box.adopters.length > 0;
   const mostNeededChips = box.box.mostNeeded
@@ -345,137 +317,231 @@ export default function BoxCardBody({
   const neededFromVisitors = mostNeededChips.length === 0 ? (box.box.neededFromVisitors ?? []) : [];
   const NameTag = headingLevel;
 
-  // ── Sheet layout (#667) ─────────────────────────────────────────────────
-  // A DELIBERATELY separate return, not a reordering of the JSX below via
-  // conditionals — the "default" branch after this one is left byte-for-
-  // byte untouched (same reasoning DesktopVenueWindow/BoxHistoryContent's
-  // Plan risk note calls out: "a default-off prop keeps desktop and history
-  // untouched"). Some markup below is intentionally the same code duplicated
-  // rather than shared through a common variable, because reusing one JSX
-  // const across both branches would mean any change made for one layout's
-  // needs risks silently altering the other's — the two orders diverge too
-  // much (name-first vs. photo-first) for a shared middle ground to stay
-  // simple. Small and boring beats clever here. The one shared piece is
-  // BoxPhotoHero (the photo block, identical in both, with an overlay slot).
+  // ── Blocks — each defined once, ordered per layout below ────────────────
+  // (#725: the two layouts used to be two full copies of the same markup.)
+
+  // Badge + actions, then name (#515 fix pass, 2026-09-19): the name gets its
+  // own row so it can run the card's full width instead of the column left
+  // beside the actions. gap-4 keeps 8px between the actions' 48px hit areas (#233).
+  const nameBlock = (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className="inline-block rounded-full px-2.5 py-1 text-[11px] font-semibold text-[var(--color-bone-50)]"
+          style={{ backgroundColor: categoryColors[box.category] }}
+        >
+          {t("category.full.blessing_box", locale)}
+        </span>
+        {actions && <div className="flex shrink-0 items-center gap-4">{actions}</div>}
+      </div>
+      <NameTag
+        id={nameId}
+        className="text-xl font-normal leading-tight text-[var(--color-ink-900)]"
+        style={{ fontFamily: "var(--font-display)" }}
+      >
+        {box.name}
+      </NameTag>
+    </div>
+  );
+
+  // Address — the text itself is the directions link/trigger (mockup v3,
+  // option B — Kyle's pick, no icon, no button row). See this file's own
+  // header for the walk-restore rationale. `walk` absent (BoxHistoryContent,
+  // no map on that page): plain external `<a>` to Google Maps with NO preset
+  // travelmode (fix pass, item 4 — many box visitors walk or ride the bus).
+  // `walk` present: a `<button>` starting the SAME in-app walking route
+  // DirectionButtons' Walk button does, styled identically, and its visible
+  // text always stays the address (never relabels to "Clear route" — see
+  // WalkRouteStatus's `onClearRoute` doc). Both forms prefix the aria-label
+  // with the visible address (WCAG 2.5.3 label-in-name).
+  const addressBlock = (
+    <div className="-mt-2 flex flex-col items-start">
+      {walk ? (
+        <button
+          type="button"
+          onClick={() => walk.onWalk(box)}
+          aria-describedby={walk.showLocationHint ? walkLocationHintId : undefined}
+          aria-label={`${box.address} — ${t("directions.walkAriaLabel", locale, { name: box.name })}`}
+          className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+        >
+          {box.address}
+        </button>
+      ) : (
+        <a
+          href={googleMapsUrl(box.lat, box.lng)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${box.address} — ${t("directions.boxAriaLabel", locale, { name: box.name })}`}
+          className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+        >
+          {box.address}
+        </a>
+      )}
+      {walk && (
+        <WalkRouteStatus
+          venue={box}
+          locale={locale}
+          isRouteActive={walk.isActive}
+          routeInfo={walk.info}
+          walkSteps={walk.steps}
+          showLocationHint={walk.showLocationHint}
+          locationHintId={walkLocationHintId}
+          onClearRoute={walk.onClear}
+          activeStepIndex={walk.activeStepIndex}
+          onStepChange={walk.onStepChange}
+        />
+      )}
+    </div>
+  );
+
+  // Most needed — admin-typed text wins when set; the self-filling
+  // visitor-sourced list (migration 0012) only renders when it isn't.
+  const needsBlock = (
+    <>
+      {mostNeededChips.length > 0 && (
+        <div>
+          <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
+            {t("box.mostNeeded", locale)}
+          </h3>
+          <div className="flex flex-wrap gap-1.5">
+            {mostNeededChips.map((item) => (
+              <span
+                key={item}
+                className="rounded-full bg-[var(--color-bone-100)] px-2.5 py-1 text-sm text-[var(--color-ink-700)]"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {neededFromVisitors.length > 0 && (
+        <div>
+          <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
+            {t("box.mostNeeded.fromVisitors", locale)}
+          </h3>
+          <div className="flex flex-wrap gap-1.5">
+            {neededFromVisitors.map(({ key, count }) => (
+              <span
+                key={key}
+                className="rounded-full bg-[var(--color-bone-100)] px-2.5 py-1 text-sm text-[var(--color-ink-700)]"
+              >
+                {t(`box.needs.${key}`, locale)} <span className="text-[var(--color-ink-400)]">· {count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  // Host's public note only — no host NAME, no "Host" heading (card redesign
+  // spec item 4); the note, when set, is a plain quiet line.
+  const hostNoteBlock = box.box.hostNote && <p className="text-sm text-[var(--color-ink-500)]">{box.box.hostNote}</p>;
+
+  // Check-in panel — status trio, took/photo row, quiet report links.
+  const checkinBlock = (
+    <BoxCheckinPanel
+      boxId={box.id}
+      onCheckinSuccess={(result) => onCheckinSuccess?.(result)}
+      latestPhotoId={box.box.latestPhoto?.id ?? null}
+    />
+  );
+
+  // Sponsor band — always present, one of two states, always carrying the
+  // adopt-application link — plus the adopt form it expands in place.
+  const sponsorBlock = (
+    <>
+      <div
+        className={`-mx-4 px-4 py-2.5 text-sm ${
+          hasSponsors
+            ? "bg-[var(--color-sage-50)] text-[var(--color-sage-700)]"
+            : "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]"
+        }`}
+      >
+        <p>
+          {hasSponsors ? (
+            <>
+              {t("box.sponsor.sponsoredByPrefix", locale)}
+              {formatSponsorNames(box.box.adopters, locale)}
+            </>
+          ) : (
+            t("box.sponsor.needsSponsor", locale)
+          )}
+        </p>
+        <p className="mt-0.5 text-xs">
+          {t("box.sponsor.wantToHelp", locale)}
+          <button
+            type="button"
+            data-tour="box-adopt"
+            aria-expanded={adoptOpen}
+            onClick={() => setAdoptOpen((open) => !open)}
+            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
+          >
+            {t("box.adopt.linkLabel", locale)}
+          </button>
+        </p>
+      </div>
+      <AdoptBoxForm boxId={box.id} open={adoptOpen} onOpenChange={setAdoptOpen} />
+    </>
+  );
+
+  // Footer — ONLY History + email-me-when-it-needs-filling, under a divider.
+  const footerBlock = (
+    <>
+      <div className="h-px bg-[var(--color-bone-200)]" />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium">
+        {showHistoryLink && (
+          <Link
+            href={`/box/${encodeURIComponent(box.id)}/history`}
+            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] items-center text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
+          >
+            {t("box.history.link", locale)}
+          </Link>
+        )}
+        <BoxAlertSignupForm boxId={box.id} />
+      </div>
+    </>
+  );
+
+  const photo = (overlay?: React.ReactNode) =>
+    box.box.latestPhoto && (
+      <BoxPhotoHero
+        photo={box.box.latestPhoto}
+        boxName={box.name}
+        locale={locale}
+        photoRadiusClassName={photoRadiusClassName}
+        open={photoViewerOpen}
+        onOpen={() => setPhotoViewerOpen(true)}
+        onClose={() => setPhotoViewerOpen(false)}
+      >
+        {overlay}
+      </BoxPhotoHero>
+    );
+
+  // ── Sheet layout (#667) — BottomSheet on a phone ────────────────────────
+  // Name, inline status, address, most needed, host note and check-in render
+  // first and unclipped; photo, sponsor band and footer sit below a clipped
+  // "peek" that the grab bar expands (#666's mechanics).
   if (layout === "sheet") {
     return (
       <div className={`flex flex-col gap-3 ${className}`}>
-        {/* First view: always rendered, never clipped — everything a
-            visitor needs to report the box's status is one tap away
-            without expanding (#667's "check-ins stay on the card" pick). */}
+        {/* First view: always rendered, never clipped — everything a visitor
+            needs to report the box's status is one tap away (#667). */}
         <div className="flex flex-col gap-3 px-4 pt-3 pb-1">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between gap-2">
-              <span
-                className="inline-block rounded-full px-2.5 py-1 text-[11px] font-semibold text-[var(--color-bone-50)]"
-                style={{ backgroundColor: categoryColors[box.category] }}
-              >
-                {t("category.full.blessing_box", locale)}
-              </span>
-              {actions && <div className="flex shrink-0 items-center gap-4">{actions}</div>}
-            </div>
-            <NameTag
-              id={nameId}
-              className="text-xl font-normal leading-tight text-[var(--color-ink-900)]"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              {box.name}
-            </NameTag>
-          </div>
-
-          {/* Status pill — ALWAYS inline here (#667 item 4: "no longer
-              overlaid on the photo"), directly under the name regardless of
-              whether the box has a photo. */}
+          {nameBlock}
+          {/* Status pill ALWAYS inline here (#667 item 4), directly under the name. */}
           <StatusPill box={box} locale={locale} overlay={false} />
-
-          <div className="-mt-2 flex flex-col items-start">
-            {onWalkRoute ? (
-              <button
-                type="button"
-                onClick={onWalkRoute}
-                aria-describedby={showWalkLocationHint ? walkLocationHintId : undefined}
-                aria-label={`${box.address} — ${t("directions.walkAriaLabel", locale, { name: box.name })}`}
-                className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
-              >
-                {box.address}
-              </button>
-            ) : (
-              <a
-                href={googleMapsUrl(box.lat, box.lng)}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`${box.address} — ${t("directions.boxAriaLabel", locale, { name: box.name })}`}
-                className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
-              >
-                {box.address}
-              </a>
-            )}
-            {onWalkRoute && (
-              <WalkRouteStatus
-                venue={box}
-                locale={locale}
-                isRouteActive={isWalkRouteActive}
-                routeInfo={walkRouteInfo}
-                walkSteps={walkRouteSteps}
-                showLocationHint={showWalkLocationHint}
-                locationHintId={walkLocationHintId}
-                onClearRoute={onClearWalkRoute}
-                activeStepIndex={activeStepIndex}
-                onStepChange={onStepChange}
-              />
-            )}
-          </div>
-
-          {mostNeededChips.length > 0 && (
-            <div>
-              <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
-                {t("box.mostNeeded", locale)}
-              </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {mostNeededChips.map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-full bg-[var(--color-bone-100)] px-2.5 py-1 text-sm text-[var(--color-ink-700)]"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          {neededFromVisitors.length > 0 && (
-            <div>
-              <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
-                {t("box.mostNeeded.fromVisitors", locale)}
-              </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {neededFromVisitors.map(({ key, count }) => (
-                  <span
-                    key={key}
-                    className="rounded-full bg-[var(--color-bone-100)] px-2.5 py-1 text-sm text-[var(--color-ink-700)]"
-                  >
-                    {t(`box.needs.${key}`, locale)} <span className="text-[var(--color-ink-400)]">· {count}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {box.box.hostNote && <p className="text-sm text-[var(--color-ink-500)]">{box.box.hostNote}</p>}
-
-          <BoxCheckinPanel
-            boxId={box.id}
-            onCheckinSuccess={(result) => onCheckinSuccess?.(result)}
-            latestPhotoId={box.box.latestPhoto?.id ?? null}
-          />
+          {addressBlock}
+          {needsBlock}
+          {hostNoteBlock}
+          {checkinBlock}
         </div>
 
-        {/* Below the fold (#667 items 9-13): the photo (or, when there's no
-            photo, the sponsor band) peeks above a bottom-edge fade when
-            collapsed — reuses #666's clip-the-wrapper-never-Drawer.Content
-            rule; BottomSheet owns `expanded`/`onRequestExpand`, this wrapper
-            just renders the CSS state. No status pill overlay here — it
-            already rendered inline above, so it isn't shown twice. */}
+        {/* Below the fold (#667 items 9-13): the photo (or the sponsor band)
+            peeks above a bottom-edge fade when collapsed. BottomSheet owns
+            `expanded`/`onRequestExpand`; no status pill overlay here — it
+            already rendered inline above. */}
         <div
           id={detailSectionId}
           onClick={!expanded ? onRequestExpand : undefined}
@@ -483,71 +549,15 @@ export default function BoxCardBody({
             "relative flex flex-col gap-3 " + (expanded ? "" : "max-h-24 overflow-hidden cursor-pointer")
           }
         >
-          {/* `inert` while collapsed (#683 review) — same reason as
-              BottomSheet's detail section: clipped controls (photo viewer,
-              sponsor form, History, email sign-up) must not be reachable by
-              Tab or a screen reader, and a tap still falls through to the
-              wrapper's expand handler. */}
+          {/* `inert` while collapsed (#683 review): clipped controls must not
+              be reachable by Tab or a screen reader, and a tap still falls
+              through to the wrapper's expand handler. */}
           <div className="contents" inert={!expanded}>
-          {box.box.latestPhoto && (
-            <BoxPhotoHero
-              photo={box.box.latestPhoto}
-              boxName={box.name}
-              locale={locale}
-              photoRadiusClassName={photoRadiusClassName}
-              open={photoViewerOpen}
-              onOpen={() => setPhotoViewerOpen(true)}
-              onClose={() => setPhotoViewerOpen(false)}
-            />
-          )}
-
-          <div className="flex flex-col gap-3 px-4">
-            <div
-              className={`-mx-4 px-4 py-2.5 text-sm ${
-                hasSponsors
-                  ? "bg-[var(--color-sage-50)] text-[var(--color-sage-700)]"
-                  : "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]"
-              }`}
-            >
-              <p>
-                {hasSponsors ? (
-                  <>
-                    {t("box.sponsor.sponsoredByPrefix", locale)}
-                    {formatSponsorNames(box.box.adopters, locale)}
-                  </>
-                ) : (
-                  t("box.sponsor.needsSponsor", locale)
-                )}
-              </p>
-              <p className="mt-0.5 text-xs">
-                {t("box.sponsor.wantToHelp", locale)}
-                <button
-                  type="button"
-                  data-tour="box-adopt"
-                  aria-expanded={adoptOpen}
-                  onClick={() => setAdoptOpen((open) => !open)}
-                  className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
-                >
-                  {t("box.adopt.linkLabel", locale)}
-                </button>
-              </p>
+            {photo()}
+            <div className="flex flex-col gap-3 px-4">
+              {sponsorBlock}
+              {footerBlock}
             </div>
-            <AdoptBoxForm boxId={box.id} open={adoptOpen} onOpenChange={setAdoptOpen} />
-
-            <div className="h-px bg-[var(--color-bone-200)]" />
-
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium">
-              {showHistoryLink && (
-                <Link
-                  href={`/box/${encodeURIComponent(box.id)}/history`}
-                  className="inline-flex min-h-[44px] items-center text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
-                >
-                  {t("box.history.link", locale)}
-                </Link>
-              )}
-              <BoxAlertSignupForm boxId={box.id} />
-            </div>
-          </div>
           </div>
 
           {!expanded && (
@@ -561,216 +571,25 @@ export default function BoxCardBody({
     );
   }
 
-  // ── Default layout — unchanged from before #667 (its photo block now ────
-  // ── renders through BoxPhotoHero, same markup). ─────────────────────────
+  // ── Default layout — desktop panel and the box history page ─────────────
+  // Photo first, full-bleed, with the status pill overlaid; no photo -> a
+  // plain inline pill instead, never a placeholder image.
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
-      {/* Photo, full-bleed, with the status pill and (when there's a photo)
-          a caption chip overlaid. No photo -> a plain inline pill instead —
-          never a placeholder image. */}
-      {box.box.latestPhoto ? (
-        <BoxPhotoHero
-          photo={box.box.latestPhoto}
-          boxName={box.name}
-          locale={locale}
-          photoRadiusClassName={photoRadiusClassName}
-          open={photoViewerOpen}
-          onOpen={() => setPhotoViewerOpen(true)}
-          onClose={() => setPhotoViewerOpen(false)}
-        >
-          <StatusPill box={box} locale={locale} overlay />
-        </BoxPhotoHero>
-      ) : (
+      {photo(<StatusPill box={box} locale={locale} overlay />) || (
         <div className="px-4 pt-3">
           <StatusPill box={box} locale={locale} overlay={false} />
         </div>
       )}
 
       <div className="flex flex-col gap-3 px-4 pb-1">
-        {/* Sponsor band — always present, one of two states, always carrying
-            the adopt-application link. */}
-        <div
-          className={`-mx-4 px-4 py-2.5 text-sm ${
-            hasSponsors
-              ? "bg-[var(--color-sage-50)] text-[var(--color-sage-700)]"
-              : "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]"
-          }`}
-        >
-          <p>
-            {hasSponsors ? (
-              <>
-                {t("box.sponsor.sponsoredByPrefix", locale)}
-                {formatSponsorNames(box.box.adopters, locale)}
-              </>
-            ) : (
-              t("box.sponsor.needsSponsor", locale)
-            )}
-          </p>
-          <p className="mt-0.5 text-xs">
-            {t("box.sponsor.wantToHelp", locale)}
-            <button
-              type="button"
-              data-tour="box-adopt"
-              aria-expanded={adoptOpen}
-              onClick={() => setAdoptOpen((open) => !open)}
-              className="inline-flex min-h-[44px] items-center font-medium underline underline-offset-2"
-            >
-              {t("box.adopt.linkLabel", locale)}
-            </button>
-          </p>
-        </div>
-        <AdoptBoxForm boxId={box.id} open={adoptOpen} onOpenChange={setAdoptOpen} />
-
-        {/* Badge + actions, then name (#515 fix pass, 2026-09-19): the name
-            used to share ONE flex row with the actions (badge+name stacked
-            in a `min-w-0` column, actions `shrink-0` beside it), which
-            capped the name's wrap width at that column's flex-computed
-            width — roughly two-thirds of the card — even though the space
-            under the actions sat empty. Splitting into two rows lets the
-            name run the card's full width; the badge stays visually
-            anchored to the same line as the actions (`items-center`) since
-            that pairing was never the problem. */}
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2">
-            <span
-              className="inline-block rounded-full px-2.5 py-1 text-[11px] font-semibold text-[var(--color-bone-50)]"
-              style={{ backgroundColor: categoryColors[box.category] }}
-            >
-              {t("category.full.blessing_box", locale)}
-            </span>
-            {/* gap-4 keeps 8px between the actions' 48px hit areas (#233). */}
-            {actions && <div className="flex shrink-0 items-center gap-4">{actions}</div>}
-          </div>
-          <NameTag
-            id={nameId}
-            className="text-xl font-normal leading-tight text-[var(--color-ink-900)]"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {box.name}
-          </NameTag>
-        </div>
-
-        {/* Address — the text itself is the directions link/trigger (mockup
-            v3, option B — Kyle's pick, no icon, no button row). See this
-            file's own header for the full walk-restore rationale.
-            `onWalkRoute` absent (BoxHistoryContent, no map on that page):
-            plain external `<a>` to Google Maps, NO preset travelmode (fix
-            pass, item 4) — many box visitors walk or ride the bus, so
-            Google Maps itself lets the person pick a mode once it opens.
-            `onWalkRoute` present (BottomSheet/DesktopVenueWindow): a
-            `<button>` that starts the SAME in-app walking route
-            DirectionButtons' own Walk button does — same style as the link
-            (underlined sage text, no icon, min-h 44px) so the card looks
-            identical either way; the visible text always stays the address
-            itself (never relabels to "Clear route" — see WalkRouteStatus's
-            own `onClearRoute` doc for why a box needs a separate clear
-            control instead of DirectionButtons' relabel-the-trigger
-            pattern). Both forms prefix the aria-label with the visible
-            address text (WCAG 2.5.3 label-in-name) — a screen-reader/
-            voice-control user saying "click <the address>" must find a
-            match inside the accessible name. */}
-        <div className="-mt-2 flex flex-col items-start">
-          {onWalkRoute ? (
-            <button
-              type="button"
-              onClick={onWalkRoute}
-              aria-describedby={showWalkLocationHint ? walkLocationHintId : undefined}
-              aria-label={`${box.address} — ${t("directions.walkAriaLabel", locale, { name: box.name })}`}
-              className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
-            >
-              {box.address}
-            </button>
-          ) : (
-            <a
-              href={googleMapsUrl(box.lat, box.lng)}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`${box.address} — ${t("directions.boxAriaLabel", locale, { name: box.name })}`}
-              className="inline-flex min-h-[44px] w-fit items-center text-sm font-medium text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
-            >
-              {box.address}
-            </a>
-          )}
-          {onWalkRoute && (
-            <WalkRouteStatus
-              venue={box}
-              locale={locale}
-              isRouteActive={isWalkRouteActive}
-              routeInfo={walkRouteInfo}
-              walkSteps={walkRouteSteps}
-              showLocationHint={showWalkLocationHint}
-              locationHintId={walkLocationHintId}
-              onClearRoute={onClearWalkRoute}
-              activeStepIndex={activeStepIndex}
-              onStepChange={onStepChange}
-            />
-          )}
-        </div>
-
-        {/* Most needed — admin-typed text wins when set; the self-filling
-            visitor-sourced list (migration 0012) only renders when it
-            isn't (see neededFromVisitors' own computation above). */}
-        {mostNeededChips.length > 0 && (
-          <div>
-            <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
-              {t("box.mostNeeded", locale)}
-            </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {mostNeededChips.map((item) => (
-                <span
-                  key={item}
-                  className="rounded-full bg-[var(--color-bone-100)] px-2.5 py-1 text-sm text-[var(--color-ink-700)]"
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-        {neededFromVisitors.length > 0 && (
-          <div>
-            <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-400)]">
-              {t("box.mostNeeded.fromVisitors", locale)}
-            </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {neededFromVisitors.map(({ key, count }) => (
-                <span
-                  key={key}
-                  className="rounded-full bg-[var(--color-bone-100)] px-2.5 py-1 text-sm text-[var(--color-ink-700)]"
-                >
-                  {t(`box.needs.${key}`, locale)} <span className="text-[var(--color-ink-400)]">· {count}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Host's public note only — no host NAME, no "Host" heading (item 4
-            of the card redesign spec: the public host name and heading are
-            removed entirely; the note, when set, is a plain quiet line). */}
-        {box.box.hostNote && <p className="text-sm text-[var(--color-ink-500)]">{box.box.hostNote}</p>}
-
-        {/* Check-in panel — status trio, took/photo row, quiet report links */}
-        <BoxCheckinPanel
-          boxId={box.id}
-          onCheckinSuccess={(result) => onCheckinSuccess?.(result)}
-          latestPhotoId={box.box.latestPhoto?.id ?? null}
-        />
-
-        <div className="h-px bg-[var(--color-bone-200)]" />
-
-        {/* Footer — ONLY History + email-me-when-it-needs-filling */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium">
-          {showHistoryLink && (
-            <Link
-              href={`/box/${encodeURIComponent(box.id)}/history`}
-              className="inline-flex min-h-[44px] items-center text-[var(--color-sage-600)] underline underline-offset-2 hover:text-[var(--color-sage-700)]"
-            >
-              {t("box.history.link", locale)}
-            </Link>
-          )}
-          <BoxAlertSignupForm boxId={box.id} />
-        </div>
+        {sponsorBlock}
+        {nameBlock}
+        {addressBlock}
+        {needsBlock}
+        {hostNoteBlock}
+        {checkinBlock}
+        {footerBlock}
       </div>
     </div>
   );

@@ -89,7 +89,7 @@ export default async function EditEventPage({
             <p className="text-sm text-[var(--color-ink-700)]">
               <span className="font-medium text-[var(--color-ink-900)]">{event.name}</span> is archived. Archiving is final, so it can&rsquo;t be edited.
             </p>
-            <Link href="/admin/events" className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2">
+            <Link href="/admin/events" className="mt-3 inline-flex min-h-12 items-center text-sm font-medium text-[var(--color-sage-700)] underline underline-offset-2">
               Back to events
             </Link>
           </div>

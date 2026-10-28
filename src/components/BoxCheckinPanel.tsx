@@ -746,7 +746,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
   }
 
   const buttonBase =
-    "min-h-[44px] px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium text-center " +
+    "min-h-12 px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium text-center " +
     "transition-colors duration-150 border border-[var(--color-bone-300)] text-[var(--color-ink-700)] bg-white " +
     "hover:bg-[var(--color-bone-100)] focus-visible:outline-none focus-visible:ring-2 " +
     "focus-visible:ring-[var(--color-sage-500)] disabled:opacity-60 disabled:cursor-not-allowed";
@@ -906,7 +906,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
             disabled={busy}
             aria-disabled={busy}
             onClick={() => handleTap("problem")}
-            className="inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
+            className="relative before:absolute before:inset-x-0 before:-inset-y-0.5 inline-flex min-h-[44px] items-center text-xs font-medium text-[var(--color-sage-700)] underline underline-offset-2 disabled:opacity-60"
           >
             {busyKind === "problem" ? t("box.checkin.submitting", locale) : t("box.checkin.problem", locale)}
           </button>
@@ -940,7 +940,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
                   disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
                   onClick={() => toggleNeed(key)}
                   className={
-                    "min-h-[44px] rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 " +
+                    "min-h-12 rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 " +
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)] " +
                     "disabled:opacity-60 disabled:cursor-not-allowed " +
                     (selected
@@ -978,7 +978,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
               aria-disabled={needsSubmitState === "submitting" || pendingSubmit?.type === "needs"}
               className={
-                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+                "min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
                 "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
               }
@@ -990,7 +990,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
             <button
               type="button"
               onClick={handleNeedsSkip}
-              className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+              className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
             >
               {t("box.needs.skip", locale)}
             </button>
@@ -1047,7 +1047,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               disabled={busy}
               aria-disabled={busy}
               className={
-                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+                "min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
                 "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
               }
@@ -1060,7 +1060,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
                 setOpenKind(null);
                 notePhoto.clear();
               }}
-              className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+              className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
             >
               {t("box.checkin.cancel", locale)}
             </button>
@@ -1083,7 +1083,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
               disabled={!standalonePhoto.blob || busy || photoSubmitState === "submitting"}
               aria-disabled={!standalonePhoto.blob || busy || photoSubmitState === "submitting"}
               className={
-                "min-h-[44px] flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
+                "min-h-12 flex-1 rounded-[var(--radius-md)] bg-[var(--color-sage-600)] text-[var(--color-bone-50)] " +
                 "text-sm font-semibold hover:bg-[var(--color-sage-700)] disabled:opacity-60 disabled:cursor-not-allowed " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-sage-500)]"
               }
@@ -1097,7 +1097,7 @@ export default function BoxCheckinPanel({ boxId, onCheckinSuccess, latestPhotoId
                 standalonePhoto.clear();
                 setPhotoSubmitState("idle");
               }}
-              className="min-h-[44px] px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
+              className="min-h-12 px-4 rounded-[var(--radius-md)] border border-[var(--color-bone-300)] text-sm font-medium text-[var(--color-ink-700)] hover:bg-[var(--color-bone-100)]"
             >
               {t("box.checkin.cancel", locale)}
             </button>

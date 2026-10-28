@@ -129,9 +129,8 @@ function triageColumns(triage: TriageResult | null | undefined, now: string, sql
 }
 
 /**
- * `sqlText` is passed in rather than imported — matches refresh-ingest.ts's
- * own deliberate non-import of seed-admin-db.ts's identical helper (see
- * that file's "SQL literal helpers" header): the caller already owns the
+ * `sqlText` is passed in rather than imported (see refresh-ingest.ts's
+ * "SQL literal helpers" header): the caller already owns the
  * one canonical `sqlText`, and passing it keeps this module free of any
  * import that could pull in a stale data-module cache.
  */

@@ -232,8 +232,7 @@ function d1Query<T>(dbMode: DbMode, sql: string): T[] {
 }
 
 /**
- * Applies a batch of SQL statements. `--local` uses `--file` — same apply
- * mechanism scripts/seed-admin-db.ts documents, and Miniflare's real
+ * Applies a batch of SQL statements. `--local` uses `--file` — Miniflare's real
  * `db.batch()` under the hood (verified in wrangler's own bundled source,
  * `executeLocally`: `splitSqlQuery` + `db.batch(queries.map(db.prepare))`).
  *
@@ -297,16 +296,14 @@ function d1ApplyFile(dbMode: DbMode, filePath: string): void {
   });
 }
 
-// ─── SQL literal helpers (deliberately NOT imported from seed-admin-db.ts) ─
-// seed-admin-db.ts's sqlText/sqlTriState are byte-identical in spirit, but
-// importing that module would also execute its own top-level
-// `import { groceryOsmVenues } from "@/data/grocery-osm"` — which, under
+// ─── SQL literal helpers (deliberately local to this script) ─────────────────
+// Kept here rather than in a shared module that imports
+// `{ groceryOsmVenues } from "@/data/grocery-osm"` at top level — which, under
 // Node's ESM module cache, would lock in whatever grocery-osm.ts contained
 // at THAT import time. This script deliberately imports grocery-osm.ts
 // dynamically, AFTER re-running the OSM scraper below, specifically so it
 // sees the freshly-regenerated file, not a stale cached copy — so nothing
-// in this file's import graph may touch that module earlier. Two tiny
-// functions duplicated is cheaper than that footgun.
+// in this file's import graph may touch that module earlier.
 
 function sqlText(value: string | null | undefined): string {
   if (value === null || value === undefined) return "NULL";

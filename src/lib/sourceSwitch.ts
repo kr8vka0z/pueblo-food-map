@@ -33,7 +33,7 @@
  * nothing about how far its readings can be trusted.
  */
 
-import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "../../scripts/refresh/diffEngine";
+import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "@/lib/venueFieldCompare";
 
 export const SWITCH_SOURCES = ["care_and_share", "website"] as const;
 export const SWITCH_FIELDS = ["address", "phone", "url", "hours_weekly", "hours_irregular"] as const;

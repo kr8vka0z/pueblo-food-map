@@ -218,10 +218,6 @@ describe("isDateOnlyUpdateProposal — shared by the client filter and the bulk-
     expect(isDateOnlyUpdateProposal({ change_type: "update", source: "link_health" }, dateOnlyDiff)).toBe(false);
   });
 
-  test("gtfs source -> false (not on the bulk-approvable allowlist)", () => {
-    expect(isDateOnlyUpdateProposal({ change_type: "update", source: "gtfs" }, dateOnlyDiff)).toBe(false);
-  });
-
   test("change_type 'add' -> false regardless of source/diff shape", () => {
     expect(isDateOnlyUpdateProposal({ change_type: "add", source: "osm" }, dateOnlyDiff)).toBe(false);
   });

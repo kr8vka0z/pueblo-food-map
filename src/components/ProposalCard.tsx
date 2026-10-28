@@ -65,7 +65,6 @@ const cardClass =
 export const SOURCE_BADGE: Record<ProposalSourceValue, { label: string; className: string }> = {
   osm: { label: "OpenStreetMap", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   plentiful: { label: "Plentiful", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
-  gtfs: { label: "GTFS", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   link_health: { label: "Broken link", className: "bg-[var(--color-clay-100)] text-[var(--color-clay-700)]" },
   care_and_share: { label: "Care and Share", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },
   website: { label: "Venue website", className: "bg-[var(--color-sage-100)] text-[var(--color-sage-700)]" },

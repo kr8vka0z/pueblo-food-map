@@ -34,6 +34,7 @@
  */
 import "../globals.css";
 import RootShell from "@/components/RootShell";
+import SpanishMessages from "@/components/SpanishMessages";
 import { ES_ROOT_METADATA, ROOT_VIEWPORT } from "@/lib/site";
 
 export const metadata = ES_ROOT_METADATA;
@@ -44,5 +45,12 @@ export default function EsRootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <RootShell lang="es">{children}</RootShell>;
+  // SpanishMessages (#723) is imported here, not in RootShell: the bundler
+  // groups client components by the server file that imports them, and
+  // RootShell's group loads on every English page too.
+  return (
+    <RootShell lang="es">
+      <SpanishMessages>{children}</SpanishMessages>
+    </RootShell>
+  );
 }

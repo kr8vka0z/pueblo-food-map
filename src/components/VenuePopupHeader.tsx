@@ -1,30 +1,16 @@
 "use client";
 
 /**
- * VenuePopupHeader — persistent chrome bar for DesktopVenueWindow (issue #64).
+ * VenuePopupHeader — the header bar of DesktopVenueWindow (issue #64).
  *
- * Always visible in both collapsed and expanded states. Same height (44px) and
- * background in both. Holds:
- *   - Visually left:  text-label toggle button ("Show details" ↔ "Hide details")
- *   - Visually right: X-close button (clears selectedVenueId)
+ * Holds the X-close (visually right) and, for a blessing box, a "History"
+ * link to /box/<id>/history (visually left). The Show/Hide details toggle
+ * that used to sit in the left slot is gone (#732): a computer always shows
+ * the full card.
  *
- * Tab order: X-close → Show/Hide details → body content.
- * The X-close is rendered first in DOM order (first in tab order); the toggle
- * follows in DOM order (second in tab order). CSS `order-*` utilities swap their
- * visual positions without touching DOM order. No positive tabIndex values are used.
- *
- * ARIA: toggle carries aria-expanded and aria-controls pointing to the popup body
- * region (id="venue-popup-body-{venueId}"), which is applied by DesktopVenueWindow.
- *
- * Keyboard: Enter/Space activate buttons (browser default for <button>).
- *
- * Blessing box variant (`historyHref`, 2026-09-18 — Kyle: "When I click show
- * details, nothing shows up"): a box card has no expand/collapse state
- * (BoxCardBody always renders everything now), so there is nothing for a
- * Show/Hide toggle to do. When `historyHref` is set, this slot renders a
- * "History" link to that URL instead — same classes, same order-1 position
- * the toggle used, so the row keeps its visual weight. `expanded`/`onToggle`
- * are unused in that branch (still required for the ordinary-venue case).
+ * Tab order: X-close → History → body content. X-close is first in DOM
+ * order; CSS `order-*` utilities swap the visual positions without touching
+ * DOM order. No positive tabIndex values are used.
  */
 
 import Link from "next/link";
@@ -33,30 +19,18 @@ import { t, type Locale } from "@/lib/i18n";
 import { PRESS_FEEDBACK } from "@/lib/interactionStyles";
 
 interface VenuePopupHeaderProps {
-  venueId: string;
-  expanded: boolean;
-  onToggle: () => void;
   onClose: () => void;
   locale?: Locale;
-  /** See this file's own header — renders a History link in place of the Show/Hide toggle for a blessing box. */
+  /** Blessing box only: the History link's URL. */
   historyHref?: string;
 }
 
 export default function VenuePopupHeader({
-  venueId,
-  expanded,
-  onToggle,
   onClose,
   locale = "en",
   historyHref,
 }: VenuePopupHeaderProps) {
-  const toggleLabel = expanded
-    ? t("detail.hideDetails", locale)
-    : t("detail.showDetails", locale);
-
-  const bodyId = `venue-popup-body-${venueId}`;
-
-  const toggleSlotClassName =
+  const historyClassName =
     "order-1 flex items-center h-8 px-3 -ml-1 rounded-md " +
     "text-xs font-medium text-[var(--color-sage-600)] " +
     "hover:text-[var(--color-sage-700)] hover:bg-[var(--color-bone-100)] transition-colors " +
@@ -91,26 +65,15 @@ export default function VenuePopupHeader({
         <X size={16} aria-hidden />
       </button>
 
-      {/* Spacer — order-2 = sits between toggle (order-1) and X-close (order-3) */}
+      {/* Spacer — order-2 = sits between History (order-1) and X-close (order-3) */}
       <div className="order-2 flex-1" />
 
-      {/* Show/Hide details toggle (ordinary venue) OR History link (blessing
-          box, no toggle state) — second in DOM = second in tab order;
-          order-1 = visually leftmost, same slot either way. */}
-      {historyHref ? (
-        <Link href={historyHref} className={toggleSlotClassName}>
+      {/* History link (blessing box) — second in DOM = second in tab order;
+          order-1 = visually leftmost. */}
+      {historyHref && (
+        <Link href={historyHref} className={historyClassName}>
           {t("box.history.link", locale)}
         </Link>
-      ) : (
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={expanded}
-          aria-controls={bodyId}
-          className={toggleSlotClassName}
-        >
-          {toggleLabel}
-        </button>
       )}
     </div>
   );

@@ -3,7 +3,7 @@
  *
  * Verifies:
  *   1. DesktopVenueWindow renders "Operated by Pueblo Food Project" (with link)
- *      when venue.operator is set — in both quick and expanded views.
+ *      when venue.operator is set.
  *   2. DesktopVenueWindow renders nothing operator-related when venue.operator
  *      is undefined (pantry, grocery, etc.)
  *   3. BottomSheet quick-summary and full-detail both render the operator line.
@@ -68,17 +68,14 @@ function makeVenue(overrides: Partial<Venue> = {}): Venue & { distanceMiles?: nu
 }
 
 /** Minimal mapboxgl.Map stub for DesktopVenueWindow position logic. */
-// ─── DesktopVenueWindow — quick view ─────────────────────────────────────────
+// ─── DesktopVenueWindow ─────────────────────────────────────────────────
 
-describe("DesktopVenueWindow — operator attribution (quick view)", () => {
+describe("DesktopVenueWindow — operator attribution", () => {
   test("shows operator line when venue.operator is set", () => {
     const venue = makeVenue({ operator: "Pueblo Food Project" });
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
@@ -92,9 +89,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
@@ -113,9 +107,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
@@ -129,9 +120,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
     render(
       <DesktopVenueWindow
         venue={venue}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="es"
       />,
@@ -139,41 +127,6 @@ describe("DesktopVenueWindow — operator attribution (quick view)", () => {
     expect(screen.getByText(/Operado por/)).toBeDefined();
     // Org name stays as-is (proper noun)
     expect(screen.getByText("Pueblo Food Project")).toBeDefined();
-  });
-});
-
-// ─── DesktopVenueWindow — expanded view ──────────────────────────────────────
-
-describe("DesktopVenueWindow — operator attribution (expanded view)", () => {
-  test("shows operator line in expanded view", () => {
-    const venue = makeVenue({ operator: "Pueblo Food Project" });
-    render(
-      <DesktopVenueWindow
-        venue={venue}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
-        onClose={vi.fn()}
-        locale="en"
-      />,
-    );
-    expect(screen.getByText(/Operated by/)).toBeDefined();
-    expect(screen.getByText("Pueblo Food Project")).toBeDefined();
-  });
-
-  test("omits operator line in expanded view when undefined (grocery)", () => {
-    const venue = makeVenue({ category: "grocery", operator: undefined });
-    render(
-      <DesktopVenueWindow
-        venue={venue}
-        expanded={true}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
-        onClose={vi.fn()}
-        locale="en"
-      />,
-    );
-    expect(screen.queryByText(/Operated by/)).toBeNull();
   });
 });
 

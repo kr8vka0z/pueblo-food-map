@@ -257,35 +257,15 @@ describe("HamburgerMenu a11y", () => {
 // ─── DesktopVenueWindow ───────────────────────────────────────────────────────
 // #682: DesktopVenueWindow no longer takes a mapboxMap prop (position is
 // owned by DesktopSidePanel now) — nothing to pass here for structural
-// rendering. Tests both collapsed and expanded states.
+// rendering. One state since #732 (always the full card).
 
 import DesktopVenueWindow from "@/components/DesktopVenueWindow";
 
 describe("DesktopVenueWindow a11y", () => {
-  test("collapsed state has no axe violations", async () => {
-    const { container } = render(
-      <DesktopVenueWindow
-        venue={makeVenue()}
-        expanded={false}
-        onExpand={() => {}}
-        onCollapse={() => {}}
-        onClose={() => {}}
-      />,
-    );
-    const results = await runAxe(container);
-    expect(
-      results.violations.length,
-      `Violations found:\n${describeViolations(results)}`,
-    ).toBe(0);
-  });
-
-  test("expanded state has no axe violations", async () => {
+  test("has no axe violations", async () => {
     const { container } = render(
       <DesktopVenueWindow
         venue={makeVenue({ accepts_snap: true, accepts_wic: true })}
-        expanded={true}
-        onExpand={() => {}}
-        onCollapse={() => {}}
         onClose={() => {}}
       />,
     );

@@ -73,9 +73,6 @@ describe("lazy box card (#721)", () => {
       <DesktopVenueWindow
         venue={BOX}
         box={BOX}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,

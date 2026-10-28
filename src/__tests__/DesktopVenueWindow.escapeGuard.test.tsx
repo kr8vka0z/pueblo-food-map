@@ -100,9 +100,6 @@ describe("DesktopVenueWindow — Escape closes only the open PhotoViewer, not th
           <DesktopVenueWindow
             venue={venue}
             box={makeBox()}
-            expanded={false}
-            onExpand={vi.fn()}
-            onCollapse={vi.fn()}
             onClose={close}
             locale="en"
           />
@@ -131,9 +128,6 @@ describe("DesktopVenueWindow — Escape closes only the open PhotoViewer, not th
           <DesktopVenueWindow
             venue={venue}
             box={makeBox()}
-            expanded={false}
-            onExpand={vi.fn()}
-            onCollapse={vi.fn()}
             onClose={close}
             locale="en"
           />

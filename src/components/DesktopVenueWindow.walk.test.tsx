@@ -90,9 +90,6 @@ describe("DesktopVenueWindow — forwards walk props into BoxCardBody", () => {
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={box}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
         walk={makeWalk({ onWalk: onWalkRoute })}
@@ -109,9 +106,6 @@ describe("DesktopVenueWindow — forwards walk props into BoxCardBody", () => {
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={makeBox()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
       />,
@@ -126,9 +120,6 @@ describe("DesktopVenueWindow — forwards walk props into BoxCardBody", () => {
       <DesktopVenueWindow
         venue={makeBoxVenue()}
         box={makeBox()}
-        expanded={false}
-        onExpand={vi.fn()}
-        onCollapse={vi.fn()}
         onClose={vi.fn()}
         locale="en"
         walk={makeWalk({ onWalk: vi.fn(), isActive: true, info: { distance: "0.4", duration: "8 min" } })}

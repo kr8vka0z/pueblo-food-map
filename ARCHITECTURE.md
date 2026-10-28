@@ -44,6 +44,10 @@ Browser
         ├── EventCardBody.tsx  (the event card, lazy; phone = inside BottomSheet,
         │     desktop = inside DesktopSidePanel via EventPanel.tsx — "Event card")
         ├── BottomSheet.tsx  (mobile: vaul bottom sheet)
+        ├── VenueCardBody.tsx  (the place card's content, one copy for both
+        │     shells — variant "sheet" in BottomSheet, "panel" in
+        │     DesktopVenueWindow, which always shows full details, #732;
+        │     a blessing box uses BoxCardBody instead)
         ├── DesktopSidePanel.tsx  (desktop: fixed right-hand panel shell —
         │     inset/size/chrome, Escape, focus-to-heading + focus-return,
         │     #682. Content is ONE of: DesktopVenueWindow (venue/box card —
@@ -512,16 +516,8 @@ Key state atoms and their roles:
 | `locationFailure` | `LocationFailure \| null` | Which message `LocationHelpCard` shows (denied / failed + reason), or null (#739) |
 | `outsideCountyVisible` | `boolean` | Toast when the position is outside Pueblo County |
 | `isPopoverOpen / activeIndex` | `boolean / number` | Typeahead popover ARIA state |
-| `windowExpanded` | `boolean` | Desktop venue window expanded state |
 | `mapboxMap` | `mapboxgl.Map \| null` | Map instance, from Map.tsx's `onMapReady` |
-| `walkingRoute` / `walkingRouteInfo` | GeoJSON / info | Active walking route (Mapbox Directions API) and its distance/time pill |
-| `walkingRouteSteps` | `WalkStep[] \| null` | Turn-by-turn steps (pre-localized via `language=`), threaded to the `WalkStepper` (#555) |
-| `walkingRouteVenueId` | `string \| null` | Venue the route targets; the Map prop is render-gated on it matching `selectedVenueId` |
-| `walkReqSeq` | `ref<number>` | Monotonic counter for in-flight walk fetches: bumped per request and per explicit clear; a result whose captured seq is stale is discarded (latest-*request*-wins, so a same-venue double tap with a moved `userLocation` is caught too). Not bumped on selection change — the render gate above covers that race |
-| `walkAwaitingVenueIdRef` | `ref<string \| null>` | Venue whose Walk tap is waiting on a just-triggered location request (#207) |
-| `walkLocationHintVenueId` | `string \| null` | Venue whose Walk tap hit a denied/failed location (#207, #738) — shows the "share your location" hint |
-| `activeStepIndex` | `number` | Turn the stepper shows — one source of truth for the phone RouteStrip, the full card and `DesktopVenueWindow`; reset on every new route, venue switch and clear |
-| `focusPoint` / `focusRequestId` | `{lng, lat} \| null` / `number` | The stepper's camera target and its own "fire again" counter (#555) — separate from `recenterRequestId` so a step tap doesn't also re-fire the user-location flyTo |
+| walking route | `useWalkingRoute` | The route (GeoJSON, distance/time, steps), the venue it targets, the stepper's turn and camera target, and the "share your location" hint (#134, #207, #555). Hands each card one `walk` object via `walkFor(id)`. Its latest-*request*-wins counter is bumped per request and per explicit clear, never on selection change (the Map prop is render-gated on the route's venue matching `selectedVenueId` instead) |
 
 **Walking directions.** `parseWalkSteps(route)` (pure, `src/lib/walkRoute.ts`) turns the
 Directions API legs into `WalkStep[]`, dropping any step with no instruction
@@ -753,8 +749,8 @@ header just above); the default (`true`, used by meta/JSON-LD) keeps it.
 - **OSM placeholder guard** (`PLACEHOLDER_ADDRESS`): a venue whose
   `address` is literally "Address not in OpenStreetMap" (an OSM import gap)
   never shows that string in the summary, `<meta description>`, or JSON-LD
-  `streetAddress` — same guard BottomSheet.tsx/DesktopVenueWindow.tsx's map
-  cards already apply (their own fallback is raw lat/lng; a sentence falls
+  `streetAddress` — same guard the map card (`VenueCardBody`'s
+  `displayAddress`) applies (their own fallback is raw lat/lng; a sentence falls
   back to the parsed city instead).
 - **`sameAs`** is emitted only when a venue's `url` is unique among
   published venues (`URL_COUNTS`, computed once at module load) — 10

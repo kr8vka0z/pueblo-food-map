@@ -279,8 +279,6 @@ export default function MapWrapper({
     mapUnavailableReason,
     handleMapError,
     showVenueOnMap,
-    windowExpanded,
-    setWindowExpanded,
     mapboxMap,
     setMapboxMap,
   } = useMapUI(initialEventId);
@@ -630,9 +628,8 @@ export default function MapWrapper({
       // clears a stale route once this fires).
       setSelectedVenueId(null);
       setSelectedEventId(null); // the panel now shows a different view (#759)
-      setWindowExpanded(false);
     },
-    [isMobile, setSelectedVenueId, setSelectedEventId, setWindowExpanded],
+    [isMobile, setSelectedVenueId, setSelectedEventId],
   );
   const handleMenuClose = useCallback(() => setMenuSection(null), []);
   // Closes whatever the desktop panel is showing (#682 8b) — Escape, the
@@ -650,8 +647,7 @@ export default function MapWrapper({
     setSidePanelView(null);
     setSelectedVenueId(null);
     setSelectedEventId(null); // the event card shares this panel (#759)
-    setWindowExpanded(false);
-  }, [setSelectedVenueId, setSelectedEventId, setWindowExpanded]);
+  }, [setSelectedVenueId, setSelectedEventId]);
 
   // "← Saved" (#682 8b) — the back-link on a venue card opened FROM the
   // Saved list. A pure navigation within the panel, not a close: the venue
@@ -683,10 +679,9 @@ export default function MapWrapper({
       setSelectedEventId(null); // one selection at a time (#758)
       if (!isMobile) {
         setSidePanelView({ kind: "venue", id, from });
-        setWindowExpanded(false);
       }
     },
-    [isMobile, setSelectedVenueId, setSelectedEventId, setWindowExpanded],
+    [isMobile, setSelectedVenueId, setSelectedEventId],
   );
 
   // ── Special events (#758) ───────────────────────────────────────────────────
@@ -2065,9 +2060,6 @@ export default function MapWrapper({
                 venue={selectedVenue}
                 box={getBoxById(sidePanelView.id)}
                 onCheckinSuccess={(result) => handleBoxCheckinSuccess(sidePanelView.id, result)}
-                expanded={windowExpanded}
-                onExpand={() => setWindowExpanded(true)}
-                onCollapse={() => setWindowExpanded(false)}
                 onClose={close}
                 eventHere={eventHereFor(sidePanelView.id)}
                 // "← Saved" (#682 8b) — a back-navigation, NOT a close: uses

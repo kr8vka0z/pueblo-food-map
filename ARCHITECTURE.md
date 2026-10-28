@@ -1120,14 +1120,20 @@ server HTML (/ and /es)
     (full page loads only: React never executes a script it renders on a
     client-side navigation)
   → MapScreenStandIn (#730) sits beside it with data-map-standin-pending: a
-    still, aria-hidden, inert copy of the search bar and bottom nav (real
-    SearchBar, BottomNav's classes from bottomNavShared.tsx), shown by
-    globals.css only when data-splash-seen is set, so a returning visitor
-    sees the map screen's frame at first paint instead of a blank page.
+    copy of the search bar and bottom nav (real SearchBar, BottomNav's
+    classes from bottomNavShared.tsx), shown by globals.css only when
+    data-splash-seen is set, so a returning visitor sees the map screen's
+    frame at first paint instead of a blank page. Its search field is a
+    plain uncontrolled <input> the visitor can type into before any script
+    runs; the filters control and nav are inert and aria-hidden.
     Once the gate resolves it becomes MapWrapper's next/dynamic `loading`
     placeholder (through a context, labels from HomeShell so the i18n
     dictionary stays out of the blocking bundle) and disappears when
-    MapWrapper mounts. Its boxes match the real ones exactly, so nothing moves.
+    MapWrapper mounts. Each takeover reads the field (readStandInSearch)
+    while rendering: the loading copy keeps the text and focus, and
+    MapWrapper seeds its query with the text and focuses the real field
+    with the caret at the end. Its boxes match the real ones exactly, so
+    nothing moves.
 
 HomePageClient.tsx layout effect resolves the gate (shouldSkipSplash(), same
 rules as the script). On client-side navigation this is the only gate: its
@@ -1160,8 +1166,9 @@ screen-reader users cannot reach the map. `<html>` carries
 `suppressHydrationWarning` (RootShell.tsx) because the script adds
 `data-splash-seen` before hydration.
 
-Residual: returning visitors still see nothing until the map chunk loads
-(the splash is hidden, and `<main>` mounts only after hydration).
+Returning visitors see MapScreenStandIn until the map chunk loads, and can
+already type a search into it. Residual: the list and the map still arrive
+with that chunk (the stand-in has no list), so the page's LCP is unchanged.
 
 ---
 

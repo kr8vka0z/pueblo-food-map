@@ -61,13 +61,19 @@ afterEach(() => {
 });
 
 describe("map-screen stand-in", () => {
-  test("server HTML: a pending, hidden-from-AT stand-in that CSS shows only when the gate script fires", () => {
+  test("server HTML: a pending stand-in, only its search field live, that CSS shows only when the gate script fires", () => {
     const host = document.createElement("div");
     host.innerHTML = renderToString(<HomePageClient standInLabels={labels} />);
     const standIn = host.querySelector("[data-map-standin]");
     expect(standIn?.hasAttribute("data-map-standin-pending")).toBe(true);
-    expect(standIn?.getAttribute("aria-hidden")).toBe("true");
-    expect(standIn?.hasAttribute("inert")).toBe(true);
+    const nav = standIn?.querySelector("[data-bottom-nav]");
+    expect(nav?.getAttribute("aria-hidden")).toBe("true");
+    expect(nav?.hasAttribute("inert")).toBe(true);
+    const filters = standIn?.querySelector('[data-testid="filters-button"]');
+    expect(filters?.hasAttribute("inert")).toBe(true);
+    const input = standIn?.querySelector("input");
+    expect(input?.getAttribute("aria-label")).toBe("Search");
+    expect(input?.closest('[inert],[aria-hidden="true"]')).toBeNull();
     // The splash is in the same HTML; this rule is what keeps a first-time
     // visitor from seeing both (the gate script sets data-splash-seen only
     // for returning visitors and shared links).

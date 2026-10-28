@@ -22,6 +22,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -30,6 +31,7 @@ import { ROUTE_STRIP_HEIGHT_PX } from "@/components/RouteStrip";
 import dynamic from "next/dynamic";
 import MapLoadingFallback from "./MapLoadingFallback";
 import SearchBar from "./SearchBar";
+import { readStandInSearch, focusAtEnd } from "./MapScreenStandIn";
 import BottomNav, { BOTTOM_NAV_HEIGHT_PX, type MenuSection } from "./BottomNav";
 import FilterPanel from "./FilterPanel";
 import BottomSheet from "./BottomSheet";
@@ -715,6 +717,11 @@ export default function MapWrapper({
   // ── Origin — user position or Pueblo center fallback ─────────────────────────
   const origin = userLocation ?? PUEBLO_CENTER;
 
+  // Takeover from the map-screen stand-in (#730): read while rendering, while
+  // the stand-in is still in the DOM (this commit removes it). Its text seeds
+  // the query; its focus moves to the real field in the layout effect below.
+  const [standInSearch] = useState(readStandInSearch);
+
   // ── Filter pipeline — extracted hook (testable independently of map render) ──
   const {
     query,
@@ -741,7 +748,7 @@ export default function MapWrapper({
     toggleCategory,
     clearFilters,
     handleClearAllFilters,
-  } = useMapFilters(origin, boxVenues);
+  } = useMapFilters(origin, boxVenues, standInSearch.value);
 
   // ── Boxes (#516) — bottom-nav shortcut for the blessing-box category filter.
   // Reuses toggleCategory directly rather than a second flag, so ticking
@@ -831,6 +838,10 @@ export default function MapWrapper({
   // entirely" (Tab past the last row, or click elsewhere) — relatedTarget
   // containment answers that; a blind timer can't.
   const searchAreaRef = useRef<HTMLDivElement>(null);
+  // Before paint, so a phone keyboard open on the stand-in's field stays up.
+  useLayoutEffect(() => {
+    if (standInSearch.focused) focusAtEnd(searchAreaRef.current?.querySelector("input"));
+  }, [standInSearch]);
 
   // ── Deep link (#132) ──────────────────────────────────────────────────────────
   // Opened with ?venue=<id> → select that venue once the map is ready to fly.

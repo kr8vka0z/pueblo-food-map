@@ -32,4 +32,36 @@ describe("Spanish loads before an English-tree visitor switches (#723)", () => {
     expect(await screen.findByText(esClient["search.placeholder"])).toBeTruthy();
     expect(document.cookie).toContain("pfm-locale=es");
   });
+
+  // Choosing English while Spanish is still downloading must win: the late
+  // download must not switch the page (or the cookie) back to Spanish.
+  test.each([
+    ["the toggle", () => undefined],
+    ["a saved Spanish cookie", () => { document.cookie = "pfm-locale=es; path=/"; }],
+  ])("a newer English choice beats a pending Spanish load (%s)", async (_, setup) => {
+    _unloadSpanishForTest();
+    document.cookie = "pfm-locale=en; path=/";
+    setup();
+    function Toggle() {
+      const { locale, setLocale } = useLocale();
+      return (
+        <>
+          <span data-testid="locale">{locale}</span>
+          <button onClick={() => setLocale("es")}>es</button>
+          <button onClick={() => setLocale("en")}>en</button>
+        </>
+      );
+    }
+    render(
+      <LocaleProvider>
+        <Toggle />
+      </LocaleProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "es" }));
+    fireEvent.click(screen.getByRole("button", { name: "en" }));
+    await loadSpanish();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.getByTestId("locale").textContent).toBe("en");
+    expect(document.cookie).toContain("pfm-locale=en");
+  });
 });

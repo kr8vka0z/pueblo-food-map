@@ -27,7 +27,7 @@
  *   samesite: Lax
  */
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { hasSpanish, loadSpanish, type Locale } from "@/lib/i18n";
 
 // ─── Cookie helpers ───────────────────────────────────────────────────────────
@@ -110,6 +110,10 @@ export function LocaleProvider({
   // that only ever changes via a full page load (crossing root layouts),
   // never a client-side re-render, so it's derived once and never updated.
   const tree = initialLocale ?? "en";
+  // Counts language choices (#723). Switching to Spanish can wait on a
+  // download; a choice made meanwhile bumps this, so the stale switch is
+  // dropped instead of landing late and overriding it.
+  const choice = useRef(0);
 
   // Sync client cookie on mount when no explicit initialLocale prop is provided (#289)
   useEffect(() => {
@@ -117,9 +121,12 @@ export function LocaleProvider({
       const saved = readLocaleCookie();
       if (saved) {
         // Spanish strings load first, so the switch never shows a fallback (#723).
+        const mine = choice.current;
         const ready = saved === "es" ? loadSpanish() : Promise.resolve();
         ready.then(
-          () => setLocaleState((prev) => (prev !== saved ? saved : prev)),
+          () => {
+            if (choice.current === mine) setLocaleState((prev) => (prev !== saved ? saved : prev));
+          },
           () => undefined, // Couldn't load (offline): stay in English.
         );
       }
@@ -127,7 +134,9 @@ export function LocaleProvider({
   }, [initialLocale]);
 
   const setLocale = useCallback((next: Locale) => {
+    const mine = ++choice.current;
     const apply = () => {
+      if (choice.current !== mine) return; // a newer choice was made meanwhile
       setLocaleState(next);
       writeLocaleCookie(next);
     };

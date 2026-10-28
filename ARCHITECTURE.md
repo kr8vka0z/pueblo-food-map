@@ -596,9 +596,28 @@ edge, so "Re-center" doesn't flicker when the dot sits on the edge.
 
 ## i18n model
 
-EN and ES dictionaries live in `src/lib/i18n.ts` as plain `Record<string, string>`
-objects. `t(key, locale, vars?)` looks up the ES dict first, falls back to EN
-if a key is missing.
+`t(key, locale, vars?)` (`src/lib/i18n.ts`) looks up the visitor's language
+and falls back to English if a key is missing. The strings are split across
+three plain `Record<string, string>` files so the browser only downloads what
+it uses (#723):
+
+- `src/lib/i18n.ts` — the English strings client components use, plus
+  `ES_ON_EVERY_PAGE`, the two Spanish strings English pages show (the splash's
+  Spanish button, the menu's "Ver en español").
+- `src/lib/i18n.es.ts` — the Spanish twins of the client strings. The browser
+  loads it only for a Spanish visitor: `SpanishMessages` (rendered by
+  `src/app/es/layout.tsx`) registers it before the `/es` tree renders, and
+  `LocaleContext`'s `setLocale("es")` / saved-cookie sync fetch it with
+  `loadSpanish()` and switch only once it has loaded.
+- `src/lib/i18n.server.ts` — strings only server code uses (email, page
+  metadata, hub pages, JSON-LD, the event page), both languages.
+
+On the server (RSC and SSR builds) and in vitest, `i18n.ts` merges all three
+at module start behind `import.meta.env.SSR || import.meta.env.MODE === "test"`,
+so server rendering is always complete in both languages; the browser build
+drops that block. `src/__tests__/i18n.test.ts` walks the `"use client"` import
+graph (`src/__tests__/helpers/clientI18nKeys.ts`) and fails if client code
+uses a key that isn't in the browser dictionaries.
 
 **Locale (the switchable client toggle) vs. tree (the route you're served
 from) are two different things** — #689 PR 2 made this split explicit.

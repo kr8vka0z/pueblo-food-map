@@ -25,14 +25,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCloudflareContext } from "@/lib/cloudflareContext";
 import { ISSUE_TYPES, type IssueTypeKey } from "@/lib/reportTypes";
-import { verifyTurnstileToken } from "@/lib/turnstile";
 import { isValidEmail } from "@/lib/email";
 import { checkFormRateLimit } from "@/lib/formRateLimit";
 import { venues } from "@/data/venues";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
+import { parsePublicPost } from "@/lib/publicRequest";
+import { sendResendEmail } from "@/lib/emailSend";
 import { insertPublicSubmission } from "@/lib/publicSubmissions";
 
 // ─── Email sender ─────────────────────────────────────────────────────────────
@@ -45,11 +45,6 @@ async function sendReportEmail(payload: {
   description: string;
   contactEmail?: string;
 }): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY not configured");
-  }
-
   const issueLabel =
     ISSUE_TYPES[payload.issueType] ?? payload.issueType;
 
@@ -70,24 +65,7 @@ async function sendReportEmail(payload: {
 
   const emailBody = lines.join("\n");
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      from: "Pueblo Food Map <noreply@pueblofoodmap.com>",
-      to: ["issues@pueblofoodmap.com"],
-      subject: `[PFM Report] ${payload.venueName} — ${issueLabel}`,
-      text: emailBody,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    throw new Error(`Resend API error ${res.status}: ${body}`);
-  }
+  await sendResendEmail({ to: "issues@pueblofoodmap.com", subject: `[PFM Report] ${payload.venueName} — ${issueLabel}`, text: emailBody });
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -145,66 +123,12 @@ function validate(body: SubmitPayload): string | null {
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // Content-Type guard
-  const ct = req.headers.get("content-type") ?? "";
-  if (!ct.includes("application/json")) {
-    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
-  }
+  // Content-Type, JSON, Turnstile, honeypot, D1 and the rate-limit secret —
+  // shared with the box routes (src/lib/publicRequest.ts).
+  const pre = await parsePublicPost<SubmitPayload>(req, "report", "managed");
+  if (pre instanceof NextResponse) return pre;
+  const { body, ip, db, rateLimitSecret } = pre;
 
-  let body: SubmitPayload;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
-  }
-
-  // IP header — used for both Turnstile remoteip and rate-limit
-  const ip =
-    req.headers.get("cf-connecting-ip") ??
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    "unknown";
-
-  // Turnstile verification — must pass before any further processing
-  // Throw instead of silently falling back to "": an empty secret makes
-  // Cloudflare's siteverify accept the always-pass test sitekey from anyone.
-  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
-  if (!turnstileSecret) {
-    throw new Error("TURNSTILE_SECRET_KEY not configured");
-  }
-  const turnstileValid = await verifyTurnstileToken(
-    body.turnstileToken,
-    turnstileSecret,
-    ip,
-  );
-  if (!turnstileValid) {
-    logFormFailure("report", "turnstile_failed");
-    return NextResponse.json(
-      { ok: false, error: "turnstile_failed" },
-      { status: 400 },
-    );
-  }
-
-  // Honeypot check — bots fill hidden fields; humans don't
-  if (body.website && body.website.trim() !== "") {
-    // Return 200 to bots so they think it worked
-    return NextResponse.json({ ok: true });
-  }
-
-  // D1-backed rate limit (#587) — fetched once here and reused below for the
-  // public_submissions write, same convention as checkins/route.ts. Fails
-  // CLOSED (503) if the Cloudflare context itself can't be resolved — same
-  // posture checkAndIncrement already takes internally on a D1 error, so a
-  // partial D1 outage can't silently let a flood through this guard.
-  let db: D1Database;
-  try {
-    ({ env: { ADMIN_DB: db } } = getCloudflareContext());
-  } catch {
-    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
-  }
-  const rateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
-  if (!rateLimitSecret) {
-    throw new Error("CHECKIN_RATE_LIMIT_SECRET not configured");
-  }
   if (!(await checkFormRateLimit(db, rateLimitSecret, "report", ip))) {
     return NextResponse.json(
       { ok: false, error: "rate_limit" },

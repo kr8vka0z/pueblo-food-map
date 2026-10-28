@@ -5,7 +5,8 @@
  *
  * Used by the three public submit routes' server-side validation
  * (report/suggest/feedback) and by the Blessing Boxes adopt/alerts/
- * host-alerts routes for their own email fields.
+ * host-alerts routes for their own email fields. EMAIL_RE is also the one
+ * copy every client form uses for its instant inline check.
  */
 
 import { FIELD_LIMITS } from "@/lib/fieldLimits";

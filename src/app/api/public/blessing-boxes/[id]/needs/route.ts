@@ -60,14 +60,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@/lib/cloudflareContext";
-import { resolveBoxTurnstileKey, verifyBoxTurnstile } from "@/lib/boxTurnstile";
 import { checkAndIncrement } from "@/lib/checkinRateLimit";
 import { computeNeedsToken, timingSafeEqualHex } from "@/lib/boxNeedsToken";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
 import { bustEdgeCache } from "@/lib/edgeCache";
 import { parseNeedsField } from "@/lib/blessingBoxes";
-import { requestIp } from "@/lib/publicRequest";
+import { parsePublicPost } from "@/lib/publicRequest";
 
 export const dynamic = "force-dynamic";
 
@@ -97,34 +96,11 @@ export async function POST(
 ): Promise<NextResponse> {
   const { id: boxId } = await params;
 
-  const ct = req.headers.get("content-type") ?? "";
-  if (!ct.includes("application/json")) {
-    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
-  }
-
-  let body: NeedsPayload;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
-  }
-
-  const ip = requestIp(req);
-
-  const turnstileKey = resolveBoxTurnstileKey(body.turnstileKey);
-  const checkinRateLimitSecret = process.env.CHECKIN_RATE_LIMIT_SECRET;
-  if (!checkinRateLimitSecret) {
-    throw new Error("CHECKIN_RATE_LIMIT_SECRET not configured");
-  }
-  const turnstileValid = await verifyBoxTurnstile(body.turnstileToken, turnstileKey, ip);
-  if (!turnstileValid) {
-    logFormFailure("checkin_needs", "turnstile_failed");
-    return NextResponse.json({ ok: false, error: "turnstile_failed" }, { status: 400 });
-  }
-
-  if (body.website && body.website.trim() !== "") {
-    return NextResponse.json({ ok: true }); // bots think it worked
-  }
+  // Content-Type, JSON, Turnstile (box key or its fallback), honeypot and
+  // the rate-limit secret — shared with the form routes (src/lib/publicRequest.ts).
+  const pre = await parsePublicPost<NeedsPayload>(req, "checkin_needs", "box", false);
+  if (pre instanceof NextResponse) return pre;
+  const { body, rateLimitSecret: checkinRateLimitSecret } = pre;
 
   // Field validation (reviewer fix pass, 2026-09-19: moved ahead of rate
   // limiting — see this file's own header for why) — shape only, no D1

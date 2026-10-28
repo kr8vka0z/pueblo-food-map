@@ -10,12 +10,14 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 
 const capture = vi.fn();
 const init = vi.fn();
+const stopSessionRecording = vi.fn();
 
 vi.mock("posthog-js", () => ({
   default: {
     init,
     capture,
     opt_out_capturing: vi.fn(),
+    stopSessionRecording,
   },
 }));
 
@@ -232,5 +234,45 @@ describe("initAnalytics — ?internal=off escape hatch", () => {
     markInternalDevice();
     await initAnalytics({ key: undefined, pathname: "/", search: "" });
     expect(isInternalDevice()).toBe(true);
+  });
+});
+
+describe("initAnalytics — moving into /admin without a reload (#861)", () => {
+  type BeforeSend = (event: { event: string }) => { event: string } | null;
+
+  beforeEach(() => {
+    init.mockClear();
+    capture.mockClear();
+    stopSessionRecording.mockClear();
+    window.localStorage.clear();
+    _resetAnalyticsStateForTest();
+    window.history.replaceState(null, "", "/");
+  });
+
+  async function startOnPublicPage(): Promise<BeforeSend> {
+    await initAnalytics({ key: "test-key", pathname: "/" });
+    const [, config] = init.mock.calls[0] as [string, { before_send: BeforeSend }];
+    return config.before_send;
+  }
+
+  test("public pages still send every event", async () => {
+    const beforeSend = await startOnPublicPage();
+    const event = { event: "$pageview" };
+    expect(beforeSend(event)).toBe(event);
+    expect(stopSessionRecording).not.toHaveBeenCalled();
+  });
+
+  test("on the move into /admin: the event is dropped, replay stops, and nothing is sent afterwards, even back on a public page", async () => {
+    const beforeSend = await startOnPublicPage();
+    window.history.pushState(null, "", "/admin/places");
+
+    expect(beforeSend({ event: "$pageview" })).toBeNull();
+    expect(stopSessionRecording).toHaveBeenCalledTimes(1);
+    expect(beforeSend({ event: "$snapshot" })).toBeNull();
+    await track(EVENTS.VENUE_OPENED, { venue_id: "abc" });
+    expect(capture).not.toHaveBeenCalled();
+
+    window.history.pushState(null, "", "/");
+    expect(beforeSend({ event: "$pageview" })).toBeNull();
   });
 });

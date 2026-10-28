@@ -255,7 +255,9 @@ chunked-write gotchas: AGENTS.md "Automated venue-refresh pipeline".
   already-`approved` proposal row with `applied_at` NULL (kept because
   `refreshAlerts.ts`'s staleness check reads it); no `venues` or `audit_log`
   write. `last_verified` now moves only when a person approves a real change
-  or edits the venue. It uses the
+  or edits the venue; an approve stamps the approval date (Denver), never the
+  card's own older date, and the stale check ignores the card's stamp (#866).
+  It uses the
   same `isDateOnlyUpdateProposal()` predicate as the Places tab's
   `ToReviewSummaryBox`'s bulk-approve (`src/lib/adminProposals.ts` — #674
   folded the standalone `/admin/flags` queue that used to own this button

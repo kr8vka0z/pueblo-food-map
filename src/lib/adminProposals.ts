@@ -30,6 +30,7 @@
 import type { AdminVenueRow, AdminVenueSourceType, Venue } from "@/types/venue";
 import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "@/lib/venueFieldCompare";
 import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
+import { localYmd } from "@/lib/activityLog";
 
 // ─── Row + parsed-diff shapes ───────────────────────────────────────────────
 
@@ -297,7 +298,11 @@ export function checkStaleApply(
         return { stale: true, reason: "This venue no longer exists or was already removed from the map." };
       }
       const before = (diff.before ?? {}) as Partial<Venue>;
-      for (const field of diff.fields_changed) {
+      // #866: every card carries the last_verified stamp, so checking it
+      // would stale every older card once the venue is verified again. Only
+      // a date-only card, which asserts nothing else, still checks it.
+      const others = diff.fields_changed.filter((f) => f !== "last_verified");
+      for (const field of others.length > 0 ? others : diff.fields_changed) {
         const key = field as keyof Venue;
         const beforeValue = currentFieldValue(before as unknown as CurrentVenueRow, key);
         const nowValue = currentFieldValue(currentRow, key);
@@ -496,7 +501,10 @@ export async function applyApprovedProposal(
   }
 
   const timestamp = new Date().toISOString();
-  const after = diff.after ?? {};
+  // #866: a human approve is the check, so last_verified is today's Denver
+  // date, never the card's older stamp (that could move it backward).
+  const approvedOn = localYmd(timestamp);
+  const after: Partial<Venue> = { ...diff.after, last_verified: approvedOn };
 
   // D1PreparedStatement isn't among cloudflare-env.d.ts's narrow runtime
   // imports (see that file's own header for why this project avoids a bare
@@ -509,10 +517,16 @@ export async function applyApprovedProposal(
 
   if (changeType === "remove") {
     const existing = currentRow!;
-    const afterRow: AdminVenueRow = { ...existing, status: "archived", updated_by: identity.email, updated_at: timestamp };
+    const afterRow: AdminVenueRow = {
+      ...existing,
+      status: "archived",
+      last_verified: approvedOn,
+      updated_by: identity.email,
+      updated_at: timestamp,
+    };
     venueStmt = db
-      .prepare("UPDATE venues SET status = 'archived', updated_by = ?, updated_at = ? WHERE id = ?")
-      .bind(identity.email, timestamp, proposalRow.target_venue_id);
+      .prepare("UPDATE venues SET status = 'archived', last_verified = ?, updated_by = ?, updated_at = ? WHERE id = ?")
+      .bind(afterRow.last_verified, identity.email, timestamp, proposalRow.target_venue_id);
     auditAction = "archive";
     beforeJson = JSON.stringify(existing);
     afterRowForAudit = afterRow;

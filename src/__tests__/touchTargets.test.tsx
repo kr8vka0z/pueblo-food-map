@@ -415,6 +415,13 @@ describe("44px leftovers reach the 48px floor (#827)", () => {
       ["relative", "before:absolute", "before:inset-x-0", "before:-top-1.5", "before:-bottom-2.5"],
     ],
     [
+      // Those overlays reach into the body; the bar's own layer keeps a
+      // positioned body element (a box photo) from covering them.
+      "desktop card header bar",
+      () => (render(<VenuePopupHeader onClose={vi.fn()} />), screen.getByRole("button", { name: "Close" }).parentElement!),
+      ["relative", "z-10"],
+    ],
+    [
       "location help card close",
       () => (
         render(<LocationHelpCard failure={{ permission: "denied", position: null }} onRetry={vi.fn()} onShowList={vi.fn()} onDismiss={vi.fn()} />),

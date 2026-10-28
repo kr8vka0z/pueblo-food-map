@@ -44,7 +44,10 @@ export default function VenuePopupHeader({
   return (
     <div
       className={
-        "flex items-center gap-2 px-3 shrink-0 " +
+        // relative z-10: the Close/History hit areas reach 4px into the body
+        // below; without a layer of their own, a positioned element there
+        // (BoxPhotoHero's wrapper) paints over them and takes the tap.
+        "relative z-10 flex items-center gap-2 px-3 shrink-0 " +
         "h-11 border-b border-[var(--color-bone-200)] " +
         "bg-[var(--color-bone-50)]"
       }

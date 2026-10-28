@@ -212,6 +212,7 @@ const en: Record<string, string> = {
   // Donate card (#736). Never "sponsor" here: on this site that word means
   // adopting a blessing box. No tax claim; PFP's own page covers that.
   "menu.donate": "Donate",
+  "menu.roadmap": "Roadmap",
   "menu.donateSub": "Supports this map and Pueblo Food Project's other work",
   // Agency credit (StyxCredit.tsx) — followed by the linked name "The Styx Group".
   "credit.builtBy": "Designed, built and managed by",
@@ -594,6 +595,7 @@ const en: Record<string, string> = {
   "footer.about": "About",
   "footer.privacy": "Privacy",
   "footer.suggest": "Suggest a place",
+  "footer.roadmap": "Roadmap",
   // SEO/AEO plan Phase 0: the footer is how crawlers reach /venues (and from
   // there every venue page) — before this, no page's server HTML linked it.
   "footer.venues": "All places",
@@ -1386,6 +1388,7 @@ const es: Record<string, string> = {
   "menu.suggest": "Sugerir un lugar",
   "menu.sponsoredBy": "Patrocinado por",
   "menu.donate": "Donar",
+  "menu.roadmap": "Ideas y novedades",
   "menu.donateSub": "Apoya este mapa y otros proyectos de Pueblo Food Project",
   "credit.builtBy": "Diseñado, creado y administrado por",
   "menu.showWelcome": "Mostrar pantalla de bienvenida",
@@ -1704,6 +1707,7 @@ const es: Record<string, string> = {
   "footer.about": "Acerca de",
   "footer.privacy": "Privacidad",
   "footer.suggest": "Sugerir un lugar",
+  "footer.roadmap": "Ideas y novedades",
   "footer.venues": "Todos los lugares", // [CHECK]
   "footer.resources": "Programas de ayuda alimentaria",
   "breadcrumb.label": "Ruta de navegación", // [CHECK]

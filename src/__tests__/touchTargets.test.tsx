@@ -239,7 +239,7 @@ describe("SiteFooter (#711)", () => {
   test("every nav link and the OSM credit are at least 48×48, with 8px between rows", () => {
     const { container } = render(<SiteFooter />);
     const links = screen.getAllByRole("link").filter((a) => a.textContent !== "The Styx Group");
-    expect(links.length).toBe(11);
+    expect(links.length).toBe(12);
     for (const a of links) expect(classes(a)).toEqual(expect.arrayContaining(["min-h-12", "min-w-12"]));
     expect(classes(container.querySelector("footer > div"))).toContain("gap-y-2");
   });

@@ -30,6 +30,7 @@ import {
   clearInternalDeviceFlag,
   INTERNAL_DEVICE_STORAGE_KEY,
   SESSION_REPLAY_SAMPLE_RATE,
+  REPLAY_BLOCK_SELECTOR,
   _resetAnalyticsStateForTest,
 } from "@/lib/analytics";
 
@@ -160,6 +161,7 @@ describe("initAnalytics — init options (session replay, masking)", () => {
         session_recording: expect.objectContaining({
           maskAllInputs: true,
           sampleRate: SESSION_REPLAY_SAMPLE_RATE,
+          blockSelector: REPLAY_BLOCK_SELECTOR,
         }),
       }),
     );

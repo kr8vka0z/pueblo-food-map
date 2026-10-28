@@ -6,7 +6,7 @@
  * export route handlers. See the route file's header for the concurrency design.
  */
 
-import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "../../scripts/refresh/diffEngine";
+import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "@/lib/venueFieldCompare";
 import type { Venue } from "@/types/venue";
 
 // Every editable column except `status` (see file header for why status is

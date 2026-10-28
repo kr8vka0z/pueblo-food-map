@@ -16,7 +16,7 @@
  * catch with plain fixtures here; neither is cheap to catch by reading
  * production D1 after the fact.
  *
- * WHY this reuses diffEngine.ts's own currentFieldValue()/valuesEqual()
+ * WHY this reuses venueFieldCompare.ts's currentFieldValue()/valuesEqual()
  * rather than re-deriving field equality: the stale-apply guard (§6.10c,
  * docs/admin/cloudflare-native-admin-spec.md) exists specifically to
  * re-check a proposal's `before` snapshot against a fresh D1 read using the
@@ -28,7 +28,7 @@
  */
 
 import type { AdminVenueRow, AdminVenueSourceType, Venue } from "@/types/venue";
-import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "../../scripts/refresh/diffEngine";
+import { currentFieldValue, valuesEqual, type CurrentVenueRow } from "@/lib/venueFieldCompare";
 import { AUDIT_INSERT_VALUES_SQL } from "@/lib/auditLog";
 
 // ─── Row + parsed-diff shapes ───────────────────────────────────────────────

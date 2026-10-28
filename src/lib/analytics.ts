@@ -179,12 +179,19 @@ export type InitAnalyticsOptions = {
 };
 
 /**
- * Session replay sample rate — 1.0 (every session) for now. Named so a
- * future dial-down doesn't require re-reading posthog-js docs to find the
- * right field again (Kyle, 2026-09-26: reversed the issue's original
- * "replay OFF" decision after seeing the #681 dashboard mockup).
+ * Session replay sample rate: 0.2 records one visit in five (#722). Recording
+ * every visit cost CPU and data on the audience's phones; one in five still
+ * gives the #681 dashboard plenty to watch. Kyle can change the number here.
  */
-export const SESSION_REPLAY_SAMPLE_RATE = 1.0;
+export const SESSION_REPLAY_SAMPLE_RATE = 0.2;
+
+/**
+ * Never recorded by replay (#722): the map container mapbox-gl marks with
+ * this class, which holds the canvas, every pin and the map popups. The
+ * recorder otherwise re-records ~130 pins on every pan frame. Replay shows a
+ * blank box of the same size; autocapture and the named events still fire.
+ */
+export const REPLAY_BLOCK_SELECTOR = ".mapboxgl-map";
 
 /**
  * Loads and initializes posthog-js, or does nothing at all (no import, no
@@ -261,6 +268,7 @@ export async function initAnalytics(options: InitAnalyticsOptions = {}): Promise
       // number shown on the page), a different surface from input values.
       maskAllInputs: true,
       sampleRate: SESSION_REPLAY_SAMPLE_RATE,
+      blockSelector: REPLAY_BLOCK_SELECTOR,
     },
   });
   client = posthog;

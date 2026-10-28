@@ -28,6 +28,7 @@ import { isValidEmail } from "@/lib/email";
 import { checkFormRateLimit } from "@/lib/formRateLimit";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
+import { sendResendEmail } from "@/lib/emailSend";
 
 /** Strip CR and LF from a string to prevent header/subject line injection. */
 function stripLineBreaks(s: string): string {
@@ -41,11 +42,6 @@ async function sendFeedbackEmail(payload: {
   message: string;
   contactEmail: string;
 }): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY not configured");
-  }
-
   const typeLabel =
     FEEDBACK_TYPES[payload.feedbackType] ?? payload.feedbackType;
 
@@ -61,24 +57,7 @@ async function sendFeedbackEmail(payload: {
 
   const emailBody = lines.join("\n");
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      from: "Pueblo Food Map <noreply@pueblofoodmap.com>",
-      to: ["feedback@pueblofoodmap.com"],
-      subject: `[PFM Feedback] ${typeLabel}`,
-      text: emailBody,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    throw new Error(`Resend API error ${res.status}: ${body}`);
-  }
+  await sendResendEmail({ to: "feedback@pueblofoodmap.com", subject: `[PFM Feedback] ${typeLabel}`, text: emailBody });
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────

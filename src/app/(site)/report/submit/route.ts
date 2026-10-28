@@ -33,6 +33,7 @@ import { checkFormRateLimit } from "@/lib/formRateLimit";
 import { venues } from "@/data/venues";
 import { FIELD_LIMITS } from "@/lib/fieldLimits";
 import { logFormFailure } from "@/lib/logger";
+import { sendResendEmail } from "@/lib/emailSend";
 import { insertPublicSubmission } from "@/lib/publicSubmissions";
 
 // ─── Email sender ─────────────────────────────────────────────────────────────
@@ -45,11 +46,6 @@ async function sendReportEmail(payload: {
   description: string;
   contactEmail?: string;
 }): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY not configured");
-  }
-
   const issueLabel =
     ISSUE_TYPES[payload.issueType] ?? payload.issueType;
 
@@ -70,24 +66,7 @@ async function sendReportEmail(payload: {
 
   const emailBody = lines.join("\n");
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      from: "Pueblo Food Map <noreply@pueblofoodmap.com>",
-      to: ["issues@pueblofoodmap.com"],
-      subject: `[PFM Report] ${payload.venueName} — ${issueLabel}`,
-      text: emailBody,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    throw new Error(`Resend API error ${res.status}: ${body}`);
-  }
+  await sendResendEmail({ to: "issues@pueblofoodmap.com", subject: `[PFM Report] ${payload.venueName} — ${issueLabel}`, text: emailBody });
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────

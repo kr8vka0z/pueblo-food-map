@@ -177,7 +177,7 @@ export default function DesktopVenueWindow({
       {/* Body. Box branch at a stable tree position so BoxCardBody (and a
           half-typed check-in note) never remounts. */}
       {isBox ? (
-        <div className="flex flex-col flex-1 overflow-hidden">{boxBody}</div>
+        boxBody
       ) : (
         <div className="flex-1 overflow-y-auto">
           <VenueCardBody
